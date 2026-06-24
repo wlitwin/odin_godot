@@ -1,0 +1,128 @@
+package {0:s}
+
+import gd "{1:s}gdextension"
+import var "{1:s}variant"
+import "core:strings"
+import "core:fmt"
+
+@(private="file")
+__{2:s}__Class__StringName: var.StringName
+
+@(private="file")
+__{2:s}__Parent__StringName: var.StringName
+
+@(private="file")
+__{2:s}__Empty__StringName: var.StringName
+
+init_{4:s}_bindings :: proc() {{
+    using gd
+    __{2:s}__Class__StringName = var.new_string_name_cstring("{2:s}")
+    __{2:s}__Parent__StringName = var.new_string_name_cstring("{3:s}")
+    __{2:s}__Empty__StringName = var.new_string_name_cstring("Object")
+    class_info := ExtensionClassCreationInfo {{
+        is_virtual               = false,
+        is_abstract              = false,
+        set_func                 = {6:s},
+        get_func                 = {7:s},
+        get_property_list_func   = {8:s},
+        free_property_list_func  = {9:s},
+        property_can_revert_func = {10:s},
+        property_get_revert_func = {11:s},
+        notification_func        = {12:s},
+        to_string_func           = {4:s}_to_string_bind,
+        reference_func           = nil,
+        unreference_func         = nil,
+        create_instance_func     = {4:s}_create,
+        free_instance_func       = {4:s}_free,
+        get_virtual_func         = gd.class_db_get_virtual_func,
+        get_rid_func             = nil,
+        class_user_data          = &__{2:s}__Class__StringName,
+    }}
+    gd.interface.classdb_register_extension_class(gd.library, cast(StringNamePtr)&__{2:s}__Class__StringName._opaque, cast(StringNamePtr)&__{2:s}__Parent__StringName._opaque, &class_info)
+}}
+
+{4:s}_set_bind :: proc "c" (instance: gd.ExtensionClassInstancePtr, name: gd.StringNamePtr, value: gd.VariantPtr) -> bool {{
+    return false
+}}
+
+{4:s}_get_bind :: proc "c" (instance: gd.ExtensionClassInstancePtr, name: gd.StringNamePtr, ret: gd.VariantPtr) -> bool {{
+    return false
+}}
+
+{4:s}_get_property_list_bind :: proc "c" (instance: gd.ExtensionClassInstancePtr, count: ^u32) -> [^]gd.PropertyInfo {{
+    if count != nil {{
+        count^ = 0
+    }}
+    return nil
+}}
+
+{4:s}_free_property_list_bind :: proc "c" (instance: gd.ExtensionClassInstancePtr, list: ^gd.PropertyInfo) {{
+    
+}}
+
+{4:s}_property_can_revert_bind :: proc "c" (instance: gd.ExtensionClassInstancePtr, name: gd.StringNamePtr) -> bool {{
+    return false
+}}
+
+{4:s}_property_get_revert_bind :: proc "c" (instance: gd.ExtensionClassInstancePtr, name: gd.StringNamePtr, ret: gd.VariantPtr) -> bool {{
+    return false
+}}
+
+{4:s}_notification_bind :: proc "c" (instance: gd.ExtensionClassInstancePtr, what: i32) {{
+    // override _notification to provide your own implementation
+}}
+
+{4:s}_to_string_bind :: proc "c" (instance: gd.ExtensionClassInstancePtr, is_valid: ^bool, out: gd.StringPtr) {{
+    out^ = var.new_string_cstring("[{2:s}:0]")
+    is_valid^ = true
+}}
+
+{4:s}_create :: proc "c" (data: rawptr) -> gd.ObjectPtr {{
+    context = gd.godot_context()
+
+    instance := new({2:s})
+    // TODO: {4:s}_init(instance)
+    instance._owner = gd.interface.classdb_construct_object(cast(gd.StringNamePtr)&__{2:s}__Empty__StringName._opaque)
+    __{2:s}__post_initialization(instance)
+
+    return instance._owner
+}}
+
+{4:s}_free :: proc "c" (data: rawptr, ptr: gd.ExtensionClassInstancePtr) {{
+    if data == nil {{
+        return
+    }}
+
+    context = gd.godot_context()
+
+    instance := cast(^{5:s})ptr
+    // TODO: {4:s}_destroy(instance)
+    free(instance)
+}}
+
+@(private="file")
+__{2:s}__post_initialization :: proc(self: ^{5:s}) {{
+    gd.interface.object_set_instance(self._owner, cast(gd.StringNamePtr)&__{2:s}__Class__StringName._opaque, cast(gd.ExtensionClassInstancePtr)self)
+    gd.interface.object_set_instance_binding(self._owner, gd.library, self, &__{2:s}__BindingCallbacks)
+}}
+
+@(private="file")
+__{2:s}__BindingCallbacks := gd.InstanceBindingCallbacks {{
+    __{2:s}__create_callback,
+    __{2:s}__free_callback,
+    __{2:s}__reference_callback,
+}}
+
+@(private="file")
+__{2:s}__create_callback :: proc "c" (token: rawptr, instance: rawptr) -> rawptr {{
+    return nil
+}}
+
+@(private="file")
+__{2:s}__free_callback :: proc "c" (token: rawptr, instance: rawptr, binding: rawptr) {{
+}}
+
+@(private="file")
+__{2:s}__reference_callback :: proc "c" (token: rawptr, instance: rawptr, reference: bool) -> bool {{
+    return true
+}}

@@ -1,0 +1,30 @@
+{
+    "$schema": "https://raw.githubusercontent.com/DanielGavin/ols/master/misc/ols.schema.json",
+    "collections": [
+        {
+            "name": "base",
+            "path": "C:\\Odin\\base"
+        },
+        {
+            "name": "core",
+            "path": "C:\\Odin\\core"
+        },
+        {
+            "name": "shared",
+            "path": "C:\\Odin\\shared"
+        },
+        {
+            "name": "vendor",
+            "path": "C:\\Odin\\vendor"
+        },
+        {
+            "name": "godot",
+            "path": "."
+        }
+    ],
+    "enable_document_symbols": true,
+    "enable_semantic_tokens": true,
+    "enable_hover": true,
+    "enable_snippets": true,
+    "checker_args": "-vet -strict-style -no-entry-point -define:REAL_PRECISION=single"
+}

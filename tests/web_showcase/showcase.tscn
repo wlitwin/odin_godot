@@ -1,0 +1,55 @@
+[gd_scene format=3 uid="uid://bonuivhpgow61"]
+
+[ext_resource type="Script" uid="uid://bus02qh4c275m" path="res://scripts/player.odin" id="1_player"]
+[ext_resource type="Script" uid="uid://c44ljgakiop7n" path="res://scripts/coin.odin" id="2_coin"]
+[ext_resource type="Script" uid="uid://cjm85047l5ak7" path="res://scripts/hud.odin" id="3_hud"]
+
+[sub_resource type="RectangleShape2D" id="shape_player"]
+size = Vector2(32, 32)
+
+[sub_resource type="CircleShape2D" id="shape_coin"]
+radius = 16.0
+
+[node name="Showcase" type="Node2D" unique_id=1733848482]
+
+[node name="Player" type="CharacterBody2D" parent="." unique_id=335097970]
+position = Vector2(40, 100)
+script = ExtResource("1_player")
+speed = 500.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Player" unique_id=1122181242]
+shape = SubResource("shape_player")
+
+[node name="Body" type="Polygon2D" parent="Player" unique_id=1107207323]
+color = Color(0.3, 0.6, 1, 1)
+polygon = PackedVector2Array(-16, -16, 16, -16, 16, 16, -16, 16)
+
+[node name="Coin1" type="Area2D" parent="." unique_id=46711468]
+position = Vector2(200, 100)
+script = ExtResource("2_coin")
+value = 5
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Coin1" unique_id=761815991]
+shape = SubResource("shape_coin")
+
+[node name="Sprite" type="Polygon2D" parent="Coin1" unique_id=1587253090]
+color = Color(1, 0.84, 0, 1)
+polygon = PackedVector2Array(0, -12, 12, 0, 0, 12, -12, 0)
+
+[node name="Coin2" type="Area2D" parent="." unique_id=1443010371]
+position = Vector2(360, 100)
+script = ExtResource("2_coin")
+value = 10
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Coin2" unique_id=1365294956]
+shape = SubResource("shape_coin")
+
+[node name="Sprite" type="Polygon2D" parent="Coin2" unique_id=1173135497]
+color = Color(1, 0.84, 0, 1)
+polygon = PackedVector2Array(0, -12, 12, 0, 0, 12, -12, 0)
+
+[node name="Hud" type="Label" parent="." unique_id=352033491]
+offset_left = 10.0
+offset_top = 10.0
+text = "Score: 0"
+script = ExtResource("3_hud")

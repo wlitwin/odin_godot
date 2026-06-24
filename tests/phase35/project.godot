@@ -1,0 +1,8 @@
+config_version=5
+
+[application]
+
+config/name="OdinGodotPhase35"
+config/features=PackedStringArray("4.6")
+
+[headless]

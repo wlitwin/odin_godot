@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://b1odineditortools01"]
+
+[ext_resource type="Script" path="res://addons/odinplugin/tool_widget.odin" id="1_tool"]
+
+[node name="Main" type="Node"]
+
+[node name="ToolWidget" type="Node" parent="."]
+script = ExtResource("1_tool")

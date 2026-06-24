@@ -1,0 +1,18 @@
+; Engine configuration file.
+; OdinGodot autoload test project.
+;
+; The [autoload] section below is the GDScript-parity Odin autoload story: the leading `*`
+; makes `game_manager.odin` a singleton NODE added under /root at startup, accessible from
+; GDScript as `GameManager` / `/root/GameManager` and persistent across scene changes.
+
+config_version=5
+
+[application]
+
+config/name="OdinGodotAutoload"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.6")
+
+[autoload]
+
+GameManager="*res://scripts/game_manager.odin"

@@ -1,0 +1,18 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/bullet.odin" id="1_bullet"]
+
+[sub_resource type="CircleShape2D" id="shape_bullet"]
+radius = 4.0
+
+[node name="Bullet" type="Area2D"]
+script = ExtResource("1_bullet")
+damage = 3
+speed = 460.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("shape_bullet")
+
+[node name="Body" type="Polygon2D" parent="."]
+color = Color(1, 0.95, 0.4, 1)
+polygon = PackedVector2Array(-4, -4, 4, -4, 4, 4, -4, 4)

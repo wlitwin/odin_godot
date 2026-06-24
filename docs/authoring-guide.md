@@ -1,0 +1,754 @@
+# Authoring guide — the Odin script feature reference
+
+This is the complete reference for writing Odin scripts: the struct convention, the `//gd:`
+markers, every `@export` form, lifecycle, methods, signals, resources, autoloads,
+cross-script access, the `gd.*` helper catalog, and editor tooling. New to odin_godot? Read
+**[Getting Started](getting-started.md)** first for setup and a hello-world; this page is the
+deep dive. For the build/edit/debug loop, see **[Workflow](workflow.md)**.
+
+You write `<name>.odin` in the clean authoring form below; a preprocessor (`scriptgen`, run
+by `build/build_scripts.sh`) reads its struct tags + markers and *auto-emits* a sibling
+`<name>.gen.odin` (the registration boilerplate — Variant trampolines, backing arrays,
+`@(init)` registration) that you never edit. Both compile together into the scripts dll, so
+you author the nice form and get the full typed dispatch for free.
+
+### Single-file authoring
+
+There is exactly **one file per script**: the `.odin` you write is also the resource
+you attach to a node. Put your scripts under the project (e.g. `res://scripts/foo.odin`)
+and attach `res://scripts/foo.odin` directly in the scene — the loader reads its
+`//gd:class` marker and binds it to the compiled class. The sibling `<name>.gen.odin`
+is a build artifact that lives beside the source; the loader deliberately **ignores
+`*.gen.odin`** so it is never treated as an attachable script. There is no separate
+"resource stub" file to keep in sync.
+
+## Anatomy of a script
+
+```odin
+//gd:extends Node          // base Godot class (authoritative). Defaults to Node.
+//gd:class Ping            // optional class-name override (defaults to struct name)
+//gd:signal pinged(value: int)   // a declared signal + its typed payload
+//gd:tool                  // optional: registers as a @tool script
+package my_scripts
+
+import gd "godot:godot"
+
+// The script struct. The FIRST field MUST be the owner Object handle (the core
+// writes the owner pointer there at offset 0). Its type is just the handle you
+// want to use in your procs (gd.Node, gd.Object, gd.Node2d, ...). The actual base
+// class comes from //gd:extends.
+Ping :: struct {
+	owner: gd.Node,
+	speed: f32    `gd:"export"`,  // tagged field -> @export var
+	count: gd.Int `gd:"export"`,
+	scratch: int,                 // untagged -> private per-instance state
+}
+
+// Lifecycle procs: matched by name (after stripping an optional `<struct>_`
+// prefix) against ready / process / physics_process / enter_tree / exit_tree, and
+// bound by the `^Ping` receiver. Write a plain Odin proc; codegen wraps it.
+ping_ready :: proc(self: ^Ping) {
+	if self.speed == 0 {self.speed = 1.5}
+}
+
+// Custom methods: tag with @(gd_method). Callable from GDScript. The exposed name
+// is the proc name minus the `<struct>_` prefix (`ping_add` -> `add`). Codegen
+// generates the Variant trampoline from the typed signature.
+@(gd_method)
+ping_add :: proc(self: ^Ping, a, b: int) -> int {return a + b}
+
+@(gd_method)
+ping_emit_ping :: proc(self: ^Ping, value: int) {
+	self.count += gd.Int(value)
+	ping_emit_pinged(self, i64(value))   // generated emit helper (see below)
+}
+```
+
+### Markers (`//gd:` comments)
+
+| Marker | Meaning |
+| --- | --- |
+| `//gd:extends <Class>` | The Godot base class. Authoritative; defaults to `Node`. |
+| `//gd:class <Name>` | Class name override. Defaults to the struct name. |
+| `//gd:tool` | Registers the class as a `@tool` script (`is_tool() == true`) — runs in the editor. |
+| `//gd:icon res://path.svg` | Custom class icon (Scene dock, Create Node/Resource dialog). |
+| `//gd:signal name(a: T, b: U)` | Declares a signal and its typed payload. |
+
+These are the marker comments the engine's resource loader reads to bind the
+authored `res://scripts/<x>.odin` resource (the same file you compile) to its
+compiled class, so the convention is uniform.
+
+### Exports
+
+Struct fields tagged `` `gd:"export"` `` become `@export` vars: the field name is
+the property name, the field type maps to a Variant type. `offset`/`size` are
+derived with `offset_of` / `size_of`, so the core narrows native Variant widths
+(Int=i64, Float=f64) to your field's real width (e.g. `f32`).
+
+**Supported field types** — the FULL Godot Variant set. Use the `gd.<Type>` binding
+type (or, for the scalar atoms, the bare Odin scalar, which is width-narrowed):
+
+| Category | Field types |
+| --- | --- |
+| Scalars | `bool`; `i8`/`i16`/`i32`/`i64`/`int`/`u8`/`u16`/`u32`/`u64`/`uint`/`gd.Int`; `f32`/`f64`/`gd.Float` |
+| Strings | `gd.String`, `gd.String_Name`, `gd.Node_Path` |
+| Math | `gd.Vector2`/`Vector2i`, `gd.Rect2`/`Rect2i`, `gd.Vector3`/`Vector3i`, `gd.Vector4`/`Vector4i`, `gd.Transform2d`/`Transform3d`, `gd.Plane`, `gd.Quaternion`, `gd.Aabb`, `gd.Basis`, `gd.Projection`, `gd.Color` |
+| Containers | `gd.Dictionary`, `gd.Array`, and every `gd.Packed_*_Array` (`Byte`, `Int32`, `Int64`, `Float32`, `Float64`, `String`, `Vector2`, `Vector3`, `Vector4`, `Color`) |
+| Handles | `gd.Object` and any object/class handle (`gd.Node2d`, `gd.Texture2D`, …) or a pointer to one (`^gd.Node2d`); `gd.Rid` |
+
+Note: `gd.Callable`/`gd.Signal`/`gd.Rid` map to their Variant types but are not
+meaningfully editable in the Inspector (Godot itself doesn't expose them as exports);
+prefer them only for cross-script data, not for editor-tunable values. An unrecognized
+field type is a hard `scriptgen: error:` (so a typo is never silently an `Object`).
+
+**Export hints.** Extend the tag with one comma-separated hint spec —
+`` `gd:"export,SPEC"` ``. Top-level tokens are comma-separated; values WITHIN a spec
+are colon-separated (so a file filter's commas never collide) and are rewritten to
+Godot's comma-joined `hint_string` form:
+
+| Tag | Inspector widget | Godot hint / hint_string |
+| --- | --- | --- |
+| `gd:"export,range=0:100"` | numeric slider | `Range` / `"0,100"` |
+| `gd:"export,range=0:100:5"` | slider with step | `Range` / `"0,100,5"` |
+| `gd:"export,enum=Idle:Walk:Run"` | named-int dropdown | `Enum` / `"Idle,Walk,Run"` |
+| `gd:"export,multiline"` | multi-line text box | `Multiline_Text` |
+| `gd:"export,file"` | file picker (any) | `File` / `""` |
+| `gd:"export,file=*.png:*.jpg"` | filtered file picker | `File` / `"*.png,*.jpg"` |
+| `gd:"export,dir"` | directory picker | `Dir` |
+| `gd:"export,global_file"` / `global_dir` | global file/dir picker | `Global_File` / `Global_Dir` |
+| `gd:"export,resource=Texture2D"` | typed resource picker | `Resource_Type` / `"Texture2D"` |
+
+`resource=` is for an `Object`/resource-handle field; `range`/`enum` for an int or
+float; `multiline` for a `gd.String`. At most one hint per field. Example:
+
+```odin
+Probe :: struct {
+	owner:       gd.Node,
+	health:      i32       `gd:"export,range=0:100:5"`,
+	mode:        i32       `gd:"export,enum=Idle:Walk:Run"`,
+	description: gd.String `gd:"export,multiline"`,
+	velocity:    gd.Vector3 `gd:"export"`,
+	texture:     gd.Object `gd:"export,resource=Texture2D"`,
+}
+```
+
+### Export groups & subgroups
+
+Add a `group=` (or `subgroup=`) token to an export to open a collapsible Inspector
+header that applies to that field and every export after it, until the next marker:
+
+```odin
+Player :: struct {
+	owner:   gd.CharacterBody2d,
+	speed:   f32 `gd:"export,group=Movement"`, // "Movement" header starts here
+	jump:    f32 `gd:"export"`,                 // …still under "Movement"
+	hp:      i32 `gd:"export,group=Combat"`,    // "Combat" header starts here
+	defense: i32 `gd:"export"`,                 // …under "Combat"
+}
+```
+
+The marker is emitted as a `PROPERTY_USAGE_GROUP` (or `…_SUBGROUP`) entry immediately
+before the field's own property entry, so the engine renders the header in both the live
+property list and the editor placeholder. The group's name-prefix is empty (property names
+are not auto-prefixed). `group=` and `subgroup=` combine with any hint/default/getter on
+the same field.
+
+### Export default values
+
+`default=` carries an initializer for a **scalar** export (`int`/`float`/`bool`/`String`).
+The value is applied to the field when the instance is created (after zeroing, before
+`_ready`) and reported through Godot's default-value API, so the Inspector shows it and the
+reset-to-default arrow works:
+
+```odin
+Player :: struct {
+	owner: gd.Node,
+	speed: f32       `gd:"export,default=200"`,
+	name:  gd.String `gd:"export,default=Hero"`,
+	alive: bool      `gd:"export,default=true"`,
+}
+```
+
+Only scalar Variant types support `default=` today (numbers, bool, and `String`); a
+`default=` on a math-struct/handle field is a clear `scriptgen` error rather than a silent
+drop. (Set those in `_ready` or from the scene instead.)
+
+### Getter / setter properties
+
+Route an export's reads/writes through Odin procs — for validation, clamping, or
+side-effects — with `get=`/`set=`. The named procs take `^<Struct>` plus (for the setter)
+the field value, and run instead of the raw field access from both GDScript and the editor:
+
+```odin
+Player :: struct {
+	owner: gd.Node,
+	hp:    i32 `gd:"export,get=player_get_hp,set=player_set_hp"`,
+}
+
+// reads of `hp` return this; writes are clamped into [0,100].
+player_get_hp :: proc(self: ^Player) -> i32 { return self.hp }
+player_set_hp :: proc(self: ^Player, v: i32) { self.hp = clamp(v, 0, 100) }
+```
+
+The `get`/`set` procs are **plain Odin procs** (no `@(gd_method)` needed) named exactly as
+written in the tag. The backing field still exists — the getter/setter may use it as
+storage (as above) or compute from other state. Combine with `group=`/`default=` freely
+(a defaulted getter/setter field applies its default through the setter).
+
+### @onready node references
+
+A struct field tagged `` `gd:"onready=PATH"` `` is auto-wired to a child node on `_ready`,
+mirroring GDScript's `@onready var sprite = $Sprite`. On the node's READY — *before* any
+`@(gd_connect)` wiring and your own `_ready` proc — the core resolves
+`get_node(owner, "PATH")` and writes the result into the field, so your `_ready` sees a
+fully-resolved, non-null reference:
+
+```odin
+Player :: struct {
+	owner:  gd.CharacterBody2d,
+	sprite: gd.Node2d `gd:"onready=Sprite"`,    // owner-relative node path
+	label:  gd.Node   `gd:"onready=HUD/Label"`,
+}
+```
+
+The field must be an object/node handle (`gd.Node2d`, `gd.Sprite2D`, `gd.Object`, …) — the
+handle IS the node pointer, so use the bare handle type, not `^gd.Node2d`. An `@onready`
+field is a **private auto-wired ref**, NOT a serialized `@export`: it never appears in the
+property list / Inspector.
+
+### Lifecycle & methods
+
+Both are plain Odin procs whose first parameter is `^<Struct>`:
+
+- **Lifecycle**: the proc name (minus an optional `<struct>_` prefix) is one of
+  `ready`, `process`, `physics_process`, `enter_tree`, `exit_tree`.
+  `process` / `physics_process` take a `delta: f64` second parameter.
+- **Methods**: tagged `@(gd_method)`. Any name; exposed minus the struct prefix.
+
+Codegen wraps each in the `proc "c"` form the runtime expects, establishing a
+heap-backed default context before calling your proc, so your proc body can use
+ordinary Odin (allocations, etc.).
+
+### Signals
+
+Signals follow the GDScript pattern of **declare / emit / connect**.
+
+**Declare** with a `//gd:signal name(args...)` marker (the payload types are typed). They are
+reported through `_get_script_signal_list`, so GDScript and the editor see them.
+
+**Emit** with the generated typed helper `<struct_snake>_emit_<signal>` — e.g.
+`ping_emit_pinged(self, value)` — which codegen emits from the `//gd:signal` declaration and
+which calls through `Object::emit_signal` with the payload:
+
+```odin
+//gd:signal health_changed(value: int)
+// ...
+player_emit_health_changed(self, i64(self.health))   // generated typed emitter
+```
+
+**Connect** a signal to a handler proc (which must be a `@(gd_method)` so the engine can
+dispatch to it). Three ways, increasingly declarative:
+
+```odin
+// 1. Connect an emitter's signal to a target's method, from any script (gd.* helper):
+gd.connect_to(player, "health_changed", self.owner, "on_health_changed")
+
+// 2. Connect one of the OWNER's own signals to its own method:
+gd.connect(self.owner, "body_entered", "collect")
+
+// 3. Declaratively — see @(gd_connect) below — no _ready/connect call at all.
+```
+
+### Declarative signal wiring (`@(gd_connect)`)
+
+Tag a `@(gd_method)` proc with `@(gd_connect = "signal_name")` to have the core
+auto-connect the **owner's** `signal_name` to this method **on READY** — so you needn't write
+a `_ready` proc just to wire a signal. The connection happens before your own `_ready` runs
+(order: `@onready` field resolution → `@(gd_connect)` connections → your `_ready`).
+
+```odin
+// `on_body` is auto-connected to the owner's `body_entered` on READY. No manual connect.
+@(gd_method, gd_connect = "body_entered")
+enemy_on_body :: proc(self: ^Enemy, body: gd.Node2d) {
+	if self.dead { return }
+	player := rt.script_of(body, Player)    // typed cross-script (see below)
+	if player != nil {
+		player_take_damage(player, CONTACT_DAMAGE)
+	}
+}
+```
+
+`@(gd_connect)` implies the proc is a signal target, so it must also be a `@(gd_method)` (use
+`@(gd_method, gd_connect = "...")`). The signal must exist on the owner (an engine signal like
+`body_entered` / `area_entered`, or one this script declared with `//gd:signal`). It connects
+only the owner's *own* signal to the owner's *own* method — to wire a different emitter or
+target, use `gd.connect_to` from `_ready` instead. (`@(gd_connect)` requires the
+`-custom-attribute:gd_connect` build flag, which `build/build_scripts.sh` passes for you.)
+
+## Multiplayer RPCs (`@(gd_rpc)`)
+
+Mark a `@(gd_method)` proc with `@(gd_rpc)` to expose it to Godot's high-level multiplayer,
+exactly like GDScript's `@rpc(...)` annotation. The annotation only declares the *config*;
+the engine routes `node.rpc("method", args)` (and incoming remote calls) to your proc through
+the same dispatch path a normal method call uses, so no extra plumbing is needed.
+
+```odin
+//gd:extends Node
+//gd:class Player
+package game
+
+import gd "godot:godot"
+
+Player :: struct {
+	owner:  gd.Node,
+	health: gd.Int `gd:"export"`,
+}
+
+// Bare form: all defaults — authority mode, reliable, no call_local, channel 0.
+@(gd_method, gd_rpc)
+player_ping :: proc(self: ^Player) { /* runs when the authority RPCs us */ }
+
+// Explicit config (comma-separated tokens, any order):
+@(gd_method, gd_rpc = "any_peer,unreliable,call_local,channel=2")
+player_take_damage :: proc(self: ^Player, amount: gd.Int) {
+	self.health -= amount
+}
+```
+
+`gd_rpc` implies `gd_method` — an RPC must be a registered, name-dispatchable method, so you
+can drop the `gd_method` and write just `@(gd_rpc)` if you prefer (both forms are equivalent).
+
+**Config tokens** (mirroring GDScript `@rpc` defaults):
+
+| Token | Effect | Default |
+| --- | --- | --- |
+| `authority` / `any_peer` | who may call it (`RPCMode`) | `authority` |
+| `reliable` / `unreliable` / `unreliable_ordered` | transfer mode | `reliable` |
+| `call_local` | the RPC ALSO runs on the calling peer | off |
+| `channel=N` | transfer channel | `0` |
+
+Codegen emits this into the class's `_get_rpc_config` surface, which the engine reads (once,
+per node) to learn the method's RPC config. From GDScript / another script you then call it as
+usual:
+
+```gdscript
+# A multiplayer peer must be active (e.g. ENetMultiplayerPeer or, for a single-process
+# loopback, OfflineMultiplayerPeer):
+node.multiplayer.multiplayer_peer = ENetMultiplayerPeer.new()  # ...create_server / _client
+node.rpc("take_damage", 10)   # routed to player_take_damage on the configured peer(s)
+```
+
+A small networked sketch: a `Player` autoloaded on both server and client, the server is the
+node's `set_multiplayer_authority`, and an `any_peer,call_local` `take_damage` lets any client
+request damage while still applying it locally. The exact config a script registered is
+observable from GDScript via `node.get_script().get_rpc_config()` (a Dictionary keyed by
+method name → `{rpc_mode, transfer_mode, call_local, channel}`).
+
+## Ergonomic helpers
+
+The `godot` package ships a hand-written ergonomics layer (`godot/Ergonomics*.odin`) that
+collapses the common — but otherwise verbose — StringName / Variant / method-bind dances
+into `gd.<helper>(...)` one-liners. Every helper takes/returns `Object`/`Node`/`Resource`,
+which are type-aliases all object handles (`Node2d`, `Area2d`, `Label`, …) collapse to, so a
+script's `self.owner` passes with no cast and a returned `Node` assigns to any handle var.
+
+| Task | One-liner |
+| --- | --- |
+| Resolve a child by path | `child := gd.get_node(self.owner, "Hud")` |
+| Get the parent node | `p := gd.get_parent(self.owner)` |
+| Get the SceneTree | `tree := gd.get_tree(self.owner)` |
+| Parent a node | `gd.add_child(self.owner, child)` |
+| Group add / check / remove | `gd.add_to_group(self.owner, "enemies")` · `gd.is_in_group(self.owner, "enemies")` · `gd.remove_from_group(self.owner, "enemies")` |
+| Load a resource | `res := gd.load("res://icon.png")` |
+| Load a PackedScene | `scene := gd.load_scene("res://enemy.tscn")` |
+| Instance a PackedScene | `node := gd.instantiate(scene)` |
+| Load + instance + add_child | `enemy := gd.spawn(self.owner, "res://enemy.tscn")` |
+| Set a property by name | `gd.set_int/set_float/set_bool/set_string(obj, "value", v)` · `gd.set_value(obj, "p", variant)` |
+| Get a property by name | `gd.get_int/get_float/get_bool/get_string(obj, "value")` · `gd.get_value(obj, "p")` |
+| Connect own signal → own method | `gd.connect(self.owner, "body_entered", "collect")` |
+| Connect emitter → target method | `gd.connect_to(emitter, "sig", target, "method")` |
+| Build a bound Callable | `cb := gd.callable(self.owner, "method")` |
+| Emit a signal (no payload) | `gd.emit(self.owner, "died")` |
+| Emit a signal with payload | `v := i64(value); gd.emit_args(self.owner, "collected", gd.variant_from(&v))` |
+| Read a project setting | `gd.get_setting_int/float/bool/string("game/lives")` · `gd.get_setting("p")` (raw Variant) · `gd.get_setting_or("p", default)` |
+| Write a project setting | `gd.set_setting_int/float/bool/string("game/lives", v)` · `gd.set_setting("p", variant)` |
+| Has a project setting | `gd.has_setting("game/lives")` |
+| Define an input action | `gd.add_action("fire")` (optional `deadzone`) |
+| Bind a key / mouse button | `gd.action_add_key("fire", i64(gd.Key.Space))` · `gd.action_add_mouse_button("fire", i64(gd.Mouse_Button.Left))` |
+| Has / erase an action | `gd.has_action("fire")` · `gd.erase_action("fire")` |
+| Is an action pressed | `if gd.is_action_pressed("fire") { ... }` |
+| Running in the editor? | `if gd.is_editor() { ... }` (wraps `Engine.is_editor_hint()`) |
+
+`gd.get_setting*`/`gd.set_setting*` wrap the `ProjectSettings` singleton; `gd.add_action`
+/ `gd.action_add_*` wrap the `InputMap` singleton (constructing the `InputEventKey` /
+`InputEventMouseButton` for you). Settings/actions registered at runtime are visible to
+GDScript (`ProjectSettings.get_setting`, `InputMap.has_action`, `Input.is_action_pressed`)
+but are NOT persisted to `project.godot` — they are the "register my game's settings +
+actions on an autoload's `_ready`" pattern (see below). `gd.get_setting_string` is the one
+that allocates (in `context.allocator`); the rest are `proc "contextless"`.
+
+All helpers are `proc "contextless"` except `gd.get_string`, which allocates the returned
+Odin `string` in `context.allocator` (fine inside any script proc — those run with the
+script context set). For a script-declared `//gd:signal`, prefer the generated typed
+`<struct_snake>_emit_<signal>` helper; `gd.emit_args` is the by-name escape hatch (and the
+path `gd.emit`/`emit_args` both take — Godot's `emit_signal` is a vararg method, so they
+varcall it rather than ptrcall).
+
+## Supported Odin → Variant types
+
+| Odin type | Variant | Notes |
+| --- | --- | --- |
+| `int`, `i8/i16/i32/i64`, `u8..u64`, `uint`, `gd.Int` | `Int` | width-narrowed via `size_of` |
+| `f32`, `f64`, `gd.Float`, `gd.Real` | `Float` | |
+| `bool` | `Bool` | |
+| `string`, `gd.String` | `String` | |
+| `gd.Vector2`, `gd.Vector3`, `gd.Color` | matching | |
+| `gd.String_Name` | `String_Name` | |
+| `^gd.<Object subclass>`, `gd.Node`, `gd.Object`, ... | `Object` | object handle |
+
+Unsupported types produce a clear `scriptgen` error (no silent miscompile).
+
+## Building
+
+`build/build_scripts.sh [PROJECT_DIR]` runs the full pipeline:
+
+1. builds the `scriptgen` binary,
+2. runs `scriptgen <scriptsdir>` to emit the `*.gen.odin` build artifacts beside the
+   authored sources (no resource stubs — the authored `.odin` is the attached resource),
+3. builds the scripts dll with `odin build <scriptsdir> -build-mode:dll
+   -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc ...`
+   (the `.gen.odin` are in the same package and compile together),
+4. builds the core dll.
+
+The three `-custom-attribute:` flags are required so the Odin compiler accepts the
+`@(gd_method)` / `@(gd_connect)` / `@(gd_rpc)` marker attributes; the build script passes
+them for you.
+
+The build, the **live-editing (show-on-save) loop**, the editor DX (validation / autocomplete
+/ highlighting), debugging, and the editor settings (`odin_godot/odin_bin`,
+`odin_godot/scripts_dir`, …) are all covered in **[Workflow](workflow.md)**.
+
+## Multiple scripts in one package
+
+A scripts dll is one Odin package. Because lifecycle/method procs and generated
+emit helpers live in that shared package, prefix your proc names with the struct
+name (`ping_ready`, `ping_add`) to avoid collisions — the prefix is stripped to
+derive the GDScript-facing name. One script struct per file (identified by its
+first field being named `owner`).
+
+## Custom resources
+
+`//gd:extends Resource` makes the script a **custom resource** — a pure data
+container (a `RefCounted`, not a scene-tree node), exactly like a GDScript
+`extends Resource`. Everything is the same as any other script; only the base
+differs. Use it for designer-tunable data assets you create, edit in the
+Inspector, and save as `.tres`.
+
+```odin
+//gd:extends Resource
+//gd:class ItemData
+package game_scripts
+
+import gd "godot:godot"
+
+ItemData :: struct {
+	owner: gd.Resource,
+	name:  gd.String   `gd:"export"`,
+	value: gd.Int      `gd:"export,range=0:999"`,
+	icon:  ^gd.Resource `gd:"export,resource=Texture2D"`,
+}
+
+@(gd_method)
+item_data_item_total :: proc(self: ^ItemData) -> int {
+	return int(self.value) + 100
+}
+```
+
+- **No lifecycle.** A resource is not in the scene tree, so `_ready` / `_process`
+  / `_physics_process` never fire — omit them. `@export` vars and `@(gd_method)`s
+  work as usual.
+- **First field is `owner: gd.Resource`** (the owner-Object convention), instead
+  of a `gd.Node`/`gd.Node2d`.
+- **`.tres` serialization is automatic.** `@export` vars carry the STORAGE usage
+  flag, so Godot's own text-resource serializer writes them — plus a reference to
+  this script — into a `.tres`. Loading the `.tres` reconstructs a live instance
+  with the script re-attached, so its methods still dispatch:
+
+  ```gdscript
+  var item = Resource.new()
+  item.set_script(load("res://scripts/item_data.odin"))
+  item.set("name", "Sword"); item.set("value", 10)
+  ResourceSaver.save(item, "res://sword.tres")
+
+  var loaded = ResourceLoader.load("res://sword.tres")
+  loaded.get("value")        # 10
+  loaded.call("item_total")  # 110 — script re-bound on load
+  ```
+
+  The saved `.tres` is plain Godot text:
+
+  ```
+  [gd_resource type="Resource" format=3]
+  [ext_resource type="Script" path="res://scripts/item_data.odin" id="1_x"]
+  [resource]
+  script = ExtResource("1_x")
+  name = "Sword"
+  value = 10
+  ```
+
+- **Editable in the editor.** Unlike a non-tool *node* script (which the editor
+  shows via a read-only placeholder), attaching a resource script builds a real,
+  live instance even in the editor — so its `@export` values are directly editable
+  in the Inspector and persist on save.
+- **Resource-typed `@export`.** A field `data: ^gd.Resource
+  `gd:"export,resource=ItemData"`` on a *node* script gives a resource-picker slot
+  that accepts a custom `ItemData` `.tres`. The `resource=` hint string filters the
+  picker, and because `ItemData` is now registered as a global class (see below) the
+  editor knows it as a type.
+
+## Global class names
+
+Every `//gd:class <Name>` is registered as a **global class** — a first-class engine
+type, exactly like a GDScript `class_name`. No extra annotation is needed; the class
+name you already declare becomes the global name.
+
+- `Script.get_global_name()` returns `<Name>` (this is `ScriptExtension._get_global_name`,
+  the virtual the editor's filesystem scan reads).
+- After the editor scans the project, `<Name>` appears in
+  `ProjectSettings.get_global_class_list()` with its declared native `base_type` (from
+  `//gd:extends`), so the engine treats it as a usable type and a type-filter (e.g. a
+  resource/node-typed `@export` picker).
+
+The registration is driven by the language's `_handles_global_class_type` /
+`_get_global_class_name(path)` virtuals, which reparse the `.odin` file's markers and
+hand back `{name, base_type, icon_path}`.
+
+## Typed cross-script references
+
+Because every script in a project compiles into ONE shared dll, a struct type declared
+in one script (e.g. `Enemy`) is the *same* type everywhere. `rt.script_of(obj, T)` turns
+a live Godot object into a typed `^T` pointer to the Odin script struct the engine
+allocated for it — giving DIRECT typed field and proc access across scripts, with no
+Variant marshaling:
+
+```odin
+import gd "godot:godot"
+import rt "godot:runtime"
+
+@(gd_method)
+controller_attack :: proc(self: ^Controller, amount: gd.Int) -> int {
+	target := gd.get_node(self.owner, "Enemy")  // or an @export node ref
+	enemy := rt.script_of(target, Enemy)         // -> ^Enemy (nil if not an Odin Enemy)
+	if enemy == nil { return -1 }
+	enemy.hp -= amount       // direct typed field write
+	enemy_heal(enemy, 0)     // direct typed proc call
+	return int(enemy.hp)
+}
+```
+
+- `script_of` returns `nil` when `obj` is nil or carries no Odin script of *our*
+  language (a foreign-language node, a placeholder, or a plain engine node) — it is
+  nil-safe, never a wild cast.
+- Works on web too (single module — the same resolver is wired directly).
+- For calling across a dll boundary (e.g. a tool that dispatches by name), the
+  GDScript-style `obj.call("method", args...)` path remains available; `script_of` is the
+  zero-overhead typed path within the shared scripts dll.
+
+For shared state with *no* per-node instance to reference (a global score, a constant
+table), the package-level "module" pattern (file-private vars + package procs like
+`game_state_add`) is the simplest tool: every script in a project compiles into ONE Odin
+package, so they all share those globals with zero Godot glue. It is NOT, however, a real
+Godot singleton — it is not reachable at `/root/Name`, not visible to GDScript, and has no
+`_ready`. When you need that (a manager node GDScript can call, lifecycle, persistence
+across scene changes), use an **autoload** — see below.
+
+## Autoload singletons
+
+A `.odin` script can be a real Godot **autoload** singleton — a node added under `/root`
+at startup, reachable everywhere (from GDScript as `Name` or `/root/Name`, from Odin via
+`gd.get_node` on any node's tree), persistent across scene changes, running `_ready` once.
+
+Write a normal script whose base is a `Node` (or any `Node` subclass), give it a
+`//gd:class` name, and add it to `project.godot`'s `[autoload]` section with a leading `*`:
+
+```odin
+//gd:extends Node
+//gd:class GameManager
+package my_game_scripts
+
+import gd "godot:godot"
+
+GameManager :: struct {
+	owner: gd.Node,
+	score: gd.Int,
+}
+
+game_manager_ready :: proc(self: ^GameManager) {
+	// Runs ONCE at startup. A good place to register the game's project settings +
+	// input actions from Odin (see the ergonomic helpers above):
+	gd.set_setting_int("game/lives", 3)
+	gd.add_action("fire")
+	gd.action_add_key("fire", i64(gd.Key.Space))
+}
+
+@(gd_method)
+game_manager_add_score :: proc(self: ^GameManager, amount: int) {
+	self.score += gd.Int(amount)
+}
+
+@(gd_method)
+game_manager_get_score :: proc(self: ^GameManager) -> int {
+	return int(self.score)
+}
+```
+
+`project.godot`:
+
+```ini
+[autoload]
+
+GameManager="*res://scripts/game_manager.odin"
+```
+
+The leading `*` is what makes the entry a **singleton node**: Godot instantiates the
+script's base node (`//gd:extends Node`), attaches the Odin script, runs `_ready`, and adds
+it under `/root` with the autoload's name. Without the `*` the path would be loaded as a
+plain resource, not added to the tree. GDScript then reaches it directly:
+
+```gdscript
+GameManager.add_score(5)                       # autoload name is a global identifier
+get_node("/root/GameManager").call("add_score", 5)
+print(GameManager.get_score())
+```
+
+`@(gd_method)` procs are GDScript-callable (the proc name has its `<struct_snake>_` prefix
+stripped: `game_manager_add_score` → `add_score`). The node is the SAME instance for the
+whole session, so its struct fields are your singleton state.
+
+> The base must be a `Node` subclass — an autoload entry is added to the scene tree, and a
+> non-`Node` base cannot be parented. (A `Resource`/`RefCounted` script in `[autoload]`
+> would load but not become a `/root` node.)
+
+**Alternative — `Engine.register_singleton`.** For a *non-node* global (e.g. exposing an
+object to GDScript as `Engine.get_singleton("Name")` without putting it in the scene tree),
+the binding also has `gd.engine_register_singleton(engine, name, obj)` /
+`gd.engine_get_singleton(engine, name)`. The `[autoload]` node form above is the
+GDScript-parity path (lifecycle + `/root/Name` + persistence); `register_singleton` is the
+lower-level escape hatch when you specifically do not want a node.
+
+See `tests/autoload/` for a full, headless-verified example (a `GameManager` autoload whose
+`_ready` registers a project setting + an input action, driven from GDScript).
+
+## Editor tooling
+
+Odin scripts can run **in the editor** and extend it. See `tests/editortools/` for the
+headless-verified examples of everything below.
+
+### `@tool` scripts + `gd.is_editor()`
+
+A `//gd:tool` marker makes the engine build a **real instance in the editor** (not a
+placeholder), so the script's lifecycle (`_ready`, `_process`, `_enter_tree`, …) runs at
+edit time too. Branch editor-only logic with the `gd.is_editor()` helper (it wraps
+`Engine.is_editor_hint()`):
+
+```odin
+//gd:extends Node
+//gd:class ToolWidget
+//gd:tool
+package my_game_scripts
+
+import gd "godot:godot"
+
+ToolWidget :: struct { owner: gd.Node }
+
+tool_widget_ready :: proc(self: ^ToolWidget) {
+	if gd.is_editor() {
+		// runs in the editor (edit mode) — e.g. live preview / gizmo setup
+	} else {
+		// runs only in the actual game
+	}
+}
+```
+
+`gd.is_editor()` returns `false` at game runtime (including exported builds) and `true`
+while the editor holds the scene open. It's only meaningful inside `//gd:tool` scripts —
+non-tool scripts never run at edit time.
+
+### Custom class icons
+
+`//gd:icon res://path.svg` gives a `//gd:class` a custom icon in the editor (Scene dock,
+Create Node/Resource dialogs):
+
+```odin
+//gd:extends Node
+//gd:class IconNode
+//gd:icon res://icon.svg
+package my_game_scripts
+```
+
+The path threads into both the script's `_get_class_icon_path` virtual and the global class
+registry's `icon_path` (so `ProjectSettings.get_global_class_list()` carries it). *(The icon
+PIXELS rendering in the dock is a visual editor behavior — the registered path is what these
+hooks provide.)*
+
+### EditorPlugin
+
+A `//gd:extends EditorPlugin` script (also `//gd:tool`) is a real editor plugin. Register it
+with the standard Godot plugin format — a `res://addons/<name>/plugin.cfg`:
+
+```ini
+[plugin]
+name="My Odin Plugin"
+script="my_plugin.odin"     ; relative to the addon dir
+```
+
+…and enable it in `project.godot`:
+
+```ini
+[editor_plugins]
+enabled=PackedStringArray("res://addons/<name>/plugin.cfg")
+```
+
+When the project opens, Godot instantiates the plugin in the editor and dispatches
+`_enter_tree` / `_exit_tree` (which arrive as Node ENTER_TREE / EXIT_TREE notifications, so
+author them as `enter_tree` / `exit_tree` lifecycle procs):
+
+```odin
+//gd:extends EditorPlugin
+//gd:class MyPlugin
+//gd:tool
+package my_plugin
+
+import gd "godot:godot"
+
+MyPlugin :: struct { owner: gd.Node }
+
+my_plugin_enter_tree :: proc(self: ^MyPlugin) {
+	gd.print("MyPlugin loaded")   // or add_tool_menu_item / add_control_to_dock / ...
+}
+my_plugin_exit_tree :: proc(self: ^MyPlugin) {}
+```
+
+> The whole project's Odin scripts compile as **one Odin package**. Because a plugin's
+> `script=` path must live under its addon dir, put the addon's package there (e.g.
+> `res://addons/<name>/*.odin`) and point `build/build_scripts.sh <proj> <that-dir>` at it.
+
+### EditorInspectorPlugin (advanced)
+
+A `//gd:extends EditorInspectorPlugin` script can customize the Inspector. Expose the engine
+virtuals as `@(gd_method)` procs — the codegen strips the `<struct_snake>_` prefix, so a
+proc named `my_inspector__can_handle` is exposed as the exact virtual `_can_handle` (note the
+double underscore):
+
+```odin
+@(gd_method)
+my_inspector__can_handle :: proc(self: ^MyInspector, object: ^gd.Object) -> bool { return true }
+
+@(gd_method)
+my_inspector__parse_begin :: proc(self: ^MyInspector, object: ^gd.Object) { /* add controls */ }
+```
+
+These virtuals **dispatch into Odin** when invoked (verified headless by calling them
+directly). Whether the editor auto-invokes them during a *live* Inspector rebuild — after
+`add_inspector_plugin()` and selecting a handled object in the dock — is a UI-driven path
+that is **visual-only** (not asserted headless).

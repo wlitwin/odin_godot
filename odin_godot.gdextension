@@ -1,0 +1,18 @@
+; odin_godot GDExtension manifest (skeleton — paths filled in by the build/export plugin)
+[configuration]
+entry_symbol = "odin_godot_init"
+compatibility_minimum = "4.6"   ; pinned to installed Godot 4.6.2 stable
+
+[libraries]
+; Desktop: the stable CORE dll. The swappable SCRIPTS dll is loaded by the core at runtime
+; (dev) or bundled by the export plugin (release).
+macos.debug     = "res://bin/libodin_godot.dylib"
+macos.release   = "res://bin/libodin_godot.dylib"
+linux.debug.x86_64   = "res://bin/libodin_godot.so"
+linux.release.x86_64 = "res://bin/libodin_godot.so"
+windows.debug.x86_64   = "res://bin/libodin_godot.dll"
+windows.release.x86_64 = "res://bin/libodin_godot.dll"
+
+; Web: core+scripts shipped AOT as Emscripten SIDE_MODULE(s). See Phase-0 Spike W.
+web.debug.wasm32   = "res://bin/libodin_godot.wasm"
+web.release.wasm32 = "res://bin/libodin_godot.wasm"

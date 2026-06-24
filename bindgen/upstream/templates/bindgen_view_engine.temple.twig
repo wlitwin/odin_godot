@@ -1,0 +1,295 @@
+package godot
+
+{% for name, import_ in this.imports %}
+import {{ name }} "{{ import_.path }}"
+{% end %}
+
+{{ this.name }}_Constants :: enum {
+{% for constant in this.file_constants %}
+    {{ constant.name }} = {{ constant.value }},
+{% end %}
+}
+
+{% for enum_ in this.enums %}
+{% embed "bindgen_view_enum.temple.twig" with enum_ %}
+{% end %}
+
+{% for bit_field_ in this.bit_fields %}
+{% embed "bindgen_view_bit_field.temple.twig" with bit_field_ %}
+{% end %}
+
+{{ this.snake_name }}_name_ref :: proc "contextless" () -> ^String_Name {
+    return &__class_name
+}
+
+{{ this.snake_name }}_name :: proc "contextless" () -> String_Name {
+    return __class_name
+}
+
+new_{{ this.snake_name }} :: proc "contextless" () -> {{ this.self }} {
+{% if this.cast_on_new %}
+    return cast({{ this.self }})__bindgen_gde.classdb_construct_object({{ this.snake_name }}_name_ref())
+{% else %}
+    return __bindgen_gde.classdb_construct_object({{ this.snake_name }}_name_ref())
+{% end %}
+}
+
+// methods
+//
+// Method binds are resolved LAZILY on first call (the `@(static) __ptr` guard),
+// NOT eagerly in `_init`. Many engine classes (Node, Control, the *Server
+// singletons, ...) are only registered with ClassDB at later initialization
+// levels (Servers/Scene), while `godot.init()` runs at the extension entry
+// (Core level). Eagerly fetching every bind there returned null for ~91% of
+// methods (a 16k-line `mb is null` flood). Resolving on first call defers the
+// fetch to a point where the owning class is registered, mirroring how the
+// builtin/variant methods already work. A genuinely unresolvable bind stays
+// nil and the following ptrcall surfaces it at the call site.
+//
+// VARARG methods (`is_vararg` in extension_api.json) cannot use ptrcall — Godot
+// aborts with "ptrcall can't be used with vararg methods". They instead go
+// through `object_method_bind_call`: the fixed declared args are marshalled to
+// Variants, the variadic `extra: ..Variant` are appended, and the returned
+// Variant is converted to the declared return type (Variant passed through,
+// `Error`/ints via variant_to_int, void ignored).
+{% for method in this.static_methods %}
+{% if method.vararg %}
+{{ this.snake_name }}_{{ method.name }} :: proc "contextless" (
+{% for arg in method.args %}
+    {{ arg.name }}_: {{ arg.type }},
+{% end %}
+    extra: ..Variant,
+{% if return_type, has_return_type := method.return_type.(string); has_return_type %}
+) -> (ret: {{ return_type }}) {
+{% else %}
+) {
+{% end %}
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("{{ method.name }}", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, {{ i64(method.hash) }})
+    }
+{% for arg in method.args %}
+    {{ arg.name }}_ := {{ arg.name }}_
+    __fv_{{ arg.name }} := variant_from(&{{ arg.name }}_)
+{% end %}
+    __argv: [64]__bindgen_gde.VariantPtr
+    __n := 0
+{% for arg in method.args %}
+    __argv[__n] = cast(__bindgen_gde.VariantPtr)&__fv_{{ arg.name }}
+    __n += 1
+{% end %}
+    for __i in 0 ..< len(extra) {
+        if __n >= 64 do break
+        __argv[__n] = cast(__bindgen_gde.VariantPtr)&extra[__i]
+        __n += 1
+    }
+{% if method.ret_is_variant %}
+    __bindgen_gde.object_method_bind_call(__ptr, nil, &__argv[0], i64(__n), cast(__bindgen_gde.VariantPtr)&ret, nil)
+{% for arg in method.args %}
+    __bindgen_gde.variant_destroy(cast(__bindgen_gde.VariantPtr)&__fv_{{ arg.name }})
+{% end %}
+    return
+{% else %}
+    __ret: Variant
+    __bindgen_gde.object_method_bind_call(__ptr, nil, &__argv[0], i64(__n), cast(__bindgen_gde.VariantPtr)&__ret, nil)
+{% if return_type, has_return_type := method.return_type.(string); has_return_type %}
+    ret = {{ return_type }}(variant_to_int(&__ret))
+{% end %}
+    __bindgen_gde.variant_destroy(cast(__bindgen_gde.VariantPtr)&__ret)
+{% for arg in method.args %}
+    __bindgen_gde.variant_destroy(cast(__bindgen_gde.VariantPtr)&__fv_{{ arg.name }})
+{% end %}
+    return
+{% end %}
+}
+
+{% else %}
+{% if return_type, has_return_type := method.return_type.(string); has_return_type %}
+{{ this.snake_name }}_{{ method.name }} :: proc "contextless" (
+{% for arg in method.args %}
+    {{ arg.name }}_: {{ arg.type }},
+{% end %}
+) -> (ret: {{ return_type }}) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("{{ method.name }}", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, {{ i64(method.hash) }})
+    }
+{% for arg in method.args %}
+    {{ arg.name }}_ := {{ arg.name }}_
+{% end %}
+    args := []__bindgen_gde.TypePtr {
+{% for arg in method.args %}
+        &{{ arg.name }}_,
+{% end %}
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    return
+}
+
+{% else %}
+{{ this.snake_name }}_{{ method.name }} :: proc "contextless" (
+{% for arg in method.args %}
+    {{ arg.name }}_: {{ arg.type }},
+{% end %}
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("{{ method.name }}", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, {{ i64(method.hash) }})
+    }
+{% for arg in method.args %}
+    {{ arg.name }}_ := {{ arg.name }}_
+{% end %}
+    args := []__bindgen_gde.TypePtr {
+{% for arg in method.args %}
+        &{{ arg.name }}_,
+{% end %}
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), nil)
+}
+
+{% end %}
+{% end %}
+{% end %}
+
+{% for method in this.instance_methods %}
+{% if method.vararg %}
+{{ this.snake_name }}_{{ method.name }} :: proc "contextless" (
+    self: {{ this.self }},
+{% for arg in method.args %}
+    {{ arg.name }}_: {{ arg.type }},
+{% end %}
+    extra: ..Variant,
+{% if return_type, has_return_type := method.return_type.(string); has_return_type %}
+) -> (ret: {{ return_type }}) {
+{% else %}
+) {
+{% end %}
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("{{ method.name }}", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, {{ i64(method.hash) }})
+    }
+    self := self
+{% for arg in method.args %}
+    {{ arg.name }}_ := {{ arg.name }}_
+    __fv_{{ arg.name }} := variant_from(&{{ arg.name }}_)
+{% end %}
+    __argv: [64]__bindgen_gde.VariantPtr
+    __n := 0
+{% for arg in method.args %}
+    __argv[__n] = cast(__bindgen_gde.VariantPtr)&__fv_{{ arg.name }}
+    __n += 1
+{% end %}
+    for __i in 0 ..< len(extra) {
+        if __n >= 64 do break
+        __argv[__n] = cast(__bindgen_gde.VariantPtr)&extra[__i]
+        __n += 1
+    }
+{% if method.ret_is_variant %}
+    __bindgen_gde.object_method_bind_call(__ptr, self, &__argv[0], i64(__n), cast(__bindgen_gde.VariantPtr)&ret, nil)
+{% for arg in method.args %}
+    __bindgen_gde.variant_destroy(cast(__bindgen_gde.VariantPtr)&__fv_{{ arg.name }})
+{% end %}
+    return
+{% else %}
+    __ret: Variant
+    __bindgen_gde.object_method_bind_call(__ptr, self, &__argv[0], i64(__n), cast(__bindgen_gde.VariantPtr)&__ret, nil)
+{% if return_type, has_return_type := method.return_type.(string); has_return_type %}
+    ret = {{ return_type }}(variant_to_int(&__ret))
+{% end %}
+    __bindgen_gde.variant_destroy(cast(__bindgen_gde.VariantPtr)&__ret)
+{% for arg in method.args %}
+    __bindgen_gde.variant_destroy(cast(__bindgen_gde.VariantPtr)&__fv_{{ arg.name }})
+{% end %}
+    return
+{% end %}
+}
+
+{% else %}
+{% if return_type, has_return_type := method.return_type.(string); has_return_type %}
+{{ this.snake_name }}_{{ method.name }} :: proc "contextless" (
+    self: {{ this.self }},
+{% for arg in method.args %}
+    {{ arg.name }}_: {{ arg.type }},
+{% end %}
+) -> (ret: {{ return_type }}) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("{{ method.name }}", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, {{ i64(method.hash) }})
+    }
+    self := self
+{% for arg in method.args %}
+    {{ arg.name }}_ := {{ arg.name }}_
+{% end %}
+    args := []__bindgen_gde.TypePtr {
+{% for arg in method.args %}
+        &{{ arg.name }}_,
+{% end %}
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+{% else %}
+{{ this.snake_name }}_{{ method.name }} :: proc "contextless" (
+    self: {{ this.self }},
+{% for arg in method.args %}
+    {{ arg.name }}_: {{ arg.type }},
+{% end %}
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("{{ method.name }}", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, {{ i64(method.hash) }})
+    }
+    self := self
+{% for arg in method.args %}
+    {{ arg.name }}_ := {{ arg.name }}_
+{% end %}
+    args := []__bindgen_gde.TypePtr {
+{% for arg in method.args %}
+        &{{ arg.name }}_,
+{% end %}
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+{% end %}
+{% end %}
+{% end %}
+
+// properties
+{% for prop in this.properties %}
+{% if prop.emit_get %}
+{{ prop.get_name }} :: proc "contextless" (self: {{ this.self }}) -> {{ prop.get_type }} {
+{% if prop.has_index %}
+    return {{ prop.get_call }}(self, {{ prop.index_type }}({{ i64(prop.index) }}))
+{% else %}
+    return {{ prop.get_call }}(self)
+{% end %}
+}
+{% end %}
+{% if prop.emit_set %}
+{{ prop.set_name }} :: proc "contextless" (self: {{ this.self }}, value: {{ prop.set_type }}) {
+{% if prop.has_index %}
+    {{ prop.set_call }}(self, {{ prop.index_type }}({{ i64(prop.index) }}), value)
+{% else %}
+    {{ prop.set_call }}(self, value)
+{% end %}
+}
+{% end %}
+{% end %}
+
+// Only interns the class StringName (used for object construction and as the
+// class argument when methods lazily resolve their binds). Method binds are NOT
+// fetched here -- see the note above the methods section.
+{{ this.snake_name}}_init :: proc "contextless" () {
+    __class_name = new_string_name_cstring("{{ this.godot_name }}", true)
+}
+
+@(private = "file")
+__class_name: String_Name

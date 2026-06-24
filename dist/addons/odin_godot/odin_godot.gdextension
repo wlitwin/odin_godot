@@ -1,0 +1,30 @@
+; odin_godot — drop-in addon manifest.
+;
+; This is the CORE GDExtension dll: a stable, pure-C-ABI ScriptLanguageExtension. It
+; teaches Godot the `.odin` scripting language and, at runtime, loads the SCRIPTS dll
+; (your compiled `.odin` files) as a sibling — so you only ever rebuild scripts, never
+; this core. Built per platform by `nix build` (see docs/distribution.md); the binaries
+; live under this addon's bin/<platform>/.
+;
+; Install: copy the whole `addons/odin_godot/` folder into your Godot project. Godot
+; auto-discovers this .gdextension. Then compile YOUR scripts with the bundled
+; build/build_scripts.sh (it emits res://bin/libodinscripts.<ext>, which the core finds).
+[configuration]
+entry_symbol = "odin_godot_init"
+compatibility_minimum = "4.6"
+
+[libraries]
+macos.debug      = "res://addons/odin_godot/bin/macos/libodin_godot.dylib"
+macos.release    = "res://addons/odin_godot/bin/macos/libodin_godot.dylib"
+
+linux.debug.x86_64    = "res://addons/odin_godot/bin/linux/libodin_godot.so"
+linux.release.x86_64  = "res://addons/odin_godot/bin/linux/libodin_godot.so"
+
+windows.debug.x86_64   = "res://addons/odin_godot/bin/windows/libodin_godot.dll"
+windows.release.x86_64 = "res://addons/odin_godot/bin/windows/libodin_godot.dll"
+
+; Web: the full extension (core + binding + your compiled scripts) is AOT-linked into ONE
+; Emscripten SIDE_MODULE at export time (build/build_web.sh). It is project-local, so this
+; points at the conventional res://bin path rather than the addon.
+web.debug.wasm32   = "res://bin/libodin_godot.wasm"
+web.release.wasm32 = "res://bin/libodin_godot.wasm"

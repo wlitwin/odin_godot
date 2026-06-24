@@ -1,0 +1,20 @@
+[configuration]
+
+entry_symbol = "odin_godot_init"
+compatibility_minimum = "4.6"
+
+[libraries]
+
+; macOS: the native core dll. Needed on the EXPORT HOST (macOS) so the extension loads at
+; export time and its OdinResourceFormatLoader recognizes the authored `.odin` files as
+; resources — otherwise they are not packed into the web export and the scripts' base types
+; cannot be resolved in the browser.
+macos.debug = "res://bin/libodin_godot.dylib"
+macos.release = "res://bin/libodin_godot.dylib"
+macos.debug.arm64 = "res://bin/libodin_godot.dylib"
+macos.release.arm64 = "res://bin/libodin_godot.dylib"
+
+; Web: the FULL extension (core + binding + the showcase scripts) AOT-compiled into one
+; Emscripten SIDE_MODULE wasm. Built by build/build_web.sh.
+web.debug.wasm32 = "res://bin/libodin_godot.wasm"
+web.release.wasm32 = "res://bin/libodin_godot.wasm"

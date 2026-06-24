@@ -1,0 +1,31 @@
+.vscode/
+
+*.gen.odin
+!libgd/classdb/bind.gen.odin
+bindgen/templates.odin
+
+bin/
+!bin/.gitkeep
+tools/
+
+*.exp
+*.dll
+*.exe
+*.so
+*.a
+*.o
+*.lib
+*.pdb
+*.ilk
+*.obj
+
+# remedybg session
+*.rdbg
+
+# local tools used for dev and debugging
+vendor_godot/
+vendor_remedy/
+
+# some other local workspace things
+*.ipynb
+*.code-workspace

@@ -1,0 +1,9 @@
+[configuration]
+entry_symbol = "odin_godot_init"
+compatibility_minimum = "4.6"
+
+[libraries]
+macos.debug = "res://libverify.dylib"
+macos.release = "res://libverify.dylib"
+macos.debug.arm64 = "res://libverify.dylib"
+macos.release.arm64 = "res://libverify.dylib"

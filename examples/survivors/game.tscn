@@ -1,0 +1,60 @@
+[gd_scene format=3 uid="uid://jbfuqwl4p7ma"]
+
+[ext_resource type="Script" uid="uid://bo3wwscxahb8t" path="res://scripts/player.odin" id="1_player"]
+[ext_resource type="PackedScene" path="res://bullet.tscn" id="2_bullet"]
+[ext_resource type="Script" uid="uid://cgxi08p64lvek" path="res://scripts/enemy.odin" id="3_enemy"]
+[ext_resource type="Resource" uid="uid://dthb2tm42rhlk" path="res://brute.tres" id="4_brute"]
+[ext_resource type="PackedScene" path="res://enemy.tscn" id="5_enemyscene"]
+[ext_resource type="Script" uid="uid://bdkj6k72wvcno" path="res://scripts/spawner.odin" id="6_spawner"]
+[ext_resource type="Script" uid="uid://fi57sgnutdhx" path="res://scripts/hud.odin" id="7_hud"]
+
+[sub_resource type="RectangleShape2D" id="shape_player"]
+size = Vector2(26, 26)
+
+[sub_resource type="CircleShape2D" id="shape_brute"]
+radius = 16.0
+
+[node name="Game" type="Node2D" unique_id=886488114]
+
+[node name="Background" type="Polygon2D" parent="." unique_id=1208328663]
+color = Color(0.08, 0.09, 0.12, 1)
+polygon = PackedVector2Array(0, 0, 640, 0, 640, 360, 0, 360)
+
+[node name="Player" type="CharacterBody2D" parent="." unique_id=199283895]
+position = Vector2(320, 180)
+script = ExtResource("1_player")
+speed = 200.0
+max_health = 100
+fire_rate = 0.3
+bullet_scene = ExtResource("2_bullet")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Player" unique_id=963626461]
+shape = SubResource("shape_player")
+
+[node name="Body" type="Polygon2D" parent="Player" unique_id=1286588040]
+color = Color(0.35, 0.65, 1, 1)
+polygon = PackedVector2Array(0, -15, 14, 12, -14, 12)
+
+[node name="Brute" type="Area2D" parent="." unique_id=1856750018]
+position = Vector2(80, 80)
+script = ExtResource("3_enemy")
+config = ExtResource("4_brute")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Brute" unique_id=1178881170]
+shape = SubResource("shape_brute")
+
+[node name="Body" type="Polygon2D" parent="Brute" unique_id=342816834]
+color = Color(0.9, 0.25, 0.2, 1)
+polygon = PackedVector2Array(-15, -15, 15, -15, 15, 15, -15, 15)
+
+[node name="Spawner" type="Node2D" parent="." unique_id=87873847]
+script = ExtResource("6_spawner")
+enemy_scene = ExtResource("5_enemyscene")
+interval = 0.0
+
+[node name="Hud" type="Label" parent="." unique_id=1496499068]
+offset_left = 12.0
+offset_top = 8.0
+text = "Score: 0
+HP: 100"
+script = ExtResource("7_hud")

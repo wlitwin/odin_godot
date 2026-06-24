@@ -1,0 +1,10 @@
+[configuration]
+
+entry_symbol = "odin_hello_init"
+compatibility_minimum = "4.6"
+
+[libraries]
+macos.debug = "bin/hello.dylib"
+macos.release = "bin/hello.dylib"
+macos.debug.arm64 = "bin/hello.dylib"
+macos.release.arm64 = "bin/hello.dylib"

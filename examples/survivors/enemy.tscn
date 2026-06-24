@@ -1,0 +1,18 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy.odin" id="1_enemy"]
+[ext_resource type="Resource" path="res://grunt.tres" id="2_cfg"]
+
+[sub_resource type="CircleShape2D" id="shape_enemy"]
+radius = 13.0
+
+[node name="Enemy" type="Area2D"]
+script = ExtResource("1_enemy")
+config = ExtResource("2_cfg")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("shape_enemy")
+
+[node name="Body" type="Polygon2D" parent="."]
+color = Color(0.2, 0.85, 1, 1)
+polygon = PackedVector2Array(0, -13, 12, -4, 8, 12, -8, 12, -12, -4)

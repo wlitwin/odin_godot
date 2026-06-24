@@ -1,0 +1,210 @@
+#+build darwin, linux, windows
+package core
+
+import "godot:gdext"
+import "godot:godot"
+
+import "diag"
+
+import "base:runtime"
+import "core:os"
+import "core:strings"
+
+// ----------------------------------------------------------------------------
+// `_validate` — REAL Odin compiler diagnostics surfaced as editor squiggles.
+//
+// The editor calls `OdinLanguage._validate(script, path, ...)` as the user types
+// (debounced). We type/parse-check the script's PACKAGE with the real `odin` compiler and
+// return `{ valid: bool, errors: [ { line, column, message } ] }`. A broken script then
+// shows a red squiggle + an Errors-panel entry instead of silently compiling to nothing.
+//
+// Why the whole package (not the single file): a `.odin` file is not a standalone compile
+// unit — its package needs the sibling scripts, the scriptgen `*.gen.odin`, and the `godot`
+// collection. So we type-check the package DIRECTORY.
+//
+// LIVE buffer overlay: `script` (args[0]) is the possibly-UNSAVED editor text. To validate
+// what the user is typing we copy the package dir to a temp overlay, overwrite the edited
+// file with `script`, run `odin check` there, and map errors back by file basename. The
+// actual overlay+check+parse pipeline lives in the `diag` sub-package (so it is unit-
+// testable headless — the `_validate` virtual itself is engine-dispatched and NOT callable
+// from GDScript; see tests/validate/).
+//
+// Robustness: ANY failure returns `{ valid: true, errors: [] }` — a dev-experience feature
+// must NEVER break the editor. v1 spawns one `odin check` per (debounced) validate call;
+// an ols-backed incremental check is a later autocomplete-phase improvement.
+// ----------------------------------------------------------------------------
+
+// Resolve the odin_godot collection root: ProjectSetting `odin_godot/root` ->
+// env `ODIN_GODOT_ROOT` -> the repo default. A consuming project must point one of these
+// at wherever odin_godot lives (so the `godot` collection resolves during the check).
+// Package-visible: the editor rebuild-on-save coordinator (reload.odin) reuses it to set
+// ODIN_GODOT_ROOT for the background build.
+@(private)
+odin_collection_root :: proc(allocator := context.allocator) -> string {
+    ps := godot.singleton_project_settings()
+    key := godot.new_string_cstring("odin_godot/root")
+    if bool(godot.project_settings_has_setting(ps, key)) {
+        def := godot.Variant{}
+        v := godot.project_settings_get_setting(ps, key, def)
+        s := godot.variant_to_string(&v)
+        os_s := string_to_odin(s, allocator)
+        if os_s != "" {
+            return os_s
+        }
+        delete(os_s, allocator)
+    }
+    if v, ok := os.lookup_env("ODIN_GODOT_ROOT", allocator); ok && v != "" {
+        return v
+    }
+    return strings.clone("/Users/walter/data/code/odin/odin_godot", allocator)
+}
+
+// One-time guard so the "odin not found" warning isn't spammed on every keystroke.
+@(private = "file")
+warned_no_odin: bool
+
+// Resolve the absolute path to the `odin` binary so validation doesn't depend on the
+// editor process inheriting a PATH that contains it (it usually won't when launched from
+// the macOS app rather than a toolchain shell — odin lives in the nix store). Order:
+// ProjectSetting `odin_godot/odin_bin` -> env `ODIN` -> a `<dir>/odin` on `$PATH`.
+// Returns ("", false) when none resolves to an existing file (caller warns + skips).
+// Package-visible: the editor rebuild-on-save coordinator (reload.odin) reuses it to
+// resolve the compiler for the background build (the editor often lacks odin on PATH).
+@(private)
+resolve_odin_bin :: proc(allocator := context.allocator) -> (string, bool) {
+    ps := godot.singleton_project_settings()
+    key := godot.new_string_cstring("odin_godot/odin_bin")
+    if bool(godot.project_settings_has_setting(ps, key)) {
+        def := godot.Variant{}
+        v := godot.project_settings_get_setting(ps, key, def)
+        s := godot.variant_to_string(&v)
+        cand := string_to_odin(s, allocator)
+        if cand != "" && os.exists(cand) {
+            return cand, true
+        }
+        delete(cand, allocator)
+    }
+    if v, ok := os.lookup_env("ODIN", allocator); ok && v != "" {
+        if os.exists(v) {
+            return v, true
+        }
+        delete(v, allocator)
+    }
+    if pathv, ok := os.lookup_env("PATH", allocator); ok {
+        defer delete(pathv, allocator)
+        it := pathv
+        for dir in strings.split_iterator(&it, ":") {
+            if dir == "" {
+                continue
+            }
+            cand := strings.concatenate({dir, "/odin"}, allocator)
+            if os.exists(cand) {
+                return cand, true
+            }
+            delete(cand, allocator)
+        }
+    }
+    return "", false
+}
+
+@(private = "file")
+vd_set_int :: proc(d: ^godot.Dictionary, key: cstring, value: i64) {
+    k := godot.new_string_cstring(key)
+    kv := godot.variant_from_string(&k)
+    iv := godot.Int(value)
+    vv := godot.variant_from_int(&iv)
+    godot.dictionary_set(d, kv, vv)
+}
+
+@(private = "file")
+vd_set_str :: proc(d: ^godot.Dictionary, key: cstring, value: string) {
+    k := godot.new_string_cstring(key)
+    kv := godot.variant_from_string(&k)
+    s := godot.new_string_odin(value)
+    sv := godot.variant_from_string(&s)
+    godot.dictionary_set(d, kv, sv)
+}
+
+@(private = "file")
+vd_set_bool :: proc(d: ^godot.Dictionary, key: cstring, value: bool) {
+    k := godot.new_string_cstring(key)
+    kv := godot.variant_from_string(&k)
+    b := value
+    bv := godot.variant_from_bool(&b)
+    godot.dictionary_set(d, kv, bv)
+}
+
+@(private = "file")
+vd_set_arr :: proc(d: ^godot.Dictionary, key: cstring, value: ^godot.Array) {
+    k := godot.new_string_cstring(key)
+    kv := godot.variant_from_string(&k)
+    av := godot.variant_from_array(value)
+    godot.dictionary_set(d, kv, av)
+}
+
+// `_validate(script, path, validate_functions, validate_errors, validate_warnings,
+//  validate_safe_lines) -> Dictionary`. args[0]=script(String), args[1]=path(String).
+lv_validate :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+    context = gdext.godot_context()
+    context.allocator = runtime.heap_allocator()
+
+    result := godot.new_dictionary_default()
+    errors := godot.new_array_default()
+
+    script := (cast(^godot.String)args[0])^
+    path := (cast(^godot.String)args[1])^
+
+    source := string_to_odin(script)
+    defer delete(source)
+
+    // Globalize the (possibly res://) path to an absolute filesystem path.
+    global := godot.project_settings_globalize_path(godot.singleton_project_settings(), path)
+    abs_path := string_to_odin(global)
+    defer delete(abs_path)
+
+    n := 0
+    odin_bin, found := resolve_odin_bin()
+    defer if found {delete(odin_bin)}
+
+    if !found {
+        // `odin` is unreachable from the editor process — validation can't run. Do NOT
+        // fail silently (that just looks like "validation does nothing"): warn ONCE, with
+        // an actionable fix, then return valid so the editor is never blocked. Common cause:
+        // launching the editor outside the toolchain shell (e.g. the macOS app from Finder),
+        // so the nix-store `odin` isn't on PATH.
+        if !warned_no_odin {
+            warned_no_odin = true
+            msg := godot.new_string_cstring(
+                "odin_godot: `odin` not found — Odin script validation is OFF. Fix: set the " +
+                "`odin_godot/odin_bin` project setting to your odin binary (absolute path), or " +
+                "launch the editor from a shell where `odin` is on PATH.",
+            )
+            godot.gd_push_warning(godot.variant_from_string(&msg))
+        }
+    } else if abs_path != "" {
+        root := odin_collection_root()
+        defer delete(root)
+        // NON-BLOCKING: returns the last-known diagnostics instantly and (re)schedules a
+        // single background worker to run the slow `odin check` off the main thread. The
+        // editor re-validates on its debounce timer, so a freshly-computed result is picked
+        // up on a later call — the UI never freezes waiting on the check. See core/diag/async.
+        ds, _ := diag.validate_async(&diag.g_validate, source, abs_path, root, odin_bin)
+        defer {
+            for d in ds {delete(d.message)}
+            delete(ds)
+        }
+        for d in ds {
+            ed := godot.new_dictionary_default()
+            vd_set_int(&ed, "line", i64(d.line))
+            vd_set_int(&ed, "column", i64(d.column))
+            vd_set_str(&ed, "message", d.message)
+            ev := godot.variant_from_dictionary(&ed)
+            godot.array_push_back(&errors, ev)
+            n += 1
+        }
+    }
+
+    vd_set_bool(&result, "valid", n == 0)
+    vd_set_arr(&result, "errors", &errors)
+    (cast(^godot.Dictionary)ret)^ = result
+}
