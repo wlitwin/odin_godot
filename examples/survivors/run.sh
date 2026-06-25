@@ -43,7 +43,9 @@ echo "SURVIVORS: editor-open smoke clean"
 SLOG="$(mktemp)"
 trap 'rm -f "$ELOG" "$SLOG"' EXIT
 set +e
-"$GODOT" --headless --path "$PROJ" --quit-after 600 >"$SLOG" 2>&1
+# main_scene is now the co-op start screen (coop.tscn); run the single-player game.tscn
+# explicitly so this gameplay live-run still exercises the full per-node survivors loop.
+"$GODOT" --headless --path "$PROJ" --quit-after 600 res://game.tscn >"$SLOG" 2>&1
 set -e
 # Ignore the benign engine EXIT-cleanup notices ("ObjectDB instances leaked", "N resources
 # still in use at exit") that every headless Godot run emits — they are unrelated to gameplay.
@@ -76,3 +78,24 @@ if ! grep -q "SURVIVORS_OK" "$TLOG"; then
     echo "SURVIVORS_FAIL: test_survivors.gd did not print SURVIVORS_OK"
     exit 1
 fi
+
+# ---- (4) UNIFIED single-player smoke: the co-op codebase in Single mode (host-with-zero-peers)
+#          must boot the SAME coop.tscn, spawn the lone player + an enemy, and run clean. This
+#          proves the "single-player == host-with-no-net" unification path also works headless.
+MLOG="$(mktemp)"
+trap 'rm -f "$ELOG" "$SLOG" "$TLOG" "$MLOG"' EXIT
+set +e
+COOP_ROLE=single "$GODOT" --headless --path "$PROJ" >"$MLOG" 2>&1
+set -e
+if grep -E "ERROR|SCRIPT ERROR|signal 11|must be overridden" "$MLOG" \
+    | grep -qvE "resources still in use at exit|ObjectDB instances leaked"; then
+    echo "SURVIVORS_FAIL: the unified single-mode (coop.tscn) run logged an error"
+    grep -E "ERROR|SCRIPT ERROR|signal 11|must be overridden" "$MLOG" \
+        | grep -vE "resources still in use at exit|ObjectDB instances leaked" | head -n 10
+    exit 1
+fi
+if ! grep -q "SINGLE_DONE" "$MLOG"; then
+    echo "SURVIVORS_FAIL: unified single-mode did not reach SINGLE_DONE"
+    exit 1
+fi
+echo "SURVIVORS: unified single-mode (coop.tscn host-with-no-net) clean"

@@ -49,10 +49,15 @@ TESTS=(
     # directions with correct sender ids — the genuine remote path tests/rpc could not reach.
     "rpcnet|RPC_NET_OK|tests/rpc_net/run.sh"
     "survivors|SURVIVORS_OK|examples/survivors/run.sh"
-    # Two REAL peers over ENet play the survivors CO-OP loop: connection, both players on both
-    # peers, client-move position replication, server enemy replication, authoritative enemy
-    # death, and a shared score that agrees on both — all asserted from both processes' stdout.
-    "coopsurvivors|COOP_OK|examples/coop_survivors/run.sh"
+    # MultiplayerSpawner + MultiplayerSynchronizer with Odin scripts, in isolation over ENet:
+    # the host spawns an Odin-scripted scene (replicated to the client) whose native position +
+    # Odin @export field sync via the synchronizer. The de-risking proof the co-op game uses.
+    "replspike|SPIKE_OK|tests/repl_spike/run.sh"
+    # CO-OP NATIVE (ENet): two REAL peers run the unified co-op survivors (coop.tscn). Proves
+    # connection, both players on both peers, client-move replication via MultiplayerSynchronizer,
+    # host enemy spawn via MultiplayerSpawner, enemy position sync, authoritative death, shared
+    # score, and a per-player level-up — all asserted from both processes' stdout.
+    "coopnative|COOP_NATIVE_OK|examples/survivors/coop_native_run.sh"
     "validate|VALIDATE_HARNESS_OK|tests/validate/run.sh"
     "complete|COMPLETE_HARNESS_OK|tests/complete/run.sh"
     "lsp|LSP_HARNESS_OK|tests/lsp/run.sh"
@@ -136,6 +141,10 @@ run_web_gated "web_showcase" "tests/web_showcase/run.sh" "PHASEWEBSHOWCASE_OK" "
 # WebSocket signaling server) and exchange @(gd_rpc) calls BOTH directions with correct sender
 # ids — the in-browser mirror of rpc_net's ENet guarantees (WEBRTC_OK).
 run_web_gated "webrtc" "tests/webrtc/run.sh" "WEBRTC_OK" "WEBRTC_BUNDLED"
+# coopweb: TWO real browser peers run the exported co-op survivors (coop.tscn) over WebRTC and
+# prove the in-browser sync guarantees — both players synced/visible, a host->client enemy sync
+# (MultiplayerSpawner + MultiplayerSynchronizer over WebRTC), and a client->host action.
+run_web_gated "coopweb" "examples/survivors/coop_web_run.sh" "COOP_WEB_OK" "COOP_WEB_BUNDLED"
 
 echo "=========================================================="
 echo "SUMMARY"

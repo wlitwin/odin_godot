@@ -38,6 +38,9 @@ examples/*/out/
 examples/*/.export_build/
 tests/.logs/
 tests/rpc_net/.runlogs/
+tests/repl_spike/.runlogs/
+examples/*/.cooplogs/
+examples/*/.coopsignal.log
 /tests/debug/bt_probe
 # resources test: .tres files written at runtime (authored examples/*.tres are kept)
 /tests/resources/*.tres
@@ -56,3 +59,4 @@ tests/rpc_net/.runlogs/
 /tests/web_showcase/node_modules
 /tests/webrtc/node_modules
 /tests/webrtc/.signal.log
+/examples/survivors/node_modules

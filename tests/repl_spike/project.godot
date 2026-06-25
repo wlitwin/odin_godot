@@ -1,0 +1,8 @@
+; Engine configuration file.
+config_version=5
+
+[application]
+
+config/name="OdinGodotReplSpike"
+run/main_scene="res://spike.tscn"
+config/features=PackedStringArray("4.6")

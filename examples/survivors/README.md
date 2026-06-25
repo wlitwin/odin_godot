@@ -32,6 +32,47 @@ nix develop --command bash -c 'bash build/build_scripts.sh examples/survivors'
 > The windowed *feel* (juice, pacing, "is it fun") can only be judged by a human — the headless
 > harness proves the **loop works**, not that it is fun.
 
+## Co-op — three modes, one codebase ("friendslop")
+
+The same project also ships a **2-player co-op** built from ONE codebase that runs in **three
+modes**, selected from a start screen (`coop.tscn`, now the main scene): **Single Player** /
+**Host** / **Join**. Transport is auto-selected by platform — **native → ENet**, **web (wasm)
+→ WebRTC** — behind one UI. The KEY UNIFICATION: **single-player == host with zero peers**, so
+the authoritative simulation (enemy spawning, enemy deaths, score) runs identically whether or
+not a client is present; Single mode just never opens a transport.
+
+The classic single-player example above (`game.tscn` + `test_survivors.gd`) is **unchanged** —
+it remains the canonical full-loop regression (`SURVIVORS_OK`). The co-op game is a separate
+scene/orchestrator (`scripts/net.odin`, `coop_player.tscn`, `coop_enemy.tscn`).
+
+**Replication uses Godot's high-level nodes (proven to work with Odin scripts):**
+- **MultiplayerSpawner** — the host spawns `coop_enemy.tscn` into `Enemies`; the engine
+  auto-instantiates (and auto-despawns) it on every client.
+- **MultiplayerSynchronizer** — streams continuous state from the authority: each player's
+  `position` + Odin `@export hp` (authority = the owning peer), each enemy's `position`/`hp`/`id`
+  (authority = host). Configs live in the `.tscn` (see the gotcha below).
+- **`@(gd_rpc)`** carries discrete events: player spawn (peer→authority), the client's
+  `request_damage`, shared score, and per-player level-up XP grants.
+
+The host is authoritative: enemies, waves, and enemy deaths are host-owned; a client hit is a
+`request_damage` RPC the host applies to the authoritative enemy. Each player levels
+independently from XP awarded on shared kills.
+
+```sh
+# co-op native (two ENet processes): prints COOP_NATIVE_OK
+nix develop --command bash -c 'bash examples/survivors/coop_native_run.sh'
+# co-op web (two headless-Chrome peers over WebRTC): prints COOP_WEB_OK (SKIPs without Chrome)
+nix develop --command bash -c 'bash examples/survivors/coop_web_run.sh'
+```
+
+> **Gotcha (replication nodes + Odin):** a `MultiplayerSynchronizer`'s `SceneReplicationConfig`
+> must be authored in the `.tscn` (present when the node enters the tree). Applying it in the
+> root script's `_ready` is too late — `on_replication_start` fires during `add_child` and
+> errors `ERR_UNCONFIGURED`, so nothing syncs. See `tests/repl_spike` for the minimal proof.
+>
+> The two-window / two-browser co-op *feel* (latency, juice) still needs a human; the headless
+> harnesses prove the **sync loop** holds over both ENet and WebRTC.
+
 ## Verify it (headless)
 
 ```sh
@@ -40,8 +81,10 @@ nix develop --command bash -c 'bash examples/survivors/run.sh'   # prints SURVIV
 
 `run.sh` runs three gates: (1) a headless **editor-open** smoke test (no crash / missing
 virtual), (2) a **live `game.tscn`** run for 600 frames that must log no script/engine errors,
-and (3) `test_survivors.gd`, which drives the **real** loop through actual physics overlaps +
-frame stepping (never faked `emit_signal`) and asserts each link:
+(3) `test_survivors.gd`, which drives the **real** loop through actual physics overlaps +
+frame stepping (never faked `emit_signal`) and asserts each link; and (4) a **unified
+single-mode** smoke of `coop.tscn` (`COOP_ROLE=single`, host-with-no-net) that must boot + run
+clean (`SINGLE_DONE`):
 
 | Milestone | What it proves |
 | --- | --- |
