@@ -69,6 +69,30 @@ func _run() -> void:
 	if v1 <= 0:
 		_fail("coin value export bad: %d" % v1); return
 
+	# REGRESSION: exercise core:math/rand on wasm via the Odin HUD's roll() method. Before the
+	# web-context fix this trapped with `unreachable executed` (no random_generator seed on
+	# freestanding_wasm32). Two calls must both succeed and advance (the shared PRNG state
+	# persists across script calls). The HUD also calls rand every _process frame; if that
+	# trapped we would never have reached this point at all. Printed EARLY (before the slow
+	# physics loop) so the entropy probe across page loads is quick. r1 also doubles as the
+	# per-load seed witness: the web context reseeds from Godot's entropy, so r1 differs across
+	# loads (drive.mjs asserts non-determinism).
+	var r1 := int(hud.call("roll"))
+	var r2 := int(hud.call("roll"))
+	if r1 == r2:
+		_fail("rand did not advance across calls: r1=%d r2=%d" % [r1, r2]); return
+	print("RAND_WEB_OK r1=%d r2=%d" % [r1, r2])
+
+	# PANIC PHASE (opt-in via ?panic=1): trigger the deliberate Odin script panic and confirm
+	# the web assertion_failure_proc surfaced a READABLE message (ODIN_SCRIPT_PANIC ...) in the
+	# console instead of a bare `unreachable`. This traps the wasm, so it is the LAST thing we
+	# do and only in this phase — the normal run never calls it, staying green.
+	if _panic_mode():
+		await get_tree().process_frame # let RAND_WEB_OK flush to the console first
+		print("PANIC_PHASE: triggering deliberate Odin script panic")
+		hud.call("panic_test") # panics -> ODIN_SCRIPT_PANIC printed, then traps
+		return
+
 	# Connect the script-declared 'collected' signal so we can assert its payload too.
 	coin1.connect("collected", _on_collected)
 
@@ -106,16 +130,13 @@ func _run() -> void:
 	if hud_text != ("Score: %d" % v1):
 		_fail("cross-script HUD Label did not reflect score: '%s', expected 'Score: %d'" % [hud_text, v1]); return
 
-	# REGRESSION: exercise core:math/rand on wasm via the Odin HUD's roll() method. Before
-	# the web-context fix this trapped with `unreachable executed` (no random_generator seed
-	# on freestanding_wasm32). Two calls must both succeed and advance (the shared PRNG state
-	# persists across script calls). The HUD also calls rand every _process frame; if that
-	# trapped we would never have reached this point at all.
-	var r1 := int(hud.call("roll"))
-	var r2 := int(hud.call("roll"))
-	if r1 == r2:
-		_fail("rand did not advance across calls: r1=%d r2=%d" % [r1, r2]); return
-	print("RAND_WEB_OK r1=%d r2=%d" % [r1, r2])
-
 	print("SHOWCASE_WEB_OK score=%d value=%d" % [score, collected_value])
 	done = true
+
+# _panic_mode — true when the page was loaded with ?panic=1 (drive.mjs's panic phase). Only
+# meaningful on web; reads location.search via JavaScriptBridge.
+func _panic_mode() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	var search = JavaScriptBridge.eval("location.search || ''", true)
+	return search != null and str(search).find("panic=1") != -1

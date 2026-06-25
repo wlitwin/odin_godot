@@ -52,6 +52,16 @@ hud_roll :: proc(self: ^Hud) -> gd.Int {
 	return gd.Int(rand.int31())
 }
 
+// panic_test() — OPT-IN deliberate panic, called by the browser driver ONLY in its panic
+// phase (never in the normal run, so the suite stays green). On freestanding wasm the default
+// panic handler traps silently (a bare `unreachable executed`); the web script context now
+// installs an assertion_failure_proc that prints a readable message first. The driver asserts
+// the recognizable text ("odin web panic sentinel") reaches the browser console.
+@(gd_method)
+hud_panic_test :: proc(self: ^Hud) {
+	panic("odin web panic sentinel")
+}
+
 // Plain helper (not a lifecycle name, not @(gd_method)) -> scriptgen leaves it alone.
 @(private = "file")
 hud_refresh :: proc(self: ^Hud) {
