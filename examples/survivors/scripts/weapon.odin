@@ -25,8 +25,8 @@ MAX_BLADES :: 16
 
 // ---- Aura visual tuning ----
 AURA_SEGMENTS :: 24 // circle resolution for the aura field (cheap: one Polygon2D)
-AURA_ALPHA_BASE :: f32(0.12) // resting translucency of the aura ring
-AURA_ALPHA_PULSE :: f32(0.42) // brightness right after a damage pulse (fades back to base)
+AURA_ALPHA_BASE :: f32(0.22) // resting translucency of the aura ring
+AURA_ALPHA_PULSE :: f32(0.6) // brightness right after a damage pulse (fades back to base)
 
 Weapon :: struct {
 	owner:        gd.Node2d,

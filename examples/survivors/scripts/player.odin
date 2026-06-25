@@ -49,6 +49,25 @@ Player :: struct {
 
 	// ---- runtime state (untagged -> private) ----
 	health: int,
+	vel:    gd.Vector2, // current velocity — accelerates toward input, coasts to a stop (momentum)
+}
+
+// How fast velocity chases the input target, as a multiple of move_speed per second: 8 => reach
+// full speed (or stop) in ~1/8 s. Scales with move_speed so fast builds stay equally responsive.
+MOVE_ACCEL_RATE :: f32(8.0)
+
+// approach moves `cur` toward `target` by at most `max_delta` (a 1-D move_toward).
+@(private = "file")
+approach :: proc(cur, target, max_delta: f32) -> f32 {
+	if cur < target {
+		r := cur + max_delta
+		return target if r > target else r
+	}
+	if cur > target {
+		r := cur - max_delta
+		return target if r < target else r
+	}
+	return cur
 }
 
 // ---- cached input action names (interned once) ----
@@ -89,13 +108,25 @@ player_process :: proc(self: ^Player, delta: f64) {
 	ensure_names()
 	if self.health <= 0 {return}
 
-	// Movement: read the real input axes and translate (a kinematic move).
+	// Movement: read the real input axes, build a target velocity, then EASE the actual velocity
+	// toward it so the hero accelerates from rest and coasts to a stop (momentum) instead of
+	// snapping on/off with the keys.
 	input := gd.singleton_input()
 	dx := f32(gd.input_get_axis(input, left_name, right_name))
 	dy := f32(gd.input_get_axis(input, up_name, down_name))
+	tvx := dx * self.move_speed
+	tvy := dy * self.move_speed
+	if dx != 0 && dy != 0 { // normalize diagonals so they aren't ~1.41x faster
+		inv := f32(0.70710677) // 1/sqrt(2)
+		tvx *= inv
+		tvy *= inv
+	}
+	step := self.move_speed * MOVE_ACCEL_RATE * f32(delta)
+	self.vel.x = approach(self.vel.x, tvx, step)
+	self.vel.y = approach(self.vel.y, tvy, step)
 	pos := gd.node2d_get_position(self.owner)
-	pos.x += dx * self.move_speed * f32(delta)
-	pos.y += dy * self.move_speed * f32(delta)
+	pos.x += self.vel.x * f32(delta)
+	pos.y += self.vel.y * f32(delta)
 	// Keep the hero inside the arena.
 	if pos.x < 8 {pos.x = 8}
 	if pos.x > ARENA_W - 8 {pos.x = ARENA_W - 8}
