@@ -54,3 +54,5 @@ tests/rpc_net/.runlogs/
 /tests/web/package.json
 /tests/web/package-lock.json
 /tests/web_showcase/node_modules
+/tests/webrtc/node_modules
+/tests/webrtc/.signal.log

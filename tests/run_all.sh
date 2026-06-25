@@ -132,6 +132,10 @@ run_web_gated "web" "tests/web/run.sh" "PHASEWEB_OK" "PHASEWEB_BUNDLED"
 # web_showcase: the FULL coin-collector game loop (physics collide -> Odin collect -> signal
 # -> shared score -> coin freed -> cross-script HUD) runs in-browser (SHOWCASE_WEB_OK).
 run_web_gated "web_showcase" "tests/web_showcase/run.sh" "PHASEWEBSHOWCASE_OK" "PHASEWEBSHOWCASE_BUNDLED"
+# webrtc: TWO real browser peers establish a browser-native WebRTC data channel (via the
+# WebSocket signaling server) and exchange @(gd_rpc) calls BOTH directions with correct sender
+# ids — the in-browser mirror of rpc_net's ENet guarantees (WEBRTC_OK).
+run_web_gated "webrtc" "tests/webrtc/run.sh" "WEBRTC_OK" "WEBRTC_BUNDLED"
 
 echo "=========================================================="
 echo "SUMMARY"

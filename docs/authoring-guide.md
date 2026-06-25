@@ -389,14 +389,76 @@ player_chat :: proc(self: ^Player, msg: gd.String) {
 | The MultiplayerAPI | `mp := gd.multiplayer(self.owner)` |
 | React to a peer joining/leaving | `gd.on_peer_connected(self.owner, "on_peer_joined")` · `gd.on_peer_disconnected(self.owner, "on_peer_left")` |
 
-> **Web/WASM:** Godot's web export does not ship `ENetMultiplayerPeer` (WebRTC/WebSocket is a
-> later milestone), so `gd.host`/`gd.join` compile but return `false` on wasm32 — branch on
-> the bool. The query helpers (`is_server`, `my_peer_id`, `rpc_sender_id`, `connected_peers`)
-> are platform-independent.
+> **Web/WASM:** Godot's web export does not ship `ENetMultiplayerPeer`, so `gd.host`/`gd.join`
+> compile but return `false` on wasm32 — branch on the bool. For browser co-op use the WebRTC
+> helpers below instead. The query helpers (`is_server`, `my_peer_id`, `rpc_sender_id`,
+> `connected_peers`) are platform-independent and work over any peer (ENet **or** WebRTC).
 
 These are proven end-to-end by `tests/rpc_net`: two real headless Godot processes (a server +
 a client) connect over ENet and exchange `@(gd_rpc)` calls in both directions, asserting each
 call executed on the *other* peer with the correct `get_remote_sender_id()`.
+
+### WebRTC / web co-op (`gd.webrtc_host` / `gd.webrtc_join`)
+
+For co-op **in the browser, over the internet, with no port-forwarding**, use WebRTC. The
+browser has a native WebRTC stack; Godot exposes it through `WebRTCMultiplayerPeer` /
+`WebRTCPeerConnection`. `godot/Ergonomics_WebRtc.odin` drives the whole async setup — open a
+signaling channel, trade an SDP offer/answer, trickle ICE, build the data channels, install
+the peer — so a game only writes:
+
+```odin
+// host becomes peer id 1; the client gets a server-assigned id:
+@(gd_method) lobby_host :: proc(self: ^Lobby) { gd.webrtc_host(self.owner, "ws://your-server:9080") }
+@(gd_method) lobby_join :: proc(self: ^Lobby) { gd.webrtc_join(self.owner, "ws://your-server:9080") }
+
+// pump the signaling socket every frame until connected (cheap no-op afterwards):
+lobby_process :: proc(self: ^Lobby, _delta: f64) { gd.webrtc_poll(self.owner) }
+```
+
+Once connected, **the same `@(gd_rpc)` methods + `gd.rpc` / `gd.rpc_id` used over ENet just
+work** — a `WebRTCMultiplayerPeer` is a `MultiplayerPeer` like any other, and the high-level
+RPC layer is transport-agnostic. Nothing about your RPC code changes; only the transport
+setup does.
+
+| Task | One-liner |
+| --- | --- |
+| Host a WebRTC lobby (id 1) | `ok := gd.webrtc_host(self.owner, "ws://host:9080")` |
+| Join a WebRTC lobby | `ok := gd.webrtc_join(self.owner, "ws://host:9080")` |
+| Pump signaling (every frame) | `gd.webrtc_poll(self.owner)` |
+| Tear the session down | `gd.webrtc_close(self.owner)` |
+
+**Signaling server.** WebRTC needs a rendezvous channel to swap connection info before the
+peer-to-peer link exists. `tests/webrtc/signal_server.mjs` is a ~70-line Node WebSocket server
+that brokers a 2-peer lobby: it assigns ids (host = 1, client = random > 1), tells each peer
+the other's id, then relays the SDP offer/answer + ICE candidates between them *verbatim* (it
+never parses their contents). The wire protocol is text frames with an ASCII Unit-Separator
+(`0x1f`) field delimiter:
+
+```
+client -> server (first frame) : HELLO\x1f<role>          role = "host" | "join"
+server -> client               : ID\x1f<peer_id>
+server -> client (both ready)  : PEER\x1f<other_id>
+peer  <-> peer (relayed)       : SDP\x1f<type>\x1f<sdp> | ICE\x1f<media>\x1f<index>\x1f<name>
+```
+
+The host (lower id) creates the offer; the client answers. **Deployment:** the *game* traffic
+is peer-to-peer WebRTC (NAT-punching, no port-forwarding), but this small signaling server
+must be reachable by both players during connection setup — host it at a public `ws://` /
+`wss://` URL. For cross-NAT cases add public STUN/TURN servers to the
+`WebRTCPeerConnection.initialize` config (localhost needs neither).
+
+> **Native caveat:** desktop/native Godot ships **no** WebRTC implementation — `WebRTCPeer
+> Connection` is an abstract extension point ("No default WebRTC extension configured") that
+> the separate [`godot-webrtc`](https://github.com/godotengine/webrtc-native) GDExtension must
+> fill. So these helpers are a **web-target path**: they compile and run natively, but
+> `initialize` fails unless `godot-webrtc` is installed (out of scope here). Prove + use them
+> in the browser export — which is exactly what `tests/webrtc` does.
+
+Proven end-to-end by `tests/webrtc`: **two real headless-Chrome instances** load the same
+exported web page (one `?role=host`, one `?role=join`), establish a genuine browser-native
+WebRTC data channel via the signaling server, and exchange `@(gd_rpc)` calls in both
+directions — asserting, from each browser's JS console, that the call executed on the *other*
+browser with the correct sender id (the in-browser mirror of `tests/rpc_net`).
 
 ## Ergonomic helpers
 
