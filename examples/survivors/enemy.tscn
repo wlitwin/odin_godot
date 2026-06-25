@@ -8,6 +8,8 @@
 radius = 13.0
 
 [node name="Enemy" type="Area2D"]
+collision_layer = 2
+collision_mask = 1
 script = ExtResource("1_enemy")
 config = ExtResource("2_cfg")
 gem_scene = ExtResource("3_gem")

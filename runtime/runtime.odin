@@ -133,6 +133,13 @@ Rpc :: struct {
 Class_Desc :: struct {
 	name:      cstring,
 	base:      cstring,
+	// The script struct's Odin `typeid` (e.g. `typeid_of(Enemy)`). Used SOLELY inside the
+	// scripts dll to map a compile-time type `T` back to its registered class name for
+	// `rt.script_of(obj, T)`'s class check (see cross.odin / class_name_for_typeid). The CORE
+	// never interprets this (typeids are not stable across the core/scripts dll boundary); it
+	// is only ever compared within the one dll that registered it. Zero for a class that does
+	// not participate in typed cross-script lookups.
+	id:        typeid,
 	size:      int,
 	align:     int,
 	lifecycle: Lifecycle,
@@ -166,6 +173,24 @@ register :: proc "contextless" (desc: Class_Desc) {
 	}
 	registry[registry_count] = desc
 	registry_count += 1
+}
+
+// Resolve a script struct's `typeid` to its registered class name (the cstring the core
+// stored in `Odin_Instance.class_name`). Returns nil when `id` is not a registered class —
+// which makes `rt.script_of(obj, T)` safely return nil for a `T` that is not an Odin script
+// class. Walked linearly (registry_count is tiny: one entry per script class); a zero `id`
+// never matches a real registration, so it cannot alias an unset Class_Desc.id. Contextless +
+// allocation-free so `script_of` stays cheap on the per-shot/per-frame hot path.
+class_name_for_typeid :: proc "contextless" (id: typeid) -> cstring {
+	if id == nil {
+		return nil
+	}
+	for i in 0 ..< registry_count {
+		if registry[i].id == id {
+			return registry[i].name
+		}
+	}
+	return nil
 }
 
 // The core pulls this right after `odin_scripts_boot`, dlsym'd by name, to learn

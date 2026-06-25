@@ -57,4 +57,22 @@ fi
 echo "SURVIVORS: live game.tscn run clean (600 frames)"
 
 # ---- (3) headless full-loop test -------------------------------------------------------
-"$GODOT" --headless --path "$PROJ" --script test_survivors.gd
+# Capture the run so we can BOTH require SURVIVORS_OK and assert the multishot milestone left
+# NO cross-script type-confusion fallout — specifically the `Can't emit non-existing signal
+# "died"` error the bug produced when an overlapping bullet was mis-resolved as an Enemy and
+# enemy_take_damage's death branch emitted "died" on the Bullet node. Must be ABSENT.
+TLOG="$(mktemp)"
+trap 'rm -f "$ELOG" "$SLOG" "$TLOG"' EXIT
+set +e
+"$GODOT" --headless --path "$PROJ" --script test_survivors.gd >"$TLOG" 2>&1
+set -e
+cat "$TLOG"
+if grep -qE 'non-existing signal|Can.t emit' "$TLOG"; then
+    echo "SURVIVORS_FAIL: emit-signal error during the multishot barrage (cross-script type confusion)"
+    grep -nE 'non-existing signal|Can.t emit' "$TLOG" | head -n 5
+    exit 1
+fi
+if ! grep -q "SURVIVORS_OK" "$TLOG"; then
+    echo "SURVIVORS_FAIL: test_survivors.gd did not print SURVIVORS_OK"
+    exit 1
+fi

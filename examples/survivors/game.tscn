@@ -36,6 +36,8 @@ polygon = PackedVector2Array(0, 0, 640, 0, 640, 360, 0, 360)
 
 [node name="Player" type="CharacterBody2D" parent="."]
 position = Vector2(320, 180)
+collision_layer = 1
+collision_mask = 0
 script = ExtResource("2_player")
 move_speed = 200.0
 max_health = 100

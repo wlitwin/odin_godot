@@ -44,3 +44,15 @@ controller_damage :: proc(self: ^Controller, target: gd.Node, amount: gd.Int) ->
 	enemy_heal(enemy, 0) // typed cross-script METHOD call (no-op heal; proves it links)
 	return int(enemy.hp)
 }
+
+// mistype(target): obtain `script_of(target, Enemy)` for a `target` whose attached Odin script
+// is NOT an Enemy (e.g. a Controller). This is the DIRECT regression for the type-confusion hole:
+// every Odin script shares one struct namespace in this dll, so before the class-checked resolver,
+// `script_of` blindly returned WHATEVER struct was attached cast to `^Enemy` (non-nil garbage),
+// defeating the caller's `if enemy == nil` guard. Returns 1 when the resolver correctly returns
+// nil (type-safe), 0 when it wrongly returns a non-nil pointer (the bug).
+@(gd_method)
+controller_mistype :: proc(self: ^Controller, target: gd.Node) -> int {
+	enemy := rt.script_of(target, Enemy)
+	return enemy == nil ? 1 : 0
+}

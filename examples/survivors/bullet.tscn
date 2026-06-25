@@ -6,6 +6,8 @@
 radius = 4.0
 
 [node name="Bullet" type="Area2D"]
+collision_layer = 4
+collision_mask = 2
 script = ExtResource("1_bullet")
 damage = 6
 speed = 470.0

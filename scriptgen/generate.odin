@@ -467,6 +467,9 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	w(b, "\t\trt.Class_Desc {\n")
 	fmt.sbprintf(b, "\t\t\tname = \"%s\",\n", s.class_name)
 	fmt.sbprintf(b, "\t\t\tbase = \"%s\",\n", s.base)
+	// The struct's typeid — lets `rt.script_of(obj, %s)` map T back to this class name for its
+	// type check (runtime/cross.odin). Without it cross-script lookups would type-confuse.
+	fmt.sbprintf(b, "\t\t\tid = typeid_of(%s),\n", cls)
 	fmt.sbprintf(b, "\t\t\tsize = size_of(%s),\n", cls)
 	fmt.sbprintf(b, "\t\t\talign = align_of(%s),\n", cls)
 	if len(s.lifecycles) > 0 {

@@ -66,5 +66,22 @@ func _initialize() -> void:
 		_fail("damage(non-Odin node) should return -1"); return
 	print("  ok  script_of(non-Odin node) safely returns nil")
 
+	# --- TYPE-SAFETY: script_of(objA, TypeB) must return nil when objA's script is TypeA != TypeB.
+	#     `ctrl` carries the Controller script; asking for an Enemy back from it must NOT hand over
+	#     the Controller struct reinterpreted as ^Enemy. mistype() returns 1 when the resolver is
+	#     type-safe (nil), 0 when it returns non-nil garbage (the type-confusion bug). This is the
+	#     direct regression: it FAILS (returns 0) before the class-checked resolver, passes after.
+	var ctrl2 := Node.new()
+	ctrl2.set_script(ctrl_script)
+	ctrl2.name = "Controller2"
+	rootw.add_child(ctrl2)
+	if int(ctrl.call("mistype", ctrl2)) != 1:
+		_fail("script_of(Controller node, Enemy) returned NON-nil -> TYPE CONFUSION (must be nil)"); return
+	# And the matching type still resolves: script_of(enemy, Enemy) is non-nil (mistype on an
+	# actual Enemy returns 0, i.e. NOT nil, proving the check is not blanket-nil).
+	if int(ctrl.call("mistype", enemy)) != 0:
+		_fail("script_of(Enemy node, Enemy) returned nil -> matching type wrongly rejected"); return
+	print("  ok  script_of type check: wrong class -> nil, matching class -> non-nil")
+
 	print("CROSSSCRIPT_OK")
 	quit(0)

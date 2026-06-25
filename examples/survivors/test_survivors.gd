@@ -225,6 +225,45 @@ func _run() -> void:
 		_fail("spawn interval did not shrink over time: t0=%.2f t120=%.2f" % [i_early, i_late]); return
 	milestones.append("difficulty(interval %.2f->%.2f)" % [i_early, i_late])
 
+	# ===== (7.5) MULTISHOT / "Split Shot": fan many bullets from ONE origin so the bullets OVERLAP
+	#          EACH OTHER. This is the survivors repro for the cross-script TYPE-CONFUSION bug: each
+	#          overlapping bullet's `area_entered` fired with `area` = ANOTHER bullet, and the old
+	#          `script_of(bullet, Enemy)` returned the Bullet struct cast to ^Enemy (non-nil garbage)
+	#          instead of nil -> enemy_take_damage ran on Bullet memory -> emitted "died" on a node
+	#          with no such signal (`Can't emit non-existing signal "died"`) -> hard crash. With the
+	#          type-checked resolver (returns nil on class mismatch) AND coherent collision layers
+	#          (bullets no longer detect bullets), this barrage must run CLEAN. Reaching the milestone
+	#          proves no crash; run.sh additionally greps this run's output for the emit error.
+	player.set("projectile_count", 10)   # huge fan -> many overlapping bullets per volley
+	player.set("fire_rate_mult", 8.0)    # fire as fast as possible
+	player.set("pierce_bonus", 4)        # bullets live longer / pass through -> more overlap
+	# Place several high-HP enemies in weapon range so the auto-pistol keeps firing volleys at them.
+	var dummies: Array = []
+	for k in range(3):
+		var hardy = load("res://config/grunt.tres").duplicate()
+		hardy.set("hp", 1000000)         # survive the barrage so the weapon never stops firing
+		var e = enemy_scene.instantiate()
+		e.set("config", hardy)
+		scene.add_child(e)
+		e.global_position = player.global_position + Vector2(55 + k * 12, 0)
+		e.set_physics_process(false)     # hold still, in range
+		dummies.append(e)
+	# Run a few hundred frames of REAL firing; each volley spawns overlapping bullets at the muzzle.
+	for _i in range(200):
+		await physics_frame
+		await process_frame
+	# Surviving to here = the overlapping-bullet path did not type-confuse / crash.
+	for e in dummies:
+		if is_instance_valid(e):
+			e.queue_free()
+	# Reset the combat boosts so the death milestone behaves like a normal run.
+	player.set("projectile_count", 0)
+	player.set("fire_rate_mult", 1.0)
+	player.set("pierce_bonus", 0)
+	await physics_frame
+	await physics_frame
+	milestones.append("multishot-overlap(no-crash)")
+
 	# ===== (8) death by contact -> game over =====
 	player.connect("health_changed", _on_health_changed)
 	# A real enemy contact, but with a lethal one-hit config so a single body_entered ends it.

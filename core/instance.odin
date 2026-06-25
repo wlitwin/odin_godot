@@ -270,8 +270,17 @@ ensure_instance_globals :: proc() {
 // instance, and nil otherwise. We additionally cross-check the pointer against the live
 // instance registry, so a placeholder / stale / foreign ptr can never be dereferenced as
 // an `Odin_Instance` (returns nil instead of handing back garbage).
+//
+// `want_class` is the class the CALLER expects (`rt.script_of(obj, T)` passes T's registered
+// class name). We return `oi.user` ONLY when the live instance's class actually matches —
+// otherwise nil. This is the type-safety check: every Odin script struct lives in one dll and
+// shares a namespace, so without verifying the class we would hand back the WRONG struct cast
+// to `^T` (e.g. a Bullet returned as a non-nil `^Enemy`), defeating the caller's nil guard and
+// corrupting memory. The compare is by VALUE (`oi.class_name` is a heap copy that survives dll
+// swaps; `want_class` is the scripts dll's static name cstring), and cheap — both are short
+// class-name strings on a hot path called every shot/frame.
 @(export)
-odin_script_struct :: proc "c" (obj: gdext.ObjectPtr) -> rawptr {
+odin_script_struct :: proc "c" (obj: gdext.ObjectPtr, want_class: cstring) -> rawptr {
 	context = gdext.godot_context()
 	if obj == nil || odin_language_object == nil {
 		return nil
@@ -283,7 +292,11 @@ odin_script_struct :: proc "c" (obj: gdext.ObjectPtr) -> rawptr {
 	oi := cast(^Odin_Instance)data
 	for x in live_instances {
 		if x == oi {
-			return oi.user
+			// Type check: only hand back the struct if its class is the one requested.
+			if want_class != nil && oi.class_name == string(want_class) {
+				return oi.user
+			}
+			return nil
 		}
 	}
 	return nil
