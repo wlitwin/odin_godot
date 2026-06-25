@@ -38,13 +38,13 @@ Spawner :: struct {
 	accum: f32, // time since the last spawn
 }
 
-// interval_at — seconds between spawns at run-time `t`. Starts ~1.1s and ramps down toward a
-// floor of 0.18s, so the swarm thickens. A pure function of t -> the test asserts it shrinks.
+// interval_at — seconds between spawns at run-time `t`. Starts ~0.9s and ramps down toward a
+// floor of 0.16s, so the swarm thickens. A pure function of t -> the test asserts it shrinks.
 @(gd_method)
 spawner_interval_at :: proc(self: ^Spawner, t: f64) -> f64 {
-	base := 1.1
+	base := 0.9
 	v := base - f64(t) * 0.006
-	if v < 0.18 {v = 0.18}
+	if v < 0.16 {v = 0.16}
 	return v
 }
 

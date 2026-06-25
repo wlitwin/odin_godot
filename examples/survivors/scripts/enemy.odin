@@ -15,9 +15,11 @@ package survivors_scripts
 //   * typed cross-script READ         — rt.script_of(config, EnemyConfig).
 //   * runtime restyling               — scales the body + recolors the Polygon2D from config.
 //   * groups                          — joins "enemies" for targeting/area-damage queries.
-//   * lifecycle _physics_process      — chases the player each physics tick.
+//   * lifecycle _physics_process      — chases the player each physics tick AND, while it is
+//                                       touching the player, deals its contact damage on a
+//                                       rate-limited per-enemy cooldown (continuous bleed —
+//                                       standing in a crowd stacks each enemy's DPS and kills).
 //   * custom @(gd_method) take_damage — weapons call this TYPED.
-//   * @(gd_connect) signal wiring     — body_entered -> on_body (contact damage).
 //   * typed cross-script WRITE        — calls the player's take_damage; sets the gem's value.
 //   * script-declared signal `died()`.
 // ----------------------------------------------------------------------------
@@ -25,18 +27,28 @@ package survivors_scripts
 import gd "godot:godot"
 import rt "godot:runtime"
 
+// How long (seconds) between an enemy's contact hits while it overlaps the player. Each enemy
+// runs its OWN cooldown, so a crowd lands many independent hits per second — the classic
+// survivors "you bleed while touching enemies".
+ENEMY_ATTACK_COOLDOWN :: f32(0.6)
+// Slack added to the enemy's body radius for the contact test (~the player's body half-extent),
+// so a touch registers a little before the centres exactly coincide.
+PLAYER_CONTACT_SLACK :: f32(12)
+
 Enemy :: struct {
 	owner:     gd.Area2d,
 	config:    ^gd.Resource `gd:"export,resource=EnemyConfig"`, // an EnemyConfig .tres slot
 	gem_scene: ^gd.Resource `gd:"export,resource=PackedScene"`, // xp_gem.tscn
 
 	// runtime state, copied from `config` on _ready:
-	hp:       int,
-	speed:    f32,
-	damage:   int,
-	xp_value: int,
-	points:   int,
-	dead:     bool,
+	hp:        int,
+	speed:     f32,
+	damage:    int,
+	xp_value:  int,
+	points:    int,
+	radius:    f32, // body radius (px) — used for the contact test
+	attack_cd: f32, // counts down to this enemy's next contact hit
+	dead:      bool,
 }
 
 enemy_ready :: proc(self: ^Enemy) {
@@ -46,6 +58,7 @@ enemy_ready :: proc(self: ^Enemy) {
 	self.damage = 8
 	self.xp_value = 1
 	self.points = 1
+	self.radius = 13
 
 	cfg := rt.script_of(cast(gd.Object)self.config, EnemyConfig)
 	if cfg != nil {
@@ -54,6 +67,7 @@ enemy_ready :: proc(self: ^Enemy) {
 		self.damage = int(cfg.damage)
 		self.xp_value = int(cfg.xp_value)
 		self.points = int(cfg.points)
+		self.radius = cfg.radius
 		// Restyle the body to this config: scale to its radius (base polygon ~13px) + recolor.
 		s := cfg.radius / 13.0
 		if s <= 0 {s = 1}
@@ -77,6 +91,21 @@ enemy_physics_process :: proc(self: ^Enemy, delta: f64) {
 	me.x += dir.x * self.speed * f32(delta)
 	me.y += dir.y * self.speed * f32(delta)
 	gd.node2d_set_global_position(self.owner, me)
+
+	// CONTINUOUS contact damage: while we overlap the player, deal our damage on a per-enemy
+	// cooldown. This (not a one-shot body_entered) is what makes standing in a crowd lethal —
+	// every overlapping enemy runs its own cooldown, so the hits stack into real DPS.
+	if self.attack_cd > 0 {self.attack_cd -= f32(delta)}
+	dx := target.x - me.x
+	dy := target.y - me.y
+	reach := self.radius + PLAYER_CONTACT_SLACK
+	if dx * dx + dy * dy <= reach * reach && self.attack_cd <= 0 {
+		ps := rt.script_of(cast(gd.Object)player, Player)
+		if ps != nil {
+			player_take_damage(ps, self.damage)
+			self.attack_cd = ENEMY_ATTACK_COOLDOWN
+		}
+	}
 }
 
 // take_damage — weapons call this TYPED. On lethal damage it banks a kill, drops an XP gem,
@@ -109,15 +138,4 @@ enemy_drop_gem :: proc(self: ^Enemy) {
 	// (physics flush), where adding a monitoring Area2D immediately is illegal.
 	gd.node2d_set_position(cast(gd.Node2d)gem, gd.node2d_get_global_position(self.owner))
 	gd.add_child_deferred(arena, gem)
-}
-
-// on_body — wired to our own `body_entered`. When the player's body overlaps us, deal our
-// contact damage through a TYPED ^Player reference.
-@(gd_method, gd_connect = "body_entered")
-enemy_on_body :: proc(self: ^Enemy, body: gd.Node2d) {
-	if self.dead {return}
-	player := rt.script_of(body, Player)
-	if player != nil {
-		player_take_damage(player, self.damage)
-	}
 }

@@ -4,9 +4,9 @@
 
 [resource]
 script = ExtResource("1")
-hp = 22
-speed = 46.0
-damage = 16
+hp = 34
+speed = 70.0
+damage = 18
 xp_value = 5
 points = 5
 radius = 20.0

@@ -23,6 +23,11 @@ import "core:math"
 
 MAX_BLADES :: 16
 
+// ---- Aura visual tuning ----
+AURA_SEGMENTS :: 24 // circle resolution for the aura field (cheap: one Polygon2D)
+AURA_ALPHA_BASE :: f32(0.12) // resting translucency of the aura ring
+AURA_ALPHA_PULSE :: f32(0.42) // brightness right after a damage pulse (fades back to base)
+
 Weapon :: struct {
 	owner:        gd.Node2d,
 	config:       ^gd.Resource `gd:"export,resource=WeaponConfig"`, // set by the player at spawn
@@ -43,6 +48,10 @@ Weapon :: struct {
 	angle:  f32, // current orbit rotation (radians)
 	blades: [MAX_BLADES]gd.Node2d, // orbit blade visuals
 	nblades: int,
+
+	// ---- Aura visual ----
+	aura_vis: gd.Polygon2d, // the translucent field ring (Aura kind only)
+	pulse:    f32, // counts down after each pulse; drives the brighten-then-fade flash
 }
 
 weapon_ready :: proc(self: ^Weapon) {
@@ -69,6 +78,7 @@ weapon_ready :: proc(self: ^Weapon) {
 	}
 
 	if self.kind == .Orbit {weapon_build_blades(self)}
+	if self.kind == .Aura {weapon_build_aura(self)}
 }
 
 weapon_process :: proc(self: ^Weapon, delta: f64) {
@@ -199,8 +209,45 @@ weapon_tick_orbit :: proc(self: ^Weapon, delta: f64) {
 }
 
 // ---------- Aura ----------
+// weapon_build_aura makes the aura's one visual: a translucent filled circle (Polygon2D)
+// sized to `range`, tinted `color`, parented to the weapon (so it rides on the player). It is
+// drawn behind the player body and pulses brighter on each strike.
+@(private = "file")
+weapon_build_aura :: proc(self: ^Weapon) {
+	vis := gd.new_polygon2d()
+	pts := gd.new_packed_vector2_array()
+	for i in 0 ..< AURA_SEGMENTS {
+		a := math.TAU * f32(i) / f32(AURA_SEGMENTS)
+		gd.packed_vector2_array_push_back(
+			&pts,
+			gd.Vector2{math.cos(a) * self.range, math.sin(a) * self.range},
+		)
+	}
+	gd.polygon2d_set_polygon(vis, pts)
+	c := self.color
+	c.a = AURA_ALPHA_BASE
+	gd.polygon2d_set_color(vis, c)
+	gd.canvas_item_set_z_index(cast(gd.Canvas_Item)vis, -1) // behind the player body
+	gd.add_child(self.owner, vis)
+	self.aura_vis = vis
+}
+
 @(private = "file")
 weapon_tick_aura :: proc(self: ^Weapon, delta: f64) {
+	// Every tick: fade the pulse flash back toward the resting alpha, so the ring visibly
+	// brightens on a hit and eases off over the cooldown.
+	if self.pulse > 0 {
+		self.pulse -= f32(delta)
+		if self.pulse < 0 {self.pulse = 0}
+	}
+	if self.aura_vis != nil {
+		k := f32(0)
+		if self.cooldown > 0 {k = self.pulse / self.cooldown}
+		c := self.color
+		c.a = AURA_ALPHA_BASE + (AURA_ALPHA_PULSE - AURA_ALPHA_BASE) * k
+		gd.polygon2d_set_color(self.aura_vis, c)
+	}
+
 	self.timer -= f32(delta)
 	if self.timer > 0 {return}
 	self.timer = self.cooldown
@@ -209,4 +256,5 @@ weapon_tick_aura :: proc(self: ^Weapon, delta: f64) {
 	dmg := self.damage
 	if p != nil {dmg *= p.damage_mult}
 	damage_enemies_in_radius(self.owner, origin, self.range, int(dmg))
+	self.pulse = self.cooldown // flash on every pulse
 }

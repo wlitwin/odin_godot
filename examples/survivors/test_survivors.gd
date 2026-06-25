@@ -88,6 +88,23 @@ func _run() -> void:
 		_fail("player has no Weapon child (starting weapon not equipped): %d" % w0); return
 	milestones.append("weapon-equipped(%d)" % w0)
 
+	# ===== (2b) Aura weapon spawns its visual field =====
+	# Equip an Aura weapon and confirm it builds its one cheap Polygon2D field-ring child (so the
+	# player can SEE the aura). _ready reads `config` to pick the .Aura branch and build the ring.
+	var aura_w = load("res://weapon.tscn").instantiate()
+	aura_w.set("config", load("res://config/aura.tres"))   # set BEFORE add_child so _ready reads it
+	player.add_child(aura_w)
+	await process_frame
+	await process_frame
+	var aura_vis_found := false
+	for c in aura_w.get_children():
+		if c.get_class() == "Polygon2D":
+			aura_vis_found = true
+			break
+	if not aura_vis_found:
+		_fail("Aura weapon did not spawn its visual Polygon2D field child"); return
+	milestones.append("aura-visual(field shown)")
+
 	# Stop the spawner so the only enemies are the ones we place (deterministic).
 	spawner.set_process(false)
 
@@ -264,9 +281,44 @@ func _run() -> void:
 	await physics_frame
 	milestones.append("multishot-overlap(no-crash)")
 
-	# ===== (8) death by contact -> game over =====
+	# ===== (7.6) CONTINUOUS CONTACT DAMAGE — the headline fix: sustained overlap BLEEDS you =====
+	# Regression guard for the one-shot `body_entered` bug. Place several high-HP enemies right on
+	# top of the (stationary) player and step ~1.5s of physics WITHOUT killing them; their contact
+	# damage must land REPEATEDLY (rate-limited, stacking per enemy) via enemy _physics_process, so
+	# the player's HP drops by far MORE than a single contact hit. (Before the fix: one hit total,
+	# then the player stood in the crowd unharmed.)
 	player.connect("health_changed", _on_health_changed)
-	# A real enemy contact, but with a lethal one-hit config so a single body_entered ends it.
+	hp_events.clear()
+	var hp_start: int = int(player.get("max_health"))   # untouched so far => health == max_health
+	var crowd: Array = []
+	for k in range(3):
+		var beefy = load("res://config/grunt.tres").duplicate()
+		beefy.set("hp", 100000)    # survive the player's auto-pistol so the crowd persists
+		beefy.set("damage", 4)     # small per-hit: ~1.5s is survivable but unmistakably multi-hit
+		var ce = enemy_scene.instantiate()
+		ce.set("config", beefy)    # set BEFORE add_child so _ready reads it
+		scene.add_child(ce)
+		ce.global_position = player.global_position   # overlapping the (stationary) player
+		crowd.append(ce)
+	for _i in range(90):           # ~1.5s of physics @ 60Hz
+		await physics_frame
+	for e in crowd:
+		if is_instance_valid(e):
+			e.queue_free()
+	await physics_frame
+	# Continuous => MANY health_changed events; the one-shot bug would yield exactly one.
+	if hp_events.size() < 2:
+		_fail("contact damage was one-shot, not continuous (hp_events=%s)" % str(hp_events)); return
+	var hp_now: int = int(hp_events[hp_events.size() - 1])
+	var contact_drop: int = hp_start - hp_now
+	if contact_drop <= 4:          # one contact hit is 4; sustained overlap must clearly exceed it
+		_fail("sustained contact did not bleed the player (drop=%d <= one hit)" % contact_drop); return
+	milestones.append("continuous-contact(drop=%d over %d hits)" % [contact_drop, hp_events.size()])
+
+	# ===== (8) death by contact -> game over =====
+	# A real enemy contact, with a lethal config so the first contact tick ends the run. The
+	# enemy sits exactly on the (stationary) player, so its chase direction is ~0 and it holds
+	# position while its _physics_process applies the continuous contact damage.
 	var lethal = load("res://config/grunt.tres").duplicate()
 	lethal.set("damage", 9999)
 	lethal.set("hp", 9999)  # so the player's weapon can't kill it before it touches us
@@ -274,7 +326,6 @@ func _run() -> void:
 	attacker.set("config", lethal)   # set BEFORE add_child so _ready reads it
 	scene.add_child(attacker)
 	attacker.global_position = player.global_position
-	attacker.set_physics_process(false)
 
 	var dead := false
 	for _i in range(40):
