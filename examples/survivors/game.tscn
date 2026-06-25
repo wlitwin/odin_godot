@@ -1,60 +1,160 @@
-[gd_scene format=3 uid="uid://jbfuqwl4p7ma"]
+[gd_scene load_steps=25 format=3]
 
-[ext_resource type="Script" uid="uid://bo3wwscxahb8t" path="res://scripts/player.odin" id="1_player"]
-[ext_resource type="PackedScene" path="res://bullet.tscn" id="2_bullet"]
-[ext_resource type="Script" uid="uid://cgxi08p64lvek" path="res://scripts/enemy.odin" id="3_enemy"]
-[ext_resource type="Resource" uid="uid://dthb2tm42rhlk" path="res://brute.tres" id="4_brute"]
-[ext_resource type="PackedScene" path="res://enemy.tscn" id="5_enemyscene"]
-[ext_resource type="Script" uid="uid://bdkj6k72wvcno" path="res://scripts/spawner.odin" id="6_spawner"]
-[ext_resource type="Script" uid="uid://fi57sgnutdhx" path="res://scripts/hud.odin" id="7_hud"]
+[ext_resource type="Script" path="res://scripts/game.odin" id="1_game"]
+[ext_resource type="Script" path="res://scripts/player.odin" id="2_player"]
+[ext_resource type="PackedScene" path="res://weapon.tscn" id="3_weapon"]
+[ext_resource type="Resource" path="res://config/pistol.tres" id="4_pistol"]
+[ext_resource type="Script" path="res://scripts/spawner.odin" id="5_spawner"]
+[ext_resource type="PackedScene" path="res://enemy.tscn" id="6_enemyscene"]
+[ext_resource type="Resource" path="res://config/swarmer.tres" id="7_swarmer"]
+[ext_resource type="Resource" path="res://config/grunt.tres" id="8_grunt"]
+[ext_resource type="Resource" path="res://config/brute.tres" id="9_brute"]
+[ext_resource type="Resource" path="res://config/tank.tres" id="10_tank"]
+[ext_resource type="Script" path="res://scripts/hud.odin" id="11_hud"]
+[ext_resource type="Script" path="res://scripts/levelup_menu.odin" id="12_levelup"]
+[ext_resource type="Script" path="res://scripts/game_over.odin" id="13_gameover"]
+[ext_resource type="Resource" path="res://config/up_damage.tres" id="14_u0"]
+[ext_resource type="Resource" path="res://config/up_damage2.tres" id="15_u1"]
+[ext_resource type="Resource" path="res://config/up_firerate.tres" id="16_u2"]
+[ext_resource type="Resource" path="res://config/up_movespeed.tres" id="17_u3"]
+[ext_resource type="Resource" path="res://config/up_maxhp.tres" id="18_u4"]
+[ext_resource type="Resource" path="res://config/up_pickup.tres" id="19_u5"]
+[ext_resource type="Resource" path="res://config/up_multishot.tres" id="20_u6"]
+[ext_resource type="Resource" path="res://config/up_pierce.tres" id="21_u7"]
+[ext_resource type="Resource" path="res://config/up_orbit.tres" id="22_u8"]
+[ext_resource type="Resource" path="res://config/up_aura.tres" id="23_u9"]
 
 [sub_resource type="RectangleShape2D" id="shape_player"]
-size = Vector2(26, 26)
+size = Vector2(24, 24)
 
-[sub_resource type="CircleShape2D" id="shape_brute"]
-radius = 16.0
+[node name="Game" type="Node2D"]
+script = ExtResource("1_game")
 
-[node name="Game" type="Node2D" unique_id=886488114]
-
-[node name="Background" type="Polygon2D" parent="." unique_id=1208328663]
+[node name="Background" type="Polygon2D" parent="."]
 color = Color(0.08, 0.09, 0.12, 1)
 polygon = PackedVector2Array(0, 0, 640, 0, 640, 360, 0, 360)
 
-[node name="Player" type="CharacterBody2D" parent="." unique_id=199283895]
+[node name="Player" type="CharacterBody2D" parent="."]
 position = Vector2(320, 180)
-script = ExtResource("1_player")
-speed = 200.0
+script = ExtResource("2_player")
+move_speed = 200.0
 max_health = 100
-fire_rate = 0.3
-bullet_scene = ExtResource("2_bullet")
+pickup_range = 70.0
+weapon_scene = ExtResource("3_weapon")
+starting_weapon = ExtResource("4_pistol")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Player" unique_id=963626461]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Player"]
 shape = SubResource("shape_player")
 
-[node name="Body" type="Polygon2D" parent="Player" unique_id=1286588040]
+[node name="Body" type="Polygon2D" parent="Player"]
 color = Color(0.35, 0.65, 1, 1)
-polygon = PackedVector2Array(0, -15, 14, 12, -14, 12)
+polygon = PackedVector2Array(0, -14, 13, 11, -13, 11)
 
-[node name="Brute" type="Area2D" parent="." unique_id=1856750018]
-position = Vector2(80, 80)
-script = ExtResource("3_enemy")
-config = ExtResource("4_brute")
+[node name="Spawner" type="Node2D" parent="."]
+script = ExtResource("5_spawner")
+enemy_scene = ExtResource("6_enemyscene")
+swarmer = ExtResource("7_swarmer")
+grunt = ExtResource("8_grunt")
+brute = ExtResource("9_brute")
+tank = ExtResource("10_tank")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Brute" unique_id=1178881170]
-shape = SubResource("shape_brute")
+[node name="Hud" type="CanvasLayer" parent="."]
+script = ExtResource("11_hud")
 
-[node name="Body" type="Polygon2D" parent="Brute" unique_id=342816834]
-color = Color(0.9, 0.25, 0.2, 1)
-polygon = PackedVector2Array(-15, -15, 15, -15, 15, 15, -15, 15)
+[node name="XPBar" type="ProgressBar" parent="Hud"]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 640.0
+offset_bottom = 10.0
+max_value = 5.0
+value = 0.0
+show_percentage = false
 
-[node name="Spawner" type="Node2D" parent="." unique_id=87873847]
-script = ExtResource("6_spawner")
-enemy_scene = ExtResource("5_enemyscene")
-interval = 0.0
+[node name="HealthBar" type="ProgressBar" parent="Hud"]
+offset_left = 8.0
+offset_top = 16.0
+offset_right = 188.0
+offset_bottom = 28.0
+max_value = 100.0
+value = 100.0
+show_percentage = false
 
-[node name="Hud" type="Label" parent="." unique_id=1496499068]
-offset_left = 12.0
-offset_top = 8.0
-text = "Score: 0
-HP: 100"
-script = ExtResource("7_hud")
+[node name="Info" type="Label" parent="Hud"]
+offset_left = 8.0
+offset_top = 32.0
+offset_right = 300.0
+offset_bottom = 70.0
+text = "Lv 1   00:00
+Kills 0   Score 0"
+
+[node name="LevelUpMenu" type="CanvasLayer" parent="."]
+process_mode = 3
+visible = false
+script = ExtResource("12_levelup")
+upgrade0 = ExtResource("14_u0")
+upgrade1 = ExtResource("15_u1")
+upgrade2 = ExtResource("16_u2")
+upgrade3 = ExtResource("17_u3")
+upgrade4 = ExtResource("18_u4")
+upgrade5 = ExtResource("19_u5")
+upgrade6 = ExtResource("20_u6")
+upgrade7 = ExtResource("21_u7")
+upgrade8 = ExtResource("22_u8")
+upgrade9 = ExtResource("23_u9")
+
+[node name="Panel" type="ColorRect" parent="LevelUpMenu"]
+offset_right = 640.0
+offset_bottom = 360.0
+color = Color(0.05, 0.06, 0.09, 0.85)
+
+[node name="Title" type="Label" parent="LevelUpMenu/Panel"]
+offset_left = 180.0
+offset_top = 34.0
+offset_right = 600.0
+offset_bottom = 60.0
+text = "LEVEL UP  —  choose an upgrade"
+
+[node name="Choice0" type="Button" parent="LevelUpMenu/Panel"]
+offset_left = 120.0
+offset_top = 90.0
+offset_right = 520.0
+offset_bottom = 150.0
+text = "Choice 0"
+
+[node name="Choice1" type="Button" parent="LevelUpMenu/Panel"]
+offset_left = 120.0
+offset_top = 160.0
+offset_right = 520.0
+offset_bottom = 220.0
+text = "Choice 1"
+
+[node name="Choice2" type="Button" parent="LevelUpMenu/Panel"]
+offset_left = 120.0
+offset_top = 230.0
+offset_right = 520.0
+offset_bottom = 290.0
+text = "Choice 2"
+
+[node name="GameOver" type="CanvasLayer" parent="."]
+process_mode = 3
+visible = false
+script = ExtResource("13_gameover")
+
+[node name="Panel" type="ColorRect" parent="GameOver"]
+offset_right = 640.0
+offset_bottom = 360.0
+color = Color(0.1, 0.03, 0.04, 0.9)
+
+[node name="Stats" type="Label" parent="GameOver/Panel"]
+offset_left = 240.0
+offset_top = 90.0
+offset_right = 540.0
+offset_bottom = 240.0
+text = "GAME OVER"
+
+[node name="Restart" type="Button" parent="GameOver/Panel"]
+offset_left = 250.0
+offset_top = 250.0
+offset_right = 390.0
+offset_bottom = 290.0
+text = "Restart"

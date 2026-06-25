@@ -1,7 +1,8 @@
 [gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemy.odin" id="1_enemy"]
-[ext_resource type="Resource" path="res://grunt.tres" id="2_cfg"]
+[ext_resource type="Resource" path="res://config/grunt.tres" id="2_cfg"]
+[ext_resource type="PackedScene" path="res://xp_gem.tscn" id="3_gem"]
 
 [sub_resource type="CircleShape2D" id="shape_enemy"]
 radius = 13.0
@@ -9,6 +10,7 @@ radius = 13.0
 [node name="Enemy" type="Area2D"]
 script = ExtResource("1_enemy")
 config = ExtResource("2_cfg")
+gem_scene = ExtResource("3_gem")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("shape_enemy")

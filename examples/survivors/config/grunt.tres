@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="EnemyConfig" format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_config.odin" id="1"]
+
+[resource]
+script = ExtResource("1")
+hp = 5
+speed = 85.0
+damage = 8
+xp_value = 2
+points = 2
+radius = 13.0
+color = Color(0.2, 0.85, 1.0, 1)

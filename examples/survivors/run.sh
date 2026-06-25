@@ -38,5 +38,23 @@ if grep -qE "signal 11|must be overridden|Required virtual" "$ELOG"; then
 fi
 echo "SURVIVORS: editor-open smoke clean"
 
-# ---- (2) headless combat-loop test -----------------------------------------------------
+# ---- (2) live-scene run: play game.tscn headless for a few hundred frames; it must log no
+#          script/engine errors (catches e.g. monitoring-state-during-physics-flush misuse). ----
+SLOG="$(mktemp)"
+trap 'rm -f "$ELOG" "$SLOG"' EXIT
+set +e
+"$GODOT" --headless --path "$PROJ" --quit-after 600 >"$SLOG" 2>&1
+set -e
+# Ignore the benign engine EXIT-cleanup notices ("ObjectDB instances leaked", "N resources
+# still in use at exit") that every headless Godot run emits — they are unrelated to gameplay.
+if grep -E "ERROR|SCRIPT ERROR|flushing queries|signal 11|must be overridden" "$SLOG" \
+    | grep -qvE "resources still in use at exit|ObjectDB instances leaked"; then
+    echo "SURVIVORS_FAIL: the live game.tscn run logged an error"
+    grep -E "ERROR|SCRIPT ERROR|flushing queries|signal 11|must be overridden" "$SLOG" \
+        | grep -vE "resources still in use at exit|ObjectDB instances leaked" | head -n 10
+    exit 1
+fi
+echo "SURVIVORS: live game.tscn run clean (600 frames)"
+
+# ---- (3) headless full-loop test -------------------------------------------------------
 "$GODOT" --headless --path "$PROJ" --script test_survivors.gd

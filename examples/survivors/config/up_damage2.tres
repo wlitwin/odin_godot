@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="UpgradeConfig" format=3]
+
+[ext_resource type="Script" path="res://scripts/upgrade_config.odin" id="1"]
+
+[resource]
+script = ExtResource("1")
+name = "Overcharge"
+description = "+40% weapon damage"
+kind = 0
+stat = 2
+amount = 0.40
+color = Color(1.0, 0.3, 0.3, 1)

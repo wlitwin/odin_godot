@@ -23,6 +23,21 @@ add_child :: proc "contextless" (parent: Object, child: Object) {
 	node_add_child(parent, child, false, Node_Internal_Mode(0))
 }
 
+// add_child_deferred parents `child` under `parent` on the NEXT idle frame (via
+// Object.call_deferred). Use it when you spawn a physics node (an Area2D/body) from inside a
+// physics callback — e.g. dropping a pickup during another area's `area_entered` — where adding
+// it immediately would toggle monitoring "while flushing queries". Set the child's LOCAL
+// position before calling (it is not in the tree yet):
+//
+//     gd.node2d_set_position(gem, world_pos) // arena is at the origin -> local == world
+//     gd.add_child_deferred(arena, gem)
+add_child_deferred :: proc "contextless" (parent: Object, child: Object) {
+	m := new_string_name_cstring("add_child", true)
+	c := child
+	cv := variant_from_object(&c)
+	object_call_deferred(parent, m, cv)
+}
+
 // get_parent returns `node`'s parent (nil at the scene root).
 get_parent :: proc "contextless" (node: Object) -> Node {
 	return node_get_parent(node)

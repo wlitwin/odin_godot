@@ -3,24 +3,26 @@
 package survivors_scripts
 
 // ----------------------------------------------------------------------------
-// Spawner — drips enemies into the arena from random edge positions on a fixed interval.
+// Spawner — streams enemies in from the arena edges, RAMPING with elapsed run-time: the spawn
+// interval shrinks over time, and the enemy-type MIX shifts from weak/fast toward tough/varied
+// as the run goes on (a weighted pick over four EnemyConfigs).
 //
 // FEATURES:
-//   * @export of a PACKED SCENE  — `enemy_scene` is an enemy.tscn picker.
-//   * @export tunable interval    — seconds between spawns.
-//   * timed spawning              — a simple delta accumulator in _process (no Timer node /
-//                                   signal wiring needed, and easy to read).
-//   * gd.* instancing             — gd.instantiate + gd.add_child to drop a new enemy in.
-//
-// New enemies are parented to the Spawner's PARENT (the arena root), not the Spawner, so
-// the scene tree stays flat and enemies are siblings of the player.
+//   * @export PackedScene + four EnemyConfig slots — the spawn template + the type pool.
+//   * difficulty scaling                            — interval_at(t) / weights from game_state's
+//                                                      run_time (the shared module).
+//   * typed cross-script WRITE                       — assigns the chosen config onto the fresh
+//                                                      enemy BEFORE add_child, so its _ready
+//                                                      reads the right stats.
+//   * @(gd_method) interval_at                        — exposes the difficulty curve so the test
+//                                                       can assert it scales.
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
+import rt "godot:runtime"
+import "core:math"
 import "core:math/rand"
 
-// Arena bounds enemies spawn along the edges of (matches the 640x360 viewport, with a small
-// inset so they appear fully on-screen).
 ARENA_W :: 640
 ARENA_H :: 360
 EDGE_INSET :: 16
@@ -28,47 +30,84 @@ EDGE_INSET :: 16
 Spawner :: struct {
 	owner:       gd.Node2d,
 	enemy_scene: ^gd.Resource `gd:"export,resource=PackedScene"`, // enemy.tscn
-	new2_scene: ^gd.Resource `gd:"export,resource=PackedScene"`,
-	interval:    f32          `gd:"export"`, // seconds between spawns
+	swarmer:     ^gd.Resource `gd:"export,resource=EnemyConfig,group=Enemy Pool"`,
+	grunt:       ^gd.Resource `gd:"export,resource=EnemyConfig"`,
+	brute:       ^gd.Resource `gd:"export,resource=EnemyConfig"`,
+	tank:        ^gd.Resource `gd:"export,resource=EnemyConfig"`,
 
-	accum: f32, // time accumulated since the last spawn
+	accum: f32, // time since the last spawn
 }
 
-spawner_ready :: proc(self: ^Spawner) {
-	if self.interval == 0 {self.interval = 1.2}
+// interval_at — seconds between spawns at run-time `t`. Starts ~1.1s and ramps down toward a
+// floor of 0.18s, so the swarm thickens. A pure function of t -> the test asserts it shrinks.
+@(gd_method)
+spawner_interval_at :: proc(self: ^Spawner, t: f64) -> f64 {
+	base := 1.1
+	v := base - f64(t) * 0.006
+	if v < 0.18 {v = 0.18}
+	return v
 }
 
 spawner_process :: proc(self: ^Spawner, delta: f64) {
+	if game_state_get_state() != .Playing {return}
 	self.accum += f32(delta)
-	if self.accum < self.interval {return}
+	t := game_state_get_run_time()
+	if f64(self.accum) < spawner_interval_at(self, t) {return}
 	self.accum = 0
-	spawner_spawn_one(self)
+	spawner_spawn_one(self, t)
+}
+
+// weighted enemy pick. `t` (seconds) shifts the mix: swarmers/grunts dominate early; brutes
+// and tanks grow more common as the run goes on.
+@(private = "file")
+spawner_pick_config :: proc(self: ^Spawner, t: f64) -> ^gd.Resource {
+	tf := f32(t)
+	w_swarm := math.max(f32(0), 4.0 - tf * 0.02)
+	w_grunt := f32(3.0)
+	w_brute := math.min(f32(5), tf * 0.02)
+	w_tank := math.min(f32(4), math.max(f32(0), (tf - 45.0) * 0.02))
+	total := w_swarm + w_grunt + w_brute + w_tank
+	r := rand.float32_range(0, total)
+	if r < w_swarm && self.swarmer != nil {return self.swarmer}
+	r -= w_swarm
+	if r < w_grunt && self.grunt != nil {return self.grunt}
+	r -= w_grunt
+	if r < w_brute && self.brute != nil {return self.brute}
+	if self.tank != nil {return self.tank}
+	if self.grunt != nil {return self.grunt}
+	return self.swarmer
 }
 
 @(private = "file")
-spawner_spawn_one :: proc(self: ^Spawner) {
+spawner_spawn_one :: proc(self: ^Spawner, t: f64) {
 	if self.enemy_scene == nil {return}
 	arena := gd.get_parent(self.owner)
 	if arena == nil {return}
-
 	enemy := gd.instantiate(cast(gd.Packed_Scene)self.enemy_scene)
 	if enemy == nil {return}
+
+	// Typed cross-script WRITE: choose this enemy's type before it enters the tree, so its
+	// _ready reads the chosen EnemyConfig.
+	cfg := spawner_pick_config(self, t)
+	if cfg != nil {
+		es := rt.script_of(enemy, Enemy)
+		if es != nil {es.config = cfg}
+	}
+
 	gd.add_child(arena, enemy)
 	gd.node2d_set_global_position(cast(gd.Node2d)enemy, random_edge_point())
 }
 
-// random_edge_point picks a random point on one of the four arena edges. (A normal proc,
-// not "contextless", because core:math/rand uses the context's random state.)
 @(private = "file")
 random_edge_point :: proc() -> gd.Vector2 {
 	switch rand.int31() % 4 {
 	case 0:
-		return gd.Vector2{rand.float32_range(0, ARENA_W), EDGE_INSET} // top
+		return gd.Vector2{rand.float32_range(0, ARENA_W), EDGE_INSET}
 	case 1:
-		return gd.Vector2{rand.float32_range(0, ARENA_W), ARENA_H - EDGE_INSET} // bottom
+		return gd.Vector2{rand.float32_range(0, ARENA_W), ARENA_H - EDGE_INSET}
 	case 2:
-		return gd.Vector2{EDGE_INSET, rand.float32_range(0, ARENA_H)} // left
+		return gd.Vector2{EDGE_INSET, rand.float32_range(0, ARENA_H)}
 	case:
-		return gd.Vector2{ARENA_W - EDGE_INSET, rand.float32_range(0, ARENA_H)} // right
+		return gd.Vector2{ARENA_W - EDGE_INSET, rand.float32_range(0, ARENA_H)}
 	}
 }

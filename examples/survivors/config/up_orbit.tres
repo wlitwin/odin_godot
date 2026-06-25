@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="UpgradeConfig" format=3]
+
+[ext_resource type="Script" path="res://scripts/upgrade_config.odin" id="1"]
+[ext_resource type="Resource" path="res://config/orbit_blade.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+name = "Orbiting Blades"
+description = "Add spinning blades that damage nearby foes"
+kind = 1
+stat = 0
+amount = 0.0
+weapon = ExtResource("2")
+color = Color(0.6, 0.9, 1.0, 1)

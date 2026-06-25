@@ -31,7 +31,17 @@ generate :: proc(s: ^Script) -> string {
 
 	// ---- cached Variant constructors used by trampolines ----
 	to_set, from_set := collect_ctors(s)
-	if len(to_set) > 0 || len(from_set) > 0 {
+	// Every method/accessor trampoline opens with `_ensure_ctors()`, so its definition must
+	// exist whenever ANY such trampoline is emitted — even if no arg/return needs a Variant
+	// constructor (a zero-arg `@(gd_method)` on a script with no other ctor needs). In that
+	// case the proc is a cheap no-op; without it the call is an undeclared-name error.
+	has_trampoline := len(s.methods) > 0
+	if !has_trampoline {
+		for ex in s.exports {
+			if ex.getter != "" || ex.setter != "" {has_trampoline = true; break}
+		}
+	}
+	if len(to_set) > 0 || len(from_set) > 0 || has_trampoline {
 		w(&b, "// ---- cached Variant constructors ----\n")
 		for tag in to_set {
 			fmt.sbprintf(&b, "@(private = \"file\")\n_to_%s: gdext.TypeFromVariantConstructorProc\n", tag)

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="UpgradeConfig" format=3]
+
+[ext_resource type="Script" path="res://scripts/upgrade_config.odin" id="1"]
+[ext_resource type="Resource" path="res://config/aura.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+name = "Searing Aura"
+description = "Add an aura that burns enemies around you"
+kind = 1
+stat = 0
+amount = 0.0
+weapon = ExtResource("2")
+color = Color(1.0, 0.5, 0.9, 1)

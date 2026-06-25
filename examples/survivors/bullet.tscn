@@ -7,8 +7,9 @@ radius = 4.0
 
 [node name="Bullet" type="Area2D"]
 script = ExtResource("1_bullet")
-damage = 3
-speed = 460.0
+damage = 6
+speed = 470.0
+pierce = 0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("shape_bullet")

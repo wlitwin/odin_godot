@@ -1,20 +1,18 @@
-//gd:extends Label
+//gd:extends CanvasLayer
 //gd:class Hud
 package survivors_scripts
 
 // ----------------------------------------------------------------------------
-// Hud — a Label showing "Score" + the player's "HP" (and "GAME OVER" when the run ends).
+// Hud — the heads-up display: an XP ProgressBar, a Health ProgressBar, and an info Label
+// (Level / Time mm:ss / Kills / Score). It is a CanvasLayer so it draws over the arena.
 //
-// It pulls its two values from two different odin_godot mechanisms, on purpose:
-//   * SCORE / game-over : read from the shared game_state MODULE every frame (the decoupled
-//                         global-state path).
-//   * HP                : received via the player's `health_changed` SIGNAL, wired with a
-//                         TYPED cross-script connect (gd.connect_to) in _ready. The HUD reads
-//                         the player's starting HP once (typed, rt.script_of) to seed itself,
-//                         then just listens.
+// It pulls its values from two odin_godot mechanisms, on purpose:
+//   * XP / level / time / kills / score : read from the shared game_state MODULE each frame.
+//   * HP                                : received via the player's `health_changed` SIGNAL,
+//                                          wired with a TYPED cross-script connect (gd.connect_to).
 //
-// So the HUD never polls the player for HP — it reacts to the signal — and the player never
-// knows the HUD exists. That is the point of signals + a shared module.
+// FEATURES: `@onready` auto-wired child refs (no manual get_node in _ready); property helpers
+// (gd.set_float / gd.set_string) to drive the bars + label; typed cross-script signal CONNECT.
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
@@ -22,57 +20,61 @@ import rt "godot:runtime"
 import "core:fmt"
 
 Hud :: struct {
-	owner:        gd.Label,
-	hp:           int, // last HP we were told about (via the signal)
-	shown_score:  gd.Int, // last score we rendered (avoids rebuilding the string each frame)
-	shown_hp:     int,
-	shown_over:   bool,
-	initialized:  bool,
+	owner:      gd.Node,
+	xp_bar:     gd.Node `gd:"onready=XPBar"`,
+	health_bar: gd.Node `gd:"onready=HealthBar"`,
+	info:       gd.Node `gd:"onready=Info"`,
+
+	hp:     int, // last HP we were told about (via the signal)
+	max_hp: int,
 }
 
 hud_ready :: proc(self: ^Hud) {
-	// Find the player by group and seed our HP from it (typed read), then subscribe to its
-	// health_changed signal so every later change pushes straight to us.
 	player := find_player(self.owner)
 	if player != nil {
 		p := rt.script_of(player, Player)
-		if p != nil {self.hp = p.health}
+		if p != nil {
+			self.hp = p.health
+			self.max_hp = p.max_health
+		}
 		// TYPED cross-script CONNECT: player.health_changed -> this.on_health_changed.
 		gd.connect_to(player, "health_changed", self.owner, "on_health_changed")
 	}
-	self.shown_score = -1 // force a first paint
-	hud_refresh(self)
+	if self.health_bar != nil {
+		gd.set_float(self.health_bar, "max_value", f64(self.max_hp))
+		gd.set_float(self.health_bar, "value", f64(self.hp))
+	}
 }
 
 hud_process :: proc(self: ^Hud, delta: f64) {
-	hud_refresh(self)
+	xp := game_state_get_xp()
+	xp_next := game_state_get_xp_to_next()
+	if self.xp_bar != nil {
+		gd.set_float(self.xp_bar, "max_value", f64(xp_next))
+		gd.set_float(self.xp_bar, "value", f64(xp))
+	}
+	if self.health_bar != nil {
+		gd.set_float(self.health_bar, "max_value", f64(self.max_hp))
+		gd.set_float(self.health_bar, "value", f64(self.hp))
+	}
+	if self.info != nil {
+		t := int(game_state_get_run_time())
+		mm := t / 60
+		ss := t % 60
+		text := fmt.ctprintf(
+			"Lv %d   %02d:%02d\nKills %d   Score %d",
+			game_state_get_level(),
+			mm,
+			ss,
+			game_state_get_kills(),
+			game_state_get_score(),
+		)
+		gd.set_string(self.info, "text", text)
+	}
 }
 
-// on_health_changed — the signal target. Connected via gd.connect_to above; it must be a
-// @(gd_method) so the engine can dispatch the signal to it. `value` is the player's new HP.
+// on_health_changed — the signal target (a @(gd_method) so the engine can dispatch to it).
 @(gd_method)
 hud_on_health_changed :: proc(self: ^Hud, value: int) {
 	self.hp = value
-}
-
-// hud_refresh rebuilds the label text only when something actually changed.
-@(private = "file")
-hud_refresh :: proc(self: ^Hud) {
-	score := game_state_get_score()
-	over := game_state_is_game_over()
-	if self.initialized && score == self.shown_score && self.hp == self.shown_hp && over == self.shown_over {
-		return
-	}
-	self.shown_score = score
-	self.shown_hp = self.hp
-	self.shown_over = over
-	self.initialized = true
-
-	text: cstring
-	if over {
-		text = fmt.ctprintf("GAME OVER\nScore: %d", score)
-	} else {
-		text = fmt.ctprintf("Score: %d\nHP: %d", score, self.hp)
-	}
-	gd.label_set_text(self.owner, gd.new_string_cstring(text))
 }
