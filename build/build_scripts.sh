@@ -43,17 +43,34 @@ ODIN="${ODIN:-odin}"
 #    dll build ONLY — e.g. `-define:RELOAD_V=2` to build a v2 for the Phase 4 reload
 #    test without rebuilding the core. `SKIP_CORE=1` skips step 4 (a reload rebuild
 #    only needs a fresh scripts dll).
-# Remove prior outputs + intermediates first: a stale dll / `.o` built against an OLD
-# runtime layout can survive an incremental `-out:` build and crash at extension init (the
-# same bug class fixed in core/build.sh). A clean output guarantees the dll matches sources.
-# This matters most for the editor reload-on-save loop, which rebuilds repeatedly in place.
-rm -f "$BIN/libodinscripts.dylib" "$BIN"/libodinscripts-*.o
+# Build to a TEMP output, then atomically `mv` it into place. `odin build -out:X` is NOT
+# atomic — it truncates/creates X up front and writes over several seconds; and a fresh
+# build needs a clean output anyway (a stale `.o` built against an OLD runtime layout can
+# survive an incremental `-out:` build and crash at extension init). Building to a temp and
+# publishing with `mv` gives BOTH: a clean output AND the invariant that the live
+# `libodinscripts.dylib` is NEVER missing/half-written. This is the macOS packaging fix:
+# the editor's reload-on-save coordinator (core/reload.odin) kicks THIS script on a worker
+# thread when the project is opened/imported; if that build is interrupted (the editor
+# quits / the headless import exits) or fails, the OLD non-destructive behavior left
+# res://bin with NO scripts dll, so the core's next load printed "failed to load scripts
+# dll" and the scene hit "No loader found". With atomic publish, an interrupted/failed
+# build simply leaves the previously-built dll in place. (Mirrored in build_scripts.ps1.)
+TMP_SCR="$BIN/.libodinscripts.tmp.dylib"
+rm -f "$TMP_SCR" "$BIN"/.libodinscripts.tmp-*.o
 "$ODIN" build "$SCRIPTS" \
     -collection:godot="$ROOT" \
     -build-mode:dll \
     -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc \
-    -out:"$BIN/libodinscripts.dylib" \
+    -out:"$TMP_SCR" \
+    -extra-linker-flags:"-Wl,-install_name,$BIN/libodinscripts.dylib" \
     -debug ${SCRIPT_BUILD_FLAGS:-}
+# Reached only if the build succeeded (set -e). Publish atomically + move the matching
+# .dSYM into place; the dylib loads by absolute path so its LC_ID_DYLIB (the tmp name) is
+# never used for resolution.
+rm -rf "$BIN/libodinscripts.dylib.dSYM"
+[ -d "$TMP_SCR.dSYM" ] && mv -f "$TMP_SCR.dSYM" "$BIN/libodinscripts.dylib.dSYM"
+mv -f "$TMP_SCR" "$BIN/libodinscripts.dylib"
+rm -f "$BIN"/.libodinscripts.tmp-*.o
 
 if [[ "${SKIP_CORE:-0}" == "1" ]]; then
     echo "Built (scripts only):"
@@ -61,13 +78,20 @@ if [[ "${SKIP_CORE:-0}" == "1" ]]; then
     exit 0
 fi
 
-# 4. Build the core ScriptLanguageExtension dll.
-rm -f "$BIN/libodin_godot.dylib" "$BIN"/libodin_godot-*.o
+# 4. Build the core ScriptLanguageExtension dll (same atomic temp+mv publish as the scripts
+#    dll above, so a failed/interrupted core build never deletes the live core dll either).
+TMP_CORE="$BIN/.libodin_godot.tmp.dylib"
+rm -f "$TMP_CORE" "$BIN"/.libodin_godot.tmp-*.o
 "$ODIN" build "$ROOT/core" \
     -collection:godot="$ROOT" \
     -build-mode:dll \
-    -out:"$BIN/libodin_godot.dylib" \
+    -out:"$TMP_CORE" \
+    -extra-linker-flags:"-Wl,-install_name,$BIN/libodin_godot.dylib" \
     -debug
+rm -rf "$BIN/libodin_godot.dylib.dSYM"
+[ -d "$TMP_CORE.dSYM" ] && mv -f "$TMP_CORE.dSYM" "$BIN/libodin_godot.dylib.dSYM"
+mv -f "$TMP_CORE" "$BIN/libodin_godot.dylib"
+rm -f "$BIN"/.libodin_godot.tmp-*.o
 
 echo "Built:"
 echo "  $BIN/libodin_godot.dylib"

@@ -58,11 +58,30 @@ function Run([string]$exe, [string[]]$argv) {
     if ($LASTEXITCODE -ne 0) { throw "command failed (exit $LASTEXITCODE): $exe $($argv -join ' ')" }
 }
 
+# Build a dll to a TEMP path, then atomically move it into place — mirrors the temp+mv in
+# build_scripts.sh. `odin build -out:X` truncates X up front and writes over several seconds;
+# if THIS build is interrupted or fails (e.g. the editor reload-on-save coordinator in
+# core/reload.odin kicks it on a worker thread and the editor quits mid-build), publishing
+# via Move means the previously-built dll is never left missing/half-written — which on
+# macOS deterministically caused "failed to load scripts dll" / "No loader found". PE has no
+# two-level namespace, but the atomic-publish invariant is identical, so keep them in sync.
+function BuildDll([string]$pkg, [string]$finalOut, [string[]]$extra) {
+    $dir  = Split-Path -Parent $finalOut
+    $leaf = Split-Path -Leaf   $finalOut
+    $tmp  = Join-Path $dir (".${leaf}.tmp.dll")
+    $tmpPdb = [System.IO.Path]::ChangeExtension($tmp, ".pdb")
+    Remove-Item -Force -ErrorAction SilentlyContinue $tmp, $tmpPdb
+    Run $Odin (@("build", $pkg, "-collection:godot=$RootRel", "-build-mode:dll", "-out:$tmp", "-debug") + $extra)
+    # Reached only on success (Run throws on a non-zero exit). Publish the dll + its .pdb.
+    $finalPdb = [System.IO.Path]::ChangeExtension($finalOut, ".pdb")
+    if (Test-Path $tmpPdb) { Move-Item -Force $tmpPdb $finalPdb }
+    Move-Item -Force $tmp $finalOut
+}
+
 # 1. CORE GDExtension dll (native MSVC build — the path that avoids the cross-compile crash).
 if (-not $SkipCore) {
     $core = Join-Path $WinBin "libodin_godot.dll"
-    Remove-Item -Force -ErrorAction SilentlyContinue $core
-    Run $Odin @("build", (Join-Path $RootRel "core"), "-collection:godot=$RootRel", "-build-mode:dll", "-out:$core", "-debug")
+    BuildDll (Join-Path $RootRel "core") $core @()
 }
 
 # 2. scriptgen preprocessor.
@@ -72,12 +91,10 @@ Run $Odin @("build", (Join-Path $RootRel "scriptgen"), "-collection:godot=$RootR
 # 3. Generate the *.gen.odin siblings.
 Run $scriptgenExe @($Scripts)
 
-# 4. Scripts dll (what the core loads at res://bin/libodinscripts.dll).
+# 4. Scripts dll (what the core loads at res://bin/libodinscripts.dll). Atomic publish (see
+#    BuildDll above) so an interrupted reload-on-save rebuild never deletes the live dll.
 $out = Join-Path $Bin "libodinscripts.dll"
-Remove-Item -Force -ErrorAction SilentlyContinue $out
-Run $Odin @("build", $Scripts, "-collection:godot=$RootRel", "-build-mode:dll",
-            "-custom-attribute:gd_method", "-custom-attribute:gd_connect", "-custom-attribute:gd_rpc",
-            "-out:$out", "-debug")
+BuildDll $Scripts $out @("-custom-attribute:gd_method", "-custom-attribute:gd_connect", "-custom-attribute:gd_rpc")
 
 Write-Host ""
 if (-not $SkipCore) { Write-Host "Built core:    $(Join-Path $WinBin 'libodin_godot.dll')" }

@@ -165,6 +165,18 @@ Because the gdext C-ABI boundary and the loader logic (`dladdr`/sibling-dll look
 macOS + web runtimes are verified, the residual risk is platform-specific link/loader detail,
 not the extension design.
 
+## Troubleshooting: `failed to load scripts dll` / `No loader found` on first open
+
+If a freshly-built project failed to load its scripts on the **first** run (often only when
+the editor was launched from a shell with `odin` on `PATH`), the cause was the scripts dll
+being **deleted** during the cold open: opening/importing the project triggers the editor's
+reload-on-save coordinator, which rebuilds the scripts dll — and the old `build_scripts.sh`
+deleted the dll *before* rebuilding, so an interrupted/failed rebuild (the headless import
+exits, or the build errors) left `res://bin` with no scripts dll. **Fixed**:
+`build/build_scripts.sh` (and `.ps1`) now build to a temp file and `mv` it into place
+**atomically**, so an interrupted or failed (re)build never removes the previously-built dll.
+Just rebuild your scripts dll once with the bundled `build_scripts.sh` and reopen.
+
 ## Verify (in-repo)
 
 ```sh
