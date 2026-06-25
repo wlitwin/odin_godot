@@ -11,10 +11,12 @@ package showcase_scripts
 
 import gd "godot:godot"
 import "core:fmt"
+import "core:math/rand"
 
 Hud :: struct {
-	owner: gd.Label,
-	shown: gd.Int, // last score we rendered (avoids rebuilding the string every frame)
+	owner:     gd.Label,
+	shown:     gd.Int, // last score we rendered (avoids rebuilding the string every frame)
+	last_roll: gd.Int, // most recent per-frame rand value (regression coverage, see below)
 }
 
 hud_ready :: proc(self: ^Hud) {
@@ -24,6 +26,11 @@ hud_ready :: proc(self: ^Hud) {
 
 hud_process :: proc(self: ^Hud, delta: f64) {
 	hud_refresh(self)
+	// REGRESSION COVERAGE: call core:math/rand EVERY frame, exactly like the survivors game
+	// does in its main loop. On freestanding_wasm32 a missing context.random_generator seed
+	// made this trap with `unreachable executed` every frame (the bug this guards). It must
+	// run cleanly in the browser now; hud_roll() lets the driver read advancing values.
+	self.last_roll = gd.Int(rand.int31())
 }
 
 // get_score() — expose the shared game_state score to the driver directly (no fmt, no
@@ -34,6 +41,15 @@ hud_process :: proc(self: ^Hud, delta: f64) {
 @(gd_method)
 hud_get_score :: proc(self: ^Hud) -> gd.Int {
 	return game_state_get()
+}
+
+// roll() — draw a fresh random value via core:math/rand. The browser driver calls this
+// twice and asserts both succeed (no wasm trap) and advance, proving the web script context
+// installs a working, persistent random_generator. This is the regression guard for the
+// "rand traps with `unreachable executed` on web" bug.
+@(gd_method)
+hud_roll :: proc(self: ^Hud) -> gd.Int {
+	return gd.Int(rand.int31())
 }
 
 // Plain helper (not a lifecycle name, not @(gd_method)) -> scriptgen leaves it alone.

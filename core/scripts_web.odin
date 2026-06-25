@@ -16,8 +16,9 @@ import "base:runtime"
 // yield "", e.g. the HUD's label text) and its main allocator is Odin's own wasm allocator,
 // which is unsafe in a shared SIDE_MODULE (memory.grow collides with Emscripten's heap).
 // We start from the default context (logger/assertion/random) but swap BOTH allocators to
-// the engine-backed, alignment-correct allocator (see web.odin). scriptgen routes the
-// trampolines here via rt.script_context() + the hook installed in web_startup below.
+// the engine-backed, alignment-correct allocator (see web.odin), AND repoint
+// `random_generator` at a persistent, pre-seeded package-global state (see below). scriptgen
+// routes the trampolines here via rt.script_context() + the hook installed in web_startup.
 //
 // Note: temp allocations made here are not freed until the engine heap reclaims them; the
 // showcase HUD only formats on a score CHANGE (guarded), so this is negligible.
@@ -27,8 +28,30 @@ web_script_context :: proc "contextless" () -> runtime.Context {
 	a := web_aligned_allocator()
 	c.allocator = a
 	c.temp_allocator = a
+	// Make `core:math/rand` work in the browser. The default chacha8 generator carried by
+	// runtime.default_context() lazily self-seeds from the OS entropy source on first use —
+	// but freestanding_wasm32 has none (runtime.HAS_RAND_BYTES == false), so that path hits
+	// `panic_contextless("no runtime entropy source")` -> wasm `unreachable` trap on EVERY
+	// rand call. Point the context at our own state, which web_startup seeds up front, so it
+	// is already `_seeded` and never reaches the entropy path. One shared global state ->
+	// the sequence ADVANCES across script calls instead of restarting each invocation.
+	// (Native is unaffected: scripts_native.odin never touches random_generator, so native
+	// scripts keep runtime.default_context()'s OS-seeded generator.)
+	c.random_generator = runtime.default_random_generator(&web_random_state)
 	return c
 }
+
+// Persistent PRNG state backing `context.random_generator` for compiled scripts on web.
+// Seeded once in web_startup with a fixed NON-ZERO constant (a zero state leaves some PRNGs
+// degenerate). freestanding_wasm32 has no cheap entropy source, so the seed is constant and
+// WEB RUNS ARE DETERMINISTIC — the same rand sequence on every page load. If you need
+// per-run variation, reseed `web_random_state` here from a real source (e.g. an engine time
+// source via the binding) once the engine is up.
+@(private)
+WEB_RANDOM_SEED :: 0x9E3779B97F4A7C15 // golden-ratio constant; non-zero
+
+@(private)
+web_random_state: runtime.Default_Random_State
 
 // A SIDE_MODULE has no CRT / entry point, so the Odin `@(init)` chain is not run
 // automatically. `odin_godot_init` calls this to run it explicitly — which fires each
@@ -38,6 +61,10 @@ web_script_context :: proc "contextless" () -> runtime.Context {
 web_startup :: proc "contextless" () {
 	rt.script_context_hook = web_script_context
 	context = runtime.default_context()
+	// Seed the script PRNG once, before any script context is used, so core:math/rand works
+	// in the browser without an OS entropy source (see web_script_context above). reset_u64
+	// drives the generator's .Reset mode, marking the state `_seeded`.
+	runtime.random_generator_reset_u64(runtime.default_random_generator(&web_random_state), WEB_RANDOM_SEED)
 	runtime._startup_runtime()
 }
 

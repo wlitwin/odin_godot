@@ -35,12 +35,18 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage();
 
 let okSeen = false, failSeen = false, okScore = 0;
+let randSeen = false, trapSeen = false;
 const lines = [];
 function record(src, text) {
   lines.push(`[${src}] ${text}`);
   const m = text.match(/SHOWCASE_WEB_OK\s+score=(\d+)/);
   if (m) { okSeen = true; okScore = parseInt(m[1], 10); }
   if (text.includes('SHOWCASE_WEB_FAIL')) failSeen = true;
+  // Regression guard for the core:math/rand wasm trap (see hud.odin / driver.gd): the HUD
+  // calls rand every frame + roll() twice, surfacing RAND_WEB_OK only if rand did NOT trap.
+  if (/RAND_WEB_OK\s+r1=/.test(text)) randSeen = true;
+  // An unseeded/entropy-less random_generator on freestanding_wasm32 surfaces as this trap.
+  if (/unreachable executed|RuntimeError/.test(text)) trapSeen = true;
 }
 page.on('console', async msg => {
   let text = msg.text();
@@ -60,7 +66,7 @@ page.on('pageerror', err => record('pageerror', err.stack || err.message));
 await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
 
 const start = Date.now();
-while (Date.now() - start < TIMEOUT_MS && !okSeen && !failSeen) {
+while (Date.now() - start < TIMEOUT_MS && !okSeen && !failSeen && !trapSeen) {
   await new Promise(r => setTimeout(r, 500));
 }
 
@@ -68,8 +74,9 @@ console.log('==== captured browser output ====');
 for (const l of lines) console.log(l);
 console.log('==== end output ====');
 console.log('SHOWCASE_WEB_OK seen:', okSeen, ' score:', okScore, '  SHOWCASE_WEB_FAIL seen:', failSeen);
+console.log('RAND_WEB_OK seen:', randSeen, '  wasm trap (unreachable/RuntimeError) seen:', trapSeen);
 
 await browser.close();
-if (okSeen && !failSeen && okScore > 0) { console.log('BROWSER_VERDICT: GREEN'); process.exit(0); }
+if (okSeen && randSeen && !failSeen && !trapSeen && okScore > 0) { console.log('BROWSER_VERDICT: GREEN'); process.exit(0); }
 console.log('BROWSER_VERDICT: FAIL');
 process.exit(1);

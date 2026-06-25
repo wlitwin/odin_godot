@@ -106,5 +106,16 @@ func _run() -> void:
 	if hud_text != ("Score: %d" % v1):
 		_fail("cross-script HUD Label did not reflect score: '%s', expected 'Score: %d'" % [hud_text, v1]); return
 
+	# REGRESSION: exercise core:math/rand on wasm via the Odin HUD's roll() method. Before
+	# the web-context fix this trapped with `unreachable executed` (no random_generator seed
+	# on freestanding_wasm32). Two calls must both succeed and advance (the shared PRNG state
+	# persists across script calls). The HUD also calls rand every _process frame; if that
+	# trapped we would never have reached this point at all.
+	var r1 := int(hud.call("roll"))
+	var r2 := int(hud.call("roll"))
+	if r1 == r2:
+		_fail("rand did not advance across calls: r1=%d r2=%d" % [r1, r2]); return
+	print("RAND_WEB_OK r1=%d r2=%d" % [r1, r2])
+
 	print("SHOWCASE_WEB_OK score=%d value=%d" % [score, collected_value])
 	done = true
