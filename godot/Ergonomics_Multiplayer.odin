@@ -132,3 +132,21 @@ on_peer_disconnected :: proc "contextless" (node: Node, method: cstring) -> Erro
 	if cast(rawptr)mp == nil {return .Failed}
 	return connect_to(cast(Object)mp, "peer_disconnected", cast(Object)node, method)
 }
+
+// rpc calls `method` (an `@(gd_rpc)` proc) on `node` across the network per the method's RPC
+// config (broadcast to the configured peers; with `call_local` it also runs locally). Thin
+// sugar over node_rpc that interns the method name for you — pass the payload as Variants:
+//
+//     v := i64(7); fv := gd.variant_from(&v)
+//     gd.rpc(self.owner, "take_damage", fv)
+rpc :: proc "contextless" (node: Node, method: cstring, args: ..Variant) -> Error {
+	name := new_string_name_cstring(method, true)
+	return node_rpc(node, name, ..args)
+}
+
+// rpc_id is `rpc` targeted at a single peer (`peer_id`; the server is always 1). Used for
+// client->server requests (e.g. `gd.rpc_id(self.owner, 1, "request_damage", ...)`):
+rpc_id :: proc "contextless" (node: Node, peer_id: int, method: cstring, args: ..Variant) -> Error {
+	name := new_string_name_cstring(method, true)
+	return node_rpc_id(node, Int(peer_id), name, ..args)
+}

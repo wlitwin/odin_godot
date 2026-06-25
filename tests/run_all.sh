@@ -49,6 +49,10 @@ TESTS=(
     # directions with correct sender ids — the genuine remote path tests/rpc could not reach.
     "rpcnet|RPC_NET_OK|tests/rpc_net/run.sh"
     "survivors|SURVIVORS_OK|examples/survivors/run.sh"
+    # Two REAL peers over ENet play the survivors CO-OP loop: connection, both players on both
+    # peers, client-move position replication, server enemy replication, authoritative enemy
+    # death, and a shared score that agrees on both — all asserted from both processes' stdout.
+    "coopsurvivors|COOP_OK|examples/coop_survivors/run.sh"
     "validate|VALIDATE_HARNESS_OK|tests/validate/run.sh"
     "complete|COMPLETE_HARNESS_OK|tests/complete/run.sh"
     "lsp|LSP_HARNESS_OK|tests/lsp/run.sh"
