@@ -45,6 +45,9 @@ TESTS=(
     "resources|RESOURCES_OK|tests/resources/run.sh"
     "crossscript|CROSSSCRIPT_OK|tests/crossscript/run.sh"
     "rpc|RPC_OK|tests/rpc/run.sh"
+    # Two REAL peers over ENet (a server + a client process) exchange @(gd_rpc) calls both
+    # directions with correct sender ids — the genuine remote path tests/rpc could not reach.
+    "rpcnet|RPC_NET_OK|tests/rpc_net/run.sh"
     "survivors|SURVIVORS_OK|examples/survivors/run.sh"
     "validate|VALIDATE_HARNESS_OK|tests/validate/run.sh"
     "complete|COMPLETE_HARNESS_OK|tests/complete/run.sh"

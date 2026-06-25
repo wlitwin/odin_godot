@@ -37,6 +37,7 @@ tests/*/.export_build/
 examples/*/out/
 examples/*/.export_build/
 tests/.logs/
+tests/rpc_net/.runlogs/
 /tests/debug/bt_probe
 # resources test: .tres files written at runtime (authored examples/*.tres are kept)
 /tests/resources/*.tres

@@ -344,6 +344,60 @@ request damage while still applying it locally. The exact config a script regist
 observable from GDScript via `node.get_script().get_rpc_config()` (a Dictionary keyed by
 method name → `{rpc_mode, transfer_mode, call_local, channel}`).
 
+### Host / join over ENet (the `gd.*` multiplayer helpers)
+
+`godot/Ergonomics_Multiplayer.odin` wraps the ENet peer + MultiplayerAPI plumbing so standing
+up a P2P session and reacting to peers is a few readable lines. Every helper takes the node
+(e.g. a script's `self.owner`) and reaches its MultiplayerAPI through `Node.get_multiplayer()`:
+
+```odin
+import gd "godot:godot"
+
+// Host or join (call from a LIVE frame — the node must be inside the tree). Each returns a
+// bool so you can branch on failure (port in use, ENet unavailable on web, …):
+@(gd_method)
+player_host :: proc(self: ^Player, port: gd.Int) {
+	if !gd.host(self.owner, int(port)) { gd.error("could not host"); return }
+	gd.on_peer_connected(self.owner, "on_peer_joined")     // wire peer_connected -> method
+	gd.on_peer_disconnected(self.owner, "on_peer_left")
+}
+@(gd_method)
+player_join :: proc(self: ^Player, port: gd.Int) {
+	gd.join(self.owner, "127.0.0.1", int(port))            // attempt; wait for connected_to_server
+}
+
+// Joined/left handlers (an @(gd_method) taking the peer id):
+@(gd_method) on_peer_joined :: proc(self: ^Player, id: gd.Int) { /* spawn their avatar */ }
+@(gd_method) on_peer_left   :: proc(self: ^Player, id: gd.Int) { /* despawn */ }
+
+// Inside any @(gd_rpc), read who sent the call:
+@(gd_method, gd_rpc = "any_peer")
+player_chat :: proc(self: ^Player, msg: gd.String) {
+	from := gd.rpc_sender_id(self.owner)                   // 0 for a local call_local dispatch
+	_ = from
+}
+```
+
+| Task | One-liner |
+| --- | --- |
+| Host an ENet server | `ok := gd.host(self.owner, 7777)` (optional `max_peers`, default 32) |
+| Join an ENet server | `ok := gd.join(self.owner, "127.0.0.1", 7777)` |
+| Am I the server/host? | `gd.is_server(self.owner)` |
+| My peer id | `id := gd.my_peer_id(self.owner)` (server is always `1`) |
+| Sender of the current RPC | `gd.rpc_sender_id(self.owner)` (call inside an `@(gd_rpc)`) |
+| All connected peer ids | `peers := gd.connected_peers(self.owner)` (`[]int`, temp-allocated) |
+| The MultiplayerAPI | `mp := gd.multiplayer(self.owner)` |
+| React to a peer joining/leaving | `gd.on_peer_connected(self.owner, "on_peer_joined")` · `gd.on_peer_disconnected(self.owner, "on_peer_left")` |
+
+> **Web/WASM:** Godot's web export does not ship `ENetMultiplayerPeer` (WebRTC/WebSocket is a
+> later milestone), so `gd.host`/`gd.join` compile but return `false` on wasm32 — branch on
+> the bool. The query helpers (`is_server`, `my_peer_id`, `rpc_sender_id`, `connected_peers`)
+> are platform-independent.
+
+These are proven end-to-end by `tests/rpc_net`: two real headless Godot processes (a server +
+a client) connect over ENet and exchange `@(gd_rpc)` calls in both directions, asserting each
+call executed on the *other* peer with the correct `get_remote_sender_id()`.
+
 ## Ergonomic helpers
 
 The `godot` package ships a hand-written ergonomics layer (`godot/Ergonomics*.odin`) that
