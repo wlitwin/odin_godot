@@ -58,6 +58,15 @@ TESTS=(
     # host enemy spawn via MultiplayerSpawner, enemy position sync, authoritative death, shared
     # score, and a per-player level-up — all asserted from both processes' stdout.
     "coopnative|COOP_NATIVE_OK|examples/survivors/coop_native_run.sh"
+    # UNIFIED PEER-AUTHORITATIVE co-op arena, SINGLE-PLAYER mode: the ONE gameplay codebase runs
+    # solo as host-with-no-peers (same pawn/bullet/enemy scripts) — move, auto-fire kills, XP/
+    # level, contact death.
+    "arenasingle|ARENA_SINGLE_OK|examples/coop_arena/run.sh"
+    # UNIFIED PEER-AUTHORITATIVE co-op arena, NATIVE (ENet): two REAL peers prove the OWNER-auth
+    # netcode — both owner-auth pawns on both peers, local-first move replication, OWNER-LOCAL
+    # bullet immediacy (the firer's bullet exists the same tick, NO host round-trip) + broadcast,
+    # a peer-authoritative kill agreed by both peers, despawn replication, XP to the firer.
+    "arenanative|ARENA_NATIVE_OK|examples/coop_arena/coop_native_run.sh"
     "validate|VALIDATE_HARNESS_OK|tests/validate/run.sh"
     "complete|COMPLETE_HARNESS_OK|tests/complete/run.sh"
     "lsp|LSP_HARNESS_OK|tests/lsp/run.sh"
@@ -145,6 +154,10 @@ run_web_gated "webrtc" "tests/webrtc/run.sh" "WEBRTC_OK" "WEBRTC_BUNDLED"
 # prove the in-browser sync guarantees — both players synced/visible, a host->client enemy sync
 # (MultiplayerSpawner + MultiplayerSynchronizer over WebRTC), and a client->host action.
 run_web_gated "coopweb" "examples/survivors/coop_web_run.sh" "COOP_WEB_OK" "COOP_WEB_BUNDLED"
+# arenaweb: TWO real browser peers run the exported peer-authoritative co-op arena over WebRTC
+# and prove the SAME owner-auth guarantees in-browser — both owner-auth pawns synced, the firer's
+# OWNER-LOCAL bullet immediacy (BULLET_LOCAL + BULLET_REMOTE), and a peer-auth kill agreed by both.
+run_web_gated "arenaweb" "examples/coop_arena/coop_web_run.sh" "ARENA_WEB_OK" "ARENA_WEB_BUNDLED"
 
 echo "=========================================================="
 echo "SUMMARY"

@@ -1,0 +1,68 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/arena.odin" id="1_arena"]
+
+[node name="ArenaGame" type="Node2D"]
+script = ExtResource("1_arena")
+
+[node name="Background" type="Polygon2D" parent="."]
+z_index = -10
+color = Color(0.08, 0.09, 0.12, 1)
+polygon = PackedVector2Array(0, 0, 640, 0, 640, 360, 0, 360)
+
+[node name="Players" type="Node2D" parent="."]
+
+[node name="Enemies" type="Node2D" parent="."]
+
+[node name="Bullets" type="Node2D" parent="."]
+
+[node name="StartScreen" type="CanvasLayer" parent="."]
+
+[node name="Panel" type="ColorRect" parent="StartScreen"]
+offset_right = 640.0
+offset_bottom = 360.0
+color = Color(0.05, 0.06, 0.09, 0.92)
+
+[node name="Title" type="Label" parent="StartScreen"]
+offset_left = 180.0
+offset_top = 30.0
+offset_right = 600.0
+offset_bottom = 60.0
+text = "ODIN CO-OP ARENA (peer-authoritative)"
+
+[node name="SingleButton" type="Button" parent="StartScreen"]
+offset_left = 180.0
+offset_top = 80.0
+offset_right = 460.0
+offset_bottom = 118.0
+text = "Single Player"
+
+[node name="HostButton" type="Button" parent="StartScreen"]
+offset_left = 180.0
+offset_top = 126.0
+offset_right = 460.0
+offset_bottom = 164.0
+text = "Host"
+
+[node name="JoinButton" type="Button" parent="StartScreen"]
+offset_left = 180.0
+offset_top = 172.0
+offset_right = 460.0
+offset_bottom = 210.0
+text = "Join"
+
+[node name="Status" type="Label" parent="StartScreen"]
+offset_left = 180.0
+offset_top = 230.0
+offset_right = 600.0
+offset_bottom = 260.0
+text = "Single, Host on one instance, Join on the other. WASD to move; auto-fire."
+
+[node name="Hud" type="CanvasLayer" parent="."]
+
+[node name="Info" type="Label" parent="Hud"]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 400.0
+offset_bottom = 30.0
+text = "Lv 1"

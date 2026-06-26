@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/arena_bullet.odin" id="1_ab"]
+
+[node name="B" type="Node2D"]
+script = ExtResource("1_ab")
+
+[node name="Body" type="Polygon2D" parent="."]
+color = Color(1, 0.95, 0.4, 1)
+polygon = PackedVector2Array(-3, -3, 3, -3, 3, 3, -3, 3)

@@ -1,0 +1,23 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/arena_player.odin" id="1_ap"]
+
+[sub_resource type="SceneReplicationConfig" id="repl_p"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:hp")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+
+[node name="P" type="Node2D"]
+script = ExtResource("1_ap")
+hp = 100
+
+[node name="Body" type="Polygon2D" parent="."]
+color = Color(0.35, 0.65, 1, 1)
+polygon = PackedVector2Array(0, -14, 13, 11, -13, 11)
+
+[node name="Sync" type="MultiplayerSynchronizer" parent="."]
+root_path = NodePath("..")
+replication_config = SubResource("repl_p")
