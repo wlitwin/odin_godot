@@ -4,6 +4,7 @@ package core
 import "godot:gdext"
 import "godot:godot"
 
+import "complete"
 import "lookup"
 
 import "base:runtime"
@@ -238,7 +239,78 @@ lv_lookup_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]
                 ld_set_str(&d, "class_member", member)
             }
         }
+    } else {
+        // Not a gd.* class symbol — treat it as a user-code symbol and ask ols where it's
+        // DEFINED, jumping there if it's a project (res://) script. Leaves `d` at the FAILED
+        // default on any miss.
+        try_definition(&d, args)
     }
 
     (cast(^godot.Dictionary)ret)^ = d
+}
+
+@(private = "file")
+ld_set_variant :: proc(d: ^godot.Dictionary, key: cstring, value: godot.Variant) {
+    k := godot.new_string_cstring(key)
+    kv := godot.variant_from_string(&k)
+    godot.dictionary_set(d, kv, value)
+}
+
+// Ask ols for the definition of the symbol at the caret (the U+FFFF marker in `code`=args[0])
+// and, when it resolves to a res:// project script, populate `d` with a SCRIPT_LOCATION result
+// the editor uses to jump there. Returns true on success; on any miss `d` keeps its FAILED
+// default. Never crashes. Definitions outside the project (Odin stdlib, gd.* binding source) do
+// not localize to res:// and are skipped — the editor can't open them as project scripts.
+@(private = "file")
+try_definition :: proc(d: ^godot.Dictionary, args: [^]gdext.TypePtr) -> bool {
+    code := string_to_odin((cast(^godot.String)args[0])^)
+    defer delete(code)
+
+    global := godot.project_settings_globalize_path(
+        godot.singleton_project_settings(),
+        (cast(^godot.String)args[2])^,
+    )
+    abs_path := string_to_odin(global)
+    defer delete(abs_path)
+    if abs_path == "" {return false}
+
+    ols_bin, found := resolve_bin("odin_godot/ols_bin", "OLS", "ols")
+    if !found {return false}
+    defer delete(ols_bin)
+    root := godot_collection_root()
+    defer delete(root)
+    share := resolve_odin_share()
+    defer delete(share)
+
+    def, sok := complete.session_definition(&complete.g_session, code, abs_path, root, share, ols_bin)
+    if !sok || !def.ok || def.path == "" {
+        if def.ok {delete(def.path)}
+        return false
+    }
+    defer delete(def.path)
+
+    // Localize the absolute target back to res:// — the editor opens project resources.
+    abs_g := godot.new_string_odin(def.path)
+    res := godot.project_settings_localize_path(godot.singleton_project_settings(), abs_g)
+    res_path := string_to_odin(res)
+    defer delete(res_path)
+    if !strings.has_prefix(res_path, "res://") {return false} // external (stdlib / binding) — not openable
+
+    ld_set_int(d, "result", OK)
+    ld_set_int(d, "type", LOOKUP_RESULT_SCRIPT_LOCATION)
+    ld_set_str(d, "script_path", res_path)
+    // LSP line is 0-based; Godot's script editor goto expects a 1-based line.
+    ld_set_int(d, "location", i64(def.line + 1))
+
+    // Pass the loaded Script so the editor opens the right FILE (not just a line in the current
+    // one). Best-effort: if the load fails, script_path + location still let it try.
+    res_g := godot.new_string_odin(res_path)
+    empty := godot.new_string_cstring("")
+    obj := godot.resource_loader_load(godot.singleton_resource_loader(), res_g, empty, .Cache_Mode_Reuse)
+    if obj != nil {
+        o := godot.Object(obj)
+        sv := godot.variant_from_object(&o)
+        ld_set_variant(d, "script", sv)
+    }
+    return true
 }

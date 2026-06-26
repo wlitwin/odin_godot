@@ -166,5 +166,37 @@ main :: proc() {
     if complete.MAX_OPTIONS <= 0 {fail("MAX_OPTIONS must be positive")}
     fmt.printf("filter/cap helpers OK (MAX_OPTIONS=%d)\n", complete.MAX_OPTIONS)
 
+    // 5. textDocument/definition reply parsing — the local goto-definition fix. ols may answer
+    // with a single Location, an array of Location, or an array of LocationLink; line is 0-based.
+    d1 := complete.parse_definition_reply(
+        transmute([]u8)string(
+            `{"jsonrpc":"2.0","id":5,"result":{"uri":"file:///proj/foo.odin","range":{"start":{"line":41,"character":2},"end":{"line":41,"character":10}}}}`,
+        ),
+    )
+    if !d1.ok || d1.path != "/proj/foo.odin" || d1.line != 41 {
+        fail(fmt.tprintf("parse_definition Location: ok=%v path=%q line=%d", d1.ok, d1.path, d1.line))
+    }
+    d2 := complete.parse_definition_reply(
+        transmute([]u8)string(`{"result":[{"uri":"file:///a/bar.odin","range":{"start":{"line":7,"character":0}}}]}`),
+    )
+    if !d2.ok || d2.path != "/a/bar.odin" || d2.line != 7 {
+        fail(fmt.tprintf("parse_definition Location[]: ok=%v path=%q line=%d", d2.ok, d2.path, d2.line))
+    }
+    d3 := complete.parse_definition_reply(
+        transmute([]u8)string(
+            `{"result":[{"targetUri":"file:///a/baz.odin","targetSelectionRange":{"start":{"line":3,"character":5}}}]}`,
+        ),
+    )
+    if !d3.ok || d3.path != "/a/baz.odin" || d3.line != 3 {
+        fail(fmt.tprintf("parse_definition LocationLink[]: ok=%v path=%q line=%d", d3.ok, d3.path, d3.line))
+    }
+    if complete.parse_definition_reply(transmute([]u8)string(`{"result":null}`)).ok {
+        fail("parse_definition null -> ok must be false")
+    }
+    if complete.parse_definition_reply(transmute([]u8)string(`{"result":[]}`)).ok {
+        fail("parse_definition [] -> ok must be false")
+    }
+    fmt.println("definition-reply parsing OK")
+
     fmt.println("COMPLETE_HARNESS_OK")
 }

@@ -55,7 +55,8 @@ godot_collection_root :: proc(allocator := context.allocator) -> string {
 // Resolve a `<dir>/<name>` binary the editor process can reach without inheriting a dev PATH:
 // ProjectSetting `<setting>` -> env `<envvar>` -> a `<dir>/<name>` on `$PATH`. Returns
 // ("", false) when nothing resolves to an existing file.
-@(private = "file")
+// Package-visible (not file-private) so core/lookup.odin resolves ols + share the SAME way.
+@(private)
 resolve_bin :: proc(setting: cstring, envvar: string, name: string, allocator := context.allocator) -> (string, bool) {
     ps := godot.singleton_project_settings()
     key := godot.new_string_cstring(setting)
@@ -89,7 +90,7 @@ resolve_bin :: proc(setting: cstring, envvar: string, name: string, allocator :=
 // `odin` either). Order: env `ODIN_SHARE` -> ProjectSetting `odin_godot/odin_share` ->
 // `<dir(dir(odin))>/share` derived from the resolved `odin` binary (symlinks followed).
 // Returns "" if none exists (completion degrades to godot-only collection).
-@(private = "file")
+@(private)
 resolve_odin_share :: proc(allocator := context.allocator) -> string {
     if v, ok := os.lookup_env("ODIN_SHARE", allocator); ok && v != "" {
         if os.exists(v) {return v}

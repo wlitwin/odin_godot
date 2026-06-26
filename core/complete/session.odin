@@ -557,3 +557,83 @@ session_complete :: proc(
     delete(opts)
     return parse_completion_reply(body, allocator), true
 }
+
+// session_definition — like session_complete but asks ols for `textDocument/definition` and
+// returns the resolved target, with the overlay path remapped back to the real package file.
+// ok=false means the session was unavailable (caller -> FAILED); ok=true with def.ok=false means
+// ols answered but found no definition.
+session_definition :: proc(
+    s: ^Session,
+    code: string,
+    abs_path: string,
+    root: string,
+    share: string,
+    ols_bin := "ols",
+    allocator := context.allocator,
+) -> (def: Definition, ok: bool) {
+    if !ensure_started(s, ols_bin, root, share) {return Definition{}, false}
+
+    overlay, ook := ensure_overlay(s, abs_path)
+    if !ook {return Definition{}, false}
+    defer delete(overlay, sess_alloc())
+
+    clean, line, char := caret_from_code(code, context.temp_allocator)
+    uri := fmt.tprintf("file://%s", overlay)
+
+    text_json, mErr := json.marshal(clean, {}, context.temp_allocator)
+    if mErr != nil {return Definition{}, false}
+
+    sync.lock(&s.state_mutex)
+    ver, opened := s.docs[uri]
+    ver += 1
+    s.docs[strings.clone(uri, sess_alloc()) if !opened else uri] = ver
+    sync.unlock(&s.state_mutex)
+
+    sync.lock(&s.req_mutex)
+    defer sync.unlock(&s.req_mutex)
+
+    if !opened {
+        notify(s, fmt.tprintf(
+            `{{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{{"textDocument":{{"uri":"%s","languageId":"odin","version":%d,"text":%s}}}}}}`,
+            uri, ver, string(text_json),
+        ))
+    } else {
+        notify(s, fmt.tprintf(
+            `{{"jsonrpc":"2.0","method":"textDocument/didChange","params":{{"textDocument":{{"uri":"%s","version":%d}},"contentChanges":[{{"text":%s}}]}}}}`,
+            uri, ver, string(text_json),
+        ))
+    }
+
+    s.next_id += 1
+    id := s.next_id
+    req := fmt.tprintf(
+        `{{"jsonrpc":"2.0","id":%d,"method":"textDocument/definition","params":{{"textDocument":{{"uri":"%s"}},"position":{{"line":%d,"character":%d}}}}}}`,
+        id, uri, line, char,
+    )
+    body, rok := do_request(s, id, req, REQUEST_TIMEOUT)
+    if !rok {return Definition{}, false}
+    defer delete(body, sess_alloc())
+
+    def = parse_definition_reply(body, allocator)
+    if def.ok {
+        def.path = remap_overlay_path(s, def.path, allocator)
+    }
+    return def, true
+}
+
+// Map an overlay path (`<workspace>/pkgN/foo.odin`) back to the real package file. Same-package
+// definitions resolve to the overlay copy; symbols in other packages already come back as real
+// paths and pass through unchanged.
+@(private = "file")
+remap_overlay_path :: proc(s: ^Session, path: string, allocator: runtime.Allocator) -> string {
+    sync.lock(&s.state_mutex)
+    defer sync.unlock(&s.state_mutex)
+    for real, ov in s.pkgs {
+        if strings.has_prefix(path, ov) && len(path) > len(ov) && path[len(ov)] == '/' {
+            remapped := strings.concatenate({real, path[len(ov):]}, allocator)
+            delete(path, allocator)
+            return remapped
+        }
+    }
+    return path
+}

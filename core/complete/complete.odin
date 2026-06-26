@@ -362,6 +362,65 @@ parse_completion_reply :: proc(body: []u8, allocator := context.allocator) -> [d
     return res
 }
 
+// A resolved goto-definition target (LSP textDocument/definition). `path` is a filesystem path
+// (file:// stripped); the caller remaps overlay paths + localizes to res://. `line` is 0-based
+// (LSP). None/parse-error -> ok=false.
+Definition :: struct {
+    path: string, // owned (cloned) into the caller's allocator
+    line: int,    // 0-based (range.start.line)
+    ok:   bool,
+}
+
+// Parse a textDocument/definition reply. `result` may be a single Location {uri,range}, an
+// array of Location, or an array of LocationLink {targetUri, targetSelectionRange|targetRange}.
+// Takes the first; ok=false on null/empty/parse-error.
+parse_definition_reply :: proc(body: []u8, allocator := context.allocator) -> Definition {
+    val, perr := json.parse(body, .JSON, true, context.temp_allocator)
+    if perr != nil {return Definition{}}
+    obj, ook := val.(json.Object)
+    if !ook {return Definition{}}
+    resv, has := obj["result"]
+    if !has {return Definition{}}
+
+    loc: json.Object
+    #partial switch t in resv {
+    case json.Object:
+        loc = t
+    case json.Array:
+        if len(t) > 0 {
+            if o, ok2 := t[0].(json.Object); ok2 {loc = o}
+        }
+    }
+    if loc == nil {return Definition{}} // null / empty / unexpected result shape
+
+    // Location: {uri, range}. LocationLink: {targetUri, targetSelectionRange|targetRange}.
+    uri := ""
+    rng: json.Object
+    if u, ok2 := as_str(loc["uri"]); ok2 && u != "" {
+        uri = u
+        if r, ok3 := loc["range"].(json.Object); ok3 {rng = r}
+    } else if u, ok2 := as_str(loc["targetUri"]); ok2 && u != "" {
+        uri = u
+        if r, ok3 := loc["targetSelectionRange"].(json.Object); ok3 {
+            rng = r
+        } else if r2, ok4 := loc["targetRange"].(json.Object); ok4 {
+            rng = r2
+        }
+    }
+    if uri == "" {return Definition{}}
+
+    line := 0
+    if rng != nil {
+        if startv, ok3 := rng["start"].(json.Object); ok3 {
+            if lv, ok4 := as_int(startv["line"]); ok4 {line = lv}
+        }
+    }
+
+    path := uri
+    if strings.has_prefix(path, "file://") {path = path[len("file://"):]}
+    return Definition{path = strings.clone(path, allocator), line = line, ok = true}
+}
+
 // ---- the full overlay + ols pipeline ----
 
 // Write the ols.json that tells ols where the collections live, so completion does NOT
