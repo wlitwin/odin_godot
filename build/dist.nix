@@ -80,7 +80,11 @@ stdenvNoCC.mkDerivation {
     # scripts module, scriptgen for the //gd: codegen the build scripts run.
     cp -r core godot gdext libgd runtime $A/
     cp -r scriptgen $A/scriptgen
-    cp -r build $A/build
+    # Only the CONSUMER-facing build scripts — not the repo's dev/test builders
+    # (build_phase*.sh) or the nix package def (dist.nix), which a consumer never runs.
+    mkdir -p $A/build
+    cp build/build_scripts.sh build/build_scripts.ps1 build/build_export_scripts.sh \
+       build/build_web.sh build/build_cross.sh $A/build/
     # The raw engine inputs are gitignored (regenerated from the pinned Godot) and are NOT
     # needed to compile scripts (the godot/ binding is already generated from them) — copy
     # only if present so `nix build` works from a clean (gitignore-filtered) source.
