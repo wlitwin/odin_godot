@@ -69,6 +69,7 @@ TESTS=(
     "arenanative|ARENA_NATIVE_OK|examples/coop_arena/coop_native_run.sh"
     "validate|VALIDATE_HARNESS_OK|tests/validate/run.sh"
     "complete|COMPLETE_HARNESS_OK|tests/complete/run.sh"
+    "gdextalloc|GDEXT_ALLOC_OK|tests/gdext_alloc/run.sh"
     "lsp|LSP_HARNESS_OK|tests/lsp/run.sh"
     "save|SAVE_TEST_OK|tests/save/run.sh"
     "editor|EDITOR_SMOKE_OK|tests/editor_smoke/run.sh"
