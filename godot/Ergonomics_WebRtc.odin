@@ -108,6 +108,13 @@ Webrtc_Session :: struct {
 	err:       Webrtc_Error,
 	room_buf:  [64]u8, // the room CODE (host: filled on `created`; client: the code it joins)
 	room_len:  int,
+	// Server-provided ICE config: the relay ships an `ice` array (STUN + an ephemeral-cred TURN
+	// entry) in `created`/`joined`, which arrives BEFORE the `peer`-triggered connection setup.
+	// We stash it here (as `{"iceServers":[...]}` JSON) and feed it to WebRTCPeerConnection.initialize;
+	// when absent we fall back to the built-in STUN config (_ICE_CONFIG_JSON).
+	ice_buf:   [4096]u8,
+	ice_len:   int,
+	have_ice:  bool,
 }
 
 @(private = "file")
@@ -282,12 +289,14 @@ _handle_packet :: proc "contextless" (s: ^Webrtc_Session) {
 	switch typ {
 	case "created":
 		_store_room(s, &d)
+		_store_ice(s, &d)
 		s.my_id = 1
 		_install_peer(s, true)
 		s.state = .Waiting_Peer
 
 	case "joined":
 		_store_room(s, &d)
+		_store_ice(s, &d)
 		s.my_id = _dget_int(&d, "id")
 		_install_peer(s, false)
 		s.state = .Waiting_Peer
@@ -340,6 +349,26 @@ _store_room :: proc "contextless" (s: ^Webrtc_Session, d: ^Dictionary) {
 	s.room_len = len(_str_to_buf(rs, s.room_buf[:]))
 }
 
+// _store_ice captures the server-provided `ice` array (sent in created/joined) so it can be used
+// as the WebRTCPeerConnection iceServers. The relay mints per-peer ephemeral TURN creds (and a
+// STUN entry); the array arrives BEFORE the peer-triggered _setup_connection, so we stash it as a
+// `{"iceServers":[...]}` JSON config string here and re-parse it at initialize time. Absent or
+// malformed `ice` ⇒ have_ice stays false and we fall back to the built-in STUN config.
+@(private = "file")
+_store_ice :: proc "contextless" (s: ^Webrtc_Session, d: ^Dictionary) {
+	if !_dhas(d, "ice") {return}
+	iv := _dget(d, "ice")
+	if gdext.variant_get_type(cast(gdext.VariantPtr)&iv) != .Array {return}
+	// Wrap the iceServers array in the config dict shape WebRTCPeerConnection.initialize expects,
+	// then stringify via Godot's JSON so we never hand-roll Array/Dictionary persistence.
+	cfg := new_dictionary_default()
+	dictionary_set(&cfg, _vstr("iceServers"), iv)
+	cv := variant_from_dictionary(&cfg)
+	js := json_stringify(cv, string_empty(), false, false)
+	s.ice_len = len(_str_to_buf(js, s.ice_buf[:]))
+	s.have_ice = s.ice_len > 0
+}
+
 // _apply_signal applies a relayed SDP/ICE payload (the nested `data` object) to our connection.
 @(private = "file")
 _apply_signal :: proc "contextless" (s: ^Webrtc_Session, dd: ^Dictionary) {
@@ -364,10 +393,13 @@ _apply_signal :: proc "contextless" (s: ^Webrtc_Session, dd: ^Dictionary) {
 _setup_connection :: proc "contextless" (s: ^Webrtc_Session) {
 	conn := new_web_rtc_peer_connection()
 
-	// Configure ICE servers (STUN; TURN slot documented at _ICE_CONFIG_JSON) so real cross-NAT
-	// deploys can gather server-reflexive candidates. Built by parsing the JSON config so the
-	// nested iceServers/urls arrays need no hand-rolled Array construction.
-	cfgv := json_parse_string(new_string_cstring(_ICE_CONFIG_JSON))
+	// Configure ICE servers. Prefer the relay's server-provided `ice` array (captured on
+	// created/joined into ice_buf) — it carries the ephemeral-cred TURN entry needed for
+	// cross-NAT relaying. Fall back to the built-in STUN config when the relay sent none (e.g.
+	// LAN / a relay with no TURN secret). Built by parsing JSON so the nested iceServers/urls
+	// arrays need no hand-rolled Array construction.
+	ice_js := s.have_ice ? new_string_odin(string(s.ice_buf[:s.ice_len])) : new_string_cstring(_ICE_CONFIG_JSON)
+	cfgv := json_parse_string(ice_js)
 	cfg := variant_to_dictionary(&cfgv)
 	web_rtc_peer_connection_initialize(conn, cfg)
 

@@ -39,6 +39,12 @@ const wss = new WebSocketServer({ host: "127.0.0.1", port: PORT });
 // rooms: CODE -> { host: sock|null, client: sock|null }
 const rooms = new Map();
 
+// ICE servers shipped in created/joined (the client uses these as its WebRTCPeerConnection
+// iceServers). The production Elixir relay also mints an ephemeral-cred TURN entry here from a
+// shared coturn secret; this LOCAL stand-in has no TURN secret, so it sends STUN-only — enough
+// for localhost (host candidates) and it exercises the client's server-provided-ICE path.
+const ICE = [{ urls: ["stun:stun.l.google.com:19302"] }];
+
 // Short, human-shareable, unambiguous room code (no 0/O/1/I).
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function newCode() {
@@ -101,7 +107,7 @@ wss.on("connection", (sock) => {
         const code = newCode();
         rooms.set(code, { host: sock, client: null });
         sock._room = code; sock._id = 1;
-        send(sock, { type: "created", room: code, id: 1 });
+        send(sock, { type: "created", room: code, id: 1, ice: ICE });
         console.log(`signal: host created room ${code} (id=1)`);
         break;
       }
@@ -112,7 +118,7 @@ wss.on("connection", (sock) => {
         if (!r) { send(sock, { type: "error", reason: "no_room" }); return; }
         if (r.client) { send(sock, { type: "error", reason: "full" }); return; }
         sock._room = code; sock._id = 2; r.client = sock;
-        send(sock, { type: "joined", room: code, id: 2 });
+        send(sock, { type: "joined", room: code, id: 2, ice: ICE });
         console.log(`signal: client joined room ${code} (id=2)`);
         // Both present -> tell each about the other; the host (id 1) then creates the offer.
         send(r.host, { type: "peer", id: r.client._id });
