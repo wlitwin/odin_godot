@@ -12,10 +12,11 @@ package godot
 // trade an SDP offer/answer + trickle ICE candidates, build the data channels, and only
 // THEN install it as `multiplayer.multiplayer_peer`. These helpers collapse that into:
 //
-//     // host (becomes peer id 1):
-//     gd.webrtc_host(self.owner, "ws://127.0.0.1:9080")
-//     // client (gets a server-assigned id):
-//     gd.webrtc_join(self.owner, "ws://127.0.0.1:9080")
+//     // host (becomes peer id 1), gets a ROOM CODE to share:
+//     gd.webrtc_host(self.owner, "wss://relay.example.com/rtc")
+//     code := gd.webrtc_room_code(self.owner)   // "" until the server replies `created`
+//     // client joins that room code:
+//     gd.webrtc_join(self.owner, "wss://relay.example.com/rtc", "ABCD")
 //     // ...then EVERY frame, pump the signaling socket until connected:
 //     gd.webrtc_poll(self.owner)
 //
@@ -24,21 +25,38 @@ package godot
 // multiplayer RPC layer is transport-agnostic. So the ENet co-op code is reused verbatim;
 // only the transport setup differs.
 //
-// SIGNALING PROTOCOL (text frames over a WebSocket; see tests/webrtc/signal_server.mjs):
-//   field separator is the ASCII Unit-Separator byte 0x1f (never present in SDP/ICE text).
-//     client -> server, first frame : "HELLO\x1f<role>"   role = "host" | "join"
-//     server -> client              : "ID\x1f<peer_id>"   (host always 1; client random > 1)
-//     server -> client (both ready) : "PEER\x1f<other_id>"  begin the handshake
-//     peer  <-> peer (relayed)      : "SDP\x1f<type>\x1f<sdp>"        type = "offer"|"answer"
-//                                     "ICE\x1f<media>\x1f<index>\x1f<name>"
-//   The server only authors ID/PEER; it relays SDP/ICE between the two peers VERBATIM (it
-//   never parses their contents). The host (lower id) creates the offer; the client answers.
+// SIGNALING PROTOCOL (raw WebSocket, JSON text frames; server path `/rtc`). This matches the
+// production Elixir relay spec EXACTLY — adhere to field names / message types / id semantics:
+//   client -> server:
+//     {"type":"create"}                                // make a room, become host (id 1)
+//     {"type":"join","room":"<CODE>"}                  // join a room
+//     {"type":"signal","to":<peerId>,"data":<opaque>}  // relay SDP/ICE to a peer
+//     {"type":"leave"}
+//   server -> client:
+//     {"type":"created","room":"<CODE>","id":1}
+//     {"type":"joined","room":"<CODE>","id":<n>}
+//     {"type":"peer","id":<peerId>}                    // both sides get it once 2 are in
+//     {"type":"signal","from":<peerId>,"data":<opaque>}
+//     {"type":"peer_left","id":<peerId>}
+//     {"type":"error","reason":"no_room"|"full"|"bad_msg"}
+// The server relays `data` VERBATIM (it never parses it). We carry the WebRTC SDP/ICE that the
+// connection emits as a nested JSON object under `data` — both client sides agree on its shape:
+//     SDP : {"kind":"sdp","sdp_type":"offer"|"answer","sdp":"<text>"}
+//     ICE : {"kind":"ice","media":"<m>","index":<i>,"name":"<candidate>"}
+// The host (is_host) initiates with an offer; the client answers when it set_remote_description's
+// the offer. Godot's JSON class does all the escaping/parsing (SDP is full of CRLF + ':' chars).
 //
-// NATIVE CAVEAT: desktop/native Godot has NO bundled WebRTC implementation ("No default
-// WebRTC extension configured" — `WebRTCPeerConnection` is an abstract extension point that
-// the separate `godot-webrtc` GDExtension must fill). So these helpers are a WEB-target path:
-// on a native build they compile and run, but `WebRTCPeerConnection.initialize` fails unless
-// godot-webrtc is installed (out of scope here). Prove + use them in the browser export.
+// STUN/TURN: _ICE_CONFIG_JSON below is parsed into the WebRTCPeerConnection config so real
+// cross-NAT deploys can gather server-reflexive candidates. A public Google STUN server is
+// configured; add a TURN entry (with credentials) for SYMMETRIC-NAT pairs that STUN can't punch.
+// Localhost needs neither (host candidates resolve directly), so the headless tests don't rely
+// on STUN — but it must be present for real internet co-op.
+//
+// NATIVE CAVEAT: desktop/native Godot has NO bundled WebRTC implementation ("No default WebRTC
+// extension configured" — `WebRTCPeerConnection` is an abstract extension point the separate
+// `godot-webrtc` GDExtension fills). So these helpers are a WEB-target path: on a native build
+// they compile + run, but `WebRTCPeerConnection.initialize` fails unless godot-webrtc is
+// installed (out of scope). Prove + use them in the browser export.
 //
 // 2-PEER scope: this implements a host + one client lobby (exactly what the signaling server
 // brokers), so each side has a SINGLE remote peer connection — which is why no per-callable
@@ -47,36 +65,49 @@ package godot
 
 import gdext "godot:gdext"
 
-// Field separator for the signaling protocol — ASCII Unit Separator (0x1f). Chosen because
-// it never occurs in SDP blobs or ICE candidate strings, so framing needs no escaping.
+// ICE server configuration parsed into WebRTCPeerConnection.initialize. A public STUN server is
+// configured for server-reflexive candidate gathering on real deploys. TURN (relay) is needed
+// for SYMMETRIC-NAT peers STUN cannot punch — add an entry like (uncomment + fill credentials):
+//   {"urls":["turn:turn.example.com:3478"],"username":"USER","credential":"PASS"}
+// to the iceServers array below. Localhost (host candidates) needs neither.
 @(private = "file")
-SEP :: "\x1f"
+_ICE_CONFIG_JSON :: `{"iceServers":[{"urls":["stun:stun.l.google.com:19302"]}]}`
 
 Webrtc_State :: enum {
 	Idle,
 	Connecting_Ws, // WebSocket opening
-	Waiting_Id,    // HELLO sent, waiting for our assigned peer id
+	Registering,   // sent create/join, waiting for created/joined (our id + room code)
 	Waiting_Peer,  // have id + multiplayer_peer installed, waiting for the other peer
 	Handshaking,   // peer connection created; trading SDP/ICE
 	Failed,
+}
+
+Webrtc_Error :: enum {
+	None,
+	No_Room,
+	Full,
+	Bad_Msg,
+	Closed,
 }
 
 // A live WebRTC signaling+connection session, owned by these helpers (one per hosting/joining
 // node). Stored in a small fixed global pool so the helpers stay contextless + allocation-free
 // (like the rest of the binding) — there is realistically one lobby per game, a handful at most.
 Webrtc_Session :: struct {
-	active:     bool,
-	is_host:    bool,
-	node:       Node,
-	mp:         Multiplayer_Api,
-	ws:         Web_Socket_Peer,
-	rtc:        Web_Rtc_Multiplayer_Peer,
-	conn:       Web_Rtc_Peer_Connection,
-	have_conn:  bool,
-	my_id:      int,
-	remote_id:  int,
-	state:      Webrtc_State,
-	role:       cstring,
+	active:    bool,
+	is_host:   bool,
+	node:      Node,
+	mp:        Multiplayer_Api,
+	ws:        Web_Socket_Peer,
+	rtc:       Web_Rtc_Multiplayer_Peer,
+	conn:      Web_Rtc_Peer_Connection,
+	have_conn: bool,
+	my_id:     int,
+	remote_id: int,
+	state:     Webrtc_State,
+	err:       Webrtc_Error,
+	room_buf:  [64]u8, // the room CODE (host: filled on `created`; client: the code it joins)
+	room_len:  int,
 }
 
 @(private = "file")
@@ -101,23 +132,26 @@ _find :: proc "contextless" (node: Node) -> ^Webrtc_Session {
 	return nil
 }
 
-// webrtc_host starts a WebRTC session as the HOST (peer id 1): it opens the signaling
-// WebSocket at `url` (e.g. "ws://host:9080") and begins the handshake when the client appears.
-// Returns false if a session slot / the MultiplayerAPI / the socket could not be set up. Call
-// `gd.webrtc_poll(node)` every frame after this to drive it; once connected, use `gd.rpc`.
+// webrtc_host starts a WebRTC session as the HOST (peer id 1): it opens the signaling WebSocket
+// at `url` (e.g. "wss://relay.example.com/rtc"), sends `create`, and on `created` captures the
+// ROOM CODE (read it back with `gd.webrtc_room_code(node)` to share with a friend). The handshake
+// begins when the joining peer appears. Returns false if a session slot / the MultiplayerAPI /
+// the socket could not be set up. Pump it with `gd.webrtc_poll(node)` every frame; once
+// connected, use `gd.rpc`.
 webrtc_host :: proc "contextless" (node: Node, url: cstring) -> bool {
-	return _webrtc_start(node, url, true)
+	return _webrtc_start(node, url, "", true)
 }
 
-// webrtc_join starts a WebRTC session as a CLIENT: opens the signaling WebSocket at `url`,
-// receives a server-assigned peer id, and answers the host's offer. Returns false on setup
-// failure. Pump it with `gd.webrtc_poll(node)` each frame; once connected, use `gd.rpc`.
-webrtc_join :: proc "contextless" (node: Node, url: cstring) -> bool {
-	return _webrtc_start(node, url, false)
+// webrtc_join starts a WebRTC session as a CLIENT: opens the signaling WebSocket at `url`, sends
+// `join` with `room` (the code the host shared), receives a server-assigned peer id, and answers
+// the host's offer. Returns false on setup failure. Pump it with `gd.webrtc_poll(node)` each
+// frame; once connected, use `gd.rpc`.
+webrtc_join :: proc "contextless" (node: Node, url: cstring, room: cstring) -> bool {
+	return _webrtc_start(node, url, room, false)
 }
 
 @(private = "file")
-_webrtc_start :: proc "contextless" (node: Node, url: cstring, is_host: bool) -> bool {
+_webrtc_start :: proc "contextless" (node: Node, url: cstring, room: cstring, is_host: bool) -> bool {
 	s := _find_free()
 	if s == nil {return false}
 	mp := node_get_multiplayer(node)
@@ -134,17 +168,50 @@ _webrtc_start :: proc "contextless" (node: Node, url: cstring, is_host: bool) ->
 		mp      = mp,
 		ws      = ws,
 		state   = .Connecting_Ws,
-		role    = is_host ? "host" : "join",
+	}
+	// Stash the join code (host's is assigned by the server on `created`).
+	if !is_host {
+		s.room_len = _cstr_to_buf(room, s.room_buf[:])
 	}
 	return true
 }
 
+// webrtc_room_code returns the room CODE for `node`'s session — empty until the server replies
+// `created`/`joined`. The host shares this with a friend; the friend passes it to webrtc_join.
+webrtc_room_code :: proc "contextless" (node: Node) -> string {
+	s := _find(node)
+	if s == nil {return ""}
+	return string(s.room_buf[:s.room_len])
+}
+
+// webrtc_session_state returns the signaling state machine position (for lobby status UI).
+webrtc_session_state :: proc "contextless" (node: Node) -> Webrtc_State {
+	s := _find(node)
+	if s == nil {return .Idle}
+	return s.state
+}
+
+// webrtc_error_reason returns the last signaling error reason ("" if none) — the verbatim
+// server `reason` string ("no_room" / "full" / "bad_msg") or "closed" for a dropped socket.
+webrtc_error_reason :: proc "contextless" (node: Node) -> string {
+	s := _find(node)
+	if s == nil {return ""}
+	switch s.err {
+	case .None:    return ""
+	case .No_Room: return "no_room"
+	case .Full:    return "full"
+	case .Bad_Msg: return "bad_msg"
+	case .Closed:  return "closed"
+	}
+	return ""
+}
+
 // webrtc_poll pumps the signaling socket for `node`'s session: it advances the WebSocket
-// handshake, sends HELLO when open, and applies inbound ID / PEER / SDP / ICE messages
-// (creating the peer connection, trading SDP/ICE, installing the multiplayer peer). Safe to
-// call every frame; it is a cheap no-op once the session is gone or has failed. The WebRTC
-// peer connection itself is polled by the engine (it is the installed multiplayer_peer), so
-// this only needs to service the WebSocket.
+// handshake, sends create/join when open, and applies inbound created/joined/peer/signal/
+// peer_left/error messages (creating the peer connection, trading SDP/ICE, installing the
+// multiplayer peer). Safe to call every frame; it is a cheap no-op once the session is gone or
+// has failed. The WebRTC peer connection itself is polled by the engine (it is the installed
+// multiplayer_peer), so this only needs to service the WebSocket.
 webrtc_poll :: proc "contextless" (node: Node) {
 	s := _find(node)
 	if s == nil || !s.active {return}
@@ -152,14 +219,22 @@ webrtc_poll :: proc "contextless" (node: Node) {
 	web_socket_peer_poll(s.ws)
 	rs := web_socket_peer_get_ready_state(s.ws)
 	if rs == .State_Closing || rs == .State_Closed {
+		if s.state != .Failed {s.err = .Closed}
 		s.state = .Failed
 		return
 	}
 
 	if s.state == .Connecting_Ws {
 		if rs != .State_Open {return}
-		_send(s.ws, "HELLO", string(s.role))
-		s.state = .Waiting_Id
+		m := new_dictionary_default()
+		if s.is_host {
+			_dset(&m, "type", _vstr("create"))
+		} else {
+			_dset(&m, "type", _vstr("join"))
+			_dset(&m, "room", _vstr_odin(string(s.room_buf[:s.room_len])))
+		}
+		_send_json(s.ws, &m)
+		s.state = .Registering
 	}
 
 	n := packet_peer_get_available_packet_count(s.ws)
@@ -168,13 +243,21 @@ webrtc_poll :: proc "contextless" (node: Node) {
 	}
 }
 
-// webrtc_close tears down `node`'s WebRTC session (closes the signaling socket and frees the
-// pool slot). The installed multiplayer peer is left in place — call multiplayer's own
-// close/clear if you want to drop the RTC connection too.
+// webrtc_close tears down `node`'s WebRTC session: it sends `leave`, closes the signaling socket
+// and frees the pool slot. The installed multiplayer peer is left in place — call multiplayer's
+// own close/clear if you want to drop the RTC connection too.
 webrtc_close :: proc "contextless" (node: Node) {
 	s := _find(node)
 	if s == nil {return}
-	if cast(rawptr)s.ws != nil {web_socket_peer_close(s.ws, 1000, string_empty())}
+	if cast(rawptr)s.ws != nil {
+		rs := web_socket_peer_get_ready_state(s.ws)
+		if rs == .State_Open {
+			m := new_dictionary_default()
+			_dset(&m, "type", _vstr("leave"))
+			_send_json(s.ws, &m)
+		}
+		web_socket_peer_close(s.ws, 1000, string_empty())
+	}
 	s.active = false
 }
 
@@ -182,54 +265,110 @@ webrtc_close :: proc "contextless" (node: Node) {
 _handle_packet :: proc "contextless" (s: ^Webrtc_Session) {
 	pba := packet_peer_get_packet(s.ws)
 	sz := int(packed_byte_array_size(&pba))
-	buf: [16384]u8
+	buf: [32768]u8
 	m := min(sz, len(buf))
 	for i in 0 ..< m {
 		buf[i] = u8(packed_byte_array_get(&pba, Int(i)))
 	}
-	msg := string(buf[:m])
 
-	fields: [4]string
-	fc := _split(msg, &fields)
-	if fc == 0 {return}
+	gs := new_string_odin(string(buf[:m]))
+	v := json_parse_string(gs)
+	if gdext.variant_get_type(cast(gdext.VariantPtr)&v) != .Dictionary {return}
+	d := variant_to_dictionary(&v)
 
-	switch fields[0] {
-	case "ID":
-		s.my_id = _atoi(fields[1])
-		s.rtc = new_web_rtc_multiplayer_peer()
-		chans := new_array_default()
-		if s.is_host {
-			web_rtc_multiplayer_peer_create_server(s.rtc, chans)
-		} else {
-			web_rtc_multiplayer_peer_create_client(s.rtc, Int(s.my_id), chans)
-		}
-		multiplayer_api_set_multiplayer_peer(s.mp, s.rtc)
+	tbuf: [32]u8
+	typ := _dget_str(&d, "type", tbuf[:])
+
+	switch typ {
+	case "created":
+		_store_room(s, &d)
+		s.my_id = 1
+		_install_peer(s, true)
 		s.state = .Waiting_Peer
 
-	case "PEER":
-		s.remote_id = _atoi(fields[1])
+	case "joined":
+		_store_room(s, &d)
+		s.my_id = _dget_int(&d, "id")
+		_install_peer(s, false)
+		s.state = .Waiting_Peer
+
+	case "peer":
+		s.remote_id = _dget_int(&d, "id")
 		_setup_connection(s)
 
-	case "SDP":
-		if s.have_conn && fc >= 3 {
-			t := new_string_odin(fields[1])
-			sdp := new_string_odin(fields[2])
-			web_rtc_peer_connection_set_remote_description(s.conn, t, sdp)
+	case "signal":
+		dv := _dget(&d, "data")
+		if gdext.variant_get_type(cast(gdext.VariantPtr)&dv) == .Dictionary {
+			dd := variant_to_dictionary(&dv)
+			_apply_signal(s, &dd)
 		}
 
-	case "ICE":
-		if s.have_conn && fc >= 4 {
-			media := new_string_odin(fields[1])
-			name := new_string_odin(fields[3])
-			web_rtc_peer_connection_add_ice_candidate(s.conn, media, Int(_atoi(fields[2])), name)
+	case "peer_left":
+		// The other peer dropped. There is only one remote in a 2-peer lobby, so the session is
+		// effectively over; surface it for the lobby UI.
+		s.err = .Closed
+		s.state = .Failed
+
+	case "error":
+		rbuf: [16]u8
+		reason := _dget_str(&d, "reason", rbuf[:])
+		switch reason {
+		case "no_room": s.err = .No_Room
+		case "full":    s.err = .Full
+		case:           s.err = .Bad_Msg
 		}
+		s.state = .Failed
+	}
+}
+
+@(private = "file")
+_install_peer :: proc "contextless" (s: ^Webrtc_Session, server: bool) {
+	s.rtc = new_web_rtc_multiplayer_peer()
+	chans := new_array_default()
+	if server {
+		web_rtc_multiplayer_peer_create_server(s.rtc, chans)
+	} else {
+		web_rtc_multiplayer_peer_create_client(s.rtc, Int(s.my_id), chans)
+	}
+	multiplayer_api_set_multiplayer_peer(s.mp, s.rtc)
+}
+
+@(private = "file")
+_store_room :: proc "contextless" (s: ^Webrtc_Session, d: ^Dictionary) {
+	rv := _dget(d, "room")
+	rs := variant_to_string(&rv)
+	s.room_len = len(_str_to_buf(rs, s.room_buf[:]))
+}
+
+// _apply_signal applies a relayed SDP/ICE payload (the nested `data` object) to our connection.
+@(private = "file")
+_apply_signal :: proc "contextless" (s: ^Webrtc_Session, dd: ^Dictionary) {
+	if !s.have_conn {return}
+	if _dhas(dd, "sdp") {
+		tv := _dget(dd, "sdp_type")
+		t := variant_to_string(&tv)
+		sv := _dget(dd, "sdp")
+		sdp := variant_to_string(&sv)
+		web_rtc_peer_connection_set_remote_description(s.conn, t, sdp)
+	} else if _dhas(dd, "name") {
+		mv := _dget(dd, "media")
+		media := variant_to_string(&mv)
+		idx := _dget_int(dd, "index")
+		nv := _dget(dd, "name")
+		name := variant_to_string(&nv)
+		web_rtc_peer_connection_add_ice_candidate(s.conn, media, Int(idx), name)
 	}
 }
 
 @(private = "file")
 _setup_connection :: proc "contextless" (s: ^Webrtc_Session) {
 	conn := new_web_rtc_peer_connection()
-	cfg := new_dictionary_default()
+
+	// Configure ICE servers (STUN; TURN slot documented at _ICE_CONFIG_JSON) so real cross-NAT
+	// deploys can gather server-reflexive candidates. Built by parsing the JSON config so the
+	// nested iceServers/urls arrays need no hand-rolled Array construction.
+	cfgv := json_parse_string(new_string_cstring(_ICE_CONFIG_JSON))
+	cfg := variant_to_dictionary(&cfgv)
 	web_rtc_peer_connection_initialize(conn, cfg)
 
 	// Route the connection's async outputs (SDP + ICE) into our relay procs via custom
@@ -245,8 +384,8 @@ _setup_connection :: proc "contextless" (s: ^Webrtc_Session) {
 	// add_peer builds the data channels the multiplayer peer needs; must precede create_offer.
 	web_rtc_multiplayer_peer_add_peer(s.rtc, conn, Int(s.remote_id), 1)
 
-	// The host (peer id 1, the lower id in a 2-peer lobby) initiates with an offer; the client
-	// answers automatically when it set_remote_description's the offer.
+	// The host initiates with an offer; the client answers automatically when it
+	// set_remote_description's the offer.
 	if s.is_host {
 		web_rtc_peer_connection_create_offer(conn)
 	}
@@ -266,8 +405,8 @@ _make_callable :: proc "contextless" (cf: gdext.ExtensionCallableCustomCall, ud:
 	return cb
 }
 
-// session_description_created(type: String, sdp: String): set it as our LOCAL description,
-// then relay it to the other peer over the signaling socket.
+// session_description_created(type: String, sdp: String): set it as our LOCAL description, then
+// relay it to the other peer as {"type":"signal","to":<remote>,"data":{"kind":"sdp",...}}.
 @(private = "file")
 _on_session_description :: proc "c" (
 	userdata: rawptr,
@@ -285,16 +424,18 @@ _on_session_description :: proc "c" (
 
 	web_rtc_peer_connection_set_local_description(s.conn, type_s, sdp_s)
 
-	tbuf: [64]u8
-	sbuf: [16384]u8
-	_send(s.ws, "SDP", _str_to_buf(type_s, tbuf[:]), _str_to_buf(sdp_s, sbuf[:]))
+	data := new_dictionary_default()
+	_dset(&data, "kind", _vstr("sdp"))
+	_dset(&data, "sdp_type", _vstr_g(type_s))
+	_dset(&data, "sdp", _vstr_g(sdp_s))
+	_send_signal(s, &data)
 
 	if err != nil {err.error = .Ok}
 	if ret != nil {(cast(^Variant)ret)^ = Variant{}}
 }
 
-// ice_candidate_created(media: String, index: int, name: String): relay the trickled
-// candidate to the other peer over the signaling socket.
+// ice_candidate_created(media: String, index: int, name: String): relay the trickled candidate
+// as {"type":"signal","to":<remote>,"data":{"kind":"ice","media":..,"index":..,"name":..}}.
 @(private = "file")
 _on_ice_candidate :: proc "c" (
 	userdata: rawptr,
@@ -313,35 +454,85 @@ _on_ice_candidate :: proc "c" (
 	to_int(cast(gdext.TypePtr)&index, args[1])
 	to_str(cast(gdext.TypePtr)&name_s, args[2])
 
-	mbuf: [256]u8
-	ibuf: [24]u8
-	nbuf: [4096]u8
-	_send(s.ws, "ICE", _str_to_buf(media_s, mbuf[:]), _itoa(int(index), ibuf[:]), _str_to_buf(name_s, nbuf[:]))
+	data := new_dictionary_default()
+	_dset(&data, "kind", _vstr("ice"))
+	_dset(&data, "media", _vstr_g(media_s))
+	_dset(&data, "index", _vint(int(index)))
+	_dset(&data, "name", _vstr_g(name_s))
+	_send_signal(s, &data)
 
 	if err != nil {err.error = .Ok}
 	if ret != nil {(cast(^Variant)ret)^ = Variant{}}
 }
 
-// ---- small contextless string helpers (stack buffers; no allocation / no Odin context) ----
-
-// _send frames `parts` with the 0x1f separator and sends them as one text frame.
+// _send_signal wraps `data` in the {"type":"signal","to":<remote>,"data":<data>} envelope and
+// sends it as a JSON text frame.
 @(private = "file")
-_send :: proc "contextless" (ws: Web_Socket_Peer, parts: ..string) {
-	buf: [20480]u8
-	pos := 0
-	for p, i in parts {
-		if i > 0 && pos < len(buf) {
-			buf[pos] = 0x1f
-			pos += 1
-		}
-		pos += copy(buf[pos:], p)
-	}
-	gs := new_string_odin(string(buf[:pos]))
-	web_socket_peer_send_text(ws, gs)
+_send_signal :: proc "contextless" (s: ^Webrtc_Session, data: ^Dictionary) {
+	msg := new_dictionary_default()
+	_dset(&msg, "type", _vstr("signal"))
+	_dset(&msg, "to", _vint(s.remote_id))
+	dv := variant_from_dictionary(data)
+	dictionary_set(&msg, _vstr("data"), dv)
+	_send_json(s.ws, &msg)
+}
+
+// ---- small contextless helpers (JSON + Variant/Dictionary glue; no allocation context) -------
+
+// _send_json stringifies a Dictionary via Godot's JSON and sends it as one text frame.
+@(private = "file")
+_send_json :: proc "contextless" (ws: Web_Socket_Peer, d: ^Dictionary) {
+	mv := variant_from_dictionary(d)
+	js := json_stringify(mv, string_empty(), false, false)
+	web_socket_peer_send_text(ws, js)
+}
+
+@(private = "file")
+_vstr :: proc "contextless" (s: cstring) -> Variant {
+	gs := new_string_cstring(s)
+	return variant_from_string(&gs)
+}
+@(private = "file")
+_vstr_odin :: proc "contextless" (s: string) -> Variant {
+	gs := new_string_odin(s)
+	return variant_from_string(&gs)
+}
+@(private = "file")
+_vstr_g :: proc "contextless" (gs: String) -> Variant {
+	gs := gs
+	return variant_from_string(&gs)
+}
+@(private = "file")
+_vint :: proc "contextless" (i: int) -> Variant {
+	v := Int(i)
+	return variant_from_int(&v)
+}
+@(private = "file")
+_dset :: proc "contextless" (d: ^Dictionary, key: cstring, val: Variant) {
+	dictionary_set(d, _vstr(key), val)
+}
+@(private = "file")
+_dget :: proc "contextless" (d: ^Dictionary, key: cstring) -> Variant {
+	return dictionary_get(d, _vstr(key), Variant{})
+}
+@(private = "file")
+_dhas :: proc "contextless" (d: ^Dictionary, key: cstring) -> bool {
+	return bool(dictionary_has(d, _vstr(key)))
+}
+@(private = "file")
+_dget_int :: proc "contextless" (d: ^Dictionary, key: cstring) -> int {
+	v := _dget(d, key)
+	return int(variant_to_int(&v))
+}
+@(private = "file")
+_dget_str :: proc "contextless" (d: ^Dictionary, key: cstring, buf: []u8) -> string {
+	v := _dget(d, key)
+	s := variant_to_string(&v)
+	return _str_to_buf(s, buf)
 }
 
 // _str_to_buf copies a Godot String's UTF-8 bytes into `buf` and returns it as an Odin string
-// (valid while `buf` lives). Used to read SDP/ICE text out for relaying.
+// (valid while `buf` lives).
 @(private = "file")
 _str_to_buf :: proc "contextless" (str: String, buf: []u8) -> string {
 	str := str
@@ -352,61 +543,14 @@ _str_to_buf :: proc "contextless" (str: String, buf: []u8) -> string {
 	return string(buf[:n])
 }
 
-// _split fills up to 4 fields split on 0x1f, returning the count.
+// _cstr_to_buf copies a cstring into `buf`, returning the length copied.
 @(private = "file")
-_split :: proc "contextless" (s: string, out: ^[4]string) -> int {
-	cnt := 0
-	start := 0
-	for i in 0 ..< len(s) {
-		if s[i] == 0x1f {
-			if cnt < 4 {
-				out[cnt] = s[start:i]
-				cnt += 1
-			}
-			start = i + 1
-		}
-	}
-	if cnt < 4 {
-		out[cnt] = s[start:]
-		cnt += 1
-	}
-	return cnt
-}
-
-@(private = "file")
-_atoi :: proc "contextless" (s: string) -> int {
+_cstr_to_buf :: proc "contextless" (s: cstring, buf: []u8) -> int {
+	p := cast([^]u8)s
 	n := 0
-	neg := false
-	i := 0
-	if len(s) > 0 && s[0] == '-' {
-		neg = true
-		i = 1
+	for n < len(buf) && p[n] != 0 {
+		buf[n] = p[n]
+		n += 1
 	}
-	for ; i < len(s); i += 1 {
-		c := s[i]
-		if c < '0' || c > '9' {break}
-		n = n * 10 + int(c - '0')
-	}
-	return neg ? -n : n
-}
-
-@(private = "file")
-_itoa :: proc "contextless" (v: int, buf: []u8) -> string {
-	if v == 0 {
-		buf[0] = '0'
-		return string(buf[:1])
-	}
-	neg := v < 0
-	m := neg ? -v : v
-	i := len(buf)
-	for m > 0 && i > 0 {
-		i -= 1
-		buf[i] = u8('0' + m % 10)
-		m /= 10
-	}
-	if neg && i > 0 {
-		i -= 1
-		buf[i] = '-'
-	}
-	return string(buf[i:])
+	return n
 }

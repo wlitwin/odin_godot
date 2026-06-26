@@ -19,6 +19,8 @@ extends Node
 var net: Node = null
 var role := "host"
 var url := "ws://127.0.0.1:9080"
+var room := ""
+var room_printed := false
 var mp: MultiplayerAPI = null
 var phase := "init"
 var t0 := 0
@@ -31,6 +33,7 @@ func _ready() -> void:
 	var q := _query()
 	role = String(q.get("role", "host"))
 	url = String(q.get("url", "ws://127.0.0.1:9080"))
+	room = String(q.get("room", ""))
 
 	var script: Script = load("res://scripts/rtc_node.odin")
 	if script == null:
@@ -48,14 +51,21 @@ func _start() -> void:
 	if role == "host":
 		net.call("start_host", url)
 	else:
-		net.call("start_join", url)
+		net.call("start_join", url, room)
 	mp = net.get_multiplayer()
 	t0 = Time.get_ticks_msec()
 	phase = "connect"
-	print("WEBRTC_BOOT role=", role, " url=", url)
+	print("WEBRTC_BOOT role=", role, " url=", url, " room=", room)
 
 func _process(_delta: float) -> void:
 	var now := Time.get_ticks_msec()
+
+	# Host: surface the server-assigned room CODE so the driver can hand it to the joiner.
+	if role == "host" and not room_printed:
+		var c := String(net.call("room_code"))
+		if c != "":
+			room_printed = true
+			print("WEBRTC_ROOM ", c)
 
 	if phase == "connect":
 		if mp == null:

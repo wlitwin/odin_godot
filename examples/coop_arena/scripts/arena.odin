@@ -74,17 +74,22 @@ ArenaGame :: struct {
 	bullets:      gd.Node `gd:"onready=Bullets"`,
 	start_screen: gd.Node `gd:"onready=StartScreen"`,
 	status:       gd.Node `gd:"onready=StartScreen/Status"`,
+	url_edit:     gd.Node `gd:"onready=StartScreen/UrlEdit"`,
+	room_edit:    gd.Node `gd:"onready=StartScreen/RoomEdit"`,
+	code_label:   gd.Node `gd:"onready=StartScreen/CodeLabel"`,
 	hud_info:     gd.Node `gd:"onready=Hud/Info"`,
 	spawner:      gd.Multiplayer_Spawner,
 
-	role:      Role,
-	mode:      Mode,
-	headless:  bool,
-	port:      int,
-	addr:      string,
-	url:       string,
-	client_id: int,
-	next_id:   int,
+	role:        Role,
+	mode:        Mode,
+	headless:    bool,
+	port:        int,
+	addr:        string,
+	url:         string,
+	room:        string,
+	room_logged: bool,
+	client_id:   int,
+	next_id:     int,
 
 	// local progression (per-peer)
 	my_xp:    int,
@@ -267,12 +272,18 @@ arena_game_ready :: proc(self: ^ArenaGame) {
 		}
 		if p := read_env("COOP_PORT"); p != "" {if v, ok := strconv.parse_int(p); ok {self.port = v}}
 		if a := read_env("COOP_ADDR"); a != "" {self.addr = a}
-		when IS_WEB {if u := web_query("url"); u != "" {self.url = u}}
+		when IS_WEB {
+			if u := web_query("url"); u != "" {self.url = u}
+			if r := web_query("room"); r != "" {self.room = r}
+		}
 		if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}
 		log(fmt.tprintf("ARENA_BOOT role=%v web=%v", self.role, IS_WEB))
 	} else {
 		self.headless = false
 		if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", true)}
+		// Default the signaling URL field so the lobby is editable for real deploys.
+		if self.url_edit != nil {gd.set_string(self.url_edit, "text", fmt.ctprintf("%s", self.url))}
+		if self.code_label != nil {gd.set_string(self.code_label, "text", "")}
 		wire_button(self, "SingleButton", "on_single")
 		wire_button(self, "HostButton", "on_host")
 		wire_button(self, "JoinButton", "on_join")
@@ -288,7 +299,10 @@ wire_button :: proc(self: ^ArenaGame, name: cstring, method: cstring) {
 }
 
 arena_game_process :: proc(self: ^ArenaGame, delta: f64) {
-	when IS_WEB {gd.webrtc_poll(self.owner)}
+	when IS_WEB {
+		gd.webrtc_poll(self.owner)
+		lobby_web_update(self)
+	}
 	self.alive_t += delta
 
 	switch self.mode {
@@ -316,6 +330,8 @@ arena_game_process :: proc(self: ^ArenaGame, delta: f64) {
 			} else {
 				log(fmt.tprintf("CLIENT_SEES_SERVER REPORT my_id=%d", my))
 			}
+			// Connected — drop the lobby panel for windowed play.
+			if !self.headless && self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}
 			self.mode = .Play
 			self.alive_t = 0
 		} else if self.alive_t > CONNECT_TIMEOUT {
@@ -342,8 +358,10 @@ arena_game_process :: proc(self: ^ArenaGame, delta: f64) {
 start_session :: proc(self: ^ArenaGame) {
 	if self.role == .Single {return}
 	when IS_WEB {
-		ok := self.role == .Server ? gd.webrtc_host(self.owner, fmt.ctprintf("%s", self.url)) : gd.webrtc_join(self.owner, fmt.ctprintf("%s", self.url))
-		if ok {log(fmt.tprintf("WEBRTC_%v_STARTED url=%s", self.role, self.url))} else {log("TRANSPORT_FAIL"); quit_now(self, 1)}
+		ok := self.role == .Server \
+			? gd.webrtc_host(self.owner, fmt.ctprintf("%s", self.url)) \
+			: gd.webrtc_join(self.owner, fmt.ctprintf("%s", self.url), fmt.ctprintf("%s", self.room))
+		if ok {log(fmt.tprintf("WEBRTC_%v_STARTED url=%s room=%s", self.role, self.url, self.room))} else {log("TRANSPORT_FAIL"); quit_now(self, 1)}
 	} else {
 		if self.role == .Server {
 			if gd.host(self.owner, self.port) {
@@ -355,6 +373,45 @@ start_session :: proc(self: ^ArenaGame) {
 			if gd.join(self.owner, fmt.ctprintf("%s", self.addr), self.port) {
 				log(fmt.tprintf("CLIENT_STARTED addr=%s port=%d", self.addr, self.port))
 			} else {log("CLIENT_FAIL"); quit_now(self, 1)}
+		}
+	}
+}
+
+// lobby_web_update (web only) — surface the room-code lobby state every frame: capture + log the
+// host's assigned CODE once it arrives (so a friend / the test driver can read it), and reflect
+// connecting / waiting / connected / error in the windowed start-screen status + code labels.
+@(private = "file")
+lobby_web_update :: proc(self: ^ArenaGame) {
+	when IS_WEB {
+		if self.role != .Server && self.role != .Client {return}
+		if self.role == .Server && !self.room_logged {
+			code := gd.webrtc_room_code(self.owner)
+			if len(code) > 0 {
+				self.room_logged = true
+				self.room = code
+				log(fmt.tprintf("ROOM_CODE %s", code)) // headless driver scrapes this
+				if !self.headless && self.code_label != nil {
+					gd.set_string(self.code_label, "text", fmt.ctprintf("ROOM CODE:  %s   (share with a friend)", code))
+				}
+			}
+		}
+		if self.headless {return}
+		// Windowed status line.
+		if self.status == nil {return}
+		if reason := gd.webrtc_error_reason(self.owner); reason != "" {
+			gd.set_string(self.status, "text", fmt.ctprintf("Error: %s", reason))
+			return
+		}
+		if self.mode == .Play {
+			gd.set_string(self.status, "text", "Connected!")
+		} else if self.role == .Server {
+			if self.room_logged {
+				gd.set_string(self.status, "text", "Waiting for a friend to join...")
+			} else {
+				gd.set_string(self.status, "text", "Hosting — contacting signaling server...")
+			}
+		} else {
+			gd.set_string(self.status, "text", fmt.ctprintf("Joining room %s...", self.room))
 		}
 	}
 }
@@ -662,23 +719,41 @@ free_play_tick :: proc(self: ^ArenaGame, delta: f64) {
 
 // ---- windowed button handlers ----------------------------------------------
 
+// read the (optional) editable signaling URL / room-code fields from the lobby.
+@(private = "file")
+read_lobby_url :: proc(self: ^ArenaGame) {
+	if self.url_edit != nil {
+		if t := gd.get_string(self.url_edit, "text"); len(t) > 0 {self.url = t}
+	}
+}
+
 @(gd_method)
 arena_game_on_single :: proc(self: ^ArenaGame) {
 	self.role = .Single
 	if self.status != nil {gd.set_string(self.status, "text", "Single Player")}
 	if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}
 }
+// Host: keep the lobby panel up so the assigned ROOM CODE can be DISPLAYED to share; the panel is
+// dropped on connect (in the Connecting->Play transition). Status is driven by lobby_web_update.
 @(gd_method)
 arena_game_on_host :: proc(self: ^ArenaGame) {
+	read_lobby_url(self)
 	self.role = .Server
 	if self.status != nil {gd.set_string(self.status, "text", "Hosting...")}
-	if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}
+	// Native (ENet) has no room code to show — drop the panel immediately.
+	when !IS_WEB {if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}}
 }
+// Join: read the room code the friend shared (RoomEdit) + URL, then connect. Panel drops on
+// connect; errors (no_room/full) surface via lobby_web_update.
 @(gd_method)
 arena_game_on_join :: proc(self: ^ArenaGame) {
+	read_lobby_url(self)
+	if self.room_edit != nil {
+		if t := gd.get_string(self.room_edit, "text"); len(t) > 0 {self.room = t}
+	}
 	self.role = .Client
 	if self.status != nil {gd.set_string(self.status, "text", "Joining...")}
-	if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}
+	when !IS_WEB {if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}}
 }
 
 // ---- peer signal handlers --------------------------------------------------

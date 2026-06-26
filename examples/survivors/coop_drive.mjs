@@ -46,7 +46,9 @@ function makePeer(tag) {
   };
 }
 
-const url = (role) => `${PAGE}?role=${role}&url=${encodeURIComponent(WSURL)}`;
+const url = (role, room) =>
+  `${PAGE}?role=${role}&url=${encodeURIComponent(WSURL)}` +
+  (room ? `&room=${encodeURIComponent(room)}` : "");
 
 const hostBrowser = await puppeteer.launch({ executablePath: CHROME, headless: "new", args: LAUNCH_ARGS });
 const clientBrowser = await puppeteer.launch({ executablePath: CHROME, headless: "new", args: LAUNCH_ARGS });
@@ -60,9 +62,18 @@ try {
   await host.attach(hostPage);
   await client.attach(clientPage);
 
+  // Host `create`s a room and prints "ROOM_CODE <code>"; scrape it, then join with that code.
   await hostPage.goto(url("host"), { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
-  await new Promise((r) => setTimeout(r, 1500));
-  await clientPage.goto(url("join"), { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
+  let roomCode = null;
+  const roomDeadline = Date.now() + 40000;
+  while (Date.now() < roomDeadline && !roomCode) {
+    const m = host.lines.map((l) => l.match(/ROOM_CODE (\S+)/)).find(Boolean);
+    if (m) roomCode = m[1];
+    else await new Promise((r) => setTimeout(r, 250));
+  }
+  if (!roomCode) throw new Error("host never produced a room code");
+  console.log("room code from host:", roomCode);
+  await clientPage.goto(url("join", roomCode), { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
 
   const start = Date.now();
   const done = () =>

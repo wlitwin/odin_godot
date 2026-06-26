@@ -34,8 +34,8 @@ CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 if ! command -v node >/dev/null 2>&1 || [[ ! -x "$CHROME" ]]; then
     echo "COOP_WEB_BUNDLED: browser step skipped (no node and/or Chrome at \$CHROME)."
     echo "  Manual: node tests/webrtc/signal_server.mjs 9080  +  bash tests/web/serve.sh examples/survivors/out $PORT"
-    echo "  then open http://127.0.0.1:$PORT/index.html?role=host&url=ws://127.0.0.1:9080 in one browser"
-    echo "  and   http://127.0.0.1:$PORT/index.html?role=join&url=ws://127.0.0.1:9080 in another."
+    echo "  open  http://127.0.0.1:$PORT/index.html?role=host&url=ws://127.0.0.1:9080/rtc  in one browser (prints ROOM_CODE)"
+    echo "  then  http://127.0.0.1:$PORT/index.html?role=join&url=ws://127.0.0.1:9080/rtc&room=<CODE>  in another."
     exit 0
 fi
 

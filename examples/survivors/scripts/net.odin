@@ -86,6 +86,8 @@ NetGame :: struct {
 	port:          int,
 	addr:          string,
 	url:           string,
+	room:          string,
+	room_logged:   bool,
 	client_id:     int,
 	score:         int,
 	enemy_hp:      map[int]int,
@@ -284,6 +286,7 @@ net_game_ready :: proc(self: ^NetGame) {
 		if a := read_env("COOP_ADDR"); a != "" {self.addr = a}
 		when IS_WEB {
 			if u := web_query("url"); u != "" {self.url = u}
+			if r := web_query("room"); r != "" {self.room = r}
 		}
 		if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}
 		log(fmt.tprintf("COOP_BOOT role=%v web=%v", self.role, IS_WEB))
@@ -305,7 +308,17 @@ wire_button :: proc(self: ^NetGame, name: cstring, method: cstring) {
 }
 
 net_game_process :: proc(self: ^NetGame, delta: f64) {
-	when IS_WEB {gd.webrtc_poll(self.owner)}
+	when IS_WEB {
+		gd.webrtc_poll(self.owner)
+		// Surface the host's assigned room CODE once (the headless driver scrapes ROOM_CODE).
+		if self.role == .Server && !self.room_logged {
+			if code := gd.webrtc_room_code(self.owner); len(code) > 0 {
+				self.room_logged = true
+				self.room = code
+				log(fmt.tprintf("ROOM_CODE %s", code))
+			}
+		}
+	}
 	self.alive_t += delta
 
 	switch self.mode {
@@ -360,9 +373,11 @@ net_game_process :: proc(self: ^NetGame, delta: f64) {
 start_session :: proc(self: ^NetGame) {
 	if self.role == .Single {return} // host-with-no-net: no transport
 	when IS_WEB {
-		ok := self.role == .Server ? gd.webrtc_host(self.owner, fmt.ctprintf("%s", self.url)) : gd.webrtc_join(self.owner, fmt.ctprintf("%s", self.url))
+		ok := self.role == .Server \
+			? gd.webrtc_host(self.owner, fmt.ctprintf("%s", self.url)) \
+			: gd.webrtc_join(self.owner, fmt.ctprintf("%s", self.url), fmt.ctprintf("%s", self.room))
 		if ok {
-			log(fmt.tprintf("WEBRTC_%v_STARTED url=%s", self.role, self.url))
+			log(fmt.tprintf("WEBRTC_%v_STARTED url=%s room=%s", self.role, self.url, self.room))
 		} else {
 			log("TRANSPORT_FAIL")
 			quit_now(self, 1)

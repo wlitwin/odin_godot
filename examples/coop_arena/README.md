@@ -84,13 +84,56 @@ case) logs `BULLET_LOCAL` the same frame its local auto-fire timer fires — a d
 not a request sent to the host — and the host only later logs `BULLET_REMOTE` when the broadcast
 arrives. No round-trip gates the owner seeing its own shot.
 
+## Deploying internet co-op (room-code lobby)
+
+The web build pairs two friends through a **room-code lobby** over a real signaling server — the
+deployable path, not a localhost-only demo:
+
+1. **Stand up a signaling relay** reachable by both players at a public `wss://HOST/rtc`. The
+   production server is the **Elixir relay** built to the wire protocol below; ANY server speaking
+   that protocol works (the local `tests/webrtc/signal_server.mjs` is the same protocol for tests).
+2. **Host** opens the page, sets the signaling URL, presses **Host**, and gets a short **ROOM
+   CODE** (e.g. `WATR`) displayed to share (text it to your friend).
+3. **Friend** opens the page, types that code into the room field, presses **Join**. Both jump
+   straight into the arena once the WebRTC data channel comes up.
+
+The signaling URL is configurable: the lobby's URL field, or on web the `?url=` query
+(`?url=wss://HOST/rtc`); the join code is the room field or `?room=CODE`. Single-player is
+unchanged (no transport, no lobby).
+
+### Signaling wire protocol (raw WebSocket, JSON text frames; server path `/rtc`)
+
+```
+client -> server                                  server -> client
+  {"type":"create"}                                 {"type":"created","room":"<CODE>","id":1}
+  {"type":"join","room":"<CODE>"}                   {"type":"joined","room":"<CODE>","id":<n>}
+  {"type":"signal","to":<peerId>,"data":<opaque>}   {"type":"peer","id":<peerId>}
+  {"type":"leave"}                                  {"type":"signal","from":<peerId>,"data":<opaque>}
+                                                    {"type":"peer_left","id":<peerId>}
+                                                    {"type":"error","reason":"no_room"|"full"|"bad_msg"}
+```
+
+The server relays `data` (the SDP offer/answer + trickled ICE) **verbatim** — it never parses it.
+The host (id 1) creates the offer; the joiner answers. Implemented client-side in
+`godot/Ergonomics_WebRtc.odin` (mirrored in `bindgen/upstream/godot/`) via Godot's `WebSocketPeer`
++ JSON; the same `@(gd_rpc)` layer then runs over the resulting `WebRTCMultiplayerPeer`.
+
+### STUN / TURN
+
+`Ergonomics_WebRtc.odin` configures the `WebRTCPeerConnection` with a public **STUN** server
+(`stun:stun.l.google.com:19302`) so peers behind ordinary NATs gather server-reflexive candidates.
+For **symmetric-NAT** pairs that STUN can't punch, add a **TURN** relay (with credentials) to the
+`_ICE_CONFIG_JSON` `iceServers` array — there's a documented slot. Localhost (host candidates)
+needs neither, which is why the headless tests don't require STUN.
+
 ## What still needs a human
 
-The architecture is proven headless (local-first immediacy + replication + owner-auth kills, all
-three modes). **Play-feel, real responsiveness under latency, and NAT traversal** need a person:
-two machines on different networks, a public `ws://`/`wss://` signaling server, and STUN/TURN ICE
-servers configured for cross-NAT WebRTC. Localhost needs none of that, so the tests don't exercise
-it.
+The architecture + the room-code signaling are proven headless (local-first immediacy +
+replication + owner-auth kills, all three modes; host `create`→code→`join`→WebRTC RPC across two
+real browsers — `WEBRTC_OK` / `ARENA_WEB_OK`). What still needs a **real deploy + a person**:
+**play-feel under real latency, and cross-NAT traversal** — two machines on different networks, a
+public `wss://HOST/rtc` relay, and (for symmetric NAT) a TURN server. Localhost needs none of that,
+so the tests prove the PROTOCOL + lobby but not internet NAT punching.
 
 ## Files
 

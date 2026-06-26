@@ -66,7 +66,9 @@ function makePeer(tag) {
   };
 }
 
-const url = (role) => `${PAGE}?role=${role}&url=${encodeURIComponent(WSURL)}`;
+const url = (role, room) =>
+  `${PAGE}?role=${role}&url=${encodeURIComponent(WSURL)}` +
+  (room ? `&room=${encodeURIComponent(room)}` : "");
 
 const hostBrowser = await puppeteer.launch({ executablePath: CHROME, headless: "new", args: LAUNCH_ARGS });
 const clientBrowser = await puppeteer.launch({ executablePath: CHROME, headless: "new", args: LAUNCH_ARGS });
@@ -81,10 +83,20 @@ try {
   await host.attach(hostPage);
   await client.attach(clientPage);
 
-  // Bring the host up first (so the signaling server has the host slot), then the client.
+  // Bring the host up first: it `create`s a room and the signaling server replies with a CODE,
+  // which the host page prints as "WEBRTC_ROOM <code>". Scrape that code, then point the joiner
+  // at ?room=<code> so the two pages pair via the room-code lobby (the real deploy flow).
   await hostPage.goto(url("host"), { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
-  await new Promise((r) => setTimeout(r, 1500));
-  await clientPage.goto(url("join"), { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
+  let roomCode = null;
+  const roomDeadline = Date.now() + 30000;
+  while (Date.now() < roomDeadline && !roomCode) {
+    const m = host.firstMatch(/WEBRTC_ROOM (\S+)/);
+    if (m) roomCode = m[1];
+    else await new Promise((r) => setTimeout(r, 250));
+  }
+  if (!roomCode) throw new Error("host never produced a room code");
+  console.log("room code from host:", roomCode);
+  await clientPage.goto(url("join", roomCode), { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
 
   const start = Date.now();
   const done = () =>

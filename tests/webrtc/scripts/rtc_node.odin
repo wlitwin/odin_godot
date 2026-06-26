@@ -62,14 +62,20 @@ rtc_node_start_host :: proc(self: ^RtcNode, url: gd.String) {
 	}
 }
 
-// start_join joins the WebRTC lobby as a client, connecting to the signaling URL.
+// start_join joins the WebRTC lobby (room CODE) as a client, connecting to the signaling URL.
 @(gd_method)
-rtc_node_start_join :: proc(self: ^RtcNode, url: gd.String) {
-	if gd.webrtc_join(self.owner, _to_cstr(url)) {
+rtc_node_start_join :: proc(self: ^RtcNode, url: gd.String, room: gd.String) {
+	if gd.webrtc_join(self.owner, _to_cstr(url), _to_cstr2(room)) {
 		gd.print("RTC_JOIN_OK")
 	} else {
 		gd.print("RTC_JOIN_FAIL")
 	}
+}
+
+// room_code returns the host's assigned room CODE (empty until the signaling server replies).
+@(gd_method)
+rtc_node_room_code :: proc(self: ^RtcNode) -> gd.String {
+	return gd.new_string_odin(gd.webrtc_room_code(self.owner))
 }
 
 // report prints the live network state (id / is_server / peers) — exercises the query helpers
@@ -94,13 +100,27 @@ _urlbuf: [512]u8
 
 @(private = "file")
 _to_cstr :: proc(s: gd.String) -> cstring {
+	return _copy_cstr(s, _urlbuf[:])
+}
+
+// Separate buffer so start_join can convert BOTH url and room without one clobbering the other.
+@(private = "file")
+_roombuf: [64]u8
+
+@(private = "file")
+_to_cstr2 :: proc(s: gd.String) -> cstring {
+	return _copy_cstr(s, _roombuf[:])
+}
+
+@(private = "file")
+_copy_cstr :: proc(s: gd.String, buf: []u8) -> cstring {
 	s := s
 	need := gdext.string_to_utf8_chars(cast(gdext.StringPtr)&s, nil, 0)
 	if need < 0 {need = 0}
-	n := min(int(need), len(_urlbuf) - 1)
+	n := min(int(need), len(buf) - 1)
 	if n > 0 {
-		gdext.string_to_utf8_chars(cast(gdext.StringPtr)&s, cast(cstring)raw_data(_urlbuf[:]), i64(n))
+		gdext.string_to_utf8_chars(cast(gdext.StringPtr)&s, cast(cstring)raw_data(buf), i64(n))
 	}
-	_urlbuf[n] = 0
-	return cstring(raw_data(_urlbuf[:]))
+	buf[n] = 0
+	return cstring(raw_data(buf))
 }

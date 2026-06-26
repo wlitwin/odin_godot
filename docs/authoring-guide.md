@@ -407,12 +407,15 @@ signaling channel, trade an SDP offer/answer, trickle ICE, build the data channe
 the peer — so a game only writes:
 
 ```odin
-// host becomes peer id 1; the client gets a server-assigned id:
-@(gd_method) lobby_host :: proc(self: ^Lobby) { gd.webrtc_host(self.owner, "ws://your-server:9080") }
-@(gd_method) lobby_join :: proc(self: ^Lobby) { gd.webrtc_join(self.owner, "ws://your-server:9080") }
+// host becomes peer id 1 and gets a ROOM CODE to share; the joiner uses that code:
+@(gd_method) lobby_host :: proc(self: ^Lobby) { gd.webrtc_host(self.owner, "wss://your-server/rtc") }
+@(gd_method) lobby_join :: proc(self: ^Lobby) { gd.webrtc_join(self.owner, "wss://your-server/rtc", "WATR") }
 
 // pump the signaling socket every frame until connected (cheap no-op afterwards):
-lobby_process :: proc(self: ^Lobby, _delta: f64) { gd.webrtc_poll(self.owner) }
+lobby_process :: proc(self: ^Lobby, _delta: f64) {
+    gd.webrtc_poll(self.owner)
+    code := gd.webrtc_room_code(self.owner) // host: "" until the server assigns it — display to share
+}
 ```
 
 Once connected, **the same `@(gd_rpc)` methods + `gd.rpc` / `gd.rpc_id` used over ENet just
@@ -422,30 +425,35 @@ setup does.
 
 | Task | One-liner |
 | --- | --- |
-| Host a WebRTC lobby (id 1) | `ok := gd.webrtc_host(self.owner, "ws://host:9080")` |
-| Join a WebRTC lobby | `ok := gd.webrtc_join(self.owner, "ws://host:9080")` |
+| Host a WebRTC lobby (id 1) | `ok := gd.webrtc_host(self.owner, "wss://host/rtc")` |
+| Join a WebRTC lobby by code | `ok := gd.webrtc_join(self.owner, "wss://host/rtc", "WATR")` |
+| Read the host's room code | `code := gd.webrtc_room_code(self.owner)` (`""` until assigned) |
+| Signaling state / error | `gd.webrtc_session_state(...)` / `gd.webrtc_error_reason(...)` |
 | Pump signaling (every frame) | `gd.webrtc_poll(self.owner)` |
 | Tear the session down | `gd.webrtc_close(self.owner)` |
 
 **Signaling server.** WebRTC needs a rendezvous channel to swap connection info before the
-peer-to-peer link exists. `tests/webrtc/signal_server.mjs` is a ~70-line Node WebSocket server
-that brokers a 2-peer lobby: it assigns ids (host = 1, client = random > 1), tells each peer
-the other's id, then relays the SDP offer/answer + ICE candidates between them *verbatim* (it
-never parses their contents). The wire protocol is text frames with an ASCII Unit-Separator
-(`0x1f`) field delimiter:
+peer-to-peer link exists. The server brokers a **room-code lobby**: a host `create`s a room and
+gets a short CODE; a friend `join`s that CODE; the server relays the SDP offer/answer + ICE
+candidates between the two *verbatim* (it never parses their contents). The wire protocol is
+**JSON text frames** over a raw WebSocket (server path `/rtc`) — the production server is the
+Elixir relay; `tests/webrtc/signal_server.mjs` is the same protocol for the headless tests:
 
 ```
-client -> server (first frame) : HELLO\x1f<role>          role = "host" | "join"
-server -> client               : ID\x1f<peer_id>
-server -> client (both ready)  : PEER\x1f<other_id>
-peer  <-> peer (relayed)       : SDP\x1f<type>\x1f<sdp> | ICE\x1f<media>\x1f<index>\x1f<name>
+client -> server                                  server -> client
+  {"type":"create"}                                 {"type":"created","room":"<CODE>","id":1}
+  {"type":"join","room":"<CODE>"}                   {"type":"joined","room":"<CODE>","id":<n>}
+  {"type":"signal","to":<peerId>,"data":<opaque>}   {"type":"peer","id":<peerId>}
+  {"type":"leave"}                                  {"type":"signal","from":<peerId>,"data":<opaque>}
+                                                    {"type":"peer_left","id":<peerId>}
+                                                    {"type":"error","reason":"no_room"|"full"|"bad_msg"}
 ```
 
-The host (lower id) creates the offer; the client answers. **Deployment:** the *game* traffic
-is peer-to-peer WebRTC (NAT-punching, no port-forwarding), but this small signaling server
-must be reachable by both players during connection setup — host it at a public `ws://` /
-`wss://` URL. For cross-NAT cases add public STUN/TURN servers to the
-`WebRTCPeerConnection.initialize` config (localhost needs neither).
+The host (id 1) creates the offer; the joiner answers. **Deployment:** the *game* traffic is
+peer-to-peer WebRTC (NAT-punching, no port-forwarding), but this signaling server must be
+reachable by both players during setup — host it at a public `wss://HOST/rtc`. `Ergonomics_WebRtc
+.odin` already configures a public **STUN** server on the `WebRTCPeerConnection`; for symmetric-NAT
+pairs add a **TURN** relay to its `_ICE_CONFIG_JSON` (localhost needs neither).
 
 > **Native caveat:** desktop/native Godot ships **no** WebRTC implementation — `WebRTCPeer
 > Connection` is an abstract extension point ("No default WebRTC extension configured") that
