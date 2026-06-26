@@ -69,6 +69,62 @@ caret_from_code :: proc(code: string, allocator := context.allocator) -> (clean:
     return
 }
 
+// MAX_OPTIONS bounds how many completion options core converts into Godot
+// Dictionaries and hands the editor. Each option is ~20 FFI calls to build and
+// the editor renders every row, so an unbounded member list — a bare `gd.` is
+// the whole ~24k-proc godot API — stalls the editor for 1-2s. Past this many
+// MATCHES the user hasn't narrowed enough for the extra rows to be useful; they
+// keep typing and the list re-narrows. The editor still fuzzy-filters whatever
+// we return.
+MAX_OPTIONS :: 256
+
+// `prefix_at_caret` returns the identifier currently being typed — the run of
+// [A-Za-z0-9_] immediately before the caret (the U+FFFF marker, or end of buffer
+// when absent). `... gd.node2d_set_p<caret>` -> "node2d_set_p"; a bare
+// `gd.<caret>` -> "". Used to thin an over-long member list down to what's typed.
+prefix_at_caret :: proc(code: string) -> string {
+    before := code
+    if idx := strings.index(code, CARET_MARKER); idx >= 0 {
+        before = code[:idx]
+    }
+    start := len(before)
+    for start > 0 && is_ident_byte(before[start - 1]) {
+        start -= 1
+    }
+    return before[start:]
+}
+
+@(private)
+is_ident_byte :: proc(c: byte) -> bool {
+    return(
+        (c >= 'a' && c <= 'z') ||
+        (c >= 'A' && c <= 'Z') ||
+        (c >= '0' && c <= '9') ||
+        c == '_' \
+    )
+}
+
+// `matches_prefix` is a case-insensitive (ASCII) SUBSTRING test used to thin a
+// too-large completion list to what the user is typing. An empty prefix matches
+// everything (the caller still caps the count). Substring, not strict prefix, so
+// typing `set_position` still surfaces `node2d_set_position`.
+matches_prefix :: proc(label: string, prefix: string) -> bool {
+    if len(prefix) == 0 {return true}
+    if len(prefix) > len(label) {return false}
+    outer: for i in 0 ..= len(label) - len(prefix) {
+        for j in 0 ..< len(prefix) {
+            if ascii_lower(label[i + j]) != ascii_lower(prefix[j]) {continue outer}
+        }
+        return true
+    }
+    return false
+}
+
+@(private)
+ascii_lower :: proc(c: byte) -> byte {
+    return c + 32 if c >= 'A' && c <= 'Z' else c
+}
+
 // Map an LSP CompletionItemKind (1..25) to a Godot CodeCompletionKind:
 //   0 CLASS 1 FUNCTION 2 SIGNAL 3 VARIABLE 4 MEMBER 5 ENUM 6 CONSTANT
 //   7 NODE_PATH 8 FILE_PATH 9 PLAIN_TEXT

@@ -264,7 +264,16 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
             }
             delete(cs)
         }
+        // Thin an over-long list (a bare `gd.` is the whole ~24k-proc godot API) to
+        // what the user is typing, and cap it — building each option's Dictionary is
+        // ~20 FFI calls and the editor renders every row, so an unbounded list stalls
+        // the editor for 1-2s. Lists already under MAX_OPTIONS pass through untouched.
+        prefix := complete.prefix_at_caret(code)
+        filter := len(cs) > complete.MAX_OPTIONS
+        emitted := 0
         for c in cs {
+            if emitted >= complete.MAX_OPTIONS {break}
+            if filter && !complete.matches_prefix(c.label, prefix) {continue}
             od := godot.new_dictionary_default()
             // Emit EVERY key Godot's ScriptLanguageExtension::complete_code ERR_CONTINUEs on
             // (else the option is dropped + the editor log is spammed — the font_color bug).
@@ -293,6 +302,7 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
             }
             ov := godot.variant_from_dictionary(&od)
             godot.array_push_back(&options, ov)
+            emitted += 1
         }
         result_code = OK // ols ran (0 options is a valid "nothing here", still OK)
     }

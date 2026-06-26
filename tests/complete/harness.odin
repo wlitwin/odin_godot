@@ -144,5 +144,27 @@ main :: proc() {
     }
     fmt.printf("completion-option shape OK: all %d required keys present: %v\n", len(seen), seen[:])
 
+    // 4. Filter/cap helpers — the `gd.` autocomplete-stutter fix. These thin a huge
+    // member list down to what's typed and cap it, so the editor doesn't stall
+    // building/rendering ~24k Dictionaries. Pure functions, asserted headless.
+    cm :: "￿" // U+FFFF caret marker
+    if p := complete.prefix_at_caret(strings.concatenate({"\tgd.node2d_set_p", cm})); p != "node2d_set_p" {
+        fail(fmt.tprintf("prefix_at_caret member = %q, want \"node2d_set_p\"", p))
+    }
+    if p := complete.prefix_at_caret(strings.concatenate({"\tgd.", cm})); p != "" {
+        fail(fmt.tprintf("prefix_at_caret bare-dot = %q, want \"\"", p))
+    }
+    if p := complete.prefix_at_caret("gd.Vector2"); p != "Vector2" { // no marker -> end of buffer
+        fail(fmt.tprintf("prefix_at_caret no-marker = %q, want \"Vector2\"", p))
+    }
+    if !complete.matches_prefix("node2d_set_position", "node2d_set_p") {fail("matches_prefix: prefix should match")}
+    if !complete.matches_prefix("node2d_set_position", "set_position") {fail("matches_prefix: substring should match")}
+    if !complete.matches_prefix("Vector2", "vector") {fail("matches_prefix: should be case-insensitive")}
+    if !complete.matches_prefix("anything", "") {fail("matches_prefix: empty prefix should match all")}
+    if complete.matches_prefix("foo", "xyz") {fail("matches_prefix: non-match should be false")}
+    if complete.matches_prefix("ab", "abc") {fail("matches_prefix: prefix longer than label should be false")}
+    if complete.MAX_OPTIONS <= 0 {fail("MAX_OPTIONS must be positive")}
+    fmt.printf("filter/cap helpers OK (MAX_OPTIONS=%d)\n", complete.MAX_OPTIONS)
+
     fmt.println("COMPLETE_HARNESS_OK")
 }
