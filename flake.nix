@@ -133,5 +133,29 @@
           crossWindowsCC = pkgs.pkgsCross.mingwW64.stdenv.cc;
           crossWindowsLibdirs = "${pkgs.pkgsCross.mingwW64.windows.mcfgthreads}/lib";
         };
+
+        # `nix build .#release` → ONE publishable archive in ./result/:
+        #   odin_godot-<version>.zip   + SHA256SUMS
+        #
+        # This is the "ship an update" command. It wraps the FULL cross addon
+        # (packages.dist-cross: macOS + Linux + Windows prebuilt cores, the Odin `godot:`
+        # collection, scriptgen, and the build scripts) into a single zip a consumer
+        # downloads and extracts into their project's `res://addons/`. Web has no prebuilt
+        # core by design (core+scripts AOT-link into one Emscripten SIDE_MODULE per project),
+        # so the addon ships `build/build_web.sh` for consumers to build web themselves.
+        #
+        # Release a new version: bump `version` in build/dist.nix, then
+        #   nix build .#release && ls -l result/
+        # and attach result/odin_godot-<version>.zip to the published release.
+        packages.release =
+          let addon = self.packages.${system}.dist-cross;
+          in pkgs.runCommand "odin_godot-release-${addon.version}"
+            { nativeBuildInputs = [ pkgs.zip pkgs.coreutils ]; }
+            ''
+              mkdir -p $out
+              # `addons/` at the archive root so it extracts straight into a project's res://.
+              ( cd ${addon} && zip -rX "$out/odin_godot-${addon.version}.zip" addons )
+              ( cd $out && sha256sum ./*.zip > SHA256SUMS )
+            '';
       });
 }
