@@ -75,6 +75,17 @@ join :: proc "contextless" (node: Node, address: cstring, port: int) -> bool {
 	}
 }
 
+// multiplayer_clear_peer detaches `node`'s multiplayer peer (sets it to nil, returning the
+// MultiplayerAPI to OFFLINE) so a fresh host/join can install a new one. Use it when tearing
+// down a failed or finished connection — e.g. recovering a lobby after a connect failure so the
+// next host/join starts from a clean MultiplayerAPI. No-op before a peer is in a tree.
+multiplayer_clear_peer :: proc "contextless" (node: Node) {
+	mp := node_get_multiplayer(node)
+	if cast(rawptr)mp == nil {return}
+	none: Multiplayer_Peer
+	multiplayer_api_set_multiplayer_peer(mp, none)
+}
+
 // is_server reports whether this peer is the multiplayer authority (the server / host). On an
 // offline (single-player) peer this is also true. False before a peer is assigned.
 is_server :: proc "contextless" (node: Node) -> bool {

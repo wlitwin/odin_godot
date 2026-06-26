@@ -66,10 +66,19 @@ for try in 1 2; do
     fi
 done
 
-if (( rc == 0 )); then
+# Lobby UX fixes (Bug 1 retry-recovery + Bug 2 web paste): drive the in-page self-test hooks in a
+# real browser and require GREEN. These exercise the SAME code paths the Host/Join buttons +
+# Ctrl/Cmd+V trigger (see lobby_drive.mjs for what's auto-verified vs needs-a-human).
+lrc=1
+echo "==> lobby UX (retry recovery + web paste) drive"
+if CHROME="$CHROME" node "$PROJ/lobby_drive.mjs" "http://127.0.0.1:$PORT/index.html" "ws://127.0.0.1:$SIGPORT"; then
+    lrc=0
+fi
+
+if (( rc == 0 && lrc == 0 )); then
     echo "ARENA_WEB_OK"
     exit 0
 fi
-echo "ARENA_WEB_FAIL: two browsers did not prove the owner-auth arena over WebRTC"
+echo "ARENA_WEB_FAIL: arena owner-auth (rc=$rc) and/or lobby UX (lrc=$lrc) checks did not pass over WebRTC"
 echo "  --- signaling log ---"; tail -n 20 "$PROJ/.coopsignal.log" 2>/dev/null | sed 's/^/    /'
 exit 1

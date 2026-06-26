@@ -64,8 +64,19 @@ when IS_WEB {
 	GLOBAL_TIMEOUT :: f64(30)
 }
 
+// LOBBY_CONNECT_TIMEOUT bounds a WINDOWED (interactive) connect attempt. If "Connecting…/Joining…"
+// runs this long with no peer/connection, the lobby treats it as a failure and RESETS to the
+// connectable start screen (so a dead room code or an unreachable relay can't hang forever). The
+// headless scripted sessions keep CONNECT_TIMEOUT (they quit on failure for the test harness).
+LOBBY_CONNECT_TIMEOUT :: f64(18)
+
 Role :: enum {None, Single, Server, Client}
 Mode :: enum {Boot, Connecting, Play}
+
+// Lobby_Test selects a headless self-drive of the WINDOWED lobby (web only), used by the gated
+// browser harness to prove the retry-recovery + web-paste mechanics without a human: it exercises
+// the SAME begin_join/begin_host/on_lobby_input code paths the real buttons + Ctrl/Cmd+V trigger.
+Lobby_Test :: enum {Off, Retry, Paste}
 
 ArenaGame :: struct {
 	owner:        gd.Node2d,
@@ -83,6 +94,16 @@ ArenaGame :: struct {
 	role:        Role,
 	mode:        Mode,
 	headless:    bool,
+
+	// windowed lobby recovery + web clipboard paste (Bug 1 + Bug 2)
+	reset_count:   int,        // how many times the lobby recovered from a failed attempt
+	lobby_test:    Lobby_Test, // headless self-drive of the windowed lobby (web harness)
+	lt_phase:      int,
+	lt_t:          f64,
+	paste_pending: bool,       // an async navigator.clipboard.readText() is in flight (web)
+	paste_target:  gd.Node,    // the LineEdit the pasted text lands in
+	paste_t:       f64,
+
 	port:        int,
 	addr:        string,
 	url:         string,
@@ -280,13 +301,29 @@ arena_game_ready :: proc(self: ^ArenaGame) {
 		log(fmt.tprintf("ARENA_BOOT role=%v web=%v", self.role, IS_WEB))
 	} else {
 		self.headless = false
+		when IS_WEB {
+			if u := web_query("url"); u != "" {self.url = u} // let a deploy pin the relay via ?url=
+		}
 		if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", true)}
-		// Default the signaling URL field so the lobby is editable for real deploys.
+		// Default the signaling URL field to the real value so a joiner usually only needs the room
+		// code (it stays editable for other deploys).
 		if self.url_edit != nil {gd.set_string(self.url_edit, "text", fmt.ctprintf("%s", self.url))}
 		if self.code_label != nil {gd.set_string(self.code_label, "text", "")}
 		wire_button(self, "SingleButton", "on_single")
 		wire_button(self, "HostButton", "on_host")
 		wire_button(self, "JoinButton", "on_join")
+		when IS_WEB {
+			// Web paste fix (Bug 2): the built-in LineEdit paste reads DisplayServer.clipboard_get,
+			// which is empty in the web export (the browser clipboard is async + permissioned). We
+			// intercept Ctrl/Cmd+V on the lobby fields and read navigator.clipboard via the JS bridge.
+			wire_signal(self, "UrlEdit", "gui_input", "on_lobby_input")
+			wire_signal(self, "RoomEdit", "gui_input", "on_lobby_input")
+			// Headless self-drive hooks for the gated browser harness (no human needed).
+			switch web_query("lobbytest") {
+			case "retry": self.lobby_test = .Retry
+			case "paste": self.lobby_test = .Paste
+			}
+		}
 	}
 	update_hud(self)
 }
@@ -298,10 +335,27 @@ wire_button :: proc(self: ^ArenaGame, name: cstring, method: cstring) {
 	if b != nil {gd.connect_to(b, "pressed", self.owner, method)}
 }
 
+@(private = "file")
+wire_signal :: proc(self: ^ArenaGame, name: cstring, signal: cstring, method: cstring) {
+	if self.start_screen == nil {return}
+	b := gd.get_node(self.start_screen, name)
+	if b != nil {gd.connect_to(b, signal, self.owner, method)}
+}
+
+@(private = "file")
+set_lobby_buttons_enabled :: proc(self: ^ArenaGame, enabled: bool) {
+	if self.start_screen == nil {return}
+	for name in ([]cstring{"SingleButton", "HostButton", "JoinButton"}) {
+		if b := gd.get_node(self.start_screen, name); b != nil {gd.set_bool(b, "disabled", !enabled)}
+	}
+}
+
 arena_game_process :: proc(self: ^ArenaGame, delta: f64) {
 	when IS_WEB {
 		gd.webrtc_poll(self.owner)
+		lobby_paste_poll(self, delta)
 		lobby_web_update(self)
+		if self.lobby_test != .Off {lobby_test_drive(self, delta)}
 	}
 	self.alive_t += delta
 
@@ -334,9 +388,36 @@ arena_game_process :: proc(self: ^ArenaGame, delta: f64) {
 			if !self.headless && self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}
 			self.mode = .Play
 			self.alive_t = 0
-		} else if self.alive_t > CONNECT_TIMEOUT {
-			log(fmt.tprintf("%v_TIMEOUT: no peer", self.role))
-			quit_now(self, 1)
+		} else if self.headless {
+			// Scripted sessions quit on failure so the harness sees a deterministic timeout.
+			if self.alive_t > CONNECT_TIMEOUT {
+				log(fmt.tprintf("%v_TIMEOUT: no peer", self.role))
+				quit_now(self, 1)
+			}
+		} else {
+			// WINDOWED (Bug 1): RECOVER on ANY connect failure — a signaling error (no_room/full),
+			// the peer dropping mid-connect (closed/peer_left -> Failed), or a connect timeout —
+			// reset to the connectable start screen so the user can attempt again with no reload.
+			failed := false
+			reason := "timed out"
+			when IS_WEB {
+				if er := gd.webrtc_error_reason(self.owner); er != "" {
+					failed = true; reason = er
+				} else if gd.webrtc_session_state(self.owner) == .Failed {
+					failed = true; reason = "connection failed"
+				}
+			}
+			// The connect TIMEOUT only fires while we're still trying to reach the other side. A HOST
+			// that successfully opened its room (web: got a room code; native: ENet bound) is healthily
+			// WAITING for a friend and must NOT reset — only a stuck joiner / unreachable relay does.
+			waiting_ok := false
+			when IS_WEB {
+				if self.role == .Server && self.room_logged {waiting_ok = true}
+			} else {
+				if self.role == .Server {waiting_ok = true}
+			}
+			if !failed && !waiting_ok && self.alive_t > LOBBY_CONNECT_TIMEOUT {failed = true; reason = "timed out"}
+			if failed {lobby_reset(self, reason)}
 		}
 
 	case .Play:
@@ -736,24 +817,226 @@ arena_game_on_single :: proc(self: ^ArenaGame) {
 // Host: keep the lobby panel up so the assigned ROOM CODE can be DISPLAYED to share; the panel is
 // dropped on connect (in the Connecting->Play transition). Status is driven by lobby_web_update.
 @(gd_method)
-arena_game_on_host :: proc(self: ^ArenaGame) {
+arena_game_on_host :: proc(self: ^ArenaGame) {begin_host(self)}
+// Join: read the room code the friend shared (RoomEdit) + URL, then connect. Panel drops on
+// connect; errors (no_room/full) surface via lobby_web_update -> lobby_reset.
+@(gd_method)
+arena_game_on_join :: proc(self: ^ArenaGame) {
+	if self.room_edit != nil {
+		if t := gd.get_string(self.room_edit, "text"); len(t) > 0 {self.room = t}
+	}
+	begin_join(self, "")
+}
+
+// begin_host / begin_join — the shared "start an attempt" path used by the Host/Join BUTTONS and
+// by the headless lobby self-test. Disabling the buttons here (and re-enabling them in lobby_reset)
+// is the "re-enable on recover" half of the retry UX.
+@(private = "file")
+begin_host :: proc(self: ^ArenaGame) {
 	read_lobby_url(self)
 	self.role = .Server
+	set_lobby_buttons_enabled(self, false)
 	if self.status != nil {gd.set_string(self.status, "text", "Hosting...")}
 	// Native (ENet) has no room code to show — drop the panel immediately.
 	when !IS_WEB {if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}}
 }
-// Join: read the room code the friend shared (RoomEdit) + URL, then connect. Panel drops on
-// connect; errors (no_room/full) surface via lobby_web_update.
-@(gd_method)
-arena_game_on_join :: proc(self: ^ArenaGame) {
+@(private = "file")
+begin_join :: proc(self: ^ArenaGame, room: string) {
 	read_lobby_url(self)
-	if self.room_edit != nil {
-		if t := gd.get_string(self.room_edit, "text"); len(t) > 0 {self.room = t}
-	}
+	if room != "" {self.room = room}
 	self.role = .Client
+	set_lobby_buttons_enabled(self, false)
 	if self.status != nil {gd.set_string(self.status, "text", "Joining...")}
 	when !IS_WEB {if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}}
+}
+
+// lobby_reset — the heart of the retry fix (Bug 1). On ANY failed/aborted connect it tears the
+// half-open transport down (webrtc_close fully clears the WS + WebRTC peer + session state; the
+// native ENet peer is detached too) and returns to the connectable START SCREEN: role/mode back to
+// the boot state, the room/code cleared, Host/Join re-shown + re-enabled, and the failure reason
+// surfaced. So attempt -> fail -> attempt again works any number of times with NO page reload.
+@(private = "file")
+lobby_reset :: proc(self: ^ArenaGame, reason: string) {
+	when IS_WEB {gd.webrtc_close(self.owner)}
+	gd.multiplayer_clear_peer(self.owner)
+	self.role = .None
+	self.mode = .Boot
+	self.room = ""
+	self.room_logged = false
+	self.client_id = 0
+	self.alive_t = 0
+	self.settle = 0
+	self.reset_count += 1
+	if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", true)}
+	set_lobby_buttons_enabled(self, true)
+	if self.code_label != nil {gd.set_string(self.code_label, "text", "")}
+	if self.status != nil {
+		gd.set_string(self.status, "text", fmt.ctprintf("Connection failed (%s). Pick Host or Join to try again.", reason))
+	}
+	log(fmt.tprintf("LOBBY_RESET reason=%s count=%d", reason, self.reset_count))
+}
+
+// ---- web clipboard paste (Bug 2) -------------------------------------------
+
+// arena_game_on_lobby_input — gui_input handler on the URL + room-code LineEdits (web only). It
+// catches Ctrl/Cmd+V on the focused field, SWALLOWS the event (so Godot's built-in paste — which
+// reads the empty web DisplayServer clipboard — does NOT run), and kicks off an async read of the
+// real browser clipboard via the JS bridge. Desktop/native is untouched (built-in paste works).
+@(gd_method)
+arena_game_on_lobby_input :: proc(self: ^ArenaGame, event: gd.Input_Event) {
+	when IS_WEB {
+		if event == nil {return}
+		if !bool(gd.object_is_class(cast(gd.Object)event, gd.new_string_cstring("InputEventKey"))) {return}
+		key := cast(gd.Input_Event_Key)event
+		if !bool(gd.input_event_is_pressed(cast(gd.Input_Event)event)) {return}
+		if gd.input_event_key_get_keycode(key) != .V {return}
+		ctrl := bool(gd.input_event_with_modifiers_is_ctrl_pressed(cast(gd.Input_Event_With_Modifiers)key))
+		meta := bool(gd.input_event_with_modifiers_is_meta_pressed(cast(gd.Input_Event_With_Modifiers)key))
+		if !ctrl && !meta {return}
+		target := focused_lobby_field(self)
+		if target == nil {return}
+		gd.control_accept_event(cast(gd.Control)target) // suppress the built-in (empty) web paste
+		start_clipboard_paste(self, target)
+	}
+}
+
+@(private = "file")
+focused_lobby_field :: proc(self: ^ArenaGame) -> gd.Node {
+	if self.room_edit != nil && bool(gd.control_has_focus(cast(gd.Control)self.room_edit, false)) {return self.room_edit}
+	if self.url_edit != nil && bool(gd.control_has_focus(cast(gd.Control)self.url_edit, false)) {return self.url_edit}
+	return nil
+}
+
+// start_clipboard_paste kicks off navigator.clipboard.readText() (async, returns a Promise) and
+// stashes the result on a JS global; lobby_paste_poll picks it up on a later frame and inserts it.
+@(private = "file")
+start_clipboard_paste :: proc(self: ^ArenaGame, target: gd.Node) {
+	when IS_WEB {
+		js := gd.singleton_java_script_bridge()
+		code := gd.new_string_cstring(
+			"window.__gdClip=null;window.__gdClipDone=0;" +
+			"try{navigator.clipboard.readText()" +
+			".then(function(t){window.__gdClip=String(t);window.__gdClipDone=1;})" +
+			".catch(function(e){window.__gdClip='';window.__gdClipDone=2;});}" +
+			"catch(e){window.__gdClip='';window.__gdClipDone=2;}''")
+		gd.java_script_bridge_eval(js, code, true)
+		self.paste_pending = true
+		self.paste_target = target
+		self.paste_t = 0
+	}
+}
+
+// lobby_paste_poll services an in-flight clipboard read each frame: once the Promise resolves
+// (__gdClipDone==1) it inserts the text at the caret (replacing any selection) like a normal paste;
+// on rejection (no permission / not a secure context) or after a short timeout it gives up cleanly.
+@(private = "file")
+lobby_paste_poll :: proc(self: ^ArenaGame, delta: f64) {
+	when IS_WEB {
+		if !self.paste_pending {return}
+		self.paste_t += delta
+		js := gd.singleton_java_script_bridge()
+		dv := gd.java_script_bridge_eval(js, gd.new_string_cstring("String(window.__gdClipDone||0)"), true)
+		done := str_to_odin(gd.variant_to_string(&dv))
+		if done == "1" {
+			tv := gd.java_script_bridge_eval(js, gd.new_string_cstring("(window.__gdClip==null?'':String(window.__gdClip))"), true)
+			text := str_to_odin(gd.variant_to_string(&tv))
+			apply_paste(self, sanitize_line(text))
+			self.paste_pending = false
+		} else if done == "2" || self.paste_t > 3.0 {
+			log("LOBBY_PASTE_FAIL: clipboard read unavailable (permission / non-secure context?)")
+			self.paste_pending = false
+		}
+	}
+}
+
+@(private = "file")
+apply_paste :: proc(self: ^ArenaGame, text: string) {
+	if self.paste_target == nil {return}
+	gd.line_edit_insert_text_at_caret(cast(gd.Line_Edit)self.paste_target, gd.new_string_odin(text))
+	field := self.paste_target == self.room_edit ? "room" : "url"
+	log(fmt.tprintf("LOBBY_PASTE_APPLIED field=%s text=%s", field, text))
+}
+
+// sanitize_line trims at the first newline — room codes / URLs are single-line, and a trailing
+// newline in the clipboard would otherwise leak into the field.
+@(private = "file")
+sanitize_line :: proc(s: string) -> string {
+	for i in 0 ..< len(s) {if s[i] == '\n' || s[i] == '\r' {return s[:i]}}
+	return s
+}
+
+// lobby_test_drive (web harness only) — headlessly exercises the REAL retry + paste code paths so
+// the gated browser test can assert the mechanics. Retry: drive a Join to a NONEXISTENT room (real
+// signaling no_room -> Failed -> lobby_reset), confirm recovery, then a SECOND attempt (Host) that
+// reaches a room code — all with no reload. Paste: focus the room field, put text on the page
+// clipboard, synthesize Ctrl+V into on_lobby_input, and assert the field receives it.
+@(private = "file")
+lobby_test_drive :: proc(self: ^ArenaGame, delta: f64) {
+	when IS_WEB {
+		self.lt_t += delta
+		switch self.lobby_test {
+		case .Off:
+		case .Retry:
+			switch self.lt_phase {
+			case 0:
+				begin_join(self, "ZZZZ") // a code no host ever created -> server replies no_room
+				log("LOBBY_TEST_JOIN_BOGUS")
+				self.lt_phase = 1; self.lt_t = 0
+			case 1:
+				if self.reset_count >= 1 {
+					log("LOBBY_RETRY_RESET_OK")
+					self.lt_phase = 2; self.lt_t = 0
+				} else if self.lt_t > 30 {
+					log("LOBBY_RETRY_FAIL: no reset after a failed join"); quit_now(self, 1)
+				}
+			case 2:
+				begin_host(self) // second attempt, no page reload
+				log("LOBBY_TEST_REHOST")
+				self.lt_phase = 3; self.lt_t = 0
+			case 3:
+				if self.room_logged {
+					log("LOBBY_RETRY_OK")
+					quit_now(self, 0)
+				} else if self.lt_t > 30 {
+					log("LOBBY_RETRY_FAIL: re-host produced no room code"); quit_now(self, 1)
+				}
+			}
+		case .Paste:
+			switch self.lt_phase {
+			case 0:
+				if self.room_edit != nil {gd.control_grab_focus(cast(gd.Control)self.room_edit, false)}
+				js := gd.singleton_java_script_bridge()
+				gd.java_script_bridge_eval(js, gd.new_string_cstring(
+					"window.__gdWrote=0;navigator.clipboard.writeText('WXYZ')" +
+					".then(function(){window.__gdWrote=1;}).catch(function(){window.__gdWrote=2;});''"), true)
+				self.lt_phase = 1; self.lt_t = 0
+			case 1:
+				js := gd.singleton_java_script_bridge()
+				wv := gd.java_script_bridge_eval(js, gd.new_string_cstring("String(window.__gdWrote||0)"), true)
+				w := str_to_odin(gd.variant_to_string(&wv))
+				if w == "1" {
+					ev := gd.new_input_event_key()
+					gd.input_event_key_set_keycode(ev, gd.Key.V)
+					gd.input_event_with_modifiers_set_ctrl_pressed(cast(gd.Input_Event_With_Modifiers)ev, true)
+					gd.input_event_key_set_pressed(ev, true)
+					arena_game_on_lobby_input(self, cast(gd.Input_Event)ev)
+					log("LOBBY_TEST_PASTE_KEY")
+					self.lt_phase = 2; self.lt_t = 0
+				} else if w == "2" || self.lt_t > 10 {
+					log("LOBBY_PASTE_FAIL: clipboard write blocked"); quit_now(self, 1)
+				}
+			case 2:
+				if self.room_edit != nil {
+					if t := gd.get_string(self.room_edit, "text"); t == "WXYZ" {
+						log(fmt.tprintf("LOBBY_PASTE_OK field=room text=%s", t))
+						quit_now(self, 0)
+					} else if self.lt_t > 10 {
+						log(fmt.tprintf("LOBBY_PASTE_FAIL: field text=%q", t)); quit_now(self, 1)
+					}
+				}
+			}
+		}
+	}
 }
 
 // ---- peer signal handlers --------------------------------------------------

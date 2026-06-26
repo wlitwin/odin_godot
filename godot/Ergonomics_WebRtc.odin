@@ -250,9 +250,12 @@ webrtc_poll :: proc "contextless" (node: Node) {
 	}
 }
 
-// webrtc_close tears down `node`'s WebRTC session: it sends `leave`, closes the signaling socket
-// and frees the pool slot. The installed multiplayer peer is left in place — call multiplayer's
-// own close/clear if you want to drop the RTC connection too.
+// webrtc_close tears down `node`'s WebRTC session COMPLETELY so a fresh webrtc_host/webrtc_join
+// can start clean: it sends `leave`, closes the signaling socket, DETACHES the installed WebRTC
+// multiplayer peer from the MultiplayerAPI (back to offline), and zeroes the pool slot (clearing
+// the room/ICE buffers + the peer-connection handles). This is what lets a failed connection
+// attempt recover and be retried in-place (no page reload): after webrtc_close the slot is free
+// and the MultiplayerAPI has no stale peer, so a re-host/re-join installs a brand-new one.
 webrtc_close :: proc "contextless" (node: Node) {
 	s := _find(node)
 	if s == nil {return}
@@ -265,7 +268,15 @@ webrtc_close :: proc "contextless" (node: Node) {
 		}
 		web_socket_peer_close(s.ws, 1000, string_empty())
 	}
-	s.active = false
+	// Detach the WebRTC multiplayer peer so the MultiplayerAPI returns to offline; the engine drops
+	// its ref to the (RefCounted) WebRTCMultiplayerPeer + its peer connection, which then free.
+	if cast(rawptr)s.mp != nil {
+		none: Multiplayer_Peer
+		multiplayer_api_set_multiplayer_peer(s.mp, none)
+	}
+	// Zero the slot: clears active/state/err, the room + ICE buffers, and the ws/rtc/conn handles,
+	// so the pool slot is fully reusable by a subsequent webrtc_host/webrtc_join.
+	s^ = Webrtc_Session{}
 }
 
 @(private = "file")
