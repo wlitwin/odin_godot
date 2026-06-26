@@ -34,7 +34,7 @@ FAILED :: i64(1)
 
 // Godot collection root (where the `godot` package lives): ProjectSetting `odin_godot/root`
 // -> env `ODIN_GODOT_ROOT` -> repo default. (Same resolution validate.odin uses.)
-@(private = "file")
+// Package-visible (not file-private) so core/lookup.odin resolves the root the SAME way.
 godot_collection_root :: proc(allocator := context.allocator) -> string {
     ps := godot.singleton_project_settings()
     key := godot.new_string_cstring("odin_godot/root")

@@ -353,7 +353,7 @@ odin_language_register :: proc() {
     add("_make_function", lv_string_empty) // String
     add("_open_in_external_editor", lv_int0) // enum::Error (0 == OK)
     add("_complete_code", lv_complete_code) // Dictionary {result, force, call_hint, options} — real ols autocomplete (complete.odin)
-    add("_lookup_code", lv_dict_result_failed) // Dictionary {result, ...}
+    add("_lookup_code", lv_lookup_code) // Dictionary {result, type, class_name, class_member} — goto-def to built-in docs (lookup.odin)
     add("_auto_indent_code", lv_string_empty) // String
     add("_add_global_constant", lv_noop) // void
     add("_add_named_global_constant", lv_noop) // void
