@@ -45,7 +45,16 @@ $WinBin  = Join-Path $RootRel "bin\windows"
 New-Item -ItemType Directory -Force -Path $Bin    | Out-Null
 New-Item -ItemType Directory -Force -Path $WinBin | Out-Null
 
-if (-not (Test-Path $Scripts)) { throw "no 'scripts' folder in project: $projAbs" }
+if (-not (Test-Path $Scripts) -or -not (Get-ChildItem -Path $Scripts -Filter *.odin -ErrorAction SilentlyContinue)) {
+    throw @"
+no Odin scripts found at '$Scripts' (project: $projAbs).
+odin_godot ships the engine core; your .odin scripts are yours and go in a 'scripts'
+folder. A scripts package also needs a boot.odin (required boilerplate). Quick start:
+copy the bundled template, then re-run:
+  Copy-Item -Recurse "$RootRel\template\scripts" "$projAbs\scripts"
+(the template lives at addons\odin_godot\template\ — see its README.md)
+"@
+}
 if ($projAbs -match ' ') {
     Write-Host "WARNING: the project path contains a space ($projAbs)."
     Write-Host "         Using relative paths to work around it; if odin still errors, move the project"

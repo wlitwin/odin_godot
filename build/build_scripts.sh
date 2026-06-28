@@ -22,6 +22,20 @@ SCRIPTS="${2:-$PROJ/scripts}"
 BIN="$PROJ/bin"
 mkdir -p "$BIN"
 
+# Actionable failure when there are no scripts to compile (the #1 first-run snag): odin_godot
+# ships the engine CORE prebuilt — your .odin gameplay scripts are YOURS and live in a
+# scripts/ folder you create. Point the user at the bundled starter (which also carries the
+# REQUIRED boot.odin boilerplate) instead of dying inside scriptgen/odin with a vague error.
+if [ ! -d "$SCRIPTS" ] || [ -z "$(ls "$SCRIPTS"/*.odin 2>/dev/null)" ]; then
+    echo "build_scripts: no Odin scripts found at '$SCRIPTS'." >&2
+    echo "  odin_godot ships the engine core; your .odin scripts are yours and go in a" >&2
+    echo "  scripts/ folder. A scripts package also needs a boot.odin (required boilerplate)." >&2
+    echo "  Quick start: copy the bundled template into place, then re-run:" >&2
+    echo "    cp -r \"$ROOT/template/scripts\" \"$PROJ/scripts\"   # boot.odin + a Hello example" >&2
+    echo "  (in the addon, the template is at addons/odin_godot/template/ — see its README.md)" >&2
+    exit 1
+fi
+
 # The `odin` compiler. Overridable via env so callers that resolved an absolute compiler
 # path (e.g. the editor reload-on-save coordinator, which can't rely on `odin` being on the
 # editor's PATH) can pass it through as `ODIN=/abs/path/to/odin`.

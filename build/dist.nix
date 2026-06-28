@@ -85,6 +85,11 @@ stdenvNoCC.mkDerivation {
     mkdir -p $A/build
     cp build/build_scripts.sh build/build_scripts.ps1 build/build_export_scripts.sh \
        build/build_web.sh build/build_cross.sh $A/build/
+
+    # Copy-paste starter for the consumer's res://scripts/ — the REQUIRED boot.odin (which
+    # a user can't be expected to write from scratch) + a minimal Hello example + a README.
+    # A fresh addon otherwise ships no scripts, so there is nothing to build or learn from.
+    cp -r build/template $A/template
     # The raw engine inputs are gitignored (regenerated from the pinned Godot) and are NOT
     # needed to compile scripts (the godot/ binding is already generated from them) — copy
     # only if present so `nix build` works from a clean (gitignore-filtered) source.
