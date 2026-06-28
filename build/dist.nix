@@ -90,6 +90,18 @@ stdenvNoCC.mkDerivation {
     # a user can't be expected to write from scratch) + a minimal Hello example + a README.
     # A fresh addon otherwise ships no scripts, so there is nothing to build or learn from.
     cp -r build/template $A/template
+
+    # CRITICAL: Godot's filesystem scanner claims EVERY .odin file as a script. The addon
+    # bundles the Odin collection SOURCE (so a consumer can compile scripts) + a template —
+    # those are build inputs resolved by odin's `-collection:` PATH, not res:// scripts.
+    # Without this, Godot scans them all as project scripts and registers the template's
+    # `//gd:class Hello` as a PHANTOM global class with no compiled impl, which crashes/
+    # destabilizes the editor. A `.gdignore` makes Godot skip a dir (odin's path-based
+    # collection resolution is unaffected). The addon root stays scannable so Godot still
+    # discovers odin_godot.gdextension.
+    for d in core godot gdext libgd runtime scriptgen template build; do
+      touch "$A/$d/.gdignore"
+    done
     # The raw engine inputs are gitignored (regenerated from the pinned Godot) and are NOT
     # needed to compile scripts (the godot/ binding is already generated from them) — copy
     # only if present so `nix build` works from a clean (gitignore-filtered) source.
