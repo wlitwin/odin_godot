@@ -38,7 +38,8 @@ That means:
 
 ## Quick start — your first script
 
-1. **Copy the starter** into your project root:
+1. **Copy the starter** — easiest from inside Godot: **Project → Tools → Set Up Odin Scripts**
+   (copies the template into `res://scripts/` and refreshes the dock). Or from a terminal:
    ```sh
    cp -r addons/odin_godot/template/scripts ./scripts
    ```

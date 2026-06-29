@@ -136,31 +136,116 @@ pl_get_plugin_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args:
 // OdinEditorPlugin._enter_tree — construct + register the export plugin. This runs
 // when `editor_add_plugin` inserts us into the editor tree, which happens during the
 // extension's `.Editor`-level init (before any export command executes).
-// The "Build Odin Scripts" tool-menu action's body: kick the SAME background build the
-// save/reload path runs (force=true so a manual click always rebuilds + gives feedback,
-// rather than being skipped when nothing changed). Runs on the editor main thread.
+// make_menu_callable — a custom Callable backed by an Odin "c" proc, for add_tool_menu_item.
 @(private = "file")
-build_menu_call :: proc "c" (
-    userdata: rawptr,
-    args: [^]gdext.VariantPtr,
-    argc: i64,
-    ret: gdext.VariantPtr,
-    err: ^gdext.CallError,
-) {
-    context = gdext.godot_context()
-    reload_request(force = true)
-}
-
-// Build a custom Callable backed by build_menu_call, for add_tool_menu_item.
-@(private = "file")
-odin_build_menu_callable :: proc() -> godot.Callable {
+make_menu_callable :: proc(fn: gdext.ExtensionCallableCustomCall) -> godot.Callable {
     info := gdext.ExtensionCallableCustomInfo2 {
         token     = gdext.library,
-        call_func = build_menu_call,
+        call_func = fn,
     }
     cb: godot.Callable
     gdext.callable_custom_create2(cast(gdext.TypePtr)&cb, &info)
     return cb
+}
+
+// "Build Odin Scripts" body: kick the SAME background build the save/reload path runs
+// (force=true so a manual click always rebuilds + gives feedback). Editor main thread.
+@(private = "file")
+build_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr, err: ^gdext.CallError) {
+    context = gdext.godot_context()
+    reload_request(force = true)
+}
+
+// "Set Up Odin Scripts" body: copy the bundled template into res://scripts/ (the template
+// lives inside the addon, which is `.gdignore`d, so it's invisible in the FileSystem dock —
+// users otherwise have to reach for their OS file manager).
+@(private = "file")
+setup_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr, err: ^gdext.CallError) {
+    context = gdext.godot_context()
+    context.allocator = runtime.heap_allocator()
+    setup_scripts_from_template()
+}
+
+@(private = "file")
+editor_msg_error :: proc(s: string) {
+    m := godot.new_string_odin(s)
+    godot.gd_push_error(godot.variant_from_string(&m))
+}
+
+@(private = "file")
+editor_msg_warn :: proc(s: string) {
+    m := godot.new_string_odin(s)
+    godot.gd_push_warning(godot.variant_from_string(&m))
+}
+
+@(private = "file")
+dir_has_odin :: proc(dir: string) -> bool {
+    if !os.exists(dir) {return false}
+    fis, derr := os.read_directory_by_path(dir, -1, context.temp_allocator)
+    if derr != nil {return false}
+    for fi in fis {
+        if strings.has_suffix(fi.name, ".odin") {return true}
+    }
+    return false
+}
+
+@(private = "file")
+rescan_editor_filesystem :: proc() {
+    ei := godot.singleton_editor_interface()
+    if ei == nil {return}
+    rfs := godot.editor_interface_get_resource_filesystem(ei)
+    if rfs == nil {return}
+    godot.editor_file_system_scan(rfs)
+}
+
+// Copy the addon's template scripts into res://scripts/ so a new project can start without a
+// trip to the file manager. Refuses to clobber an existing scripts dir that has .odin sources.
+@(private = "file")
+setup_scripts_from_template :: proc() {
+    root := odin_collection_root()
+    defer delete(root)
+    if root == "" {
+        editor_msg_error("odin_godot: couldn't locate the addon — set the `odin_godot/root` project setting, then retry.")
+        return
+    }
+    src := strings.concatenate({root, "/template/scripts"})
+    defer delete(src)
+
+    gres := godot.new_string_cstring("res://scripts")
+    destg := godot.project_settings_globalize_path(godot.singleton_project_settings(), gres)
+    dest := string_to_odin(destg)
+    defer delete(dest)
+
+    if dir_has_odin(dest) {
+        editor_msg_warn(fmt.tprintf("odin_godot: res://scripts already exists with .odin files — leaving it untouched (%s).", dest))
+        return
+    }
+    fis, derr := os.read_directory_by_path(src, -1, context.temp_allocator)
+    if derr != nil {
+        editor_msg_error(fmt.tprintf("odin_godot: template not found at %s — is the addon intact?", src))
+        return
+    }
+    if !os.exists(dest) {
+        if mkerr := os.make_directory(dest); mkerr != nil {
+            editor_msg_error(fmt.tprintf("odin_godot: couldn't create %s.", dest))
+            return
+        }
+    }
+    copied := 0
+    for fi in fis {
+        if fi.type == .Directory || strings.has_suffix(fi.name, ".gen.odin") {continue}
+        data, rerr := os.read_entire_file(fi.fullpath, context.temp_allocator)
+        if rerr != nil {continue}
+        out := strings.concatenate({dest, "/", fi.name}, context.temp_allocator)
+        if werr := os.write_entire_file(out, data); werr == nil {copied += 1}
+    }
+    rescan_editor_filesystem()
+    godot.print_str(
+        fmt.tprintf(
+            "odin_godot: created res://scripts/ (%d file(s)) from the template. Next: Project > Tools > Build Odin Scripts, then Play.",
+            copied,
+        ),
+    )
 }
 
 @(private = "file")
@@ -172,15 +257,16 @@ pl_enter_tree :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]g
         cast(godot.Editor_Plugin)self.object,
         cast(godot.Editor_Export_Plugin)ep_object,
     )
-    // "Project > Tools > Build Odin Scripts" — compile the scripts dll without leaving Godot
-    // (no more dropping to a terminal for build_scripts.sh). Reuses the save-path build, so it
-    // streams the same "rebuilding…" / "reloaded" status to the Output.
-    menu_name := godot.new_string_cstring("Build Odin Scripts")
-    godot.editor_plugin_add_tool_menu_item(
-        cast(godot.Editor_Plugin)self.object,
-        menu_name,
-        odin_build_menu_callable(),
-    )
+    // Project > Tools items, so a new user never has to leave Godot:
+    //   * "Set Up Odin Scripts" — copy the bundled template into res://scripts/ (the template
+    //     is inside the .gdignore'd addon, so it's invisible in the FileSystem dock otherwise).
+    //   * "Build Odin Scripts" — compile the scripts dll (reuses the save-path build, streaming
+    //     the same "rebuilding…" / "reloaded" status to the Output).
+    plug := cast(godot.Editor_Plugin)self.object
+    setup_name := godot.new_string_cstring("Set Up Odin Scripts")
+    godot.editor_plugin_add_tool_menu_item(plug, setup_name, make_menu_callable(setup_menu_call))
+    build_name := godot.new_string_cstring("Build Odin Scripts")
+    godot.editor_plugin_add_tool_menu_item(plug, build_name, make_menu_callable(build_menu_call))
 }
 
 // Map a target OS feature tag -> the scripts dll suffix the EXPORTED core will look for.

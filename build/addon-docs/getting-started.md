@@ -38,6 +38,10 @@ The fastest way to both is the bundled starter.
 
 ### 2a. Copy the starter
 
+**Easiest — from inside Godot:** **Project → Tools → Set Up Odin Scripts**. This copies the
+template into `res://scripts/` and refreshes the FileSystem dock (the template lives inside the
+addon, so it isn't visible there to drag yourself). Or from a terminal:
+
 ```sh
 cp -r addons/odin_godot/template/scripts ./scripts
 ```

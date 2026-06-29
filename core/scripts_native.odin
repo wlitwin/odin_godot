@@ -132,9 +132,9 @@ scripts_surface_missing_warning :: proc() {
 	}
 	msg := godot.new_string_cstring(
 		"odin_godot: no compiled Odin scripts found (res://bin/libodinscripts.*). This is normal " +
-		"for a fresh install — your .odin gameplay code compiles into that dll. Quick start: copy " +
-		"addons/odin_godot/template/scripts into res://scripts, then build via Project > Tools > " +
-		"Build Odin Scripts (see addons/odin_godot/README.md).",
+		"for a fresh install — your .odin gameplay code compiles into that dll. Quick start: " +
+		"Project > Tools > Set Up Odin Scripts (creates res://scripts from the template), then " +
+		"Project > Tools > Build Odin Scripts. See addons/odin_godot/README.md.",
 	)
 	godot.gd_push_warning(godot.variant_from_string(&msg))
 }
