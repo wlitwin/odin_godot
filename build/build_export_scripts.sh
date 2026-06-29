@@ -15,16 +15,27 @@
 # macos (native). linux/windows: supported-but-unverified — see docs/phase5-export.md.
 set -euo pipefail
 
-ROOT="${ODIN_GODOT_ROOT:-/Users/walter/data/code/odin/odin_godot}"
+# Overridable so the editor's export plugin can pass an absolute compiler (the editor often
+# can't see `odin` on its PATH when launched from Finder/Steam).
+ODIN="${ODIN:-odin}"
+# Root derived from this script's location (build/ -> root), overridable. Never hardcode a
+# checkout path — this ships inside the addon.
+ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 PROJ="$1"
 TARGET="$2"
 OUT="$3"
 SCRIPTS="$PROJ/scripts"
 
+# Optimization level for the EXPORTED scripts dll. Unlike the dev rebuild-on-save loop (which
+# stays at -o:none for fast iteration), a shipped game wants real optimization. Default to
+# `speed`; override per project via the `odin_godot/export_optimization` setting (the export
+# plugin forwards it as ODIN_EXPORT_OPT) — one of none|minimal|size|speed|aggressive.
+OPT="${ODIN_EXPORT_OPT:-speed}"
+
 mkdir -p "$(dirname "$OUT")"
 
 # 1. Build the scriptgen preprocessor (cheap; keeps the pipeline self-contained).
-odin build "$ROOT/scriptgen" \
+"$ODIN" build "$ROOT/scriptgen" \
     -collection:godot="$ROOT" \
     -out:"$ROOT/scriptgen/scriptgen"
 
@@ -40,12 +51,14 @@ case "$TARGET" in
     *) echo "build_export_scripts.sh: unsupported target '$TARGET'" >&2; exit 2 ;;
 esac
 
-# 4. Build the scripts dll for the target.
-odin build "$SCRIPTS" \
+# 4. Build the scripts dll for the target, OPTIMIZED. `SCRIPT_BUILD_FLAGS` (env) appends extra
+#    odin flags for the truly release-minded (e.g. `-no-bounds-check -disable-assert`).
+"$ODIN" build "$SCRIPTS" \
     -collection:godot="$ROOT" \
     -build-mode:dll \
+    -o:"$OPT" \
     -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc \
     -out:"$OUT" \
-    "${EXTRA[@]}"
+    "${EXTRA[@]}" ${SCRIPT_BUILD_FLAGS:-}
 
 echo "build_export_scripts.sh: built $OUT" >&2

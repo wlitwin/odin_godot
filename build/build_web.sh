@@ -28,6 +28,10 @@ set -euo pipefail
 # it's launched from Finder/Steam) can pass them through as `ODIN=...`/`EMCC=...`.
 EMCC="${EMCC:-emcc}"
 ODIN="${ODIN:-odin}"
+# Odin optimization for the wasm object. Default none (fast dev/test builds); the editor's
+# export plugin forwards `odin_godot/export_optimization` as ODIN_EXPORT_OPT (default speed)
+# so a shipped web build is optimized. emcc's own -O2 (below) still runs regardless.
+OPT="${ODIN_EXPORT_OPT:-none}"
 
 # Repo/addon root: derive from THIS script's location (build/ -> root), overridable via
 # ODIN_GODOT_ROOT. (Never hardcode a checkout path — this script ships inside the addon and
@@ -93,6 +97,7 @@ ODIN_OBJ="${OUT%.wasm}.wasm.o"
     -collection:godot="$ROOT" \
     -target:freestanding_wasm32 \
     -build-mode:obj \
+    -o:"$OPT" \
     -no-entry-point \
     -reloc-mode:pic \
     -define:ODIN_GODOT_WEB=true \

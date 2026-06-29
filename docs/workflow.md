@@ -125,6 +125,13 @@ Set these as **project settings** (they also have env fallbacks for shell-launch
 | `odin_godot/emcc_bin` | `EMCC` | absolute path to Emscripten's `emcc` (**web export** only) |
 | `odin_godot/root` | `ODIN_GODOT_ROOT` | the odin_godot checkout, for the `-collection:godot` root |
 | `odin_godot/scripts_dir` | — | the scripts package (default `res://scripts`) |
+| `odin_godot/export_optimization` | `ODIN_EXPORT_OPT` | Odin `-o:` level for **exported** builds: `none`/`minimal`/`size`/`speed`/`aggressive` (default `speed`) |
+
+> **Dev builds vs. exports.** The editor's rebuild-on-save loop compiles at `-o:none` so saves
+> stay fast. **Exports** (desktop and web) compile at `odin_godot/export_optimization` (default
+> `speed`) so shipped games are optimized — the two are independent. For a maximally lean
+> release, append `-no-bounds-check -disable-assert` via the `SCRIPT_BUILD_FLAGS` env when
+> running the export build script directly.
 
 ## Debugging
 

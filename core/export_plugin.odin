@@ -211,6 +211,39 @@ dir_of :: proc(path: string) -> string {
     return "."
 }
 
+// Optimization level for the EXPORTED scripts: project setting `odin_godot/export_optimization`,
+// default "speed". A shipped game should be optimized (the dev rebuild-on-save loop stays at
+// -o:none for fast iteration — see build_export_scripts.sh). VALIDATED to one of Odin's -o:
+// levels because it's spliced into a shell command; an unknown value falls back to "speed".
+@(private = "file")
+export_opt_level :: proc() -> string {
+    ps := godot.singleton_project_settings()
+    key := godot.new_string_cstring("odin_godot/export_optimization")
+    if bool(godot.project_settings_has_setting(ps, key)) {
+        def := godot.Variant{}
+        v := godot.project_settings_get_setting(ps, key, def)
+        s := godot.variant_to_string(&v)
+        cand := string_to_odin(s, context.temp_allocator)
+        switch cand {
+        case "none":       return "none"
+        case "minimal":    return "minimal"
+        case "size":       return "size"
+        case "speed":      return "speed"
+        case "aggressive": return "aggressive"
+        case "": // unset/empty -> default below
+        case:
+            export_log(
+                fmt.tprintf(
+                    "odin export: ignoring invalid odin_godot/export_optimization=%q " +
+                    "(use none|minimal|size|speed|aggressive) — using speed",
+                    cand,
+                ),
+            )
+        }
+    }
+    return "speed"
+}
+
 // OdinExportPlugin._export_begin — compile scripts for the target, bundle the dll.
 @(private = "file")
 ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
@@ -264,21 +297,23 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         }
         defer delete(emcc_bin)
 
+        opt := export_opt_level()
         outwasm := fmt.aprintf("%s/bin/libodin_godot.wasm", proj)
         defer delete(outwasm)
         odin_dir := dir_of(odin_bin)
         emcc_dir := dir_of(emcc_bin)
         cmd := fmt.ctprintf(
-            "PATH='%s':'%s':\"$PATH\" ODIN='%s' EMCC='%s' ODIN_GODOT_ROOT='%s' bash '%s/build/build_web.sh' '%s' 1>&2",
+            "PATH='%s':'%s':\"$PATH\" ODIN='%s' EMCC='%s' ODIN_EXPORT_OPT='%s' ODIN_GODOT_ROOT='%s' bash '%s/build/build_web.sh' '%s' 1>&2",
             odin_dir,
             emcc_dir,
             odin_bin,
             emcc_bin,
+            opt,
             root,
             root,
             proj,
         )
-        export_log(fmt.tprintf("odin export: building web SIDE_MODULE wasm -> %s", outwasm))
+        export_log(fmt.tprintf("odin export: building web SIDE_MODULE wasm (-o:%s) -> %s", opt, outwasm))
         rc := libc.system(cmd)
         if rc != 0 {
             export_log(
@@ -309,21 +344,37 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         return
     }
 
+    // Resolve the compiler (project setting -> env -> PATH) and prepend its dir to PATH, so
+    // desktop export works from an editor launched outside a toolchain shell (Finder/Steam).
+    odin_bin, odin_ok := resolve_odin_bin()
+    if !odin_ok {
+        export_log(
+            "odin export: `odin` not found — cannot compile scripts. Set the " +
+            "`odin_godot/odin_bin` project setting to your odin binary (absolute path), or " +
+            "launch the editor from a shell where `odin` is on PATH.",
+        )
+        return
+    }
+    defer delete(odin_bin)
+    opt := export_opt_level()
+
     ext := target_ext(target)
     outdll := fmt.aprintf("%s/.export_build/libodinscripts%s", proj, ext)
     defer delete(outdll)
 
-    // Run the scriptgen + odin build pipeline for the target. libc.system inherits the
-    // (nix) PATH of the editor process, so `odin` resolves.
+    // Run the scriptgen + odin build pipeline for the target, OPTIMIZED (ODIN_EXPORT_OPT).
     cmd := fmt.ctprintf(
-        "ODIN_GODOT_ROOT='%s' bash '%s/build/build_export_scripts.sh' '%s' '%s' '%s' 1>&2",
+        "PATH='%s':\"$PATH\" ODIN='%s' ODIN_EXPORT_OPT='%s' ODIN_GODOT_ROOT='%s' bash '%s/build/build_export_scripts.sh' '%s' '%s' '%s' 1>&2",
+        dir_of(odin_bin),
+        odin_bin,
+        opt,
         root,
         root,
         proj,
         target,
         outdll,
     )
-    export_log(fmt.tprintf("odin export: compiling scripts for %s -> %s", target, outdll))
+    export_log(fmt.tprintf("odin export: compiling scripts for %s (-o:%s) -> %s", target, opt, outdll))
     rc := libc.system(cmd)
     if rc != 0 {
         export_log(fmt.tprintf("odin export: FAILED to compile scripts dll (rc=%d)", rc))
