@@ -44,3 +44,11 @@ reloader_process :: proc(self: ^Reloader, delta: f64) {
 reloader_get_step :: proc(self: ^Reloader) -> int {
 	return STEP
 }
+
+// Hot-reload hook: runs on each live instance AFTER the dll swap, with the NEW code. A real
+// script rebuilds cached proc pointers here; this one just emits a marker so the harness can
+// prove the `<class>_reload` lifecycle fired on the swap. (A proc, not a field — no layout
+// change, so the reload still takes the same-layout fast path the rest of this test asserts.)
+reloader_reload :: proc(self: ^Reloader) {
+	gd.print("RELOAD_HOOK_FIRED")
+}

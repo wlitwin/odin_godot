@@ -168,7 +168,7 @@ map_variant :: proc(type_text: string) -> (Variant_Info, bool) {
 	return {}, false
 }
 
-LIFECYCLE_KEYWORDS := [?]string{"physics_process", "process", "ready", "enter_tree", "exit_tree"}
+LIFECYCLE_KEYWORDS := [?]string{"physics_process", "process", "ready", "enter_tree", "exit_tree", "reload"}
 
 // ---- parsed model ------------------------------------------------------------
 

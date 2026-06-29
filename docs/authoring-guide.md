@@ -221,9 +221,30 @@ property list / Inspector.
 Both are plain Odin procs whose first parameter is `^<Struct>`:
 
 - **Lifecycle**: the proc name (minus an optional `<struct>_` prefix) is one of
-  `ready`, `process`, `physics_process`, `enter_tree`, `exit_tree`.
+  `ready`, `process`, `physics_process`, `enter_tree`, `exit_tree`, `reload`.
   `process` / `physics_process` take a `delta: f64` second parameter.
 - **Methods**: tagged `@(gd_method)`. Any name; exposed minus the struct prefix.
+
+#### `reload` — the hot-reload hook
+
+`<struct>_reload(self: ^T)` runs on each live instance **after a hot reload** swaps the
+scripts dll (editor save-on-rebuild, or an explicit `script.reload(true)` in a running game),
+with the **new** code. You rarely need it: a same-layout reload preserves your struct in place
+and re-points all engine entry points (`_process`, methods, signals) to the new code
+automatically. The one thing the swap *can't* fix is a **raw proc pointer you cached into your
+own struct** — a callback/dispatch table, or a behaviour-tree node like `flow.Action`'s
+`Call.fn`. On a same-layout reload those bytes are preserved untouched, so they still point at
+the *old* (still-mapped, now stale) code. Rebuild that state in `reload`:
+
+```odin
+boss_reload :: proc(self: ^Boss) {
+    self.behaviour = build_behaviour_tree()  // re-capture fresh proc pointers
+}
+```
+
+This only matters for scripts that (a) run in the editor (i.e. `//gd:tool`) or are explicitly
+reloaded at runtime, *and* (b) cache proc pointers in their state. Ordinary gameplay scripts
+never hit it (a running game doesn't hot-reload itself).
 
 Codegen wraps each in the `proc "c"` form the runtime expects, establishing a
 heap-backed default context before calling your proc, so your proc body can use

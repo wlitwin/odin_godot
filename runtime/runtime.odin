@@ -24,6 +24,12 @@ Lifecycle :: struct {
 	exit_tree:        proc "c" (self: rawptr),
 	process:          proc "c" (self: rawptr, delta: f64),
 	physics_process:  proc "c" (self: rawptr, delta: f64),
+	// `reload` runs after a HOT RELOAD swaps the scripts dll, on each live instance (with
+	// its NEW code). Lets a script rebuild state the swap can't fix itself — chiefly raw
+	// proc pointers cached into its struct (callback/dispatch tables, behaviour-tree nodes
+	// like flow.Action), which on a same-layout reload are preserved byte-for-byte and so
+	// still point at the OLD (stale, but still-mapped) code. Authored as `<class>_reload`.
+	reload:           proc "c" (self: rawptr),
 }
 
 // ----------------------------------------------------------------------------

@@ -893,6 +893,14 @@ rebind_all_instances :: proc() {
 		} else {
 			migrate_instance(oi, new_desc, new_cache)
 		}
+		// Hot-reload hook: the instance is now bound to the NEW desc + (preserved or
+		// migrated) state. Give the script a chance to rebuild what the swap can't fix
+		// itself — chiefly raw proc pointers it cached into its own struct, which on a
+		// same-layout reload survive byte-for-byte and still point at stale old code.
+		// Runs with the new code (nil when the class defines no `<class>_reload`).
+		if oi.desc.lifecycle.reload != nil {
+			oi.desc.lifecycle.reload(oi.user)
+		}
 	}
 }
 
