@@ -58,6 +58,47 @@ lifecycle_keyword :: proc(name: string) -> (string, bool) {
 	return "", false
 }
 
+// nearest_lifecycle reports a lifecycle keyword within edit-distance 1 of `name` (excluding
+// an exact match, which lifecycle_keyword already caught). Used only for a typo warning.
+nearest_lifecycle :: proc(name: string) -> (string, bool) {
+	for kw in LIFECYCLE_KEYWORDS {
+		if name != kw && edit_distance_le1(name, kw) {return kw, true}
+	}
+	return "", false
+}
+
+// edit_distance_le1 — true iff `a` becomes `b` with at most one insertion, deletion, or
+// substitution. (A tiny single-edit check; not a full Levenshtein.)
+edit_distance_le1 :: proc(a, b: string) -> bool {
+	x, y := a, b // params are immutable; work on locals so we can normalize order
+	lx, ly := len(x), len(y)
+	if lx == ly {
+		diffs := 0
+		for i in 0 ..< lx {
+			if x[i] != y[i] {
+				diffs += 1
+				if diffs > 1 {return false}
+			}
+		}
+		return diffs == 1
+	}
+	// length differs by exactly 1: the longer must equal the shorter with one char inserted.
+	if lx > ly {x, y = y, x; lx, ly = ly, lx}
+	if ly - lx != 1 {return false}
+	i, j := 0, 0
+	skipped := false
+	for i < lx && j < ly {
+		if x[i] == y[j] {
+			i += 1; j += 1
+		} else {
+			if skipped {return false}
+			skipped = true
+			j += 1 // skip one char in the longer string
+		}
+	}
+	return true
+}
+
 // ---- marker scanning (//gd:extends / //gd:class / //gd:tool / //gd:signal) ----
 
 scan_markers :: proc(src: string, s: ^Script) {
@@ -66,18 +107,41 @@ scan_markers :: proc(src: string, s: ^Script) {
 		l := strings.trim_space(line)
 		if !strings.has_prefix(l, "//gd:") {continue}
 		body := strings.trim_space(l[len("//gd:"):])
-		if strings.has_prefix(body, "extends") {
-			s.base = strings.trim_space(body[len("extends"):])
-		} else if strings.has_prefix(body, "class") {
-			s.class_name = strings.trim_space(body[len("class"):])
-		} else if strings.has_prefix(body, "tool") {
+		if rest, ok := marker_arg(body, "extends"); ok {
+			s.marked = true
+			s.base = strings.trim_space(rest)
+			if s.base == "" {errorf("//gd:extends needs a base class name")}
+		} else if rest, ok := marker_arg(body, "class"); ok {
+			s.marked = true
+			s.class_name = strings.trim_space(rest)
+			if s.class_name == "" {errorf("//gd:class needs a name")}
+		} else if _, ok := marker_arg(body, "tool"); ok {
+			s.marked = true
 			s.tool = true
-		} else if strings.has_prefix(body, "icon") {
-			s.icon = strings.trim_space(body[len("icon"):])
-		} else if strings.has_prefix(body, "signal") {
-			parse_signal_marker(strings.trim_space(body[len("signal"):]), s)
+		} else if rest, ok := marker_arg(body, "icon"); ok {
+			s.marked = true
+			s.icon = strings.trim_space(rest)
+		} else if rest, ok := marker_arg(body, "signal"); ok {
+			s.marked = true
+			parse_signal_marker(strings.trim_space(rest), s)
+		} else {
+			// A `//gd:` line that matches no known marker is almost always a typo
+			// (`//gd:extend`, `//gd:singal`) that would otherwise silently no-op — and the
+			// `//gd:` namespace is reserved, so erroring is safe.
+			errorf("unknown //gd: marker %q (expected one of: extends/class/tool/icon/signal)", body)
 		}
 	}
+}
+
+// marker_arg matches keyword `kw` at a WORD BOUNDARY, returning the text after it. The
+// boundary check is what stops `//gd:tooltip` from matching `tool` and `//gd:extend` (no
+// trailing `s`) from matching `extends` — both previously silently changed behaviour.
+marker_arg :: proc(body, kw: string) -> (rest: string, ok: bool) {
+	if !strings.has_prefix(body, kw) {return "", false}
+	r := body[len(kw):]
+	if len(r) == 0 {return "", true} // bare marker (e.g. `//gd:tool`)
+	if r[0] == ' ' || r[0] == '\t' {return r, true}
+	return "", false // e.g. `tooltip` after `tool` — not a boundary
 }
 
 // Parse `pinged(value: int, other: float)` into a Signal_Info.
@@ -159,6 +223,17 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		break
 	}
 	if struct_type == nil {
+		// A `//gd:` marker is an unambiguous declaration that this file IS a script. Finding
+		// one but no script struct almost always means the struct's first field isn't named
+		// `owner` (a typo, wrong name, or wrong position) — fail loudly instead of silently
+		// dropping the class (which left the user with a node that does nothing, no error).
+		if s.marked {
+			errorf(
+				"%q has //gd: marker(s) (class %q) but no script struct — a script's struct must have its FIRST field named `owner`",
+				path,
+				s.class_name,
+			)
+		}
 		return s, false
 	}
 	if s.class_name == "" {
@@ -207,7 +282,18 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			continue
 		}
 
-		if tok0 != "export" {continue}
+		if tok0 != "export" {
+			// The field HAS a `gd:"..."` tag (tag_gd_value succeeded) but its first token is
+			// neither `export` nor `onready=` — almost certainly a misspelling (`exprot`)
+			// that would otherwise silently leave the field un-exported.
+			errorf(
+				"%s.%s: unknown gd tag %q (expected `export` or `onready=PATH`)",
+				s.struct_name,
+				field_label,
+				tok0,
+			)
+			continue
+		}
 
 		vi, ok := map_variant(type_text)
 		if !ok {
@@ -310,6 +396,19 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			has_delta := count_params(pt) >= 2
 			append(&s.lifecycles, Lifecycle_Info{keyword = kw, proc_name = proc_name, has_delta = has_delta})
 			continue
+		}
+		// Typo hint: a struct-bound proc whose stripped name is one edit from a lifecycle
+		// keyword, and which isn't an explicit @(gd_method), is very likely a misspelled hook
+		// (`player_redy`) that will silently never run. Warn (non-fatal — it might be a helper).
+		if !is_gd_method {
+			if kw, near := nearest_lifecycle(stripped); near {
+				warnf(
+					"%s: proc %q looks like a misspelled `%s` lifecycle — it will NOT run as one",
+					s.struct_name,
+					proc_name,
+					kw,
+				)
+			}
 		}
 		if is_gd_method {
 			m := Method_Info {

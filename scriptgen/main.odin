@@ -377,6 +377,7 @@ Script :: struct {
 	struct_name: string,
 	class_name:  string,
 	base:        string,
+	marked:      bool, // saw at least one valid `//gd:` marker (intent signal for diagnostics)
 	tool:        bool,
 	icon:        string, // `//gd:icon <res-path>` — custom class icon (""=none)
 	exports:     [dynamic]Export_Info,
@@ -395,6 +396,14 @@ errorf :: proc(format: string, args: ..any) {
 	fmt.eprintf(format, ..args)
 	fmt.eprintln()
 	had_error = true
+}
+
+// Non-fatal diagnostic — prints but does NOT fail the build (used for likely-typo hints
+// where scriptgen can't be sure, e.g. a proc whose name is one edit away from a lifecycle).
+warnf :: proc(format: string, args: ..any) {
+	fmt.eprintf("scriptgen: warning: ")
+	fmt.eprintf(format, ..args)
+	fmt.eprintln()
 }
 
 // ---- main --------------------------------------------------------------------
@@ -434,6 +443,8 @@ main :: proc() {
 	emitted := 0
 	pkg := "" // the scripts package name (for the generated boot); from the first source file
 	has_boot := false // a hand-written `odin_scripts_boot` exists — don't generate one
+	seen_classes := make(map[string]string) // //gd:class name -> file that declared it
+	defer delete(seen_classes)
 	for fi in files {
 		if fi.type == .Directory {continue}
 		if !strings.has_suffix(fi.name, ".odin") {continue}
@@ -458,6 +469,14 @@ main :: proc() {
 		script, has := parse_script(path, src)
 		if !has {continue} // not a script file (no owner-struct) — skip silently
 		if had_error {continue}
+
+		// Duplicate //gd:class across files: the core's name->desc map would silently let the
+		// last-loaded win and mis-bind the other. Catch it here with both file paths.
+		if prev, dup := seen_classes[script.class_name]; dup {
+			errorf("duplicate //gd:class %q in %q and %q", script.class_name, prev, path)
+			continue
+		}
+		seen_classes[script.class_name] = path
 
 		gen := generate(&script)
 		out_path := strings.concatenate({path[:len(path) - len(".odin")], ".gen.odin"})
