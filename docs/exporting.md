@@ -29,6 +29,13 @@ library, which Godot doesn't otherwise know about. At runtime an exported game f
 library as a **sibling of the core dll** (via `dladdr`), since `res://` is packed and can't be
 `dlopen`ed.
 
+> **Keep your scripts self-contained.** The exporter bundles `libodinscripts` but **not its
+> transitive native dependencies**. A pure-Odin scripts library is self-contained and ships
+> fine; but if your scripts `foreign import` a third-party native lib, that lib is **not**
+> bundled automatically — `dlopen` will fail on a player's machine (the game then runs with no
+> Odin scripts). If you pull in native deps, add them to the export yourself (e.g. another
+> `add_shared_object` via your own export plugin, or place them beside the executable).
+
 ## Native desktop (macOS) — verified
 
 This is the firm, end-to-end-verified path. The exported `.app` loads the extension and runs an
@@ -151,8 +158,15 @@ Cross-Origin-Opener-Policy:   same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-See `tests/web/serve.sh` for a minimal Node server that sets them (the macOS system `python3`
-is a stub that fails inside the Nix shell).
+A plain static host or `python -m http.server` does **not** set these — the usual cause of "my
+web export won't start". The addon bundles a one-command Node server that does:
+
+```sh
+bash addons/odin_godot/build/serve.sh path/to/export_dir   # then open http://localhost:8099/
+```
+
+Deploying instead of testing locally? Set the same two headers on your host. On **itch.io**,
+tick the **"SharedArrayBuffer support"** box in the HTML5 settings and it configures them.
 
 ### Web caveats
 

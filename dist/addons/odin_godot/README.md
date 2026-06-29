@@ -59,8 +59,9 @@ That means:
      ```
    This writes `res://bin/libodinscripts.<ext>`.
 
-3. **Run it:** open the project in Godot, add a `Node` to a scene, **Attach Script → pick
-   `Hello`**, and press **Play**. The Output panel prints "Hello from Odin!".
+3. **Run it:** open the project in Godot (**restart the editor once after first adding the
+   addon** so Godot registers `.odin` as a script language), add a `Node` to a scene, **Attach
+   Script → pick `Hello`**, and press **Play**. The Output panel prints "Hello from Odin!".
 
 From here, edit `hello.odin` (or add your own) — the editor **rebuilds on save** so new
 `@export`s and code appear after a moment. See [`template/README.md`](template/README.md)

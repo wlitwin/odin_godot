@@ -66,13 +66,17 @@ if [ ! -d "$SCRIPTS" ] || [ -z "$(ls "$SCRIPTS"/*.odin 2>/dev/null)" ]; then
     exit 1
 fi
 
-# 1. Build the scriptgen preprocessor.
+# 1. Build the scriptgen preprocessor to a writable TEMP dir (never into the addon, which may
+#    be read-only when installed under res://addons/).
+SGEN_DIR="$(mktemp -d)"
+trap 'rm -rf "$SGEN_DIR"' EXIT
+SGEN="$SGEN_DIR/scriptgen"
 "$ODIN" build "$ROOT/scriptgen" \
     -collection:godot="$ROOT" \
-    -out:"$ROOT/scriptgen/scriptgen"
+    -out:"$SGEN"
 
 # 2. Generate *.gen.odin siblings beside the authored sources.
-"$ROOT/scriptgen/scriptgen" "$SCRIPTS"
+"$SGEN" "$SCRIPTS"
 
 # 3. Emit the wasm-only compose file that pulls `core` into the scripts build. Named
 #    *_wasm32.odin so Odin's arch-gated file selection keeps it OUT of native builds.

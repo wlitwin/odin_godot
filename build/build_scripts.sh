@@ -41,14 +41,19 @@ fi
 # editor's PATH) can pass it through as `ODIN=/abs/path/to/odin`.
 ODIN="${ODIN:-odin}"
 
-# 1. Build the codegen preprocessor itself.
+# 1. Build the codegen preprocessor itself — to a writable TEMP dir, NOT into the addon. When
+#    odin_godot is installed under res://addons/ that dir may be read-only (and shouldn't
+#    collect build artifacts or leak a binary into res://bin/ that the exporter would pack).
+SGEN_DIR="$(mktemp -d)"
+trap 'rm -rf "$SGEN_DIR"' EXIT
+SGEN="$SGEN_DIR/scriptgen"
 "$ODIN" build "$ROOT/scriptgen" \
     -collection:godot="$ROOT" \
-    -out:"$ROOT/scriptgen/scriptgen" \
+    -out:"$SGEN" \
     -debug
 
 # 2. Generate the *.gen.odin siblings beside the authored sources.
-"$ROOT/scriptgen/scriptgen" "$SCRIPTS"
+"$SGEN" "$SCRIPTS"
 
 # 3. Build the scripts dll. The *.gen.odin live in the same package and compile
 #    together. `-custom-attribute:gd_method` lets authors mark methods with

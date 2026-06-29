@@ -123,9 +123,15 @@ This (1) builds `scriptgen`, (2) generates the `*.gen.odin` siblings, and (3) co
 `scripts/` package into `res://bin/libodinscripts.<ext>`. (`SKIP_CORE`/`-SkipCore` skips
 rebuilding the engine core — it's already prebuilt in the addon, so you rarely need it.)
 
+> **Version control:** the build produces artifacts you don't commit. The bundled
+> `scripts/.gitignore` already excludes the generated `*.gen.odin`; add `/bin/` and `*.dSYM/`
+> to your project's `.gitignore` for the compiled library + debug symbols.
+
 ## 5. Attach and run
 
-1. Open the project in Godot (Project Manager, or `godot --path .`).
+1. Open the project in Godot (Project Manager, or `godot --path .`). **The first time you add
+   the addon, restart the editor** so Godot registers `.odin` as a script language (a one-time
+   GDExtension step — until you do, `.odin` files aren't recognized as scripts).
 2. Add a **`Node2D`** to your scene (the base must match `//gd:extends`).
 3. In the Inspector's **Script** slot, **Attach** and pick `res://scripts/mover.odin` — the
    same file you wrote (there's no separate resource stub; the `.odin` *is* the script).

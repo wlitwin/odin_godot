@@ -34,13 +34,17 @@ OPT="${ODIN_EXPORT_OPT:-speed}"
 
 mkdir -p "$(dirname "$OUT")"
 
-# 1. Build the scriptgen preprocessor (cheap; keeps the pipeline self-contained).
+# 1. Build the scriptgen preprocessor to a writable TEMP dir (never into the addon, which may
+#    be read-only when installed under res://addons/).
+SGEN_DIR="$(mktemp -d)"
+trap 'rm -rf "$SGEN_DIR"' EXIT
+SGEN="$SGEN_DIR/scriptgen"
 "$ODIN" build "$ROOT/scriptgen" \
     -collection:godot="$ROOT" \
-    -out:"$ROOT/scriptgen/scriptgen"
+    -out:"$SGEN"
 
 # 2. Generate *.gen.odin siblings beside the authored sources.
-"$ROOT/scriptgen/scriptgen" "$SCRIPTS"
+"$SGEN" "$SCRIPTS"
 
 # 3. Target -> odin flags.
 EXTRA=()

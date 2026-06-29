@@ -253,7 +253,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
     features := cast(^godot.Packed_String_Array)args[0]
     target := detect_target(features)
     if target == "" {
-        export_log("odin export: could not determine target platform from features")
+        export_error("odin export: could not determine target platform from features")
         return
     }
 
@@ -277,7 +277,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         // inherited PATH (build_web.sh runs `odin`, and `emcc` shells its own sibling tools).
         odin_bin, odin_ok := resolve_odin_bin()
         if !odin_ok {
-            export_log(
+            export_error(
                 "odin export: `odin` not found — cannot build the web wasm. Set the " +
                 "`odin_godot/odin_bin` project setting to your odin binary (absolute path), " +
                 "or launch the editor from a shell where `odin` is on PATH.",
@@ -287,7 +287,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         defer delete(odin_bin)
         emcc_bin, emcc_ok := resolve_bin("odin_godot/emcc_bin", "EMCC", "emcc")
         if !emcc_ok {
-            export_log(
+            export_error(
                 "odin export: Emscripten `emcc` not found — required for web export. Install " +
                 "the Emscripten SDK (emsdk; activate 4.0.20 to match Godot 4.6's web " +
                 "templates), then set the `odin_godot/emcc_bin` project setting to its `emcc` " +
@@ -316,7 +316,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         export_log(fmt.tprintf("odin export: building web SIDE_MODULE wasm (-o:%s) -> %s", opt, outwasm))
         rc := libc.system(cmd)
         if rc != 0 {
-            export_log(
+            export_error(
                 fmt.tprintf(
                     "odin export: FAILED to build web wasm (rc=%d). See the compiler/emcc error " +
                     "in the Output above. Reproduce it directly with: ODIN='%s' EMCC='%s' " +
@@ -332,7 +332,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
             return
         }
         if !os.is_file(outwasm) {
-            export_log(fmt.tprintf("odin export: web build reported success but %s is missing", outwasm))
+            export_error(fmt.tprintf("odin export: web build reported success but %s is missing", outwasm))
             return
         }
         export_log(
@@ -348,7 +348,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
     // desktop export works from an editor launched outside a toolchain shell (Finder/Steam).
     odin_bin, odin_ok := resolve_odin_bin()
     if !odin_ok {
-        export_log(
+        export_error(
             "odin export: `odin` not found — cannot compile scripts. Set the " +
             "`odin_godot/odin_bin` project setting to your odin binary (absolute path), or " +
             "launch the editor from a shell where `odin` is on PATH.",
@@ -377,11 +377,11 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
     export_log(fmt.tprintf("odin export: compiling scripts for %s (-o:%s) -> %s", target, opt, outdll))
     rc := libc.system(cmd)
     if rc != 0 {
-        export_log(fmt.tprintf("odin export: FAILED to compile scripts dll (rc=%d)", rc))
+        export_error(fmt.tprintf("odin export: FAILED to compile scripts dll (rc=%d) — the exported game will have no Odin scripts", rc))
         return
     }
     if !os.is_file(outdll) {
-        export_log(fmt.tprintf("odin export: compile reported success but %s is missing", outdll))
+        export_error(fmt.tprintf("odin export: compile reported success but %s is missing", outdll))
         return
     }
 
@@ -404,6 +404,18 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
 export_log :: proc(msg: string) {
     os.write_string(os.stderr, msg)
     os.write_string(os.stderr, "\n")
+}
+
+// export_error — a failure that must be VISIBLE. The plugin can't hard-abort the export from
+// here (Godot 4.6 doesn't expose add_message to an EditorExportPlugin), and returning early
+// leaves the export to finish with a broken/missing scripts library — so without this the
+// user gets a "successful" export whose first symptom is a cryptic load failure. Push a red
+// editor error (Output + Errors panels) in addition to the stderr line.
+@(private = "file")
+export_error :: proc(msg: string) {
+    export_log(msg)
+    gmsg := godot.new_string_odin(msg)
+    godot.gd_push_error(godot.variant_from_string(&gmsg))
 }
 
 // ---- registration (called at .Editor init level) ----

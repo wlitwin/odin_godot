@@ -116,9 +116,13 @@ if [[ "${CORE_ONLY:-0}" == "1" ]]; then
 fi
 
 # SCRIPTS dll: scriptgen preprocess the project's scripts, then build the dll (same
-# custom attributes as the native/web builds).
-"$ODIN" build "$ROOT/scriptgen" -collection:godot="$ROOT" -out:"$ROOT/scriptgen/scriptgen"
-"$ROOT/scriptgen/scriptgen" "$SCRIPTS"
+# custom attributes as the native/web builds). scriptgen goes to a writable TEMP dir, never
+# into the addon (read-only when installed under res://addons/).
+SGEN_DIR="$(mktemp -d)"
+trap 'rm -rf "$SGEN_DIR"' EXIT
+SGEN="$SGEN_DIR/scriptgen"
+"$ODIN" build "$ROOT/scriptgen" -collection:godot="$ROOT" -out:"$SGEN"
+"$SGEN" "$SCRIPTS"
 SCRIPTS_OUT="$OUT_DIR/libodinscripts$EXT"
 odin_obj_link "$SCRIPTS" "$SCRIPTS_OUT" \
     -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc \

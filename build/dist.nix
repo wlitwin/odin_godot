@@ -84,7 +84,7 @@ stdenvNoCC.mkDerivation {
     # (build_phase*.sh) or the nix package def (dist.nix), which a consumer never runs.
     mkdir -p $A/build
     cp build/build_scripts.sh build/build_scripts.ps1 build/build_export_scripts.sh \
-       build/build_web.sh build/build_cross.sh $A/build/
+       build/build_web.sh build/build_cross.sh build/serve.sh $A/build/
 
     # Copy-paste starter for the consumer's res://scripts/ — the REQUIRED boot.odin (which
     # a user can't be expected to write from scratch) + a minimal Hello example + a README.

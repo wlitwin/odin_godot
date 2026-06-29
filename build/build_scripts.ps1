@@ -93,8 +93,11 @@ if (-not $SkipCore) {
     BuildDll (Join-Path $RootRel "core") $core @()
 }
 
-# 2. scriptgen preprocessor.
-$scriptgenExe = Join-Path $RootRel "scriptgen\scriptgen.exe"
+# 2. scriptgen preprocessor — build to a writable TEMP dir, NOT into the addon (which may be
+#    read-only when installed under res://addons/ and shouldn't collect build artifacts).
+$scriptgenDir = Join-Path ([System.IO.Path]::GetTempPath()) ("odin_godot_sgen_" + [System.Guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Force -Path $scriptgenDir | Out-Null
+$scriptgenExe = Join-Path $scriptgenDir "scriptgen.exe"
 Run $Odin @("build", (Join-Path $RootRel "scriptgen"), "-collection:godot=$RootRel", "-out:$scriptgenExe", "-debug")
 
 # 3. Generate the *.gen.odin siblings.
