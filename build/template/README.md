@@ -35,4 +35,6 @@ to build until you add scripts — this template is that starting point.
 A script needs the two `//gd:` markers (`//gd:extends <Base>`, `//gd:class <Name>`), a
 struct whose first field is `owner`, and lifecycle/method procs named `<class>_<hook>`
 (`hello_ready`, `hello_process`, …). The editor rebuilds the scripts dll on save once the
-project is set up. See the full reference in the repo's `docs/authoring-guide.md`.
+project is set up. See the full reference in the addon's
+[`../docs/authoring-guide.md`](../docs/authoring-guide.md) (and
+[`../README.md`](../README.md) for install/prerequisites).

@@ -328,6 +328,10 @@ lv_frame :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.
     // Drive the rebuild-on-save flow on the MAIN thread: if a background scripts build has
     // finished, swap the dll + refresh the Inspector here (reload.odin). Cheap when idle.
     reload_pump_main_thread()
+    // If the scripts dll was missing at load (a fresh install with nothing compiled yet),
+    // surface ONE actionable editor warning now that the engine/editor are up. No-op after
+    // the first warning and outside the editor. Cheap when idle (a single bool check).
+    scripts_surface_missing_warning()
     if highlighter_registered {
         return
     }

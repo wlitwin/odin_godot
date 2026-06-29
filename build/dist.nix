@@ -91,6 +91,16 @@ stdenvNoCC.mkDerivation {
     # A fresh addon otherwise ships no scripts, so there is nothing to build or learn from.
     cp -r build/template $A/template
 
+    # Onboarding docs for someone who DOWNLOADED the addon (vs. cloned the repo): the
+    # addon-root README is their entry point, and a curated docs/ set gives the full
+    # reference. The bundled getting-started/index are the DOWNLOAD-oriented rewrites
+    # (build/addon-docs/) — bring-your-own-odin, no Nix/repo assumptions; the reference
+    # pages (authoring/workflow/exporting/debugging) are content-oriented and copied as-is.
+    cp dist/addons/odin_godot/README.md $A/README.md
+    mkdir -p $A/docs
+    cp build/addon-docs/getting-started.md build/addon-docs/index.md $A/docs/
+    cp docs/authoring-guide.md docs/workflow.md docs/exporting.md docs/debugging.md $A/docs/
+
     # CRITICAL: Godot's filesystem scanner claims EVERY .odin file as a script. The addon
     # bundles the Odin collection SOURCE (so a consumer can compile scripts) + a template —
     # those are build inputs resolved by odin's `-collection:` PATH, not res:// scripts.
@@ -99,7 +109,7 @@ stdenvNoCC.mkDerivation {
     # destabilizes the editor. A `.gdignore` makes Godot skip a dir (odin's path-based
     # collection resolution is unaffected). The addon root stays scannable so Godot still
     # discovers odin_godot.gdextension.
-    for d in core godot gdext libgd runtime scriptgen template build; do
+    for d in core godot gdext libgd runtime scriptgen template build docs; do
       touch "$A/$d/.gdignore"
     done
     # The raw engine inputs are gitignored (regenerated from the pinned Godot) and are NOT

@@ -47,6 +47,37 @@ Scripts_Dll :: struct {
 @(private)
 scripts_dll: Scripts_Dll
 
+// Set by odin_scripts_load when no scripts dll could be loaded (the expected state of a
+// fresh install: the prebuilt core is here, but the user's .odin scripts aren't compiled
+// yet). The main-thread frame pump reads these to surface ONE actionable editor warning.
+@(private)
+g_scripts_missing: bool
+@(private)
+g_scripts_missing_warned: bool
+
+// Surface a ONE-TIME, actionable warning in the editor console when no scripts dll was
+// loaded. Called from the main-thread frame pump (lv_frame) where the engine + editor are
+// up. Editor-only: a shipped game with no scripts dll already printed to stderr at load and
+// must never nag a player. Tells the user this is the normal first-run state and how to fix.
+@(private)
+scripts_surface_missing_warning :: proc() {
+	if !g_scripts_missing || g_scripts_missing_warned {
+		return
+	}
+	if !bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
+		g_scripts_missing_warned = true // never warn outside the editor
+		return
+	}
+	g_scripts_missing_warned = true
+	msg := godot.new_string_cstring(
+		"odin_godot: no compiled Odin scripts found (res://bin/libodinscripts.*). This is normal " +
+		"for a fresh install — your .odin gameplay code compiles into that dll. Quick start: copy " +
+		"addons/odin_godot/template/scripts into res://scripts, then build it (see " +
+		"addons/odin_godot/README.md / addons/odin_godot/template/README.md).",
+	)
+	godot.gd_push_warning(godot.variant_from_string(&msg))
+}
+
 // dladdr — resolve the file path of the shared object containing a given address.
 // Non-POSIX but present in libSystem (Darwin) / libc+libdl (Linux). Lets the core
 // find its OWN on-disk path so it can load the scripts dll sitting beside it.
@@ -127,6 +158,11 @@ odin_scripts_load :: proc() {
 	_, ok := dynlib.initialize_symbols(&scripts_dll, path, "", "__handle")
 	if !ok || scripts_dll.__handle == nil || scripts_dll.odin_scripts_boot == nil || scripts_dll.odin_scripts_manifest == nil {
 		gdext_print("odin: failed to load scripts dll", path)
+		// Flag for the editor frame pump to surface ONE actionable warning in the editor
+		// console (this load runs at extension init, before the engine logger/editor UI are
+		// guaranteed up, so a push_warning here can be lost — defer it). The common cause is
+		// not an error at all: a fresh install hasn't compiled its scripts dll yet.
+		g_scripts_missing = true
 		return
 	}
 
