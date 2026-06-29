@@ -11,6 +11,7 @@ import "core:os"
 import "core:strings"
 import "core:sync"
 import "core:thread"
+import "core:time"
 
 // ----------------------------------------------------------------------------
 // Editor "show on save" — rebuild + reload the scripts dll while the editor RUNS.
@@ -50,6 +51,11 @@ Reload_State :: struct {
 
 	// A build COMPLETED successfully: the main thread must swap the dll + refresh.
 	swap_ready:     bool,
+	// A build FAILED: the main thread must surface the error in the editor Output (the worker
+	// thread cannot call into Godot). Read + cleared by reload_pump_main_thread.
+	build_failed:   bool,
+	// Wall-clock duration of the last finished build (ms) — surfaced as a UX hint on reload.
+	last_build_ms:  f64,
 
 	// Content hash of the authored sources the LAST kicked build was for. Guards against a
 	// rebuild LOOP: the editor's filesystem watcher re-triggers `_reload` when the build
@@ -207,6 +213,13 @@ reload_request :: proc() {
 	g_reload.last_hash = src_hash
 	g_reload.have_last_hash = true
 
+	// Tell the user their save is being processed. The rebuild is async (background worker),
+	// so without this the editor looks idle until the swap lands a few seconds later — a new
+	// `@export` or code change appears to "do nothing" in the meantime. Goes to the editor
+	// Output panel (godot.print), not just stderr, so it shows regardless of how the editor
+	// was launched. Safe here: reload_request runs on the MAIN thread.
+	godot.print_str("odin_godot: rebuilding scripts…")
+
 	if g_reload.build_running {
 		// Coalesce: keep only the LATEST pending command (replace any earlier one).
 		if g_reload.build_pending && g_reload.pending_cmd != "" {
@@ -241,7 +254,9 @@ build_worker_entry :: proc(data: rawptr) {
 	context.allocator = runtime.heap_allocator()
 
 	ccmd := strings.clone_to_cstring(job.cmd)
+	start := time.tick_now()
 	rc := libc.system(ccmd)
+	build_ms := time.duration_milliseconds(time.tick_since(start))
 	delete(ccmd)
 	if rc != 0 {
 		os.write_string(os.stderr, "odin reload: background scripts build FAILED (see output above)\n")
@@ -250,11 +265,14 @@ build_worker_entry :: proc(data: rawptr) {
 	state := job.state
 	sync.lock(&state.mutex)
 	state.build_running = false
+	state.last_build_ms = build_ms
 	if rc == 0 {
 		// Only schedule a swap when the rebuild succeeded — never swap to a stale/unchanged
 		// dll on a broken build (the old code keeps running until the next good save).
 		state.swap_ready = true
 	} else {
+		// Surface the failure on the MAIN thread (this worker can't call Godot).
+		state.build_failed = true
 		// Failed build: forget the source hash so the SAME source can be retried (e.g. after a
 		// transient error). A real source change would change the hash and rebuild regardless.
 		state.have_last_hash = false
@@ -290,7 +308,21 @@ reload_pump_main_thread :: proc() {
 	sync.lock(&g_reload.mutex)
 	ready := g_reload.swap_ready
 	g_reload.swap_ready = false
+	failed := g_reload.build_failed
+	g_reload.build_failed = false
+	build_ms := g_reload.last_build_ms
 	sync.unlock(&g_reload.mutex)
+
+	// A finished build failed: surface it prominently in the editor (Output + Errors). The
+	// compiler error itself already streamed to the Output above (build_scripts.sh 1>&2).
+	if failed {
+		msg := godot.new_string_cstring(
+			"odin_godot: scripts build FAILED — your change is NOT live. See the compiler error " +
+			"in the Output above.",
+		)
+		godot.gd_push_error(godot.variant_from_string(&msg))
+	}
+
 	if !ready {
 		return
 	}
@@ -301,5 +333,8 @@ reload_pump_main_thread :: proc() {
 		// non-tool editor case) still hold the OLD property list, so re-push their exports.
 		refresh_placeholder_exports()
 		os.write_string(os.stderr, "odin reload: scripts dll swapped + exports refreshed (RELOAD_SWAPPED)\n")
+		// Editor-Output confirmation (with the build time) so the user knows their save is now
+		// live — the visible bookend to the "rebuilding…" message from reload_request.
+		godot.print_str(fmt.tprintf("odin_godot: scripts reloaded — your change is live (%.1fs)", build_ms / 1000))
 	}
 }
