@@ -43,7 +43,8 @@ nix develop --command bash tests/run_all.sh    # the full suite — should end "
 An odin_godot project needs three things beyond your normal Godot project:
 
 1. **A `.gdextension` manifest** that loads the compiled **core** dll.
-2. **A `scripts/` package** containing a copy-verbatim `boot.odin` plus your `.odin` scripts.
+2. **A `scripts/` package** containing your `.odin` scripts (the required boot shim is
+   generated for you — see 2b).
 3. **A build** (`build/build_scripts.sh`) that compiles your scripts (and the core) into the
    project's `bin/`.
 
@@ -75,12 +76,16 @@ web.release.wasm32 = "res://bin/libodin_godot.wasm"
 manifest loads; the **scripts** dll (`libodinscripts.dylib`) is loaded *by* the core at runtime,
 so it is deliberately not listed here.
 
-### 2b. The `scripts/` package and `boot.odin`
+### 2b. The `scripts/` package and its boot shim
 
-All of a project's `.odin` scripts compile into **one Odin package** (one shared dll). That
-package needs an init shim so the binding's globals are set up when the core loads it. Create
-`scripts/boot.odin` — **copy this verbatim into every project** (it is identical in
-`tests/showcase/scripts/boot.odin` and `examples/survivors/scripts/boot.odin`):
+All of a project's `.odin` scripts compile into **one Odin package** (one shared dll). Pick a
+package name and use the *same* `package` line at the top of every `.odin` file in the
+directory.
+
+That package needs one init shim — an `@(export) odin_scripts_boot` the core calls right after
+it loads the dll, so the dll initializes its own `gdext`/`godot` package globals. **`scriptgen`
+generates this for you** as `scripts/odin_godot_boot.gen.odin` on every build, so you normally
+write nothing. For reference, the generated file is:
 
 ```odin
 package my_game_scripts
@@ -98,8 +103,9 @@ odin_scripts_boot :: proc "c" (
 }
 ```
 
-Pick a package name (`my_game_scripts` here) and use the *same* `package` line at the top of
-every `.odin` file in the directory.
+To customize it (rare), add a hand-written file defining `odin_scripts_boot` and scriptgen
+detects it and skips generating its own. (The in-repo `tests/`/`examples/` projects predate
+the codegen and still carry a hand-written `boot.odin` — that's the opt-out path in action.)
 
 ### 2c. Tell the editor where odin_godot lives
 

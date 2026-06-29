@@ -42,8 +42,9 @@ That means:
    ```sh
    cp -r addons/odin_godot/template/scripts ./scripts
    ```
-   This gives you `res://scripts/boot.odin` (required boilerplate — never edit it) and
-   `res://scripts/hello.odin` (a minimal `Hello` node that prints on `_ready`).
+   This gives you `res://scripts/hello.odin` (a minimal `Hello` node that prints on
+   `_ready`). The required boot boilerplate is generated for you at build time
+   (`odin_godot_boot.gen.odin`) — you never write it.
 
 2. **Build the scripts library:**
    - **macOS / Linux:**

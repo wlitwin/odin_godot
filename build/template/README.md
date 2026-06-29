@@ -7,10 +7,12 @@ to build until you add scripts — this template is that starting point.
 ## Get started
 
 1. **Copy `scripts/` into your project root** as `res://scripts/`.
-   - `boot.odin` — **required** boilerplate (the `odin_scripts_boot` export the core
-     needs). Keep it as-is; you never edit it.
    - `hello.odin` — a minimal example class (`Hello`, extends `Node`). Edit or replace it
      with your own.
+   - The build generates an `odin_godot_boot.gen.odin` for you (the required
+     `odin_scripts_boot` export the core needs after it loads your dll) — you never write or
+     edit it. To customize it, drop in your own file defining `odin_scripts_boot` and the
+     generated one steps aside.
 
 2. **Build the scripts dll** (you need `odin` on your PATH):
    - **macOS / Linux:**

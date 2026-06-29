@@ -29,7 +29,8 @@ time and ships no compiler.
 Once the addon is in `res://addons/odin_godot/`, Godot auto-discovers its
 `odin_godot.gdextension` and recognizes `.odin` files. Beyond that, a project needs:
 
-1. **A `scripts/` package** — your `.odin` files plus a copy-verbatim `boot.odin`.
+1. **A `scripts/` package** — your `.odin` files. (The build auto-generates the one piece of
+   required boilerplate, `odin_godot_boot.gen.odin`, so you don't write it.)
 2. **A build** — `addons/odin_godot/build/build_scripts.sh` (or `.ps1` on Windows) compiles
    that package into `res://bin/libodinscripts.<ext>`, which the core loads at runtime.
 
@@ -43,11 +44,13 @@ cp -r addons/odin_godot/template/scripts ./scripts
 
 You now have `res://scripts/`:
 
-- **`boot.odin`** — required boilerplate. Every scripts package needs it so the binding's
-  globals initialize when the core loads the dll. **Copy it verbatim; never edit it.** It
-  also fixes the package name — every `.odin` in `scripts/` uses the same `package scripts`
-  line at the top.
-- **`hello.odin`** — a minimal example class you'll replace below.
+- **`hello.odin`** — a minimal example class you'll replace below. Every `.odin` in
+  `scripts/` shares the same `package scripts` line at the top.
+
+The first build also drops an **`odin_godot_boot.gen.odin`** next to it — generated, required
+boilerplate (the `odin_scripts_boot` export the core calls after it loads your dll) that you
+never write or edit. (Need to customize it? Add your own file defining `odin_scripts_boot`
+and the generated one steps aside.)
 
 ### 2b. (Optional) editor settings
 
