@@ -15,9 +15,11 @@ Two GDExtension classes in `core/export_plugin.odin` are registered **only at ed
 initialization**, so they don't exist in a running/exported game:
 
 - **`OdinExportPlugin`** (`EditorExportPlugin`) does the work. On `_export_begin` it reads the
-  target OS from the export feature set, shells the matching build script (inheriting the
-  editor's Nix `PATH`, so `odin`/`emcc` resolve), and `add_shared_object`s the freshly-compiled
-  scripts library so the exporter copies it **beside the executable**.
+  target OS from the export feature set, resolves the toolchain (the `odin_godot/odin_bin` /
+  `odin_godot/emcc_bin` project settings → `ODIN`/`EMCC` env → `PATH`, so it works even when
+  the editor is launched outside a toolchain shell), shells the matching build script, and
+  `add_shared_object`s the freshly-compiled scripts library so the exporter copies it **beside
+  the executable**.
 - **`OdinEditorPlugin`** (`EditorPlugin`) is a thin host that constructs and registers the
   export plugin.
 
@@ -86,6 +88,31 @@ scripts) builds into **one Emscripten `SIDE_MODULE` wasm**, Godot's web export b
 an Odin script's `_ready` **runs in a real browser** — verified by a headless-Chrome driver
 asserting the Odin script ran (and that a `@(gd_method)` returns the right value). The full
 pure-Odin coin-collector game loop is also verified in-browser (`tests/web_showcase/`).
+
+### Toolchain setup (one-time)
+
+Web export needs the **Odin compiler** *and* **Emscripten** on the machine doing the export
+(the same as a desktop build, plus emcc). If you work from the Nix dev shell both are already
+present; if you installed the addon into your own project, set them up once:
+
+1. **Install the Emscripten SDK** — <https://emscripten.org/docs/getting_started/downloads.html>:
+   ```sh
+   git clone https://github.com/emscripten-core/emsdk && cd emsdk
+   ./emsdk install 4.0.20 && ./emsdk activate 4.0.20
+   ```
+   **Pin 4.0.20** — it's the exact version Godot 4.6's web templates were built with, so the
+   dylink/longjmp ABI matches. (Newer emcc generally works too; 4.0.20 is the safe default.)
+
+2. **Point the editor at the binaries.** When you launch Godot from Finder/Steam/the Project
+   Manager, the editor process doesn't inherit your shell `PATH`, so it can't see `odin` or
+   `emcc`. Set these **project settings** to their absolute paths (Project → Project Settings,
+   "Add" a custom property):
+   - `odin_godot/odin_bin` → your `odin`
+   - `odin_godot/emcc_bin` → `…/emsdk/upstream/emscripten/emcc`
+
+   With those set, **web export Just Works from the export dialog** — the plugin finds the
+   tools, builds the wasm, and bundles it. Alternatively, launch the editor from a terminal
+   where both are already on `PATH` (e.g. after `source ./emsdk/emsdk_env.sh`).
 
 ### Build the wasm
 

@@ -122,6 +122,7 @@ Set these as **project settings** (they also have env fallbacks for shell-launch
 |---|---|---|
 | `odin_godot/odin_bin` | `ODIN` | absolute path to the `odin` compiler (reload-on-save, validation) |
 | `odin_godot/ols_bin` | `OLS` | absolute path to the `ols` language server (autocomplete) |
+| `odin_godot/emcc_bin` | `EMCC` | absolute path to Emscripten's `emcc` (**web export** only) |
 | `odin_godot/root` | `ODIN_GODOT_ROOT` | the odin_godot checkout, for the `-collection:godot` root |
 | `odin_godot/scripts_dir` | — | the scripts package (default `res://scripts`) |
 

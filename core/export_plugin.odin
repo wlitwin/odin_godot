@@ -201,6 +201,16 @@ project_dir :: proc(allocator := context.allocator) -> string {
     return strings.trim_suffix(s, "/")
 }
 
+// Directory component of a binary path (for prepending to PATH). "/a/b/odin" -> "/a/b";
+// a bare name with no slash -> "." (it was found on PATH, so "." is a harmless prefix).
+@(private = "file")
+dir_of :: proc(path: string) -> string {
+    if idx := strings.last_index_byte(path, '/'); idx >= 0 {
+        return path[:idx]
+    }
+    return "."
+}
+
 // OdinExportPlugin._export_begin — compile scripts for the target, bundle the dll.
 @(private = "file")
 ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
@@ -225,13 +235,45 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         // project's .gdextension references it as `web.{debug,release}.wasm32`, so Godot's
         // own GDExtension export handling bundles it automatically (exactly like the macOS
         // dylib) — no add_shared_object needed. Our job here is just to (re)build that wasm
-        // so the file the .gdextension points at actually exists at export time. We shell
-        // build/build_web.sh; libc.system inherits the editor's (nix) PATH so `odin`/`emcc`
-        // resolve. Run the export inside the nix dev shell so emcc is present.
+        // so the file the .gdextension points at actually exists at export time.
+        //
+        // Resolve BOTH toolchain binaries the way the native reload path does (project
+        // setting -> env -> PATH), then prepend their dirs to PATH and pass ODIN=/EMCC=
+        // explicitly. This is what lets web export work from an editor launched OUTSIDE a
+        // toolchain shell (Finder/Steam) — where neither `odin` nor `emcc` is on the
+        // inherited PATH (build_web.sh runs `odin`, and `emcc` shells its own sibling tools).
+        odin_bin, odin_ok := resolve_odin_bin()
+        if !odin_ok {
+            export_log(
+                "odin export: `odin` not found — cannot build the web wasm. Set the " +
+                "`odin_godot/odin_bin` project setting to your odin binary (absolute path), " +
+                "or launch the editor from a shell where `odin` is on PATH.",
+            )
+            return
+        }
+        defer delete(odin_bin)
+        emcc_bin, emcc_ok := resolve_bin("odin_godot/emcc_bin", "EMCC", "emcc")
+        if !emcc_ok {
+            export_log(
+                "odin export: Emscripten `emcc` not found — required for web export. Install " +
+                "the Emscripten SDK (emsdk; activate 4.0.20 to match Godot 4.6's web " +
+                "templates), then set the `odin_godot/emcc_bin` project setting to its `emcc` " +
+                "(absolute path) or put it on the editor's PATH. See docs/exporting.md.",
+            )
+            return
+        }
+        defer delete(emcc_bin)
+
         outwasm := fmt.aprintf("%s/bin/libodin_godot.wasm", proj)
         defer delete(outwasm)
+        odin_dir := dir_of(odin_bin)
+        emcc_dir := dir_of(emcc_bin)
         cmd := fmt.ctprintf(
-            "ODIN_GODOT_ROOT='%s' bash '%s/build/build_web.sh' '%s' 1>&2",
+            "PATH='%s':'%s':\"$PATH\" ODIN='%s' EMCC='%s' ODIN_GODOT_ROOT='%s' bash '%s/build/build_web.sh' '%s' 1>&2",
+            odin_dir,
+            emcc_dir,
+            odin_bin,
+            emcc_bin,
             root,
             root,
             proj,
@@ -241,8 +283,14 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         if rc != 0 {
             export_log(
                 fmt.tprintf(
-                    "odin export: FAILED to build web wasm (rc=%d). Ensure `odin` + `emcc` are on PATH — run the export inside the nix dev shell. You can also prebuild with `bash build/build_web.sh %s`.",
+                    "odin export: FAILED to build web wasm (rc=%d). See the compiler/emcc error " +
+                    "in the Output above. Reproduce it directly with: ODIN='%s' EMCC='%s' " +
+                    "ODIN_GODOT_ROOT='%s' bash '%s/build/build_web.sh' '%s'.",
                     rc,
+                    odin_bin,
+                    emcc_bin,
+                    root,
+                    root,
                     proj,
                 ),
             )

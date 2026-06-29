@@ -84,9 +84,17 @@ scripts and bundles them into the build. The prebuilt cores for all three deskto
 ship in this addon (`bin/macos`, `bin/linux`, `bin/windows`).
 
 **Web/WASM:** there is **no prebuilt web binary** — the whole extension (core + your scripts)
-is ahead-of-time linked into one Emscripten module *per project*. Build it before a web
-export with `addons/odin_godot/build/build_web.sh`. If you export to web without that step,
-Godot reports a missing `res://bin/libodin_godot.wasm`. See [Exporting](docs/exporting.md).
+is ahead-of-time linked into one Emscripten module *per project*. The editor's export plugin
+**builds it automatically** when you export to Web, provided you've done the one-time setup:
+
+1. Install the **Emscripten SDK** and activate **4.0.20** (the version Godot 4.6's web
+   templates use) — see <https://emscripten.org/docs/getting_started/downloads.html>.
+2. Set the **`odin_godot/emcc_bin`** project setting to the absolute path of `emcc` (and
+   `odin_godot/odin_bin` to `odin`) so a Finder/Steam-launched editor can find them.
+
+Then just **Export → Web**. Full walkthrough — including serving headers — in
+[docs/exporting.md](docs/exporting.md). (You can also prebuild manually with
+`addons/odin_godot/build/build_web.sh .`.)
 
 ## Troubleshooting
 
@@ -94,6 +102,7 @@ Godot reports a missing `res://bin/libodin_godot.wasm`. See [Exporting](docs/exp
 |---------|-------------|
 | Editor warns **"no compiled Odin scripts found"** | Normal on a fresh install — follow *Quick start* to build the scripts library. |
 | Editor warns **"`odin` not found"** (validation/reload off) | The editor process can't see `odin` on PATH. Set the `odin_godot/odin_bin` project setting to the absolute path of your `odin`, or launch the editor from a shell where `odin` is on PATH. |
+| Web export logs **"Emscripten `emcc` not found"** | Install the Emscripten SDK (activate 4.0.20) and set the `odin_godot/emcc_bin` project setting to its `emcc`. See [docs/exporting.md](docs/exporting.md). |
 | Build error **"no Odin scripts found"** | You have no `scripts/` folder yet — copy the template (*Quick start*, step 1). |
 | Windows: odin errors on a path with spaces | The build scripts use relative paths to cope, but the most reliable fix is a space-free project path (e.g. `C:\games\mygame`). |
 

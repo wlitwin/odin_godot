@@ -23,17 +23,47 @@
 # format is cross-compatible. 4.0.20 remains the exact-match (use `EMCC=/path/to/4.0.20/emcc
 # bash build/build_web.sh` to pin it, e.g. an emsdk install); the default `emcc` works too.
 set -euo pipefail
+# Toolchain binaries. Both are overridable so a caller that resolved absolute paths (the
+# editor's export plugin, which can't rely on `odin`/`emcc` being on the editor's PATH when
+# it's launched from Finder/Steam) can pass them through as `ODIN=...`/`EMCC=...`.
 EMCC="${EMCC:-emcc}"
+ODIN="${ODIN:-odin}"
 
-ROOT="${ODIN_GODOT_ROOT:-/Users/walter/data/code/odin/odin_godot}"
+# Repo/addon root: derive from THIS script's location (build/ -> root), overridable via
+# ODIN_GODOT_ROOT. (Never hardcode a checkout path — this script ships inside the addon and
+# runs on machines that have never seen the maintainer's filesystem.)
+ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 PROJ="${1:-$ROOT/tests/web}"
 SCRIPTS="${2:-$PROJ/scripts}"
 OUT="${3:-$PROJ/bin/libodin_godot.wasm}"
 
 mkdir -p "$(dirname "$OUT")"
 
+# Preflight: a web build needs Emscripten. Fail FAST with an actionable message instead of
+# dying deep in the emcc link. Godot 4.6's web templates were built with emscripten 4.0.20
+# (an exact-match is most reliable; newer also works — see the header note).
+if ! command -v "$EMCC" >/dev/null 2>&1; then
+    echo "build_web.sh: Emscripten '$EMCC' not found." >&2
+    echo "  Web export compiles the extension to wasm with emcc. Install the Emscripten SDK" >&2
+    echo "  (https://emscripten.org/docs/getting_started/downloads.html) and activate 4.0.20" >&2
+    echo "  to match Godot 4.6's web templates, then either put emcc on PATH or pass it:" >&2
+    echo "    EMCC=/path/to/emsdk/upstream/emscripten/emcc bash build/build_web.sh $PROJ" >&2
+    echo "  In the editor, set the 'odin_godot/emcc_bin' project setting to that path." >&2
+    exit 1
+fi
+
+# Actionable failure when there are no scripts to compile (mirrors build_scripts.sh): the
+# wasm is the project's scripts + the engine core AOT-linked together, so an empty scripts
+# dir means there's nothing to export. Point the user at the bundled starter.
+if [ ! -d "$SCRIPTS" ] || [ -z "$(ls "$SCRIPTS"/*.odin 2>/dev/null)" ]; then
+    echo "build_web.sh: no Odin scripts found at '$SCRIPTS'." >&2
+    echo "  Your .odin gameplay code (plus the required boot.odin) goes in a scripts/ folder." >&2
+    echo "  Quick start: cp -r \"$ROOT/template/scripts\" \"$PROJ/scripts\", then re-run." >&2
+    exit 1
+fi
+
 # 1. Build the scriptgen preprocessor.
-odin build "$ROOT/scriptgen" \
+"$ODIN" build "$ROOT/scriptgen" \
     -collection:godot="$ROOT" \
     -out:"$ROOT/scriptgen/scriptgen"
 
@@ -59,7 +89,7 @@ EOF
 # 4. Odin -> wasm object. Freestanding wasm32, PIC (required: SIDE_MODULE data
 #    relocations), object mode, no entry point, ODIN_GODOT_WEB define.
 ODIN_OBJ="${OUT%.wasm}.wasm.o"
-odin build "$SCRIPTS" \
+"$ODIN" build "$SCRIPTS" \
     -collection:godot="$ROOT" \
     -target:freestanding_wasm32 \
     -build-mode:obj \
