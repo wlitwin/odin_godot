@@ -136,12 +136,24 @@ pl_get_plugin_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args:
 // OdinEditorPlugin._enter_tree — construct + register the export plugin. This runs
 // when `editor_add_plugin` inserts us into the editor tree, which happens during the
 // extension's `.Editor`-level init (before any export command executes).
+// A custom Callable is always valid + takes no args. Providing these (rather than leaving the
+// struct's optional fields nil) avoids any chance the engine calls a nil function pointer.
+@(private = "file")
+menu_callable_is_valid :: proc "c" (userdata: rawptr) -> bool {return true}
+@(private = "file")
+menu_callable_argc :: proc "c" (userdata: rawptr, is_valid: ^bool) -> i64 {
+    if is_valid != nil {is_valid^ = true}
+    return 0
+}
+
 // make_menu_callable — a custom Callable backed by an Odin "c" proc, for add_tool_menu_item.
 @(private = "file")
 make_menu_callable :: proc(fn: gdext.ExtensionCallableCustomCall) -> godot.Callable {
     info := gdext.ExtensionCallableCustomInfo2 {
-        token     = gdext.library,
-        call_func = fn,
+        token                   = gdext.library,
+        call_func               = fn,
+        is_valid_func           = menu_callable_is_valid,
+        get_argument_count_func = menu_callable_argc,
     }
     cb: godot.Callable
     gdext.callable_custom_create2(cast(gdext.TypePtr)&cb, &info)
@@ -153,6 +165,7 @@ make_menu_callable :: proc(fn: gdext.ExtensionCallableCustomCall) -> godot.Calla
 @(private = "file")
 build_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr, err: ^gdext.CallError) {
     context = gdext.godot_context()
+    if err != nil {err.error = .Ok} // signal success — else Godot logs "Error calling function from tool menu"
     reload_request(force = true)
 }
 
@@ -163,6 +176,7 @@ build_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: 
 setup_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr, err: ^gdext.CallError) {
     context = gdext.godot_context()
     context.allocator = runtime.heap_allocator()
+    if err != nil {err.error = .Ok} // signal success — else Godot logs "Error calling function from tool menu"
     setup_scripts_from_template()
 }
 
