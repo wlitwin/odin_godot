@@ -142,8 +142,10 @@ hash_sources :: proc(scripts: string) -> u64 {
 // Called on the MAIN THREAD from `OdinScript._reload` (save) and from the manual editor
 // reload virtuals. Resolves everything that needs Godot here, then hands an opaque shell
 // command to a worker thread. Returns immediately (non-blocking).
+// `force` bypasses the unchanged-sources skip — used by the manual "Build Odin Scripts" editor
+// action so a click always rebuilds (and gives feedback), even with nothing edited.
 @(private)
-reload_request :: proc() {
+reload_request :: proc(force := false) {
 	// Hard gate: never rebuild outside the editor (a shipped game has no compiler and must
 	// never shell out to one).
 	if !bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
@@ -206,7 +208,7 @@ reload_request :: proc() {
 	// Loop guard: if the authored sources are byte-identical to the last build we kicked,
 	// there is nothing new to compile — skip (this is what the editor re-importing our own
 	// `*.gen.odin` output looks like). A hash of 0 (unreadable dir) always proceeds.
-	if src_hash != 0 && g_reload.have_last_hash && g_reload.last_hash == src_hash {
+	if !force && src_hash != 0 && g_reload.have_last_hash && g_reload.last_hash == src_hash {
 		delete(cmd)
 		return
 	}

@@ -136,6 +136,33 @@ pl_get_plugin_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args:
 // OdinEditorPlugin._enter_tree — construct + register the export plugin. This runs
 // when `editor_add_plugin` inserts us into the editor tree, which happens during the
 // extension's `.Editor`-level init (before any export command executes).
+// The "Build Odin Scripts" tool-menu action's body: kick the SAME background build the
+// save/reload path runs (force=true so a manual click always rebuilds + gives feedback,
+// rather than being skipped when nothing changed). Runs on the editor main thread.
+@(private = "file")
+build_menu_call :: proc "c" (
+    userdata: rawptr,
+    args: [^]gdext.VariantPtr,
+    argc: i64,
+    ret: gdext.VariantPtr,
+    err: ^gdext.CallError,
+) {
+    context = gdext.godot_context()
+    reload_request(force = true)
+}
+
+// Build a custom Callable backed by build_menu_call, for add_tool_menu_item.
+@(private = "file")
+odin_build_menu_callable :: proc() -> godot.Callable {
+    info := gdext.ExtensionCallableCustomInfo2 {
+        token     = gdext.library,
+        call_func = build_menu_call,
+    }
+    cb: godot.Callable
+    gdext.callable_custom_create2(cast(gdext.TypePtr)&cb, &info)
+    return cb
+}
+
 @(private = "file")
 pl_enter_tree :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
@@ -144,6 +171,15 @@ pl_enter_tree :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]g
     godot.editor_plugin_add_export_plugin(
         cast(godot.Editor_Plugin)self.object,
         cast(godot.Editor_Export_Plugin)ep_object,
+    )
+    // "Project > Tools > Build Odin Scripts" — compile the scripts dll without leaving Godot
+    // (no more dropping to a terminal for build_scripts.sh). Reuses the save-path build, so it
+    // streams the same "rebuilding…" / "reloaded" status to the Output.
+    menu_name := godot.new_string_cstring("Build Odin Scripts")
+    godot.editor_plugin_add_tool_menu_item(
+        cast(godot.Editor_Plugin)self.object,
+        menu_name,
+        odin_build_menu_callable(),
     )
 }
 

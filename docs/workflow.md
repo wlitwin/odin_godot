@@ -23,6 +23,11 @@ These are inherent to a compiled language. Everything below is built around them
 
 ## Building
 
+**In the editor:** **Project → Tools → Build Odin Scripts** compiles the current project's
+scripts dll (the same background build as save-on-reload), with progress in the Output panel —
+no terminal needed. Saving a script rebuilds automatically too. The command line below is for
+CI, headless builds, or working from the source repo.
+
 `build/build_scripts.sh [PROJECT_DIR] [SCRIPTS_DIR]` runs the full pipeline:
 
 1. builds the `scriptgen` preprocessor,

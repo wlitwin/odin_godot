@@ -106,7 +106,12 @@ sibling `mover.gen.odin` (a build artifact you never edit) next to your source.
 
 ## 4. Build
 
-From your project directory:
+**The easy way — from inside Godot:** **Project → Tools → Build Odin Scripts**. This compiles
+your `scripts/` package into `res://bin/libodinscripts.<ext>` and reports progress in the
+Output panel — no terminal needed. (The editor also rebuilds automatically when you save a
+script.)
+
+**From a terminal** (CI, scripting, or if you prefer):
 
 - **macOS / Linux:**
   ```sh
@@ -119,9 +124,10 @@ From your project directory:
     -Root addons\odin_godot -Project . -SkipCore
   ```
 
-This (1) builds `scriptgen`, (2) generates the `*.gen.odin` siblings, and (3) compiles your
-`scripts/` package into `res://bin/libodinscripts.<ext>`. (`SKIP_CORE`/`-SkipCore` skips
-rebuilding the engine core — it's already prebuilt in the addon, so you rarely need it.)
+Either way it (1) builds `scriptgen`, (2) generates the `*.gen.odin` siblings, and (3) compiles
+your `scripts/` package into `res://bin/libodinscripts.<ext>`. (`SKIP_CORE`/`-SkipCore` skips
+rebuilding the engine core — it's already prebuilt in the addon, so you rarely need it.) Either
+path needs the **Odin compiler** installed (and findable — see `odin_godot/odin_bin`).
 
 > **Version control:** the build produces artifacts you don't commit. The bundled
 > `scripts/.gitignore` already excludes the generated `*.gen.odin`; add `/bin/` and `*.dSYM/`

@@ -46,7 +46,9 @@ That means:
    `_ready`). The required boot boilerplate is generated for you at build time
    (`odin_godot_boot.gen.odin`) — you never write it.
 
-2. **Build the scripts library:**
+2. **Build the scripts library** — easiest from inside Godot: **Project → Tools → Build Odin
+   Scripts** (progress shows in the Output panel; the editor also rebuilds on save). Or from a
+   terminal:
    - **macOS / Linux:**
      ```sh
      ODIN_GODOT_ROOT="$PWD/addons/odin_godot" SKIP_CORE=1 \
@@ -57,7 +59,7 @@ That means:
      powershell -ExecutionPolicy Bypass -File addons\odin_godot\build\build_scripts.ps1 `
        -Root addons\odin_godot -Project . -SkipCore
      ```
-   This writes `res://bin/libodinscripts.<ext>`.
+   This writes `res://bin/libodinscripts.<ext>` (needs the Odin compiler installed).
 
 3. **Run it:** open the project in Godot (**restart the editor once after first adding the
    addon** so Godot registers `.odin` as a script language), add a `Node` to a scene, **Attach

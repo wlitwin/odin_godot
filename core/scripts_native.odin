@@ -85,8 +85,8 @@ surface_load_failure_runtime :: proc(detail: string) {
 		"An exported game must ship libodinscripts beside the executable; rebuild/re-export."
 	if editor_run {
 		fix =
-			"Build your Odin scripts first: run addons/odin_godot/build/build_scripts.sh (or save " +
-			"a script in the editor to trigger a build), then press Play again."
+			"Build your Odin scripts first: in the editor use Project > Tools > Build Odin Scripts " +
+			"(or run addons/odin_godot/build/build_scripts.sh / save a script), then press Play again."
 	}
 	msg := godot.new_string_odin(
 		fmt.tprintf(
@@ -133,8 +133,8 @@ scripts_surface_missing_warning :: proc() {
 	msg := godot.new_string_cstring(
 		"odin_godot: no compiled Odin scripts found (res://bin/libodinscripts.*). This is normal " +
 		"for a fresh install — your .odin gameplay code compiles into that dll. Quick start: copy " +
-		"addons/odin_godot/template/scripts into res://scripts, then build it (see " +
-		"addons/odin_godot/README.md / addons/odin_godot/template/README.md).",
+		"addons/odin_godot/template/scripts into res://scripts, then build via Project > Tools > " +
+		"Build Odin Scripts (see addons/odin_godot/README.md).",
 	)
 	godot.gd_push_warning(godot.variant_from_string(&msg))
 }
