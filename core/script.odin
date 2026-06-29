@@ -748,10 +748,48 @@ v_get_property_default_value :: proc "c" (instance: gdext.ExtensionClassInstance
     (cast(^godot.Variant)ret)^ = out
 }
 
+@(private = "file")
+g_default_icon: string
+@(private = "file")
+g_default_icon_done: bool
+
+// resolved_default_icon — the icon for an Odin script that sets no `//gd:icon` of its own, so
+// `.odin` scripts show an Odin mark in the editor (Scene/FileSystem docks, Create-Node dialog)
+// instead of the generic script glyph. Project setting `odin_godot/default_icon` overrides the
+// default (the bundled `res://addons/odin_godot/icon.svg`). EXISTENCE-CHECKED so the in-repo/dev
+// layout (no installed addon -> the path is absent) cleanly returns "" (engine generic icon)
+// rather than a broken reference. Resolved once per session (cached) — the editor calls the
+// icon virtuals often.
+@(private)
+resolved_default_icon :: proc() -> string {
+    if g_default_icon_done {
+        return g_default_icon
+    }
+    g_default_icon_done = true
+    ps := godot.singleton_project_settings()
+    key := godot.new_string_cstring("odin_godot/default_icon")
+    path := "res://addons/odin_godot/icon.svg"
+    if bool(godot.project_settings_has_setting(ps, key)) {
+        v := godot.project_settings_get_setting(ps, key, godot.Variant{})
+        s := godot.variant_to_string(&v)
+        path = string_to_odin(s, context.temp_allocator)
+    }
+    if path != "" {
+        gp := godot.new_string_odin(path)
+        if bool(godot.file_access_file_exists(gp)) {
+            g_default_icon = strings.clone(path, core_allocator())
+            return g_default_icon
+        }
+    }
+    g_default_icon = ""
+    return g_default_icon
+}
+
 // `Script.get_class_icon_path()` routes here. Return the `//gd:icon <res-path>` marker so
 // the editor (Scene dock, Create Node/Resource dialogs) shows the class with that icon.
 // Prefer the script's own parsed `icon`; fall back to the resolved Class_Desc's `icon`
-// (set by codegen from the same marker). Empty string => engine default icon.
+// (set by codegen from the same marker), then the bundled default Odin icon. Empty => engine
+// generic icon.
 @(private = "file")
 v_get_class_icon_path :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
@@ -761,6 +799,9 @@ v_get_class_icon_path :: proc "c" (instance: gdext.ExtensionClassInstancePtr, ar
         icon = self.icon
     } else if desc, ok := odin_script_resolve_desc(self); ok && desc.icon != nil {
         icon = string(desc.icon)
+    }
+    if icon == "" {
+        icon = resolved_default_icon()
     }
     ret_string(ret, godot.new_string_odin(icon))
 }

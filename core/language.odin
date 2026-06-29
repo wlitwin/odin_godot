@@ -239,6 +239,9 @@ lv_get_global_class_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr,
     if name != "" {
         base := parse_base_type(odin_text)
         icon := parse_icon(odin_text)
+        if icon == "" {
+            icon = resolved_default_icon() // bundled Odin mark when the script sets no //gd:icon
+        }
         gc_dict_set_string(&d, "name", name)
         gc_dict_set_string(&d, "base_type", base)
         // `//gd:icon <res-path>` threads into the global class registry so the editor's

@@ -119,13 +119,18 @@ PascalCase types, proc calls). It's registered on the first editor frame and tou
 Script editor. Limitation: block comments are highlighted per-line — a `/* … */` spanning
 lines isn't tracked across them.
 
-### Icons & known cosmetic gaps
+### Icons
 
 A script class gets a custom icon via the **`//gd:icon <res-path>`** marker (shown in the Scene
-/ FileSystem docks like a GDScript `@icon`). Two cosmetic gaps remain: a `.odin` file with no
-`//gd:icon` shows Godot's generic script icon (there's no default Odin file-type icon yet), and
-documentation tooltips for `@export`s/methods in the Inspector aren't wired (autocomplete does
-show type signatures — see above). Neither affects functionality.
+/ FileSystem docks and Create-Node dialog, like a GDScript `@icon`). A script that sets **no**
+`//gd:icon` falls back to a bundled **Odin mark** (`res://addons/odin_godot/icon.svg`), so
+`.odin` scripts are recognizable rather than showing the generic script glyph. Override the
+default per project with the **`odin_godot/default_icon`** setting (point it at your own icon,
+or `""` to use the engine generic). The default is existence-checked, so a non-standard install
+without the icon simply shows the generic one.
+
+One known gap remains, functionality-irrelevant: documentation tooltips for `@export`s/methods
+in the Inspector aren't wired (autocomplete *does* show type signatures — see above).
 
 <a name="editor-settings"></a>
 ### Editor settings reference
@@ -140,6 +145,7 @@ Set these as **project settings** (they also have env fallbacks for shell-launch
 | `odin_godot/root` | `ODIN_GODOT_ROOT` | the odin_godot checkout, for the `-collection:godot` root |
 | `odin_godot/scripts_dir` | — | the scripts package (default `res://scripts`) |
 | `odin_godot/export_optimization` | `ODIN_EXPORT_OPT` | Odin `-o:` level for **exported** builds: `none`/`minimal`/`size`/`speed`/`aggressive` (default `speed`) |
+| `odin_godot/default_icon` | — | editor icon for `.odin` scripts with no `//gd:icon` (default `res://addons/odin_godot/icon.svg`; `""` = engine generic) |
 
 > **Dev builds vs. exports.** The editor's rebuild-on-save loop compiles at `-o:none` so saves
 > stay fast. **Exports** (desktop and web) compile at `odin_godot/export_optimization` (default

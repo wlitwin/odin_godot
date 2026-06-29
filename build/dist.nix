@@ -97,6 +97,9 @@ stdenvNoCC.mkDerivation {
     # (build/addon-docs/) — bring-your-own-odin, no Nix/repo assumptions; the reference
     # pages (authoring/workflow/exporting/debugging) are content-oriented and copied as-is.
     cp dist/addons/odin_godot/README.md $A/README.md
+    # Default editor icon for `.odin` scripts that set no `//gd:icon` (script.odin
+    # resolved_default_icon -> res://addons/odin_godot/icon.svg).
+    cp dist/addons/odin_godot/icon.svg $A/icon.svg
     mkdir -p $A/docs
     cp build/addon-docs/getting-started.md build/addon-docs/index.md $A/docs/
     cp docs/authoring-guide.md docs/workflow.md docs/exporting.md docs/debugging.md $A/docs/
