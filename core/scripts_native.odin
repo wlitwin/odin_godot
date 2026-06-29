@@ -76,11 +76,23 @@ surface_load_failure_runtime :: proc(detail: string) {
 	if bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
 		return
 	}
+	// Distinguish a game launched from the EDITOR (you pressed Play but never built your
+	// scripts) from a real EXPORTED build (shipped without its dll). The "editor" OS feature is
+	// set for any non-exported run, including editor Play — so the fix advice can be accurate.
+	feat := godot.new_string_cstring("editor")
+	editor_run := bool(godot.os_has_feature(godot.singleton_os(), feat))
+	fix :=
+		"An exported game must ship libodinscripts beside the executable; rebuild/re-export."
+	if editor_run {
+		fix =
+			"Build your Odin scripts first: run addons/odin_godot/build/build_scripts.sh (or save " +
+			"a script in the editor to trigger a build), then press Play again."
+	}
 	msg := godot.new_string_odin(
 		fmt.tprintf(
-			"odin_godot: Odin scripts failed to load (%s) — this build's Odin scripts will NOT " +
-			"run. An exported game must ship libodinscripts beside the executable; rebuild/re-export.",
+			"odin_godot: Odin scripts failed to load (%s) — they will NOT run. %s",
 			detail,
+			fix,
 		),
 	)
 	godot.gd_push_error(godot.variant_from_string(&msg))
