@@ -27,6 +27,10 @@ git -C "$ROOT" checkout -- tests/reload_exports/scripts/widget.odin 2>/dev/null 
 # Build core + scripts dll.
 bash "$ROOT/build/build_scripts.sh" "$PROJ" "$SCRIPTS"
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+# The editor's reload-on-save coordinator resolves the collection root for the rebuild. In this
+# in-repo (non-installed) layout it can't be auto-derived from the core dll location, so declare
+# it explicitly (an installed addons/odin_godot/ install derives it automatically).
+export ODIN_GODOT_ROOT="$ROOT"
 
 # First pass: write .godot/extension_list.cfg + import so the editor loads the GDExtension.
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true

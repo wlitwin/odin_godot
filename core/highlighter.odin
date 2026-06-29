@@ -332,6 +332,8 @@ lv_frame :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.
     // surface ONE actionable editor warning now that the engine/editor are up. No-op after
     // the first warning and outside the editor. Cheap when idle (a single bool check).
     scripts_surface_missing_warning()
+    // One-shot warning if running on an untested Godot version (the virtual table is pinned).
+    check_engine_version_once()
     if highlighter_registered {
         return
     }

@@ -3,6 +3,9 @@ package core
 import "godot:gdext"
 import "godot:godot"
 
+import "core:fmt"
+import "core:strings"
+
 // ----------------------------------------------------------------------------
 // OdinLanguage — the language singleton. Extends `ScriptLanguageExtension`.
 //
@@ -132,16 +135,70 @@ lv_create_script :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
     ret_object(ret, object)
 }
 
+// `_make_template(template, class_name, base_class_name) -> Script`. The editor calls this
+// when you create/attach a new script. Returns a script pre-filled with a COMPILING starter —
+// `//gd:` markers, the `owner`-first struct, and `_ready`/`_process` stubs — instead of the
+// empty buffer it used to (which forced the user to type all the boilerplate from memory).
 @(private = "file")
 lv_make_template :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
-    object, _ := odin_script_construct()
+    class_name := string_to_odin((cast(^godot.String)args[1])^, context.temp_allocator)
+    base := string_to_odin((cast(^godot.String)args[2])^, context.temp_allocator)
+    if class_name == "" {class_name = "NewScript"}
+    if base == "" {base = "Node"}
+
+    src := make_odin_template(class_name, base)
+    defer delete(src)
+    object, self := odin_script_construct()
+    gs := godot.new_string_odin(src)
+    odin_script_set_source(self, gs)
     ret_object(ret, object)
+}
+
+// Build the starter source for a new `.odin` script. Uses `package scripts` (the convention
+// the template/getting-started establish) and the `to_snake(class)_` proc-prefix scriptgen
+// expects, so the result compiles and its lifecycle hooks are recognized as-is.
+@(private = "file")
+make_odin_template :: proc(class_name, base: string) -> string {
+    snake := core_to_snake(class_name)
+    defer delete(snake)
+    b := strings.builder_make()
+    fmt.sbprintf(&b, "//gd:extends %s\n//gd:class %s\npackage scripts\n\n", base, class_name)
+    strings.write_string(&b, "import gd \"godot:godot\"\n\n")
+    fmt.sbprintf(
+        &b,
+        "%s :: struct {{\n\towner: gd.Node, // the node this script is attached to (retype for your base, e.g. gd.Node2d)\n}}\n\n",
+        class_name,
+    )
+    fmt.sbprintf(&b, "%s_ready :: proc(self: ^%s) {{\n\tgd.print(\"%s ready\")\n}}\n\n", snake, class_name, class_name)
+    fmt.sbprintf(&b, "%s_process :: proc(self: ^%s, delta: f64) {{\n}}\n", snake, class_name)
+    return strings.to_string(b)
+}
+
+// snake_case a PascalCase identifier (Player -> player, MyBoss -> my_boss) — mirrors
+// scriptgen's to_snake so the generated proc prefix matches what it strips.
+@(private = "file")
+core_to_snake :: proc(s: string) -> string {
+    b := strings.builder_make()
+    for r, i in s {
+        if r >= 'A' && r <= 'Z' {
+            if i != 0 {strings.write_rune(&b, '_')}
+            strings.write_rune(&b, r + ('a' - 'A'))
+        } else {
+            strings.write_rune(&b, r)
+        }
+    }
+    return strings.to_string(b)
 }
 
 @(private = "file")
 lv_false :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     ret_bool(ret, false)
+}
+
+@(private = "file")
+lv_true :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+    ret_bool(ret, true)
 }
 
 // ---- global class registration ------------------------------------------------------
@@ -221,6 +278,16 @@ lv_intneg1 :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdex
 lv_string_empty :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
     ret_string(ret, godot.new_string_cstring(""))
+}
+
+// `_auto_indent_code(code, from_line, to_line) -> String` must return the (re)formatted code.
+// We don't reformat Odin, so echo the INPUT back unchanged — returning "" (as before) would
+// blank the buffer if the editor ever invokes auto-indent on an `.odin` file.
+@(private = "file")
+lv_echo_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+    context = gdext.godot_context()
+    code := (cast(^godot.String)args[0])^
+    ret_string(ret, code)
 }
 
 @(private = "file")
@@ -332,7 +399,7 @@ odin_language_register :: proc() {
     add("_make_template", lv_make_template)
     add("_supports_builtin_mode", lv_false)
     add("_can_inherit_from_file", lv_false)
-    add("_is_using_templates", lv_false)
+    add("_is_using_templates", lv_true)
     add("_has_named_classes", lv_false)
     add("_overrides_external_editor", lv_false)
     add("_handles_global_class_type", lv_handles_global_class_type)
@@ -354,7 +421,7 @@ odin_language_register :: proc() {
     add("_open_in_external_editor", lv_int0) // enum::Error (0 == OK)
     add("_complete_code", lv_complete_code) // Dictionary {result, force, call_hint, options} — real ols autocomplete (complete.odin)
     add("_lookup_code", lv_lookup_code) // Dictionary {result, type, class_name, class_member} — goto-def to built-in docs (lookup.odin)
-    add("_auto_indent_code", lv_string_empty) // String
+    add("_auto_indent_code", lv_echo_code) // String — echo input (never blank the buffer)
     add("_add_global_constant", lv_noop) // void
     add("_add_named_global_constant", lv_noop) // void
     add("_remove_named_global_constant", lv_noop) // void

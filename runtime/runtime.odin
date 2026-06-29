@@ -205,3 +205,27 @@ class_name_for_typeid :: proc "contextless" (id: typeid) -> cstring {
 odin_scripts_manifest :: proc "c" () -> (descs: [^]Class_Desc, count: int) {
 	return raw_data(registry[:]), registry_count
 }
+
+// ABI version of the core<->scripts data contract (the structs above, read across the dll
+// boundary). The core dlsym's this right after boot and REFUSES to read the manifest on a
+// mismatch — so updating the addon's prebuilt core but forgetting to rebuild your scripts dll
+// (or vice-versa) fails with a clear "rebuild" message instead of reading Class_Desc at the
+// wrong field offsets (bogus sizes -> undersized allocs -> heap corruption; stale proc ptrs
+// -> jumps into garbage). Auto-derived from the shared struct sizes so adding/removing a field
+// bumps it automatically; ABI_GENERATION is a manual bump for layout changes size_of can't see
+// (e.g. reordering Class_Desc's fields).
+ABI_GENERATION :: u32(1)
+ABI_VERSION :: ABI_GENERATION ~
+	u32(size_of(Class_Desc)) ~
+	(u32(size_of(Lifecycle)) << 8) ~
+	(u32(size_of(Export)) << 16) ~
+	(u32(size_of(Method)) << 5) ~
+	(u32(size_of(Signal)) << 13) ~
+	(u32(size_of(Onready)) << 21) ~
+	(u32(size_of(Connection)) << 3) ~
+	(u32(size_of(Rpc)) << 11)
+
+@(export)
+odin_scripts_abi_version :: proc "c" () -> u32 {
+	return ABI_VERSION
+}

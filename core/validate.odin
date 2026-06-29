@@ -56,7 +56,59 @@ odin_collection_root :: proc(allocator := context.allocator) -> string {
     if v, ok := os.lookup_env("ODIN_GODOT_ROOT", allocator); ok && v != "" {
         return v
     }
-    return strings.clone("/Users/walter/data/code/odin/odin_godot", allocator)
+    return derive_collection_root(allocator)
+}
+
+// One-shot "couldn't find the addon root" warning guard.
+@(private = "file")
+warned_no_root: bool
+
+// Fallback collection root when neither `odin_godot/root` nor $ODIN_GODOT_ROOT is set: derive
+// it from the core dll's OWN on-disk location (via dladdr). The core lives at
+// <addon>/bin/<platform>/libodin_godot.<ext>, so the addon root — which carries the
+// godot/gdext/runtime collection a project compiles against — is two directories up. This
+// makes an installed addon zero-config. Returns "" + a one-shot editor warning if it can't be
+// derived; NEVER the old hardcoded maintainer path, which silently produced false squiggles on
+// a consumer's `import "godot:godot"` line.
+@(private)
+derive_collection_root :: proc(allocator := context.allocator) -> string {
+    if dir, ok := core_dll_dir(allocator); ok {
+        defer delete(dir, allocator)
+        // The INSTALLED layout is <addon>/bin/<platform>/libodin_godot.<ext>, so the addon root
+        // is two dirs up. VALIDATE it by checking for the `godot/` collection it must contain —
+        // otherwise (e.g. the in-repo dev layout, where the core sits in <project>/bin/) we'd
+        // hand back a path with no collection. On a miss, fall through to the warning.
+        if up := dir_up_n(dir, 2); up != "" {
+            marker := strings.concatenate({up, "/godot"}, allocator)
+            defer delete(marker, allocator)
+            if os.exists(marker) {
+                return strings.clone(up, allocator)
+            }
+        }
+    }
+    if !warned_no_root {
+        warned_no_root = true
+        msg := godot.new_string_cstring(
+            "odin_godot: couldn't locate the addon root automatically — set the `odin_godot/root` " +
+            "project setting (or the ODIN_GODOT_ROOT env var) to your odin_godot / " +
+            "addons/odin_godot directory so validation + autocomplete can resolve " +
+            "`import \"godot:godot\"`.",
+        )
+        godot.gd_push_warning(godot.variant_from_string(&msg))
+    }
+    return strings.clone("", allocator)
+}
+
+// Strip `n` trailing path components ("/a/b/c", 2 -> "/a"). Returns "" if it runs out.
+@(private = "file")
+dir_up_n :: proc(path: string, n: int) -> string {
+    p := path
+    for _ in 0 ..< n {
+        idx := strings.last_index_byte(p, '/')
+        if idx < 0 {return ""}
+        p = p[:idx]
+    }
+    return p
 }
 
 // One-time guard so the "odin not found" warning isn't spammed on every keystroke.

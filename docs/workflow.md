@@ -92,9 +92,15 @@ as you type. Because a single `.odin` file isn't a compile unit, it type-checks 
 unsaved buffer, runs `odin check`, and maps `‹file›(‹line›:‹col›) Error: ‹msg›` back to the
 editor. It runs on a **background worker** with a result cache, so it never freezes the UI
 (first-call latency ~0.03 ms; the check itself completes a moment later and the squiggles
-update on the next debounce). Resolution of the `godot` collection root: `odin_godot/root`
-project setting → `ODIN_GODOT_ROOT` env → repo default — **a consuming project must point one
-of these at wherever odin_godot lives.**
+update on the next debounce). The `godot` collection root resolves `odin_godot/root` setting →
+`ODIN_GODOT_ROOT` env → **auto-derived from the installed addon's own location** — so a normal
+`addons/odin_godot/` install needs no configuration; set `odin_godot/root` only if you keep the
+collection somewhere non-standard.
+
+> **Scope:** `_validate` shows squiggles for the **file you're editing**. An error your edit
+> causes in a *sibling* file of the same package isn't shown as a live squiggle there (the
+> engine only validates the open file) — but it **does** surface in the Output when the
+> rebuild-on-save build runs, so cross-file breakage isn't silent, just deferred to save.
 
 ### Autocomplete (`_complete_code`, backed by `ols`)
 
@@ -102,9 +108,9 @@ Typing offers completions from the `ols` Odin language server (so `gd.node2d_set
 `node2d_set_position`, etc.). One **long-lived** `ols` subprocess is kept alive for the editor
 session over real stdio pipes, so completions are warm (~17–19 ms) instead of re-spawning and
 re-indexing the whole binding each keystroke (~0.5–1.25 s). If `ols` can't start or dies, the
-editor transparently falls back to a fresh spawn, then restarts the session. Point at the
-binary with **`odin_godot/ols_bin`** (or the `OLS` env var, or `PATH`); `ols` ships in the Nix
-shell.
+editor transparently falls back to a fresh spawn, then restarts the session. Each row shows the
+symbol's **type/signature** inline (from ols) next to its name. Point at the binary with
+**`odin_godot/ols_bin`** (or the `OLS` env var, or `PATH`); `ols` ships in the Nix shell.
 
 ### Syntax highlighting
 
@@ -112,6 +118,14 @@ shell.
 PascalCase types, proc calls). It's registered on the first editor frame and touches only the
 Script editor. Limitation: block comments are highlighted per-line — a `/* … */` spanning
 lines isn't tracked across them.
+
+### Icons & known cosmetic gaps
+
+A script class gets a custom icon via the **`//gd:icon <res-path>`** marker (shown in the Scene
+/ FileSystem docks like a GDScript `@icon`). Two cosmetic gaps remain: a `.odin` file with no
+`//gd:icon` shows Godot's generic script icon (there's no default Odin file-type icon yet), and
+documentation tooltips for `@export`s/methods in the Inspector aren't wired (autocomplete does
+show type signatures — see above). Neither affects functionality.
 
 <a name="editor-settings"></a>
 ### Editor settings reference

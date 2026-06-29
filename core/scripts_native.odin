@@ -42,6 +42,10 @@ Scripts_Dll :: struct {
 	// the scripts dll its `obj -> Odin script struct` resolver (core's odin_script_struct),
 	// which `rt.script_of` then uses. Exported by the runtime package (linked into the dll).
 	odin_scripts_set_core_api: proc "c" (script_struct: rt.Script_Struct_Proc),
+	// ABI version of the shared core<->scripts data contract (see rt.ABI_VERSION). Checked
+	// before reading the manifest to reject a scripts dll built against a different addon
+	// version. Absent (nil) on a dll built before this handshake existed — also a mismatch.
+	odin_scripts_abi_version: proc "c" () -> u32,
 }
 
 @(private)
@@ -55,13 +59,43 @@ g_scripts_missing: bool
 @(private)
 g_scripts_missing_warned: bool
 
+// Set when the scripts dll loaded but its ABI version didn't match the core's (a version skew).
+@(private)
+g_scripts_abi_skew: bool
+@(private)
+g_abi_core: u32
+@(private)
+g_abi_scripts: u32
+
+// surface_load_failure_runtime — in a SHIPPED GAME (NOT the editor), a missing or incompatible
+// scripts dll means the game runs with zero Odin scripts. Push a visible error to the game log
+// instead of dying silently. No-op in the editor (it instead defers a friendly one-shot
+// warning from the frame pump — scripts_surface_missing_warning / the ABI-skew branch).
+@(private)
+surface_load_failure_runtime :: proc(detail: string) {
+	if bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
+		return
+	}
+	msg := godot.new_string_odin(
+		fmt.tprintf(
+			"odin_godot: Odin scripts failed to load (%s) — this build's Odin scripts will NOT " +
+			"run. An exported game must ship libodinscripts beside the executable; rebuild/re-export.",
+			detail,
+		),
+	)
+	godot.gd_push_error(godot.variant_from_string(&msg))
+}
+
 // Surface a ONE-TIME, actionable warning in the editor console when no scripts dll was
 // loaded. Called from the main-thread frame pump (lv_frame) where the engine + editor are
 // up. Editor-only: a shipped game with no scripts dll already printed to stderr at load and
 // must never nag a player. Tells the user this is the normal first-run state and how to fix.
 @(private)
 scripts_surface_missing_warning :: proc() {
-	if !g_scripts_missing || g_scripts_missing_warned {
+	if !g_scripts_missing && !g_scripts_abi_skew {
+		return
+	}
+	if g_scripts_missing_warned {
 		return
 	}
 	if !bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
@@ -69,6 +103,21 @@ scripts_surface_missing_warning :: proc() {
 		return
 	}
 	g_scripts_missing_warned = true
+	if g_scripts_abi_skew {
+		// Loaded, but built against a different odin_godot version — a clear "rebuild" message,
+		// not the fresh-install one.
+		msg := godot.new_string_odin(
+			fmt.tprintf(
+				"odin_godot: your scripts dll was built against a different addon version " +
+				"(core ABI v%d, scripts v%d). Rebuild it: addons/odin_godot/build/build_scripts.sh " +
+				"(your scripts won't load until you do).",
+				g_abi_core,
+				g_abi_scripts,
+			),
+		)
+		godot.gd_push_error(godot.variant_from_string(&msg))
+		return
+	}
 	msg := godot.new_string_cstring(
 		"odin_godot: no compiled Odin scripts found (res://bin/libodinscripts.*). This is normal " +
 		"for a fresh install — your .odin gameplay code compiles into that dll. Quick start: copy " +
@@ -76,6 +125,49 @@ scripts_surface_missing_warning :: proc() {
 		"addons/odin_godot/README.md / addons/odin_godot/template/README.md).",
 	)
 	godot.gd_push_warning(godot.variant_from_string(&msg))
+}
+
+@(private)
+g_version_checked: bool
+
+// One-shot engine-version sanity check. The required-virtual table (core/language.odin) is
+// pinned to the tested Godot (4.6); a different minor may have changed the ScriptLanguage
+// virtual contract, which can range from "features misbehave" to a hard crash. We WARN rather
+// than block (a hard `compatibility_maximum` in the manifest is fragile — it would also reject
+// valid 4.6.x patch releases). Editor-only, surfaced from the frame pump.
+@(private)
+check_engine_version_once :: proc() {
+	if g_version_checked {
+		return
+	}
+	g_version_checked = true
+	eng := godot.singleton_engine()
+	if !bool(godot.engine_is_editor_hint(eng)) {
+		return
+	}
+	info := godot.engine_get_version_info(eng)
+	major := version_field(&info, "major")
+	minor := version_field(&info, "minor")
+	if major == 4 && minor == 6 {
+		return // the tested range
+	}
+	msg := godot.new_string_odin(
+		fmt.tprintf(
+			"odin_godot is built and tested for Godot 4.6.x — you are on %d.%d. It may not work " +
+			"correctly; if the script-language ABI changed, expect editor issues or crashes.",
+			major,
+			minor,
+		),
+	)
+	godot.gd_push_warning(godot.variant_from_string(&msg))
+}
+
+@(private = "file")
+version_field :: proc(d: ^godot.Dictionary, key: cstring) -> int {
+	k := godot.new_string_cstring(key)
+	kv := godot.variant_from_string(&k)
+	v := godot.dictionary_get(d, kv, godot.Variant{})
+	return int(godot.variant_to_int(&v))
 }
 
 // dladdr — resolve the file path of the shared object containing a given address.
@@ -163,11 +255,34 @@ odin_scripts_load :: proc() {
 		// guaranteed up, so a push_warning here can be lost — defer it). The common cause is
 		// not an error at all: a fresh install hasn't compiled its scripts dll yet.
 		g_scripts_missing = true
+		// In a SHIPPED GAME (not the editor) this is a hard error, not a fresh-install state —
+		// surface it now so the game doesn't silently run with no Odin scripts.
+		surface_load_failure_runtime("scripts library not found")
 		return
 	}
 
 	// Boot FIRST so the scripts dll's gdext/godot globals are live, THEN read the manifest.
 	scripts_dll.odin_scripts_boot(saved_get_proc_address, gdext.library)
+
+	// ABI handshake: refuse to read the manifest from a scripts dll built against a different
+	// odin_godot version (its Class_Desc layout would differ -> reading at wrong offsets ->
+	// heap corruption / garbage proc ptrs). nil symbol = built before this handshake existed =
+	// also a mismatch. The fix is always "rebuild your scripts dll".
+	scripts_abi := u32(0)
+	if scripts_dll.odin_scripts_abi_version != nil {
+		scripts_abi = scripts_dll.odin_scripts_abi_version()
+	}
+	if scripts_abi != rt.ABI_VERSION {
+		gdext_print(
+			"odin: scripts dll ABI mismatch (rebuild your scripts: build/build_scripts.sh) — core wants",
+			fmt.tprintf("v%d, scripts dll is v%d", rt.ABI_VERSION, scripts_abi),
+		)
+		g_scripts_abi_skew = true
+		g_abi_core = rt.ABI_VERSION
+		g_abi_scripts = scripts_abi
+		surface_load_failure_runtime(fmt.tprintf("ABI mismatch: core v%d, scripts v%d", rt.ABI_VERSION, scripts_abi))
+		return
+	}
 
 	// Hand the scripts dll the typed cross-script resolver (Option A). Optional: an older
 	// scripts dll without the runtime symbol simply leaves rt.script_of returning nil.
@@ -238,6 +353,19 @@ odin_scripts_reload :: proc() -> bool {
 		return false
 	}
 	new_dll.odin_scripts_boot(saved_get_proc_address, gdext.library)
+	// ABI handshake on the swapped-in dll too (same reasoning as the initial load): never read
+	// a manifest whose Class_Desc layout might differ from this core's.
+	new_abi := u32(0)
+	if new_dll.odin_scripts_abi_version != nil {
+		new_abi = new_dll.odin_scripts_abi_version()
+	}
+	if new_abi != rt.ABI_VERSION {
+		gdext_print(
+			"odin reload: new scripts dll ABI mismatch — keeping old code",
+			fmt.tprintf("(core v%d, new dll v%d)", rt.ABI_VERSION, new_abi),
+		)
+		return false
+	}
 	// Re-hand the resolver to the freshly-swapped dll (it has its own runtime globals).
 	if new_dll.odin_scripts_set_core_api != nil {
 		new_dll.odin_scripts_set_core_api(odin_script_struct)

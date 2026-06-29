@@ -49,7 +49,7 @@ godot_collection_root :: proc(allocator := context.allocator) -> string {
     if v, ok := os.lookup_env("ODIN_GODOT_ROOT", allocator); ok && v != "" {
         return v
     }
-    return strings.clone("/Users/walter/data/code/odin/odin_godot", allocator)
+    return derive_collection_root(allocator)
 }
 
 // Resolve a `<dir>/<name>` binary the editor process can reach without inheriting a dev PATH:
@@ -288,7 +288,15 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
                 case .Kind:
                     cd_set_int(&od, key, i64(c.kind))
                 case .Display:
-                    cd_set_str(&od, key, c.label)
+                    // Surface the ols type/signature (`detail`) inline in the popup row so
+                    // autocomplete shows what a symbol IS, not just its name. Matching/insert
+                    // are unaffected (filtering uses c.label; insert_text stays the bare name).
+                    if c.detail != "" {
+                        disp := strings.concatenate({c.label, "  ", c.detail}, context.temp_allocator)
+                        cd_set_str(&od, key, disp)
+                    } else {
+                        cd_set_str(&od, key, c.label)
+                    }
                 case .Insert_Text:
                     cd_set_str(&od, key, c.insert_text)
                 case .Font_Color:
