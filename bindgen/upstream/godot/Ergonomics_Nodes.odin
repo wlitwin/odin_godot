@@ -101,3 +101,80 @@ node2d_set_global_y :: proc "contextless" (node: Node2d, y: Real) {
 	p.y = y
 	node2d_set_global_position(node, p)
 }
+
+// ---- Node3D position-component setters (same idea, Vector3) ----
+
+// node3d_set_x / _y / _z set one component of a Node3D's LOCAL position, keeping the others.
+node3d_set_x :: proc "contextless" (node: Node3d, x: Real) {
+	p := node3d_get_position(node)
+	p.x = x
+	node3d_set_position(node, p)
+}
+node3d_set_y :: proc "contextless" (node: Node3d, y: Real) {
+	p := node3d_get_position(node)
+	p.y = y
+	node3d_set_position(node, p)
+}
+node3d_set_z :: proc "contextless" (node: Node3d, z: Real) {
+	p := node3d_get_position(node)
+	p.z = z
+	node3d_set_position(node, p)
+}
+
+// node3d_set_global_x / _y / _z set one component of a Node3D's WORLD position.
+node3d_set_global_x :: proc "contextless" (node: Node3d, x: Real) {
+	p := node3d_get_global_position(node)
+	p.x = x
+	node3d_set_global_position(node, p)
+}
+node3d_set_global_y :: proc "contextless" (node: Node3d, y: Real) {
+	p := node3d_get_global_position(node)
+	p.y = y
+	node3d_set_global_position(node, p)
+}
+node3d_set_global_z :: proc "contextless" (node: Node3d, z: Real) {
+	p := node3d_get_global_position(node)
+	p.z = z
+	node3d_set_global_position(node, p)
+}
+
+// ---- Control position / size component setters ----
+//
+// Control's set_position/set_size take a `keep_offsets` flag; these pass `false` (the common
+// case — let the offsets follow). For anchor-driven layouts you'll still want the raw setters.
+
+// control_set_x / _y set one component of a Control's position, keeping the other.
+control_set_x :: proc "contextless" (node: Control, x: Real) {
+	p := control_get_position(node)
+	p.x = x
+	control_set_position(node, p, false)
+}
+control_set_y :: proc "contextless" (node: Control, y: Real) {
+	p := control_get_position(node)
+	p.y = y
+	control_set_position(node, p, false)
+}
+
+// control_set_width / _height set one component of a Control's size, keeping the other.
+control_set_width :: proc "contextless" (node: Control, w: Real) {
+	s := control_get_size(node)
+	s.x = w
+	control_set_size(node, s, false)
+}
+control_set_height :: proc "contextless" (node: Control, h: Real) {
+	s := control_get_size(node)
+	s.y = h
+	control_set_size(node, s, false)
+}
+
+// control_set_global_x / _y set one component of a Control's WORLD position.
+control_set_global_x :: proc "contextless" (node: Control, x: Real) {
+	p := control_get_global_position(node)
+	p.x = x
+	control_set_global_position(node, p, false)
+}
+control_set_global_y :: proc "contextless" (node: Control, y: Real) {
+	p := control_get_global_position(node)
+	p.y = y
+	control_set_global_position(node, p, false)
+}

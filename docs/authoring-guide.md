@@ -557,8 +557,10 @@ don't need get → modify → set at all:
 | set ONE position component (keep the other) | `gd.node2d_set_x(self.owner, 100)` · `gd.node2d_set_y(self.owner, 250)` (and `_global_x` / `_global_y`) |
 
 The `node2d_set_x` / `_set_y` (+ `_global_x` / `_global_y`) helpers cover the absolute-component
-case — "snap x to 100, keep y" — without the get → modify → set round-trip. If you ever need it
-by hand (other components, or another type), it's plain Odin array math:
+case — "snap x to 100, keep y" — without the get → modify → set round-trip. **The same setters
+exist for the other positional types:** `node3d_set_x/_y/_z` (+ `_global_*`), and
+`control_set_x/_y`, `control_set_width/_height`, `control_set_global_x/_y`. If you ever need it by
+hand (a component with no setter, or another type), it's plain Odin array math:
 
 ```odin
 pos := gd.node2d_get_position(self.owner)
