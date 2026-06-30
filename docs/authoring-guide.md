@@ -554,9 +554,11 @@ don't need get → modify → set at all:
 | rotate by radians | `gd.node2d_rotate(self.owner, 0.1)` |
 | scale by a factor | `gd.node2d_apply_scale(self.owner, gd.Vector2{2, 2})` |
 | set / get in world space | `gd.node2d_set_global_position(self.owner, p)` · `gd.node2d_get_global_position(self.owner)` |
+| set ONE position component (keep the other) | `gd.node2d_set_x(self.owner, 100)` · `gd.node2d_set_y(self.owner, 250)` (and `_global_x` / `_global_y`) |
 
-You only need the explicit three lines when setting an absolute **component** (e.g. snap x to
-100, keep y) — and even then the math is plain Odin:
+The `node2d_set_x` / `_set_y` (+ `_global_x` / `_global_y`) helpers cover the absolute-component
+case — "snap x to 100, keep y" — without the get → modify → set round-trip. If you ever need it
+by hand (other components, or another type), it's plain Odin array math:
 
 ```odin
 pos := gd.node2d_get_position(self.owner)

@@ -66,3 +66,38 @@ is_in_group :: proc "contextless" (node: Object, group: cstring) -> bool {
 	g := new_string_name_cstring(group, true)
 	return node_is_in_group(node, g)
 }
+
+// ---- Node2D position-component setters ----
+//
+// Setting ONE component of a Node2D's position ("snap x to 100, keep y") otherwise needs the
+// get -> modify -> set round-trip, since a `Vector2` component can't be written across the engine
+// boundary on its own. These close that gap. For DELTAS (`pos.x += d`) prefer `node2d_translate`
+// / `node2d_move_local_x`, which skip the read entirely.
+
+// node2d_set_x sets the X of a Node2D's LOCAL position, keeping Y.
+node2d_set_x :: proc "contextless" (node: Node2d, x: Real) {
+	p := node2d_get_position(node)
+	p.x = x
+	node2d_set_position(node, p)
+}
+
+// node2d_set_y sets the Y of a Node2D's LOCAL position, keeping X.
+node2d_set_y :: proc "contextless" (node: Node2d, y: Real) {
+	p := node2d_get_position(node)
+	p.y = y
+	node2d_set_position(node, p)
+}
+
+// node2d_set_global_x sets the X of a Node2D's WORLD (global) position, keeping Y.
+node2d_set_global_x :: proc "contextless" (node: Node2d, x: Real) {
+	p := node2d_get_global_position(node)
+	p.x = x
+	node2d_set_global_position(node, p)
+}
+
+// node2d_set_global_y sets the Y of a Node2D's WORLD (global) position, keeping X.
+node2d_set_global_y :: proc "contextless" (node: Node2d, y: Real) {
+	p := node2d_get_global_position(node)
+	p.y = y
+	node2d_set_global_position(node, p)
+}
