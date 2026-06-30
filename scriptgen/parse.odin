@@ -243,14 +243,6 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 	// Exports: struct fields (after owner) tagged `gd:"export"` (or `gd:"onready=PATH"`).
 	for f, i in struct_type.fields.list {
 		if i == 0 {continue} // owner
-		val, has := tag_gd_value(f.tag.text)
-		if !has {continue}
-		// Tag is comma-separated tokens. The FIRST token selects the kind:
-		//   - `onready=PATH`  -> a private auto-wired node ref (richer-authoring #1)
-		//   - `export[,SPEC]` -> a serialized @export property
-		specs := strings.split(val, ",")
-		if len(specs) == 0 {continue}
-		tok0 := strings.trim_space(specs[0])
 
 		// Field name (first ident) — for error messages + offset_of.
 		field_label := s.struct_name
@@ -260,6 +252,31 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 				break
 			}
 		}
+
+		val, has := tag_gd_value(f.tag.text)
+		if !has {
+			// A tag that LOOKS like an attempted gd tag but isn't the required `gd:"..."` form
+			// (missing the inner quotes, or the colon) would otherwise be silently ignored — the
+			// field isn't exported/onready-wired, then reads as nil/garbage and crashes at
+			// runtime when you use it. Catch it at build time.
+			raw := strings.trim(f.tag.text, "`")
+			if strings.contains(raw, "gd:") || strings.contains(raw, "gd\"") {
+				errorf(
+					"%s.%s: malformed gd tag %q — use the quoted form `gd:\"...\"`, e.g. `gd:\"onready=Sprite2D\"` or `gd:\"export\"`",
+					s.struct_name,
+					field_label,
+					raw,
+				)
+			}
+			continue
+		}
+		// Tag is comma-separated tokens. The FIRST token selects the kind:
+		//   - `onready=PATH`  -> a private auto-wired node ref (richer-authoring #1)
+		//   - `export[,SPEC]` -> a serialized @export property
+		specs := strings.split(val, ",")
+		if len(specs) == 0 {continue}
+		tok0 := strings.trim_space(specs[0])
+
 		type_text := node_text(src, f.type)
 
 		// richer-authoring #1: `gd:"onready=Sprite"` — must be an object-handle/pointer field.
