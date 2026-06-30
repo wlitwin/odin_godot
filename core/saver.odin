@@ -147,6 +147,16 @@ sv_save :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.T
         ret_int(ret, 12) // ERR_FILE_CANT_WRITE
         return
     }
+
+    // Saving a script changed it — kick the background rebuild HERE so the change goes live
+    // without a manual "Build Odin Scripts". We don't rely on the editor calling
+    // OdinScript._reload after a save: a built-in-editor Ctrl+S doesn't trigger it reliably,
+    // and when it does it can run BEFORE these bytes reach disk (so the sources look unchanged
+    // and the build is skipped). Doing it right after the write guarantees the rebuild sees the
+    // new content. reload_request is editor-gated + non-blocking, and hash-deduped if _reload
+    // also fires.
+    reload_request()
+
     ret_int(ret, 0) // OK
 }
 
