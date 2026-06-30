@@ -54,6 +54,11 @@ Reload_State :: struct {
 	// A build FAILED: the main thread must surface the error in the editor Output (the worker
 	// thread cannot call into Godot). Read + cleared by reload_pump_main_thread.
 	build_failed:   bool,
+	// File the build's combined stdout+stderr is captured to (so the COMPILER ERROR can be
+	// shown in Godot's Output, not just the terminal). Constant per project; set once.
+	log_path:       string,
+	// On failure, the worker reads `log_path` into here; the pump prints it (filtered) + frees.
+	build_output:   string,
 	// Wall-clock duration of the last finished build (ms) — surfaced as a UX hint on reload.
 	last_build_ms:  f64,
 
@@ -190,14 +195,23 @@ reload_request :: proc(force := false) {
 	if idx := strings.last_index_byte(odin_bin, '/'); idx >= 0 {
 		odin_dir = odin_bin[:idx]
 	}
+	// Capture the build's combined output to a log file (in bin/, which is build output + a
+	// dotfile Godot ignores) instead of the terminal, so on failure the pump can show the
+	// actual COMPILER ERROR in Godot's Output — not just to a terminal the GUI user never sees.
+	// `> log 2>&1` (no pipe) preserves build_scripts.sh's exit code for the failure check.
+	if g_reload.log_path == "" {
+		g_reload.log_path = strings.concatenate({proj, "/bin/.odin_reload.log"})
+	}
 	cmd := fmt.aprintf(
-		"PATH='%s':\"$PATH\" ODIN='%s' ODIN_GODOT_ROOT='%s' SKIP_CORE=1 bash '%s/build/build_scripts.sh' '%s' '%s' 1>&2",
+		"mkdir -p '%s/bin'; PATH='%s':\"$PATH\" ODIN='%s' ODIN_GODOT_ROOT='%s' SKIP_CORE=1 bash '%s/build/build_scripts.sh' '%s' '%s' > '%s' 2>&1",
+		proj,
 		odin_dir,
 		odin_bin,
 		root,
 		root,
 		proj,
 		scripts,
+		g_reload.log_path,
 	)
 
 	src_hash := hash_sources(scripts)
@@ -260,11 +274,21 @@ build_worker_entry :: proc(data: rawptr) {
 	rc := libc.system(ccmd)
 	build_ms := time.duration_milliseconds(time.tick_since(start))
 	delete(ccmd)
+	state := job.state
+
+	// On failure, slurp the captured build log so the MAIN thread can show the actual compiler
+	// error in Godot's Output (the worker must not call Godot). Allocated on the long-lived
+	// core allocator; the pump frees it.
+	log_content: string
 	if rc != 0 {
 		os.write_string(os.stderr, "odin reload: background scripts build FAILED (see output above)\n")
+		if state.log_path != "" {
+			if data, rerr := os.read_entire_file(state.log_path, core_allocator()); rerr == nil {
+				log_content = string(data)
+			}
+		}
 	}
 
-	state := job.state
 	sync.lock(&state.mutex)
 	state.build_running = false
 	state.last_build_ms = build_ms
@@ -278,6 +302,8 @@ build_worker_entry :: proc(data: rawptr) {
 		// Failed build: forget the source hash so the SAME source can be retried (e.g. after a
 		// transient error). A real source change would change the hash and rebuild regardless.
 		state.have_last_hash = false
+		if state.build_output != "" {delete(state.build_output, core_allocator())}
+		state.build_output = log_content
 	}
 	next_cmd: string
 	has_next := false
@@ -298,6 +324,28 @@ build_worker_entry :: proc(data: rawptr) {
 	free(job, core_allocator())
 }
 
+// Print the meaningful lines of a failed build's captured output into Godot's Output, dropping
+// the benign linker dead-strip warnings (from scriptgen's own build) and scriptgen progress
+// lines so the actual `path(line:col) Error: …` stands out. print_str -> Output dock + stdout.
+@(private = "file")
+print_build_errors :: proc(output: string) {
+	b := strings.builder_make(context.temp_allocator)
+	it := output
+	for line in strings.split_lines_iterator(&it) {
+		if strings.contains(line, "could not find symbol") {continue}
+		if strings.has_prefix(line, "warning:") {continue}
+		if strings.has_prefix(line, "scriptgen: wrote") {continue}
+		if strings.has_prefix(line, "scriptgen: generated") {continue}
+		strings.write_string(&b, line)
+		strings.write_byte(&b, '\n')
+	}
+	text := strings.trim_space(strings.to_string(b))
+	if text == "" {
+		return
+	}
+	godot.print_str(strings.concatenate({"── odin_godot build errors ──\n", text}, context.temp_allocator))
+}
+
 // `reload_pump_main_thread` — drive a completed build's swap on the MAIN thread.
 //
 // Called every editor frame from OdinLanguage._frame (lv_frame). Cheap when idle (one
@@ -312,17 +360,25 @@ reload_pump_main_thread :: proc() {
 	g_reload.swap_ready = false
 	failed := g_reload.build_failed
 	g_reload.build_failed = false
+	build_out := g_reload.build_output // transfer ownership to this frame
+	g_reload.build_output = ""
 	build_ms := g_reload.last_build_ms
 	sync.unlock(&g_reload.mutex)
 
-	// A finished build failed: surface it prominently in the editor (Output + Errors). The
-	// compiler error itself already streamed to the Output above (build_scripts.sh 1>&2).
+	// A finished build failed: print the ACTUAL compiler error into Godot's Output (the build
+	// log was captured to a file, not the terminal — a GUI user never sees the terminal), then a
+	// prominent red summary.
 	if failed {
+		if build_out != "" {
+			print_build_errors(build_out)
+			delete(build_out, core_allocator())
+		}
 		msg := godot.new_string_cstring(
-			"odin_godot: scripts build FAILED — your change is NOT live. See the compiler error " +
-			"in the Output above.",
+			"odin_godot: scripts build FAILED — your change is NOT live (compiler errors above).",
 		)
 		godot.gd_push_error(godot.variant_from_string(&msg))
+	} else if build_out != "" {
+		delete(build_out, core_allocator())
 	}
 
 	if !ready {
