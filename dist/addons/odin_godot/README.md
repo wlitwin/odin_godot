@@ -62,9 +62,10 @@ That means:
      ```
    This writes `res://bin/libodinscripts.<ext>` (needs the Odin compiler installed).
 
-3. **Run it:** open the project in Godot (**restart the editor once after first adding the
-   addon** so Godot registers `.odin` as a script language), add a `Node` to a scene, **Attach
-   Script → pick `Hello`**, and press **Play**. The Output panel prints "Hello from Odin!".
+3. **Run it:** open the project in Godot (**restart the editor after adding _or updating_ the
+   addon** — Godot registers `.odin` at load and can't hot-swap the extension dll in place),
+   add a `Node` to a scene, **Attach Script → pick `Hello`**, and press **Play**. The Output
+   panel prints "Hello from Odin!".
 
 From here, edit `hello.odin` (or add your own) — the editor **rebuilds on save** so new
 `@export`s and code appear after a moment. See [`template/README.md`](template/README.md)
@@ -105,6 +106,7 @@ Then just **Export → Web**. Full walkthrough — including serving headers —
 
 | Symptom | Cause / fix |
 |---------|-------------|
+| **Editor crashes after updating / replacing the addon** | Don't swap the addon's core dll while the editor is open — Godot tries to hot-reload the GDExtension in place and crashes ("class already registered"). **Quit Godot first, replace `addons/odin_godot/`, then reopen.** (Same restart rule as first install.) |
 | Editor warns **"no compiled Odin scripts found"** | Normal on a fresh install — follow *Quick start* to build the scripts library. |
 | Editor warns **"`odin` not found"** (validation/reload off) | The editor process can't see `odin` on PATH. Set the `odin_godot/odin_bin` project setting to the absolute path of your `odin`, or launch the editor from a shell where `odin` is on PATH. |
 | Web export logs **"Emscripten `emcc` not found"** | Install the Emscripten SDK (activate 4.0.20) and set the `odin_godot/emcc_bin` project setting to its `emcc`. See [docs/exporting.md](docs/exporting.md). |

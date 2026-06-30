@@ -139,9 +139,10 @@ path needs the **Odin compiler** installed (and findable — see `odin_godot/odi
 
 ## 5. Attach and run
 
-1. Open the project in Godot (Project Manager, or `godot --path .`). **The first time you add
-   the addon, restart the editor** so Godot registers `.odin` as a script language (a one-time
-   GDExtension step — until you do, `.odin` files aren't recognized as scripts).
+1. Open the project in Godot (Project Manager, or `godot --path .`). **Restart the editor after
+   adding _or updating_ the addon** so Godot (re)registers `.odin` as a script language — and
+   never replace the addon's dll while the editor is open (Godot can't hot-swap a GDExtension in
+   place and will crash; quit first, replace, reopen).
 2. Add a **`Node2D`** to your scene (the base must match `//gd:extends`).
 3. In the Inspector's **Script** slot, **Attach** and pick `res://scripts/mover.odin` — the
    same file you wrote (there's no separate resource stub; the `.odin` *is* the script).
