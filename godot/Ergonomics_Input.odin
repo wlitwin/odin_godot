@@ -62,9 +62,62 @@ action_add_mouse_button :: proc "contextless" (action: cstring, button_index: i6
 	input_map_action_add_event(im, n, ev)
 }
 
-// is_action_pressed reports whether `action` is currently held down (collapses the Input
-// singleton + StringName + exact_match=false dance over `input_is_action_pressed`).
+// The runtime polling helpers below mirror Godot's `Input.*` method names (so a GDScript habit
+// transfers directly), each collapsing the Input singleton + StringName interning + the
+// exact_match/deadzone arguments. Action NAMES are plain cstrings.
+
+// is_action_pressed reports whether `action` is currently held down.
 is_action_pressed :: proc "contextless" (action: cstring) -> bool {
 	n := new_string_name_cstring(action, true)
 	return bool(input_is_action_pressed(singleton_input(), n, false))
+}
+
+// is_action_just_pressed / is_action_just_released — true only on the frame the action's state
+// changed (the usual "fire on press, not while held" check).
+is_action_just_pressed :: proc "contextless" (action: cstring) -> bool {
+	n := new_string_name_cstring(action, true)
+	return bool(input_is_action_just_pressed(singleton_input(), n, false))
+}
+is_action_just_released :: proc "contextless" (action: cstring) -> bool {
+	n := new_string_name_cstring(action, true)
+	return bool(input_is_action_just_released(singleton_input(), n, false))
+}
+
+// get_action_strength — analog strength of `action` in 0..1 (1 for a pressed digital input).
+get_action_strength :: proc "contextless" (action: cstring) -> f64 {
+	n := new_string_name_cstring(action, true)
+	return input_get_action_strength(singleton_input(), n, false)
+}
+
+// get_axis — `positive` strength minus `negative` strength (e.g. "ui_right" minus "ui_left"), in
+// -1..1. The classic 1-D movement input.
+get_axis :: proc "contextless" (negative, positive: cstring) -> f64 {
+	neg := new_string_name_cstring(negative, true)
+	pos := new_string_name_cstring(positive, true)
+	return input_get_axis(singleton_input(), neg, pos)
+}
+
+// get_vector — a 2-D input vector from four actions (the classic WASD / left-stick movement),
+// already deadzone-clamped and length-limited by Godot. A negative `deadzone` (the default) uses
+// each action's own configured deadzone.
+get_vector :: proc "contextless" (
+	negative_x, positive_x, negative_y, positive_y: cstring,
+	deadzone := f32(-1),
+) -> Vector2 {
+	nx := new_string_name_cstring(negative_x, true)
+	px := new_string_name_cstring(positive_x, true)
+	ny := new_string_name_cstring(negative_y, true)
+	py := new_string_name_cstring(positive_y, true)
+	return input_get_vector(singleton_input(), nx, px, ny, py, f64(deadzone))
+}
+
+// action_press / action_release — synthesize an action press (optionally analog `strength`) or
+// release, as if the player triggered it (handy for AI, replays, tests, on-screen buttons).
+action_press :: proc "contextless" (action: cstring, strength := f32(1)) {
+	n := new_string_name_cstring(action, true)
+	input_action_press(singleton_input(), n, f64(strength))
+}
+action_release :: proc "contextless" (action: cstring) {
+	n := new_string_name_cstring(action, true)
+	input_action_release(singleton_input(), n)
 }

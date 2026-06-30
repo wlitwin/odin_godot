@@ -55,3 +55,23 @@ callable :: proc "contextless" (obj: Object, method: cstring) -> Callable {
 is_editor :: proc "contextless" () -> bool {
 	return bool(engine_is_editor_hint(singleton_engine()))
 }
+
+// sname interns a cstring as a Godot StringName — the concise inline form of
+// `new_string_name_cstring(name, true)`. The many bound methods that take a `String_Name`
+// (method / signal / action / animation / property names) almost always want a string LITERAL,
+// and `static = true` interns it once and keeps it. Use this when no higher-level `gd.*` helper
+// exists for the call:
+//
+//     gd.animation_player_play(p, gd.sname("run"), -1, 1, false)
+//     gd.object_has_method(obj, gd.sname("attack"))
+sname :: proc "contextless" (name: cstring) -> String_Name {
+	return new_string_name_cstring(name, true)
+}
+
+// gstr builds a Godot String from a cstring — the inline form of `new_string_cstring`, for the
+// bound methods that take a `String` (rather than a `String_Name`).
+//
+//     gd.label_set_text(lbl, gd.gstr("Score: 0"))   // or just gd.set_text(lbl, "Score: 0")
+gstr :: proc "contextless" (s: cstring) -> String {
+	return new_string_cstring(s)
+}

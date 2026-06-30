@@ -551,7 +551,10 @@ script's `self.owner` passes with no cast and a returned `Node` assigns to any h
 | Define an input action | `gd.add_action("fire")` (optional `deadzone`) |
 | Bind a key / mouse button | `gd.action_add_key("fire", i64(gd.Key.Space))` · `gd.action_add_mouse_button("fire", i64(gd.Mouse_Button.Left))` |
 | Has / erase an action | `gd.has_action("fire")` · `gd.erase_action("fire")` |
-| Is an action pressed | `if gd.is_action_pressed("fire") { ... }` |
+| Poll an action | `gd.is_action_pressed("fire")` · `gd.is_action_just_pressed("jump")` · `gd.is_action_just_released("jump")` · `gd.get_action_strength("accelerate")` |
+| Movement input | `x := gd.get_axis("ui_left", "ui_right")` · `v := gd.get_vector("ui_left", "ui_right", "ui_up", "ui_down")` |
+| Synthesize input | `gd.action_press("fire", 0.8)` · `gd.action_release("fire")` |
+| Intern a name inline | `gd.sname("run")` → `String_Name` · `gd.gstr("text")` → `String` (for raw calls with no `gd.*` wrapper) |
 | Running in the editor? | `if gd.is_editor() { ... }` (wraps `Engine.is_editor_hint()`) |
 | Set / get a control's text | `gd.set_text(self.label, "Score: 0")` · `s := gd.get_text(self.label)` (any Control with a `text` property) |
 | Play / stop an animation | `gd.animation_play(self.anim, "run")` · `gd.animation_stop(self.anim)` · `gd.is_animation_playing(self.anim)` |
@@ -573,6 +576,22 @@ script context set). For a script-declared `//gd:signal`, prefer the generated t
 `<struct_snake>_emit_<signal>` helper; `gd.emit_args` is the by-name escape hatch (and the
 path `gd.emit`/`emit_args` both take — Godot's `emit_signal` is a vararg method, so they
 varcall it rather than ptrcall).
+
+**The interning pattern.** The `gd.*` helpers above all take plain Odin `cstring`s and do the
+Godot `String` / `String_Name` interning internally — that's the ergonomic path, so reach for a
+helper first. When you call a *raw* bound method that has no wrapper, it takes a `String_Name`
+(method/signal/action/animation/property names) or a `String`, and you intern inline with
+`gd.sname("…")` / `gd.gstr("…")` rather than spelling out `new_string_name_cstring(…, true)`:
+
+```odin
+// raw call (no dedicated helper): intern the name inline
+if gd.object_has_method(enemy, gd.sname("take_damage")) {
+    // ...
+}
+```
+
+`gd.sname` uses `static = true` (intern once, keep) — correct for the string *literals* these
+calls almost always use.
 
 ### Common transforms — moving / rotating a Node2D
 
