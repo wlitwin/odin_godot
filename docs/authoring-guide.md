@@ -539,6 +539,36 @@ script context set). For a script-declared `//gd:signal`, prefer the generated t
 path `gd.emit`/`emit_args` both take — Godot's `emit_signal` is a vararg method, so they
 varcall it rather than ptrcall).
 
+### Common transforms — moving / rotating a Node2D
+
+`gd.Vector2` is just an Odin `[2]f32`, so you get Odin's vector math for free: component access
+(`pos.x`), compound assignment (`pos.x += 10`), and whole-vector arithmetic (`pos += other`,
+`pos * delta`). The only round-trip is the get/set across the engine boundary — and for the
+common "move/rotate/scale by a delta" cases, Godot's own one-call methods skip even that, so you
+don't need get → modify → set at all:
+
+| Instead of (get → modify → set) | One call |
+| --- | --- |
+| `pos.x += 10` on the position | `gd.node2d_translate(self.owner, gd.Vector2{10, 0})` |
+| move along the node's own axes (respects rotation) | `gd.node2d_move_local_x(self.owner, 10)` · `gd.node2d_move_local_y(self.owner, 10)` |
+| rotate by radians | `gd.node2d_rotate(self.owner, 0.1)` |
+| scale by a factor | `gd.node2d_apply_scale(self.owner, gd.Vector2{2, 2})` |
+| set / get in world space | `gd.node2d_set_global_position(self.owner, p)` · `gd.node2d_get_global_position(self.owner)` |
+
+You only need the explicit three lines when setting an absolute **component** (e.g. snap x to
+100, keep y) — and even then the math is plain Odin:
+
+```odin
+pos := gd.node2d_get_position(self.owner)
+pos.x = 100                                  // Odin array swizzle — no Vector2 ctor needed
+gd.node2d_set_position(self.owner, pos)
+```
+
+The same shape generalizes: every Godot method on a node is bound as
+`gd.<class_snake>_<method>(handle, args…)` (so reach for `node2d_translate`, `control_set_size`,
+`sprite2d_set_frame`, …), and the math types (`Vector2/3`, `Color`, `Rect2`, …) are plain Odin
+structs/arrays you manipulate with normal operators.
+
 ## Supported Odin → Variant types
 
 | Odin type | Variant | Notes |
