@@ -367,6 +367,24 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			}
 		}
 
+		// Type-driven typed collections: a `Typed_Array(T)` / `Typed_Dictionary(K,V)` field
+		// derives its export hint from the element types in the type itself — no `array=`/`dict=`
+		// tag needed. (Mixing the two is a conflict.)
+		if matched, th, ths, tok := derive_typed_collection_hint(s.struct_name, field_label, type_text);
+		   matched {
+			if hint != 0 {
+				errorf(
+					"%s.%s: %s already declares its element type(s) — remove the redundant hint spec",
+					s.struct_name,
+					field_label,
+					type_text,
+				)
+			} else if tok {
+				hint = th
+				hint_string = ths
+			}
+		}
+
 		for nm in f.names {
 			ident, _ := nm.derived.(^ast.Ident)
 			if ident == nil {continue}

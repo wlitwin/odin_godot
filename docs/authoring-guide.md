@@ -147,6 +147,21 @@ Probe :: struct {
 > only drives the export's *typing* — the Inspector widget and the engine-side key/value
 > type enforcement.
 
+**Type-driven form.** Instead of the tag, you can declare the field as a `gd.Typed_Array(T)` /
+`gd.Typed_Dictionary(K, V)` and a bare `gd:"export"` derives the same hint from the type — no
+duplication:
+
+```odin
+scores: gd.Typed_Array(i64)                       `gd:"export"`,  // == array=int
+loot:   gd.Typed_Dictionary(gd.String, gd.Packed_Scene) `gd:"export"`, // == dict=String;PackedScene
+```
+
+Element types are the Odin spellings (`i64`, `gd.String`, `gd.Texture2d`); Resource handles are
+mapped back to their engine class name automatically (`gd.Texture2d` → `Texture2D`). For
+acronym-heavy class names that don't round-trip cleanly (e.g. `JSON`, `GLTFDocument`), use the
+`array=`/`dict=` tag form with the exact name. Don't combine the two on one field — that's a
+build-time error.
+
 ### Export groups & subgroups
 
 Add a `group=` (or `subgroup=`) token to an export to open a collapsible Inspector

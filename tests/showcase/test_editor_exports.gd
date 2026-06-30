@@ -74,6 +74,15 @@ func _initialize() -> void:
 	if int(rewards.get("hint", -1)) != PROPERTY_HINT_TYPE_STRING or String(rewards.get("hint_string", "")) != "4:;2:":
 		_fail("Coin1.rewards wrong typed-dict encoding: hint=%d hint_string='%s' (want %d / '4:;2:')" % [int(rewards.get("hint", -1)), String(rewards.get("hint_string", "")), PROPERTY_HINT_TYPE_STRING]); return
 
+	# --- Type-driven typed collections (Typed_Array(i64) / Typed_Dictionary(String,int)) must
+	# produce the SAME encoding as the tag form. ---
+	var levels = _prop(coin1, "levels")
+	if int(levels.get("type", -1)) != TYPE_ARRAY or int(levels.get("hint", -1)) != PROPERTY_HINT_TYPE_STRING or String(levels.get("hint_string", "")) != "2:":
+		_fail("Coin1.levels (Typed_Array) wrong: type=%d hint=%d hint_string='%s' (want %d / %d / '2:')" % [int(levels.get("type", -1)), int(levels.get("hint", -1)), String(levels.get("hint_string", "")), TYPE_ARRAY, PROPERTY_HINT_TYPE_STRING]); return
+	var prices = _prop(coin1, "prices")
+	if int(prices.get("type", -1)) != TYPE_DICTIONARY or int(prices.get("hint", -1)) != PROPERTY_HINT_TYPE_STRING or String(prices.get("hint_string", "")) != "4:;2:":
+		_fail("Coin1.prices (Typed_Dictionary) wrong: type=%d hint=%d hint_string='%s' (want %d / %d / '4:;2:')" % [int(prices.get("type", -1)), int(prices.get("hint", -1)), String(prices.get("hint_string", "")), TYPE_DICTIONARY, PROPERTY_HINT_TYPE_STRING]); return
+
 	# --- Hud declares no exports: its Inspector must not invent one ---
 	if not _prop(scene.get_node("Hud"), "speed").is_empty():
 		_fail("Hud unexpectedly exposes a 'speed' property"); return

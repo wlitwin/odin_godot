@@ -23,6 +23,10 @@ Coin :: struct {
 	// Dictionary[String,int].
 	tags:    gd.Array `gd:"export,array=int"`,
 	rewards: gd.Dictionary `gd:"export,dict=String;int"`,
+	// Type-driven form: the element types come from the `Typed_Array`/`Typed_Dictionary` type
+	// itself, no `array=`/`dict=` tag — must produce the identical encoding.
+	levels:  gd.Typed_Array(i64) `gd:"export"`,
+	prices:  gd.Typed_Dictionary(gd.String, i64) `gd:"export"`,
 	taken:   bool, // private guard so a coin is only collected once
 }
 

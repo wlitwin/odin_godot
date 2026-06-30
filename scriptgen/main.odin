@@ -66,6 +66,21 @@ map_variant :: proc(type_text: string) -> (Variant_Info, bool) {
 	if strings.has_prefix(t, "^") {
 		return Variant_Info{".Object", "rawptr", .Other}, true
 	}
+	// Typed collections — `Typed_Array(T)` / `Typed_Dictionary(K,V)` — resolve to plain Array /
+	// Dictionary variants (the element types drive the EXPORT hint, derived separately). Checked
+	// before the qualifier strip below, which would mangle a qualified element like `gd.String`.
+	tq := t
+	if strings.has_prefix(tq, "gd.") {
+		tq = tq[3:]
+	} else if strings.has_prefix(tq, "godot.") {
+		tq = tq[6:]
+	}
+	if strings.has_prefix(tq, "Typed_Array(") {
+		return Variant_Info{".Array", "gd.Array", .Other}, true
+	}
+	if strings.has_prefix(tq, "Typed_Dictionary(") {
+		return Variant_Info{".Dictionary", "gd.Dictionary", .Other}, true
+	}
 	base := t
 	if i := strings.last_index(base, "."); i >= 0 {
 		base = base[i + 1:] // strip a `gd.` / `godot.` qualifier
@@ -274,7 +289,7 @@ parse_hint_spec :: proc(owner, field, spec: string, field_vt: string) -> (hint: 
 			errorf("%s.%s: `array=` hint requires the field to be `gd.Array` (got %s)", owner, field, field_vt)
 			return 0, "", false
 		}
-		part, pok := encode_type_part(owner, field, value)
+		part, pok := encode_type_part(owner, field, value, false)
 		if !pok {return 0, "", false}
 		return HINT_TYPE_STRING, part, true
 	case "dict":
@@ -290,8 +305,8 @@ parse_hint_spec :: proc(owner, field, spec: string, field_vt: string) -> (hint: 
 			errorf("%s.%s: `dict=` needs KEY;VALUE, e.g. dict=String;int", owner, field)
 			return 0, "", false
 		}
-		kpart, kok := encode_type_part(owner, field, value[:semi])
-		vpart, vok := encode_type_part(owner, field, value[semi + 1:])
+		kpart, kok := encode_type_part(owner, field, value[:semi], false)
+		vpart, vok := encode_type_part(owner, field, value[semi + 1:], false)
 		if !kok || !vok {return 0, "", false}
 		return HINT_TYPE_STRING, strings.concatenate({kpart, ";", vpart}), true
 	case:
@@ -305,7 +320,11 @@ parse_hint_spec :: proc(owner, field, spec: string, field_vt: string) -> (hint: 
 // "<variant_type_int>:" (int -> "2:", String -> "4:"); anything else is taken to be a Resource
 // class and renders "24/17:ClassName" (24=TYPE_OBJECT, 17=HINT_RESOURCE_TYPE) — only
 // Resource-derived objects are serializable as exports.
-encode_type_part :: proc(owner, field, t: string) -> (string, bool) {
+// `from_odin` distinguishes the two front-ends: the `array=`/`dict=` TAG form passes the Godot
+// class name verbatim (from_odin=false); the `Typed_Array(T)` TYPE form passes an Odin handle
+// type (from_odin=true), so a non-builtin (Resource) name is mapped back to its engine spelling
+// (`Texture2d` -> `Texture2D`) before encoding.
+encode_type_part :: proc(owner, field, t: string, from_odin: bool) -> (string, bool) {
 	n := strings.trim_space(t)
 	if i := strings.last_index(n, "."); i >= 0 {
 		n = n[i + 1:] // strip a gd./godot. qualifier
@@ -318,7 +337,99 @@ encode_type_part :: proc(owner, field, t: string) -> (string, bool) {
 		buf: [8]byte
 		return strings.concatenate({strconv.itoa(buf[:], vt), ":"}), true
 	}
-	return strings.concatenate({"24/17:", n}), true
+	cls := n
+	if from_odin {
+		cls = godot_class_name(n)
+	}
+	return strings.concatenate({"24/17:", cls}), true
+}
+
+// godot_class_name reverses the binding's Godot->Odin class renaming so a Resource element type
+// renders with its real engine class name in a typed-collection hint. Handles the common
+// PascalCase + 2D/3D pattern: drop underscores, and uppercase a letter immediately following a
+// digit (`Texture2d` -> `Texture2D`, `Packed_Scene` -> `PackedScene`, `Animated_Sprite2d` ->
+// `AnimatedSprite2D`). Acronym-heavy names (e.g. `Json` -> would-be `JSON`) aren't recovered —
+// use the `array=`/`dict=` tag form with the exact class name for those.
+godot_class_name :: proc(odin: string) -> string {
+	b := strings.builder_make()
+	prev_digit := false
+	for r in odin {
+		if r == '_' {
+			continue
+		}
+		c := r
+		if prev_digit && c >= 'a' && c <= 'z' {
+			c -= 32 // 'a'..'z' -> 'A'..'Z'
+		}
+		strings.write_rune(&b, c)
+		prev_digit = r >= '0' && r <= '9'
+	}
+	return strings.to_string(b)
+}
+
+// derive_typed_collection_hint produces the export hint for a `Typed_Array(T)` /
+// `Typed_Dictionary(K,V)` field type. `matched` is false if `type_text` is neither.
+derive_typed_collection_hint :: proc(
+	owner, field, type_text: string,
+) -> (matched: bool, hint: int, hint_string: string, ok: bool) {
+	t := strings.trim_space(type_text)
+	if strings.has_prefix(t, "gd.") {
+		t = t[3:]
+	} else if strings.has_prefix(t, "godot.") {
+		t = t[6:]
+	}
+	is_arr := strings.has_prefix(t, "Typed_Array(")
+	is_dict := strings.has_prefix(t, "Typed_Dictionary(")
+	if !is_arr && !is_dict {
+		return false, 0, "", false
+	}
+	open := strings.index_byte(t, '(')
+	close := strings.last_index_byte(t, ')')
+	if open < 0 || close < open {
+		errorf("%s.%s: malformed typed collection %q", owner, field, type_text)
+		return true, 0, "", false
+	}
+	args := split_top_level(t[open + 1:close])
+	if is_arr {
+		if len(args) != 1 {
+			errorf("%s.%s: Typed_Array takes one element type, got %d", owner, field, len(args))
+			return true, 0, "", false
+		}
+		p, pok := encode_type_part(owner, field, args[0], true)
+		if !pok {return true, 0, "", false}
+		return true, HINT_TYPE_STRING, p, true
+	}
+	if len(args) != 2 {
+		errorf("%s.%s: Typed_Dictionary takes (KEY, VALUE), got %d", owner, field, len(args))
+		return true, 0, "", false
+	}
+	k, kok := encode_type_part(owner, field, args[0], true)
+	v, vok := encode_type_part(owner, field, args[1], true)
+	if !kok || !vok {return true, 0, "", false}
+	return true, HINT_TYPE_STRING, strings.concatenate({k, ";", v}), true
+}
+
+// split_top_level splits on commas that are NOT nested inside parens (so a nested generic like
+// `Typed_Array(i64)` as a value type stays intact).
+split_top_level :: proc(s: string) -> []string {
+	out: [dynamic]string
+	depth := 0
+	start := 0
+	for i := 0; i < len(s); i += 1 {
+		switch s[i] {
+		case '(':
+			depth += 1
+		case ')':
+			depth -= 1
+		case ',':
+			if depth == 0 {
+				append(&out, strings.trim_space(s[start:i]))
+				start = i + 1
+			}
+		}
+	}
+	append(&out, strings.trim_space(s[start:]))
+	return out[:]
 }
 
 // builtin_variant_int maps a builtin type name (Godot or Odin spelling) to its Variant::Type
