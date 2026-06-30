@@ -17,7 +17,13 @@ import gd "godot:godot"
 Coin :: struct {
 	owner: gd.Area2d,
 	value: gd.Int `gd:"export"`,
-	taken: bool, // private guard so a coin is only collected once
+	// Typed-collection exports (regression for the `array=`/`dict=` hints): these must render
+	// the Inspector's typed-array / typed-dictionary editors, i.e. emit the exact same
+	// PropertyInfo (hint Type_String, encoded hint_string) GDScript produces for Array[int] /
+	// Dictionary[String,int].
+	tags:    gd.Array `gd:"export,array=int"`,
+	rewards: gd.Dictionary `gd:"export,dict=String;int"`,
+	taken:   bool, // private guard so a coin is only collected once
 }
 
 coin_ready :: proc(self: ^Coin) {

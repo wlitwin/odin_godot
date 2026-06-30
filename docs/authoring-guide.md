@@ -117,20 +117,35 @@ Godot's comma-joined `hint_string` form:
 | `gd:"export,dir"` | directory picker | `Dir` |
 | `gd:"export,global_file"` / `global_dir` | global file/dir picker | `Global_File` / `Global_Dir` |
 | `gd:"export,resource=Texture2D"` | typed resource picker | `Resource_Type` / `"Texture2D"` |
+| `gd:"export,array=int"` | typed-array editor | `Type_String` / `"2:"` |
+| `gd:"export,array=Texture2D"` | typed-array of resources | `Type_String` / `"24/17:Texture2D"` |
+| `gd:"export,dict=String;int"` | typed-dictionary editor | `Type_String` / `"4:;2:"` |
+| `gd:"export,dict=String;Texture2D"` | typed-dict, resource values | `Type_String` / `"4:;24/17:Texture2D"` |
 
 `resource=` is for an `Object`/resource-handle field; `range`/`enum` for an int or
-float; `multiline` for a `gd.String`. At most one hint per field. Example:
+float; `multiline` for a `gd.String`. **`array=ELEM`** (on a `gd.Array` field) and
+**`dict=KEY;VALUE`** (on a `gd.Dictionary` field) declare *typed* collections — the same
+Inspector editors GDScript's `Array[T]` / `Dictionary[K,V]` produce. Each element/key/value
+is a builtin (`int`, `float`, `String`, `Vector2`, `Color`, …) or a Resource class name
+(`Texture2D`, `PackedScene`, …). At most one hint per field. Example:
 
 ```odin
 Probe :: struct {
 	owner:       gd.Node,
-	health:      i32       `gd:"export,range=0:100:5"`,
-	mode:        i32       `gd:"export,enum=Idle:Walk:Run"`,
-	description: gd.String `gd:"export,multiline"`,
+	health:      i32        `gd:"export,range=0:100:5"`,
+	mode:        i32        `gd:"export,enum=Idle:Walk:Run"`,
+	description: gd.String  `gd:"export,multiline"`,
 	velocity:    gd.Vector3 `gd:"export"`,
-	texture:     gd.Object `gd:"export,resource=Texture2D"`,
+	texture:     gd.Object  `gd:"export,resource=Texture2D"`,
+	scores:      gd.Array   `gd:"export,array=int"`,            // Array[int]
+	loot:        gd.Dictionary `gd:"export,dict=String;PackedScene"`, // Dictionary[String, PackedScene]
 }
 ```
+
+> The values still live as untyped `gd.Array` / `gd.Dictionary` handles in Odin (you
+> read/write them through the `array_*` / `dictionary_*` methods); the `array=`/`dict=` tag
+> only drives the export's *typing* — the Inspector widget and the engine-side key/value
+> type enforcement.
 
 ### Export groups & subgroups
 

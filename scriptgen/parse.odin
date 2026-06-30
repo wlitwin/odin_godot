@@ -359,7 +359,7 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 					errorf("%s.%s: only one export hint allowed (got extra %q)", s.struct_name, field_label, spec)
 					break
 				}
-				h, hs, hok := parse_hint_spec(s.struct_name, field_label, spec)
+				h, hs, hok := parse_hint_spec(s.struct_name, field_label, spec, vi.enum_name)
 				if hok {
 					hint = h
 					hint_string = hs

@@ -56,6 +56,24 @@ func _initialize() -> void:
 	if typeof(coin1.get("value")) != TYPE_INT:
 		_fail("Coin1.value get() did not round-trip as an int (got %s)" % str(coin1.get("value"))); return
 
+	# --- Coin typed-collection exports: must match GDScript's PropertyInfo exactly so the
+	# Inspector renders the typed-array / typed-dictionary editors (hint Type_String == 23). ---
+	var tags = _prop(coin1, "tags")
+	if tags.is_empty():
+		_fail("Coin1 Inspector is missing the 'tags' Array export"); return
+	if int(tags.get("type", -1)) != TYPE_ARRAY:
+		_fail("Coin1.tags wrong type: got %d, want TYPE_ARRAY(%d)" % [int(tags.get("type", -1)), TYPE_ARRAY]); return
+	if int(tags.get("hint", -1)) != PROPERTY_HINT_TYPE_STRING or String(tags.get("hint_string", "")) != "2:":
+		_fail("Coin1.tags wrong typed-array encoding: hint=%d hint_string='%s' (want %d / '2:')" % [int(tags.get("hint", -1)), String(tags.get("hint_string", "")), PROPERTY_HINT_TYPE_STRING]); return
+
+	var rewards = _prop(coin1, "rewards")
+	if rewards.is_empty():
+		_fail("Coin1 Inspector is missing the 'rewards' Dictionary export"); return
+	if int(rewards.get("type", -1)) != TYPE_DICTIONARY:
+		_fail("Coin1.rewards wrong type: got %d, want TYPE_DICTIONARY(%d)" % [int(rewards.get("type", -1)), TYPE_DICTIONARY]); return
+	if int(rewards.get("hint", -1)) != PROPERTY_HINT_TYPE_STRING or String(rewards.get("hint_string", "")) != "4:;2:":
+		_fail("Coin1.rewards wrong typed-dict encoding: hint=%d hint_string='%s' (want %d / '4:;2:')" % [int(rewards.get("hint", -1)), String(rewards.get("hint_string", "")), PROPERTY_HINT_TYPE_STRING]); return
+
 	# --- Hud declares no exports: its Inspector must not invent one ---
 	if not _prop(scene.get_node("Hud"), "speed").is_empty():
 		_fail("Hud unexpectedly exposes a 'speed' property"); return

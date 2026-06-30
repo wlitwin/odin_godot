@@ -209,6 +209,7 @@ HINT_GLOBAL_FILE :: 15
 HINT_GLOBAL_DIR :: 16
 HINT_RESOURCE_TYPE :: 17
 HINT_MULTILINE_TEXT :: 18
+HINT_TYPE_STRING :: 23 // typed Array/Dictionary element-type encoding (Godot's own choice)
 
 // Parse one `gd:"export,..."` hint spec into its (Property_Hint int, hint_string).
 //
@@ -226,7 +227,7 @@ HINT_MULTILINE_TEXT :: 18
 //   - global_file[=...]    -> Global_File
 //   - global_dir           -> Global_Dir
 //   - resource=Texture2D   -> Resource_Type, hint_string "Texture2D"
-parse_hint_spec :: proc(owner, field, spec: string) -> (hint: int, hint_string: string, ok: bool) {
+parse_hint_spec :: proc(owner, field, spec: string, field_vt: string) -> (hint: int, hint_string: string, ok: bool) {
 	name := spec
 	value := ""
 	if eq := strings.index(spec, "="); eq >= 0 {
@@ -266,10 +267,113 @@ parse_hint_spec :: proc(owner, field, spec: string) -> (hint: int, hint_string: 
 			return 0, "", false
 		}
 		return HINT_RESOURCE_TYPE, value, true
+	case "array":
+		// Typed Array export: `gd.Array `gd:"export,array=int"`` (or a Resource class, e.g.
+		// `array=Texture2D`). Renders the Inspector's typed-array editor.
+		if field_vt != ".Array" {
+			errorf("%s.%s: `array=` hint requires the field to be `gd.Array` (got %s)", owner, field, field_vt)
+			return 0, "", false
+		}
+		part, pok := encode_type_part(owner, field, value)
+		if !pok {return 0, "", false}
+		return HINT_TYPE_STRING, part, true
+	case "dict":
+		// Typed Dictionary export: `gd.Dictionary `gd:"export,dict=String;int"`` — KEY and VALUE
+		// separated by `;` (each a builtin like int/float/String or a Resource class). Renders
+		// the Inspector's typed-dictionary editor (Godot 4.4+).
+		if field_vt != ".Dictionary" {
+			errorf("%s.%s: `dict=` hint requires the field to be `gd.Dictionary` (got %s)", owner, field, field_vt)
+			return 0, "", false
+		}
+		semi := strings.index(value, ";")
+		if semi < 0 {
+			errorf("%s.%s: `dict=` needs KEY;VALUE, e.g. dict=String;int", owner, field)
+			return 0, "", false
+		}
+		kpart, kok := encode_type_part(owner, field, value[:semi])
+		vpart, vok := encode_type_part(owner, field, value[semi + 1:])
+		if !kok || !vok {return 0, "", false}
+		return HINT_TYPE_STRING, strings.concatenate({kpart, ";", vpart}), true
 	case:
 		errorf("%s.%s: unknown export hint %q", owner, field, name)
 		return 0, "", false
 	}
+}
+
+// encode_type_part encodes ONE key/value/element type for a typed Array/Dictionary export
+// hint_string (Godot's PROPERTY_HINT_TYPE_STRING form). A builtin renders as
+// "<variant_type_int>:" (int -> "2:", String -> "4:"); anything else is taken to be a Resource
+// class and renders "24/17:ClassName" (24=TYPE_OBJECT, 17=HINT_RESOURCE_TYPE) — only
+// Resource-derived objects are serializable as exports.
+encode_type_part :: proc(owner, field, t: string) -> (string, bool) {
+	n := strings.trim_space(t)
+	if i := strings.last_index(n, "."); i >= 0 {
+		n = n[i + 1:] // strip a gd./godot. qualifier
+	}
+	if n == "" {
+		errorf("%s.%s: typed Array/Dictionary export has an empty element type", owner, field)
+		return "", false
+	}
+	if vt := builtin_variant_int(n); vt >= 0 {
+		buf: [8]byte
+		return strings.concatenate({strconv.itoa(buf[:], vt), ":"}), true
+	}
+	return strings.concatenate({"24/17:", n}), true
+}
+
+// builtin_variant_int maps a builtin type name (Godot or Odin spelling) to its Variant::Type
+// integer, or -1 if it's not a builtin (then it's treated as a Resource class). Values are the
+// ABI-stable Godot 4 Variant type ids.
+builtin_variant_int :: proc(n: string) -> int {
+	switch n {
+	case "bool", "Bool":
+		return 1
+	case "int", "Int", "i64", "i32", "i16", "i8", "u64", "u32", "u16", "u8":
+		return 2
+	case "float", "Float", "f64", "f32":
+		return 3
+	case "String", "string", "cstring":
+		return 4
+	case "Vector2":
+		return 5
+	case "Vector2i":
+		return 6
+	case "Rect2":
+		return 7
+	case "Rect2i":
+		return 8
+	case "Vector3":
+		return 9
+	case "Vector3i":
+		return 10
+	case "Transform2d", "Transform2D":
+		return 11
+	case "Vector4":
+		return 12
+	case "Vector4i":
+		return 13
+	case "Plane":
+		return 14
+	case "Quaternion":
+		return 15
+	case "Aabb", "AABB":
+		return 16
+	case "Basis":
+		return 17
+	case "Transform3d", "Transform3D":
+		return 18
+	case "Projection":
+		return 19
+	case "Color":
+		return 20
+	case "String_Name", "StringName":
+		return 21
+	case "Node_Path", "NodePath":
+		return 22
+	case "Rid", "RID":
+		return 23
+	}
+	return -1
 }
 
 // Parse an `@export default=...` literal (richer-authoring #3) for a field of Variant `vi`.
