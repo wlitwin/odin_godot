@@ -523,6 +523,11 @@ script's `self.owner` passes with no cast and a returned `Node` assigns to any h
 | Has / erase an action | `gd.has_action("fire")` · `gd.erase_action("fire")` |
 | Is an action pressed | `if gd.is_action_pressed("fire") { ... }` |
 | Running in the editor? | `if gd.is_editor() { ... }` (wraps `Engine.is_editor_hint()`) |
+| Set / get a control's text | `gd.set_text(self.label, "Score: 0")` · `s := gd.get_text(self.label)` (any Control with a `text` property) |
+| Play / stop an animation | `gd.animation_play(self.anim, "run")` · `gd.animation_stop(self.anim)` · `gd.is_animation_playing(self.anim)` |
+| Play / stop an AnimatedSprite2D | `gd.sprite_play(self.spr, "idle")` · `gd.sprite_stop(self.spr)` · `gd.is_sprite_playing(self.spr)` |
+| Play / stop audio | `gd.audio_play(self.sfx)` · `gd.audio_stop(self.sfx)` (positional: `gd.audio_play2d` / `gd.audio_stop2d`) |
+| Set one position component | `gd.node2d_set_x(self.owner, 100)` (also `node3d_*` with `_z`, `control_*` with `_width`/`_height`; see [Common 2D transforms](#common-2d-transforms--moving--rotating-a-node2d)) |
 
 `gd.get_setting*`/`gd.set_setting*` wrap the `ProjectSettings` singleton; `gd.add_action`
 / `gd.action_add_*` wrap the `InputMap` singleton (constructing the `InputEventKey` /
