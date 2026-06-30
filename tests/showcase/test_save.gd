@@ -20,8 +20,24 @@ func _initialize() -> void:
 	if FileAccess.file_exists(uid):
 		DirAccess.remove_absolute(uid)
 
-	if err == OK and on_disk:
+	# Regression: saving a NON-script (a scene) to a .odin path must FAIL GRACEFULLY, not crash.
+	# The editor's Save-As dialog can pick .odin by accident; the saver's _recognize must reject
+	# a non-OdinScript so sv_save never calls Script.get_source_code() on it (that segfaults).
+	# Reaching the assertion below at all proves "no crash"; scene_err proves the graceful error.
+	var n := Node2D.new()
+	var ps := PackedScene.new()
+	ps.pack(n)
+	var scene_probe := "res://__save_scene_probe.odin"
+	var scene_err = ResourceSaver.save(ps, scene_probe)
+	var scene_os := ProjectSettings.globalize_path(scene_probe)
+	if FileAccess.file_exists(scene_os):
+		DirAccess.remove_absolute(scene_os)
+	n.free()
+	var scene_rejected = scene_err != OK
+
+	var ok = err == OK and on_disk and scene_rejected
+	if ok:
 		print("SAVE_TEST_OK")
 	else:
-		print("SAVE_TEST_FAIL: err=%d on_disk=%s" % [err, on_disk])
-	quit(0 if (err == OK and on_disk) else 1)
+		print("SAVE_TEST_FAIL: err=%d on_disk=%s scene_err=%d (scene must be rejected)" % [err, on_disk, scene_err])
+	quit(0 if ok else 1)

@@ -68,11 +68,27 @@ saver_get_virtual_call_data :: proc "c" (class_user_data: rawptr, name: gdext.St
 
 // ---- virtuals ----
 
-// `_recognize(resource) -> bool`: true (we are scoped to `.odin` by the extensions list,
-// so ResourceSaver only consults us when saving to a `.odin` path).
+// True iff `resource` is actually an OdinScript. The extension scoping is NOT enough on its
+// own: if the user saves a *scene* (or any resource) to a `.odin` path, ResourceSaver still
+// consults us, and saving a non-Script here means calling Script.get_source_code() on a
+// non-Script object — which crashes the editor. is_class is a plain Object method, safe to
+// call on any resource.
+@(private = "file")
+resource_is_odin_script :: proc(resource: gdext.ObjectPtr) -> bool {
+    if resource == nil {
+        return false
+    }
+    name := godot.new_string_cstring("OdinScript")
+    return bool(godot.object_is_class(cast(godot.Object)resource, name))
+}
+
+// `_recognize(resource) -> bool`: only ACTUAL Odin scripts. Returning false for e.g. a scene
+// saved to a `.odin` path makes that save fail gracefully instead of crashing in sv_save.
 @(private = "file")
 sv_recognize :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
-    ret_bool(ret, true)
+    context = gdext.godot_context()
+    resource := (cast(^gdext.ObjectPtr)args[0])^
+    ret_bool(ret, resource_is_odin_script(resource))
 }
 
 @(private = "file")
@@ -103,6 +119,14 @@ sv_save :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.T
 
     resource := (cast(^gdext.ObjectPtr)args[0])^
     path := (cast(^godot.String)args[1])^
+
+    // Defensive: never call Script.get_source_code() on a non-Script (e.g. a scene the user
+    // mistakenly saved to a `.odin` path) — that crashes. _recognize already rejects these, but
+    // guard here too in case ResourceSaver reaches _save another way.
+    if !resource_is_odin_script(resource) {
+        ret_int(ret, 15) // ERR_FILE_UNRECOGNIZED
+        return
+    }
 
     // Current source via Script.get_source_code() (routes to OdinScript._get_source_code).
     src := godot.script_get_source_code(cast(godot.Script)resource)
