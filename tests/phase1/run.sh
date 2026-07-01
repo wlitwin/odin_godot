@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Build the core dll + run the Phase 1 headless milestone test. Greps for PHASE1_OK.
+# (The sentinel-grep contract — which string means PASS — lives in tests/run_all.sh.)
 # Phase 1 only exercises the ScriptLanguageExtension skeleton (no compiled scripts dll
 # is required: hello.odin registers no class, so the engine gets a placeholder instance).
 # Run inside the Nix dev shell, e.g.:

@@ -12,12 +12,14 @@
 #   nix develop --command bash -c 'bash tests/web/run.sh'
 #
 # Pin emscripten 4.0.20 (the engine's exact version) with EMCC=/path/to/4.0.20/emcc; the
-# dev shell's emcc also produces a browser-loadable module (verified — see docs/phase-web.md).
+# dev shell's emcc also produces a browser-loadable module (verified — see docs/exporting.md
+# and docs/design/web-internals.md).
 set -euo pipefail
 
-ROOT="${ODIN_GODOT_ROOT:-/Users/walter/data/code/odin/odin_godot}"
+ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PROJ="$ROOT/tests/web"
-PORT="${PORT:-8099}"
+# Random default port (like SIGPORT in tests/webrtc) so parallel/leftover servers don't collide.
+PORT="${PORT:-$(( (RANDOM % 4000) + 9080 ))}"
 
 # 1. Build the full SIDE_MODULE wasm and 2. headless web export.
 bash "$ROOT/build/build_web.sh" "$PROJ" >/dev/null

@@ -10,9 +10,11 @@ class, custom resources, autoloads, `@tool`/editor plugins, multiplayer RPCs, ho
 **native + WebAssembly** export — all reproducible from a single Nix flake.
 
 > **Status: working engine.** `nix develop --command bash tests/run_all.sh` is green across a
-> 25-test end-to-end suite (every feature below, plus the showcase and an in-browser web run).
-> The headline examples are a pure-Odin coin-collector (`tests/showcase/`) and a complete
-> top-down arena shooter (`examples/survivors/`) — **zero GDScript gameplay code**.
+> 32-test end-to-end suite (every feature below, plus the showcase and the examples' co-op
+> runs), plus 5 browser-gated web tests that verify the WASM export in a real headless Chrome
+> when one is available. The headline examples are a pure-Odin coin-collector
+> (`tests/showcase/`), a complete top-down arena shooter (`examples/survivors/`), and a
+> peer-authoritative co-op arena (`examples/coop_arena/`) — **zero GDScript gameplay code**.
 
 ## What you can do (the 60-second tour)
 
@@ -97,6 +99,7 @@ script from empty file to a moving node.
 | **[Authoring Guide](docs/authoring-guide.md)** | The feature reference: struct convention, `//gd:` markers, `@export` (all types/hints/groups/defaults), lifecycle, methods, signals, `@(gd_connect)`, `@(gd_rpc)`, `@onready`, resources, autoloads, cross-script, the `gd.*` helper catalog, editor tooling |
 | **[Workflow](docs/workflow.md)** | The dev loop: build, live-edit (show-on-save recompile), editor DX (validation/autocomplete/highlighting), debugging (`gd.print`, `lldb`, crash backtraces), and the honest AOT limitations |
 | **[Exporting](docs/exporting.md)** | Shipping: native desktop export and web/WASM export (COOP/COEP) |
+| **[Distribution](docs/distribution.md)** | Building the drop-in addon (`nix build`), cross-compiling the core for Linux/Windows, the consumer install workflow, per-platform status |
 | **[Debugging](docs/debugging.md)** | The full `lldb` + crash-backtrace reference |
 | [PLAN.md](PLAN.md) | The original architecture + phased design plan (design history) |
 | [docs/design/](docs/design) | Internal notes: the `ScriptLanguageExtension` surface, export/web internals, the WASM spike |
@@ -105,6 +108,9 @@ script from empty file to a moving node.
 
 - **`examples/survivors/`** — a complete top-down arena shooter in pure Odin; each script is
   commented to teach one slice of the binding ([README](examples/survivors/README.md)).
+- **`examples/coop_arena/`** — the canonical co-op / multiplayer reference: ONE
+  peer-authoritative codebase that runs single-player, over native ENet, and in the browser
+  over WebRTC (room-code lobby) ([README](examples/coop_arena/README.md)).
 - **`tests/showcase/`** — a minimal pure-Odin coin-collector; the smallest "everything wired"
   scene. Run it: `$GODOT --path tests/showcase`.
 - **`examples/hello/`** — the lowest-level path: a hand-registered GDExtension class (not a

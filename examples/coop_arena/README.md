@@ -4,8 +4,9 @@ A pure-Odin / Polygon2D co-op survivors example where **ONE gameplay codebase ru
 modes** — single-player, co-op over native ENet, and co-op in the browser over WebRTC — and the
 netcode is **owner / peer-authoritative** so your own actions are instant (no host round-trip).
 
-This supersedes the older host-authoritative co-op bits in `examples/survivors` (which remains
-the single-player gameplay reference). Everything co-op lives here.
+This is the **canonical co-op reference**. `examples/survivors` remains the single-player
+gameplay reference; its co-op layer is retained as the *host-authoritative* variant + the
+regression tests for the replication machinery (see its README).
 
 ```
 nix develop --command bash -c 'bash examples/coop_arena/run.sh'              # single-player  -> ARENA_SINGLE_OK
@@ -89,9 +90,10 @@ arrives. No round-trip gates the owner seeing its own shot.
 The web build pairs two friends through a **room-code lobby** over a real signaling server — the
 deployable path, not a localhost-only demo:
 
-1. **Stand up a signaling relay** reachable by both players at a public `wss://HOST/rtc`. The
-   production server is the **Elixir relay** built to the wire protocol below; ANY server speaking
-   that protocol works (the local `tests/webrtc/signal_server.mjs` is the same protocol for tests).
+1. **Stand up a signaling relay** reachable by both players at a public `wss://HOST/rtc`. ANY
+   server speaking the small JSON wire protocol below works; a Node reference implementation
+   ships at `tests/webrtc/signal_server.mjs` (the maintainer runs an Elixir implementation of
+   the same protocol in production).
 2. **Host** opens the page, sets the signaling URL, presses **Host**, and gets a short **ROOM
    CODE** (e.g. `WATR`) displayed to share (text it to your friend).
 3. **Friend** opens the page, types that code into the room field, presses **Join**. Both jump

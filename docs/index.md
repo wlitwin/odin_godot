@@ -34,6 +34,16 @@ use → ship.**
 - **[Debugging](debugging.md)** — the deep `lldb` + crash-backtrace reference (what Workflow
   summarizes).
 
+## Learn from the examples
+
+- **[examples/survivors](../examples/survivors/README.md)** — the headline single-player
+  example: a complete survivors-like in pure Odin, with a per-file feature map. Its co-op
+  layer is retained as the **host-authoritative** variant + regression tests.
+- **[examples/coop_arena](../examples/coop_arena/README.md)** — the canonical
+  **peer-authoritative co-op** reference: one codebase, three modes (single-player, native
+  ENet, browser WebRTC with a room-code lobby).
+- `tests/showcase/` — the smallest "everything wired" pure-Odin scene (coin collector).
+
 ## Ship it
 
 - **[Exporting](exporting.md)** — native desktop export (the `OdinExportPlugin`) and web/WASM

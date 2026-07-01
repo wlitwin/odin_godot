@@ -29,8 +29,40 @@ fi
 LOGDIR="$ROOT/tests/.logs"
 mkdir -p "$LOGDIR"
 
-# name  sentinel  script
+# One suite-wide root for every child script (they all honor ODIN_GODOT_ROOT), so the
+# per-test run.sh's stop re-deriving it.
+export ODIN_GODOT_ROOT="$ROOT"
+
+# Per-test wall-clock cap: a wedged headless Godot must not hang the whole suite.
+# coreutils `timeout` ships in the nix dev shell; degrade gracefully without it.
+TIMEOUT_SECS="${TIMEOUT_SECS:-600}"
+TIMEOUT_BIN="$(command -v timeout || true)"
+if [[ -z "$TIMEOUT_BIN" ]]; then
+    echo "run_all: WARNING: no \`timeout\` on PATH — tests run uncapped" >&2
+fi
+run_with_timeout() { # run_with_timeout <script> — bash <script> under the suite time cap
+    if [[ -n "$TIMEOUT_BIN" ]]; then
+        "$TIMEOUT_BIN" "$TIMEOUT_SECS" bash "$@"
+    else
+        bash "$@"
+    fi
+}
+
+# Pre-build the scriptgen preprocessor ONCE. build_scripts.sh honors SGEN_BIN (an already
+# built scriptgen) and skips rebuilding it per test — a large chunk of suite wall time.
+SGEN_BIN="$LOGDIR/scriptgen"
+if "${ODIN:-odin}" build "$ROOT/scriptgen" -collection:godot="$ROOT" -out:"$SGEN_BIN" -debug \
+    >"$LOGDIR/scriptgen_build.log" 2>&1; then
+    export SGEN_BIN
+else
+    echo "run_all: scriptgen pre-build failed (see $LOGDIR/scriptgen_build.log); tests rebuild it per-run" >&2
+    unset SGEN_BIN
+fi
+
+# name  sentinel  script  [skip-sentinel: reported as a non-fatal SKIP, like the web tests]
 TESTS=(
+    # Pure-Odin unit tests for the `flow` sequencer — no Godot process, the fastest entry.
+    "flow|FLOW_OK|tests/flow/run.sh"
     "phase1|PHASE1_OK|tests/phase1/run.sh"
     "phase2|PHASE2_OK|tests/phase2/run.sh"
     "phase3|PHASE3_OK|tests/phase3/run.sh"
@@ -77,24 +109,33 @@ TESTS=(
     "editortools|EDITORTOOLS_OK|tests/editortools/run.sh"
     "debug|DEBUG_OK|tests/debug/run.sh"
     "reloadexports|RELOAD_EXPORTS_OK|tests/reload_exports/run.sh"
-    # Cross-build smoke: self-gating — SKIPs (still prints CROSS_OK) when no Linux/Windows
-    # cross toolchain is present, so the default macOS shell stays green. To actually
-    # exercise the cross builds: `nix develop .#cross --command bash tests/cross/run.sh`.
-    "cross|CROSS_OK|tests/cross/run.sh"
+    # Cross-build smoke: self-gating — prints CROSS_SKIP (a non-fatal SKIP) when no
+    # Linux/Windows cross toolchain is present, so the default macOS shell stays green. To
+    # actually exercise the cross builds: `nix develop .#cross --command bash tests/cross/run.sh`.
+    "cross|CROSS_OK|tests/cross/run.sh|CROSS_SKIP"
 )
 
 declare -a SUMMARY
 FAILED=0
 
 run_one() {
-    local name="$1" sentinel="$2" script="$3"
+    local name="$1" sentinel="$2" script="$3" skip_sentinel="${4:-}"
     local log="$LOGDIR/$name.log"
     printf '==> %-9s ' "$name"
-    local start=$SECONDS
-    if bash "$ROOT/$script" >"$log" 2>&1 && grep -q "$sentinel" "$log"; then
-        local dt=$((SECONDS - start))
+    local start=$SECONDS rc=0
+    run_with_timeout "$ROOT/$script" >"$log" 2>&1 || rc=$?
+    local dt=$((SECONDS - start))
+    if [[ $rc -eq 0 ]] && grep -q "$sentinel" "$log"; then
         printf 'PASS (%ds)\n' "$dt"
         SUMMARY+=("$(printf '  %-9s PASS  (%s)' "$name" "$sentinel")")
+    elif [[ $rc -eq 124 && -n "$TIMEOUT_BIN" ]]; then
+        # coreutils timeout exit code for "killed by the cap": report distinctly.
+        printf 'TIMEOUT (>%ss)\n' "$TIMEOUT_SECS"
+        SUMMARY+=("$(printf '  %-9s TIMEOUT  (>%ss, see %s)' "$name" "$TIMEOUT_SECS" "$log")")
+        FAILED=1
+    elif [[ -n "$skip_sentinel" ]] && grep -q "$skip_sentinel" "$log"; then
+        printf 'SKIP (%s)\n' "$skip_sentinel"
+        SUMMARY+=("$(printf '  %-9s SKIP  (%s)' "$name" "$skip_sentinel")")
     else
         printf 'FAIL\n'
         echo "    ----- last 15 lines of $log -----"
@@ -108,8 +149,8 @@ echo "odin_godot full test suite  (root: $ROOT)"
 echo "=========================================================="
 
 for t in "${TESTS[@]}"; do
-    IFS='|' read -r name sentinel script <<<"$t"
-    run_one "$name" "$sentinel" "$script"
+    IFS='|' read -r name sentinel script skip <<<"$t"
+    run_one "$name" "$sentinel" "$script" "${skip:-}"
 done
 
 # ---- browser-gated web tests ----
@@ -125,10 +166,14 @@ run_web_gated() {
     fi
     printf '==> %-12s ' "$name"
     local log="$LOGDIR/$name.log"
-    local start=$SECONDS
-    bash "$ROOT/$script" >"$log" 2>&1
+    local start=$SECONDS rc=0
+    run_with_timeout "$ROOT/$script" >"$log" 2>&1 || rc=$?
     local dt=$((SECONDS - start))
-    if grep -q "$ok" "$log"; then
+    if [[ $rc -eq 124 && -n "$TIMEOUT_BIN" ]] && ! grep -q "$ok" "$log"; then
+        printf 'TIMEOUT (>%ss)\n' "$TIMEOUT_SECS"
+        SUMMARY+=("$(printf '  %-12s TIMEOUT  (>%ss, see %s)' "$name" "$TIMEOUT_SECS" "$log")")
+        FAILED=1
+    elif grep -q "$ok" "$log"; then
         printf 'PASS browser-verified (%ds)\n' "$dt"
         SUMMARY+=("$(printf '  %-12s PASS  (%s, in-browser)' "$name" "$ok")")
     elif grep -q "$bundled" "$log"; then

@@ -15,9 +15,10 @@
 #   nix develop --command bash -c 'bash tests/web_showcase/run.sh'
 set -euo pipefail
 
-ROOT="${ODIN_GODOT_ROOT:-/Users/walter/data/code/odin/odin_godot}"
+ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PROJ="$ROOT/tests/web_showcase"
-PORT="${PORT:-8098}"
+# Random default port (like SIGPORT in tests/webrtc) so parallel/leftover servers don't collide.
+PORT="${PORT:-$(( (RANDOM % 4000) + 9080 ))}"
 
 # 1. Build the full SIDE_MODULE wasm (core + binding + the showcase scripts) for the
 #    browser, AND the native core dll for the macOS export host. The host dll is what makes

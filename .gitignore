@@ -51,6 +51,9 @@ examples/*/.coopsignal.log
 
 # ── editor / misc ───────────────────────────────────────────────────
 *.tmp
+.DS_Store
+# stray repo-root logs (e.g. a redirected error.log)
+/*.log
 
 # ── web browser-test deps (puppeteer-core, installed by the web test) ──
 /tests/web/node_modules/

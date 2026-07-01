@@ -487,8 +487,9 @@ setup does.
 peer-to-peer link exists. The server brokers a **room-code lobby**: a host `create`s a room and
 gets a short CODE; a friend `join`s that CODE; the server relays the SDP offer/answer + ICE
 candidates between the two *verbatim* (it never parses their contents). The wire protocol is
-**JSON text frames** over a raw WebSocket (server path `/rtc`) — the production server is the
-Elixir relay; `tests/webrtc/signal_server.mjs` is the same protocol for the headless tests:
+**JSON text frames** over a raw WebSocket (server path `/rtc`) — ANY server speaking this
+small protocol works; a Node reference implementation ships at `tests/webrtc/signal_server.mjs`
+(used by the headless tests; the maintainer runs an Elixir implementation in production):
 
 ```
 client -> server                                  server -> client
@@ -640,6 +641,33 @@ structs/arrays you manipulate with normal operators.
 | `^gd.<Object subclass>`, `gd.Node`, `gd.Object`, ... | `Object` | object handle |
 
 Unsupported types produce a clear `scriptgen` error (no silent miscompile).
+
+## Threads & memory
+
+Practical rules for what runs where and who owns which allocation:
+
+- **Everything script-facing runs on the engine's main thread.** Lifecycle procs
+  (`*_ready`, `*_process`, …), `@(gd_method)` calls, `@(gd_connect)` handlers and
+  `@(gd_rpc)` procs are all invoked by the engine on its main thread; the generated
+  trampolines add no synchronization. Don't call `gd.*` / engine APIs from threads you
+  spawn with `core:thread` — compute on the worker, then apply the result back on the
+  main thread from a lifecycle proc (e.g. poll a mutex-guarded value in `*_process`).
+- **`rt.script_of` is main-thread-only too**: it resolves through the core's live-instance
+  registry, which the main thread mutates as script instances are created and freed.
+- **`context.allocator` is a real, persistent allocator** inside script procs: the Odin
+  heap default on native, an engine-backed (alignment-correct) allocator on web. Either
+  way, what you `make`/`new` there lives until you free it.
+- **`context.temp_allocator` is call-local.** The core resets its shared temp arena once
+  per frame from the main-thread frame pump, so never stash a temp pointer (including
+  `fmt.tprintf`/`fmt.ctprintf` results) across frames — copy anything you keep into
+  `context.allocator` memory.
+- **String-returning helpers allocate — the caller frees.** `gd.get_string` (and helpers
+  like it that return an Odin `string`) allocate from `context.allocator`; `delete(s)`
+  when you're done with it.
+- **`gd.sname` interns forever.** It is `new_string_name_cstring(name, true)` —
+  `static = true` hands Godot the cstring pointer to keep for the program's lifetime.
+  Pass only string literals (or otherwise program-lifetime, ASCII) names; never a name
+  built at runtime from a temporary buffer such as `fmt.ctprintf(...)`.
 
 ## Building
 

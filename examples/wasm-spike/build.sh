@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Spike W — Odin -> Emscripten SIDE_MODULE wasm, the exact working command sequence.
 #
-# Run inside the Nix dev shell:
-#   nix develop /Users/walter/data/code/odin/odin_godot --command bash examples/wasm-spike/build.sh
+# Run inside the Nix dev shell (from the repo root):
+#   nix develop --command bash examples/wasm-spike/build.sh
 #
 # Produces examples/wasm-spike/spike.wasm and verifies add(2,3)==5 via node.
 #

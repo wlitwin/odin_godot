@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Build + run the Phase 2 headless milestone test. Greps for PHASE2_OK.
+# (The sentinel-grep contract — which string means PASS — lives in tests/run_all.sh.)
 # Run inside the Nix dev shell, e.g.:
 #   nix develop --command bash -c 'bash tests/phase2/run.sh'
 set -euo pipefail

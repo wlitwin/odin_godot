@@ -11,7 +11,9 @@
 # (build_cross.sh exits 3), that target is a non-fatal SKIP. Provide the toolchains via
 # the cross dev shell:
 #   nix develop .#cross --command bash tests/cross/run.sh
-# Prints CROSS_OK when at least the checks that COULD run passed (and none failed).
+# Prints CROSS_OK when at least the checks that COULD run passed (and none failed);
+# prints CROSS_SKIP when NO cross toolchain is present at all (run_all.sh reports that
+# as a non-fatal SKIP — the sentinel-grep contract lives in tests/run_all.sh).
 # ----------------------------------------------------------------------------
 set -uo pipefail
 
@@ -81,8 +83,9 @@ if [[ "$FAILED" == "1" ]]; then
     echo "CROSS_FAIL"
     exit 1
 elif [[ "$RAN" == "0" ]]; then
+    # Nothing was verified — say so. run_all.sh treats CROSS_SKIP as a non-fatal SKIP
+    # (NOT a PASS); do not print CROSS_OK here.
     echo "CROSS_SKIP (no cross toolchains available)"
-    echo "CROSS_OK"   # non-fatal: nothing to verify here, suite stays green
     exit 0
 else
     echo "CROSS_OK"

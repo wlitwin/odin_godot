@@ -1,0 +1,48 @@
+# CI: run the headless E2E suite on Linux.
+#
+# STATUS: untested scaffolding — this workflow has not yet run green. Linux-native script
+# builds were only recently enabled (build_scripts.sh used to hardcode .dylib), and the
+# suite has so far been runtime-verified on macOS + web only. Expect a shakedown run to
+# surface Linux-specific issues; that is exactly what this job exists to catch.
+#
+# Web tests are skipped (SKIP_WEB=1): they need Chrome + puppeteer, which this runner
+# doesn't set up. The editor/GUI tests run headless like they do locally.
+
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: DeterminateSystems/magic-nix-cache-action@v9
+
+      - name: Install Godot 4.6.2 (linux headless)
+        run: |
+          curl -sSLo godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          chmod +x Godot_v4.6.2-stable_linux.x86_64
+          echo "GODOT=$PWD/Godot_v4.6.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+
+      - name: Dump engine API (extension_api.json is gitignored)
+        run: nix develop --command make api-dump
+
+      - name: Run the suite
+        run: SKIP_WEB=1 nix develop --command bash tests/run_all.sh
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: tests/.logs/

@@ -32,14 +32,21 @@ nix develop --command bash -c 'bash build/build_scripts.sh examples/survivors'
 > The windowed *feel* (juice, pacing, "is it fun") can only be judged by a human — the headless
 > harness proves the **loop works**, not that it is fun.
 
-## Co-op — three modes, one codebase ("friendslop")
+## Co-op — the HOST-authoritative variant
+
+> **Looking for the co-op reference?** The canonical, peer-authoritative co-op example is
+> [`examples/coop_arena`](../coop_arena/README.md) — one codebase, three modes, owner-auth
+> netcode (your own actions are instant, no host round-trip). The co-op layer below is
+> **retained** as the *host-authoritative* variant and as regression tests for the
+> MultiplayerSpawner / MultiplayerSynchronizer / `@(gd_rpc)` machinery; read coop_arena's
+> README for why peer authority is the recommended model.
 
 The same project also ships a **2-player co-op** built from ONE codebase that runs in **three
-modes**, selected from a start screen (`coop.tscn`, now the main scene): **Single Player** /
-**Host** / **Join**. Transport is auto-selected by platform — **native → ENet**, **web (wasm)
-→ WebRTC** — behind one UI. The KEY UNIFICATION: **single-player == host with zero peers**, so
-the authoritative simulation (enemy spawning, enemy deaths, score) runs identically whether or
-not a client is present; Single mode just never opens a transport.
+modes**, selected from a start screen (`coop.tscn`, the project's main scene): **Single
+Player** / **Host** / **Join**. Transport is auto-selected by platform — **native → ENet**,
+**web (wasm) → WebRTC** — behind one UI. The KEY UNIFICATION: **single-player == host with
+zero peers**, so the authoritative simulation (enemy spawning, enemy deaths, score) runs
+identically whether or not a client is present; Single mode just never opens a transport.
 
 The classic single-player example above (`game.tscn` + `test_survivors.gd`) is **unchanged** —
 it remains the canonical full-loop regression (`SURVIVORS_OK`). The co-op game is a separate

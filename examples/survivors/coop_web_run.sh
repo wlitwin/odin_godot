@@ -14,7 +14,8 @@
 set -uo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PROJ="$ROOT/examples/survivors"
-PORT="${PORT:-8098}"
+# Random default port (like SIGPORT below) so parallel/leftover servers don't collide.
+PORT="${PORT:-$(( (RANDOM % 4000) + 9080 ))}"
 SIGPORT="${SIGPORT:-$(( (RANDOM % 4000) + 9080 ))}"
 
 set -e
