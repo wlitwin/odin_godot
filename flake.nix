@@ -64,17 +64,26 @@
           nodejs        # web milestone: COOP/COEP serve.sh + headless-browser drive.mjs
         ];
 
-        godotPath = "/Applications/Godot.app/Contents/MacOS/Godot";
+        # GODOT is exported from shellHook (NOT a mkShell env attr): an env attr would
+        # CLOBBER a caller's exported GODOT, breaking the documented `GODOT=… nix develop`
+        # override. The shellHook default respects the environment.
+        #   darwin: default to the installed 4.6.2 app bundle.
+        #   linux:  no meaningful default — leave empty and tell the user once.
+        godotHook =
+          if pkgs.stdenv.isDarwin then ''
+            export GODOT="''${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
+          '' else ''
+            export GODOT="''${GODOT:-}"
+            [ -n "$GODOT" ] || echo "note: set GODOT to a Godot 4.6.2 binary (headless tests + api dumps need it)"
+          '';
       in
       {
         devShells.default = pkgs.mkShell {
           name = "odin_godot-dev";
           packages = toolchain;
 
-          # Default GODOT to the installed 4.6.2 app; override with `GODOT=… nix develop`.
-          GODOT = godotPath;
-
           shellHook = ''
+            ${godotHook}
             echo "odin_godot dev shell  (target: Godot 4.6.2 stable)"
             echo "  odin:  $(command -v odin)  $(odin version 2>/dev/null | head -1)"
             echo "  emcc:  $(command -v emcc)"
@@ -90,11 +99,11 @@
         devShells.cross = pkgs.mkShell {
           name = "odin_godot-cross";
           packages = toolchain;
-          GODOT = godotPath;
           ODIN_CROSS_LINUX_CC = crossLinuxCC;
           ODIN_CROSS_WINDOWS_CC = crossWindowsCC;
           ODIN_CROSS_WINDOWS_LIBDIRS = crossWindowsLibdirs;
           shellHook = ''
+            ${godotHook}
             echo "odin_godot CROSS shell"
             echo "  linux  CC: $ODIN_CROSS_LINUX_CC"
             echo "  windows CC: $ODIN_CROSS_WINDOWS_CC"

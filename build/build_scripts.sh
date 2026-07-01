@@ -17,6 +17,10 @@ set -euo pipefail
 # Repo root: derive from this script's location (build/ -> repo root), overridable via
 # ODIN_GODOT_ROOT so the repo is not tied to one user's checkout path.
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# Shared helpers: ODIN/ODIN_GD_ATTRS/DLL_EXT, build_scriptgen/run_scriptgen,
+# atomic_odin_dll (temp-build + atomic mv publish). Sourced from beside THIS script so
+# an ODIN_GODOT_ROOT override can't point at a tree with a mismatched helper version.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 PROJ="${1:-$ROOT/tests/phase35}"
 SCRIPTS="${2:-$PROJ/scripts}"
 BIN="$PROJ/bin"
@@ -36,82 +40,42 @@ if [ ! -d "$SCRIPTS" ] || [ -z "$(ls "$SCRIPTS"/*.odin 2>/dev/null)" ]; then
     exit 1
 fi
 
-# The `odin` compiler. Overridable via env so callers that resolved an absolute compiler
-# path (e.g. the editor reload-on-save coordinator, which can't rely on `odin` being on the
-# editor's PATH) can pass it through as `ODIN=/abs/path/to/odin`.
-ODIN="${ODIN:-odin}"
-
-# 1. Build the codegen preprocessor itself — to a writable TEMP dir, NOT into the addon. When
-#    odin_godot is installed under res://addons/ that dir may be read-only (and shouldn't
-#    collect build artifacts or leak a binary into res://bin/ that the exporter would pack).
-SGEN_DIR="$(mktemp -d)"
-trap 'rm -rf "$SGEN_DIR"' EXIT
-SGEN="$SGEN_DIR/scriptgen"
-"$ODIN" build "$ROOT/scriptgen" \
-    -collection:godot="$ROOT" \
-    -out:"$SGEN" \
-    -debug
+# 1. Build the codegen preprocessor itself — to a writable TEMP dir, NOT into the addon
+#    (see build_scriptgen in build/common.sh; SGEN_BIN env reuses a prebuilt one).
+build_scriptgen
 
 # 2. Generate the *.gen.odin siblings beside the authored sources.
-"$SGEN" "$SCRIPTS"
+run_scriptgen "$SCRIPTS"
 
 # 3. Build the scripts dll. The *.gen.odin live in the same package and compile
-#    together. `-custom-attribute:gd_method` lets authors mark methods with
-#    `@(gd_method)` (the codegen marker for GDScript-callable procs).
+#    together. ODIN_GD_ATTRS (common.sh) lets authors mark methods with
+#    `@(gd_method)` etc. (the codegen markers for GDScript-callable procs).
 #    `SCRIPT_BUILD_FLAGS` (env, optional) forwards extra odin flags to the scripts
 #    dll build ONLY — e.g. `-define:RELOAD_V=2` to build a v2 for the Phase 4 reload
 #    test without rebuilding the core. `SKIP_CORE=1` skips step 4 (a reload rebuild
 #    only needs a fresh scripts dll).
-# Build to a TEMP output, then atomically `mv` it into place. `odin build -out:X` is NOT
-# atomic — it truncates/creates X up front and writes over several seconds; and a fresh
-# build needs a clean output anyway (a stale `.o` built against an OLD runtime layout can
-# survive an incremental `-out:` build and crash at extension init). Building to a temp and
-# publishing with `mv` gives BOTH: a clean output AND the invariant that the live
-# `libodinscripts.dylib` is NEVER missing/half-written. This is the macOS packaging fix:
-# the editor's reload-on-save coordinator (core/reload.odin) kicks THIS script on a worker
-# thread when the project is opened/imported; if that build is interrupted (the editor
-# quits / the headless import exits) or fails, the OLD non-destructive behavior left
-# res://bin with NO scripts dll, so the core's next load printed "failed to load scripts
-# dll" and the scene hit "No loader found". With atomic publish, an interrupted/failed
-# build simply leaves the previously-built dll in place. (Mirrored in build_scripts.ps1.)
-TMP_SCR="$BIN/.libodinscripts.tmp.dylib"
-rm -f "$TMP_SCR" "$BIN"/.libodinscripts.tmp-*.o
-"$ODIN" build "$SCRIPTS" \
-    -collection:godot="$ROOT" \
-    -build-mode:dll \
-    -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc \
-    -out:"$TMP_SCR" \
-    -extra-linker-flags:"-Wl,-install_name,$BIN/libodinscripts.dylib" \
+# atomic_odin_dll (common.sh) builds to a TEMP output and atomically `mv`s it into place,
+# so the live scripts dll is NEVER missing/half-written even if the editor's
+# reload-on-save coordinator (core/reload.odin) is interrupted mid-build — the macOS
+# packaging fix that ended "failed to load scripts dll" / "No loader found" after an
+# interrupted rebuild. It also guarantees a clean build (no stale `.o` against an old
+# runtime layout). (Mirrored in build_scripts.ps1.)
+SCR_DLL="$BIN/libodinscripts.$DLL_EXT"
+CORE_DLL="$BIN/libodin_godot.$DLL_EXT"
+atomic_odin_dll "$SCRIPTS" "$SCR_DLL" \
+    ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \
     -debug ${SCRIPT_BUILD_FLAGS:-}
-# Reached only if the build succeeded (set -e). Publish atomically + move the matching
-# .dSYM into place; the dylib loads by absolute path so its LC_ID_DYLIB (the tmp name) is
-# never used for resolution.
-rm -rf "$BIN/libodinscripts.dylib.dSYM"
-[ -d "$TMP_SCR.dSYM" ] && mv -f "$TMP_SCR.dSYM" "$BIN/libodinscripts.dylib.dSYM"
-mv -f "$TMP_SCR" "$BIN/libodinscripts.dylib"
-rm -f "$BIN"/.libodinscripts.tmp-*.o
 
 if [[ "${SKIP_CORE:-0}" == "1" ]]; then
     echo "Built (scripts only):"
-    echo "  $BIN/libodinscripts.dylib"
+    echo "  $SCR_DLL"
     exit 0
 fi
 
 # 4. Build the core ScriptLanguageExtension dll (same atomic temp+mv publish as the scripts
 #    dll above, so a failed/interrupted core build never deletes the live core dll either).
-TMP_CORE="$BIN/.libodin_godot.tmp.dylib"
-rm -f "$TMP_CORE" "$BIN"/.libodin_godot.tmp-*.o
-"$ODIN" build "$ROOT/core" \
-    -collection:godot="$ROOT" \
-    -build-mode:dll \
-    -out:"$TMP_CORE" \
-    -extra-linker-flags:"-Wl,-install_name,$BIN/libodin_godot.dylib" \
-    -debug
-rm -rf "$BIN/libodin_godot.dylib.dSYM"
-[ -d "$TMP_CORE.dSYM" ] && mv -f "$TMP_CORE.dSYM" "$BIN/libodin_godot.dylib.dSYM"
-mv -f "$TMP_CORE" "$BIN/libodin_godot.dylib"
-rm -f "$BIN"/.libodin_godot.tmp-*.o
+atomic_odin_dll "$ROOT/core" "$CORE_DLL" -debug
 
 echo "Built:"
-echo "  $BIN/libodin_godot.dylib"
-echo "  $BIN/libodinscripts.dylib"
+echo "  $CORE_DLL"
+echo "  $SCR_DLL"

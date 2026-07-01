@@ -12,15 +12,16 @@
 # Cross-compile note: linux/windows targets pass `-target:<os>_amd64`. Odin can emit
 # the object, but producing a final .so/.dll requires the matching cross LINKER on
 # PATH (lld is in the dev shell; a full sysroot may still be needed). Verified here:
-# macos (native). linux/windows: supported-but-unverified — see docs/phase5-export.md.
+# macos (native). linux/windows: supported-but-unverified — see docs/exporting.md and
+# docs/design/export-internals.md.
 set -euo pipefail
 
-# Overridable so the editor's export plugin can pass an absolute compiler (the editor often
-# can't see `odin` on its PATH when launched from Finder/Steam).
-ODIN="${ODIN:-odin}"
 # Root derived from this script's location (build/ -> root), overridable. Never hardcode a
 # checkout path — this ships inside the addon.
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# Shared helpers (ODIN — overridable so the editor's export plugin can pass an absolute
+# compiler path — ODIN_GD_ATTRS, build_scriptgen/run_scriptgen, atomic_odin_dll).
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 PROJ="$1"
 TARGET="$2"
 OUT="$3"
@@ -35,16 +36,11 @@ OPT="${ODIN_EXPORT_OPT:-speed}"
 mkdir -p "$(dirname "$OUT")"
 
 # 1. Build the scriptgen preprocessor to a writable TEMP dir (never into the addon, which may
-#    be read-only when installed under res://addons/).
-SGEN_DIR="$(mktemp -d)"
-trap 'rm -rf "$SGEN_DIR"' EXIT
-SGEN="$SGEN_DIR/scriptgen"
-"$ODIN" build "$ROOT/scriptgen" \
-    -collection:godot="$ROOT" \
-    -out:"$SGEN"
+#    be read-only when installed under res://addons/). SGEN_BIN env reuses a prebuilt one.
+build_scriptgen
 
 # 2. Generate *.gen.odin siblings beside the authored sources.
-"$SGEN" "$SCRIPTS"
+run_scriptgen "$SCRIPTS"
 
 # 3. Target -> odin flags.
 EXTRA=()
@@ -57,12 +53,11 @@ esac
 
 # 4. Build the scripts dll for the target, OPTIMIZED. `SCRIPT_BUILD_FLAGS` (env) appends extra
 #    odin flags for the truly release-minded (e.g. `-no-bounds-check -disable-assert`).
-"$ODIN" build "$SCRIPTS" \
-    -collection:godot="$ROOT" \
-    -build-mode:dll \
+#    atomic_odin_dll (common.sh) builds to a temp and publishes with `mv -f`, so a
+#    failed/aborted export never leaves $OUT missing/half-written for the packer.
+atomic_odin_dll "$SCRIPTS" "$OUT" \
     -o:"$OPT" \
-    -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc \
-    -out:"$OUT" \
-    "${EXTRA[@]}" ${SCRIPT_BUILD_FLAGS:-}
+    ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \
+    ${EXTRA[@]+"${EXTRA[@]}"} ${SCRIPT_BUILD_FLAGS:-}
 
 echo "build_export_scripts.sh: built $OUT" >&2

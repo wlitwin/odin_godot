@@ -16,7 +16,13 @@
 , crossWindowsLibdirs ? null   # mcfgthreads/lib — needed to self-contain the Windows DLL
 }:
 
-stdenvNoCC.mkDerivation {
+let
+  isDarwin = stdenvNoCC.hostPlatform.isDarwin;
+  # Where the NATIVE core dll lands (the cross cores pick their own dirs below).
+  nativePlatformDir = if isDarwin then "macos" else "linux";
+  nativeDllExt      = if isDarwin then "dylib" else "so";
+in
+stdenvNoCC.mkDerivation ({
   pname = "odin_godot-addon";
   version = "0.1.0";
   inherit src;
@@ -25,31 +31,22 @@ stdenvNoCC.mkDerivation {
     ++ lib.optional (crossLinuxCC != null) crossLinuxCC
     ++ lib.optional (crossWindowsCC != null) crossWindowsCC;
 
-  # IMPURE build. The macOS core link is the reason: Odin shells out to the host `xcrun` +
-  # the Xcode macOS SDK (libSystem/-lm live there), which the hermetic nix sandbox does not
-  # carry. A pure Apple-SDK toolchain for an arbitrary tool that calls `xcrun` directly is a
-  # known nixpkgs-Darwin rabbit hole, so we mirror what the dev shell already does: reach the
-  # host toolchain. `__noChroot` lets the build see /usr/bin/xcrun + the system SDK, and
-  # NIX_ENFORCE_PURITY=0 stops the cc-wrapper rejecting the Xcode SDK path in the link.
-  # NOTE: this makes the macOS dll depend on the host's Xcode (not bit-reproducible). The
-  # Linux/Windows CROSS cores, by contrast, build fully HERMETICALLY (self-contained nix
-  # cross gcc, no xcrun) — they are the reproducible part of this artifact.
-  __noChroot = true;
-  NIX_ENFORCE_PURITY = 0;
-
   buildPhase = ''
     runHook preBuild
     export HOME=$TMPDIR
     export ODIN_GODOT_ROOT=$PWD
-    export NIX_ENFORCE_PURITY=0
-    export PATH=$PATH:/usr/bin:/usr/sbin:/bin   # host xcrun/ld for the macOS link
+    ${lib.optionalString isDarwin ''
+      # darwin-only impurity — see the __noChroot / NIX_ENFORCE_PURITY note below.
+      export NIX_ENFORCE_PURITY=0
+      export PATH=$PATH:/usr/bin:/usr/sbin:/bin   # host xcrun/ld for the macOS link
+    ''}
 
-    echo "dist: building macOS core dll (native, via host Xcode toolchain)"
-    mkdir -p out/bin/macos
+    echo "dist: building native core dll"
+    mkdir -p out/bin/${nativePlatformDir}
     odin build core \
       -collection:godot=$PWD \
       -build-mode:dll \
-      -out:out/bin/macos/libodin_godot.dylib
+      -out:out/bin/${nativePlatformDir}/libodin_godot.${nativeDllExt}
 
     ${lib.optionalString (crossLinuxCC != null) ''
       echo "dist: cross-building Linux core .so"
@@ -134,4 +131,19 @@ stdenvNoCC.mkDerivation {
     description = "odin_godot drop-in GDExtension addon (core dlls + Odin collection + build scripts)";
     platforms = lib.platforms.darwin ++ lib.platforms.linux;
   };
-}
+} // lib.optionalAttrs isDarwin {
+  # IMPURE build — DARWIN ONLY. The macOS core link is the reason: Odin shells out to the
+  # host `xcrun` + the Xcode macOS SDK (libSystem/-lm live there), which the hermetic nix
+  # sandbox does not carry. A pure Apple-SDK toolchain for an arbitrary tool that calls
+  # `xcrun` directly is a known nixpkgs-Darwin rabbit hole, so we mirror what the dev shell
+  # already does: reach the host toolchain. `__noChroot` lets the build see /usr/bin/xcrun +
+  # the system SDK, and NIX_ENFORCE_PURITY=0 stops the cc-wrapper rejecting the Xcode SDK
+  # path in the link. NOTE: `__noChroot` is only honored when the nix daemon runs with
+  # `sandbox = relaxed` (nix.conf) — the nix-darwin/macOS default; a `sandbox = true` daemon
+  # refuses the build.
+  # This makes the macOS dll depend on the host's Xcode (not bit-reproducible). The LINUX
+  # native build and the Linux/Windows CROSS cores stay fully HERMETIC (self-contained nix
+  # toolchains, no xcrun, none of these attrs) — they are the reproducible part.
+  __noChroot = true;
+  NIX_ENFORCE_PURITY = 0;
+})

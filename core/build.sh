@@ -7,17 +7,19 @@ ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SRC="$ROOT/core"
 OUT="$ROOT/tests/phase1/bin/libodin_godot.dylib"
 
+# Shared helpers: $ODIN override + atomic_odin_dll (temp+mv publish, stale-.o scrub).
+source "$ROOT/build/common.sh"
+
 mkdir -p "$ROOT/tests/phase1/bin"
 
-# Remove prior outputs first: a stale dll / intermediate `.o` built against an OLD
+# Scrub intermediates from OLD non-atomic builds: a stale `.o` built against an old
 # runtime layout (e.g. a changed Class_Desc) can survive an incremental `-out:` build and
-# crash at extension init. A clean output guarantees the dll matches the current sources.
-rm -f "$OUT" "$ROOT"/tests/phase1/bin/libodin_godot-*.o
+# crash at extension init. (atomic_odin_dll scrubs its OWN temp intermediates; this line
+# covers the legacy `libodin_godot-*.o` names earlier versions of this script left behind.)
+rm -f "$ROOT"/tests/phase1/bin/libodin_godot-*.o
 
-odin build "$SRC" \
-    -collection:godot="$ROOT" \
-    -build-mode:dll \
-    -out:"$OUT" \
-    -debug
+# temp+mv publish: never build over the live dll, so an interrupted/failed build leaves
+# the previously-built dll loadable instead of a truncated half-write.
+atomic_odin_dll "$SRC" "$OUT" -debug
 
 echo "Built $OUT"

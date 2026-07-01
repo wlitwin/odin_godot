@@ -8,21 +8,20 @@ ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 BIN="$ROOT/tests/phase2/bin"
 mkdir -p "$BIN"
 
+# Shared helpers: $ODIN override + atomic_odin_dll (temp+mv publish — never write over the
+# live test dlls — plus a clean-temp build so no stale `.o` from an old runtime layout
+# survives an incremental `-out:` build). Legacy intermediates from earlier non-atomic
+# builds are scrubbed explicitly below.
+source "$ROOT/build/common.sh"
+rm -f "$BIN"/libodinscripts-*.o "$BIN"/libodin_godot-*.o
+
 # The compiled scripts dll: the project's authored res://scripts sources (Player +
 # the runtime registry boot), as a dll. The same `res://scripts/player.odin` is the
 # resource attached to the node — single-file authoring, no separate stub.
-odin build "$ROOT/tests/phase2/scripts" \
-    -collection:godot="$ROOT" \
-    -build-mode:dll \
-    -out:"$BIN/libodinscripts.dylib" \
-    -debug
+atomic_odin_dll "$ROOT/tests/phase2/scripts" "$BIN/libodinscripts.dylib" -debug
 
 # The core ScriptLanguageExtension dll.
-odin build "$ROOT/core" \
-    -collection:godot="$ROOT" \
-    -build-mode:dll \
-    -out:"$BIN/libodin_godot.dylib" \
-    -debug
+atomic_odin_dll "$ROOT/core" "$BIN/libodin_godot.dylib" -debug
 
 echo "Built:"
 echo "  $BIN/libodin_godot.dylib"

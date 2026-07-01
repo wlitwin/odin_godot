@@ -17,7 +17,7 @@
 #   nix develop --command bash -c 'bash build/build_web.sh'
 #
 # EMSCRIPTEN VERSION: Godot 4.6.2's web templates were built with emscripten 4.0.20.
-# VERIFIED (docs/phase-web.md): a module linked with the dev shell's emscripten (5.0.6)
+# VERIFIED (docs/design/web-internals.md): a module linked with the dev shell's emscripten (5.0.6)
 # ALSO loads and runs in the browser against the 4.0.20-built engine — with
 # `-sSUPPORT_LONGJMP=wasm` the longjmp ABI is self-contained in the wasm and the dylink
 # format is cross-compatible. 4.0.20 remains the exact-match (use `EMCC=/path/to/4.0.20/emcc
@@ -26,8 +26,8 @@ set -euo pipefail
 # Toolchain binaries. Both are overridable so a caller that resolved absolute paths (the
 # editor's export plugin, which can't rely on `odin`/`emcc` being on the editor's PATH when
 # it's launched from Finder/Steam) can pass them through as `ODIN=...`/`EMCC=...`.
+# (ODIN's default + the shared helpers come from build/common.sh, sourced below.)
 EMCC="${EMCC:-emcc}"
-ODIN="${ODIN:-odin}"
 # Odin optimization for the wasm object. Default none (fast dev/test builds); the editor's
 # export plugin forwards `odin_godot/export_optimization` as ODIN_EXPORT_OPT (default speed)
 # so a shipped web build is optimized. emcc's own -O2 (below) still runs regardless.
@@ -37,6 +37,8 @@ OPT="${ODIN_EXPORT_OPT:-none}"
 # ODIN_GODOT_ROOT. (Never hardcode a checkout path — this script ships inside the addon and
 # runs on machines that have never seen the maintainer's filesystem.)
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# Shared helpers (ODIN, ODIN_GD_ATTRS, build_scriptgen/run_scriptgen, cleanup registry).
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 PROJ="${1:-$ROOT/tests/web}"
 SCRIPTS="${2:-$PROJ/scripts}"
 OUT="${3:-$PROJ/bin/libodin_godot.wasm}"
@@ -67,24 +69,23 @@ if [ ! -d "$SCRIPTS" ] || [ -z "$(ls "$SCRIPTS"/*.odin 2>/dev/null)" ]; then
 fi
 
 # 1. Build the scriptgen preprocessor to a writable TEMP dir (never into the addon, which may
-#    be read-only when installed under res://addons/).
-SGEN_DIR="$(mktemp -d)"
-trap 'rm -rf "$SGEN_DIR"' EXIT
-SGEN="$SGEN_DIR/scriptgen"
-"$ODIN" build "$ROOT/scriptgen" \
-    -collection:godot="$ROOT" \
-    -out:"$SGEN"
+#    be read-only when installed under res://addons/). SGEN_BIN env reuses a prebuilt one.
+build_scriptgen
 
 # 2. Generate *.gen.odin siblings beside the authored sources.
-"$SGEN" "$SCRIPTS"
+run_scriptgen "$SCRIPTS"
 
 # 3. Emit the wasm-only compose file that pulls `core` into the scripts build. Named
 #    *_wasm32.odin so Odin's arch-gated file selection keeps it OUT of native builds.
+#    It only needs to exist DURING the odin build below, so it is removed on exit —
+#    otherwise Godot's filesystem scanner claims it as a project script and users end
+#    up committing a build artifact.
 PKG="$(grep -h -m1 '^package ' "$SCRIPTS"/*.odin | head -1 | awk '{print $2}')"
 if [[ -z "$PKG" ]]; then
     echo "build_web.sh: could not determine scripts package name" >&2
     exit 1
 fi
+odin_gd_cleanup_on_exit "$SCRIPTS/odin_godot_web_wasm32.odin"
 cat > "$SCRIPTS/odin_godot_web_wasm32.odin" <<EOF
 package $PKG
 
@@ -95,8 +96,13 @@ package $PKG
 EOF
 
 # 4. Odin -> wasm object. Freestanding wasm32, PIC (required: SIDE_MODULE data
-#    relocations), object mode, no entry point, ODIN_GODOT_WEB define.
-ODIN_OBJ="${OUT%.wasm}.wasm.o"
+#    relocations), object mode, no entry point, ODIN_GODOT_WEB define. The object is an
+#    intermediate — keep it in a temp dir (cleaned on exit), not in the project's bin/.
+#    `SCRIPT_BUILD_FLAGS` (env, optional) forwards extra odin flags, matching the
+#    native/export/cross script builds.
+OBJ_DIR="$(mktemp -d)"
+odin_gd_cleanup_on_exit "$OBJ_DIR"
+ODIN_OBJ="$OBJ_DIR/$(basename "${OUT%.wasm}").wasm.o"
 "$ODIN" build "$SCRIPTS" \
     -collection:godot="$ROOT" \
     -target:freestanding_wasm32 \
@@ -105,17 +111,22 @@ ODIN_OBJ="${OUT%.wasm}.wasm.o"
     -no-entry-point \
     -reloc-mode:pic \
     -define:ODIN_GODOT_WEB=true \
-    -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc \
-    -out:"$ODIN_OBJ"
+    ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \
+    -out:"$ODIN_OBJ" \
+    ${SCRIPT_BUILD_FLAGS:-}
 
 # 5. Object -> Emscripten SIDE_MODULE. -sSUPPORT_LONGJMP=wasm matches the binding's
 #    setjmp/longjmp -> invoke_* ABI. The entry symbol odin_godot_init is exported via
-#    its Odin @(export) attribute.
+#    its Odin @(export) attribute. Link to a temp beside $OUT, then publish atomically
+#    (same invariant as atomic_odin_dll: the live wasm is never missing/half-written).
+TMP_WASM="$(dirname "$OUT")/.$(basename "$OUT").tmp"
+odin_gd_cleanup_on_exit "$TMP_WASM"
 "$EMCC" "$ODIN_OBJ" \
     -sSIDE_MODULE=1 \
     -sSUPPORT_LONGJMP=wasm \
     -O2 \
-    -o "$OUT"
+    -o "$TMP_WASM"
+mv -f "$TMP_WASM" "$OUT"
 
 echo "build_web.sh: built $OUT"
 file "$OUT" || true

@@ -30,10 +30,11 @@
 set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# Shared helpers (ODIN, ODIN_GD_ATTRS, build_scriptgen/run_scriptgen, cleanup registry).
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 TARGET="${1:?usage: build_cross.sh <linux|windows> [PROJECT_DIR] [OUT_DIR]}"
 PROJ="${2:-$ROOT/tests/phase35}"
 SCRIPTS="$PROJ/scripts"
-ODIN="${ODIN:-odin}"
 
 case "$TARGET" in
     linux)
@@ -81,11 +82,18 @@ echo "build_cross.sh: $TARGET cross CC = $CC"
 # ----------------------------------------------------------------------------
 # odin_obj_link <pkg_dir> <out_lib> [extra odin flags...]
 #   Emit ONE relocatable object for the target, then cross-link it into a shared lib.
+#   The link goes to a TEMP path and is published with an atomic `mv -f` (same
+#   invariant as atomic_odin_dll in common.sh: the live lib is never missing or
+#   half-written if the build fails or is interrupted).
 # ----------------------------------------------------------------------------
 odin_obj_link() {
     local pkg="$1" out="$2"; shift 2
-    local obj="${out%${EXT}}.o"
-    rm -f "$out" "$obj"
+    local dir leaf tmp obj
+    dir="$(dirname "$out")"
+    leaf="$(basename "$out")"
+    tmp="$dir/.$leaf.tmp$EXT"
+    obj="$dir/.$leaf.tmp.o"
+    rm -f "$tmp" "$obj"
 
     "$ODIN" build "$pkg" \
         -collection:godot="$ROOT" \
@@ -98,7 +106,8 @@ odin_obj_link() {
 
     # -shared: a loadable module Godot dlopen/LoadLibrary's. The cross gcc wrapper
     # supplies the target crt/libc/libgcc + dynamic linker for us.
-    "$CC" -shared -o "$out" "$obj" "${LINK_LIBS[@]}"
+    "$CC" -shared -o "$tmp" "$obj" "${LINK_LIBS[@]}"
+    mv -f "$tmp" "$out"
     rm -f "$obj"
 }
 
@@ -117,15 +126,12 @@ fi
 
 # SCRIPTS dll: scriptgen preprocess the project's scripts, then build the dll (same
 # custom attributes as the native/web builds). scriptgen goes to a writable TEMP dir, never
-# into the addon (read-only when installed under res://addons/).
-SGEN_DIR="$(mktemp -d)"
-trap 'rm -rf "$SGEN_DIR"' EXIT
-SGEN="$SGEN_DIR/scriptgen"
-"$ODIN" build "$ROOT/scriptgen" -collection:godot="$ROOT" -out:"$SGEN"
-"$SGEN" "$SCRIPTS"
+# into the addon (read-only when installed under res://addons/); SGEN_BIN reuses a prebuilt one.
+build_scriptgen
+run_scriptgen "$SCRIPTS"
 SCRIPTS_OUT="$OUT_DIR/libodinscripts$EXT"
 odin_obj_link "$SCRIPTS" "$SCRIPTS_OUT" \
-    -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc \
+    ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \
     ${SCRIPT_BUILD_FLAGS:-}
 
 echo "build_cross.sh: built"

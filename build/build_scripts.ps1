@@ -67,8 +67,9 @@ function Run([string]$exe, [string[]]$argv) {
     if ($LASTEXITCODE -ne 0) { throw "command failed (exit $LASTEXITCODE): $exe $($argv -join ' ')" }
 }
 
-# Build a dll to a TEMP path, then atomically move it into place — mirrors the temp+mv in
-# build_scripts.sh. `odin build -out:X` truncates X up front and writes over several seconds;
+# Build a dll to a TEMP path, then atomically move it into place — mirrors atomic_odin_dll
+# in build/common.sh (KEEP IN SYNC — the bash builds all publish through that one helper).
+# `odin build -out:X` truncates X up front and writes over several seconds;
 # if THIS build is interrupted or fails (e.g. the editor reload-on-save coordinator in
 # core/reload.odin kicks it on a worker thread and the editor quits mid-build), publishing
 # via Move means the previously-built dll is never left missing/half-written — which on
@@ -95,6 +96,8 @@ if (-not $SkipCore) {
 
 # 2. scriptgen preprocessor — build to a writable TEMP dir, NOT into the addon (which may be
 #    read-only when installed under res://addons/ and shouldn't collect build artifacts).
+#    KEEP IN SYNC with build/common.sh (build_scriptgen) — the bash builds share one helper;
+#    this is its Windows-native mirror.
 $scriptgenDir = Join-Path ([System.IO.Path]::GetTempPath()) ("odin_godot_sgen_" + [System.Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Force -Path $scriptgenDir | Out-Null
 $scriptgenExe = Join-Path $scriptgenDir "scriptgen.exe"
@@ -105,6 +108,9 @@ Run $scriptgenExe @($Scripts)
 
 # 4. Scripts dll (what the core loads at res://bin/libodinscripts.dll). Atomic publish (see
 #    BuildDll above) so an interrupted reload-on-save rebuild never deletes the live dll.
+#    The three -custom-attribute flags: KEEP IN SYNC with build/common.sh (ODIN_GD_ATTRS) —
+#    every scripts build (bash native/web/cross + this Windows-native one) must pass the
+#    same set, or @(gd_method)/@(gd_connect)/@(gd_rpc) fail to compile.
 $out = Join-Path $Bin "libodinscripts.dll"
 BuildDll $Scripts $out @("-custom-attribute:gd_method", "-custom-attribute:gd_connect", "-custom-attribute:gd_rpc")
 
