@@ -206,6 +206,32 @@ Export_Info :: struct {
 	setter:      string,
 	// 1-based source line of the field (for `_get_member_line` — editor jump-to-member).
 	line:        int,
+	// `///` doc comment above the field (property description for the editor doc panel).
+	doc:         string,
+}
+
+// extract_doc joins the `///` lines of a doc comment group into a description string (leading
+// `///` and one space stripped, lines joined with '\n'). Plain `//` comments are ignored, so
+// documentation is opt-in via `///`. Returns "" when there's no `///` doc.
+extract_doc :: proc(g: ^ast.Comment_Group) -> string {
+	if g == nil {
+		return ""
+	}
+	b := strings.builder_make()
+	first := true
+	for c in g.list {
+		t := c.text
+		if !strings.has_prefix(t, "///") {
+			continue
+		}
+		line := strings.trim_space(t[3:])
+		if !first {
+			strings.write_byte(&b, '\n')
+		}
+		strings.write_string(&b, line)
+		first = false
+	}
+	return strings.to_string(b)
 }
 
 // richer-authoring #1: an `@onready` auto-wired node ref — a struct field of object-handle
@@ -594,6 +620,7 @@ Script :: struct {
 	struct_name: string,
 	class_name:  string,
 	base:        string,
+	doc:         string, // `///` doc comment above the script struct (class description)
 	marked:      bool, // saw at least one valid `//gd:` marker (intent signal for diagnostics)
 	tool:        bool,
 	icon:        string, // `//gd:icon <res-path>` — custom class icon (""=none)

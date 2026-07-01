@@ -557,6 +557,50 @@ v_get_script_signal_list :: proc "c" (instance: gdext.ExtensionClassInstancePtr,
     (cast(^godot.Array)ret)^ = arr
 }
 
+// `_get_documentation` — REAL class + property docs from the script's `///` comments, so the
+// class appears in the editor's Help (F1) and its `@export`s carry descriptions. Returns an
+// Array with one ClassDoc Dictionary (Godot's DocData::ClassDoc::from_dict reads keys via
+// has()-checks, so this confident subset is safe; unknown/absent keys just default).
+@(private = "file")
+v_get_documentation :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+    context = gdext.godot_context()
+    self := cast(^OdinScript)instance
+    arr := godot.new_array_default()
+    if desc, ok := odin_script_resolve_desc(self); ok {
+        cd := godot.new_dictionary_default()
+        dict_set(&cd, "name", v_str(desc.name))
+        if desc.base != nil {
+            dict_set(&cd, "inherits", v_str(desc.base))
+        }
+        dict_set(&cd, "is_script_doc", v_bool(true))
+        if desc.doc != nil {
+            // brief = first line; description = the whole `///` block.
+            doc_s := string(desc.doc)
+            brief := doc_s
+            if nl := strings.index_byte(doc_s, '\n'); nl >= 0 {
+                brief = doc_s[:nl]
+            }
+            dict_set(&cd, "brief_description", v_str(strings.clone_to_cstring(brief, context.temp_allocator)))
+            dict_set(&cd, "description", v_str(desc.doc))
+        }
+        props := godot.new_array_default()
+        for ex in desc.exports {
+            pd := godot.new_dictionary_default()
+            dict_set(&pd, "name", v_str(ex.name))
+            if ex.doc != nil {
+                dict_set(&pd, "description", v_str(ex.doc))
+            }
+            pdv := godot.variant_from_dictionary(&pd)
+            godot.array_push_back(&props, pdv)
+        }
+        pav := godot.variant_from_array(&props)
+        dict_set(&cd, "properties", pav)
+        cdv := godot.variant_from_dictionary(&cd)
+        godot.array_push_back(&arr, cdv)
+    }
+    (cast(^godot.Array)ret)^ = arr
+}
+
 // `_get_members` — the script's member variables (its exported fields) as StringNames, for the
 // editor's member outline / member-name highlighting. Fresh Array each call (engine owns it).
 @(private = "file")
@@ -989,7 +1033,7 @@ odin_script_register :: proc() {
     add("_get_script_method_list", v_get_script_method_list)
     add("_get_script_property_list", v_get_script_property_list)
     add("_get_script_signal_list", v_get_script_signal_list)
-    add("_get_documentation", v_empty_array)
+    add("_get_documentation", v_get_documentation) // Array[ClassDoc] from `///` comments
     // Remaining REQUIRED ScriptExtension virtuals (4.6.2) the editor exercises.
     add("_editor_can_reload_from_file", v_true) // bool
     add("_has_static_method", v_false) // bool

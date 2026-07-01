@@ -75,6 +75,8 @@ Export :: struct {
 	// 1-based source line of the field in the authored `.odin`, for `_get_member_line`
 	// (editor jump-to-member / member outline). 0 == unknown.
 	line:        i32,
+	// `///` doc comment above the field (property description in the editor doc panel). nil/"" == none.
+	doc:         cstring,
 }
 
 // An `@onready`-style auto-wired node reference (richer-authoring #1). On the node's
@@ -163,6 +165,9 @@ Class_Desc :: struct {
 	// `//gd:icon <res-path>` — custom class icon shown in the editor (Scene dock,
 	// Create Node/Resource dialogs). Empty => no custom icon.
 	icon:        cstring,
+	// `///` doc comment above the script struct (class description for the editor doc panel,
+	// via `_get_documentation`). nil/"" == none.
+	doc:         cstring,
 }
 
 // Scripts-dll-local registry. A FIXED-SIZE array (not a [dynamic]) so `register`

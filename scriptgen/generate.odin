@@ -345,6 +345,9 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			if ex.setter != "" {
 				fmt.sbprintf(b, ", setter = _%s_set_%s", snake, ex.name)
 			}
+			if ex.doc != "" {
+				fmt.sbprintf(b, ", doc = %q", ex.doc)
+			}
 			w(b, "},\n")
 		}
 		w(b, "}\n\n")
@@ -499,6 +502,9 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	}
 	if s.icon != "" {
 		fmt.sbprintf(b, "\t\t\ticon = \"%s\",\n", s.icon)
+	}
+	if s.doc != "" {
+		fmt.sbprintf(b, "\t\t\tdoc = %q,\n", s.doc)
 	}
 	w(b, "\t\t},\n")
 	w(b, "\t)\n}\n")

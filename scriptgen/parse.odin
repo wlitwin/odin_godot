@@ -219,6 +219,7 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		name_ident, _ := vd.names[0].derived.(^ast.Ident)
 		if name_ident == nil {continue}
 		s.struct_name = name_ident.name
+		s.doc = extract_doc(vd.docs) // `///` above the struct -> class description
 		struct_type = st
 		break
 	}
@@ -402,6 +403,7 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 				getter      = getter,
 				setter      = setter,
 				line        = ident.pos.line,
+				doc         = extract_doc(f.docs),
 			})
 		}
 	}

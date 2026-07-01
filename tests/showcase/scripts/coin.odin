@@ -14,8 +14,11 @@ package showcase_scripts
 
 import gd "godot:godot"
 
+/// A collectible coin.
+/// Worth `value` points when the player touches it.
 Coin :: struct {
 	owner: gd.Area2d,
+	/// How many points this coin awards on pickup.
 	value: gd.Int `gd:"export"`,
 	// Typed-collection exports (regression for the `array=`/`dict=` hints): these must render
 	// the Inspector's typed-array / typed-dictionary editors, i.e. emit the exact same
