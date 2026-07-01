@@ -325,6 +325,10 @@ odin_highlighter_register_class :: proc() {
 // then construct the highlighter and hand it to the ScriptEditor.
 lv_frame :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+    // Reset the shared godot temp arena FIRST: everything context.temp_allocator handed
+    // out since the previous frame dies here (temp allocations are strictly call-local;
+    // without this the arena grows unbounded over an editor session).
+    gdext.reset_temp_arena()
     // Drive the rebuild-on-save flow on the MAIN thread: if a background scripts build has
     // finished, swap the dll + refresh the Inspector here (reload.odin). Cheap when idle.
     reload_pump_main_thread()

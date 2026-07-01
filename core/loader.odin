@@ -128,6 +128,17 @@ ld_load :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.T
     // Ref-typed receivers like File_Access and crashes; static methods avoid that.
     text := godot.file_access_get_file_as_string(path)
 
+    // An unreadable path must return the ERROR int, not a valid empty script — a broken
+    // res:// reference would otherwise "load" fine and only fail later at instance time.
+    // get_file_as_string returns "" for both an empty file and a failure; get_open_error
+    // (static, set by the underlying open) disambiguates.
+    if open_err := godot.file_access_get_open_error(); open_err != .Ok {
+        err_code := i64(godot.Error.Err_File_Cant_Open)
+        err_v := godot.variant_from_int(&err_code)
+        ret_variant(ret, err_v)
+        return
+    }
+
     object, self := odin_script_construct()
     odin_script_set_source(self, text)
 

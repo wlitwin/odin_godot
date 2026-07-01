@@ -3,6 +3,7 @@ package core
 import "godot:gdext"
 import "godot:godot"
 import rt "godot:runtime"
+import "core:fmt"
 import "core:strings"
 
 // ----------------------------------------------------------------------------
@@ -20,11 +21,12 @@ odin_script_class_name: godot.String_Name
 script_virtuals: [dynamic]Virtual_Entry
 
 OdinScript :: struct {
-    object:      gdext.ObjectPtr,
-    source_utf8: []u8, // owned copy of the `.odin` source
-    base_type:   string, // owned copy of the parsed `extends` base (default "Node")
-    class_name:  string, // owned copy of the parsed `//gd:class <Name>` (default "")
-    icon:        string, // owned copy of the parsed `//gd:icon <res-path>` (default "")
+    object:           gdext.ObjectPtr,
+    source_utf8:      []u8, // owned copy of the `.odin` source
+    base_type:        string, // owned copy of the parsed `extends` base (default "Node")
+    class_name:       string, // owned copy of the parsed `//gd:class <Name>` (default "")
+    icon:             string, // owned copy of the parsed `//gd:icon <res-path>` (default "")
+    warned_ambiguous: bool, // one-shot: ambiguous base-type class resolution already warned
 }
 
 @(private = "file")
@@ -144,8 +146,11 @@ odin_script_free_strings :: proc(self: ^OdinScript) {
     }
 }
 
-// Resolve the Class_Desc this script binds to: by `//gd:class` name first, else by
-// the first registered class whose base matches our `extends` base type.
+// Resolve the Class_Desc this script binds to: by `//gd:class` name first, else by base-type
+// match — but only when EXACTLY ONE registered class extends that base. With several
+// candidates the old "first match" bound to whichever class the map iteration happened to
+// yield (nondeterministic across runs), so instead we warn once (naming the candidates) and
+// resolve nothing — the caller falls back to a harmless placeholder.
 odin_script_resolve_desc :: proc(self: ^OdinScript) -> (rt.Class_Desc, bool) {
     if self == nil {
         return {}, false
@@ -156,10 +161,38 @@ odin_script_resolve_desc :: proc(self: ^OdinScript) -> (rt.Class_Desc, bool) {
         }
     }
     base := self.base_type != "" ? self.base_type : "Node"
+    found: rt.Class_Desc
+    count := 0
     for _, desc in scripts_classes {
         if string(desc.base) == base {
-            return desc, true
+            if count == 0 {found = desc}
+            count += 1
         }
+    }
+    if count == 1 {
+        return found, true
+    }
+    if count > 1 && !self.warned_ambiguous {
+        self.warned_ambiguous = true
+        names := strings.builder_make(context.temp_allocator)
+        for _, desc in scripts_classes {
+            if string(desc.base) == base {
+                if strings.builder_len(names) > 0 {strings.write_string(&names, ", ")}
+                strings.write_string(&names, string(desc.name))
+            }
+        }
+        gpath := godot.resource_get_path(cast(godot.Resource)self.object)
+        path := string_to_odin(gpath, context.temp_allocator)
+        msg := godot.new_string_odin(
+            fmt.tprintf(
+                "odin_godot: script %s has no //gd:class marker and multiple registered classes " +
+                "extend %s (%s) — add `//gd:class <Name>` to pick one (using a placeholder for now).",
+                path,
+                base,
+                strings.to_string(names),
+            ),
+        )
+        godot.gd_push_warning(godot.variant_from_string(&msg))
     }
     return {}, false
 }
@@ -184,11 +217,10 @@ script_create_instance :: proc "c" (class_user_data: rawptr) -> gdext.ObjectPtr 
     object := gdext.classdb_construct_object(godot.script_extension_name_ref())
 
     self := new(OdinScript)
-    // The Godot allocator's `.Alloc` does NOT zero (it just wraps `mem_alloc`), which
-    // violates Odin's allocator contract that `new` returns zeroed memory. On native the
-    // returned pages happened to be zero; on web (Emscripten malloc reuses memory) they
-    // are garbage, so the owned source/base/class fields must be explicitly cleared or
-    // set_source's first delete would free a garbage pointer.
+    // gdext's godot allocator zeroes on `.Alloc` (see gdext/context.odin), so `new`
+    // already returned zeroed memory. The explicit clear is belt-and-braces: if the
+    // allocator ever stopped zeroing, set_source's first delete would free a garbage
+    // pointer in the owned source/base/class fields.
     self^ = {}
     self.object = object
     // base_type stays "" until source is set; "" is reported as "Node" on read.

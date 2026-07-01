@@ -302,6 +302,33 @@ odin_script_struct :: proc "c" (obj: gdext.ObjectPtr, want_class: cstring) -> ra
 	return nil
 }
 
+// Allocator for the user script struct. Godot's `mem_alloc` guarantees only 16-byte
+// alignment (and the gdext wrapper ignores the alignment argument), so an over-aligned
+// class (Class_Desc.align > 16, e.g. SIMD fields) must live on the alignment-honoring
+// core allocator instead. Deterministic per `align`, so inst_free/migrate_instance can
+// free on the same allocator the struct was alloc'd from.
+@(private)
+user_struct_allocator :: proc(align: int) -> runtime.Allocator {
+	if align > 16 {
+		return core_allocator()
+	}
+	return gdext.godot_allocator()
+}
+
+// Apply an @export's declared `default=...` (richer-authoring #3) to its struct field.
+// A defaulted field with a setter routes through the setter so validation/side-effects
+// run; otherwise it is written straight to the field. No-op without a default.
+@(private)
+apply_export_default :: proc "contextless" (user: rawptr, ex: ^Export_Cache) {
+	if !ex.has_default {return}
+	dv := ex.default
+	if ex.setter != nil {
+		ex.setter(user, cast(gdext.VariantPtr)&dv)
+	} else {
+		write_export_variant(user, ex, cast(gdext.VariantPtr)&dv)
+	}
+}
+
 // Build a real script instance for `owner`, binding it to `desc`. Returns the
 // engine ScriptInstancePtr to hand back from `_instance_create`.
 @(private)
@@ -327,24 +354,18 @@ odin_make_script_instance :: proc(script: gdext.ObjectPtr, owner: gdext.ObjectPt
 	script_hold_ref(script)
 
 	// Allocate + zero the script's own struct; write the owner Object* at offset 0.
-	// The Godot allocator's `.Alloc` does not actually zero (it just wraps `mem_alloc`),
-	// so zero explicitly — otherwise non-`owner` fields would start as garbage on web.
-	user, err := mem.alloc(desc.size, desc.align)
+	// gdext's godot allocator zeroes on `.Alloc` (see gdext/context.odin) — the explicit
+	// mem.zero here is belt-and-braces so a future allocator change can't reintroduce
+	// garbage in non-`owner` fields.
+	user, err := mem.alloc(desc.size, desc.align, user_struct_allocator(desc.align))
 	if err == nil && user != nil {
 		mem.zero(user, desc.size)
 		(cast(^gdext.ObjectPtr)user)^ = owner
 
 		// Apply `@export default=...` values (richer-authoring #3) onto the freshly-zeroed
-		// struct, BEFORE _ready. A defaulted field with a setter routes through the setter so
-		// validation/side-effects run; otherwise it is written straight to the field.
+		// struct, BEFORE _ready.
 		for &ex in oi.cache.exports {
-			if !ex.has_default {continue}
-			dv := ex.default
-			if ex.setter != nil {
-				ex.setter(user, cast(gdext.VariantPtr)&dv)
-			} else {
-				write_export_variant(user, &ex, cast(gdext.VariantPtr)&dv)
-			}
+			apply_export_default(user, &ex)
 		}
 	}
 	oi.user = user
@@ -437,6 +458,17 @@ node_enable_physics_process :: proc(owner: gdext.ObjectPtr, enable: bool) {
 	gdext.object_method_bind_ptrcall(set_physics_process_bind, owner, &args[0], nil)
 }
 
+// Resolve `@onready`-style node refs (richer-authoring #1): write get_node(owner, path)
+// into each tagged field. Runs at NOTIFICATION_READY, and again after a changed-layout
+// hot-reload migration (the re-alloc zeroed those fields).
+@(private)
+resolve_onready_refs :: proc "contextless" (oi: ^Odin_Instance) {
+	for o in oi.desc.onready {
+		node := godot.get_node(cast(godot.Object)oi.owner, o.path)
+		(cast(^gdext.ObjectPtr)(uintptr(oi.user) + o.offset))^ = cast(gdext.ObjectPtr)node
+	}
+}
+
 // ---- vtable: the hot path ----
 
 @(private)
@@ -447,13 +479,9 @@ inst_notification :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, w
 	}
 	switch int(what) {
 	case NOTIFICATION_READY:
-		// Resolve `@onready`-style node refs (richer-authoring #1) FIRST: write
-		// get_node(owner, path) into each tagged field, so the user's _ready (and the
-		// gd_connect wiring below) sees fully resolved, non-null references.
-		for o in oi.desc.onready {
-			node := godot.get_node(cast(godot.Object)oi.owner, o.path)
-			(cast(^gdext.ObjectPtr)(uintptr(oi.user) + o.offset))^ = cast(gdext.ObjectPtr)node
-		}
+		// Resolve `@onready`-style node refs (richer-authoring #1) FIRST, so the user's
+		// _ready (and the gd_connect wiring below) sees fully resolved, non-null references.
+		resolve_onready_refs(oi)
 		// Wire `@(gd_connect="signal")` declarations: connect owner.signal -> owner.method
 		// before the user's ready runs, so the connections are live for the rest of _ready.
 		for c in oi.desc.connections {
@@ -495,6 +523,19 @@ inst_call :: proc "c" (
 	if oi.cache != nil {
 		for mname, i in oi.cache.method_names {
 			if name == mname {
+				// Arity guard: the trampoline reads exactly len(arg_types) Variants from
+				// `args`, so a short call would read past the array. Odin methods are never
+				// vararg, so extra args are an error too. `expected` carries the declared
+				// arity, `argument` the passed count (what Godot's call-error text reads).
+				want := len(oi.desc.methods[i].arg_types)
+				if int(argument_count) != want {
+					if error != nil {
+						error.error = int(argument_count) < want ? .Too_Few_Arguments : .Too_Many_Arguments
+						error.argument = i32(argument_count)
+						error.expected = i32(want)
+					}
+					return
+				}
 				oi.desc.methods[i].trampoline(oi.user, args, argument_count, ret)
 				if error != nil {error.error = .Ok}
 				return
@@ -580,7 +621,7 @@ inst_free :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) {
 	}
 	heap_delete_string(oi.class_name)
 	if oi.user != nil {
-		mem.free(oi.user)
+		mem.free(oi.user, user_struct_allocator(oi.desc.align))
 	}
 	free(oi)
 }
@@ -623,7 +664,22 @@ inst_set :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, name: gdex
 	}
 	// Getter/setter routing (richer-authoring #4): a setter validates/transforms the write.
 	if ex.setter != nil {
-		ex.setter(oi.user, value)
+		// A RESOURCE-typed export needs the same hold/release bookkeeping as the plain
+		// field path below even when the write routes through a setter — inst_free
+		// unconditionally releases every Resource_Type field's final value, so a
+		// setter-written resource that was never held would underflow its refcount.
+		if ex.type == .Object && ex.hint == i64(godot.Property_Hint.Resource_Type) {
+			fld := cast(^gdext.ObjectPtr)(uintptr(oi.user) + ex.offset)
+			old := fld^
+			ex.setter(oi.user, value)
+			newp := fld^
+			if newp != old {
+				script_hold_ref(newp)
+				script_release_ref(old)
+			}
+		} else {
+			ex.setter(oi.user, value)
+		}
 		return true
 	}
 	if ex.to_type == nil {
@@ -774,6 +830,10 @@ inst_free_property_list :: proc "c" (instance: gdext.ExtensionScriptInstanceData
 	context = gdext.godot_context()
 	if list != nil {
 		// Reconstruct the slice we allocated in inst_get_property_list and free it.
+		// INVARIANT: `count` may be less than the dynamic array's grown CAPACITY, so this
+		// delete passes a smaller size than was allocated — valid only because the godot
+		// allocator's `.Free` ignores size (plain `mem_free`). A size-checking allocator
+		// here would need inst_get_property_list to shrink-to-fit (or pass the capacity).
 		s := transmute([]gdext.PropertyInfo)runtime.Raw_Slice{data = list, len = int(count)}
 		delete(s)
 	}
@@ -997,10 +1057,6 @@ write_export_variant :: proc "contextless" (user: rawptr, ex: ^Export_Cache, val
 // Changed-layout fallback: preserve @export values across a re-alloc to the new size.
 @(private)
 migrate_instance :: proc(oi: ^Odin_Instance, new_desc: rt.Class_Desc, new_cache: ^Class_Cache) {
-	// The script struct was alloc'd on the GODOT allocator (see odin_make_script_instance,
-	// which runs in godot context); free/realloc it on the SAME allocator.
-	gctx := gdext.godot_context()
-
 	Saved :: struct {
 		name: godot.String_Name,
 		v:    godot.Variant,
@@ -1011,8 +1067,10 @@ migrate_instance :: proc(oi: ^Odin_Instance, new_desc: rt.Class_Desc, new_cache:
 		append(&saved, Saved{ex.name, read_export_variant(oi.user, &ex)})
 	}
 
-	mem.free(oi.user, gctx.allocator)
-	user, _ := mem.alloc(new_desc.size, new_desc.align, gctx.allocator)
+	// Free/realloc the script struct on the allocator odin_make_script_instance used
+	// (user_struct_allocator — the OLD desc picks the free side, the NEW one the alloc).
+	mem.free(oi.user, user_struct_allocator(oi.desc.align))
+	user, _ := mem.alloc(new_desc.size, new_desc.align, user_struct_allocator(new_desc.align))
 	if user != nil {
 		(cast(^gdext.ObjectPtr)user)^ = oi.owner
 	}
@@ -1021,12 +1079,32 @@ migrate_instance :: proc(oi: ^Odin_Instance, new_desc: rt.Class_Desc, new_cache:
 	oi.cache = new_cache
 
 	for &nex in oi.cache.exports {
+		restored := false
 		for s in saved {
 			if s.name == nex.name {
 				sv := s.v
 				write_export_variant(oi.user, &nex, cast(gdext.VariantPtr)&sv)
+				restored = true
 				break
 			}
 		}
+		// An export NEW in this layout (absent from the snapshot) starts from its declared
+		// default, exactly like a fresh instance — not from zeroed memory.
+		if !restored {
+			apply_export_default(oi.user, &nex)
+		}
+	}
+
+	// The re-alloc zeroed the `@onready` fields; resolve them again so the migrated
+	// instance doesn't run the new code against nil node refs. Guarded: get_node is only
+	// meaningful once the owner is in the tree (pre-READY instances resolve at READY).
+	if len(oi.desc.onready) > 0 && bool(godot.node_is_inside_tree(cast(godot.Node)oi.owner)) {
+		resolve_onready_refs(oi)
+	}
+
+	// The snapshot Variants own refs (String/Object/...); destroy them or every
+	// changed-layout reload leaks one Variant per export.
+	for &s in saved {
+		gdext.variant_destroy(cast(gdext.VariantPtr)&s.v)
 	}
 }
