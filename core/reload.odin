@@ -122,24 +122,42 @@ reload_scripts_dir :: proc(proj: string, allocator := context.allocator) -> stri
 // output. Hashes each file's name + bytes (fnv64a chained); unreadable dir => 0.
 @(private = "file")
 hash_sources :: proc(scripts: string) -> u64 {
-	fis, err := os.read_directory_by_path(scripts, -1, context.temp_allocator)
-	if err != nil {
-		return 0
-	}
 	h: u64 = 0xcbf29ce484222325 // fnv64a offset basis
+	hash_sources_dir(scripts, &h)
+	if h == 0xcbf29ce484222325 {
+		return 0 // nothing hashed (unreadable or empty) — treat like "unknown", always build
+	}
+	return h
+}
+
+// Recursive worker: the scripts dir can hold sub-package directories (the build compiles
+// them too), so an edit anywhere under it must change the hash — a top-level-only scan
+// made saves in a subdirectory silently skip the rebuild.
+@(private = "file")
+hash_sources_dir :: proc(dir: string, h: ^u64) {
+	fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
+	if err != nil {
+		return
+	}
 	for fi in fis {
-		// Only authored sources; skip generated artifacts (a directory named `*.odin` is
-		// pathological — read_entire_file simply errors on it and it contributes nothing).
+		if fi.type == .Directory {
+			// Skip hidden dirs and build output — not compiler inputs.
+			if strings.has_prefix(fi.name, ".") || fi.name == "bin" {
+				continue
+			}
+			hash_sources_dir(fi.fullpath, h)
+			continue
+		}
+		// Only authored sources; skip generated artifacts.
 		if !strings.has_suffix(fi.name, ".odin") || strings.has_suffix(fi.name, ".gen.odin") {
 			continue
 		}
 		data, rerr := os.read_entire_file(fi.fullpath, context.temp_allocator)
 		if rerr == nil {
-			h = hash.fnv64a(transmute([]byte)fi.name, h)
-			h = hash.fnv64a(data, h)
+			h^ = hash.fnv64a(transmute([]byte)fi.name, h^)
+			h^ = hash.fnv64a(data, h^)
 		}
 	}
-	return h
 }
 
 // `reload_request` — kick a background rebuild of the scripts dll (editor only).
@@ -202,17 +220,40 @@ reload_request :: proc(force := false) {
 	if g_reload.log_path == "" {
 		g_reload.log_path = strings.concatenate({proj, "/bin/.odin_reload.log"})
 	}
-	cmd := fmt.aprintf(
-		"mkdir -p '%s/bin'; PATH='%s':\"$PATH\" ODIN='%s' ODIN_GODOT_ROOT='%s' SKIP_CORE=1 bash '%s/build/build_scripts.sh' '%s' '%s' > '%s' 2>&1",
-		proj,
-		odin_dir,
-		odin_bin,
-		root,
-		root,
-		proj,
-		scripts,
-		g_reload.log_path,
-	)
+	cmd: string
+	when ODIN_OS == .Windows {
+		// libc.system routes through cmd.exe: drive the PowerShell counterpart of
+		// build_scripts.sh (native MSVC toolchain — see build_scripts.ps1's header).
+		// cmd.exe quoting: double quotes; ^-escaping is not needed for these paths.
+		cmd = fmt.aprintf(
+			`powershell -NoProfile -ExecutionPolicy Bypass -File "%s\build\build_scripts.ps1" -Root "%s" -Project "%s" -Odin "%s" -SkipCore > "%s" 2>&1`,
+			root,
+			root,
+			proj,
+			odin_bin,
+			g_reload.log_path,
+		)
+	} else {
+		// Every interpolated path goes through shell_quote (paths carry apostrophes; the
+		// scripts-dir/odin-bin settings are user-editable text — see core/common.odin).
+		q_proj := shell_quote(proj, context.temp_allocator)
+		q_odin_dir := shell_quote(odin_dir, context.temp_allocator)
+		q_odin_bin := shell_quote(odin_bin, context.temp_allocator)
+		q_root := shell_quote(root, context.temp_allocator)
+		q_scripts := shell_quote(scripts, context.temp_allocator)
+		q_log := shell_quote(g_reload.log_path, context.temp_allocator)
+		cmd = fmt.aprintf(
+			"mkdir -p %s/bin; PATH=%s:\"$PATH\" ODIN=%s ODIN_GODOT_ROOT=%s SKIP_CORE=1 bash %s/build/build_scripts.sh %s %s > %s 2>&1",
+			q_proj,
+			q_odin_dir,
+			q_odin_bin,
+			q_root,
+			q_root,
+			q_proj,
+			q_scripts,
+			q_log,
+		)
+	}
 
 	src_hash := hash_sources(scripts)
 
@@ -223,6 +264,9 @@ reload_request :: proc(force := false) {
 	// there is nothing new to compile — skip (this is what the editor re-importing our own
 	// `*.gen.odin` output looks like). A hash of 0 (unreadable dir) always proceeds.
 	if !force && src_hash != 0 && g_reload.have_last_hash && g_reload.last_hash == src_hash {
+		// Diagnosable, not silent: this is normally the editor re-importing our own gen
+		// output, but it's also what a save looks like when something upstream is stale.
+		os.write_string(os.stderr, "odin reload: authored sources unchanged — rebuild skipped\n")
 		delete(cmd)
 		return
 	}
@@ -356,8 +400,14 @@ print_build_errors :: proc(output: string) {
 @(private)
 reload_pump_main_thread :: proc() {
 	sync.lock(&g_reload.mutex)
-	ready := g_reload.swap_ready
-	g_reload.swap_ready = false
+	// Don't swap while a coalesced follow-up build is STILL RUNNING: build A set
+	// swap_ready, but build B's linker may be rewriting the dll right now — the swap
+	// would snapshot a half-written image. Leave swap_ready set; B re-sets it (or flags
+	// failure) and the next frame swaps a settled dll.
+	ready := g_reload.swap_ready && !g_reload.build_running
+	if ready {
+		g_reload.swap_ready = false
+	}
 	failed := g_reload.build_failed
 	g_reload.build_failed = false
 	build_out := g_reload.build_output // transfer ownership to this frame

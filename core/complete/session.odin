@@ -72,7 +72,11 @@ Session :: struct {
 
     started:       bool,
     dead:          bool,
+    closing:       bool, // shutdown in progress: refuse new starts/warm-ups
+    warming:       bool, // a background warm-up thread is in flight
     next_retry_ns: i64, // monotonic ns before which a failed start won't be retried
+
+    warm_thread:   ^thread.Thread, // last warm-up thread; joined on next warm / shutdown
 
     proc_:         os.Process,
     stdin:         ^os.File,
@@ -304,6 +308,7 @@ ensure_started :: proc(s: ^Session, ols_bin, root, share: string) -> bool {
     sync.lock(&s.start_mutex)
     defer sync.unlock(&s.start_mutex)
 
+    if s.closing {return false} // shutting down — don't resurrect ols under teardown
     if s.started && !s.dead {return true}
 
     if s.dead {teardown_locked(s)} // reclaim a crashed session before restarting
@@ -328,7 +333,10 @@ ensure_started :: proc(s: ^Session, ols_bin, root, share: string) -> bool {
     }
 
     // (re)create workspace + ols.json
-    libc.system(fmt.ctprintf("rm -rf '%s' && mkdir -p '%s'", s.workspace, s.workspace))
+    {
+        q_ws := shell_quote(s.workspace, context.temp_allocator)
+        libc.system(fmt.ctprintf("rm -rf %s && mkdir -p %s", q_ws, q_ws))
+    }
     clear(&s.pkgs)
     clear(&s.docs)
     if !session_write_ols_json(s) {
@@ -444,10 +452,117 @@ teardown_locked :: proc(s: ^Session) {
     clear(&s.docs)
 }
 
+// ---- background warm-up ------------------------------------------------------
+
+Warm_State :: enum {
+    Cold,    // never started (or torn down); the next start pays the full cold index
+    Warming, // a background warm-up is in flight
+    Ready,   // live initialized session; session_complete is the fast path
+    Failed,  // last start failed and the retry backoff hasn't elapsed
+}
+
+// session_warm_state is a cheap, non-blocking snapshot used by the editor main
+// thread to route a completion request without ever paying the cold start.
+session_warm_state :: proc(s: ^Session) -> Warm_State {
+    sync.lock(&s.state_mutex)
+    defer sync.unlock(&s.state_mutex)
+    if s.started && !s.dead {return .Ready}
+    if s.warming {return .Warming}
+    if s.next_retry_ns != 0 && time.tick_now()._nsec < s.next_retry_ns {return .Failed}
+    return .Cold
+}
+
+@(private = "file")
+Warm_Args :: struct {
+    s:       ^Session,
+    ols_bin: string,
+    root:    string,
+    share:   string,
+}
+
+// session_warm_async kicks ensure_started on a background thread so the caller
+// never blocks on the cold ols spawn + godot-collection index (up to 30s).
+// At most one warm-up is in flight; a no-op when Ready/Warming/closing or
+// inside the failed-start backoff window. Safe to call on every request.
+session_warm_async :: proc(s: ^Session, ols_bin, root, share: string) {
+    sync.lock(&s.state_mutex)
+    if (s.started && !s.dead) || s.warming || s.closing ||
+       (s.next_retry_ns != 0 && time.tick_now()._nsec < s.next_retry_ns) {
+        sync.unlock(&s.state_mutex)
+        return
+    }
+    s.warming = true
+    sync.unlock(&s.state_mutex)
+
+    // Reclaim the previous warm thread's handle. warming was false, so that
+    // thread has already passed its final store and join returns promptly.
+    if s.warm_thread != nil {
+        thread.join(s.warm_thread)
+        thread.destroy(s.warm_thread)
+        s.warm_thread = nil
+    }
+
+    a := sess_alloc()
+    args := new(Warm_Args, a)
+    args.s = s
+    args.ols_bin = strings.clone(ols_bin, a)
+    args.root = strings.clone(root, a)
+    args.share = strings.clone(share, a)
+
+    ctx := runtime.default_context()
+    ctx.allocator = a
+    s.warm_thread = thread.create_and_start_with_data(rawptr(args), warm_entry, init_context = ctx)
+    if s.warm_thread == nil {
+        sync.lock(&s.state_mutex)
+        s.warming = false
+        sync.unlock(&s.state_mutex)
+        warm_args_free(args)
+    }
+}
+
+@(private = "file")
+warm_entry :: proc(data: rawptr) {
+    args := cast(^Warm_Args)data
+    s := args.s
+    _ = ensure_started(s, args.ols_bin, args.root, args.share)
+    sync.lock(&s.state_mutex)
+    s.warming = false
+    sync.unlock(&s.state_mutex)
+    warm_args_free(args)
+}
+
+@(private = "file")
+warm_args_free :: proc(args: ^Warm_Args) {
+    a := sess_alloc()
+    delete(args.ols_bin, a)
+    delete(args.root, a)
+    delete(args.share, a)
+    free(args, a)
+}
+
 // Clean shutdown for editor `_finish` / module deinit. Idempotent.
 session_shutdown :: proc(s: ^Session) {
+    // Stop any in-flight warm-up first, and do it BEFORE taking start_mutex:
+    // the warm thread's ensure_started needs that lock to finish, so joining
+    // while holding it would deadlock. `closing` makes a not-yet-started
+    // warm-up bail instead of resurrecting ols mid-teardown.
+    sync.lock(&s.state_mutex)
+    s.closing = true
+    sync.unlock(&s.state_mutex)
+    if s.warm_thread != nil {
+        thread.join(s.warm_thread)
+        thread.destroy(s.warm_thread)
+        s.warm_thread = nil
+    }
+
     sync.lock(&s.start_mutex)
     defer sync.unlock(&s.start_mutex)
+    defer {
+        // allow a later restart (tests reuse sessions); harmless for editor exit
+        sync.lock(&s.state_mutex)
+        s.closing = false
+        sync.unlock(&s.state_mutex)
+    }
     if !s.configured && !s.started {return}
     if s.started && !s.dead {
         // best-effort graceful shutdown before the kill in teardown
@@ -455,7 +570,7 @@ session_shutdown :: proc(s: ^Session) {
         notify(s, `{"jsonrpc":"2.0","method":"exit","params":{}}`)
     }
     if s.workspace != "" {
-        libc.system(fmt.ctprintf("rm -rf '%s'", s.workspace))
+        libc.system(fmt.ctprintf("rm -rf %s", shell_quote(s.workspace, context.temp_allocator)))
     }
     teardown_locked(s)
 }
@@ -481,7 +596,13 @@ ensure_overlay :: proc(s: ^Session, abs_path: string) -> (overlay: string, ok: b
         s.pkg_counter += 1
         ov_dir = fmt.aprintf("%s/pkg%d", s.workspace, s.pkg_counter, allocator = a)
         sync.unlock(&s.start_mutex)
-        cp := fmt.ctprintf("mkdir -p '%s' && cp '%s'/*.odin '%s'/ 2>/dev/null", ov_dir, pkgdir, ov_dir)
+        q_ov := shell_quote(ov_dir, context.temp_allocator)
+        cp := fmt.ctprintf(
+            "mkdir -p %s && cp %s/*.odin %s/ 2>/dev/null",
+            q_ov,
+            shell_quote(pkgdir, context.temp_allocator),
+            q_ov,
+        )
         if libc.system(cp) != 0 {
             delete(ov_dir, a)
             return "", false

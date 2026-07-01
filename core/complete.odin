@@ -32,58 +32,8 @@ import "core:strings"
 OK :: i64(0)
 FAILED :: i64(1)
 
-// Godot collection root (where the `godot` package lives): ProjectSetting `odin_godot/root`
-// -> env `ODIN_GODOT_ROOT` -> repo default. (Same resolution validate.odin uses.)
-// Package-visible (not file-private) so core/lookup.odin resolves the root the SAME way.
-godot_collection_root :: proc(allocator := context.allocator) -> string {
-    ps := godot.singleton_project_settings()
-    key := godot.new_string_cstring("odin_godot/root")
-    if bool(godot.project_settings_has_setting(ps, key)) {
-        def := godot.Variant{}
-        v := godot.project_settings_get_setting(ps, key, def)
-        s := godot.variant_to_string(&v)
-        os_s := string_to_odin(s, allocator)
-        if os_s != "" {return os_s}
-        delete(os_s, allocator)
-    }
-    if v, ok := os.lookup_env("ODIN_GODOT_ROOT", allocator); ok && v != "" {
-        return v
-    }
-    return derive_collection_root(allocator)
-}
-
-// Resolve a `<dir>/<name>` binary the editor process can reach without inheriting a dev PATH:
-// ProjectSetting `<setting>` -> env `<envvar>` -> a `<dir>/<name>` on `$PATH`. Returns
-// ("", false) when nothing resolves to an existing file.
-// Package-visible (not file-private) so core/lookup.odin resolves ols + share the SAME way.
-@(private)
-resolve_bin :: proc(setting: cstring, envvar: string, name: string, allocator := context.allocator) -> (string, bool) {
-    ps := godot.singleton_project_settings()
-    key := godot.new_string_cstring(setting)
-    if bool(godot.project_settings_has_setting(ps, key)) {
-        def := godot.Variant{}
-        v := godot.project_settings_get_setting(ps, key, def)
-        s := godot.variant_to_string(&v)
-        cand := string_to_odin(s, allocator)
-        if cand != "" && os.exists(cand) {return cand, true}
-        delete(cand, allocator)
-    }
-    if v, ok := os.lookup_env(envvar, allocator); ok && v != "" {
-        if os.exists(v) {return v, true}
-        delete(v, allocator)
-    }
-    if pathv, ok := os.lookup_env("PATH", allocator); ok {
-        defer delete(pathv, allocator)
-        it := pathv
-        for dir in strings.split_iterator(&it, ":") {
-            if dir == "" {continue}
-            cand := strings.concatenate({dir, "/", name}, allocator)
-            if os.exists(cand) {return cand, true}
-            delete(cand, allocator)
-        }
-    }
-    return "", false
-}
+// The godot_collection_root / resolve_bin resolvers this file used to own now live in
+// core/resolve.odin (shared with validate/lookup/reload/export_plugin).
 
 // Derive the Odin distribution `share` dir (holding the base/core/vendor/shared collections)
 // so ols.json can point at them WITHOUT relying on `odin root` (the editor usually can't reach
@@ -247,14 +197,35 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
         defer delete(root)
         share := resolve_odin_share()
         defer delete(share)
-        // FAST PATH: the persistent ols session (warm ~30-70 ms; no per-request re-index). If
-        // the session can't start / died / timed out it returns ok=false and we transparently
-        // fall back to the (slower but self-contained) fresh-spawn `run_completion` so
-        // completion never regresses. See core/complete/session.odin.
-        cs, ok := complete.session_complete(&complete.g_session, code, abs_path, root, share, ols_bin)
-        if !ok {
-            for c in cs {delete(c.label); delete(c.insert_text); delete(c.detail)}
-            delete(cs)
+        // COLD ols start pays process spawn + the full godot-collection index (up to 30s) —
+        // never on the main thread. Route on the session's warm state:
+        //   Cold/Warming -> kick (or keep) a one-shot background warm-up and return FAILED
+        //                   NOW; the editor re-requests and hits the warm session later.
+        //   Ready        -> the fast path (warm ~30-70 ms), falling back to fresh-spawn if
+        //                   the session died mid-request.
+        //   Failed       -> ols session unusable: the self-contained fresh-spawn path (and
+        //                   re-kick the warm-up, bounded by its retry backoff).
+        warm := complete.session_warm_state(&complete.g_session)
+        if warm == .Cold || warm == .Warming {
+            complete.session_warm_async(&complete.g_session, ols_bin, root, share)
+            cd_set_int(&result, "result", result_code)
+            cd_set_bool(&result, "force", false)
+            cd_set_str(&result, "call_hint", "")
+            cd_set_arr(&result, "options", &options)
+            (cast(^godot.Dictionary)ret)^ = result
+            return
+        }
+        cs: [dynamic]complete.Completion
+        if warm == .Ready {
+            ok: bool
+            cs, ok = complete.session_complete(&complete.g_session, code, abs_path, root, share, ols_bin)
+            if !ok {
+                for c in cs {delete(c.label); delete(c.insert_text); delete(c.detail)}
+                delete(cs)
+                cs = complete.run_completion(code, abs_path, root, share, ols_bin)
+            }
+        } else {
+            complete.session_warm_async(&complete.g_session, ols_bin, root, share)
             cs = complete.run_completion(code, abs_path, root, share, ols_bin)
         }
         defer {

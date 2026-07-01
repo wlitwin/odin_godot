@@ -27,6 +27,23 @@ Diagnostic :: struct {
 @(private)
 counter: int
 
+// Quote `s` for a POSIX shell (private mirror of core/common.odin's canonical
+// shell_quote — this package must stay Godot/core-free for the unit harness).
+@(private)
+shell_quote :: proc(s: string, allocator := context.allocator) -> string {
+    b := strings.builder_make(allocator)
+    strings.write_byte(&b, '\'')
+    for i in 0 ..< len(s) {
+        if s[i] == '\'' {
+            strings.write_string(&b, `'\''`)
+        } else {
+            strings.write_byte(&b, s[i])
+        }
+    }
+    strings.write_byte(&b, '\'')
+    return strings.to_string(b)
+}
+
 // basename of a '/'-separated path (returns a slice of `path`, no allocation).
 path_base :: proc(path: string) -> string {
     if idx := strings.last_index_byte(path, '/'); idx >= 0 {
@@ -114,24 +131,29 @@ run_check_overlay :: proc(
     tmpdir = strings.trim_suffix(tmpdir, "/")
 
     counter += 1
-    work := fmt.aprintf("%s/odin_validate_%d", tmpdir, counter)
+    // PID in the name: two editor instances validating concurrently must not share (and
+    // rm -rf) each other's overlay dirs — the counter alone is process-local.
+    work := fmt.aprintf("%s/odin_validate_%d_%d", tmpdir, os.get_pid(), counter)
     defer delete(work)
-    out_file := fmt.aprintf("%s/odin_validate_%d.out", tmpdir, counter)
+    out_file := fmt.aprintf("%s/odin_validate_%d_%d.out", tmpdir, os.get_pid(), counter)
     defer delete(out_file)
+
+    q_work := shell_quote(work, context.temp_allocator)
+    q_pkgdir := shell_quote(pkgdir, context.temp_allocator)
 
     // 1. Fresh overlay dir holding a copy of every sibling `.odin` (incl. `*.gen.odin`).
     setup := fmt.ctprintf(
-        "rm -rf '%s' && mkdir -p '%s' && cp '%s'/*.odin '%s'/ 2>/dev/null",
-        work,
-        work,
-        pkgdir,
-        work,
+        "rm -rf %s && mkdir -p %s && cp %s/*.odin %s/ 2>/dev/null",
+        q_work,
+        q_work,
+        q_pkgdir,
+        q_work,
     )
     if libc.system(setup) != 0 {
         return empty
     }
     defer {
-        cleanup := fmt.ctprintf("rm -rf '%s' '%s'", work, out_file)
+        cleanup := fmt.ctprintf("rm -rf %s %s", q_work, shell_quote(out_file, context.temp_allocator))
         libc.system(cleanup)
     }
 
@@ -144,11 +166,11 @@ run_check_overlay :: proc(
 
     // 3. Type/parse-check the overlay; capture stdout+stderr.
     check := fmt.ctprintf(
-        "'%s' check '%s' -collection:godot='%s' -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc > '%s' 2>&1",
-        odin_bin,
-        work,
-        root,
-        out_file,
+        "%s check %s -collection:godot=%s -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc > %s 2>&1",
+        shell_quote(odin_bin, context.temp_allocator),
+        q_work,
+        shell_quote(root, context.temp_allocator),
+        shell_quote(out_file, context.temp_allocator),
     )
     libc.system(check) // rc ignored: diagnostics are read from the captured output
 

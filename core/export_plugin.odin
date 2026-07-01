@@ -222,8 +222,19 @@ setup_scripts_from_template :: proc() {
         editor_msg_error("odin_godot: couldn't locate the addon — set the `odin_godot/root` project setting, then retry.")
         return
     }
+    // The built addon ships the template at <root>/template/scripts; an in-repo checkout
+    // keeps it at <root>/build/template/scripts (dist.nix moves it up when packaging).
     src := strings.concatenate({root, "/template/scripts"})
     defer delete(src)
+    if !os.exists(src) {
+        alt := strings.concatenate({root, "/build/template/scripts"})
+        if os.exists(alt) {
+            delete(src)
+            src = alt
+        } else {
+            delete(alt)
+        }
+    }
 
     gres := godot.new_string_cstring("res://scripts")
     destg := godot.project_settings_globalize_path(godot.singleton_project_settings(), gres)
@@ -236,7 +247,12 @@ setup_scripts_from_template :: proc() {
     }
     fis, derr := os.read_directory_by_path(src, -1, context.temp_allocator)
     if derr != nil {
-        editor_msg_error(fmt.tprintf("odin_godot: template not found at %s — is the addon intact?", src))
+        editor_msg_error(
+            fmt.tprintf(
+                "odin_godot: template not found at %s (nor under build/template/scripts) — is the addon intact?",
+                src,
+            ),
+        )
         return
     }
     if !os.exists(dest) {
@@ -318,16 +334,6 @@ detect_target :: proc(features: ^godot.Packed_String_Array) -> string {
     return ""
 }
 
-// The odin_godot repo root (collection path for the compile). Hardcoded like every
-// other build script here, overridable via env for a relocated checkout.
-@(private = "file")
-godot_root :: proc(allocator := context.allocator) -> string {
-    if v, ok := os.lookup_env("ODIN_GODOT_ROOT", allocator); ok && v != "" {
-        return v
-    }
-    return strings.clone("/Users/walter/data/code/odin/odin_godot", allocator)
-}
-
 // Absolute filesystem path of `res://` for the project being exported.
 @(private = "file")
 project_dir :: proc(allocator := context.allocator) -> string {
@@ -395,8 +401,18 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
 
     proj := project_dir()
     defer delete(proj)
-    root := godot_root()
+    // Same resolution as validate/reload: `odin_godot/root` setting -> ODIN_GODOT_ROOT env
+    // -> derived. NEVER a hardcoded checkout path — a consumer exporting from a GUI-launched
+    // editor has neither the env nor the maintainer's filesystem.
+    root := odin_collection_root()
     defer delete(root)
+    if root == "" {
+        export_error(
+            "odin export: couldn't locate the odin_godot collection — set the " +
+            "`odin_godot/root` project setting to the addon/checkout path, then retry.",
+        )
+        return
+    }
 
     if target == "web" {
         // Web: the FULL extension (core + binding + this project's scripts) is AOT-compiled
@@ -438,16 +454,17 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         defer delete(outwasm)
         odin_dir := dir_of(odin_bin)
         emcc_dir := dir_of(emcc_bin)
+        // shell_quote every interpolated path (settings are user-editable; see common.odin).
         cmd := fmt.ctprintf(
-            "PATH='%s':'%s':\"$PATH\" ODIN='%s' EMCC='%s' ODIN_EXPORT_OPT='%s' ODIN_GODOT_ROOT='%s' bash '%s/build/build_web.sh' '%s' 1>&2",
-            odin_dir,
-            emcc_dir,
-            odin_bin,
-            emcc_bin,
-            opt,
-            root,
-            root,
-            proj,
+            "PATH=%s:%s:\"$PATH\" ODIN=%s EMCC=%s ODIN_EXPORT_OPT=%s ODIN_GODOT_ROOT=%s bash %s/build/build_web.sh %s 1>&2",
+            shell_quote(odin_dir, context.temp_allocator),
+            shell_quote(emcc_dir, context.temp_allocator),
+            shell_quote(odin_bin, context.temp_allocator),
+            shell_quote(emcc_bin, context.temp_allocator),
+            shell_quote(opt, context.temp_allocator),
+            shell_quote(root, context.temp_allocator),
+            shell_quote(root, context.temp_allocator),
+            shell_quote(proj, context.temp_allocator),
         )
         export_log(fmt.tprintf("odin export: building web SIDE_MODULE wasm (-o:%s) -> %s", opt, outwasm))
         rc := libc.system(cmd)
@@ -500,15 +517,15 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
 
     // Run the scriptgen + odin build pipeline for the target, OPTIMIZED (ODIN_EXPORT_OPT).
     cmd := fmt.ctprintf(
-        "PATH='%s':\"$PATH\" ODIN='%s' ODIN_EXPORT_OPT='%s' ODIN_GODOT_ROOT='%s' bash '%s/build/build_export_scripts.sh' '%s' '%s' '%s' 1>&2",
-        dir_of(odin_bin),
-        odin_bin,
-        opt,
-        root,
-        root,
-        proj,
-        target,
-        outdll,
+        "PATH=%s:\"$PATH\" ODIN=%s ODIN_EXPORT_OPT=%s ODIN_GODOT_ROOT=%s bash %s/build/build_export_scripts.sh %s %s %s 1>&2",
+        shell_quote(dir_of(odin_bin), context.temp_allocator),
+        shell_quote(odin_bin, context.temp_allocator),
+        shell_quote(opt, context.temp_allocator),
+        shell_quote(root, context.temp_allocator),
+        shell_quote(root, context.temp_allocator),
+        shell_quote(proj, context.temp_allocator),
+        shell_quote(target, context.temp_allocator),
+        shell_quote(outdll, context.temp_allocator),
     )
     export_log(fmt.tprintf("odin export: compiling scripts for %s (-o:%s) -> %s", target, opt, outdll))
     rc := libc.system(cmd)

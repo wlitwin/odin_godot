@@ -222,18 +222,38 @@ odin_scripts_manifest :: proc "c" () -> (descs: [^]Class_Desc, count: int) {
 // -> jumps into garbage). Auto-derived from the shared struct sizes so adding/removing a field
 // bumps it automatically; ABI_GENERATION is a manual bump for layout changes size_of can't see
 // (e.g. reordering Class_Desc's fields).
-ABI_GENERATION :: u32(1)
-ABI_VERSION :: ABI_GENERATION ~
-	u32(size_of(Class_Desc)) ~
-	(u32(size_of(Lifecycle)) << 8) ~
-	(u32(size_of(Export)) << 16) ~
-	(u32(size_of(Method)) << 5) ~
-	(u32(size_of(Signal)) << 13) ~
-	(u32(size_of(Onready)) << 21) ~
-	(u32(size_of(Connection)) << 3) ~
-	(u32(size_of(Rpc)) << 11)
+//
+// The sizes are folded with FNV-1a (each size is one "symbol": xor then multiply by the FNV
+// prime, masked to 32 bits so the untyped-constant arithmetic never overflows). The previous
+// scheme XOR'd shifted sizes together, and XOR terms can CANCEL — two offsetting size changes
+// (or one struct growing by exactly what another shrank, at colliding shift positions) yielded
+// the SAME version for a different layout. FNV-1a's multiply makes the fold order- and
+// position-sensitive, so any single size change always changes the version.
+ABI_GENERATION :: 1
+@(private) ABI_FNV_PRIME :: 16777619
+@(private) ABI_H0 :: ((2166136261 ~ ABI_GENERATION)        * ABI_FNV_PRIME) & 0xFFFF_FFFF
+@(private) ABI_H1 :: ((ABI_H0 ~ size_of(Class_Desc))       * ABI_FNV_PRIME) & 0xFFFF_FFFF
+@(private) ABI_H2 :: ((ABI_H1 ~ size_of(Lifecycle))        * ABI_FNV_PRIME) & 0xFFFF_FFFF
+@(private) ABI_H3 :: ((ABI_H2 ~ size_of(Export))           * ABI_FNV_PRIME) & 0xFFFF_FFFF
+@(private) ABI_H4 :: ((ABI_H3 ~ size_of(Method))           * ABI_FNV_PRIME) & 0xFFFF_FFFF
+@(private) ABI_H5 :: ((ABI_H4 ~ size_of(Signal))           * ABI_FNV_PRIME) & 0xFFFF_FFFF
+@(private) ABI_H6 :: ((ABI_H5 ~ size_of(Onready))          * ABI_FNV_PRIME) & 0xFFFF_FFFF
+@(private) ABI_H7 :: ((ABI_H6 ~ size_of(Connection))       * ABI_FNV_PRIME) & 0xFFFF_FFFF
+@(private) ABI_H8 :: ((ABI_H7 ~ size_of(Rpc))              * ABI_FNV_PRIME) & 0xFFFF_FFFF
+ABI_VERSION :: u32(ABI_H8)
 
 @(export)
 odin_scripts_abi_version :: proc "c" () -> u32 {
 	return ABI_VERSION
+}
+
+// Compiler-skew handshake, companion to the ABI version above. Same struct SIZES do not
+// guarantee the same layout/calling conventions across Odin compiler releases, so the core
+// also compares the compiler that built the scripts dll against its own ODIN_VERSION and
+// refuses the manifest on a mismatch ("rebuild your scripts"). Pure data — safe to call
+// before boot. A dll built before this symbol existed dlsyms to nil, which the core treats
+// as a mismatch too (never a crash).
+@(export)
+odin_scripts_odin_version :: proc "c" () -> cstring {
+	return ODIN_VERSION
 }

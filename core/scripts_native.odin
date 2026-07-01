@@ -46,6 +46,11 @@ Scripts_Dll :: struct {
 	// before reading the manifest to reject a scripts dll built against a different addon
 	// version. Absent (nil) on a dll built before this handshake existed — also a mismatch.
 	odin_scripts_abi_version: proc "c" () -> u32,
+	// ODIN_VERSION of the compiler that built the scripts dll (see rt.odin_scripts_odin_version).
+	// Same struct sizes across Odin releases do not guarantee the same layout/calling
+	// conventions, so a compiler mismatch is rejected like an ABI mismatch. Absent (nil) on an
+	// older dll — also treated as a mismatch, never a crash.
+	odin_scripts_odin_version: proc "c" () -> cstring,
 }
 
 @(private)
@@ -66,6 +71,13 @@ g_scripts_abi_skew: bool
 g_abi_core: u32
 @(private)
 g_abi_scripts: u32
+
+// Set when the scripts dll was built by a different Odin compiler than the core (compiler skew:
+// same struct sizes do not guarantee the same layout/ABI across compiler releases).
+@(private)
+g_scripts_odin_skew: bool
+@(private)
+g_odin_scripts: string // compiler version reported by the rejected dll (heap-owned clone)
 
 // surface_load_failure_runtime — in a SHIPPED GAME (NOT the editor), a missing or incompatible
 // scripts dll means the game runs with zero Odin scripts. Push a visible error to the game log
@@ -104,7 +116,7 @@ surface_load_failure_runtime :: proc(detail: string) {
 // must never nag a player. Tells the user this is the normal first-run state and how to fix.
 @(private)
 scripts_surface_missing_warning :: proc() {
-	if !g_scripts_missing && !g_scripts_abi_skew {
+	if !g_scripts_missing && !g_scripts_abi_skew && !g_scripts_odin_skew {
 		return
 	}
 	if g_scripts_missing_warned {
@@ -115,6 +127,20 @@ scripts_surface_missing_warning :: proc() {
 		return
 	}
 	g_scripts_missing_warned = true
+	if g_scripts_odin_skew {
+		// Loaded, but compiled by a different Odin than the core — same "rebuild" fix.
+		msg := godot.new_string_odin(
+			fmt.tprintf(
+				"odin_godot: your scripts dll was built with Odin %s, core with %s — rebuild " +
+				"scripts: addons/odin_godot/build/build_scripts.sh (your scripts won't load " +
+				"until you do).",
+				g_odin_scripts,
+				ODIN_VERSION,
+			),
+		)
+		godot.gd_push_error(godot.variant_from_string(&msg))
+		return
+	}
 	if g_scripts_abi_skew {
 		// Loaded, but built against a different odin_godot version — a clear "rebuild" message,
 		// not the fresh-install one.
@@ -216,8 +242,22 @@ core_dll_dir :: proc(allocator := context.allocator) -> (string, bool) {
 				return strings.clone(path[:idx], allocator), true
 			}
 		}
+	} else when ODIN_OS == .Windows {
+		// GetModuleHandleExW needs the core:sys/windows import, which can't live behind a
+		// `when` — the implementation is in scripts_native_windows.odin (#+build windows).
+		return core_dll_dir_windows(cast(rawptr)odin_scripts_load, allocator)
 	}
 	return "", false
+}
+
+// Shared-library extension of the scripts dll on THIS platform (also the suffix of the
+// hot-reload unique copies, `<base>.rN<ext>`).
+when ODIN_OS == .Windows {
+	SCRIPTS_DLL_EXT :: ".dll"
+} else when ODIN_OS == .Linux {
+	SCRIPTS_DLL_EXT :: ".so"
+} else {
+	SCRIPTS_DLL_EXT :: ".dylib"
 }
 
 // Resolve the scripts dll path. Order: explicit env override (test harness) ->
@@ -228,9 +268,7 @@ scripts_dll_path :: proc() -> string {
 	if override, ok := os.lookup_env("ODIN_SCRIPTS_DLL", context.allocator); ok && override != "" {
 		return override
 	}
-	ext := ".dylib"
-	when ODIN_OS == .Windows {ext = ".dll"}
-	when ODIN_OS == .Linux {ext = ".so"}
+	ext := SCRIPTS_DLL_EXT
 
 	if dir, ok := core_dll_dir(); ok {
 		defer delete(dir)
@@ -259,6 +297,11 @@ odin_scripts_load :: proc() {
 	path := scripts_dll_path()
 	defer delete(path)
 
+	// Sweep `<base>.rN.<ext>` unique-copy artifacts left by PREVIOUS sessions' hot reloads:
+	// the reload counter restarts with the process, and the old copies are no longer mapped
+	// by anyone — without this they accumulate in bin/ forever.
+	cleanup_stale_reload_copies(path)
+
 	_, ok := dynlib.initialize_symbols(&scripts_dll, path, "", "__handle")
 	if !ok || scripts_dll.__handle == nil || scripts_dll.odin_scripts_boot == nil || scripts_dll.odin_scripts_manifest == nil {
 		gdext_print("odin: failed to load scripts dll", path)
@@ -273,13 +316,13 @@ odin_scripts_load :: proc() {
 		return
 	}
 
-	// Boot FIRST so the scripts dll's gdext/godot globals are live, THEN read the manifest.
-	scripts_dll.odin_scripts_boot(saved_get_proc_address, gdext.library)
-
-	// ABI handshake: refuse to read the manifest from a scripts dll built against a different
+	// ABI handshake FIRST, before boot: refuse a scripts dll built against a different
 	// odin_godot version (its Class_Desc layout would differ -> reading at wrong offsets ->
-	// heap corruption / garbage proc ptrs). nil symbol = built before this handshake existed =
-	// also a mismatch. The fix is always "rebuild your scripts dll".
+	// heap corruption / garbage proc ptrs). The version procs are PURE DATA (they return
+	// constants), so they are safe to call pre-boot — and booting a mismatched dll (letting
+	// it initialize its gdext/godot globals against this core) is exactly what must not
+	// happen. nil symbol = built before this handshake existed = also a mismatch. The fix is
+	// always "rebuild your scripts dll".
 	scripts_abi := u32(0)
 	if scripts_dll.odin_scripts_abi_version != nil {
 		scripts_abi = scripts_dll.odin_scripts_abi_version()
@@ -295,6 +338,32 @@ odin_scripts_load :: proc() {
 		surface_load_failure_runtime(fmt.tprintf("ABI mismatch: core v%d, scripts v%d", rt.ABI_VERSION, scripts_abi))
 		return
 	}
+
+	// Compiler-skew handshake (also pre-boot, also pure data): matching struct SIZES across
+	// different Odin compiler releases do not guarantee the same layout/calling conventions.
+	// A missing symbol (a dll built before this handshake) is a mismatch too — never a crash.
+	scripts_odin := "unknown (older scripts dll)"
+	if scripts_dll.odin_scripts_odin_version != nil {
+		if cs := scripts_dll.odin_scripts_odin_version(); cs != nil {
+			scripts_odin = string(cs)
+		}
+	}
+	if scripts_odin != ODIN_VERSION {
+		gdext_print(
+			"odin: scripts dll compiler mismatch",
+			fmt.tprintf("scripts dll built with Odin %s, core with %s — rebuild scripts (build/build_scripts.sh)", scripts_odin, ODIN_VERSION),
+		)
+		g_scripts_odin_skew = true
+		g_odin_scripts = strings.clone(scripts_odin)
+		surface_load_failure_runtime(
+			fmt.tprintf("scripts dll built with Odin %s, core with %s — rebuild scripts", scripts_odin, ODIN_VERSION),
+		)
+		return
+	}
+
+	// Handshakes passed: boot so the scripts dll's gdext/godot globals are live, THEN read
+	// the manifest.
+	scripts_dll.odin_scripts_boot(saved_get_proc_address, gdext.library)
 
 	// Hand the scripts dll the typed cross-script resolver (Option A). Optional: an older
 	// scripts dll without the runtime symbol simply leaves rt.script_of returning nil.
@@ -331,6 +400,33 @@ odin_scripts_load :: proc() {
 @(private)
 reload_counter: int
 
+// Best-effort sweep of `<base>.rN<ext>` unique-copy artifacts (see odin_scripts_reload)
+// left by PREVIOUS sessions: the counter restarts with the process and nothing maps the
+// old copies anymore. Runs once at initial load, BEFORE the first reload of this session.
+@(private = "file")
+cleanup_stale_reload_copies :: proc(base: string) {
+	slash := strings.last_index_byte(base, '/')
+	when ODIN_OS == .Windows {
+		if bidx := strings.last_index_byte(base, '\\'); bidx > slash {
+			slash = bidx
+		}
+	}
+	if slash < 0 {return}
+	dir_path := base[:slash]
+	prefix := fmt.tprintf("%s.r", base[slash + 1:])
+
+	fd, oerr := os.open(dir_path)
+	if oerr != nil {return}
+	defer os.close(fd)
+	files, rerr := os.read_dir(fd, -1, context.temp_allocator)
+	if rerr != nil {return}
+	for fi in files {
+		if strings.has_prefix(fi.name, prefix) {
+			os.remove(fi.fullpath)
+		}
+	}
+}
+
 @(private)
 odin_scripts_reload :: proc() -> bool {
 	context.allocator = core_allocator()
@@ -347,7 +443,7 @@ odin_scripts_reload :: proc() -> bool {
 	defer delete(data)
 
 	reload_counter += 1
-	unique := fmt.aprintf("%s.r%d.dylib", base, reload_counter)
+	unique := fmt.aprintf("%s.r%d%s", base, reload_counter, SCRIPTS_DLL_EXT)
 	defer delete(unique)
 	if write_err := os.write_entire_file(unique, data); write_err != nil {
 		gdext_print("odin reload: cannot write unique dll", unique)

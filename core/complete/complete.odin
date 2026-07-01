@@ -39,6 +39,23 @@ Completion :: struct {
 @(private)
 counter: int
 
+// Quote `s` for a POSIX shell (private mirror of core/common.odin's canonical
+// shell_quote — this package must stay Godot/core-free for the unit harness).
+@(private)
+shell_quote :: proc(s: string, allocator := context.allocator) -> string {
+    b := strings.builder_make(allocator)
+    strings.write_byte(&b, '\'')
+    for i in 0 ..< len(s) {
+        if s[i] == '\'' {
+            strings.write_string(&b, `'\''`)
+        } else {
+            strings.write_byte(&b, s[i])
+        }
+    }
+    strings.write_byte(&b, '\'')
+    return strings.to_string(b)
+}
+
 // U+FFFF — the sentinel `TextEdit::get_text_for_code_completion()` inserts at the caret.
 // (Godot hands `_complete_code` the FULL buffer with this marker at the cursor.)
 @(private)
@@ -471,20 +488,34 @@ run_completion :: proc(
     tmpdir = strings.trim_suffix(tmpdir, "/")
 
     counter += 1
-    work := fmt.aprintf("%s/odin_complete_%d", tmpdir, counter)
+    // PID in the name: two editor instances must not share (and rm -rf) each other's dirs.
+    work := fmt.aprintf("%s/odin_complete_%d_%d", tmpdir, os.get_pid(), counter)
     defer delete(work)
-    in_file := fmt.aprintf("%s/odin_complete_%d.in", tmpdir, counter)
+    in_file := fmt.aprintf("%s/odin_complete_%d_%d.in", tmpdir, os.get_pid(), counter)
     defer delete(in_file)
-    out_file := fmt.aprintf("%s/odin_complete_%d.out", tmpdir, counter)
+    out_file := fmt.aprintf("%s/odin_complete_%d_%d.out", tmpdir, os.get_pid(), counter)
     defer delete(out_file)
 
+    q_work := shell_quote(work, context.temp_allocator)
+
     // 1. Fresh overlay dir with a copy of every sibling `.odin` (incl. `*.gen.odin`).
-    setup := fmt.ctprintf("rm -rf '%s' && mkdir -p '%s' && cp '%s'/*.odin '%s'/ 2>/dev/null", work, work, pkgdir, work)
+    setup := fmt.ctprintf(
+        "rm -rf %s && mkdir -p %s && cp %s/*.odin %s/ 2>/dev/null",
+        q_work,
+        q_work,
+        shell_quote(pkgdir, context.temp_allocator),
+        q_work,
+    )
     if libc.system(setup) != 0 {
         return empty
     }
     defer {
-        cleanup := fmt.ctprintf("rm -rf '%s' '%s' '%s'", work, in_file, out_file)
+        cleanup := fmt.ctprintf(
+            "rm -rf %s %s %s",
+            q_work,
+            shell_quote(in_file, context.temp_allocator),
+            shell_quote(out_file, context.temp_allocator),
+        )
         libc.system(cleanup)
     }
 
@@ -513,7 +544,13 @@ run_completion :: proc(
     }
 
     // 5. Run ols once over the batch (cwd = overlay so it discovers ols.json), capture stdout.
-    run := fmt.ctprintf("cd '%s' && '%s' < '%s' > '%s' 2>/dev/null", work, ols_bin, in_file, out_file)
+    run := fmt.ctprintf(
+        "cd %s && %s < %s > %s 2>/dev/null",
+        q_work,
+        shell_quote(ols_bin, context.temp_allocator),
+        shell_quote(in_file, context.temp_allocator),
+        shell_quote(out_file, context.temp_allocator),
+    )
     libc.system(run) // rc ignored: the reply is read from the captured frames
 
     data, rerr := os.read_entire_file(out_file, context.allocator)
