@@ -1,8 +1,9 @@
 package godot
 
 // Ergonomic helpers for ENet-based multiplayer / RPC — hand-written (like the other
-// Ergonomics_*.odin), and mirrored in bindgen/upstream/godot/ so they survive binding
-// regeneration.
+// Ergonomics_*.odin) and owned here (binding regeneration only rewrites *.gen.odin).
+// RPC method names are interned as STATIC StringNames — pass string literals only (see the
+// interning note in Ergonomics.odin). Addresses may be dynamic (freed here).
 //
 // These collapse the host/join + peer-id + sender-id dance into a few readable lines so P2P
 // co-op netcode reads like:
@@ -66,6 +67,7 @@ join :: proc "contextless" (node: Node, address: cstring, port: int) -> bool {
 		peer := new_e_net_multiplayer_peer()
 		if cast(rawptr)peer == nil {return false}
 		addr := new_string_cstring(address)
+		defer free_string(addr)
 		err := e_net_multiplayer_peer_create_client(peer, addr, Int(port), 0, 0, 0, 0)
 		if err != .Ok {return false}
 		mp := node_get_multiplayer(node)
@@ -117,6 +119,7 @@ connected_peers :: proc(node: Node) -> []int {
 	mp := node_get_multiplayer(node)
 	if cast(rawptr)mp == nil {return nil}
 	arr := multiplayer_api_get_peers(mp)
+	defer free_packed_int32_array(arr)
 	n := int(packed_int32_array_size(&arr))
 	if n <= 0 {return nil}
 	out := make([]int, n, context.temp_allocator)

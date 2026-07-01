@@ -82,6 +82,10 @@ godot_allocator :: #force_inline proc "contextless" () -> (a: runtime.Allocator)
 @(private)
 default_godot_allocator := godot_allocator()
 
+// Single GLOBAL arena backing `context.temp_allocator` under godot_context(). NOT
+// thread-safe: only the main thread may allocate through it — background threads must
+// bring their own arenas (core/diag/async.odin and core/complete/session.odin do).
+// Reset once per frame by reset_temp_arena (called from the core's frame pump).
 @(private)
 temp_arena := runtime.Arena {
     backing_allocator = default_godot_allocator,
@@ -89,6 +93,13 @@ temp_arena := runtime.Arena {
 
 @(private)
 default_temp_godot_allocator := runtime.Allocator{runtime.arena_allocator_proc, &temp_arena}
+
+// Free everything allocated through godot_context()'s temp_allocator. Called once per
+// frame from the main-thread frame pump (OdinLanguage._frame -> lv_frame); nothing may
+// retain a temp pointer across frames.
+reset_temp_arena :: proc() {
+    runtime.arena_free_all(&temp_arena)
+}
 
 godot_context :: #force_inline proc "contextless" () -> (c: runtime.Context) {
     c.allocator = default_godot_allocator

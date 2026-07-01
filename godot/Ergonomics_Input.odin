@@ -1,7 +1,13 @@
 package godot
 
-// Ergonomic helpers for InputMap — hand-written, mirrored in bindgen/upstream/godot/ so
-// they survive binding regeneration.
+// Ergonomic helpers for InputMap — hand-written and owned here (binding regeneration only
+// rewrites *.gen.odin).
+//
+// Action names are interned as STATIC StringNames — per the GDExtension contract the engine
+// may keep the buffer for the program's lifetime, so pass string literals (or other
+// program-lifetime ASCII cstrings) only; never `fmt.ctprintf`-built names. For a dynamic
+// action name, use `new_string_name_cstring(name, false)` + the bound `input_*` proc +
+// `free_string_name`.
 //
 // These let Odin code DEFINE input actions at runtime (the autoload-style "register the
 // game's actions on _ready" pattern), wrapping the InputMap singleton

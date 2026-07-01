@@ -2,8 +2,8 @@ package godot
 
 // ----------------------------------------------------------------------------
 // Ergonomic helpers for WebRTC multiplayer — the WEB / browser co-op transport.
-// Hand-written (like the other Ergonomics_*.odin), and mirrored in
-// bindgen/upstream/godot/ so it survives binding regeneration.
+// Hand-written (like the other Ergonomics_*.odin) and owned here (binding regeneration only
+// rewrites *.gen.odin).
 //
 // WHY: Godot's web export does NOT ship ENetMultiplayerPeer, so `gd.host`/`gd.join`
 // (Ergonomics_Multiplayer.odin) return false in the browser. The browser DOES have native
@@ -96,7 +96,10 @@ Webrtc_Error :: enum {
 Webrtc_Session :: struct {
 	active:    bool,
 	is_host:   bool,
-	node:      Node,
+	// The owning node's INSTANCE ID (object_get_instance_id), not its raw pointer: a freed
+	// node's pointer can be reused by a new allocation, which would alias a stale session
+	// slot onto an unrelated node. Instance ids are never reused.
+	node_id:   u64,
 	mp:        Multiplayer_Api,
 	ws:        Web_Socket_Peer,
 	rtc:       Web_Rtc_Multiplayer_Peer,
@@ -133,8 +136,9 @@ _find_free :: proc "contextless" () -> ^Webrtc_Session {
 
 @(private = "file")
 _find :: proc "contextless" (node: Node) -> ^Webrtc_Session {
+	id := object_get_instance_id(node)
 	for i in 0 ..< _WEBRTC_MAX_SESSIONS {
-		if _sessions[i].active && _sessions[i].node == node {return &_sessions[i]}
+		if _sessions[i].active && _sessions[i].node_id == id {return &_sessions[i]}
 	}
 	return nil
 }
@@ -167,11 +171,12 @@ _webrtc_start :: proc "contextless" (node: Node, url: cstring, room: cstring, is
 	if cast(rawptr)ws == nil {return false}
 	tls: Tls_Options
 	u := new_string_cstring(url)
+	defer free_string(u)
 	if web_socket_peer_connect_to_url(ws, u, tls) != .Ok {return false}
 	s^ = Webrtc_Session {
 		active  = true,
 		is_host = is_host,
-		node    = node,
+		node_id = object_get_instance_id(node),
 		mp      = mp,
 		ws      = ws,
 		state   = .Connecting_Ws,
@@ -234,6 +239,7 @@ webrtc_poll :: proc "contextless" (node: Node) {
 	if s.state == .Connecting_Ws {
 		if rs != .State_Open {return}
 		m := new_dictionary_default()
+		defer free_dictionary(m)
 		if s.is_host {
 			_dset(&m, "type", _vstr("create"))
 		} else {
@@ -263,6 +269,7 @@ webrtc_close :: proc "contextless" (node: Node) {
 		rs := web_socket_peer_get_ready_state(s.ws)
 		if rs == .State_Open {
 			m := new_dictionary_default()
+			defer free_dictionary(m)
 			_dset(&m, "type", _vstr("leave"))
 			_send_json(s.ws, &m)
 		}
@@ -282,6 +289,7 @@ webrtc_close :: proc "contextless" (node: Node) {
 @(private = "file")
 _handle_packet :: proc "contextless" (s: ^Webrtc_Session) {
 	pba := packet_peer_get_packet(s.ws)
+	defer free_packed_byte_array(pba)
 	sz := int(packed_byte_array_size(&pba))
 	buf: [32768]u8
 	m := min(sz, len(buf))
@@ -290,9 +298,12 @@ _handle_packet :: proc "contextless" (s: ^Webrtc_Session) {
 	}
 
 	gs := new_string_odin(string(buf[:m]))
+	defer free_string(gs)
 	v := json_parse_string(gs)
+	defer variant_destroy(&v)
 	if gdext.variant_get_type(cast(gdext.VariantPtr)&v) != .Dictionary {return}
 	d := variant_to_dictionary(&v)
+	defer free_dictionary(d)
 
 	tbuf: [32]u8
 	typ := _dget_str(&d, "type", tbuf[:])
@@ -318,8 +329,10 @@ _handle_packet :: proc "contextless" (s: ^Webrtc_Session) {
 
 	case "signal":
 		dv := _dget(&d, "data")
+		defer variant_destroy(&dv)
 		if gdext.variant_get_type(cast(gdext.VariantPtr)&dv) == .Dictionary {
 			dd := variant_to_dictionary(&dv)
+			defer free_dictionary(dd)
 			_apply_signal(s, &dd)
 		}
 
@@ -345,6 +358,7 @@ _handle_packet :: proc "contextless" (s: ^Webrtc_Session) {
 _install_peer :: proc "contextless" (s: ^Webrtc_Session, server: bool) {
 	s.rtc = new_web_rtc_multiplayer_peer()
 	chans := new_array_default()
+	defer free_array(chans)
 	if server {
 		web_rtc_multiplayer_peer_create_server(s.rtc, chans)
 	} else {
@@ -356,7 +370,9 @@ _install_peer :: proc "contextless" (s: ^Webrtc_Session, server: bool) {
 @(private = "file")
 _store_room :: proc "contextless" (s: ^Webrtc_Session, d: ^Dictionary) {
 	rv := _dget(d, "room")
+	defer variant_destroy(&rv)
 	rs := variant_to_string(&rv)
+	defer free_string(rs)
 	s.room_len = len(_str_to_buf(rs, s.room_buf[:]))
 }
 
@@ -369,13 +385,19 @@ _store_room :: proc "contextless" (s: ^Webrtc_Session, d: ^Dictionary) {
 _store_ice :: proc "contextless" (s: ^Webrtc_Session, d: ^Dictionary) {
 	if !_dhas(d, "ice") {return}
 	iv := _dget(d, "ice")
-	if gdext.variant_get_type(cast(gdext.VariantPtr)&iv) != .Array {return}
+	if gdext.variant_get_type(cast(gdext.VariantPtr)&iv) != .Array {
+		variant_destroy(&iv)
+		return
+	}
 	// Wrap the iceServers array in the config dict shape WebRTCPeerConnection.initialize expects,
 	// then stringify via Godot's JSON so we never hand-roll Array/Dictionary persistence.
 	cfg := new_dictionary_default()
-	dictionary_set(&cfg, _vstr("iceServers"), iv)
+	defer free_dictionary(cfg)
+	_dset(&cfg, "iceServers", iv) // _dset consumes iv
 	cv := variant_from_dictionary(&cfg)
+	defer variant_destroy(&cv)
 	js := json_stringify(cv, string_empty(), false, false)
+	defer free_string(js)
 	s.ice_len = len(_str_to_buf(js, s.ice_buf[:]))
 	s.have_ice = s.ice_len > 0
 }
@@ -386,16 +408,24 @@ _apply_signal :: proc "contextless" (s: ^Webrtc_Session, dd: ^Dictionary) {
 	if !s.have_conn {return}
 	if _dhas(dd, "sdp") {
 		tv := _dget(dd, "sdp_type")
+		defer variant_destroy(&tv)
 		t := variant_to_string(&tv)
+		defer free_string(t)
 		sv := _dget(dd, "sdp")
+		defer variant_destroy(&sv)
 		sdp := variant_to_string(&sv)
+		defer free_string(sdp)
 		web_rtc_peer_connection_set_remote_description(s.conn, t, sdp)
 	} else if _dhas(dd, "name") {
 		mv := _dget(dd, "media")
+		defer variant_destroy(&mv)
 		media := variant_to_string(&mv)
+		defer free_string(media)
 		idx := _dget_int(dd, "index")
 		nv := _dget(dd, "name")
+		defer variant_destroy(&nv)
 		name := variant_to_string(&nv)
+		defer free_string(name)
 		web_rtc_peer_connection_add_ice_candidate(s.conn, media, Int(idx), name)
 	}
 }
@@ -410,16 +440,24 @@ _setup_connection :: proc "contextless" (s: ^Webrtc_Session) {
 	// LAN / a relay with no TURN secret). Built by parsing JSON so the nested iceServers/urls
 	// arrays need no hand-rolled Array construction.
 	ice_js := s.have_ice ? new_string_odin(string(s.ice_buf[:s.ice_len])) : new_string_cstring(_ICE_CONFIG_JSON)
+	defer free_string(ice_js)
 	cfgv := json_parse_string(ice_js)
+	defer variant_destroy(&cfgv)
 	cfg := variant_to_dictionary(&cfgv)
+	defer free_dictionary(cfg)
 	web_rtc_peer_connection_initialize(conn, cfg)
 
 	// Route the connection's async outputs (SDP + ICE) into our relay procs via custom
 	// Callables that carry the session pointer — no per-game handler methods required.
+	// object_connect copies the Callable into the connection, so release our temporaries.
 	sd_sig := new_string_name_cstring("session_description_created", true)
 	ic_sig := new_string_name_cstring("ice_candidate_created", true)
-	object_connect(conn, sd_sig, _make_callable(_on_session_description, s), 0)
-	object_connect(conn, ic_sig, _make_callable(_on_ice_candidate, s), 0)
+	sd_cb := _make_callable(_on_session_description, s)
+	defer free_callable(sd_cb)
+	ic_cb := _make_callable(_on_ice_candidate, s)
+	defer free_callable(ic_cb)
+	object_connect(conn, sd_sig, sd_cb, 0)
+	object_connect(conn, ic_sig, ic_cb, 0)
 
 	s.conn = conn
 	s.have_conn = true
@@ -463,11 +501,14 @@ _on_session_description :: proc "c" (
 	type_s: String
 	sdp_s: String
 	to_str(cast(gdext.TypePtr)&type_s, args[0])
+	defer free_string(type_s)
 	to_str(cast(gdext.TypePtr)&sdp_s, args[1])
+	defer free_string(sdp_s)
 
 	web_rtc_peer_connection_set_local_description(s.conn, type_s, sdp_s)
 
 	data := new_dictionary_default()
+	defer free_dictionary(data)
 	_dset(&data, "kind", _vstr("sdp"))
 	_dset(&data, "sdp_type", _vstr_g(type_s))
 	_dset(&data, "sdp", _vstr_g(sdp_s))
@@ -494,10 +535,13 @@ _on_ice_candidate :: proc "c" (
 	name_s: String
 	index: i64
 	to_str(cast(gdext.TypePtr)&media_s, args[0])
+	defer free_string(media_s)
 	to_int(cast(gdext.TypePtr)&index, args[1])
 	to_str(cast(gdext.TypePtr)&name_s, args[2])
+	defer free_string(name_s)
 
 	data := new_dictionary_default()
+	defer free_dictionary(data)
 	_dset(&data, "kind", _vstr("ice"))
 	_dset(&data, "media", _vstr_g(media_s))
 	_dset(&data, "index", _vint(int(index)))
@@ -513,33 +557,45 @@ _on_ice_candidate :: proc "c" (
 @(private = "file")
 _send_signal :: proc "contextless" (s: ^Webrtc_Session, data: ^Dictionary) {
 	msg := new_dictionary_default()
+	defer free_dictionary(msg)
 	_dset(&msg, "type", _vstr("signal"))
 	_dset(&msg, "to", _vint(s.remote_id))
-	dv := variant_from_dictionary(data)
-	dictionary_set(&msg, _vstr("data"), dv)
+	_dset(&msg, "data", variant_from_dictionary(data)) // _dset consumes the Variant
 	_send_json(s.ws, &msg)
 }
 
 // ---- small contextless helpers (JSON + Variant/Dictionary glue; no allocation context) -------
+//
+// Ownership convention: the _vstr*/_vint builders return a Variant OWNED BY THE CALLER (the
+// intermediate Godot String is freed inside — the Variant constructor takes its own
+// reference). `_dset` CONSUMES its `val` Variant (dictionary_set stores a copy, so _dset
+// destroys both the key and the value temporaries); `_dget` returns a Variant the caller must
+// destroy.
 
 // _send_json stringifies a Dictionary via Godot's JSON and sends it as one text frame.
+// `d` is not consumed.
 @(private = "file")
 _send_json :: proc "contextless" (ws: Web_Socket_Peer, d: ^Dictionary) {
 	mv := variant_from_dictionary(d)
+	defer variant_destroy(&mv)
 	js := json_stringify(mv, string_empty(), false, false)
+	defer free_string(js)
 	web_socket_peer_send_text(ws, js)
 }
 
 @(private = "file")
 _vstr :: proc "contextless" (s: cstring) -> Variant {
 	gs := new_string_cstring(s)
+	defer free_string(gs)
 	return variant_from_string(&gs)
 }
 @(private = "file")
 _vstr_odin :: proc "contextless" (s: string) -> Variant {
 	gs := new_string_odin(s)
+	defer free_string(gs)
 	return variant_from_string(&gs)
 }
+// _vstr_g does NOT consume `gs` — the caller still owns (and must free) its String.
 @(private = "file")
 _vstr_g :: proc "contextless" (gs: String) -> Variant {
 	gs := gs
@@ -550,27 +606,41 @@ _vint :: proc "contextless" (i: int) -> Variant {
 	v := Int(i)
 	return variant_from_int(&v)
 }
+// _dset stores `val` under `key` and CONSUMES `val` (dictionary_set copies; the key and value
+// temporaries are destroyed here).
 @(private = "file")
 _dset :: proc "contextless" (d: ^Dictionary, key: cstring, val: Variant) {
-	dictionary_set(d, _vstr(key), val)
+	val := val
+	defer variant_destroy(&val)
+	k := _vstr(key)
+	defer variant_destroy(&k)
+	dictionary_set(d, k, val)
 }
+// _dget returns the value Variant OWNED BY THE CALLER (destroy with variant_destroy).
 @(private = "file")
 _dget :: proc "contextless" (d: ^Dictionary, key: cstring) -> Variant {
-	return dictionary_get(d, _vstr(key), Variant{})
+	k := _vstr(key)
+	defer variant_destroy(&k)
+	return dictionary_get(d, k, Variant{})
 }
 @(private = "file")
 _dhas :: proc "contextless" (d: ^Dictionary, key: cstring) -> bool {
-	return bool(dictionary_has(d, _vstr(key)))
+	k := _vstr(key)
+	defer variant_destroy(&k)
+	return bool(dictionary_has(d, k))
 }
 @(private = "file")
 _dget_int :: proc "contextless" (d: ^Dictionary, key: cstring) -> int {
 	v := _dget(d, key)
+	defer variant_destroy(&v)
 	return int(variant_to_int(&v))
 }
 @(private = "file")
 _dget_str :: proc "contextless" (d: ^Dictionary, key: cstring, buf: []u8) -> string {
 	v := _dget(d, key)
+	defer variant_destroy(&v)
 	s := variant_to_string(&v)
+	defer free_string(s)
 	return _str_to_buf(s, buf)
 }
 

@@ -1,10 +1,14 @@
 package godot
 
-// Ergonomic helpers for common gameplay/UI classes — hand-written, mirrored in
-// bindgen/upstream/godot/ so they survive binding regeneration. They collapse the verbose bits
+// Ergonomic helpers for common gameplay/UI classes — hand-written and owned here (binding
+// regeneration only rewrites *.gen.odin). They collapse the verbose bits
 // (constructing a Godot String / StringName, multi-arg method calls with defaults) into
 // `gd.<helper>(...)` one-liners. Generic helpers take `Object` (so `self.owner` passes with no
 // cast); the class-specific ones take the class alias for a little type safety.
+//
+// Animation names (animation_play / sprite_play) are interned as STATIC StringNames — pass
+// string literals only, never dynamically built cstrings (see the interning note in
+// Ergonomics.odin). Text (set_text) may be dynamic.
 
 // ---- Text: any Control with a `text` property (Label, Button, LineEdit, RichTextLabel, …) ----
 

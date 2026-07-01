@@ -1,15 +1,18 @@
 package godot
 
-// Ergonomic helpers for loading resources / instancing scenes — hand-written, mirrored in
-// bindgen/upstream/godot/ so they survive binding regeneration.
+// Ergonomic helpers for loading resources / instancing scenes — hand-written and owned here
+// (binding regeneration only rewrites *.gen.odin).
 
 // load loads a resource by `res://` (or absolute) path through ResourceLoader, reusing the
-// cache (Cache_Mode_Reuse). Collapses the singleton + two-String + cache-mode dance:
+// cache (Cache_Mode_Reuse). Collapses the singleton + two-String + cache-mode dance
+// (`path` may be dynamic; the temporary Strings are freed here):
 //
 //     tex := gd.load("res://icon.png")
 load :: proc "contextless" (path: cstring) -> Resource {
 	p := new_string_cstring(path)
+	defer free_string(p)
 	hint := new_string_cstring("")
+	defer free_string(hint)
 	return resource_loader_load(singleton_resource_loader(), p, hint, .Cache_Mode_Reuse)
 }
 

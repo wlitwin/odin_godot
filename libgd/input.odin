@@ -2,26 +2,29 @@ package libgd
 
 import "godot:godot"
 
+// get_input_vector mirrors `gd.get_vector` (godot/Ergonomics_Input.odin) but adds a `static`
+// flag for DYNAMICALLY BUILT action names. With `static = true` (action names are string
+// literals — the common case) it simply delegates to `gd.get_vector`, which interns the names
+// as static StringNames per the GDExtension contract (no frees needed, but the cstrings must
+// live for the program's lifetime). With `static = false` it builds refcounted StringNames
+// and frees them after the call — use this for names from `fmt.ctprintf` or other transient
+// buffers, which `gd.get_vector` must NOT be given.
 get_input_vector :: proc "contextless" (negative_x: cstring, positive_x: cstring, negative_y: cstring, positive_y: cstring, static: bool) -> godot.Vector2 {
-    negative_x_name := godot.new_string_name(negative_x, static)
-    defer if !static {
-        godot.free_string_name(negative_x_name)
+    if static {
+        return godot.get_vector(negative_x, positive_x, negative_y, positive_y)
     }
 
-    positive_x_name := godot.new_string_name(positive_x, static)
-    defer if !static {
-        godot.free_string_name(positive_x_name)
-    }
+    negative_x_name := godot.new_string_name(negative_x, false)
+    defer godot.free_string_name(negative_x_name)
 
-    negative_y_name := godot.new_string_name(negative_y, static)
-    defer if !static {
-        godot.free_string_name(negative_y_name)
-    }
+    positive_x_name := godot.new_string_name(positive_x, false)
+    defer godot.free_string_name(positive_x_name)
 
-    positive_y_name := godot.new_string_name(positive_y, static)
-    defer if !static {
-        godot.free_string_name(positive_y_name)
-    }
+    negative_y_name := godot.new_string_name(negative_y, false)
+    defer godot.free_string_name(negative_y_name)
+
+    positive_y_name := godot.new_string_name(positive_y, false)
+    defer godot.free_string_name(positive_y_name)
 
     return godot.input_get_vector(godot.singleton_input(), negative_x_name, positive_x_name, negative_y_name, positive_y_name, -1.0)
 }

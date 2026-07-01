@@ -1,17 +1,23 @@
 package godot
 
-// Ergonomic helpers for Node tree operations — hand-written, mirrored in
-// bindgen/upstream/godot/ so they survive binding regeneration.
+// Ergonomic helpers for Node tree operations — hand-written and owned here (binding
+// regeneration only rewrites *.gen.odin).
 //
 // Object handles (Node2d, Area2d, …) are all type-aliases up to `Object`, so these helpers
 // take `Object`/`Node` and accept any node handle (e.g. a script's `self.owner`) with no
 // cast, and a returned `Node` assigns to any handle var.
+//
+// Group names are interned as STATIC StringNames — pass string literals only (see the
+// interning note in Ergonomics.odin). Scene PATHS may be dynamic: they go through refcounted
+// String/NodePath temporaries that are freed here.
 
-// get_node resolves a child of `node` by scene path (collapses NodePath + node_get_node):
+// get_node resolves a child of `node` by scene path (collapses NodePath + node_get_node).
+// `path` may be a dynamically built cstring; the temporary NodePath is freed here:
 //
 //     hud := gd.get_node(self.owner, "Hud")
 get_node :: proc "contextless" (node: Object, path: cstring) -> Node {
 	np := new_node_path_cstring(path)
+	defer free_node_path(np)
 	return node_get_node(node, np)
 }
 
@@ -34,7 +40,10 @@ add_child :: proc "contextless" (parent: Object, child: Object) {
 add_child_deferred :: proc "contextless" (parent: Object, child: Object) {
 	m := new_string_name_cstring("add_child", true)
 	c := child
+	// call_deferred copies its argument Variants, so destroy ours after the call (an Object
+	// Variant can hold a reference when the target is RefCounted).
 	cv := variant_from_object(&c)
+	defer variant_destroy(&cv)
 	object_call_deferred(parent, m, cv)
 }
 

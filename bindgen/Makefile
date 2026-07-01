@@ -19,6 +19,18 @@
 # source in the repo top level. The generator only produces the `godot` package, so
 # `generate` must NOT copy over ../gdext (doing so clobbered hand fixes like the
 # allocator .Resize bug). Edit ../gdext in place.
+#
+# CONTRACT: `generate` only writes `*.gen.odin` files into ../godot. The hand-written
+# files in ../godot (Strings.odin, Variant.odin, Ergonomics*.odin — see HAND_WRITTEN
+# below) are the single source of truth, live ONLY in ../godot, and are never copied,
+# overwritten, or deleted by any target here. The generator itself emits only
+# `*.gen.odin`, and the publish step below copies only `*.gen.odin`.
+#
+# HAND_WRITTEN (owned in ../godot, NOT touched by regen):
+#   Strings.odin Variant.odin Ergonomics.odin Ergonomics_Debug.odin
+#   Ergonomics_Gameplay.odin Ergonomics_Input.odin Ergonomics_Multiplayer.odin
+#   Ergonomics_Nodes.odin Ergonomics_Project.odin Ergonomics_Properties.odin
+#   Ergonomics_Scenes.odin Ergonomics_Signals.odin Ergonomics_WebRtc.odin
 
 UPSTREAM   := upstream
 API        := $(abspath ../extension_api.json)
@@ -55,8 +67,9 @@ generate: $(BINDGEN)
 	cd $(UPSTREAM) && rm -f godot/*.gen.odin && ./bin/bindgen $(API) -jobs:$(JOBS)
 	mkdir -p $(GODOT_OUT)
 	rm -f $(GODOT_OUT)/*.gen.odin
-	cp $(UPSTREAM)/godot/*.odin $(GODOT_OUT)/
+	cp $(UPSTREAM)/godot/*.gen.odin $(GODOT_OUT)/
 	@echo "Generated $$(ls $(GODOT_OUT)/*.gen.odin | wc -l) files into $(GODOT_OUT)"
+	@echo "NOTE: only *.gen.odin published; hand-written godot/*.odin are owned in $(GODOT_OUT)."
 	@echo "NOTE: ../gdext and ../libgd are owned runtime (not regenerated/copied)."
 
 # Type-check the published package (collection `godot` = repo root).

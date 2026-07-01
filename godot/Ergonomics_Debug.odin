@@ -1,8 +1,9 @@
 package godot
 
 // Ergonomic logging / error helpers over the generated `gd_*` utility functions —
-// hand-written (like Strings.odin / Variant.odin), and mirrored in
-// bindgen/upstream/godot/ so they survive binding regeneration.
+// hand-written (like Strings.odin / Variant.odin) and owned here (binding regeneration only
+// rewrites *.gen.odin). Message text may be dynamic (ctprintf/tprintf output is fine); the
+// temporary Godot String + Variant each helper builds are freed here.
 //
 // Odin scripts are AOT-compiled NATIVE code with NO interpreter, so Godot's in-editor
 // breakpoints / step / expression-eval do NOT work for them. The day-to-day debugging
@@ -28,7 +29,9 @@ package godot
 // print logs `s` to the Godot output (stdout + the editor Output panel), like GDScript `print`.
 print :: proc "contextless" (s: cstring) {
 	str := new_string_cstring(s)
+	defer free_string(str)
 	v := variant_from_string(&str)
+	defer variant_destroy(&v)
 	gd_print(v)
 }
 
@@ -36,7 +39,9 @@ print :: proc "contextless" (s: cstring) {
 // building the cstring yourself.
 print_str :: proc "contextless" (s: string) {
 	str := new_string_odin(s)
+	defer free_string(str)
 	v := variant_from_string(&str)
+	defer variant_destroy(&v)
 	gd_print(v)
 }
 
@@ -67,27 +72,35 @@ print_bool :: proc "contextless" (v: bool) {
 // fault conditions (GDScript `push_error`).
 error :: proc "contextless" (s: cstring) {
 	str := new_string_cstring(s)
+	defer free_string(str)
 	v := variant_from_string(&str)
+	defer variant_destroy(&v)
 	gd_push_error(v)
 }
 
 // error_str — `error` for an Odin `string` (e.g. `fmt.tprintf` output).
 error_str :: proc "contextless" (s: string) {
 	str := new_string_odin(s)
+	defer free_string(str)
 	v := variant_from_string(&str)
+	defer variant_destroy(&v)
 	gd_push_error(v)
 }
 
 // warn pushes a Godot warning (yellow, non-fatal — GDScript `push_warning`).
 warn :: proc "contextless" (s: cstring) {
 	str := new_string_cstring(s)
+	defer free_string(str)
 	v := variant_from_string(&str)
+	defer variant_destroy(&v)
 	gd_push_warning(v)
 }
 
 // warn_str — `warn` for an Odin `string`.
 warn_str :: proc "contextless" (s: string) {
 	str := new_string_odin(s)
+	defer free_string(str)
 	v := variant_from_string(&str)
+	defer variant_destroy(&v)
 	gd_push_warning(v)
 }

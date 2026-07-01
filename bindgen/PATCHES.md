@@ -11,7 +11,7 @@ compiler and to generate a valid `godot` binding package from our
 All commands must run inside the project Nix dev shell. From the repo root:
 
 ```sh
-nix develop --command make -C bindgen          # build + generate -> ../godot, ../gdext
+nix develop --command make -C bindgen          # build + generate -> ../godot (*.gen.odin only)
 nix develop --command make -C bindgen check    # odin check the generated package
 ```
 
@@ -21,7 +21,11 @@ The pipeline the Makefile encodes (matches the upstream `Makefile`):
 2. `cd upstream && ./bin/temple_cli bindgen bindgen bindgen`   (writes `bindgen/templates.odin`)
 3. `cd upstream && odin build bindgen/ -o:speed -out:bin/bindgen`
 4. `cd upstream && ./bin/bindgen <abs path>/extension_api.json -jobs:1`  (writes `upstream/godot/*.gen.odin`)
-5. copy `upstream/godot/*.odin` -> `../godot/` and `upstream/gdext/*.odin` -> `../gdext/`
+5. copy `upstream/godot/*.gen.odin` -> `../godot/` (ONLY the generated files; the
+   hand-written `../godot/*.odin` — `Strings.odin`, `Variant.odin`, the
+   `Ergonomics*.odin` family — are the single source of truth in `../godot` and
+   are never copied over or deleted by regeneration; `../gdext`/`../libgd` are
+   likewise owned runtime and never copied)
 
 ## Stdlib drift fixes (compile errors)
 
@@ -91,12 +95,16 @@ No template (`*.temple.twig`) changes were required — the emitted Odin is vali
 
 ## Output placement
 
-- Generated package → `../godot/` (`package godot`, 1059 `*.gen.odin` files plus
-  the upstream hand-written `Strings.odin` and `Variant.odin`).
-- The package's only external dependency is `import "godot:gdext"`. The upstream
-  `gdext` runtime package (`package gdextension`) was copied to a new top-level
-  `../gdext/` so the generated package resolves and type-checks at its final
-  location (`collection godot = repo root`).
+- Generated package → `../godot/` (`package godot`, 1059 `*.gen.odin` files). The
+  package also contains 13 hand-written files — `Strings.odin`, `Variant.odin`,
+  and the `Ergonomics*.odin` family — which live ONLY in `../godot/` (single
+  source of truth) and are never written by the generator or the publish step.
+- The package's only external dependency is `import "godot:gdext"`. The `gdext`
+  runtime package (`package gdextension`) at the top-level `../gdext/` is owned,
+  hand-edited source (originally derived from upstream, since diverged — e.g.
+  `Variant_Type` is `enum c.int` to match the C ABI); the stale
+  `upstream/gdext/`/`upstream/libgd/` copies were deleted and nothing under
+  `bindgen/` references them.
 
 ## Caveats / coverage limitations of the generated bindings
 

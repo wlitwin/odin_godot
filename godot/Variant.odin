@@ -4,16 +4,22 @@ import gd "godot:gdext"
 import "base:intrinsics"
 import "core:math"
 
-REAL_PRECISION :: #config(REAL_PRECISION, "float_64")
+// REAL_PRECISION selects the width of Godot's `real_t` and must match the engine build:
+// "single" (default; stock Godot builds) or "double" (an engine compiled with
+// `precision=double` — select with `-define:REAL_PRECISION=double`). Any other value is a
+// configuration mistake, so fail the build loudly instead of silently falling back to f32.
+REAL_PRECISION :: #config(REAL_PRECISION, "single")
 
 when REAL_PRECISION == "double" {
     Real :: f64
     Quat :: quaternion256
     REAL_INF :: math.INF_F64
-} else {
+} else when REAL_PRECISION == "single" {
     Real :: f32
     Quat :: quaternion128
     REAL_INF :: math.INF_F32
+} else {
+    #panic("Unknown REAL_PRECISION value; expected \"single\" or \"double\" (-define:REAL_PRECISION=double for a double-precision engine build)")
 }
 
 Bool :: bool
@@ -939,6 +945,9 @@ variant_to :: proc "contextless" (
         return variant_to_rid(from)
     } else when T == Object {
         return variant_to_object(from)
+    } else when T == Ref_Counted {
+        // Ref_Counted class aliases are Object handles at the engine boundary.
+        return cast(Ref_Counted)variant_to_object(from)
     } else when T == Callable {
         return variant_to_callable(from)
     } else when T == Signal {
@@ -1403,6 +1412,10 @@ variant_type :: proc "contextless" (
         return .Rid
     } else when T == Object {
         return .Object
+    } else when T == Ref_Counted {
+        // Ref_Counted (and every class alias built on it — Resource, Texture2d, …) is still an
+        // engine Object; a Variant holding one is an Object-typed Variant.
+        return .Object
     } else when T == Callable {
         return .Callable
     } else when T == Signal {
@@ -1429,6 +1442,8 @@ variant_type :: proc "contextless" (
         return .Packed_Vector3_Array
     } else when T == Packed_Color_Array {
         return .Packed_Color_Array
+    } else when T == Packed_Vector4_Array {
+        return .Packed_Vector4_Array
     } else {
         #panic("Unknown type passed to variant_type")
     }

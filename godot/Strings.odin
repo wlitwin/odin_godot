@@ -85,9 +85,16 @@ Clones a UTF8 cstring into a Godot String_Name
 
 Inputs:
 - from: The cstring to be cloned. Must be null-terminated.
+- static: When true, the name is interned for the LIFETIME OF THE PROGRAM and — per the
+  GDExtension static-StringName contract — the engine may keep referring to `from`'s buffer
+  forever. So with `static = true`, `from` MUST be a string literal (or another
+  program-lifetime, never-freed cstring) and ASCII/latin1; do NOT pass a dynamically built
+  cstring (e.g. `fmt.ctprintf(...)` output, user text, scene paths) — pass `static = false`
+  for those (and release the refcounted name with `free_string_name` when done).
 
 Returns:
-- res: A cloned Godot String_Name
+- res: A cloned Godot String_Name. `static = true` names are interned and never freed;
+  `static = false` names are refcounted and owned by the caller (free with `free_string_name`).
 */
 new_string_name_cstring :: proc "contextless" (from: cstring, static: bool) -> (ret: String_Name) {
     ret = String_Name{}
@@ -108,8 +115,15 @@ new_string_name_cstring :: proc "contextless" (from: cstring, static: bool) -> (
 }
 
 
+/*
+Clones a UTF8 cstring into a Godot Node_Path.
+
+Returns a Node_Path OWNED BY THE CALLER — release it with `free_node_path` when done.
+The intermediate Godot String is freed here (the Node_Path constructor copies it).
+*/
 new_node_path_cstring :: proc "contextless" (from: cstring) -> Node_Path {
     str: String
     gd.string_new_with_utf8_chars(&str, from)
+    defer free_string(str)
     return new_node_path_string(str)
 }

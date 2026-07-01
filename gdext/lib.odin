@@ -144,7 +144,12 @@ VariantFromTypeConstructorProc :: #type proc "c" (variant: UninitializedVariantP
 TypeFromVariantConstructorProc :: #type proc "c" (type: TypePtr, variant: VariantPtr)
 VariantGetInternalPtrFunc :: #type proc "c" (variant: VariantPtr) -> rawptr
 PtrOperatorEvaluator :: #type proc "c" (left: TypePtr, right: TypePtr, result: TypePtr)
-PtrBuiltInMethod :: #type proc "c" (base: TypePtr, args: ^TypePtr, returns: TypePtr, arg_count: int)
+// NOTE: the C header (gdextension_interface.h) declares `arg_count` as int32_t for both
+// PtrBuiltInMethod and PtrUtilityFunction. It stays Odin `int` here because every generated
+// call site passes `len(args)` (typed int); switching to i32 needs a bindgen template change
+// (follow-up). Passing a register-sized int where the callee reads int32_t is benign on all
+// supported C ABIs (the value always fits; the callee reads the low 32 bits).
+PtrBuiltInMethod :: #type proc "c" (base: TypePtr, args: [^]TypePtr, returns: TypePtr, arg_count: int)
 PtrConstructor :: #type proc "c" (base: UninitializedTypePtr, args: ^TypePtr)
 PtrDestructor :: #type proc "c" (base: TypePtr)
 PtrSetter :: #type proc "c" (base: TypePtr, value: TypePtr)
