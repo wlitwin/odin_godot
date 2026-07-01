@@ -204,6 +204,8 @@ Export_Info :: struct {
 	// richer-authoring #4: author proc names from `get=`/`set=` (""=plain field access).
 	getter:      string,
 	setter:      string,
+	// 1-based source line of the field (for `_get_member_line` — editor jump-to-member).
+	line:        int,
 }
 
 // richer-authoring #1: an `@onready` auto-wired node ref — a struct field of object-handle

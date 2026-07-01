@@ -72,6 +72,9 @@ Export :: struct {
 	// instead of reading/writing the raw field. nil => plain offset-based field access.
 	getter:      proc "c" (self: rawptr, ret: gdext.VariantPtr),
 	setter:      proc "c" (self: rawptr, value: gdext.VariantPtr),
+	// 1-based source line of the field in the authored `.odin`, for `_get_member_line`
+	// (editor jump-to-member / member outline). 0 == unknown.
+	line:        i32,
 }
 
 // An `@onready`-style auto-wired node reference (richer-authoring #1). On the node's

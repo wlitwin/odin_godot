@@ -401,6 +401,7 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 				default_str = default_str,
 				getter      = getter,
 				setter      = setter,
+				line        = ident.pos.line,
 			})
 		}
 	}

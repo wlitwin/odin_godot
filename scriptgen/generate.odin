@@ -316,7 +316,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		for ex in s.exports {
 			fmt.sbprintf(
 				b,
-				"\t{{name = \"%s\", type = %s, offset = offset_of(%s, %s), size = size_of(%s), hint = %d, hint_string = \"%s\"",
+				"\t{{name = \"%s\", type = %s, offset = offset_of(%s, %s), size = size_of(%s), hint = %d, hint_string = \"%s\", line = %d",
 				ex.name,
 				ex.vi.enum_name,
 				cls,
@@ -324,6 +324,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				ex.type_text,
 				ex.hint,
 				ex.hint_string,
+				ex.line,
 			)
 			// Optional richer-authoring fields — emit only when set (nil/false otherwise).
 			if ex.group != "" {

@@ -557,6 +557,43 @@ v_get_script_signal_list :: proc "c" (instance: gdext.ExtensionClassInstancePtr,
     (cast(^godot.Array)ret)^ = arr
 }
 
+// `_get_members` — the script's member variables (its exported fields) as StringNames, for the
+// editor's member outline / member-name highlighting. Fresh Array each call (engine owns it).
+@(private = "file")
+v_get_members :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+    context = gdext.godot_context()
+    self := cast(^OdinScript)instance
+    arr := godot.new_array_default()
+    if desc, ok := odin_script_resolve_desc(self); ok {
+        for ex in desc.exports {
+            godot.array_push_back(&arr, v_sn(ex.name))
+        }
+    }
+    (cast(^godot.Array)ret)^ = arr
+}
+
+// `_get_member_line` — 1-based source line of an exported member in the authored `.odin`, so the
+// editor can jump to it. args[0] is the member's StringName; -1 when unknown.
+@(private = "file")
+v_get_member_line :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+    context = gdext.godot_context()
+    self := cast(^OdinScript)instance
+    name := string_name_to_odin(cast(gdext.StringNamePtr)args[0])
+    defer delete(name)
+    line := i64(-1)
+    if desc, ok := odin_script_resolve_desc(self); ok {
+        for ex in desc.exports {
+            if string(ex.name) == name {
+                if ex.line > 0 {
+                    line = i64(ex.line)
+                }
+                break
+            }
+        }
+    }
+    ret_int(ret, line)
+}
+
 @(private = "file")
 v_get_script_method_list :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
@@ -959,9 +996,9 @@ odin_script_register :: proc() {
     add("_get_doc_class_name", v_string_name_empty) // StringName
     add("_get_method_info", v_dict_empty) // Dictionary
     add("_get_property_default_value", v_get_property_default_value) // Variant
-    add("_get_member_line", v_int_neg1) // int (-1 == unknown)
+    add("_get_member_line", v_get_member_line) // int line of an exported member (-1 == unknown)
     add("_get_constants", v_dict_empty) // Dictionary
-    add("_get_members", v_empty_array) // typedarray::StringName
+    add("_get_members", v_get_members) // typedarray::StringName — exported member vars
     add("_get_rpc_config", v_get_rpc_config) // Variant — real per-method @(gd_rpc) config
     add("_get_script_method_argument_count", v_variant_nil) // Variant
     add("_get_class_icon_path", v_get_class_icon_path) // String — `//gd:icon` marker path
