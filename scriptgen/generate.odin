@@ -145,6 +145,11 @@ emit_method_trampoline :: proc(b: ^strings.Builder, s: ^Script, m: Method_Info) 
 	w(b, "\n")
 
 	fmt.sbprintf(b, "@(private = \"file\")\n%s :: proc \"c\" (self_raw: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr) {{\n", fname)
+	// Arity guard (dll-boundary defense in depth; the core's inst_call checks too): the
+	// unpack below reads exactly this many Variants — a short call must not read past them.
+	if len(m.args) > 0 {
+		fmt.sbprintf(b, "\tif argc < %d {{return}}\n", len(m.args))
+	}
 	w(b, "\tcontext = rt.script_context()\n")
 	w(b, "\t_ensure_ctors()\n")
 	fmt.sbprintf(b, "\tself := cast(^%s)self_raw\n", cls)
@@ -316,7 +321,8 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		for ex in s.exports {
 			fmt.sbprintf(
 				b,
-				"\t{{name = \"%s\", type = %s, offset = offset_of(%s, %s), size = size_of(%s), hint = %d, hint_string = \"%s\", line = %d",
+				// %q for every user-authored string (hint specs etc. can carry quotes/backslashes).
+			"\t{{name = \"%s\", type = %s, offset = offset_of(%s, %s), size = size_of(%s), hint = %d, hint_string = %q, line = %d",
 				ex.name,
 				ex.vi.enum_name,
 				cls,
@@ -328,15 +334,15 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			)
 			// Optional richer-authoring fields — emit only when set (nil/false otherwise).
 			if ex.group != "" {
-				fmt.sbprintf(b, ", group = \"%s\"", ex.group)
+				fmt.sbprintf(b, ", group = %q", ex.group)
 			}
 			if ex.subgroup != "" {
-				fmt.sbprintf(b, ", subgroup = \"%s\"", ex.subgroup)
+				fmt.sbprintf(b, ", subgroup = %q", ex.subgroup)
 			}
 			if ex.has_default {
 				fmt.sbprintf(b, ", has_default = true, default_num = %v", ex.default_num)
 				if ex.default_str != "" {
-					fmt.sbprintf(b, ", default_str = \"%s\"", ex.default_str)
+					fmt.sbprintf(b, ", default_str = %q", ex.default_str)
 				}
 			}
 			if ex.getter != "" {
@@ -357,7 +363,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	if len(s.onready) > 0 {
 		fmt.sbprintf(b, "@(private = \"file\")\n_%s_onready := [?]rt.Onready {{\n", snake)
 		for o in s.onready {
-			fmt.sbprintf(b, "\t{{offset = offset_of(%s, %s), path = \"%s\"}},\n", cls, o.field, o.path)
+			fmt.sbprintf(b, "\t{{offset = offset_of(%s, %s), path = %q}},\n", cls, o.field, o.path)
 		}
 		w(b, "}\n\n")
 	}
@@ -469,8 +475,8 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	fmt.sbprintf(b, "@(init)\n_register_%s :: proc \"contextless\" () {{\n", snake)
 	w(b, "\trt.register(\n")
 	w(b, "\t\trt.Class_Desc {\n")
-	fmt.sbprintf(b, "\t\t\tname = \"%s\",\n", s.class_name)
-	fmt.sbprintf(b, "\t\t\tbase = \"%s\",\n", s.base)
+	fmt.sbprintf(b, "\t\t\tname = %q,\n", s.class_name)
+	fmt.sbprintf(b, "\t\t\tbase = %q,\n", s.base)
 	// The struct's typeid — lets `rt.script_of(obj, %s)` map T back to this class name for its
 	// type check (runtime/cross.odin). Without it cross-script lookups would type-confuse.
 	fmt.sbprintf(b, "\t\t\tid = typeid_of(%s),\n", cls)
@@ -501,7 +507,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		w(b, "\t\t\ttool = true,\n")
 	}
 	if s.icon != "" {
-		fmt.sbprintf(b, "\t\t\ticon = \"%s\",\n", s.icon)
+		fmt.sbprintf(b, "\t\t\ticon = %q,\n", s.icon)
 	}
 	if s.doc != "" {
 		fmt.sbprintf(b, "\t\t\tdoc = %q,\n", s.doc)

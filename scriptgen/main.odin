@@ -63,7 +63,14 @@ Variant_Info :: struct {
 map_variant :: proc(type_text: string) -> (Variant_Info, bool) {
 	t := strings.trim_space(type_text)
 	// Any pointer-to-object (`^gd.Node2d`, `^gd.Object`, ...) is a Variant Object.
+	// A pointee qualified by an UNKNOWN import alias is not silently an Object though —
+	// same rule as the non-pointer fallback below (ok=false; the caller errors).
 	if strings.has_prefix(t, "^") {
+		pointee := strings.trim_space(t[1:])
+		if strings.contains(pointee, ".") &&
+		   !strings.has_prefix(pointee, "gd.") && !strings.has_prefix(pointee, "godot.") {
+			return {}, false
+		}
 		return Variant_Info{".Object", "rawptr", .Other}, true
 	}
 	// Typed collections — `Typed_Array(T)` / `Typed_Dictionary(K,V)` — resolve to plain Array /
@@ -83,7 +90,15 @@ map_variant :: proc(type_text: string) -> (Variant_Info, bool) {
 	}
 	base := t
 	if i := strings.last_index(base, "."); i >= 0 {
-		base = base[i + 1:] // strip a `gd.` / `godot.` qualifier
+		// Only the KNOWN godot qualifier may be stripped. Author spellings are normalized
+		// to `gd.` from the file's actual `godot:godot` import alias before they reach here
+		// (normalize_godot_qualifier); `godot.` is additionally accepted for the marker
+		// spellings that don't go through the AST. Any OTHER qualifier (a different import,
+		// or a typo'd alias) is NOT silently a godot type — ok=false so the caller errors.
+		if !strings.has_prefix(t, "gd.") && !strings.has_prefix(t, "godot.") {
+			return {}, false
+		}
+		base = base[i + 1:] // strip the `gd.` / `godot.` qualifier
 	}
 	// A whole-struct/handle Variant: enum member ".X", native binding type "gd.X".
 	other :: proc(name: string) -> (Variant_Info, bool) {
@@ -174,9 +189,11 @@ map_variant :: proc(type_text: string) -> (Variant_Info, bool) {
 	case:
 		// Any other QUALIFIED `gd.<Pascal>` selector is a godot Object/class handle
 		// (Node2d, Sprite2D, Texture2D, ...) — these are all ObjectPtr aliases, so they
-		// marshal as a Variant Object. An UNQUALIFIED or non-PascalCase token (a typo, an
-		// `[N]T`, a `map`, ...) is NOT silently an Object — the caller errors on ok=false.
-		if strings.contains(t, ".") && len(base) > 0 && base[0] >= 'A' && base[0] <= 'Z' {
+		// marshal as a Variant Object. Only the KNOWN godot qualifier gets this treatment
+		// (unknown qualifiers already bailed above); an UNQUALIFIED or non-PascalCase token
+		// (a typo, an `[N]T`, a `map`, ...) is NOT silently an Object — ok=false.
+		if (strings.has_prefix(t, "gd.") || strings.has_prefix(t, "godot.")) &&
+		   len(base) > 0 && base[0] >= 'A' && base[0] <= 'Z' {
 			return Variant_Info{".Object", "rawptr", .Other}, true
 		}
 	}
@@ -270,7 +287,7 @@ HINT_TYPE_STRING :: 23 // typed Array/Dictionary element-type encoding (Godot's 
 //   - global_file[=...]    -> Global_File
 //   - global_dir           -> Global_Dir
 //   - resource=Texture2D   -> Resource_Type, hint_string "Texture2D"
-parse_hint_spec :: proc(owner, field, spec: string, field_vt: string) -> (hint: int, hint_string: string, ok: bool) {
+parse_hint_spec :: proc(loc: Loc, owner, field, spec: string, field_vt: string) -> (hint: int, hint_string: string, ok: bool) {
 	name := spec
 	value := ""
 	if eq := strings.index(spec, "="); eq >= 0 {
@@ -284,13 +301,13 @@ parse_hint_spec :: proc(owner, field, spec: string, field_vt: string) -> (hint: 
 	switch name {
 	case "range":
 		if value == "" {
-			errorf("%s.%s: `range` hint needs MIN:MAX[:STEP]", owner, field)
+			error_at(loc, "%s.%s: `range` hint needs MIN:MAX[:STEP]", owner, field)
 			return 0, "", false
 		}
 		return HINT_RANGE, csv(value), true
 	case "enum":
 		if value == "" {
-			errorf("%s.%s: `enum` hint needs A:B:C", owner, field)
+			error_at(loc, "%s.%s: `enum` hint needs A:B:C", owner, field)
 			return 0, "", false
 		}
 		return HINT_ENUM, csv(value), true
@@ -306,7 +323,7 @@ parse_hint_spec :: proc(owner, field, spec: string, field_vt: string) -> (hint: 
 		return HINT_GLOBAL_DIR, csv(value), true
 	case "resource":
 		if value == "" {
-			errorf("%s.%s: `resource` hint needs a type name, e.g. resource=Texture2D", owner, field)
+			error_at(loc, "%s.%s: `resource` hint needs a type name, e.g. resource=Texture2D", owner, field)
 			return 0, "", false
 		}
 		return HINT_RESOURCE_TYPE, value, true
@@ -314,10 +331,10 @@ parse_hint_spec :: proc(owner, field, spec: string, field_vt: string) -> (hint: 
 		// Typed Array export: `gd.Array `gd:"export,array=int"`` (or a Resource class, e.g.
 		// `array=Texture2D`). Renders the Inspector's typed-array editor.
 		if field_vt != ".Array" {
-			errorf("%s.%s: `array=` hint requires the field to be `gd.Array` (got %s)", owner, field, field_vt)
+			error_at(loc, "%s.%s: `array=` hint requires the field to be `gd.Array` (got %s)", owner, field, field_vt)
 			return 0, "", false
 		}
-		part, pok := encode_type_part(owner, field, value, false)
+		part, pok := encode_type_part(loc, owner, field, value, false)
 		if !pok {return 0, "", false}
 		return HINT_TYPE_STRING, part, true
 	case "dict":
@@ -325,20 +342,20 @@ parse_hint_spec :: proc(owner, field, spec: string, field_vt: string) -> (hint: 
 		// separated by `;` (each a builtin like int/float/String or a Resource class). Renders
 		// the Inspector's typed-dictionary editor (Godot 4.4+).
 		if field_vt != ".Dictionary" {
-			errorf("%s.%s: `dict=` hint requires the field to be `gd.Dictionary` (got %s)", owner, field, field_vt)
+			error_at(loc, "%s.%s: `dict=` hint requires the field to be `gd.Dictionary` (got %s)", owner, field, field_vt)
 			return 0, "", false
 		}
 		semi := strings.index(value, ";")
 		if semi < 0 {
-			errorf("%s.%s: `dict=` needs KEY;VALUE, e.g. dict=String;int", owner, field)
+			error_at(loc, "%s.%s: `dict=` needs KEY;VALUE, e.g. dict=String;int", owner, field)
 			return 0, "", false
 		}
-		kpart, kok := encode_type_part(owner, field, value[:semi], false)
-		vpart, vok := encode_type_part(owner, field, value[semi + 1:], false)
+		kpart, kok := encode_type_part(loc, owner, field, value[:semi], false)
+		vpart, vok := encode_type_part(loc, owner, field, value[semi + 1:], false)
 		if !kok || !vok {return 0, "", false}
 		return HINT_TYPE_STRING, strings.concatenate({kpart, ";", vpart}), true
 	case:
-		errorf("%s.%s: unknown export hint %q", owner, field, name)
+		error_at(loc, "%s.%s: unknown export hint %q", owner, field, name)
 		return 0, "", false
 	}
 }
@@ -352,13 +369,13 @@ parse_hint_spec :: proc(owner, field, spec: string, field_vt: string) -> (hint: 
 // class name verbatim (from_odin=false); the `Typed_Array(T)` TYPE form passes an Odin handle
 // type (from_odin=true), so a non-builtin (Resource) name is mapped back to its engine spelling
 // (`Texture2d` -> `Texture2D`) before encoding.
-encode_type_part :: proc(owner, field, t: string, from_odin: bool) -> (string, bool) {
+encode_type_part :: proc(loc: Loc, owner, field, t: string, from_odin: bool) -> (string, bool) {
 	n := strings.trim_space(t)
 	if i := strings.last_index(n, "."); i >= 0 {
 		n = n[i + 1:] // strip a gd./godot. qualifier
 	}
 	if n == "" {
-		errorf("%s.%s: typed Array/Dictionary export has an empty element type", owner, field)
+		error_at(loc, "%s.%s: typed Array/Dictionary export has an empty element type", owner, field)
 		return "", false
 	}
 	if vt := builtin_variant_int(n); vt >= 0 {
@@ -398,7 +415,7 @@ godot_class_name :: proc(odin: string) -> string {
 // derive_typed_collection_hint produces the export hint for a `Typed_Array(T)` /
 // `Typed_Dictionary(K,V)` field type. `matched` is false if `type_text` is neither.
 derive_typed_collection_hint :: proc(
-	owner, field, type_text: string,
+	loc: Loc, owner, field, type_text: string,
 ) -> (matched: bool, hint: int, hint_string: string, ok: bool) {
 	t := strings.trim_space(type_text)
 	if strings.has_prefix(t, "gd.") {
@@ -414,25 +431,25 @@ derive_typed_collection_hint :: proc(
 	open := strings.index_byte(t, '(')
 	close := strings.last_index_byte(t, ')')
 	if open < 0 || close < open {
-		errorf("%s.%s: malformed typed collection %q", owner, field, type_text)
+		error_at(loc, "%s.%s: malformed typed collection %q", owner, field, type_text)
 		return true, 0, "", false
 	}
 	args := split_top_level(t[open + 1:close])
 	if is_arr {
 		if len(args) != 1 {
-			errorf("%s.%s: Typed_Array takes one element type, got %d", owner, field, len(args))
+			error_at(loc, "%s.%s: Typed_Array takes one element type, got %d", owner, field, len(args))
 			return true, 0, "", false
 		}
-		p, pok := encode_type_part(owner, field, args[0], true)
+		p, pok := encode_type_part(loc, owner, field, args[0], true)
 		if !pok {return true, 0, "", false}
 		return true, HINT_TYPE_STRING, p, true
 	}
 	if len(args) != 2 {
-		errorf("%s.%s: Typed_Dictionary takes (KEY, VALUE), got %d", owner, field, len(args))
+		error_at(loc, "%s.%s: Typed_Dictionary takes (KEY, VALUE), got %d", owner, field, len(args))
 		return true, 0, "", false
 	}
-	k, kok := encode_type_part(owner, field, args[0], true)
-	v, vok := encode_type_part(owner, field, args[1], true)
+	k, kok := encode_type_part(loc, owner, field, args[0], true)
+	v, vok := encode_type_part(loc, owner, field, args[1], true)
 	if !kok || !vok {return true, 0, "", false}
 	return true, HINT_TYPE_STRING, strings.concatenate({k, ";", v}), true
 }
@@ -518,20 +535,20 @@ builtin_variant_int :: proc(n: string) -> int {
 // Parse an `@export default=...` literal (richer-authoring #3) for a field of Variant `vi`.
 // Scalars only: Int/Float/Bool -> default_num (bool as 0/1); String -> default_str (quotes
 // stripped). Returns ok=false (with a clear error) for unsupported types / bad literals.
-parse_default :: proc(owner, field: string, vi: Variant_Info, value: string) -> (num: f64, str: string, ok: bool) {
+parse_default :: proc(loc: Loc, owner, field: string, vi: Variant_Info, value: string) -> (num: f64, str: string, ok: bool) {
 	v := strings.trim_space(value)
 	switch vi.kind {
 	case .Int:
 		n, pok := strconv.parse_i64(v)
 		if !pok {
-			errorf("%s.%s: bad integer default %q", owner, field, v)
+			error_at(loc, "%s.%s: bad integer default %q", owner, field, v)
 			return 0, "", false
 		}
 		return f64(n), "", true
 	case .Float:
 		f, pok := strconv.parse_f64(v)
 		if !pok {
-			errorf("%s.%s: bad float default %q", owner, field, v)
+			error_at(loc, "%s.%s: bad float default %q", owner, field, v)
 			return 0, "", false
 		}
 		return f, "", true
@@ -542,7 +559,7 @@ parse_default :: proc(owner, field: string, vi: Variant_Info, value: string) -> 
 		case "false":
 			return 0, "", true
 		case:
-			errorf("%s.%s: bool default must be true/false (got %q)", owner, field, v)
+			error_at(loc, "%s.%s: bool default must be true/false (got %q)", owner, field, v)
 			return 0, "", false
 		}
 	case .Other:
@@ -551,10 +568,10 @@ parse_default :: proc(owner, field: string, vi: Variant_Info, value: string) -> 
 		if vi.enum_name == ".String" {
 			return 0, strings.trim(v, "\"`"), true
 		}
-		errorf("%s.%s: `default=` only supported for int/float/bool/String (type %s)", owner, field, vi.enum_name)
+		error_at(loc, "%s.%s: `default=` only supported for int/float/bool/String (type %s)", owner, field, vi.enum_name)
 		return 0, "", false
 	case .Nil:
-		errorf("%s.%s: `default=` on a void-typed field", owner, field)
+		error_at(loc, "%s.%s: `default=` on a void-typed field", owner, field)
 		return 0, "", false
 	}
 	return 0, "", false
@@ -571,12 +588,14 @@ Method_Info :: struct {
 	gd_name:   string, // the name exposed to GDScript
 	args:      [dynamic]Arg,
 	ret:       Variant_Info, // .Nil kind => void
+	line:      int, // 1-based source line of the proc decl (duplicate-name diagnostics)
 }
 
 Lifecycle_Info :: struct {
 	keyword:   string, // ready / process / physics_process / enter_tree / exit_tree
 	proc_name: string,
 	has_delta: bool,
+	line:      int, // 1-based source line of the proc decl (duplicate diagnostics)
 }
 
 Signal_Arg :: struct {
@@ -587,6 +606,7 @@ Signal_Arg :: struct {
 Signal_Info :: struct {
 	name: string,
 	args: [dynamic]Signal_Arg,
+	line: int, // 1-based source line of the //gd:signal marker (duplicate diagnostics)
 }
 
 // A `@(gd_connect="signal")` declaration on a method: auto-connect owner.signal -> method.
@@ -616,6 +636,8 @@ Rpc_Info :: struct {
 }
 
 Script :: struct {
+	path:        string, // source file path (diagnostics)
+	godot_alias: string, // the file's `godot:godot` import alias ("" = not imported)
 	pkg:         string,
 	struct_name: string,
 	class_name:  string,
@@ -635,8 +657,35 @@ Script :: struct {
 
 had_error: bool
 
+// A diagnostic source location: `path:line:` when both are known, `path:` when only the
+// file is known (line 0), or nothing (a global error). Marker scan line indexes count as
+// lines (1-based), matching the AST's `pos.line`.
+Loc :: struct {
+	path: string,
+	line: int,
+}
+
+// Print the diagnostic prefix. The `scriptgen: error:`/`scriptgen: warning:` convention is
+// what build scripts grep for — the location slots in AFTER it (`scriptgen: error: path:line:`).
+@(private = "file")
+diag_prefix :: proc(kind: string, loc: Loc) {
+	fmt.eprintf("scriptgen: %s: ", kind)
+	if loc.path != "" {
+		if loc.line > 0 {
+			fmt.eprintf("%s:%d: ", loc.path, loc.line)
+		} else {
+			fmt.eprintf("%s: ", loc.path)
+		}
+	}
+}
+
 errorf :: proc(format: string, args: ..any) {
-	fmt.eprintf("scriptgen: error: ")
+	error_at(Loc{}, format, ..args)
+}
+
+// Location-carrying error — prints `scriptgen: error: path:line: message`.
+error_at :: proc(loc: Loc, format: string, args: ..any) {
+	diag_prefix("error", loc)
 	fmt.eprintf(format, ..args)
 	fmt.eprintln()
 	had_error = true
@@ -645,7 +694,11 @@ errorf :: proc(format: string, args: ..any) {
 // Non-fatal diagnostic — prints but does NOT fail the build (used for likely-typo hints
 // where scriptgen can't be sure, e.g. a proc whose name is one edit away from a lifecycle).
 warnf :: proc(format: string, args: ..any) {
-	fmt.eprintf("scriptgen: warning: ")
+	warn_at(Loc{}, format, ..args)
+}
+
+warn_at :: proc(loc: Loc, format: string, args: ..any) {
+	diag_prefix("warning", loc)
 	fmt.eprintf(format, ..args)
 	fmt.eprintln()
 }
@@ -689,6 +742,13 @@ main :: proc() {
 	has_boot := false // a hand-written `odin_scripts_boot` exists — don't generate one
 	seen_classes := make(map[string]string) // //gd:class name -> file that declared it
 	defer delete(seen_classes)
+	// Every gen file THIS run owns (wrote, or would have written but for an unrelated
+	// earlier error): the `<src>.gen.odin` per emitted script plus the boot shim. Anything
+	// else matching `*.gen.odin` in the dir is a stale orphan (its source was deleted or
+	// renamed) and is removed after the emit loop — a stale gen file otherwise breaks the
+	// build inside "DO NOT EDIT" code.
+	owned_gen := make(map[string]bool)
+	defer delete(owned_gen)
 	for fi in files {
 		if fi.type == .Directory {continue}
 		if !strings.has_suffix(fi.name, ".odin") {continue}
@@ -708,22 +768,29 @@ main :: proc() {
 		if pkg == "" {
 			if p := scan_package(src); p != "" {pkg = p}
 		}
-		if strings.contains(src, "odin_scripts_boot") {has_boot = true}
+		// A DECLARATION of `odin_scripts_boot` (not a mere mention in a comment/string —
+		// that used to suppress boot generation and break the dll's init handshake).
+		if scan_boot_decl(src) {has_boot = true}
 
 		script, has := parse_script(path, src)
 		if !has {continue} // not a script file (no owner-struct) — skip silently
-		if had_error {continue}
 
 		// Duplicate //gd:class across files: the core's name->desc map would silently let the
-		// last-loaded win and mis-bind the other. Catch it here with both file paths.
+		// last-loaded win and mis-bind the other. Catch it here with both file paths. This
+		// bookkeeping runs BEFORE the had_error skip below so dup detection keeps working
+		// across the remaining files even after an unrelated error.
 		if prev, dup := seen_classes[script.class_name]; dup {
-			errorf("duplicate //gd:class %q in %q and %q", script.class_name, prev, path)
-			continue
+			error_at(Loc{path = path}, "duplicate //gd:class %q (also declared in %q)", script.class_name, prev)
+		} else {
+			seen_classes[script.class_name] = path
 		}
-		seen_classes[script.class_name] = path
 
-		gen := generate(&script)
+		// This script's gen file is ours either way — never orphan-collect it.
 		out_path := strings.concatenate({path[:len(path) - len(".odin")], ".gen.odin"})
+		owned_gen[out_path] = true
+
+		if had_error {continue}
+		gen := generate(&script)
 		if werr := os.write_entire_file(out_path, transmute([]byte)gen); werr != nil {
 			errorf("cannot write %q", out_path)
 			continue
@@ -732,16 +799,13 @@ main :: proc() {
 		emitted += 1
 	}
 
-	if had_error {
-		os.exit(1)
-	}
-
 	// Generate the REQUIRED boot shim (the `odin_scripts_boot` export the core calls after
 	// dlopen) so users never hand-copy it — UNLESS the project already defines its own.
 	// Skipped when the package has no name (nothing to compile anyway).
-	if !has_boot && pkg != "" {
+	if !had_error && !has_boot && pkg != "" {
 		dir := strings.trim_suffix(scripts_dir, "/")
 		boot_path := strings.concatenate({dir, "/odin_godot_boot.gen.odin"})
+		owned_gen[boot_path] = true
 		if werr := os.write_entire_file(boot_path, transmute([]byte)gen_boot(pkg)); werr != nil {
 			errorf("cannot write %q", boot_path)
 		} else {
@@ -749,7 +813,59 @@ main :: proc() {
 		}
 	}
 
+	if had_error {
+		os.exit(1)
+	}
+
+	// Orphan cleanup: delete any `*.gen.odin` in the scripts dir that this run does not own
+	// (its authored source was deleted/renamed, or a hand-written boot replaced the shim).
+	// Only on a CLEAN run — after an error nothing was emitted, so nothing is collected.
+	// The dir is re-listed because the emit loop just changed its contents. Scripts live
+	// flat in the one dir (the emit loop above skips subdirectories), so no recursion.
+	remove_orphan_gen(scripts_dir, owned_gen)
+
 	fmt.printfln("scriptgen: generated %d script(s)", emitted)
+}
+
+// remove_orphan_gen deletes `*.gen.odin` files under `dir` that are not in `owned` —
+// gen output for sources that no longer exist. A Godot `.uid` sidecar for a removed gen
+// file goes with it (the editor generates those beside every res:// file).
+remove_orphan_gen :: proc(dir: string, owned: map[string]bool) {
+	dir_fh, oerr := os.open(dir)
+	if oerr != nil {return}
+	files, rderr := os.read_dir(dir_fh, -1, context.allocator)
+	os.close(dir_fh)
+	if rderr != nil {return}
+	for fi in files {
+		if fi.type == .Directory {continue}
+		if !strings.has_suffix(fi.name, ".gen.odin") {continue}
+		if owned[fi.fullpath] {continue}
+		if rmerr := os.remove(fi.fullpath); rmerr != nil {
+			// Non-fatal: warn — the stale file will still break the scripts build with a
+			// clear-enough odin error, and the next run retries.
+			warn_at(Loc{path = fi.fullpath}, "cannot remove stale gen file")
+			continue
+		}
+		fmt.printfln("scriptgen: removed stale %s (no matching source)", fi.fullpath)
+		uid := strings.concatenate({fi.fullpath, ".uid"})
+		if os.exists(uid) {
+			os.remove(uid)
+		}
+	}
+}
+
+// scan_boot_decl reports whether the source DECLARES `odin_scripts_boot` (a line whose
+// trimmed form is `odin_scripts_boot ::` ...). A mention inside a comment or string —
+// e.g. docs referencing the boot shim — must NOT suppress boot generation.
+scan_boot_decl :: proc(src: string) -> bool {
+	it := src
+	for line in strings.split_lines_iterator(&it) {
+		t := strings.trim_space(line)
+		if !strings.has_prefix(t, "odin_scripts_boot") {continue}
+		rest := strings.trim_space(t[len("odin_scripts_boot"):])
+		if strings.has_prefix(rest, "::") {return true}
+	}
+	return false
 }
 
 // First `package <name>` declaration in a source file (cheap line scan — independent of the
