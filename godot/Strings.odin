@@ -91,7 +91,19 @@ Returns:
 */
 new_string_name_cstring :: proc "contextless" (from: cstring, static: bool) -> (ret: String_Name) {
     ret = String_Name{}
-    gd.string_name_new_with_utf8_chars(&ret, from)
+    if static {
+        // `static = true` promises a permanent (interned-for-the-program) name — method / signal /
+        // action / class-name literals. Use Godot's static StringName constructor (the only one
+        // that takes the flag), which tracks the atom as static rather than refcounted: it isn't
+        // reported as a leak at shutdown and skips the per-construction refcount churn. Static
+        // names are ASCII identifiers, so latin1 is the right (and only static-capable) path — the
+        // same constructor the core uses for its own class names. Previously the flag was ignored
+        // and every name went through the refcounted utf8 path, "leaking" a refcount per call.
+        gd.string_name_new_with_latin1_chars(&ret, from, true)
+    } else {
+        // Transient and/or non-ASCII name — refcounted utf8 StringName.
+        gd.string_name_new_with_utf8_chars(&ret, from)
+    }
     return
 }
 
