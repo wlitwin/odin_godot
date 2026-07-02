@@ -18,6 +18,17 @@
 #      chained crash handler still ran ("Dumping the backtrace" — verified present in
 #      a headless macOS 4.6 run).
 #
+#  Both dying children ALSO write their report to bin/.odin_crash.log (the artifact
+#  that survives an editor-launched child, whose stderr goes nowhere): (1) asserts the
+#  panic line landed in the file; (2) asserts the file holds a FRESH signal report
+#  (marker + symbolized frame + a backtrace line, and no stale panic line — O_TRUNC).
+#
+#  (3) EDITOR-side surfacing — with (2)'s crash file on disk, a HEADLESS EDITOR pass
+#      over the project must notice it (core/crash_watch.odin, polled from the
+#      lv_frame pump every ~30 frames), push the FULL framed report into the editor
+#      Output ("the game process CRASHED"), and rename the file to
+#      .odin_crash.prev.log (one-shot; artifact preserved).
+#
 # THIS script exits 0 and prints CRASH_TEST_OK after asserting on the crashed
 # children. Run inside the Nix dev shell:
 #   nix develop --command bash -c 'bash tests/crash/run.sh'
@@ -38,6 +49,12 @@ export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
 
 LOGDIR="$ROOT/tests/.logs"
 mkdir -p "$LOGDIR"
+
+# The crash-report file the dying children write (editor-feature runs -> res://bin) and
+# the watcher's rename target. Clean both so every assertion below is about THIS run.
+CRASH_FILE="$PROJ/bin/.odin_crash.log"
+CRASH_PREV="$PROJ/bin/.odin_crash.prev.log"
+rm -f "$CRASH_FILE" "$CRASH_PREV"
 
 fail() {
     echo "CRASH_TEST_FAIL: $1"
@@ -72,7 +89,21 @@ assert_grep "$PANIC_LOG" "crash_target\.odin:[0-9]+" \
 # The push_error copy — the channel the editor Output shows (headless: an ERROR: line).
 assert_grep "$PANIC_LOG" "ERROR: ODIN_SCRIPT_PANIC" \
     "push_error copy of the panic (editor-visible route) missing"
-echo "  panic child died (rc=$rc) with ODIN_SCRIPT_PANIC + file:line + push_error copy"
+# The crash-report FILE: the panic hook writes the same line to bin/.odin_crash.log
+# BEFORE trapping (core/crash.odin crash_file_note_panic) — required because on darwin
+# arm64 the trap raises SIGTRAP, which the fatal-signal handler does not catch.
+[[ -f "$CRASH_FILE" ]] || fail "crash-report file missing after the panic child"
+assert_grep "$CRASH_FILE" "ODIN_SCRIPT_PANIC panic: CRASH_TEST_PANIC boom from odin script" \
+    "crash-report file lacks the panic line"
+if [[ "$(uname -sm)" == "Darwin arm64" ]]; then
+    # trap == SIGTRAP here (not a handled signal): the file must hold EXACTLY the panic
+    # report, no double-report. (On x86 the trap is SIGILL and the handler APPENDS its
+    # report after the panic line — one coherent file either way; not asserted here.)
+    if grep -q "ODIN_GODOT_CRASH" "$CRASH_FILE"; then
+        fail "unexpected signal-handler double-report in the crash file after a panic"
+    fi
+fi
+echo "  panic child died (rc=$rc) with ODIN_SCRIPT_PANIC + file:line + push_error copy + crash file"
 
 # ---------------------------------------------------------------------------
 # (2) SIGNAL path
@@ -100,7 +131,45 @@ assert_grep "$SEGV_LOG" "ERROR: Odin: the game CRASHED in native code \(SIGSEGV"
 # Chaining: Godot's OWN crash handler still ran after ours re-raised.
 assert_grep "$SEGV_LOG" "Dumping the backtrace" \
     "Godot's chained crash handler did not run"
-echo "  segv child died (rc=$rc); reporter + symbolized Odin frame + Godot's own handler chained"
+# The crash-report FILE: the handler mirrors every chunk into bin/.odin_crash.log —
+# a FRESH report (O_TRUNC: the panic line from (1) must be gone) with the marker, the
+# symbolized faulting frame, and at least one backtrace_symbols_fd frame line.
+[[ -f "$CRASH_FILE" ]] || fail "crash-report file missing after the segv child"
+assert_grep "$CRASH_FILE" "ODIN_GODOT_CRASH: fatal signal SIGSEGV" \
+    "crash-report file lacks the ODIN_GODOT_CRASH marker"
+assert_grep "$CRASH_FILE" "ODIN_GODOT_CRASH at +pc .*crash_target_do_segv" \
+    "crash-report file lacks the symbolized faulting frame"
+assert_grep "$CRASH_FILE" "^[0-9]+ +[^ ]+ +0x[0-9a-f]+" \
+    "crash-report file lacks backtrace frame lines"
+if grep -q "ODIN_SCRIPT_PANIC" "$CRASH_FILE"; then
+    fail "stale panic line survived in the crash file — handler did not truncate a fresh report"
+fi
+echo "  segv child died (rc=$rc); reporter + symbolized Odin frame + Godot's own handler chained + crash file"
+
+# ---------------------------------------------------------------------------
+# (3) EDITOR-side surfacing: a headless editor pass over the project must notice the
+#     crash file from (2), push the FULL framed report into the editor Output, and
+#     rename the file to .odin_crash.prev.log (one-shot, artifact preserved).
+# ---------------------------------------------------------------------------
+echo "== (3) editor-side surfacing: headless editor notices bin/.odin_crash.log =="
+ED_LOG="$LOGDIR/crash-editor.log"
+rc=0
+"$GODOT" --editor --headless --path "$PROJ" --quit-after 60 >"$ED_LOG" 2>&1 || rc=$?
+if [[ "$rc" != "0" ]]; then
+    tail -n 25 "$ED_LOG" | sed 's/^/    /'
+    fail "headless editor pass exited non-zero ($rc)"
+fi
+# The framed push_error (headless prints push_error as an ERROR: line) + the report body.
+assert_grep "$ED_LOG" "odin_godot: the game process CRASHED — report" \
+    "editor watcher did not surface the crash report (framed push_error missing)"
+assert_grep "$ED_LOG" "ODIN_GODOT_CRASH: fatal signal SIGSEGV" \
+    "surfaced report does not carry the full crash-file contents"
+assert_grep "$ED_LOG" "crash_target_do_segv" \
+    "surfaced report does not carry the symbolized faulting frame"
+# One-shot semantics: surfaced report renamed away, artifact preserved as .prev.
+[[ ! -f "$CRASH_FILE" ]] || fail "crash file was not renamed after surfacing (would refire)"
+[[ -f "$CRASH_PREV" ]] || fail ".odin_crash.prev.log missing — the surfaced artifact was lost"
+echo "  editor pass surfaced the report into the Output and renamed the file to .prev"
 
 echo
 echo "CRASH_TEST_OK"

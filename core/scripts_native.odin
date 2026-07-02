@@ -464,6 +464,11 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 // called from the scripts dll mid-panic; gd.error is contextless and allocation-light.
 @(private)
 script_panic_report :: proc "c" (msg: cstring) {
+	// Crash-report FILE first (core/crash.odin; no-op stub on Windows): for an
+	// editor-launched child neither stderr nor this push_error survives the dying
+	// debugger connection — the file is what the editor-side watcher surfaces. Also
+	// ordered before godot.error in case the engine call faults in the dying process.
+	crash_file_note_panic(msg)
 	godot.error(msg)
 }
 

@@ -343,6 +343,11 @@ lv_frame :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.
     // reload — see runtime/register_class.odin) now that the engine log is up. Drains the
     // list, so each error is pushed once; a no-op when empty.
     scripts_surface_registration_errors()
+    // Surface a crash report written by a DYING GAME process (core/crash.odin writes
+    // bin/.odin_crash.log; the child's stderr and mid-crash push_error never reach an
+    // editor-launched session). Editor-gated inside; cheap when idle (a counter, one
+    // stat every ~30 frames). See core/crash_watch.odin (no-op stub on Windows).
+    crash_watch_pump()
     // One-shot warning if running on an untested Godot version (the virtual table is pinned).
     check_engine_version_once()
     if highlighter_registered {

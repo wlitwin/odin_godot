@@ -10,3 +10,13 @@ package core
 // (The web build has no crash reporter either; main.odin gates the call with !WEB.)
 crash_reporter_install :: proc() {
 }
+
+// Crash-report FILE + editor-side watcher — WINDOWS STUBS. The signal-handler install
+// above never runs, so no crash-file path is ever precomputed and no report file is
+// written on Windows; the panic hook's file write and the editor watcher are no-ops to
+// match (script panics still print + push_error via runtime/panic_native.odin).
+crash_file_note_panic :: proc "c" (msg: cstring) {
+}
+
+crash_watch_pump :: proc() {
+}

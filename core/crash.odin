@@ -16,7 +16,11 @@ import "core:sys/posix"
 // (SIGSEGV/SIGBUS/SIGILL/SIGFPE) that, best-effort (the process is dying):
 //
 //   1. write a grep-able ODIN_GODOT_CRASH marker to STDERR (unbuffered write(2) —
-//      always lands, headless harnesses and terminals capture it),
+//      always lands, headless harnesses and terminals capture it) AND to a crash-report
+//      FILE (path precomputed at install — see crash_file_precompute_path): when the game
+//      was launched from the editor its stderr goes nowhere and the mid-crash push_error
+//      dies with the debugger connection, so the FILE is the only artifact that survives;
+//      the EDITOR-side watcher (core/crash_watch.odin) surfaces it in the editor Output,
 //   2. write the FAULTING pc (and, on arm64, the caller lr) pulled out of the signal
 //      ucontext, symbolized with dladdr — in the backtrace spike this was the ONLY
 //      mechanism that named the faulting Odin proc: both execinfo's backtrace() and
@@ -69,6 +73,86 @@ g_crash_installed: bool
 @(private = "file")
 g_crash_reporting: bool
 
+// ---- crash-report FILE (the artifact that survives an editor-launched child) ----
+
+// Absolute, NUL-terminated crash-report file path, filled at install time (the handler
+// cannot allocate or call the engine). [0] == 0 means "no file" (editor process /
+// precompute failure) — the stderr path is unaffected either way.
+@(private = "file")
+g_crash_file_path: [1024]byte
+
+// Set once crash_file_note_panic has written a panic line this process: the signal
+// handler then APPENDS instead of truncating, so a trap-after-panic that IS a handled
+// signal (x86: ud2 -> SIGILL) yields ONE coherent file, never a clobbered panic line.
+@(private = "file")
+g_crash_file_panic: bool
+
+// Crash file fd, open only while the handler runs (-1 otherwise).
+@(private = "file")
+g_crash_fd: posix.FD = -1
+
+// Precompute the crash-report file path while Godot calls are still legal (install runs
+// at .Scene init in the GAME process). Where:
+//   - ANY non-exported run (os_has_feature("editor") — true for editor-Play children and
+//     headless --script runs alike): <globalized res://>/bin/.odin_crash.log. bin/ exists
+//     in every built project (the dlls live there) and is exactly the path the EDITOR
+//     process polls (core/crash_watch.odin) to surface the report in the editor Output.
+//   - exported game: <globalized user://>/odin_crash.log — always writable, and a shipped
+//     game's crash leaves a post-mortem file a player can send in.
+@(private = "file")
+crash_file_precompute_path :: proc() {
+	feat := godot.new_string_cstring("editor")
+	editor_run := bool(godot.os_has_feature(godot.singleton_os(), feat))
+	loc: cstring = editor_run ? "res://bin/.odin_crash.log" : "user://odin_crash.log"
+	gres := godot.new_string_cstring(loc)
+	global := godot.project_settings_globalize_path(godot.singleton_project_settings(), gres)
+	s := string_to_odin(global, context.temp_allocator)
+	if len(s) == 0 || len(s) >= len(g_crash_file_path) {
+		return
+	}
+	copy(g_crash_file_path[:], s)
+	g_crash_file_path[len(s)] = 0
+}
+
+// Open the crash-report file for one report. O_TRUNC normally (a fresh report replaces
+// any stale one); O_APPEND once a panic line landed (see g_crash_file_panic). Raw
+// open(2) — async-signal-safe, allocation-free — so it is legal both mid-signal and
+// mid-panic. Returns -1 (disabled/failed) without affecting the stderr path.
+@(private = "file")
+crash_file_open :: proc "c" () -> posix.FD {
+	if g_crash_file_path[0] == 0 {
+		return -1
+	}
+	flags := posix.O_Flags{.WRONLY, .CREAT} +
+		(g_crash_file_panic ? posix.O_Flags{.APPEND} : posix.O_Flags{.TRUNC})
+	mode := posix.mode_t{.IRUSR, .IWUSR, .IRGRP, .IROTH} // 0644
+	return posix.open(cast(cstring)raw_data(g_crash_file_path[:]), flags, mode)
+}
+
+// crash_file_note_panic — write one already-formatted ODIN_SCRIPT_PANIC line to the
+// crash-report file. Reached via core's script_panic_report (scripts_native.odin), which
+// the scripts dll's assertion proc calls BEFORE it traps. This is NOT redundant with the
+// signal handler: on darwin arm64 the trap raises SIGTRAP (verified empirically — Godot's
+// handle_crash reports "signal 5"), which is not in CRASH_SIGNALS, so without this write
+// the file would stay empty for script panics. Where the trap IS a handled signal (x86:
+// ud2 -> SIGILL) the handler sees g_crash_file_panic and APPENDS its report after this
+// line — one coherent file either way. proc "c" + raw write(2): called mid-panic, must
+// not allocate. No-op when no path was precomputed (editor process / Windows stub).
+crash_file_note_panic :: proc "c" (msg: cstring) {
+	if msg == nil {
+		return
+	}
+	fd := crash_file_open()
+	if fd < 0 {
+		return
+	}
+	g_crash_file_panic = true
+	posix.write(fd, transmute([^]u8)msg, uint(len(msg)))
+	nl: [1]byte = {'\n'}
+	posix.write(fd, raw_data(nl[:]), 1)
+	posix.close(fd)
+}
+
 // Install the fatal-signal reporter. Called at extension .Scene init (runs in both the
 // editor and the game — the editor-hint gate below picks the game only). Idempotent.
 // Godot installs its own crash handler during main setup, BEFORE extension init, so the
@@ -83,6 +167,10 @@ crash_reporter_install :: proc() {
 	}
 	g_crash_installed = true
 
+	// Godot calls are legal HERE (not in the handler): fix the crash-report file path
+	// now, into a static buffer the handler and the panic path can use allocation-free.
+	crash_file_precompute_path()
+
 	act: posix.sigaction_t
 	act.sa_sigaction = crash_handler
 	act.sa_flags = {.SIGINFO}
@@ -93,11 +181,16 @@ crash_reporter_install :: proc() {
 	}
 }
 
-// ---- async-signal-safe stderr helpers (raw write(2); no fmt, no allocation) ----
+// ---- async-signal-safe output helpers (raw write(2); no fmt, no allocation) ----
+// Every chunk goes to STDERR and, when the handler opened it, the crash-report FILE —
+// the file is what survives an editor-launched child whose stderr goes nowhere.
 
 @(private = "file")
 cwrite :: proc "c" (s: string) {
 	posix.write(posix.FD(2), raw_data(s), uint(len(s)))
+	if g_crash_fd >= 0 {
+		posix.write(g_crash_fd, raw_data(s), uint(len(s)))
+	}
 }
 
 @(private = "file")
@@ -114,6 +207,9 @@ cwrite_hex :: proc "c" (v: uintptr) {
 		shift -= 4
 	}
 	posix.write(posix.FD(2), raw_data(buf[:]), uint(n))
+	if g_crash_fd >= 0 {
+		posix.write(g_crash_fd, raw_data(buf[:]), uint(n))
+	}
 }
 
 // One "  <addr>  <symbol> + <offset>  (<module>)" line via dladdr (Dl_info/dladdr are
@@ -224,6 +320,10 @@ crash_handler :: proc "c" (sig: posix.Signal, info: ^posix.siginfo_t, uctx: rawp
 		return
 	}
 
+	// 0. Open the crash-report FILE (path fixed at install). Best-effort: on failure
+	//    g_crash_fd stays -1 and every cwrite below is stderr-only, exactly as before.
+	g_crash_fd = crash_file_open()
+
 	// 1. Marker FIRST — an unbuffered write that survives whatever happens next.
 	cwrite("\nODIN_GODOT_CRASH: fatal signal ")
 	cwrite(signal_name(sig))
@@ -244,6 +344,16 @@ crash_handler :: proc "c" (sig: posix.Signal, info: ^posix.siginfo_t, uctx: rawp
 	n := backtrace(raw_data(frames[:]), i32(len(frames)))
 	if n > 0 {
 		backtrace_symbols_fd(raw_data(frames[:]), n, 2)
+		if g_crash_fd >= 0 {
+			backtrace_symbols_fd(raw_data(frames[:]), n, i32(g_crash_fd))
+		}
+	}
+
+	// 3b. Close the crash file BEFORE the risky part below: the report must be complete
+	//     on disk even if push_error or the re-raise teardown faults.
+	if g_crash_fd >= 0 {
+		posix.close(g_crash_fd)
+		g_crash_fd = -1
 	}
 
 	// 4. Restore Godot's handlers BEFORE the risky part: if push_error faults mid-crash,
