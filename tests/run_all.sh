@@ -63,6 +63,8 @@ fi
 TESTS=(
     # Pure-Odin unit tests for the `flow` sequencer — no Godot process, the fastest entry.
     "flow|FLOW_OK|tests/flow/run.sh"
+    # Pure-Odin unit tests for the runtime-reflection registration walk (register_class).
+    "reflectregister|REFLECT_REGISTER_OK|tests/reflect_register/run.sh"
     "phase1|PHASE1_OK|tests/phase1/run.sh"
     "phase2|PHASE2_OK|tests/phase2/run.sh"
     "phase3|PHASE3_OK|tests/phase3/run.sh"

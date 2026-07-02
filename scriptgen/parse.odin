@@ -393,6 +393,8 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		type_text := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
 
 		// richer-authoring #1: `gd:"onready=Sprite"` — must be an object-handle/pointer field.
+		// The rt.Onready table itself is built by the runtime reflection walk
+		// (runtime/register_class.odin); scriptgen keeps only the cheap build-time checks.
 		if strings.has_prefix(tok0, "onready=") {
 			path := strings.trim_space(tok0[len("onready="):])
 			if path == "" {
@@ -402,12 +404,6 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			vi, ok := map_variant(type_text)
 			if !ok || vi.enum_name != ".Object" {
 				error_at(floc, "%s.%s: `onready` field must be an object/node handle or pointer (got %q)", s.struct_name, field_label, type_text)
-				continue
-			}
-			for nm in f.names {
-				ident, _ := nm.derived.(^ast.Ident)
-				if ident == nil {continue}
-				append(&s.onready, Onready_Info{field = ident.name, path = path})
 			}
 			continue
 		}
@@ -432,14 +428,10 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			continue
 		}
 
-		// Trailing tokens: at most one hint spec, plus optional group/subgroup/default/get/set.
-		hint := 0
-		hint_string := ""
-		group := ""
-		subgroup := ""
-		has_default := false
-		default_num := f64(0)
-		default_str := ""
+		// Hints/groups/defaults are parsed by the RUNTIME reflection walk from this same
+		// tag (runtime/register_class.odin) — scriptgen only extracts what codegen itself
+		// consumes: the `get=`/`set=` accessor proc names (wrapper emission) and the
+		// field's Variant type (wrapper marshalling + the ctor set).
 		getter := ""
 		setter := ""
 		for si in 1 ..< len(specs) {
@@ -452,51 +444,10 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 				value = strings.trim_space(spec[eq + 1:])
 			}
 			switch name {
-			case "group":
-				group = value
-			case "subgroup":
-				subgroup = value
-			case "default":
-				num, str, dok := parse_default(floc, s.struct_name, field_label, vi, value)
-				if dok {
-					has_default = true
-					default_num = num
-					default_str = str
-				}
 			case "get":
 				getter = value
 			case "set":
 				setter = value
-			case:
-				// Anything else is a hint spec (range/enum/multiline/file/resource/...).
-				if hint != 0 {
-					error_at(floc, "%s.%s: only one export hint allowed (got extra %q)", s.struct_name, field_label, spec)
-					break
-				}
-				h, hs, hok := parse_hint_spec(floc, s.struct_name, field_label, spec, vi.enum_name)
-				if hok {
-					hint = h
-					hint_string = hs
-				}
-			}
-		}
-
-		// Type-driven typed collections: a `Typed_Array(T)` / `Typed_Dictionary(K,V)` field
-		// derives its export hint from the element types in the type itself — no `array=`/`dict=`
-		// tag needed. (Mixing the two is a conflict.)
-		if matched, th, ths, tok := derive_typed_collection_hint(floc, s.struct_name, field_label, type_text);
-		   matched {
-			if hint != 0 {
-				error_at(
-					floc,
-					"%s.%s: %s already declares its element type(s) — remove the redundant hint spec",
-					s.struct_name,
-					field_label,
-					type_text,
-				)
-			} else if tok {
-				hint = th
-				hint_string = ths
 			}
 		}
 
@@ -504,20 +455,13 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			ident, _ := nm.derived.(^ast.Ident)
 			if ident == nil {continue}
 			append(&s.exports, Export_Info {
-				name        = ident.name,
-				type_text   = type_text,
-				vi          = vi,
-				hint        = hint,
-				hint_string = hint_string,
-				group       = group,
-				subgroup    = subgroup,
-				has_default = has_default,
-				default_num = default_num,
-				default_str = default_str,
-				getter      = getter,
-				setter      = setter,
-				line        = ident.pos.line,
-				doc         = extract_doc(f.docs),
+				name      = ident.name,
+				type_text = type_text,
+				vi        = vi,
+				getter    = getter,
+				setter    = setter,
+				line      = ident.pos.line,
+				doc       = extract_doc(f.docs),
 			})
 		}
 	}

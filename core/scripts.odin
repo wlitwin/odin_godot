@@ -1,7 +1,9 @@
 package core
 
 import "godot:gdext"
+import "godot:godot"
 import rt "godot:runtime"
+import "core:fmt"
 import "core:strings"
 
 // ----------------------------------------------------------------------------
@@ -49,4 +51,51 @@ index_scripts_manifest :: proc(descs: [^]rt.Class_Desc, n: int) {
 		name := strings.clone(string(d.name))
 		scripts_classes[name] = d
 	}
+}
+
+// ----------------------------------------------------------------------------
+// Registration errors — problems the scripts dll's runtime reflection walk recorded
+// while building its Export/Onready tables at `@(init)` (bad export type, bad hint
+// spec, pool exhaustion, ...). The walk runs pre-boot where nothing can print, so
+// the loaders pull the table afterwards (native: dlsym'd odin_scripts_registration_
+// errors; web: the rt proc directly), note them here, and the main-thread frame pump
+// surfaces each as ONE push_error once the engine is up. A bad export is dropped
+// from the class but must never be dropped silently.
+// ----------------------------------------------------------------------------
+
+// Formatted messages, core-allocator-owned. Drained (freed) by the surface proc.
+@(private)
+g_registration_errors: [dynamic]string
+
+@(private)
+scripts_note_registration_errors :: proc(errs: [^]rt.Registration_Error, n: int) {
+	context.allocator = core_allocator()
+	for i in 0 ..< n {
+		e := errs[i]
+		class := e.class != nil ? string(e.class) : "?"
+		msg := e.msg != nil ? string(e.msg) : "registration error"
+		formatted: string
+		if e.field != nil {
+			formatted = fmt.aprintf("odin_godot: %s.%s: %s", class, string(e.field), msg)
+		} else {
+			formatted = fmt.aprintf("odin_godot: %s: %s", class, msg)
+		}
+		append(&g_registration_errors, formatted)
+	}
+}
+
+// Push every noted registration error to the engine log (JS console on web), then
+// drain. Safe to call every frame — a no-op when the list is empty.
+@(private)
+scripts_surface_registration_errors :: proc() {
+	if len(g_registration_errors) == 0 {
+		return
+	}
+	context.allocator = core_allocator()
+	for m in g_registration_errors {
+		s := godot.new_string_odin(m)
+		godot.gd_push_error(godot.variant_from_string(&s))
+		delete(m)
+	}
+	clear(&g_registration_errors)
 }

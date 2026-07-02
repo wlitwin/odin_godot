@@ -315,35 +315,17 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 
 	w(b, "// ---- registration ----\n")
 
-	// exports
+	// Per-export field metadata reflection cannot see: source line, `///` doc, and the
+	// getter/setter WRAPPER proc pointers for `get=`/`set=` tags. The Export/Onready
+	// tables themselves are built at registration by the runtime reflection walk
+	// (rt.register_class -> runtime/register_class.odin).
 	if len(s.exports) > 0 {
-		fmt.sbprintf(b, "@(private = \"file\")\n_%s_exports := [?]rt.Export {{\n", snake)
+		fmt.sbprintf(b, "@(private = \"file\")\n_%s_fields := [?]rt.Field_Meta {{\n", snake)
 		for ex in s.exports {
-			fmt.sbprintf(
-				b,
-				// %q for every user-authored string (hint specs etc. can carry quotes/backslashes).
-			"\t{{name = \"%s\", type = %s, offset = offset_of(%s, %s), size = size_of(%s), hint = %d, hint_string = %q, line = %d",
-				ex.name,
-				ex.vi.enum_name,
-				cls,
-				ex.name,
-				ex.type_text,
-				ex.hint,
-				ex.hint_string,
-				ex.line,
-			)
-			// Optional richer-authoring fields — emit only when set (nil/false otherwise).
-			if ex.group != "" {
-				fmt.sbprintf(b, ", group = %q", ex.group)
-			}
-			if ex.subgroup != "" {
-				fmt.sbprintf(b, ", subgroup = %q", ex.subgroup)
-			}
-			if ex.has_default {
-				fmt.sbprintf(b, ", has_default = true, default_num = %v", ex.default_num)
-				if ex.default_str != "" {
-					fmt.sbprintf(b, ", default_str = %q", ex.default_str)
-				}
+			fmt.sbprintf(b, "\t{{field = \"%s\", line = %d", ex.name, ex.line)
+			if ex.doc != "" {
+				// %q — user-authored text can carry quotes/backslashes.
+				fmt.sbprintf(b, ", doc = %q", ex.doc)
 			}
 			if ex.getter != "" {
 				fmt.sbprintf(b, ", getter = _%s_get_%s", snake, ex.name)
@@ -351,19 +333,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			if ex.setter != "" {
 				fmt.sbprintf(b, ", setter = _%s_set_%s", snake, ex.name)
 			}
-			if ex.doc != "" {
-				fmt.sbprintf(b, ", doc = %q", ex.doc)
-			}
 			w(b, "},\n")
-		}
-		w(b, "}\n\n")
-	}
-
-	// onready node refs (richer-authoring #1) — private auto-wired references.
-	if len(s.onready) > 0 {
-		fmt.sbprintf(b, "@(private = \"file\")\n_%s_onready := [?]rt.Onready {{\n", snake)
-		for o in s.onready {
-			fmt.sbprintf(b, "\t{{offset = offset_of(%s, %s), path = %q}},\n", cls, o.field, o.path)
 		}
 		w(b, "}\n\n")
 	}
@@ -481,26 +451,19 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		strings.write_string(&lc_lit, "}")
 	}
 
-	// @(init) registration
+	// @(init) registration. rt.register_class walks the struct's TYPE INFO (field
+	// offsets/sizes/types + the gd:"..." tags) to build the Export/Onready tables at
+	// startup; Class_Info carries only what reflection cannot see.
 	fmt.sbprintf(b, "@(init)\n_register_%s :: proc \"contextless\" () {{\n", snake)
-	w(b, "\trt.register(\n")
-	w(b, "\t\trt.Class_Desc {\n")
+	fmt.sbprintf(b, "\trt.register_class(\n\t\t%s,\n", cls)
+	w(b, "\t\trt.Class_Info {\n")
 	fmt.sbprintf(b, "\t\t\tname = %q,\n", s.class_name)
 	fmt.sbprintf(b, "\t\t\tbase = %q,\n", s.base)
-	// The struct's typeid — lets `rt.script_of(obj, %s)` map T back to this class name for its
-	// type check (runtime/cross.odin). Without it cross-script lookups would type-confuse.
-	fmt.sbprintf(b, "\t\t\tid = typeid_of(%s),\n", cls)
-	fmt.sbprintf(b, "\t\t\tsize = size_of(%s),\n", cls)
-	fmt.sbprintf(b, "\t\t\talign = align_of(%s),\n", cls)
 	if len(s.lifecycles) > 0 {
 		fmt.sbprintf(b, "\t\t\tlifecycle = %s,\n", strings.to_string(lc_lit))
 	}
 	// C-shaped member tables: pointer + count into the static backing arrays above.
-	// An absent table stays at the Class_Desc zero value (nil + 0).
-	if len(s.exports) > 0 {
-		fmt.sbprintf(b, "\t\t\texports = raw_data(_%s_exports[:]),\n", snake)
-		fmt.sbprintf(b, "\t\t\texports_count = %d,\n", len(s.exports))
-	}
+	// An absent table stays at the Class_Info zero value (nil + 0).
 	if len(s.methods) > 0 {
 		fmt.sbprintf(b, "\t\t\tmethods = raw_data(_%s_methods[:]),\n", snake)
 		fmt.sbprintf(b, "\t\t\tmethods_count = %d,\n", len(s.methods))
@@ -517,9 +480,9 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		fmt.sbprintf(b, "\t\t\trpcs = raw_data(_%s_rpcs[:]),\n", snake)
 		fmt.sbprintf(b, "\t\t\trpcs_count = %d,\n", len(s.rpcs))
 	}
-	if len(s.onready) > 0 {
-		fmt.sbprintf(b, "\t\t\tonready = raw_data(_%s_onready[:]),\n", snake)
-		fmt.sbprintf(b, "\t\t\tonready_count = %d,\n", len(s.onready))
+	if len(s.exports) > 0 {
+		fmt.sbprintf(b, "\t\t\tfields = raw_data(_%s_fields[:]),\n", snake)
+		fmt.sbprintf(b, "\t\t\tfields_count = %d,\n", len(s.exports))
 	}
 	if s.tool {
 		w(b, "\t\t\ttool = true,\n")

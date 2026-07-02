@@ -294,7 +294,9 @@ ABI_GENERATION :: 2
 @(private) ABI_H6 :: ((ABI_H5 ~ size_of(Onready))          * ABI_FNV_PRIME) & 0xFFFF_FFFF
 @(private) ABI_H7 :: ((ABI_H6 ~ size_of(Connection))       * ABI_FNV_PRIME) & 0xFFFF_FFFF
 @(private) ABI_H8 :: ((ABI_H7 ~ size_of(Rpc))              * ABI_FNV_PRIME) & 0xFFFF_FFFF
-ABI_VERSION :: u32(ABI_H8)
+// Registration_Error crosses the boundary too (odin_scripts_registration_errors).
+@(private) ABI_H9 :: ((ABI_H8 ~ size_of(Registration_Error)) * ABI_FNV_PRIME) & 0xFFFF_FFFF
+ABI_VERSION :: u32(ABI_H9)
 
 @(export)
 odin_scripts_abi_version :: proc "c" () -> u32 {

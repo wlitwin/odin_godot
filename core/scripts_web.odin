@@ -157,6 +157,13 @@ odin_scripts_load :: proc() {
 	n: i32
 	descs := rt.odin_scripts_manifest(&n)
 	index_scripts_manifest(descs, int(n))
+	// Registration errors from the reflection walk (run in web_startup's @(init) chain).
+	// Same module — read the table directly and surface immediately: this runs at .Scene
+	// init, where push_error already reaches the JS console (no frame pump on web).
+	en: i32
+	errs := rt.odin_scripts_registration_errors(&en)
+	scripts_note_registration_errors(errs, int(en))
+	scripts_surface_registration_errors()
 }
 
 // No hot reload in the browser (no compiler, no dlopen). Always reports failure.

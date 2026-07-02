@@ -29,9 +29,7 @@ package scriptgen
 
 import "core:fmt"
 import "core:odin/ast"
-import "core:odin/parser"
 import "core:os"
-import "core:strconv"
 import "core:strings"
 
 // ---- Odin type -> Godot Variant mapping --------------------------------------
@@ -204,27 +202,23 @@ LIFECYCLE_KEYWORDS := [?]string{"physics_process", "process", "ready", "enter_tr
 
 // ---- parsed model ------------------------------------------------------------
 
+// An @export field, reduced to what CODEGEN itself consumes. Hints/groups/defaults are
+// no longer parsed here — the runtime reflection walk (runtime/register_class.odin)
+// reads them from the same struct tag when the class registers. scriptgen keeps the
+// field's Variant type (accessor-wrapper marshalling + the ctor set), the `get=`/`set=`
+// proc names (wrapper emission), and the line/doc metadata reflection cannot see
+// (published via the rt.Field_Meta table).
 Export_Info :: struct {
-	name:        string,
-	type_text:   string,
-	vi:          Variant_Info,
-	hint:        int, // godot.Property_Hint int value (0 == None)
-	hint_string: string, // companion string for the hint (Godot conventions)
-	// richer-authoring #2: group/subgroup header this field starts (""=none).
-	group:       string,
-	subgroup:    string,
-	// richer-authoring #3: parsed `default=...` literal. `default_num` carries Int/Float/Bool
-	// (bool as 0/1); `default_str` carries String. Emitted into the rt.Export literal.
-	has_default: bool,
-	default_num: f64,
-	default_str: string,
+	name:      string,
+	type_text: string,
+	vi:        Variant_Info,
 	// richer-authoring #4: author proc names from `get=`/`set=` (""=plain field access).
-	getter:      string,
-	setter:      string,
+	getter:    string,
+	setter:    string,
 	// 1-based source line of the field (for `_get_member_line` — editor jump-to-member).
-	line:        int,
+	line:      int,
 	// `///` doc comment above the field (property description for the editor doc panel).
-	doc:         string,
+	doc:       string,
 }
 
 // extract_doc joins the `///` lines of a doc comment group into a description string (leading
@@ -249,332 +243,6 @@ extract_doc :: proc(g: ^ast.Comment_Group) -> string {
 		first = false
 	}
 	return strings.to_string(b)
-}
-
-// richer-authoring #1: an `@onready` auto-wired node ref — a struct field of object-handle
-// type tagged `gd:"onready=PATH"`. Resolved to get_node(owner, path) on READY. Private (not
-// an @export), so it never enters the exports/property list.
-Onready_Info :: struct {
-	field: string, // struct field name (for offset_of)
-	path:  string, // node path relative to owner
-}
-
-// `godot.Property_Hint` int values used by the struct-tag hint specs. Kept in sync with
-// `godot/godot.gen.odin`'s `Property_Hint :: enum int`.
-HINT_RANGE :: 1
-HINT_ENUM :: 2
-HINT_FILE :: 13
-HINT_DIR :: 14
-HINT_GLOBAL_FILE :: 15
-HINT_GLOBAL_DIR :: 16
-HINT_RESOURCE_TYPE :: 17
-HINT_MULTILINE_TEXT :: 18
-HINT_TYPE_STRING :: 23 // typed Array/Dictionary element-type encoding (Godot's own choice)
-
-// Parse one `gd:"export,..."` hint spec into its (Property_Hint int, hint_string).
-//
-// SYNTAX. The struct tag is `gd:"export[,SPEC]"` with at most one hint SPEC. Top-level
-// tokens are comma-separated; values WITHIN a spec are colon-separated (so list values
-// like a file filter never collide with the comma separator) and are rewritten to the
-// comma-joined form Godot's hint_string conventions expect:
-//   - range=MIN:MAX        -> Range,        hint_string "MIN,MAX"
-//   - range=MIN:MAX:STEP   -> Range,        hint_string "MIN,MAX,STEP"
-//   - enum=A:B:C           -> Enum,         hint_string "A,B,C"
-//   - multiline            -> Multiline_Text
-//   - file                 -> File,         hint_string ""   (any file)
-//   - file=*.png:*.jpg     -> File,         hint_string "*.png,*.jpg"
-//   - dir                  -> Dir
-//   - global_file[=...]    -> Global_File
-//   - global_dir           -> Global_Dir
-//   - resource=Texture2D   -> Resource_Type, hint_string "Texture2D"
-parse_hint_spec :: proc(loc: Loc, owner, field, spec: string, field_vt: string) -> (hint: int, hint_string: string, ok: bool) {
-	name := spec
-	value := ""
-	if eq := strings.index(spec, "="); eq >= 0 {
-		name = strings.trim_space(spec[:eq])
-		value = strings.trim_space(spec[eq + 1:])
-	}
-	// colon-separated list values -> Godot's comma-separated hint_string form.
-	csv :: proc(v: string) -> string {
-		return strings.replace_all(v, ":", ",") or_else v
-	}
-	switch name {
-	case "range":
-		if value == "" {
-			error_at(loc, "%s.%s: `range` hint needs MIN:MAX[:STEP]", owner, field)
-			return 0, "", false
-		}
-		return HINT_RANGE, csv(value), true
-	case "enum":
-		if value == "" {
-			error_at(loc, "%s.%s: `enum` hint needs A:B:C", owner, field)
-			return 0, "", false
-		}
-		return HINT_ENUM, csv(value), true
-	case "multiline":
-		return HINT_MULTILINE_TEXT, "", true
-	case "file":
-		return HINT_FILE, csv(value), true
-	case "dir":
-		return HINT_DIR, csv(value), true
-	case "global_file":
-		return HINT_GLOBAL_FILE, csv(value), true
-	case "global_dir":
-		return HINT_GLOBAL_DIR, csv(value), true
-	case "resource":
-		if value == "" {
-			error_at(loc, "%s.%s: `resource` hint needs a type name, e.g. resource=Texture2D", owner, field)
-			return 0, "", false
-		}
-		return HINT_RESOURCE_TYPE, value, true
-	case "array":
-		// Typed Array export: `gd.Array `gd:"export,array=int"`` (or a Resource class, e.g.
-		// `array=Texture2D`). Renders the Inspector's typed-array editor.
-		if field_vt != ".Array" {
-			error_at(loc, "%s.%s: `array=` hint requires the field to be `gd.Array` (got %s)", owner, field, field_vt)
-			return 0, "", false
-		}
-		part, pok := encode_type_part(loc, owner, field, value, false)
-		if !pok {return 0, "", false}
-		return HINT_TYPE_STRING, part, true
-	case "dict":
-		// Typed Dictionary export: `gd.Dictionary `gd:"export,dict=String;int"`` — KEY and VALUE
-		// separated by `;` (each a builtin like int/float/String or a Resource class). Renders
-		// the Inspector's typed-dictionary editor (Godot 4.4+).
-		if field_vt != ".Dictionary" {
-			error_at(loc, "%s.%s: `dict=` hint requires the field to be `gd.Dictionary` (got %s)", owner, field, field_vt)
-			return 0, "", false
-		}
-		semi := strings.index(value, ";")
-		if semi < 0 {
-			error_at(loc, "%s.%s: `dict=` needs KEY;VALUE, e.g. dict=String;int", owner, field)
-			return 0, "", false
-		}
-		kpart, kok := encode_type_part(loc, owner, field, value[:semi], false)
-		vpart, vok := encode_type_part(loc, owner, field, value[semi + 1:], false)
-		if !kok || !vok {return 0, "", false}
-		return HINT_TYPE_STRING, strings.concatenate({kpart, ";", vpart}), true
-	case:
-		error_at(loc, "%s.%s: unknown export hint %q", owner, field, name)
-		return 0, "", false
-	}
-}
-
-// encode_type_part encodes ONE key/value/element type for a typed Array/Dictionary export
-// hint_string (Godot's PROPERTY_HINT_TYPE_STRING form). A builtin renders as
-// "<variant_type_int>:" (int -> "2:", String -> "4:"); anything else is taken to be a Resource
-// class and renders "24/17:ClassName" (24=TYPE_OBJECT, 17=HINT_RESOURCE_TYPE) — only
-// Resource-derived objects are serializable as exports.
-// `from_odin` distinguishes the two front-ends: the `array=`/`dict=` TAG form passes the Godot
-// class name verbatim (from_odin=false); the `Typed_Array(T)` TYPE form passes an Odin handle
-// type (from_odin=true), so a non-builtin (Resource) name is mapped back to its engine spelling
-// (`Texture2d` -> `Texture2D`) before encoding.
-encode_type_part :: proc(loc: Loc, owner, field, t: string, from_odin: bool) -> (string, bool) {
-	n := strings.trim_space(t)
-	if i := strings.last_index(n, "."); i >= 0 {
-		n = n[i + 1:] // strip a gd./godot. qualifier
-	}
-	if n == "" {
-		error_at(loc, "%s.%s: typed Array/Dictionary export has an empty element type", owner, field)
-		return "", false
-	}
-	if vt := builtin_variant_int(n); vt >= 0 {
-		buf: [8]byte
-		return strings.concatenate({strconv.itoa(buf[:], vt), ":"}), true
-	}
-	cls := n
-	if from_odin {
-		cls = godot_class_name(n)
-	}
-	return strings.concatenate({"24/17:", cls}), true
-}
-
-// godot_class_name reverses the binding's Godot->Odin class renaming so a Resource element type
-// renders with its real engine class name in a typed-collection hint. Handles the common
-// PascalCase + 2D/3D pattern: drop underscores, and uppercase a letter immediately following a
-// digit (`Texture2d` -> `Texture2D`, `Packed_Scene` -> `PackedScene`, `Animated_Sprite2d` ->
-// `AnimatedSprite2D`). Acronym-heavy names (e.g. `Json` -> would-be `JSON`) aren't recovered —
-// use the `array=`/`dict=` tag form with the exact class name for those.
-godot_class_name :: proc(odin: string) -> string {
-	b := strings.builder_make()
-	prev_digit := false
-	for r in odin {
-		if r == '_' {
-			continue
-		}
-		c := r
-		if prev_digit && c >= 'a' && c <= 'z' {
-			c -= 32 // 'a'..'z' -> 'A'..'Z'
-		}
-		strings.write_rune(&b, c)
-		prev_digit = r >= '0' && r <= '9'
-	}
-	return strings.to_string(b)
-}
-
-// derive_typed_collection_hint produces the export hint for a `Typed_Array(T)` /
-// `Typed_Dictionary(K,V)` field type. `matched` is false if `type_text` is neither.
-derive_typed_collection_hint :: proc(
-	loc: Loc, owner, field, type_text: string,
-) -> (matched: bool, hint: int, hint_string: string, ok: bool) {
-	t := strings.trim_space(type_text)
-	if strings.has_prefix(t, "gd.") {
-		t = t[3:]
-	} else if strings.has_prefix(t, "godot.") {
-		t = t[6:]
-	}
-	is_arr := strings.has_prefix(t, "Typed_Array(")
-	is_dict := strings.has_prefix(t, "Typed_Dictionary(")
-	if !is_arr && !is_dict {
-		return false, 0, "", false
-	}
-	open := strings.index_byte(t, '(')
-	close := strings.last_index_byte(t, ')')
-	if open < 0 || close < open {
-		error_at(loc, "%s.%s: malformed typed collection %q", owner, field, type_text)
-		return true, 0, "", false
-	}
-	args := split_top_level(t[open + 1:close])
-	if is_arr {
-		if len(args) != 1 {
-			error_at(loc, "%s.%s: Typed_Array takes one element type, got %d", owner, field, len(args))
-			return true, 0, "", false
-		}
-		p, pok := encode_type_part(loc, owner, field, args[0], true)
-		if !pok {return true, 0, "", false}
-		return true, HINT_TYPE_STRING, p, true
-	}
-	if len(args) != 2 {
-		error_at(loc, "%s.%s: Typed_Dictionary takes (KEY, VALUE), got %d", owner, field, len(args))
-		return true, 0, "", false
-	}
-	k, kok := encode_type_part(loc, owner, field, args[0], true)
-	v, vok := encode_type_part(loc, owner, field, args[1], true)
-	if !kok || !vok {return true, 0, "", false}
-	return true, HINT_TYPE_STRING, strings.concatenate({k, ";", v}), true
-}
-
-// split_top_level splits on commas that are NOT nested inside parens (so a nested generic like
-// `Typed_Array(i64)` as a value type stays intact).
-split_top_level :: proc(s: string) -> []string {
-	out: [dynamic]string
-	depth := 0
-	start := 0
-	for i := 0; i < len(s); i += 1 {
-		switch s[i] {
-		case '(':
-			depth += 1
-		case ')':
-			depth -= 1
-		case ',':
-			if depth == 0 {
-				append(&out, strings.trim_space(s[start:i]))
-				start = i + 1
-			}
-		}
-	}
-	append(&out, strings.trim_space(s[start:]))
-	return out[:]
-}
-
-// builtin_variant_int maps a builtin type name (Godot or Odin spelling) to its Variant::Type
-// integer, or -1 if it's not a builtin (then it's treated as a Resource class). Values are the
-// ABI-stable Godot 4 Variant type ids.
-builtin_variant_int :: proc(n: string) -> int {
-	switch n {
-	case "bool", "Bool":
-		return 1
-	case "int", "Int", "i64", "i32", "i16", "i8", "u64", "u32", "u16", "u8":
-		return 2
-	case "float", "Float", "f64", "f32":
-		return 3
-	case "String", "string", "cstring":
-		return 4
-	case "Vector2":
-		return 5
-	case "Vector2i":
-		return 6
-	case "Rect2":
-		return 7
-	case "Rect2i":
-		return 8
-	case "Vector3":
-		return 9
-	case "Vector3i":
-		return 10
-	case "Transform2d", "Transform2D":
-		return 11
-	case "Vector4":
-		return 12
-	case "Vector4i":
-		return 13
-	case "Plane":
-		return 14
-	case "Quaternion":
-		return 15
-	case "Aabb", "AABB":
-		return 16
-	case "Basis":
-		return 17
-	case "Transform3d", "Transform3D":
-		return 18
-	case "Projection":
-		return 19
-	case "Color":
-		return 20
-	case "String_Name", "StringName":
-		return 21
-	case "Node_Path", "NodePath":
-		return 22
-	case "Rid", "RID":
-		return 23
-	}
-	return -1
-}
-
-// Parse an `@export default=...` literal (richer-authoring #3) for a field of Variant `vi`.
-// Scalars only: Int/Float/Bool -> default_num (bool as 0/1); String -> default_str (quotes
-// stripped). Returns ok=false (with a clear error) for unsupported types / bad literals.
-parse_default :: proc(loc: Loc, owner, field: string, vi: Variant_Info, value: string) -> (num: f64, str: string, ok: bool) {
-	v := strings.trim_space(value)
-	switch vi.kind {
-	case .Int:
-		n, pok := strconv.parse_i64(v)
-		if !pok {
-			error_at(loc, "%s.%s: bad integer default %q", owner, field, v)
-			return 0, "", false
-		}
-		return f64(n), "", true
-	case .Float:
-		f, pok := strconv.parse_f64(v)
-		if !pok {
-			error_at(loc, "%s.%s: bad float default %q", owner, field, v)
-			return 0, "", false
-		}
-		return f, "", true
-	case .Bool:
-		switch v {
-		case "true":
-			return 1, "", true
-		case "false":
-			return 0, "", true
-		case:
-			error_at(loc, "%s.%s: bool default must be true/false (got %q)", owner, field, v)
-			return 0, "", false
-		}
-	case .Other:
-		// Only the String Variant supports a `default=` (other Other-kinds — Vector*, Color,
-		// Object, packed arrays — are not yet supported; report rather than silently drop).
-		if vi.enum_name == ".String" {
-			return 0, strings.trim(v, "\"`"), true
-		}
-		error_at(loc, "%s.%s: `default=` only supported for int/float/bool/String (type %s)", owner, field, vi.enum_name)
-		return 0, "", false
-	case .Nil:
-		error_at(loc, "%s.%s: `default=` on a void-typed field", owner, field)
-		return 0, "", false
-	}
-	return 0, "", false
 }
 
 Arg :: struct {
@@ -651,7 +319,6 @@ Script :: struct {
 	methods:     [dynamic]Method_Info,
 	signals:     [dynamic]Signal_Info,
 	connections: [dynamic]Connection_Info,
-	onready:     [dynamic]Onready_Info,
 	rpcs:        [dynamic]Rpc_Info,
 }
 

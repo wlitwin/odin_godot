@@ -51,6 +51,10 @@ Scripts_Dll :: struct {
 	// conventions, so a compiler mismatch is rejected like an ABI mismatch. Absent (nil) on an
 	// older dll — also treated as a mismatch, never a crash.
 	odin_scripts_odin_version: proc "c" () -> cstring,
+	// Problems the dll's runtime reflection walk recorded while building its member tables
+	// at `@(init)` (see runtime/register_class.odin). Pulled after the manifest and surfaced
+	// via push_error from the frame pump — a bad export is dropped LOUDLY, never silently.
+	odin_scripts_registration_errors: proc "c" (out_count: ^i32) -> [^]rt.Registration_Error,
 }
 
 @(private)
@@ -374,6 +378,36 @@ odin_scripts_load :: proc() {
 	n: i32
 	descs := scripts_dll.odin_scripts_manifest(&n)
 	index_scripts_manifest(descs, int(n))
+	note_dll_registration_errors(scripts_dll.odin_scripts_registration_errors)
+}
+
+// Pull the dll's registration-error table (recorded during its `@(init)` reflection
+// walk), note it for the frame pump's push_error pass, and mirror each line to stderr
+// NOW — this runs at extension init / mid-reload, where the engine logger may not be
+// up, and a dropped export must be visible in headless logs regardless.
+@(private = "file")
+note_dll_registration_errors :: proc(errors_proc: proc "c" (out_count: ^i32) -> [^]rt.Registration_Error) {
+	if errors_proc == nil {
+		return
+	}
+	en: i32
+	errs := errors_proc(&en)
+	if en <= 0 {
+		return
+	}
+	scripts_note_registration_errors(errs, int(en))
+	for i in 0 ..< int(en) {
+		e := errs[i]
+		gdext_print(
+			"odin: script registration error",
+			fmt.tprintf(
+				"%s.%s: %s",
+				e.class != nil ? string(e.class) : "?",
+				e.field != nil ? string(e.field) : "-",
+				e.msg != nil ? string(e.msg) : "?",
+			),
+		)
+	}
 }
 
 // ----------------------------------------------------------------------------
@@ -481,6 +515,9 @@ odin_scripts_reload :: proc() -> bool {
 	}
 	n: i32
 	descs := new_dll.odin_scripts_manifest(&n)
+	// Surface the NEW dll's registration errors too (the frame pump pushes them next
+	// frame — the engine is fully up during a reload).
+	note_dll_registration_errors(new_dll.odin_scripts_registration_errors)
 
 	// 3. Rebuild the class map; free the previous (heap-cloned) keys.
 	new_classes := make(map[string]rt.Class_Desc)
