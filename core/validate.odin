@@ -161,11 +161,21 @@ lv_validate :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gde
             for d in ds {delete(d.message)}
             delete(ds)
         }
+        source_path := string_to_odin(path)
+        defer delete(source_path)
         for d in ds {
             ed := godot.new_dictionary_default()
             vd_set_int(&ed, "line", i64(d.line))
             vd_set_int(&ed, "column", i64(d.column))
             vd_set_str(&ed, "message", d.message)
+            // LOAD-BEARING: `path` must echo the script's own path (args[1], VERBATIM — the
+            // editor compares it against script->get_path() by string equality). An error
+            // with an EMPTY path is reclassified by ScriptTextEditor::_validate_script as a
+            // "depended error" belonging to some OTHER file and ERASED from the same-file
+            // list — which is the only list that drives the status alert, the error-count
+            // badge, and the red line background. Without this key, every diagnostic we
+            // return is silently invisible. (GDScript fills ScriptError.path natively.)
+            vd_set_str(&ed, "path", source_path)
             ev := godot.variant_from_dictionary(&ed)
             godot.array_push_back(&errors, ev)
             n += 1
