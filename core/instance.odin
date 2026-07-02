@@ -132,6 +132,9 @@ Export_Cache :: struct {
 	key_class:  godot.String_Name,
 	to_type:     gdext.TypeFromVariantConstructorProc, // Variant -> field
 	from_type:   gdext.VariantFromTypeConstructorProc, // field   -> Variant
+	// Destructor for the field's engine value (nil for POD types and .Object — see
+	// destruct_export_field). Cached here: inst_set is a hot vtable path.
+	dtor:        gdext.PtrDestructor,
 	// group/subgroup header to emit before this property (richer-authoring #2).
 	group:        godot.String_Name,
 	has_group:    bool,
@@ -200,6 +203,7 @@ ensure_class_cache :: proc(desc: rt.Class_Desc) -> ^Class_Cache {
 			hint_string = godot.new_string_cstring(ex.hint_string == nil ? "" : ex.hint_string),
 			to_type     = gdext.get_variant_to_type_constructor(ex.type),
 			from_type   = gdext.get_variant_from_type_constructor(ex.type),
+			dtor        = (ex.type == .Object || ex.type == .Nil) ? nil : gdext.variant_get_ptr_destructor(ex.type),
 			has_group    = ex.group != nil,
 			group        = godot.new_string_name_cstring(ex.group == nil ? "" : ex.group, true),
 			has_subgroup = ex.subgroup != nil,
@@ -452,6 +456,21 @@ seed_container_field :: proc "contextless" (user: rawptr, ex: ^Export_Cache) {
 		}
 		(cast(^godot.Dictionary)fld)^ = d
 	}
+}
+
+// Destruct the engine value held by an @export field — for every builtin type with
+// heap internals (String, StringName, NodePath, Array, Dictionary, Callable, Signal,
+// all Packed_*_Arrays). That set is exactly "builtin types with a ptr destructor":
+// variant_get_ptr_destructor returns nil for the POD ones, and every engine destructor
+// is null-safe, so a zeroed field is a harmless no-op. `.Object` is EXCLUDED — it's a
+// raw handle whose Resource refcounting is handled explicitly (script_hold_ref/
+// script_release_ref). Called wherever the field's storage dies (inst_free, migrate
+// re-alloc) or is overwritten (inst_set / write_export_variant) — without it every
+// instance leaked one COW allocation per engine-typed export for the process lifetime.
+@(private)
+destruct_export_field :: proc "contextless" (user: rawptr, ex: ^Export_Cache) {
+	if ex.dtor == nil {return}
+	ex.dtor(cast(gdext.TypePtr)rawptr(uintptr(user) + ex.offset))
 }
 
 // Apply an @export's declared `default=...` (richer-authoring #3) to its struct field.
@@ -747,21 +766,16 @@ inst_free :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) {
 	untrack_live_instance(oi)
 	script_release_ref(oi.script) // release the ref taken in odin_make_script_instance
 	// Release any resource references retained by RESOURCE-typed @export fields (inst_set),
-	// and destruct Array/Dictionary export fields — every instance holds a live container
-	// there (seeded at creation, then scene/Inspector-set); without the unref the container
-	// and everything it holds (e.g. Resources) leak for the process lifetime.
+	// and destruct every engine-value export field with heap internals (String, packed
+	// arrays, Array, Dictionary, ...) — otherwise each instance leaks those allocations
+	// (and everything they hold, e.g. Resources inside an Array) for the process lifetime.
 	if oi.cache != nil && oi.user != nil {
 		for &ex in oi.cache.exports {
 			if ex.type == .Object && ex.hint == i64(godot.Property_Hint.Resource_Type) {
 				fld := rawptr(uintptr(oi.user) + ex.offset)
 				script_release_ref((cast(^gdext.ObjectPtr)fld)^)
 			}
-			if ex.type == .Array || ex.type == .Dictionary {
-				fld := rawptr(uintptr(oi.user) + ex.offset)
-				if (cast(^rawptr)fld)^ != nil {
-					gdext.variant_get_ptr_destructor(ex.type)(cast(gdext.TypePtr)fld)
-				}
-			}
+			destruct_export_field(oi.user, &ex)
 		}
 	}
 	heap_delete_string(oi.class_name)
@@ -853,6 +867,11 @@ inst_set :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, name: gdex
 		}
 	case:
 		// Engine-native types (Vector2, String, Object, ...) match the field width.
+		// Drop the old COW/ref'd value first (String/Array/packed/... — no-op for POD
+		// and .Object): to_type CONSTRUCTS over the bytes, so overwriting leaked the
+		// previous allocation. Safe for self-assignment — the incoming Variant holds
+		// its own reference to the value.
+		destruct_export_field(oi.user, ex)
 		// A RESOURCE-typed Object export (hint Resource_Type) holds a RefCounted; we must
 		// take a reference so the assigned resource stays alive for as long as this instance
 		// references it (a `Ref<Resource>` would do this in godot-cpp). Without it, a resource
@@ -1212,6 +1231,9 @@ write_export_variant :: proc "contextless" (user: rawptr, ex: ^Export_Cache, val
 			(cast(^i64)dst)^ = tmp
 		}
 	case:
+		// Same overwrite rule as inst_set: drop the old COW/ref'd value before
+		// constructing the new one over its bytes (no-op for POD and .Object).
+		destruct_export_field(user, ex)
 		ex.to_type(dst, value)
 	}
 }
@@ -1231,14 +1253,9 @@ migrate_instance :: proc(oi: ^Odin_Instance, new_desc: rt.Class_Desc, new_cache:
 
 	// Free/realloc the script struct on the allocator odin_make_script_instance used
 	// (user_struct_allocator — the OLD desc picks the free side, the NEW one the alloc).
-	// Container fields drop their own ref first (the snapshot Variants hold another).
+	// Engine-value fields drop their own ref first (the snapshot Variants hold another).
 	for &ex in oi.cache.exports {
-		if ex.type == .Array || ex.type == .Dictionary {
-			fld := rawptr(uintptr(oi.user) + ex.offset)
-			if (cast(^rawptr)fld)^ != nil {
-				gdext.variant_get_ptr_destructor(ex.type)(cast(gdext.TypePtr)fld)
-			}
-		}
+		destruct_export_field(oi.user, &ex)
 	}
 	mem.free(oi.user, user_struct_allocator(oi.desc.align))
 	user, _ := mem.alloc(new_desc.size, new_desc.align, user_struct_allocator(new_desc.align))
