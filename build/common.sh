@@ -151,9 +151,17 @@ atomic_odin_dll() {
     fi
 
     rm -f "$tmp" "$dir/.$base.tmp-"*.o
+    # -use-single-module: REQUIRED for usable debug info on macOS. Odin's default for
+    # -o:none/-o:minimal is separate modules (one .o per package), and ld then emits a
+    # broken one-entry debug map (a single N_OSO stab pointing at one arbitrary .o), so
+    # dsymutil produces a near-empty .dSYM: no line tables -> no `b file:line`, no
+    # stepping, no `frame variable`. One build unit gives a complete .dSYM with source
+    # lines AND named/valued proc arguments in lldb, for ~0.2s extra per dll.
+    # (Mirrored in build/build_scripts.ps1 BuildDll — keep them in sync.)
     "$ODIN" build "$pkg" \
         -collection:godot="$ROOT" \
         -build-mode:dll \
+        -use-single-module \
         -out:"$tmp" \
         ${link_flags[@]+"${link_flags[@]}"} \
         "$@"

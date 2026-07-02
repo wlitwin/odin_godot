@@ -119,6 +119,11 @@ TESTS=(
     # fatal-signal reporter (ODIN_GODOT_CRASH + symbolized faulting Odin frame +
     # backtrace) and still chains to Godot's own crash handler.
     "crash|CRASH_TEST_OK|tests/crash/run.sh"
+    # Editor-launched lldb debugging (build/debug_game.sh): file:line breakpoints bind
+    # across the scripts-dll dlopen (the -use-single-module regression net), named args
+    # + godot_lldb.py printers live, and a script panic freezes the session in place.
+    # Darwin-only (SKIPs elsewhere / without a working lldb).
+    "debuglaunch|DEBUG_LAUNCH_OK|tests/debug_launch/run.sh|DEBUG_LAUNCH_SKIP"
     "reloadexports|RELOAD_EXPORTS_OK|tests/reload_exports/run.sh"
     # Cross-build smoke: self-gating — prints CROSS_SKIP (a non-fatal SKIP) when no
     # Linux/Windows cross toolchain is present, so the default macOS shell stays green. To

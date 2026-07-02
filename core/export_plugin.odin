@@ -139,16 +139,17 @@ pl_get_plugin_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args:
 // extension's `.Editor`-level init (before any export command executes).
 // A custom Callable is always valid + takes no args. Providing these (rather than leaving the
 // struct's optional fields nil) avoids any chance the engine calls a nil function pointer.
-@(private = "file")
+@(private)
 menu_callable_is_valid :: proc "c" (userdata: rawptr) -> bool {return true}
-@(private = "file")
+@(private)
 menu_callable_argc :: proc "c" (userdata: rawptr, is_valid: ^bool) -> i64 {
     if is_valid != nil {is_valid^ = true}
     return 0
 }
 
-// make_menu_callable — a custom Callable backed by an Odin "c" proc, for add_tool_menu_item.
-@(private = "file")
+// make_menu_callable — a custom Callable backed by an Odin "c" proc, for
+// add_tool_menu_item. Package-private: core/debug_launch.odin registers its own items.
+@(private)
 make_menu_callable :: proc(fn: gdext.ExtensionCallableCustomCall) -> godot.Callable {
     info := gdext.ExtensionCallableCustomInfo2 {
         token                   = gdext.library,
@@ -181,13 +182,13 @@ setup_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: 
     setup_scripts_from_template()
 }
 
-@(private = "file")
+@(private)
 editor_msg_error :: proc(s: string) {
     m := godot.new_string_odin(s)
     godot.gd_push_error(godot.variant_from_string(&m))
 }
 
-@(private = "file")
+@(private)
 editor_msg_warn :: proc(s: string) {
     m := godot.new_string_odin(s)
     godot.gd_push_warning(godot.variant_from_string(&m))
@@ -298,6 +299,9 @@ pl_enter_tree :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]g
     godot.editor_plugin_add_tool_menu_item(plug, setup_name, make_menu_callable(setup_menu_call))
     build_name := godot.new_string_cstring("Build Odin Scripts")
     godot.editor_plugin_add_tool_menu_item(plug, build_name, make_menu_callable(build_menu_call))
+    //   * the debugger items ("Debug Game (LLDB)" / break-at-cursor / VS Code config) —
+    //     core/debug_launch.odin (no-op on Windows: core/debug_launch_windows.odin).
+    debug_register_menu_items(plug)
 }
 
 // Map a target OS feature tag -> the scripts dll suffix the EXPORTED core will look for.

@@ -61,6 +61,29 @@ push_error may not survive to the editor if the debugger link dies first — std
 carries the full report. Verified end-to-end by `tests/crash/run.sh` (sentinel
 `CRASH_TEST_OK`).
 
+## Launching the debugger from the editor (macOS + Linux)
+
+Three items under **Project > Tools** remove every manual lldb step (paths, SIP
+re-signing, breakpoint syntax):
+
+- **Debug Game (LLDB)** — opens a terminal window running the game under lldb (the
+  game starts immediately). A script `panic`/failed `assert` **freezes the session at
+  the panic site** with the whole stack inspectable, and any hard crash (SIGSEGV on a
+  nil handle, the classic) stops lldb at the exact faulting instruction — strictly
+  better than reading a post-mortem crash log.
+- **Debug Game (Break at Cursor)** — put the caret on a line in an `.odin` script,
+  click, and the game runs until it reaches that line, then halts there with locals
+  live. (The engine's gutter-dot breakpoints only drive the GDScript VM; this is the
+  native equivalent.)
+- **Generate VS Code Debug Config** — writes `.vscode/launch.json` + `tasks.json` so
+  F5 in VS Code (with the CodeLLDB extension) debugs the game with clickable
+  breakpoints, stepping, and a live Variables pane, directly in your `.odin` files.
+
+All three shell out to `addons/odin_godot/build/debug_game.sh`, which also works
+standalone (see §2). The Godot binary being debugged is the editor's own executable, so
+what you debug is exactly what Play runs. Windows: not wired up yet (the native path
+there is VS/WinDbg against the `.pdb` the build already emits).
+
 ## The one thing to internalize first
 
 Odin scripts in odin_godot are **AOT-compiled native code** (a `.dylib`/`.so`/`.dll`),
@@ -69,12 +92,12 @@ single fact decides which tools work:
 
 | Tool | Works for Odin scripts? |
 | --- | --- |
-| Godot **in-editor breakpoints** (gutter dots) | ❌ No — no interpreter to halt |
-| Godot **step / pause / resume** of script lines | ❌ No |
+| Godot **in-editor breakpoints** (gutter dots) | ❌ No — no interpreter to halt (use Tools > Debug Game (Break at Cursor)) |
+| Godot **step / pause / resume** of script lines | ❌ No — lldb steps natively instead |
 | Godot **expression evaluation** in the debugger panel | ❌ No |
 | Godot **remote scene tree / live property edit** | ✅ Yes (engine-side, not script-line) |
 | `gd.print` / `gd.error` / `gd.warn` logging | ✅ Yes — your bread and butter |
-| **native `lldb`** (breakpoints, `bt`, inspect memory) | ✅ Yes — full power, this is the real debugger |
+| **native `lldb`** (line breakpoints, stepping, `bt`, `frame variable`) | ✅ Yes — full power, this is the real debugger |
 | **crash backtraces** (signal 11) with Odin proc names | ✅ Yes — built with `-debug`, symbols present |
 
 The Godot debugger panel is built around GDScript's bytecode VM. Your Odin proc is a
@@ -129,21 +152,28 @@ which is exactly what `gd.print` wants. `tprintf` returns a temp `string` — pa
 
 ## 2. Native debugging with `lldb`
 
-Because the script dll is built with `-debug` (see `build/build_scripts.sh`), every Odin
-proc is a real, named symbol with line tables. `nm` shows them:
+Because the script dll is built `-debug -use-single-module` (see `atomic_odin_dll` in
+`build/common.sh`), every Odin proc is a real, named symbol with **complete DWARF**:
+line tables, typed arguments, struct layouts. The `-use-single-module` half matters —
+with Odin's default separate-modules debug build, macOS `ld` emits a broken one-entry
+debug map and `dsymutil` produces a near-empty `.dSYM` (symbols work, but no line
+breakpoints, no stepping, no `frame variable`). One build unit gives lldb everything.
 
-```
-$ nm tests/showcase/bin/libodinscripts.dylib | grep coin_collect
-0000000000019…  T _showcase_scripts::coin_collect
-```
-
-So lldb debugs them like any C library. Use the launcher:
+So lldb debugs Odin scripts like any C library — with source lines. Use the launcher
+(the same one the Project > Tools menu items run; `--break` accepts `file.odin:LINE`
+or a symbol regex, repeatable, and implies auto-run):
 
 ```bash
-tools/lldb-godot.sh coin_collect tests/showcase --headless --script test_showcase.gd
+build/debug_game.sh tests/showcase                                # interactive (lldb) prompt
+build/debug_game.sh --break player.odin:51 tests/showcase        # halt at that line
+build/debug_game.sh --break coin_collect tests/showcase -- --headless --script test_showcase.gd
 ```
 
-then at the `(lldb)` prompt: `run`, and when the breakpoint fires, `bt`, `continue`, etc.
+At the prompt: `run` (if not auto-run), then `bt`, `n`/`s`/`c` to step, `frame variable`
+to inspect. The launcher also auto-loads `build/godot_lldb.py` — lldb type summaries so
+`godot.String` / `String_Name` / `Variant` display their live values instead of an
+opaque pointer — and pre-sets a breakpoint on the script assertion proc, so a script
+`panic("...")` freezes the session at the panic site rather than printing and dying.
 
 ### Two macOS gotchas the launcher handles for you
 
@@ -166,7 +196,7 @@ then at the `(lldb)` prompt: `run`, and when the breakpoint fires, `bt`, `contin
    error: process exited with status -1 (attach failed (Not allowed to attach to process...))
    ```
 
-   The fix (which `tools/lldb-godot.sh` does automatically, cached, without touching your
+   The fix (which `build/debug_game.sh` does automatically, cached, without touching your
    install): make a copy of the Godot binary and ad-hoc re-sign it with `get-task-allow`:
 
    ```bash
@@ -182,47 +212,49 @@ then at the `(lldb)` prompt: `run`, and when the breakpoint fires, `bt`, `contin
 
 ### A real breakpoint hit (verified)
 
-Running the showcase under lldb and driving a real **physics** coin collect, the breakpoint
-fires *inside* the Odin proc with the full native call chain — Odin script frames at the top,
-the engine's physics dispatch below:
+Running the showcase with a **line breakpoint** and driving a real physics coin collect,
+the process halts at that exact source line, with the source listed, the full native call
+chain, and the proc's arguments **named and valued** in the frame:
 
 ```
-(lldb) break set -r coin_collect
+(lldb) breakpoint set -f coin.odin -l 50
+Breakpoint 1: no locations (pending).        # normal: the dll isn't dlopen'd yet
 (lldb) run
+1 location added to breakpoint 1             # bound when Godot loaded the scripts dll
 Process … stopped
 * thread #1, stop reason = breakpoint 1.1
-    frame #0: libodinscripts.dylib`showcase_scripts::coin_collect
+    frame #0: libodinscripts.dylib`showcase_scripts::coin_collect(self=0x…, body=0x…) at coin.odin:50:2
+   48       if self.taken {return}
+   49       self.taken = true
+-> 50       game_state_add(self.value)
 (lldb) bt
-* frame #0: libodinscripts.dylib`showcase_scripts::coin_collect
-  frame #1: libodinscripts.dylib`showcase_scripts::[coin.gen.odin]::_coin_m_collect + 208
-  frame #2: libodin_godot.dylib`core::[instance.odin]::inst_call + 448
+* frame #0: libodinscripts.dylib`showcase_scripts::coin_collect(...) at coin.odin:50:2
+  frame #1: libodinscripts.dylib`showcase_scripts::[coin.gen.odin]::_coin_m_collect(...) at coin.gen.odin:36:2
+  frame #2: libodin_godot.dylib`core::[instance.odin]::inst_call + 520
   frame #3: Godot`Object::callp(...) + 184
   frame #4: Godot`Object::emit_signalp(...) + 1568
-  frame #5: Godot`Area2D::_body_inout(...) + 1268
-  frame #6: Godot`GodotSpace2D::call_queries() + 216
-  frame #7: Godot`Main::iteration() + 532
   …
 ```
 
-### Inspecting `self` and arguments
+### Inspecting `self`, arguments, locals
 
-Odin built with `-debug` emits line tables and unwind info, but **limited local-variable
-DWARF** — at a function's prologue `frame variable` is often empty. Read arguments from
-registers instead. On arm64 macOS the first integer argument (the script instance pointer,
-i.e. `self`) is in **`x0`**, the second in `x1`:
+`frame variable` shows the typed arguments; dereference `self` (C syntax — `*self`, not
+Odin's `self^`) for the whole live script struct:
 
 ```
-(lldb) register read x0 x1
-     x0 = 0x0000600003f96b60     ; self: ^Coin
-     x1 = 0x0000000133926410     ; body: ^Node2d
-(lldb) memory read --size 8 --format x --count 4 $x0
-0x600003f96b60: 0x0000000133930c10  0x0000000000000005   ; owner=…  value=5
-0x600003f96b70: 0x0000000000000000  …                    ; taken=false
+(lldb) frame variable
+(showcase_scripts::Player *) self = 0x0000600000c71b70
+(f64) delta = 0.066456
+(lldb) frame variable *self
+(showcase_scripts::Player) *self = (owner = …, speed = 500)
+(lldb) target variable left_name          # file-scope globals: `target variable`
+(godot::String_Name) left_name = StringName("ui_left")   # <- godot_lldb.py summary
 ```
 
-The fields read straight out in struct order (`owner`, `value`, `taken`) — confirming
-`self` points at the live `Coin`. Set a breakpoint a few instructions past the prologue (or
-`next` a couple of times) and locals tend to materialize in `frame variable`.
+Mid-body locals materialize once their declaration line has executed (`next` past it).
+If a value ever looks unavailable (heavily optimized frame, prologue stop), the raw
+fallback still works: arm64 passes the first integer args in `x0`/`x1` — `register read
+x0`, then `memory read` on the pointer.
 
 ---
 

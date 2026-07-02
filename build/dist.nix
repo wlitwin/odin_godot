@@ -84,6 +84,10 @@ stdenvNoCC.mkDerivation ({
     cp build/common.sh \
        build/build_scripts.sh build/build_scripts.ps1 build/build_export_scripts.sh \
        build/build_web.sh build/build_cross.sh build/serve.sh $A/build/
+    # The editor's Project > Tools debugger items shell out to debug_game.sh, which
+    # auto-imports the godot_lldb.py pretty-printers from beside itself. The .py is not
+    # a `source`d .sh, so the self-guard below can't catch a miss — keep the pair here.
+    cp build/debug_game.sh build/godot_lldb.py $A/build/
 
     # Self-guard: every `source .../<file>` in a shipped script must resolve inside the
     # addon — a helper added to build/ but forgotten here should fail THIS build, not a

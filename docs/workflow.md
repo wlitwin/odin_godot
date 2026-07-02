@@ -196,19 +196,21 @@ gd.print_str(fmt.tprintf("hp=%d/%d", hp, max_hp))
 
 ### Native debugging with `lldb`
 
-The scripts dll is built with `-debug`, so every Odin proc is a named symbol with line tables.
-Use the launcher, which handles the two macOS gotchas for you (regex breakpoints, since lldb
-mis-parses `::`; and re-signing a Godot copy with `get-task-allow` because SIP blocks attaching
-to the installed app):
+Zero-setup from the editor: **Project > Tools > Debug Game (LLDB)** opens a terminal
+running the game under lldb, and **Debug Game (Break at Cursor)** halts it on the script
+line the caret is on; **Generate VS Code Debug Config** wires the same thing into VS
+Code/CodeLLDB (F5, clickable breakpoints in `.odin` files). From a shell, the same
+launcher (it handles the macOS gotchas — SIP re-sign, lldb's `::` mis-parse):
 
 ```sh
-tools/lldb-godot.sh coin_collect tests/showcase --headless --script test_showcase.gd
+build/debug_game.sh --break player.odin:51 tests/showcase
 ```
 
-then at the `(lldb)` prompt: `run`, and when the breakpoint fires, `bt`, `continue`, etc. To
-inspect `self`, read argument registers (`register read x0 x1` on arm64) — Odin's `-debug` emits
-line tables but limited local-variable DWARF, so `frame variable` is often empty at the
-prologue.
+The dlls carry full DWARF (`-debug -use-single-module`): file:line breakpoints, stepping,
+and `frame variable` with typed args — `frame variable *self` prints the live script
+struct, and the auto-loaded `godot_lldb.py` summaries render `godot.String`/`String_Name`/
+`Variant` values. A script `panic` freezes the session at the panic site. See
+[debugging.md](debugging.md) for the full tour.
 
 ### Crashes and panics are reported automatically
 

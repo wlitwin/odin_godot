@@ -52,7 +52,15 @@ echo
 echo "== (A) unit: native backtrace + dladdr + filter =="
 odin build "$ROOT/tests/debug/bt_probe.odin" -file -debug -out:"$ROOT/tests/debug/bt_probe" 2>&1 \
     | grep -iE "error" | grep -v "could not find symbol" || true
-BT_OUT="$("$ROOT/tests/debug/bt_probe" "$SCRIPTS_DLL" 2>&1 || true)"
+# coin_collect's unslid file address for the probe's part 2: script procs are LOCAL
+# symbols since -use-single-module (dlsym can't see them; dladdr can — that's the point
+# of the probe), so the address comes from the symbol table via nm.
+SYM_ADDR="$(nm "$SCRIPTS_DLL" | grep -F 'showcase_scripts::coin_collect' | head -1 | awk '{print $1}')"
+if [[ -z "$SYM_ADDR" ]]; then
+    echo "debug: FAIL — coin_collect not in the scripts dll symbol table (nm)"
+    exit 1
+fi
+BT_OUT="$("$ROOT/tests/debug/bt_probe" "$SCRIPTS_DLL" "$SYM_ADDR" 2>&1 || true)"
 echo "$BT_OUT"
 if ! grep -q "BTPROBE_OK" <<<"$BT_OUT"; then
     echo "debug: FAIL — backtrace/dladdr unit probe did not pass"

@@ -81,7 +81,9 @@ All bundled under [`docs/`](docs/index.md):
   autoloads, and the `gd.*` helper catalog.
 - **[Workflow](docs/workflow.md)** — the build/edit/iterate loop, editor DX, and honest limits.
 - **[Exporting](docs/exporting.md)** — shipping desktop and web builds.
-- **[Debugging](docs/debugging.md)** — `gd.print`, `lldb`, and reading crash backtraces.
+- **[Debugging](docs/debugging.md)** — `gd.print`, one-click lldb sessions from **Project →
+  Tools → Debug Game (LLDB)** (line breakpoints, stepping, live struct inspection; also a
+  break-at-cursor variant and a VS Code config generator), and reading crash backtraces.
 
 ## Exporting
 

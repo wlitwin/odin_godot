@@ -104,7 +104,9 @@ function BuildDll([string]$pkg, [string]$finalOut, [string[]]$extra) {
     $tmp  = Join-Path $dir (".${leaf}.tmp.dll")
     $tmpPdb = [System.IO.Path]::ChangeExtension($tmp, ".pdb")
     Remove-Item -Force -ErrorAction SilentlyContinue $tmp, $tmpPdb
-    Run $Odin (@("build", $pkg, "-collection:godot=$RootRel", "-build-mode:dll", "-out:$tmp", "-debug") + $extra)
+    # -use-single-module: keeps the debug info in one build unit so the PDB carries
+    # complete line tables (mirrors atomic_odin_dll in build/common.sh — keep in sync).
+    Run $Odin (@("build", $pkg, "-collection:godot=$RootRel", "-build-mode:dll", "-use-single-module", "-out:$tmp", "-debug") + $extra)
     # Reached only on success (Run throws on a non-zero exit). Publish the dll + its .pdb.
     $finalPdb = [System.IO.Path]::ChangeExtension($finalOut, ".pdb")
     if (Test-Path $tmpPdb) { Move-Item -Force $tmpPdb $finalPdb }

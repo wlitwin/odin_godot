@@ -8,15 +8,23 @@ package bt_probe
 //   1. backtrace() + dladdr() over THIS program's own call chain  -> proves that the
 //      mechanism yields readable Odin `pkg::proc` frames (the procs below appear as
 //      `bt_probe::sim_*`), and that the `::`-substring filter isolates them.
-//   2. dlopen()+dlsym() the REAL tests/showcase/bin/libodinscripts.dylib, then dladdr()
-//      the address of `showcase_scripts::coin_collect`  -> proves that, for the real
-//      script symbol, dladdr reports dli_sname="showcase_scripts::coin_collect" and a
-//      dli_fname that contains "libodinscripts" (the production filter key).
+//   2. dlopen() the REAL tests/showcase/bin/libodinscripts.dylib and dladdr() an address
+//      INSIDE `showcase_scripts::coin_collect` -> proves that, for the real script
+//      symbol, dladdr reports dli_sname="showcase_scripts::coin_collect" and a dli_fname
+//      containing "libodinscripts" (the production filter key). The address arrives as
+//      argv[2]: the symbol's unslid file address (run.sh reads it out of `nm`), slid by
+//      the module base. It can NOT come from dlsym: since -use-single-module (the flag
+//      that makes debug DWARF usable, build/common.sh) script procs are INTERNALIZED —
+//      local `t` symbols, absent from the export table dlsym searches. dladdr still
+//      names them (it scans the full nlist, exactly what the crash reporter leans on),
+//      and probing base+offset mirrors the crash path (an arbitrary faulting pc) more
+//      faithfully than a dlsym'd entry address anyway.
 //
 // Build + run by tests/debug/run.sh; asserts BTPROBE_OK.
 
 import "core:fmt"
 import "core:os"
+import "core:strconv"
 import "core:strings"
 
 when ODIN_OS == .Darwin {
@@ -130,12 +138,31 @@ main :: proc() {
 		fmt.printf("BTPROBE_FAIL: dlopen failed for %s\n", dll)
 		os.exit(1)
 	}
-	// dlsym wants the symbol WITHOUT the leading underscore that `nm` shows.
-	addr := dlsym(h, "showcase_scripts::coin_collect")
-	if addr == nil {
-		fmt.println("BTPROBE_FAIL: dlsym could not find showcase_scripts::coin_collect")
+	if len(os.args) < 3 {
+		fmt.println("BTPROBE_FAIL: missing argv[2] = coin_collect's unslid nm address")
 		os.exit(1)
 	}
+	file_addr, addr_ok := strconv.parse_u64_of_base(os.args[2], 16)
+	if !addr_ok {
+		fmt.printf("BTPROBE_FAIL: argv[2] is not a hex address: %s\n", os.args[2])
+		os.exit(1)
+	}
+	// Module base: dladdr any EXPORTED anchor (the boot handshake proc is always there);
+	// its dli_fbase is the dylib's slid load address. Script procs are local symbols
+	// (see header), so this is the only dlopen-visible route to an in-proc address.
+	anchor := dlsym(h, "odin_scripts_boot")
+	if anchor == nil {
+		fmt.println("BTPROBE_FAIL: dlsym could not find the odin_scripts_boot anchor")
+		os.exit(1)
+	}
+	base_info: Dl_info
+	if dladdr(anchor, &base_info) == 0 || base_info.dli_fbase == nil {
+		fmt.println("BTPROBE_FAIL: dladdr failed on the boot anchor")
+		os.exit(1)
+	}
+	// +8: an address strictly INSIDE the proc (mirrors a faulting pc, and keeps a
+	// boundary symbol's end address from resolving to whatever proc follows it).
+	addr := rawptr(uintptr(base_info.dli_fbase) + uintptr(file_addr) + 8)
 	info: Dl_info
 	if dladdr(addr, &info) == 0 || info.dli_sname == nil || info.dli_fname == nil {
 		fmt.println("BTPROBE_FAIL: dladdr failed on coin_collect address")
