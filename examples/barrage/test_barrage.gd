@@ -50,6 +50,10 @@ func _tick() -> void:
 			field.call("spawn_ring", Vector2(480, 300), 100, 60.0, float(i) * 0.13, 1)
 	if frames == 400 and player != null:
 		player.call("apply_powerup", 0, 4.0)
+	if frames == 410 and spawner != null:
+		# Exercise the SlowEnemies fan-out (spawner's pure-Odin events.Event -> every
+		# live enemy, docs/events.md) with live subscribers mid-fight.
+		spawner.call("slow_all_enemies", 0.5)
 	if frames == 420 and player != null:
 		player.call("take_damage", 1)
 

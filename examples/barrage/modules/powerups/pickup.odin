@@ -56,17 +56,17 @@ pickup_collect :: proc(self: ^Pickup, body: ^gd.Node2d) {
 	}
 
 	if Powerup_Kind(cfg.kind) == .SlowEnemies {
-		// Debuff every live enemy (cross-module, by group + name).
+		// ONE cross-module engine call into the enemies module; the per-enemy fan-out
+		// happens over there on a pure-Odin events.Event — the canonical split
+		// (docs/events.md): engine calls cross the module boundary, direct typed
+		// calls handle the one-to-many inside it.
 		if tree := gd.node_get_tree(cast(gd.Node)self.owner); tree != nil {
-			grp := gd.new_string_name_cstring("enemies", true)
-			nodes := gd.scene_tree_get_nodes_in_group(tree, grp)
-			m := gd.sname("apply_slow")
-			for i in 0 ..< gd.array_size(&nodes) {
-				ev := gd.array_get(&nodes, i)
-				e := gd.variant_to_object(&ev)
+			grp := gd.new_string_name_cstring("spawner", true)
+			if sp := gd.scene_tree_get_first_node_in_group(tree, grp); sp != nil {
+				m := gd.sname("slow_all_enemies")
 				factor := f64(cfg.magnitude)
 				fv := gd.variant_from(&factor)
-				_ = gd.object_call(cast(gd.Object)e, m, fv)
+				_ = gd.object_call(cast(gd.Object)sp, m, fv)
 			}
 		}
 	} else {

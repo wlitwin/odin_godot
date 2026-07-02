@@ -7,10 +7,14 @@ package barrage_enemies
 // position with the BulletField every physics tick (the field does the circle math),
 // drifts toward the player's half of the screen, and fires aimed volleys on a timer.
 // Damage arrives from the Spawner (which owns the field's `enemy_hit` signal) via
-// the typed `take_hit` @(gd_method).
+// the typed `take_hit` @(gd_method). The SlowEnemies debuff arrives on the Spawner's
+// pure-Odin `slow_changed` event (docs/events.md) — subscribed at ready, unsubscribed
+// at exit_tree (covers death), resubscribed in the reload hook.
 // ----------------------------------------------------------------------------
 
+import events "godot:events"
 import gd "godot:godot"
+import rt "godot:runtime"
 
 Enemy :: struct {
 	owner: gd.Node2d,
@@ -34,6 +38,51 @@ enemy_ready :: proc(self: ^Enemy) {
 	self.fire_cd = self.fire_ivl * 0.5
 	grp := gd.new_string_name_cstring("enemies", true)
 	gd.node_add_to_group(cast(gd.Node)self.owner, grp, false)
+	enemy_subscribe_slow(self)
+}
+
+// ---- the SlowEnemies debuff, over the Spawner's pure-Odin event ------------
+
+@(private = "file")
+enemy_on_slow :: proc(ctx: rawptr, factor: f64) {
+	self := cast(^Enemy)ctx
+	self.slow = f32(factor) // stretches this enemy's whole timeline (see physics_process)
+}
+
+// find_spawner — SAME-module publisher lookup (group + typed script_of; both scripts
+// live in this dll, so the direct struct pointer is legal — never do this across
+// modules, see docs/events.md).
+@(private = "file")
+find_spawner :: proc(self: ^Enemy) -> ^Spawner {
+	tree := gd.node_get_tree(cast(gd.Node)self.owner)
+	if tree == nil {return nil}
+	grp := gd.new_string_name_cstring("spawner", true)
+	sp := gd.scene_tree_get_first_node_in_group(tree, grp)
+	if sp == nil {return nil}
+	return rt.script_of(cast(gd.Object)sp, Spawner)
+}
+
+// The documented resubscribe pattern (events.odin header): owner-tagged, idempotent,
+// shared by ready AND the hot-reload hook so a dll swap refreshes the proc pointers.
+@(private = "file")
+enemy_subscribe_slow :: proc(self: ^Enemy) {
+	sp := find_spawner(self)
+	if sp == nil {return}
+	id := u64(gd.object_get_instance_id(cast(gd.Object)self.owner))
+	events.unsubscribe_owner(&sp.slow_changed, id)
+	events.subscribe(&sp.slow_changed, self, enemy_on_slow, id)
+}
+
+enemy_reload :: proc(self: ^Enemy) {
+	enemy_subscribe_slow(self)
+}
+
+// exit_tree covers every way an enemy dies (take_hit's queue_free, scene switch):
+// the subscription holds a raw pointer to THIS struct, so it must not outlive it.
+enemy_exit_tree :: proc(self: ^Enemy) {
+	if sp := find_spawner(self); sp != nil {
+		events.unsubscribe_owner(&sp.slow_changed, u64(gd.object_get_instance_id(cast(gd.Object)self.owner)))
+	}
 }
 
 @(private)
@@ -118,8 +167,3 @@ enemy_take_hit :: proc(self: ^Enemy, damage: gd.Int) -> gd.Bool {
 	return false
 }
 
-// slow debuff (powerups module, by name): factor 0..1, e.g. 0.4 = 60% slower.
-@(gd_method)
-enemy_apply_slow :: proc(self: ^Enemy, factor: f64) {
-	self.slow = f32(factor)
-}

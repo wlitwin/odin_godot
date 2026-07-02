@@ -74,8 +74,10 @@ stdenvNoCC.mkDerivation ({
     # resolve `-collection:godot=$ODIN_GODOT_ROOT` (with ODIN_GODOT_ROOT pointing here)
     # exactly as in-repo: `godot:godot` -> $A/godot, `godot:gdext` -> $A/gdext, etc.
     # `core` + `scriptgen` are bundled too — `core` so the WEB build can pull it into the
-    # scripts module, scriptgen for the //gd: codegen the build scripts run.
-    cp -r core godot gdext libgd runtime $A/
+    # scripts module, scriptgen for the //gd: codegen the build scripts run. flow/flowgd
+    # (the sequencer) and events (the pure-Odin observer) are documented script-facing
+    # collections — a consumer following the authoring docs imports them.
+    cp -r core godot gdext libgd runtime flow flowgd events $A/
     cp -r scriptgen $A/scriptgen
     # Only the CONSUMER-facing build scripts — not the repo's dev/test builders
     # (build_phase*.sh) or the nix package def (dist.nix), which a consumer never runs.
@@ -119,7 +121,7 @@ stdenvNoCC.mkDerivation ({
     cp dist/addons/odin_godot/icon.svg $A/icon.svg
     mkdir -p $A/docs
     cp build/addon-docs/getting-started.md build/addon-docs/index.md $A/docs/
-    cp docs/authoring-guide.md docs/workflow.md docs/exporting.md docs/debugging.md $A/docs/
+    cp docs/authoring-guide.md docs/workflow.md docs/exporting.md docs/debugging.md docs/modules.md docs/events.md $A/docs/
 
     # Stamp the EXACT Odin release the bundled core was just built with into the docs'
     # @ODIN_VERSION@ placeholders (README prerequisites + getting-started). The core<->

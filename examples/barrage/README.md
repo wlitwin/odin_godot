@@ -32,6 +32,7 @@ engine-mediated: groups + `object_call` by name, typed signals wired in `game.ts
 | `resource=` PackedScene/typed-resource exports | `spawner.odin`, `manager.odin` |
 | **Typed-array export** (`array=`), assigned from the scene | `manager.odin` (`drop_table`), `game.tscn` |
 | `@(gd_connect)` declarative signal wiring | `modules/powerups/pickup.odin` (`body_entered`) |
+| **Pure-Odin `events.Event(T)`** (same-module fan-out; cross-module edge stays ONE engine call) | `spawner.odin` (`slow_changed`), `enemy.odin` (subscribe/exit_tree/reload) |
 | Typed cross-dll reads (`rt.script_of`) | `pickup.odin` (PowerupConfig) |
 | Autoload + engine-mediated state | `scripts/game_state.odin` |
 | Scene loading (title → game → game-over) | `modules/ui/*.odin` |

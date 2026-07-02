@@ -11,9 +11,13 @@ package barrage_enemies
 //
 // FEATURES: PackedScene exports + runtime instancing, scene [connection] target,
 // engine-mediated calls into TWO other modules, wave pacing driven by the shared
-// BARRAGE_TEST flag.
+// BARRAGE_TEST flag, and a pure-Odin `events.Event` (slow_changed) fanning the
+// SlowEnemies debuff out to every live enemy at direct-call cost — the canonical
+// shape: the cross-module edge (pickup -> here) is ONE engine call, the
+// intra-module one-to-many is the Event (docs/events.md).
 // ----------------------------------------------------------------------------
 
+import events "godot:events"
 import gd "godot:godot"
 
 Spawner :: struct {
@@ -32,6 +36,11 @@ Spawner :: struct {
 	fast:       bool,
 	first_kill: bool, // one-shot console sentinel (web smoke test)
 	rng:        u64,
+
+	// Pure-Odin observer: enemies subscribe at spawn (enemy.odin), the powerups module
+	// triggers slow_all_enemies with ONE engine call, and the fan-out is direct typed
+	// calls — no per-enemy Variant boxing. Same-module only (docs/events.md).
+	slow_changed: events.Event(f64),
 }
 
 spawner_ready :: proc(self: ^Spawner) {
@@ -164,4 +173,19 @@ spawner_get_boss_phase :: proc(self: ^Spawner) -> gd.Int {
 	m := gd.sname("get_phase")
 	v := gd.object_call(self.boss, m)
 	return gd.Int(gd.variant_to_int(&v))
+}
+
+// slow_all_enemies — the ONE cross-module engine entry for the SlowEnemies powerup
+// (pickup.odin calls it by name). The per-enemy fan-out happens on the pure-Odin
+// slow_changed event: direct typed calls into every subscribed Enemy, zero boxing.
+@(gd_method)
+spawner_slow_all_enemies :: proc(self: ^Spawner, factor: f64) {
+	events.emit(&self.slow_changed, factor)
+}
+
+// The publisher owns the subscriber list — free it when the spawner leaves the tree
+// (scene switch / game over). Enemies unsubscribe themselves first (their exit_tree
+// runs as the same teardown drains), but destroy is safe regardless.
+spawner_exit_tree :: proc(self: ^Spawner) {
+	events.destroy(&self.slow_changed)
 }

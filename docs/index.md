@@ -33,6 +33,10 @@ use → ship.**
   - **the honest AOT limitations** (no in-editor breakpoints, recompile-on-save latency, …)
 - **[Debugging](debugging.md)** — the deep `lldb` + crash-backtrace reference (what Workflow
   summarizes).
+- **[Pure-Odin Events](events.md)** — `events.Event(T)`: typed one-to-many dispatch at
+  direct-call cost for scripts in the same dll (the C#-events-vs-Godot-signals split).
+  When to use it vs an engine signal vs batching, the module-boundary rule, and the
+  hot-reload resubscribe pattern.
 - **[Script Modules](modules.md)** — the opt-in scaling tool for large projects: split
   scripts into `res://modules/<name>/` packages, one dll each, rebuilt + hot-swapped
   independently on save. Covers the cost model (when NOT to use them), the no-cross-imports
