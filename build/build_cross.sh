@@ -53,11 +53,16 @@ case "$TARGET" in
         # statically link libgcc + the gcc thread runtime (mcfgthreads, pulled in by mingw's
         # default `mcf` thread model); only system DLLs (msvcrt/kernel32/bcrypt) stay dynamic.
         #   -lbcrypt                       : BCryptGenRandom (core:crypto/rand seeding)
+        #   -ldbghelp                      : Sym* crash symbolization (core/crash_windows.odin).
+        #     Odin records `system:Dbghelp.lib` in the object's .drectve directive section,
+        #     which link.exe would honor — GNU ld IGNORES it (the harmless-looking
+        #     "corrupt .drectve" warning is it skipping the section), so every foreign-import
+        #     library must be repeated EXPLICITLY here or the link dies on undefined Sym*.
         #   --defsym __chkstk=___chkstk_ms : Odin/LLVM emits the MSVC stack-probe symbol
         #     `__chkstk`; mingw ships the interface-compatible `___chkstk_ms` (x86-64: both
         #     probe RAX bytes, leave RSP to the caller). Aliasing is the standard fix that
         #     Rust/Zig also use when linking LLVM output against mingw.
-        LINK_LIBS=(-static-libgcc -lbcrypt -Wl,--defsym,__chkstk=___chkstk_ms)
+        LINK_LIBS=(-static-libgcc -lbcrypt -ldbghelp -Wl,--defsym,__chkstk=___chkstk_ms)
         # mcfgthreads lib dir(s) — from the flake (ODIN_CROSS_WINDOWS_LIBDIRS); static-link.
         for d in ${ODIN_CROSS_WINDOWS_LIBDIRS:-}; do LINK_LIBS+=(-L"$d"); done
         LINK_LIBS+=(-Wl,-Bstatic -lmcfgthread -Wl,-Bdynamic)
