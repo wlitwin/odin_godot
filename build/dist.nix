@@ -121,6 +121,25 @@ stdenvNoCC.mkDerivation ({
     cp build/addon-docs/getting-started.md build/addon-docs/index.md $A/docs/
     cp docs/authoring-guide.md docs/workflow.md docs/exporting.md docs/debugging.md $A/docs/
 
+    # Stamp the EXACT Odin release the bundled core was just built with into the docs'
+    # @ODIN_VERSION@ placeholders (README prerequisites + getting-started). The core<->
+    # scripts handshake requires an identical ODIN_VERSION string, so the prebuilt core
+    # PINS the consumer's compiler — the docs must name that release, and hardcoding it
+    # would rot on every toolchain bump. Guard: an unstamped placeholder or a failed
+    # version probe must fail THIS build, not confuse a consumer.
+    ODIN_VER="$(odin version | awk '{print $NF}')"
+    if [ -z "$ODIN_VER" ]; then
+      echo "dist.nix: could not determine the odin version for the doc stamp" >&2
+      exit 1
+    fi
+    for f in $A/README.md $A/docs/getting-started.md; do
+      sed -i "s/@ODIN_VERSION@/$ODIN_VER/g" "$f"
+      if grep -q "@ODIN_VERSION@" "$f"; then
+        echo "dist.nix: unstamped @ODIN_VERSION@ placeholder left in $f" >&2
+        exit 1
+      fi
+    done
+
     # CRITICAL: Godot's filesystem scanner claims EVERY .odin file as a script. The addon
     # bundles the Odin collection SOURCE (so a consumer can compile scripts) + a template —
     # those are build inputs resolved by odin's `-collection:` PATH, not res:// scripts.

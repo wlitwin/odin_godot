@@ -13,8 +13,12 @@ the end you'll have a `Node2D` that prints on `_ready` and moves every frame.
 You need three things on your machine (the addon already provides the prebuilt engine core):
 
 1. **Godot 4.6+** — <https://godotengine.org>
-2. **The Odin compiler** — <https://odin-lang.org/docs/install/>. After installing, confirm
-   `odin version` prints a version from a terminal.
+2. **The Odin compiler, release `@ODIN_VERSION@` exactly** —
+   <https://github.com/odin-lang/Odin/releases>. After installing, confirm `odin version`
+   prints `@ODIN_VERSION@` from a terminal. The exact release matters: the addon's
+   prebuilt core only loads script libraries built by the same Odin release it was
+   (compiler releases don't guarantee a stable ABI between them); a mismatch fails
+   safely with an error naming the required version.
 3. **A C linker Odin can drive:**
    - **macOS:** Xcode Command Line Tools — `xcode-select --install`
    - **Linux:** `gcc` or `clang` from your package manager

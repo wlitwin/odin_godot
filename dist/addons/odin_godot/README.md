@@ -29,12 +29,27 @@ That means:
 | Need | Where |
 |------|-------|
 | **Godot 4.6+** | <https://godotengine.org> |
-| **Odin compiler** (`odin` on your PATH) | <https://odin-lang.org/docs/install/> |
+| **Odin compiler — release `@ODIN_VERSION@`, exactly** (`odin` on your PATH) | <https://github.com/odin-lang/Odin/releases> |
 | **A C linker** Odin can drive | macOS: Xcode Command Line Tools (`xcode-select --install`) · Linux: `gcc`/`clang` · Windows: Visual Studio Build Tools (run builds from a *"x64 Native Tools Command Prompt for VS"*) |
 
-> Verify Odin works: `odin version` should print a version. If the editor can't find `odin`
-> (common when launched from Finder/Steam, which don't inherit your shell PATH), set the
-> **`odin_godot/odin_bin`** project setting to the absolute path of your `odin` binary.
+> **Why an exact Odin release:** this addon ships a **prebuilt** core library, and Odin
+> makes no layout/calling-convention guarantees across compiler releases, so the core
+> only loads script libraries built by the *same* release it was (`odin version` must
+> print `@ODIN_VERSION@`). A different release fails safely, with an error naming the
+> required version. If the editor can't find `odin` (common when launched from
+> Finder/Steam, which don't inherit your shell PATH), set the **`odin_godot/odin_bin`**
+> project setting to the absolute path of your `odin` binary.
+
+**Optional, per feature** — everything below works without these:
+
+| For | Install |
+|------|-------|
+| Autocomplete / hover / call hints in the editor | [`ols`](https://github.com/DanielGavin/ols) on PATH (or the `odin_godot/ols_bin` setting) |
+| Project > Tools debugger items (macOS/Linux) | macOS: nothing extra (lldb is in the Xcode CLT above) · Linux: `lldb` + a terminal emulator |
+| VS Code debugging | VS Code + the **CodeLLDB** extension (`vadimcn.vscode-lldb`) |
+| JetBrains editing (Rider/CLion/…) | the **Odin Support** plugin (import the generated `ols.json`) |
+| Local **web-export preview** (`build/serve.sh`) | Node.js (deployed hosts just need the COOP/COEP headers — see docs/exporting.md) |
+| **Web export** itself | Emscripten (`emcc`) + Godot's web export templates |
 
 ## Quick start — your first script
 

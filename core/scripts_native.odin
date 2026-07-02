@@ -189,12 +189,15 @@ scripts_surface_missing_warning :: proc() {
 	}
 	g_scripts_missing_warned = true
 	if g_scripts_odin_skew {
-		// Loaded, but compiled by a different Odin than the core — same "rebuild" fix.
+		// Loaded, but compiled by a different Odin than the core. Rebuilding is only half
+		// the fix: the core is usually PREBUILT, so the user must build with the exact
+		// Odin release it pins — name it.
 		msg := godot.new_string_odin(
 			fmt.tprintf(
-				"odin_godot: your scripts dll was built with Odin %s, core with %s — rebuild " +
-				"scripts: addons/odin_godot/build/build_scripts.sh (your scripts won't load " +
-				"until you do).",
+				"odin_godot: your scripts dll was built with Odin %s, but this core requires " +
+				"Odin %s — install that exact release (odin-lang.org), then rebuild scripts " +
+				"(Project > Tools > Build Odin Scripts). Your scripts won't load until the " +
+				"versions match.",
 				g_odin_scripts,
 				ODIN_VERSION,
 			),
@@ -416,9 +419,20 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 		}
 	}
 	if scripts_odin != ODIN_VERSION {
+		// The fix depends on which side is "wrong", and for an ADDON consumer it is
+		// almost always their compiler: the core ships PREBUILT, so "rebuild scripts"
+		// with their (different) Odin can never converge on a match. Name the exact
+		// release the core requires — installing it is the actionable step.
 		gdext_print(
 			"odin: scripts dll compiler mismatch",
-			fmt.tprintf("scripts dll built with Odin %s, core with %s — rebuild scripts (build/build_scripts.sh)", scripts_odin, ODIN_VERSION),
+			fmt.tprintf(
+				"scripts dll built with Odin %s, but this odin_godot core requires Odin %s — " +
+				"install that exact release (odin-lang.org), then rebuild scripts " +
+				"(Project > Tools > Build Odin Scripts). A prebuilt core pins the Odin " +
+				"version; building the core from source with your Odin also works.",
+				scripts_odin,
+				ODIN_VERSION,
+			),
 		)
 		if main {
 			g_scripts_odin_skew = true
@@ -426,7 +440,7 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 		} else {
 			scripts_note_error(
 				fmt.tprintf(
-					"odin_godot: script module dll %s was built with Odin %s, core with %s — rebuild it",
+					"odin_godot: script module dll %s was built with Odin %s, but the core requires %s — install that Odin release and rebuild",
 					path,
 					scripts_odin,
 					ODIN_VERSION,
@@ -434,7 +448,11 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 			)
 		}
 		surface_load_failure_runtime(
-			fmt.tprintf("scripts dll built with Odin %s, core with %s — rebuild scripts", scripts_odin, ODIN_VERSION),
+			fmt.tprintf(
+				"scripts dll built with Odin %s, but this core requires Odin %s — install that release, then rebuild scripts",
+				scripts_odin,
+				ODIN_VERSION,
+			),
 		)
 		return {}, false
 	}
