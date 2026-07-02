@@ -97,17 +97,20 @@ Method_Proc :: proc "c" (self: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret
 
 // A callable custom method (from GDScript and cross-script).
 Method :: struct {
-	name:        cstring,
-	trampoline:  Method_Proc,
-	arg_types:   []gdext.Variant_Type,
-	return_type: gdext.Variant_Type, // .Nil for void
+	name:            cstring,
+	trampoline:      Method_Proc,
+	arg_types:       [^]gdext.Variant_Type,
+	arg_types_count: i32,
+	return_type:     gdext.Variant_Type, // .Nil for void
 }
 
 // A declared signal. `arg_names`/`arg_types` describe the payload (parallel arrays).
 Signal :: struct {
-	name:      cstring,
-	arg_names: []cstring,
-	arg_types: []gdext.Variant_Type,
+	name:            cstring,
+	arg_names:       [^]cstring,
+	arg_names_count: i32,
+	arg_types:       [^]gdext.Variant_Type,
+	arg_types_count: i32,
 }
 
 // A declarative signal connection (from `@(gd_connect="signal")` on a method): on the
@@ -140,27 +143,37 @@ Rpc :: struct {
 // A registered Odin script class. `size`/`align` describe the script's own struct
 // (whose FIRST field is, by convention, the owner Object pointer) so the core can
 // allocate + zero an instance. `exports`/`methods`/`signals` are Phase 3 member
-// surfaces; their slices point at static arrays in the scripts dll.
+// surfaces: C-shaped pointer+count pairs referencing static arrays in the scripts dll
+// (dll-lifetime; an empty table is nil + 0). The whole struct is strict C-compatible
+// data — no Odin slices/multi-returns cross the dll boundary (see desc_exports & co.
+// for the per-side slice views).
 Class_Desc :: struct {
 	name:      cstring,
 	base:      cstring,
-	// The script struct's Odin `typeid` (e.g. `typeid_of(Enemy)`). Used SOLELY inside the
-	// scripts dll to map a compile-time type `T` back to its registered class name for
-	// `rt.script_of(obj, T)`'s class check (see cross.odin / class_name_for_typeid). The CORE
-	// never interprets this (typeids are not stable across the core/scripts dll boundary); it
-	// is only ever compared within the one dll that registered it. Zero for a class that does
-	// not participate in typed cross-script lookups.
+	// The script struct's Odin `typeid` (e.g. `typeid_of(Enemy)`). An OPAQUE pointer-sized
+	// token to the core: used SOLELY inside the scripts dll to map a compile-time type `T`
+	// back to its registered class name for `rt.script_of(obj, T)`'s class check (see
+	// cross.odin / class_name_for_typeid). The CORE never interprets or dereferences it
+	// (typeids are not stable across the core/scripts dll boundary); it is only ever
+	// compared within the one dll that registered it. Zero for a class that does not
+	// participate in typed cross-script lookups.
 	id:        typeid,
 	size:      int,
 	align:     int,
 	lifecycle: Lifecycle,
-	exports:     []Export,
-	methods:     []Method,
-	signals:     []Signal,
-	connections: []Connection,
-	onready:     []Onready,
+	exports:           [^]Export,
+	exports_count:     i32,
+	methods:           [^]Method,
+	methods_count:     i32,
+	signals:           [^]Signal,
+	signals_count:     i32,
+	connections:       [^]Connection,
+	connections_count: i32,
+	onready:           [^]Onready,
+	onready_count:     i32,
 	// `@(gd_rpc)` method RPC configs — reported to the engine via `_get_rpc_config`.
-	rpcs:        []Rpc,
+	rpcs:              [^]Rpc,
+	rpcs_count:        i32,
 	tool:        bool,
 	// `//gd:icon <res-path>` — custom class icon shown in the editor (Scene dock,
 	// Create Node/Resource dialogs). Empty => no custom icon.
@@ -168,6 +181,40 @@ Class_Desc :: struct {
 	// `///` doc comment above the script struct (class description for the editor doc panel,
 	// via `_get_documentation`). nil/"" == none.
 	doc:         cstring,
+}
+
+// ----------------------------------------------------------------------------
+// Slice views over the C-shaped tables above. The BOUNDARY carries raw
+// pointer+count pairs; these contextless helpers are a per-side convenience
+// (compiled into whichever module uses them) and never cross the dll boundary.
+// A nil table views as an empty slice.
+// ----------------------------------------------------------------------------
+desc_exports :: proc "contextless" (d: Class_Desc) -> []Export {
+	return d.exports[:d.exports_count]
+}
+desc_methods :: proc "contextless" (d: Class_Desc) -> []Method {
+	return d.methods[:d.methods_count]
+}
+desc_signals :: proc "contextless" (d: Class_Desc) -> []Signal {
+	return d.signals[:d.signals_count]
+}
+desc_connections :: proc "contextless" (d: Class_Desc) -> []Connection {
+	return d.connections[:d.connections_count]
+}
+desc_onready :: proc "contextless" (d: Class_Desc) -> []Onready {
+	return d.onready[:d.onready_count]
+}
+desc_rpcs :: proc "contextless" (d: Class_Desc) -> []Rpc {
+	return d.rpcs[:d.rpcs_count]
+}
+method_arg_types :: proc "contextless" (m: Method) -> []gdext.Variant_Type {
+	return m.arg_types[:m.arg_types_count]
+}
+signal_arg_names :: proc "contextless" (s: Signal) -> []cstring {
+	return s.arg_names[:s.arg_names_count]
+}
+signal_arg_types :: proc "contextless" (s: Signal) -> []gdext.Variant_Type {
+	return s.arg_types[:s.arg_types_count]
 }
 
 // Scripts-dll-local registry. A FIXED-SIZE array (not a [dynamic]) so `register`
@@ -208,10 +255,14 @@ class_name_for_typeid :: proc "contextless" (id: typeid) -> cstring {
 }
 
 // The core pulls this right after `odin_scripts_boot`, dlsym'd by name, to learn
-// which classes the scripts dll provides.
+// which classes the scripts dll provides. C-shaped: out-param count + returned
+// pointer (no Odin multi-return across the dll boundary).
 @(export)
-odin_scripts_manifest :: proc "c" () -> (descs: [^]Class_Desc, count: int) {
-	return raw_data(registry[:]), registry_count
+odin_scripts_manifest :: proc "c" (out_count: ^i32) -> [^]Class_Desc {
+	if out_count != nil {
+		out_count^ = i32(registry_count)
+	}
+	return raw_data(registry[:])
 }
 
 // ABI version of the core<->scripts data contract (the structs above, read across the dll
@@ -229,7 +280,10 @@ odin_scripts_manifest :: proc "c" () -> (descs: [^]Class_Desc, count: int) {
 // (or one struct growing by exactly what another shrank, at colliding shift positions) yielded
 // the SAME version for a different layout. FNV-1a's multiply makes the fold order- and
 // position-sensitive, so any single size change always changes the version.
-ABI_GENERATION :: 1
+// Generation 2: the C-shaped ABI — slices became pointer+count pairs and
+// odin_scripts_manifest's multi-return became an out-param (a signature change the
+// size fold below cannot see).
+ABI_GENERATION :: 2
 @(private) ABI_FNV_PRIME :: 16777619
 @(private) ABI_H0 :: ((2166136261 ~ ABI_GENERATION)        * ABI_FNV_PRIME) & 0xFFFF_FFFF
 @(private) ABI_H1 :: ((ABI_H0 ~ size_of(Class_Desc))       * ABI_FNV_PRIME) & 0xFFFF_FFFF

@@ -381,13 +381,20 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	if len(s.methods) > 0 {
 		fmt.sbprintf(b, "@(private = \"file\")\n_%s_methods := [?]rt.Method {{\n", snake)
 		for m in s.methods {
-			args_ref := "{}"
+			// C-shaped table: pointer + count into the static per-method arg-type array.
+			// An empty arg list stays at the zero value (nil + 0).
+			args_ref := ""
 			if len(m.args) > 0 {
-				args_ref = fmt.tprintf("_%s_%s_args[:]", snake, m.gd_name)
+				args_ref = fmt.tprintf(
+					"arg_types = raw_data(_%s_%s_args[:]), arg_types_count = %d, ",
+					snake,
+					m.gd_name,
+					len(m.args),
+				)
 			}
 			fmt.sbprintf(
 				b,
-				"\t{{name = \"%s\", trampoline = _%s_m_%s, arg_types = %s, return_type = %s}},\n",
+				"\t{{name = \"%s\", trampoline = _%s_m_%s, %sreturn_type = %s}},\n",
 				m.gd_name,
 				snake,
 				m.gd_name,
@@ -416,19 +423,22 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	if len(s.signals) > 0 {
 		fmt.sbprintf(b, "@(private = \"file\")\n_%s_signals := [?]rt.Signal {{\n", snake)
 		for sig in s.signals {
-			names_ref := "{}"
-			types_ref := "{}"
+			// C-shaped tables: pointer + count into the static parallel arrays. A
+			// payload-less signal stays at the zero value (nil + 0).
+			tables := ""
 			if len(sig.args) > 0 {
-				names_ref = fmt.tprintf("_%s_%s_arg_names[:]", snake, sig.name)
-				types_ref = fmt.tprintf("_%s_%s_arg_types[:]", snake, sig.name)
+				tables = fmt.tprintf(
+					", arg_names = raw_data(_%s_%s_arg_names[:]), arg_names_count = %d" +
+					", arg_types = raw_data(_%s_%s_arg_types[:]), arg_types_count = %d",
+					snake,
+					sig.name,
+					len(sig.args),
+					snake,
+					sig.name,
+					len(sig.args),
+				)
 			}
-			fmt.sbprintf(
-				b,
-				"\t{{name = \"%s\", arg_names = %s, arg_types = %s}},\n",
-				sig.name,
-				names_ref,
-				types_ref,
-			)
+			fmt.sbprintf(b, "\t{{name = \"%s\"%s}},\n", sig.name, tables)
 		}
 		w(b, "}\n\n")
 	}
@@ -485,23 +495,31 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	if len(s.lifecycles) > 0 {
 		fmt.sbprintf(b, "\t\t\tlifecycle = %s,\n", strings.to_string(lc_lit))
 	}
+	// C-shaped member tables: pointer + count into the static backing arrays above.
+	// An absent table stays at the Class_Desc zero value (nil + 0).
 	if len(s.exports) > 0 {
-		fmt.sbprintf(b, "\t\t\texports = _%s_exports[:],\n", snake)
+		fmt.sbprintf(b, "\t\t\texports = raw_data(_%s_exports[:]),\n", snake)
+		fmt.sbprintf(b, "\t\t\texports_count = %d,\n", len(s.exports))
 	}
 	if len(s.methods) > 0 {
-		fmt.sbprintf(b, "\t\t\tmethods = _%s_methods[:],\n", snake)
+		fmt.sbprintf(b, "\t\t\tmethods = raw_data(_%s_methods[:]),\n", snake)
+		fmt.sbprintf(b, "\t\t\tmethods_count = %d,\n", len(s.methods))
 	}
 	if len(s.signals) > 0 {
-		fmt.sbprintf(b, "\t\t\tsignals = _%s_signals[:],\n", snake)
+		fmt.sbprintf(b, "\t\t\tsignals = raw_data(_%s_signals[:]),\n", snake)
+		fmt.sbprintf(b, "\t\t\tsignals_count = %d,\n", len(s.signals))
 	}
 	if len(s.connections) > 0 {
-		fmt.sbprintf(b, "\t\t\tconnections = _%s_connections[:],\n", snake)
+		fmt.sbprintf(b, "\t\t\tconnections = raw_data(_%s_connections[:]),\n", snake)
+		fmt.sbprintf(b, "\t\t\tconnections_count = %d,\n", len(s.connections))
 	}
 	if len(s.rpcs) > 0 {
-		fmt.sbprintf(b, "\t\t\trpcs = _%s_rpcs[:],\n", snake)
+		fmt.sbprintf(b, "\t\t\trpcs = raw_data(_%s_rpcs[:]),\n", snake)
+		fmt.sbprintf(b, "\t\t\trpcs_count = %d,\n", len(s.rpcs))
 	}
 	if len(s.onready) > 0 {
-		fmt.sbprintf(b, "\t\t\tonready = _%s_onready[:],\n", snake)
+		fmt.sbprintf(b, "\t\t\tonready = raw_data(_%s_onready[:]),\n", snake)
+		fmt.sbprintf(b, "\t\t\tonready_count = %d,\n", len(s.onready))
 	}
 	if s.tool {
 		w(b, "\t\t\ttool = true,\n")

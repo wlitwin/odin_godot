@@ -49,11 +49,10 @@ odin_scripts_set_core_api :: proc "c" (script_struct: Script_Struct_Proc) {
 //
 // MAIN-THREAD CONTRACT: call this only from the engine's main thread (script lifecycle
 // callbacks, @(gd_method) bodies, signal handlers — i.e. everywhere the engine already
-// dispatches your script code). The core-side resolver walks its live-instance registry
-// (core/instance.odin `live_instances`), which is deliberately LOCK-FREE: it is only ever
-// mutated and read on the main thread. Calling script_of from a spawned thread races that
-// registry (and the pointer you'd get back can be freed under you by a main-thread
-// instance teardown anyway). The class check is what makes this TYPE-SAFE:
+// dispatches your script code). The core-side registry lookup itself is mutex-guarded
+// (core/instance.odin `live_lock`), but the POINTER you get back is not: from a spawned
+// thread it can be freed under you by a main-thread instance teardown the moment the
+// resolver returns. The class check is what makes this TYPE-SAFE:
 // `T` is resolved to its registered class name (via the runtime registry's typeid->name map),
 // and the core only returns the struct pointer when the live instance's class matches. Without
 // it, `script_of(a_bullet, Enemy)` would return the Bullet struct cast to `^Enemy` (non-nil

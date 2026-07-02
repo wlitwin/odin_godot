@@ -154,8 +154,9 @@ web_startup :: proc "contextless" () {
 odin_scripts_load :: proc() {
 	// Single module on web: wire the typed cross-script resolver directly (no dlsym).
 	rt.odin_scripts_set_core_api(odin_script_struct)
-	descs, n := rt.odin_scripts_manifest()
-	index_scripts_manifest(descs, n)
+	n: i32
+	descs := rt.odin_scripts_manifest(&n)
+	index_scripts_manifest(descs, int(n))
 }
 
 // No hot reload in the browser (no compiler, no dlopen). Always reports failure.

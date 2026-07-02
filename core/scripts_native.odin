@@ -37,7 +37,7 @@ Scripts_Dll :: struct {
 		get_proc_address: gdext.ExtensionInterfaceGetProcAddress,
 		library: gdext.ExtensionClassLibraryPtr,
 	),
-	odin_scripts_manifest: proc "c" () -> (descs: [^]rt.Class_Desc, count: int),
+	odin_scripts_manifest: proc "c" (out_count: ^i32) -> [^]rt.Class_Desc,
 	// Typed cross-script handoff (Option A): the core calls this right after boot to hand
 	// the scripts dll its `obj -> Odin script struct` resolver (core's odin_script_struct),
 	// which `rt.script_of` then uses. Exported by the runtime package (linked into the dll).
@@ -371,8 +371,9 @@ odin_scripts_load :: proc() {
 		scripts_dll.odin_scripts_set_core_api(odin_script_struct)
 	}
 
-	descs, n := scripts_dll.odin_scripts_manifest()
-	index_scripts_manifest(descs, n)
+	n: i32
+	descs := scripts_dll.odin_scripts_manifest(&n)
+	index_scripts_manifest(descs, int(n))
 }
 
 // ----------------------------------------------------------------------------
@@ -478,11 +479,12 @@ odin_scripts_reload :: proc() -> bool {
 	if new_dll.odin_scripts_set_core_api != nil {
 		new_dll.odin_scripts_set_core_api(odin_script_struct)
 	}
-	descs, n := new_dll.odin_scripts_manifest()
+	n: i32
+	descs := new_dll.odin_scripts_manifest(&n)
 
 	// 3. Rebuild the class map; free the previous (heap-cloned) keys.
 	new_classes := make(map[string]rt.Class_Desc)
-	for i in 0 ..< n {
+	for i in 0 ..< int(n) {
 		d := descs[i]
 		name := strings.clone(string(d.name))
 		new_classes[name] = d

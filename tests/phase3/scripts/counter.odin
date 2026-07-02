@@ -41,7 +41,7 @@ counter_exports := [?]rt.Export {
 
 @(private = "file")
 counter_methods := [?]rt.Method {
-	{name = "increment", trampoline = counter_increment, arg_types = {}, return_type = .Int},
+	{name = "increment", trampoline = counter_increment, return_type = .Int},
 }
 
 @(init)
@@ -52,8 +52,10 @@ _register_counter :: proc "contextless" () {
 			base = "RefCounted",
 			size = size_of(Counter),
 			align = align_of(Counter),
-			exports = counter_exports[:],
-			methods = counter_methods[:],
+			exports = raw_data(counter_exports[:]),
+			exports_count = len(counter_exports),
+			methods = raw_data(counter_methods[:]),
+			methods_count = len(counter_methods),
 		},
 	)
 }

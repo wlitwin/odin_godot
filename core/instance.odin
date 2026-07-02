@@ -7,6 +7,7 @@ import rt "godot:runtime"
 import "base:runtime"
 import "core:mem"
 import "core:strings"
+import "core:sync"
 
 // ----------------------------------------------------------------------------
 // Real per-node script instances — the compiled-dispatch heart (Phase 2).
@@ -49,20 +50,43 @@ Odin_Instance :: struct {
 @(private)
 live_instances: [dynamic]^Odin_Instance
 
+// owner -> its live instance, the O(1) lookup behind odin_script_struct. Maintained in
+// lockstep with live_instances, under live_lock.
+@(private)
+live_by_owner: map[gdext.ObjectPtr]^Odin_Instance
+
+// Guards ALL access to live_instances/live_by_owner: Godot can create/free script
+// instances on worker threads (threaded resource loads), and odin_script_struct is
+// reachable from arbitrary script code via rt.script_of. NON-recursive — never call
+// into Godot or script code while holding it.
+@(private)
+live_lock: sync.Mutex
+
 @(private)
 track_live_instance :: proc(oi: ^Odin_Instance) {
 	context.allocator = core_allocator()
+	sync.lock(&live_lock)
+	defer sync.unlock(&live_lock)
 	append(&live_instances, oi)
+	if live_by_owner == nil {
+		live_by_owner = make(map[gdext.ObjectPtr]^Odin_Instance)
+	}
+	live_by_owner[oi.owner] = oi
 }
 
 @(private)
 untrack_live_instance :: proc(oi: ^Odin_Instance) {
 	context.allocator = core_allocator()
+	sync.lock(&live_lock)
+	defer sync.unlock(&live_lock)
 	for x, i in live_instances {
 		if x == oi {
 			unordered_remove(&live_instances, i)
-			return
+			break
 		}
+	}
+	if x, ok := live_by_owner[oi.owner]; ok && x == oi {
+		delete_key(&live_by_owner, oi.owner)
 	}
 }
 
@@ -116,8 +140,21 @@ Export_Cache :: struct {
 Class_Cache :: struct {
 	exports:           []Export_Cache,
 	method_names:      []godot.String_Name, // parallels desc.methods
+	// name -> index into exports / method_names, so the per-call vtable hot paths
+	// (inst_set/inst_get/inst_call) are a map probe, not a linear scan. Keyed by the
+	// interned String_Name's raw bits (see sn_bits).
+	export_index:      map[uintptr]int,
+	method_index:      map[uintptr]int,
 	empty_string:      godot.String,
 	empty_string_name: godot.String_Name,
+}
+
+// A String_Name's raw bits as a map key. StringNames are engine-interned: equal names
+// share one handle, so bit equality IS name equality — the same invariant the `==`
+// comparisons throughout this file rely on. (String_Name is one uintptr wide.)
+@(private)
+sn_bits :: #force_inline proc "contextless" (n: godot.String_Name) -> uintptr {
+	return transmute(uintptr)n
 }
 
 // class name -> its built cache. Keyed by the Class_Desc.name cstring (string view).
@@ -142,8 +179,9 @@ ensure_class_cache :: proc(desc: rt.Class_Desc) -> ^Class_Cache {
 	cache.empty_string = godot.new_string_cstring("")
 	cache.empty_string_name = godot.new_string_name_cstring("", true)
 
-	cache.exports = make([]Export_Cache, len(desc.exports))
-	for ex, i in desc.exports {
+	exports := rt.desc_exports(desc)
+	cache.exports = make([]Export_Cache, len(exports))
+	for ex, i in exports {
 		cache.exports[i] = Export_Cache {
 			name        = godot.new_string_name_cstring(ex.name, true),
 			type        = ex.type,
@@ -164,9 +202,19 @@ ensure_class_cache :: proc(desc: rt.Class_Desc) -> ^Class_Cache {
 		}
 	}
 
-	cache.method_names = make([]godot.String_Name, len(desc.methods))
-	for m, i in desc.methods {
+	methods := rt.desc_methods(desc)
+	cache.method_names = make([]godot.String_Name, len(methods))
+	for m, i in methods {
 		cache.method_names[i] = godot.new_string_name_cstring(m.name, true)
+	}
+
+	cache.export_index = make(map[uintptr]int, len(cache.exports))
+	for &ex, i in cache.exports {
+		cache.export_index[sn_bits(ex.name)] = i
+	}
+	cache.method_index = make(map[uintptr]int, len(cache.method_names))
+	for mname, i in cache.method_names {
+		cache.method_index[sn_bits(mname)] = i
 	}
 
 	class_caches[key] = cache
@@ -290,13 +338,12 @@ odin_script_struct :: proc "c" (obj: gdext.ObjectPtr, want_class: cstring) -> ra
 		return nil
 	}
 	oi := cast(^Odin_Instance)data
-	for x in live_instances {
-		if x == oi {
-			// Type check: only hand back the struct if its class is the one requested.
-			if want_class != nil && oi.class_name == string(want_class) {
-				return oi.user
-			}
-			return nil
+	sync.lock(&live_lock)
+	defer sync.unlock(&live_lock)
+	if x, ok := live_by_owner[obj]; ok && x == oi {
+		// Type check: only hand back the struct if its class is the one requested.
+		if want_class != nil && oi.class_name == string(want_class) {
+			return oi.user
 		}
 	}
 	return nil
@@ -463,7 +510,7 @@ node_enable_physics_process :: proc(owner: gdext.ObjectPtr, enable: bool) {
 // hot-reload migration (the re-alloc zeroed those fields).
 @(private)
 resolve_onready_refs :: proc "contextless" (oi: ^Odin_Instance) {
-	for o in oi.desc.onready {
+	for o in rt.desc_onready(oi.desc) {
 		node := godot.get_node(cast(godot.Object)oi.owner, o.path)
 		(cast(^gdext.ObjectPtr)(uintptr(oi.user) + o.offset))^ = cast(gdext.ObjectPtr)node
 	}
@@ -484,7 +531,7 @@ inst_notification :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, w
 		resolve_onready_refs(oi)
 		// Wire `@(gd_connect="signal")` declarations: connect owner.signal -> owner.method
 		// before the user's ready runs, so the connections are live for the rest of _ready.
-		for c in oi.desc.connections {
+		for c in rt.desc_connections(oi.desc) {
 			godot.connect(cast(godot.Object)oi.owner, c.signal, c.method)
 		}
 		if oi.desc.lifecycle.ready != nil {
@@ -521,25 +568,23 @@ inst_call :: proc "c" (
 	// Custom methods first: GDScript `obj.add(2, 3)` arrives here as a Variant call.
 	// We forward args/ret straight to the class's trampoline (which unpacks/marshals).
 	if oi.cache != nil {
-		for mname, i in oi.cache.method_names {
-			if name == mname {
-				// Arity guard: the trampoline reads exactly len(arg_types) Variants from
-				// `args`, so a short call would read past the array. Odin methods are never
-				// vararg, so extra args are an error too. `expected` carries the declared
-				// arity, `argument` the passed count (what Godot's call-error text reads).
-				want := len(oi.desc.methods[i].arg_types)
-				if int(argument_count) != want {
-					if error != nil {
-						error.error = int(argument_count) < want ? .Too_Few_Arguments : .Too_Many_Arguments
-						error.argument = i32(argument_count)
-						error.expected = i32(want)
-					}
-					return
+		if i, found := oi.cache.method_index[sn_bits(name)]; found {
+			// Arity guard: the trampoline reads exactly arg_types_count Variants from
+			// `args`, so a short call would read past the array. Odin methods are never
+			// vararg, so extra args are an error too. `expected` carries the declared
+			// arity, `argument` the passed count (what Godot's call-error text reads).
+			want := int(oi.desc.methods[i].arg_types_count)
+			if int(argument_count) != want {
+				if error != nil {
+					error.error = int(argument_count) < want ? .Too_Few_Arguments : .Too_Many_Arguments
+					error.argument = i32(argument_count)
+					error.expected = i32(want)
 				}
-				oi.desc.methods[i].trampoline(oi.user, args, argument_count, ret)
-				if error != nil {error.error = .Ok}
 				return
 			}
+			oi.desc.methods[i].trampoline(oi.user, args, argument_count, ret)
+			if error != nil {error.error = .Ok}
+			return
 		}
 	}
 
@@ -577,9 +622,7 @@ inst_has_method :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, nam
 	if n == process_name {return oi.desc.lifecycle.process != nil}
 	if n == physics_process_name {return oi.desc.lifecycle.physics_process != nil}
 	if oi.cache != nil {
-		for mname in oi.cache.method_names {
-			if n == mname {return true}
-		}
+		if _, found := oi.cache.method_index[sn_bits(n)]; found {return true}
 	}
 	return false
 }
@@ -642,10 +685,8 @@ inst_find_export :: proc "contextless" (oi: ^Odin_Instance, name: gdext.StringNa
 		return nil
 	}
 	n := (cast(^godot.String_Name)name)^
-	for &ex in oi.cache.exports {
-		if n == ex.name {
-			return &ex
-		}
+	if i, found := oi.cache.export_index[sn_bits(n)]; found {
+		return &oi.cache.exports[i]
 	}
 	return nil
 }
@@ -879,11 +920,9 @@ inst_get_method_argument_count :: proc "c" (instance: gdext.ExtensionScriptInsta
 	oi := cast(^Odin_Instance)instance
 	if oi != nil && oi.cache != nil {
 		n := (cast(^godot.String_Name)name)^
-		for mname, i in oi.cache.method_names {
-			if n == mname {
-				if is_valid != nil {is_valid^ = true}
-				return i64(len(oi.desc.methods[i].arg_types))
-			}
+		if i, found := oi.cache.method_index[sn_bits(n)]; found {
+			if is_valid != nil {is_valid^ = true}
+			return i64(oi.desc.methods[i].arg_types_count)
 		}
 	}
 	if is_valid != nil {is_valid^ = false}
@@ -936,7 +975,16 @@ inst_is_placeholder :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr)
 
 @(private)
 rebind_all_instances :: proc() {
-	for oi in live_instances {
+	// Snapshot the registry under the lock, rebind OUTSIDE it: the rebind path calls into
+	// Godot (ensure_class_cache interning, get_node) and into script code
+	// (lifecycle.reload, which may call rt.script_of -> odin_script_struct -> the same
+	// non-recursive live_lock).
+	sync.lock(&live_lock)
+	snapshot := make([]^Odin_Instance, len(live_instances), context.temp_allocator)
+	copy(snapshot, live_instances[:])
+	sync.unlock(&live_lock)
+
+	for oi in snapshot {
 		if oi == nil {
 			continue
 		}
@@ -973,12 +1021,14 @@ layout_compatible :: proc(a, b: rt.Class_Desc) -> bool {
 	if a.size != b.size || a.align != b.align {
 		return false
 	}
-	if len(a.exports) != len(b.exports) {
+	a_exports := rt.desc_exports(a)
+	b_exports := rt.desc_exports(b)
+	if len(a_exports) != len(b_exports) {
 		return false
 	}
-	for i in 0 ..< len(a.exports) {
-		ae := a.exports[i]
-		be := b.exports[i]
+	for i in 0 ..< len(a_exports) {
+		ae := a_exports[i]
+		be := b_exports[i]
 		if ae.offset != be.offset || ae.size != be.size || ae.type != be.type {
 			return false
 		}
@@ -1098,7 +1148,7 @@ migrate_instance :: proc(oi: ^Odin_Instance, new_desc: rt.Class_Desc, new_cache:
 	// The re-alloc zeroed the `@onready` fields; resolve them again so the migrated
 	// instance doesn't run the new code against nil node refs. Guarded: get_node is only
 	// meaningful once the owner is in the tree (pre-READY instances resolve at READY).
-	if len(oi.desc.onready) > 0 && bool(godot.node_is_inside_tree(cast(godot.Node)oi.owner)) {
+	if oi.desc.onready_count > 0 && bool(godot.node_is_inside_tree(cast(godot.Node)oi.owner)) {
 		resolve_onready_refs(oi)
 	}
 

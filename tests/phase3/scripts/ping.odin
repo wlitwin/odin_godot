@@ -125,7 +125,7 @@ emit_pinged :: proc "c" (self: ^Ping, value: i64) {
 	gdext.variant_destroy(&val_arg)
 }
 
-// ---- registration (static backing arrays referenced by the Class_Desc slices) ----
+// ---- registration (static backing arrays referenced by the Class_Desc pointer+count tables) ----
 @(private = "file")
 ping_exports := [?]rt.Export {
 	{name = "speed", type = .Float, offset = offset_of(Ping, speed), size = size_of(f32)},
@@ -141,10 +141,10 @@ emit_arg_types := [?]gdext.Variant_Type{.Int}
 
 @(private = "file")
 ping_methods := [?]rt.Method {
-	{name = "add", trampoline = ping_add, arg_types = add_arg_types[:], return_type = .Int},
-	{name = "addf", trampoline = ping_addf, arg_types = addf_arg_types[:], return_type = .Float},
-	{name = "get_speed", trampoline = ping_get_speed, arg_types = {}, return_type = .Float},
-	{name = "emit_ping", trampoline = ping_emit_ping, arg_types = emit_arg_types[:], return_type = .Nil},
+	{name = "add", trampoline = ping_add, arg_types = raw_data(add_arg_types[:]), arg_types_count = len(add_arg_types), return_type = .Int},
+	{name = "addf", trampoline = ping_addf, arg_types = raw_data(addf_arg_types[:]), arg_types_count = len(addf_arg_types), return_type = .Float},
+	{name = "get_speed", trampoline = ping_get_speed, return_type = .Float},
+	{name = "emit_ping", trampoline = ping_emit_ping, arg_types = raw_data(emit_arg_types[:]), arg_types_count = len(emit_arg_types), return_type = .Nil},
 }
 
 @(private = "file")
@@ -154,7 +154,13 @@ pinged_arg_types := [?]gdext.Variant_Type{.Int}
 
 @(private = "file")
 ping_signals := [?]rt.Signal {
-	{name = "pinged", arg_names = pinged_arg_names[:], arg_types = pinged_arg_types[:]},
+	{
+		name = "pinged",
+		arg_names = raw_data(pinged_arg_names[:]),
+		arg_names_count = len(pinged_arg_names),
+		arg_types = raw_data(pinged_arg_types[:]),
+		arg_types_count = len(pinged_arg_types),
+	},
 }
 
 @(init)
@@ -166,9 +172,12 @@ _register_ping :: proc "contextless" () {
 			size = size_of(Ping),
 			align = align_of(Ping),
 			lifecycle = rt.Lifecycle{ready = ping_ready},
-			exports = ping_exports[:],
-			methods = ping_methods[:],
-			signals = ping_signals[:],
+			exports = raw_data(ping_exports[:]),
+			exports_count = len(ping_exports),
+			methods = raw_data(ping_methods[:]),
+			methods_count = len(ping_methods),
+			signals = raw_data(ping_signals[:]),
+			signals_count = len(ping_signals),
 		},
 	)
 }

@@ -548,7 +548,7 @@ update_placeholder_exports :: proc(placeholder: gdext.ScriptInstancePtr, self: ^
     }
     props := godot.new_array_default()
     values := godot.new_dictionary_default()
-    for ex in desc.exports {
+    for ex in rt.desc_exports(desc) {
         push_group_markers(&props, ex)
         pi := make_property_info(ex.name, ex.type, ex.hint, ex.hint_string == nil ? "" : ex.hint_string)
         pv := godot.variant_from_dictionary(&pi)
@@ -568,11 +568,11 @@ v_get_script_signal_list :: proc "c" (instance: gdext.ExtensionClassInstancePtr,
     self := cast(^OdinScript)instance
     arr := godot.new_array_default()
     if desc, ok := odin_script_resolve_desc(self); ok {
-        for sig in desc.signals {
+        for sig in rt.desc_signals(desc) {
             d := godot.new_dictionary_default()
             dict_set(&d, "name", v_sn(sig.name))
             sig_args := godot.new_array_default()
-            n := min(len(sig.arg_names), len(sig.arg_types))
+            n := int(min(sig.arg_names_count, sig.arg_types_count))
             for i in 0 ..< n {
                 pi := make_property_info(sig.arg_names[i], sig.arg_types[i])
                 pv := godot.variant_from_dictionary(&pi)
@@ -616,7 +616,7 @@ v_get_documentation :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args
             dict_set(&cd, "description", v_str(desc.doc))
         }
         props := godot.new_array_default()
-        for ex in desc.exports {
+        for ex in rt.desc_exports(desc) {
             pd := godot.new_dictionary_default()
             dict_set(&pd, "name", v_str(ex.name))
             if ex.doc != nil {
@@ -641,7 +641,7 @@ v_get_members :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]g
     self := cast(^OdinScript)instance
     arr := godot.new_array_default()
     if desc, ok := odin_script_resolve_desc(self); ok {
-        for ex in desc.exports {
+        for ex in rt.desc_exports(desc) {
             godot.array_push_back(&arr, v_sn(ex.name))
         }
     }
@@ -658,7 +658,7 @@ v_get_member_line :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: 
     defer delete(name)
     line := i64(-1)
     if desc, ok := odin_script_resolve_desc(self); ok {
-        for ex in desc.exports {
+        for ex in rt.desc_exports(desc) {
             if string(ex.name) == name {
                 if ex.line > 0 {
                     line = i64(ex.line)
@@ -676,11 +676,11 @@ v_get_script_method_list :: proc "c" (instance: gdext.ExtensionClassInstancePtr,
     self := cast(^OdinScript)instance
     arr := godot.new_array_default()
     if desc, ok := odin_script_resolve_desc(self); ok {
-        for m in desc.methods {
+        for m in rt.desc_methods(desc) {
             d := godot.new_dictionary_default()
             dict_set(&d, "name", v_sn(m.name))
             m_args := godot.new_array_default()
-            for atype in m.arg_types {
+            for atype in rt.method_arg_types(m) {
                 // Method descriptors carry no per-arg names; an empty name is valid.
                 pi := make_property_info("", atype)
                 pv := godot.variant_from_dictionary(&pi)
@@ -706,7 +706,7 @@ v_get_script_property_list :: proc "c" (instance: gdext.ExtensionClassInstancePt
     self := cast(^OdinScript)instance
     arr := godot.new_array_default()
     if desc, ok := odin_script_resolve_desc(self); ok {
-        for ex in desc.exports {
+        for ex in rt.desc_exports(desc) {
             push_group_markers(&arr, ex)
             pi := make_property_info(ex.name, ex.type, ex.hint, ex.hint_string == nil ? "" : ex.hint_string)
             pv := godot.variant_from_dictionary(&pi)
@@ -743,7 +743,7 @@ v_get_rpc_config :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
     self := cast(^OdinScript)instance
     d := godot.new_dictionary_default()
     if desc, ok := odin_script_resolve_desc(self); ok {
-        for r in desc.rpcs {
+        for r in rt.desc_rpcs(desc) {
             cfg := godot.new_dictionary_default()
             dict_set(&cfg, "rpc_mode", v_i64(r.mode))
             dict_set(&cfg, "transfer_mode", v_i64(r.transfer))
@@ -831,7 +831,7 @@ v_has_property_default_value :: proc "c" (instance: gdext.ExtensionClassInstance
     defer delete(name)
     has := false
     if desc, ok := odin_script_resolve_desc(self); ok {
-        for ex in desc.exports {
+        for ex in rt.desc_exports(desc) {
             if string(ex.name) == name && ex.has_default {
                 has = true
                 break
@@ -851,7 +851,7 @@ v_get_property_default_value :: proc "c" (instance: gdext.ExtensionClassInstance
     defer delete(name)
     out := godot.Variant{}
     if desc, ok := odin_script_resolve_desc(self); ok {
-        for ex in desc.exports {
+        for ex in rt.desc_exports(desc) {
             if string(ex.name) == name && ex.has_default {
                 out = export_default_variant(ex)
                 break
@@ -935,7 +935,7 @@ v_has_method :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gd
         case "_ready":
             has = desc.lifecycle.ready != nil
         case:
-            for m in desc.methods {
+            for m in rt.desc_methods(desc) {
                 if string(m.name) == method {
                     has = true
                     break
@@ -957,7 +957,7 @@ v_has_script_signal :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args
     defer delete(signal)
     has := false
     if desc, ok := odin_script_resolve_desc(self); ok {
-        for s in desc.signals {
+        for s in rt.desc_signals(desc) {
             if string(s.name) == signal {
                 has = true
                 break
