@@ -299,9 +299,72 @@ pl_enter_tree :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]g
     godot.editor_plugin_add_tool_menu_item(plug, setup_name, make_menu_callable(setup_menu_call))
     build_name := godot.new_string_cstring("Build Odin Scripts")
     godot.editor_plugin_add_tool_menu_item(plug, build_name, make_menu_callable(build_menu_call))
+    //   * "Generate ols.json" — completion/checker config for EXTERNAL editors: any
+    //     ols-based one (Neovim/Zed/Sublime/Helix), and JetBrains IDEs, whose Odin
+    //     plugin imports ols.json (right-click it) to configure collections. All
+    //     platforms — it's just a file write.
+    ols_name := godot.new_string_cstring("Generate ols.json (IDE Completion)")
+    godot.editor_plugin_add_tool_menu_item(plug, ols_name, make_menu_callable(ols_menu_call))
     //   * the debugger items ("Debug Game (LLDB)" / break-at-cursor / VS Code config) —
     //     core/debug_launch.odin (no-op on Windows: core/debug_launch_windows.odin).
     debug_register_menu_items(plug)
+}
+
+// "Generate ols.json" body: write <project>/ols.json pointing the `godot` collection at
+// the addon (plus base/core/vendor at the Odin share dir when resolvable) with the
+// checker args every script package needs (-no-entry-point + the @(gd_*) attributes —
+// without them an external checker flags every marked proc). Refuses to clobber an
+// existing file: users hand-tune ols.json, and regenerating is one delete away.
+@(private = "file")
+ols_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr, err: ^gdext.CallError) {
+    context = gdext.godot_context()
+    context.allocator = runtime.heap_allocator()
+    if err != nil {err.error = .Ok}
+
+    root := odin_collection_root()
+    defer delete(root)
+    if root == "" {
+        editor_msg_error("odin_godot: couldn't locate the addon — set the `odin_godot/root` project setting, then retry.")
+        return
+    }
+    gres := godot.new_string_cstring("res://ols.json")
+    pg := godot.project_settings_globalize_path(godot.singleton_project_settings(), gres)
+    path := string_to_odin(pg)
+    defer delete(path)
+    if os.exists(path) {
+        editor_msg_warn(fmt.tprintf("odin_godot: %s already exists — leaving it untouched (delete it to regenerate).", path))
+        return
+    }
+
+    share := resolve_odin_share()
+    defer delete(share)
+
+    b := strings.builder_make(context.temp_allocator)
+    strings.write_string(&b, "{\n    \"collections\": [\n")
+    fmt.sbprintf(&b, "        {{\"name\": \"godot\", \"path\": \"%s\"}}", root)
+    if share != "" {
+        for c in ([3]string{"base", "core", "vendor"}) {
+            fmt.sbprintf(&b, ",\n        {{\"name\": \"%s\", \"path\": \"%s/%s\"}}", c, share, c)
+        }
+    }
+    strings.write_string(&b, "\n    ],\n")
+    strings.write_string(
+        &b,
+        "    \"enable_snippets\": true,\n" +
+        "    \"enable_hover\": true,\n" +
+        "    \"enable_semantic_tokens\": true,\n" +
+        "    \"checker_args\": \"-no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc\"\n}\n",
+    )
+    if werr := os.write_entire_file(path, transmute([]byte)strings.to_string(b)); werr != nil {
+        editor_msg_error(fmt.tprintf("odin_godot: couldn't write %s.", path))
+        return
+    }
+    godot.print_str(
+        fmt.tprintf(
+            "odin_godot: wrote %s — ols-based editors pick it up automatically; in JetBrains IDEs right-click it and choose the Odin plugin's import action.",
+            path,
+        ),
+    )
 }
 
 // Map a target OS feature tag -> the scripts dll suffix the EXPORTED core will look for.

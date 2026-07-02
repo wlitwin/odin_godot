@@ -212,6 +212,16 @@ struct, and the auto-loaded `godot_lldb.py` summaries render `godot.String`/`Str
 `Variant` values. A script `panic` freezes the session at the panic site. See
 [debugging.md](debugging.md) for the full tour.
 
+### Other editors and IDEs
+
+**Project > Tools > Generate ols.json (IDE Completion)** writes an `ols.json` at the
+project root: ols-based editors (Neovim, Zed, Sublime, Helix) get completion for your
+scripts + the `godot` collection immediately, and JetBrains IDEs import it via the
+[Odin Support plugin](https://plugins.jetbrains.com/plugin/22933-odin-support)
+(right-click the file). Rider edits great but cannot debug native code (plugin
+limitation on Rider ≥ 2025.2) — CLion/IDEA Ultimate can, pointed at the debuggable
+Godot copy; details in [debugging.md](debugging.md#jetbrains-ides-rider-clion-idea-ultimate-).
+
 ### Crashes and panics are reported automatically
 
 A crash or panic in script code is **no longer silent**: an Odin `panic`/`assert` pushes a red

@@ -84,6 +84,31 @@ standalone (see §2). The Godot binary being debugged is the editor's own execut
 what you debug is exactly what Play runs. Windows: not wired up yet (the native path
 there is VS/WinDbg against the `.pdb` the build already emits).
 
+### JetBrains IDEs (Rider, CLion, IDEA Ultimate, …)
+
+The [Odin Support plugin](https://plugins.jetbrains.com/plugin/22933-odin-support)
+makes JetBrains IDEs first-class for **editing**: run **Project > Tools > Generate
+ols.json (IDE Completion)** in Godot, then in the IDE right-click the generated
+`ols.json` and use the plugin's import action — it configures the `godot` collection
+(the addon), the Odin core collections, and the checker args that keep `@(gd_method)`
+markers from being flagged. (The same file makes any ols-based editor — Neovim, Zed,
+Sublime, Helix — work out of the box.)
+
+**Debugging** is split by IDE, honestly:
+
+- **Rider**: the Odin plugin does *not* support debugging on Rider ≥ 2025.2, and
+  Rider's own Native Executable run configurations run but cannot debug native code.
+  Edit in Rider; debug via the Godot menu items above (terminal lldb) or the VS Code
+  config.
+- **CLion / IDEA Ultimate / GoLand / RustRover** (+ the *Native Debugging Support*
+  plugin where applicable): the Odin plugin debugs through LLDB (out of the box on
+  macOS/Linux). Point a run configuration at the **debuggable Godot copy** — get its
+  path with `build/debug_game.sh --prepare-only` (macOS needs this re-signed copy;
+  SIP blocks debugging the stock binary) — with program arguments
+  `--path /path/to/your/project`. Breakpoints in `.odin` files then bind normally.
+  The `godot_lldb.py` pretty-printers are terminal/VS-Code-lldb extras; JetBrains'
+  debugger does not load them.
+
 ## The one thing to internalize first
 
 Odin scripts in odin_godot are **AOT-compiled native code** (a `.dylib`/`.so`/`.dll`),
