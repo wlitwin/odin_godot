@@ -79,9 +79,25 @@ stdenvNoCC.mkDerivation ({
     cp -r scriptgen $A/scriptgen
     # Only the CONSUMER-facing build scripts — not the repo's dev/test builders
     # (build_phase*.sh) or the nix package def (dist.nix), which a consumer never runs.
+    # common.sh is the shared helper library every one of them sources.
     mkdir -p $A/build
-    cp build/build_scripts.sh build/build_scripts.ps1 build/build_export_scripts.sh \
+    cp build/common.sh \
+       build/build_scripts.sh build/build_scripts.ps1 build/build_export_scripts.sh \
        build/build_web.sh build/build_cross.sh build/serve.sh $A/build/
+
+    # Self-guard: every `source .../<file>` in a shipped script must resolve inside the
+    # addon — a helper added to build/ but forgotten here should fail THIS build, not a
+    # consumer's Project > Tools > Build Odin Scripts.
+    # (The source lines nest quotes inside $(...) — match greedily to the trailing
+    # /<name>.sh", don't try to bound the quoted string.)
+    for s in $A/build/*.sh; do
+      for dep in $(grep -oE 'source ".*/[A-Za-z0-9_.-]+\.sh"' "$s" | sed -E 's/.*\/([A-Za-z0-9_.-]+\.sh)"/\1/' | sort -u); do
+        if [ ! -f "$A/build/$dep" ]; then
+          echo "dist.nix: $s sources $dep, which is not packaged into the addon" >&2
+          exit 1
+        fi
+      done
+    done
 
     # Copy-paste starter for the consumer's res://scripts/ — the REQUIRED boot.odin (which
     # a user can't be expected to write from scratch) + a minimal Hello example + a README.
