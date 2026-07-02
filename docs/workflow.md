@@ -161,6 +161,15 @@ default per project with the **`odin_godot/default_icon`** setting (point it at 
 or `""` to use the engine generic). The default is existence-checked, so a non-standard install
 without the icon simply shows the generic one.
 
+### Find in Files
+
+The script editor's **Find in Files** (Ctrl/Cmd+Shift+F) searches `.odin` files. Godot builds
+that search's file-type list from a hardcoded set (`gd`, `cs`, `gdshader`) with no hook for a
+GDExtension scripting language, so the Odin editor plugin appends `odin` to the
+`editor/script/search_in_file_extensions` project setting when it loads. The value is applied
+in-memory each session (your `project.godot` is left untouched), and the search dialog re-reads
+it every time it opens — so the `*.odin` filter checkbox is there and checked by default.
+
 One known gap remains, functionality-irrelevant: documentation tooltips for `@export`s/methods
 in the Inspector aren't wired (autocomplete *does* show type signatures — see above).
 

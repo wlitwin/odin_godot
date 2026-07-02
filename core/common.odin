@@ -117,6 +117,40 @@ make_psa :: proc "contextless" (items: ..cstring) -> godot.Packed_String_Array {
     return psa
 }
 
+@(private = "file")
+psa_has: gdext.PtrBuiltInMethod
+
+// psa_ensure appends `item` to `psa` iff it is not already present; returns true when it
+// added it (false = already there). Resolves `has`/`push_back` directly for the same
+// reason make_psa does. `psa` is mutated in place.
+psa_ensure :: proc "contextless" (psa: ^godot.Packed_String_Array, item: cstring) -> bool {
+    if psa_has == nil {
+        hn := godot.new_string_name_cstring("has", true)
+        psa_has = gdext.variant_get_ptr_builtin_method(.Packed_String_Array, &hn, HASH_PSA_HAS)
+        pn := godot.new_string_name_cstring("push_back", true)
+        psa_push_back = gdext.variant_get_ptr_builtin_method(.Packed_String_Array, &pn, HASH_PSA_PUSH_BACK)
+    }
+    s := godot.new_string_cstring(item)
+    defer godot.free_string(s)
+    arg0 := cast(gdext.TypePtr)&s
+    found: bool
+    psa_has(cast(gdext.TypePtr)psa, &arg0, cast(gdext.TypePtr)&found, 1)
+    if found {return false}
+    result: bool
+    psa_push_back(cast(gdext.TypePtr)psa, &arg0, cast(gdext.TypePtr)&result, 1)
+    return true
+}
+
+// psa_destroy frees a Packed_String_Array the core owns (e.g. one built by
+// variant_to_packed_string_array). The engine's builtin destructor is null-safe on a
+// zeroed value, so an empty/never-filled array is a harmless no-op.
+psa_destroy :: proc "contextless" (psa: ^godot.Packed_String_Array) {
+    dtor := gdext.variant_get_ptr_destructor(.Packed_String_Array)
+    if dtor != nil {
+        dtor(cast(gdext.TypePtr)psa)
+    }
+}
+
 // Convert a Godot String to an owned Odin string using the current context allocator.
 string_to_odin :: proc(s: godot.String, allocator := context.allocator) -> string {
     s := s
@@ -142,8 +176,9 @@ string_to_odin :: proc(s: godot.String, allocator := context.allocator) -> strin
 // set_physics_process.)
 // ----------------------------------------------------------------------------
 
-// Packed_String_Array builtin `push_back` (variant_get_ptr_builtin_method).
+// Packed_String_Array builtins (variant_get_ptr_builtin_method).
 HASH_PSA_PUSH_BACK :: 816187996
+HASH_PSA_HAS :: 2566493496
 
 // ----------------------------------------------------------------------------
 // Shell quoting. Every path/setting interpolated into a `libc.system` command line

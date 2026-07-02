@@ -69,7 +69,16 @@ func _process(_delta: float) -> bool:
 		return true
 	print("  ok  //gd:tool ToolWidget._ready ran in editor; gd.is_editor() == true (setting=4242)")
 
-	# ---- (4, STRETCH) EditorInspectorPlugin virtual dispatch (reported, not gated) ----
+	# ---- (4) Find-in-Files searches .odin: the Odin EditorPlugin._enter_tree appended
+	# "odin" to the hardcoded search_in_file_extensions list (which Godot builds without
+	# any hook for GDExtension languages). Assert the setting now contains it. ----
+	var exts = ProjectSettings.get_setting("editor/script/search_in_file_extensions", PackedStringArray())
+	if not ("odin" in exts):
+		_fail("search_in_file_extensions is missing 'odin' (Find-in-Files won't search .odin): %s" % str(exts))
+		return true
+	print("  ok  Find-in-Files search extensions include 'odin' (%s)" % str(exts))
+
+	# ---- (5, STRETCH) EditorInspectorPlugin virtual dispatch (reported, not gated) ----
 	_try_inspector(_scene)
 
 	print("EDITORTOOLS_DRIVER_OK")

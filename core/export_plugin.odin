@@ -311,6 +311,37 @@ pl_enter_tree :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]g
     // Toolbar build-status widget ("building… / build FAILED / live ✓") — see
     // core/build_status.odin. Torn down in _exit_tree.
     build_status_create(plug)
+    // Teach the script editor's Find-in-Files (Ctrl+Shift+F) to search `.odin`.
+    register_search_extension()
+}
+
+// register_search_extension — add "odin" to `editor/script/search_in_file_extensions`
+// so the script editor's Find-in-Files searches `.odin` files.
+//
+// Godot builds that filter list from a HARDCODED default in main.cpp — `gd`, `cs` (only
+// if C# is present), `gdshader` — with NO hook for a GDExtension scripting language to
+// contribute its extension (verified against 4.6 source). So `.gd`/`.cs` are searchable
+// but `.odin` is silently skipped: the file walker treats the list as an allowlist
+// (find_in_files.cpp `extension_filter.has(file.get_extension())`). Extensions are bare
+// (no leading dot), and the dialog re-reads GLOBAL_GET each time it opens, so appending
+// here at _enter_tree (which runs long before the user opens the dialog) takes effect
+// this session. We DON'T ProjectSettings.save() — the in-memory value is enough and
+// re-applied every launch, so a consumer's project.godot stays untouched.
+@(private = "file")
+register_search_extension :: proc "contextless" () {
+    KEY :: "editor/script/search_in_file_extensions"
+    v := godot.get_setting(KEY)
+    defer godot.variant_destroy(&v)
+    // The setting is a PACKED_STRING_ARRAY (main.cpp GLOBAL_DEF_NOVAL); if it's somehow
+    // absent/another type the conversion yields an empty array and we still write a valid one.
+    exts := godot.variant_to_packed_string_array(&v)
+    defer psa_destroy(&exts)
+    if !psa_ensure(&exts, "odin") {
+        return // already present (persisted by a prior session or the user)
+    }
+    nv := godot.variant_from_packed_string_array(&exts)
+    defer godot.variant_destroy(&nv)
+    godot.set_setting(KEY, nv)
 }
 
 // OdinEditorPlugin._exit_tree — detach + free the toolbar widget (its Label must not
