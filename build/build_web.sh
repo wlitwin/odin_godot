@@ -68,6 +68,45 @@ if [ ! -d "$SCRIPTS" ] || [ -z "$(ls "$SCRIPTS"/*.odin 2>/dev/null)" ]; then
     exit 1
 fi
 
+# Preflight: catch imports of core packages that do NOT exist on the wasm target BEFORE
+# the compiler spews cryptic "Undeclared name: _read_directory_iterator"-style errors
+# from inside Odin's own core library. Each hit is reported file:line with the portable
+# alternative. Files excluded from wasm builds by Odin's filename platform gates
+# (foo_darwin.odin etc.) are skipped; `when ODIN_OS == ...` gating is invisible to this
+# scan, so ODIN_WEB_PREFLIGHT=0 skips it for code you know is unreachable on web.
+if [[ "${ODIN_WEB_PREFLIGHT:-1}" != "0" ]]; then
+    SCAN_DIRS=("$SCRIPTS")
+    [ -d "$PROJ/modules" ] && SCAN_DIRS+=("$PROJ/modules")
+    BAD_IMPORTS="$(
+        find "${SCAN_DIRS[@]}" -name '*.odin' \
+            ! -name '*.gen.odin' \
+            ! -name '*_windows.odin' ! -name '*_darwin.odin' ! -name '*_linux.odin' \
+            ! -name '*_freebsd.odin' ! -name '*_openbsd.odin' ! -name '*_netbsd.odin' \
+            ! -name '*_haiku.odin' ! -name '*_amd64.odin' ! -name '*_arm64.odin' \
+            ! -name '*_i386.odin' ! -name '*_riscv64.odin' \
+            -print0 2>/dev/null |
+        xargs -0 grep -nE '^[[:space:]]*(@\(require\)[[:space:]]*)?import([[:space:]]+[A-Za-z_][A-Za-z0-9_]*)?[[:space:]]+"core:(os|os/os2|dynlib|thread|net|sys/[^"]*)"' 2>/dev/null || true
+    )"
+    if [ -n "$BAD_IMPORTS" ]; then
+        echo "build_web.sh: scripts import core packages that do not exist on the wasm target:" >&2
+        echo "$BAD_IMPORTS" | sed 's/^/  /' >&2
+        cat >&2 <<'EOM'
+  These compile natively but have no wasm implementation, so the web build would fail
+  with cryptic "Undeclared name: ..." errors from inside Odin's core library. Portable
+  routes (docs/exporting.md, web section):
+    core:os / core:os/os2  -> engine calls: gd.singleton_os() + gd.os_get_environment(...);
+                              files via gd.File_Access
+    core:net               -> engine networking: HTTPRequest / WebSocketPeer / WebRTC
+    core:thread            -> no OS threads in the web side module
+    core:dynlib            -> no dynamic loading on web
+    core:sys/*             -> platform-specific by definition
+  If an import really is unreachable on web (e.g. inside `when ODIN_OS == .Darwin`),
+  re-run with ODIN_WEB_PREFLIGHT=0.
+EOM
+        exit 1
+    fi
+fi
+
 # 1. Build the scriptgen preprocessor to a writable TEMP dir (never into the addon, which may
 #    be read-only when installed under res://addons/). SGEN_BIN env reuses a prebuilt one.
 build_scriptgen

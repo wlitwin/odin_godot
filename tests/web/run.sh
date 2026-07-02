@@ -21,6 +21,32 @@ PROJ="$ROOT/tests/web"
 # Random default port (like SIGPORT in tests/webrtc) so parallel/leftover servers don't collide.
 PORT="${PORT:-$(( (RANDOM % 4000) + 9080 ))}"
 
+# 0. Preflight regression: a script importing a wasm-unsupported core package must fail
+#    FAST with the actionable message (file:line + portable alternative), not the
+#    compiler's cryptic "Undeclared name" spew; ODIN_WEB_PREFLIGHT=0 must skip the scan
+#    (it then dies later, in the compiler — we only assert the preflight is bypassed).
+PF="$(mktemp -d)"
+trap 'rm -rf "$PF"' EXIT
+cp -r "$PROJ/scripts" "$PF/scripts"
+printf 'package %s\nimport "core:os"\n' \
+    "$(grep -h -m1 '^package ' "$PROJ/scripts"/*.odin | head -1 | awk '{print $2}')" > "$PF/scripts/pf_bad.odin"
+if bash "$ROOT/build/build_web.sh" "$PF" > "$PF/preflight.log" 2>&1; then
+    echo "PHASEWEB_FAIL: preflight let a core:os import through"
+    exit 1
+fi
+if ! grep -q "do not exist on the wasm target" "$PF/preflight.log" \
+   || ! grep -q "pf_bad.odin:2" "$PF/preflight.log"; then
+    echo "PHASEWEB_FAIL: preflight failed without the actionable message"
+    cat "$PF/preflight.log"
+    exit 1
+fi
+if ODIN_WEB_PREFLIGHT=0 bash "$ROOT/build/build_web.sh" "$PF" > "$PF/skip.log" 2>&1 \
+   || grep -q "do not exist on the wasm target" "$PF/skip.log"; then
+    echo "PHASEWEB_FAIL: ODIN_WEB_PREFLIGHT=0 did not bypass the scan"
+    exit 1
+fi
+echo "web preflight: core:os import rejected with file:line + bypass works"
+
 # 1. Build the full SIDE_MODULE wasm and 2. headless web export.
 bash "$ROOT/build/build_web.sh" "$PROJ" >/dev/null
 rm -rf "$PROJ/out"; mkdir -p "$PROJ/out"
@@ -53,7 +79,7 @@ fi
 # Serve with COOP/COEP, then drive a headless browser.
 bash "$ROOT/tests/web/serve.sh" "$PROJ/out" "$PORT" >/dev/null 2>&1 &
 SRV=$!
-trap 'kill $SRV 2>/dev/null || true' EXIT
+trap 'kill $SRV 2>/dev/null || true; rm -rf "$PF"' EXIT # replaces the preflight trap — keep its cleanup
 # Wait (up to ~15s) for the server to accept connections.
 for _ in $(seq 1 30); do
     if curl -s -o /dev/null "http://127.0.0.1:$PORT/index.html"; then break; fi
