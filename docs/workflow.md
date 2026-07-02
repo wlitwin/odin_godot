@@ -64,6 +64,12 @@ the scripts dll for you:
    instances re-bind and **keep their state**, and the Inspector's property lists refresh — so
    a freshly-added `@export` appears **without restarting the editor**.
 
+**Format on save.** When `odinfmt` is reachable (it ships with ols; also the
+`odin_godot/odinfmt_bin` setting), saving a script writes **formatted** code to disk and
+updates the open buffer in place — one undo step, caret preserved, no unsaved dot. A
+project-root `odinfmt.json` is honored. Sources that don't parse yet save unformatted
+(never blocked); disable with the `odin_godot/format_on_save` project setting.
+
 **You can always see where the build is.** A status badge in the editor's **top toolbar**
 shows *Odin: building…* while a rebuild runs, flashes green *live ✓ (X.Xs)* when the swap
 lands, and turns a sticky red *build FAILED* after a broken save (the actual compiler

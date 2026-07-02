@@ -143,7 +143,13 @@ sv_save :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.T
         return
     }
 
-    if werr := os.write_entire_file(os_path, transmute([]u8)odin_src); werr != nil {
+    // Format on save (core/format.odin): odinfmt the text hitting disk, keep the resource
+    // + the open editor buffer in sync. Falls back to the original bytes on any problem
+    // (no odinfmt, mid-edit syntax errors) — saving must never fail because of formatting.
+    final_src := format_for_save(cast(godot.Script)resource, path, odin_src)
+    defer if raw_data(final_src) != raw_data(odin_src) {delete(final_src)}
+
+    if werr := os.write_entire_file(os_path, transmute([]u8)final_src); werr != nil {
         ret_int(ret, 12) // ERR_FILE_CANT_WRITE
         return
     }

@@ -7,6 +7,11 @@ PROJ="$ROOT/tests/showcase"
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+# Assert the format-on-save path only where odinfmt exists (it ships with ols; the nix
+# dev shell has it). Elsewhere the save test still covers the raw write path.
+if command -v odinfmt >/dev/null 2>&1; then
+    export SAVE_TEST_EXPECT_FMT=1
+fi
 OUT="$("$GODOT" --headless --path "$PROJ" --script test_save.gd 2>&1 || true)"
 echo "$OUT" | grep -E "SAVE_TEST_OK|SAVE_TEST_FAIL" || true
 echo "$OUT" | grep -q "SAVE_TEST_OK"

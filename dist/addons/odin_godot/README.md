@@ -44,7 +44,7 @@ That means:
 
 | For | Install |
 |------|-------|
-| Autocomplete / hover / call hints in the editor | [`ols`](https://github.com/DanielGavin/ols) on PATH (or the `odin_godot/ols_bin` setting) |
+| Autocomplete / hover / call hints + **format on save** | [`ols`](https://github.com/DanielGavin/ols) on PATH (or the `odin_godot/ols_bin` setting) — `odinfmt` ships with it |
 | Project > Tools debugger items (macOS/Linux) | macOS: nothing extra (lldb is in the Xcode CLT above) · Linux: `lldb` + a terminal emulator |
 | VS Code debugging | VS Code + the **CodeLLDB** extension (`vadimcn.vscode-lldb`) |
 | JetBrains editing (Rider/CLion/…) | the **Odin Support** plugin (import the generated `ols.json`) |

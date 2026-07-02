@@ -35,9 +35,33 @@ func _initialize() -> void:
 	n.free()
 	var scene_rejected = scene_err != OK
 
-	var ok = err == OK and on_disk and scene_rejected
+	# Format on save (core/format.odin): with the setting EXPLICITLY on (the headless
+	# override — the default only applies inside the editor) and odinfmt reachable, the
+	# BYTES ON DISK must come out formatted. Gated: run.sh sets SAVE_TEST_EXPECT_FMT only
+	# when odinfmt is on PATH, so environments without ols still pass.
+	var fmt_ok := true
+	if OS.get_environment("SAVE_TEST_EXPECT_FMT") == "1":
+		ProjectSettings.set_setting("odin_godot/format_on_save", true)
+		var ugly = src.duplicate()
+		ugly.source_code = "package showcase_scripts\nfmt_probe::proc(){x:=1\n_=x}\n"
+		var fmt_probe := "res://__save_fmt_probe.odin"
+		var fmt_os := ProjectSettings.globalize_path(fmt_probe)
+		var fmt_err = ResourceSaver.save(ugly, fmt_probe)
+		var fmt_text := ""
+		if FileAccess.file_exists(fmt_os):
+			fmt_text = FileAccess.get_file_as_string(fmt_os)
+			DirAccess.remove_absolute(fmt_os)
+		var fmt_uid := fmt_os + ".uid"
+		if FileAccess.file_exists(fmt_uid):
+			DirAccess.remove_absolute(fmt_uid)
+		# odinfmt normalizes `fmt_probe::proc(){` to spaced form — proof it ran.
+		fmt_ok = fmt_err == OK and fmt_text.contains("fmt_probe :: proc()") and fmt_text.contains("x := 1")
+		if not fmt_ok:
+			print("SAVE_TEST_FMT_DEBUG: err=%d text=<%s>" % [fmt_err, fmt_text])
+
+	var ok = err == OK and on_disk and scene_rejected and fmt_ok
 	if ok:
 		print("SAVE_TEST_OK")
 	else:
-		print("SAVE_TEST_FAIL: err=%d on_disk=%s scene_err=%d (scene must be rejected)" % [err, on_disk, scene_err])
+		print("SAVE_TEST_FAIL: err=%d on_disk=%s scene_err=%d fmt_ok=%s" % [err, on_disk, scene_err, fmt_ok])
 	quit(0 if ok else 1)
