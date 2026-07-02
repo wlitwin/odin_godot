@@ -72,8 +72,26 @@ fi
 #    be read-only when installed under res://addons/). SGEN_BIN env reuses a prebuilt one.
 build_scriptgen
 
-# 2. Generate *.gen.odin siblings beside the authored sources.
+# 2. Generate *.gen.odin siblings beside the authored sources — for the main scripts dir
+#    AND each optional res://modules/<name> script module (multi-module spike). On web all
+#    modules link into this ONE side module: the compose file below @(require)-imports each
+#    module package, and web_startup's @(init) chain runs their registrations too.
 run_scriptgen "$SCRIPTS"
+MODULE_IMPORT_LINES=""
+if [ -d "$PROJ/modules" ]; then
+    if [ "$SCRIPTS" != "$PROJ/scripts" ]; then
+        echo "build_web.sh: WARNING: modules/ present but SCRIPTS ($SCRIPTS) is not \$PROJ/scripts — module compose skipped" >&2
+    else
+        for mdir in "$PROJ/modules"/*/; do
+            mdir="${mdir%/}"
+            mname="$(basename "$mdir")"
+            [ -z "$(ls "$mdir"/*.odin 2>/dev/null)" ] && continue
+            run_scriptgen "$mdir"
+            MODULE_IMPORT_LINES="$MODULE_IMPORT_LINES@(require) import mod_$mname \"../modules/$mname\"
+"
+        done
+    fi
+fi
 
 # 3. Emit the wasm-only compose file that pulls `core` into the scripts build. Named
 #    *_wasm32.odin so Odin's arch-gated file selection keeps it OUT of native builds.
@@ -93,6 +111,7 @@ package $PKG
 // @(export) odin_godot_init entry + all registration) to link into this module
 // alongside the scripts. Excluded from native builds by the _wasm32 filename gate.
 @(require) import core "godot:core"
+$MODULE_IMPORT_LINES
 EOF
 
 # 4. Odin -> wasm object. Freestanding wasm32, PIC (required: SIDE_MODULE data

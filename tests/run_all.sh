@@ -70,6 +70,10 @@ TESTS=(
     "phase3|PHASE3_OK|tests/phase3/run.sh"
     "phase35|PHASE35_OK|tests/phase35/run.sh"
     "phase4|PHASE4_OK|tests/phase4/run.sh"
+    # Multi-module spike: one dll per script module (res://modules/<name>), per-module
+    # hot reload with other modules provably untouched, engine-mediated cross-module
+    # calls, module-local script_of, loud class-collision + cross-import rejection.
+    "modspike|MODULES_SPIKE_OK|tests/modules_spike/run.sh"
     "phase5|PHASE5_OK|tests/phase5/run.sh"
     "showcase|SHOWCASE_OK|tests/showcase/run.sh"
     "autoload|AUTOLOAD_OK|tests/autoload/run.sh"

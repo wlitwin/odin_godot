@@ -973,8 +973,11 @@ inst_is_placeholder :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr)
 //     documented limitation; GDScript has the same reload caveat).
 // ----------------------------------------------------------------------------
 
+// `only` scopes the rebind to instances of the given class names (multi-module spike:
+// a per-module swap must leave OTHER modules' instances — descs, caches, struct bytes —
+// completely untouched). nil == rebind everything (the single-module behavior).
 @(private)
-rebind_all_instances :: proc() {
+rebind_all_instances :: proc(only: map[string]bool = nil) {
 	// Snapshot the registry under the lock, rebind OUTSIDE it: the rebind path calls into
 	// Godot (ensure_class_cache interning, get_node) and into script code
 	// (lifecycle.reload, which may call rt.script_of -> odin_script_struct -> the same
@@ -987,6 +990,9 @@ rebind_all_instances :: proc() {
 	for oi in snapshot {
 		if oi == nil {
 			continue
+		}
+		if only != nil && !(oi.class_name in only) {
+			continue // another module's instance — must survive the swap untouched
 		}
 		new_desc, ok := scripts_classes[oi.class_name]
 		if !ok {

@@ -62,12 +62,17 @@ Reload_State :: struct {
 	// Wall-clock duration of the last finished build (ms) — surfaced as a UX hint on reload.
 	last_build_ms:  f64,
 
-	// Content hash of the authored sources the LAST kicked build was for. Guards against a
-	// rebuild LOOP: the editor's filesystem watcher re-triggers `_reload` when the build
-	// writes the `*.gen.odin` artifacts, but those don't change the authored-source hash, so
-	// an unchanged hash is skipped. 0 == nothing built yet.
-	last_hash:      u64,
-	have_last_hash: bool,
+	// PER-MODULE content hashes of the authored sources the LAST kicked build was for,
+	// keyed by module name ("" == the main scripts dir; "<name>" == res://modules/<name>).
+	// Guards against a rebuild LOOP: the editor's filesystem watcher re-triggers `_reload`
+	// when the build writes the `*.gen.odin` artifacts, but those don't change the
+	// authored-source hash, so an unchanged module is skipped — which is ALSO the payoff:
+	// a save in one module rebuilds only that module's dll. Missing key == never built.
+	last_hashes:    map[string]u64,
+	// Modules the next successful swap must hot-reload (heap-owned names, deduped).
+	// Appended by reload_request for each module it kicks a rebuild of; drained by the
+	// pump once swap_ready fires; cleared on build failure (never swap an unbuilt dll).
+	swap_modules:   [dynamic]string,
 
 	// One-time "odin not found" warning guard (don't spam on every save).
 	warned_no_odin: bool,
@@ -220,6 +225,83 @@ reload_request :: proc(force := false) {
 	if g_reload.log_path == "" {
 		g_reload.log_path = strings.concatenate({proj, "/bin/.odin_reload.log"})
 	}
+	// ---- enumerate the script modules: the main scripts dir + each res://modules/<name> ----
+	Candidate :: struct {
+		name: string, // "" == the main module
+		dir:  string,
+		hash: u64,
+	}
+	cands := make([dynamic]Candidate, context.temp_allocator)
+	append(
+		&cands,
+		Candidate{name = "", dir = strings.clone(scripts, context.temp_allocator), hash = hash_sources(scripts)},
+	)
+	when ODIN_OS != .Windows {
+		// Multi-module is POSIX-native only for now (build_scripts.ps1 knows nothing of
+		// modules); on Windows only the main module is considered — pre-spike behavior.
+		mroot := strings.concatenate({proj, "/modules"}, context.temp_allocator)
+		if fis, rerr := os.read_directory_by_path(mroot, -1, context.temp_allocator); rerr == nil {
+			for fi in fis {
+				if fi.type != .Directory || strings.has_prefix(fi.name, ".") {
+					continue
+				}
+				append(
+					&cands,
+					Candidate{
+						name = strings.clone(fi.name, context.temp_allocator),
+						dir  = strings.clone(fi.fullpath, context.temp_allocator),
+						hash = hash_sources(fi.fullpath),
+					},
+				)
+			}
+		}
+	}
+
+	sync.lock(&g_reload.mutex)
+	defer sync.unlock(&g_reload.mutex)
+
+	if g_reload.last_hashes == nil {
+		g_reload.last_hashes = make(map[string]u64)
+	}
+
+	// Loop guard, PER MODULE: skip modules whose authored sources are byte-identical to the
+	// last build we kicked (this is what the editor re-importing our own `*.gen.odin` output
+	// looks like) — which is ALSO the multi-module payoff: a save in ONE module rebuilds
+	// only that module's dll. A hash of 0 (unreadable dir) always proceeds.
+	changed := make([dynamic]Candidate, context.temp_allocator)
+	for c in cands {
+		prev, seen := g_reload.last_hashes[c.name]
+		if !force && c.hash != 0 && seen && prev == c.hash {
+			continue
+		}
+		append(&changed, c)
+	}
+	if len(changed) == 0 {
+		// Diagnosable, not silent: this is normally the editor re-importing our own gen
+		// output, but it's also what a save looks like when something upstream is stale.
+		os.write_string(os.stderr, "odin reload: authored sources unchanged — rebuild skipped\n")
+		return
+	}
+	for c in changed {
+		if c.name in g_reload.last_hashes {
+			g_reload.last_hashes[c.name] = c.hash
+		} else {
+			g_reload.last_hashes[strings.clone(c.name)] = c.hash
+		}
+		// Record the module for the pump's swap pass (deduped; heap-owned clone).
+		already := false
+		for s in g_reload.swap_modules {
+			if s == c.name {
+				already = true
+				break
+			}
+		}
+		if !already {
+			append(&g_reload.swap_modules, strings.clone(c.name))
+		}
+	}
+
+	// ---- assemble the shell command: ONE build invocation per CHANGED module ----
 	cmd: string
 	when ODIN_OS == .Windows {
 		// libc.system routes through cmd.exe: drive the PowerShell counterpart of
@@ -236,42 +318,40 @@ reload_request :: proc(force := false) {
 	} else {
 		// Every interpolated path goes through shell_quote (paths carry apostrophes; the
 		// scripts-dir/odin-bin settings are user-editable text — see core/common.odin).
+		// BUILD_MODULES=0 keeps each invocation scoped to exactly the one dir passed to it
+		// (build_scripts.sh would otherwise chain the modules/* loop after a main build).
 		q_proj := shell_quote(proj, context.temp_allocator)
 		q_odin_dir := shell_quote(odin_dir, context.temp_allocator)
 		q_odin_bin := shell_quote(odin_bin, context.temp_allocator)
 		q_root := shell_quote(root, context.temp_allocator)
-		q_scripts := shell_quote(scripts, context.temp_allocator)
 		q_log := shell_quote(g_reload.log_path, context.temp_allocator)
+		parts := strings.builder_make(context.temp_allocator)
+		for c, i in changed {
+			if i > 0 {
+				strings.write_string(&parts, " && ")
+			}
+			q_dir := shell_quote(c.dir, context.temp_allocator)
+			fmt.sbprintf(
+				&parts,
+				"PATH=%s:\"$PATH\" ODIN=%s ODIN_GODOT_ROOT=%s SKIP_CORE=1 BUILD_MODULES=0 bash %s/build/build_scripts.sh %s %s",
+				q_odin_dir,
+				q_odin_bin,
+				q_root,
+				q_root,
+				q_proj,
+				q_dir,
+			)
+		}
+		// Parentheses (a subshell), NOT `{ ...; }`: Odin's fmt parses braces as its own
+		// placeholder syntax (they'd emit %!(MISSING CLOSE BRACE) into the shell command),
+		// and the subshell grouping is equivalent for this redirect.
 		cmd = fmt.aprintf(
-			"mkdir -p %s/bin; PATH=%s:\"$PATH\" ODIN=%s ODIN_GODOT_ROOT=%s SKIP_CORE=1 bash %s/build/build_scripts.sh %s %s > %s 2>&1",
+			"mkdir -p %s/bin; ( %s ) > %s 2>&1",
 			q_proj,
-			q_odin_dir,
-			q_odin_bin,
-			q_root,
-			q_root,
-			q_proj,
-			q_scripts,
+			strings.to_string(parts),
 			q_log,
 		)
 	}
-
-	src_hash := hash_sources(scripts)
-
-	sync.lock(&g_reload.mutex)
-	defer sync.unlock(&g_reload.mutex)
-
-	// Loop guard: if the authored sources are byte-identical to the last build we kicked,
-	// there is nothing new to compile — skip (this is what the editor re-importing our own
-	// `*.gen.odin` output looks like). A hash of 0 (unreadable dir) always proceeds.
-	if !force && src_hash != 0 && g_reload.have_last_hash && g_reload.last_hash == src_hash {
-		// Diagnosable, not silent: this is normally the editor re-importing our own gen
-		// output, but it's also what a save looks like when something upstream is stale.
-		os.write_string(os.stderr, "odin reload: authored sources unchanged — rebuild skipped\n")
-		delete(cmd)
-		return
-	}
-	g_reload.last_hash = src_hash
-	g_reload.have_last_hash = true
 
 	// Tell the user their save is being processed. The rebuild is async (background worker),
 	// so without this the editor looks idle until the swap lands a few seconds later — a new
@@ -343,9 +423,16 @@ build_worker_entry :: proc(data: rawptr) {
 	} else {
 		// Surface the failure on the MAIN thread (this worker can't call Godot).
 		state.build_failed = true
-		// Failed build: forget the source hash so the SAME source can be retried (e.g. after a
-		// transient error). A real source change would change the hash and rebuild regardless.
-		state.have_last_hash = false
+		// Failed build: forget the source hashes so the SAME sources can be retried (e.g.
+		// after a transient error). A real source change would rebuild regardless.
+		clear(&state.last_hashes)
+		// Never swap modules whose rebuild just failed — drop the pending swap set. (If an
+		// EARLIER coalesced build succeeded, swap_ready stays set and the pump falls back to
+		// swapping the main module.)
+		for s in state.swap_modules {
+			delete(s, core_allocator())
+		}
+		clear(&state.swap_modules)
 		if state.build_output != "" {delete(state.build_output, core_allocator())}
 		state.build_output = log_content
 	}
@@ -405,8 +492,13 @@ reload_pump_main_thread :: proc() {
 	// would snapshot a half-written image. Leave swap_ready set; B re-sets it (or flags
 	// failure) and the next frame swaps a settled dll.
 	ready := g_reload.swap_ready && !g_reload.build_running
+	swap_names: []string
 	if ready {
 		g_reload.swap_ready = false
+		// Drain the per-module swap set (ownership of the heap-owned names moves here).
+		swap_names = make([]string, len(g_reload.swap_modules), context.temp_allocator)
+		copy(swap_names, g_reload.swap_modules[:])
+		clear(&g_reload.swap_modules)
 	}
 	failed := g_reload.build_failed
 	g_reload.build_failed = false
@@ -436,7 +528,23 @@ reload_pump_main_thread :: proc() {
 	}
 
 	context.allocator = core_allocator()
-	if odin_scripts_reload() {
+	// Swap each module the finished build(s) covered. An empty drained set (a failed
+	// coalesced build cleared it while an earlier success left swap_ready) falls back to
+	// the main module — the pre-spike behavior.
+	swapped := 0
+	if len(swap_names) == 0 {
+		if odin_scripts_reload() {
+			swapped += 1
+		}
+	} else {
+		for name in swap_names {
+			if odin_scripts_reload(name) {
+				swapped += 1
+			}
+			delete(name) // heap-owned clone from reload_request
+		}
+	}
+	if swapped > 0 {
 		// Real (tool) instances are already re-bound by the swap; placeholders (the common
 		// non-tool editor case) still hold the OLD property list, so re-push their exports.
 		refresh_placeholder_exports()

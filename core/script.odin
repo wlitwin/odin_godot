@@ -983,7 +983,17 @@ v_reload :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.
         ret_int(ret, 0) // 0 == OK; the rebuild+swap happens asynchronously
         return
     }
-    ok := odin_scripts_reload()
+    // Multi-module: swap ONLY the module this script belongs to (res://modules/<name>/...
+    // -> "<name>", anything else -> "" == the MAIN module). A single-module project always
+    // resolves to "" — the pre-spike behavior.
+    self := cast(^OdinScript)instance
+    module := ""
+    if self != nil && self.object != nil {
+        gpath := godot.resource_get_path(cast(godot.Resource)self.object)
+        path := string_to_odin(gpath, context.temp_allocator)
+        module = scripts_module_for_res_path(path)
+    }
+    ok := odin_scripts_reload(module)
     ret_int(ret, ok ? 0 : 1) // 0 == OK, 1 == FAILED
 }
 

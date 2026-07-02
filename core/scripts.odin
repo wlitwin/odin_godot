@@ -40,6 +40,22 @@ scripts_find_class :: proc(name: string) -> (rt.Class_Desc, bool) {
 	return desc, ok
 }
 
+// Module name for a `res://` script path under the multi-module layout (Phase 5 spike):
+// `res://modules/<name>/...` -> "<name>"; anything else (res://scripts/..., addons, etc.)
+// -> "" (the MAIN module). Pure string logic, shared by native (per-module reload routing)
+// and web (where it is unused but must compile). Returns a VIEW into `path`.
+@(private)
+scripts_module_for_res_path :: proc(path: string) -> string {
+	prefix :: "res://modules/"
+	if strings.has_prefix(path, prefix) {
+		rest := path[len(prefix):]
+		if idx := strings.index_byte(rest, '/'); idx > 0 {
+			return rest[:idx]
+		}
+	}
+	return ""
+}
+
 // Build the class-name -> Class_Desc map from a manifest (descs/count). Uses the core
 // allocator (alignment-correct for maps). Shared by both the native and web loaders.
 @(private)
@@ -82,6 +98,15 @@ scripts_note_registration_errors :: proc(errs: [^]rt.Registration_Error, n: int)
 		}
 		append(&g_registration_errors, formatted)
 	}
+}
+
+// Note a single pre-formatted load-time error (multi-module class collisions, module dll
+// load failures) for the frame pump's push_error pass. Same surfacing channel as the
+// registration errors: loud in the editor console, never silent.
+@(private)
+scripts_note_error :: proc(msg: string) {
+	context.allocator = core_allocator()
+	append(&g_registration_errors, strings.clone(msg))
 }
 
 // Push every noted registration error to the engine log (JS console on web), then

@@ -167,8 +167,9 @@ odin_scripts_load :: proc() {
 }
 
 // No hot reload in the browser (no compiler, no dlopen). Always reports failure.
+// (`module` mirrors the native per-module signature so shared callers compile.)
 @(private)
-odin_scripts_reload :: proc() -> bool {
+odin_scripts_reload :: proc(module := "") -> bool {
 	return false
 }
 
