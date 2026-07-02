@@ -1,7 +1,5 @@
 //gd:extends Node2D
 //gd:class Tester
-//gd:signal pinged(value: int)
-//gd:signal triggered()
 package ergonomics_scripts
 
 // ----------------------------------------------------------------------------
@@ -17,8 +15,12 @@ package ergonomics_scripts
 import gd "godot:godot"
 
 Tester :: struct {
-	owner:  gd.Node2d,
-	result: gd.Int `gd:"export"`,
+	owner:     gd.Node2d,
+	// Declared signals (typed fields). Emission below is deliberately BY NAME via the
+	// gd.emit/gd.emit_args ergonomic helpers — that escape hatch is what this test covers.
+	pinged:    gd.Signal1(int) `gd:"args=value"`,
+	triggered: gd.Signal0,
+	result:    gd.Int `gd:"export"`,
 }
 
 BIT_GET_NODE :: 1 << 0

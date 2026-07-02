@@ -1,6 +1,5 @@
 //gd:extends Node
 //gd:class Ping
-//gd:signal pinged(value: int)
 package phase35_scripts
 
 // ----------------------------------------------------------------------------
@@ -18,9 +17,12 @@ import gd "godot:godot"
 // First field MUST be the owner Object pointer (core writes it at offset 0).
 // Tagged fields become @export vars; untagged fields are private instance state.
 Ping :: struct {
-	owner: gd.Node,
-	speed: f32   `gd:"export"`,
-	count: gd.Int `gd:"export"`,
+	owner:  gd.Node,
+	// A declared signal is a typed FIELD: name = field name, payload = type parameter,
+	// `args=` names the payload. scriptgen emits the typed `ping_emit_pinged` helper.
+	pinged: gd.Signal1(int) `gd:"args=value"`,
+	speed:  f32   `gd:"export"`,
+	count:  gd.Int `gd:"export"`,
 }
 
 // Lifecycle by proc name (the `ping_` struct prefix is stripped -> `ready`), bound
@@ -50,6 +52,6 @@ ping_get_speed :: proc(self: ^Ping) -> f64 {
 @(gd_method)
 ping_emit_ping :: proc(self: ^Ping, value: int) {
 	self.count += gd.Int(value)
-	// `ping_emit_<signal>` is generated from the //gd:signal marker.
+	// `ping_emit_<signal>` is generated from the signal FIELD above.
 	ping_emit_pinged(self, i64(value))
 }

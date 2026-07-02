@@ -1,8 +1,5 @@
 //gd:extends CharacterBody2D
 //gd:class Player
-//gd:signal health_changed(value: int)
-//gd:signal leveled_up()
-//gd:signal died()
 package survivors_scripts
 
 // ----------------------------------------------------------------------------
@@ -21,8 +18,8 @@ package survivors_scripts
 //                                   game_state module and emits `leveled_up` on a level.
 //   * apply_upgrade (@(gd_method)) — reads an UpgradeConfig (typed) and mutates a stat / grants
 //                                   a weapon — the observable effect the test asserts.
-//   * signals                     — health_changed(value), leveled_up(), died(); the HUD/Game
-//                                   listen.
+//   * signals                     — the health_changed/leveled_up/died signal FIELDS; the
+//                                   HUD/Game listen.
 //   * custom @(gd_method) take_damage — an enemy calls it TYPED on contact.
 // ----------------------------------------------------------------------------
 
@@ -31,6 +28,11 @@ import rt "godot:runtime"
 
 Player :: struct {
 	owner:          gd.Node2d, // base is CharacterBody2D (a Node2d)
+
+	// ---- signals (typed fields; the HUD/Game listen) ----
+	health_changed: gd.Signal1(int) `gd:"args=value"`, // every HP change (damage, heal, level)
+	leveled_up:     gd.Signal0, // crossing an XP level boundary
+	died:           gd.Signal0, // HP hit 0 — the run is over
 
 	// ---- base stats (Inspector-tunable) ----
 	move_speed:     f32          `gd:"export,range=60:400:10,group=Stats"`, // px/s

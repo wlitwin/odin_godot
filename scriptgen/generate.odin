@@ -91,9 +91,9 @@ generate :: proc(s: ^Script) -> string {
 		}
 	}
 
-	// ---- signal emit helpers ----
+	// ---- typed signal emit helpers ----
 	if len(s.signals) > 0 {
-		emit_signal_infra(&b, s)
+		emit_signal_helpers(&b, s)
 	}
 
 	// ---- backing arrays + registration ----
@@ -255,54 +255,39 @@ emit_accessor_wrappers :: proc(b: ^strings.Builder, s: ^Script, ex: Export_Info)
 	}
 }
 
-// Signal emission via the Object::emit_signal method bind (shared per gen file).
-emit_signal_infra :: proc(b: ^strings.Builder, s: ^Script) {
+// Typed emit helpers, one per signal FIELD: `<snake>_emit_<field>(self, payload…)`. Thin
+// wrappers over the godot package's `gd.emit`/`gd.emit_args` (which own the emit_signal
+// MethodBind caching + CallError handling); the value they add is the TYPED signature —
+// the field name and payload types are compile-checked at every emit site. The returned
+// Error surfaces a misspelled/unregistered signal; callers are free to ignore it.
+emit_signal_helpers :: proc(b: ^strings.Builder, s: ^Script) {
 	w :: strings.write_string
 	cls := s.struct_name
 	snake := to_snake(cls)
 
-	w(b, "// ---- signal emission (Object::emit_signal method bind) ----\n")
-	w(b, "@(private = \"file\")\n_emit_signal_name: gd.String_Name\n")
-	w(b, "@(private = \"file\")\n_emit_bind: gdext.MethodBindPtr\n")
-	w(b, "@(private = \"file\")\n_emit_ready: bool\n")
+	w(b, "// ---- typed signal emit helpers (over gd.emit/gd.emit_args) ----\n")
 	for sig in s.signals {
-		fmt.sbprintf(b, "@(private = \"file\")\n_sig_%s_name: gd.String_Name\n", sig.name)
-	}
-	w(b, "@(private = \"file\")\n_ensure_emit :: proc \"contextless\" () {\n")
-	w(b, "\tif _emit_ready {return}\n")
-	w(b, "\t_emit_signal_name = gd.new_string_name_cstring(\"emit_signal\", true)\n")
-	w(b, "\t_emit_bind = gdext.classdb_get_method_bind(gd.object_name_ref(), &_emit_signal_name, 4047867050)\n")
-	for sig in s.signals {
-		fmt.sbprintf(b, "\t_sig_%s_name = gd.new_string_name_cstring(\"%s\", true)\n", sig.name, sig.name)
-	}
-	w(b, "\t_emit_ready = true\n}\n\n")
-
-	for sig in s.signals {
-		fmt.sbprintf(b, "// emit the `%s` signal with its payload.\n", sig.name)
-		fmt.sbprintf(b, "%s_emit_%s :: proc \"c\" (self: ^%s", snake, sig.name, cls)
+		fmt.sbprintf(b, "// emit the `%s` signal (declared by the %s.%s field) with its payload.\n", sig.name, cls, sig.name)
+		fmt.sbprintf(b, "%s_emit_%s :: proc \"contextless\" (self: ^%s", snake, sig.name, cls)
 		for a in sig.args {
 			fmt.sbprintf(b, ", %s: %s", a.name, a.vi.native)
 		}
-		w(b, ") {\n")
-		w(b, "\t_ensure_emit()\n")
-		w(b, "\tif _emit_bind == nil {return}\n")
-		// Build the variant args: [signal_name, payload...].
-		n := len(sig.args)
-		for a, i in sig.args {
-			fmt.sbprintf(b, "\t_v%d := %s\n\t_va%d := gd.variant_from(&_v%d)\n", i, a.name, i, i)
-		}
-		fmt.sbprintf(b, "\t_sig := gd.variant_from(&_sig_%s_name)\n", sig.name)
-		fmt.sbprintf(b, "\t_call_args := [%d]gdext.VariantPtr{{&_sig", n + 1)
-		for i in 0 ..< n {
-			fmt.sbprintf(b, ", &_va%d", i)
-		}
-		w(b, "}\n")
-		w(b, "\t_r := gd.Variant{}\n")
-		w(b, "\tgdext.object_method_bind_call(_emit_bind, self.owner, &_call_args[0], len(_call_args), &_r, nil)\n")
-		w(b, "\tgdext.variant_destroy(&_r)\n")
-		w(b, "\tgdext.variant_destroy(&_sig)\n")
-		for i in 0 ..< n {
-			fmt.sbprintf(b, "\tgdext.variant_destroy(&_va%d)\n", i)
+		w(b, ") -> gd.Error {\n")
+		if len(sig.args) == 0 {
+			fmt.sbprintf(b, "\treturn gd.emit(self.owner, \"%s\")\n", sig.name)
+		} else {
+			for a, i in sig.args {
+				fmt.sbprintf(b, "\t_v%d := %s\n\t_va%d := gd.variant_from(&_v%d)\n", i, a.name, i, i)
+			}
+			fmt.sbprintf(b, "\t_err := gd.emit_args(self.owner, \"%s\"", sig.name)
+			for i in 0 ..< len(sig.args) {
+				fmt.sbprintf(b, ", _va%d", i)
+			}
+			w(b, ")\n")
+			for i in 0 ..< len(sig.args) {
+				fmt.sbprintf(b, "\tgdext.variant_destroy(&_va%d)\n", i)
+			}
+			w(b, "\treturn _err\n")
 		}
 		w(b, "}\n\n")
 	}
@@ -375,43 +360,8 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		w(b, "}\n\n")
 	}
 
-	// signals
-	for sig in s.signals {
-		fmt.sbprintf(b, "@(private = \"file\")\n_%s_%s_arg_names := [?]cstring{{", snake, sig.name)
-		for a, i in sig.args {
-			if i > 0 {w(b, ", ")}
-			fmt.sbprintf(b, "\"%s\"", a.name)
-		}
-		w(b, "}\n")
-		fmt.sbprintf(b, "@(private = \"file\")\n_%s_%s_arg_types := [?]gdext.Variant_Type{{", snake, sig.name)
-		for a, i in sig.args {
-			if i > 0 {w(b, ", ")}
-			w(b, a.vi.enum_name)
-		}
-		w(b, "}\n")
-	}
-	if len(s.signals) > 0 {
-		fmt.sbprintf(b, "@(private = \"file\")\n_%s_signals := [?]rt.Signal {{\n", snake)
-		for sig in s.signals {
-			// C-shaped tables: pointer + count into the static parallel arrays. A
-			// payload-less signal stays at the zero value (nil + 0).
-			tables := ""
-			if len(sig.args) > 0 {
-				tables = fmt.tprintf(
-					", arg_names = raw_data(_%s_%s_arg_names[:]), arg_names_count = %d" +
-					", arg_types = raw_data(_%s_%s_arg_types[:]), arg_types_count = %d",
-					snake,
-					sig.name,
-					len(sig.args),
-					snake,
-					sig.name,
-					len(sig.args),
-				)
-			}
-			fmt.sbprintf(b, "\t{{name = \"%s\"%s}},\n", sig.name, tables)
-		}
-		w(b, "}\n\n")
-	}
+	// (No signal tables: signals are declared by typed struct fields, so the runtime
+	// reflection walk builds the rt.Signal tables itself at registration.)
 
 	// connections (@(gd_connect="signal") declarations)
 	if len(s.connections) > 0 {
@@ -467,10 +417,6 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	if len(s.methods) > 0 {
 		fmt.sbprintf(b, "\t\t\tmethods = raw_data(_%s_methods[:]),\n", snake)
 		fmt.sbprintf(b, "\t\t\tmethods_count = %d,\n", len(s.methods))
-	}
-	if len(s.signals) > 0 {
-		fmt.sbprintf(b, "\t\t\tsignals = raw_data(_%s_signals[:]),\n", snake)
-		fmt.sbprintf(b, "\t\t\tsignals_count = %d,\n", len(s.signals))
 	}
 	if len(s.connections) > 0 {
 		fmt.sbprintf(b, "\t\t\tconnections = raw_data(_%s_connections[:]),\n", snake)

@@ -1,6 +1,5 @@
 //gd:extends Area2D
 //gd:class Enemy
-//gd:signal died()
 package survivors_scripts
 
 // ----------------------------------------------------------------------------
@@ -21,7 +20,7 @@ package survivors_scripts
 //                                       standing in a crowd stacks each enemy's DPS and kills).
 //   * custom @(gd_method) take_damage — weapons call this TYPED.
 //   * typed cross-script WRITE        — calls the player's take_damage; sets the gem's value.
-//   * script-declared signal `died()`.
+//   * a script-declared signal — the `died` signal FIELD.
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
@@ -37,6 +36,7 @@ PLAYER_CONTACT_SLACK :: f32(12)
 
 Enemy :: struct {
 	owner:     gd.Area2d,
+	died:      gd.Signal0, // signal field: emitted on lethal damage (the Game listens)
 	config:    ^gd.Resource `gd:"export,resource=EnemyConfig"`, // an EnemyConfig .tres slot
 	gem_scene: ^gd.Resource `gd:"export,resource=PackedScene"`, // xp_gem.tscn
 

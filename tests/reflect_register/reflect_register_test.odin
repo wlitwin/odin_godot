@@ -78,6 +78,28 @@ Bad :: struct {
 	fine:      i32 `gd:"export"`, // sanity: a good export among the bad ones survives
 }
 
+// Signal fields (gd.Signal0 … Signal4): detected by TYPE (tag optional), the field name
+// is the signal name, `args=` names the payload (else arg0…). `score` checks routing —
+// signal fields and tagged exports coexist in one struct.
+Signals :: struct {
+	owner:     gd.Node,
+	died:      gd.Signal0,
+	collected: gd.Signal1(int) `gd:"args=value"`,
+	hit:       gd.Signal2(i64, ^gd.Node2d) `gd:"args=amount,who"`,
+	multi:     gd.Signal3(f32, gd.String, bool), // no tag -> synthesized arg0/arg1/arg2
+	full:      gd.Signal4(int, int, int, int) `gd:"args=a,b,c,d"`,
+	score:     i32 `gd:"export"`,
+}
+
+Bad_Signals :: struct {
+	owner:    gd.Node,
+	bad_arg:  gd.Signal1(map[string]int), // unsupported payload -> signal dropped, loudly
+	bad_tag:  gd.Signal0 `gd:"export"`, // signals register by TYPE; only `args=` is legal
+	miscount: gd.Signal1(int) `gd:"args=a,b"`, // 2 names, 1 parameter -> synthesized names kept
+	stray:    i32 `gd:"args=x"`, // `args=` on a NON-signal field
+	fine:     gd.Signal0, // sanity: a good signal among the bad ones survives
+}
+
 Exhaust :: struct {
 	owner: gd.Node,
 	e00:   i32 `gd:"export"`, e01: i32 `gd:"export"`, e02: i32 `gd:"export"`, e03: i32 `gd:"export"`,
@@ -252,6 +274,101 @@ groups_defaults_accessors :: proc(t: ^testing.T) {
 	testing.expect(t, hp.getter == dummy_get, "getter wired from Field_Meta")
 	testing.expect(t, hp.setter == dummy_set, "setter wired from Field_Meta")
 	testing.expect_value(t, hp.line, 30)
+}
+
+@(test)
+signal_fields :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	desc := rt.reflect_class_desc(Signals, info("Signals"))
+	testing.expect_value(t, len(new_errors_since(before)), 0)
+
+	// Signal fields never become exports; the tagged export still routes correctly.
+	testing.expect_value(t, int(desc.exports_count), 1)
+	_, sok := find_export(desc, "score")
+	testing.expect(t, sok, "score must be exported")
+
+	testing.expect_value(t, int(desc.signals_count), 5)
+	sigs := rt.desc_signals(desc)
+
+	// died: zero payload — empty (nil + 0) arg tables.
+	testing.expect_value(t, string(sigs[0].name), "died")
+	testing.expect_value(t, int(sigs[0].arg_types_count), 0)
+	testing.expect_value(t, int(sigs[0].arg_names_count), 0)
+
+	// collected(value: int) — `args=` names the payload.
+	testing.expect_value(t, string(sigs[1].name), "collected")
+	testing.expect_value(t, int(sigs[1].arg_types_count), 1)
+	testing.expect_value(t, rt.signal_arg_types(sigs[1])[0], gdext.Variant_Type.Int)
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[1])[0]), "value")
+
+	// hit(amount: i64, who: ^Node2d) — an object-handle payload presents as .Object.
+	testing.expect_value(t, string(sigs[2].name), "hit")
+	testing.expect_value(t, int(sigs[2].arg_types_count), 2)
+	testing.expect_value(t, rt.signal_arg_types(sigs[2])[0], gdext.Variant_Type.Int)
+	testing.expect_value(t, rt.signal_arg_types(sigs[2])[1], gdext.Variant_Type.Object)
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[2])[0]), "amount")
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[2])[1]), "who")
+
+	// multi — no tag, names synthesize as argN.
+	testing.expect_value(t, string(sigs[3].name), "multi")
+	testing.expect_value(t, int(sigs[3].arg_types_count), 3)
+	testing.expect_value(t, rt.signal_arg_types(sigs[3])[0], gdext.Variant_Type.Float)
+	testing.expect_value(t, rt.signal_arg_types(sigs[3])[1], gdext.Variant_Type.String)
+	testing.expect_value(t, rt.signal_arg_types(sigs[3])[2], gdext.Variant_Type.Bool)
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[3])[0]), "arg0")
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[3])[1]), "arg1")
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[3])[2]), "arg2")
+
+	// full — max arity, all four names from the tag.
+	testing.expect_value(t, string(sigs[4].name), "full")
+	testing.expect_value(t, int(sigs[4].arg_types_count), 4)
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[4])[3]), "d")
+}
+
+@(test)
+signal_error_paths :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	desc := rt.reflect_class_desc(Bad_Signals, info("BadSignals"))
+
+	errs := new_errors_since(before)
+	testing.expect_value(t, len(errs), 4)
+	has :: proc(errs: []rt.Registration_Error, field: string) -> bool {
+		for e in errs {
+			if e.field != nil && string(e.field) == field {return true}
+		}
+		return false
+	}
+	testing.expect(t, has(errs, "bad_arg"), "unsupported signal payload recorded")
+	testing.expect(t, has(errs, "bad_tag"), "non-args tag on a signal field recorded")
+	testing.expect(t, has(errs, "miscount"), "args= count mismatch recorded")
+	testing.expect(t, has(errs, "stray"), "args= on a non-signal field recorded")
+
+	// bad_arg is DROPPED; bad_tag/miscount register anyway (loudly); stray never exports.
+	testing.expect_value(t, int(desc.signals_count), 3)
+	sigs := rt.desc_signals(desc)
+	testing.expect_value(t, string(sigs[0].name), "bad_tag")
+	testing.expect_value(t, string(sigs[1].name), "miscount")
+	testing.expect_value(t, int(sigs[1].arg_types_count), 1)
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[1])[0]), "arg0") // synth fallback
+	testing.expect_value(t, string(sigs[2].name), "fine")
+	testing.expect_value(t, int(desc.exports_count), 0)
+}
+
+@(test)
+signal_fields_merge_with_info_table :: proc(t: ^testing.T) {
+	// A hand-written Class_Info signal table (the raw escape hatch) folds into the same
+	// contiguous run AFTER the walked signal fields.
+	before := len(rt.registration_errors())
+	extra := []rt.Signal{{name = "handwritten"}}
+	inf := info("Signals")
+	inf.signals = raw_data(extra)
+	inf.signals_count = 1
+	desc := rt.reflect_class_desc(Signals, inf)
+	testing.expect_value(t, len(new_errors_since(before)), 0)
+	testing.expect_value(t, int(desc.signals_count), 6)
+	sigs := rt.desc_signals(desc)
+	testing.expect_value(t, string(sigs[0].name), "died")
+	testing.expect_value(t, string(sigs[5].name), "handwritten")
 }
 
 @(test)

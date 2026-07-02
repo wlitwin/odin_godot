@@ -43,6 +43,10 @@ Field_Meta :: struct {
 // Everything reflection cannot see about a class. INTERNAL to the scripts dll (see
 // the header comment); the C-shaped pointer+count pairs reference static arrays in
 // the generated file, exactly like Class_Desc's.
+//
+// `signals` is a HAND-WRITTEN escape hatch only: script signals are declared as typed
+// struct fields (gd.Signal0 … Signal4) and built by the reflection walk — scriptgen no
+// longer emits a signal table. A table passed here is folded in after the walked ones.
 Class_Info :: struct {
 	name:              cstring,
 	base:              cstring,
@@ -112,9 +116,17 @@ reflect_class_desc :: proc "contextless" (id: typeid, info: Class_Info) -> Class
 	// so this class's entries form the contiguous run [start, count).
 	exports_start := export_pool_count
 	onready_start := onready_pool_count
+	signals_start := signal_pool_count
 	for i in 0 ..< int(st.field_count) {
 		if i == 0 {continue} // the owner Object pointer, by convention — never a member
 		tag, has := reflect.struct_tag_lookup(reflect.Struct_Tag(st.tags[i]), "gd")
+		// A signal field declares itself by TYPE (gd.Signal0 … Signal4) — the tag is
+		// OPTIONAL (`gd:"args=..."` names the payload), so this check precedes the
+		// tagged-fields-only skip below.
+		if arg_tis, is_signal := signal_field_args(st.types[i]); is_signal {
+			walk_signal_field(info, st.names[i], arg_tis, tag, has)
+			continue
+		}
 		if !has {continue}
 		walk_field(info, st.names[i], st.types[i], st.offsets[i], tag)
 	}
@@ -125,6 +137,21 @@ reflect_class_desc :: proc "contextless" (id: typeid, info: Class_Info) -> Class
 	if n := onready_pool_count - onready_start; n > 0 {
 		desc.onready = raw_data(onready_pool[onready_start:])
 		desc.onready_count = i32(n)
+	}
+	if signal_pool_count > signals_start {
+		// Signal fields found. A hand-written Class_Info may ALSO carry its own signal
+		// table — fold it into the same contiguous pool run so the desc stays one table.
+		// (When no signal fields exist, desc.signals = info.signals from above, zero-copy.)
+		for i in 0 ..< int(info.signals_count) {
+			if signal_pool_count >= MAX_REFLECT_SIGNALS {
+				record_error(info.name, nil, "registration signal pool exhausted — signal dropped")
+				break
+			}
+			signal_pool[signal_pool_count] = info.signals[i]
+			signal_pool_count += 1
+		}
+		desc.signals = raw_data(signal_pool[signals_start:])
+		desc.signals_count = i32(signal_pool_count - signals_start)
 	}
 	return desc
 }
@@ -178,6 +205,10 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 	}
 
 	if tok0 != "export" {
+		if strings.has_prefix(tok0, "args=") {
+			record_error(cls, name_c, "`args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)")
+			return
+		}
 		msg, _ := pool_cstr("unknown gd tag `", tok0, "` (expected `export` or `onready=PATH`)")
 		if msg == nil {msg = "unknown gd tag (expected `export` or `onready=PATH`)"}
 		record_error(cls, name_c, msg)
@@ -302,6 +333,142 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 	}
 	export_pool[export_pool_count] = ex
 	export_pool_count += 1
+}
+
+// ---- signal fields (gd.Signal0 … Signal4) --------------------------------------
+
+// Detect a signal MARKER field type (godot/Signal_Fields.odin) and return the payload
+// type infos. Matched by the instantiation's Named spelling ("Signal0", "Signal2($A=…")
+// AND its structural shape — the single `_marker` phantom pointer whose pointee struct's
+// field types ARE the payload typeids. Structural recovery is what lets the arg types go
+// through the same variant_type_for every export uses (no rendered-name parsing).
+@(private = "file")
+signal_field_args :: proc(fti: ^runtime.Type_Info) -> (arg_tis: []^runtime.Type_Info, is_signal: bool) {
+	named, is_named := fti.variant.(runtime.Type_Info_Named)
+	if !is_named {return nil, false}
+	n := named.name
+	matched := n == "Signal0"
+	if !matched {
+		for prefix in ([4]string{"Signal1($A=", "Signal2($A=", "Signal3($A=", "Signal4($A="}) {
+			if strings.has_prefix(n, prefix) {
+				matched = true
+				break
+			}
+		}
+	}
+	if !matched {return nil, false}
+	st, sok := runtime.type_info_base(fti).variant.(runtime.Type_Info_Struct)
+	if !sok || st.field_count != 1 || st.names[0] != "_marker" {return nil, false}
+	ptr, pok := runtime.type_info_base(st.types[0]).variant.(runtime.Type_Info_Pointer)
+	if !pok {return nil, false}
+	inner, iok := runtime.type_info_base(ptr.elem).variant.(runtime.Type_Info_Struct)
+	if !iok {return nil, false}
+	return inner.types[:inner.field_count], true
+}
+
+// Synthesized payload names for a signal field without an `args=` tag. Static literals —
+// the marker family tops out at 4 parameters, so no pooling needed.
+@(private = "file")
+SYNTH_ARG_NAMES := [4]cstring{"arg0", "arg1", "arg2", "arg3"}
+
+// One signal field -> a Signal pool entry (or a recorded error). The signal name is the
+// FIELD name; arg types come from the marker's phantom struct; arg names come from the
+// optional `gd:"args=a,b"` tag (comma-separated, one per payload parameter) or synthesize
+// as argN. `args=` is the ONLY tag a signal field accepts — in particular a signal cannot
+// be `export`ed (it is not a property; it registers as a signal regardless).
+@(private = "file")
+walk_signal_field :: proc(info: Class_Info, fname: string, arg_tis: []^runtime.Type_Info, tag: string, has_tag: bool) {
+	cls := info.name
+	name_c, name_ok := pool_cstr(fname)
+	if !name_ok {
+		record_error(cls, nil, "registration name pool exhausted — signal dropped")
+		return
+	}
+
+	sig := Signal {
+		name = name_c,
+	}
+
+	if len(arg_tis) > len(SYNTH_ARG_NAMES) {
+		// Unreachable via the marker family (max arity 4) — defensive for a hand-rolled
+		// lookalike type.
+		record_error(cls, name_c, "signal has too many payload parameters")
+		return
+	}
+	if signal_pool_count >= MAX_REFLECT_SIGNALS {
+		record_error(cls, name_c, "registration signal pool exhausted — signal dropped")
+		return
+	}
+
+	// Payload types — every parameter must be Variant-able (the same rule as exports;
+	// object/node handles present as .Object). One bad parameter drops the SIGNAL, loudly.
+	if len(arg_tis) > 0 {
+		if signal_arg_pool_count + len(arg_tis) > MAX_REFLECT_SIGNAL_ARGS {
+			record_error(cls, name_c, "registration signal-arg pool exhausted — signal dropped")
+			return
+		}
+		args_start := signal_arg_pool_count
+		for ati in arg_tis {
+			vt, vok := variant_type_for(ati.id)
+			if !vok {
+				record_error(cls, name_c, "signal payload parameter of unsupported type — every parameter must map to a Variant")
+				signal_arg_pool_count = args_start // roll back this signal's partial run
+				return
+			}
+			signal_arg_type_pool[signal_arg_pool_count] = vt
+			signal_arg_name_pool[signal_arg_pool_count] = SYNTH_ARG_NAMES[signal_arg_pool_count - args_start]
+			signal_arg_pool_count += 1
+		}
+		sig.arg_types = raw_data(signal_arg_type_pool[args_start:])
+		sig.arg_types_count = i32(len(arg_tis))
+		sig.arg_names = raw_data(signal_arg_name_pool[args_start:])
+		sig.arg_names_count = i32(len(arg_tis))
+
+		// Optional `args=a,b` names replace the synthesized argN slots, positionally.
+		if has_tag {
+			if !strings.has_prefix(tag, "args=") {
+				record_error(cls, name_c, "a signal field's gd tag must be `args=name1,name2` (signals register by type and cannot be exported)")
+			} else {
+				rest := tag[len("args="):]
+				idx := 0
+				ok := true
+				for ok {
+					part := rest
+					if ci := strings.index_byte(rest, ','); ci >= 0 {
+						part = rest[:ci]
+						rest = rest[ci + 1:]
+					} else {
+						rest = ""
+					}
+					part = strings.trim_space(part)
+					if part == "" || idx >= len(arg_tis) {
+						ok = false
+						break
+					}
+					pc, pok := pool_cstr(part)
+					if !pok {
+						ok = false
+						break
+					}
+					signal_arg_name_pool[args_start + idx] = pc
+					idx += 1
+					if rest == "" {break}
+				}
+				if !ok || idx != len(arg_tis) {
+					record_error(cls, name_c, "`args=` must name each payload parameter exactly once (comma-separated) — synthesized names kept")
+					for i in 0 ..< len(arg_tis) {
+						signal_arg_name_pool[args_start + i] = SYNTH_ARG_NAMES[i]
+					}
+				}
+			}
+		}
+	} else if has_tag {
+		// A zero-payload signal accepts no tag at all (there is nothing to name).
+		record_error(cls, name_c, "a signal field's gd tag must be `args=name1,name2` (signals register by type and cannot be exported)")
+	}
+
+	signal_pool[signal_pool_count] = sig
+	signal_pool_count += 1
 }
 
 // ---- Odin typeid -> Godot Variant type ----------------------------------------
@@ -789,6 +956,8 @@ parse_default :: proc(cls, field: cstring, vt: gdext.Variant_Type, value: string
 @(private = "file") REFLECT_NAME_POOL_SIZE :: 64 * 1024
 @(private = "file") MAX_REFLECT_EXPORTS :: 1024
 @(private = "file") MAX_REFLECT_ONREADY :: 256
+@(private = "file") MAX_REFLECT_SIGNALS :: 256
+@(private = "file") MAX_REFLECT_SIGNAL_ARGS :: 512
 @(private = "file") MAX_REG_ERRORS :: 64
 
 @(private = "file")
@@ -805,6 +974,21 @@ export_pool_count: int
 onready_pool: [MAX_REFLECT_ONREADY]Onready
 @(private = "file")
 onready_pool_count: int
+
+// Signal tables: one Signal per declared field, plus the parallel arg name/type runs the
+// Signal's C-shaped pointer+count pairs reference (one shared cursor — the pools advance
+// in lockstep, a signal's args forming one contiguous run in both).
+@(private = "file")
+signal_pool: [MAX_REFLECT_SIGNALS]Signal
+@(private = "file")
+signal_pool_count: int
+
+@(private = "file")
+signal_arg_name_pool: [MAX_REFLECT_SIGNAL_ARGS]cstring
+@(private = "file")
+signal_arg_type_pool: [MAX_REFLECT_SIGNAL_ARGS]gdext.Variant_Type
+@(private = "file")
+signal_arg_pool_count: int
 
 @(private = "file")
 reg_errors: [MAX_REG_ERRORS]Registration_Error
@@ -865,6 +1049,8 @@ reflect_register_reset_for_tests :: proc "contextless" () {
 	name_pool_used = 0
 	export_pool_count = 0
 	onready_pool_count = 0
+	signal_pool_count = 0
+	signal_arg_pool_count = 0
 	reg_error_count = 0
 }
 

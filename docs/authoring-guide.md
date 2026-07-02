@@ -27,7 +27,6 @@ is a build artifact that lives beside the source; the loader deliberately **igno
 ```odin
 //gd:extends Node          // base Godot class (authoritative). Defaults to Node.
 //gd:class Ping            // optional class-name override (defaults to struct name)
-//gd:signal pinged(value: int)   // a declared signal + its typed payload
 //gd:tool                  // optional: registers as a @tool script
 package my_scripts
 
@@ -38,9 +37,10 @@ import gd "godot:godot"
 // want to use in your procs (gd.Node, gd.Object, gd.Node2d, ...). The actual base
 // class comes from //gd:extends.
 Ping :: struct {
-	owner: gd.Node,
-	speed: f32    `gd:"export"`,  // tagged field -> @export var
-	count: gd.Int `gd:"export"`,
+	owner:  gd.Node,
+	pinged: gd.Signal1(int) `gd:"args=value"`, // signal field -> declared signal (see Signals)
+	speed:  f32    `gd:"export"`,  // tagged field -> @export var
+	count:  gd.Int `gd:"export"`,
 	scratch: int,                 // untagged -> private per-instance state
 }
 
@@ -72,7 +72,6 @@ ping_emit_ping :: proc(self: ^Ping, value: int) {
 | `//gd:class <Name>` | Class name override. Defaults to the struct name. |
 | `//gd:tool` | Registers the class as a `@tool` script (`is_tool() == true`) — runs in the editor. |
 | `//gd:icon res://path.svg` | Custom class icon (Scene dock, Create Node/Resource dialog). |
-| `//gd:signal name(a: T, b: U)` | Declares a signal and its typed payload. |
 
 These are the marker comments the engine's resource loader reads to bind the
 authored `res://scripts/<x>.odin` resource (the same file you compile) to its
@@ -284,16 +283,34 @@ ordinary Odin (allocations, etc.).
 
 Signals follow the GDScript pattern of **declare / emit / connect**.
 
-**Declare** with a `//gd:signal name(args...)` marker (the payload types are typed). They are
-reported through `_get_script_signal_list`, so GDScript and the editor see them.
-
-**Emit** with the generated typed helper `<struct_snake>_emit_<signal>` — e.g.
-`ping_emit_pinged(self, value)` — which codegen emits from the `//gd:signal` declaration and
-which calls through `Object::emit_signal` with the payload:
+**Declare** a signal as a typed STRUCT FIELD of one of the `gd.Signal0` … `gd.Signal4`
+marker types (arity = payload count). The **field name is the signal name**, the type
+parameters are the payload types, and the optional `gd:"args=..."` tag names the payload
+(comma-separated, one name per parameter — omitted names synthesize as `arg0`, `arg1`, …).
+No tag is required; the field is recognized by its type. Declared signals are reported
+through `_get_script_signal_list`, so GDScript and the editor see them.
 
 ```odin
-//gd:signal health_changed(value: int)
-// ...
+Player :: struct {
+	owner:          gd.Node2d,
+	health_changed: gd.Signal1(int) `gd:"args=value"`, // health_changed(value: int)
+	leveled_up:     gd.Signal0,                        // leveled_up()
+	hit:            gd.Signal2(int, ^gd.Node2d) `gd:"args=amount,who"`,
+	// ...
+}
+```
+
+The payload types must be Variant-able — the same rule as `@export` and `@(gd_method)`
+args (object/node handles present as `Object`). A signal field costs one nil pointer of
+instance size and is never read or written at runtime; it exists so the declaration is
+part of the type, checked by the compiler, and visible to reflection.
+
+**Emit** with the generated typed helper `<struct_snake>_emit_<field>` — e.g.
+`ping_emit_pinged(self, value)` — which codegen emits from the signal field and which
+calls through `gd.emit`/`gd.emit_args` (returning the engine `Error`, which you may
+ignore):
+
+```odin
 player_emit_health_changed(self, i64(self.health))   // generated typed emitter
 ```
 
@@ -331,7 +348,7 @@ enemy_on_body :: proc(self: ^Enemy, body: gd.Node2d) {
 
 `@(gd_connect)` implies the proc is a signal target, so it must also be a `@(gd_method)` (use
 `@(gd_method, gd_connect = "...")`). The signal must exist on the owner (an engine signal like
-`body_entered` / `area_entered`, or one this script declared with `//gd:signal`). It connects
+`body_entered` / `area_entered`, or one this script declared with a signal field). It connects
 only the owner's *own* signal to the owner's *own* method — to wire a different emitter or
 target, use `gd.connect_to` from `_ready` instead. (`@(gd_connect)` requires the
 `-custom-attribute:gd_connect` build flag, which `build/build_scripts.sh` passes for you.)
@@ -573,8 +590,8 @@ that allocates (in `context.allocator`); the rest are `proc "contextless"`.
 
 All helpers are `proc "contextless"` except `gd.get_string`, which allocates the returned
 Odin `string` in `context.allocator` (fine inside any script proc — those run with the
-script context set). For a script-declared `//gd:signal`, prefer the generated typed
-`<struct_snake>_emit_<signal>` helper; `gd.emit_args` is the by-name escape hatch (and the
+script context set). For a script-declared signal field, prefer the generated typed
+`<struct_snake>_emit_<field>` helper; `gd.emit_args` is the by-name escape hatch (and the
 path `gd.emit`/`emit_args` both take — Godot's `emit_signal` is a vararg method, so they
 varcall it rather than ptrcall).
 

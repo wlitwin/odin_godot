@@ -1,6 +1,5 @@
 //gd:extends Area2D
 //gd:class Coin
-//gd:signal collected(value: int)
 package showcase_scripts
 
 // ----------------------------------------------------------------------------
@@ -15,9 +14,10 @@ package showcase_scripts
 import gd "godot:godot"
 
 Coin :: struct {
-	owner: gd.Area2d,
-	value: gd.Int `gd:"export"`,
-	taken: bool, // private guard so a coin is only collected once
+	owner:     gd.Area2d,
+	collected: gd.Signal1(int) `gd:"args=value"`, // signal field: name = field, payload = type param
+	value:     gd.Int `gd:"export"`,
+	taken:     bool, // private guard so a coin is only collected once
 }
 
 coin_ready :: proc(self: ^Coin) {
@@ -31,6 +31,6 @@ coin_collect :: proc(self: ^Coin, body: ^gd.Node2d) {
 	if self.taken {return}
 	self.taken = true
 	game_state_add(self.value)
-	coin_emit_collected(self, i64(self.value)) // generated from //gd:signal
+	coin_emit_collected(self, i64(self.value)) // typed emitter generated from the signal field
 	gd.node_queue_free(self.owner)
 }

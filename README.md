@@ -21,15 +21,15 @@ class, custom resources, autoloads, `@tool`/editor plugins, multiplayer RPCs, ho
 ```odin
 //gd:extends Area2D            // base Godot class
 //gd:class Coin                // global class_name
-//gd:signal collected(value: int)
 package game_scripts
 
 import gd "godot:godot"
 
 Coin :: struct {
-	owner: gd.Area2d,                         // first field = the node, always
-	value: gd.Int `gd:"export,range=1:100"`,  // @export var with an Inspector slider
-	taken: bool,                              // untagged = private per-instance state
+	owner:     gd.Area2d,                        // first field = the node, always
+	collected: gd.Signal1(int) `gd:"args=value"`, // typed signal field -> collected(value: int)
+	value:     gd.Int `gd:"export,range=1:100"`, // @export var with an Inspector slider
+	taken:     bool,                             // untagged = private per-instance state
 }
 
 coin_ready :: proc(self: ^Coin) {            // lifecycle, matched by name
@@ -41,7 +41,7 @@ coin_ready :: proc(self: ^Coin) {            // lifecycle, matched by name
 coin_collect :: proc(self: ^Coin, body: gd.Node2d) {
 	if self.taken { return }
 	self.taken = true
-	coin_emit_collected(self, i64(self.value))   // typed emitter generated from //gd:signal
+	coin_emit_collected(self, i64(self.value))   // typed emitter generated from the signal field
 	gd.node_queue_free(self.owner)               // gd.* ergonomic helper
 }
 ```
@@ -54,7 +54,7 @@ matter:
 |---|---|
 | **Lifecycle** | `_ready` / `_process` / `_physics_process` / `_enter_tree` / `_exit_tree` by proc name |
 | **`@export`** | every Variant type + Inspector hints (range/enum/multiline/file/resource), groups, defaults, getters/setters, `@onready` refs |
-| **Signals** | declare (`//gd:signal`), emit (typed generated helper), connect (`gd.connect_to` / `@(gd_connect)`) |
+| **Signals** | declare (typed `gd.Signal0`…`Signal4` struct fields), emit (typed generated helper), connect (`gd.connect_to` / `@(gd_connect)`) |
 | **Methods** | `@(gd_method)` — callable from GDScript, as signal targets, and **typed cross-script** (`rt.script_of`) |
 | **Classes** | `extends` any engine class, global `class_name`, custom **resources** (`.tres`), **autoload** singletons |
 | **Editor** | `@tool` scripts, `gd.is_editor()`, custom icons, **EditorPlugin**, live error squiggles + autocomplete |

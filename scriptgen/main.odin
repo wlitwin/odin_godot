@@ -17,9 +17,10 @@ package scriptgen
 // resource stub. The `.gen.odin` is named so the loader ignores it as an attachable script.
 //
 // Parsing is done PROPERLY with `core:odin/parser` + `core:odin/ast` (the struct,
-// its fields/tags, the procs + their typed signatures). The `//gd:` comment markers
-// (extends/class/tool/signal) — which Phases 1-3 already recognize — are scanned
-// from the source text, exactly as the core's ResourceLoader does.
+// its fields/tags — including the typed signal fields — and the procs + their typed
+// signatures). The `//gd:` comment markers (extends/class/tool/icon) — which Phases
+// 1-3 already recognize — are scanned from the source text, exactly as the core's
+// ResourceLoader does.
 //
 // Usage:
 //   scriptgen <scripts_dir>
@@ -189,9 +190,12 @@ map_variant :: proc(type_text: string) -> (Variant_Info, bool) {
 		// (Node2d, Sprite2D, Texture2D, ...) — these are all ObjectPtr aliases, so they
 		// marshal as a Variant Object. Only the KNOWN godot qualifier gets this treatment
 		// (unknown qualifiers already bailed above); an UNQUALIFIED or non-PascalCase token
-		// (a typo, an `[N]T`, a `map`, ...) is NOT silently an Object — ok=false.
+		// (a typo, an `[N]T`, a `map`, ...) is NOT silently an Object — ok=false. A
+		// PARAMETRIC spelling (contains '(', e.g. a `gd.Signal1(int)` marker used as a
+		// method arg) is not a class handle either.
 		if (strings.has_prefix(t, "gd.") || strings.has_prefix(t, "godot.")) &&
-		   len(base) > 0 && base[0] >= 'A' && base[0] <= 'Z' {
+		   len(base) > 0 && base[0] >= 'A' && base[0] <= 'Z' &&
+		   !strings.contains_rune(base, '(') {
 			return Variant_Info{".Object", "rawptr", .Other}, true
 		}
 	}
@@ -271,10 +275,14 @@ Signal_Arg :: struct {
 	vi:   Variant_Info,
 }
 
+// A signal declared by a typed struct field (gd.Signal0 … Signal4). The signal name IS
+// the field name; `args` carries the payload (names from the `gd:"args=..."` tag or
+// synthesized argN). Registration happens in the runtime reflection walk — scriptgen
+// only consumes this for the typed `<snake>_emit_<name>` helper.
 Signal_Info :: struct {
 	name: string,
 	args: [dynamic]Signal_Arg,
-	line: int, // 1-based source line of the //gd:signal marker (duplicate diagnostics)
+	line: int, // 1-based source line of the signal field (diagnostics)
 }
 
 // A `@(gd_connect="signal")` declaration on a method: auto-connect owner.signal -> method.
