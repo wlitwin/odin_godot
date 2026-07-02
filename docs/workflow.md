@@ -64,6 +64,17 @@ the scripts dll for you:
    instances re-bind and **keep their state**, and the Inspector's property lists refresh — so
    a freshly-added `@export` appears **without restarting the editor**.
 
+**You can always see where the build is.** A status badge in the editor's **top toolbar**
+shows *Odin: building…* while a rebuild runs, flashes green *live ✓ (X.Xs)* when the swap
+lands, and turns a sticky red *build FAILED* after a broken save (the actual compiler
+errors are in the Output panel). It hides when idle.
+
+**Play waits for the build.** Pressing Play while a rebuild is in flight blocks (briefly)
+until it finishes, and **refuses to launch on a failed build** — otherwise save-then-Play
+would silently run your *previous* dll. This uses the editor's `EditorPlugin._build` hook,
+the same mechanism C# uses to compile before launch; a red error in the Output explains
+the refusal.
+
 **Per-module rebuilds.** In a project using [script modules](modules.md), the rebuild is
 scoped: the coordinator hashes each module's sources and rebuilds + swaps **only the
 module(s) whose sources changed** — a save in `res://modules/enemies/` recompiles that one

@@ -308,6 +308,28 @@ pl_enter_tree :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]g
     //   * the debugger items ("Debug Game (LLDB)" / break-at-cursor / VS Code config) —
     //     core/debug_launch.odin (no-op on Windows: core/debug_launch_windows.odin).
     debug_register_menu_items(plug)
+    // Toolbar build-status widget ("building… / build FAILED / live ✓") — see
+    // core/build_status.odin. Torn down in _exit_tree.
+    build_status_create(plug)
+}
+
+// OdinEditorPlugin._exit_tree — detach + free the toolbar widget (its Label must not
+// outlive the extension dll that backs it).
+@(private = "file")
+pl_exit_tree :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+    context = gdext.godot_context()
+    self := cast(^OdinEditorPlugin)instance
+    build_status_destroy(cast(godot.Editor_Plugin)self.object)
+}
+
+// OdinEditorPlugin._build — Godot calls this on EVERY editor plugin when the user
+// presses Play; returning false CANCELS the run (the C#-compilation hook). Waits out an
+// in-flight background scripts build and refuses to launch on a failed one — otherwise
+// save-then-Play silently runs the PREVIOUS dll. Body in core/build_status.odin.
+@(private = "file")
+pl_build :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+    context = gdext.godot_context()
+    (cast(^godot.Bool)ret)^ = godot.Bool(build_gate_before_play())
 }
 
 // "Generate ols.json" body: write <project>/ols.json pointing the `godot` collection at
@@ -742,7 +764,9 @@ odin_export_register :: proc() {
     // OdinEditorPlugin (host that registers the export plugin).
     editor_plugin_virtuals = make([dynamic]Virtual_Entry, 0, 16)
     append(&editor_plugin_virtuals, Virtual_Entry{name = "_enter_tree", fn = pl_enter_tree})
+    append(&editor_plugin_virtuals, Virtual_Entry{name = "_exit_tree", fn = pl_exit_tree})
     append(&editor_plugin_virtuals, Virtual_Entry{name = "_get_plugin_name", fn = pl_get_plugin_name})
+    append(&editor_plugin_virtuals, Virtual_Entry{name = "_build", fn = pl_build})
 
     plugin_info := gdext.ExtensionClassCreationInfo2 {
         is_virtual                  = false,

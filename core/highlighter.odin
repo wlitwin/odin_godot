@@ -332,6 +332,10 @@ lv_frame :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.
     // Drive the rebuild-on-save flow on the MAIN thread: if a background scripts build has
     // finished, swap the dll + refresh the Inspector here (reload.odin). Cheap when idle.
     reload_pump_main_thread()
+    // Reflect the build's state in the toolbar widget ("building… / FAILED / live ✓") —
+    // core/build_status.odin. Runs AFTER the reload pump so a finished build's swap and
+    // its green flash land in the same frame. Cheap when idle (mutex peek + enum compare).
+    build_status_pump()
     // Deliver freshly-computed async diagnostics to the script editor's red-line UI by
     // nudging a re-validate (validate.odin). Cheap when idle (one mutex check).
     validate_pump_main_thread()

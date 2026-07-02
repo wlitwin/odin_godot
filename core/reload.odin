@@ -61,6 +61,11 @@ Reload_State :: struct {
 	build_output:   string,
 	// Wall-clock duration of the last finished build (ms) — surfaced as a UX hint on reload.
 	last_build_ms:  f64,
+	// PERSISTENT outcome of the most recent finished build (unlike build_failed, which is a
+	// one-shot the pump consumes). Read by the toolbar status widget and the Play gate
+	// (core/build_status.odin): a red badge must stay red, and Play must stay blocked,
+	// until a build actually SUCCEEDS — not just until the failure has been printed once.
+	last_build_failed: bool,
 
 	// PER-MODULE content hashes of the authored sources the LAST kicked build was for,
 	// keyed by module name ("" == the main scripts dir; "<name>" == res://modules/<name>).
@@ -433,6 +438,7 @@ build_worker_entry :: proc(data: rawptr) {
 	sync.lock(&state.mutex)
 	state.build_running = false
 	state.last_build_ms = build_ms
+	state.last_build_failed = rc != 0
 	if rc == 0 {
 		// Only schedule a swap when the rebuild succeeded — never swap to a stale/unchanged
 		// dll on a broken build (the old code keeps running until the next good save).
