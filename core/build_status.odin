@@ -57,22 +57,10 @@ PLAY_GATE_CAP :: 60 * time.Second
 
 // build_status_create — construct the toolbar Label and park it in the editor's top
 // toolbar. Called from OdinEditorPlugin._enter_tree (editor only, once).
-//
-// The label stays PERMANENTLY visible with a RESERVED width; "hidden" is empty text.
-// Why: the Play gate (below) blocks the main thread and repaints via force_draw, but
-// container re-layout rides the message queue, which does NOT flush while blocked — a
-// label that becomes visible (or grows) mid-block would render unlaid-out. A fixed
-// footprint whose TEXT changes needs no layout pass, so the badge can appear even
-// inside the blocking wait. When idle the reserved strip is empty and invisible.
 @(private)
 build_status_create :: proc(plug: godot.Editor_Plugin) {
 	label := godot.new_label()
-	godot.control_set_custom_minimum_size(cast(godot.Control)label, godot.Vector2{170, 0})
-	godot.label_set_vertical_alignment(label, .Center)
-	// Clip instead of growing: a text whose natural width exceeded the reserved 170px
-	// would raise the minimum size and queue a container re-sort — exactly the deferred
-	// layout the blocked-main-thread repaint can't have.
-	godot.label_set_clip_text(label, true)
+	godot.canvas_item_set_visible(cast(godot.Canvas_Item)label, false)
 	godot.editor_plugin_add_control_to_container(plug, .Container_Toolbar, cast(godot.Control)label)
 	g_status.label = label
 	g_status.phase = .Hidden
@@ -101,6 +89,7 @@ status_apply :: proc(text: string, color: godot.Color, tooltip: cstring) {
 	godot.control_add_theme_color_override(cast(godot.Control)l, fc, color)
 	tt := godot.new_string_cstring(tooltip)
 	godot.control_set_tooltip_text(cast(godot.Control)l, tt)
+	godot.canvas_item_set_visible(cast(godot.Canvas_Item)l, true)
 }
 
 // build_status_pump — drive the widget from the reload coordinator's state. Called every
@@ -143,7 +132,7 @@ build_status_pump :: proc() {
 
 	switch desired {
 	case .Hidden:
-		status_apply("", godot.Color{1, 1, 1, 1}, "")
+		godot.canvas_item_set_visible(cast(godot.Canvas_Item)g_status.label, false)
 	case .Building:
 		status_apply(
 			"Odin: building…",
@@ -170,16 +159,8 @@ build_status_pump :: proc() {
 // build_gate_before_play — the body of OdinEditorPlugin._build (see export_plugin.odin).
 // Returns whether Play may proceed. Blocks the main thread while a build is in flight —
 // deliberately: that is the entire point (the alternative is silently running the OLD
-// dll), it is how the C# integration behaves, and script builds are seconds.
-//
-// VISIBILITY while blocked: with unsaved changes, Play runs try_autosave (which saves
-// the scripts, kicking the rebuild) and call_build (this gate) in ONE main-thread stack
-// — no editor frame renders in between, so without help the badge would never appear
-// for exactly the save-then-Play flow it most matters for. So the gate paints the badge
-// itself and repaints via RenderingServer.force_draw inside the wait (rendering only —
-// deliberately NOT DisplayServer input processing, which could re-enter the editor from
-// inside _build). The fixed-footprint label (see build_status_create) makes the text
-// change safe without a message-queue layout flush.
+// dll), it is how the C# integration behaves, and script builds are seconds. The widget
+// already shows "building…" from the frames before the press.
 @(private)
 build_gate_before_play :: proc() -> bool {
 	announced := false
@@ -206,14 +187,6 @@ build_gate_before_play :: proc() -> bool {
 		if !announced {
 			announced = true
 			godot.print_str("odin_godot: waiting for the scripts build to finish before Play…")
-			if g_status.label != nil {
-				g_status.phase = .Building // keep the pump's state machine consistent afterwards
-				status_apply(
-					"Odin: building…",
-					godot.Color{0.98, 0.86, 0.4, 1.0},
-					"Play is waiting for the Odin scripts build to finish.",
-				)
-			}
 		}
 		if time.tick_since(start) > PLAY_GATE_CAP {
 			editor_msg_error(
@@ -222,11 +195,6 @@ build_gate_before_play :: proc() -> bool {
 			)
 			return false
 		}
-		if g_status.label != nil {
-			// Repaint so the badge (set above) is actually seen during the block. ~10fps
-			// is plenty for a status light and keeps the forced full-editor redraws cheap.
-			godot.rendering_server_force_draw(godot.singleton_rendering_server(), true, 0)
-		}
-		time.sleep(100 * time.Millisecond)
+		time.sleep(50 * time.Millisecond)
 	}
 }
