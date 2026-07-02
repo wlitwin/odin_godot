@@ -1,5 +1,66 @@
 # Debugging Odin scripts
 
+## What you see when the game crashes (from the editor)
+
+A mistake in script code used to kill the game launched from the editor with **no
+indication of what went wrong** — the editor's Output dock shows the child game's output
+via Godot's debugger channel (push_error/print over TCP), *not* piped stderr, so anything
+that only reached stderr was invisible (and a Finder-launched editor's stderr goes nowhere
+at all). Both failure shapes now report themselves:
+
+- **Odin `panic` / failed `assert`** (incl. failed type assertions) — the script context's
+  assertion proc ([`runtime/panic_native.odin`](../runtime/panic_native.odin)) prints
+  `ODIN_SCRIPT_PANIC <prefix>: <message> (file:line:col)` to stderr **and** push_errors the
+  same line, so the **editor Output shows it red**, with the exact script location:
+
+  ```
+  ERROR: ODIN_SCRIPT_PANIC panic: no Hud attached (res://scripts/hud.odin:41:2)
+  ```
+
+- **Fatal signal** (SIGSEGV/SIGBUS/SIGILL/SIGFPE — the classic: calling an engine method on
+  a nil object handle) — a crash reporter ([`core/crash.odin`](../core/crash.odin),
+  macOS + Linux; installed only in the *game* process, never the editor) prints to stderr:
+
+  ```
+  ODIN_GODOT_CRASH: fatal signal SIGSEGV — crash in native code (Odin script or engine).
+  ODIN_GODOT_CRASH at   pc 0x…  my_scripts::take_damage + 0x20  (…/libodinscripts.dylib)
+  ODIN_GODOT_CRASH from lr 0x…  my_scripts::[enemy.gen.odin]::_enemy_m_on_hit + 0xac  (…)
+  ODIN_GODOT_CRASH backtrace (backtrace_symbols_fd):
+  0   libodin_godot.dylib   0x… core::[crash.odin]::crash_handler + 496
+  1   libodinscripts.dylib  0x… my_scripts::[enemy.gen.odin]::_enemy_m_on_hit + 172
+  2   Godot                 0x… _ZN6Object5callpE… + 184
+  …
+  ```
+
+  The `at pc` line **names the faulting Odin proc** (pulled from the signal context —
+  the stack walkers lose that frame across the signal trampoline). After reporting, it
+  best-effort push_errors ONE red line toward the editor Output ("Odin: the game CRASHED
+  in native code (SIGSEGV …)") and re-raises into **Godot's own crash handler**, whose
+  engine backtrace still prints.
+
+Where to look for the stderr report: launch the editor from a terminal (the child game
+inherits its stderr), or run the game headless — test harnesses capture it directly. The
+push_error lines are what you see inside the editor GUI.
+
+**Symbolizing** a bare `module + offset` line: the build keeps a `.dSYM` beside the dll —
+
+```sh
+atos -o bin/libodinscripts.dylib.dSYM/Contents/Resources/DWARF/libodinscripts.dylib \
+     -l <module load address> <pc address>
+```
+
+(on Linux: `addr2line -f -e bin/libodinscripts.so <offset>`). Usually unnecessary — the
+Odin frames come out symbolized already, as above.
+
+Honest limits: **Windows** crash capture is not implemented (SEH, not signals — script
+*panics* still report; only the raw-signal net is missing); Odin **bounds-check** failures
+bypass the assertion proc (a separate contextless runtime path) — they print to stderr and
+trap, so they surface via the SIGILL/SIGTRAP crash path, without the pretty message; a
+**stack-overflow** crash can't run the handler (no sigaltstack); and the mid-crash
+push_error may not survive to the editor if the debugger link dies first — stderr always
+carries the full report. Verified end-to-end by `tests/crash/run.sh` (sentinel
+`CRASH_TEST_OK`).
+
 ## The one thing to internalize first
 
 Odin scripts in odin_godot are **AOT-compiled native code** (a `.dylib`/`.so`/`.dll`),

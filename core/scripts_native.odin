@@ -43,6 +43,11 @@ Scripts_Dll :: struct {
 	// the scripts dll its `obj -> Odin script struct` resolver (core's odin_script_struct),
 	// which `rt.script_of` then uses. Exported by the runtime package (linked into the dll).
 	odin_scripts_set_core_api: proc "c" (script_struct: rt.Script_Struct_Proc),
+	// Panic-surfacing handoff (same pattern): the core hands the scripts dll a push_error
+	// reporter right after boot, so a script panic/assert shows RED in the editor Output
+	// (the runtime's assertion proc is stderr-only until this is installed). Exported by
+	// runtime/panic_native.odin (linked into the dll); optional — nil on an older dll.
+	odin_scripts_set_panic_report: proc "c" (report: rt.Panic_Report_Proc),
 	// ABI version of the shared core<->scripts data contract (see rt.ABI_VERSION). Checked
 	// before reading the manifest to reject a scripts dll built against a different addon
 	// version. Absent (nil) on a dll built before this handshake existed — also a mismatch.
@@ -444,7 +449,22 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 	if dll.odin_scripts_set_core_api != nil {
 		dll.odin_scripts_set_core_api(odin_script_struct)
 	}
+	// Hand over the panic reporter so ODIN_SCRIPT_PANIC lines also reach the editor
+	// Output via push_error (stderr is written by the runtime side regardless).
+	if dll.odin_scripts_set_panic_report != nil {
+		dll.odin_scripts_set_panic_report(script_panic_report)
+	}
 	return dll, true
+}
+
+// The push_error half of the scripts dll's assertion proc (runtime/panic_native.odin):
+// routes the already-formatted ODIN_SCRIPT_PANIC line through Godot's error channel,
+// which the editor shows red in the Output/Debugger docks — including for a game child
+// process (push_error travels over the debugger TCP link, unlike stderr). `proc "c"`:
+// called from the scripts dll mid-panic; gd.error is contextless and allocation-light.
+@(private)
+script_panic_report :: proc "c" (msg: cstring) {
+	godot.error(msg)
 }
 
 // Merge a booted module's manifest into the shared class map. A class-name collision with
@@ -717,6 +737,10 @@ odin_scripts_reload :: proc(module := "") -> bool {
 	// Re-hand the resolver to the freshly-swapped dll (it has its own runtime globals).
 	if new_dll.odin_scripts_set_core_api != nil {
 		new_dll.odin_scripts_set_core_api(odin_script_struct)
+	}
+	// ... and the panic reporter (same per-dll globals reasoning).
+	if new_dll.odin_scripts_set_panic_report != nil {
+		new_dll.odin_scripts_set_panic_report(script_panic_report)
 	}
 	n: i32
 	descs := new_dll.odin_scripts_manifest(&n)

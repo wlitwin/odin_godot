@@ -47,6 +47,15 @@ initialize_odin_module :: proc "c" (user_data: rawptr, level: gdext.Initializati
         return
     }
 
+    // Fatal-signal crash reporter (core/crash.odin; no-op stub on Windows). Installed
+    // at .Scene init, which runs in BOTH the editor and the game — the install gates
+    // itself to the GAME (engine_is_editor_hint false), so the editor's own crash
+    // behavior is never altered. Godot's crash handler went in during main setup,
+    // before this, so we chain to it. Not applicable on web (no signals in wasm).
+    when !WEB {
+        crash_reporter_install()
+    }
+
     // Register the GDExtension classes first (OdinScript is constructed by the
     // language + loader), then register the language with the engine and install
     // the resource-format loader.

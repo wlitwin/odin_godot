@@ -210,12 +210,18 @@ inspect `self`, read argument registers (`register read x0 x1` on arm64) — Odi
 line tables but limited local-variable DWARF, so `frame variable` is often empty at the
 prologue.
 
-### Crash backtraces (signal 11)
+### Crashes and panics are reported automatically
 
-A segfaulting script dies with SIGSEGV; because the dll carries symbols you get the Odin proc
-names directly. Run the crashing scenario under `lldb` (it stops at the fault) and `bt`, or read
-the native backtrace printed to stderr (grep it for your package name). On macOS the same
-backtrace is in the `.ips` report under `~/Library/Logs/DiagnosticReports/`.
+A crash or panic in script code is **no longer silent**: an Odin `panic`/`assert` pushes a red
+`ODIN_SCRIPT_PANIC <message> (file:line)` error to the **editor Output**, and a raw fatal
+signal (SIGSEGV etc., e.g. an engine call on a nil handle — macOS/Linux) prints an
+`ODIN_GODOT_CRASH` report to stderr with the **faulting Odin proc symbolized**, pushes a
+one-line error toward the editor, and still chains to Godot's own crash handler. See the
+"What you see when the game crashes" section of [Debugging](debugging.md).
+
+For deeper digging: run the crashing scenario under `lldb` (it stops at the fault) and `bt`,
+or read the native backtrace printed to stderr (grep it for your package name). On macOS the
+same backtrace is in the `.ips` report under `~/Library/Logs/DiagnosticReports/`.
 
 > A `_debug_get_current_stack_info` virtual is wired and produces a correct native Odin
 > backtrace **when invoked**, but Godot only calls it during an active remote-debug session, so

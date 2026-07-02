@@ -12,9 +12,12 @@ import "base:runtime"
 // `context.temp_allocator`.
 //
 //   * NATIVE: `script_context_hook` is left nil, so this returns
-//     `runtime.default_context()` exactly as before (heap allocator + a real default
-//     temp allocator). The scripts dll's own load/boot path never sets the hook, so
-//     native behaviour is byte-for-byte unchanged.
+//     `runtime.default_context()` (heap allocator + a real default temp allocator) with
+//     ONE addition: `assertion_failure_proc` is pointed at
+//     `native_script_assertion_failure` (panic_native.odin), so a script panic/assert
+//     prints a grep-able ODIN_SCRIPT_PANIC line to stderr AND — once the core has
+//     installed the push_error hook post-boot — shows up red in the editor Output,
+//     instead of dying visible only on a (possibly nowhere-routed) stderr.
 //
 //   * WEB (freestanding_wasm32): `runtime.default_context()` is UNUSABLE for scripts.
 //     `ODIN_OS == .Freestanding` forces `NO_DEFAULT_TEMP_ALLOCATOR`, so its
@@ -35,5 +38,12 @@ script_context :: proc "contextless" () -> runtime.Context {
 	if script_context_hook != nil {
 		return script_context_hook()
 	}
-	return runtime.default_context()
+	c := runtime.default_context()
+	// NATIVE panic/assert surfacing (see panic_native.odin). Excluded on freestanding
+	// wasm32, where the web hook above is always installed before any script runs (and
+	// the freestanding fallthrough context must stay untouched).
+	when ODIN_OS != .Freestanding {
+		c.assertion_failure_proc = native_script_assertion_failure
+	}
+	return c
 }

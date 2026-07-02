@@ -1,0 +1,19 @@
+; Engine configuration file.
+; OdinGodot crash-reporting test project.
+;
+; CrashTarget is an Odin autoload node whose @(gd_method)s deliberately die two ways:
+; an Odin panic() (the assertion-proc path) and a nil-pointer dereference (the raw
+; fatal-signal path). tests/crash/run.sh launches a driver for each and asserts on the
+; crashed child's captured output.
+
+config_version=5
+
+[application]
+
+config/name="OdinGodotCrash"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.6")
+
+[autoload]
+
+CrashTarget="*res://scripts/crash_target.odin"

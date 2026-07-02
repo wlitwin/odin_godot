@@ -114,6 +114,11 @@ TESTS=(
     "editor|EDITOR_SMOKE_OK|tests/editor_smoke/run.sh"
     "editortools|EDITORTOOLS_OK|tests/editortools/run.sh"
     "debug|DEBUG_OK|tests/debug/run.sh"
+    # Crash/panic REPORTING: a script panic prints ODIN_SCRIPT_PANIC (msg + file:line)
+    # and push_errors it (editor-visible); a raw SIGSEGV in script code triggers the
+    # fatal-signal reporter (ODIN_GODOT_CRASH + symbolized faulting Odin frame +
+    # backtrace) and still chains to Godot's own crash handler.
+    "crash|CRASH_TEST_OK|tests/crash/run.sh"
     "reloadexports|RELOAD_EXPORTS_OK|tests/reload_exports/run.sh"
     # Cross-build smoke: self-gating — prints CROSS_SKIP (a non-fatal SKIP) when no
     # Linux/Windows cross toolchain is present, so the default macOS shell stays green. To
