@@ -60,6 +60,7 @@ matter:
 | **Editor** | `@tool` scripts, `gd.is_editor()`, custom icons, **EditorPlugin**, live error squiggles + autocomplete |
 | **Multiplayer** | `@(gd_rpc)` annotations mirroring GDScript's `@rpc` |
 | **Ship it** | hot reload on save, native desktop export, WebAssembly export |
+| **Scale it** | opt-in [script modules](docs/modules.md) — one dll per `res://modules/<name>`, rebuilt + hot-swapped independently so save latency stays flat in large projects |
 
 Because Odin is **ahead-of-time compiled** there are honest, inherent differences from
 interpreted GDScript — no `eval`/REPL, no in-editor breakpoints (use `lldb`), and `@export`

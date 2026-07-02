@@ -47,6 +47,9 @@ Defaults target `tests/phase35`; pass your project dir as the first argument. Th
 (for the `godot` collection) is derived from the script's own location, overridable with
 `ODIN_GODOT_ROOT`. If `odin` is not on `PATH`, pass it explicitly as `ODIN=/abs/path/to/odin`.
 
+If the project has [script modules](modules.md) (`res://modules/<name>/`), the same command
+also builds one `libodinscripts_<name>.<ext>` per module (`BUILD_MODULES=0` opts out).
+
 ## Live editing (show-on-save)
 
 GDScript is interpreted, so a new `@export` appears in the Inspector the instant you save. An
@@ -60,6 +63,13 @@ the scripts dll for you:
 2. **When the build finishes**, on the next editor frame the dll is hot-swapped in place: live
    instances re-bind and **keep their state**, and the Inspector's property lists refresh — so
    a freshly-added `@export` appears **without restarting the editor**.
+
+**Per-module rebuilds.** In a project using [script modules](modules.md), the rebuild is
+scoped: the coordinator hashes each module's sources and rebuilds + swaps **only the
+module(s) whose sources changed** — a save in `res://modules/enemies/` recompiles that one
+dll, leaving the main module and every other module's dll (instances, package globals, all
+of it) untouched. That's what keeps save latency flat in large projects; the swapped
+module's own package globals reset (fresh dll). Details in [Script Modules](modules.md).
 
 **Finding the compiler.** The editor often has no `odin` on its `PATH` (e.g. launched from the
 macOS app, not a shell). Point it at the binary with the **`odin_godot/odin_bin`** project

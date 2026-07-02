@@ -33,6 +33,10 @@ use → ship.**
   - **the honest AOT limitations** (no in-editor breakpoints, recompile-on-save latency, …)
 - **[Debugging](debugging.md)** — the deep `lldb` + crash-backtrace reference (what Workflow
   summarizes).
+- **[Script Modules](modules.md)** — the opt-in scaling tool for large projects: split
+  scripts into `res://modules/<name>/` packages, one dll each, rebuilt + hot-swapped
+  independently on save. Covers the cost model (when NOT to use them), the no-cross-imports
+  rule and why, cross-module communication patterns, reload/collision semantics, and export.
 
 ## Learn from the examples
 

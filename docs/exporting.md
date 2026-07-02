@@ -36,6 +36,16 @@ library as a **sibling of the core dll** (via `dladdr`), since `res://` is packe
 > Odin scripts). If you pull in native deps, add them to the export yourself (e.g. another
 > `add_shared_object` via your own export plugin, or place them beside the executable).
 
+**Script modules.** If the project uses [script modules](modules.md)
+(`res://modules/<name>/`), the export plugin builds **one optimized dll per module** and
+bundles each beside the main scripts dll — the exact sibling layout the exported game scans
+for at runtime. A module whose dll is missing **fails the export loudly, naming the module**
+(an export must never silently ship without a module's classes). The `BUILD_MODULES=0` env
+var skips modules at build *and* bundling — also loudly, since the result intentionally
+lacks the module classes; it is a scoped-build/CI switch, not a shipping configuration. On
+**web**, all modules compose into the single wasm. See
+[Script Modules — Exporting](modules.md#exporting-with-modules).
+
 ## Native desktop (macOS) — verified
 
 This is the firm, end-to-end-verified path. The exported `.app` loads the extension and runs an

@@ -852,6 +852,10 @@ controller_attack :: proc(self: ^Controller, amount: gd.Int) -> int {
   language (a foreign-language node, a placeholder, or a plain engine node) — it is
   nil-safe, never a wild cast.
 - Works on web too (single module — the same resolver is wired directly).
+- **Module boundary:** if the project uses [script modules](modules.md), `script_of` is
+  typed access within *one* module only — across modules it returns `nil` by construction
+  (modules can't import each other's types), and cross-module access goes through the
+  engine (signals, name-based calls, autoloads). See [Script Modules](modules.md).
 - For calling across a dll boundary (e.g. a tool that dispatches by name), the
   GDScript-style `obj.call("method", args...)` path remains available; `script_of` is the
   zero-overhead typed path within the shared scripts dll.
