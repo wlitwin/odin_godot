@@ -1,0 +1,4 @@
+# run.sh symlinks/installs puppeteer-core here (reusing tests/web's install when present).
+node_modules
+package-lock.json
+package.json

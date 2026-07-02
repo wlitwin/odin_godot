@@ -8,6 +8,7 @@ import "base:runtime"
 import "core:c/libc"
 import "core:fmt"
 import "core:os"
+import "core:slice"
 import "core:strings"
 
 // ----------------------------------------------------------------------------
@@ -551,6 +552,78 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         tgt,
     )
     export_log(fmt.tprintf("odin export: bundled %s", outdll))
+
+    // Script MODULES (res://modules/<name>): build_export_scripts.sh (above) also built
+    // one dll per module, as libodinscripts_<name><ext> SIBLINGS of the main dll in
+    // .export_build/. Bundle each the same way — add_shared_object puts them beside the
+    // main scripts dll (macOS: Contents/Frameworks), which is exactly where the exported
+    // core's load_extra_modules scans (siblings of the main scripts dll). A module whose
+    // dll is missing is an export ERROR naming the module — an exported game must never
+    // silently ship without its module classes.
+    bundle_export_modules(self, proj, ext)
+}
+
+// Enumerate <proj>/modules/* and add_shared_object each module's freshly built export
+// dll. Skips (like the build script) module dirs with no .odin sources, and honors the
+// same BUILD_MODULES=0 opt-out build_export_scripts.sh honors — with a loud log line,
+// since the resulting export intentionally lacks the module classes.
+@(private = "file")
+bundle_export_modules :: proc(self: ^OdinExportPlugin, proj: string, ext: string) {
+    if os.get_env("BUILD_MODULES", context.temp_allocator) == "0" {
+        export_log(
+            "odin export: BUILD_MODULES=0 — script modules NOT built or bundled; " +
+            "the exported game will only have the main res://scripts classes",
+        )
+        return
+    }
+    modules_dir := fmt.tprintf("%s/modules", proj)
+    if !os.exists(modules_dir) {return}
+    fis, derr := os.read_directory_by_path(modules_dir, -1, context.temp_allocator)
+    if derr != nil {
+        export_error(fmt.tprintf("odin export: couldn't read %s — script modules not bundled", modules_dir))
+        return
+    }
+    names := make([dynamic]string, context.temp_allocator)
+    for fi in fis {
+        if fi.type != .Directory {continue}
+        if !dir_has_odin(fi.fullpath) {continue} // build_export_scripts.sh skipped it too
+        append(&names, fi.name)
+    }
+    slice.sort(names[:]) // deterministic bundle/log order (matches the runtime's sorted load)
+    for name in names {
+        if strings.contains_rune(name, '.') {
+            export_error(
+                fmt.tprintf(
+                    "odin export: script module '%s' has a dot in its name — the runtime only " +
+                    "discovers dot-free libodinscripts_<name>%s dlls, so its classes would be " +
+                    "silently absent from the exported game. Rename res://modules/%s.",
+                    name, ext, name,
+                ),
+            )
+            continue
+        }
+        dll := fmt.tprintf("%s/.export_build/libodinscripts_%s%s", proj, name, ext)
+        if !os.is_file(dll) {
+            export_error(
+                fmt.tprintf(
+                    "odin export: script module '%s' dll missing (%s) — the exported game " +
+                    "would ship WITHOUT this module's classes",
+                    name, dll,
+                ),
+            )
+            continue
+        }
+        path := godot.new_string_odin(dll)
+        tags := godot.new_packed_string_array()
+        tgt := godot.new_string_cstring("")
+        godot.editor_export_plugin_add_shared_object(
+            cast(godot.Editor_Export_Plugin)self.object,
+            path,
+            tags,
+            tgt,
+        )
+        export_log(fmt.tprintf("odin export: bundled module '%s' (%s)", name, dll))
+    }
 }
 
 @(private = "file")

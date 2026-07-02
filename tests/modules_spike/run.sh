@@ -3,7 +3,7 @@
 # Run inside the Nix dev shell:
 #   nix develop --command bash -c 'bash tests/modules_spike/run.sh'
 #
-# Three phases:
+# Four phases:
 #   1. MAIN     — test_modules.gd: both modules attach + lifecycle; cross-module call
 #                 via the engine; script_of module-local semantics; PER-MODULE reload
 #                 (enemies v2 swap with the main module provably untouched).
@@ -12,10 +12,19 @@
 #                 BOTH modules, while main's Player keeps working.
 #   3. ISOLATION— a generated modules/sneak `import "../enemies"`: the build must FAIL
 #                 with the ILLEGAL cross-module import message (globals-fork hazard).
+#   4. EXPORT   — headless macOS export (phase5 pattern): the export plugin must build
+#                 + bundle the MODULE dll beside the main scripts dll, and the exported
+#                 app must run a module class. Prints MODULES_EXPORT_OK, then the suite
+#                 sentinel MODULES_SPIKE_OK.
 set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PROJ="$ROOT/tests/modules_spike"
+# The export phase runs the headless EDITOR, whose OdinExportPlugin resolves the
+# collection root from the `odin_godot/root` setting -> ODIN_GODOT_ROOT env -> dladdr
+# derivation. The test project keeps no root setting (it must work from any checkout),
+# so export the env for the editor child — exactly what tests/run_all.sh does suite-wide.
+export ODIN_GODOT_ROOT="$ROOT"
 
 # Clean any leftovers from an aborted earlier run (the rogue/sneak modules are
 # GENERATED here; they must never be present for phase 1).
@@ -121,5 +130,43 @@ if ! grep -q "ILLEGAL cross-module import" "$ILOG"; then
     exit 1
 fi
 echo "  ok  cross-module import rejected at build time with a clear message"
+
+# ---- phase 4: NATIVE EXPORT bundles + runs ALL module dlls ----
+# The generated sneak module from phase 3 is still on disk (the trap removes it at
+# exit); it MUST be gone before exporting or the export build fails its isolation check.
+cleanup_generated
+
+APP="$PROJ/out/OdinGameModulesSpike.app"
+EXE="$APP/Contents/MacOS/OdinGodotModulesSpike"
+rm -rf "$PROJ/out" "$PROJ/.export_build"
+mkdir -p "$PROJ/out"
+"$GODOT" --headless --path "$PROJ" --export-release "macOS" "$APP" 2>&1 \
+    | grep -E "odin export:" || true
+
+if [[ ! -x "$EXE" ]]; then
+    echo "MODULES_SPIKE_FAIL: exported executable missing ($EXE)"
+    exit 1
+fi
+if [[ ! -f "$APP/Contents/Frameworks/libodinscripts.dylib" ]]; then
+    echo "MODULES_SPIKE_FAIL: main scripts dll not bundled into Frameworks"
+    exit 1
+fi
+if [[ ! -f "$APP/Contents/Frameworks/libodinscripts_enemies.dylib" ]]; then
+    echo "MODULES_SPIKE_FAIL: enemies MODULE dll not bundled into Frameworks"
+    exit 1
+fi
+echo "  ok  export bundled BOTH dlls (libodinscripts + libodinscripts_enemies)"
+
+# Run the EXPORTED app headless. ODIN_SCRIPTS_DLL (exported above for the editor
+# phases) must NOT leak in — the exported core must find its dlls INSIDE the bundle.
+EOUT="$(env -u ODIN_SCRIPTS_DLL "$EXE" --headless --quit-after 120 2>&1 || true)"
+if ! grep -q "EXPORT_MODULE_ENEMY_RAN" <<<"$EOUT" || ! grep -q "MODULES_EXPORT_ASSERT_OK" <<<"$EOUT"; then
+    echo "MODULES_SPIKE_FAIL: exported app did not print the module sentinels"
+    echo "----- output -----"
+    grep -vE "could not find symbol|^warning" <<<"$EOUT" | tail -20
+    exit 1
+fi
+echo "  ok  exported app ran a MODULE class: EXPORT_MODULE_ENEMY_RAN + MODULES_EXPORT_ASSERT_OK"
+echo "MODULES_EXPORT_OK"
 
 echo "MODULES_SPIKE_OK"

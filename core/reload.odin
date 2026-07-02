@@ -236,24 +236,22 @@ reload_request :: proc(force := false) {
 		&cands,
 		Candidate{name = "", dir = strings.clone(scripts, context.temp_allocator), hash = hash_sources(scripts)},
 	)
-	when ODIN_OS != .Windows {
-		// Multi-module is POSIX-native only for now (build_scripts.ps1 knows nothing of
-		// modules); on Windows only the main module is considered — pre-spike behavior.
-		mroot := strings.concatenate({proj, "/modules"}, context.temp_allocator)
-		if fis, rerr := os.read_directory_by_path(mroot, -1, context.temp_allocator); rerr == nil {
-			for fi in fis {
-				if fi.type != .Directory || strings.has_prefix(fi.name, ".") {
-					continue
-				}
-				append(
-					&cands,
-					Candidate{
-						name = strings.clone(fi.name, context.temp_allocator),
-						dir  = strings.clone(fi.fullpath, context.temp_allocator),
-						hash = hash_sources(fi.fullpath),
-					},
-				)
+	// Every platform enumerates modules: build_scripts.sh (POSIX) and build_scripts.ps1
+	// (Windows, -ScriptsDir/-SkipModules) both build one named scripts dir per invocation.
+	mroot := strings.concatenate({proj, "/modules"}, context.temp_allocator)
+	if fis, rerr := os.read_directory_by_path(mroot, -1, context.temp_allocator); rerr == nil {
+		for fi in fis {
+			if fi.type != .Directory || strings.has_prefix(fi.name, ".") {
+				continue
 			}
+			append(
+				&cands,
+				Candidate{
+					name = strings.clone(fi.name, context.temp_allocator),
+					dir  = strings.clone(fi.fullpath, context.temp_allocator),
+					hash = hash_sources(fi.fullpath),
+				},
+			)
 		}
 	}
 
@@ -307,12 +305,31 @@ reload_request :: proc(force := false) {
 		// libc.system routes through cmd.exe: drive the PowerShell counterpart of
 		// build_scripts.sh (native MSVC toolchain — see build_scripts.ps1's header).
 		// cmd.exe quoting: double quotes; ^-escaping is not needed for these paths.
+		// PER-MODULE parity with the POSIX branch below: one invocation per CHANGED
+		// module, scoped to exactly its dir via -ScriptsDir, with -SkipModules the
+		// BUILD_MODULES=0 equivalent (no chaining of the other modules).
+		parts := strings.builder_make(context.temp_allocator)
+		for c, i in changed {
+			if i > 0 {
+				strings.write_string(&parts, " && ")
+			}
+			fmt.sbprintf(
+				&parts,
+				`powershell -NoProfile -ExecutionPolicy Bypass -File "%s\build\build_scripts.ps1" -Root "%s" -Project "%s" -ScriptsDir "%s" -Odin "%s" -SkipCore -SkipModules`,
+				root,
+				root,
+				proj,
+				c.dir,
+				odin_bin,
+			)
+		}
+		// `if not exist` needs the trailing `\` to test for a DIRECTORY; parentheses group
+		// the chain for the one log redirect (mirrors the POSIX subshell + mkdir -p below).
 		cmd = fmt.aprintf(
-			`powershell -NoProfile -ExecutionPolicy Bypass -File "%s\build\build_scripts.ps1" -Root "%s" -Project "%s" -Odin "%s" -SkipCore > "%s" 2>&1`,
-			root,
-			root,
+			`if not exist "%s\bin\" mkdir "%s\bin" & ( %s ) > "%s" 2>&1`,
 			proj,
-			odin_bin,
+			proj,
+			strings.to_string(parts),
 			g_reload.log_path,
 		)
 	} else {

@@ -1123,7 +1123,9 @@ pool_cstr_csv :: proc "contextless" (s: string) -> (cstring, bool) {
 	return c, true
 }
 
-@(private = "file")
+// Package-visible (not file-private): `register` in runtime.odin also records here
+// for duplicate-class detection.
+@(private)
 record_error :: proc "contextless" (class: cstring, field: cstring, msg: cstring) {
 	if reg_error_count >= MAX_REG_ERRORS {
 		return
@@ -1137,9 +1139,10 @@ registration_errors :: proc "contextless" () -> []Registration_Error {
 	return reg_errors[:reg_error_count]
 }
 
-// TEST-ONLY: reset the walk's pools + error table so `odin test` cases (which share
-// one process) can exercise exhaustion without poisoning later cases. Never called
-// in production — a dll's pools live exactly as long as the dll.
+// TEST-ONLY: reset the walk's pools + error table + the CLASS REGISTRY (runtime.odin —
+// same package) so `odin test` cases (which share one process) can exercise exhaustion
+// and duplicate-registration without poisoning later cases. Never called in
+// production — a dll's pools/registry live exactly as long as the dll.
 reflect_register_reset_for_tests :: proc "contextless" () {
 	name_pool_used = 0
 	export_pool_count = 0
@@ -1147,6 +1150,7 @@ reflect_register_reset_for_tests :: proc "contextless" () {
 	signal_pool_count = 0
 	signal_arg_pool_count = 0
 	reg_error_count = 0
+	registry_count = 0
 }
 
 // The core pulls this right after the manifest (dlsym'd by name on native, called

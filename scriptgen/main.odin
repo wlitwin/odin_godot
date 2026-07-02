@@ -400,6 +400,18 @@ main :: proc() {
 		fmt.eprintln("usage: scriptgen <scripts_dir>")
 		os.exit(2)
 	}
+	// Canonicalize to ABSOLUTE before anything else touches the path. The owned-gen-file
+	// set (below) is keyed by the ABSOLUTE `fullpath`s the directory listing reports, but
+	// the boot-shim path used to be composed from this raw argument — with a RELATIVE
+	// scripts dir the shim's key never matched, so orphan cleanup deleted the boot shim
+	// it had JUST written. Making the one input path absolute fixes every derived path
+	// (out_path already came from fullpath; boot_path now does too, in effect).
+	if abs, aerr := os.get_absolute_path(scripts_dir, context.allocator); aerr == nil {
+		scripts_dir = abs
+	} else {
+		fmt.eprintfln("scriptgen: cannot resolve dir %q", scripts_dir)
+		os.exit(1)
+	}
 
 	dir_fh, oerr := os.open(scripts_dir)
 	if oerr != nil {
@@ -463,7 +475,7 @@ main :: proc() {
 
 		// This script's gen file is ours either way — never orphan-collect it.
 		out_path := strings.concatenate({path[:len(path) - len(".odin")], ".gen.odin"})
-		owned_gen[out_path] = true
+		owned_gen[norm_path(out_path)] = true
 
 		if had_error {continue}
 		gen := generate(&script)
@@ -479,9 +491,9 @@ main :: proc() {
 	// dlopen) so users never hand-copy it — UNLESS the project already defines its own.
 	// Skipped when the package has no name (nothing to compile anyway).
 	if !had_error && !has_boot && pkg != "" {
-		dir := strings.trim_suffix(scripts_dir, "/")
+		dir := strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\")
 		boot_path := strings.concatenate({dir, "/odin_godot_boot.gen.odin"})
-		owned_gen[boot_path] = true
+		owned_gen[norm_path(boot_path)] = true
 		if werr := os.write_entire_file(boot_path, transmute([]byte)gen_boot(pkg)); werr != nil {
 			errorf("cannot write %q", boot_path)
 		} else {
@@ -503,6 +515,17 @@ main :: proc() {
 	fmt.printfln("scriptgen: generated %d script(s)", emitted)
 }
 
+// norm_path returns `p` with backslashes normalized to '/'. The owned-gen map is keyed by
+// NORMALIZED absolute paths so a `\`-separated fullpath from the Windows directory listing
+// still matches a `dir + "/leaf"` composed path (the boot shim) — the same key-mismatch
+// class that made a RELATIVE scripts-dir argument orphan-collect the just-written boot
+// shim before main() canonicalized the argument. No-op (no allocation) on POSIX paths.
+norm_path :: proc(p: string, allocator := context.allocator) -> string {
+	if !strings.contains_rune(p, '\\') {return p}
+	out, _ := strings.replace_all(p, "\\", "/", allocator)
+	return out
+}
+
 // remove_orphan_gen deletes `*.gen.odin` files under `dir` that are not in `owned` —
 // gen output for sources that no longer exist. A Godot `.uid` sidecar for a removed gen
 // file goes with it (the editor generates those beside every res:// file).
@@ -515,7 +538,7 @@ remove_orphan_gen :: proc(dir: string, owned: map[string]bool) {
 	for fi in files {
 		if fi.type == .Directory {continue}
 		if !strings.has_suffix(fi.name, ".gen.odin") {continue}
-		if owned[fi.fullpath] {continue}
+		if owned[norm_path(fi.fullpath, context.temp_allocator)] {continue}
 		if rmerr := os.remove(fi.fullpath); rmerr != nil {
 			// Non-fatal: warn — the stale file will still break the scripts build with a
 			// clear-enough odin error, and the next run retries.

@@ -1,0 +1,14 @@
+[gd_scene load_steps=4 format=3 uid="uid://b5odinmodspikex"]
+
+[ext_resource type="Script" path="res://export_main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/player.odin" id="2_player"]
+[ext_resource type="Script" path="res://modules/enemies/enemy.odin" id="3_enemy"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1_main")
+
+[node name="Player" type="Node" parent="."]
+script = ExtResource("2_player")
+
+[node name="Enemy" type="Node" parent="."]
+script = ExtResource("3_enemy")

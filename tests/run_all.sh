@@ -199,6 +199,11 @@ run_web_gated "web" "tests/web/run.sh" "PHASEWEB_OK" "PHASEWEB_BUNDLED"
 # web_showcase: the FULL coin-collector game loop (physics collide -> Odin collect -> signal
 # -> shared score -> coin freed -> cross-script HUD) runs in-browser (SHOWCASE_WEB_OK).
 run_web_gated "web_showcase" "tests/web_showcase/run.sh" "PHASEWEBSHOWCASE_OK" "PHASEWEBSHOWCASE_BUNDLED"
+# modules_web: MULTI-MODULE scripts on web (main + modules composed into ONE wasm) — the
+# main-module class AND a module class both run in-browser, a cross-module engine call works,
+# and a deliberate cross-module class-name collision surfaces a LOUD duplicate-registration
+# error on the JS console (keep-first, never silent last-write-wins).
+run_web_gated "modules_web" "tests/modules_web/run.sh" "MODULES_WEB_OK" "MODULES_WEB_BUNDLED"
 # webrtc: TWO real browser peers establish a browser-native WebRTC data channel (via the
 # WebSocket signaling server) and exchange @(gd_rpc) calls BOTH directions with correct sender
 # ids — the in-browser mirror of rpc_net's ENet guarantees (WEBRTC_OK).

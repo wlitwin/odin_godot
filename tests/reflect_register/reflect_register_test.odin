@@ -12,6 +12,7 @@ package reflect_register_test
 // asserted hint ints / hint_strings / offsets / sizes / defaults are exactly the
 // values the old text-generated rt.Export tables carried.
 
+import "core:strings"
 import "core:testing"
 import "godot:gdext"
 import gd "godot:godot"
@@ -626,6 +627,62 @@ error_paths :: proc(t: ^testing.T) {
 	testing.expect(t, xok, "typed collection with a resource element stays an untyped Array export")
 	testing.expect_value(t, tex.type, gdext.Variant_Type.Array)
 	testing.expect_value(t, tex.hint, 0)
+}
+
+// Backing bytes for a "Duped" cstring that can NEVER pointer-match the "Duped"
+// literal below — the cross-module reality (each module compiles its own literals),
+// so the duplicate check must compare by VALUE.
+@(private)
+DUP_NAME_BYTES := [6]byte{'D', 'u', 'p', 'e', 'd', 0}
+
+@(test)
+duplicate_class_names :: proc(t: ^testing.T) {
+	// register() semantics: keep-first + ONE recorded error naming the class; a later
+	// same-name registration is dropped, distinct names are unaffected.
+	rt.reflect_register_reset_for_tests()
+	before := len(rt.registration_errors())
+
+	rt.register_class(Basics, info("Duped"))
+	dup := cstring(raw_data(DUP_NAME_BYTES[:]))
+	rt.register_class(Tagged_Owner, info(dup)) // same NAME, different storage -> dropped
+	rt.register_class(Tagged_Owner, info("Distinct")) // distinct name -> registers fine
+
+	errs := new_errors_since(before)
+	testing.expect_value(t, len(errs), 1)
+	if len(errs) == 1 {
+		testing.expect_value(t, string(errs[0].class), "Duped")
+		testing.expect(t, errs[0].field == nil, "duplicate is a class-level error (no field)")
+		testing.expect(
+			t,
+			errs[0].msg != nil && strings.contains(string(errs[0].msg), "duplicate class registration"),
+			"error message names the problem",
+		)
+	}
+
+	// Keep-first: the registry holds the FIRST "Duped" (Basics' desc) plus "Distinct".
+	n: i32
+	descs := rt.odin_scripts_manifest(&n)
+	testing.expect_value(t, int(n), 2)
+	testing.expect_value(t, string(descs[0].name), "Duped")
+	testing.expect_value(t, descs[0].size, size_of(Basics)) // the first registration won
+	testing.expect_value(t, descs[0].id, typeid_of(Basics))
+	testing.expect_value(t, string(descs[1].name), "Distinct")
+
+	rt.reflect_register_reset_for_tests()
+}
+
+@(test)
+test_reset_clears_class_registry :: proc(t: ^testing.T) {
+	// The test-only reset must clear the class registry too — otherwise duplicate-name
+	// cases would poison every later test in this shared process.
+	rt.reflect_register_reset_for_tests()
+	rt.register_class(Basics, info("ResetProbe"))
+	n: i32
+	_ = rt.odin_scripts_manifest(&n)
+	testing.expect_value(t, int(n), 1)
+	rt.reflect_register_reset_for_tests()
+	_ = rt.odin_scripts_manifest(&n)
+	testing.expect_value(t, int(n), 0)
 }
 
 @(test)

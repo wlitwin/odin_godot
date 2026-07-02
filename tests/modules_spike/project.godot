@@ -4,5 +4,10 @@ config_version=5
 
 config/name="OdinGodotModulesSpike"
 config/features=PackedStringArray("4.6")
+run/main_scene="res://export_main.tscn"
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true
 
 [headless]

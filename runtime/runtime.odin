@@ -228,7 +228,36 @@ registry: [MAX_CLASSES]Class_Desc
 registry_count: int
 
 // Called by each script's `@(init)` to publish its class to the scripts dll.
+//
+// DUPLICATE CLASS NAMES — keep-first + a recorded Registration_Error (never silent,
+// never last-write-wins). Names are compared by VALUE: every module compiles its own
+// cstring literals, so pointer comparison would miss every real collision. Semantics
+// by target:
+//   * NATIVE: each scripts dll has its OWN registry, so a duplicate here is a
+//     SAME-module authoring error (two structs claiming one class name). The
+//     CROSS-module collision is still caught by the core's index_module_manifest,
+//     which loads dlls one at a time and can name both modules.
+//   * WEB: all script modules link into ONE wasm and share THIS registry, so this
+//     check IS the cross-module collision check (the core's class index would
+//     otherwise silently last-write-wins). Keep-first mirrors native's
+//     reject-the-later-module semantics.
+// LIMITATION: the registry has no module attribution (`register` runs from `@(init)`,
+// before any module identity exists), so the error can name the CLASS but not which
+// two modules collided. The error surfaces through the same drain as every other
+// registration error (odin_scripts_registration_errors -> the core's push_error pass).
 register :: proc "contextless" (desc: Class_Desc) {
+	if desc.name != nil {
+		for i in 0 ..< registry_count {
+			if registry[i].name != nil && string(registry[i].name) == string(desc.name) {
+				record_error(
+					desc.name,
+					nil,
+					"duplicate class registration — this class name is already registered; the LATER registration is DROPPED (first wins). In one module this means two structs claim the same class name; on web (all script modules share one registry) it can also be a cross-module collision (module names are not known here — check scripts/ and each modules/<name>/)",
+				)
+				return
+			}
+		}
+	}
 	if registry_count >= MAX_CLASSES {
 		return
 	}

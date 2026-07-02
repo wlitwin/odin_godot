@@ -1,0 +1,12 @@
+[configuration]
+
+entry_symbol = "odin_godot_init"
+compatibility_minimum = "4.6"
+
+[libraries]
+
+; Web-only (like tests/web): the FULL extension (core + binding + the main-module scripts
+; + every res://modules/<name> script module) AOT-composed into ONE Emscripten SIDE_MODULE
+; wasm by build/build_web.sh. No native entries — this project only ever runs in a browser.
+web.debug.wasm32 = "res://bin/libodin_godot.wasm"
+web.release.wasm32 = "res://bin/libodin_godot.wasm"
