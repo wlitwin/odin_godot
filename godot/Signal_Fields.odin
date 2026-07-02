@@ -30,6 +30,16 @@ package godot
 // a value you store/pass/export — hence the arity-suffixed family. Odin parametric structs
 // have a fixed parameter count, so each arity is its own type; 4 covers well past any
 // signal in the tree, and mirrors how far GDScript payloads sanely go.)
+//
+// `SignalN` is the struct-payload GENERAL form: its parameter is the argument LIST as a
+// struct — the FIELD NAMES ARE THE ARG NAMES (no `args=` tag; a tag on a SignalN field is
+// an error), and any number of args works (the escape past arity 4, or just self-naming):
+//
+//     hit: SignalN(struct { amount: int, who: ^Node2d }),
+//
+// One-way-to-do-it rule: SignalN's parameter must be a plain payload STRUCT, never itself
+// a Variant-mappable type — `SignalN(Vector2)` is rejected at registration; write
+// `Signal1(Vector2)` or wrap it, `SignalN(struct { pos: Vector2 })`.
 
 Signal0 :: struct {
 	_marker: ^struct {},
@@ -63,4 +73,10 @@ Signal4 :: struct($A, $B, $C, $D: typeid) {
 		c: C,
 		d: D,
 	},
+}
+
+// The general form: the pointee IS the payload struct — its field names/types are the
+// signal's arg names/types (see the header comment for the rules).
+SignalN :: struct($P: typeid) {
+	_marker: ^P,
 }

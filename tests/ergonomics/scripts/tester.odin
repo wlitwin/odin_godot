@@ -20,6 +20,16 @@ Tester :: struct {
 	// gd.emit/gd.emit_args ergonomic helpers — that escape hatch is what this test covers.
 	pinged:    gd.Signal1(int) `gd:"args=value"`,
 	triggered: gd.Signal0,
+	// The struct-payload general form (gd.SignalN): 5 args — past the arity family's cap —
+	// and the payload struct's FIELD NAMES are the registered arg names (no `args=` tag).
+	// Emitted below through the scriptgen-generated typed helper (tester_emit_scored).
+	scored:    gd.SignalN(struct {
+		points: int,
+		combo:  i64,
+		streak: bool,
+		mult:   f32,
+		pos:    gd.Vector2,
+	}),
 	result:    gd.Int `gd:"export"`,
 }
 
@@ -87,4 +97,11 @@ tester_do_emit :: proc(self: ^Tester, value: i64) {
 @(gd_method)
 tester_do_trigger :: proc(self: ^Tester) {
 	gd.emit(self.owner, "triggered")
+}
+
+// do_score fires the 5-arg SignalN `scored` signal through its generated TYPED helper —
+// the parameter names below are the payload struct's field names, compile-checked.
+@(gd_method)
+tester_do_score :: proc(self: ^Tester) {
+	tester_emit_scored(self, points = 10, combo = 3, streak = true, mult = 1.5, pos = gd.Vector2{2, 4})
 }

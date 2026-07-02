@@ -305,6 +305,30 @@ args (object/node handles present as `Object`). A signal field costs one nil poi
 instance size and is never read or written at runtime; it exists so the declaration is
 part of the type, checked by the compiler, and visible to reflection.
 
+**`gd.SignalN` — the struct-payload general form.** Its single parameter is the argument
+LIST as an inline struct: the struct's **field names are the arg names** (no `args=` tag —
+a tag on a `SignalN` field is a build error), and any number of args works. Prefer it for
+5+ payload args (past the arity family's cap) or whenever you want named args without the
+tag:
+
+```odin
+Enemy :: struct {
+	owner: gd.Node2d,
+	hit:   gd.SignalN(struct {
+		amount: int,
+		who:    ^gd.Node2d,
+		pos:    gd.Vector2,
+		crit:   bool,
+		combo:  i64,
+	}), // hit(amount, who, pos, crit, combo) — 5 named args
+}
+```
+
+One-way-to-do-it rule: `SignalN`'s parameter must be the payload **struct**, never itself a
+single Variant-mappable type — `gd.SignalN(gd.Vector2)` is rejected. For one payload value,
+either `gd.Signal1(gd.Vector2)` (name it with `args=`) or wrap it so the field name names
+it: `gd.SignalN(struct { pos: gd.Vector2 })` → `moved(pos: Vector2)`.
+
 **Emit** with the generated typed helper `<struct_snake>_emit_<field>` — e.g.
 `ping_emit_pinged(self, value)` — which codegen emits from the signal field and which
 calls through `gd.emit`/`gd.emit_args` (returning the engine `Error`, which you may

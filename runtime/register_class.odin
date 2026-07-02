@@ -120,11 +120,16 @@ reflect_class_desc :: proc "contextless" (id: typeid, info: Class_Info) -> Class
 	for i in 0 ..< int(st.field_count) {
 		if i == 0 {continue} // the owner Object pointer, by convention — never a member
 		tag, has := reflect.struct_tag_lookup(reflect.Struct_Tag(st.tags[i]), "gd")
-		// A signal field declares itself by TYPE (gd.Signal0 … Signal4) — the tag is
-		// OPTIONAL (`gd:"args=..."` names the payload), so this check precedes the
+		// A signal field declares itself by TYPE (gd.Signal0 … Signal4, or the general
+		// gd.SignalN) — the tag is OPTIONAL for the arity family (`gd:"args=..."` names
+		// the payload) and FORBIDDEN for SignalN, so these checks precede the
 		// tagged-fields-only skip below.
 		if arg_tis, is_signal := signal_field_args(st.types[i]); is_signal {
 			walk_signal_field(info, st.names[i], arg_tis, tag, has)
+			continue
+		}
+		if payload_ti, is_sn := signal_n_payload(st.types[i]); is_sn {
+			walk_signal_n_field(info, st.names[i], payload_ti, has)
 			continue
 		}
 		if !has {continue}
@@ -335,9 +340,9 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 	export_pool_count += 1
 }
 
-// ---- signal fields (gd.Signal0 … Signal4) --------------------------------------
+// ---- signal fields (gd.Signal0 … Signal4, gd.SignalN) ---------------------------
 
-// Detect a signal MARKER field type (godot/Signal_Fields.odin) and return the payload
+// Detect an arity-family signal MARKER field type (godot/Signal_Fields.odin) and return the payload
 // type infos. Matched by the instantiation's Named spelling ("Signal0", "Signal2($A=…")
 // AND its structural shape — the single `_marker` phantom pointer whose pointee struct's
 // field types ARE the payload typeids. Structural recovery is what lets the arg types go
@@ -364,6 +369,23 @@ signal_field_args :: proc(fti: ^runtime.Type_Info) -> (arg_tis: []^runtime.Type_
 	inner, iok := runtime.type_info_base(ptr.elem).variant.(runtime.Type_Info_Struct)
 	if !iok {return nil, false}
 	return inner.types[:inner.field_count], true
+}
+
+// Detect the general-form marker (gd.SignalN — the struct-payload form) and return the
+// PAYLOAD type info (the `_marker` pointee, i.e. the $P parameter). Matched like
+// signal_field_args: the instantiation's Named spelling ("SignalN($P=…") AND the single
+// `_marker` phantom-pointer shape. $P itself is NOT validated here — walk_signal_n_field
+// owns the plain-struct / not-Variant-mappable rules so a bad parameter is a recorded
+// registration error, never a silently skipped field.
+@(private = "file")
+signal_n_payload :: proc(fti: ^runtime.Type_Info) -> (payload: ^runtime.Type_Info, is_signal_n: bool) {
+	named, is_named := fti.variant.(runtime.Type_Info_Named)
+	if !is_named || !strings.has_prefix(named.name, "SignalN($P=") {return nil, false}
+	st, sok := runtime.type_info_base(fti).variant.(runtime.Type_Info_Struct)
+	if !sok || st.field_count != 1 || st.names[0] != "_marker" {return nil, false}
+	ptr, pok := runtime.type_info_base(st.types[0]).variant.(runtime.Type_Info_Pointer)
+	if !pok {return nil, false}
+	return ptr.elem, true
 }
 
 // Synthesized payload names for a signal field without an `args=` tag. Static literals —
@@ -465,6 +487,79 @@ walk_signal_field :: proc(info: Class_Info, fname: string, arg_tis: []^runtime.T
 	} else if has_tag {
 		// A zero-payload signal accepts no tag at all (there is nothing to name).
 		record_error(cls, name_c, "a signal field's gd tag must be `args=name1,name2` (signals register by type and cannot be exported)")
+	}
+
+	signal_pool[signal_pool_count] = sig
+	signal_pool_count += 1
+}
+
+// One SignalN field -> a Signal pool entry (or a recorded error). The signal name is the
+// FIELD name; the payload struct's FIELD NAMES are the arg names (authoritative — a gd
+// tag, `args=` included, is an error) and its field types the arg types. The $P rules
+// live here: it must be a plain struct, and never itself a Variant-mappable type (the
+// one-arg-vs-arg-list ambiguity is rejected at the boundary — see Signal_Fields.odin).
+@(private = "file")
+walk_signal_n_field :: proc(info: Class_Info, fname: string, payload_ti: ^runtime.Type_Info, has_tag: bool) {
+	cls := info.name
+	name_c, name_ok := pool_cstr(fname)
+	if !name_ok {
+		record_error(cls, nil, "registration name pool exhausted — signal dropped")
+		return
+	}
+
+	if has_tag {
+		// Registered anyway (loudly), like a bad tag on the arity family: the field names
+		// already carry everything a tag could say.
+		record_error(cls, name_c, "a SignalN field takes no gd tag — the payload struct's field names ARE the arg names")
+	}
+	if _, mappable := variant_type_for(payload_ti.id); mappable {
+		record_error(cls, name_c, "SignalN's parameter is the argument LIST as a struct, not a single payload type — use Signal1(Vector2) or SignalN(struct { pos: Vector2 })")
+		return
+	}
+	inner, iok := runtime.type_info_base(payload_ti).variant.(runtime.Type_Info_Struct)
+	if !iok || .raw_union in inner.flags {
+		record_error(cls, name_c, "SignalN's parameter must be a plain struct — its field names/types are the signal's payload")
+		return
+	}
+
+	if signal_pool_count >= MAX_REFLECT_SIGNALS {
+		record_error(cls, name_c, "registration signal pool exhausted — signal dropped")
+		return
+	}
+	sig := Signal {
+		name = name_c,
+	}
+
+	// Payload fields — same Variant rule as the arity family, plus the field NAMES go
+	// through the name pool (SignalN has no arity cap, so no static synth table applies;
+	// pool exhaustion stays a recorded error).
+	if n := int(inner.field_count); n > 0 {
+		if signal_arg_pool_count + n > MAX_REFLECT_SIGNAL_ARGS {
+			record_error(cls, name_c, "registration signal-arg pool exhausted — signal dropped")
+			return
+		}
+		args_start := signal_arg_pool_count
+		for j in 0 ..< n {
+			vt, vok := variant_type_for(inner.types[j].id)
+			if !vok {
+				record_error(cls, name_c, "signal payload parameter of unsupported type — every parameter must map to a Variant")
+				signal_arg_pool_count = args_start // roll back this signal's partial run
+				return
+			}
+			arg_c, aok := pool_cstr(inner.names[j])
+			if !aok {
+				record_error(cls, name_c, "registration name pool exhausted — signal dropped")
+				signal_arg_pool_count = args_start
+				return
+			}
+			signal_arg_type_pool[signal_arg_pool_count] = vt
+			signal_arg_name_pool[signal_arg_pool_count] = arg_c
+			signal_arg_pool_count += 1
+		}
+		sig.arg_types = raw_data(signal_arg_type_pool[args_start:])
+		sig.arg_types_count = i32(n)
+		sig.arg_names = raw_data(signal_arg_name_pool[args_start:])
+		sig.arg_names_count = i32(n)
 	}
 
 	signal_pool[signal_pool_count] = sig

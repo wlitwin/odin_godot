@@ -223,9 +223,9 @@ marker_arg :: proc(body, kw: string) -> (rest: string, ok: bool) {
 	return "", false // e.g. `tooltip` after `tool` — not a boundary
 }
 
-// ---- signal fields (gd.Signal0 … Signal4) --------------------------------------
+// ---- signal fields (gd.Signal0 … Signal4, gd.SignalN) ---------------------------
 
-// Detect a signal marker field type from its (gd.-normalized) rendered spelling and return
+// Detect an arity-family signal marker field type from its (gd.-normalized) rendered spelling and return
 // the arity plus the raw parameter-list text ("" for Signal0). The godot qualifier is
 // REQUIRED — an unqualified `Signal1(...)` is the user's own package-local type, not the
 // marker. The runtime walk re-derives the same facts from type info at registration
@@ -320,6 +320,73 @@ parse_signal_field :: proc(s: ^Script, floc: Loc, fname: string, arity: int, par
 					}
 					sig.args[i].name = aname
 				}
+			}
+		}
+	}
+
+	append(&s.signals, sig)
+}
+
+// Detect the general-form marker (gd.SignalN) on a field's type expression and return its
+// single type-parameter NODE. Unlike the arity family (whose parameters are plain type
+// spellings, matched from the rendered text), SignalN's parameter is an inline struct —
+// an ast.Struct_Type node whose field names/types are read directly, no text-splitting.
+// The godot qualifier is REQUIRED, same rule as signal_type_params: the file's actual
+// `godot:godot` import alias, or the canonical gd./godot. spellings.
+signal_n_param :: proc(type_expr: ^ast.Expr, alias: string) -> (param: ^ast.Expr, ok: bool) {
+	if type_expr == nil {return nil, false}
+	call, cok := type_expr.derived.(^ast.Call_Expr)
+	if !cok {return nil, false}
+	sel, sok := call.expr.derived.(^ast.Selector_Expr)
+	if !sok || sel.field == nil || sel.field.name != "SignalN" {return nil, false}
+	pkg, pok := sel.expr.derived.(^ast.Ident)
+	if !pok {return nil, false}
+	if pkg.name != alias && pkg.name != "gd" && pkg.name != "godot" {return nil, false}
+	if len(call.args) != 1 {return nil, false}
+	return call.args[0], true
+}
+
+// Parse one SignalN FIELD (`hit: gd.SignalN(struct { amount: int, who: ^gd.Node2d })`)
+// into a Signal_Info: the payload struct's FIELD NAMES are the arg names (already valid
+// identifiers — they parsed) and its field types the arg types. Mirrors the runtime
+// walk's rules as build-time errors: the parameter must be an inline payload struct
+// (never a single Variant-mappable type — the one-arg ambiguity gets the pointed
+// suggestion), and a gd tag (`args=` included) is an error, field names being
+// authoritative. Registration is still the runtime walk's job.
+parse_signal_n_field :: proc(s: ^Script, src: string, floc: Loc, fname: string, param: ^ast.Expr, has_tag: bool) {
+	if has_tag {
+		error_at(floc, "%s.%s: a SignalN field takes no gd tag — the payload struct's field names ARE the arg names", s.struct_name, fname)
+	}
+
+	st, is_struct := param.derived.(^ast.Struct_Type)
+	if !is_struct || st.is_raw_union {
+		ptext := normalize_godot_qualifier(node_text(src, param), s.godot_alias)
+		if _, mok := map_variant(ptext); mok && !is_struct {
+			error_at(floc, "%s.%s: SignalN's parameter is the argument LIST as a struct, not a single payload type — use Signal1(%s) or SignalN(struct {{ pos: %s })", s.struct_name, fname, ptext, ptext)
+		} else {
+			error_at(floc, "%s.%s: SignalN's parameter must be an inline payload struct, e.g. SignalN(struct {{ amount: int }) — got %q", s.struct_name, fname, ptext)
+		}
+		return
+	}
+
+	sig := Signal_Info {
+		name = fname,
+		line = floc.line,
+	}
+	if st.fields != nil {
+		for f in st.fields.list {
+			atext := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
+			vi, vok := map_variant(atext)
+			if !vok {
+				flabel := "?"
+				if len(f.names) > 0 {flabel = node_text(src, f.names[0])}
+				error_at(floc, "%s.%s: signal payload field %q has unsupported type %q — every field must map to a Variant", s.struct_name, fname, flabel, atext)
+				return
+			}
+			for nm in f.names {
+				ident, iok := nm.derived.(^ast.Ident)
+				if !iok || ident == nil {continue}
+				append(&sig.args, Signal_Arg{name = ident.name, vi = vi})
 			}
 		}
 	}
@@ -434,10 +501,11 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			}
 		}
 
-		// Signal fields declare themselves by TYPE (gd.Signal0 … Signal4) — no tag needed
-		// (`gd:"args=..."` optionally names the payload), so this check precedes the
-		// tagged-fields-only skip below. One field, one signal; multi-name fields
-		// (`a, b: gd.Signal0`) declare one signal per name, like exports.
+		// Signal fields declare themselves by TYPE (gd.Signal0 … Signal4, or the general
+		// gd.SignalN) — no tag needed (`gd:"args=..."` optionally names the arity family's
+		// payload; SignalN forbids a tag), so these checks precede the tagged-fields-only
+		// skip below. One field, one signal; multi-name fields (`a, b: gd.Signal0`)
+		// declare one signal per name, like exports.
 		{
 			sig_type := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
 			if arity, params, is_sig := signal_type_params(sig_type); is_sig {
@@ -445,6 +513,14 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 					ident, iok := nm.derived.(^ast.Ident)
 					if !iok || ident == nil {continue}
 					parse_signal_field(&s, floc, ident.name, arity, params, val, has)
+				}
+				continue
+			}
+			if param, is_sn := signal_n_param(f.type, s.godot_alias); is_sn {
+				for nm in f.names {
+					ident, iok := nm.derived.(^ast.Ident)
+					if !iok || ident == nil {continue}
+					parse_signal_n_field(&s, src, floc, ident.name, param, has)
 				}
 				continue
 			}

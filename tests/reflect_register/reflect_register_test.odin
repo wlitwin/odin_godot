@@ -91,6 +91,42 @@ Signals :: struct {
 	score:     i32 `gd:"export"`,
 }
 
+// SignalN — the struct-payload general form: the parameter is the argument LIST as a
+// struct, its FIELD NAMES are the arg names (no tag). The escape past arity 4 (`blast`),
+// the self-naming single-arg wrap (`moved`), and coexistence with the arity family on
+// one class (`classic`).
+Signals_N :: struct {
+	owner:   gd.Node,
+	blast:   gd.SignalN(struct {
+		amount: int,
+		who:    ^gd.Node2d,
+		pos:    gd.Vector2,
+		crit:   bool,
+		tag:    gd.String,
+	}), // 5 args — past the arity family's cap
+	moved:   gd.SignalN(struct {
+		pos: gd.Vector2,
+	}), // single-field wrap: one .Vector2 arg named pos
+	classic: gd.Signal1(int) `gd:"args=value"`,
+	score:   i32 `gd:"export"`,
+}
+
+Bad_Signals_N :: struct {
+	owner:     gd.Node,
+	unwrapped: gd.SignalN(gd.Vector2), // $P itself Variant-mappable -> rejected with the two escapes
+	unstruct:  gd.SignalN(int), // non-struct $P that is ALSO mappable -> same pointed rejection
+	unmapped:  gd.SignalN(map[string]int), // non-struct, non-mappable $P -> plain-struct rule
+	tagged:    gd.SignalN(struct {
+		hp: int,
+	}) `gd:"args=hp"`, // SignalN takes NO tag (field names are authoritative) — registers anyway, loudly
+	bad_arg:   gd.SignalN(struct {
+		m: map[string]int,
+	}), // unmappable payload FIELD -> signal dropped, loudly
+	fine:      gd.SignalN(struct {
+		v: int,
+	}), // sanity: a good SignalN among the bad ones survives
+}
+
 Bad_Signals :: struct {
 	owner:    gd.Node,
 	bad_arg:  gd.Signal1(map[string]int), // unsupported payload -> signal dropped, loudly
@@ -323,6 +359,95 @@ signal_fields :: proc(t: ^testing.T) {
 	testing.expect_value(t, string(sigs[4].name), "full")
 	testing.expect_value(t, int(sigs[4].arg_types_count), 4)
 	testing.expect_value(t, string(rt.signal_arg_names(sigs[4])[3]), "d")
+}
+
+@(test)
+signal_n_fields :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	desc := rt.reflect_class_desc(Signals_N, info("SignalsN"))
+	testing.expect_value(t, len(new_errors_since(before)), 0)
+
+	// SignalN fields never become exports; the tagged export still routes correctly.
+	testing.expect_value(t, int(desc.exports_count), 1)
+	_, sok := find_export(desc, "score")
+	testing.expect(t, sok, "score must be exported")
+
+	testing.expect_value(t, int(desc.signals_count), 3)
+	sigs := rt.desc_signals(desc)
+
+	// blast — 5 args (past the arity family's cap); the payload struct's FIELD NAMES
+	// are the arg names.
+	testing.expect_value(t, string(sigs[0].name), "blast")
+	testing.expect_value(t, int(sigs[0].arg_types_count), 5)
+	testing.expect_value(t, rt.signal_arg_types(sigs[0])[0], gdext.Variant_Type.Int)
+	testing.expect_value(t, rt.signal_arg_types(sigs[0])[1], gdext.Variant_Type.Object)
+	testing.expect_value(t, rt.signal_arg_types(sigs[0])[2], gdext.Variant_Type.Vector2)
+	testing.expect_value(t, rt.signal_arg_types(sigs[0])[3], gdext.Variant_Type.Bool)
+	testing.expect_value(t, rt.signal_arg_types(sigs[0])[4], gdext.Variant_Type.String)
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[0])[0]), "amount")
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[0])[1]), "who")
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[0])[2]), "pos")
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[0])[3]), "crit")
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[0])[4]), "tag")
+
+	// moved — the single-field wrap: struct{pos: Vector2} -> one .Vector2 arg named pos.
+	testing.expect_value(t, string(sigs[1].name), "moved")
+	testing.expect_value(t, int(sigs[1].arg_types_count), 1)
+	testing.expect_value(t, rt.signal_arg_types(sigs[1])[0], gdext.Variant_Type.Vector2)
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[1])[0]), "pos")
+
+	// classic — the arity family coexists with SignalN on one class, tags intact.
+	testing.expect_value(t, string(sigs[2].name), "classic")
+	testing.expect_value(t, int(sigs[2].arg_types_count), 1)
+	testing.expect_value(t, rt.signal_arg_types(sigs[2])[0], gdext.Variant_Type.Int)
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[2])[0]), "value")
+}
+
+@(test)
+signal_n_error_paths :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	desc := rt.reflect_class_desc(Bad_Signals_N, info("BadSignalsN"))
+
+	errs := new_errors_since(before)
+	testing.expect_value(t, len(errs), 5)
+	find :: proc(errs: []rt.Registration_Error, field: string) -> (rt.Registration_Error, bool) {
+		for e in errs {
+			if e.field != nil && string(e.field) == field {return e, true}
+		}
+		return {}, false
+	}
+	// Rule (b): a Variant-mappable $P is the one-arg-vs-arg-list ambiguity — rejected
+	// with BOTH escapes spelled out.
+	unwrapped, uok := find(errs, "unwrapped")
+	testing.expect(t, uok, "mappable $P recorded")
+	if uok {
+		testing.expect_value(t, string(unwrapped.msg), "SignalN's parameter is the argument LIST as a struct, not a single payload type — use Signal1(Vector2) or SignalN(struct { pos: Vector2 })")
+	}
+	_, sok := find(errs, "unstruct")
+	testing.expect(t, sok, "non-struct mappable $P recorded")
+	// Rule (a): a non-struct, non-mappable $P gets the plain-struct rule.
+	unmapped, mok := find(errs, "unmapped")
+	testing.expect(t, mok, "non-struct $P recorded")
+	if mok {
+		testing.expect_value(t, string(unmapped.msg), "SignalN's parameter must be a plain struct — its field names/types are the signal's payload")
+	}
+	// Rule (c): SignalN takes no tag — field names are authoritative.
+	_, tok := find(errs, "tagged")
+	testing.expect(t, tok, "tag on a SignalN field recorded")
+	// Rule (d): an unmappable payload FIELD drops the signal, loudly (existing path).
+	_, bok := find(errs, "bad_arg")
+	testing.expect(t, bok, "unsupported SignalN payload field recorded")
+
+	// unwrapped/unstruct/unmapped/bad_arg are DROPPED; tagged registers anyway (loudly).
+	testing.expect_value(t, int(desc.signals_count), 2)
+	sigs := rt.desc_signals(desc)
+	testing.expect_value(t, string(sigs[0].name), "tagged")
+	testing.expect_value(t, int(sigs[0].arg_types_count), 1)
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[0])[0]), "hp")
+	testing.expect_value(t, string(sigs[1].name), "fine")
+	testing.expect_value(t, int(sigs[1].arg_types_count), 1)
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[1])[0]), "v")
+	testing.expect_value(t, int(desc.exports_count), 0)
 }
 
 @(test)

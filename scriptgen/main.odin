@@ -275,10 +275,11 @@ Signal_Arg :: struct {
 	vi:   Variant_Info,
 }
 
-// A signal declared by a typed struct field (gd.Signal0 … Signal4). The signal name IS
-// the field name; `args` carries the payload (names from the `gd:"args=..."` tag or
-// synthesized argN). Registration happens in the runtime reflection walk — scriptgen
-// only consumes this for the typed `<snake>_emit_<name>` helper.
+// A signal declared by a typed struct field (gd.Signal0 … Signal4, or gd.SignalN). The
+// signal name IS the field name; `args` carries the payload (names from the `gd:"args=..."`
+// tag / SignalN's payload-struct field names, else synthesized argN). Registration happens
+// in the runtime reflection walk — scriptgen only consumes this for the typed
+// `<snake>_emit_<name>` helper.
 Signal_Info :: struct {
 	name: string,
 	args: [dynamic]Signal_Arg,
