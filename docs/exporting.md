@@ -165,6 +165,11 @@ Requirements, all automated by the example projects:
   errors naming `core/os` files. Go through the engine instead: `gd.singleton_os()` +
   `gd.os_get_environment(...)` / `gd.os_has_environment(...)` work on every platform
   (see `examples/barrage/scripts/game_state.odin` for the pattern).
+- Odin's `int` is **32-bit on wasm32** (it's pointer-sized). Never store an engine 64-bit
+  value — above all **instance IDs** (`object_get_instance_id`) — in `int`: it compiles
+  clean, works natively, and silently truncates on web, so `gd_instance_from_id` resolves to
+  nothing (e.g. "enemies stopped dying, no errors"). Use `i64`/`gd.Int` for IDs and anything
+  else that is 64-bit engine-side.
 
 **Serving:** Godot web needs `SharedArrayBuffer`, which requires two HTTP headers:
 

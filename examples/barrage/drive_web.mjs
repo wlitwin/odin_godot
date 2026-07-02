@@ -2,8 +2,10 @@
 // waits for the title scene's Odin sentinel (BARRAGE_TITLE_READY — proves the AOT
 // SIDE_MODULE wasm booted and the ui module runs), then CLICKS the Play button and
 // waits for the game scene's sentinel (BARRAGE_FIELD_READY — proves input reached an
-// Odin handler, start_game switched scenes, and a second isolated module booted).
-// Fails on any wasm trap (`unreachable` / RuntimeError) throughout.
+// Odin handler, start_game switched scenes, and a second isolated module booted), then
+// waits for a confirmed enemy kill (BARRAGE_FIRST_KILL — the full 64-bit instance-id
+// round-trip; an `int`-typed id truncates on wasm32 and made enemies unkillable ONLY
+// on web). Fails on any wasm trap (`unreachable` / RuntimeError) throughout.
 //
 // Requires: puppeteer-core + a local Chrome (CHROME=/path/to/chrome). Serve with
 // COOP/COEP headers (tests/web/serve.sh) — Godot web needs SharedArrayBuffer.
@@ -75,15 +77,19 @@ if (booted) {
   }
 }
 
-// Let the game run a moment so an early physics/render crash would surface.
-if (entered) await new Promise(r => setTimeout(r, 3000));
+// 3. Gameplay: the player auto-fires at the first wave — wait for a confirmed kill.
+let killed = false;
+if (entered) {
+  killed = await waitFor('enemy killed (64-bit instance-id round-trip)',
+    () => has(/BARRAGE_FIRST_KILL/));
+}
 const clean = !has(trapRe) && !has(/ODIN_SCRIPT_PANIC|ODIN_GODOT_CRASH/);
 
 await browser.close();
 
 for (const l of lines) if (/BARRAGE_|ERROR|error|unreachable|RuntimeError/.test(l)) console.log(l);
 console.log('\n==== VERDICT ====');
-console.log('booted:', booted, ' entered game:', entered, ' clean:', clean);
-if (booted && entered && clean) { console.log('BROWSER_VERDICT: GREEN'); process.exit(0); }
+console.log('booted:', booted, ' entered game:', entered, ' enemy killed:', killed, ' clean:', clean);
+if (booted && entered && killed && clean) { console.log('BROWSER_VERDICT: GREEN'); process.exit(0); }
 console.log('BROWSER_VERDICT: FAIL');
 process.exit(1);

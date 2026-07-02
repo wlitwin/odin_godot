@@ -50,8 +50,10 @@ BulletField :: struct {
 	// ---- typed signal fields (the cross-module OUTPUT — enemies/player listen) ----
 	player_hit: gd.Signal1(int) `gd:"args=damage"`, // a hostile bullet reached the player
 	// SignalN carries a struct payload: which enemy instance, how hard (docs: signals).
+	// enemy_id is an engine ObjectID: ALWAYS i64, never `int` — Odin's int is 32-bit
+	// on the wasm32 web target and would truncate it (enemies become unkillable).
 	enemy_hit:  gd.SignalN(struct {
-		enemy_id: int,
+		enemy_id: i64,
 		damage:   int,
 	}), // SignalN: the FIELD NAMES are the arg names (no args= tag)
 
@@ -67,8 +69,9 @@ BulletField :: struct {
 	buffer:     gd.Packed_Float32_Array, // reused every frame
 	player:     gd.Object, // resolved lazily from the "player" group
 	player_radius: f32,
-	// enemies register/unregister themselves (by engine call) for player-bullet hits
-	enemy_ids:  [256]int,
+	// enemies register/unregister themselves (by engine call) for player-bullet hits.
+	// ids are engine ObjectIDs — i64 (see enemy_hit above; `int` truncates on wasm32).
+	enemy_ids:  [256]i64,
 	enemy_pos:  [256][2]f32,
 	enemy_radius: [256]f32,
 	enemy_count: int,
@@ -184,14 +187,14 @@ bullet_field_register_enemy :: proc(self: ^BulletField, id: gd.Int, pos: gd.Vect
 	// Update-or-add: enemies re-register each physics tick with their current position
 	// (dumb and robust across module boundaries — no lifetime coupling).
 	for k in 0 ..< self.enemy_count {
-		if self.enemy_ids[k] == int(id) {
+		if self.enemy_ids[k] == i64(id) {
 			self.enemy_pos[k] = {pos.x, pos.y}
 			self.enemy_radius[k] = f32(radius)
 			return
 		}
 	}
 	if self.enemy_count >= len(self.enemy_ids) {return}
-	self.enemy_ids[self.enemy_count] = int(id)
+	self.enemy_ids[self.enemy_count] = i64(id)
 	self.enemy_pos[self.enemy_count] = {pos.x, pos.y}
 	self.enemy_radius[self.enemy_count] = f32(radius)
 	self.enemy_count += 1
@@ -200,7 +203,7 @@ bullet_field_register_enemy :: proc(self: ^BulletField, id: gd.Int, pos: gd.Vect
 @(gd_method)
 bullet_field_unregister_enemy :: proc(self: ^BulletField, id: gd.Int) {
 	for k in 0 ..< self.enemy_count {
-		if self.enemy_ids[k] == int(id) {
+		if self.enemy_ids[k] == i64(id) {
 			self.enemy_count -= 1
 			self.enemy_ids[k] = self.enemy_ids[self.enemy_count]
 			self.enemy_pos[k] = self.enemy_pos[self.enemy_count]
@@ -242,7 +245,7 @@ bullet_field_physics_process :: proc(self: ^BulletField, delta: f64) {
 					d := b.pos - self.enemy_pos[k]
 					r := b.radius + self.enemy_radius[k]
 					if d.x * d.x + d.y * d.y < r * r {
-						bullet_field_emit_enemy_hit(self, i64(self.enemy_ids[k]), i64(b.damage))
+						bullet_field_emit_enemy_hit(self, self.enemy_ids[k], i64(b.damage))
 						dead = true
 						break
 					}

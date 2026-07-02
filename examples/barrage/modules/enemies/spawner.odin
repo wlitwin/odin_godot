@@ -30,6 +30,7 @@ Spawner :: struct {
 	boss:       gd.Object, // nil until spawned
 	boss_spawned: bool,
 	fast:       bool,
+	first_kill: bool, // one-shot console sentinel (web smoke test)
 	rng:        u64,
 }
 
@@ -117,6 +118,15 @@ spawner_on_enemy_hit :: proc(self: ^Spawner, enemy_id: gd.Int, damage: gd.Int) {
 	dv := gd.variant_from(&d)
 	died_v := gd.object_call(cast(gd.Object)target, m, dv)
 	if !bool(gd.variant_to_bool(&died_v)) {return}
+
+	// First confirmed kill sentinel: proves the full id round-trip (register -> collide
+	// -> enemy_hit signal -> gd_instance_from_id -> take_hit). The web smoke test waits
+	// for it — instance ids are 64-bit, and an `int`-typed registry truncated them on
+	// wasm32 (enemies were unkillable ONLY on web; ids must stay i64 end to end).
+	if !self.first_kill {
+		self.first_kill = true
+		gd.print_str("BARRAGE_FIRST_KILL")
+	}
 
 	gs := gd.node_get_node(cast(gd.Node)self.owner, gd.new_node_path_cstring("/root/GameState"))
 	if gs != nil {
