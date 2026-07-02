@@ -22,6 +22,7 @@ GameState="*res://scripts/game_state.odin"
 
 window/size/viewport_width=960
 window/size/viewport_height=720
+window/stretch/mode="canvas_items"
 
 [rendering]
 
