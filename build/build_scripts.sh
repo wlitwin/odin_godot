@@ -65,26 +65,9 @@ dll_leaf_for_dir() {
     fi
 }
 
-# HARD RULE: no imports between script modules. Odin happily compiles a relative
-# `import "../other_module"` — but a package imported by two script dlls duplicates its
-# package GLOBALS per dll (the shared blackboard would silently fork). So any `..`
-# relative import in a script module is rejected here, at build time. Cross-module
-# communication goes through the ENGINE: signals, methods (gd.object_call), autoloads.
-check_module_isolation() {
-    local dir="$1" hits
-    hits="$(grep -rnE --include='*.odin' \
-        '^[[:space:]]*(@\(require\)[[:space:]]*)?import[[:space:]]+([A-Za-z_][A-Za-z0-9_]*[[:space:]]+)?"\.\.' \
-        "$dir" 2>/dev/null | grep -v '\.gen\.odin:' || true)"
-    if [[ -n "$hits" ]]; then
-        echo "build_scripts: ILLEGAL cross-module import in '$dir':" >&2
-        echo "$hits" >&2
-        echo "  Script modules are ISOLATED packages: a package imported by two script dlls" >&2
-        echo "  duplicates its globals per dll (shared state would silently fork). Talk to" >&2
-        echo "  other modules through the engine (signals / methods / autoloads) instead," >&2
-        echo "  or move the shared state into exactly one module." >&2
-        exit 1
-    fi
-}
+# HARD RULE: no imports between script modules — enforced by check_module_isolation,
+# which lives in build/common.sh (shared with build_export_scripts.sh; scriptgen adds
+# the structural AST-level check on top). See its comment there for the why.
 
 # scriptgen + odin build one scripts dir into its dll (atomic temp+mv publish — see
 # atomic_odin_dll in common.sh: the live dll is NEVER missing/half-written even if the
@@ -117,6 +100,8 @@ if [[ "$IS_MODULE_DIR" == "0" && "${BUILD_MODULES:-1}" != "0" && -d "$PROJ/modul
         mdir="${mdir%/}"
         [ -d "$mdir" ] || continue
         if [ -z "$(ls "$mdir"/*.odin 2>/dev/null)" ]; then
+            # Shared phrasing with build_export_scripts.sh / build_scripts.ps1 —
+            # docs/modules.md quotes this exact string.
             echo "build_scripts: skipping module '$(basename "$mdir")' (no .odin sources)" >&2
             continue
         fi

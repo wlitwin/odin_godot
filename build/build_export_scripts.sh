@@ -57,29 +57,9 @@ case "$TARGET" in
     *) echo "build_export_scripts.sh: unsupported target '$TARGET'" >&2; exit 2 ;;
 esac
 
-# HARD RULE: no imports between script modules. Odin happily compiles a relative
-# `import "../other_module"` — but a package imported by two script dlls duplicates its
-# package GLOBALS per dll (the shared blackboard would silently fork). So any `..`
-# relative import in a script module is rejected here, at build time. Cross-module
-# communication goes through the ENGINE: signals, methods (gd.object_call), autoloads.
-# KEEP IN SYNC with check_module_isolation in build/build_scripts.sh (the dev-loop
-# build) — it lives there, not in common.sh, and is replicated here verbatim so the
-# export build enforces the same rule the editor build does.
-check_module_isolation() {
-    local dir="$1" hits
-    hits="$(grep -rnE --include='*.odin' \
-        '^[[:space:]]*(@\(require\)[[:space:]]*)?import[[:space:]]+([A-Za-z_][A-Za-z0-9_]*[[:space:]]+)?"\.\.' \
-        "$dir" 2>/dev/null | grep -v '\.gen\.odin:' || true)"
-    if [[ -n "$hits" ]]; then
-        echo "build_export_scripts.sh: ILLEGAL cross-module import in '$dir':" >&2
-        echo "$hits" >&2
-        echo "  Script modules are ISOLATED packages: a package imported by two script dlls" >&2
-        echo "  duplicates its globals per dll (shared state would silently fork). Talk to" >&2
-        echo "  other modules through the engine (signals / methods / autoloads) instead," >&2
-        echo "  or move the shared state into exactly one module." >&2
-        exit 1
-    fi
-}
+# HARD RULE: no imports between script modules — enforced by check_module_isolation,
+# which lives in build/common.sh (one canonical implementation, shared with the dev-loop
+# build_scripts.sh, so the export build enforces exactly the rule the editor build does).
 
 # 1. Build the scriptgen preprocessor to a writable TEMP dir (never into the addon, which may
 #    be read-only when installed under res://addons/). SGEN_BIN env reuses a prebuilt one.
@@ -112,7 +92,9 @@ if [[ "${BUILD_MODULES:-1}" != "0" && -d "$PROJ/modules" ]]; then
         mdir="${mdir%/}"
         [ -d "$mdir" ] || continue
         if [ -z "$(ls "$mdir"/*.odin 2>/dev/null)" ]; then
-            echo "build_export_scripts.sh: skipping module '$(basename "$mdir")' (no .odin sources)" >&2
+            # Shared phrasing with build_scripts.sh / build_scripts.ps1 — docs/modules.md
+            # quotes this exact string.
+            echo "build_scripts: skipping module '$(basename "$mdir")' (no .odin sources)" >&2
             continue
         fi
         build_one_export_dir "$mdir" "$OUTDIR/libodinscripts_$(basename "$mdir").$TARGET_EXT"

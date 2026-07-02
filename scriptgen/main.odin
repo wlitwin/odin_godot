@@ -30,6 +30,8 @@ package scriptgen
 
 import "core:fmt"
 import "core:odin/ast"
+import "core:odin/parser"
+import "core:odin/tokenizer"
 import "core:os"
 import "core:strings"
 
@@ -413,6 +415,12 @@ main :: proc() {
 		os.exit(1)
 	}
 
+	// Structural whole-tree pass (helpers in subdirectories included) BEFORE the emit
+	// loop: module-isolation import checks are hard errors even in files the emit loop
+	// never parses, and a marked script hiding in a subdirectory gets a warning instead
+	// of silently never becoming attachable. See check_tree.
+	check_tree(scripts_dir)
+
 	dir_fh, oerr := os.open(scripts_dir)
 	if oerr != nil {
 		fmt.eprintfln("scriptgen: cannot open dir %q", scripts_dir)
@@ -549,6 +557,159 @@ remove_orphan_gen :: proc(dir: string, owned: map[string]bool) {
 		uid := strings.concatenate({fi.fullpath, ".uid"})
 		if os.exists(uid) {
 			os.remove(uid)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Whole-tree structural checks (module isolation + misplaced //gd: markers)
+// ---------------------------------------------------------------------------
+
+// check_tree — one recursive pass over EVERY authored `.odin` under the scripts dir
+// (the emit loop above only parses TOP-LEVEL files; subdirectories are helper packages):
+//
+//   1. IMPORT ISOLATION, all files: a script module may import collections
+//      (godot:/core:/base:/vendor:) and packages that RESOLVE INSIDE the module's own
+//      directory (subdir helpers, helpers importing each other). Anything else — an
+//      absolute path, or a relative path that escapes the module root after lexical
+//      normalization — is a HARD ERROR. Odin itself would happily compile
+//      `import "../other_module"`, but a package linked into two script dlls duplicates
+//      its package GLOBALS per dll and the "shared" state silently forks. The bash/ps1
+//      builds keep a fast grep for the same rule (check_module_isolation in
+//      build/common.sh, ported in build/build_scripts.ps1) as a backstop; THIS is the
+//      structural check that also catches absolute paths and creative spellings.
+//
+//   2. MISPLACED MARKERS, subdirectory files only: a `//gd:` header marker on a file in
+//      a subdirectory is a script that will never be attachable (no gen is emitted for
+//      subdirs) — warn, don't error, since the file still compiles as helper code.
+check_tree :: proc(scripts_dir: string) {
+	check_tree_dir(scripts_dir, scripts_dir, true)
+}
+
+check_tree_dir :: proc(dir, root: string, is_top: bool) {
+	dir_fh, oerr := os.open(dir)
+	if oerr != nil {return} // unreadable dirs are surfaced by the emit loop / odin build
+	files, rderr := os.read_dir(dir_fh, -1, context.allocator)
+	os.close(dir_fh)
+	if rderr != nil {return}
+	for fi in files {
+		if fi.type == .Directory {
+			if strings.has_prefix(fi.name, ".") {continue} // .godot and friends
+			check_tree_dir(fi.fullpath, root, false)
+			continue
+		}
+		if !strings.has_suffix(fi.name, ".odin") {continue}
+		if strings.has_suffix(fi.name, ".gen.odin") {continue}
+		check_file(fi.fullpath, root, is_top)
+	}
+}
+
+// Parser diagnostics stay SILENT here: a file that doesn't parse is reported properly by
+// the emit loop (top level) or by `odin build` itself — this pass must not double-print.
+@(private = "file")
+silent_parse_diag :: proc(pos: tokenizer.Pos, format: string, args: ..any) {}
+
+check_file :: proc(path, root: string, is_top: bool) {
+	src_bytes, rerr := os.read_entire_file_from_path(path, context.allocator)
+	if rerr != nil {return}
+	src := string(src_bytes)
+	file := ast.File {
+		fullpath = path,
+		src      = src,
+	}
+	p := parser.default_parser()
+	p.err = silent_parse_diag
+	p.warn = silent_parse_diag
+	if !parser.parse_file(&p, &file) {return} // unparseable — odin build reports it
+	file_dir := norm_path(path)
+	if i := strings.last_index(file_dir, "/"); i >= 0 {
+		file_dir = file_dir[:i]
+	}
+	for imp in file.imports {
+		check_import(root, file_dir, path, imp)
+	}
+	if !is_top {
+		warn_subdir_markers(path, src, file.pkg_token.pos.line)
+	}
+}
+
+// The teaching text shared with the bash grep (check_module_isolation in build/common.sh)
+// — why a cross-module import is rejected instead of merely discouraged.
+@(private = "file")
+explain_isolation :: proc() {
+	fmt.eprintln("  Script modules are ISOLATED packages: a package imported by two script dlls")
+	fmt.eprintln("  duplicates its globals per dll (shared state would silently fork). Talk to")
+	fmt.eprintln("  other modules through the engine (signals / methods / autoloads) instead,")
+	fmt.eprintln("  or move the shared state into exactly one module.")
+}
+
+// check_import validates ONE import declaration against the isolation rule. `root` is the
+// absolute scripts dir being compiled; `file_dir` the importing file's dir (normalized).
+check_import :: proc(root, file_dir, path: string, imp: ^ast.Import_Decl) {
+	ipath := strings.trim(imp.fullpath, "\"")
+	loc := Loc{path, imp.pos.line}
+	// `<collection>:<pkg>` — godot:/core:/base:/vendor: (an unknown collection is odin
+	// build's own error). Collection imports never cross module boundaries.
+	if strings.contains_rune(ipath, ':') {return}
+	if strings.has_prefix(ipath, "/") || strings.has_prefix(ipath, "\\") {
+		error_at(loc, "ILLEGAL cross-module import %q — absolute import paths are not allowed in a script module; import collections (godot:/core:/base:/vendor:) or packages inside this module's directory", ipath)
+		explain_isolation()
+		return
+	}
+	nroot := norm_path(root)
+	resolved := resolve_lexical(file_dir, ipath)
+	if resolved != nroot && !strings.has_prefix(resolved, strings.concatenate({nroot, "/"})) {
+		error_at(loc, "ILLEGAL cross-module import %q — resolves to %q, outside this script module's directory (%s)", ipath, resolved, nroot)
+		explain_isolation()
+	}
+}
+
+// resolve_lexical joins `rel` onto `base_dir` and normalizes `.`/`..` segments purely
+// lexically (no filesystem access — symlink dodges are not a concern here, the rule is
+// about what the COMPILER will resolve, and odin resolves imports lexically too).
+resolve_lexical :: proc(base_dir, rel: string) -> string {
+	joined := strings.concatenate({norm_path(base_dir), "/", norm_path(rel)}, context.temp_allocator)
+	parts := strings.split(joined, "/", context.temp_allocator)
+	stack := make([dynamic]string, context.temp_allocator)
+	for part in parts {
+		switch part {
+		case "", ".":
+		case "..":
+			if len(stack) > 0 {pop(&stack)}
+		case:
+			append(&stack, part)
+		}
+	}
+	b := strings.builder_make()
+	lead := strings.has_prefix(joined, "/") // POSIX abs; a Windows `C:/...` keeps its drive segment
+	for part, i in stack {
+		if i > 0 || lead {strings.write_byte(&b, '/')}
+		strings.write_string(&b, part)
+	}
+	return strings.to_string(b)
+}
+
+// warn_subdir_markers — the misplaced-marker warning (check_tree case 2). Header region
+// only (lines BEFORE the package decl), matching scan_markers' convention; only the four
+// real markers warn — an unknown `//gd:` line in a helper is not a claim of script-ness.
+warn_subdir_markers :: proc(path, src: string, pkg_line: int) {
+	it := src
+	ln := 0
+	for line in strings.split_lines_iterator(&it) {
+		ln += 1
+		if pkg_line > 0 && ln >= pkg_line {break}
+		l := strings.trim_space(line)
+		if !strings.has_prefix(l, "//gd:") {continue}
+		body := strings.trim_space(l[len("//gd:"):])
+		for kw in ([4]string{"extends", "class", "tool", "icon"}) {
+			if _, ok := marker_arg(body, kw); ok {
+				warn_at(
+					Loc{path, ln},
+					"//gd:%s in a subdirectory file — attachable scripts must live at the top level of the scripts dir; subdirectories are helper packages",
+					kw,
+				)
+				break
+			}
 		}
 	}
 }

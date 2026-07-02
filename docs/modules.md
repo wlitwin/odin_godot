@@ -54,7 +54,8 @@ your_project/
 - **Attachable scripts live flat in the module dir** (an Odin package is one directory —
   same as `scripts/` today). Subdirectories are fine as *helper packages* the module imports
   relatively; an edit anywhere under `res://modules/<name>/` counts as an edit to that
-  module for rebuild-on-save.
+  module for rebuild-on-save. A `//gd:`-marked file in a subdirectory is never attachable —
+  `scriptgen` warns about it instead of silently skipping it.
 - A module dir with no `.odin` sources is skipped at build time, loudly:
   `build_scripts: skipping module '<name>' (no .odin sources)`.
 
@@ -94,9 +95,11 @@ Attach `res://modules/enemies/enemy.odin` to a node exactly like any other Odin 
 ## The rule: no imports between script modules
 
 A script module must not import another script module (or `scripts/`), and the build
-enforces it — any `..`-relative import inside a module fails the build
-(`check_module_isolation` in `build/build_scripts.sh`, mirrored in
-`build_export_scripts.sh` and `build_scripts.ps1`):
+enforces it twice over: `scriptgen` checks every file's import declarations structurally
+(an absolute-path import, or any relative import that resolves outside the module's
+directory, is a hard error), and a fast grep for `..`-relative imports backstops it
+(`check_module_isolation` in `build/common.sh`, shared by `build_scripts.sh` and
+`build_export_scripts.sh`, ported in `build_scripts.ps1`):
 
 ```
 build_scripts: ILLEGAL cross-module import in '<dir>':
@@ -306,7 +309,7 @@ The messages you'll actually see, and what they mean:
 
 | Message (abridged) | Meaning / fix |
 |---|---|
-| `build_scripts: ILLEGAL cross-module import in '<dir>': …` | A module imports another module (any `..`-relative import). Remove it; communicate through the engine or move the shared state into one module. |
+| `build_scripts: ILLEGAL cross-module import in '<dir>': …` (or `scriptgen: error: … ILLEGAL cross-module import …`) | A module imports another module (any import that resolves outside the module's own directory — `..`-relative or absolute). Remove it; communicate through the engine or move the shared state into one module. |
 | `odin_godot: script class 'X' is defined in BOTH script module '…' and script module '…' — … module '…' was NOT loaded.` | Class-name collision at load; the later module was rejected whole. Rename one `//gd:class`. |
 | `odin_godot: reload rejected — class 'X' in script module '…' collides with script module '…' (old code kept).` | A rebuild introduced a collision; the swap was refused and the old code stays live. |
 | `… duplicate class registration — … the LATER registration is DROPPED (first wins) …` | Two structs claim one class name in a single registry — same module on any target, or cross-module on web (check `scripts/` and each `modules/<name>/`). |

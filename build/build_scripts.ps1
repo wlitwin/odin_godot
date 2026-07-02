@@ -8,8 +8,9 @@
 #   - scriptgen -> the codegen preprocessor
 #   - the SCRIPTS dll -> <Project>\bin\libodinscripts.dll (core loads this at res://bin/libodinscripts.dll)
 #   - one dll per script MODULE: <Project>\modules\<name> -> <Project>\bin\libodinscripts_<name>.dll
-#     (KEEP IN SYNC with build/build_scripts.sh — dll_leaf_for_dir / check_module_isolation /
-#     the modules/* loop; -SkipModules is the ps1 spelling of its BUILD_MODULES=0 opt-out)
+#     (KEEP IN SYNC with build/build_scripts.sh — dll_leaf_for_dir / the modules/* loop — and
+#     build/common.sh — check_module_isolation; -SkipModules is the ps1 spelling of the bash
+#     BUILD_MODULES=0 opt-out)
 # Pass -SkipCore to build only the scripts; -ScriptsDir to build ONE specific scripts dir (the
 # per-module reload rebuild passes a single modules\<name> dir here, plus -SkipModules).
 #
@@ -143,14 +144,17 @@ function DllLeafForDir([string]$dir) {
 }
 
 # HARD RULE: no imports between script modules (mirror of check_module_isolation in
-# build/build_scripts.sh — KEEP IN SYNC, including the regex). Odin happily compiles a
+# build/common.sh — KEEP IN SYNC, including the regex). Odin happily compiles a
 # relative `import "../other_module"` — but a package imported by two script dlls
 # duplicates its package GLOBALS per dll (the shared blackboard would silently fork).
 # So any `..` relative import in a script module is rejected here, at build time.
 # Cross-module communication goes through the ENGINE: signals, methods, autoloads.
+# TOP-LEVEL FILES ONLY (no -Recurse), matching common.sh: at the module root a `..`
+# import always escapes; in subdirs it can be a legal sibling-helper import, which
+# only scriptgen's lexical AST check can tell apart.
 function CheckModuleIsolation([string]$dir) {
     $pattern = '^\s*(@\(require\)\s*)?import\s+([A-Za-z_][A-Za-z0-9_]*\s+)?"\.\.'
-    $hits = Get-ChildItem -Path $dir -Filter *.odin -File -Recurse -ErrorAction SilentlyContinue |
+    $hits = Get-ChildItem -Path $dir -Filter *.odin -File -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notlike "*.gen.odin" } |
         Select-String -Pattern $pattern
     if ($hits) {

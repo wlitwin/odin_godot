@@ -77,6 +77,44 @@ run_scriptgen() {
 }
 
 # ----------------------------------------------------------------------------
+# check_module_isolation <scripts_dir>
+#
+# HARD RULE: no imports between script modules. Odin happily compiles a relative
+# `import "../other_module"` — but a package imported by two script dlls duplicates its
+# package GLOBALS per dll (the shared blackboard would silently fork). So any `..`
+# relative import in a script module is rejected here, at build time. Cross-module
+# communication goes through the ENGINE: signals, methods (gd.object_call), autoloads.
+#
+# The CANONICAL bash implementation, shared by build_scripts.sh (dev loop) and
+# build_export_scripts.sh (export) — ported in build/build_scripts.ps1
+# (CheckModuleIsolation; KEEP IN SYNC, including the regex). This grep is the fast
+# BACKSTOP: scriptgen enforces the same rule STRUCTURALLY from the AST (absolute-path
+# imports and any relative import escaping the module included). docs/modules.md
+# quotes the message.
+#
+# TOP-LEVEL FILES ONLY (-maxdepth 1): at the module root a `..` import always escapes
+# the module, so the grep has no false positives there. In SUBDIRECTORIES a `..` import
+# can be a legal sibling-helper import (`helpers/a` importing `../b`) — only scriptgen's
+# lexical resolution can tell those apart, so subdir depth is left entirely to it.
+# ----------------------------------------------------------------------------
+check_module_isolation() {
+    local dir="$1" hits
+    hits="$(find "$dir" -maxdepth 1 -name '*.odin' ! -name '*.gen.odin' -print0 2>/dev/null |
+        xargs -0 grep -nE \
+        '^[[:space:]]*(@\(require\)[[:space:]]*)?import[[:space:]]+([A-Za-z_][A-Za-z0-9_]*[[:space:]]+)?"\.\.' \
+        2>/dev/null || true)"
+    if [[ -n "$hits" ]]; then
+        echo "build_scripts: ILLEGAL cross-module import in '$dir':" >&2
+        echo "$hits" >&2
+        echo "  Script modules are ISOLATED packages: a package imported by two script dlls" >&2
+        echo "  duplicates its globals per dll (shared state would silently fork). Talk to" >&2
+        echo "  other modules through the engine (signals / methods / autoloads) instead," >&2
+        echo "  or move the shared state into exactly one module." >&2
+        exit 1
+    fi
+}
+
+# ----------------------------------------------------------------------------
 # atomic_odin_dll <pkg_dir> <out_lib> [extra odin flags...]
 #
 # Build a shared library with `odin build -build-mode:dll` to a TEMP path beside
