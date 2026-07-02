@@ -47,8 +47,27 @@ func _initialize() -> void:
 	if not _check(n, "scores",      TYPE_PACKED_INT32_ARRAY,  PROPERTY_HINT_NONE,           ""): return
 	if not _check(n, "target",      TYPE_NODE_PATH,           PROPERTY_HINT_NONE,           ""): return
 	if not _check(n, "texture",     TYPE_OBJECT,              PROPERTY_HINT_RESOURCE_TYPE,  "Texture2D"): return
+	if not _check(n, "nums",        TYPE_ARRAY,               PROPERTY_HINT_TYPE_STRING,    "2:"): return
+	if not _check(n, "table",       TYPE_ARRAY,               PROPERTY_HINT_TYPE_STRING,    "24/17:Resource"): return
+
+	# --- scene-assigned typed arrays (regression: instantiating a scene that assigns a
+	# typed-array export used to SIGSEGV in inst_set — the engine get()s the property
+	# first and crashed on the zeroed field's null-internal Array) ---
+	var nums = n.get("nums")
+	if typeof(nums) != TYPE_ARRAY or nums != Array([7, 8, 9]):
+		_fail("nums scene value: got %s" % str(nums)); return
+	if not nums.is_typed() or nums.get_typed_builtin() != TYPE_INT:
+		_fail("nums did not come back as a typed Array[int]"); return
+	var table = n.get("table")
+	if typeof(table) != TYPE_ARRAY or table.size() != 1 or not (table[0] is Resource):
+		_fail("table scene value: got %s" % str(table)); return
+	print("  ok  scene-assigned typed arrays (nums=%s, table[0]=%s)" % [str(nums), str(table[0])])
 
 	# --- set/get round-trips through the real instance vtable ---
+	n.set("nums", Array([1, 2], TYPE_INT, "", null))
+	if n.get("nums") != Array([1, 2]):
+		_fail("nums round-trip: got %s" % str(n.get("nums"))); return
+
 	n.set("health", 42) # i32 width-narrow
 	if int(n.get("health")) != 42:
 		_fail("health round-trip: got %s" % str(n.get("health"))); return

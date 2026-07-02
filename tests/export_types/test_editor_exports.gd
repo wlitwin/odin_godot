@@ -50,6 +50,8 @@ func _initialize() -> void:
 	if not _check(n, "scores",      TYPE_PACKED_INT32_ARRAY,  PROPERTY_HINT_NONE,           ""): return
 	if not _check(n, "target",      TYPE_NODE_PATH,           PROPERTY_HINT_NONE,           ""): return
 	if not _check(n, "texture",     TYPE_OBJECT,              PROPERTY_HINT_RESOURCE_TYPE,  "Texture2D"): return
+	if not _check(n, "nums",        TYPE_ARRAY,               PROPERTY_HINT_TYPE_STRING,    "2:"): return
+	if not _check(n, "table",       TYPE_ARRAY,               PROPERTY_HINT_TYPE_STRING,    "24/17:Resource"): return
 
 	print("EXPORT_TYPES_EDITOR_OK")
 	quit(0)

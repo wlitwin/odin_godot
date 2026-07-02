@@ -32,4 +32,9 @@ Probe :: struct {
 	target:      gd.Node_Path `gd:"export"`,
 	// typed resource picker
 	texture:     gd.Object `gd:"export,resource=Texture2D"`,
+	// typed arrays (tag form) — BOTH set from the scene file (regression: scene-assigned
+	// typed-array exports used to crash inst_set during SceneState::instantiate; the
+	// suite previously only exercised the Inspector/set() path).
+	nums:        gd.Array `gd:"export,array=int"`,
+	table:       gd.Array `gd:"export,array=Resource"`,
 }

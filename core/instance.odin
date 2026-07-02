@@ -121,6 +121,15 @@ Export_Cache :: struct {
 	size:        int,
 	hint:        i64, // godot.Property_Hint int value (0 == None)
 	hint_string: godot.String, // companion string for the hint (interned once per class)
+	// Typed-collection element info, parsed from a Type_String hint (hint 23 on an
+	// Array/Dictionary export: "2:" builtin / "24/17:Class" Resource / "K;V" dict).
+	// Drives seed_container_field: a freshly-zeroed gd.Array/gd.Dictionary is NOT a
+	// valid engine value, so instances are seeded with real empty containers, typed
+	// per the hint. key_* are the Dictionary KEY (unused for Arrays).
+	elem_type:  gdext.Variant_Type, // Array element / Dictionary VALUE
+	elem_class: godot.String_Name,
+	key_type:   gdext.Variant_Type,
+	key_class:  godot.String_Name,
 	to_type:     gdext.TypeFromVariantConstructorProc, // Variant -> field
 	from_type:   gdext.VariantFromTypeConstructorProc, // field   -> Variant
 	// group/subgroup header to emit before this property (richer-authoring #2).
@@ -199,6 +208,25 @@ ensure_class_cache :: proc(desc: rt.Class_Desc) -> ^Class_Cache {
 			default      = export_default_variant(ex),
 			getter       = ex.getter,
 			setter       = ex.setter,
+		}
+		// Typed Array/Dictionary: recover the element Variant type (+ Resource class)
+		// from the registration hint_string so seed_container_field can construct
+		// correctly-TYPED empty containers (the engine's scene-load conversion asks the
+		// property for its current typed value before setting it).
+		ec := &cache.exports[i]
+		ec.elem_class = cache.empty_string_name
+		ec.key_class = cache.empty_string_name
+		if ec.hint == i64(godot.Property_Hint.Type_String) && ex.hint_string != nil {
+			hs := string(ex.hint_string)
+			#partial switch ec.type {
+			case .Array:
+				ec.elem_type, ec.elem_class = parse_type_string_part(hs, cache.empty_string_name)
+			case .Dictionary:
+				if semi := strings.index_byte(hs, ';'); semi >= 0 {
+					ec.key_type, ec.key_class = parse_type_string_part(hs[:semi], cache.empty_string_name)
+					ec.elem_type, ec.elem_class = parse_type_string_part(hs[semi + 1:], cache.empty_string_name)
+				}
+			}
 		}
 	}
 
@@ -362,6 +390,70 @@ user_struct_allocator :: proc(align: int) -> runtime.Allocator {
 	return gdext.godot_allocator()
 }
 
+// Decode ONE part of a PROPERTY_HINT_TYPE_STRING hint_string (register_class's
+// encode_tag_part/encode_builtin_part): "<variant int>:" for a builtin element,
+// "24/17:ClassName" for a Resource class. The leading integer (up to ':' or '/') is
+// the element's Variant::Type; any text after ':' is the class name.
+@(private)
+parse_type_string_part :: proc(part: string, empty: godot.String_Name) -> (vt: gdext.Variant_Type, class_name: godot.String_Name) {
+	class_name = empty
+	n := 0
+	i := 0
+	for ; i < len(part) && part[i] >= '0' && part[i] <= '9'; i += 1 {
+		n = n*10 + int(part[i] - '0')
+	}
+	vt = gdext.Variant_Type(n)
+	if colon := strings.index_byte(part, ':'); colon >= 0 && colon + 1 < len(part) {
+		class_name = godot.new_string_name_odin(part[colon + 1:])
+	}
+	return
+}
+
+// A freshly-zeroed gd.Array / gd.Dictionary field is NOT a valid engine value: both are
+// one-pointer COW handles, and the engine dereferences their internals without null
+// checks. SceneState::instantiate is the proven crash: for an Array property it get()s
+// the CURRENT value first (to convert the stored scene value to the field's element
+// type) and calls Array::is_same_typed on it — a null-internal Array SIGSEGVs there,
+// so any scene-assigned Array/Dictionary export crashed on instantiate. Construct a
+// real empty container in place — TYPED per the export's Type_String hint, which also
+// makes that scene-load element-type conversion actually work. No-op when the field
+// already holds a live value.
+@(private)
+seed_container_field :: proc "contextless" (user: rawptr, ex: ^Export_Cache) {
+	if ex.type != .Array && ex.type != .Dictionary {return}
+	fld := cast(^rawptr)(uintptr(user) + ex.offset)
+	if fld^ != nil {return}
+	typed := ex.hint == i64(godot.Property_Hint.Type_String)
+	// gdextension_*_set_typed dereference the script pointer — pass a real NIL Variant.
+	nil_script: godot.Variant
+	if ex.type == .Array {
+		a := godot.new_array_default()
+		if typed {
+			gdext.array_set_typed(
+				cast(gdext.TypePtr)&a,
+				ex.elem_type,
+				cast(gdext.StringNamePtr)&ex.elem_class,
+				cast(gdext.VariantPtr)&nil_script,
+			)
+		}
+		(cast(^godot.Array)fld)^ = a
+	} else {
+		d := godot.new_dictionary_default()
+		if typed {
+			gdext.dictionary_set_typed(
+				cast(gdext.TypePtr)&d,
+				ex.key_type,
+				cast(gdext.StringNamePtr)&ex.key_class,
+				cast(gdext.VariantPtr)&nil_script,
+				ex.elem_type,
+				cast(gdext.StringNamePtr)&ex.elem_class,
+				cast(gdext.VariantPtr)&nil_script,
+			)
+		}
+		(cast(^godot.Dictionary)fld)^ = d
+	}
+}
+
 // Apply an @export's declared `default=...` (richer-authoring #3) to its struct field.
 // A defaulted field with a setter routes through the setter so validation/side-effects
 // run; otherwise it is written straight to the field. No-op without a default.
@@ -409,9 +501,10 @@ odin_make_script_instance :: proc(script: gdext.ObjectPtr, owner: gdext.ObjectPt
 		mem.zero(user, desc.size)
 		(cast(^gdext.ObjectPtr)user)^ = owner
 
-		// Apply `@export default=...` values (richer-authoring #3) onto the freshly-zeroed
-		// struct, BEFORE _ready.
+		// Seed Array/Dictionary exports with valid empty containers, then apply
+		// `@export default=...` values (richer-authoring #3) — both BEFORE _ready.
 		for &ex in oi.cache.exports {
+			seed_container_field(user, &ex)
 			apply_export_default(user, &ex)
 		}
 	}
@@ -653,12 +746,21 @@ inst_free :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) {
 	}
 	untrack_live_instance(oi)
 	script_release_ref(oi.script) // release the ref taken in odin_make_script_instance
-	// Release any resource references retained by RESOURCE-typed @export fields (inst_set).
+	// Release any resource references retained by RESOURCE-typed @export fields (inst_set),
+	// and destruct Array/Dictionary export fields — every instance holds a live container
+	// there (seeded at creation, then scene/Inspector-set); without the unref the container
+	// and everything it holds (e.g. Resources) leak for the process lifetime.
 	if oi.cache != nil && oi.user != nil {
 		for &ex in oi.cache.exports {
 			if ex.type == .Object && ex.hint == i64(godot.Property_Hint.Resource_Type) {
 				fld := rawptr(uintptr(oi.user) + ex.offset)
 				script_release_ref((cast(^gdext.ObjectPtr)fld)^)
+			}
+			if ex.type == .Array || ex.type == .Dictionary {
+				fld := rawptr(uintptr(oi.user) + ex.offset)
+				if (cast(^rawptr)fld)^ != nil {
+					gdext.variant_get_ptr_destructor(ex.type)(cast(gdext.TypePtr)fld)
+				}
 			}
 		}
 	}
@@ -790,6 +892,9 @@ inst_get :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, name: gdex
 	if ex.from_type == nil {
 		return false
 	}
+	// Heal a zeroed Array/Dictionary field (e.g. script code assigned the Odin zero
+	// value) — marshalling a null-internal container into a Variant crashes the engine.
+	seed_container_field(oi.user, ex)
 	src := rawptr(uintptr(oi.user) + ex.offset)
 	#partial switch ex.type {
 	case .Float:
@@ -1050,6 +1155,7 @@ layout_compatible :: proc(a, b: rt.Class_Desc) -> bool {
 @(private)
 read_export_variant :: proc "contextless" (user: rawptr, ex: ^Export_Cache) -> godot.Variant {
 	v: godot.Variant
+	seed_container_field(user, ex) // never marshal a zeroed (null-internal) container
 	src := rawptr(uintptr(user) + ex.offset)
 	#partial switch ex.type {
 	case .Float:
@@ -1125,6 +1231,15 @@ migrate_instance :: proc(oi: ^Odin_Instance, new_desc: rt.Class_Desc, new_cache:
 
 	// Free/realloc the script struct on the allocator odin_make_script_instance used
 	// (user_struct_allocator — the OLD desc picks the free side, the NEW one the alloc).
+	// Container fields drop their own ref first (the snapshot Variants hold another).
+	for &ex in oi.cache.exports {
+		if ex.type == .Array || ex.type == .Dictionary {
+			fld := rawptr(uintptr(oi.user) + ex.offset)
+			if (cast(^rawptr)fld)^ != nil {
+				gdext.variant_get_ptr_destructor(ex.type)(cast(gdext.TypePtr)fld)
+			}
+		}
+	}
 	mem.free(oi.user, user_struct_allocator(oi.desc.align))
 	user, _ := mem.alloc(new_desc.size, new_desc.align, user_struct_allocator(new_desc.align))
 	if user != nil {
@@ -1144,9 +1259,11 @@ migrate_instance :: proc(oi: ^Odin_Instance, new_desc: rt.Class_Desc, new_cache:
 				break
 			}
 		}
-		// An export NEW in this layout (absent from the snapshot) starts from its declared
-		// default, exactly like a fresh instance — not from zeroed memory.
+		// An export NEW in this layout (absent from the snapshot) starts from a seeded
+		// container + its declared default, exactly like a fresh instance — not from
+		// zeroed memory.
 		if !restored {
+			seed_container_field(oi.user, &nex)
 			apply_export_default(oi.user, &nex)
 		}
 	}
