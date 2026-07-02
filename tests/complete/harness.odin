@@ -75,7 +75,10 @@ main :: proc() {
     code := strings.to_string(b)
 
     // 1. REAL ols completion for the `gd.node2d_set_p` prefix.
-    cs := complete.run_completion(code, fixture, root, share, ols_bin)
+    cs, hint0 := complete.run_completion(code, fixture, root, share, ols_bin)
+    if hint0 != "" {
+        fail(fmt.tprintf("call_hint should be empty outside a call, got %q", hint0))
+    }
     fmt.printf("prefix 'gd.node2d_set_p' -> %d option(s)\n", len(cs))
     if len(cs) == 0 {
         fail("ols returned NO completions for a known prefix (is `ols` on PATH / OLS set?)")
@@ -97,10 +100,10 @@ main :: proc() {
     fmt.println("found node2d_set_position among real ols completions")
 
     // 2. Garbage / empty input must not crash and must return a well-formed (empty ok) list.
-    junk := complete.run_completion("", fixture, root, share, ols_bin)
-    fmt.printf("empty input -> %d option(s) (no crash)\n", len(junk))
-    garbage := complete.run_completion("@@@ not odin %%%", fixture, root, share, ols_bin)
-    fmt.printf("garbage input -> %d option(s) (no crash)\n", len(garbage))
+    junk, junk_hint := complete.run_completion("", fixture, root, share, ols_bin)
+    fmt.printf("empty input -> %d option(s), hint=%q (no crash)\n", len(junk), junk_hint)
+    garbage, garbage_hint := complete.run_completion("@@@ not odin %%%", fixture, root, share, ols_bin)
+    fmt.printf("garbage input -> %d option(s), hint=%q (no crash)\n", len(garbage), garbage_hint)
 
     // 3. Completion-option Dictionary SHAPE — the font_color log-spam fix.
     //
@@ -197,6 +200,107 @@ main :: proc() {
         fail("parse_definition [] -> ok must be false")
     }
     fmt.println("definition-reply parsing OK")
+
+    // 6. SIGNATURE HELP (the `call_hint` parameter tooltip) — end-to-end through the SAME
+    // one-shot batch that serves completion. Caret INSIDE `gd.node2d_set_position(` must
+    // yield the REAL Odin signature (explicit `self` first arg — the thing Godot's class
+    // docs hide) in Godot's CodeEdit format: active parameter wrapped in U+FFFF markers.
+    sig_inject := strings.concatenate({"\tgd.node2d_set_position(", cm})
+    sb := strings.builder_make()
+    for ln in lines {
+        strings.write_string(&sb, ln)
+        strings.write_byte(&sb, '\n')
+        if strings.contains(ln, "ensure_names()") {
+            strings.write_string(&sb, sig_inject)
+            strings.write_byte(&sb, '\n')
+        }
+    }
+    sig_code := strings.to_string(sb)
+    sig_cs, sig_hint := complete.run_completion(sig_code, fixture, root, share, ols_bin)
+    _ = sig_cs
+    fmt.printf("caret in `gd.node2d_set_position(` -> call_hint=%q\n", sig_hint)
+    if !strings.contains(sig_hint, "node2d_set_position") {
+        fail("call_hint does not contain the proc name — signatureHelp not answered")
+    }
+    if !strings.contains(sig_hint, "position_: Vector2") {
+        fail("call_hint is missing the parameter list (`position_: Vector2`)")
+    }
+    // Active parameter 0 (`self: ...`) must be wrapped in the U+FFFF pair CodeEdit
+    // underlines (scene/gui/code_edit.cpp finds the first/last 0xFFFF per line).
+    if !strings.contains(sig_hint, strings.concatenate({cm, "self:"})) {
+        fail("call_hint does not mark the active `self` parameter with U+FFFF")
+    }
+    if strings.count(sig_hint, cm) != 2 {
+        fail(fmt.tprintf("call_hint must carry exactly 2 U+FFFF markers, got %d", strings.count(sig_hint, cm)))
+    }
+    fmt.println("end-to-end signatureHelp call_hint OK")
+
+    // 7. call-hint FORMATTER unit tests (fabricated LSP replies — pin the exact
+    // Godot-facing format independently of what ols emits today).
+    // 7a. string param labels + activeParameter=1 -> second param wrapped.
+    h1 := complete.parse_signature_help_reply(
+        transmute([]u8)string(
+            `{"jsonrpc":"2.0","id":6,"result":{"signatures":[{"label":"f :: proc(a: int, b: f32)","parameters":[{"label":"a: int"},{"label":"b: f32"}]}],"activeSignature":0,"activeParameter":1}}`,
+        ),
+    )
+    if h1 != strings.concatenate({"f :: proc(a: int, ", cm, "b: f32", cm, ")"}) {
+        fail(fmt.tprintf("formatter string-labels: got %q", h1))
+    }
+    // 7b. [start,end] offset param labels.
+    h2 := complete.parse_signature_help_reply(
+        transmute([]u8)string(
+            `{"result":{"signatures":[{"label":"g(x, y)","parameters":[{"label":[2,3]},{"label":[5,6]}]}],"activeParameter":0}}`,
+        ),
+    )
+    if h2 != strings.concatenate({"g(", cm, "x", cm, ", y)"}) {
+        fail(fmt.tprintf("formatter offset-labels: got %q", h2))
+    }
+    // 7c. duplicate param text resolves to the RIGHT occurrence (left-to-right walk).
+    h3 := complete.parse_signature_help_reply(
+        transmute([]u8)string(
+            `{"result":{"signatures":[{"label":"h(a: int, a: int)","parameters":[{"label":"a: int"},{"label":"a: int"}],"activeParameter":1}]}}`,
+        ),
+    )
+    if h3 != strings.concatenate({"h(a: int, ", cm, "a: int", cm, ")"}) {
+        fail(fmt.tprintf("formatter duplicate-params (per-signature activeParameter): got %q", h3))
+    }
+    // 7d. multiple signatures -> '\n'-joined lines; only the ACTIVE one gets markers.
+    h4 := complete.parse_signature_help_reply(
+        transmute([]u8)string(
+            `{"result":{"signatures":[{"label":"o(a: int)","parameters":[{"label":"a: int"}]},{"label":"o(a: int, b: int)","parameters":[{"label":"a: int"},{"label":"b: int"}]}],"activeSignature":1,"activeParameter":1}}`,
+        ),
+    )
+    if h4 != strings.concatenate({"o(a: int)\no(a: int, ", cm, "b: int", cm, ")"}) {
+        fail(fmt.tprintf("formatter multi-signature: got %q", h4))
+    }
+    // 7e. null result (caret not in a call) and malformed replies -> "" — never break.
+    if h := complete.parse_signature_help_reply(transmute([]u8)string(`{"result":null}`)); h != "" {
+        fail(fmt.tprintf("formatter null result: got %q, want \"\"", h))
+    }
+    if h := complete.parse_signature_help_reply(transmute([]u8)string(`not json at all`)); h != "" {
+        fail(fmt.tprintf("formatter garbage body: got %q, want \"\"", h))
+    }
+    // 7f. activeParameter out of range -> plain signature, no markers.
+    h5 := complete.parse_signature_help_reply(
+        transmute([]u8)string(
+            `{"result":{"signatures":[{"label":"p()","parameters":[]}],"activeParameter":3}}`,
+        ),
+    )
+    if h5 != "p()" {
+        fail(fmt.tprintf("formatter out-of-range activeParameter: got %q, want \"p()\"", h5))
+    }
+    fmt.println("call-hint formatter OK")
+
+    // 8. in_call_context — the cheap gate that decides whether to spend the extra
+    // signatureHelp round-trip at all.
+    if !complete.in_call_context(strings.concatenate({"foo(", cm})) {fail("in_call_context: `foo(` should be in-call")}
+    if !complete.in_call_context(strings.concatenate({"foo(bar, ", cm})) {fail("in_call_context: `foo(bar, ` should be in-call")}
+    if !complete.in_call_context(strings.concatenate({"foo(bar(x), ", cm})) {fail("in_call_context: nested closed call should be in-call")}
+    if !complete.in_call_context(strings.concatenate({"foo(a,\n\tb, ", cm})) {fail("in_call_context: calls span newlines")}
+    if complete.in_call_context(strings.concatenate({"foo(bar)", cm})) {fail("in_call_context: closed call should NOT be in-call")}
+    if complete.in_call_context(strings.concatenate({"foo", cm})) {fail("in_call_context: bare ident should NOT be in-call")}
+    if complete.in_call_context(strings.concatenate({"f(x) {\n\ty ", cm})) {fail("in_call_context: `{` at depth 0 is a statement boundary")}
+    fmt.println("in_call_context OK")
 
     fmt.println("COMPLETE_HARNESS_OK")
 }

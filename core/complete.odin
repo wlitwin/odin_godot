@@ -168,6 +168,11 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
     result := godot.new_dictionary_default()
     options := godot.new_array_default()
     result_code := FAILED
+    // The Godot-format parameter tooltip (CodeEdit set_code_hint): the REAL Odin signature —
+    // explicit self/singleton first arg and all — shown while typing inside a call's parens.
+    // Owned; replaced by the ols signatureHelp answer below; "" (the default) clears the hint.
+    call_hint := strings.clone("")
+    defer delete(call_hint)
 
     code := string_to_odin((cast(^godot.String)args[0])^)
     defer delete(code)
@@ -215,18 +220,34 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
             (cast(^godot.Dictionary)ret)^ = result
             return
         }
+        // The call hint (signatureHelp) is only requested when the caret is syntactically
+        // inside a call's argument list — `in_call_context` — so the common
+        // typing-an-identifier completion never pays the extra warm round-trip.
         cs: [dynamic]complete.Completion
         if warm == .Ready {
             ok: bool
             cs, ok = complete.session_complete(&complete.g_session, code, abs_path, root, share, ols_bin)
-            if !ok {
+            if ok {
+                if complete.in_call_context(code) {
+                    // One extra warm request (~tens of ms). A failure just means no tooltip —
+                    // never worth a fresh ols spawn of its own.
+                    if h, hok := complete.session_signature_help(&complete.g_session, code, abs_path, root, share, ols_bin); hok {
+                        delete(call_hint)
+                        call_hint = h
+                    } else {
+                        delete(h)
+                    }
+                }
+            } else {
                 for c in cs {delete(c.label); delete(c.insert_text); delete(c.detail)}
                 delete(cs)
-                cs = complete.run_completion(code, abs_path, root, share, ols_bin)
+                delete(call_hint)
+                cs, call_hint = complete.run_completion(code, abs_path, root, share, ols_bin)
             }
         } else {
             complete.session_warm_async(&complete.g_session, ols_bin, root, share)
-            cs = complete.run_completion(code, abs_path, root, share, ols_bin)
+            delete(call_hint)
+            cs, call_hint = complete.run_completion(code, abs_path, root, share, ols_bin)
         }
         defer {
             for c in cs {
@@ -289,7 +310,7 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
 
     cd_set_int(&result, "result", result_code)
     cd_set_bool(&result, "force", false)
-    cd_set_str(&result, "call_hint", "")
+    cd_set_str(&result, "call_hint", call_hint)
     cd_set_arr(&result, "options", &options)
     (cast(^godot.Dictionary)ret)^ = result
 }

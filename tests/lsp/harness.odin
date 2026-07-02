@@ -135,6 +135,37 @@ main :: proc() {
     }
 
     // ------------------------------------------------------------------
+    // 2b. SIGNATURE HELP through the WARM session — the `call_hint` parameter tooltip.
+    // Caret INSIDE `gd.node2d_set_position(` must yield the REAL Odin signature (explicit
+    // `self` first arg) in Godot's CodeEdit format: active param wrapped in U+FFFF markers.
+    // ------------------------------------------------------------------
+    marker :: "￿" // U+FFFF
+    sig_code := make_code(string(base), "node2d_set_position(")
+    t_sig := time.now()
+    hint, hok := complete.session_signature_help(&sess, sig_code, fixture, root, share, ols_bin)
+    fmt.printf("WARM session_signature_help: %.0f ms, ok=%v hint=%q\n",
+        time.duration_milliseconds(time.since(t_sig)), hok, hint)
+    if !hok {fail("session_signature_help returned ok=false on a warm session")}
+    if !strings.contains(hint, "node2d_set_position") {
+        fail("session call_hint does not contain the proc name")
+    }
+    if !strings.contains(hint, "position_: Vector2") {
+        fail("session call_hint is missing the parameter list (`position_: Vector2`)")
+    }
+    if !strings.contains(hint, strings.concatenate({marker, "self:"})) {
+        fail("session call_hint does not mark the active `self` parameter with U+FFFF")
+    }
+    delete(hint)
+
+    // NOT in a call -> ols answers null -> empty hint, still ok=true (session healthy).
+    no_call := make_code(string(base), "node2d_set_p")
+    hint2, hok2 := complete.session_signature_help(&sess, no_call, fixture, root, share, ols_bin)
+    if !hok2 {fail("session_signature_help (not in call) returned ok=false")}
+    if hint2 != "" {fail(fmt.tprintf("expected empty hint outside a call, got %q", hint2))}
+    delete(hint2)
+    fmt.println("session signatureHelp OK (in-call hint + empty outside call)")
+
+    // ------------------------------------------------------------------
     // 4. CRASH RECOVERY: kill the live ols process; the next call must restart + still work.
     // ------------------------------------------------------------------
     pid := sess.proc_.pid
@@ -176,6 +207,13 @@ main :: proc() {
         fail(fmt.tprintf("session_complete with a bogus ols took %.0f ms — it hung instead of failing fast", time.duration_milliseconds(bad)))
     }
     free_cs(bcs)
+    // signatureHelp against the same bogus session must also fail fast with an EMPTY hint —
+    // the ok=false + "" contract lv_complete_code relies on (empty hint, never a hang).
+    bhint, bhok := complete.session_signature_help(&bsess, sig_code, fixture, root, share, "/nonexistent/definitely/not/ols")
+    if bhok {fail("session_signature_help with a bogus ols returned ok=true")}
+    if bhint != "" {fail(fmt.tprintf("bogus-ols hint must be empty, got %q", bhint))}
+    delete(bhint)
+    fmt.println("bogus-ols signatureHelp fails fast with empty hint")
     complete.session_shutdown(&bsess)
 
     fmt.println("LSP_HARNESS_OK")

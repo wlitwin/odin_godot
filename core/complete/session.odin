@@ -20,7 +20,8 @@ package complete
 //   * A dedicated READER THREAD owns ols's stdout: it parses every Content-Length frame and,
 //     when a frame is the response to the id we're awaiting, hands the body to the requester
 //     via a cond var. Server notifications (logMessage, publishDiagnostics) are ignored — this
-//     module is completion-only (diagnostics stay on the async `odin check` path; ols computes
+//     module serves completion, signatureHelp (the call hint) and goto-definition, never
+//     diagnostics (diagnostics stay on the async `odin check` path; ols computes
 //     diagnostics by shelling the SAME `odin check`, so routing them through ols buys no speed).
 //   * `req_mutex` serializes the one outstanding response-bearing request; `write_mutex` guards
 //     stdin writes; `state_mutex` + `cond` guard the awaited-reply slot, the doc/pkg maps and
@@ -677,6 +678,70 @@ session_complete :: proc(
 
     delete(opts)
     return parse_completion_reply(body, allocator), true
+}
+
+// session_signature_help — like session_complete but asks ols for `textDocument/signatureHelp`
+// and returns the Godot code-hint string (see signature_help_to_hint: '\n'-joined signatures,
+// active parameter wrapped in U+FFFF). `hint` is owned by `allocator`; "" (allocated) when the
+// caret is not inside a call. ok=false means the session was unavailable/timed out — the caller
+// simply shows no hint (a tooltip is never worth a fresh ols spawn on its own; when the
+// COMPLETION also fell back to run_completion, the hint rides that same batch instead).
+session_signature_help :: proc(
+    s: ^Session,
+    code: string,
+    abs_path: string,
+    root: string,
+    share: string,
+    ols_bin := "ols",
+    allocator := context.allocator,
+) -> (hint: string, ok: bool) {
+    no_hint := strings.clone("", allocator)
+
+    if !ensure_started(s, ols_bin, root, share) {return no_hint, false}
+
+    overlay, ook := ensure_overlay(s, abs_path)
+    if !ook {return no_hint, false}
+    defer delete(overlay, sess_alloc())
+
+    clean, line, char := caret_from_code(code, context.temp_allocator)
+    uri := fmt.tprintf("file://%s", overlay)
+
+    text_json, mErr := json.marshal(clean, {}, context.temp_allocator)
+    if mErr != nil {return no_hint, false}
+
+    sync.lock(&s.state_mutex)
+    ver, opened := s.docs[uri]
+    ver += 1
+    s.docs[strings.clone(uri, sess_alloc()) if !opened else uri] = ver
+    sync.unlock(&s.state_mutex)
+
+    sync.lock(&s.req_mutex)
+    defer sync.unlock(&s.req_mutex)
+
+    if !opened {
+        notify(s, fmt.tprintf(
+            `{{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{{"textDocument":{{"uri":"%s","languageId":"odin","version":%d,"text":%s}}}}}}`,
+            uri, ver, string(text_json),
+        ))
+    } else {
+        notify(s, fmt.tprintf(
+            `{{"jsonrpc":"2.0","method":"textDocument/didChange","params":{{"textDocument":{{"uri":"%s","version":%d}},"contentChanges":[{{"text":%s}}]}}}}`,
+            uri, ver, string(text_json),
+        ))
+    }
+
+    s.next_id += 1
+    id := s.next_id
+    req := fmt.tprintf(
+        `{{"jsonrpc":"2.0","id":%d,"method":"textDocument/signatureHelp","params":{{"textDocument":{{"uri":"%s"}},"position":{{"line":%d,"character":%d}}}}}}`,
+        id, uri, line, char,
+    )
+    body, rok := do_request(s, id, req, REQUEST_TIMEOUT)
+    if !rok {return no_hint, false} // timeout / death -> no hint (session marked dead by reader)
+    defer delete(body, sess_alloc())
+
+    delete(no_hint, allocator)
+    return parse_signature_help_reply(body, allocator), true
 }
 
 // session_definition — like session_complete but asks ols for `textDocument/definition` and

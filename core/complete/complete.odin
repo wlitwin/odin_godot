@@ -14,7 +14,7 @@ package complete
 //
 // Transport: ols speaks LSP JSON-RPC over stdio. Rather than hold a bidirectional pipe,
 // we batch the whole handshake (initialize -> initialized -> didOpen -> completion ->
-// shutdown -> exit) into one stdin stream, run `ols` once, and parse every Content-Length
+// signatureHelp -> shutdown -> exit) into one stdin stream, run `ols` once, and parse every Content-Length
 // frame out of its stdout (ols processes the queued messages in order, so the completion
 // reply is produced before exit). A fresh spawn per request indexes the package each time
 // (~0.5s for the godot collection); that is acceptable for a debounced editor request and
@@ -204,6 +204,8 @@ DidOpen :: struct {
     },
 }
 
+// Shared shape for the position-bearing requests (textDocument/completion and
+// textDocument/signatureHelp — both take {textDocument, position}).
 @(private)
 CompletionReq :: struct {
     jsonrpc: string,
@@ -240,13 +242,24 @@ add_msg :: proc(b: ^strings.Builder, msg: $T) {
     frame(b, data)
 }
 
+// The request ids used inside the batched stream. SIG_ID rides along AFTER the completion
+// request (ols answers the queued messages in order) so one spawn serves both replies.
+@(private)
+COMPLETION_ID :: 2
+@(private)
+SIG_ID :: 4
+
 // Build the full stdin stream for one completion request against `uri` at (line, char).
+// A textDocument/signatureHelp request (id SIG_ID) is batched alongside the completion so
+// the same one-shot ols spawn also yields the editor call hint — when the caret is not
+// inside a call ols answers it with `result: null`, which parses to an empty hint.
 build_batch :: proc(uri: string, text: string, root_uri: string, line: int, char: int, allocator := context.allocator) -> string {
     b := strings.builder_make(allocator)
     add_msg(&b, Initialize{"2.0", 1, "initialize", {processId = 1, rootUri = root_uri, capabilities = {}}})
     add_msg(&b, Notify{"2.0", "initialized", {}})
     add_msg(&b, DidOpen{"2.0", "textDocument/didOpen", {textDocument = {uri = uri, languageId = "odin", version = 1, text = text}}})
-    add_msg(&b, CompletionReq{"2.0", 2, "textDocument/completion", {textDocument = {uri = uri}, position = {line = line, character = char}}})
+    add_msg(&b, CompletionReq{"2.0", COMPLETION_ID, "textDocument/completion", {textDocument = {uri = uri}, position = {line = line, character = char}}})
+    add_msg(&b, CompletionReq{"2.0", SIG_ID, "textDocument/signatureHelp", {textDocument = {uri = uri}, position = {line = line, character = char}}})
     add_msg(&b, ShutdownReq{"2.0", 3, "shutdown"})
     add_msg(&b, Notify{"2.0", "exit", {}})
     return strings.to_string(b)
@@ -273,11 +286,10 @@ as_str :: proc(v: json.Value) -> (string, bool) {
     return "", false
 }
 
-// Scan an ols stdout capture for the `id == 2` (completion) reply and turn its CompletionItems
-// into Completion records. Tolerant of `result` being either {items:[...]} or a bare [...].
-parse_completion_output :: proc(output: string, allocator := context.allocator) -> [dynamic]Completion {
-    res := make([dynamic]Completion, allocator)
-
+// Scan an ols stdout capture for the reply frame with `want_id` and return its `result`
+// json.Value (parsed into `parse_allocator`). found=false when no such reply exists.
+@(private)
+find_reply_result :: proc(output: string, want_id: int, parse_allocator: runtime.Allocator) -> (resv: json.Value, found: bool) {
     data := transmute([]u8)output
     i := 0
     HDR :: "Content-Length:"
@@ -304,22 +316,40 @@ parse_completion_output :: proc(output: string, allocator := context.allocator) 
         body := data[body_start:body_end]
         i = body_end
 
-        val, perr := json.parse(body, .JSON, true, context.temp_allocator)
+        val, perr := json.parse(body, .JSON, true, parse_allocator)
         if perr != nil {continue}
         obj, ok := val.(json.Object)
         if !ok {continue}
         idv, has_id := obj["id"]
         if !has_id {continue}
         id, idok := as_int(idv)
-        if !idok || id != 2 {continue}
+        if !idok || id != want_id {continue}
 
         resv, has_res := obj["result"]
         if !has_res {continue}
+        return resv, true // first matching reply is the answer
+    }
+    return nil, false
+}
 
+// Scan an ols stdout capture for the completion reply and turn its CompletionItems into
+// Completion records. Tolerant of `result` being either {items:[...]} or a bare [...].
+parse_completion_output :: proc(output: string, allocator := context.allocator) -> [dynamic]Completion {
+    res := make([dynamic]Completion, allocator)
+    if resv, found := find_reply_result(output, COMPLETION_ID, context.temp_allocator); found {
         extract_items(&res, resv, allocator)
-        return res // first id==2 reply is the answer
     }
     return res
+}
+
+// Scan an ols stdout capture for the signatureHelp reply and format it as a Godot code-hint
+// string (see signature_help_to_hint). Owned by `allocator`; "" (allocated) when the reply is
+// missing, null (caret not in a call), or malformed — the hint must never break completion.
+parse_signature_help_output :: proc(output: string, allocator := context.allocator) -> string {
+    if resv, found := find_reply_result(output, SIG_ID, context.temp_allocator); found {
+        return signature_help_to_hint(resv, allocator)
+    }
+    return strings.clone("", allocator)
 }
 
 // Append every CompletionItem in an LSP completion `result` (either {items:[...]} or a bare
@@ -377,6 +407,144 @@ parse_completion_reply :: proc(body: []u8, allocator := context.allocator) -> [d
     if !has_res {return res}
     extract_items(&res, resv, allocator)
     return res
+}
+
+// ---- signature help (the editor call hint) ----------------------------------
+//
+// Godot's CodeEdit renders `set_code_hint` (fed from `_complete_code`'s `call_hint`) as:
+//   * one signature per '\n'-separated line (scene/gui/code_edit.cpp splits on "\n"),
+//   * the ACTIVE PARAMETER wrapped in a pair of U+FFFF chars — CodeEdit underlines/highlights
+//     the span between the line's first and last 0xFFFF and strips the markers before drawing
+//     (code_edit.cpp `line.find/rfind(String::chr(0xFFFF))` + `line.remove_char(0xFFFF)`).
+// GDScript emits exactly this from _make_arguments_hint (modules/gdscript/gdscript_editor.cpp):
+// "Type name(a: int, ￿b: int = 0￿)". We reproduce that format from ols's LSP
+// SignatureHelp reply so Odin engine-binding calls get REAL parameter tooltips (the Odin
+// signature has an explicit self/singleton first arg the Godot class docs hide).
+
+// `in_call_context` reports whether the caret sits inside an UNCLOSED call's argument list —
+// a cheap syntactic gate that lets core skip the extra warm signatureHelp round-trip when the
+// caret is obviously not in a call. Scans BACKWARDS from the caret (the U+FFFF marker, or end
+// of buffer): `)` opens nesting, `(` closes it; the first unmatched `(` means in-call. A
+// `{`/`}`/`;` at depth 0 is a statement/block boundary — stop there (calls DO span newlines,
+// so newlines never stop the scan). Strings/comments are not lexed: a paren inside a string
+// can mislead this, costing only a wasted (null-answered) signatureHelp request or a missing
+// hint — never a wrong one (ols does the real reasoning). Scan bounded to the last 4 KiB.
+in_call_context :: proc(code: string) -> bool {
+    before := code
+    if idx := strings.index(code, CARET_MARKER); idx >= 0 {
+        before = code[:idx]
+    }
+    SCAN_LIMIT :: 4096
+    stop := 0
+    if len(before) > SCAN_LIMIT {stop = len(before) - SCAN_LIMIT}
+    depth := 0
+    for i := len(before) - 1; i >= stop; i -= 1 {
+        switch before[i] {
+        case ')':
+            depth += 1
+        case '(':
+            if depth == 0 {return true}
+            depth -= 1
+        case '{', '}', ';':
+            if depth == 0 {return false}
+        }
+    }
+    return false
+}
+
+// Locate the byte span of the `active`-th parameter inside a signature `label`, walking
+// `parameters[].label` in order. Each parameter label is either a SUBSTRING of the signature
+// label (ols's form — matched left-to-right starting after the '(' so duplicate texts resolve
+// to the right occurrence) or an LSP `[start, end]` offset pair (UTF-16 units == bytes for
+// the ASCII signatures ols emits). ok=false when anything is out of shape — the caller then
+// shows the signature without a highlight rather than a wrong one.
+@(private)
+param_span :: proc(label: string, params_v: json.Value, active: int) -> (start, end: int, ok: bool) {
+    params, pok := params_v.(json.Array)
+    if !pok || active < 0 || active >= len(params) {return 0, 0, false}
+    search_from := strings.index_byte(label, '(') + 1 // 0 when the label has no '('
+    for p_v, i in params {
+        if i > active {break}
+        po, ook := p_v.(json.Object)
+        if !ook {return 0, 0, false}
+        lv, has := po["label"]
+        if !has {return 0, 0, false}
+        #partial switch t in lv {
+        case json.String:
+            s := string(t)
+            if s == "" {return 0, 0, false}
+            rel := strings.index(label[search_from:], s)
+            if rel < 0 {return 0, 0, false}
+            start = search_from + rel
+            end = start + len(s)
+            search_from = end
+        case json.Array:
+            if len(t) != 2 {return 0, 0, false}
+            s0, k0 := as_int(t[0])
+            e0, k1 := as_int(t[1])
+            if !k0 || !k1 {return 0, 0, false}
+            start, end = s0, e0
+        case:
+            return 0, 0, false
+        }
+    }
+    if start < 0 || end > len(label) || start >= end {return 0, 0, false}
+    return start, end, true
+}
+
+// Convert a parsed LSP SignatureHelp `result` value into Godot's code-hint string (see the
+// format note above): '\n'-joined signature labels, with the active signature's active
+// parameter wrapped in U+FFFF markers. Returns an owned (possibly empty) string; null /
+// malformed results format to "" — CodeEdit treats an empty hint as "no tooltip".
+signature_help_to_hint :: proc(resv: json.Value, allocator := context.allocator) -> string {
+    obj, ook := resv.(json.Object)
+    if !ook {return strings.clone("", allocator)} // null result: caret not in a call
+    sigs, aok := obj["signatures"].(json.Array)
+    if !aok || len(sigs) == 0 {return strings.clone("", allocator)}
+
+    active_sig, _ := as_int(obj["activeSignature"]) // absent -> 0 (the LSP default)
+    active_param_top, _ := as_int(obj["activeParameter"])
+
+    b := strings.builder_make(allocator)
+    emitted := 0
+    for sig_v, i in sigs {
+        sig, sok := sig_v.(json.Object)
+        if !sok {continue}
+        label, lok := as_str(sig["label"])
+        if !lok || label == "" {continue}
+        if emitted > 0 {strings.write_string(&b, "\n")}
+        emitted += 1
+        if i != active_sig {
+            strings.write_string(&b, label)
+            continue
+        }
+        // Per-signature activeParameter (LSP 3.16+) overrides the top-level one.
+        ap := active_param_top
+        if v, k := as_int(sig["activeParameter"]); k {ap = v}
+        if start, end, found := param_span(label, sig["parameters"], ap); found {
+            strings.write_string(&b, label[:start])
+            strings.write_string(&b, CARET_MARKER)
+            strings.write_string(&b, label[start:end])
+            strings.write_string(&b, CARET_MARKER)
+            strings.write_string(&b, label[end:])
+        } else {
+            strings.write_string(&b, label)
+        }
+    }
+    return strings.to_string(b)
+}
+
+// Parse a SINGLE LSP signatureHelp response body (one frame's JSON) into the Godot code-hint
+// string — the persistent-session counterpart to parse_signature_help_output. Owned by
+// `allocator`; "" on null/malformed (never breaks completion).
+parse_signature_help_reply :: proc(body: []u8, allocator := context.allocator) -> string {
+    val, perr := json.parse(body, .JSON, true, context.temp_allocator)
+    if perr != nil {return strings.clone("", allocator)}
+    obj, ok := val.(json.Object)
+    if !ok {return strings.clone("", allocator)}
+    resv, has_res := obj["result"]
+    if !has_res {return strings.clone("", allocator)}
+    return signature_help_to_hint(resv, allocator)
 }
 
 // A resolved goto-definition target (LSP textDocument/definition). `path` is a filesystem path
@@ -462,8 +630,10 @@ write_ols_json :: proc(path: string, root: string, share: string) -> bool {
 // Full LIVE-buffer completion: copy the package dir to a temp overlay, overwrite the edited
 // file (basename of `abs_path`) with the caret-resolved buffer, write an ols.json pointing
 // the `godot`/base/core/vendor collections at `root`/`share`, run `ols` over a batched LSP
-// handshake, and return the completion options at the caret. ANY failure returns an empty
-// list — completion must never break/hang the editor.
+// handshake, and return the completion options at the caret PLUS the Godot-format call hint
+// (`call_hint` is owned by `allocator`; "" when the caret is not inside a call — the
+// signatureHelp request rides the same batch, see build_batch). ANY failure returns an empty
+// list + empty hint — completion must never break/hang the editor.
 run_completion :: proc(
     code: string,
     abs_path: string,
@@ -471,12 +641,13 @@ run_completion :: proc(
     share: string,
     ols_bin := "ols",
     allocator := context.allocator,
-) -> [dynamic]Completion {
+) -> (opts: [dynamic]Completion, call_hint: string) {
     empty := make([dynamic]Completion, allocator)
+    no_hint := strings.clone("", allocator)
 
     slash := strings.last_index_byte(abs_path, '/')
     if slash <= 0 {
-        return empty
+        return empty, no_hint
     }
     pkgdir := abs_path[:slash]
     basename := abs_path[slash + 1:]
@@ -507,7 +678,7 @@ run_completion :: proc(
         q_work,
     )
     if libc.system(setup) != 0 {
-        return empty
+        return empty, no_hint
     }
     defer {
         cleanup := fmt.ctprintf(
@@ -523,14 +694,14 @@ run_completion :: proc(
     ols_json := fmt.aprintf("%s/ols.json", work)
     defer delete(ols_json)
     if !write_ols_json(ols_json, root, share) {
-        return empty
+        return empty, no_hint
     }
 
     // 3. Overwrite the edited file with the LIVE (caret-stripped) editor buffer.
     overlay := fmt.aprintf("%s/%s", work, basename)
     defer delete(overlay)
     if werr := os.write_entire_file(overlay, transmute([]u8)clean); werr != nil {
-        return empty
+        return empty, no_hint
     }
 
     // 4. Build the batched LSP stdin stream and write it.
@@ -540,7 +711,7 @@ run_completion :: proc(
     defer delete(root_uri)
     batch := build_batch(uri, clean, root_uri, line, char, context.temp_allocator)
     if werr := os.write_entire_file(in_file, transmute([]u8)batch); werr != nil {
-        return empty
+        return empty, no_hint
     }
 
     // 5. Run ols once over the batch (cwd = overlay so it discovers ols.json), capture stdout.
@@ -555,10 +726,11 @@ run_completion :: proc(
 
     data, rerr := os.read_entire_file(out_file, context.allocator)
     if rerr != nil {
-        return empty
+        return empty, no_hint
     }
     defer delete(data)
 
     delete(empty)
-    return parse_completion_output(string(data), allocator)
+    delete(no_hint, allocator)
+    return parse_completion_output(string(data), allocator), parse_signature_help_output(string(data), allocator)
 }
