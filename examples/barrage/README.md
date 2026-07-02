@@ -30,6 +30,7 @@ engine-mediated: groups + `object_call` by name, typed signals wired in `game.ts
 | `flowgd.tween` (engine tween as a flow Action) | `modules/ui/title.odin` |
 | Custom `Resource` class + `enum=`/`range=` exports + `.tres` assets | `modules/powerups/powerup_config.odin`, `config/*.tres` |
 | `resource=` PackedScene/typed-resource exports | `spawner.odin`, `manager.odin` |
+| **Typed-array export** (`array=`), assigned from the scene | `manager.odin` (`drop_table`), `game.tscn` |
 | `@(gd_connect)` declarative signal wiring | `modules/powerups/pickup.odin` (`body_entered`) |
 | Typed cross-dll reads (`rt.script_of`) | `pickup.odin` (PowerupConfig) |
 | Autoload + engine-mediated state | `scripts/game_state.odin` |
@@ -38,3 +39,13 @@ engine-mediated: groups + `object_call` by name, typed signals wired in `game.ts
 | Export groups, ranges on every tunable | `scripts/player.odin` |
 
 Not here: `gd_rpc`/multiplayer — see `examples/survivors` (co-op) for that story.
+
+## Web export
+
+The project exports to Web out of the box: the `.gdextension`'s `web.*.wasm32` entry
+points at `res://bin/libodin_godot.wasm`, which the export plugin AOT-builds (all five
+script modules composed into ONE Emscripten SIDE_MODULE) when you export the Web
+preset. `bash web_run.sh` (inside the dev shell) exports headless and verifies the
+game boots and plays in a real browser (`BARRAGE_WEB_OK`). Note the scripts avoid
+`core:os` (no OS layer on wasm) — env checks go through the engine's `OS` singleton
+(`game_state.odin`, `is_test`).

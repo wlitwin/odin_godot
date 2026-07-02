@@ -230,6 +230,10 @@ run_web_gated "coopweb" "examples/survivors/coop_web_run.sh" "COOP_WEB_OK" "COOP
 # and prove the SAME owner-auth guarantees in-browser — both owner-auth pawns synced, the firer's
 # OWNER-LOCAL bullet immediacy (BULLET_LOCAL + BULLET_REMOTE), and a peer-auth kill agreed by both.
 run_web_gated "arenaweb" "examples/coop_arena/coop_web_run.sh" "ARENA_WEB_OK" "ARENA_WEB_BUNDLED"
+# barrageweb: the bullet-hell example's Web export boots in a real browser (all FIVE script
+# modules in one wasm), and clicking Play runs Odin input handling + a scene switch into the
+# RenderingServer/MultiMesh game scene (BARRAGE_TITLE_READY -> BARRAGE_FIELD_READY).
+run_web_gated "barrageweb" "examples/barrage/web_run.sh" "BARRAGE_WEB_OK" "BARRAGE_WEB_BUNDLED"
 
 echo "=========================================================="
 echo "SUMMARY"

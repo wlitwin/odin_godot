@@ -1,10 +1,10 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://bdf16lnauccux"]
 
-[ext_resource type="Script" path="res://scripts/player.odin" id="1"]
-[ext_resource type="Script" path="res://modules/barrage/field.odin" id="2"]
-[ext_resource type="Script" path="res://modules/enemies/spawner.odin" id="3"]
-[ext_resource type="Script" path="res://modules/powerups/manager.odin" id="4"]
-[ext_resource type="Script" path="res://modules/ui/hud.odin" id="5"]
+[ext_resource type="Script" uid="uid://dd3wp33kk7xwo" path="res://scripts/player.odin" id="1"]
+[ext_resource type="Script" uid="uid://bwgv0bnpxuwr0" path="res://modules/barrage/field.odin" id="2"]
+[ext_resource type="Script" uid="uid://duxy383877ld8" path="res://modules/enemies/spawner.odin" id="3"]
+[ext_resource type="Script" uid="uid://bngtn66knvff3" path="res://modules/powerups/manager.odin" id="4"]
+[ext_resource type="Script" uid="uid://b17xi8lol72x7" path="res://modules/ui/hud.odin" id="5"]
 [ext_resource type="PackedScene" path="res://enemy.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://boss.tscn" id="7"]
 [ext_resource type="PackedScene" path="res://pickup.tscn" id="8"]
@@ -14,59 +14,63 @@
 [ext_resource type="Resource" path="res://config/slow.tres" id="12"]
 
 [sub_resource type="CircleShape2D" id="pshape"]
-radius = 10.0
 
-[node name="Game" type="Node2D"]
+[node name="Game" type="Node2D" unique_id=1160024974]
 
-[node name="BulletField" type="Node2D" parent="."]
+[node name="BulletField" type="Node2D" parent="." unique_id=773564777]
 script = ExtResource("2")
+bullet_scale = 0.0
+bounds_pad = 0.0
 
-[node name="Player" type="CharacterBody2D" parent="."]
+[node name="Player" type="CharacterBody2D" parent="." unique_id=126930471]
 script = ExtResource("1")
+move_speed = 0.0
+fire_rate = 0.0
+shot_count = 0
 
-[node name="Shape" type="CollisionShape2D" parent="Player"]
+[node name="Shape" type="CollisionShape2D" parent="Player" unique_id=122415056]
 shape = SubResource("pshape")
 
-[node name="Body" type="Polygon2D" parent="Player"]
+[node name="Body" type="Polygon2D" parent="Player" unique_id=122596650]
 color = Color(0.35, 0.85, 1, 1)
 polygon = PackedVector2Array(0, -14, 10, 10, -10, 10)
 
-[node name="Spawner" type="Node2D" parent="."]
+[node name="Spawner" type="Node2D" parent="." unique_id=1796037540]
 script = ExtResource("3")
 enemy_scene = ExtResource("6")
 boss_scene = ExtResource("7")
+waves_before_boss = 0
+wave_size = 0
+wave_interval = 0.0
 
-[node name="PowerupManager" type="Node2D" parent="."]
+[node name="PowerupManager" type="Node2D" parent="." unique_id=1102968605]
 script = ExtResource("4")
 pickup_scene = ExtResource("8")
-drop_a = ExtResource("9")
-drop_b = ExtResource("10")
-drop_c = ExtResource("11")
-drop_d = ExtResource("12")
+drop_table = [ExtResource("9"), ExtResource("10"), ExtResource("11"), ExtResource("12")]
 
-[node name="Hud" type="CanvasLayer" parent="."]
+[node name="Hud" type="CanvasLayer" parent="." unique_id=21039921]
 script = ExtResource("5")
 
-[node name="Score" type="Label" parent="Hud"]
+[node name="Score" type="Label" parent="Hud" unique_id=567004577]
 offset_left = 12.0
 offset_top = 8.0
 offset_right = 300.0
 offset_bottom = 34.0
 text = "SCORE 0"
 
-[node name="Hp" type="Label" parent="Hud"]
+[node name="Hp" type="Label" parent="Hud" unique_id=1600196638]
 offset_left = 12.0
 offset_top = 34.0
 offset_right = 300.0
 offset_bottom = 60.0
 text = "HP 5/5"
 
-[node name="Stats" type="Label" parent="Hud"]
+[node name="Stats" type="Label" parent="Hud" unique_id=1860089437]
 offset_left = 12.0
 offset_top = 686.0
 offset_right = 500.0
 offset_bottom = 712.0
 text = "bullets 0"
 
-[connection signal="player_hit" from="BulletField" to="Player" method="take_damage"]
 [connection signal="enemy_hit" from="BulletField" to="Spawner" method="on_enemy_hit"]
+[connection signal="player_hit" from="BulletField" to="Player" method="take_damage"]

@@ -64,3 +64,5 @@ examples/*/.coopsignal.log
 /tests/webrtc/.signal.log
 /examples/survivors/node_modules
 /examples/coop_arena/node_modules
+/examples/barrage/node_modules
+/examples/barrage/out

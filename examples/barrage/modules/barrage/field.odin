@@ -75,6 +75,9 @@ BulletField :: struct {
 }
 
 bullet_field_ready :: proc(self: ^BulletField) {
+	// Scene-entry sentinel: proves the barrage module (a SECOND isolated module) booted —
+	// entering the game scene from the title is the web smoke test's gameplay assertion.
+	gd.print_str("BARRAGE_FIELD_READY")
 	if self.bullet_scale == 0 {self.bullet_scale = 6}
 	if self.bounds_pad == 0 {self.bounds_pad = 64}
 

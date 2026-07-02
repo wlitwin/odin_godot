@@ -160,6 +160,11 @@ Requirements, all automated by the example projects:
   runtime).
 - The editor's export plugin builds the wasm at export time (it shells `build/build_web.sh`),
   so the file the `.gdextension` references actually exists.
+- Script code must not import `core:os` — Odin's native OS layer doesn't compile for the wasm
+  target, so the export fails with `Undeclared name: _read_directory_iterator`-style compile
+  errors naming `core/os` files. Go through the engine instead: `gd.singleton_os()` +
+  `gd.os_get_environment(...)` / `gd.os_has_environment(...)` work on every platform
+  (see `examples/barrage/scripts/game_state.odin` for the pattern).
 
 **Serving:** Godot web needs `SharedArrayBuffer`, which requires two HTTP headers:
 

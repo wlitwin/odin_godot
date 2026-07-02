@@ -39,6 +39,9 @@ configure_pulse :: proc(t: gd.Tween, ctx: rawptr) {
 }
 
 title_ready :: proc(self: ^Title) {
+	// Scene-entry sentinel: proves the ui module booted (the web smoke test greps the
+	// browser console for it; on web, print_str lands in console.log).
+	gd.print_str("BARRAGE_TITLE_READY")
 	// GameState survives scene switches (autoload) — a fresh title = a fresh run.
 	gs := gd.node_get_node(cast(gd.Node)self.owner, gd.new_node_path_cstring("/root/GameState"))
 	if gs != nil {

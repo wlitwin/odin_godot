@@ -12,26 +12,24 @@ package barrage_main
 // @(gd_method)s called cross-module by name, exports for Inspector debugging.
 // ----------------------------------------------------------------------------
 
-import "core:os"
+import gdext "godot:gdext"
 import gd "godot:godot"
 
 GameState :: struct {
-	owner: gd.Node,
-
+	owner:         gd.Node,
 	score_changed: gd.Signal1(int) `gd:"args=score"`,
 	hp_changed:    gd.Signal2(int, int) `gd:"args=hp,max_hp"`,
 	player_died:   gd.Signal0,
-
-	max_hp: int `gd:"export,range=1:20:1"`,
+	max_hp:        int `gd:"export,range=1:20:1"`,
 
 	// runtime (untagged -> private)
-	score:   int,
-	hp:      int,
-	cleared: bool, // boss defeated (game_over.odin shows CLEARED vs GAME OVER)
+	score:         int,
+	hp:            int,
+	cleared:       bool, // boss defeated (game_over.odin shows CLEARED vs GAME OVER)
 }
 
 game_state_ready :: proc(self: ^GameState) {
-	if self.max_hp == 0 {self.max_hp = 5}
+	if self.max_hp == 0 {self.max_hp = 100}
 	game_state_reset(self)
 }
 
@@ -78,5 +76,11 @@ game_state_is_cleared :: proc(self: ^GameState) -> gd.Bool {return gd.Bool(self.
 // one place. @(gd_method) so the ISOLATED modules can ask through the engine too.
 @(gd_method)
 game_state_is_test :: proc(self: ^GameState) -> gd.Bool {
-	return gd.Bool(os.get_env("BARRAGE_TEST", context.temp_allocator) == "1")
+	// Engine OS singleton, not core:os — portable to the web export (no env in the
+	// browser, so this correctly reads as "not a test" there).
+	env := gd.os_get_environment(gd.singleton_os(), gd.new_string_cstring("BARRAGE_TEST"))
+	buf: [8]u8
+	n := gdext.string_to_utf8_chars(cast(gdext.StringPtr)&env, cast(cstring)&buf[0], len(buf))
+	return gd.Bool(n == 1 && buf[0] == '1')
 }
+

@@ -1,7 +1,10 @@
 ; Engine configuration file.
-; Barrage — the odin_godot data-oriented showcase: a bullet-hell whose thousands of
-; bullets live in an Odin #soa pool and render through ONE RenderingServer MultiMesh.
-; See README.md for the feature -> file reference map.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
