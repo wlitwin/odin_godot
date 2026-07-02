@@ -87,6 +87,10 @@ TESTS=(
     # directions with correct sender ids — the genuine remote path tests/rpc could not reach.
     "rpcnet|RPC_NET_OK|tests/rpc_net/run.sh"
     "survivors|SURVIVORS_OK|examples/survivors/run.sh"
+    # Barrage: the data-oriented showcase — thousands of #soa bullets through ONE
+    # RenderingServer multimesh, 5 isolated script modules, boss via the flow sequencer,
+    # powerup resources, multi-scene UI. See examples/barrage/README.md.
+    "barrage|BARRAGE_OK|examples/barrage/run.sh"
     # MultiplayerSpawner + MultiplayerSynchronizer with Odin scripts, in isolation over ENet:
     # the host spawns an Odin-scripted scene (replicated to the client) whose native position +
     # Odin @export field sync via the synchronizer. The de-risking proof the co-op game uses.

@@ -1,0 +1,25 @@
+; Engine configuration file.
+; Barrage — the odin_godot data-oriented showcase: a bullet-hell whose thousands of
+; bullets live in an Odin #soa pool and render through ONE RenderingServer MultiMesh.
+; See README.md for the feature -> file reference map.
+
+config_version=5
+
+[application]
+
+config/name="Barrage"
+run/main_scene="res://title.tscn"
+config/features=PackedStringArray("4.6")
+
+[autoload]
+
+GameState="*res://scripts/game_state.odin"
+
+[display]
+
+window/size/viewport_width=960
+window/size/viewport_height=720
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true

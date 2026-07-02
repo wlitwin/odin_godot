@@ -1,0 +1,28 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://modules/ui/title.odin" id="1"]
+
+[node name="Title" type="Control"]
+script = ExtResource("1")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Heading" type="Label" parent="."]
+offset_left = 330.0
+offset_top = 200.0
+offset_right = 630.0
+offset_bottom = 260.0
+pivot_offset = Vector2(150, 30)
+theme_override_font_sizes/font_size = 48
+text = "BARRAGE"
+horizontal_alignment = 1
+
+[node name="Play" type="Button" parent="."]
+offset_left = 420.0
+offset_top = 360.0
+offset_right = 540.0
+offset_bottom = 404.0
+text = "Play"
+
+[connection signal="pressed" from="Play" to="." method="start_game"]
