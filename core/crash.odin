@@ -7,8 +7,8 @@ import "base:intrinsics"
 import "core:sys/posix"
 
 // ----------------------------------------------------------------------------
-// Fatal-signal crash reporter (darwin + linux; Windows is OUT OF SCOPE — see
-// crash_other.odin). WHY: a mistake in script code (the classic: calling an engine
+// Fatal-signal crash reporter (darwin + linux; the Windows SEH twin lives in
+// crash_windows.odin). WHY: a mistake in script code (the classic: calling an engine
 // method on a nil object handle) kills the game with a raw SIGSEGV and ZERO Odin-side
 // output — and when the game was launched from the editor, the editor's Output dock
 // shows the child's output via Godot's debugger TCP channel, not piped stderr, so the
@@ -44,8 +44,16 @@ import "core:sys/posix"
 // Symbolizing the module+offset lines: `atos -o libodinscripts.dylib.dSYM/Contents/
 // Resources/DWARF/libodinscripts.dylib -l <load addr> <pc>` (see docs/debugging.md).
 //
-// NOT handled: stack-overflow crashes (no sigaltstack — the handler runs on the dead
-// stack), and anything on Windows (SEH, not signals — documented out of scope).
+// SIGTRAP is in the handled set: Odin terminates panics/asserts AND bounds-check
+// failures with a trap instruction, which on arm64 raises SIGTRAP (x86: ud2 -> SIGILL).
+// Handling it (a) closes the bounds-check hole — those bypass the assertion proc via a
+// contextless runtime path, so without this an editor-launched game died silently —
+// and (b) makes arm64 panics append the signal report after the ODIN_SCRIPT_PANIC line
+// exactly like x86 (the O_APPEND coordination below).
+//
+// The handler runs on a SIGALTSTACK, so a STACK-OVERFLOW SIGSEGV (whose faulting thread
+// has no usable stack left) still reports. NOT handled: Windows — SEH, not signals; see
+// core/crash_windows.odin.
 // ----------------------------------------------------------------------------
 
 // execinfo: backtrace/backtrace_symbols_fd live in libSystem on Darwin, glibc on Linux.
@@ -60,7 +68,7 @@ foreign libexecinfo {
 }
 
 @(private = "file")
-CRASH_SIGNALS :: [4]posix.Signal{.SIGSEGV, .SIGBUS, .SIGILL, .SIGFPE}
+CRASH_SIGNALS :: [5]posix.Signal{.SIGSEGV, .SIGBUS, .SIGILL, .SIGFPE, .SIGTRAP}
 
 @(private = "file")
 g_prev_actions: [len(CRASH_SIGNALS)]posix.sigaction_t
@@ -171,9 +179,21 @@ crash_reporter_install :: proc() {
 	// now, into a static buffer the handler and the panic path can use allocation-free.
 	crash_file_precompute_path()
 
+	// Alternate signal stack: a STACK-OVERFLOW SIGSEGV leaves the faulting thread no
+	// stack to run a handler on — without this the process just dies, report-less. A
+	// static buffer (never freed; the reporter lives for the process) + SA_ONSTACK.
+	// Failure is non-fatal: handlers still work for every non-overflow crash.
+	@(static) alt_stack: [256 * 1024]byte
+	ss := posix.stack_t {
+		ss_sp    = raw_data(alt_stack[:]),
+		ss_size  = len(alt_stack),
+		ss_flags = {},
+	}
+	posix.sigaltstack(&ss, nil)
+
 	act: posix.sigaction_t
 	act.sa_sigaction = crash_handler
-	act.sa_flags = {.SIGINFO}
+	act.sa_flags = {.SIGINFO, .ONSTACK}
 	posix.sigemptyset(&act.sa_mask)
 	sigs := CRASH_SIGNALS
 	for s, i in sigs {
@@ -281,6 +301,7 @@ signal_name :: proc "c" (sig: posix.Signal) -> string {
 	case .SIGBUS:  return "SIGBUS"
 	case .SIGILL:  return "SIGILL"
 	case .SIGFPE:  return "SIGFPE"
+	case .SIGTRAP: return "SIGTRAP"
 	}
 	return "signal"
 }
@@ -298,6 +319,8 @@ editor_crash_message :: proc "c" (sig: posix.Signal) -> cstring {
 		return "Odin: the game CRASHED in native code (SIGILL — illegal instruction; also how an Odin panic/trap terminates). Backtrace on stderr/terminal; symbolize with docs/debugging.md."
 	case .SIGFPE:
 		return "Odin: the game CRASHED in native code (SIGFPE — integer division by zero or similar). Backtrace on stderr/terminal; symbolize with docs/debugging.md."
+	case .SIGTRAP:
+		return "Odin: the game hit a TRAP (SIGTRAP — how an Odin panic/assert/bounds-check terminates). If no ODIN_SCRIPT_PANIC message appears above, this is likely a bounds-check failure: run from a terminal (or under Tools > Debug Game (LLDB)) to see the runtime's index/range message."
 	}
 	return "Odin: the game CRASHED in native code (fatal signal). Backtrace on stderr/terminal; symbolize with docs/debugging.md."
 }

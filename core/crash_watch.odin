@@ -1,4 +1,4 @@
-#+build darwin, linux
+#+build darwin, linux, windows
 package core
 
 import "godot:godot"
@@ -6,7 +6,7 @@ import "godot:godot"
 import "core:fmt"
 import "core:os"
 import "core:strings"
-import "core:sys/posix"
+import "core:time"
 
 // ----------------------------------------------------------------------------
 // EDITOR-side crash-report surfacing. WHY: when the game is launched FROM THE EDITOR
@@ -25,7 +25,8 @@ import "core:sys/posix"
 // its own file; the editor itself never installs the handler, so a report here is
 // always a child's/previous session's). Headless `--import` runs also have editor_hint
 // set and may surface+rename a stale report — harmless by design (the rename makes it
-// one-shot). Windows: no-op stub in crash_other.odin (no handler writes files there).
+// one-shot). All THREE desktop platforms: the writers are core/crash.odin (signals,
+// darwin/linux) and core/crash_windows.odin (SEH).
 // ----------------------------------------------------------------------------
 
 // ~0.5s at 60fps — a crash is rare; one stat(2) every 30 frames is free.
@@ -88,12 +89,11 @@ crash_watch_pump :: proc() {
 		return
 	}
 
-	cpath := strings.clone_to_cstring(g_watch_path, context.temp_allocator)
-	st: posix.stat_t
-	if posix.stat(cpath, &st) != .OK {
+	fi, serr := os.stat(g_watch_path, context.temp_allocator)
+	if serr != nil {
 		return // no report — the overwhelmingly common case
 	}
-	mtime := i64(st.st_mtim.tv_sec) * 1_000_000_000 + i64(st.st_mtim.tv_nsec)
+	mtime := time.time_to_unix_nano(fi.modification_time)
 	if mtime <= g_watch_last_mtime {
 		return // already surfaced (rename must have failed) — never spam
 	}

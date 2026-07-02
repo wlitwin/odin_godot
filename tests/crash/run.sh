@@ -37,6 +37,9 @@ set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PROJ="$ROOT/tests/crash"
+# The export phase (5) runs the headless EDITOR, whose OdinExportPlugin resolves the
+# odin_godot collection from this env (repo test projects have no addons/ dir).
+export ODIN_GODOT_ROOT="$ROOT"
 
 # Build the scripts dll (CrashTarget + boot) + the core dll.
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
@@ -95,15 +98,15 @@ assert_grep "$PANIC_LOG" "ERROR: ODIN_SCRIPT_PANIC" \
 [[ -f "$CRASH_FILE" ]] || fail "crash-report file missing after the panic child"
 assert_grep "$CRASH_FILE" "ODIN_SCRIPT_PANIC panic: CRASH_TEST_PANIC boom from odin script" \
     "crash-report file lacks the panic line"
-if [[ "$(uname -sm)" == "Darwin arm64" ]]; then
-    # trap == SIGTRAP here (not a handled signal): the file must hold EXACTLY the panic
-    # report, no double-report. (On x86 the trap is SIGILL and the handler APPENDS its
-    # report after the panic line — one coherent file either way; not asserted here.)
-    if grep -q "ODIN_GODOT_CRASH" "$CRASH_FILE"; then
-        fail "unexpected signal-handler double-report in the crash file after a panic"
-    fi
+# The post-panic trap (arm64: SIGTRAP; x86: ud2 -> SIGILL) is a HANDLED signal, and the
+# handler must APPEND its report after the panic line (the g_crash_file_panic O_APPEND
+# coordination), never clobber it — assert both halves of the coherent file.
+assert_grep "$CRASH_FILE" "ODIN_GODOT_CRASH" \
+    "trap-after-panic signal report missing from the crash file (SIGTRAP/SIGILL handling)"
+if ! grep -q "ODIN_SCRIPT_PANIC" "$CRASH_FILE"; then
+    fail "panic line clobbered by the trap report — O_APPEND coordination broken"
 fi
-echo "  panic child died (rc=$rc) with ODIN_SCRIPT_PANIC + file:line + push_error copy + crash file"
+echo "  panic child died (rc=$rc) with ODIN_SCRIPT_PANIC + file:line + push_error copy + coherent crash file"
 
 # ---------------------------------------------------------------------------
 # (2) SIGNAL path
@@ -170,6 +173,61 @@ assert_grep "$ED_LOG" "crash_target_do_segv" \
 [[ ! -f "$CRASH_FILE" ]] || fail "crash file was not renamed after surfacing (would refire)"
 [[ -f "$CRASH_PREV" ]] || fail ".odin_crash.prev.log missing — the surfaced artifact was lost"
 echo "  editor pass surfaced the report into the Output and renamed the file to .prev"
+
+# ---------------------------------------------------------------------------
+# (4) STACK OVERFLOW: unbounded recursion faults on the guard page — a SIGSEGV whose
+#     thread has NO usable stack. The report below exists at all only because the
+#     handler runs on a sigaltstack.
+# ---------------------------------------------------------------------------
+echo "== (4) stack overflow: report survives via sigaltstack =="
+rm -f "$CRASH_FILE" "$CRASH_PREV"
+OVF_LOG="$LOGDIR/crash-overflow.log"
+rc=0
+"$GODOT" --headless --path "$PROJ" --script test_overflow.gd >"$OVF_LOG" 2>&1 || rc=$?
+if [[ "$rc" == "0" ]]; then
+    fail "overflow child exited 0 — the recursion did not kill the process"
+fi
+grep -q "CRASH_DRIVER_FAIL" "$OVF_LOG" && fail "overflow driver reported failure (see $OVF_LOG)"
+assert_grep "$OVF_LOG" "ODIN_GODOT_CRASH: fatal signal (SIGSEGV|SIGBUS)" \
+    "no crash report from the stack overflow — sigaltstack handling broken"
+[[ -f "$CRASH_FILE" ]] || fail "crash-report file missing after the overflow child"
+assert_grep "$CRASH_FILE" "ODIN_GODOT_CRASH: fatal signal" \
+    "crash-report file lacks the overflow report"
+echo "  overflow child died (rc=$rc) and the sigaltstack handler still reported"
+
+# ---------------------------------------------------------------------------
+# (5) EXPORTED game: a real .app export whose autoload self-crashes at startup
+#     (ODIN_CRASH_TEST=segv — see crash_target_ready). The reporter must land the
+#     post-mortem at user://odin_crash.log (the res://bin path is editor-feature-only),
+#     the artifact a player can send in. Darwin-only (the export preset is macOS).
+# ---------------------------------------------------------------------------
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "== (5) exported game: crash report lands at user://odin_crash.log =="
+    APP="$PROJ/out/OdinGodotCrash.app"
+    EXE="$APP/Contents/MacOS/OdinGodotCrash"
+    USER_LOG="$HOME/Library/Application Support/Godot/app_userdata/OdinGodotCrash/odin_crash.log"
+    rm -rf "$PROJ/out" "$PROJ/.export_build"
+    rm -f "$USER_LOG"
+    mkdir -p "$PROJ/out"
+    "$GODOT" --headless --path "$PROJ" --export-release "macOS" "$APP" 2>&1 \
+        | grep -E "odin export:" || true
+    [[ -x "$EXE" ]] || fail "exported executable missing ($EXE) — export templates installed?"
+    rc=0
+    env -u ODIN_SCRIPTS_DLL ODIN_CRASH_TEST=segv "$EXE" --headless >"$LOGDIR/crash-export.log" 2>&1 || rc=$?
+    if [[ "$rc" == "0" ]]; then
+        fail "exported app exited 0 — ODIN_CRASH_TEST=segv did not crash it"
+    fi
+    [[ -f "$USER_LOG" ]] || fail "user:// crash log missing after the exported-app crash ($USER_LOG)"
+    assert_grep "$USER_LOG" "ODIN_GODOT_CRASH: fatal signal SIGSEGV" \
+        "user:// crash log lacks the report marker"
+    # The RELEASE export inlines do_segv into the generated _ready trampoline — assert
+    # the faulting frame symbolizes into the script's code at all (crash_target*), not
+    # a specific proc name.
+    assert_grep "$USER_LOG" "ODIN_GODOT_CRASH at +pc .*crash_target" \
+        "user:// crash log lacks a faulting frame symbolized into the script"
+    rm -f "$USER_LOG"
+    echo "  exported app crashed and left a symbolized post-mortem at user://odin_crash.log"
+fi
 
 echo
 echo "CRASH_TEST_OK"

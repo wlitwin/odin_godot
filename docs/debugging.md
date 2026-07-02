@@ -52,14 +52,18 @@ atos -o bin/libodinscripts.dylib.dSYM/Contents/Resources/DWARF/libodinscripts.dy
 (on Linux: `addr2line -f -e bin/libodinscripts.so <offset>`). Usually unnecessary — the
 Odin frames come out symbolized already, as above.
 
-Honest limits: **Windows** crash capture is not implemented (SEH, not signals — script
-*panics* still report; only the raw-signal net is missing); Odin **bounds-check** failures
-bypass the assertion proc (a separate contextless runtime path) — they print to stderr and
-trap, so they surface via the SIGILL/SIGTRAP crash path, without the pretty message; a
-**stack-overflow** crash can't run the handler (no sigaltstack); and the mid-crash
-push_error may not survive to the editor if the debugger link dies first — stderr always
-carries the full report. Verified end-to-end by `tests/crash/run.sh` (sentinel
-`CRASH_TEST_OK`).
+The net covers the hard cases too: **stack overflows** report (the handler runs on a
+`sigaltstack`; Windows: `SetThreadStackGuarantee`); the post-panic/assert/**bounds-check
+trap** is a handled signal (SIGTRAP/SIGILL; Windows: `EXCEPTION_BREAKPOINT`), so those
+never die silently — a bounds-check failure's own index/range message goes to stderr
+only, so the report hints to rerun from a terminal (or under lldb) for it; **exported
+games** leave the report at `user://odin_crash.log` — a post-mortem a player can send in;
+and **Windows** has an SEH twin of the reporter (`core/crash_windows.odin`, DbgHelp
+symbolization against the build's `.pdb`s — compile-verified, awaiting a real-Windows
+run). Honest limits: the mid-crash push_error may not survive to the editor if the
+debugger link dies first — stderr and the crash FILE always carry the full report.
+Verified end-to-end by `tests/crash/run.sh` (sentinel `CRASH_TEST_OK`): panic, segv,
+stack overflow, editor surfacing, and a real exported-.app crash.
 
 ## Launching the debugger from the editor (macOS + Linux)
 
@@ -81,8 +85,10 @@ re-signing, breakpoint syntax):
 
 All three shell out to `addons/odin_godot/build/debug_game.sh`, which also works
 standalone (see §2). The Godot binary being debugged is the editor's own executable, so
-what you debug is exactly what Play runs. Windows: not wired up yet (the native path
-there is VS/WinDbg against the `.pdb` the build already emits).
+what you debug is exactly what Play runs. On **Windows**, the terminal-lldb items don't
+exist, but **Generate VS Code Debug Config** does — it writes a `cppvsdbg` launch.json
+(the standard C/C++ extension) that debugs the editor's binary directly against the
+`.pdb`s the builds emit; no re-signing needed there.
 
 ### JetBrains IDEs (Rider, CLion, IDEA Ultimate, …)
 

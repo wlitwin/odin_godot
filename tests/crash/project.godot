@@ -17,3 +17,7 @@ config/features=PackedStringArray("4.6")
 [autoload]
 
 CrashTarget="*res://scripts/crash_target.odin"
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true
