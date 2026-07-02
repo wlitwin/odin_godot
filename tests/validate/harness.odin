@@ -241,5 +241,59 @@ main :: proc() {
         fail("coalescing: workers did not drain within 30s")
     }
 
+    // ------------------------------------------------------------------
+    // 5. FRESH-RESULT FLAG (drives the editor re-validate poke): a completed worker sets it;
+    //    take_fresh consumes it exactly once; a cache-hit validate_async (the editor picked
+    //    the result up naturally) suppresses a pending poke.
+    // ------------------------------------------------------------------
+    // The drained coordinator above just published its last result -> flag must be set.
+    if !diag.take_fresh(&cstate) {
+        fail("fresh flag: expected true after a worker published a result")
+    }
+    if diag.take_fresh(&cstate) {
+        fail("fresh flag: take_fresh must consume the flag (second read true)")
+    }
+    // Natural pickup: recompute for known content -> the publish sets the flag; a cache-HIT
+    // call for that same content clears it (no redundant poke).
+    {
+        // last published content was contents[4] (the final coalesced job) — cache-hit it.
+        ds, _ := diag.validate_async(&cstate, contents[4], fixture, root, odin_bin)
+        free_diags(ds)
+        // wait: is contents[4] actually the cached one? the coalesced pending kept only the
+        // LATEST, so yes — but guard against surprises by asserting via the snapshot instead.
+        s := snapshot(&cstate)
+        if !s.have_result {
+            fail("fresh flag: expected a cached result to still be present")
+        }
+    }
+    // A worker publish followed by a cache-hit _validate must leave the flag CLEARED: force
+    // one more full cycle on never-seen content, wait for publish, cache-hit, then check.
+    fresh_src := "package validate_fixture\n\nzz :: proc() { x := 9; _ = x }\n"
+    {
+        ds0, _ := diag.validate_async(&cstate, fresh_src, fixture, root, odin_bin)
+        free_diags(ds0)
+        start := time.now()
+        published := false
+        for time.since(start) < 30 * time.Second {
+            s := snapshot(&cstate)
+            if !s.worker_running && !s.pending && s.have_result {
+                published = true
+                break
+            }
+            time.sleep(25 * time.Millisecond)
+        }
+        if !published {
+            fail("fresh flag: publish cycle did not complete within 30s")
+        }
+        // Cache-hit pickup (what the editor's own debounce would do)...
+        ds1, _ := diag.validate_async(&cstate, fresh_src, fixture, root, odin_bin)
+        free_diags(ds1)
+        // ...must have consumed the flag: the pump should NOT poke afterwards.
+        if diag.take_fresh(&cstate) {
+            fail("fresh flag: a cache-hit validate_async must clear the pending poke")
+        }
+    }
+    fmt.println("fresh-flag semantics: set on publish, consumed once, cleared by cache-hit pickup")
+
     fmt.println("VALIDATE_HARNESS_OK")
 }

@@ -39,6 +39,42 @@ import "base:runtime"
 @(private = "file")
 warned_no_odin: bool
 
+// validate_pump_main_thread — deliver ASYNC results to the editor's red-line UI.
+//
+// The editor only calls `_validate` when the TEXT CHANGES, but our diagnostics are computed
+// on a background worker (core/diag/async.odin). A result that lands after the user's LAST
+// edit would sit in the cache forever — the exact moment they stop typing and look for the
+// squiggle is the moment nothing re-asks us. So when a fresh result lands, this pump (called
+// once per editor frame from lv_frame) emits `text_changed` on the current script editor's
+// underlying CodeEdit — a signal-only nudge (no text mutation, no undo step, no dirty
+// marker: the editor's unsaved state keys off the text VERSION, which doesn't move). That
+// restarts the editor's own validate debounce; the follow-up `_validate` cache-hits the
+// fresh result and the red line + Errors panel light up. Converges: a cache hit never kicks
+// a new worker, so poke -> revalidate -> (hit) -> no new fresh flag -> no loop.
+@(private)
+validate_pump_main_thread :: proc() {
+	if !diag.take_fresh(&diag.g_validate) {
+		return
+	}
+	ei := godot.singleton_editor_interface()
+	if ei == nil {
+		return
+	}
+	se := godot.editor_interface_get_script_editor(ei)
+	if se == nil {
+		return
+	}
+	current := godot.script_editor_get_current_editor(se)
+	if current == nil {
+		return // no script open — the cache still serves the next natural _validate
+	}
+	code_edit := godot.script_editor_base_get_base_editor(current)
+	if code_edit == nil {
+		return
+	}
+	godot.emit(cast(godot.Object)code_edit, "text_changed")
+}
+
 @(private = "file")
 vd_set_int :: proc(d: ^godot.Dictionary, key: cstring, value: i64) {
     k := godot.new_string_cstring(key)

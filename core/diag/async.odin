@@ -58,6 +58,13 @@ Async_State :: struct {
     result_valid:   bool,
     result_diags:   [dynamic]Diagnostic,
 
+    // A worker PUBLISHED a result that no `_validate` call has consumed yet. The editor only
+    // calls `_validate` when the text changes, so without a nudge a result computed after the
+    // user's LAST edit would sit in the cache forever (the red-line squiggle never appears).
+    // The main-thread frame pump reads-and-clears this (take_fresh) and pokes the script
+    // editor to re-validate, which cache-hits the published result.
+    fresh:          bool,
+
     // The single in-flight worker, if any.
     worker_running: bool,
     worker_hash:    u64,
@@ -166,6 +173,7 @@ worker_entry :: proc(data: rawptr) {
     state.result_hash = job.hash
     state.result_valid = len(diags) == 0
     state.have_result = true
+    state.fresh = true
     state.worker_running = false
 
     // Coalesce: if newer content arrived while we ran, kick exactly one fresh worker for it.
@@ -211,8 +219,10 @@ validate_async :: proc(
     sync.lock(&state.mutex)
     defer sync.unlock(&state.mutex)
 
-    // 1. Exact cache hit -> return immediately.
+    // 1. Exact cache hit -> return immediately. The published result has now reached a
+    // real `_validate` call, so any pending re-validate poke would be redundant.
     if state.have_result && state.result_hash == h {
+        state.fresh = false
         return clone_diags(state.result_diags[:], allocator), state.result_valid
     }
 
@@ -239,4 +249,15 @@ validate_async :: proc(
         return clone_diags(state.result_diags[:], allocator), state.result_valid
     }
     return nil, true
+}
+
+// take_fresh reads-and-clears the "a result landed that nothing has consumed" flag.
+// Called once per editor frame by the main-thread pump; true means "poke the script
+// editor to re-validate now" (see Async_State.fresh).
+take_fresh :: proc(state: ^Async_State) -> bool {
+    sync.lock(&state.mutex)
+    defer sync.unlock(&state.mutex)
+    f := state.fresh
+    state.fresh = false
+    return f
 }
