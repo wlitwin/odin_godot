@@ -8,10 +8,10 @@ zip; this page is the end-to-end runbook.
 
 ## One-time setup
 
-1. Create the public GitHub repo and push (replace `OWNER`):
+1. Create the public GitHub repo and push (already done):
 
    ```sh
-   git remote add origin git@github.com:OWNER/odin_godot.git
+   git remote add origin git@github.com:wlitwin/odin_godot.git
    git push -u origin main
    ```
 
@@ -34,10 +34,10 @@ zip; this page is the end-to-end runbook.
 | Category | `Scripts` |
 | License | `Apache-2.0` |
 | Repository host | `GitHub` |
-| Repository URL | `https://github.com/OWNER/odin_godot` |
-| Issues URL | `https://github.com/OWNER/odin_godot/issues` |
+| Repository URL | `https://github.com/wlitwin/odin_godot` |
+| Issues URL | `https://github.com/wlitwin/odin_godot/issues` |
 | Download commit | the `release`-branch commit for the tag (printed by `release.sh`) |
-| Icon URL | `https://raw.githubusercontent.com/OWNER/odin_godot/release/addons/odin_godot/icon.svg` |
+| Icon URL | `https://raw.githubusercontent.com/wlitwin/odin_godot/release/addons/odin_godot/icon.svg` |
 | Godot version | `4.6` |
 | Asset version | match `version` in `build/dist.nix` (e.g. `0.1.0`) |
 
