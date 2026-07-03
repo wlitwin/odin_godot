@@ -1,0 +1,15 @@
+odin_godot — Odin as a first-class Godot scripting language
+Copyright 2026 Walter Litwinczyk
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes software developed as part of
+dresswithpockets/odin-godot (https://github.com/dresswithpockets/odin-godot),
+licensed under the Apache License, Version 2.0. The binding generator
+(bindgen/) and the runtime packages (godot/, gdext/, libgd/) originated
+there and have been substantially modified; see bindgen/ATTRIBUTION.md and
+bindgen/UPSTREAM.txt for provenance.
+
+The Godot engine API description (extension_api.json,
+gdextension_interface.h) is from the Godot Engine project
+(https://godotengine.org), licensed under the MIT license.

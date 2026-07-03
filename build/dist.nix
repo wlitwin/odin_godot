@@ -116,6 +116,9 @@ stdenvNoCC.mkDerivation ({
     # (build/addon-docs/) — bring-your-own-odin, no Nix/repo assumptions; the reference
     # pages (authoring/workflow/exporting/debugging) are content-oriented and copied as-is.
     cp dist/addons/odin_godot/README.md $A/README.md
+    # License + attribution travel WITH the addon (Apache-2.0 requires the NOTICE to
+    # accompany redistribution, and Asset Library reviewers look for a license in-tree).
+    cp LICENSE NOTICE $A/
     # Default editor icon for `.odin` scripts that set no `//gd:icon` (script.odin
     # resolved_default_icon -> res://addons/odin_godot/icon.svg).
     cp dist/addons/odin_godot/icon.svg $A/icon.svg

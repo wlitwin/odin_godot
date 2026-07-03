@@ -59,6 +59,8 @@ use → ship.**
 - **[Distribution](distribution.md)** — building the drop-in addon with `nix build`,
   cross-compiling the core for Linux/Windows, the consumer install workflow, and the honest
   per-platform build-vs-runtime status.
+- **[Publishing](publishing.md)** — the Godot Asset Library runbook: the `release` branch
+  (`build/release.sh`), the submission form values, and consumer-facing quirks.
 
 ## Design history & internals
 

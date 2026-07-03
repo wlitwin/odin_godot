@@ -10,9 +10,9 @@ class, custom resources, autoloads, `@tool`/editor plugins, multiplayer RPCs, ho
 **native + WebAssembly** export — all reproducible from a single Nix flake.
 
 > **Status: working engine.** `nix develop --command bash tests/run_all.sh` is green across a
-> 32-test end-to-end suite (every feature below, plus the showcase and the examples' co-op
-> runs), plus 5 browser-gated web tests that verify the WASM export in a real headless Chrome
-> when one is available. The headline examples are a pure-Odin coin-collector
+> 39-test end-to-end suite (every feature below, plus the showcase, the examples' co-op runs,
+> and the Asset-Library drop-in layout), plus 7 browser-gated web tests that verify the WASM
+> export in a real headless Chrome when one is available. The headline examples are a pure-Odin coin-collector
 > (`tests/showcase/`), a complete top-down arena shooter (`examples/survivors/`), and a
 > peer-authoritative co-op arena (`examples/coop_arena/`) — **zero GDScript gameplay code**.
 
@@ -132,10 +132,26 @@ script from empty file to a moving node.
 | `tests/` | per-feature headless milestones + `run_all.sh` |
 | `docs/` | this documentation set |
 
+## Installing (without cloning this repo)
+
+The distributable is a **drop-in addon**: `addons/odin_godot/` with prebuilt core dlls, the
+docs, the build scripts, and a starter template. Get it from the `release` branch (what the
+Godot Asset Library entry points at) or build it yourself with `nix build .#release`, then
+follow [Distribution → Install into a Godot project](docs/distribution.md). The one host
+tool you need is the `odin` compiler (the addon README names the exact pinned release).
+
+## Platform status
+
+macOS is the development platform and is verified end-to-end by the suite (including the
+Asset-Library drop-in layout and the web export). **Windows** ships prebuilt core dlls and
+builds scripts natively via `build_scripts.ps1`, with limited runtime verification so far;
+**Linux** is build-verified only. Reports from either platform are very welcome — the crash
+reporter and build scripts are designed to produce actionable output, so please file what
+you see.
+
 ## License / attribution
 
-The binding generator + C-ABI runtime were vendored from
+**Apache-2.0** — see [LICENSE](LICENSE) and [NOTICE](NOTICE). The binding generator +
+C-ABI runtime were vendored from
 [`dresswithpockets/odin-godot`](https://github.com/dresswithpockets/odin-godot) (Apache-2.0);
 attribution and provenance are kept in [`bindgen/ATTRIBUTION.md`](bindgen/ATTRIBUTION.md).
-</content>
-</invoke>
