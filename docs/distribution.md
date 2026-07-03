@@ -129,6 +129,20 @@ scr   .dll: PE32+ executable (DLL) x86-64, for MS Windows, 11 sections
 You need an `odin` compiler on `PATH` to compile scripts — that is the one host tool a
 consumer project needs. (A future enhancement could ship a prebuilt scripts-build helper.)
 
+This **split layout** — core dll inside `addons/odin_godot/bin/<platform>/`, scripts dll at
+`res://bin/` — is exactly what the suite's `splitaddon` test pins (macOS, where dlopen
+semantics are strictest: the scripts dll is self-contained, so the core's location doesn't
+matter). If a scripts-dll load ever does fail, the core now prints the OS loader's own
+reason (`odin: loader error: …`) next to the path.
+
+> **Known engine quirk (Godot 4.6, still on master):** a headless `godot --import` of a
+> project containing *any* GDExtension can crash **at exit, after the import succeeded**
+> (`EditorHelp::_gen_extensions_docs` is queued as a deferred call; when the quit wins the
+> race it flushes during `Main::cleanup`, after `~EditorNode` nulled EditorHelp's `doc`).
+> Harmless but scary: the `.godot/` artifacts are complete. In CI, don't gate on
+> `--import`'s exit code — check for the artifacts, or use `--editor --quit-after 30`
+> instead (frames flush the deferred while everything is alive).
+
 ## Export your game
 
 Exporting is unchanged from [exporting.md](exporting.md): the editor's `OdinExportPlugin`

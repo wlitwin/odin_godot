@@ -71,6 +71,9 @@ TESTS=(
     "phase2|PHASE2_OK|tests/phase2/run.sh"
     "phase3|PHASE3_OK|tests/phase3/run.sh"
     "phase35|PHASE35_OK|tests/phase35/run.sh"
+    # Asset-Library drop-in layout: core dll inside addons/odin_godot/bin/<platform>/,
+    # scripts dll at res://bin — NOT siblings. Pins the core's scripts-dll resolution.
+    "splitaddon|SPLITADDON_OK|tests/splitaddon/run.sh"
     "phase4|PHASE4_OK|tests/phase4/run.sh"
     # Multi-module spike: one dll per script module (res://modules/<name>), per-module
     # hot reload with other modules provably untouched, engine-mediated cross-module

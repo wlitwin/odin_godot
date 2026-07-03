@@ -312,12 +312,7 @@ odin_highlighter_register_class :: proc() {
         call_virtual_with_data_func = call_virtual_with_data,
         class_userdata              = nil,
     }
-    gdext.classdb_register_extension_class2(
-        gdext.library,
-        &odin_highlighter_class_name,
-        godot.editor_syntax_highlighter_name_ref(),
-        &class_info,
-    )
+    register_extension_class(&odin_highlighter_class_name, godot.editor_syntax_highlighter_name_ref(), &class_info)
 }
 
 // `OdinLanguage._frame` — deferred, one-time highlighter registration. The ScriptEditor UI

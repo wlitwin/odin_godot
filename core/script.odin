@@ -1101,10 +1101,5 @@ odin_script_register :: proc() {
         class_userdata              = nil,
     }
 
-    gdext.classdb_register_extension_class2(
-        gdext.library,
-        &odin_script_class_name,
-        godot.script_extension_name_ref(),
-        &class_info,
-    )
+    register_extension_class(&odin_script_class_name, godot.script_extension_name_ref(), &class_info)
 }

@@ -190,12 +190,7 @@ odin_saver_register :: proc() {
         class_userdata              = nil,
     }
 
-    gdext.classdb_register_extension_class2(
-        gdext.library,
-        &odin_saver_class_name,
-        godot.resource_format_saver_name_ref(),
-        &class_info,
-    )
+    register_extension_class(&odin_saver_class_name, godot.resource_format_saver_name_ref(), &class_info)
 
     odin_saver_object = gdext.classdb_construct_object(&odin_saver_class_name)
     godot.resource_saver_add_resource_format_saver(

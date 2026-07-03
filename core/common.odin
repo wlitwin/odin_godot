@@ -151,6 +151,57 @@ psa_destroy :: proc "contextless" (psa: ^godot.Packed_String_Array) {
     }
 }
 
+// ----------------------------------------------------------------------------
+// Extension-class registration TRACKING. Godot does NOT unregister a GDExtension's
+// classes when the extension deinitializes — that is the binding's job (godot-cpp
+// does it in its own deinit hook). Leaving them registered is a real crash:
+// Main::cleanup runs GDExtensionManager::shutdown() FIRST and flushes the message
+// queue AFTER, and the editor defers EditorHelp::_gen_extensions_docs — so a
+// `--import` run (which quits before normal frames flush the queue) walks
+// ClassDB's extension-class list at cleanup, hits our dangling entries, and
+// SIGSEGVs (seen on every `--import` of every project, silently swallowed by the
+// `|| true` in test harnesses). Every core classdb_register_extension_class2 call
+// goes through register_extension_class so uninitialize_odin_module can unregister
+// EXACTLY what was registered, per init level, in reverse order.
+// ----------------------------------------------------------------------------
+
+@(private = "file")
+Tracked_Class :: struct {
+    name:  ^godot.String_Name, // points at the registrant's file-scope name global (stable)
+    level: gdext.InitializationLevel,
+}
+
+@(private = "file")
+tracked_classes: [dynamic]Tracked_Class
+
+// register_extension_class — the core's ONLY path to classdb_register_extension_class2.
+// `name` must outlive the extension (all callers pass file-scope String_Name globals).
+register_extension_class :: proc(
+    name: ^godot.String_Name,
+    parent: ^godot.String_Name,
+    info: ^gdext.ExtensionClassCreationInfo2,
+    level := gdext.InitializationLevel.Scene,
+) {
+    gdext.classdb_register_extension_class2(gdext.library, name, parent, info)
+    if tracked_classes == nil {
+        tracked_classes = make([dynamic]Tracked_Class, 0, 16)
+    }
+    append(&tracked_classes, Tracked_Class{name, level})
+}
+
+// Unregister every class registered at `level`, newest-first. Called from
+// uninitialize_odin_module for each level as the engine winds the extension down.
+// ClassDB::unregister_extension_class (4.6) erases unconditionally, so classes with
+// straggler instances (e.g. OdinScript resources the engine frees later) are fine —
+// the dll stays loaded until close_library, so their free callbacks still work.
+unregister_extension_classes :: proc(level: gdext.InitializationLevel) {
+    for i := len(tracked_classes) - 1; i >= 0; i -= 1 {
+        if tracked_classes[i].level != level {continue}
+        gdext.classdb_unregister_extension_class(gdext.library, tracked_classes[i].name)
+        ordered_remove(&tracked_classes, i)
+    }
+}
+
 // Convert a Godot String to an owned Odin string using the current context allocator.
 string_to_odin :: proc(s: godot.String, allocator := context.allocator) -> string {
     s := s

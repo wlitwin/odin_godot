@@ -798,11 +798,11 @@ odin_export_register :: proc() {
         call_virtual_with_data_func = call_virtual_with_data,
         class_userdata              = nil,
     }
-    gdext.classdb_register_extension_class2(
-        gdext.library,
+    register_extension_class(
         &odin_export_class_name,
         godot.editor_export_plugin_name_ref(),
         &export_info,
+        level = .Editor,
     )
 
     // OdinEditorPlugin (host that registers the export plugin).
@@ -823,11 +823,11 @@ odin_export_register :: proc() {
         call_virtual_with_data_func = call_virtual_with_data,
         class_userdata              = nil,
     }
-    gdext.classdb_register_extension_class2(
-        gdext.library,
+    register_extension_class(
         &odin_editor_plugin_class_name,
         godot.editor_plugin_name_ref(),
         &plugin_info,
+        level = .Editor,
     )
 
     // Hand the editor plugin to the editor by class name; Godot instantiates it and

@@ -359,7 +359,10 @@ scripts_dll_path :: proc() -> string {
 load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: bool) {
 	_, lok := dynlib.initialize_symbols(&dll, path, "", "__handle")
 	if !lok || dll.__handle == nil || dll.odin_scripts_boot == nil || dll.odin_scripts_manifest == nil {
+		// Include the loader's own reason (dlerror / GetLastError text) — "failed to
+		// load" alone has sent people chasing phantom linkage theories before.
 		gdext_print("odin: failed to load scripts dll", path)
+		gdext_print("odin: loader error:", dynlib.last_error())
 		if main {
 			// Flag for the editor frame pump to surface ONE actionable warning in the editor
 			// console (this load runs at extension init, before the engine logger/editor UI are

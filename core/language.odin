@@ -462,12 +462,7 @@ odin_language_register :: proc() {
         class_userdata              = nil,
     }
 
-    gdext.classdb_register_extension_class2(
-        gdext.library,
-        &odin_language_class_name,
-        godot.script_language_extension_name_ref(),
-        &class_info,
-    )
+    register_extension_class(&odin_language_class_name, godot.script_language_extension_name_ref(), &class_info)
 
     // Instantiate the singleton and register it with the engine's ScriptServer.
     odin_language_object = gdext.classdb_construct_object(&odin_language_class_name)

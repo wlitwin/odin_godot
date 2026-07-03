@@ -74,6 +74,7 @@ uninitialize_odin_module :: proc "c" (user_data: rawptr, level: gdext.Initializa
     when !WEB {
         if level == .Editor {
             odin_export_unregister()
+            unregister_extension_classes(.Editor)
             return
         }
     }
@@ -82,4 +83,9 @@ uninitialize_odin_module :: proc "c" (user_data: rawptr, level: gdext.Initializa
     }
     odin_loader_unregister()
     odin_language_unregister()
+    // Unregister EVERY ClassDB class this level registered (script/language/loader/
+    // saver/highlighter). Godot never does this for an extension, and stale entries
+    // are walked by the editor's deferred doc generation AFTER extension shutdown
+    // during Main::cleanup — a guaranteed `--import` exit crash. See common.odin.
+    unregister_extension_classes(.Scene)
 }

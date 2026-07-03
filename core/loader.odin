@@ -170,12 +170,7 @@ odin_loader_register :: proc() {
         class_userdata              = nil,
     }
 
-    gdext.classdb_register_extension_class2(
-        gdext.library,
-        &odin_loader_class_name,
-        godot.resource_format_loader_name_ref(),
-        &class_info,
-    )
+    register_extension_class(&odin_loader_class_name, godot.resource_format_loader_name_ref(), &class_info)
 
     // Construct the loader and register it (at front so it wins for `.odin`).
     odin_loader_object = gdext.classdb_construct_object(&odin_loader_class_name)
