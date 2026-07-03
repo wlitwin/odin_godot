@@ -66,3 +66,6 @@ examples/*/.coopsignal.log
 /examples/coop_arena/node_modules
 /examples/barrage/node_modules
 /examples/barrage/out
+
+# JetBrains (Rider) per-user project config
+.idea/

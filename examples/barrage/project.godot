@@ -24,6 +24,10 @@ window/size/viewport_width=960
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 
+[editor]
+
+script/search_in_file_extensions=PackedStringArray("gd", "gdshader", "odin")
+
 [rendering]
 
 textures/vram_compression/import_etc2_astc=true

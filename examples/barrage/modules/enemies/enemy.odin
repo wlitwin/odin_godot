@@ -17,16 +17,14 @@ import gd "godot:godot"
 import rt "godot:runtime"
 
 Enemy :: struct {
-	owner: gd.Node2d,
-
-	hp:        int `gd:"export,range=1:60:1"`,
-	fire_ivl:  f32 `gd:"export,range=0.2:5:0.1"`, // seconds between volleys
-	radius:    f32 `gd:"export,range=6:40:1"`,
-	drift:     f32 `gd:"export,range=10:200:5"`, // px/s downward drift
-
-	fire_cd:   f32,
-	slow:      f32, // debuff multiplier applied by the powerups module (1 = normal)
-	field:     gd.Object,
+	owner:    gd.Node2d,
+	hp:       int `gd:"export,range=1:60:1"`,
+	fire_ivl: f32 `gd:"export,range=0.2:5:0.1"`, // seconds between volleys
+	radius:   f32 `gd:"export,range=6:40:1"`,
+	drift:    f32 `gd:"export,range=10:200:5"`, // px/s downward drift
+	fire_cd:  f32,
+	slow:     f32, // debuff multiplier applied by the powerups module (1 = normal)
+	field:    gd.Object,
 }
 
 enemy_ready :: proc(self: ^Enemy) {
@@ -81,7 +79,10 @@ enemy_reload :: proc(self: ^Enemy) {
 // the subscription holds a raw pointer to THIS struct, so it must not outlive it.
 enemy_exit_tree :: proc(self: ^Enemy) {
 	if sp := find_spawner(self); sp != nil {
-		events.unsubscribe_owner(&sp.slow_changed, u64(gd.object_get_instance_id(cast(gd.Object)self.owner)))
+		events.unsubscribe_owner(
+			&sp.slow_changed,
+			u64(gd.object_get_instance_id(cast(gd.Object)self.owner)),
+		)
 	}
 }
 
@@ -111,7 +112,7 @@ enemy_physics_process :: proc(self: ^Enemy, delta: f64) {
 	dt := f32(delta) * self.slow // the slow debuff stretches this enemy's whole timeline
 	pos := gd.node2d_get_position(self.owner)
 	pos.y += self.drift * dt
-	if pos.y > 780 {pos.y = -40} // wrap: keeps the pressure up without despawn logic
+	if pos.y > 780 {pos.y = -40} 	// wrap: keeps the pressure up without despawn logic
 	gd.node2d_set_position(self.owner, pos)
 
 	field := find_field(cast(gd.Node)self.owner, &self.field)
