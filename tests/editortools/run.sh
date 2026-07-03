@@ -6,7 +6,10 @@
 #
 #   Pass A (--editor --headless --quit-after): the enabled Odin EditorPlugin auto-loads;
 #     its _enter_tree prints EDITORTOOLS_PLUGIN_ENTER_TREE. Also guards against
-#     signal 11 / "must be overridden" regressions at editor-open + plugin-load time.
+#     signal 11 / "must be overridden" regressions at editor-open + plugin-load time,
+#     and asserts the FileSystem-dock gen-file filter ran (core/gen_filter.odin prints
+#     "odin_godot: hid N generated .gen.odin file(s)" on its first prune — needs the
+#     threaded filesystem scan to finish, hence the generous --quit-after).
 #   Pass B (--editor --headless --script test_editortools.gd): drives the icon
 #     (_get_class_icon_path), @tool (_ready ran + gd.is_editor()), and inspector-dispatch
 #     checks; prints EDITORTOOLS_DRIVER_OK.
@@ -36,7 +39,7 @@ echo "== Pass A: editor --headless (Odin EditorPlugin _enter_tree) =="
 ALOG="$(mktemp)"
 trap 'rm -f "$ALOG" "${BLOG:-}"' EXIT
 set +e
-"$GODOT" --editor --headless --path "$PROJ" --quit-after 8 >"$ALOG" 2>&1
+"$GODOT" --editor --headless --path "$PROJ" --quit-after 240 >"$ALOG" 2>&1
 ARC=$?
 set -e
 echo "----- Pass A output (tail) -----"; tail -n 20 "$ALOG"; echo "--------------------------------"
@@ -51,6 +54,16 @@ if ! grep -q "EDITORTOOLS_PLUGIN_ENTER_TREE" "$ALOG"; then
 	exit 1
 fi
 echo "  ok  Odin EditorPlugin loaded + _enter_tree executed (EDITORTOOLS_PLUGIN_ENTER_TREE)"
+
+# The FileSystem-dock filter hid the addon's *.gen.odin build artifacts (this project
+# has several after build_scripts.sh). The sentinel prints once, on the first prune
+# that hides anything — its absence means the scan didn't finish (raise --quit-after)
+# or the filter regressed.
+if ! grep -q "odin_godot: hid [0-9]* generated .gen.odin file(s)" "$ALOG"; then
+	echo "EDITORTOOLS_FAIL: FileSystem-dock gen-file filter did not run (no 'odin_godot: hid N generated' sentinel)"
+	exit 1
+fi
+echo "  ok  FileSystem dock hides *.gen.odin build artifacts ($(grep -o 'odin_godot: hid [0-9]* generated' "$ALOG" | head -1))"
 
 # The editor reopened main.tscn and the //gd:tool ToolWidget._ready ran in edit mode, taking
 # its gd.is_editor()==true branch (which prints this marker). Corroborates Pass B's gated

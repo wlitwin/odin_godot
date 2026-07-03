@@ -173,6 +173,20 @@ it every time it opens — so the `*.odin` filter checkbox is there and checked 
 One known gap remains, functionality-irrelevant: documentation tooltips for `@export`s/methods
 in the Inspector aren't wired (autocomplete *does* show type signatures — see above).
 
+### Generated files are hidden in the FileSystem dock
+
+The build writes a `*.gen.odin` registration file next to each script (they must live inside
+the script's package directory — Odin packages are single-directory). They aren't attachable
+or openable in the editor, so the Odin plugin **hides them from the FileSystem dock**. This is
+widget-level hiding: Godot's filesystem scan admits files by extension only (`.gen.odin` ends
+in `.odin`) and the engine has no per-file exclusion hook, so the plugin re-hides them after
+every dock rebuild. They remain real files on disk — external editors, git, and the engine's
+Find in Files (which is also extension-based) still see them.
+
+To show them (e.g. when inspecting what scriptgen emits), set the
+**`odin_godot/show_generated_files`** project setting to `true` — it takes effect at the next
+dock rebuild (toggling a file save or reopening the project is enough).
+
 <a name="editor-settings"></a>
 ### Editor settings reference
 
@@ -187,6 +201,7 @@ Set these as **project settings** (they also have env fallbacks for shell-launch
 | `odin_godot/scripts_dir` | — | the scripts package (default `res://scripts`) |
 | `odin_godot/export_optimization` | `ODIN_EXPORT_OPT` | Odin `-o:` level for **exported** builds: `none`/`minimal`/`size`/`speed`/`aggressive` (default `speed`) |
 | `odin_godot/default_icon` | — | editor icon for `.odin` scripts with no `//gd:icon` (default `res://addons/odin_godot/icon.svg`; `""` = engine generic) |
+| `odin_godot/show_generated_files` | — | `true` shows `*.gen.odin` build artifacts in the FileSystem dock (hidden by default) |
 
 > **Dev builds vs. exports.** The editor's rebuild-on-save loop compiles at `-o:none` so saves
 > stay fast. **Exports** (desktop and web) compile at `odin_godot/export_optimization` (default

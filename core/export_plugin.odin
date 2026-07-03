@@ -313,6 +313,19 @@ pl_enter_tree :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]g
     build_status_create(plug)
     // Teach the script editor's Find-in-Files (Ctrl+Shift+F) to search `.odin`.
     register_search_extension()
+    // Drive the FileSystem-dock gen-file filter (core/gen_filter.odin) from _process.
+    // EXPLICIT set_process: the engine's is-_process-overridden auto-enable doesn't
+    // fire for virtual-call-data extension classes (same reason instance.odin calls
+    // set_process by hand for script instances).
+    godot.node_set_process(cast(godot.Node)self.object, true)
+}
+
+// OdinEditorPlugin._process — per-frame tick for the FileSystem-dock `*.gen.odin`
+// filter. The dirty checks inside make the idle cost a handful of ptrcalls.
+@(private = "file")
+pl_process :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+    context = gdext.godot_context()
+    gen_filter_tick()
 }
 
 // register_search_extension — add "odin" to `editor/script/search_in_file_extensions`
@@ -796,6 +809,7 @@ odin_export_register :: proc() {
     editor_plugin_virtuals = make([dynamic]Virtual_Entry, 0, 16)
     append(&editor_plugin_virtuals, Virtual_Entry{name = "_enter_tree", fn = pl_enter_tree})
     append(&editor_plugin_virtuals, Virtual_Entry{name = "_exit_tree", fn = pl_exit_tree})
+    append(&editor_plugin_virtuals, Virtual_Entry{name = "_process", fn = pl_process})
     append(&editor_plugin_virtuals, Virtual_Entry{name = "_get_plugin_name", fn = pl_get_plugin_name})
     append(&editor_plugin_virtuals, Virtual_Entry{name = "_build", fn = pl_build})
 
