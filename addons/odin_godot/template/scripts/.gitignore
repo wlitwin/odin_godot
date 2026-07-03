@@ -1,0 +1,2 @@
+# scriptgen build artifacts — regenerated on every build, don't commit them.
+*.gen.odin
