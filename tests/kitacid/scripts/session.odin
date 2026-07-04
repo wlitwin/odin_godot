@@ -61,6 +61,12 @@ AcidSession :: struct {
 	issue_at:       f64,
 	clock_reported: bool,
 
+	// stat-registry scenario
+	strikes_col: ksess.Stat_Col, // host: successful strikes, credited to the owner
+	owner_pid:   knet.Player_Id, // host: who owns the orb (found by name)
+	stats_seen:  int, // client: scoreboard verified (driver gates DONE on it)
+	ping_ok:     int, // host: both clients' ping stats reflect the injected latency
+
 	// owner-stream scenario
 	moving:       bool, // owner only
 	move_start:   f64,
@@ -119,6 +125,7 @@ acid_session_start_host :: proc(self: ^AcidSession, port: gd.Int) {
 	self.ses.send = session_send
 	self.ses.send_user = self
 	ksess.session_host_start(&self.ses, "host")
+	self.strikes_col = ksess.session_stat_column(&self.ses, "strikes")
 	self.started = true
 	gd.print_str("ACID_HOST_OK")
 }
@@ -172,6 +179,7 @@ acid_session_announce_world :: proc(self: ^AcidSession) {
 		gd.print_str("ACID_ERR no seated player named owner")
 		return
 	}
+	self.owner_pid = owner_pid
 	self.orb.hp = 100
 	self.orb.stamina = 10
 	self.orb.net_id = ksess.session_spawn(&self.ses, ORB_TYPE, self.orb, &orb_command_set, owner_pid)
@@ -226,7 +234,24 @@ acid_session_tick :: proc(self: ^AcidSession, dt: gd.Float) {
 		stream_stats(self)
 	}
 	drain_events(self, now)
-	if !self.clock_reported && self.ses.pongs >= 3 {
+	if self.ses.is_host && self.ping_ok == 0 {
+		// The auto-fed ping column must reflect the injected latency for BOTH
+		// clients (measured by the host's own pings).
+		ready := 0
+		for _, p in self.ses.players {
+			if p.id == self.ses.me {continue}
+			if f64(ksess.session_stat(&self.ses, p.id, ksess.STAT_PING)) >= self.min_rtt * 1000 {
+				ready += 1
+			}
+		}
+		if ready == 2 {
+			self.ping_ok = 1
+			gd.print_str("ACID_PING ok=true")
+		}
+	}
+	// Clients only: the host's pongs (it pings its clients for the ping stat
+	// since brick 4) would measure itself here.
+	if !self.ses.is_host && !self.clock_reported && self.ses.pongs >= 3 {
 		self.clock_reported = true
 		c := ksess.session_clock(&self.ses, ksess.HOST_PEER)
 		ok := c.rtt >= self.min_rtt && abs(c.offset) < 0.1
@@ -254,6 +279,27 @@ drain_events :: proc(self: ^AcidSession, now: f64) {
 			)
 		case ksess.Ev_Despawned:
 			gd.print_str(fmt.tprintf("ACID_DESPAWN id=%d", u32(e.id)))
+		case ksess.Ev_Stats_Updated:
+			// Verify the scoreboard once the owner's 2 confirmed strikes show:
+			// schema by name, values by player, our own ping measured BY the
+			// host and reflecting the injected latency.
+			if self.stats_seen != 0 {continue}
+			strikes, sok := ksess.session_stat_find(&self.ses, "strikes")
+			ping, pok := ksess.session_stat_find(&self.ses, "ping")
+			if !sok || !pok {continue}
+			owner_pid := knet.PLAYER_ID_INVALID
+			for _, p in self.ses.players {
+				if p.name == "owner" {owner_pid = p.id}
+			}
+			n := ksess.session_stat(&self.ses, owner_pid, strikes)
+			my_ping := ksess.session_stat(&self.ses, self.ses.me, ping)
+			// Snapshots keep flowing (~1/s: ping jitter re-dirties them), so
+			// wait for one that carries BOTH proofs: the strike tally and our
+			// own host-measured ping reflecting the injected latency.
+			if n >= 2 && f64(my_ping) >= self.min_rtt * 1000 {
+				gd.print_str(fmt.tprintf("ACID_STATS strikes=%d ping_ok=true ping_ms=%d", n, my_ping))
+				self.stats_seen = 1
+			}
 		case ksess.Ev_Player_Joined:
 			p, _ := ksess.session_player(&self.ses, e.id)
 			gd.print_str(fmt.tprintf("ACID_PLAYER name=%s rejoin=%v", p.name, e.rejoin))
@@ -267,6 +313,10 @@ drain_events :: proc(self: ^AcidSession, now: f64) {
 			)
 		case ksess.Ev_Command_Executed:
 			self.cmds += 1
+			if e.ok {
+				// The gameplay hook for the stat registry: credit the striker.
+				ksess.session_stat_add(&self.ses, self.owner_pid, self.strikes_col, 1)
+			}
 			gd.print_str(fmt.tprintf("ACID_EXEC ok=%v hp=%d st=%d", e.ok, self.orb.hp, self.orb.stamina))
 		case ksess.Ev_Command_Confirmed:
 			self.got += 1
@@ -412,6 +462,16 @@ acid_session_get_pings :: proc(self: ^AcidSession) -> gd.Int {
 @(gd_method)
 acid_session_get_stream :: proc(self: ^AcidSession) -> gd.Int {
 	return gd.Int(self.stream_state)
+}
+
+@(gd_method)
+acid_session_get_stats :: proc(self: ^AcidSession) -> gd.Int {
+	return gd.Int(self.stats_seen)
+}
+
+@(gd_method)
+acid_session_get_ping_ok :: proc(self: ^AcidSession) -> gd.Int {
+	return gd.Int(self.ping_ok)
 }
 
 @(gd_method)

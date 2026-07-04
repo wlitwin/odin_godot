@@ -80,6 +80,8 @@ Ev_Despawned :: struct {
 	id: knet.Net_Id, // (client) already removed; the factory's free ran
 }
 
+Ev_Stats_Updated :: struct {} // (client) a stat snapshot landed — repaint scoreboards
+
 Ev_State_Applied :: struct {
 	entities: int, // (client) a host state batch landed on this many entities
 }
@@ -104,11 +106,29 @@ Event :: union {
 	Ev_Host_Left,
 	Ev_Spawned,
 	Ev_Despawned,
+	Ev_Stats_Updated,
 	Ev_State_Applied,
 	Ev_Command_Executed,
 	Ev_Command_Confirmed,
 	Ev_Command_Rejected,
 }
+
+// ---- the stat registry ---------------------------------------------------------
+//
+// Generic named counters on the player record: kills, deaths, damage, score —
+// whatever the game declares. HOST-accumulated (gameplay mutates them on the
+// authority only) and replicated to everyone as a full snapshot at a low rate
+// when dirty (~2 Hz: display data, not simulation data). Stats live on the
+// PLAYER, so they survive disconnects and come back with a reclaimed identity
+// like everything else. Column 0 is always "ping": the host pings its clients
+// and feeds each player's measured RTT (ms) in automatically.
+
+Stat_Col :: distinct u8
+
+MAX_STAT_COLS :: 16
+
+// Always declared, always fed by the session itself.
+STAT_PING :: Stat_Col(0)
 
 // ---- entity factories --------------------------------------------------------
 //
@@ -158,6 +178,8 @@ SES_SPAWN :: u8(11) // host -> all    [type u16][id][owner][len u16][full fields
 SES_DESPAWN :: u8(12) // host -> all  [id]
 @(private)
 SES_WORLD :: u8(13) // host -> one    [count u16] x the SES_SPAWN tuple (join snapshot)
+@(private)
+SES_STATS :: u8(14) // host -> all    [cols u8] x [name] + [players u16] x ([id][cols x i64])
 
 // Remote entities render this far in the past (~3 net ticks at 20 Hz): almost
 // always a bracketing sample pair, smooth through jitter and single drops.
@@ -190,6 +212,11 @@ Session :: struct {
 	factory_make: Make_Entity_Proc,
 	factory_free: Free_Entity_Proc,
 
+	// the stat registry (host accumulates; everyone reads)
+	stat_names:  [dynamic]string, // owned; index = column
+	stats:       map[knet.Player_Id][MAX_STAT_COLS]i64,
+	stats_dirty: bool, // host: snapshot goes out on the next low-rate tick
+
 	// host bookkeeping
 	next_player: knet.Player_Id,
 	tokens:      map[u64]knet.Player_Id, // reconnect identity, forever
@@ -210,6 +237,7 @@ session_init :: proc(s: ^Session) {
 	// Commands always go host-ward through the session's own framing.
 	s.ctx.send = ctx_send_command
 	s.ctx.send_user = s
+	append(&s.stat_names, strings.clone("ping")) // STAT_PING, fed by the session
 }
 
 session_destroy :: proc(s: ^Session) {
@@ -225,7 +253,71 @@ session_destroy :: proc(s: ^Session) {
 	knet.command_ctx_destroy(&s.ctx)
 	delete(s.clocks)
 	delete(s.types)
+	for n in s.stat_names {
+		delete(n)
+	}
+	delete(s.stat_names)
+	delete(s.stats)
 	s^ = {}
+}
+
+// ---- stats: declare / mutate (host) / read (anyone) ---------------------------
+
+// Host: declare (or find) a named column. Idempotent by name — safe to call
+// from ready() on every run. Clients get columns from the wire.
+session_stat_column :: proc(s: ^Session, name: string) -> Stat_Col {
+	assert(s.is_host, "the authority declares stat columns; clients receive them")
+	if col, ok := session_stat_find(s, name); ok {
+		return col
+	}
+	assert(len(s.stat_names) < MAX_STAT_COLS, "too many stat columns")
+	append(&s.stat_names, strings.clone(name))
+	s.stats_dirty = true
+	return Stat_Col(len(s.stat_names) - 1)
+}
+
+// Look a column up by name — how clients resolve what the scoreboard shows.
+session_stat_find :: proc(s: ^Session, name: string) -> (Stat_Col, bool) {
+	for n, i in s.stat_names {
+		if n == name {
+			return Stat_Col(i), true
+		}
+	}
+	return 0, false
+}
+
+session_stat_names :: proc(s: ^Session) -> []string {
+	return s.stat_names[:]
+}
+
+// NOTE: all row reads use the comma-ok form — a plain missing-key index of a
+// map with a large value type faults in the current compiler (found by the
+// acid test's crash reporter; a missing player must read as an all-zero row).
+session_stat_set :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col, value: i64) {
+	assert(s.is_host, "stats are host-accumulated")
+	row, _ := s.stats[player]
+	if row[col] == value {
+		return
+	}
+	row[col] = value
+	s.stats[player] = row
+	s.stats_dirty = true
+}
+
+session_stat_add :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col, delta: i64) {
+	assert(s.is_host, "stats are host-accumulated")
+	row, _ := s.stats[player]
+	row[col] += delta
+	s.stats[player] = row
+	s.stats_dirty = true
+}
+
+session_stat :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col) -> i64 {
+	row, ok := s.stats[player]
+	if !ok {
+		return 0
+	}
+	return row[col]
 }
 
 // Install the client-side entity factory (do it before joining).
@@ -405,14 +497,40 @@ net_tick :: proc(s: ^Session) {
 		}
 	}
 
-	// Clock ping toward the host, ~1/s, once seated. (Per-peer mesh pings —
-	// for sender-stamped stream timelines — come with a later brick.)
-	if !s.is_host && s.joined && t % 20 == 5 {
+	// Clock pings, ~1/s: clients ping the host; the HOST pings every seated
+	// client — that is where the automatic ping stat comes from. (Per-peer
+	// mesh pings for sender-stamped stream timelines come later.)
+	if s.joined && t % 20 == 5 {
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
 		knet.write_u8(&w, SES_PING)
 		knet.ping_write(&w, s.now)
-		s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
+		if s.is_host {
+			for _, p in s.players {
+				if p.connected && p.id != s.me {
+					s.send(s.send_user, p.peer, knet.writer_bytes(&w), .Reliable)
+				}
+			}
+		} else {
+			s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
+		}
+	}
+
+	// Stats: host feeds the ping column from its per-peer clocks and ships the
+	// full snapshot at a LOW rate when something changed (display data).
+	if s.is_host && t % 10 == 0 {
+		for _, p in s.players {
+			if !p.connected || p.id == s.me {
+				continue
+			}
+			if c := s.clocks[p.peer]; c.initialized {
+				session_stat_set(s, p.id, STAT_PING, i64(c.rtt * 1000))
+			}
+		}
+		if s.stats_dirty && s.replicating {
+			s.stats_dirty = false
+			send_stats(s)
+		}
 	}
 
 	if n := knet.registry_expire_pending(&s.reg, &s.ctx, DEFAULT_PENDING_MAX_AGE); n > 0 {
@@ -436,6 +554,33 @@ broadcast :: proc(s: ^Session, bytes: []u8, channel: Channel) {
 // This peer's clock estimate for `peer` (zero value until a pong lands).
 session_clock :: proc(s: ^Session, peer: int) -> knet.Clock_Sync {
 	return s.clocks[peer]
+}
+
+// Full stat snapshot: schema + every player's row. Small (16 cols x 8 players
+// ≈ 1KB) and rare (~2 Hz when dirty) — no delta machinery to get wrong.
+@(private = "file")
+send_stats :: proc(s: ^Session, to_peer := BROADCAST_PEER) {
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_u8(&w, SES_STATS)
+	knet.write_u8(&w, u8(len(s.stat_names)))
+	for n in s.stat_names {
+		knet.write_string(&w, n)
+	}
+	assert(len(s.players) <= int(max(u16)))
+	knet.write_u16(&w, u16(len(s.players)))
+	for _, p in s.players {
+		knet.write_player_id(&w, p.id)
+		row, _ := s.stats[p.id]
+		for i in 0 ..< len(s.stat_names) {
+			knet.write_i64(&w, row[i])
+		}
+	}
+	if to_peer == BROADCAST_PEER {
+		broadcast(s, knet.writer_bytes(&w), .Reliable)
+	} else {
+		s.send(s.send_user, to_peer, knet.writer_bytes(&w), .Reliable)
+	}
 }
 
 // Drain one queued event (call until ok=false each frame).
@@ -594,8 +739,10 @@ host_handle_join :: proc(s: ^Session, peer: int, r: ^knet.Reader) {
 	// channel — the joiner materializes everything before any delta can name
 	// an id it doesn't know. (Deltas broadcast before this arrive at the
 	// still-unseated client and are dropped; SES_WORLD supersedes them.)
+	// The current scoreboard rides along.
 	if s.replicating {
 		send_world(s, peer)
+		send_stats(s, peer)
 	}
 
 	append(&s.events, Ev_Player_Joined{id = id, rejoin = rejoin})
@@ -755,6 +902,42 @@ session_handle_packet :: proc(s: ^Session, from_peer: int, r: ^knet.Reader) {
 			s.factory_free(s.factory_user, id, e.entity)
 		}
 		append(&s.events, Ev_Despawned{id = id})
+	case SES_STATS:
+		if s.is_host || !s.joined {
+			return
+		}
+		cols := int(knet.read_u8(r))
+		if r.err || cols > MAX_STAT_COLS {
+			return
+		}
+		// Schema first (the host may declare columns mid-run): rebuild ours.
+		names: [MAX_STAT_COLS]string
+		for i in 0 ..< cols {
+			names[i] = knet.read_string(r)
+		}
+		players := int(knet.read_u16(r))
+		if r.err {
+			return
+		}
+		for n in s.stat_names {
+			delete(n)
+		}
+		clear(&s.stat_names)
+		for i in 0 ..< cols {
+			append(&s.stat_names, strings.clone(names[i]))
+		}
+		for _ in 0 ..< players {
+			id := knet.read_player_id(r)
+			row: [MAX_STAT_COLS]i64
+			for i in 0 ..< cols {
+				row[i] = knet.read_i64(r)
+			}
+			if r.err {
+				return
+			}
+			s.stats[id] = row
+		}
+		append(&s.events, Ev_Stats_Updated{})
 	case SES_STATE:
 		if s.is_host || !s.joined {
 			return

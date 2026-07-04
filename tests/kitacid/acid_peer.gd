@@ -109,7 +109,7 @@ func _process(delta: float) -> bool:
 
 	# ---- server: commands answered, own stream view verified, clients done ----
 	if phase == "serve":
-		if int(session.call("get_cmds")) >= 3 and int(session.call("get_stream")) >= 1 and int(session.call("get_dones")) >= 2:
+		if int(session.call("get_cmds")) >= 3 and int(session.call("get_stream")) >= 1 and int(session.call("get_ping_ok")) >= 1 and int(session.call("get_dones")) >= 2:
 			phase = "settle"
 			t_acted = now
 		elif timed_out(now, "cmds=" + str(session.call("get_cmds")) + " stream=" + str(session.call("get_stream")) + " dones=" + str(session.call("get_dones"))):
@@ -192,7 +192,7 @@ func _process(delta: float) -> bool:
 
 	# ---- both clients: prove clock sync sampled the injected RTT ----
 	if phase == "clock":
-		if int(session.call("get_pings")) >= 3:
+		if int(session.call("get_pings")) >= 3 and int(session.call("get_stats")) >= 1:
 			session.call("send_done")
 			phase = "flush"
 			t_acted = now

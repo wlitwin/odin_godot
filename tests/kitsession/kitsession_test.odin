@@ -693,3 +693,136 @@ unknown_entity_type_is_skipped :: proc(t: ^testing.T) {
 	testing.expect_value(t, alice.bots[kid].hp, i32(30))
 	testing.expect_value(t, knet.registry_count(&alice.s.reg), 1)
 }
+
+// ---- the stat registry ---------------------------------------------------------
+
+@(test)
+stats_declare_accumulate_replicate :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	drain(&host.s)
+	drain(&alice.s)
+
+	kills := ksess.session_stat_column(&host.s, "kills")
+	testing.expect_value(t, ksess.session_stat_column(&host.s, "kills"), kills) // idempotent
+	testing.expect_value(t, kills, ksess.Stat_Col(1)) // 0 is always ping
+	// Reading a player with no row yet (nil/missing map entry) is all zeros —
+	// the acid test's crash reporter caught a compiler fault on the plain index.
+	testing.expect_value(t, ksess.session_stat(&host.s, alice.s.me, kills), i64(0))
+
+	ksess.session_start_replicating(&host.s)
+	ksess.session_stat_add(&host.s, alice.s.me, kills, 2)
+	ksess.session_stat_add(&host.s, host.s.me, kills, 1)
+
+	// Stats ship on the low-rate tick (every 10 net ticks when dirty).
+	now := 50.0
+	for _ in 0 ..< 10 {
+		step(boxes, &now)
+	}
+	akills, found := ksess.session_stat_find(&alice.s, "kills")
+	testing.expect(t, found, "the schema must reach the client")
+	testing.expect_value(t, ksess.session_stat(&alice.s, alice.s.me, akills), i64(2))
+	testing.expect_value(t, ksess.session_stat(&alice.s, host.s.me, akills), i64(1))
+	updated := false
+	for ev in drain(&alice.s) {
+		if _, ok := ev.(ksess.Ev_Stats_Updated); ok {
+			updated = true
+		}
+	}
+	testing.expect(t, updated)
+
+	// Mid-run column declaration: the schema grows on the client too.
+	deaths := ksess.session_stat_column(&host.s, "deaths")
+	ksess.session_stat_set(&host.s, alice.s.me, deaths, 7)
+	for _ in 0 ..< 10 {
+		step(boxes, &now)
+	}
+	adeaths, dfound := ksess.session_stat_find(&alice.s, "deaths")
+	testing.expect(t, dfound)
+	testing.expect_value(t, ksess.session_stat(&alice.s, alice.s.me, adeaths), i64(7))
+	testing.expect_value(t, ksess.session_stat(&alice.s, alice.s.me, akills), i64(2)) // untouched
+}
+
+@(test)
+ping_stat_auto_feeds :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	ksess.session_start_replicating(&host.s)
+
+	// Walk the host up to its ping tick, HOLD the traffic for 300ms of host
+	// time (simulated latency), then deliver — the measured rtt must be the
+	// gap the pong actually took on the host's clock.
+	now := 50.0
+	for _ in 0 ..< 5 { // host ticks 1..5; ping goes out at tick 5
+		now += 0.05
+		_, _ = ksess.session_tick(&host.s, 0.05, now)
+	}
+	now += 0.3
+	_, _ = ksess.session_tick(&host.s, 0.05, now) // host clock advances; ping still queued
+	pump(boxes) // alice answers; host applies the pong at its CURRENT now
+
+	c := ksess.session_clock(&host.s, 100)
+	testing.expect(t, c.initialized, "host must measure its clients")
+	testing.expect(t, c.rtt >= 0.29, "rtt must reflect the held round trip")
+
+	// The next low-rate stats tick feeds the ping column and ships it.
+	for _ in 0 ..< 10 {
+		step(boxes, &now)
+	}
+	ping, found := ksess.session_stat_find(&alice.s, "ping")
+	testing.expect(t, found)
+	testing.expect(t, ksess.session_stat(&alice.s, alice.s.me, ping) >= 290, "alice sees her own measured ping")
+}
+
+@(test)
+stats_survive_reconnect :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump([]^Peer_Box{&host, &alice})
+	ksess.session_start_replicating(&host.s)
+
+	kills := ksess.session_stat_column(&host.s, "kills")
+	ksess.session_stat_set(&host.s, alice.s.me, kills, 5)
+
+	// She drops; her stats stay on her PLAYER record, not her connection.
+	ksess.session_peer_disconnected(&host.s, 100)
+	testing.expect_value(t, ksess.session_stat(&host.s, 2, kills), i64(5))
+
+	// Fresh process, same token: the join-time stats snapshot restores her
+	// scoreboard row under the reclaimed identity.
+	alice2: Peer_Box
+	box_make(&alice2, 300)
+	defer box_destroy(&alice2)
+	ksess.session_client_start(&alice2.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice2.s)
+	pump([]^Peer_Box{&host, &alice2})
+
+	akills, found := ksess.session_stat_find(&alice2.s, "kills")
+	testing.expect(t, found, "join-time stats snapshot must carry the schema")
+	testing.expect_value(t, ksess.session_stat(&alice2.s, alice2.s.me, akills), i64(5))
+}

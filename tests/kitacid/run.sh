@@ -110,6 +110,8 @@ attempt() {
 		|| { echo "  FAIL: host never rejected the empty-stamina strike (state must be untouched)"; ok=0; }
 	grep -qF "ACID_STREAM ok=true" "$slog" \
 		|| { echo "  FAIL: the HOST did not verify smooth sampled motion (it is a remote for owner streams)"; ok=0; }
+	grep -qF "ACID_PING ok=true" "$slog" \
+		|| { echo "  FAIL: the auto-fed ping stat never reflected the injected latency"; ok=0; }
 	grep -q "SERVER_DONE" "$slog" || { echo "  FAIL: server did not finish cleanly"; ok=0; }
 
 	# ---- owner: seated + optimistic prediction + confirm/reject round trips ----
@@ -131,6 +133,8 @@ attempt() {
 	grep -qF "ACID_CLOCK ok=true" "$wlog" \
 		|| { echo "  FAIL: owner clock sync did not measure the injected RTT"; ok=0; }
 	grep -q "ACID_MOVING" "$wlog" || { echo "  FAIL: owner never started streaming motion"; ok=0; }
+	grep -qF "ACID_STATS strikes=2 ping_ok=true" "$wlog" \
+		|| { echo "  FAIL: owner scoreboard (strikes + measured ping) not verified"; ok=0; }
 	grep -q "ACID_STREAM" "$wlog" \
 		&& { echo "  FAIL: the owner sampled its own stream (it is authoritative for it)"; ok=0; }
 	grep -q "OWNER_DONE" "$wlog" || { echo "  FAIL: owner did not finish cleanly"; ok=0; }
@@ -149,6 +153,8 @@ attempt() {
 		|| { echo "  FAIL: observer did not verify smooth sampled motion"; ok=0; }
 	grep -qF "ACID_CLOCK ok=true" "$olog" \
 		|| { echo "  FAIL: observer clock sync did not measure the injected RTT"; ok=0; }
+	grep -qF "ACID_STATS strikes=2 ping_ok=true" "$olog" \
+		|| { echo "  FAIL: observer scoreboard (strikes + measured ping) not verified"; ok=0; }
 	grep -q "ACID_ISSUE" "$olog" \
 		&& { echo "  FAIL: the observer issued a command?!"; ok=0; }
 	grep -q "OBSERVER_DONE" "$olog" || { echo "  FAIL: observer did not finish cleanly"; ok=0; }
