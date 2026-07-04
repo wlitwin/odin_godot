@@ -284,6 +284,40 @@ clock_sync_converges :: proc(t: ^testing.T) {
 	testing.expect_value(t, c.offset, before)
 }
 
+@(test)
+ping_pong_feeds_clock :: proc(t: ^testing.T) {
+	// Two peers with disagreeing clocks exchange ping/pong purely through the
+	// wire messages; the estimate must converge on the true skew.
+	TRUE_OFFSET :: 12.75 // remote clock is ahead
+	ONE_WAY :: 0.030
+	c := knet.Clock_Sync{}
+	local := 50.0
+	for _ in 0 ..< 40 {
+		ping := knet.writer_make()
+		knet.ping_write(&ping, local)
+
+		remote_recv_time := (local + ONE_WAY) + TRUE_OFFSET
+		pr := knet.reader_make(knet.writer_bytes(&ping))
+		pong := knet.writer_make()
+		knet.ping_answer(&pr, &pong, remote_recv_time)
+
+		gr := knet.reader_make(knet.writer_bytes(&pong))
+		testing.expect(t, knet.pong_apply(&gr, &c, local + 2 * ONE_WAY))
+		knet.writer_destroy(&ping)
+		knet.writer_destroy(&pong)
+		local += 1.0
+	}
+	est := knet.clock_remote_now(&c, local) - local
+	testing.expect(t, abs(est - TRUE_OFFSET) < 0.001, "wire ping/pong must converge on the true offset")
+
+	// Truncated pong: nothing sampled, no error escapes.
+	before := c.offset
+	short := [4]u8{}
+	sr := knet.reader_make(short[:])
+	testing.expect(t, !knet.pong_apply(&sr, &c, local))
+	testing.expect_value(t, c.offset, before)
+}
+
 // ---- interp ----------------------------------------------------------------
 
 @(private = "file")
@@ -597,6 +631,230 @@ command_non_predicted_defers_to_host :: proc(t: ^testing.T) {
 	defer knet.writer_destroy(&result)
 	_ = host_handle(&host, &set, &hctx, 7, cap.msgs[0], &result)
 	testing.expect_value(t, host.state, u8(4))
+}
+
+// ---- registry ------------------------------------------------------------
+//
+// A second entity type proves heterogeneous batching: per-entity mask widths,
+// dispatch by id, and a descriptor with no commands at all.
+
+Dot :: struct {
+	v:      u16,
+	hidden: int, // not replicated
+}
+
+dot_desc :: proc() -> knet.Entity_Desc {
+	@(static) fields := [?]knet.Field_Desc{{offset = offset_of(Dot, v), size = size_of(u16)}}
+	return knet.Entity_Desc{fields = fields[:]}
+}
+
+@(test)
+registry_batched_deltas :: proc(t: ^testing.T) {
+	pdesc := probe_desc()
+	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+	ddesc := dot_desc()
+	dset := knet.Command_Set{entity_desc = &ddesc} // desc-only: no commands
+
+	// Authority side: spawn allocates ids; fresh shadows make the first walk
+	// the initial full send.
+	sreg := knet.registry_make()
+	defer knet.registry_destroy(&sreg)
+	sprobe := Probe{hp = 10, x = 1}
+	sdot := Dot{v = 7}
+	pid := knet.registry_spawn(&sreg, &sprobe, &pset)
+	did := knet.registry_spawn(&sreg, &sdot, &dset)
+	testing.expect(t, pid != did)
+
+	// Remote side mirrors under the wire ids.
+	creg := knet.registry_make()
+	defer knet.registry_destroy(&creg)
+	cprobe := Probe{local_only = 5}
+	cdot := Dot{hidden = 5}
+	knet.registry_insert(&creg, pid, &cprobe, &pset)
+	knet.registry_insert(&creg, did, &cdot, &dset)
+
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	testing.expect_value(t, knet.registry_write_deltas(&w, &sreg), 2)
+	r := knet.reader_make(knet.writer_bytes(&w))
+	testing.expect_value(t, knet.registry_apply_deltas(&r, &creg), 2)
+	testing.expect(t, !r.err)
+	testing.expect_value(t, cprobe.hp, i32(10))
+	testing.expect_value(t, cprobe.x, f32(1))
+	testing.expect_value(t, cdot.v, u16(7))
+	testing.expect_value(t, cprobe.local_only, 5) // private state untouched
+	testing.expect_value(t, cdot.hidden, 5)
+
+	// Idle tick: zero entities, callers may skip the send.
+	knet.writer_reset(&w)
+	testing.expect_value(t, knet.registry_write_deltas(&w, &sreg), 0)
+
+	// Partial tick: only the dot moves — the probe contributes zero bytes.
+	sdot.v = 8
+	knet.writer_reset(&w)
+	testing.expect_value(t, knet.registry_write_deltas(&w, &sreg), 1)
+	r2 := knet.reader_make(knet.writer_bytes(&w))
+	testing.expect_value(t, knet.registry_apply_deltas(&r2, &creg), 1)
+	testing.expect_value(t, cdot.v, u16(8))
+}
+
+@(test)
+registry_unknown_id_abandons_batch :: proc(t: ^testing.T) {
+	pdesc := probe_desc()
+	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+
+	sreg := knet.registry_make()
+	defer knet.registry_destroy(&sreg)
+	a := Probe{hp = 1}
+	b := Probe{hp = 2}
+	_ = knet.registry_spawn(&sreg, &a, &pset)
+	bid := knet.registry_spawn(&sreg, &b, &pset)
+
+	// The receiver only knows entity b: an unknown id mid-batch is unrecoverable
+	// (no descriptor to size the fields) — err set, no crash, no overrun.
+	creg := knet.registry_make()
+	defer knet.registry_destroy(&creg)
+	cb := Probe{}
+	knet.registry_insert(&creg, bid, &cb, &pset)
+
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	_ = knet.registry_write_deltas(&w, &sreg)
+	r := knet.reader_make(knet.writer_bytes(&w))
+	_ = knet.registry_apply_deltas(&r, &creg)
+	testing.expect(t, r.err, "unknown id must abandon the batch with a sticky error")
+}
+
+@(test)
+registry_full_snapshot_roundtrip :: proc(t: ^testing.T) {
+	pdesc := probe_desc()
+	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+
+	sreg := knet.registry_make()
+	defer knet.registry_destroy(&sreg)
+	s1 := Probe{hp = 11, x = 2, state = 3}
+	s2 := Probe{hp = 22}
+	id1 := knet.registry_spawn(&sreg, &s1, &pset)
+	id2 := knet.registry_spawn(&sreg, &s2, &pset)
+
+	creg := knet.registry_make()
+	defer knet.registry_destroy(&creg)
+	c1 := Probe{}
+	c2 := Probe{}
+	knet.registry_insert(&creg, id1, &c1, &pset)
+	knet.registry_insert(&creg, id2, &c2, &pset)
+
+	// The join snapshot: everything, no masks. Then commit shadows so the new
+	// peer's own first diff (were it to become authority) is clean.
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	testing.expect_value(t, knet.registry_write_fulls(&w, &sreg), 2)
+	r := knet.reader_make(knet.writer_bytes(&w))
+	testing.expect_value(t, knet.registry_apply_fulls(&r, &creg), 2)
+	testing.expect(t, !r.err)
+	testing.expect_value(t, c1.hp, i32(11))
+	testing.expect_value(t, c1.state, u8(3))
+	testing.expect_value(t, c2.hp, i32(22))
+
+	knet.registry_commit_shadows(&creg)
+	w2 := knet.writer_make()
+	defer knet.writer_destroy(&w2)
+	testing.expect_value(t, knet.registry_write_deltas(&w2, &creg), 0)
+
+	// registry_insert keeps allocation ahead of mirrored ids (migration-ready).
+	extra := Probe{}
+	nid := knet.registry_spawn(&creg, &extra, &pset)
+	testing.expect(t, nid != id1 && nid != id2)
+}
+
+@(test)
+registry_command_routing :: proc(t: ^testing.T) {
+	pdesc := probe_desc()
+	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+
+	sreg := knet.registry_make()
+	defer knet.registry_destroy(&sreg)
+	host := Probe{hp = 10}
+	hid := knet.registry_spawn(&sreg, &host, &pset)
+
+	creg := knet.registry_make()
+	defer knet.registry_destroy(&creg)
+	client := Probe{hp = 10}
+	knet.registry_insert(&creg, hid, &client, &pset)
+
+	cap := Capture{}
+	defer capture_destroy(&cap)
+	cctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&cctx)
+	cctx.send = capture_send
+	cctx.send_user = &cap
+	hctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&hctx)
+
+	// Confirmed command through the registry resolver.
+	knet.command_begin(&cctx, hid, CMD_ADD)
+	knet.write_i32(&cctx.msg, 5)
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	result := knet.writer_make()
+	defer knet.writer_destroy(&result)
+	rr := knet.reader_make(cap.msgs[0])
+	responded, ok := knet.registry_host_command(&sreg, &hctx, 7, &rr, &result)
+	testing.expect(t, responded && ok)
+	testing.expect_value(t, host.hp, i32(15))
+	res_r := knet.reader_make(knet.writer_bytes(&result))
+	res := knet.registry_client_result(&creg, &cctx, &res_r)
+	testing.expect(t, res.ok)
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
+
+	// A command naming an entity the host doesn't have: NO response (expiry is
+	// the client's safety net), nothing executes.
+	knet.command_begin(&cctx, knet.Net_Id(999), CMD_ADD)
+	knet.write_i32(&cctx.msg, 5)
+	_ = knet.command_issue(&cctx, &client, &pset, CMD_ADD) // predicts against the local copy
+	knet.writer_reset(&result)
+	rr2 := knet.reader_make(cap.msgs[1])
+	responded2, _ := knet.registry_host_command(&sreg, &hctx, 7, &rr2, &result)
+	testing.expect(t, !responded2)
+	testing.expect_value(t, len(knet.writer_bytes(&result)), 0)
+}
+
+@(test)
+registry_expire_reverts_lost_predictions :: proc(t: ^testing.T) {
+	pdesc := probe_desc()
+	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+
+	creg := knet.registry_make()
+	defer knet.registry_destroy(&creg)
+	alive := Probe{hp = 10}
+	doomed := Probe{hp = 10}
+	aid := knet.Net_Id(1)
+	did := knet.Net_Id(2)
+	knet.registry_insert(&creg, aid, &alive, &pset)
+	knet.registry_insert(&creg, did, &doomed, &pset)
+
+	cctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&cctx)
+	cctx.now_tick = 100
+
+	issue :: proc(cctx: ^knet.Command_Ctx, e: ^Probe, set: ^knet.Command_Set, id: knet.Net_Id) {
+		knet.command_begin(cctx, id, CMD_ADD)
+		knet.write_i32(&cctx.msg, 5)
+		_ = knet.command_issue(cctx, e, set, CMD_ADD)
+	}
+	issue(&cctx, &alive, &pset, aid)
+	issue(&cctx, &doomed, &pset, did)
+	testing.expect_value(t, alive.hp, i32(15))
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 2)
+
+	// The doomed entity despawns while its prediction is in flight.
+	testing.expect(t, knet.registry_remove(&creg, did))
+
+	// No result ever arrives: both predictions age out; the live one reverts,
+	// the despawned one is skipped without crashing (revert buffer still freed).
+	cctx.now_tick = 200
+	testing.expect_value(t, knet.registry_expire_pending(&creg, &cctx, 50), 2)
+	testing.expect_value(t, alive.hp, i32(10))
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
 }
 
 @(test)

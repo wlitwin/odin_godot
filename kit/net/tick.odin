@@ -72,3 +72,34 @@ clock_sample :: proc(c: ^Clock_Sync, local_send, remote_time, local_recv: f64) {
 clock_remote_now :: proc(c: ^Clock_Sync, local_now: f64) -> f64 {
 	return local_now + c.offset
 }
+
+// ---------------------------------------------------------------------------
+// The ping/pong wire messages that feed clock_sample. The session layer sends
+// a ping every second or so on the reliable channel (rare + tiny; reliability
+// keeps the sample loop alive through loss) and answers pings it receives.
+// The echoed local_send never needs the peers' clocks to agree — each side
+// only ever interprets its OWN timestamps.
+
+// [local_send f64] — stamp with this peer's monotonic seconds.
+ping_write :: proc(w: ^Writer, local_now: f64) {
+	write_f64(w, local_now)
+}
+
+// Answer a received ping: echo the sender's stamp, add our own clock reading.
+// Pong layout: [their_send f64][remote_time f64].
+ping_answer :: proc(r: ^Reader, w: ^Writer, local_now: f64) {
+	write_f64(w, read_f64(r))
+	write_f64(w, local_now)
+}
+
+// Feed a received pong into the clock estimate. false = malformed/truncated
+// (nothing sampled).
+pong_apply :: proc(r: ^Reader, c: ^Clock_Sync, local_now: f64) -> bool {
+	local_send := read_f64(r)
+	remote_time := read_f64(r)
+	if r.err {
+		return false
+	}
+	clock_sample(c, local_send, remote_time, local_now)
+	return true
+}
