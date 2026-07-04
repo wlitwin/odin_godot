@@ -81,6 +81,12 @@ TESTS=(
     # two-spelunkers-one-gem conflict, the cross-entity command-hook pattern,
     # range gates shared by prompt and host, item conservation on every peer.
     "kitloot|KITLOOT_OK|tests/kitloot/run.sh"
+    # Pure-Odin unit tests for kit/combat (damage, ability gates, effects,
+    # swept projectiles, auto-published stat columns).
+    "kitcombat|KITCOMBAT_OK|tests/kitcombat/run.sh"
+    # Phase-4 integration: rocks over the session pipeline — predicted casts,
+    # host-validated hits, death/respawn, effects wearing off, the ledger.
+    "kitarena|KITARENA_OK|tests/kitarena/run.sh"
     # gd:"replicate" codegen contract: scriptgen -> knet.Entity_Desc tables, POD
     # enforcement at scriptgen time (engine types) + consumer compile (#assert).
     "repgen|REPGEN_OK|tests/repgen/run.sh"
