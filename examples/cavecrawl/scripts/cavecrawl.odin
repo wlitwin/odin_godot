@@ -7,11 +7,15 @@ package cavecrawl_scripts
 // time. Phase 1: it boots to a WORKING LOBBY — host a cave or join one,
 // watch the spelunker list fill in live (names, host crown, you-marker,
 // measured ping), and reconnect-proof identity underneath it all.
+// Phase 2: the spelunkers TALK — a kit/comms chat box (host-ordered lines,
+// system flavor text on joins/leaves, history for drop-in joiners) and
+// positional markers, all riding the session's wire with no new glue.
 //
 // This file is the whole game so far, and most of it is button wiring:
-//   * kit/ui builds the lobby controls (lobby_make / lobby_refresh).
-//   * kit/session runs identity, roster, stats, and (from phase 2 on) the
+//   * kit/ui builds the lobby + chat controls (lobby_make / chat_make).
+//   * kit/session runs identity, roster, stats, and (from phase 3 on) the
 //     world — this node just forwards transport packets and drains events.
+//   * kit/comms rides the session (SES_APP), so chat needs zero transport code.
 //   * kit/netgd is the wire. Host = ENet :4242; Join = localhost for now
 //     (room codes ride the WebRTC signaling server in a later phase).
 //
@@ -22,6 +26,7 @@ package cavecrawl_scripts
 
 import gd "godot:godot"
 import "godot:gdext"
+import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import kui "godot:kit/ui"
@@ -36,7 +41,9 @@ MSG_SESSION :: u8(0) // all kit/session traffic under one game byte
 CaveLobby :: struct {
 	owner:     gd.Node,
 	ses:       ksess.Session,
+	comms:     kcomms.Comms,
 	ui:        kui.Lobby,
+	chat:      kui.Chat,
 	running:   bool, // hosting or joining (transport is up)
 	join_sent: bool, // client: JOIN goes out once the transport connects
 }
@@ -103,6 +110,13 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	kui.lobby_set_status(&self.ui, "Host a cave, or join one at localhost")
 	gd.connect_to(cast(gd.Object)self.ui.host_btn, "pressed", self.owner, "on_host")
 	gd.connect_to(cast(gd.Object)self.ui.join_btn, "pressed", self.owner, "on_join")
+
+	// Comms bind before the session starts (routes survive host/client start);
+	// the chat box stays hidden until there is a session to speak into.
+	kcomms.comms_init(&self.comms, &self.ses)
+	self.chat = kui.chat_make(self.owner)
+	kui.chat_show(&self.chat, false)
+	gd.connect_to(cast(gd.Object)self.chat.input, "text_submitted", self.owner, "on_chat")
 	gd.print_str("CAVE_UI_READY")
 }
 
@@ -122,6 +136,7 @@ cave_lobby_on_host :: proc(self: ^CaveLobby) {
 	kui.lobby_show_menu(&self.ui, false, false)
 	kui.lobby_set_status(&self.ui, fmt.ctprintf("Hosting on :%d — waiting for friends", port()))
 	kui.lobby_refresh(&self.ui, &self.ses)
+	kui.chat_show(&self.chat, true)
 	gd.print_str("CAVE_HOSTING")
 }
 
@@ -139,6 +154,7 @@ cave_lobby_on_join :: proc(self: ^CaveLobby) {
 	self.running = true
 	kui.lobby_show_menu(&self.ui, false, false)
 	kui.lobby_set_status(&self.ui, "Joining the cave...")
+	kui.chat_show(&self.chat, true)
 	gd.print_str("CAVE_JOINING")
 }
 
@@ -182,9 +198,26 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 		case ksess.Ev_Player_Joined:
 			roster_changed(self)
 			refresh = true
+			// The host words the flavor lines; comms ships them. Catchup goes
+			// FIRST so a fresh joiner's replayed history doesn't duplicate the
+			// join line it is about to receive from the broadcast.
+			if self.ses.is_host {
+				if p, ok := ksess.session_player(&self.ses, e.id); ok {
+					if !e.rejoin {
+						kcomms.comms_catchup(&self.comms, e.id)
+					}
+					verb := e.rejoin ? "returned to" : "joined"
+					kcomms.comms_system(&self.comms, fmt.tprintf("%s %s the cave", p.name, verb))
+				}
+			}
 		case ksess.Ev_Player_Left:
 			roster_changed(self)
 			refresh = true
+			if self.ses.is_host {
+				if p, ok := ksess.session_player(&self.ses, e.id); ok {
+					kcomms.comms_system(&self.comms, fmt.tprintf("%s wandered off", p.name))
+				}
+			}
 		case ksess.Ev_Stats_Updated:
 			refresh = true // ping column repaint
 		case ksess.Ev_Host_Left:
@@ -195,6 +228,35 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 	if refresh {
 		kui.lobby_refresh(&self.ui, &self.ses)
 	}
+
+	refresh_chat := false
+	for {
+		cev, cok := kcomms.comms_poll(&self.comms)
+		if !cok {break}
+		switch e in cev {
+		case kcomms.Ev_Line:
+			refresh_chat = true
+		case kcomms.Ev_Marker:
+			// No world yet to draw it in — phase 3 gives markers a cave wall.
+			gd.print_str(fmt.tprintf("CAVE_MARK player=%d kind=%d x=%.1f", u64(e.player), e.kind, e.pos.x))
+		}
+	}
+	if refresh_chat {
+		kui.chat_refresh(&self.chat, &self.comms)
+	}
+}
+
+// The chat box's text_submitted — say it and clear the line.
+@(gd_method)
+cave_lobby_on_chat :: proc(self: ^CaveLobby, text: gd.String) {
+	if !self.running {return}
+	text := text
+	buf: [512]u8
+	n := gdext.string_to_utf8_chars(cast(gdext.StringPtr)&text, cast(cstring)&buf[0], len(buf) - 1)
+	if n > 0 {
+		kcomms.comms_say(&self.comms, string(buf[:n]))
+	}
+	kui.chat_clear_input(&self.chat)
 }
 
 @(gd_method)
@@ -206,7 +268,14 @@ cave_lobby_on_packet :: proc(self: ^CaveLobby, id: gd.Int, packet: gd.Packed_Byt
 	}
 }
 
-// ---- test driver polls ----
+// ---- test drivers ----
+
+// Drop a marker (the test's stand-in for a ping keybind; kind 1 = "look here").
+@(gd_method)
+cave_lobby_mark :: proc(self: ^CaveLobby) {
+	if !self.running {return}
+	kcomms.comms_ping(&self.comms, 1, {1, 2, 3})
+}
 
 @(gd_method)
 cave_lobby_get_players :: proc(self: ^CaveLobby) -> gd.Int {

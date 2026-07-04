@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # ----------------------------------------------------------------------------
-# CAVECRAWL (phase 1): the toolkit example boots to a WORKING LOBBY. Two
-# headless processes instantiate the real cave.tscn, press the lobby's own
-# button methods (host / join), seat over real ENet through kit/session, and
-# then read the ACTUAL kit/ui Label texts back out of the tree: both names on
-# both peers, the you-marker, and the host's Start button appearing once two
-# spelunkers are in.
+# CAVECRAWL (phases 1+2): the toolkit example boots to a WORKING LOBBY with
+# CHAT. Two headless processes instantiate the real cave.tscn, press the
+# lobby's own button methods (host / join), seat over real ENet through
+# kit/session, and then read the ACTUAL kit/ui Label texts back out of the
+# tree: both names on both peers, the you-marker, the host's Start button
+# appearing once two spelunkers are in — and both peers' chat lines, the
+# "guest joined" system line, and the guest's positional marker (kit/comms
+# over the session's SES_APP wire).
 #
 # Prints CAVECRAWL_OK. Run inside the Nix dev shell:
 #   nix develop --command bash -c 'bash examples/cavecrawl/run.sh'
@@ -70,6 +72,15 @@ attempt() {
 	# Host gets a visible Start once the cave has company; the guest never does.
 	grep -q "CAVE_START_VISIBLE n=1" "$hlog" || { echo "  FAIL: host Start button not shown"; ok=0; }
 	grep -q "CAVE_START_VISIBLE n=0" "$glog" || { echo "  FAIL: guest must not see a Start button"; ok=0; }
+	# Phase 2 — chat: each peer's line lands on BOTH real UIs, host order,
+	# plus the host-authored system line about the guest joining.
+	for log in "$hlog" "$glog"; do
+		grep -qE "CAVE_CHAT \[.*hosty: found a torch.*\]" "$log" || { echo "  FAIL: host line missing in $(basename "$log")"; ok=0; }
+		grep -qE "CAVE_CHAT \[.*guest: on my way.*\]" "$log" || { echo "  FAIL: guest line missing in $(basename "$log")"; ok=0; }
+		grep -qE "CAVE_CHAT \[.*\* guest joined the cave.*\]" "$log" || { echo "  FAIL: join system line missing in $(basename "$log")"; ok=0; }
+		# The guest's marker surfaces as a comms event on both peers.
+		grep -q "CAVE_MARK player=2 kind=1" "$log" || { echo "  FAIL: marker missing in $(basename "$log")"; ok=0; }
+	done
 	grep -q "HOST_DONE" "$hlog" || { echo "  FAIL: host did not finish"; ok=0; }
 	grep -q "GUEST_DONE" "$glog" || { echo "  FAIL: guest did not finish"; ok=0; }
 

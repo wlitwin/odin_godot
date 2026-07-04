@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://d1505mqnwmr5a"]
 
-[ext_resource type="Script" path="res://scripts/cavecrawl.odin" id="1_cave"]
+[ext_resource type="Script" uid="uid://c4085nl4dngjn" path="res://scripts/cavecrawl.odin" id="1_cave"]
 
-[node name="Cave" type="Node"]
+[node name="Cave" type="Node" unique_id=480048836]
 script = ExtResource("1_cave")

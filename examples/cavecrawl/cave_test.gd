@@ -4,8 +4,11 @@ extends SceneTree
 # Cavecrawl lobby test driver (examples/cavecrawl). TWO processes — host and
 # guest — instantiate the REAL cave.tscn and press the same code paths the
 # lobby buttons fire. Verified: seating over the wire, the live player list
-# (actual Label texts read back out of the kit/ui tree on both peers), and
-# the host's Start button appearing once enough spelunkers are in.
+# (actual Label texts read back out of the kit/ui tree on both peers), the
+# host's Start button appearing once enough spelunkers are in — and, phase 2,
+# CHAT: both peers speak through the chat box's own submit path and each reads
+# the other's line (plus the "guest joined" system line) out of its real UI;
+# the guest drops a marker that surfaces as Ev_Marker on both ends.
 # ----------------------------------------------------------------------------
 
 var cave: Node = null
@@ -71,8 +74,23 @@ func _process(_delta: float) -> bool:
 				if b.text == "Start" and b.visible:
 					starts += 1
 			print("CAVE_START_VISIBLE n=", starts)
+			# Phase 2: speak through the chat box's own submit path.
+			cave.call("on_chat", "found a torch" if role == "host" else "on my way")
+			if role == "guest":
+				cave.call("mark")
+			phase = "chat"
+			t_acted = now
+		return false
+
+	if phase == "chat":
+		# Both lines land in the host's order on BOTH peers' real chat labels.
+		var ui := label_texts()
+		if ui.contains("hosty: found a torch") and ui.contains("guest: on my way"):
+			print("CAVE_CHAT [", ui, "]")
 			print(role.to_upper(), "_DONE")
 			quit(0); return true
+		if timed_out(now, "chat lines never landed"):
+			quit(1); return true
 		return false
 
 	return false
