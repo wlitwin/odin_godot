@@ -220,6 +220,11 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	self.hud_hp = kui.hp_make(self.owner)
 	self.hud_ab = kui.abilities_make(self.owner, 2)
 	self.score = kui.score_make(self.owner)
+	// The LAYOUT is the game's call, not the kit's: status cluster stacked
+	// in the top-left (kit widgets spawn at the anchor origin by default).
+	gd.control_set_position(cast(gd.Control)self.hud_hp.label, {8, 4}, false)
+	gd.control_set_position(self.hud_ab.root, {8, 22}, false)
+	gd.control_set_position(self.inv.root, {8, 40}, false)
 	self.latency = f64(env_int("CAVE_LATENCY", 0)) / 1000.0
 	ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
 	ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
@@ -228,7 +233,15 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	self.legend = gd.new_label()
 	gd.node_set_name(cast(gd.Node)self.legend, gd.new_string_name_cstring("Legend", true))
 	gd.add_child(self.owner, cast(gd.Node)self.legend)
-	gd.control_set_anchors_preset(cast(gd.Control)self.legend, .Preset_Bottom_Left, false)
+	// Bottom-RIGHT corner (chat owns bottom-left, the prompt the center);
+	// grow up-and-left so the label stays inside the screen as it sizes.
+	gd.control_set_anchors_preset(cast(gd.Control)self.legend, .Preset_Bottom_Right, false)
+	gd.control_set_v_grow_direction(cast(gd.Control)self.legend, .Grow_Direction_Begin)
+	gd.control_set_h_grow_direction(cast(gd.Control)self.legend, .Grow_Direction_Begin)
+	gd.control_set_offset(cast(gd.Control)self.legend, .Right, -8)
+	gd.control_set_offset(cast(gd.Control)self.legend, .Left, -8)
+	gd.control_set_offset(cast(gd.Control)self.legend, .Top, -4)
+	gd.control_set_offset(cast(gd.Control)self.legend, .Bottom, -4)
 	gd.set_string(cast(gd.Object)self.legend, "text", "WASD walk · E use · click/Space throw · Q drop · Tab scores · Enter chat")
 	gd.set_bool(cast(gd.Object)self.legend, "visible", false)
 	gd.print_str("CAVE_UI_READY")

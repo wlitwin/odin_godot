@@ -1,7 +1,7 @@
 package kit_ui
 
 // The CHAT BOX (toolkit phase 2): a bounded scrollback of kit/comms lines and
-// a line to speak into, anchored across the bottom of the screen. Same
+// a line to speak into, anchored in the bottom-left corner. Same
 // contract as the lobby — kit/ui builds controls, the GAME wires the input
 // and repaints on events:
 //
@@ -18,7 +18,7 @@ import "core:fmt"
 CHAT_SHOW :: 8
 
 Chat :: struct {
-	root:      gd.Control, // bottom-wide VBox under the owner node
+	root:      gd.Control, // bottom-left VBox under the owner node
 	lines_box: gd.Control,
 	input:     gd.Line_Edit,
 	rows:      [dynamic]gd.Label, // reused across refreshes
@@ -31,13 +31,22 @@ chat_make :: proc(parent: gd.Node) -> Chat {
 	ch.root = cast(gd.Control)gd.new_v_box_container()
 	gd.node_set_name(cast(gd.Node)ch.root, gd.new_string_name_cstring("Chat", true))
 	gd.add_child(parent, cast(gd.Node)ch.root)
-	gd.control_set_anchors_preset(ch.root, .Preset_Bottom_Wide, false)
+	// A bottom-LEFT column, not bottom-wide — the bottom edge is shared real
+	// estate (prompt, legends). Pinned a strip above the edge; grow=Begin
+	// means new lines push the box UP from that pinned bottom, the classic
+	// chat shape. Offsets are anchor-relative, so it tracks window resizes.
+	gd.control_set_anchors_preset(ch.root, .Preset_Bottom_Left, false)
+	gd.control_set_v_grow_direction(ch.root, .Grow_Direction_Begin)
+	gd.control_set_offset(ch.root, .Left, 8)
+	gd.control_set_offset(ch.root, .Top, -30)
+	gd.control_set_offset(ch.root, .Bottom, -30)
 
 	ch.lines_box = cast(gd.Control)gd.new_v_box_container()
 	gd.add_child(cast(gd.Node)ch.root, cast(gd.Node)ch.lines_box)
 
 	ch.input = gd.new_line_edit()
 	gd.set_string(cast(gd.Object)ch.input, "placeholder_text", "say something...")
+	gd.control_set_custom_minimum_size(cast(gd.Control)ch.input, {240, 0})
 	gd.add_child(cast(gd.Node)ch.root, cast(gd.Node)ch.input)
 	return ch
 }

@@ -24,6 +24,10 @@ score_make :: proc(parent: gd.Node) -> Score {
 	gd.node_set_name(cast(gd.Node)sb.root, gd.new_string_name_cstring("Scoreboard", true))
 	gd.add_child(parent, cast(gd.Node)sb.root)
 	gd.control_set_anchors_preset(sb.root, .Preset_Center_Top, false)
+	// Keep the panel centered as rows change width, and off the top edge.
+	gd.control_set_h_grow_direction(sb.root, .Grow_Direction_Both)
+	gd.control_set_offset(sb.root, .Top, 24)
+	gd.control_set_offset(sb.root, .Bottom, 24)
 	sb.header = gd.new_label()
 	gd.add_child(cast(gd.Node)sb.root, cast(gd.Node)sb.header)
 	gd.set_bool(cast(gd.Object)sb.root, "visible", false)

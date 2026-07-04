@@ -24,6 +24,14 @@ prompt_make :: proc(parent: gd.Node) -> Prompt {
 	gd.node_set_name(cast(gd.Node)p.label, gd.new_string_name_cstring("Prompt", true))
 	gd.add_child(parent, cast(gd.Node)p.label)
 	gd.control_set_anchors_preset(cast(gd.Control)p.label, .Preset_Center_Bottom, false)
+	// Presets set ANCHORS only — an auto-sizing label at the exact bottom
+	// edge otherwise grows DOWN, off screen. Grow up from a lifted baseline
+	// (offsets are anchor-relative, so this tracks the bottom on resize),
+	// and keep the center as the text changes width.
+	gd.control_set_v_grow_direction(cast(gd.Control)p.label, .Grow_Direction_Begin)
+	gd.control_set_h_grow_direction(cast(gd.Control)p.label, .Grow_Direction_Both)
+	gd.control_set_offset(cast(gd.Control)p.label, .Top, -34)
+	gd.control_set_offset(cast(gd.Control)p.label, .Bottom, -34)
 	gd.set_bool(cast(gd.Object)p.label, "visible", false)
 	return p
 }
