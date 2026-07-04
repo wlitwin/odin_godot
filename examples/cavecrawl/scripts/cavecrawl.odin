@@ -34,6 +34,7 @@ package cavecrawl_scripts
 import gd "godot:godot"
 import "godot:gdext"
 import rt "godot:runtime"
+import kcombat "godot:kit/combat"
 import kcomms "godot:kit/comms"
 import kinter "godot:kit/interact"
 import kitems "godot:kit/items"
@@ -42,6 +43,7 @@ import ksess "godot:kit/session"
 import kui "godot:kit/ui"
 import netgd "godot:kit/netgd"
 import "core:fmt"
+import "core:math"
 import "core:strconv"
 import "core:time"
 
@@ -59,8 +61,46 @@ SPEL_TYPE :: ksess.Entity_Type(1)
 CHEST_TYPE :: ksess.Entity_Type(2)
 DOOR_TYPE :: ksess.Entity_Type(3)
 PICKUP_TYPE :: ksess.Entity_Type(4)
+ROCK_TYPE :: ksess.Entity_Type(5)
 
 WALK_SPEED :: f32(120) // px/s
+
+// ---- combat (phase 4) ----
+
+MAX_HP :: i32(100)
+MAX_STAMINA :: i32(10)
+ROCK_ABILITY :: kcombat.Ability_Def{name = "rock", cooldown = 20, cost = 3} // 1s at 20 Hz
+ROCK_DMG :: i32(35)
+ROCK_SPEED :: f32(12) // px per net tick
+ROCK_TTL :: u16(24) // ~288 px of flight
+BODY_RADIUS :: f32(14)
+RESPAWN_TICKS :: 60 // 3s in the grave
+CHILL :: u8(1) // rocks chill what they don't kill
+SPAWN_X :: f32(80)
+SPAWN_Y :: f32(120)
+
+// Command indices = @(gd_command) declaration order in spelunker.odin.
+SPEL_CMD_DROP :: u16(0)
+SPEL_CMD_THROW :: u16(1)
+
+// Rocks declare no commands, so scriptgen emits only their descriptor.
+rock_set := knet.Command_Set{entity_desc = &rock_net_desc}
+
+// One rock in flight: the authoritative sim (host only) + the entity that
+// shows it (host-owned, so the sim's positions stream to every peer).
+Cave_Rock :: struct {
+	p:       kcombat.Projectile,
+	shooter: knet.Player_Id,
+	id:      knet.Net_Id,
+}
+
+// Injected receive latency for the acid run (CAVE_LATENCY ms): packets
+// buffer here before routing — the suite proves casts feel instant anyway.
+Delayed_Packet :: struct {
+	due:  f64,
+	from: int,
+	data: []u8,
+}
 
 CaveLobby :: struct {
 	owner:     gd.Node,
@@ -80,6 +120,7 @@ CaveLobby :: struct {
 	chests:      map[knet.Net_Id]^Chest,
 	doors:       map[knet.Net_Id]^Door,
 	pickups:     map[knet.Net_Id]^Pickup,
+	rocks:       map[knet.Net_Id]^Rock,
 	nodes:       map[knet.Net_Id]gd.Node, // for freeing on despawn
 	avatar_of:   map[knet.Player_Id]knet.Net_Id,
 	me_spel:     ^Spelunker, // my avatar (nil until spawned)
@@ -87,7 +128,22 @@ CaveLobby :: struct {
 	walking:     bool, // headless drivers steer via walk_to
 	walk_target: gd.Vector2,
 	target_id:   knet.Net_Id, // what the prompt points at right now
-	target_kind: int, // 0 none, 1 chest, 2 door
+	target_kind: int, // 0 none, 1 chest, 2 door, 3 pickup
+
+	// ---- combat (phase 4) ----
+	cols:       kcombat.Combat_Cols, // host: the auto-published ledger columns
+	flying:     [dynamic]Cave_Rock, // host: the authoritative rock sim
+	respawn_at: map[knet.Net_Id]int, // host: resurrection clocks
+	host_ticks: int, // host: game ticks elapsed
+	hud_hp:     kui.Health_Bar,
+	hud_ab:     kui.Ability_Bar,
+	score:      kui.Score,
+	was_dead:   bool, // owner-side respawn edge detector
+	issue_at:   f64, // when my last command left (confirm latency proof)
+
+	// injected latency (CAVE_LATENCY ms; tests only)
+	latency: f64,
+	delayed: [dynamic]Delayed_Packet,
 }
 
 @(private = "file")
@@ -172,9 +228,29 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	self.prompt = kui.prompt_make(self.owner)
 	self.inv = kui.inv_make(self.owner, 6)
 	kui.inv_show(&self.inv, false)
+	self.hud_hp = kui.hp_make(self.owner)
+	self.hud_ab = kui.abilities_make(self.owner, 2)
+	self.score = kui.score_make(self.owner)
+	self.latency = f64(env_int("CAVE_LATENCY", 0)) / 1000.0
 	ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
 	ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
 	gd.print_str("CAVE_UI_READY")
+}
+
+@(private = "file")
+env_int :: proc(name: cstring, fallback: int) -> int {
+	if v, ok := strconv.parse_int(env_string(name, "")); ok {
+		return v
+	}
+	return fallback
+}
+
+@(private = "file")
+refresh_hud :: proc(self: ^CaveLobby) {
+	if self.me_spel == nil {return}
+	kui.hp_refresh(&self.hud_hp, self.me_spel.hp, MAX_HP)
+	defs := [?]kcombat.Ability_Def{ROCK_ABILITY}
+	kui.abilities_refresh(&self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.stamina)
 }
 
 // ---- the world: nodes, factory, spawning ------------------------------------------
@@ -227,6 +303,13 @@ cave_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 		p.net_id = id
 		self.pickups[id] = p
 		return p, &pickup_command_set
+	case ROCK_TYPE:
+		node := spawn_node(self, "res://scripts/rock.odin")
+		self.nodes[id] = node
+		r := rt.script_of(node, Rock)
+		r.net_id = id
+		self.rocks[id] = r
+		return r, &rock_set
 	case CHEST_TYPE:
 		node := spawn_node(self, "res://scripts/chest.odin")
 		self.nodes[id] = node
@@ -256,6 +339,7 @@ cave_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	delete_key(&self.chests, id)
 	delete_key(&self.doors, id)
 	delete_key(&self.pickups, id)
+	delete_key(&self.rocks, id)
 }
 
 // THE CROSS-ENTITY HALF of looting, host only (see chest.odin): a successful
@@ -311,12 +395,132 @@ cave_command_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net
 		cave_credit(self, player, chest)
 		return
 	}
-	if sp, is_spel := self.spelunkers[entity]; is_spel && cmd == 0 {
-		cave_mint_pickup(self, sp)
+	if sp, is_spel := self.spelunkers[entity]; is_spel {
+		switch cmd {
+		case SPEL_CMD_DROP:
+			cave_mint_pickup(self, sp)
+		case SPEL_CMD_THROW:
+			cave_launch_rock(self, player, sp)
+		}
 		return
 	}
 	if p, is_pickup := self.pickups[entity]; is_pickup && cmd == 0 {
 		cave_settle_grab(self, player, entity, p)
+	}
+}
+
+// Host: a confirmed throw launches the authoritative rock from the thrower
+// toward their recorded aim. The Rock ENTITY is only the visual — owned by
+// the host player, so the sim's positions stream to everyone.
+@(private = "file")
+cave_launch_rock :: proc(self: ^CaveLobby, shooter: knet.Player_Id, sp: ^Spelunker) {
+	dx, dy := sp.aim.x, sp.aim.y
+	n := math.sqrt(dx * dx + dy * dy)
+	if n == 0 {return}
+	node := spawn_node(self, "res://scripts/rock.odin")
+	r := rt.script_of(node, Rock)
+	r.x = sp.x
+	r.y = sp.y
+	r.net_id = ksess.session_spawn(&self.ses, ROCK_TYPE, r, &rock_set, owner = self.ses.me)
+	self.rocks[r.net_id] = r
+	self.nodes[r.net_id] = node
+	append(&self.flying, Cave_Rock {
+		p = kcombat.Projectile {
+			pos  = {sp.x, sp.y, 0},
+			vel  = {dx / n * ROCK_SPEED, dy / n * ROCK_SPEED, 0},
+			left = ROCK_TTL,
+		},
+		shooter = shooter,
+		id      = r.net_id,
+	})
+}
+
+// Host: death spills the whole bag onto the floor — phase 3's pickups are
+// suddenly a combat mechanic. (Loot the fallen, or guard them.)
+@(private = "file")
+cave_spill_bag :: proc(self: ^CaveLobby, sp: ^Spelunker) {
+	for slot in sp.bag {
+		if slot.item == kitems.ITEM_NONE {continue}
+		sp.last_drop = slot
+		cave_mint_pickup(self, sp)
+	}
+	sp.bag = {}
+}
+
+@(private = "file")
+cave_remove_rock :: proc(self: ^CaveLobby, id: knet.Net_Id) {
+	ksess.session_despawn(&self.ses, id)
+	if node, ok := self.nodes[id]; ok {
+		gd.node_queue_free(node)
+		delete_key(&self.nodes, id)
+	}
+	delete_key(&self.rocks, id)
+}
+
+// The host's game tick (once per 20 Hz net tick): decay ability clocks and
+// effects, regen stamina, fly the rocks, deal the damage, credit the
+// ledger, run the respawn clocks. Deltas carry every consequence.
+@(private = "file")
+cave_host_tick :: proc(self: ^CaveLobby) {
+	self.host_ticks += 1
+	for _, sp in self.spelunkers {
+		kcombat.abilities_tick(sp.cds[:])
+		kcombat.effects_tick(sp.fx[:])
+		if self.host_ticks % 20 == 0 && sp.hp > 0 {
+			sp.stamina = min(sp.stamina + 1, MAX_STAMINA)
+		}
+	}
+
+	for i := 0; i < len(self.flying); {
+		fl := &self.flying[i]
+		from := fl.p.pos
+		alive := kcombat.projectile_step(&fl.p)
+		if r, ok := self.rocks[fl.id]; ok {
+			r.x = fl.p.pos.x // the entity shows what the sim computes
+			r.y = fl.p.pos.y
+		}
+
+		targets := make([dynamic]kcombat.Target, context.temp_allocator)
+		for id, sp in self.spelunkers {
+			if id == self.avatar_of[fl.shooter] || sp.hp <= 0 {continue}
+			append(&targets, kcombat.Target{id = u32(id), pos = {sp.x, sp.y, 0}, radius = BODY_RADIUS})
+		}
+		if hit, hit_ok := kcombat.projectile_hit(from, fl.p.vel, targets[:]); hit_ok {
+			victim_id := knet.Net_Id(hit.id)
+			victim := self.spelunkers[victim_id]
+			kcombat.credit_hit(&self.ses, self.cols, fl.shooter, ROCK_DMG)
+			if kcombat.hit(&victim.hp, ROCK_DMG) {
+				victim_pid := knet.PLAYER_ID_INVALID
+				for pid, av in self.avatar_of {
+					if av == victim_id {victim_pid = pid}
+				}
+				kcombat.credit_kill(&self.ses, self.cols, fl.shooter, victim_pid)
+				cave_spill_bag(self, victim)
+				self.respawn_at[victim_id] = self.host_ticks + RESPAWN_TICKS
+			} else {
+				_ = kcombat.effects_add(victim.fx[:], CHILL, 50, 40) // 2s of cold feet
+			}
+			cave_remove_rock(self, fl.id)
+			unordered_remove(&self.flying, i)
+			continue
+		}
+		if !alive {
+			cave_remove_rock(self, fl.id)
+			unordered_remove(&self.flying, i)
+			continue
+		}
+		i += 1
+	}
+
+	// Respawn restores STATE; position is owner-streamed, so each OWNER
+	// walks out of the grave themselves (see the was_dead edge in process).
+	for id, at in self.respawn_at {
+		if self.host_ticks >= at {
+			sp := self.spelunkers[id]
+			sp.hp = MAX_HP
+			sp.stamina = MAX_STAMINA
+			delete_key(&self.respawn_at, id)
+		}
 	}
 }
 
@@ -350,8 +554,10 @@ cave_lobby_on_start :: proc(self: ^CaveLobby) {
 		if !p.connected {continue}
 		node := spawn_node(self, "res://scripts/spelunker.odin")
 		sp := rt.script_of(node, Spelunker)
-		sp.x = 80 + f32(i) * 60
-		sp.y = 120
+		sp.x = SPAWN_X + f32(i) * 60
+		sp.y = SPAWN_Y
+		sp.hp = MAX_HP
+		sp.stamina = MAX_STAMINA
 		i += 1
 		id := ksess.session_spawn(&self.ses, SPEL_TYPE, sp, &spelunker_command_set, owner = p.id)
 		self.nodes[id] = node
@@ -372,6 +578,7 @@ enter_the_cave :: proc(self: ^CaveLobby) {
 	kui.inv_show(&self.inv, true)
 	if self.me_spel != nil {
 		kui.inv_refresh(&self.inv, self.me_spel.bag[:], &self.table)
+		refresh_hud(self)
 	}
 }
 
@@ -387,6 +594,7 @@ cave_lobby_on_host :: proc(self: ^CaveLobby) {
 	self.ses.send = session_send
 	self.ses.send_user = self
 	ksess.session_host_start(&self.ses, my_name())
+	self.cols = kcombat.combat_columns(&self.ses) // the ledger, on the scoreboard
 	self.running = true
 	kui.lobby_show_menu(&self.ui, false, false)
 	kui.lobby_set_status(&self.ui, fmt.ctprintf("Hosting on :%d — waiting for friends", port()))
@@ -427,6 +635,17 @@ roster_changed :: proc(self: ^CaveLobby) {
 cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 	if !self.running {return}
 
+	// The fake wire delivers (acid runs only; self.latency == 0 otherwise).
+	for len(self.delayed) > 0 && self.delayed[0].due <= now_s() {
+		pkt := self.delayed[0]
+		ordered_remove(&self.delayed, 0)
+		r := knet.reader_make(pkt.data)
+		if knet.read_u8(&r) == MSG_SESSION {
+			ksess.session_handle_packet(&self.ses, pkt.from, &r)
+		}
+		delete(pkt.data)
+	}
+
 	// Client: seat ourselves as soon as the transport handshake completes.
 	if !self.ses.is_host && !self.join_sent {
 		mp := gd.node_get_multiplayer(self.owner)
@@ -439,7 +658,12 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 		}
 	}
 
-	_, _ = ksess.session_tick(&self.ses, delta, now_s())
+	ticks, _ := ksess.session_tick(&self.ses, delta, now_s())
+	if self.ses.is_host && self.started {
+		for _ in 0 ..< ticks {
+			cave_host_tick(self)
+		}
+	}
 
 	refresh := false
 	for {
@@ -475,6 +699,7 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 			}
 		case ksess.Ev_Stats_Updated:
 			refresh = true // ping column repaint
+			kui.score_refresh(&self.score, &self.ses)
 		case ksess.Ev_Host_Left:
 			kui.lobby_set_status(&self.ui, "The host left — this run is over")
 			gd.print_str("CAVE_HOST_LEFT")
@@ -487,9 +712,11 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 		case ksess.Ev_State_Applied:
 			if self.me_spel != nil {
 				kui.inv_refresh(&self.inv, self.me_spel.bag[:], &self.table)
+				refresh_hud(self)
 			}
 		case ksess.Ev_Command_Confirmed:
-			gd.print_str("CAVE_CONFIRM")
+			dt_ms := self.issue_at > 0 ? int((now_s() - self.issue_at) * 1000) : 0
+			gd.print_str(fmt.tprintf("CAVE_CONFIRM dt_ms=%d", dt_ms))
 		case ksess.Ev_Command_Rejected:
 			gd.print_str(fmt.tprintf("CAVE_REJECT entity=%d", u32(e.entity)))
 		}
@@ -515,7 +742,23 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 	}
 
 	if self.started && self.me_spel != nil {
-		drive_spelunker(self, delta)
+		// Owner-side respawn: hp coming back is the signal to walk out of
+		// the grave — position is owner-streamed, only I can move me.
+		if self.me_spel.hp <= 0 {
+			if !self.was_dead {
+				self.was_dead = true
+				self.walking = false
+				gd.print_str("CAVE_DIED")
+			}
+		} else if self.was_dead {
+			self.was_dead = false
+			self.me_spel.x = SPAWN_X
+			self.me_spel.y = SPAWN_Y
+			gd.print_str("CAVE_RESPAWNED")
+		}
+		if self.me_spel.hp > 0 {
+			drive_spelunker(self, delta)
+		}
 		update_prompt(self)
 	}
 }
@@ -526,7 +769,11 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 @(private = "file")
 drive_spelunker :: proc(self: ^CaveLobby, delta: f64) {
 	me := self.me_spel
-	step := WALK_SPEED * f32(delta)
+	speed := WALK_SPEED
+	if chill, chilled := kcombat.effect_of(me.fx[:], CHILL); chilled {
+		speed *= 1 - f32(chill.power) / 100 // cold feet
+	}
+	step := speed * f32(delta)
 	dir := gd.input_get_vector(
 		gd.singleton_input(),
 		gd.new_string_name_cstring("ui_left", true),
@@ -637,6 +884,26 @@ cave_lobby_interact :: proc(self: ^CaveLobby) {
 	}
 }
 
+// Throw a rock toward (dx, dy) — the ONE author-surface call, every peer.
+// The cast bites on this frame's screen; the host's rock flies ~RTT later.
+@(gd_method)
+cave_lobby_throw :: proc(self: ^CaveLobby, dx: gd.Float, dy: gd.Float) {
+	if !self.started || self.me_spel == nil {return}
+	self.issue_at = now_s()
+	applied := spelunker_throw_cmd(&self.ses.ctx, self.me_spel, f32(dx), f32(dy))
+	if applied && self.ses.is_host {
+		cave_launch_rock(self, self.ses.me, self.me_spel) // the authority's inline half
+	}
+	refresh_hud(self)
+	gd.print_str(fmt.tprintf("CAVE_THROW predicted=%v stamina=%d cd=%d", applied, self.me_spel.stamina, self.me_spel.cds[0]))
+}
+
+@(gd_method)
+cave_lobby_show_score :: proc(self: ^CaveLobby, visible: gd.Bool) {
+	kui.score_show(&self.score, bool(visible))
+	kui.score_refresh(&self.score, &self.ses)
+}
+
 // Drop a bag slot at my feet (a real game binds this to a key / drag-out).
 @(gd_method)
 cave_lobby_drop :: proc(self: ^CaveLobby, slot: gd.Int) {
@@ -652,6 +919,36 @@ cave_lobby_drop :: proc(self: ^CaveLobby, slot: gd.Int) {
 @(gd_method)
 cave_lobby_pickups :: proc(self: ^CaveLobby) -> gd.Int {
 	return gd.Int(len(self.pickups))
+}
+
+@(gd_method)
+cave_lobby_rocks :: proc(self: ^CaveLobby) -> gd.Int {
+	return gd.Int(len(self.rocks))
+}
+
+@(gd_method)
+cave_lobby_my_hp :: proc(self: ^CaveLobby) -> gd.Int {
+	if self.me_spel == nil {return 0}
+	return gd.Int(self.me_spel.hp)
+}
+
+// The other spelunker's hp, as this peer sees it (2-player test scaffolding).
+@(gd_method)
+cave_lobby_their_hp :: proc(self: ^CaveLobby) -> gd.Int {
+	my_av := self.avatar_of[self.ses.me]
+	for id, sp in self.spelunkers {
+		if id != my_av {
+			return gd.Int(sp.hp)
+		}
+	}
+	return 0
+}
+
+@(gd_method)
+cave_lobby_can_throw :: proc(self: ^CaveLobby) -> gd.Bool {
+	me := self.me_spel
+	if me == nil || me.hp <= 0 {return false}
+	return gd.Bool(kcombat.ability_ready(me.cds[:], 0) && me.stamina >= ROCK_ABILITY.cost)
 }
 
 @(gd_method)
@@ -676,7 +973,15 @@ cave_lobby_on_chat :: proc(self: ^CaveLobby, text: gd.String) {
 @(gd_method)
 cave_lobby_on_packet :: proc(self: ^CaveLobby, id: gd.Int, packet: gd.Packed_Byte_Array) {
 	packet := packet
-	r := knet.reader_make(netgd.pba_view(&packet))
+	view := netgd.pba_view(&packet)
+	if self.latency > 0 {
+		// The acid run: buffer everything, route when the fake wire delivers.
+		data := make([]u8, len(view))
+		copy(data, view)
+		append(&self.delayed, Delayed_Packet{due = now_s() + self.latency, from = int(id), data = data})
+		return
+	}
+	r := knet.reader_make(view)
 	if knet.read_u8(&r) == MSG_SESSION {
 		ksess.session_handle_packet(&self.ses, int(id), &r)
 	}

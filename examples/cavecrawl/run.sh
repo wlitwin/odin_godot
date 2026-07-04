@@ -24,9 +24,15 @@ export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
 
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
 
+# THE ACID CONDITION: every packet on every peer arrives 120ms late (240ms
+# round trips). Casts must still bite instantly (prediction) while confirms
+# measurably ride the slow wire — that is the "never feels sloppy" proof.
+LATENCY_MS=120
+
 launch() {
 	local role="$1" log="$2" port="$3" name="$4" token="$5"
 	ROLE="$role" CAVE_PORT="$port" CAVE_NAME="$name" CAVE_TOKEN="$token" \
+		CAVE_LATENCY="$LATENCY_MS" \
 		"$GODOT" --headless --path "$PROJ" --script cave_test.gd \
 		>"$log" 2>&1 &
 	echo $!
@@ -101,7 +107,7 @@ attempt() {
 	grep -q "CAVE_LOOT_DENIED" "$glog" || { echo "  FAIL: empty-chest grab was not denied"; ok=0; }
 	# The door toggle over the wire, and drops/pickups: the guest spills its
 	# gems, the pickup materializes on BOTH peers, the host scoops it up
-	# (authority path) and ends with the gems in ITS real inventory UI.
+	# (authority path) and shows the loot in ITS real inventory UI.
 	grep -q "CAVE_TOGGLE applied=true" "$glog" || { echo "  FAIL: guest door toggle failed"; ok=0; }
 	grep -q "CAVE_DROP applied=true" "$glog" || { echo "  FAIL: guest drop not predicted"; ok=0; }
 	for log in "$hlog" "$glog"; do
@@ -110,8 +116,32 @@ attempt() {
 	done
 	grep -q "CAVE_GRAB applied=true" "$hlog" || { echo "  FAIL: host grab failed"; ok=0; }
 	grep -q "CAVE_GRABBED my_gems=3" "$hlog" || { echo "  FAIL: gems never reached the host's bag"; ok=0; }
-	grep -qE "CAVE_FINAL \[.*gem x3.*\]" "$hlog" || { echo "  FAIL: host inventory UI missing the grabbed gems"; ok=0; }
-	grep -qE "CAVE_FINAL \[.*torch x2.*\]" "$hlog" || { echo "  FAIL: host inventory UI missing torches"; ok=0; }
+	grep -qE "CAVE_LOADOUT \[.*gem x3.*\]" "$hlog" || { echo "  FAIL: host inventory UI missing the grabbed gems"; ok=0; }
+	grep -qE "CAVE_LOADOUT \[.*torch x2.*\]" "$hlog" || { echo "  FAIL: host inventory UI missing torches"; ok=0; }
+	# Phase 4 — combat under ${LATENCY_MS}ms injected latency. The cast BITES
+	# INSTANTLY (stamina spent in the same print) while its confirm takes a
+	# real round trip: prediction beat the wire, and only the host dealt
+	# damage. One rock = one hit on both screens; three = a death, a spilled
+	# bag, a respawn, and a truthful scoreboard.
+	grep -q "CAVE_THROW predicted=true stamina=7 cd=20" "$glog" || { echo "  FAIL: cast not predicted instantly"; ok=0; }
+	grep -qE "CAVE_CONFIRM dt_ms=(19[0-9]|[2-9][0-9]{2}|[0-9]{4,})" "$glog" || { echo "  FAIL: confirm arrived impossibly fast (latency not proven)"; ok=0; }
+	for log in "$hlog" "$glog"; do
+		grep -q "CAVE_ARMED" "$log" || { echo "  FAIL: never armed in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_HIT hp=65" "$log" || { echo "  FAIL: the rock never landed in $(basename "$log")"; ok=0; }
+		grep -qE "CAVE_SPILLED pickups=[2-9] gems=3" "$log" || { echo "  FAIL: death never spilled the bag in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_BACK" "$log" || { echo "  FAIL: the host never rose in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_GEMS total=3" "$log" || { echo "  FAIL: gems not conserved in $(basename "$log")"; ok=0; }
+	done
+	grep -q "CAVE_DIED" "$hlog" || { echo "  FAIL: the host never died"; ok=0; }
+	grep -q "CAVE_RESPAWNED" "$hlog" || { echo "  FAIL: the host never walked out of the grave"; ok=0; }
+	# The REAL scoreboard on both peers: guest 105 damage / 1 kill / 0 deaths,
+	# host 0 damage / 0 kills / 1 death (plus a live ping column).
+	for log in "$hlog" "$glog"; do
+		grep -qE "CAVE_SCORE \[.*guest \| [0-9]+ \| 105 \| 1 \| 0.*\]" "$log" || { echo "  FAIL: guest ledger row wrong in $(basename "$log")"; ok=0; }
+		grep -qE "CAVE_SCORE \[.*hosty \| [0-9]+ \| 0 \| 0 \| 1.*\]" "$log" || { echo "  FAIL: host ledger row wrong in $(basename "$log")"; ok=0; }
+	done
+	# The host's HUD after resurrection: a full bar in the real UI tree.
+	grep -qE "CAVE_FINAL \[.*100/100.*\]" "$hlog" || { echo "  FAIL: host HUD not full after respawn"; ok=0; }
 	grep -q "HOST_DONE" "$hlog" || { echo "  FAIL: host did not finish"; ok=0; }
 	grep -q "GUEST_DONE" "$glog" || { echo "  FAIL: guest did not finish"; ok=0; }
 

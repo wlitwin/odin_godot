@@ -182,8 +182,77 @@ func _process(_delta: float) -> bool:
 			cave.call("interact") # scoop it up (authority path)
 		if int(cave.call("pickups")) == 0 and (role == "guest" or int(cave.call("my_gems")) == 3):
 			print("CAVE_GRABBED my_gems=", cave.call("my_gems"))
-			enter("wrap", now)
+			# The pre-combat loadout, read from the real inventory UI.
+			print("CAVE_LOADOUT [", label_texts(), "]")
+			# Phase 4: back apart — rock-throwing distance.
+			cave.call("walk_to", 440.0 if role == "host" else 200.0, 180.0)
+			enter("arm", now)
 		elif timed_out(now, "grab never settled, pickups=" + str(cave.call("pickups"))):
+			quit(1); return true
+		return false
+
+	if phase == "arm":
+		var pos: Vector2 = cave.call("my_pos")
+		var tx := 440.0 if role == "host" else 200.0
+		if abs(pos.x - tx) < 4.0 and abs(pos.y - 180.0) < 4.0 and bool(cave.call("can_throw")):
+			print("CAVE_ARMED")
+			# The guest opens fire: one rock, east, at the host's spelunker.
+			if role == "guest":
+				cave.call("throw", 1.0, 0.0)
+			enter("fight", now)
+		elif timed_out(now, "never in position, pos=" + str(pos)):
+			quit(1); return true
+		return false
+
+	if phase == "fight":
+		# One rock, one hit: 100 -> 65, seen from BOTH sides of the wire.
+		var hp := int(cave.call("my_hp") if role == "host" else cave.call("their_hp"))
+		if hp == 65:
+			print("CAVE_HIT hp=65")
+			enter("kill", now)
+		elif timed_out(now, "the rock never landed, hp=" + str(hp)):
+			quit(1); return true
+		return false
+
+	if phase == "kill":
+		# The guest keeps throwing as the cooldown allows until the host
+		# falls; the host's own process prints CAVE_DIED / CAVE_RESPAWNED.
+		if role == "guest" and int(cave.call("their_hp")) > 0 and bool(cave.call("can_throw")):
+			cave.call("throw", 1.0, 0.0)
+		var down := int(cave.call("my_hp") if role == "host" else cave.call("their_hp")) <= 0
+		# Death spills the host's bag: gems + torches hit the floor.
+		if down and int(cave.call("pickups")) >= 2:
+			print("CAVE_SPILLED pickups=", cave.call("pickups"), " gems=", cave.call("world_gems"))
+			enter("rise", now)
+		elif timed_out(now, "the host never fell, their_hp=" + str(cave.call("their_hp"))):
+			quit(1); return true
+		return false
+
+	if phase == "rise":
+		if role == "host":
+			if int(cave.call("my_hp")) == 100:
+				print("CAVE_BACK hp=", cave.call("my_hp"))
+				enter("score", now)
+			elif timed_out(now, "never respawned, hp=" + str(cave.call("my_hp"))):
+				quit(1); return true
+		else:
+			if int(cave.call("their_hp")) == 100:
+				print("CAVE_BACK their_hp=100")
+				enter("score", now)
+			elif timed_out(now, "host never rose, their_hp=" + str(cave.call("their_hp"))):
+				quit(1); return true
+		return false
+
+	if phase == "score":
+		if not acted:
+			acted = true
+			cave.call("show_score", true)
+		# Wait for a stat flush carrying the kill, then read the REAL board.
+		var board := label_texts()
+		if board.contains("| 1 | 0") and board.contains("| 0 | 1"):
+			print("CAVE_SCORE [", board, "]")
+			enter("wrap", now)
+		elif timed_out(now, "the ledger never showed"):
 			quit(1); return true
 		return false
 
