@@ -727,7 +727,18 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		}
 	}
 
-	// Procs bound to the struct (first param `^<Struct>`).
+	scan_bound_procs(&s, path, src, &file)
+
+	return s, true
+}
+
+// scan_bound_procs collects the procs bound to `s`'s script struct (first param
+// `^<Struct>`) from ONE parsed file: the script's own file during parse_script,
+// then every top-level HELPER file (no owner-struct) in the package — a grown
+// class may spread its @(gd_method)/@(gd_command)/lifecycle procs across sibling
+// files instead of living in one monolith. `path`/`src` are the file being
+// SCANNED, so diagnostics point at the helper, not the class's home file.
+scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 	self_type := strings.concatenate({"^", s.struct_name})
 	for decl in file.decls {
 		vd, ok := decl.derived.(^ast.Value_Decl)
@@ -750,7 +761,7 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		// before the lifecycle match so a command can never be misread as a hook.
 		if has_attr(vd, "gd_command") {
 			config, _ := attr_value(vd, "gd_command")
-			parse_command(&s, src, Loc{s.path, name_ident.pos.line}, proc_name, pt, config)
+			parse_command(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
 			continue
 		}
 
@@ -823,11 +834,15 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			}
 		}
 	}
+}
 
-	// Commands lean on the replication machinery: prediction reverts, torn-state
-	// restore, and reject-truth snapshots all need the Entity_Desc, and the wire
-	// header needs the entity's net identity. Missing either is a build error HERE,
-	// with the fix spelled out — not a nil-descriptor crash at runtime.
+// validate_script — contract checks that must wait until EVERY file's procs are
+// in (a @(gd_command) may live in a helper file, so parse_script alone can't see
+// the full set). Commands lean on the replication machinery: prediction reverts,
+// torn-state restore, and reject-truth snapshots all need the Entity_Desc, and
+// the wire header needs the entity's net identity. Missing either is a build
+// error HERE, with the fix spelled out — not a nil-descriptor crash at runtime.
+validate_script :: proc(s: ^Script) {
 	if len(s.commands) > 0 {
 		if len(s.replicates) == 0 {
 			error_at(
@@ -846,8 +861,6 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			)
 		}
 	}
-
-	return s, true
 }
 
 // Classify a `gd:"replicate,interp"` field's type into a knet.Lerp_Kind literal

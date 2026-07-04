@@ -478,6 +478,21 @@ main :: proc() {
 	// build inside "DO NOT EDIT" code.
 	owned_gen := make(map[string]bool)
 	defer delete(owned_gen)
+
+	// Pass 1: parse every top-level file. Script files (owner-struct) become pending
+	// gen output; the rest are HELPERS, remembered for pass 2 — a class may spread its
+	// bound procs across sibling files, so generation can't happen until every file
+	// has been seen.
+	Pending :: struct {
+		script:   Script,
+		out_path: string,
+	}
+	Helper :: struct {
+		path: string,
+		src:  string,
+	}
+	pending := make([dynamic]Pending)
+	helpers := make([dynamic]Helper)
 	for fi in files {
 		if fi.type == .Directory {continue}
 		if !strings.has_suffix(fi.name, ".odin") {continue}
@@ -502,7 +517,10 @@ main :: proc() {
 		if scan_boot_decl(src) {has_boot = true}
 
 		script, has := parse_script(path, src)
-		if !has {continue} // not a script file (no owner-struct) — skip silently
+		if !has {
+			append(&helpers, Helper{path = path, src = src})
+			continue
+		}
 
 		// Duplicate //gd:class across files: the core's name->desc map would silently let the
 		// last-loaded win and mis-bind the other. Catch it here with both file paths. This
@@ -518,13 +536,38 @@ main :: proc() {
 		out_path := strings.concatenate({path[:len(path) - len(".odin")], ".gen.odin"})
 		owned_gen[norm_path(out_path)] = true
 
+		append(&pending, Pending{script = script, out_path = out_path})
+	}
+
+	// Pass 2: multi-file classes. A helper file's procs whose first param is
+	// `^<Struct>` of a sibling script join that script's tables — methods, commands,
+	// lifecycles, rpcs — exactly as if they lived in the class's home file. Parse
+	// failures stay silent here (odin build reports them properly).
+	for h in helpers {
+		file := ast.File {
+			fullpath = h.path,
+			src      = h.src,
+		}
+		p := parser.default_parser()
+		p.err = silent_parse_diag
+		p.warn = silent_parse_diag
+		if !parser.parse_file(&p, &file) {continue}
+		for &pend in pending {
+			scan_bound_procs(&pend.script, h.path, h.src, &file)
+		}
+	}
+
+	// Generate, now that every file's contribution is in (validation too — a
+	// @(gd_command) found in a helper still needs its class's replicate/net_id).
+	for &pend in pending {
+		validate_script(&pend.script)
 		if had_error {continue}
-		gen := generate(&script)
-		if werr := os.write_entire_file(out_path, transmute([]byte)gen); werr != nil {
-			errorf("cannot write %q", out_path)
+		gen := generate(&pend.script)
+		if werr := os.write_entire_file(pend.out_path, transmute([]byte)gen); werr != nil {
+			errorf("cannot write %q", pend.out_path)
 			continue
 		}
-		fmt.printfln("scriptgen: wrote %s", out_path)
+		fmt.printfln("scriptgen: wrote %s", pend.out_path)
 		emitted += 1
 	}
 
