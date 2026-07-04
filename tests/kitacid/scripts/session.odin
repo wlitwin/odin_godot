@@ -14,9 +14,9 @@ package kitacid_scripts
 //   * gameplay: the Orb, driving it when we own it, reacting to session
 //     events (this test turns them into sentinels; a game turns them into
 //     effects/UI).
-//   * game-level messages that predate their toolkit brick: MSG_SPAWN
-//     (spawn-by-type factories are the next brick) and MSG_DONE (test
-//     sequencing).
+//   * an entity FACTORY: the session announces spawns by type; this game's
+//     factory hands back its (driver-pre-created) orb node's struct.
+//   * MSG_DONE, a game-level message for test sequencing.
 //
 // The injected-latency queue also stays here: it buffers RECEIVED packets
 // before routing, which is a test-driver concern, not a session one.
@@ -31,8 +31,9 @@ import "core:fmt"
 import "core:time"
 
 MSG_SESSION :: u8(0) // ALL kit/session traffic rides this one game byte
-MSG_SPAWN :: u8(1) // [net_id][owner][full fields]  host -> joined peer
 MSG_DONE :: u8(2) // client scenario finished       client -> host
+
+ORB_TYPE :: ksess.Entity_Type(1)
 
 TOKEN_OWNER :: u64(0xACED_0001)
 TOKEN_OBSERVER :: u64(0xACED_0002)
@@ -134,6 +135,7 @@ start_client :: proc(self: ^AcidSession, port: int, token: u64, name: string) {
 	}
 	self.ses.send = session_send
 	self.ses.send_user = self
+	ksess.session_set_factory(&self.ses, self, acid_make_entity, acid_free_entity)
 	ksess.session_client_start(&self.ses, token, name)
 	self.started = true
 	gd.print_str("JOIN_OK")
@@ -155,9 +157,9 @@ acid_session_join :: proc(self: ^AcidSession) {
 	ksess.session_client_join(&self.ses)
 }
 
-// Host: both players are seated — announce the world to each of them (the
-// orb, owned by the player NAMED "owner"), then start replicating. Spawn and
-// deltas share the reliable channel, so ids are known before any batch.
+// Host: both players are seated — spawn the orb (owned by the player NAMED
+// "owner"; ids depend on join order) and go live. The session ships SES_WORLD
+// to every seated client and announces later spawns itself.
 @(gd_method)
 acid_session_announce_world :: proc(self: ^AcidSession) {
 	owner_pid := knet.PLAYER_ID_INVALID
@@ -170,27 +172,35 @@ acid_session_announce_world :: proc(self: ^AcidSession) {
 		gd.print_str("ACID_ERR no seated player named owner")
 		return
 	}
-	self.orb.net_id = ksess.session_spawn(&self.ses, self.orb, &orb_command_set, owner_pid)
 	self.orb.hp = 100
 	self.orb.stamina = 10
-
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	knet.write_u8(&w, MSG_SPAWN)
-	knet.write_net_id(&w, self.orb.net_id)
-	knet.write_player_id(&w, owner_pid)
-	knet.write_full(&w, self.orb, &orb_net_desc)
-	sent := 0
-	for _, p in self.ses.players {
-		if !p.connected || p.id == self.ses.me {
-			continue
-		}
-		if err := netgd.send_reliable(self.owner, p.peer, knet.writer_bytes(&w)); err == .Ok {
-			sent += 1
-		}
-	}
+	self.orb.net_id = ksess.session_spawn(&self.ses, ORB_TYPE, self.orb, &orb_command_set, owner_pid)
 	ksess.session_start_replicating(&self.ses)
-	gd.print_str(fmt.tprintf("ACID_WORLD id=%d spawns=%d", u32(self.orb.net_id), sent))
+	gd.print_str(
+		fmt.tprintf(
+			"ACID_WORLD id=%d seated=%d",
+			u32(self.orb.net_id),
+			ksess.session_count(&self.ses, connected_only = true),
+		),
+	)
+}
+
+// The factory: this game has exactly one entity, pre-created by the driver —
+// hand it to the session under the announced id. A real game instantiates a
+// scene per type here.
+@(private = "file")
+acid_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (rawptr, ^knet.Command_Set) {
+	self := cast(^AcidSession)user
+	if type != ORB_TYPE {
+		return nil, nil
+	}
+	self.orb.net_id = id
+	return self.orb, &orb_command_set
+}
+
+@(private = "file")
+acid_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
+	// The driver owns the orb node's lifetime in this test.
 }
 
 // Driven every frame by the driver: drain due delayed packets, run the
@@ -234,6 +244,16 @@ drain_events :: proc(self: ^AcidSession, now: f64) {
 		switch e in ev {
 		case ksess.Ev_Welcomed:
 			gd.print_str(fmt.tprintf("ACID_SEATED me=%d", u64(e.me)))
+		case ksess.Ev_Spawned:
+			self.got += 1
+			gd.print_str(
+				fmt.tprintf(
+					"ACID_SPAWN ok=true id=%d mine=%v hp=%d st=%d",
+					u32(e.id), e.owner == self.ses.me, self.orb.hp, self.orb.stamina,
+				),
+			)
+		case ksess.Ev_Despawned:
+			gd.print_str(fmt.tprintf("ACID_DESPAWN id=%d", u32(e.id)))
 		case ksess.Ev_Player_Joined:
 			p, _ := ksess.session_player(&self.ses, e.id)
 			gd.print_str(fmt.tprintf("ACID_PLAYER name=%s rejoin=%v", p.name, e.rejoin))
@@ -325,20 +345,6 @@ route_packet :: proc(self: ^AcidSession, from: int, data: []u8) {
 	switch knet.read_u8(&r) {
 	case MSG_SESSION:
 		ksess.session_handle_packet(&self.ses, from, &r)
-	case MSG_SPAWN:
-		id := knet.read_net_id(&r)
-		who := knet.read_player_id(&r)
-		ksess.session_bind(&self.ses, id, self.orb, &orb_command_set, who)
-		self.orb.net_id = id
-		knet.apply_full(&r, self.orb, &orb_net_desc)
-		knet.registry_commit_shadows(&self.ses.reg)
-		gd.print_str(
-			fmt.tprintf(
-				"ACID_SPAWN ok=%v id=%d mine=%v hp=%d st=%d",
-				!r.err, u32(id), who == self.ses.me, self.orb.hp, self.orb.stamina,
-			),
-		)
-		if !r.err {self.got += 1}
 	case MSG_DONE:
 		self.dones += 1
 	case:

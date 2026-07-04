@@ -19,9 +19,11 @@ Envelope :: struct {
 }
 
 Peer_Box :: struct {
-	peer: int,
-	s:    ksess.Session,
-	out:  [dynamic]Envelope,
+	peer:  int,
+	s:     ksess.Session,
+	out:   [dynamic]Envelope,
+	bots:  map[knet.Net_Id]^Bot, // factory-created entities (clients)
+	freed: int, // factory frees observed
 }
 
 box_send :: proc(user: rawptr, to_peer: int, bytes: []u8, channel: ksess.Channel) {
@@ -35,6 +37,7 @@ box_make :: proc(b: ^Peer_Box, peer: int) {
 	b.peer = peer
 	b.s.send = box_send
 	b.s.send_user = b
+	ksess.session_set_factory(&b.s, b, box_make_entity, box_free_entity)
 }
 
 box_destroy :: proc(b: ^Peer_Box) {
@@ -42,6 +45,10 @@ box_destroy :: proc(b: ^Peer_Box) {
 		delete(e.data)
 	}
 	delete(b.out)
+	for _, bot in b.bots {
+		free(bot)
+	}
+	delete(b.bots)
 	ksess.session_destroy(&b.s)
 }
 
@@ -318,15 +325,34 @@ bot_cmd_hit :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
 	return true
 }
 
-bot_set :: proc() -> knet.Command_Set {
-	@(static) fields := [?]knet.Field_Desc{
-		{offset = offset_of(Bot, hp), size = size_of(i32)},
-		{offset = offset_of(Bot, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32},
+// File-scope like generated code: the registry and factories keep pointers.
+bot_fields := [?]knet.Field_Desc{
+	{offset = offset_of(Bot, hp), size = size_of(i32)},
+	{offset = offset_of(Bot, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32},
+}
+bot_desc := knet.Entity_Desc{fields = bot_fields[:]}
+bot_cmds := [?]knet.Command_Desc{{name = "hit", predict = true, invoke = bot_cmd_hit}}
+bot_command_set := knet.Command_Set{entity_desc = &bot_desc, commands = bot_cmds[:]}
+
+BOT_TYPE :: ksess.Entity_Type(7)
+UNKNOWN_TYPE :: ksess.Entity_Type(99)
+
+// The client-side factory: heap-allocate a Bot for BOT_TYPE, refuse the rest.
+box_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (rawptr, ^knet.Command_Set) {
+	b := cast(^Peer_Box)user
+	if type != BOT_TYPE {
+		return nil, nil
 	}
-	@(static) desc: knet.Entity_Desc
-	desc = knet.Entity_Desc{fields = fields[:]}
-	@(static) cmds := [?]knet.Command_Desc{{name = "hit", predict = true, invoke = bot_cmd_hit}}
-	return knet.Command_Set{entity_desc = &desc, commands = cmds[:]}
+	bot := new(Bot)
+	b.bots[id] = bot
+	return bot, &bot_command_set
+}
+
+box_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
+	b := cast(^Peer_Box)user
+	delete_key(&b.bots, id)
+	free(entity)
+	b.freed += 1
 }
 
 // Advance both peers' sessions one net tick's worth and deliver the traffic.
@@ -354,14 +380,17 @@ world_over_the_session :: proc(t: ^testing.T) {
 	drain(&host.s)
 	drain(&alice.s)
 
-	// World setup, the (pre-factory) game's job: host spawns + snapshots, the
-	// client binds under the announced id. Alice owns the bot's streamed x.
-	set := bot_set()
+	// World setup: the host spawns its own entity; going live ships SES_WORLD
+	// and alice's FACTORY creates her copy. Alice owns the bot's streamed x.
 	hbot := Bot{hp = 10, x = 1}
-	id := ksess.session_spawn(&host.s, &hbot, &set, owner = alice.s.me)
-	abot := Bot{hp = 10, x = 1}
-	ksess.session_bind(&alice.s, id, &abot, &set, owner = alice.s.me)
+	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set, owner = alice.s.me)
 	ksess.session_start_replicating(&host.s)
+	pump(boxes)
+	abot := alice.bots[id]
+	testing.expect(t, abot != nil, "the factory must have made alice's bot")
+	testing.expect_value(t, abot.hp, i32(10))
+	testing.expect_value(t, abot.x, f32(1))
+	drain(&alice.s) // Ev_Spawned
 
 	now := 100.0
 
@@ -382,7 +411,7 @@ world_over_the_session :: proc(t: ^testing.T) {
 	// executes, confirm event drains the pending.
 	knet.command_begin(&alice.s.ctx, id, 0)
 	knet.write_i32(&alice.s.ctx.msg, 3)
-	testing.expect(t, knet.command_issue(&alice.s.ctx, &abot, &set, 0))
+	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, 0))
 	testing.expect_value(t, abot.hp, i32(5))
 	pump(boxes)
 	testing.expect_value(t, hbot.hp, i32(5))
@@ -410,7 +439,7 @@ world_over_the_session :: proc(t: ^testing.T) {
 	// still settles it (and the event names the entity).
 	knet.command_begin(&alice.s.ctx, id, 0)
 	knet.write_i32(&alice.s.ctx.msg, 5)
-	testing.expect(t, !knet.command_issue(&alice.s.ctx, &abot, &set, 0))
+	testing.expect(t, !knet.command_issue(&alice.s.ctx, abot, &bot_command_set, 0))
 	testing.expect_value(t, abot.hp, i32(5)) // local revert
 	pump(boxes)
 	testing.expect_value(t, hbot.hp, i32(5)) // host rejected too
@@ -465,9 +494,8 @@ commands_from_unseated_peers_are_dropped :: proc(t: ^testing.T) {
 	defer box_destroy(&host)
 	ksess.session_host_start(&host.s, "hosty")
 
-	set := bot_set()
 	hbot := Bot{hp = 10}
-	id := ksess.session_spawn(&host.s, &hbot, &set)
+	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
 
 	// A raw SES_CMD from a transport peer that never JOINed: dropped whole —
 	// no execution, no result, no event.
@@ -482,4 +510,186 @@ commands_from_unseated_peers_are_dropped :: proc(t: ^testing.T) {
 	ksess.session_handle_packet(&host.s, 666, &r)
 	testing.expect_value(t, hbot.hp, i32(10))
 	testing.expect_value(t, len(drain(&host.s)), 0)
+}
+
+// ---- spawn/despawn by type, drop-in join, reconnect reclaim --------------------
+
+@(test)
+spawn_and_despawn_via_factory :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	drain(&host.s)
+	drain(&alice.s)
+
+	// Pre-live spawn travels via SES_WORLD at go-live.
+	b1 := Bot{hp = 30, x = 3}
+	id1 := ksess.session_spawn(&host.s, BOT_TYPE, &b1, &bot_command_set)
+	ksess.session_start_replicating(&host.s)
+	pump(boxes)
+	testing.expect(t, alice.bots[id1] != nil)
+	testing.expect_value(t, alice.bots[id1].hp, i32(30))
+
+	// LIVE spawn: announced immediately (SES_SPAWN), snapshot included.
+	b2 := Bot{hp = 55, x = 5}
+	id2 := ksess.session_spawn(&host.s, BOT_TYPE, &b2, &bot_command_set)
+	pump(boxes)
+	testing.expect(t, alice.bots[id2] != nil)
+	testing.expect_value(t, alice.bots[id2].hp, i32(55))
+	spawned := 0
+	for ev in drain(&alice.s) {
+		if _, ok := ev.(ksess.Ev_Spawned); ok {
+			spawned += 1
+		}
+	}
+	testing.expect_value(t, spawned, 2)
+
+	// Deltas reach the factory-made copy.
+	now := 50.0
+	b2.hp = 44
+	step(boxes, &now)
+	testing.expect_value(t, alice.bots[id2].hp, i32(44))
+
+	// Despawn: removed everywhere, the factory's free runs, event fires.
+	ksess.session_despawn(&host.s, id1)
+	pump(boxes)
+	testing.expect(t, alice.bots[id1] == nil)
+	testing.expect_value(t, alice.freed, 1)
+	despawned := false
+	for ev in drain(&alice.s) {
+		if d, ok := ev.(ksess.Ev_Despawned); ok && d.id == id1 {
+			despawned = true
+		}
+	}
+	testing.expect(t, despawned)
+	testing.expect_value(t, knet.registry_count(&host.s.reg), 1)
+	testing.expect_value(t, knet.registry_count(&alice.s.reg), 1)
+}
+
+@(test)
+drop_in_join_gets_the_world :: proc(t: ^testing.T) {
+	host: Peer_Box
+	box_make(&host, 1)
+	defer box_destroy(&host)
+	ksess.session_host_start(&host.s, "hosty")
+
+	// The run is ALREADY going: world spawned, live, and mutated — deltas have
+	// been broadcast (to nobody) and shadows committed.
+	b1 := Bot{hp = 30}
+	b2 := Bot{hp = 55}
+	id1 := ksess.session_spawn(&host.s, BOT_TYPE, &b1, &bot_command_set)
+	id2 := ksess.session_spawn(&host.s, BOT_TYPE, &b2, &bot_command_set)
+	ksess.session_start_replicating(&host.s)
+	now := 50.0
+	b1.hp = 25
+	step([]^Peer_Box{&host}, &now)
+
+	// Bob drops in mid-game: WELCOME, then the CURRENT world.
+	bob: Peer_Box
+	box_make(&bob, 200)
+	defer box_destroy(&bob)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	boxes := []^Peer_Box{&host, &bob}
+	pump(boxes)
+
+	testing.expect(t, bob.s.joined)
+	testing.expect(t, bob.bots[id1] != nil && bob.bots[id2] != nil)
+	testing.expect_value(t, bob.bots[id1].hp, i32(25)) // post-mutation state
+	testing.expect_value(t, bob.bots[id2].hp, i32(55))
+
+	// And the ongoing delta stream just works for him.
+	b2.hp = 40
+	step(boxes, &now)
+	testing.expect_value(t, bob.bots[id2].hp, i32(40))
+}
+
+@(test)
+reconnect_reclaims_owned_entities :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	// Alice's pawn: host-spawned, owned by her — she streams its x.
+	pawn := Bot{hp = 10, x = 1}
+	id := ksess.session_spawn(&host.s, BOT_TYPE, &pawn, &bot_command_set, owner = alice.s.me)
+	ksess.session_start_replicating(&host.s)
+	pump(boxes)
+	now := 50.0
+	alice.bots[id].x = 5
+	step(boxes, &now)
+	step(boxes, &now)
+	now += 1.0
+	_, _ = ksess.session_tick(&host.s, 0.0, now)
+	testing.expect_value(t, pawn.x, f32(5)) // her stream reached the host
+
+	// She vanishes; the world persists.
+	ksess.session_peer_disconnected(&host.s, 100)
+
+	// Fresh process, same token: seat reclaimed, WORLD recreates her pawn —
+	// owned by HER id — and her stream authority resumes without ceremony.
+	alice2: Peer_Box
+	box_make(&alice2, 300)
+	defer box_destroy(&alice2)
+	ksess.session_client_start(&alice2.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice2.s)
+	boxes2 := []^Peer_Box{&host, &alice2}
+	pump(boxes2)
+
+	testing.expect_value(t, alice2.s.me, knet.Player_Id(2))
+	repawn := alice2.bots[id]
+	testing.expect(t, repawn != nil, "the world snapshot must recreate her pawn")
+	e, _ := knet.registry_get(&alice2.s.reg, id)
+	testing.expect_value(t, e.owner, alice2.s.me)
+
+	repawn.x = 77
+	step(boxes2, &now)
+	step(boxes2, &now)
+	now += 1.0
+	_, _ = ksess.session_tick(&host.s, 0.0, now)
+	testing.expect_value(t, pawn.x, f32(77)) // authority reclaimed, stream flows
+}
+
+@(test)
+unknown_entity_type_is_skipped :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	// One knowable bot, one type alice's factory refuses: the WORLD parse must
+	// skip the stranger by length and still deliver the bot.
+	known := Bot{hp = 30}
+	strange := Bot{hp = 66}
+	kid := ksess.session_spawn(&host.s, BOT_TYPE, &known, &bot_command_set)
+	_ = ksess.session_spawn(&host.s, UNKNOWN_TYPE, &strange, &bot_command_set)
+	ksess.session_start_replicating(&host.s)
+	pump(boxes)
+
+	testing.expect(t, alice.bots[kid] != nil, "known entity survives an unknown neighbor")
+	testing.expect_value(t, alice.bots[kid].hp, i32(30))
+	testing.expect_value(t, knet.registry_count(&alice.s.reg), 1)
 }

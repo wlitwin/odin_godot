@@ -70,6 +70,16 @@ Ev_Player_Left :: struct {
 
 Ev_Host_Left :: struct {} // (client) the run is over — v1 has no migration
 
+Ev_Spawned :: struct {
+	id:    knet.Net_Id, // (client) the factory made it and the snapshot applied
+	type:  Entity_Type,
+	owner: knet.Player_Id,
+}
+
+Ev_Despawned :: struct {
+	id: knet.Net_Id, // (client) already removed; the factory's free ran
+}
+
 Ev_State_Applied :: struct {
 	entities: int, // (client) a host state batch landed on this many entities
 }
@@ -92,11 +102,31 @@ Event :: union {
 	Ev_Player_Joined,
 	Ev_Player_Left,
 	Ev_Host_Left,
+	Ev_Spawned,
+	Ev_Despawned,
 	Ev_State_Applied,
 	Ev_Command_Executed,
 	Ev_Command_Confirmed,
 	Ev_Command_Rejected,
 }
+
+// ---- entity factories --------------------------------------------------------
+//
+// The game's kind of thing: a small u16 the host stamps on every spawn so
+// remote peers know WHAT to create (the values come in the same message).
+Entity_Type :: distinct u16
+
+// Client-side: create the local counterpart of a spawned entity — instantiate
+// the node/scene for `type`, return its struct + command set. Returning nil
+// skips the entity safely (unknown type: the wire carries its length). This is
+// the one place the session CALLS INTO the game synchronously — the registry
+// needs the pointer before the snapshot can apply; react to the spawn itself
+// via Ev_Spawned, which fires right after.
+Make_Entity_Proc :: proc(user: rawptr, type: Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (entity: rawptr, set: ^knet.Command_Set)
+
+// Client-side: the entity was despawned and already removed from the registry
+// — free the node/struct.
+Free_Entity_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr)
 
 // ---- wire (sub-framed: the game's session kind byte comes first, then ours) --
 
@@ -122,6 +152,12 @@ SES_STREAM :: u8(8) // owner -> all    owner-stream batch (Channel.Stream)
 SES_PING :: u8(9) // any -> any      [local_send f64]
 @(private)
 SES_PONG :: u8(10) // reply           [echoed_send][remote_time]
+@(private)
+SES_SPAWN :: u8(11) // host -> all    [type u16][id][owner][len u16][full fields]
+@(private)
+SES_DESPAWN :: u8(12) // host -> all  [id]
+@(private)
+SES_WORLD :: u8(13) // host -> one    [count u16] x the SES_SPAWN tuple (join snapshot)
 
 // Remote entities render this far in the past (~3 net ticks at 20 Hz): almost
 // always a bracketing sample pair, smooth through jitter and single drops.
@@ -145,8 +181,14 @@ Session :: struct {
 	clocks:       map[int]knet.Clock_Sync, // per transport peer, fed by ping/pong
 	pongs:        int, // pong samples applied (games gate "clock is warm" on this)
 	now:          f64, // the game's monotonic seconds, updated each session_tick
-	replicating:  bool, // host: the delta walk is live (after join snapshots)
+	replicating:  bool, // host: the world is LIVE (deltas flow; joiners get SES_WORLD)
 	interp_delay: f64,
+
+	// entity types + client-side factories
+	types:        map[knet.Net_Id]Entity_Type, // host: for (re-)announcing spawns
+	factory_user: rawptr,
+	factory_make: Make_Entity_Proc,
+	factory_free: Free_Entity_Proc,
 
 	// host bookkeeping
 	next_player: knet.Player_Id,
@@ -182,7 +224,15 @@ session_destroy :: proc(s: ^Session) {
 	knet.registry_destroy(&s.reg)
 	knet.command_ctx_destroy(&s.ctx)
 	delete(s.clocks)
+	delete(s.types)
 	s^ = {}
+}
+
+// Install the client-side entity factory (do it before joining).
+session_set_factory :: proc(s: ^Session, user: rawptr, make_entity: Make_Entity_Proc, free_entity: Free_Entity_Proc) {
+	s.factory_user = user
+	s.factory_make = make_entity
+	s.factory_free = free_entity
 }
 
 // The Command_Ctx send hook: wrap raw command bytes in session framing and
@@ -200,23 +250,117 @@ ctx_send_command :: proc(user: rawptr, bytes: []u8) {
 
 // ---- the replicated world ----------------------------------------------------
 
-// Host: register a new entity (allocates its net id). The game still owns
-// entity CREATION and the spawn message carrying (id, owner, snapshot) to the
-// other peers — spawn-by-type factories are the next brick.
-session_spawn :: proc(s: ^Session, entity: rawptr, set: ^knet.Command_Set, owner := knet.PLAYER_ID_INVALID) -> knet.Net_Id {
-	return knet.registry_spawn(&s.reg, entity, set, owner)
+// Host: spawn an entity into the session. Allocates its net id, records its
+// type, and — once the world is live — announces it to every seated peer
+// (reliable, so the spawn always precedes any delta naming the id). The HOST
+// game creates its own entity however it likes; remote peers create theirs
+// through the factory when the announcement arrives.
+session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet.Command_Set, owner := knet.PLAYER_ID_INVALID) -> knet.Net_Id {
+	assert(s.is_host, "only the authority spawns; clients create via the factory")
+	id := knet.registry_spawn(&s.reg, entity, set, owner)
+	s.types[id] = type
+	if s.replicating {
+		w := knet.writer_make()
+		defer knet.writer_destroy(&w)
+		knet.write_u8(&w, SES_SPAWN)
+		write_spawn_tuple(s, &w, id)
+		broadcast(s, knet.writer_bytes(&w), .Reliable)
+	}
+	return id
 }
 
-// Client: mirror an entity under the id (and owner) the wire announced.
-session_bind :: proc(s: ^Session, id: knet.Net_Id, entity: rawptr, set: ^knet.Command_Set, owner := knet.PLAYER_ID_INVALID) {
-	knet.registry_insert(&s.reg, id, entity, set, owner)
+// Host: remove an entity from the session and tell everyone. The host game
+// frees its own node after this returns; remote peers free theirs through the
+// factory. Clients' in-flight predictions on the entity clean up on their own
+// (results/expiry handle a missing entity).
+session_despawn :: proc(s: ^Session, id: knet.Net_Id) {
+	assert(s.is_host)
+	if !knet.registry_remove(&s.reg, id) {
+		return
+	}
+	delete_key(&s.types, id)
+	if s.replicating {
+		w := knet.writer_make()
+		defer knet.writer_destroy(&w)
+		knet.write_u8(&w, SES_DESPAWN)
+		knet.write_net_id(&w, id)
+		broadcast(s, knet.writer_bytes(&w), .Reliable)
+	}
 }
 
-// Host: every joined peer has its snapshot — commit shadows and let the
-// per-tick delta walk broadcast from here on.
+// Host: the world is set up — go live. Commits shadows, ships the full world
+// (SES_WORLD) to every ALREADY-seated client, and from here on the per-tick
+// delta walk broadcasts and every later joiner gets SES_WORLD right behind
+// its WELCOME: drop-in mid-game join is the same code path as being early.
 session_start_replicating :: proc(s: ^Session) {
+	assert(s.is_host)
 	knet.registry_commit_shadows(&s.reg)
 	s.replicating = true
+	for _, p in s.players {
+		if !p.connected || p.id == s.me {
+			continue
+		}
+		send_world(s, p.peer)
+	}
+}
+
+// [type][id][owner][len][full fields] — len makes unknown types skippable.
+@(private = "file")
+write_spawn_tuple :: proc(s: ^Session, w: ^knet.Writer, id: knet.Net_Id) {
+	e, _ := knet.registry_get(&s.reg, id)
+	knet.write_u16(w, u16(s.types[id]))
+	knet.write_net_id(w, id)
+	knet.write_player_id(w, e.owner)
+	n := knet.desc_data_size(e.set.entity_desc)
+	assert(n <= int(max(u16)))
+	knet.write_u16(w, u16(n))
+	knet.write_full(w, e.entity, e.set.entity_desc)
+}
+
+@(private = "file")
+send_world :: proc(s: ^Session, peer: int) {
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_u8(&w, SES_WORLD)
+	assert(knet.registry_count(&s.reg) <= int(max(u16)))
+	knet.write_u16(&w, u16(knet.registry_count(&s.reg)))
+	for id in s.types {
+		write_spawn_tuple(s, &w, id)
+	}
+	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
+}
+
+// Client: one incoming spawn tuple — factory-create (or reconcile onto an
+// entity we already have: a same-session rejoin re-receives the world), apply
+// the snapshot, event. Unknown types skip by length.
+@(private = "file")
+apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
+	type := Entity_Type(knet.read_u16(r))
+	id := knet.read_net_id(r)
+	owner := knet.read_player_id(r)
+	n := int(knet.read_u16(r))
+	if r.err || r.off + n > len(r.data) {
+		r.err = true
+		return
+	}
+	body := knet.reader_make(r.data[r.off:r.off + n])
+	r.off += n
+
+	if e, exists := knet.registry_get(&s.reg, id); exists {
+		knet.apply_full(&body, e.entity, e.set.entity_desc)
+		return
+	}
+	if s.factory_make == nil {
+		return
+	}
+	entity, set := s.factory_make(s.factory_user, type, id, owner)
+	if entity == nil || set == nil {
+		return // unknown type: skipped whole, by length
+	}
+	knet.registry_insert(&s.reg, id, entity, set, owner)
+	s.types[id] = type
+	knet.apply_full(&body, entity, set.entity_desc)
+	append(&s.events, Ev_Spawned{id = id, type = type, owner = owner})
 }
 
 // Drive the session once per frame. `now` is the game's monotonic seconds
@@ -446,6 +590,14 @@ host_handle_join :: proc(s: ^Session, peer: int, r: ^knet.Reader) {
 	knet.write_bool(&up, rejoin)
 	host_broadcast(s, knet.writer_bytes(&up), except = id)
 
+	// DROP-IN JOIN: a live world follows the welcome on the same ordered
+	// channel — the joiner materializes everything before any delta can name
+	// an id it doesn't know. (Deltas broadcast before this arrive at the
+	// still-unseated client and are dropped; SES_WORLD supersedes them.)
+	if s.replicating {
+		send_world(s, peer)
+	}
+
 	append(&s.events, Ev_Player_Joined{id = id, rejoin = rejoin})
 }
 
@@ -565,9 +717,46 @@ session_handle_packet :: proc(s: ^Session, from_peer: int, r: ^knet.Reader) {
 			append(&s.events, Ev_Player_Left{id = id})
 		}
 
-	// ---- the replicated world ----
+	// ---- the replicated world (clients ignore it all until SEATED: a spawn
+	// arriving before our WELCOME would collide with the SES_WORLD that
+	// follows it — everything pre-seat is superseded by that snapshot) ----
+	case SES_WORLD:
+		if s.is_host || !s.joined {
+			return
+		}
+		count := int(knet.read_u16(r))
+		for _ in 0 ..< count {
+			apply_spawn_tuple(s, r)
+			if r.err {
+				return
+			}
+		}
+		knet.registry_commit_shadows(&s.reg)
+	case SES_SPAWN:
+		if s.is_host || !s.joined {
+			return
+		}
+		apply_spawn_tuple(s, r)
+	case SES_DESPAWN:
+		if s.is_host || !s.joined {
+			return
+		}
+		id := knet.read_net_id(r)
+		if r.err {
+			return
+		}
+		e, exists := knet.registry_get(&s.reg, id)
+		if !exists {
+			return
+		}
+		knet.registry_remove(&s.reg, id)
+		delete_key(&s.types, id)
+		if s.factory_free != nil {
+			s.factory_free(s.factory_user, id, e.entity)
+		}
+		append(&s.events, Ev_Despawned{id = id})
 	case SES_STATE:
-		if s.is_host {
+		if s.is_host || !s.joined {
 			return
 		}
 		n := knet.registry_apply_deltas(r, &s.reg, &s.ctx)
@@ -610,6 +799,9 @@ session_handle_packet :: proc(s: ^Session, from_peer: int, r: ^knet.Reader) {
 			append(&s.events, Ev_Command_Rejected{seq = res.seq, entity = res.entity})
 		}
 	case SES_STREAM:
+		if !s.joined {
+			return
+		}
 		_ = knet.registry_stream_time(r) // sender stamp (clock-mapped timelines later)
 		_ = knet.registry_apply_streams(r, &s.reg, s.me, s.now)
 	case SES_PING:

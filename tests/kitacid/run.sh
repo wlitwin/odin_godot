@@ -100,8 +100,8 @@ attempt() {
 		|| { echo "  FAIL: the owner never joined the session"; ok=0; }
 	grep -q "ACID_PLAYER name=observer rejoin=false" "$slog" \
 		|| { echo "  FAIL: the observer never joined the session"; ok=0; }
-	grep -qF "ACID_WORLD id=1 spawns=2" "$slog" \
-		|| { echo "  FAIL: world was not announced to exactly 2 seated peers"; ok=0; }
+	grep -qF "ACID_WORLD id=1 seated=3" "$slog" \
+		|| { echo "  FAIL: world did not go live with 3 seated players"; ok=0; }
 	grep -qF "ACID_EXEC ok=true hp=92 st=6" "$slog" \
 		|| { echo "  FAIL: host never executed strike 1"; ok=0; }
 	grep -qF "ACID_EXEC ok=true hp=84 st=2" "$slog" \
