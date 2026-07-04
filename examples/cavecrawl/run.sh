@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ----------------------------------------------------------------------------
-# CAVECRAWL (phases 1+2): the toolkit example boots to a WORKING LOBBY with
-# CHAT. Two headless processes instantiate the real cave.tscn, press the
-# lobby's own button methods (host / join), seat over real ENet through
-# kit/session, and then read the ACTUAL kit/ui Label texts back out of the
-# tree: both names on both peers, the you-marker, the host's Start button
-# appearing once two spelunkers are in — and both peers' chat lines, the
-# "guest joined" system line, and the guest's positional marker (kit/comms
-# over the session's SES_APP wire).
+# CAVECRAWL (phases 1+2+3): lobby -> chat -> THE CAVE, two headless processes
+# over real ENet driving the real cave.tscn. Phase 3: Start spawns a world
+# (spelunker per player, stocked chest, door), both peers WALK there (owner-
+# streamed motion swinging the interact prompt's range gate), the guest loots
+# the gems (predicted; the host's command hook credits the bag), the host
+# loots the torches (authority path), a second grab is denied, the door
+# opens on both screens, gems are conserved, and the inventory grid shows
+# the loot in the real UI tree.
 #
 # Prints CAVECRAWL_OK. Run inside the Nix dev shell:
 #   nix develop --command bash -c 'bash examples/cavecrawl/run.sh'
@@ -81,6 +81,28 @@ attempt() {
 		# The guest's marker surfaces as a comms event on both peers.
 		grep -q "CAVE_MARK player=2 kind=1" "$log" || { echo "  FAIL: marker missing in $(basename "$log")"; ok=0; }
 	done
+	# Phase 3 — the cave. Both peers materialize the world and reach the chest
+	# on their own legs (the prompt only shows inside the shared range gate).
+	for log in "$hlog" "$glog"; do
+		grep -q "CAVE_WORLD_READY gems=3" "$log" || { echo "  FAIL: world missing in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_AT_CHEST" "$log" || { echo "  FAIL: never reached the chest in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_CHEST_EMPTY" "$log" || { echo "  FAIL: chest never emptied in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_DOOR_OPEN" "$log" || { echo "  FAIL: door never opened in $(basename "$log")"; ok=0; }
+		# Conservation: exactly the 3 gems that ever existed, on every peer.
+		grep -q "CAVE_GEMS total=3" "$log" || { echo "  FAIL: gems not conserved in $(basename "$log")"; ok=0; }
+	done
+	# The guest's loot was PREDICTED (applied locally) then host-confirmed...
+	grep -q "CAVE_LOOT applied=true" "$glog" || { echo "  FAIL: guest loot not predicted"; ok=0; }
+	grep -q "CAVE_CONFIRM" "$glog" || { echo "  FAIL: guest loot never confirmed"; ok=0; }
+	grep -q "CAVE_GEMS_LOOTED mine=3" "$glog" || { echo "  FAIL: gems never reached the guest's bag"; ok=0; }
+	# ...the host looted through the authority path, and a second grab said no.
+	grep -q "CAVE_LOOT applied=true" "$hlog" || { echo "  FAIL: host loot failed"; ok=0; }
+	grep -q "CAVE_CHEST_EMPTY torches=2" "$hlog" || { echo "  FAIL: torches never reached the host's bag"; ok=0; }
+	grep -q "CAVE_LOOT_DENIED" "$glog" || { echo "  FAIL: empty-chest grab was not denied"; ok=0; }
+	# The bag in the REAL inventory UI, and the door toggle over the wire.
+	grep -qE "CAVE_FINAL \[.*gem x3.*\]" "$glog" || { echo "  FAIL: guest inventory UI missing gems"; ok=0; }
+	grep -qE "CAVE_FINAL \[.*torch x2.*\]" "$hlog" || { echo "  FAIL: host inventory UI missing torches"; ok=0; }
+	grep -q "CAVE_TOGGLE applied=true" "$glog" || { echo "  FAIL: guest door toggle failed"; ok=0; }
 	grep -q "HOST_DONE" "$hlog" || { echo "  FAIL: host did not finish"; ok=0; }
 	grep -q "GUEST_DONE" "$glog" || { echo "  FAIL: guest did not finish"; ok=0; }
 
