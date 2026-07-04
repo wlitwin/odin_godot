@@ -34,6 +34,18 @@ cave_lobby_their_hp :: proc(self: ^CaveLobby) -> gd.Int {
 	return 0
 }
 
+// The other spelunker's position, as this peer sees it.
+@(gd_method)
+cave_lobby_their_pos :: proc(self: ^CaveLobby) -> gd.Vector2 {
+	my_av := self.avatar_of[self.ses.me]
+	for id, sp in self.spelunkers {
+		if id != my_av {
+			return {sp.x, sp.y}
+		}
+	}
+	return {}
+}
+
 @(gd_method)
 cave_lobby_can_throw :: proc(self: ^CaveLobby) -> gd.Bool {
 	me := self.me_spel

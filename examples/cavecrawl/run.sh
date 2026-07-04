@@ -131,6 +131,11 @@ attempt() {
 	# displayed hp dips to 65 WHILE the replicated truth still reads 100 —
 	# the impact you saw, a round trip before the wire agrees. The victim's
 	# screen plays the same impact from the host's fire announcement.
+	# THE MOVING CAST: the guest's opening shot is thrown MID-STRIDE. The
+	# cast carries its owner-true origin, so the host's authoritative rock
+	# flies the shooter's line — without that, the host launches from its
+	# ~30px-stale copy and the shot the guest watched connect misses.
+	grep -q "CAVE_STRAFE_THROW" "$glog" || { echo "  FAIL: the guest never threw on the move"; ok=0; }
 	grep -q "CAVE_IMPACT mine=true view=65 truth=100" "$glog" || { echo "  FAIL: shooter's impact not predicted ahead of truth"; ok=0; }
 	grep -q "CAVE_IMPACT mine=false" "$hlog" || { echo "  FAIL: victim's screen never played the impact"; ok=0; }
 	# JUICE: every impact spawns a particle burst + a tween hit-flash from

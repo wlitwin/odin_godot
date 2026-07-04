@@ -32,6 +32,7 @@ Spelunker :: struct {
 	fx:        [2]kcombat.Effect `gd:"replicate"`, // status effects, host-decayed
 	last_drop: kitems.Slot, // scratch for the drop hook — never on the wire
 	aim:       [2]f32, // scratch for the throw hook — never on the wire
+	cast_from: [2]f32, // scratch: where the throw REALLY left from (owner truth, leashed)
 	php:       kcombat.Predicted_Hp, // scratch: impacts SEEN here, pre-truth
 	was_dead:  bool, // scratch: death-edge detector for the pyre burst
 }
@@ -50,11 +51,20 @@ spelunker_drop :: proc(self: ^Spelunker, slot: i32) -> bool {
 // Throw a rock: the WHOLE cast, zero role branches. The gate (alive +
 // cooldown + stamina) bites instantly on the thrower's screen and refuses
 // identically on the host; the host's hook launches the authoritative rock.
+//
+// The cast carries its ORIGIN (ox, oy): a moving shooter's own screen is
+// the truth for where the rock left from — its position is owner-streamed,
+// so the host's copy lags a stream behind, and launching from the lagged
+// copy makes the authoritative rock fly a different line than the one the
+// shooter SAW hit. Leashed against our copy: honest latency offsets pass,
+// teleports don't (on the caster's own prediction ox,oy == x,y — no-op).
 @(gd_command = "predict")
-spelunker_throw :: proc(self: ^Spelunker, dx: f32, dy: f32) -> bool {
+spelunker_throw :: proc(self: ^Spelunker, dx: f32, dy: f32, ox: f32, oy: f32) -> bool {
 	if self.hp <= 0 {return false}
 	if dx == 0 && dy == 0 {return false}
 	if !kcombat.ability_try(self.cds[:], 0, ROCK_ABILITY, &self.stamina) {return false}
+	from := kcombat.leash({ox, oy, 0}, {self.x, self.y, 0}, CAST_LEASH)
+	self.cast_from = {from.x, from.y}
 	self.aim = {dx, dy}
 	return true
 }

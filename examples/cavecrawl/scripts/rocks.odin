@@ -20,7 +20,10 @@ rock_fire :: proc(shooter: knet.Player_Id, sp: ^Spelunker) -> (f: kcombat.Fire, 
 	if n == 0 {return}
 	return kcombat.Fire {
 			shooter = shooter,
-			origin  = {sp.x, sp.y, 0},
+			// The cast's OWN origin (owner truth, leashed in spelunker_throw)
+			// — NOT the host's lagged copy of the shooter: the authoritative
+			// rock must fly the same line the shooter's screen saw hit.
+			origin  = {sp.cast_from.x, sp.cast_from.y, 0},
 			vel     = {dx / n * ROCK_SPEED, dy / n * ROCK_SPEED, 0},
 			ttl     = ROCK_TTL,
 			kind    = FIRE_ROCK,

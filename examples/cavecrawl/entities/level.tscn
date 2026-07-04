@@ -1,9 +1,9 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://qbmokgtrh3ok"]
 
-[ext_resource type="Script" path="res://scripts/level.odin" id="1_level"]
+[ext_resource type="Script" uid="uid://bslhbtagxmq15" path="res://scripts/level.odin" id="1_level"]
 
-[node name="CaveLevel" type="Node2D"]
+[node name="CaveLevel" type="Node2D" unique_id=1886145758]
 position = Vector2(566, 4)
 script = ExtResource("1_level")
 
-[node name="Glyph" type="Label" parent="."]
+[node name="Glyph" type="Label" parent="." unique_id=52231368]

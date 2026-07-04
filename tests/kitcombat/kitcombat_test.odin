@@ -237,3 +237,23 @@ combat_stats_publish_into_the_registry :: proc(t: ^testing.T) {
 	testing.expect_value(t, ksess.session_stat(&s, victim, cols.kills), i64(0))
 	testing.expect_value(t, ksess.session_stat(&s, victim, cols.deaths), i64(3))
 }
+
+@(test)
+leash_passes_honest_offsets_and_drags_teleports :: proc(t: ^testing.T) {
+	anchor := [3]f32{100, 100, 0}
+	// An honest latency offset (a moving caster ~30px ahead of the
+	// authority's lagged copy) passes through untouched.
+	honest := [3]f32{100, 130, 0}
+	testing.expect_value(t, kcombat.leash(honest, anchor, 64), honest)
+	// Exactly at the leash: still honest.
+	edge := [3]f32{164, 100, 0}
+	testing.expect_value(t, kcombat.leash(edge, anchor, 64), edge)
+	// A claimed teleport gets dragged back to arm's length, ON the claimed
+	// direction (the caster keeps its aim line, loses the free travel).
+	teleport := [3]f32{100, 400, 0}
+	got := kcombat.leash(teleport, anchor, 64)
+	testing.expect_value(t, got.x, f32(100))
+	testing.expect_value(t, got.y, f32(164))
+	// The anchor itself is a fixed point (the prediction's no-op case).
+	testing.expect_value(t, kcombat.leash(anchor, anchor, 64), anchor)
+}

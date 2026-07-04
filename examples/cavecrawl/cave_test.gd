@@ -264,11 +264,31 @@ func _process(_delta: float) -> bool:
 		var tx := 440.0 if role == "host" else 200.0
 		if abs(pos.x - tx) < 4.0 and abs(pos.y - 180.0) < 4.0 and bool(cave.call("can_throw")):
 			print("CAVE_ARMED")
-			# The guest opens fire: one rock, east, at the host's spelunker.
+			# The guest opens fire ON THE MOVE (see strafe).
 			if role == "guest":
-				cave.call("throw", 1.0, 0.0)
-			enter("fight", now)
+				cave.call("walk_to", 200.0, 110.0)
+			enter("strafe", now)
 		elif timed_out(now, "never in position, pos=" + str(pos)):
+			quit(1); return true
+		return false
+
+	if phase == "strafe":
+		# THE MOVING CAST: the guest shoots mid-stride, aimed at the host.
+		# Its own screen is the truth for where the rock left from (position
+		# is owner-streamed) — the cast carries that origin, so the host's
+		# authoritative rock flies the SAME line the shooter saw. Without
+		# that, the host launches from its lagged copy (~30px behind at this
+		# latency) and the rock the guest watched connect sails wide.
+		if role == "host":
+			enter("fight", now)
+			return false
+		var pos: Vector2 = cave.call("my_pos")
+		if pos.y <= 150.0 and bool(cave.call("can_throw")):
+			var d: Vector2 = (Vector2(cave.call("their_pos")) - pos).normalized()
+			cave.call("throw", d.x, d.y)
+			print("CAVE_STRAFE_THROW y=", pos.y)
+			enter("fight", now)
+		elif timed_out(now, "never threw on the move, pos=" + str(pos)):
 			quit(1); return true
 		return false
 
@@ -286,7 +306,9 @@ func _process(_delta: float) -> bool:
 		# The guest keeps throwing as the cooldown allows until the host
 		# falls; the host's own process prints CAVE_DIED / CAVE_RESPAWNED.
 		if role == "guest" and int(cave.call("their_hp")) > 0 and bool(cave.call("can_throw")):
-			cave.call("throw", 1.0, 0.0)
+			var d: Vector2 = (Vector2(cave.call("their_pos")) - Vector2(cave.call("my_pos"))).normalized()
+			if d != Vector2.ZERO:
+				cave.call("throw", d.x, d.y)
 		var down := int(cave.call("my_hp") if role == "host" else cave.call("their_hp")) <= 0
 		# Death spills the host's bag: gems + torches hit the floor.
 		if down and int(cave.call("pickups")) >= 2:

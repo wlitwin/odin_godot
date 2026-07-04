@@ -64,6 +64,7 @@ HEAL_AMOUNT :: i32(25)
 ROCK_DMG :: i32(35)
 ROCK_SPEED :: f32(12) // px per net tick
 ROCK_TTL :: u16(24) // ~288 px of flight
+CAST_LEASH :: f32(64) // how far a claimed cast origin may differ from the host's lagged copy
 BODY_RADIUS :: f32(14)
 RESPAWN_TICKS :: 60 // 3s in the grave
 CHILL :: u8(1) // rocks chill what they don't kill

@@ -146,6 +146,23 @@ Projectile :: struct {
 	left: u16, // ticks to live
 }
 
+// leash clamps a CLAIMED point into a disc of radius r around anchor — the
+// trust-but-verify for owner-reported cast origins. A moving caster's own
+// screen is the truth for where its cast left from (its position is owner-
+// authoritative anyway), while the authority's copy lags a stream behind;
+// honest latency offsets pass through untouched, teleport-cheese gets
+// dragged back to arm's length. Run it in the command proc itself: on the
+// caster's own prediction claimed == anchor and it is a no-op — no role
+// branch.
+leash :: proc "contextless" (claimed, anchor: [3]f32, r: f32) -> [3]f32 {
+	d := claimed - anchor
+	n := math.sqrt(d.x * d.x + d.y * d.y + d.z * d.z)
+	if n <= r {
+		return claimed
+	}
+	return anchor + d * (r / n)
+}
+
 Target :: struct {
 	id:     u32,
 	pos:    [3]f32,
