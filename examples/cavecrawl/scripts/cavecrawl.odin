@@ -179,6 +179,8 @@ CaveLobby :: struct {
 	hud_hp:     kui.Health_Bar,
 	hud_ab:     kui.Ability_Bar,
 	score:      kui.Score,
+	legend:     gd.Label, // the controls line, shown once the world is live
+	chat_sent:  bool, // the Enter that submitted a line must not also re-open chat
 	was_dead:   bool, // owner-side respawn edge detector
 	issue_at:   f64, // when my last command left (confirm latency proof)
 
@@ -297,7 +299,79 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
 	ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
 	ksess.session_app_route(&self.ses, TAG_FIRE, self, cave_on_fire)
+	install_controls()
+	self.legend = gd.new_label()
+	gd.node_set_name(cast(gd.Node)self.legend, gd.new_string_name_cstring("Legend", true))
+	gd.add_child(self.owner, cast(gd.Node)self.legend)
+	gd.control_set_anchors_preset(cast(gd.Control)self.legend, .Preset_Bottom_Left, false)
+	gd.set_string(cast(gd.Object)self.legend, "text", "WASD walk · E use · click/Space throw · Q drop · Tab scores · Enter chat")
+	gd.set_bool(cast(gd.Object)self.legend, "visible", false)
 	gd.print_str("CAVE_UI_READY")
+}
+
+// ---- keyboard & mouse: a human at the wheel ----------------------------------------
+
+// The demo's controls, registered at runtime (the InputMap autoload pattern)
+// so the example stays a bare scene with no project-level input map. Tests
+// keep driving the same @(gd_method)s directly — these are just bindings
+// onto them.
+@(private = "file")
+install_controls :: proc "contextless" () {
+	if gd.has_action("cave_throw") {return} // scene reloads re-run ready
+	bind :: proc "contextless" (action: cstring, keys: ..i64) {
+		gd.add_action(action)
+		for k in keys {
+			gd.action_add_key(action, k)
+		}
+	}
+	bind("cave_left", i64('A'), i64(gd.Key.Left))
+	bind("cave_right", i64('D'), i64(gd.Key.Right))
+	bind("cave_up", i64('W'), i64(gd.Key.Up))
+	bind("cave_down", i64('S'), i64(gd.Key.Down))
+	bind("cave_interact", i64('E'))
+	bind("cave_drop", i64('Q'))
+	bind("cave_score", i64(gd.Key.Tab))
+	bind("cave_talk", i64(gd.Key.Enter))
+	bind("cave_throw", i64(gd.Key.Space))
+	gd.action_add_mouse_button("cave_throw", i64(gd.Mouse_Button.Left))
+}
+
+// Poll the controls each frame. Everything routes through the same
+// @(gd_method) verbs the test drivers call — keys are the demo's driver.
+// Skipped entirely while the chat line has focus: "wasd" there is a word,
+// not a stroll (the click that focuses chat also lands here as has_focus
+// before this frame's poll, so it never doubles as a throw).
+@(private = "file")
+poll_controls :: proc(self: ^CaveLobby) {
+	if bool(gd.control_has_focus(cast(gd.Control)self.chat.input, false)) {return}
+	if gd.is_action_just_pressed("cave_talk") && !self.chat_sent {
+		gd.control_grab_focus(cast(gd.Control)self.chat.input, false)
+		return
+	}
+	self.chat_sent = false
+	if gd.is_action_just_pressed("cave_score") {
+		cave_lobby_show_score(self, true)
+	}
+	if gd.is_action_just_released("cave_score") {
+		cave_lobby_show_score(self, false)
+	}
+	me := self.me_spel
+	if me == nil || me.hp <= 0 {return} // the dead may chat and spectate
+	if gd.is_action_just_pressed("cave_interact") {
+		cave_lobby_interact(self)
+	}
+	if gd.is_action_just_pressed("cave_drop") {
+		for s, i in me.bag {
+			if s.item != kitems.ITEM_NONE {
+				cave_lobby_drop(self, gd.Int(i))
+				break
+			}
+		}
+	}
+	if gd.is_action_just_pressed("cave_throw") {
+		m := gd.viewport_get_mouse_position(gd.node_get_viewport(self.owner))
+		cave_lobby_throw(self, gd.Float(m.x - me.x), gd.Float(m.y - me.y))
+	}
 }
 
 @(private = "file")
@@ -961,6 +1035,7 @@ cave_lobby_on_start :: proc(self: ^CaveLobby) {
 enter_the_cave :: proc(self: ^CaveLobby) {
 	self.started = true
 	gd.set_bool(cast(gd.Object)self.ui.root, "visible", false)
+	gd.set_bool(cast(gd.Object)self.legend, "visible", true)
 	kui.inv_show(&self.inv, true)
 	if self.me_spel != nil {
 		kui.inv_refresh(&self.inv, self.me_spel.bag[:], &self.table)
@@ -1136,6 +1211,9 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 		kui.chat_refresh(&self.chat, &self.comms)
 	}
 
+	if self.started {
+		poll_controls(self)
+	}
 	if self.started && self.me_spel != nil {
 		// Owner-side respawn: hp coming back is the signal to walk out of
 		// the grave — position is owner-streamed, only I can move me.
@@ -1170,14 +1248,10 @@ drive_spelunker :: proc(self: ^CaveLobby, delta: f64) {
 		speed *= 1 - f32(chill.power) / 100 // cold feet
 	}
 	step := speed * f32(delta)
-	dir := gd.input_get_vector(
-		gd.singleton_input(),
-		gd.new_string_name_cstring("ui_left", true),
-		gd.new_string_name_cstring("ui_right", true),
-		gd.new_string_name_cstring("ui_up", true),
-		gd.new_string_name_cstring("ui_down", true),
-		0.2,
-	)
+	dir := gd.Vector2{}
+	if !bool(gd.control_has_focus(cast(gd.Control)self.chat.input, false)) {
+		dir = gd.get_vector("cave_left", "cave_right", "cave_up", "cave_down", 0.2)
+	}
 	if dir.x != 0 || dir.y != 0 {
 		self.walking = false
 		me.x += dir.x * step
@@ -1422,6 +1496,8 @@ cave_lobby_on_chat :: proc(self: ^CaveLobby, text: gd.String) {
 		kcomms.comms_say(&self.comms, string(buf[:n]))
 	}
 	kui.chat_clear_input(&self.chat)
+	gd.control_release_focus(cast(gd.Control)self.chat.input) // Enter sends AND puts the keys back on the wheel
+	self.chat_sent = true
 }
 
 @(gd_method)
