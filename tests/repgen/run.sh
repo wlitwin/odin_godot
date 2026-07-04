@@ -46,6 +46,8 @@ for needle in \
 	'offset_of(Pawn, y)' \
 	'{.Interp, .Owner_Stream}' \
 	'lerp = .F32' \
+	'lerp = .Quat' \
+	'lerp = .Custom, blend = pawn_blend_aim' \
 	'pawn_net_desc := knet.Entity_Desc' \
 	'intrinsics.type_is_nearly_simple_compare' \
 ; do
@@ -188,6 +190,44 @@ if ! echo "$SGEN_OUT" | grep -q "unknown replicate option"; then
 	exit 1
 fi
 echo "  ok  unknown replicate option rejected at scriptgen time"
+
+# ---- (4b): interp on a non-float + interp= with no proc — both errors ----
+LRP="$TMP/lrp"
+mkdir -p "$LRP"
+cat > "$LRP/steppy.odin" <<'EOF'
+//gd:extends Node
+//gd:class Steppy
+package repgen_lrp
+
+import gd "godot:godot"
+
+Steppy :: struct {
+	owner: gd.Node,
+	rate:  i32 `gd:"replicate,interp"`, // ints can't lerp: loud error, not silent stutter
+	turn:  f32 `gd:"replicate,interp="`, // custom blend with no proc named
+}
+
+steppy_ready :: proc(self: ^Steppy) {}
+EOF
+set +e
+LRP_OUT="$(run_scriptgen "$LRP" 2>&1)"
+LRP_RC=$?
+set -e
+if [ "$LRP_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: interp on an i32 / empty interp= was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$LRP_OUT" | grep -q "can only snap between samples"; then
+	echo "REPGEN_FAIL: missing the interp-needs-floats error:"
+	echo "$LRP_OUT" | tail -4
+	exit 1
+fi
+if ! echo "$LRP_OUT" | grep -q "needs a blend proc name"; then
+	echo "REPGEN_FAIL: missing the empty interp= error:"
+	echo "$LRP_OUT" | tail -4
+	exit 1
+fi
+echo "  ok  interp on a non-float and empty interp= rejected, both spelled out"
 
 # ---- (5a): a command without net_id AND without replicated fields — both errors ----
 CMD1="$TMP/cmd1"

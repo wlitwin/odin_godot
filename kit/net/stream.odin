@@ -23,6 +23,8 @@ package kit_net
 // .Owner_Stream), so streams and deltas are disjoint: full snapshots seed the
 // initial values, streams own them from then on.
 
+import "core:math"
+
 // Byte size of one stream snapshot for a descriptor (just the streamed fields,
 // desc order, tightly packed). 0 = this entity type streams nothing.
 stream_data_size :: proc(desc: ^Entity_Desc) -> int {
@@ -118,8 +120,42 @@ stream_blend :: proc(entity: rawptr, desc: ^Entity_Desc, lo, hi: []u8, alpha: f3
 			for i in 0 ..< f.size / 8 {
 				df[i] = lf[i] + (hf[i] - lf[i]) * f64(alpha)
 			}
+		case .Quat:
+			assert(f.size == 16, ".Quat blends exactly 4 x f32 (xyzw)")
+			quat_nlerp(([^]f32)(dst), ([^]f32)(&lo[off]), ([^]f32)(&hi[off]), alpha)
+		case .Custom:
+			assert(f.blend != nil, "lerp = .Custom needs Field_Desc.blend")
+			f.blend(rawptr(dst), rawptr(&lo[off]), rawptr(&hi[off]), alpha)
 		}
 		off += f.size
+	}
+}
+
+// Normalized lerp with hemisphere agreement: q and -q are the same rotation,
+// so blend toward whichever sign of `b` is nearer `a` (a raw componentwise lerp
+// across hemispheres collapses through zero and garbles the rotation). nlerp
+// isn't constant-velocity like slerp, but between stream samples ~50ms apart
+// the difference is invisible — and it's branchless-cheap on the render path.
+@(private = "file")
+quat_nlerp :: proc(dst, a, b: [^]f32, alpha: f32) {
+	dot := a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
+	sign: f32 = dot < 0 ? -1 : 1
+	out: [4]f32
+	len2: f32 = 0
+	for i in 0 ..< 4 {
+		out[i] = a[i] + (b[i] * sign - a[i]) * alpha
+		len2 += out[i] * out[i]
+	}
+	if len2 > 1e-8 {
+		inv := 1.0 / math.sqrt(len2)
+		for i in 0 ..< 4 {
+			out[i] *= inv
+		}
+	} else {
+		out = {a[0], a[1], a[2], a[3]} // exact antipode midpoint: hold the earlier sample
+	}
+	for i in 0 ..< 4 {
+		dst[i] = out[i]
 	}
 }
 

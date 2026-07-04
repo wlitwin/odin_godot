@@ -1193,3 +1193,72 @@ registry_streams_end_to_end :: proc(t: ^testing.T) {
 	_ = knet.registry_stream_time(&r3)
 	testing.expect_value(t, knet.registry_apply_streams(&r3, &rreg, ME, 3.0), 0)
 }
+
+// ---- special interpolation math (quat nlerp + custom blends) ------------------
+
+Turret :: struct {
+	rot:     [4]f32, // quaternion xyzw — hemisphere-safe nlerp
+	heading: f32, // degrees — custom shortest-arc blend
+}
+
+// A knet.Blend_Proc: degrees along the shortest arc, wrapped to [0, 360).
+blend_heading :: proc(dst, a, b: rawptr, alpha: f32) {
+	av := (^f32)(a)^
+	bv := (^f32)(b)^
+	d := bv - av
+	for d > 180 {d -= 360}
+	for d < -180 {d += 360}
+	v := av + d * alpha
+	for v >= 360 {v -= 360}
+	for v < 0 {v += 360}
+	(^f32)(dst)^ = v
+}
+
+turret_desc :: proc() -> knet.Entity_Desc {
+	@(static) fields := [?]knet.Field_Desc{
+		{offset = offset_of(Turret, rot), size = size_of([4]f32), flags = {.Interp, .Owner_Stream}, lerp = .Quat},
+		{offset = offset_of(Turret, heading), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .Custom, blend = blend_heading},
+	}
+	return knet.Entity_Desc{fields = fields[:]}
+}
+
+@(test)
+stream_quat_and_custom_blend :: proc(t: ^testing.T) {
+	desc := turret_desc()
+	near :: proc(a, b: f32) -> bool {return abs(a - b) < 0.0005}
+
+	// Sample A: identity rotation, heading 350°. Sample B: 90° about X — but
+	// streamed as the NEGATED quaternion (-q == q as a rotation): the exact
+	// input that collapses a raw componentwise lerp through zero.
+	owner := Turret{rot = {0, 0, 0, 1}, heading = 350}
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.stream_write(&w, &owner, &desc)
+	ring := knet.Stream_Ring{}
+	defer knet.stream_ring_destroy(&ring)
+	knet.stream_ring_push(&ring, 1.0, knet.writer_bytes(&w))
+
+	S45 :: f32(0.70710678)
+	owner.rot = {-S45, 0, 0, -S45}
+	owner.heading = 10
+	knet.writer_reset(&w)
+	knet.stream_write(&w, &owner, &desc)
+	knet.stream_ring_push(&ring, 2.0, knet.writer_bytes(&w))
+
+	// Midpoint must be 45° about X — unit length, right hemisphere — and the
+	// heading must cross 360° the short way (350° -> 10° lands on 0°, not 180°).
+	remote := Turret{}
+	testing.expect(t, knet.stream_ring_sample(&ring, 1.5, &remote, &desc))
+	SIN22_5 :: f32(0.38268343)
+	COS22_5 :: f32(0.92387953)
+	testing.expect(t, near(remote.rot[0], SIN22_5), "quat x: hemisphere flip + nlerp")
+	testing.expect(t, near(remote.rot[1], 0) && near(remote.rot[2], 0))
+	testing.expect(t, near(remote.rot[3], COS22_5), "quat w")
+	len2 := remote.rot[0] * remote.rot[0] + remote.rot[1] * remote.rot[1] + remote.rot[2] * remote.rot[2] + remote.rot[3] * remote.rot[3]
+	testing.expect(t, near(len2, 1), "nlerp renormalizes")
+	testing.expect(t, near(remote.heading, 0), "custom blend takes the shortest arc across 360")
+
+	// Quarter point for the custom blend: 350° + 20°*0.25 = 355°.
+	testing.expect(t, knet.stream_ring_sample(&ring, 1.25, &remote, &desc))
+	testing.expect(t, near(remote.heading, 355))
+}

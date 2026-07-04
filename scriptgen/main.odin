@@ -322,7 +322,8 @@ Replicate_Info :: struct {
 	field:  string,
 	interp: bool, // remote peers interpolate this field
 	owner:  bool, // part of the owner-authoritative unreliable stream
-	lerp:   string, // knet.Lerp_Kind literal (".F32"/".F64") for interp fields; "" = Snap
+	lerp:   string, // knet.Lerp_Kind literal (".F32"/".F64"/".Quat"/".Custom"); "" = Snap
+	blend:  string, // `interp=NAME`: the author's knet.Blend_Proc, spliced verbatim
 }
 
 // One @(gd_command) arg. Command args cross the wire, so the allowed types are

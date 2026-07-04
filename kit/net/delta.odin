@@ -29,6 +29,7 @@ Field_Desc :: struct {
 	size:   int,
 	flags:  Field_Flags,
 	lerp:   Lerp_Kind, // how stream sampling blends this field (meaningful with .Interp)
+	blend:  Blend_Proc, // required iff lerp == .Custom
 }
 
 Field_Flag :: enum u8 {
@@ -42,10 +43,29 @@ Field_Flags :: bit_set[Field_Flag; u8]
 // How interpolation blends a field's bytes between two stream samples. scriptgen
 // classifies from the declared type; hand-built descriptors set it directly.
 Lerp_Kind :: enum u8 {
-	Snap, // step to the sample at-or-before the render time (any POD; the default)
-	F32,  // treat the field as [size/4]f32 and lerp componentwise (f32, vectors, colors)
-	F64,  // as F32 but f64 elements
+	Snap,   // step to the sample at-or-before the render time (any POD; the default)
+	F32,    // treat the field as [size/4]f32 and lerp componentwise (f32, vectors, colors)
+	F64,    // as F32 but f64 elements
+	Quat,   // 4 x f32 quaternion: nlerp with hemisphere flip + renormalize (a raw
+	        // componentwise lerp collapses through zero when q and -q meet)
+	Custom, // author-supplied Blend_Proc (special math: wrapped angles, color spaces, …)
 }
+
+// Custom field blend: write the interpolation of the field bytes at `a` (earlier
+// sample) and `b` (later sample) into the ENTITY field at `dst`. All three point
+// at exactly Field_Desc.size bytes. Authors declare one via the tag:
+//
+//     heading: f32 `gd:"replicate,owner,interp=blend_heading"`
+//
+//     blend_heading :: proc(dst, a, b: rawptr, alpha: f32) {
+//         av := (^f32)(a)^
+//         bv := (^f32)(b)^
+//         (^f32)(dst)^ = av + shortest_arc(av, bv) * alpha
+//     }
+//
+// scriptgen splices the proc name into the generated descriptor, so a missing
+// or wrongly-typed blend proc fails the consumer compile with the field's line.
+Blend_Proc :: proc(dst, a, b: rawptr, alpha: f32)
 
 // A replicated entity type. At most 64 fields so the dirty mask is one u64 —
 // a struct wanting more should group them into sub-structs (fixed arrays are one

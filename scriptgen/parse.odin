@@ -596,6 +596,25 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			rep := Replicate_Info{}
 			for spec_raw in specs[1:] {
 				spec := strings.trim_space(spec_raw)
+				// `interp=NAME`: custom blend math — NAME is an author proc of type
+				// knet.Blend_Proc, spliced verbatim into the generated descriptor
+				// (a missing/mistyped proc fails the consumer compile on that line).
+				if strings.has_prefix(spec, "interp=") {
+					name := strings.trim_space(spec[len("interp="):])
+					if name == "" {
+						error_at(
+							floc,
+							"%s.%s: `interp=` needs a blend proc name (a knet.Blend_Proc in this package)",
+							s.struct_name,
+							field_label,
+						)
+						continue
+					}
+					rep.interp = true
+					rep.lerp = ".Custom"
+					rep.blend = name
+					continue
+				}
 				switch spec {
 				case "interp":
 					rep.interp = true
@@ -605,22 +624,25 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 				case:
 					error_at(
 						floc,
-						"%s.%s: unknown replicate option %q (expected `interp` / `owner`)",
+						"%s.%s: unknown replicate option %q (expected `interp`, `interp=BLEND_PROC`, or `owner`)",
 						s.struct_name,
 						field_label,
 						spec,
 					)
 				}
 			}
-			// `interp` must know HOW to blend: classify the declared type into a
-			// knet.Lerp_Kind. Non-float types can only snap — rejected loudly so a
-			// tagged int doesn't silently stutter at the stream rate.
-			if rep.interp {
+			// Bare `interp` must know HOW to blend: classify the declared type into
+			// a knet.Lerp_Kind (quaternions get hemisphere-safe nlerp — a raw
+			// componentwise lerp garbles rotations near the antipode). Non-float
+			// types can only snap — rejected loudly so a tagged int doesn't
+			// silently stutter at the stream rate; `interp=BLEND_PROC` is the
+			// escape hatch for any POD type with special math.
+			if rep.interp && rep.lerp == "" {
 				rep.lerp = interp_lerp_kind(type_text)
 				if rep.lerp == "" {
 					error_at(
 						floc,
-						"%s.%s: `interp` needs a float-based field (f32/f64, float vectors/colors, or fixed arrays of them) — %q can only snap between samples; drop `interp` or use a float type",
+						"%s.%s: `interp` needs a float-based field (f32/f64, float vectors/colors, or fixed arrays of them) — %q can only snap between samples; drop `interp`, use a float type, or supply custom math with `interp=BLEND_PROC`",
 						s.struct_name,
 						field_label,
 						type_text,
@@ -852,8 +874,11 @@ interp_lerp_kind :: proc(type_text: string) -> string {
 		base = base[i + 1:]
 	}
 	switch base {
-	case "Vector2", "Vector3", "Vector4", "Quaternion", "Color":
+	case "Vector2", "Vector3", "Vector4", "Color":
 		return ".F32"
+	case "Quaternion":
+		// NOT componentwise: rotations need hemisphere-safe nlerp (q == -q).
+		return ".Quat"
 	}
 	return ""
 }

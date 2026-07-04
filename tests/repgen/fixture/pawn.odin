@@ -15,9 +15,17 @@ Pawn :: struct {
 	net_id: knet.Net_Id, // command wire identity (assigned by the session layer)
 	hp:     i32 `gd:"replicate"`,
 	x, y:   f32 `gd:"replicate,interp,owner"`, // multi-name: one desc entry per name
+	rot:    gd.Quaternion `gd:"replicate,interp,owner"`, // classified to hemisphere-safe nlerp
+	aim:    f32 `gd:"replicate,interp=pawn_blend_aim,owner"`, // custom blend math
 	state:  u8 `gd:"replicate"`,
 	speed:  f64 `gd:"export,range=0:10"`, // exports and replicates coexist
 	local:  int, // untagged: never replicated
+}
+
+// The custom blend `aim` names — a knet.Blend_Proc; the generated descriptor
+// references it verbatim, so this consumer compile IS the signature check.
+pawn_blend_aim :: proc(dst, a, b: rawptr, alpha: f32) {
+	(^f32)(dst)^ = (^f32)(a)^ + ((^f32)(b)^ - (^f32)(a)^) * alpha
 }
 
 pawn_ready :: proc(self: ^Pawn) {
