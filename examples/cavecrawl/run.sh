@@ -133,6 +133,12 @@ attempt() {
 	# screen plays the same impact from the host's fire announcement.
 	grep -q "CAVE_IMPACT mine=true view=65 truth=100" "$glog" || { echo "  FAIL: shooter's impact not predicted ahead of truth"; ok=0; }
 	grep -q "CAVE_IMPACT mine=false" "$hlog" || { echo "  FAIL: victim's screen never played the impact"; ok=0; }
+	# JUICE: every impact spawns a particle burst + a tween hit-flash from
+	# code (fx.odin) — both peers must have played them.
+	for log in "$hlog" "$glog"; do
+		grep -q "CAVE_FX burst" "$log" || { echo "  FAIL: no particle burst in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_FX flash" "$log" || { echo "  FAIL: no hit-flash tween in $(basename "$log")"; ok=0; }
+	done
 	for log in "$hlog" "$glog"; do
 		grep -q "CAVE_ARMED" "$log" || { echo "  FAIL: never armed in $(basename "$log")"; ok=0; }
 		grep -q "CAVE_HIT hp=65" "$log" || { echo "  FAIL: the rock never landed in $(basename "$log")"; ok=0; }

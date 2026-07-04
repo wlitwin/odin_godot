@@ -27,6 +27,8 @@ Spelunker :: struct {
 	last_drop: kitems.Slot, // scratch for the drop hook — never on the wire
 	aim:       [2]f32, // scratch for the throw hook — never on the wire
 	php:       kcombat.Predicted_Hp, // scratch: impacts SEEN here, pre-truth
+	was_dead:  bool, // scratch: death-edge detector for the pyre burst
+	pyre:      gd.Cpu_Particles2d, // scratch: this corpse's own death particles
 }
 
 // Drop a bag slot at my feet: my bag empties on my screen this frame; the
@@ -60,4 +62,16 @@ spelunker_process :: proc(self: ^Spelunker, delta: f64) {
 	gd.control_set_position(cast(gd.Control)self.owner, {self.x, self.y}, false)
 	// Everyone can see who's dead — the corpse glyph replicates with hp.
 	gd.set_string(cast(gd.Object)self.owner, "text", self.hp > 0 ? "\xE2\x9B\x8F" : "\xF0\x9F\x92\x80") // ⛏ / 💀
+	// Death edge, on EVERY screen (hp replicates): the corpse persists, so
+	// it carries its own pyre — an entity hanging FX on itself needs no
+	// game plumbing at all.
+	if self.hp <= 0 && !self.was_dead {
+		self.was_dead = true
+		if cast(rawptr)self.pyre != nil {
+			gd.node_queue_free(cast(gd.Node)self.pyre)
+		}
+		self.pyre = fx_burst_node(cast(gd.Node)self.owner, 0, 0, {1, 0.3, 0.2, 1})
+	} else if self.hp > 0 {
+		self.was_dead = false
+	}
 }
