@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/level.odin" id="1_level"]
+
+[node name="CaveLevel" type="Node2D"]
+position = Vector2(566, 4)
+script = ExtResource("1_level")
+
+[node name="Glyph" type="Label" parent="."]

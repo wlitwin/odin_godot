@@ -1,13 +1,14 @@
-//gd:extends Label
+//gd:extends Node2D
 //gd:class Dweller
 package cavecrawl_scripts
 
 // A hostile cave dweller — THE toolkit NPC pattern. There is no NPC
 // machinery anywhere: this is an ordinary entity OWNED BY THE HOST PLAYER,
-// so the host's brain tick (cavecrawl.odin) writes x/y like any owner writes
+// so the host's brain tick (host.odin) writes x/y like any owner writes
 // streamed fields and every client interpolates the motion for free. Its
 // mood is one replicated byte — every peer renders the same 🦇/😈/💨 —
 // and its hp is hit by the same rocks that hit spelunkers.
+// The body is entities/dweller.tscn.
 
 import gd "godot:godot"
 import kai "godot:kit/ai"
@@ -19,7 +20,8 @@ DWELLER_CHASE :: u8(1)
 DWELLER_FLEE :: u8(2)
 
 Dweller :: struct {
-	owner:  gd.Label,
+	owner:  gd.Node2d,
+	glyph:  gd.Label `gd:"onready=Glyph"`,
 	net_id: knet.Net_Id,
 	x, y:   f32 `gd:"replicate,interp,owner"`, // the HOST owns it: brain writes, clients interp
 	hp:     i32 `gd:"replicate"`,
@@ -43,7 +45,7 @@ dweller_process :: proc(self: ^Dweller, delta: f64) {
 	glide := DWELLER_SPEED * f32(knet.DEFAULT_TICK_HZ) * 1.5 * f32(delta)
 	p, _ := kai.step_toward({self.rx, self.ry, 0}, {self.x, self.y, 0}, glide)
 	self.rx, self.ry = p.x, p.y
-	gd.control_set_position(cast(gd.Control)self.owner, {self.rx, self.ry}, false)
+	gd.node2d_set_position(self.owner, {self.rx, self.ry})
 	glyph: cstring = "\xF0\x9F\xA6\x87" // 🦇
 	switch self.state {
 	case DWELLER_CHASE:
@@ -51,5 +53,5 @@ dweller_process :: proc(self: ^Dweller, delta: f64) {
 	case DWELLER_FLEE:
 		glyph = "\xF0\x9F\x92\xA8" // 💨
 	}
-	gd.set_string(cast(gd.Object)self.owner, "text", glyph)
+	gd.set_string(cast(gd.Object)self.glyph, "text", glyph)
 }

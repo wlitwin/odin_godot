@@ -7,6 +7,7 @@ package cavecrawl_scripts
 
 import gd "godot:godot"
 import rt "godot:runtime"
+import kai "godot:kit/ai"
 import kcomms "godot:kit/comms"
 import kinter "godot:kit/interact"
 import kitems "godot:kit/items"
@@ -15,18 +16,12 @@ import ksess "godot:kit/session"
 import kui "godot:kit/ui"
 import "core:fmt"
 
-// A script-backed entity node, made from code: base Label + the entity's own
-// .odin script. Same flow the editor uses, no scene assets to install.
-spawn_node :: proc(self: ^CaveLobby, script_path: cstring) -> gd.Node {
-	node := cast(gd.Node)gd.new_label()
-	script := gd.resource_loader_load(
-		gd.singleton_resource_loader(),
-		gd.new_string_cstring(script_path),
-		gd.new_string_cstring(""),
-		.Cache_Mode_Reuse,
-	)
-	obj := cast(gd.Object)script
-	gd.object_set_script(cast(gd.Object)node, gd.variant_from_object(&obj))
+// Instantiate one of the game's AUTHORED entity scenes (the exported slots
+// cave.tscn assigns) under the world node. The scene root carries the
+// entity's .odin script; children (glyphs, particles, future sprites and
+// collision) are the editor's department.
+spawn_scene :: proc(self: ^CaveLobby, scene: ^gd.Resource) -> gd.Node {
+	node := gd.instantiate(cast(gd.Packed_Scene)scene)
 	gd.add_child(self.world, node)
 	return node
 }
@@ -49,41 +44,41 @@ cave_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 	self := cast(^CaveLobby)user
 	switch type {
 	case SPEL_TYPE:
-		node := spawn_node(self, "res://scripts/spelunker.odin")
+		node := spawn_scene(self, self.spelunker_scene)
 		self.nodes[id] = node
 		sp := rt.script_of(node, Spelunker)
 		track_spelunker(self, id, sp, owner)
 		return sp, &spelunker_command_set
 	case PICKUP_TYPE:
-		node := spawn_node(self, "res://scripts/pickup.odin")
+		node := spawn_scene(self, self.pickup_scene)
 		self.nodes[id] = node
 		p := rt.script_of(node, Pickup)
 		p.net_id = id
 		self.pickups[id] = p
 		return p, &pickup_command_set
 	case DWELLER_TYPE:
-		node := spawn_node(self, "res://scripts/dweller.odin")
+		node := spawn_scene(self, self.dweller_scene)
 		self.nodes[id] = node
 		d := rt.script_of(node, Dweller)
 		d.net_id = id
 		self.dwellers[id] = d
 		return d, &dweller_set
 	case CHEST_TYPE:
-		node := spawn_node(self, "res://scripts/chest.odin")
+		node := spawn_scene(self, self.chest_scene)
 		self.nodes[id] = node
 		c := rt.script_of(node, Chest)
 		c.net_id = id
 		self.chests[id] = c
 		return c, &chest_command_set
 	case DOOR_TYPE:
-		node := spawn_node(self, "res://scripts/door.odin")
+		node := spawn_scene(self, self.door_scene)
 		self.nodes[id] = node
 		d := rt.script_of(node, Door)
 		d.net_id = id
 		self.doors[id] = d
 		return d, &door_command_set
 	case LEVEL_TYPE:
-		node := spawn_node(self, "res://scripts/level.odin")
+		node := spawn_scene(self, self.level_scene)
 		self.nodes[id] = node
 		lv := rt.script_of(node, Level)
 		lv.net_id = id
@@ -114,26 +109,81 @@ cave_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	}
 }
 
+// The floor's data asset, by depth. Depths past the table replay the
+// deepest def (the cave goes on).
+cave_def :: proc(self: ^CaveLobby, depth: int) -> ^Level_Def {
+	res := depth >= 2 ? self.floor2_def : self.floor1_def
+	return rt.script_of(cast(gd.Object)res, Level_Def)
+}
+
+// Load this floor's SCENE on this peer (idempotent per depth): backdrop,
+// decoration, and the spawn markers, purely local — the wire carries only
+// the depth byte that told us to do this.
+cave_load_scenery :: proc(self: ^CaveLobby, depth: int) {
+	if self.scenery != nil && int(self.scenery_depth) == depth {return}
+	if self.scenery != nil {
+		gd.node_queue_free(self.scenery)
+	}
+	def := cave_def(self, depth)
+	self.scenery = gd.instantiate(cast(gd.Packed_Scene)def.scene)
+	gd.add_child(self.stage, self.scenery)
+	self.scenery_depth = u8(depth)
+}
+
+// Where the floor's authoring says a thing goes: a Marker2D by name in the
+// loaded scenery.
+@(private = "file")
+marker_pos :: proc(self: ^CaveLobby, name: cstring) -> gd.Vector2 {
+	m := gd.get_node(cast(gd.Object)self.scenery, name)
+	if m == nil {return {}}
+	return gd.node2d_get_position(cast(gd.Node2d)m)
+}
+
+// Host: read the floor's def + markers into the campaign caches the game
+// tick runs on (dens, wave plan). Called wherever a floor becomes current:
+// Start, each descent, and resume.
+cave_cache_floor :: proc(self: ^CaveLobby, depth: int) {
+	cave_load_scenery(self, depth)
+	d1 := marker_pos(self, "Den1")
+	d2 := marker_pos(self, "Den2")
+	self.dens = {{d1.x, d1.y, 0}, {d2.x, d2.y, 0}}
+	def := cave_def(self, depth)
+	counts := def.wave_counts
+	rests := def.wave_rests
+	n := min(int(gd.packed_int32_array_size(&counts)), int(gd.packed_int32_array_size(&rests)), MAX_WAVES)
+	self.waves_n = n
+	for i in 0 ..< n {
+		self.waves[i] = kai.Wave {
+			count = u16(gd.packed_int32_array_get(&counts, gd.Int(i))),
+			rest  = u16(gd.packed_int32_array_get(&rests, gd.Int(i))),
+		}
+	}
+}
+
 // Host: furnish one floor from its def — the stocked chest and the (closed)
-// door. Both Start and every descent build floors through here.
+// door at the positions its scene's markers author. Both Start and every
+// descent build floors through here.
 @(private = "file")
 cave_build_floor :: proc(self: ^CaveLobby, depth: int) {
-	def := level_def(depth)
+	cave_cache_floor(self, depth)
+	def := cave_def(self, depth)
+	chest_at := marker_pos(self, "ChestSpawn")
+	door_at := marker_pos(self, "DoorSpawn")
 
-	chest_node := spawn_node(self, "res://scripts/chest.odin")
+	chest_node := spawn_scene(self, self.chest_scene)
 	chest := rt.script_of(chest_node, Chest)
-	chest.x = def.chest.x
-	chest.y = def.chest.y
-	chest.slots[0] = {GEM, def.gems}
-	chest.slots[1] = {TORCH, def.torches}
+	chest.x = chest_at.x
+	chest.y = chest_at.y
+	chest.slots[0] = {GEM, u16(def.gems)}
+	chest.slots[1] = {TORCH, u16(def.torches)}
 	chest.net_id = ksess.session_spawn(&self.ses, CHEST_TYPE, chest, &chest_command_set)
 	self.chests[chest.net_id] = chest
 	self.nodes[chest.net_id] = chest_node
 
-	door_node := spawn_node(self, "res://scripts/door.odin")
+	door_node := spawn_scene(self, self.door_scene)
 	door := rt.script_of(door_node, Door)
-	door.x = def.door.x
-	door.y = def.door.y
+	door.x = door_at.x
+	door.y = door_at.y
 	door.net_id = ksess.session_spawn(&self.ses, DOOR_TYPE, door, &door_command_set)
 	self.doors[door.net_id] = door
 	self.nodes[door.net_id] = door_node
@@ -146,7 +196,7 @@ cave_build_floor :: proc(self: ^CaveLobby, depth: int) {
 cave_lobby_on_start :: proc(self: ^CaveLobby) {
 	if !self.ses.is_host || self.started {return}
 
-	level_node := spawn_node(self, "res://scripts/level.odin")
+	level_node := spawn_scene(self, self.level_scene)
 	lv := rt.script_of(level_node, Level)
 	lv.depth = 1
 	lv.net_id = ksess.session_spawn(&self.ses, LEVEL_TYPE, lv, &level_set)
@@ -158,7 +208,7 @@ cave_lobby_on_start :: proc(self: ^CaveLobby) {
 	i := 0
 	for _, p in self.ses.players {
 		if !p.connected {continue}
-		node := spawn_node(self, "res://scripts/spelunker.odin")
+		node := spawn_scene(self, self.spelunker_scene)
 		sp := rt.script_of(node, Spelunker)
 		sp.x = SPAWN_X + f32(i) * 60
 		sp.y = SPAWN_Y

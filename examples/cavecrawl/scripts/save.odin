@@ -16,7 +16,7 @@ import ksess "godot:kit/session"
 import kui "godot:kit/ui"
 import "core:fmt"
 
-GAME_VERSION :: u16(7) // stamped into saves; bump when cave content shifts
+GAME_VERSION :: u16(8) // stamped into saves; bump when cave content shifts
 
 // Where the save lives; tests point it somewhere disposable via env.
 @(private = "file")
@@ -136,6 +136,11 @@ cave_lobby_on_resume :: proc(self: ^CaveLobby) {
 	}
 	self.cols = kcombat.combat_columns(&self.ses) // find, not redeclare
 	self.slain_col = ksess.session_stat_column(&self.ses, "slain")
+	// The snapshot restored the depth; the resumed AUTHORITY needs the
+	// floor's caches (scenery markers, wave plan) before its first tick.
+	if self.level != nil {
+		cave_cache_floor(self, int(self.level.depth))
+	}
 	self.running = true
 	enter_the_cave(self)
 	kui.chat_show(&self.chat, true)

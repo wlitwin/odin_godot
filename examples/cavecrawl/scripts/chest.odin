@@ -1,4 +1,4 @@
-//gd:extends Label
+//gd:extends Node2D
 //gd:class Chest
 package cavecrawl_scripts
 
@@ -7,7 +7,8 @@ package cavecrawl_scripts
 // whole loot rule: range-gated (the SAME gate the prompt uses), predicted on
 // the taker's screen, host-serialized when two spelunkers grab at once. What
 // it took lands in `last_take` (untagged scratch) for the game's command
-// hook, which credits the taker's bag on the host — see cavecrawl.odin.
+// hook, which credits the taker's bag on the host — see host.odin.
+// The body is entities/chest.tscn.
 
 import gd "godot:godot"
 import kinter "godot:kit/interact"
@@ -15,7 +16,7 @@ import kitems "godot:kit/items"
 import knet "godot:kit/net"
 
 Chest :: struct {
-	owner:     gd.Label,
+	owner:     gd.Node2d,
 	net_id:    knet.Net_Id,
 	x, y:      f32 `gd:"replicate"`,
 	slots:     [8]kitems.Slot `gd:"replicate"`,
@@ -31,10 +32,6 @@ chest_take :: proc(self: ^Chest, slot: i32, px: f32, py: f32) -> bool {
 	return true
 }
 
-chest_ready :: proc(self: ^Chest) {
-	gd.set_string(cast(gd.Object)self.owner, "text", "\xF0\x9F\x93\xA6") // 📦
-}
-
 chest_process :: proc(self: ^Chest, delta: f64) {
-	gd.control_set_position(cast(gd.Control)self.owner, {self.x, self.y}, false)
+	gd.node2d_set_position(self.owner, {self.x, self.y})
 }

@@ -91,28 +91,14 @@ FLEE_BELOW :: i32(35) // one rock in: it runs
 
 // ---- the floors (level migration) ----
 //
-// A LEVEL is data: where the furniture stands, what the chest holds, where
-// the dens open, how the waves come. Descending = despawn the old floor's
-// entities, bump the replicated depth, build the next def — the same
-// replication that built floor 1 delivers floor 2 to every peer.
-Level_Def :: struct {
-	chest:   [2]f32,
-	gems:    u16,
-	torches: u16,
-	door:    [2]f32,
-	dens:    [2][3]f32,
-	waves:   [2]kai.Wave,
-}
-
-CAVE_LEVELS := [?]Level_Def {
-	{chest = {300, 180}, gems = 3, torches = 2, door = {560, 180}, dens = {{320, 40, 0}, {320, 320, 0}}, waves = {{count = 2, rest = 40}, {count = 3, rest = 40}}},
-	{chest = {200, 260}, gems = 5, torches = 1, door = {90, 300}, dens = {{500, 100, 0}, {500, 300, 0}}, waves = {{count = 3, rest = 100}, {count = 4, rest = 60}}},
-}
-
-// Depths beyond the table replay the deepest floor (the cave goes on).
-level_def :: proc(depth: int) -> ^Level_Def {
-	return &CAVE_LEVELS[clamp(depth - 1, 0, len(CAVE_LEVELS) - 1)]
-}
+// A LEVEL is a data asset: a CaveLevelDef .tres names the floor's SCENE
+// (backdrop + spawn markers, loaded LOCALLY by every peer — static
+// presentation never touches the wire) plus the chest stock and the wave
+// plan. Descending = despawn the old floor's entities, bump the replicated
+// depth byte, furnish the next def — the same replication that built floor
+// 1 delivers floor 2 to every peer. Depths beyond the table replay the
+// deepest floor (the cave goes on).
+MAX_WAVES :: 8
 
 // Dwellers and the level marker declare no commands, so scriptgen emits
 // only their descriptors.
@@ -161,6 +147,30 @@ CaveLobby :: struct {
 	chat:      kui.Chat,
 	running:   bool, // hosting or joining (transport is up)
 	join_sent: bool, // client: JOIN goes out once the transport connects
+
+	// The authored entity scenes, assigned in cave.tscn's inspector — the
+	// factory instantiates these; the entity structs only tag what
+	// replicates. Bodies, particles, and layout live in the editor.
+	spelunker_scene: ^gd.Resource `gd:"export,resource=PackedScene"`,
+	chest_scene:     ^gd.Resource `gd:"export,resource=PackedScene"`,
+	door_scene:      ^gd.Resource `gd:"export,resource=PackedScene"`,
+	pickup_scene:    ^gd.Resource `gd:"export,resource=PackedScene"`,
+	dweller_scene:   ^gd.Resource `gd:"export,resource=PackedScene"`,
+	level_scene:     ^gd.Resource `gd:"export,resource=PackedScene"`,
+
+	// The campaign: one CaveLevelDef data asset per floor (scene + loot +
+	// waves), authored in the inspector.
+	floor1_def: ^gd.Resource `gd:"export,resource=CaveLevelDef"`,
+	floor2_def: ^gd.Resource `gd:"export,resource=CaveLevelDef"`,
+
+	// The current floor, as loaded on THIS peer: the scene instance under
+	// `stage`, plus the host-side caches read from its def + markers.
+	stage:         gd.Node, // scenery container (behind `world` in draw order)
+	scenery:       gd.Node, // the loaded level_N.tscn instance (nil pre-game)
+	scenery_depth: u8, // which depth `scenery` shows
+	dens:          [2][3]f32, // host: den positions, from the floor's markers
+	waves:         [MAX_WAVES]kai.Wave, // host: the floor's wave plan
+	waves_n:       int,
 
 	// ---- the world (phase 3) ----
 	table:       kitems.Table,
@@ -243,6 +253,9 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	// table. World hookups install now; entities exist only after Start.
 	kitems.items_register(&self.table, GEM, "gem", 99)
 	kitems.items_register(&self.table, TORCH, "torch", 5)
+	self.stage = gd.new_node()
+	gd.node_set_name(self.stage, gd.new_string_name_cstring("Stage", true))
+	gd.add_child(self.owner, self.stage) // scenery first: it draws BEHIND the world
 	self.world = gd.new_node()
 	gd.node_set_name(self.world, gd.new_string_name_cstring("World", true))
 	gd.add_child(self.owner, self.world)
@@ -425,10 +438,13 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 		poll_controls(self)
 	}
 	// Owner-side descent: the replicated depth ticking over is the signal
-	// to step to the new floor's mouth — position is owner-streamed, only
+	// to load the floor's SCENE locally (static presentation never rides
+	// the wire) and step to its mouth — position is owner-streamed, only
 	// I can move me (the respawn pattern, reused). First sight of a depth
-	// (fresh start, resumed save, drop-in join) is not a transition.
+	// (fresh start, resumed save, drop-in join) loads scenery but is not
+	// a teleport.
 	if self.level != nil && self.level.depth != self.seen_depth {
+		cave_load_scenery(self, int(self.level.depth))
 		if self.seen_depth != 0 && self.me_spel != nil {
 			self.me_spel.x = SPAWN_X + f32(u64(self.ses.me) % 4) * 40
 			self.me_spel.y = SPAWN_Y

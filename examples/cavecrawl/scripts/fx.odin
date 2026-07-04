@@ -20,8 +20,9 @@ Fx_Burst :: struct {
 }
 
 // The emitter itself: a configured one-shot spark burst under `parent` at a
-// parent-relative position, already emitting. Entities may hang one on
-// themselves (see spelunker.odin's pyre); world-positioned bursts go
+// parent-relative position, already emitting. (An entity that keeps its own
+// emitter — like the spelunker's pyre — authors it in its scene instead;
+// this is for FX with no authored home.) World-positioned bursts go
 // through fx_burst_at so they get reaped.
 fx_burst_node :: proc(parent: gd.Node, x, y: f32, color: gd.Color) -> gd.Cpu_Particles2d {
 	p := gd.new_cpu_particles2d()

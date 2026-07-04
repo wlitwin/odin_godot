@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/chest.odin" id="1_chest"]
+
+[node name="Chest" type="Node2D"]
+script = ExtResource("1_chest")
+
+[node name="Glyph" type="Label" parent="."]
+text = "📦"

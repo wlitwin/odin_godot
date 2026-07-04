@@ -1,11 +1,12 @@
-//gd:extends Label
+//gd:extends Node2D
 //gd:class Pickup
 package cavecrawl_scripts
 
 // A dropped stack lying on the cave floor — an ordinary entity, minted by
-// the drop hook, despawned by the grab hook (both in cavecrawl.odin). The
+// the drop hook, despawned by the grab hook (both in host.odin). The
 // grab is the contended race at its smallest: whoever the host hears first
 // zeroes it; the loser's prediction dissolves with the despawn.
+// The body is entities/pickup.tscn.
 
 import gd "godot:godot"
 import kinter "godot:kit/interact"
@@ -13,7 +14,8 @@ import kitems "godot:kit/items"
 import knet "godot:kit/net"
 
 Pickup :: struct {
-	owner:     gd.Label,
+	owner:     gd.Node2d,
+	glyph:     gd.Label `gd:"onready=Glyph"`,
 	net_id:    knet.Net_Id,
 	x, y:      f32 `gd:"replicate"`,
 	item:      kitems.Item_Id `gd:"replicate"`,
@@ -32,7 +34,7 @@ pickup_grab :: proc(self: ^Pickup, px: f32, py: f32) -> bool {
 }
 
 pickup_process :: proc(self: ^Pickup, delta: f64) {
-	gd.control_set_position(cast(gd.Control)self.owner, {self.x, self.y}, false)
+	gd.node2d_set_position(self.owner, {self.x, self.y})
 	glyph: cstring = "\xE2\x9C\xA8" // ✨ whatever it is, it sparkles
 	switch self.item {
 	case GEM:
@@ -42,5 +44,5 @@ pickup_process :: proc(self: ^Pickup, delta: f64) {
 	case kitems.ITEM_NONE:
 		glyph = "" // grabbed; the despawn is on its way
 	}
-	gd.set_string(cast(gd.Object)self.owner, "text", glyph)
+	gd.set_string(cast(gd.Object)self.glyph, "text", glyph)
 }

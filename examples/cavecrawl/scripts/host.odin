@@ -18,15 +18,6 @@ import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import "core:fmt"
 
-// The floor the campaign is currently on (waves, dens — see CAVE_LEVELS).
-@(private = "file")
-cave_floor :: proc(self: ^CaveLobby) -> ^Level_Def {
-	depth := 1
-	if self.level != nil {
-		depth = int(self.level.depth)
-	}
-	return level_def(depth)
-}
 
 // THE CROSS-ENTITY HALF of looting, host only (see chest.odin): a successful
 // take credits the issuer's bag; what doesn't fit goes back in the chest.
@@ -43,7 +34,7 @@ cave_credit :: proc(self: ^CaveLobby, player: knet.Player_Id, chest: ^Chest) {
 // Host: mint a pickup lying on the floor.
 @(private = "file")
 cave_mint_pickup_at :: proc(self: ^CaveLobby, item: kitems.Item_Id, count: u16, x, y: f32) {
-	node := spawn_node(self, "res://scripts/pickup.odin")
+	node := spawn_scene(self, self.pickup_scene)
 	p := rt.script_of(node, Pickup)
 	p.x = x
 	p.y = y
@@ -95,17 +86,16 @@ cave_slay_dweller :: proc(self: ^CaveLobby, id: knet.Net_Id, slayer: knet.Player
 	}
 	delete_key(&self.dwellers, id)
 	delete_key(&self.brains, id)
-	kai.director_note_death(&self.director, u64(self.host_ticks), cave_floor(self).waves[:])
+	kai.director_note_death(&self.director, u64(self.host_ticks), self.waves[:self.waves_n])
 	gd.print_str(fmt.tprintf("CAVE_SLAIN left=%d", len(self.dwellers)))
 }
 
 // Host: a dweller crawls out of a den (the kit/ai director said when).
 @(private = "file")
 cave_spawn_dweller :: proc(self: ^CaveLobby) {
-	dens := cave_floor(self).dens
-	den := dens[self.dens_used % len(dens)]
+	den := self.dens[self.dens_used % len(self.dens)]
 	self.dens_used += 1
-	node := spawn_node(self, "res://scripts/dweller.odin")
+	node := spawn_scene(self, self.dweller_scene)
 	d := rt.script_of(node, Dweller)
 	d.x = den.x
 	d.y = den.y
@@ -263,7 +253,7 @@ cave_host_tick :: proc(self: ^CaveLobby) {
 	// (The call is HOISTED: an Odin range bound is re-evaluated per
 	// iteration, and director_tick has side effects — inlining it in the
 	// range silently drains the wave.)
-	to_spawn := kai.director_tick(&self.director, u64(self.host_ticks), cave_floor(self).waves[:])
+	to_spawn := kai.director_tick(&self.director, u64(self.host_ticks), self.waves[:self.waves_n])
 	for _ in 0 ..< to_spawn {
 		cave_spawn_dweller(self)
 	}

@@ -1,4 +1,4 @@
-//gd:extends Label
+//gd:extends Node2D
 //gd:class Spelunker
 package cavecrawl_scripts
 
@@ -6,9 +6,13 @@ package cavecrawl_scripts
 // tag the fields, done. x/y are owner-streamed (whoever owns this spelunker
 // writes them; everyone else sees interpolated motion), the bag replicates
 // to everyone (co-op transparency: you can see what your friends carry),
-// and phase 4 adds the combat block: hp, stamina, ability cooldowns, status
-// effects — all plain replicated POD the host decays and deltas carry.
-// The node IS its own visual (a Label glyph); process just places it.
+// plus the combat block: hp, stamina, ability cooldowns, status effects —
+// all plain replicated POD the host decays and deltas carry.
+//
+// The BODY is an authored scene (entities/spelunker.tscn): a Node2D this
+// script drives, a Glyph label, and a pre-configured Pyre emitter for the
+// death burst — visuals live in the editor, the struct only tags what
+// replicates. `onready` wires the children by path.
 
 import gd "godot:godot"
 import kcombat "godot:kit/combat"
@@ -16,7 +20,9 @@ import kitems "godot:kit/items"
 import knet "godot:kit/net"
 
 Spelunker :: struct {
-	owner:     gd.Label,
+	owner:     gd.Node2d,
+	glyph:     gd.Label `gd:"onready=Glyph"`,
+	pyre:      gd.Cpu_Particles2d `gd:"onready=Pyre"`, // authored death burst
 	net_id:    knet.Net_Id, // assigned by the session at spawn
 	x, y:      f32 `gd:"replicate,interp,owner"`,
 	bag:       [6]kitems.Slot `gd:"replicate"`,
@@ -28,7 +34,6 @@ Spelunker :: struct {
 	aim:       [2]f32, // scratch for the throw hook — never on the wire
 	php:       kcombat.Predicted_Hp, // scratch: impacts SEEN here, pre-truth
 	was_dead:  bool, // scratch: death-edge detector for the pyre burst
-	pyre:      gd.Cpu_Particles2d, // scratch: this corpse's own death particles
 }
 
 // Drop a bag slot at my feet: my bag empties on my screen this frame; the
@@ -65,23 +70,15 @@ spelunker_heal :: proc(self: ^Spelunker) -> bool {
 	return true
 }
 
-spelunker_ready :: proc(self: ^Spelunker) {
-	gd.set_string(cast(gd.Object)self.owner, "text", "\xE2\x9B\x8F") // ⛏
-}
-
 spelunker_process :: proc(self: ^Spelunker, delta: f64) {
-	gd.control_set_position(cast(gd.Control)self.owner, {self.x, self.y}, false)
+	gd.node2d_set_position(self.owner, {self.x, self.y})
 	// Everyone can see who's dead — the corpse glyph replicates with hp.
-	gd.set_string(cast(gd.Object)self.owner, "text", self.hp > 0 ? "\xE2\x9B\x8F" : "\xF0\x9F\x92\x80") // ⛏ / 💀
+	gd.set_string(cast(gd.Object)self.glyph, "text", self.hp > 0 ? "\xE2\x9B\x8F" : "\xF0\x9F\x92\x80") // ⛏ / 💀
 	// Death edge, on EVERY screen (hp replicates): the corpse persists, so
-	// it carries its own pyre — an entity hanging FX on itself needs no
-	// game plumbing at all.
+	// it carries its own pyre — authored in spelunker.tscn, fired here.
 	if self.hp <= 0 && !self.was_dead {
 		self.was_dead = true
-		if cast(rawptr)self.pyre != nil {
-			gd.node_queue_free(cast(gd.Node)self.pyre)
-		}
-		self.pyre = fx_burst_node(cast(gd.Node)self.owner, 0, 0, {1, 0.3, 0.2, 1})
+		gd.cpu_particles2d_restart(self.pyre, false)
 	} else if self.hp > 0 {
 		self.was_dead = false
 	}

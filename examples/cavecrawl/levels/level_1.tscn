@@ -1,0 +1,36 @@
+[gd_scene format=3]
+
+[node name="Level1" type="Node2D"]
+
+[node name="ChestSpawn" type="Marker2D" parent="."]
+position = Vector2(300, 180)
+
+[node name="DoorSpawn" type="Marker2D" parent="."]
+position = Vector2(560, 180)
+
+[node name="Den1" type="Marker2D" parent="."]
+position = Vector2(320, 40)
+
+[node name="Den2" type="Marker2D" parent="."]
+position = Vector2(320, 320)
+
+[node name="Rock1" type="Label" parent="."]
+offset_left = 180.0
+offset_top = 60.0
+text = "🪨"
+
+[node name="Rock2" type="Label" parent="."]
+offset_left = 480.0
+offset_top = 300.0
+text = "🪨"
+
+[node name="Rock3" type="Label" parent="."]
+offset_left = 60.0
+offset_top = 260.0
+text = "🪨"
+
+[node name="Sign" type="Label" parent="."]
+modulate = Color(1, 1, 1, 0.35)
+offset_left = 250.0
+offset_top = 340.0
+text = "· the upper galleries ·"

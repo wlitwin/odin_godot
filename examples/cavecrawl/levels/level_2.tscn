@@ -1,0 +1,37 @@
+[gd_scene format=3]
+
+[node name="Level2" type="Node2D"]
+modulate = Color(0.82, 0.86, 1, 1)
+
+[node name="ChestSpawn" type="Marker2D" parent="."]
+position = Vector2(200, 260)
+
+[node name="DoorSpawn" type="Marker2D" parent="."]
+position = Vector2(90, 300)
+
+[node name="Den1" type="Marker2D" parent="."]
+position = Vector2(500, 100)
+
+[node name="Den2" type="Marker2D" parent="."]
+position = Vector2(500, 300)
+
+[node name="Rock1" type="Label" parent="."]
+offset_left = 420.0
+offset_top = 40.0
+text = "🪨"
+
+[node name="Rock2" type="Label" parent="."]
+offset_left = 140.0
+offset_top = 80.0
+text = "🪨"
+
+[node name="Stalactite" type="Label" parent="."]
+offset_left = 320.0
+offset_top = 200.0
+text = "🦴"
+
+[node name="Sign" type="Label" parent="."]
+modulate = Color(1, 1, 1, 0.35)
+offset_left = 240.0
+offset_top = 340.0
+text = "· the deep warrens ·"

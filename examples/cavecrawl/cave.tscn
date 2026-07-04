@@ -1,6 +1,22 @@
-[gd_scene format=3 uid="uid://d1505mqnwmr5a"]
+[gd_scene load_steps=10 format=3 uid="uid://d1505mqnwmr5a"]
 
 [ext_resource type="Script" uid="uid://c4085nl4dngjn" path="res://scripts/cavecrawl.odin" id="1_cave"]
+[ext_resource type="PackedScene" path="res://entities/spelunker.tscn" id="2_spel"]
+[ext_resource type="PackedScene" path="res://entities/chest.tscn" id="3_chest"]
+[ext_resource type="PackedScene" path="res://entities/door.tscn" id="4_door"]
+[ext_resource type="PackedScene" path="res://entities/pickup.tscn" id="5_pickup"]
+[ext_resource type="PackedScene" path="res://entities/dweller.tscn" id="6_dweller"]
+[ext_resource type="PackedScene" path="res://entities/level.tscn" id="7_level"]
+[ext_resource type="Resource" path="res://levels/level_1.tres" id="8_floor1"]
+[ext_resource type="Resource" path="res://levels/level_2.tres" id="9_floor2"]
 
 [node name="Cave" type="Node" unique_id=480048836]
 script = ExtResource("1_cave")
+spelunker_scene = ExtResource("2_spel")
+chest_scene = ExtResource("3_chest")
+door_scene = ExtResource("4_door")
+pickup_scene = ExtResource("5_pickup")
+dweller_scene = ExtResource("6_dweller")
+level_scene = ExtResource("7_level")
+floor1_def = ExtResource("8_floor1")
+floor2_def = ExtResource("9_floor2")
