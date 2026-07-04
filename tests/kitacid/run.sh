@@ -92,11 +92,16 @@ attempt() {
 	wait "$sp" 2>/dev/null; wait "$wp" 2>/dev/null; wait "$op" 2>/dev/null
 
 	local ok=1
-	# ---- server: authoritative execution ----
+	# ---- server: session seating + authoritative execution ----
 	grep -q "ACID_HOST_OK" "$slog" || { echo "  FAIL: host never came up"; ok=0; }
-	[[ "$(grep -c "ACID_SPAWN_SENT" "$slog")" == "2" ]] \
-		|| { echo "  FAIL: server did not join-snapshot exactly 2 peers"; ok=0; }
-	grep -q "ACID_REPLICATING" "$slog" || { echo "  FAIL: delta walk never started"; ok=0; }
+	[[ "$(grep -c "ACID_PLAYER name=" "$slog")" == "2" ]] \
+		|| { echo "  FAIL: host did not seat exactly 2 players"; ok=0; }
+	grep -q "ACID_PLAYER name=owner rejoin=false" "$slog" \
+		|| { echo "  FAIL: the owner never joined the session"; ok=0; }
+	grep -q "ACID_PLAYER name=observer rejoin=false" "$slog" \
+		|| { echo "  FAIL: the observer never joined the session"; ok=0; }
+	grep -qF "ACID_WORLD id=1 spawns=2" "$slog" \
+		|| { echo "  FAIL: world was not announced to exactly 2 seated peers"; ok=0; }
 	grep -qF "ACID_EXEC ok=true hp=92 st=6" "$slog" \
 		|| { echo "  FAIL: host never executed strike 1"; ok=0; }
 	grep -qF "ACID_EXEC ok=true hp=84 st=2" "$slog" \
@@ -107,8 +112,9 @@ attempt() {
 		|| { echo "  FAIL: the HOST did not verify smooth sampled motion (it is a remote for owner streams)"; ok=0; }
 	grep -q "SERVER_DONE" "$slog" || { echo "  FAIL: server did not finish cleanly"; ok=0; }
 
-	# ---- owner: optimistic prediction + confirm/reject round trips ----
-	grep -qF "ACID_SPAWN ok=true id=1 owner=2 hp=100 st=10" "$wlog" \
+	# ---- owner: seated + optimistic prediction + confirm/reject round trips ----
+	grep -q "ACID_SEATED me=" "$wlog" || { echo "  FAIL: owner was never welcomed"; ok=0; }
+	grep -qF "ACID_SPAWN ok=true id=1 mine=true hp=100 st=10" "$wlog" \
 		|| { echo "  FAIL: owner join snapshot (with ownership) not verified"; ok=0; }
 	grep -qF "ACID_ISSUE n=1 predicted=true hp=92 st=6 pending=1" "$wlog" \
 		|| { echo "  FAIL: strike 1 was not predicted instantly"; ok=0; }
@@ -130,7 +136,8 @@ attempt() {
 	grep -q "OWNER_DONE" "$wlog" || { echo "  FAIL: owner did not finish cleanly"; ok=0; }
 
 	# ---- observer: converges with ZERO role-specific code ----
-	grep -qF "ACID_SPAWN ok=true id=1 owner=2 hp=100 st=10" "$olog" \
+	grep -q "ACID_SEATED me=" "$olog" || { echo "  FAIL: observer was never welcomed"; ok=0; }
+	grep -qF "ACID_SPAWN ok=true id=1 mine=false hp=100 st=10" "$olog" \
 		|| { echo "  FAIL: observer join snapshot (with ownership) not verified"; ok=0; }
 	grep -qF "ACID_DELTA ok=true n=1 hp=92 st=6" "$olog" \
 		|| { echo "  FAIL: observer never saw strike 1's delta batch"; ok=0; }

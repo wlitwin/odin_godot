@@ -24,7 +24,7 @@ Peer_Box :: struct {
 	out:  [dynamic]Envelope,
 }
 
-box_send :: proc(user: rawptr, to_peer: int, bytes: []u8) {
+box_send :: proc(user: rawptr, to_peer: int, bytes: []u8, channel: ksess.Channel) {
 	b := cast(^Peer_Box)user
 	cloned := make([]u8, len(bytes))
 	copy(cloned, bytes)
@@ -46,7 +46,8 @@ box_destroy :: proc(b: ^Peer_Box) {
 }
 
 // Deliver every queued message (including ones queued by handling) until the
-// network is quiet.
+// network is quiet. `to == BROADCAST_PEER (0)` reaches everyone but the sender,
+// matching the transport's relay semantics.
 pump :: proc(boxes: []^Peer_Box) {
 	for progress := true; progress; {
 		progress = false
@@ -55,10 +56,12 @@ pump :: proc(boxes: []^Peer_Box) {
 				e := b.out[0]
 				ordered_remove(&b.out, 0)
 				for dst in boxes {
-					if dst.peer == e.to {
+					if dst.peer == b.peer {
+						continue
+					}
+					if e.to == ksess.BROADCAST_PEER || dst.peer == e.to {
 						r := knet.reader_make(e.data)
 						ksess.session_handle_packet(&dst.s, b.peer, &r)
-						break
 					}
 				}
 				delete(e.data)
@@ -293,4 +296,190 @@ rename_on_rejoin :: proc(t: ^testing.T) {
 	testing.expect_value(t, alice2.s.me, knet.Player_Id(2))
 	p, _ := ksess.session_player(&host.s, 2)
 	testing.expect_value(t, p.name, "alicia")
+}
+
+// ---- the replicated world through the session ---------------------------------
+//
+// The session owns registry + command ctx + ticker (the acid test's node,
+// promoted). One fixture entity exercises the whole loop: host deltas,
+// predicted commands with confirm/reject events, owner streams, clock pings.
+
+Bot :: struct {
+	hp: i32,
+	x:  f32,
+}
+
+bot_cmd_hit :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+	b := cast(^Bot)entity
+	amount := knet.read_i32(r)
+	if r.err {return false}
+	if b.hp <= amount {return false} // can't drop to/below zero: reject
+	b.hp -= amount
+	return true
+}
+
+bot_set :: proc() -> knet.Command_Set {
+	@(static) fields := [?]knet.Field_Desc{
+		{offset = offset_of(Bot, hp), size = size_of(i32)},
+		{offset = offset_of(Bot, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32},
+	}
+	@(static) desc: knet.Entity_Desc
+	desc = knet.Entity_Desc{fields = fields[:]}
+	@(static) cmds := [?]knet.Command_Desc{{name = "hit", predict = true, invoke = bot_cmd_hit}}
+	return knet.Command_Set{entity_desc = &desc, commands = cmds[:]}
+}
+
+// Advance both peers' sessions one net tick's worth and deliver the traffic.
+step :: proc(boxes: []^Peer_Box, now: ^f64) {
+	now^ += 0.05 // exactly one 20 Hz tick
+	for b in boxes {
+		_, _ = ksess.session_tick(&b.s, 0.05, now^)
+	}
+	pump(boxes)
+}
+
+@(test)
+world_over_the_session :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	drain(&host.s)
+	drain(&alice.s)
+
+	// World setup, the (pre-factory) game's job: host spawns + snapshots, the
+	// client binds under the announced id. Alice owns the bot's streamed x.
+	set := bot_set()
+	hbot := Bot{hp = 10, x = 1}
+	id := ksess.session_spawn(&host.s, &hbot, &set, owner = alice.s.me)
+	abot := Bot{hp = 10, x = 1}
+	ksess.session_bind(&alice.s, id, &abot, &set, owner = alice.s.me)
+	ksess.session_start_replicating(&host.s)
+
+	now := 100.0
+
+	// HOST STATE: a host-side mutation deltas out on the next net tick.
+	hbot.hp = 8
+	step(boxes, &now)
+	testing.expect_value(t, abot.hp, i32(8))
+	aev := drain(&alice.s)
+	found_state := false
+	for ev in aev {
+		if st, ok := ev.(ksess.Ev_State_Applied); ok && st.entities == 1 {
+			found_state = true
+		}
+	}
+	testing.expect(t, found_state, "client must see the state batch land")
+
+	// PREDICTED COMMAND, CONFIRM: alice hits for 3 — instant locally, host
+	// executes, confirm event drains the pending.
+	knet.command_begin(&alice.s.ctx, id, 0)
+	knet.write_i32(&alice.s.ctx.msg, 3)
+	testing.expect(t, knet.command_issue(&alice.s.ctx, &abot, &set, 0))
+	testing.expect_value(t, abot.hp, i32(5))
+	pump(boxes)
+	testing.expect_value(t, hbot.hp, i32(5))
+
+	hev := drain(&host.s)
+	exec_ok := false
+	for ev in hev {
+		if ex, ok := ev.(ksess.Ev_Command_Executed); ok && ex.ok {
+			exec_ok = true
+		}
+	}
+	testing.expect(t, exec_ok)
+	aev2 := drain(&alice.s)
+	confirmed := false
+	for ev in aev2 {
+		if _, ok := ev.(ksess.Ev_Command_Confirmed); ok {
+			confirmed = true
+		}
+	}
+	testing.expect(t, confirmed)
+	testing.expect_value(t, knet.pending_count(&alice.s.ctx.pending), 0)
+
+	// PREDICTED COMMAND, REJECT: hitting for 5 would kill (hp 5) — alice's
+	// stale-free prediction also rejects locally, the host's reject + truth
+	// still settles it (and the event names the entity).
+	knet.command_begin(&alice.s.ctx, id, 0)
+	knet.write_i32(&alice.s.ctx.msg, 5)
+	testing.expect(t, !knet.command_issue(&alice.s.ctx, &abot, &set, 0))
+	testing.expect_value(t, abot.hp, i32(5)) // local revert
+	pump(boxes)
+	testing.expect_value(t, hbot.hp, i32(5)) // host rejected too
+	aev3 := drain(&alice.s)
+	rejected := false
+	for ev in aev3 {
+		if rj, ok := ev.(ksess.Ev_Command_Rejected); ok && rj.entity == id {
+			rejected = true
+		}
+	}
+	testing.expect(t, rejected)
+	drain(&host.s)
+
+	// Flush the delta the command's hp mutation legitimately owes (it goes out
+	// on the next net tick), so the stream section below can assert silence.
+	step(boxes, &now)
+	drain(&alice.s)
+
+	// OWNER STREAM: alice owns x — she writes it, her session streams it, the
+	// HOST samples it (the host is just another remote for owned fields).
+	abot.x = 10
+	step(boxes, &now) // stream snapshot t=now
+	abot.x = 20
+	step(boxes, &now) // second snapshot; host ring has a bracketing pair
+	// Sample far enough past both snapshots to land on the newest.
+	now += 1.0
+	_, sampled := ksess.session_tick(&host.s, 0.0, now)
+	testing.expect_value(t, sampled, 1)
+	testing.expect_value(t, hbot.x, f32(20))
+	// The host's OWN delta walk must never re-broadcast alice's stream.
+	step(boxes, &now)
+	aev4 := drain(&alice.s)
+	for ev in aev4 {
+		if _, ok := ev.(ksess.Ev_State_Applied); ok {
+			testing.expect(t, false, "owner-streamed fields leaked into a host delta batch")
+		}
+	}
+
+	// CLOCK: alice pings ~1/s once seated; the host answers; the estimate warms.
+	for _ in 0 ..< 25 { // > one ping interval of net ticks
+		step(boxes, &now)
+	}
+	testing.expect(t, alice.s.pongs > 0, "ping/pong must feed the client clock")
+	c := ksess.session_clock(&alice.s, ksess.HOST_PEER)
+	testing.expect(t, c.initialized)
+}
+
+@(test)
+commands_from_unseated_peers_are_dropped :: proc(t: ^testing.T) {
+	host: Peer_Box
+	box_make(&host, 1)
+	defer box_destroy(&host)
+	ksess.session_host_start(&host.s, "hosty")
+
+	set := bot_set()
+	hbot := Bot{hp = 10}
+	id := ksess.session_spawn(&host.s, &hbot, &set)
+
+	// A raw SES_CMD from a transport peer that never JOINed: dropped whole —
+	// no execution, no result, no event.
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_u8(&w, 6) // SES_CMD
+	knet.write_net_id(&w, id)
+	knet.write_u16(&w, 0)
+	knet.write_u32(&w, 1)
+	knet.write_i32(&w, 3)
+	r := knet.reader_make(knet.writer_bytes(&w))
+	ksess.session_handle_packet(&host.s, 666, &r)
+	testing.expect_value(t, hbot.hp, i32(10))
+	testing.expect_value(t, len(drain(&host.s)), 0)
 }

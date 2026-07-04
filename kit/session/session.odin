@@ -32,10 +32,16 @@ package kit_session
 import knet "godot:kit/net"
 import "core:strings"
 
+// Which wire the message rides — maps to kit/netgd's channel plan.
+Channel :: enum u8 {
+	Reliable, // commands, results, state batches, roster, pings
+	Stream,   // owner-stream snapshots: unreliable-ordered, last-value
+}
+
 // The transport hookup. `to_peer` is a transport peer id (ENet/WebRTC/Steam
 // semantics belong to the game+netgd layer; the session never broadcasts —
 // it targets connected players individually).
-Send_Proc :: proc(user: rawptr, to_peer: int, bytes: []u8)
+Send_Proc :: proc(user: rawptr, to_peer: int, bytes: []u8, channel: Channel)
 
 // ENet/SceneMultiplayer convention: the host is always transport peer 1.
 HOST_PEER :: 1
@@ -64,11 +70,32 @@ Ev_Player_Left :: struct {
 
 Ev_Host_Left :: struct {} // (client) the run is over — v1 has no migration
 
+Ev_State_Applied :: struct {
+	entities: int, // (client) a host state batch landed on this many entities
+}
+
+Ev_Command_Executed :: struct {
+	ok: bool, // (host) a client command ran (or was rejected) authoritatively
+}
+
+Ev_Command_Confirmed :: struct {
+	seq: knet.Intent_Seq, // (client) prediction stands
+}
+
+Ev_Command_Rejected :: struct {
+	seq:    knet.Intent_Seq, // (client) truth applied (or revert fallback)
+	entity: knet.Net_Id,
+}
+
 Event :: union {
 	Ev_Welcomed,
 	Ev_Player_Joined,
 	Ev_Player_Left,
 	Ev_Host_Left,
+	Ev_State_Applied,
+	Ev_Command_Executed,
+	Ev_Command_Confirmed,
+	Ev_Command_Rejected,
 }
 
 // ---- wire (sub-framed: the game's session kind byte comes first, then ours) --
@@ -83,6 +110,25 @@ SES_UPSERT :: u8(2) // host -> others  [id][name][connected u8][rejoin u8]
 SES_LEFT :: u8(3) // host -> all     [id]
 @(private)
 SES_BYE :: u8(4) // client -> host  graceful leave (no payload)
+@(private)
+SES_STATE :: u8(5) // host -> all     registry delta batch, per net tick
+@(private)
+SES_CMD :: u8(6) // client -> host  command header + args
+@(private)
+SES_RESULT :: u8(7) // host -> issuer  confirm / reject+truth
+@(private)
+SES_STREAM :: u8(8) // owner -> all    owner-stream batch (Channel.Stream)
+@(private)
+SES_PING :: u8(9) // any -> any      [local_send f64]
+@(private)
+SES_PONG :: u8(10) // reply           [echoed_send][remote_time]
+
+// Remote entities render this far in the past (~3 net ticks at 20 Hz): almost
+// always a bracketing sample pair, smooth through jitter and single drops.
+DEFAULT_INTERP_DELAY :: 0.15
+
+// Predictions whose result never arrives revert after this many net ticks.
+DEFAULT_PENDING_MAX_AGE :: 60 // 3s at 20 Hz — far beyond any sane RTT
 
 Session :: struct {
 	is_host:   bool,
@@ -91,6 +137,16 @@ Session :: struct {
 	events:    [dynamic]Event,
 	send:      Send_Proc,
 	send_user: rawptr,
+
+	// the replicated world (kit/net): the session drives the per-tick walks
+	reg:          knet.Registry,
+	ctx:          knet.Command_Ctx,
+	ticker:       knet.Ticker,
+	clocks:       map[int]knet.Clock_Sync, // per transport peer, fed by ping/pong
+	pongs:        int, // pong samples applied (games gate "clock is warm" on this)
+	now:          f64, // the game's monotonic seconds, updated each session_tick
+	replicating:  bool, // host: the delta walk is live (after join snapshots)
+	interp_delay: f64,
 
 	// host bookkeeping
 	next_player: knet.Player_Id,
@@ -103,6 +159,17 @@ Session :: struct {
 	joined: bool, // WELCOME received
 }
 
+@(private = "file")
+session_init :: proc(s: ^Session) {
+	s.reg = knet.registry_make()
+	s.ctx = knet.command_ctx_make()
+	s.ticker = knet.ticker_make()
+	s.interp_delay = DEFAULT_INTERP_DELAY
+	// Commands always go host-ward through the session's own framing.
+	s.ctx.send = ctx_send_command
+	s.ctx.send_user = s
+}
+
 session_destroy :: proc(s: ^Session) {
 	for _, p in s.players {
 		delete(p.name)
@@ -112,7 +179,119 @@ session_destroy :: proc(s: ^Session) {
 	delete(s.tokens)
 	delete(s.by_peer)
 	delete(s.name)
+	knet.registry_destroy(&s.reg)
+	knet.command_ctx_destroy(&s.ctx)
+	delete(s.clocks)
 	s^ = {}
+}
+
+// The Command_Ctx send hook: wrap raw command bytes in session framing and
+// ship them to the host. Installed by session_init — the generated `<proc>_cmd`
+// wrappers reach the wire without the game writing any glue.
+@(private = "file")
+ctx_send_command :: proc(user: rawptr, bytes: []u8) {
+	s := cast(^Session)user
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_u8(&w, SES_CMD)
+	append(&w.buf, ..bytes)
+	s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
+}
+
+// ---- the replicated world ----------------------------------------------------
+
+// Host: register a new entity (allocates its net id). The game still owns
+// entity CREATION and the spawn message carrying (id, owner, snapshot) to the
+// other peers — spawn-by-type factories are the next brick.
+session_spawn :: proc(s: ^Session, entity: rawptr, set: ^knet.Command_Set, owner := knet.PLAYER_ID_INVALID) -> knet.Net_Id {
+	return knet.registry_spawn(&s.reg, entity, set, owner)
+}
+
+// Client: mirror an entity under the id (and owner) the wire announced.
+session_bind :: proc(s: ^Session, id: knet.Net_Id, entity: rawptr, set: ^knet.Command_Set, owner := knet.PLAYER_ID_INVALID) {
+	knet.registry_insert(&s.reg, id, entity, set, owner)
+}
+
+// Host: every joined peer has its snapshot — commit shadows and let the
+// per-tick delta walk broadcast from here on.
+session_start_replicating :: proc(s: ^Session) {
+	knet.registry_commit_shadows(&s.reg)
+	s.replicating = true
+}
+
+// Drive the session once per frame. `now` is the game's monotonic seconds
+// (any base — it stamps stream rings and clock pings). Returns how many net
+// ticks fired and how many remote entities were stream-sampled this frame.
+session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: int) {
+	s.now = now
+	ticks = knet.ticker_advance(&s.ticker, dt)
+	for _ in 0 ..< ticks {
+		net_tick(s)
+	}
+	sampled = knet.registry_sample_streams(&s.reg, now - s.interp_delay, s.me)
+	return
+}
+
+@(private = "file")
+net_tick :: proc(s: ^Session) {
+	t := s.ticker.tick
+	s.ctx.now_tick = t
+
+	if s.is_host && s.replicating {
+		// Host state: ONE batched delta message for every dirty entity, to
+		// every joined peer, reliable (the shadow commits on send — a dropped
+		// delta would be lost forever; spawn/despawn shares this channel so
+		// ids are always known before a batch names them).
+		w := knet.writer_make()
+		defer knet.writer_destroy(&w)
+		knet.write_u8(&w, SES_STATE)
+		if knet.registry_write_deltas(&w, &s.reg) > 0 {
+			broadcast(s, knet.writer_bytes(&w), .Reliable)
+		}
+	}
+
+	// Owner streams: last-value snapshots of every entity WE own, unreliable
+	// (a drop is superseded by the next tick's snapshot). Any peer can own.
+	{
+		w := knet.writer_make()
+		defer knet.writer_destroy(&w)
+		knet.write_u8(&w, SES_STREAM)
+		if knet.registry_write_streams(&w, &s.reg, s.me, s.now) > 0 {
+			broadcast(s, knet.writer_bytes(&w), .Stream)
+		}
+	}
+
+	// Clock ping toward the host, ~1/s, once seated. (Per-peer mesh pings —
+	// for sender-stamped stream timelines — come with a later brick.)
+	if !s.is_host && s.joined && t % 20 == 5 {
+		w := knet.writer_make()
+		defer knet.writer_destroy(&w)
+		knet.write_u8(&w, SES_PING)
+		knet.ping_write(&w, s.now)
+		s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
+	}
+
+	if n := knet.registry_expire_pending(&s.reg, &s.ctx, DEFAULT_PENDING_MAX_AGE); n > 0 {
+		for _ in 0 ..< n {
+			append(&s.events, Ev_Command_Rejected{}) // loud auto-revert: silence means no
+		}
+	}
+}
+
+// Transport-level "everyone but me" (engine semantics: netgd relays peer 0 to
+// all other peers, server-relayed for clients). World traffic uses this — only
+// the HOST knows other players' transport peers, but any peer may own streamed
+// entities. Roster messages stay host-targeted (they need per-peer exclusion).
+BROADCAST_PEER :: 0
+
+@(private = "file")
+broadcast :: proc(s: ^Session, bytes: []u8, channel: Channel) {
+	s.send(s.send_user, BROADCAST_PEER, bytes, channel)
+}
+
+// This peer's clock estimate for `peer` (zero value until a pong lands).
+session_clock :: proc(s: ^Session, peer: int) -> knet.Clock_Sync {
+	return s.clocks[peer]
 }
 
 // Drain one queued event (call until ok=false each frame).
@@ -148,7 +327,9 @@ session_count :: proc(s: ^Session, connected_only := false) -> int {
 // Become the session authority. The host is a full player too (name, id,
 // stats) — it just never JOINs over the wire.
 session_host_start :: proc(s: ^Session, name: string) {
+	session_init(s)
 	s.is_host = true
+	s.ctx.is_authority = true
 	s.next_player = 1
 	s.me = s.next_player
 	s.next_player += 1
@@ -199,7 +380,7 @@ host_broadcast :: proc(s: ^Session, bytes: []u8, except := knet.PLAYER_ID_INVALI
 		if !p.connected || p.id == s.me || p.id == except {
 			continue
 		}
-		s.send(s.send_user, p.peer, bytes)
+		s.send(s.send_user, p.peer, bytes, .Reliable)
 	}
 }
 
@@ -253,7 +434,7 @@ host_handle_join :: proc(s: ^Session, peer: int, r: ^knet.Reader) {
 		knet.write_string(&w, p.name)
 		knet.write_bool(&w, p.connected)
 	}
-	s.send(s.send_user, peer, knet.writer_bytes(&w))
+	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
 
 	// Everyone else learns about (or re-learns) the joiner.
 	up := knet.writer_make()
@@ -273,6 +454,7 @@ host_handle_join :: proc(s: ^Session, peer: int, r: ^knet.Reader) {
 // Remember who we are; the JOIN goes out when the game confirms the transport
 // is up (session_client_join). `token` is the persistent reconnect secret.
 session_client_start :: proc(s: ^Session, token: u64, name: string) {
+	session_init(s)
 	s.is_host = false
 	s.token = token
 	s.name = strings.clone(name)
@@ -285,7 +467,7 @@ session_client_join :: proc(s: ^Session) {
 	knet.write_u8(&w, SES_JOIN)
 	knet.write_u64(&w, s.token)
 	knet.write_string(&w, s.name)
-	s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w))
+	s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
 }
 
 // Graceful goodbye (the host also handles the plain transport disconnect —
@@ -294,7 +476,7 @@ session_client_leave :: proc(s: ^Session) {
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_u8(&w, SES_BYE)
-	s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w))
+	s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
 }
 
 @(private = "file")
@@ -335,25 +517,30 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 
 // The game routes its session kind byte here with the rest of the packet.
 // `from_peer` is the transport sender (hosts route by it; clients only ever
-// hear from the host).
+// hear from the host — except streams, which any owning peer may broadcast).
 session_handle_packet :: proc(s: ^Session, from_peer: int, r: ^knet.Reader) {
 	kind := knet.read_u8(r)
 	if r.err {
 		return
 	}
-	if s.is_host {
-		switch kind {
-		case SES_JOIN:
+	switch kind {
+	// ---- roster ----
+	case SES_JOIN:
+		if s.is_host {
 			host_handle_join(s, from_peer, r)
-		case SES_BYE:
+		}
+	case SES_BYE:
+		if s.is_host {
 			session_peer_disconnected(s, from_peer)
 		}
-		return
-	}
-	switch kind {
 	case SES_WELCOME:
-		client_handle_welcome(s, r)
+		if !s.is_host {
+			client_handle_welcome(s, r)
+		}
 	case SES_UPSERT:
+		if s.is_host {
+			return
+		}
 		id := knet.read_player_id(r)
 		name := knet.read_string(r)
 		connected := knet.read_bool(r)
@@ -364,6 +551,9 @@ session_handle_packet :: proc(s: ^Session, from_peer: int, r: ^knet.Reader) {
 		roster_upsert(s, id, name, connected)
 		append(&s.events, Ev_Player_Joined{id = id, rejoin = rejoin})
 	case SES_LEFT:
+		if s.is_host {
+			return
+		}
 		id := knet.read_player_id(r)
 		if r.err {
 			return
@@ -373,6 +563,68 @@ session_handle_packet :: proc(s: ^Session, from_peer: int, r: ^knet.Reader) {
 			p.peer = 0
 			s.players[id] = p
 			append(&s.events, Ev_Player_Left{id = id})
+		}
+
+	// ---- the replicated world ----
+	case SES_STATE:
+		if s.is_host {
+			return
+		}
+		n := knet.registry_apply_deltas(r, &s.reg, &s.ctx)
+		if !r.err {
+			append(&s.events, Ev_State_Applied{entities = n})
+		}
+	case SES_CMD:
+		if !s.is_host {
+			return
+		}
+		// Dedup keyed by PLAYER id, not transport peer: a reconnecting player's
+		// retransmits stay exactly-once across the peer change. A command from
+		// a peer that never JOINed is from nobody — dropped.
+		pid, seated := s.by_peer[from_peer]
+		if !seated {
+			return
+		}
+		w := knet.writer_make()
+		defer knet.writer_destroy(&w)
+		knet.write_u8(&w, SES_RESULT)
+		responded, ok := knet.registry_host_command(&s.reg, &s.ctx, u64(pid), r, &w)
+		if !responded {
+			return
+		}
+		s.send(s.send_user, from_peer, knet.writer_bytes(&w), .Reliable)
+		append(&s.events, Ev_Command_Executed{ok = ok})
+	case SES_RESULT:
+		if s.is_host {
+			return
+		}
+		res := knet.registry_client_result(&s.reg, &s.ctx, r)
+		if res.seq == 0 {
+			return // truncated header: not a result at all (seqs start at 1)
+		}
+		if res.ok {
+			append(&s.events, Ev_Command_Confirmed{seq = res.seq})
+		} else {
+			// A truncated truth snapshot already fell back to the local revert
+			// inside command_reject — the rejection event holds either way.
+			append(&s.events, Ev_Command_Rejected{seq = res.seq, entity = res.entity})
+		}
+	case SES_STREAM:
+		_ = knet.registry_stream_time(r) // sender stamp (clock-mapped timelines later)
+		_ = knet.registry_apply_streams(r, &s.reg, s.me, s.now)
+	case SES_PING:
+		w := knet.writer_make()
+		defer knet.writer_destroy(&w)
+		knet.write_u8(&w, SES_PONG)
+		knet.ping_answer(r, &w, s.now)
+		if !r.err {
+			s.send(s.send_user, from_peer, knet.writer_bytes(&w), .Reliable)
+		}
+	case SES_PONG:
+		c := s.clocks[from_peer]
+		if knet.pong_apply(r, &c, s.now) {
+			s.clocks[from_peer] = c
+			s.pongs += 1
 		}
 	}
 }

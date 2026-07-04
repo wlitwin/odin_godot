@@ -68,12 +68,13 @@ func _process(delta: float) -> bool:
 	if phase == "init":
 		if not session.is_inside_tree() or not orb.is_inside_tree():
 			return false
-		var me := 1 if role == "server" else (2 if role == "owner" else 3)
-		session.call("setup", latency, me, orb)
+		session.call("setup", latency, orb)
 		if role == "server":
 			session.call("start_host", port)
+		elif role == "owner":
+			session.call("start_owner", port)
 		else:
-			session.call("start_client", port)
+			session.call("start_observer", port)
 		mp = session.get_multiplayer()
 		if mp == null:
 			print(role.to_upper(), "_FAIL: get_multiplayer() is null")
@@ -86,16 +87,23 @@ func _process(delta: float) -> bool:
 		var need := 2 if role == "server" else 1
 		if mp.get_peers().size() >= need and mp.get_unique_id() != 0:
 			if role == "server":
-				# Both clients present: join-snapshot each, then start the
-				# per-tick delta walk (spawn-before-delta, same channel).
-				for p in mp.get_peers():
-					session.call("send_spawn", p)
-				session.call("start_replicating")
-				phase = "serve"
+				phase = "seat"
 			else:
+				# Transport up: ask the host to seat us in the session.
+				session.call("join")
 				phase = "wait_spawn"
 			t_acted = now
 		elif timed_out(now, "peers never connected"):
+			quit(1); return true
+		return false
+
+	# ---- server: both players seated in the SESSION, then announce the world ----
+	if phase == "seat":
+		if int(session.call("get_players")) >= 3:
+			session.call("announce_world")
+			phase = "serve"
+			t_acted = now
+		elif timed_out(now, "players seated=" + str(session.call("get_players"))):
 			quit(1); return true
 		return false
 
