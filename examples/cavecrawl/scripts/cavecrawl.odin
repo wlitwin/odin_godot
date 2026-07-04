@@ -34,6 +34,7 @@ package cavecrawl_scripts
 import gd "godot:godot"
 import "godot:gdext"
 import rt "godot:runtime"
+import kai "godot:kit/ai"
 import kcombat "godot:kit/combat"
 import kcomms "godot:kit/comms"
 import kinter "godot:kit/interact"
@@ -61,6 +62,7 @@ SPEL_TYPE :: ksess.Entity_Type(1)
 CHEST_TYPE :: ksess.Entity_Type(2)
 DOOR_TYPE :: ksess.Entity_Type(3)
 PICKUP_TYPE :: ksess.Entity_Type(4)
+DWELLER_TYPE :: ksess.Entity_Type(5)
 
 WALK_SPEED :: f32(120) // px/s
 
@@ -85,6 +87,29 @@ SPEL_CMD_THROW :: u16(1)
 // kit/comms rides SES_APP tag 0; fire announcements ride tag 1.
 TAG_FIRE :: u8(1)
 FIRE_ROCK :: u8(1)
+
+// ---- cave dwellers (phase 5) ----
+
+DWELLER_HP :: i32(70) // two rocks
+DWELLER_SPEED :: f32(4) // px per tick (players outrun them)
+DWELLER_AGGRO :: f32(100) // sight radius (open cave: no LoS blocker)
+BITE_RANGE :: f32(24)
+BITE_DMG :: i32(10)
+BITE_CD :: u16(30) // 1.5s between bites
+FLEE_BELOW :: i32(35) // one rock in: it runs
+
+// The waves (kit/ai director): the game only says what and where.
+CAVE_WAVES := [?]kai.Wave{{count = 2, rest = 40}, {count = 3, rest = 40}}
+DWELLER_DENS := [?][3]f32{{320, 40, 0}, {320, 320, 0}}
+
+// Dwellers declare no commands, so scriptgen emits only their descriptor.
+dweller_set := knet.Command_Set{entity_desc = &dweller_net_desc}
+
+// The host-side half of a dweller's mind (never on the wire).
+Dweller_Brain :: struct {
+	home:    [3]f32,
+	bite_cd: u16,
+}
 
 // One rock in the HOST's authoritative sim — the only rocks that hurt.
 Cave_Rock :: struct {
@@ -127,6 +152,7 @@ CaveLobby :: struct {
 	chests:      map[knet.Net_Id]^Chest,
 	doors:       map[knet.Net_Id]^Door,
 	pickups:     map[knet.Net_Id]^Pickup,
+	dwellers:    map[knet.Net_Id]^Dweller,
 	nodes:       map[knet.Net_Id]gd.Node, // for freeing on despawn
 	avatar_of:   map[knet.Player_Id]knet.Net_Id,
 	me_spel:     ^Spelunker, // my avatar (nil until spawned)
@@ -141,6 +167,13 @@ CaveLobby :: struct {
 	flying:     [dynamic]Cave_Rock, // host: the authoritative rock sim
 	visuals:    [dynamic]Visual_Rock, // every peer: the rocks on THIS screen
 	respawn_at: map[knet.Net_Id]int, // host: resurrection clocks
+
+	// ---- dwellers (phase 5, host-side) ----
+	brains:    map[knet.Net_Id]Dweller_Brain,
+	director:  kai.Director,
+	slain_col: ksess.Stat_Col, // the game's own scoreboard column
+	dens_used: int, // round-robin den picker
+	last_wave: int, // wave-announcement edge
 	host_ticks: int, // host: game ticks elapsed
 	hud_hp:     kui.Health_Bar,
 	hud_ab:     kui.Ability_Bar,
@@ -311,6 +344,13 @@ cave_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 		p.net_id = id
 		self.pickups[id] = p
 		return p, &pickup_command_set
+	case DWELLER_TYPE:
+		node := spawn_node(self, "res://scripts/dweller.odin")
+		self.nodes[id] = node
+		d := rt.script_of(node, Dweller)
+		d.net_id = id
+		self.dwellers[id] = d
+		return d, &dweller_set
 	case CHEST_TYPE:
 		node := spawn_node(self, "res://scripts/chest.odin")
 		self.nodes[id] = node
@@ -340,6 +380,7 @@ cave_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	delete_key(&self.chests, id)
 	delete_key(&self.doors, id)
 	delete_key(&self.pickups, id)
+	delete_key(&self.dwellers, id)
 }
 
 // THE CROSS-ENTITY HALF of looting, host only (see chest.odin): a successful
@@ -355,19 +396,125 @@ cave_credit :: proc(self: ^CaveLobby, player: knet.Player_Id, chest: ^Chest) {
 	}
 }
 
+// Host: mint a pickup lying on the floor.
+@(private = "file")
+cave_mint_pickup_at :: proc(self: ^CaveLobby, item: kitems.Item_Id, count: u16, x, y: f32) {
+	node := spawn_node(self, "res://scripts/pickup.odin")
+	p := rt.script_of(node, Pickup)
+	p.x = x
+	p.y = y
+	p.item = item
+	p.count = count
+	p.net_id = ksess.session_spawn(&self.ses, PICKUP_TYPE, p, &pickup_command_set)
+	self.pickups[p.net_id] = p
+	self.nodes[p.net_id] = node
+}
+
 // Host: mint the Pickup a drop left behind (the dropper's scratch tells us
 // what; the host's view of their avatar tells us where).
 @(private = "file")
 cave_mint_pickup :: proc(self: ^CaveLobby, sp: ^Spelunker) {
-	node := spawn_node(self, "res://scripts/pickup.odin")
-	p := rt.script_of(node, Pickup)
-	p.x = sp.x + 24 // at their feet, not under them
-	p.y = sp.y
-	p.item = sp.last_drop.item
-	p.count = sp.last_drop.count
-	p.net_id = ksess.session_spawn(&self.ses, PICKUP_TYPE, p, &pickup_command_set)
-	self.pickups[p.net_id] = p
-	self.nodes[p.net_id] = node
+	cave_mint_pickup_at(self, sp.last_drop.item, sp.last_drop.count, sp.x + 24, sp.y)
+}
+
+// Host: damage a spelunker from any source — a rock (attacker credited, a
+// chill on survivors) or a dweller's bite (the environment; deaths only).
+@(private = "file")
+cave_hurt_spelunker :: proc(self: ^CaveLobby, victim_id: knet.Net_Id, victim: ^Spelunker, dmg: i32, attacker: knet.Player_Id, chill: bool) {
+	kcombat.credit_hit(&self.ses, self.cols, attacker, dmg)
+	if kcombat.hit(&victim.hp, dmg) {
+		victim_pid := knet.PLAYER_ID_INVALID
+		for pid, av in self.avatar_of {
+			if av == victim_id {victim_pid = pid}
+		}
+		kcombat.credit_kill(&self.ses, self.cols, attacker, victim_pid)
+		cave_spill_bag(self, victim)
+		self.respawn_at[victim_id] = self.host_ticks + RESPAWN_TICKS
+	} else if chill {
+		_ = kcombat.effects_add(victim.fx[:], CHILL, 50, 40) // 2s of cold feet
+	}
+}
+
+// Host: a dweller falls — credit the game's own "slain" column, drop its
+// torch where it died, and tell the director the field thinned.
+@(private = "file")
+cave_slay_dweller :: proc(self: ^CaveLobby, id: knet.Net_Id, slayer: knet.Player_Id) {
+	dw := self.dwellers[id]
+	cave_mint_pickup_at(self, TORCH, 1, dw.x, dw.y)
+	if slayer != knet.PLAYER_ID_INVALID {
+		ksess.session_stat_add(&self.ses, slayer, self.slain_col, 1)
+	}
+	ksess.session_despawn(&self.ses, id)
+	if node, ok := self.nodes[id]; ok {
+		gd.node_queue_free(node)
+		delete_key(&self.nodes, id)
+	}
+	delete_key(&self.dwellers, id)
+	delete_key(&self.brains, id)
+	kai.director_note_death(&self.director, u64(self.host_ticks), CAVE_WAVES[:])
+	gd.print_str(fmt.tprintf("CAVE_SLAIN left=%d", len(self.dwellers)))
+}
+
+// Host: a dweller crawls out of a den (the kit/ai director said when).
+@(private = "file")
+cave_spawn_dweller :: proc(self: ^CaveLobby) {
+	den := DWELLER_DENS[self.dens_used % len(DWELLER_DENS)]
+	self.dens_used += 1
+	node := spawn_node(self, "res://scripts/dweller.odin")
+	d := rt.script_of(node, Dweller)
+	d.x = den.x
+	d.y = den.y
+	d.hp = DWELLER_HP
+	d.net_id = ksess.session_spawn(&self.ses, DWELLER_TYPE, d, &dweller_set, owner = self.ses.me)
+	self.dwellers[d.net_id] = d
+	self.nodes[d.net_id] = node
+	self.brains[d.net_id] = Dweller_Brain{home = den}
+	gd.print_str(fmt.tprintf("CAVE_DEN id=%d at=%.0f,%.0f", u32(d.net_id), den.x, den.y))
+}
+
+// Host: one think-tick for every dweller — the WHOLE brain, written from
+// kit/ai verbs: perceive, then a plain switch. State and position are
+// replicated fields; writing them IS the AI's entire network presence.
+@(private = "file")
+cave_dwellers_think :: proc(self: ^CaveLobby) {
+	targets := make([dynamic]kai.Target, context.temp_allocator)
+	for id, sp in self.spelunkers {
+		if sp.hp > 0 {
+			append(&targets, kai.Target{id = u32(id), pos = {sp.x, sp.y, 0}})
+		}
+	}
+	for id, dw in self.dwellers {
+		brain := self.brains[id]
+		if brain.bite_cd > 0 {
+			brain.bite_cd -= 1
+		}
+		pos := [3]f32{dw.x, dw.y, 0}
+		seen, spotted := kai.nearest(pos, targets[:], DWELLER_AGGRO)
+
+		state := DWELLER_IDLE
+		switch {
+		case spotted && dw.hp <= FLEE_BELOW:
+			state = DWELLER_FLEE
+			pos = kai.step_away(pos, seen.pos, DWELLER_SPEED / 2)
+		case spotted:
+			state = DWELLER_CHASE
+			if kai.in_reach(pos, seen.pos, BITE_RANGE) {
+				if brain.bite_cd == 0 {
+					brain.bite_cd = BITE_CD
+					victim_id := knet.Net_Id(seen.id)
+					cave_hurt_spelunker(self, victim_id, self.spelunkers[victim_id], BITE_DMG, knet.PLAYER_ID_INVALID, false)
+				}
+			} else {
+				pos, _ = kai.step_toward(pos, seen.pos, DWELLER_SPEED)
+			}
+		case:
+			pos, _ = kai.step_toward(pos, brain.home, DWELLER_SPEED)
+		}
+		dw.x = pos.x
+		dw.y = pos.y
+		dw.state = state
+		self.brains[id] = brain
+	}
 }
 
 // Host: a grab succeeded — credit the grabber and remove the pickup for
@@ -486,11 +633,22 @@ cave_visual_tick :: proc(self: ^CaveLobby) {
 			if id == self.avatar_of[v.shooter] || sp.hp <= 0 {continue}
 			append(&targets, kcombat.Target{id = u32(id), pos = {sp.x, sp.y, 0}, radius = BODY_RADIUS})
 		}
+		for id, dw in self.dwellers {
+			if dw.hp > 0 {
+				append(&targets, kcombat.Target{id = u32(id), pos = {dw.x, dw.y, 0}, radius = BODY_RADIUS})
+			}
+		}
 		if hit, hit_ok := kcombat.projectile_hit(from, v.p.vel, targets[:]); hit_ok {
-			victim := self.spelunkers[knet.Net_Id(hit.id)]
-			truth := victim.hp
-			kcombat.php_note_hit(&victim.php, victim.hp, ROCK_DMG, now)
-			view := kcombat.php_display(&victim.php, victim.hp, now)
+			truth, view: i32
+			if victim, is_sp := self.spelunkers[knet.Net_Id(hit.id)]; is_sp {
+				truth = victim.hp
+				kcombat.php_note_hit(&victim.php, victim.hp, ROCK_DMG, now)
+				view = kcombat.php_display(&victim.php, victim.hp, now)
+			} else if dw, is_dw := self.dwellers[knet.Net_Id(hit.id)]; is_dw {
+				truth = dw.hp
+				kcombat.php_note_hit(&dw.php, dw.hp, ROCK_DMG, now)
+				view = kcombat.php_display(&dw.php, dw.hp, now)
+			}
 			refresh_hud(self)
 			gd.print_str(fmt.tprintf("CAVE_IMPACT mine=%v view=%d truth=%d", v.shooter == self.ses.me, view, truth))
 			gd.node_queue_free(cast(gd.Node)v.node)
@@ -542,20 +700,20 @@ cave_host_tick :: proc(self: ^CaveLobby) {
 			if id == self.avatar_of[fl.shooter] || sp.hp <= 0 {continue}
 			append(&targets, kcombat.Target{id = u32(id), pos = {sp.x, sp.y, 0}, radius = BODY_RADIUS})
 		}
+		for id, dw in self.dwellers {
+			if dw.hp > 0 {
+				append(&targets, kcombat.Target{id = u32(id), pos = {dw.x, dw.y, 0}, radius = BODY_RADIUS})
+			}
+		}
 		if hit, hit_ok := kcombat.projectile_hit(from, fl.p.vel, targets[:]); hit_ok {
 			victim_id := knet.Net_Id(hit.id)
-			victim := self.spelunkers[victim_id]
-			kcombat.credit_hit(&self.ses, self.cols, fl.shooter, ROCK_DMG)
-			if kcombat.hit(&victim.hp, ROCK_DMG) {
-				victim_pid := knet.PLAYER_ID_INVALID
-				for pid, av in self.avatar_of {
-					if av == victim_id {victim_pid = pid}
+			if victim, is_sp := self.spelunkers[victim_id]; is_sp {
+				cave_hurt_spelunker(self, victim_id, victim, ROCK_DMG, fl.shooter, true)
+			} else if dw, is_dw := self.dwellers[victim_id]; is_dw {
+				kcombat.credit_hit(&self.ses, self.cols, fl.shooter, ROCK_DMG)
+				if kcombat.hit(&dw.hp, ROCK_DMG) {
+					cave_slay_dweller(self, victim_id, fl.shooter)
 				}
-				kcombat.credit_kill(&self.ses, self.cols, fl.shooter, victim_pid)
-				cave_spill_bag(self, victim)
-				self.respawn_at[victim_id] = self.host_ticks + RESPAWN_TICKS
-			} else {
-				_ = kcombat.effects_add(victim.fx[:], CHILL, 50, 40) // 2s of cold feet
 			}
 			unordered_remove(&self.flying, i)
 			continue
@@ -566,6 +724,21 @@ cave_host_tick :: proc(self: ^CaveLobby) {
 		}
 		i += 1
 	}
+
+	// The dwellers stir: the director paces the waves, the brains think.
+	// (The call is HOISTED: an Odin range bound is re-evaluated per
+	// iteration, and director_tick has side effects — inlining it in the
+	// range silently drains the wave.)
+	to_spawn := kai.director_tick(&self.director, u64(self.host_ticks), CAVE_WAVES[:])
+	for _ in 0 ..< to_spawn {
+		cave_spawn_dweller(self)
+	}
+	if w := kai.director_wave(&self.director); w > self.last_wave {
+		self.last_wave = w
+		kcomms.comms_system(&self.comms, "the dwellers stir")
+		gd.print_str(fmt.tprintf("CAVE_WAVE n=%d", w))
+	}
+	cave_dwellers_think(self)
 
 	// Respawn restores STATE; position is owner-streamed, so each OWNER
 	// walks out of the grave themselves (see the was_dead edge in process).
@@ -650,6 +823,7 @@ cave_lobby_on_host :: proc(self: ^CaveLobby) {
 	self.ses.send_user = self
 	ksess.session_host_start(&self.ses, my_name())
 	self.cols = kcombat.combat_columns(&self.ses) // the ledger, on the scoreboard
+	self.slain_col = ksess.session_stat_column(&self.ses, "slain") // the game's own column
 	self.running = true
 	kui.lobby_show_menu(&self.ui, false, false)
 	kui.lobby_set_status(&self.ui, fmt.ctprintf("Hosting on :%d — waiting for friends", port()))
@@ -1024,6 +1198,51 @@ cave_lobby_can_throw :: proc(self: ^CaveLobby) -> gd.Bool {
 	me := self.me_spel
 	if me == nil || me.hp <= 0 {return false}
 	return gd.Bool(kcombat.ability_ready(me.cds[:], 0) && me.stamina >= ROCK_ABILITY.cost)
+}
+
+@(gd_method)
+cave_lobby_dwellers :: proc(self: ^CaveLobby) -> gd.Int {
+	return gd.Int(len(self.dwellers))
+}
+
+// The angriest mood on the field (0 idle, 1 chase, 2 flee) — replicated
+// state, so any peer can watch a dweller lock on.
+@(gd_method)
+cave_lobby_dweller_mood :: proc(self: ^CaveLobby) -> gd.Int {
+	mood := u8(0)
+	for _, d in self.dwellers {
+		mood = max(mood, d.state)
+	}
+	return gd.Int(mood)
+}
+
+@(gd_method)
+cave_lobby_dweller_pos :: proc(self: ^CaveLobby) -> gd.Vector2 {
+	if self.me_spel == nil {return {}}
+	best := gd.Vector2{}
+	best_d := max(f32)
+	for _, d in self.dwellers {
+		dx := d.x - self.me_spel.x
+		dy := d.y - self.me_spel.y
+		if dd := dx * dx + dy * dy; dd < best_d {
+			best_d = dd
+			best = {d.x, d.y}
+		}
+	}
+	return best
+}
+
+// Aim helper for drivers/keybinds: unit vector from me to the nearest
+// dweller ({0,0} when the cave is quiet).
+@(gd_method)
+cave_lobby_dweller_dir :: proc(self: ^CaveLobby) -> gd.Vector2 {
+	if self.me_spel == nil || len(self.dwellers) == 0 {return {}}
+	p := cave_lobby_dweller_pos(self)
+	dx := p.x - self.me_spel.x
+	dy := p.y - self.me_spel.y
+	n := math.sqrt(dx * dx + dy * dy)
+	if n == 0 {return {}}
+	return {dx / n, dy / n}
 }
 
 @(gd_method)

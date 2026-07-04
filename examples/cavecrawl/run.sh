@@ -146,8 +146,26 @@ attempt() {
 		grep -qE "CAVE_SCORE \[.*guest \| [0-9]+ \| 105 \| 1 \| 0.*\]" "$log" || { echo "  FAIL: guest ledger row wrong in $(basename "$log")"; ok=0; }
 		grep -qE "CAVE_SCORE \[.*hosty \| [0-9]+ \| 0 \| 0 \| 1.*\]" "$log" || { echo "  FAIL: host ledger row wrong in $(basename "$log")"; ok=0; }
 	done
-	# The host's HUD after resurrection: a full bar in the real UI tree.
-	grep -qE "CAVE_FINAL \[.*100/100.*\]" "$hlog" || { echo "  FAIL: host HUD not full after respawn"; ok=0; }
+	# The host's HUD after resurrection: a full bar in the real UI tree
+	# (read at the scoreboard beat — the phase-5 hunt scars it again later).
+	grep -qE "CAVE_SCORE \[.*100/100.*\]" "$hlog" || { echo "  FAIL: host HUD not full after respawn"; ok=0; }
+	# Phase 5 — cave dwellers. The kit/ai director paces the waves; brains
+	# think on the host only, yet the guest watches the whole hunt through
+	# replication: the mood byte flips to chase, the pursuit MOVES on its
+	# screen (owner-streamed interp), the bite lands, rocks clear the wave
+	# (torch drops on the floor), and the breather ends in wave 2.
+	grep -q "CAVE_WAVE n=1" "$hlog" || { echo "  FAIL: wave 1 never announced"; ok=0; }
+	grep -q "CAVE_WAVE n=2" "$hlog" || { echo "  FAIL: wave 2 never announced"; ok=0; }
+	grep -qE "CAVE_SLAIN left=[0-9]" "$hlog" || { echo "  FAIL: no dweller ever fell"; ok=0; }
+	for log in "$hlog" "$glog"; do
+		grep -qE "CAVE_DWELLERS n=[1-9]" "$log" || { echo "  FAIL: dwellers missing in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_CHASE_SEEN" "$log" || { echo "  FAIL: chase never seen in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_BITTEN" "$log" || { echo "  FAIL: the bite never landed in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_WAVE_CLEARED" "$log" || { echo "  FAIL: wave 1 never cleared in $(basename "$log")"; ok=0; }
+		grep -qE "CAVE_WAVE2 n=[1-9]" "$log" || { echo "  FAIL: wave 2 never rose in $(basename "$log")"; ok=0; }
+	done
+	# The guest's view of the pursuit crossed real distance (interp motion).
+	grep -qE "CAVE_DWELLER_MOVED d=([1-9][0-9]|[0-9]{3,})" "$glog" || { echo "  FAIL: the pursuit never moved on the guest's screen"; ok=0; }
 	grep -q "HOST_DONE" "$hlog" || { echo "  FAIL: host did not finish"; ok=0; }
 	grep -q "GUEST_DONE" "$glog" || { echo "  FAIL: guest did not finish"; ok=0; }
 

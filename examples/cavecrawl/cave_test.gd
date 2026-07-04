@@ -251,8 +251,66 @@ func _process(_delta: float) -> bool:
 		var board := label_texts()
 		if board.contains("| 1 | 0") and board.contains("| 0 | 1"):
 			print("CAVE_SCORE [", board, "]")
-			enter("wrap", now)
+			enter("hunt", now)
 		elif timed_out(now, "the ledger never showed"):
+			quit(1); return true
+		return false
+
+	if phase == "hunt":
+		# Phase 5: the dwellers are out (the kit/ai director paced them in).
+		# The host walks toward a den; the guest just watches the REPLICATED
+		# brain: mood byte flips to chase, position streams the pursuit.
+		if int(cave.call("dwellers")) >= 1:
+			if not acted:
+				acted = true
+				print("CAVE_DWELLERS n=", cave.call("dwellers"))
+				if role == "host":
+					cave.call("walk_to", 320.0, 100.0)
+			if int(cave.call("dweller_mood")) >= 1:
+				print("CAVE_CHASE_SEEN pos=", cave.call("dweller_pos"))
+				enter("bitten", now)
+		if timed_out(now, "no dweller ever stirred, n=" + str(cave.call("dwellers"))):
+			quit(1); return true
+		return false
+
+	if phase == "bitten":
+		# It catches the host and bites; both peers see the hp drop. The
+		# guest also confirms the pursuit MOVED on its screen (interp).
+		var hurt := int(cave.call("my_hp") if role == "host" else cave.call("their_hp")) < 100
+		if role == "guest" and not acted:
+			acted = true
+			set_meta("dw0", cave.call("dweller_pos"))
+		if hurt:
+			if role == "guest":
+				var moved: Vector2 = cave.call("dweller_pos") - get_meta("dw0")
+				print("CAVE_DWELLER_MOVED d=", moved.length())
+			print("CAVE_BITTEN")
+			enter("slay", now)
+		elif timed_out(now, "never bitten"):
+			quit(1); return true
+		return false
+
+	if phase == "slay":
+		# Rocks answer teeth: both spelunkers shoot at the nearest dweller
+		# (it flees when hurt — the rocks chase it down the same line).
+		if int(cave.call("dwellers")) > 0 and bool(cave.call("can_throw")):
+			var dir: Vector2 = cave.call("dweller_dir")
+			if dir != Vector2.ZERO:
+				cave.call("throw", dir.x, dir.y)
+		if int(cave.call("dwellers")) == 0:
+			print("CAVE_WAVE_CLEARED")
+			enter("wave2", now)
+		elif timed_out(now, "wave 1 never cleared, dwellers=" + str(cave.call("dwellers"))):
+			quit(1); return true
+		return false
+
+	if phase == "wave2":
+		# The director's breather passes and the next wave crawls out —
+		# visible on both peers as new dweller entities.
+		if int(cave.call("dwellers")) > 0:
+			print("CAVE_WAVE2 n=", cave.call("dwellers"))
+			enter("wrap", now)
+		elif timed_out(now, "wave 2 never came"):
 			quit(1); return true
 		return false
 
