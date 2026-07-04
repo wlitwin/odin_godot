@@ -557,7 +557,9 @@ net_tick :: proc(s: ^Session) {
 				session_stat_set(s, p.id, STAT_PING, i64(c.rtt * 1000))
 			}
 		}
-		if s.stats_dirty && s.replicating {
+		// Stats flow in the LOBBY too (the player list shows ping pre-game);
+		// only the world waits for replicating.
+		if s.stats_dirty {
 			s.stats_dirty = false
 			send_stats(s)
 		}
@@ -918,11 +920,11 @@ host_handle_join :: proc(s: ^Session, peer: int, r: ^knet.Reader) {
 	// channel — the joiner materializes everything before any delta can name
 	// an id it doesn't know. (Deltas broadcast before this arrive at the
 	// still-unseated client and are dropped; SES_WORLD supersedes them.)
-	// The current scoreboard rides along.
+	// The current scoreboard always rides along; the world only once live.
 	if s.replicating {
 		send_world(s, peer)
-		send_stats(s, peer)
 	}
+	send_stats(s, peer)
 
 	append(&s.events, Ev_Player_Joined{id = id, rejoin = rejoin})
 }

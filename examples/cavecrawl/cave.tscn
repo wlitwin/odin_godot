@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/cavecrawl.odin" id="1_cave"]
+
+[node name="Cave" type="Node"]
+script = ExtResource("1_cave")

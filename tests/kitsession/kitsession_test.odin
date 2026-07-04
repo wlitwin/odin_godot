@@ -117,9 +117,11 @@ join_builds_the_roster_everywhere :: proc(t: ^testing.T) {
 	testing.expect_value(t, hp.name, "hosty")
 
 	aev := drain(&alice.s)
-	testing.expect_value(t, len(aev), 1)
+	testing.expect_value(t, len(aev), 2) // WELCOME, then the join-time stats snapshot
 	_, welcomed := aev[0].(ksess.Ev_Welcomed)
 	testing.expect(t, welcomed)
+	_, statsed := aev[1].(ksess.Ev_Stats_Updated)
+	testing.expect(t, statsed, "the scoreboard rides along with the welcome")
 
 	hev := drain(&host.s)
 	testing.expect_value(t, len(hev), 1)

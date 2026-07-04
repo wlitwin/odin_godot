@@ -111,6 +111,11 @@ TESTS=(
     # directions with correct sender ids — the genuine remote path tests/rpc could not reach.
     "rpcnet|RPC_NET_OK|tests/rpc_net/run.sh"
     "survivors|SURVIVORS_OK|examples/survivors/run.sh"
+    # CAVECRAWL (the friendslop toolkit's example, grown per phase). Phase 1: boots
+    # to a WORKING LOBBY — two real peers seat via kit/session (tokens, roster) and
+    # the test reads the ACTUAL kit/ui player-list labels back out of both trees
+    # (names, you-marker, host crown, host-only Start button).
+    "cavecrawl|CAVECRAWL_OK|examples/cavecrawl/run.sh"
     # Barrage: the data-oriented showcase — thousands of #soa bullets through ONE
     # RenderingServer multimesh, 5 isolated script modules, boss via the flow sequencer,
     # powerup resources, multi-scene UI. See examples/barrage/README.md.
