@@ -179,3 +179,18 @@ cave_lobby_my_pos :: proc(self: ^CaveLobby) -> gd.Vector2 {
 	if self.me_spel == nil {return {}}
 	return {self.me_spel.x, self.me_spel.y}
 }
+
+// Which floor this peer believes the run is on (0 before the world exists).
+@(gd_method)
+cave_lobby_depth :: proc(self: ^CaveLobby) -> gd.Int {
+	if self.level == nil {return 0}
+	return gd.Int(self.level.depth)
+}
+
+// The director's current wave, replicated — campaign progress any peer can
+// key off without racing entity counts.
+@(gd_method)
+cave_lobby_wave :: proc(self: ^CaveLobby) -> gd.Int {
+	if self.level == nil {return 0}
+	return gd.Int(self.level.wave)
+}

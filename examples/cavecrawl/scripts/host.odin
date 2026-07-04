@@ -12,10 +12,21 @@ import rt "godot:runtime"
 import kai "godot:kit/ai"
 import kcombat "godot:kit/combat"
 import kcomms "godot:kit/comms"
+import kinter "godot:kit/interact"
 import kitems "godot:kit/items"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import "core:fmt"
+
+// The floor the campaign is currently on (waves, dens — see CAVE_LEVELS).
+@(private = "file")
+cave_floor :: proc(self: ^CaveLobby) -> ^Level_Def {
+	depth := 1
+	if self.level != nil {
+		depth = int(self.level.depth)
+	}
+	return level_def(depth)
+}
 
 // THE CROSS-ENTITY HALF of looting, host only (see chest.odin): a successful
 // take credits the issuer's bag; what doesn't fit goes back in the chest.
@@ -84,14 +95,15 @@ cave_slay_dweller :: proc(self: ^CaveLobby, id: knet.Net_Id, slayer: knet.Player
 	}
 	delete_key(&self.dwellers, id)
 	delete_key(&self.brains, id)
-	kai.director_note_death(&self.director, u64(self.host_ticks), CAVE_WAVES[:])
+	kai.director_note_death(&self.director, u64(self.host_ticks), cave_floor(self).waves[:])
 	gd.print_str(fmt.tprintf("CAVE_SLAIN left=%d", len(self.dwellers)))
 }
 
 // Host: a dweller crawls out of a den (the kit/ai director said when).
 @(private = "file")
 cave_spawn_dweller :: proc(self: ^CaveLobby) {
-	den := DWELLER_DENS[self.dens_used % len(DWELLER_DENS)]
+	dens := cave_floor(self).dens
+	den := dens[self.dens_used % len(dens)]
 	self.dens_used += 1
 	node := spawn_node(self, "res://scripts/dweller.odin")
 	d := rt.script_of(node, Dweller)
@@ -251,7 +263,7 @@ cave_host_tick :: proc(self: ^CaveLobby) {
 	// (The call is HOISTED: an Odin range bound is re-evaluated per
 	// iteration, and director_tick has side effects — inlining it in the
 	// range silently drains the wave.)
-	to_spawn := kai.director_tick(&self.director, u64(self.host_ticks), CAVE_WAVES[:])
+	to_spawn := kai.director_tick(&self.director, u64(self.host_ticks), cave_floor(self).waves[:])
 	for _ in 0 ..< to_spawn {
 		cave_spawn_dweller(self)
 	}
@@ -259,6 +271,9 @@ cave_host_tick :: proc(self: ^CaveLobby) {
 		self.last_wave = w
 		kcomms.comms_system(&self.comms, "the dwellers stir")
 		gd.print_str(fmt.tprintf("CAVE_WAVE n=%d", w))
+	}
+	if self.level != nil {
+		self.level.wave = u8(kai.director_wave(&self.director))
 	}
 	cave_dwellers_think(self)
 
@@ -270,6 +285,29 @@ cave_host_tick :: proc(self: ^CaveLobby) {
 			sp.hp = MAX_HP
 			sp.stamina = MAX_STAMINA
 			delete_key(&self.respawn_at, id)
+		}
+	}
+
+	// LEVEL MIGRATION trigger: the floor CLEARED (the director is done) and
+	// the whole party, alive, at the open door — the same reach gate the
+	// interact prompt uses. Without the cleared gate, opening the door
+	// (which you do standing at it) would descend the party on the spot.
+	// One check, host only; everything downstream is ordinary despawns,
+	// spawns, and deltas.
+	if self.level != nil && self.director.done && len(self.spelunkers) > 0 {
+		for _, door in self.doors {
+			if !door.open {continue}
+			all_at_door := true
+			for _, sp in self.spelunkers {
+				if sp.hp <= 0 || !kinter.in_range({sp.x, sp.y, 0}, {door.x, door.y, 0}, REACH) {
+					all_at_door = false
+					break
+				}
+			}
+			if all_at_door {
+				cave_descend(self)
+				break
+			}
 		}
 	}
 }

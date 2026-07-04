@@ -54,6 +54,17 @@ spelunker_throw :: proc(self: ^Spelunker, dx: f32, dy: f32) -> bool {
 	return true
 }
 
+// Bandage up: the second ability slot. Self-targeted, so this command IS
+// the whole effect — no host hook half at all: the same proc heals
+// instantly on the caster's screen and re-runs authoritatively on the host.
+@(gd_command = "predict")
+spelunker_heal :: proc(self: ^Spelunker) -> bool {
+	if self.hp <= 0 || self.hp >= MAX_HP {return false} // corpses and the hale need no bandage
+	if !kcombat.ability_try(self.cds[:], 1, HEAL_ABILITY, &self.stamina) {return false}
+	self.hp = min(self.hp + HEAL_AMOUNT, MAX_HP)
+	return true
+}
+
 spelunker_ready :: proc(self: ^Spelunker) {
 	gd.set_string(cast(gd.Object)self.owner, "text", "\xE2\x9B\x8F") // ⛏
 }

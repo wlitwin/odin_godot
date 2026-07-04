@@ -29,6 +29,7 @@ install_controls :: proc "contextless" () {
 	bind("cave_down", i64('S'), i64(gd.Key.Down))
 	bind("cave_interact", i64('E'))
 	bind("cave_drop", i64('Q'))
+	bind("cave_heal", i64('R'))
 	bind("cave_score", i64(gd.Key.Tab))
 	bind("cave_talk", i64(gd.Key.Enter))
 	bind("cave_throw", i64(gd.Key.Space))
@@ -56,6 +57,9 @@ poll_controls :: proc(self: ^CaveLobby) {
 	if me == nil || me.hp <= 0 {return} // the dead may chat and spectate
 	if gd.is_action_just_pressed("cave_interact") {
 		cave_lobby_interact(self)
+	}
+	if gd.is_action_just_pressed("cave_heal") {
+		cave_lobby_heal(self)
 	}
 	if gd.is_action_just_pressed("cave_drop") {
 		for s, i in me.bag {
@@ -169,6 +173,23 @@ cave_lobby_throw :: proc(self: ^CaveLobby, dx: gd.Float, dy: gd.Float) {
 	}
 	refresh_hud(self)
 	gd.print_str(fmt.tprintf("CAVE_THROW predicted=%v stamina=%d cd=%d", applied, self.me_spel.stamina, self.me_spel.cds[0]))
+}
+
+// Bandage up (ability slot 1) — predicted like every cast: the hp climbs on
+// this frame's screen, the host's authoritative re-run confirms it.
+@(gd_method)
+cave_lobby_heal :: proc(self: ^CaveLobby) {
+	if !self.started || self.me_spel == nil {return}
+	me := self.me_spel
+	// Gate BEFORE issuing: a refused prediction still rides the wire for
+	// the authority's verdict (clients don't self-censor), so a key held
+	// at full hp would otherwise flood the host with doomed commands.
+	if me.hp <= 0 || me.hp >= MAX_HP || !kcombat.ability_ready(me.cds[:], 1) || me.stamina < HEAL_ABILITY.cost {return}
+	applied := spelunker_heal_cmd(&self.ses.ctx, self.me_spel)
+	refresh_hud(self)
+	if applied {
+		gd.print_str(fmt.tprintf("CAVE_HEAL applied=true hp=%d stamina=%d", self.me_spel.hp, self.me_spel.stamina))
+	}
 }
 
 @(gd_method)

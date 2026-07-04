@@ -16,7 +16,7 @@ import ksess "godot:kit/session"
 import kui "godot:kit/ui"
 import "core:fmt"
 
-GAME_VERSION :: u16(6) // stamped into saves; bump when cave content shifts
+GAME_VERSION :: u16(7) // stamped into saves; bump when cave content shifts
 
 // Where the save lives; tests point it somewhere disposable via env.
 @(private = "file")

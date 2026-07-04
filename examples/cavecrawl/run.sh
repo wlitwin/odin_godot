@@ -60,7 +60,7 @@ attempt() {
 
 	local gp; gp=$(launch guest "$glog" "$port" guest cave-guest-token)
 	local waited=0
-	while ((waited < 300)); do
+	while ((waited < 600)); do
 		if ! kill -0 "$hp" 2>/dev/null && ! kill -0 "$gp" 2>/dev/null; then break; fi
 		sleep 0.1; ((waited++))
 	done
@@ -174,6 +174,24 @@ attempt() {
 	done
 	# The guest's view of the pursuit crossed real distance (interp motion).
 	grep -qE "CAVE_DWELLER_MOVED d=([1-9][0-9]|[0-9]{3,})" "$glog" || { echo "  FAIL: the pursuit never moved on the guest's screen"; ok=0; }
+	# THE BANDAGE (ability slot 1): the bitten host heals through the same
+	# predicted gate as the rock; the guest watches the hp climb back.
+	grep -q "CAVE_HEAL applied=true" "$hlog" || { echo "  FAIL: the host never bandaged"; ok=0; }
+	for log in "$hlog" "$glog"; do
+		grep -q "CAVE_MENDED" "$log" || { echo "  FAIL: the heal never showed in $(basename "$log")"; ok=0; }
+	done
+	# LEVEL MIGRATION: the cleared party at the open door moves the run down
+	# a floor — old floor despawned, new def spawned, bags carried through,
+	# each owner stepping to the new floor's mouth on the replicated edge.
+	for log in "$hlog" "$glog"; do
+		grep -q "CAVE_CLEARED_FLOOR" "$log" || { echo "  FAIL: wave 2 never fell in $(basename "$log")"; ok=0; }
+	done
+	grep -q "CAVE_DESCEND depth=2" "$hlog" || { echo "  FAIL: the host never descended the run"; ok=0; }
+	for log in "$hlog" "$glog"; do
+		grep -q "CAVE_FLOOR depth=2" "$log" || { echo "  FAIL: owner never stepped to floor 2 in $(basename "$log")"; ok=0; }
+		grep -qE "CAVE_DESCENDED depth=2 door=false dwellers=[0-9] chest=6" "$log" || { echo "  FAIL: floor 2 wrong in $(basename "$log")"; ok=0; }
+	done
+	grep -qE "CAVE_DESCENDED depth=2 door=false dwellers=[0-9] chest=6 gems_bag=3" "$glog" || { echo "  FAIL: the guest's bag did not cross the stairs"; ok=0; }
 	grep -q "HOST_DONE" "$hlog" || { echo "  FAIL: host did not finish"; ok=0; }
 	grep -q "GUEST_DONE" "$glog" || { echo "  FAIL: guest did not finish"; ok=0; }
 

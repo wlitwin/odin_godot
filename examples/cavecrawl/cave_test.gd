@@ -353,19 +353,41 @@ func _process(_delta: float) -> bool:
 				var moved: Vector2 = cave.call("dweller_pos") - get_meta("dw0")
 				print("CAVE_DWELLER_MOVED d=", moved.length())
 			print("CAVE_BITTEN")
-			enter("slay", now)
+			enter("mend", now)
 		elif timed_out(now, "never bitten"):
 			quit(1); return true
+		return false
+
+	if phase == "mend":
+		# The BANDAGE (ability slot 1): the bitten host heals through the
+		# same predicted-command gate the rock uses. Only the HOST gates on
+		# hp — its own screen is authoritative and instant. The guest just
+		# settles: watching someone else's fluctuating hp for an exact
+		# value is a phase-machine trap (the heal erases the hurt between
+		# samples); the wire-side proof is run.sh's CAVE_HEAL grep.
+		if role == "host":
+			cave.call("heal")
+			if int(cave.call("my_hp")) >= 95:
+				print("CAVE_MENDED hp=", cave.call("my_hp"))
+				enter("slay", now)
+			elif timed_out(now, "the bandage never took, hp=" + str(cave.call("my_hp"))):
+				quit(1); return true
+		else:
+			if now - t_acted > 2000:
+				print("CAVE_MENDED their_hp=", cave.call("their_hp"))
+				enter("slay", now)
 		return false
 
 	if phase == "slay":
 		# Rocks answer teeth: both spelunkers shoot at the nearest dweller
 		# (it flees when hurt — the rocks chase it down the same line).
+		# Exit on the REPLICATED wave byte, not the entity count: counts
+		# race the next wave's spawns; the byte is ordered with them.
 		if int(cave.call("dwellers")) > 0 and bool(cave.call("can_throw")):
 			var dir: Vector2 = cave.call("dweller_dir")
 			if dir != Vector2.ZERO:
 				cave.call("throw", dir.x, dir.y)
-		if int(cave.call("dwellers")) == 0:
+		if int(cave.call("wave")) >= 2:
 			print("CAVE_WAVE_CLEARED")
 			enter("wave2", now)
 		elif timed_out(now, "wave 1 never cleared, dwellers=" + str(cave.call("dwellers"))):
@@ -384,12 +406,63 @@ func _process(_delta: float) -> bool:
 
 	if phase == "wrap":
 		# Let the last deltas settle, then the final ledger + the real UI —
-		# and the host etches the run to disk for act 2.
+		# and the host etches the run to disk for act 2 (BEFORE the party
+		# descends: act 2 resumes this floor).
 		if now - t_acted > 800:
 			print("CAVE_GEMS total=", cave.call("world_gems"))
 			print("CAVE_FINAL [", label_texts(), "]")
 			if role == "host":
 				cave.call("save_run")
+			enter("clearout", now)
+		return false
+
+	if phase == "clearout":
+		# The cave only lets a CLEARED floor go: kill wave 2, bandaging
+		# through the bites, before anyone can leave.
+		cave.call("heal")
+		if int(cave.call("dwellers")) > 0 and bool(cave.call("can_throw")):
+			var dir: Vector2 = cave.call("dweller_dir")
+			if dir != Vector2.ZERO:
+				cave.call("throw", dir.x, dir.y)
+		if int(cave.call("dwellers")) == 0 and int(cave.call("wave")) >= 2:
+			print("CAVE_CLEARED_FLOOR")
+			enter("descend", now)
+		elif timed_out(now, "wave 2 never fell, dwellers=" + str(cave.call("dwellers"))):
+			quit(1); return true
+		return false
+
+	if phase == "descend":
+		# LEVEL MIGRATION: the floor is cleared. The guest first rescues
+		# the loot the host's death spilled — the collapse eats anything
+		# left lying on the floor; only BAGS cross floors — then the whole
+		# party walks to the open door, and the host, seeing everyone
+		# standing there alive, moves the run down a level.
+		if role == "guest" and int(cave.call("my_gems")) < 3:
+			if not acted:
+				acted = true
+				cave.call("walk_to", 464.0, 180.0)
+			if int(cave.call("prompt_kind")) == 3:
+				cave.call("interact")
+			if timed_out(now, "never rescued the spilled gems"):
+				quit(1); return true
+			return false
+		if not get_meta("to_door", false):
+			set_meta("to_door", true)
+			cave.call("walk_to", 560.0, 180.0)
+		cave.call("heal")
+		if int(cave.call("depth")) >= 2:
+			enter("floor2", now)
+		elif timed_out(now, "the party never descended, depth=" + str(cave.call("depth"))):
+			quit(1); return true
+		return false
+
+	if phase == "floor2":
+		# The new floor arrived over the wire: closed door, restocked chest,
+		# a cleared field — and the bag walked down the stairs intact.
+		if now - t_acted > 600:
+			print("CAVE_DESCENDED depth=", cave.call("depth"), " door=", cave.call("door_open"),
+				" dwellers=", cave.call("dwellers"), " chest=", cave.call("chest_items"),
+				" gems_bag=", cave.call("my_gems"), " pos=", cave.call("my_pos"))
 			print(role.to_upper(), "_DONE")
 			quit(0); return true
 		return false

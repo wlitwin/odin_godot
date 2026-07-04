@@ -50,6 +50,7 @@ CHEST_TYPE :: ksess.Entity_Type(2)
 DOOR_TYPE :: ksess.Entity_Type(3)
 PICKUP_TYPE :: ksess.Entity_Type(4)
 DWELLER_TYPE :: ksess.Entity_Type(5)
+LEVEL_TYPE :: ksess.Entity_Type(6)
 
 WALK_SPEED :: f32(120) // px/s
 
@@ -58,6 +59,8 @@ WALK_SPEED :: f32(120) // px/s
 MAX_HP :: i32(100)
 MAX_STAMINA :: i32(10)
 ROCK_ABILITY :: kcombat.Ability_Def{name = "rock", cooldown = 20, cost = 3} // 1s at 20 Hz
+HEAL_ABILITY :: kcombat.Ability_Def{name = "bandage", cooldown = 60, cost = 5} // 3s
+HEAL_AMOUNT :: i32(25)
 ROCK_DMG :: i32(35)
 ROCK_SPEED :: f32(12) // px per net tick
 ROCK_TTL :: u16(24) // ~288 px of flight
@@ -70,6 +73,7 @@ SPAWN_Y :: f32(120)
 // Command indices = @(gd_command) declaration order in spelunker.odin.
 SPEL_CMD_DROP :: u16(0)
 SPEL_CMD_THROW :: u16(1)
+SPEL_CMD_HEAL :: u16(2)
 
 // kit/comms rides SES_APP tag 0; fire announcements ride tag 1.
 TAG_FIRE :: u8(1)
@@ -85,12 +89,35 @@ BITE_DMG :: i32(10)
 BITE_CD :: u16(30) // 1.5s between bites
 FLEE_BELOW :: i32(35) // one rock in: it runs
 
-// The waves (kit/ai director): the game only says what and where.
-CAVE_WAVES := [?]kai.Wave{{count = 2, rest = 40}, {count = 3, rest = 40}}
-DWELLER_DENS := [?][3]f32{{320, 40, 0}, {320, 320, 0}}
+// ---- the floors (level migration) ----
+//
+// A LEVEL is data: where the furniture stands, what the chest holds, where
+// the dens open, how the waves come. Descending = despawn the old floor's
+// entities, bump the replicated depth, build the next def — the same
+// replication that built floor 1 delivers floor 2 to every peer.
+Level_Def :: struct {
+	chest:   [2]f32,
+	gems:    u16,
+	torches: u16,
+	door:    [2]f32,
+	dens:    [2][3]f32,
+	waves:   [2]kai.Wave,
+}
 
-// Dwellers declare no commands, so scriptgen emits only their descriptor.
+CAVE_LEVELS := [?]Level_Def {
+	{chest = {300, 180}, gems = 3, torches = 2, door = {560, 180}, dens = {{320, 40, 0}, {320, 320, 0}}, waves = {{count = 2, rest = 40}, {count = 3, rest = 40}}},
+	{chest = {200, 260}, gems = 5, torches = 1, door = {90, 300}, dens = {{500, 100, 0}, {500, 300, 0}}, waves = {{count = 3, rest = 100}, {count = 4, rest = 60}}},
+}
+
+// Depths beyond the table replay the deepest floor (the cave goes on).
+level_def :: proc(depth: int) -> ^Level_Def {
+	return &CAVE_LEVELS[clamp(depth - 1, 0, len(CAVE_LEVELS) - 1)]
+}
+
+// Dwellers and the level marker declare no commands, so scriptgen emits
+// only their descriptors.
 dweller_set := knet.Command_Set{entity_desc = &dweller_net_desc}
+level_set := knet.Command_Set{entity_desc = &level_net_desc}
 
 // The host-side half of a dweller's mind (never on the wire).
 Dweller_Brain :: struct {
@@ -148,6 +175,8 @@ CaveLobby :: struct {
 	nodes:       map[knet.Net_Id]gd.Node, // for freeing on despawn
 	avatar_of:   map[knet.Player_Id]knet.Net_Id,
 	me_spel:     ^Spelunker, // my avatar (nil until spawned)
+	level:       ^Level, // the run's depth marker (nil until spawned)
+	seen_depth:  u8, // owner-side descent edge: teleport to the new floor's mouth
 	started:     bool, // the world is live
 	walking:     bool, // headless drivers steer via walk_to
 	walk_target: gd.Vector2,
@@ -188,7 +217,7 @@ now_s :: proc "contextless" () -> f64 {
 refresh_hud :: proc(self: ^CaveLobby) {
 	if self.me_spel == nil {return}
 	kui.hp_refresh(&self.hud_hp, hp_view(self.me_spel), MAX_HP)
-	defs := [?]kcombat.Ability_Def{ROCK_ABILITY}
+	defs := [?]kcombat.Ability_Def{ROCK_ABILITY, HEAL_ABILITY}
 	kui.abilities_refresh(&self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.stamina)
 }
 
@@ -242,7 +271,7 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	gd.control_set_offset(cast(gd.Control)self.legend, .Left, -8)
 	gd.control_set_offset(cast(gd.Control)self.legend, .Top, -4)
 	gd.control_set_offset(cast(gd.Control)self.legend, .Bottom, -4)
-	gd.set_string(cast(gd.Object)self.legend, "text", "WASD walk · E use · click/Space throw · Q drop · Tab scores · Enter chat")
+	gd.set_string(cast(gd.Object)self.legend, "text", "WASD walk · E use · click throw · Q drop · R heal · Tab scores · Enter chat")
 	gd.set_bool(cast(gd.Object)self.legend, "visible", false)
 	gd.print_str("CAVE_UI_READY")
 }
@@ -391,6 +420,19 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 
 	if self.started {
 		poll_controls(self)
+	}
+	// Owner-side descent: the replicated depth ticking over is the signal
+	// to step to the new floor's mouth — position is owner-streamed, only
+	// I can move me (the respawn pattern, reused). First sight of a depth
+	// (fresh start, resumed save, drop-in join) is not a transition.
+	if self.level != nil && self.level.depth != self.seen_depth {
+		if self.seen_depth != 0 && self.me_spel != nil {
+			self.me_spel.x = SPAWN_X + f32(u64(self.ses.me) % 4) * 40
+			self.me_spel.y = SPAWN_Y
+			self.walking = false
+			gd.print_str(fmt.tprintf("CAVE_FLOOR depth=%d", self.level.depth))
+		}
+		self.seen_depth = self.level.depth
 	}
 	if self.started && self.me_spel != nil {
 		// Owner-side respawn: hp coming back is the signal to walk out of

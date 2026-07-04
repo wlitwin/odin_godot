@@ -82,6 +82,13 @@ cave_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 		d.net_id = id
 		self.doors[id] = d
 		return d, &door_command_set
+	case LEVEL_TYPE:
+		node := spawn_node(self, "res://scripts/level.odin")
+		self.nodes[id] = node
+		lv := rt.script_of(node, Level)
+		lv.net_id = id
+		self.level = lv
+		return lv, &level_set
 	}
 	return nil, nil
 }
@@ -102,32 +109,51 @@ cave_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	delete_key(&self.doors, id)
 	delete_key(&self.pickups, id)
 	delete_key(&self.dwellers, id)
+	if self.level != nil && self.level.net_id == id {
+		self.level = nil
+	}
 }
 
-// Host, Start pressed: build the world — a spelunker per seated player, a
-// stocked chest, a door — and go live. Every already-seated client gets the
-// whole world; later joiners get it behind their welcome (drop-in).
-@(gd_method)
-cave_lobby_on_start :: proc(self: ^CaveLobby) {
-	if !self.ses.is_host || self.started {return}
+// Host: furnish one floor from its def — the stocked chest and the (closed)
+// door. Both Start and every descent build floors through here.
+@(private = "file")
+cave_build_floor :: proc(self: ^CaveLobby, depth: int) {
+	def := level_def(depth)
 
 	chest_node := spawn_node(self, "res://scripts/chest.odin")
 	chest := rt.script_of(chest_node, Chest)
-	chest.x = 300
-	chest.y = 180
-	chest.slots[0] = {GEM, 3}
-	chest.slots[1] = {TORCH, 2}
+	chest.x = def.chest.x
+	chest.y = def.chest.y
+	chest.slots[0] = {GEM, def.gems}
+	chest.slots[1] = {TORCH, def.torches}
 	chest.net_id = ksess.session_spawn(&self.ses, CHEST_TYPE, chest, &chest_command_set)
 	self.chests[chest.net_id] = chest
 	self.nodes[chest.net_id] = chest_node
 
 	door_node := spawn_node(self, "res://scripts/door.odin")
 	door := rt.script_of(door_node, Door)
-	door.x = 560
-	door.y = 180
+	door.x = def.door.x
+	door.y = def.door.y
 	door.net_id = ksess.session_spawn(&self.ses, DOOR_TYPE, door, &door_command_set)
 	self.doors[door.net_id] = door
 	self.nodes[door.net_id] = door_node
+}
+
+// Host, Start pressed: build the world — the depth marker, floor 1, and a
+// spelunker per seated player — and go live. Every already-seated client
+// gets the whole world; later joiners get it behind their welcome (drop-in).
+@(gd_method)
+cave_lobby_on_start :: proc(self: ^CaveLobby) {
+	if !self.ses.is_host || self.started {return}
+
+	level_node := spawn_node(self, "res://scripts/level.odin")
+	lv := rt.script_of(level_node, Level)
+	lv.depth = 1
+	lv.net_id = ksess.session_spawn(&self.ses, LEVEL_TYPE, lv, &level_set)
+	self.level = lv
+	self.nodes[lv.net_id] = level_node
+
+	cave_build_floor(self, 1)
 
 	i := 0
 	for _, p in self.ses.players {
@@ -148,6 +174,43 @@ cave_lobby_on_start :: proc(self: ^CaveLobby) {
 	enter_the_cave(self)
 	kcomms.comms_system(&self.comms, "the descent begins")
 	gd.print_str(fmt.tprintf("CAVE_STARTED spel=%d", i))
+}
+
+// Host: LEVEL MIGRATION — the whole party stood at the open door, so the
+// run moves down a floor. Despawn everything that belongs to the old floor
+// (spelunkers and the depth marker persist — bags, hp, and cooldowns walk
+// down the stairs), reset the host-side campaign state, bump the replicated
+// depth, and furnish the next def. Clients need NO migration code: the same
+// despawns/spawns/deltas that built floor 1 deliver floor 2, and each owner
+// walks itself to the new floor's mouth on the depth edge (see process).
+cave_descend :: proc(self: ^CaveLobby) {
+	doomed := make([dynamic]knet.Net_Id, context.temp_allocator)
+	for id in self.chests {append(&doomed, id)}
+	for id in self.doors {append(&doomed, id)}
+	for id in self.pickups {append(&doomed, id)}
+	for id in self.dwellers {append(&doomed, id)}
+	for id in doomed {
+		ksess.session_despawn(&self.ses, id)
+		if node, ok := self.nodes[id]; ok {
+			gd.node_queue_free(node)
+			delete_key(&self.nodes, id)
+		}
+		delete_key(&self.chests, id)
+		delete_key(&self.doors, id)
+		delete_key(&self.pickups, id)
+		delete_key(&self.dwellers, id)
+	}
+	clear(&self.brains)
+	clear(&self.respawn_at)
+	clear(&self.flying) // old floor's rocks die with the floor
+	self.director = {}
+	self.dens_used = 0
+	self.last_wave = 0
+
+	self.level.depth += 1
+	cave_build_floor(self, int(self.level.depth))
+	kcomms.comms_system(&self.comms, fmt.tprintf("the party descends to depth %d", self.level.depth))
+	gd.print_str(fmt.tprintf("CAVE_DESCEND depth=%d", self.level.depth))
 }
 
 // What can I use from here? The prompt and the host's command gate share
