@@ -74,6 +74,13 @@ TESTS=(
     # Pure-Odin unit tests for kit/comms — host-ordered chat, positional
     # markers, system lines, late-join catchup, and SES_APP route gating.
     "kitcomms|KITCOMMS_OK|tests/kitcomms/run.sh"
+    # Pure-Odin unit tests for kit/items (stack-aware slot ops, deterministic +
+    # allocation-free for predicted commands) and kit/interact (range/facing gates).
+    "kititems|KITITEMS_OK|tests/kititems/run.sh"
+    # Phase-3 integration: chests/bags/doors over the session pipeline — the
+    # two-spelunkers-one-gem conflict, the cross-entity command-hook pattern,
+    # range gates shared by prompt and host, item conservation on every peer.
+    "kitloot|KITLOOT_OK|tests/kitloot/run.sh"
     # gd:"replicate" codegen contract: scriptgen -> knet.Entity_Desc tables, POD
     # enforcement at scriptgen time (engine types) + consumer compile (#assert).
     "repgen|REPGEN_OK|tests/repgen/run.sh"

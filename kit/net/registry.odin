@@ -383,21 +383,22 @@ registry_sample_streams :: proc(reg: ^Registry, t: f64, me: Player_Id) -> int {
 
 // Host side: handle one received command message end-to-end — header, dedup,
 // resolve, execute, and (for resolvable entities) write the result into `out`.
-// Returns whether a result was produced. Unknown entities produce NO result
-// (the client's pending expiry is the safety net — we can't write truth for
-// an entity we don't have).
-registry_host_command :: proc(reg: ^Registry, ctx: ^Command_Ctx, peer_key: u64, r: ^Reader, out: ^Writer) -> (responded: bool, ok: bool) {
-	h := command_read_header(r)
+// Returns whether a result was produced, plus the parsed header so the caller
+// can tell its game WHAT ran (the session's command hook rides on it).
+// Unknown entities produce NO result (the client's pending expiry is the
+// safety net — we can't write truth for an entity we don't have).
+registry_host_command :: proc(reg: ^Registry, ctx: ^Command_Ctx, peer_key: u64, r: ^Reader, out: ^Writer) -> (responded: bool, ok: bool, h: Command_Header) {
+	h = command_read_header(r)
 	if r.err || !command_dedup(ctx, peer_key, h.seq) {
-		return false, false
+		return false, false, h
 	}
 	e, found := reg.entries[h.entity]
 	if !found {
-		return false, false
+		return false, false, h
 	}
 	ok = command_execute(e.entity, e.set, h.cmd, r)
 	command_result_write(out, h, ok, e.entity, e.set)
-	return true, ok
+	return true, ok, h
 }
 
 // Client side: route a received result to its entity. Unknown entity (it

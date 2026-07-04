@@ -91,7 +91,10 @@ Ev_State_Applied :: struct {
 }
 
 Ev_Command_Executed :: struct {
-	ok: bool, // (host) a client command ran (or was rejected) authoritatively
+	ok:     bool, // (host) a client command ran (or was rejected) authoritatively
+	player: knet.Player_Id, // who issued it
+	entity: knet.Net_Id, // what it targeted
+	cmd:    u16, // which command in the target's set
 }
 
 Ev_Command_Confirmed :: struct {
@@ -152,6 +155,19 @@ Make_Entity_Proc :: proc(user: rawptr, type: Entity_Type, id: knet.Net_Id, owner
 // Client-side: the entity was despawned and already removed from the registry
 // — free the node/struct.
 Free_Entity_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr)
+
+// Host-side: called SYNCHRONOUSLY right after a client command executes (ok
+// or rejected) — before any same-frame command can touch the entity again.
+// This is the sanctioned spot for THE CROSS-ENTITY HALF of a command: a
+// command proc may only mutate its target (that's what the predict/revert/
+// reject-truth machinery protects), so "loot chest → items appear in MY bag"
+// is a chest-only proc that records what it took in a non-replicated scratch
+// field, plus this hook crediting the issuer's entity — a host-authoritative
+// mutation that reaches everyone as an ordinary delta. The loser of a race
+// gets a rejected chest command and no credit: phantom items are impossible.
+// (The host's OWN commands don't pass through here — the authority runs procs
+// directly; call your credit code inline right after.)
+Command_Hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool)
 
 // ---- wire (sub-framed: the game's session kind byte comes first, then ours) --
 
@@ -255,10 +271,12 @@ Session :: struct {
 	interp_delay: f64,
 
 	// entity types + client-side factories
-	types:        map[knet.Net_Id]Entity_Type, // host: for (re-)announcing spawns
-	factory_user: rawptr,
-	factory_make: Make_Entity_Proc,
-	factory_free: Free_Entity_Proc,
+	types:         map[knet.Net_Id]Entity_Type, // host: for (re-)announcing spawns
+	factory_user:  rawptr,
+	factory_make:  Make_Entity_Proc,
+	factory_free:  Free_Entity_Proc,
+	cmd_hook_user: rawptr,
+	cmd_hook:      Command_Hook, // host: the cross-entity half of commands
 
 	// the stat registry (host accumulates; everyone reads)
 	stat_names:  [dynamic]string, // owned; index = column
@@ -399,6 +417,12 @@ session_set_factory :: proc(s: ^Session, user: rawptr, make_entity: Make_Entity_
 	s.factory_user = user
 	s.factory_make = make_entity
 	s.factory_free = free_entity
+}
+
+// Install the host-side command hook (see Command_Hook; survives session start).
+session_set_command_hook :: proc(s: ^Session, user: rawptr, hook: Command_Hook) {
+	s.cmd_hook_user = user
+	s.cmd_hook = hook
 }
 
 // The Command_Ctx send hook: wrap raw command bytes in session framing and
@@ -1197,12 +1221,17 @@ session_handle_packet :: proc(s: ^Session, from_peer: int, r: ^knet.Reader) {
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
 		knet.write_u8(&w, SES_RESULT)
-		responded, ok := knet.registry_host_command(&s.reg, &s.ctx, u64(pid), r, &w)
+		responded, ok, h := knet.registry_host_command(&s.reg, &s.ctx, u64(pid), r, &w)
 		if !responded {
 			return
 		}
 		s.send(s.send_user, from_peer, knet.writer_bytes(&w), .Reliable)
-		append(&s.events, Ev_Command_Executed{ok = ok})
+		// The hook runs BEFORE the result ships onward in game terms: scratch
+		// state the proc left on the entity is still exactly this command's.
+		if s.cmd_hook != nil {
+			s.cmd_hook(s.cmd_hook_user, pid, h.entity, h.cmd, ok)
+		}
+		append(&s.events, Ev_Command_Executed{ok = ok, player = pid, entity = h.entity, cmd = h.cmd})
 	case SES_RESULT:
 		if s.is_host {
 			return
