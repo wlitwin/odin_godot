@@ -45,6 +45,7 @@ for needle in \
 	'offset_of(Pawn, x)' \
 	'offset_of(Pawn, y)' \
 	'{.Interp, .Owner_Stream}' \
+	'lerp = .F32' \
 	'pawn_net_desc := knet.Entity_Desc' \
 	'intrinsics.type_is_nearly_simple_compare' \
 ; do

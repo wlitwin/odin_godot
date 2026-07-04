@@ -82,11 +82,13 @@ Probe :: struct {
 	local_only: int, // NOT in the descriptor — must never be touched
 }
 
+// All-host-state fixture (no stream flags — owner streams have their own Mover
+// fixture below; .Owner_Stream fields are excluded from deltas by design).
 probe_desc :: proc() -> knet.Entity_Desc {
 	@(static) fields := [?]knet.Field_Desc{
 		{offset = offset_of(Probe, hp), size = size_of(i32)},
-		{offset = offset_of(Probe, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}},
-		{offset = offset_of(Probe, y), size = size_of(f32), flags = {.Interp, .Owner_Stream}},
+		{offset = offset_of(Probe, x), size = size_of(f32), flags = {.Interp}},
+		{offset = offset_of(Probe, y), size = size_of(f32), flags = {.Interp}},
 		{offset = offset_of(Probe, state), size = size_of(u8)},
 	}
 	return knet.Entity_Desc{fields = fields[:]}
@@ -1026,4 +1028,168 @@ interp_ring_wraps :: proc(t: ^testing.T) {
 	testing.expect_value(t, v, f32(385))
 	v, _ = knet.interp_sample(&b, 0, lerp_f32) // evicted history clamps to oldest kept
 	testing.expect_value(t, v, f32((40 - knet.INTERP_CAP) * 10))
+}
+
+// ---- owner streams -----------------------------------------------------------
+//
+// Fields flagged .Owner_Stream are authoritative on the entity's OWNER: they
+// travel as last-value snapshots on the unreliable channel and are SAMPLED
+// (delayed, interpolated) by everyone else — and they are excluded from
+// authority delta batches by construction.
+
+Mover :: struct {
+	hp:    i32, // host state: the delta path
+	x, y:  f32, // owner-streamed, lerped
+	face:  u8, // owner-streamed, snapped (steps between samples)
+	local: int,
+}
+
+mover_desc :: proc() -> knet.Entity_Desc {
+	@(static) fields := [?]knet.Field_Desc{
+		{offset = offset_of(Mover, hp), size = size_of(i32)},
+		{offset = offset_of(Mover, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32},
+		{offset = offset_of(Mover, y), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32},
+		{offset = offset_of(Mover, face), size = size_of(u8), flags = {.Owner_Stream}},
+	}
+	return knet.Entity_Desc{fields = fields[:]}
+}
+
+@(test)
+stream_ring_lerps_and_snaps :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	testing.expect_value(t, knet.stream_data_size(&desc), 9) // x + y + face
+
+	owner := Mover{hp = 77, x = 0, y = 10, face = 1}
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.stream_write(&w, &owner, &desc)
+	testing.expect_value(t, len(knet.writer_bytes(&w)), 9) // hp/local never stream
+
+	ring := knet.Stream_Ring{}
+	defer knet.stream_ring_destroy(&ring)
+	knet.stream_ring_push(&ring, 1.0, knet.writer_bytes(&w))
+
+	owner.x = 10
+	owner.y = 20
+	owner.face = 2
+	knet.writer_reset(&w)
+	knet.stream_write(&w, &owner, &desc)
+	knet.stream_ring_push(&ring, 2.0, knet.writer_bytes(&w))
+
+	remote := Mover{hp = 5, local = 9}
+	// Midpoint: floats lerp, the snap field HOLDS the earlier sample.
+	testing.expect(t, knet.stream_ring_sample(&ring, 1.5, &remote, &desc))
+	testing.expect_value(t, remote.x, f32(5))
+	testing.expect_value(t, remote.y, f32(15))
+	testing.expect_value(t, remote.face, u8(1))
+	testing.expect_value(t, remote.hp, i32(5)) // non-streamed fields untouched
+	testing.expect_value(t, remote.local, 9)
+
+	// Clamp semantics: before the oldest → oldest; past the newest → hold.
+	testing.expect(t, knet.stream_ring_sample(&ring, 0.5, &remote, &desc))
+	testing.expect_value(t, remote.x, f32(0))
+	testing.expect_value(t, remote.face, u8(1))
+	testing.expect(t, knet.stream_ring_sample(&ring, 9.0, &remote, &desc))
+	testing.expect_value(t, remote.x, f32(10))
+	testing.expect_value(t, remote.face, u8(2))
+
+	// Stale (reordered) push is dropped: the timeline never goes backwards.
+	knet.writer_reset(&w)
+	owner.x = -999
+	knet.stream_write(&w, &owner, &desc)
+	knet.stream_ring_push(&ring, 1.5, knet.writer_bytes(&w))
+	testing.expect(t, knet.stream_ring_sample(&ring, 9.0, &remote, &desc))
+	testing.expect_value(t, remote.x, f32(10))
+}
+
+@(test)
+delta_excludes_owner_stream_fields :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	e := Mover{hp = 1, x = 100, y = 200, face = 3}
+	shadow := knet.shadow_make(&desc)
+	defer delete(shadow)
+	knet.shadow_capture(&e, shadow, &desc)
+
+	// Streamed fields changing NEVER dirty the delta mask — the host samples
+	// them locally every frame; if they dirtied, deltas would re-broadcast the
+	// owner's stream on the reliable channel forever.
+	e.x = 500
+	e.face = 4
+	testing.expect_value(t, knet.diff_mask(&e, shadow, &desc), u64(0))
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	testing.expect_value(t, knet.write_delta(&w, &e, shadow, &desc), u64(0))
+
+	// Host state still deltas normally alongside.
+	e.hp = 2
+	testing.expect_value(t, knet.write_delta(&w, &e, shadow, &desc), u64(0b0001))
+
+	// Fulls still carry EVERYTHING — the join snapshot seeds streamed fields.
+	knet.writer_reset(&w)
+	knet.write_full(&w, &e, &desc)
+	fresh := Mover{}
+	r := knet.reader_make(knet.writer_bytes(&w))
+	knet.apply_full(&r, &fresh, &desc)
+	testing.expect_value(t, fresh.x, f32(500))
+	testing.expect_value(t, fresh.face, u8(4))
+}
+
+@(test)
+registry_streams_end_to_end :: proc(t: ^testing.T) {
+	mdesc := mover_desc()
+	mset := knet.Command_Set{entity_desc = &mdesc}
+	ME :: knet.Player_Id(2)
+	OTHER :: knet.Player_Id(3)
+
+	// Owner side: two owned movers, plus one owned by someone else (must not
+	// be streamed by this peer).
+	oreg := knet.registry_make()
+	defer knet.registry_destroy(&oreg)
+	m1 := Mover{x = 0, y = 10, face = 1}
+	m2 := Mover{x = 100, y = 0, face = 7}
+	other := Mover{x = -5}
+	id1 := knet.registry_spawn(&oreg, &m1, &mset, ME)
+	id2 := knet.registry_spawn(&oreg, &m2, &mset, ME)
+	_ = knet.registry_spawn(&oreg, &other, &mset, OTHER)
+
+	// Receiver knows only m1 (m2's spawn hasn't arrived — stream batches skip
+	// unknown ids by LENGTH instead of abandoning, unlike delta batches).
+	rreg := knet.registry_make()
+	defer knet.registry_destroy(&rreg)
+	r1 := Mover{hp = 42}
+	knet.registry_insert(&rreg, id1, &r1, &mset, ME)
+	_ = id2
+
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	testing.expect_value(t, knet.registry_write_streams(&w, &oreg, ME, 1.0), 2)
+
+	r := knet.reader_make(knet.writer_bytes(&w))
+	testing.expect_value(t, knet.registry_stream_time(&r), 1.0)
+	testing.expect_value(t, knet.registry_apply_streams(&r, &rreg, OTHER, 1.0), 1)
+	testing.expect(t, !r.err, "unknown id in a stream batch is skipped, not an error")
+
+	// Second tick: m1 moved.
+	m1.x = 10
+	m1.y = 30
+	m1.face = 2
+	knet.writer_reset(&w)
+	_ = knet.registry_write_streams(&w, &oreg, ME, 2.0)
+	r2 := knet.reader_make(knet.writer_bytes(&w))
+	_ = knet.registry_stream_time(&r2)
+	testing.expect_value(t, knet.registry_apply_streams(&r2, &rreg, OTHER, 2.0), 1)
+
+	// Sample the midpoint into the receiver's entity.
+	testing.expect_value(t, knet.registry_sample_streams(&rreg, 1.5, OTHER), 1)
+	testing.expect_value(t, r1.x, f32(5))
+	testing.expect_value(t, r1.y, f32(20))
+	testing.expect_value(t, r1.face, u8(1))
+	testing.expect_value(t, r1.hp, i32(42)) // host state untouched by streams
+
+	// A peer NEVER accepts a stream for an entity it owns itself.
+	knet.writer_reset(&w)
+	_ = knet.registry_write_streams(&w, &oreg, ME, 3.0)
+	r3 := knet.reader_make(knet.writer_bytes(&w))
+	_ = knet.registry_stream_time(&r3)
+	testing.expect_value(t, knet.registry_apply_streams(&r3, &rreg, ME, 3.0), 0)
 }

@@ -19,6 +19,7 @@ Orb :: struct {
 	net_id:  knet.Net_Id, // wire identity (the session assigns it at spawn)
 	hp:      i32 `gd:"replicate"`,
 	stamina: i32 `gd:"replicate"`,
+	x, y:    f32 `gd:"replicate,interp,owner"`, // owner-streamed: write them, they replicate
 }
 
 // Spend stamina to strike: authoritative on the host, predicted on the issuing

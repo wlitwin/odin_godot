@@ -33,7 +33,7 @@ SyncNode :: struct {
 	owner:  gd.Node,
 	net_id: knet.Net_Id,
 	hp:     i32 `gd:"replicate"`,
-	x, y:   f32 `gd:"replicate,interp,owner"`,
+	x, y:   f32 `gd:"replicate,interp"`, // host-authoritative here (owner streams are kitacid's)
 	state:  u8 `gd:"replicate"`,
 	locked: u8 `gd:"replicate"`, // server flips this SILENTLY to force a stale prediction
 	shadow: []u8,

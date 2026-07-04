@@ -23,13 +23,24 @@ import netgd "godot:kit/netgd"
 import "core:fmt"
 import "core:time"
 
-MSG_SPAWN :: u8(0) // [net_id][full fields]           host -> joining peer, reliable
+MSG_SPAWN :: u8(0) // [net_id][owner][full fields]    host -> joining peer, reliable
 MSG_STATE :: u8(1) // [count]([net_id][mask][dirty])  host -> all, per net tick
 MSG_CMD :: u8(2) // command header + args             client -> host
 MSG_RESULT :: u8(3) // confirm / reject+truth         host -> issuing client
 MSG_PING :: u8(4) // [local_send]                     client -> host, ~1/s
 MSG_PONG :: u8(5) // [echoed_send][remote_time]       host -> client
 MSG_DONE :: u8(6) // client scenario finished         client -> host
+MSG_STREAM :: u8(7) // owner-stream batch             owner -> all, UNRELIABLE, per net tick
+
+// The orb is owned by the OWNER client (player 2) — the host and the observer
+// are both just "everyone else" for its streamed fields: the same sampling
+// code runs on both, which is the zero-role-branch claim for streams.
+OWNER_PLAYER :: knet.Player_Id(2)
+
+// Remote entities render this far in the timeline's past (~3 net ticks): there
+// is almost always a bracketing sample pair, so motion stays smooth through
+// jitter and drops.
+INTERP_DELAY :: 0.15
 
 Delayed_Packet :: struct {
 	due:  f64,
@@ -40,6 +51,7 @@ Delayed_Packet :: struct {
 AcidSession :: struct {
 	owner:       gd.Node,
 	orb:         ^Orb,
+	me:          knet.Player_Id,
 	reg:         knet.Registry,
 	ctx:         knet.Command_Ctx,
 	ticker:      knet.Ticker,
@@ -55,6 +67,17 @@ AcidSession :: struct {
 	pings:       int, // client: pongs sampled into the clock estimate
 	issues:      int,
 	issue_at:    f64,
+
+	// owner-stream scenario: the owner drives the orb; everyone else samples
+	// and verifies the sampled motion is smooth (interpolated, not snapped).
+	moving:       bool, // owner only
+	moved_ticks:  int,
+	last_x:       f32,
+	samples:      int,
+	incs:         int, // sampled frames where x increased
+	big_steps:    int, // increases near a full tick step (snapping signature)
+	mono_bad:     int, // sampled x ever DECREASED (must never happen)
+	stream_state: int, // 0 = unverified, 1 = verified ok (driver polls)
 }
 
 // Absolute monotonic seconds (mach_absolute_time / CLOCK_MONOTONIC — one clock
@@ -71,12 +94,15 @@ acid_session_ready :: proc(self: ^AcidSession) {
 	self.ticker = knet.ticker_make()
 }
 
-// latency_ms: the injected one-way receive delay. orb_node: the entity node
-// (pre-created by the driver — dynamic spawn-by-type is the phase-1 session's).
+// latency_ms: the injected one-way receive delay. me: this peer's player id
+// (host 1, owner 2, observer 3 — assigned identity is phase 1's job). orb_node:
+// the entity node (pre-created by the driver — dynamic spawn-by-type is the
+// phase-1 session's).
 @(gd_method)
-acid_session_setup :: proc(self: ^AcidSession, latency_ms: gd.Int, orb_node: gd.Node) {
+acid_session_setup :: proc(self: ^AcidSession, latency_ms: gd.Int, me: gd.Int, orb_node: gd.Node) {
 	self.latency = f64(latency_ms) / 1000.0
 	self.min_rtt = 1.5 * self.latency // 2x is the theoretical floor; 1.5x absorbs jitter
+	self.me = knet.Player_Id(me)
 	self.orb = rt.script_of(orb_node, Orb)
 	if self.orb == nil {
 		gd.print_str("ACID_ERR adopt failed")
@@ -94,9 +120,10 @@ acid_session_start_host :: proc(self: ^AcidSession, port: gd.Int) {
 		return
 	}
 	self.ctx.is_authority = true
-	// Scenario setup: the authority spawns THE orb (allocates its net id) and
-	// sets the initial state clients must see in their join snapshot.
-	self.orb.net_id = knet.registry_spawn(&self.reg, self.orb, &orb_command_set)
+	// Scenario setup: the authority spawns THE orb (allocates its net id,
+	// records the OWNER whose stream drives x/y) and sets the initial state
+	// clients must see in their join snapshot.
+	self.orb.net_id = knet.registry_spawn(&self.reg, self.orb, &orb_command_set, OWNER_PLAYER)
 	self.orb.hp = 100
 	self.orb.stamina = 10
 	self.started = true
@@ -132,14 +159,17 @@ send_command_bytes :: proc(user: rawptr, bytes: []u8) {
 	}
 }
 
-// Host: one peer's join snapshot — [net_id][full fields] on the reliable
-// channel, BEFORE any delta can name that id (the pinned ordering contract).
+// Host: one peer's join snapshot — [net_id][owner][full fields] on the
+// reliable channel, BEFORE any delta can name that id (the pinned ordering
+// contract). Ownership travels with the spawn so every peer routes the orb's
+// stream the same way.
 @(gd_method)
 acid_session_send_spawn :: proc(self: ^AcidSession, peer: gd.Int) {
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_u8(&w, MSG_SPAWN)
 	knet.write_net_id(&w, self.orb.net_id)
+	knet.write_player_id(&w, OWNER_PLAYER)
 	knet.write_full(&w, self.orb, &orb_net_desc)
 	if err := netgd.send_reliable(self.owner, int(peer), knet.writer_bytes(&w)); err == .Ok {
 		gd.print_str(fmt.tprintf("ACID_SPAWN_SENT peer=%d", int(peer)))
@@ -175,6 +205,44 @@ acid_session_tick :: proc(self: ^AcidSession, dt: gd.Float) {
 	for _ in 0 ..< n {
 		net_tick(self)
 	}
+	// Remote-owned streams are sampled per FRAME (smoothness is the point):
+	// render the owner's timeline INTERP_DELAY in the past. Owners are skipped
+	// by the registry (they're authoritative), so this line is role-free.
+	if knet.registry_sample_streams(&self.reg, now - INTERP_DELAY, self.me) > 0 {
+		stream_stats(self)
+	}
+}
+
+// Verify the SAMPLED motion is genuinely interpolated: monotone, mostly
+// sub-tick steps (snapping to 20 Hz samples from a ~60 Hz frame loop would
+// show full-tick jumps), and y tracking its exact linear relation to x.
+@(private = "file")
+stream_stats :: proc(self: ^AcidSession) {
+	x := self.orb.x
+	if self.samples > 0 {
+		dx := x - self.last_x
+		if dx < -0.0001 {
+			self.mono_bad += 1
+		} else if dx > 0.0001 {
+			self.incs += 1
+			if dx > 0.9 {
+				self.big_steps += 1 // ~a full tick step; rare frame hitches only
+			}
+		}
+	}
+	self.last_x = x
+	self.samples += 1
+	if self.stream_state == 0 && x >= 30 {
+		y_ok := abs(self.orb.y + 0.5 * self.orb.x) < 0.01
+		ok := self.mono_bad == 0 && self.incs >= 25 && f64(self.big_steps) < 0.5 * f64(self.incs) && y_ok
+		gd.print_str(
+			fmt.tprintf(
+				"ACID_STREAM ok=%v x=%.1f incs=%d big=%d mono_bad=%d y_ok=%v",
+				ok, x, self.incs, self.big_steps, self.mono_bad, y_ok,
+			),
+		)
+		self.stream_state = ok ? 1 : -1
+	}
 }
 
 @(private = "file")
@@ -202,6 +270,21 @@ net_tick :: proc(self: ^AcidSession) {
 		knet.ping_write(&w, now_s())
 		_ = netgd.send_reliable(self.owner, 1, knet.writer_bytes(&w))
 	}
+	if self.moving {
+		// THE OWNER'S AUTHOR SURFACE for streamed state: just write the fields.
+		// The walk below ships them; everyone else's sampling renders them.
+		self.moved_ticks += 1
+		self.orb.x = f32(self.moved_ticks)
+		self.orb.y = -0.5 * self.orb.x
+		w := knet.writer_make()
+		defer knet.writer_destroy(&w)
+		knet.write_u8(&w, MSG_STREAM)
+		if knet.registry_write_streams(&w, &self.reg, self.me, now_s()) > 0 {
+			// Broadcast on the UNRELIABLE stream channel: last-value semantics,
+			// a drop is superseded by the next tick's snapshot.
+			_ = netgd.send_stream(self.owner, 0, knet.writer_bytes(&w))
+		}
+	}
 	// 60 ticks = 3s at 20 Hz — far beyond the injected RTT, so any expiry means
 	// a result was genuinely lost. The suite asserts this NEVER fires.
 	if n := knet.registry_expire_pending(&self.reg, &self.ctx, 60); n > 0 {
@@ -225,14 +308,15 @@ route_packet :: proc(self: ^AcidSession, from: int, data: []u8) {
 	r := knet.reader_make(data)
 	switch knet.read_u8(&r) {
 	case MSG_SPAWN:
-		// Join snapshot: mirror the wire id onto the local orb, apply the full
-		// state, and commit shadows (migration-ready bookkeeping).
+		// Join snapshot: mirror the wire id + ownership onto the local orb,
+		// apply the full state, and commit shadows (migration-ready bookkeeping).
 		id := knet.read_net_id(&r)
-		knet.registry_insert(&self.reg, id, self.orb, &orb_command_set)
+		who := knet.read_player_id(&r)
+		knet.registry_insert(&self.reg, id, self.orb, &orb_command_set, who)
 		self.orb.net_id = id
 		knet.apply_full(&r, self.orb, &orb_net_desc)
 		knet.registry_commit_shadows(&self.reg)
-		gd.print_str(fmt.tprintf("ACID_SPAWN ok=%v id=%d hp=%d st=%d", !r.err, u32(id), self.orb.hp, self.orb.stamina))
+		gd.print_str(fmt.tprintf("ACID_SPAWN ok=%v id=%d owner=%d hp=%d st=%d", !r.err, u32(id), u64(who), self.orb.hp, self.orb.stamina))
 		if !r.err {self.got += 1}
 	case MSG_STATE:
 		// The observer's whole job: apply what the authority says. No role code.
@@ -296,11 +380,24 @@ route_packet :: proc(self: ^AcidSession, from: int, data: []u8) {
 				)
 			}
 		}
+	case MSG_STREAM:
+		// The batch carries the OWNER's clock stamp; this session uses the
+		// simpler ARRIVAL timeline (constant injected latency preserves shape —
+		// a full session maps the sender stamp through a per-peer Clock_Sync).
+		_ = knet.registry_stream_time(&r)
+		_ = knet.registry_apply_streams(&r, &self.reg, self.me, now_s())
 	case MSG_DONE:
 		self.dones += 1
 	case:
 		gd.print_str("ACID_ERR unknown msg")
 	}
+}
+
+// Owner: start driving the orb (a deterministic ramp the remotes verify).
+@(gd_method)
+acid_session_start_moving :: proc(self: ^AcidSession) {
+	self.moving = true
+	gd.print_str("ACID_MOVING")
 }
 
 // Owner: THE author-surface call — identical on every peer. On the host it
@@ -349,6 +446,11 @@ acid_session_get_dones :: proc(self: ^AcidSession) -> gd.Int {
 @(gd_method)
 acid_session_get_pings :: proc(self: ^AcidSession) -> gd.Int {
 	return gd.Int(self.pings)
+}
+
+@(gd_method)
+acid_session_get_stream :: proc(self: ^AcidSession) -> gd.Int {
+	return gd.Int(self.stream_state)
 }
 
 @(gd_method)

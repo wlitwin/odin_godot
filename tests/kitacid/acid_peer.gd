@@ -7,12 +7,16 @@ extends SceneTree
 # ROLE + PORT + LATENCY_MS come from the environment. The driver only sequences;
 # all wire logic lives in the Odin AcidSession, all GAMEPLAY in orb.odin.
 #
-# Scenario: server spawns the orb (hp=100 st=10) and join-snapshots both
-# clients. The owner strikes (cost 4) twice — each predicted instantly, then
-# CONFIRMED a real round trip later — and a third time on empty stamina, which
-# is locally rejected, still sent, and REJECTED by the host with truth. The
-# observer just converges (100/10 -> 92/6 -> 84/2) through delta batches. Both
-# clients also prove clock sync sees the injected RTT.
+# Scenario: server spawns the orb (hp=100 st=10, owned by player 2) and
+# join-snapshots both clients. COMMANDS: the owner strikes (cost 4) twice —
+# each predicted instantly, then CONFIRMED a real round trip later — and a
+# third time on empty stamina, which is locally rejected, still sent, and
+# REJECTED by the host with truth. The observer just converges
+# (100/10 -> 92/6 -> 84/2) through delta batches. STREAMS: the owner then
+# drives the orb's x/y for ~4s — streamed unreliable at the net tick rate —
+# and BOTH the host and the observer (the same role-free sampling code)
+# verify smooth interpolated motion. Both clients also prove clock sync sees
+# the injected RTT.
 # ----------------------------------------------------------------------------
 
 var session: Node = null
@@ -64,7 +68,8 @@ func _process(delta: float) -> bool:
 	if phase == "init":
 		if not session.is_inside_tree() or not orb.is_inside_tree():
 			return false
-		session.call("setup", latency, orb)
+		var me := 1 if role == "server" else (2 if role == "owner" else 3)
+		session.call("setup", latency, me, orb)
 		if role == "server":
 			session.call("start_host", port)
 		else:
@@ -94,12 +99,12 @@ func _process(delta: float) -> bool:
 			quit(1); return true
 		return false
 
-	# ---- server ----
+	# ---- server: commands answered, own stream view verified, clients done ----
 	if phase == "serve":
-		if int(session.call("get_cmds")) >= 3 and int(session.call("get_dones")) >= 2:
+		if int(session.call("get_cmds")) >= 3 and int(session.call("get_stream")) >= 1 and int(session.call("get_dones")) >= 2:
 			phase = "settle"
 			t_acted = now
-		elif timed_out(now, "cmds=" + str(session.call("get_cmds")) + " dones=" + str(session.call("get_dones"))):
+		elif timed_out(now, "cmds=" + str(session.call("get_cmds")) + " stream=" + str(session.call("get_stream")) + " dones=" + str(session.call("get_dones"))):
 			quit(1); return true
 		return false
 
@@ -142,18 +147,38 @@ func _process(delta: float) -> bool:
 
 	if phase == "round3":
 		if int(session.call("get_got")) >= 4:
-			phase = "clock"
+			# Commands proven — now drive the orb for the stream scenario. The
+			# owner streams for a fixed window while host + observer verify.
+			session.call("start_moving")
+			phase = "move"
 			t_acted = now
 		elif timed_out(now, "reject never arrived"):
+			quit(1); return true
+		return false
+
+	if phase == "move":
+		if now - t_acted > 4000 and int(session.call("get_pings")) >= 3:
+			session.call("send_done")
+			phase = "flush"
+			t_acted = now
+		elif timed_out(now, "move window / pings=" + str(session.call("get_pings"))):
 			quit(1); return true
 		return false
 
 	# ---- observer: converge on the authoritative end state, no role code ----
 	if phase == "watch":
 		if int(session.call("get_hp")) == 84 and int(session.call("get_st")) == 2:
-			phase = "clock"
+			phase = "stream"
 			t_acted = now
 		elif timed_out(now, "state never converged hp=" + str(session.call("get_hp")) + " st=" + str(session.call("get_st"))):
+			quit(1); return true
+		return false
+
+	if phase == "stream":
+		if int(session.call("get_stream")) >= 1:
+			phase = "clock"
+			t_acted = now
+		elif timed_out(now, "stream never verified (state=" + str(session.call("get_stream")) + ")"):
 			quit(1); return true
 		return false
 

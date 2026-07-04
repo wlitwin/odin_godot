@@ -1,0 +1,156 @@
+package kit_net
+
+// stream — owner-authoritative field streaming with delayed interpolated sampling.
+//
+// Fields flagged .Owner_Stream (gd:"replicate,owner") are authoritative on the
+// peer that OWNS the entity, not the host. The owner writes them as last-value
+// snapshots every net tick on the unreliable-ordered channel: a dropped packet
+// is superseded by the next one, so there is no loss story at all. Everyone
+// else (host included — it is just another remote peer for these fields) pushes
+// arriving snapshots into a per-entity Stream_Ring and SAMPLES the ring at
+// (timeline_now - delay), lerping .Interp fields between the bracketing pair
+// (Lerp_Kind decides how) and stepping the rest. Clamp semantics match
+// interp.odin: never extrapolate — hold.
+//
+// TIMELINE: ring timestamps are whatever the caller stamps pushes with. Two
+// valid models: RECEIVER-ARRIVAL time (simple — sample at local_now - delay;
+// jitter becomes small velocity wobble the delay absorbs) or SENDER time (the
+// batch carries the owner's clock; map it through a per-peer Clock_Sync for a
+// jitter-correct timeline). The wire format carries the sender stamp either way
+// so a session can upgrade without a format change.
+//
+// These fields never appear in authority delta batches (diff_mask skips
+// .Owner_Stream), so streams and deltas are disjoint: full snapshots seed the
+// initial values, streams own them from then on.
+
+// Byte size of one stream snapshot for a descriptor (just the streamed fields,
+// desc order, tightly packed). 0 = this entity type streams nothing.
+stream_data_size :: proc(desc: ^Entity_Desc) -> int {
+	n := 0
+	for f in desc.fields {
+		if .Owner_Stream in f.flags {
+			n += f.size
+		}
+	}
+	return n
+}
+
+@(private = "file")
+stream_field_ptr :: proc(entity: rawptr, f: Field_Desc) -> [^]u8 {
+	return ([^]u8)(rawptr(uintptr(entity) + f.offset))
+}
+
+// Owner side: append the streamed fields' current values.
+stream_write :: proc(w: ^Writer, entity: rawptr, desc: ^Entity_Desc) {
+	for f in desc.fields {
+		if .Owner_Stream not_in f.flags {
+			continue
+		}
+		ep := stream_field_ptr(entity, f)
+		append(&w.buf, ..ep[:f.size])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Receiver side: a fixed ring of timestamped snapshots per remote-owned entity.
+
+Stream_Ring :: struct {
+	times: [INTERP_CAP]f64,
+	blobs: [INTERP_CAP][]u8, // each stream_data_size bytes, allocated on first use
+	head:  int, // oldest sample
+	count: int,
+}
+
+stream_ring_destroy :: proc(ring: ^Stream_Ring) {
+	for b in ring.blobs {
+		delete(b)
+	}
+	ring^ = {}
+}
+
+// Push one snapshot (copied). Stale arrivals — at or before the newest sample's
+// stamp — are dropped, mirroring interp_push (the unreliable-ORDERED channel
+// already discards reordered packets; this is the belt to those suspenders).
+stream_ring_push :: proc(ring: ^Stream_Ring, t: f64, data: []u8, allocator := context.allocator) {
+	if ring.count > 0 && t <= ring.times[(ring.head + ring.count - 1) % INTERP_CAP] {
+		return
+	}
+	slot: int
+	if ring.count < INTERP_CAP {
+		slot = (ring.head + ring.count) % INTERP_CAP
+		ring.count += 1
+	} else {
+		slot = ring.head
+		ring.head = (ring.head + 1) % INTERP_CAP
+	}
+	if ring.blobs[slot] == nil {
+		ring.blobs[slot] = make([]u8, len(data), allocator)
+	}
+	assert(len(ring.blobs[slot]) == len(data), "stream snapshot size changed mid-session")
+	copy(ring.blobs[slot], data)
+	ring.times[slot] = t
+}
+
+// Blend the streamed fields of `lo`/`hi` at `alpha` straight into the entity.
+@(private = "file")
+stream_blend :: proc(entity: rawptr, desc: ^Entity_Desc, lo, hi: []u8, alpha: f32) {
+	off := 0
+	for f in desc.fields {
+		if .Owner_Stream not_in f.flags {
+			continue
+		}
+		dst := stream_field_ptr(entity, f)
+		lerp := f.lerp if .Interp in f.flags else Lerp_Kind.Snap
+		switch lerp {
+		case .Snap:
+			copy(dst[:f.size], lo[off:off + f.size]) // step: hold until the next stamp
+		case .F32:
+			df := ([^]f32)(dst)
+			lf := ([^]f32)(&lo[off])
+			hf := ([^]f32)(&hi[off])
+			for i in 0 ..< f.size / 4 {
+				df[i] = lf[i] + (hf[i] - lf[i]) * alpha
+			}
+		case .F64:
+			df := ([^]f64)(dst)
+			lf := ([^]f64)(&lo[off])
+			hf := ([^]f64)(&hi[off])
+			for i in 0 ..< f.size / 8 {
+				df[i] = lf[i] + (hf[i] - lf[i]) * f64(alpha)
+			}
+		}
+		off += f.size
+	}
+}
+
+// Sample the ring's timeline at `t` and write the result into the entity's
+// streamed fields. ok=false only on an empty ring (entity keeps its last/spawn
+// values). Same clamp discipline as interp_sample: before the oldest sample →
+// oldest; past the newest → newest, held (never extrapolate).
+stream_ring_sample :: proc(ring: ^Stream_Ring, t: f64, entity: rawptr, desc: ^Entity_Desc) -> bool {
+	if ring.count == 0 {
+		return false
+	}
+	oldest := ring.head
+	newest := (ring.head + ring.count - 1) % INTERP_CAP
+	if t <= ring.times[oldest] {
+		stream_blend(entity, desc, ring.blobs[oldest], ring.blobs[oldest], 0)
+		return true
+	}
+	if t >= ring.times[newest] {
+		stream_blend(entity, desc, ring.blobs[newest], ring.blobs[newest], 0)
+		return true
+	}
+	for i in 1 ..< ring.count {
+		hi := (ring.head + i) % INTERP_CAP
+		if t <= ring.times[hi] {
+			lo := (ring.head + i - 1) % INTERP_CAP
+			span := ring.times[hi] - ring.times[lo]
+			alpha := span > 0 ? f32((t - ring.times[lo]) / span) : 1
+			stream_blend(entity, desc, ring.blobs[lo], ring.blobs[hi], alpha)
+			return true
+		}
+	}
+	stream_blend(entity, desc, ring.blobs[newest], ring.blobs[newest], 0) // unreachable; safe
+	return true
+}

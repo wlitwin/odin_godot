@@ -429,10 +429,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			case:
 				flags = "{}"
 			}
+			lerp := len(r.lerp) > 0 ? fmt.tprintf(", lerp = %s", r.lerp) : ""
 			fmt.sbprintf(
 				b,
-				"\t{{offset = offset_of(%s, %s), size = size_of(type_of(%s{{}}.%s)), flags = %s}},\n",
-				cls, r.field, cls, r.field, flags,
+				"\t{{offset = offset_of(%s, %s), size = size_of(type_of(%s{{}}.%s)), flags = %s%s}},\n",
+				cls, r.field, cls, r.field, flags, lerp,
 			)
 		}
 		w(b, "}\n\n")

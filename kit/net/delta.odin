@@ -28,14 +28,24 @@ Field_Desc :: struct {
 	offset: uintptr,
 	size:   int,
 	flags:  Field_Flags,
+	lerp:   Lerp_Kind, // how stream sampling blends this field (meaningful with .Interp)
 }
 
 Field_Flag :: enum u8 {
-	Interp,       // higher layers interpolate this field on remote peers
-	Owner_Stream, // part of the owner-authoritative unreliable stream (vs host state)
+	Interp,       // remote peers interpolate this field (stream sampling lerps it)
+	Owner_Stream, // owner-authoritative: travels ONLY via streams + full snapshots,
+	              // NEVER in authority delta batches (diff_mask skips it)
 }
 
 Field_Flags :: bit_set[Field_Flag; u8]
+
+// How interpolation blends a field's bytes between two stream samples. scriptgen
+// classifies from the declared type; hand-built descriptors set it directly.
+Lerp_Kind :: enum u8 {
+	Snap, // step to the sample at-or-before the render time (any POD; the default)
+	F32,  // treat the field as [size/4]f32 and lerp componentwise (f32, vectors, colors)
+	F64,  // as F32 but f64 elements
+}
 
 // A replicated entity type. At most 64 fields so the dirty mask is one u64 —
 // a struct wanting more should group them into sub-structs (fixed arrays are one
@@ -75,12 +85,21 @@ shadow_make :: proc(desc: ^Entity_Desc, allocator := context.allocator) -> []u8 
 }
 
 // Compare entity vs shadow, bit i set = field i differs. Does NOT modify the shadow.
+//
+// OWNER-STREAMED FIELDS ARE NEVER DIRTY HERE: they are authoritative on their
+// owner and travel via the unreliable stream (+ full snapshots for joins) — an
+// authority delta re-broadcasting them would fight the owner's stream on every
+// peer (the host SAMPLES those fields locally, which would re-dirty them each
+// tick). Excluding them at the mask level makes deltas and streams disjoint by
+// construction.
 diff_mask :: proc(entity: rawptr, shadow: []u8, desc: ^Entity_Desc) -> (mask: u64) {
 	off := 0
 	for f, i in desc.fields {
-		ep := ([^]u8)(field_ptr(entity, f))
-		if mem.compare(ep[:f.size], shadow[off:off + f.size]) != 0 {
-			mask |= 1 << u64(i)
+		if .Owner_Stream not_in f.flags {
+			ep := ([^]u8)(field_ptr(entity, f))
+			if mem.compare(ep[:f.size], shadow[off:off + f.size]) != 0 {
+				mask |= 1 << u64(i)
+			}
 		}
 		off += f.size
 	}

@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
 # ----------------------------------------------------------------------------
-# THE PHASE-0 ACID TEST — a new multiplayer entity in ~10 lines, zero role
+# THE PHASE-0 ACID TEST — a new multiplayer entity in ~15 lines, zero role
 # branches, correct from ALL THREE perspectives under injected latency.
 #
 # Launches THREE headless Godot processes over ENet localhost:
 #   server    the authority: spawns the Orb, join-snapshots both clients,
-#             executes commands, broadcasts per-tick delta batches.
+#             executes commands, broadcasts per-tick delta batches — and, for
+#             the orb's OWNER-STREAMED x/y, is itself just another remote:
+#             it samples the owner's stream with the same role-free code.
 #   owner     the issuing client: strikes are PREDICTED the same call (before
 #             any round trip can land — latency-proven), then confirmed; the
-#             out-of-stamina strike is rejected with embedded truth.
+#             out-of-stamina strike is rejected with embedded truth. Then it
+#             DRIVES the orb: writing x/y is the whole author surface — the
+#             session streams them unreliable at the net tick rate.
 #   observer  a client that never issues anything and has NO role-specific
 #             code — it converges purely by applying spawn + delta batches
-#             (the peer Unreal makes you write "simulated proxy" code for).
+#             (the peer Unreal makes you write "simulated proxy" code for)
+#             and renders the owner's motion by delayed interpolated sampling.
 #
 # Every peer buffers RECEIVED packets for LATENCY_MS before applying them, so
 # a round trip provably costs >= 2x latency: the owner's lat_ok asserts confirm
@@ -98,11 +103,13 @@ attempt() {
 		|| { echo "  FAIL: host never executed strike 2"; ok=0; }
 	grep -qF "ACID_EXEC ok=false hp=84 st=2" "$slog" \
 		|| { echo "  FAIL: host never rejected the empty-stamina strike (state must be untouched)"; ok=0; }
+	grep -qF "ACID_STREAM ok=true" "$slog" \
+		|| { echo "  FAIL: the HOST did not verify smooth sampled motion (it is a remote for owner streams)"; ok=0; }
 	grep -q "SERVER_DONE" "$slog" || { echo "  FAIL: server did not finish cleanly"; ok=0; }
 
 	# ---- owner: optimistic prediction + confirm/reject round trips ----
-	grep -qF "ACID_SPAWN ok=true id=1 hp=100 st=10" "$wlog" \
-		|| { echo "  FAIL: owner join snapshot not verified"; ok=0; }
+	grep -qF "ACID_SPAWN ok=true id=1 owner=2 hp=100 st=10" "$wlog" \
+		|| { echo "  FAIL: owner join snapshot (with ownership) not verified"; ok=0; }
 	grep -qF "ACID_ISSUE n=1 predicted=true hp=92 st=6 pending=1" "$wlog" \
 		|| { echo "  FAIL: strike 1 was not predicted instantly"; ok=0; }
 	grep -qF "ACID_CONFIRM n=1 ok=true hp=92 st=6 pending=0 lat_ok=true" "$wlog" \
@@ -117,15 +124,22 @@ attempt() {
 		|| { echo "  FAIL: host reject + truth did not settle the owner"; ok=0; }
 	grep -qF "ACID_CLOCK ok=true" "$wlog" \
 		|| { echo "  FAIL: owner clock sync did not measure the injected RTT"; ok=0; }
+	grep -q "ACID_MOVING" "$wlog" || { echo "  FAIL: owner never started streaming motion"; ok=0; }
+	grep -q "ACID_STREAM" "$wlog" \
+		&& { echo "  FAIL: the owner sampled its own stream (it is authoritative for it)"; ok=0; }
 	grep -q "OWNER_DONE" "$wlog" || { echo "  FAIL: owner did not finish cleanly"; ok=0; }
 
 	# ---- observer: converges with ZERO role-specific code ----
-	grep -qF "ACID_SPAWN ok=true id=1 hp=100 st=10" "$olog" \
-		|| { echo "  FAIL: observer join snapshot not verified"; ok=0; }
+	grep -qF "ACID_SPAWN ok=true id=1 owner=2 hp=100 st=10" "$olog" \
+		|| { echo "  FAIL: observer join snapshot (with ownership) not verified"; ok=0; }
 	grep -qF "ACID_DELTA ok=true n=1 hp=92 st=6" "$olog" \
 		|| { echo "  FAIL: observer never saw strike 1's delta batch"; ok=0; }
 	grep -qF "ACID_DELTA ok=true n=1 hp=84 st=2" "$olog" \
 		|| { echo "  FAIL: observer never saw strike 2's delta batch"; ok=0; }
+	[[ "$(grep -c "ACID_DELTA" "$olog")" == "2" ]] \
+		|| { echo "  FAIL: observer saw extra delta batches — streamed fields must never dirty host deltas"; ok=0; }
+	grep -qF "ACID_STREAM ok=true" "$olog" \
+		|| { echo "  FAIL: observer did not verify smooth sampled motion"; ok=0; }
 	grep -qF "ACID_CLOCK ok=true" "$olog" \
 		|| { echo "  FAIL: observer clock sync did not measure the injected RTT"; ok=0; }
 	grep -q "ACID_ISSUE" "$olog" \

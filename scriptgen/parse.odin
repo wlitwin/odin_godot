@@ -612,6 +612,22 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 					)
 				}
 			}
+			// `interp` must know HOW to blend: classify the declared type into a
+			// knet.Lerp_Kind. Non-float types can only snap — rejected loudly so a
+			// tagged int doesn't silently stutter at the stream rate.
+			if rep.interp {
+				rep.lerp = interp_lerp_kind(type_text)
+				if rep.lerp == "" {
+					error_at(
+						floc,
+						"%s.%s: `interp` needs a float-based field (f32/f64, float vectors/colors, or fixed arrays of them) — %q can only snap between samples; drop `interp` or use a float type",
+						s.struct_name,
+						field_label,
+						type_text,
+					)
+					continue
+				}
+			}
 			// Multi-name fields (`x, y: f32 `gd:"replicate"``) replicate each name.
 			for nm in f.names {
 				ident, iok := nm.derived.(^ast.Ident)
@@ -810,6 +826,36 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 	}
 
 	return s, true
+}
+
+// Classify a `gd:"replicate,interp"` field's type into a knet.Lerp_Kind literal
+// — how stream sampling blends it between two snapshots. f32/f64 scalars, fixed
+// arrays of them, and the engine's float value types (real_t = f32 in standard
+// builds) lerp; everything else returns "" and the caller rejects the tag.
+interp_lerp_kind :: proc(type_text: string) -> string {
+	t := strings.trim_space(type_text)
+	// fixed arrays: [N]f32 / [N]f64 (and nested, e.g. [2][2]f32)
+	if strings.has_prefix(t, "[") {
+		if i := strings.index_byte(t, ']'); i >= 0 {
+			return interp_lerp_kind(t[i + 1:])
+		}
+		return ""
+	}
+	switch t {
+	case "f32":
+		return ".F32"
+	case "f64":
+		return ".F64"
+	}
+	base := t
+	if i := strings.last_index(base, "."); i >= 0 {
+		base = base[i + 1:]
+	}
+	switch base {
+	case "Vector2", "Vector3", "Vector4", "Quaternion", "Color":
+		return ".F32"
+	}
+	return ""
 }
 
 // Map a command-arg type to kit/net's wire read_/write_ proc suffix plus the

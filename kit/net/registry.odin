@@ -30,6 +30,7 @@ Registry_Entry :: struct {
 	set:    ^Command_Set, // commands + Entity_Desc (desc-only entities use an empty command table)
 	shadow: []u8,
 	owner:  Player_Id, // PLAYER_ID_INVALID = host-owned
+	stream: Stream_Ring, // remote-owned entities: buffered owner-stream snapshots
 }
 
 Registry :: struct {
@@ -42,8 +43,9 @@ registry_make :: proc(allocator := context.allocator) -> Registry {
 }
 
 registry_destroy :: proc(reg: ^Registry) {
-	for _, e in reg.entries {
+	for _, &e in reg.entries {
 		delete(e.shadow)
+		stream_ring_destroy(&e.stream)
 	}
 	delete(reg.entries)
 	reg.entries = nil
@@ -83,6 +85,7 @@ registry_remove :: proc(reg: ^Registry, id: Net_Id) -> bool {
 		return false
 	}
 	delete(e.shadow)
+	stream_ring_destroy(&e.stream)
 	delete_key(&reg.entries, id)
 	return true
 }
@@ -284,6 +287,95 @@ registry_commit_shadows :: proc(reg: ^Registry) {
 	for _, &e in reg.entries {
 		shadow_capture(e.entity, e.shadow, e.set.entity_desc)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Owner streams: the per-tick walk for the fields the HOST does not own.
+//
+// Batch layout: [sender_time f64][count u16] then count × ([net_id u32]
+// [len u16][streamed fields]). Unlike delta batches, every entity carries its
+// byte LENGTH: streams ride the UNRELIABLE channel, so a batch may arrive
+// before the spawn that would make its ids known — an unknown id is simply
+// skipped by length instead of abandoning the batch (the next tick supersedes
+// everything anyway). sender_time is the owner's clock; read it with
+// registry_stream_time before applying, then stamp the ring with whichever
+// timeline the session uses (arrival time, or sender time mapped through a
+// per-peer Clock_Sync).
+
+// Write one stream batch for every entity owned by `me`. Returns the entity
+// count; 0 = nothing owned that streams (skip the send).
+registry_write_streams :: proc(w: ^Writer, reg: ^Registry, me: Player_Id, sender_now: f64) -> int {
+	write_f64(w, sender_now)
+	count_at := len(w.buf)
+	write_u16(w, 0) // patched below
+	count := 0
+	for _, &e in reg.entries {
+		if e.owner != me {
+			continue
+		}
+		n := stream_data_size(e.set.entity_desc)
+		if n == 0 {
+			continue
+		}
+		assert(n <= int(max(u16)))
+		write_net_id(w, e.id)
+		write_u16(w, u16(n))
+		stream_write(w, e.entity, e.set.entity_desc)
+		count += 1
+	}
+	assert(count <= int(max(u16)))
+	w.buf[count_at] = u8(count)
+	w.buf[count_at + 1] = u8(count >> 8)
+	return count
+}
+
+// The batch's sender-clock stamp — call once, before registry_apply_streams.
+registry_stream_time :: proc(r: ^Reader) -> f64 {
+	return read_f64(r)
+}
+
+// Buffer a received stream batch into the target entities' rings, stamped with
+// `stamp` (the caller's timeline — see the header comment). Entities that are
+// unknown, owned by `me` (never accept a stream for state this peer is
+// authoritative over), or size-mismatched are skipped by length. Returns how
+// many entities were buffered.
+registry_apply_streams :: proc(r: ^Reader, reg: ^Registry, me: Player_Id, stamp: f64) -> int {
+	count := int(read_u16(r))
+	applied := 0
+	for _ in 0 ..< count {
+		id := read_net_id(r)
+		n := int(read_u16(r))
+		if r.err || r.off + n > len(r.data) {
+			r.err = true
+			break
+		}
+		blob := r.data[r.off:r.off + n]
+		r.off += n
+		e, ok := reg.entries[id]
+		if !ok || e.owner == me || n != stream_data_size(e.set.entity_desc) {
+			continue
+		}
+		stream_ring_push(&e.stream, stamp, blob)
+		reg.entries[id] = e // ring bookkeeping changed; store back (no map addressing)
+		applied += 1
+	}
+	return applied
+}
+
+// Sample every remote-owned entity's ring at time `t`, writing interpolated
+// values into the entities' streamed fields. Call once per FRAME (not per net
+// tick) with t = timeline_now - interp delay. Returns how many entities moved.
+registry_sample_streams :: proc(reg: ^Registry, t: f64, me: Player_Id) -> int {
+	sampled := 0
+	for _, &e in reg.entries {
+		if e.owner == me || e.stream.count == 0 {
+			continue
+		}
+		if stream_ring_sample(&e.stream, t, e.entity, e.set.entity_desc) {
+			sampled += 1
+		}
+	}
+	return sampled
 }
 
 // ---------------------------------------------------------------------------
