@@ -826,3 +826,144 @@ stats_survive_reconnect :: proc(t: ^testing.T) {
 	testing.expect(t, found, "join-time stats snapshot must carry the schema")
 	testing.expect_value(t, ksess.session_stat(&alice2.s, alice2.s.me, akills), i64(5))
 }
+
+// ---- backup hosting: the snapshot ships, and it is genuinely re-hostable -------
+
+@(test)
+backup_ships_to_the_eldest_client :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+	ksess.session_start_replicating(&host.s)
+
+	// The target-change trigger fires on the next low-rate tick — no waiting
+	// out the full refresh interval for the FIRST backup.
+	now := 50.0
+	for _ in 0 ..< 10 {
+		step(boxes, &now)
+	}
+	testing.expect(t, len(alice.s.backup) > 0, "the eldest client holds the blob")
+	testing.expect_value(t, len(bob.s.backup), 0)
+	got_ev := false
+	for ev in drain(&alice.s) {
+		if b, ok := ev.(ksess.Ev_Backup_Received); ok && b.size > 0 {
+			got_ev = true
+		}
+	}
+	testing.expect(t, got_ev)
+
+	// The eldest leaves: the duty (and the blob) moves to the next client.
+	ksess.session_peer_disconnected(&host.s, 100)
+	for _ in 0 ..< 10 {
+		step([]^Peer_Box{&host, &bob}, &now)
+	}
+	testing.expect(t, len(bob.s.backup) > 0, "the duty must move when the target leaves")
+}
+
+@(test)
+resume_run_from_backup :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+
+	// A real run: two entities (one owned by bob), stats on the board.
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+
+	world_bot := Bot{hp = 30, x = 3}
+	wid := ksess.session_spawn(&host.s, BOT_TYPE, &world_bot, &bot_command_set)
+	pawn := Bot{hp = 10, x = 1}
+	pid := ksess.session_spawn(&host.s, BOT_TYPE, &pawn, &bot_command_set, owner = bob.s.me)
+	ksess.session_start_replicating(&host.s)
+
+	kills := ksess.session_stat_column(&host.s, "kills")
+	ksess.session_stat_set(&host.s, bob.s.me, kills, 9)
+	world_bot.hp = 21 // post-spawn mutation: the backup must carry CURRENT state
+
+	now := 50.0
+	for _ in 0 ..< 10 {
+		step(boxes, &now)
+	}
+	testing.expect(t, len(alice.s.backup) > 0)
+
+	// THE HOST DIES. Alice's game copies the blob out of the dead session and
+	// resumes the run as the new host (fresh session, factory installed).
+	blob := make([]u8, len(alice.s.backup))
+	defer delete(blob)
+	copy(blob, alice.s.backup)
+	old_me := alice.s.me
+
+	host2: Peer_Box
+	box_make(&host2, 1)
+	defer box_destroy(&host2)
+	testing.expect(t, ksess.session_host_resume(&host2.s, old_me, "alice", blob))
+
+	// The roster survived: 3 players, only alice connected; identity table
+	// intact for everyone who ever JOINed (the dead host has no token — v1).
+	testing.expect_value(t, ksess.session_count(&host2.s), 3)
+	testing.expect_value(t, ksess.session_count(&host2.s, connected_only = true), 1)
+	me, _ := ksess.session_player(&host2.s, old_me)
+	testing.expect(t, me.connected && me.peer == ksess.HOST_PEER)
+
+	// The world survived, through HER factory, with post-mutation values.
+	rebot := host2.bots[wid]
+	testing.expect(t, rebot != nil, "resume must recreate entities")
+	testing.expect_value(t, rebot.hp, i32(21))
+	k2, kfound := ksess.session_stat_find(&host2.s, "kills")
+	testing.expect(t, kfound)
+	testing.expect_value(t, ksess.session_stat(&host2.s, bob.s.me, k2), i64(9))
+
+	// Bob rejoins the RESUMED run with his old token: same id, his stats, and
+	// his OWNED pawn back under his authority — streams flow again.
+	bob2: Peer_Box
+	box_make(&bob2, 500)
+	defer box_destroy(&bob2)
+	ksess.session_client_start(&bob2.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob2.s)
+	boxes2 := []^Peer_Box{&host2, &bob2}
+	pump(boxes2)
+
+	testing.expect_value(t, bob2.s.me, bob.s.me) // identity reclaimed across HOSTS
+	repawn := bob2.bots[pid]
+	testing.expect(t, repawn != nil)
+	e, _ := knet.registry_get(&bob2.s.reg, pid)
+	testing.expect_value(t, e.owner, bob2.s.me)
+	bk, _ := ksess.session_stat_find(&bob2.s, "kills")
+	testing.expect_value(t, ksess.session_stat(&bob2.s, bob2.s.me, bk), i64(9))
+
+	repawn.x = 42
+	step(boxes2, &now)
+	step(boxes2, &now)
+	now += 1.0
+	_, _ = ksess.session_tick(&host2.s, 0.0, now)
+	rpawn := host2.bots[pid]
+	testing.expect(t, rpawn != nil)
+	testing.expect_value(t, rpawn.x, f32(42)) // owner streams flow to the NEW host
+
+	// Allocation cursors came through: nothing collides.
+	fresh := Bot{hp = 1}
+	nid := ksess.session_spawn(&host2.s, BOT_TYPE, &fresh, &bot_command_set)
+	testing.expect(t, nid != wid && nid != pid)
+	testing.expect(t, host2.s.next_player > bob.s.me)
+}

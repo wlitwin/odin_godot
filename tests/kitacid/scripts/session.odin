@@ -125,6 +125,7 @@ acid_session_start_host :: proc(self: ^AcidSession, port: gd.Int) {
 	self.ses.send = session_send
 	self.ses.send_user = self
 	ksess.session_host_start(&self.ses, "host")
+	self.ses.backup_every = 40 // refresh the backup snapshot every 2s in-test
 	self.strikes_col = ksess.session_stat_column(&self.ses, "strikes")
 	self.started = true
 	gd.print_str("ACID_HOST_OK")
@@ -279,6 +280,9 @@ drain_events :: proc(self: ^AcidSession, now: f64) {
 			)
 		case ksess.Ev_Despawned:
 			gd.print_str(fmt.tprintf("ACID_DESPAWN id=%d", u32(e.id)))
+		case ksess.Ev_Backup_Received:
+			// Exactly ONE client is the designated backup host (the eldest).
+			gd.print_str(fmt.tprintf("ACID_BACKUP bytes=%d", e.size))
 		case ksess.Ev_Stats_Updated:
 			// Verify the scoreboard once the owner's 2 confirmed strikes show:
 			// schema by name, values by player, our own ping measured BY the

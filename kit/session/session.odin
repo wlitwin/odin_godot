@@ -82,6 +82,10 @@ Ev_Despawned :: struct {
 
 Ev_Stats_Updated :: struct {} // (client) a stat snapshot landed — repaint scoreboards
 
+Ev_Backup_Received :: struct {
+	size: int, // (client) we are the designated backup host; the blob is stored
+}
+
 Ev_State_Applied :: struct {
 	entities: int, // (client) a host state batch landed on this many entities
 }
@@ -107,6 +111,7 @@ Event :: union {
 	Ev_Spawned,
 	Ev_Despawned,
 	Ev_Stats_Updated,
+	Ev_Backup_Received,
 	Ev_State_Applied,
 	Ev_Command_Executed,
 	Ev_Command_Confirmed,
@@ -180,6 +185,8 @@ SES_DESPAWN :: u8(12) // host -> all  [id]
 SES_WORLD :: u8(13) // host -> one    [count u16] x the SES_SPAWN tuple (join snapshot)
 @(private)
 SES_STATS :: u8(14) // host -> all    [cols u8] x [name] + [players u16] x ([id][cols x i64])
+@(private)
+SES_BACKUP :: u8(15) // host -> ONE   the full re-hostable session snapshot (opaque to the client)
 
 // Remote entities render this far in the past (~3 net ticks at 20 Hz): almost
 // always a bracketing sample pair, smooth through jitter and single drops.
@@ -217,6 +224,14 @@ Session :: struct {
 	stats:       map[knet.Player_Id][MAX_STAT_COLS]i64,
 	stats_dirty: bool, // host: snapshot goes out on the next low-rate tick
 
+	// backup hosting (migration-readiness): the host periodically ships a
+	// complete re-hostable snapshot to the ELDEST connected client
+	backup_every:  u64, // net ticks between refreshes (default 100 = 5s)
+	backup_tick:   u64, // host: when the last one shipped
+	backup_target: knet.Player_Id, // host: who holds it
+	backup:        []u8, // client: the latest blob (opaque; owned)
+	backup_at:     f64, // client: when it arrived (session now)
+
 	// host bookkeeping
 	next_player: knet.Player_Id,
 	tokens:      map[u64]knet.Player_Id, // reconnect identity, forever
@@ -237,7 +252,21 @@ session_init :: proc(s: ^Session) {
 	// Commands always go host-ward through the session's own framing.
 	s.ctx.send = ctx_send_command
 	s.ctx.send_user = s
+	s.backup_every = 100
 	append(&s.stat_names, strings.clone("ping")) // STAT_PING, fed by the session
+}
+
+// Reconnect tokens are stored HASHED, so the backup snapshot can carry the
+// token->player table to a would-be new host without handing anyone the
+// secrets themselves (a rejoining client sends its raw token; any host —
+// original or resumed — hashes and matches). splitmix64: good avalanche,
+// zero dependencies.
+@(private = "file")
+token_hash :: proc(token: u64) -> u64 {
+	z := token + 0x9E3779B97F4A7C15
+	z = (z ~ (z >> 30)) * 0xBF58476D1CE4E5B9
+	z = (z ~ (z >> 27)) * 0x94D049BB133111EB
+	return z ~ (z >> 31)
 }
 
 session_destroy :: proc(s: ^Session) {
@@ -258,6 +287,7 @@ session_destroy :: proc(s: ^Session) {
 	}
 	delete(s.stat_names)
 	delete(s.stats)
+	delete(s.backup)
 	s^ = {}
 }
 
@@ -531,6 +561,19 @@ net_tick :: proc(s: ^Session) {
 			s.stats_dirty = false
 			send_stats(s)
 		}
+		// Backup hosting: keep the ELDEST connected client holding a fresh
+		// re-hostable snapshot — refreshed on the interval, and immediately
+		// when the target changes (first client seats, old target leaves).
+		if s.replicating {
+			target := backup_target(s)
+			if target != knet.PLAYER_ID_INVALID &&
+			   (target != s.backup_target || t - s.backup_tick >= s.backup_every) {
+				s.backup_target = target
+				s.backup_tick = t
+				p, _ := s.players[target]
+				send_backup(s, p.peer)
+			}
+		}
 	}
 
 	if n := knet.registry_expire_pending(&s.reg, &s.ctx, DEFAULT_PENDING_MAX_AGE); n > 0 {
@@ -554,6 +597,142 @@ broadcast :: proc(s: ^Session, bytes: []u8, channel: Channel) {
 // This peer's clock estimate for `peer` (zero value until a pong lands).
 session_clock :: proc(s: ^Session, peer: int) -> knet.Clock_Sync {
 	return s.clocks[peer]
+}
+
+// The eldest connected client (lowest Player_Id) — deterministic, stable
+// across everything except that player leaving.
+@(private = "file")
+backup_target :: proc(s: ^Session) -> knet.Player_Id {
+	best := knet.PLAYER_ID_INVALID
+	for _, p in s.players {
+		if !p.connected || p.id == s.me {
+			continue
+		}
+		if best == knet.PLAYER_ID_INVALID || p.id < best {
+			best = p.id
+		}
+	}
+	return best
+}
+
+// The re-hostable snapshot: everything a client needs to BECOME the host of
+// this run — identity table (hashed tokens), roster names, allocation
+// cursors, the stat registry, and every entity as a spawn tuple. The client
+// stores it opaquely; session_host_resume parses it.
+//
+// Layout: [next_player u64]
+//         [cols u8] x [name string]
+//         [players u16] x ([id u64][name string][token_hash u64][cols x i64])
+//         [next_net_id u32]
+//         [entities u16] x the SES_SPAWN tuple
+@(private = "file")
+send_backup :: proc(s: ^Session, peer: int) {
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_u8(&w, SES_BACKUP)
+	knet.write_u64(&w, u64(s.next_player))
+	knet.write_u8(&w, u8(len(s.stat_names)))
+	for n in s.stat_names {
+		knet.write_string(&w, n)
+	}
+	assert(len(s.players) <= int(max(u16)))
+	knet.write_u16(&w, u16(len(s.players)))
+	for _, p in s.players {
+		knet.write_player_id(&w, p.id)
+		knet.write_string(&w, p.name)
+		hash := u64(0)
+		for h, id in s.tokens {
+			if id == p.id {
+				hash = h
+			}
+		}
+		knet.write_u64(&w, hash) // 0 for the host itself (hosts never JOINed)
+		row, _ := s.stats[p.id]
+		for i in 0 ..< len(s.stat_names) {
+			knet.write_i64(&w, row[i])
+		}
+	}
+	knet.write_u32(&w, u32(s.reg.next_id))
+	assert(knet.registry_count(&s.reg) <= int(max(u16)))
+	knet.write_u16(&w, u16(knet.registry_count(&s.reg)))
+	for id in s.types {
+		write_spawn_tuple(s, &w, id)
+	}
+	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
+}
+
+// Become the host of a run someone else was hosting, from a backup blob this
+// session (or a previous run's session) received as the designated backup.
+// Call on a FRESH session with the factory already installed; `me` is the
+// caller's own Player_Id from the dead run. Every other player comes back
+// disconnected — they rejoin with their tokens and reclaim ids, stats, and
+// owned entities exactly like any reconnect. The dead run's HOST has no
+// token (hosts never JOIN), so in v1 it returns as a NEW player.
+// Returns false on a corrupt blob (destroy the session and start clean).
+session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backup: []u8) -> bool {
+	assert(s.factory_make != nil, "resume recreates entities through the factory — install it first")
+	session_init(s)
+	s.is_host = true
+	s.ctx.is_authority = true
+	s.me = me
+	s.joined = true
+
+	r := knet.reader_make(backup)
+	s.next_player = knet.Player_Id(knet.read_u64(&r))
+	cols := int(knet.read_u8(&r))
+	if r.err || cols > MAX_STAT_COLS {
+		return false
+	}
+	for n in s.stat_names { // replace the init-time default schema wholesale
+		delete(n)
+	}
+	clear(&s.stat_names)
+	for _ in 0 ..< cols {
+		append(&s.stat_names, strings.clone(knet.read_string(&r)))
+	}
+	players := int(knet.read_u16(&r))
+	if r.err {
+		return false
+	}
+	for _ in 0 ..< players {
+		id := knet.read_player_id(&r)
+		pname := knet.read_string(&r)
+		hash := knet.read_u64(&r)
+		row: [MAX_STAT_COLS]i64
+		for i in 0 ..< cols {
+			row[i] = knet.read_i64(&r)
+		}
+		if r.err {
+			return false
+		}
+		mine := id == me
+		s.players[id] = Player {
+			id        = id,
+			name      = strings.clone(mine ? name : pname),
+			peer      = mine ? HOST_PEER : 0,
+			connected = mine,
+		}
+		if hash != 0 {
+			s.tokens[hash] = id
+		}
+		s.stats[id] = row
+	}
+	next_net := knet.Net_Id(knet.read_u32(&r))
+	entities := int(knet.read_u16(&r))
+	if r.err {
+		return false
+	}
+	for _ in 0 ..< entities {
+		apply_spawn_tuple(s, &r)
+		if r.err {
+			return false
+		}
+	}
+	s.reg.next_id = max(s.reg.next_id, next_net)
+	knet.registry_commit_shadows(&s.reg)
+	s.replicating = true // the world is live: rejoiners get SES_WORLD + stats
+	s.stats_dirty = true
+	return true
 }
 
 // Full stat snapshot: schema + every player's row. Small (16 cols x 8 players
@@ -681,7 +860,7 @@ host_handle_join :: proc(s: ^Session, peer: int, r: ^knet.Reader) {
 		return
 	}
 
-	id, known := s.tokens[token]
+	id, known := s.tokens[token_hash(token)]
 	rejoin := false
 	if known {
 		// The token IS the identity: reclaim it. If the roster still shows the
@@ -700,7 +879,7 @@ host_handle_join :: proc(s: ^Session, peer: int, r: ^knet.Reader) {
 	} else {
 		id = s.next_player
 		s.next_player += 1
-		s.tokens[token] = id
+		s.tokens[token_hash(token)] = id
 		s.players[id] = Player {
 			id        = id,
 			name      = strings.clone(name),
@@ -902,6 +1081,18 @@ session_handle_packet :: proc(s: ^Session, from_peer: int, r: ^knet.Reader) {
 			s.factory_free(s.factory_user, id, e.entity)
 		}
 		append(&s.events, Ev_Despawned{id = id})
+	case SES_BACKUP:
+		if s.is_host || !s.joined {
+			return
+		}
+		// We are the designated backup host: keep the blob, opaque, replacing
+		// any older one. Parsing happens only if we ever resume.
+		blob := r.data[r.off:]
+		delete(s.backup)
+		s.backup = make([]u8, len(blob))
+		copy(s.backup, blob)
+		s.backup_at = s.now
+		append(&s.events, Ev_Backup_Received{size = len(blob)})
 	case SES_STATS:
 		if s.is_host || !s.joined {
 			return

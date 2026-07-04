@@ -159,6 +159,12 @@ attempt() {
 		&& { echo "  FAIL: the observer issued a command?!"; ok=0; }
 	grep -q "OBSERVER_DONE" "$olog" || { echo "  FAIL: observer did not finish cleanly"; ok=0; }
 
+	# ---- backup hosting: exactly ONE client holds the re-hostable snapshot ----
+	local nbackup=$(( $(grep -c "ACID_BACKUP bytes=" "$wlog") > 0 ? 1 : 0 ))
+	local obackup=$(( $(grep -c "ACID_BACKUP bytes=" "$olog") > 0 ? 1 : 0 ))
+	[[ $((nbackup + obackup)) == 1 ]] \
+		|| { echo "  FAIL: expected exactly one designated backup client (owner=$nbackup observer=$obackup)"; ok=0; }
+
 	# ---- nothing lost, nothing torn, anywhere ----
 	if grep -q "ACID_EXPIRED\|ACID_ERR\|ACID_CLOCK ok=false" "$slog" "$wlog" "$olog"; then
 		echo "  FAIL: expiry/error/clock-failure sentinel present:"
