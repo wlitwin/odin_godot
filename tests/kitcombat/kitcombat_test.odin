@@ -125,6 +125,90 @@ earliest_along_the_path_wins :: proc(t: ^testing.T) {
 }
 
 @(test)
+predicted_hp_dips_then_squares_with_truth :: proc(t: ^testing.T) {
+	ph: kcombat.Predicted_Hp
+	hp := i32(100) // the replicated field, moved only by the host
+
+	// My rock visually connects: the DISPLAYED number dips this frame.
+	kcombat.php_note_hit(&ph, hp, 35, 1.0)
+	testing.expect_value(t, kcombat.php_display(&ph, hp, 1.05), i32(65))
+
+	// The authoritative delta lands: the real field drops, the overlay is
+	// consumed, the number I show does NOT move twice.
+	hp = 65
+	testing.expect_value(t, kcombat.php_display(&ph, hp, 1.25), i32(65))
+	testing.expect_value(t, ph.pending, i32(0))
+	hp = 40 // later, unrelated damage passes straight through
+	testing.expect_value(t, kcombat.php_display(&ph, hp, 1.3), i32(40))
+}
+
+@(test)
+predicted_hp_heals_back_when_truth_disagrees :: proc(t: ^testing.T) {
+	ph: kcombat.Predicted_Hp
+	hp := i32(100)
+
+	// I saw a hit; the host saw a dodge. No delta ever comes...
+	kcombat.php_note_hit(&ph, hp, 35, 1.0)
+	testing.expect_value(t, kcombat.php_display(&ph, hp, 1.2), i32(65))
+	// ...so the dip expires and the bar heals back: wrong for a heartbeat,
+	// honest forever after.
+	testing.expect_value(t, kcombat.php_display(&ph, hp, 1.0 + kcombat.PHP_TTL), i32(100))
+}
+
+@(test)
+predictions_wound_but_never_kill :: proc(t: ^testing.T) {
+	ph: kcombat.Predicted_Hp
+	hp := i32(20)
+
+	// Two visual contacts before any delta: 20 - 70 would be a corpse, but
+	// corpses appear only on truth — the display floors at 1.
+	kcombat.php_note_hit(&ph, hp, 35, 1.0)
+	kcombat.php_note_hit(&ph, hp, 35, 1.1)
+	testing.expect_value(t, kcombat.php_display(&ph, hp, 1.2), i32(1))
+	// Truth arrives and it IS a kill: now the display says so.
+	hp = 0
+	testing.expect_value(t, kcombat.php_display(&ph, hp, 1.3), i32(0))
+}
+
+@(test)
+third_party_damage_consumes_the_overlay_first :: proc(t: ^testing.T) {
+	ph: kcombat.Predicted_Hp
+	hp := i32(100)
+
+	// I predict -35; meanwhile someone ELSE's confirmed -20 lands first.
+	kcombat.php_note_hit(&ph, hp, 35, 1.0)
+	hp = 80
+	testing.expect_value(t, kcombat.php_display(&ph, hp, 1.1), i32(65)) // still my dip
+	testing.expect_value(t, ph.pending, i32(15)) // partially consumed
+	hp = 45 // my hit confirms too
+	testing.expect_value(t, kcombat.php_display(&ph, hp, 1.2), i32(45))
+	testing.expect_value(t, ph.pending, i32(0))
+}
+
+@(test)
+fire_announcements_round_trip :: proc(t: ^testing.T) {
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	out := kcombat.Fire {
+		shooter = knet.Player_Id(7),
+		origin  = {200, 180, 0},
+		vel     = {12, -3, 0},
+		ttl     = 24,
+		kind    = 1,
+	}
+	kcombat.fire_write(&w, out)
+	r := knet.reader_make(knet.writer_bytes(&w))
+	back, ok := kcombat.fire_read(&r)
+	testing.expect(t, ok)
+	testing.expect_value(t, back, out)
+
+	// A truncated announcement reads as not-ok, never as garbage.
+	short := knet.reader_make(knet.writer_bytes(&w)[:10])
+	_, bad := kcombat.fire_read(&short)
+	testing.expect(t, !bad)
+}
+
+@(test)
 combat_stats_publish_into_the_registry :: proc(t: ^testing.T) {
 	s: ksess.Session
 	dummy_send :: proc(user: rawptr, to_peer: int, bytes: []u8, channel: ksess.Channel) {}

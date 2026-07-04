@@ -61,7 +61,6 @@ SPEL_TYPE :: ksess.Entity_Type(1)
 CHEST_TYPE :: ksess.Entity_Type(2)
 DOOR_TYPE :: ksess.Entity_Type(3)
 PICKUP_TYPE :: ksess.Entity_Type(4)
-ROCK_TYPE :: ksess.Entity_Type(5)
 
 WALK_SPEED :: f32(120) // px/s
 
@@ -83,15 +82,23 @@ SPAWN_Y :: f32(120)
 SPEL_CMD_DROP :: u16(0)
 SPEL_CMD_THROW :: u16(1)
 
-// Rocks declare no commands, so scriptgen emits only their descriptor.
-rock_set := knet.Command_Set{entity_desc = &rock_net_desc}
+// kit/comms rides SES_APP tag 0; fire announcements ride tag 1.
+TAG_FIRE :: u8(1)
+FIRE_ROCK :: u8(1)
 
-// One rock in flight: the authoritative sim (host only) + the entity that
-// shows it (host-owned, so the sim's positions stream to every peer).
+// One rock in the HOST's authoritative sim — the only rocks that hurt.
 Cave_Rock :: struct {
 	p:       kcombat.Projectile,
 	shooter: knet.Player_Id,
-	id:      knet.Net_Id,
+}
+
+// One rock on THIS screen — a peer-owned visual running the same sim math.
+// The shooter's spawns at cast time (zero RTT: press fire, see rock);
+// everyone else's spawns on the host's fire announcement.
+Visual_Rock :: struct {
+	p:       kcombat.Projectile,
+	shooter: knet.Player_Id,
+	node:    gd.Label,
 }
 
 // Injected receive latency for the acid run (CAVE_LATENCY ms): packets
@@ -120,7 +127,6 @@ CaveLobby :: struct {
 	chests:      map[knet.Net_Id]^Chest,
 	doors:       map[knet.Net_Id]^Door,
 	pickups:     map[knet.Net_Id]^Pickup,
-	rocks:       map[knet.Net_Id]^Rock,
 	nodes:       map[knet.Net_Id]gd.Node, // for freeing on despawn
 	avatar_of:   map[knet.Player_Id]knet.Net_Id,
 	me_spel:     ^Spelunker, // my avatar (nil until spawned)
@@ -133,6 +139,7 @@ CaveLobby :: struct {
 	// ---- combat (phase 4) ----
 	cols:       kcombat.Combat_Cols, // host: the auto-published ledger columns
 	flying:     [dynamic]Cave_Rock, // host: the authoritative rock sim
+	visuals:    [dynamic]Visual_Rock, // every peer: the rocks on THIS screen
 	respawn_at: map[knet.Net_Id]int, // host: resurrection clocks
 	host_ticks: int, // host: game ticks elapsed
 	hud_hp:     kui.Health_Bar,
@@ -234,6 +241,7 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	self.latency = f64(env_int("CAVE_LATENCY", 0)) / 1000.0
 	ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
 	ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
+	ksess.session_app_route(&self.ses, TAG_FIRE, self, cave_on_fire)
 	gd.print_str("CAVE_UI_READY")
 }
 
@@ -248,7 +256,7 @@ env_int :: proc(name: cstring, fallback: int) -> int {
 @(private = "file")
 refresh_hud :: proc(self: ^CaveLobby) {
 	if self.me_spel == nil {return}
-	kui.hp_refresh(&self.hud_hp, self.me_spel.hp, MAX_HP)
+	kui.hp_refresh(&self.hud_hp, hp_view(self.me_spel), MAX_HP)
 	defs := [?]kcombat.Ability_Def{ROCK_ABILITY}
 	kui.abilities_refresh(&self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.stamina)
 }
@@ -303,13 +311,6 @@ cave_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 		p.net_id = id
 		self.pickups[id] = p
 		return p, &pickup_command_set
-	case ROCK_TYPE:
-		node := spawn_node(self, "res://scripts/rock.odin")
-		self.nodes[id] = node
-		r := rt.script_of(node, Rock)
-		r.net_id = id
-		self.rocks[id] = r
-		return r, &rock_set
 	case CHEST_TYPE:
 		node := spawn_node(self, "res://scripts/chest.odin")
 		self.nodes[id] = node
@@ -339,7 +340,6 @@ cave_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	delete_key(&self.chests, id)
 	delete_key(&self.doors, id)
 	delete_key(&self.pickups, id)
-	delete_key(&self.rocks, id)
 }
 
 // THE CROSS-ENTITY HALF of looting, host only (see chest.odin): a successful
@@ -409,30 +409,101 @@ cave_command_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net
 	}
 }
 
-// Host: a confirmed throw launches the authoritative rock from the thrower
-// toward their recorded aim. The Rock ENTITY is only the visual — owned by
-// the host player, so the sim's positions stream to everyone.
 @(private = "file")
-cave_launch_rock :: proc(self: ^CaveLobby, shooter: knet.Player_Id, sp: ^Spelunker) {
+rock_fire :: proc(shooter: knet.Player_Id, sp: ^Spelunker) -> (f: kcombat.Fire, ok: bool) {
 	dx, dy := sp.aim.x, sp.aim.y
 	n := math.sqrt(dx * dx + dy * dy)
 	if n == 0 {return}
-	node := spawn_node(self, "res://scripts/rock.odin")
-	r := rt.script_of(node, Rock)
-	r.x = sp.x
-	r.y = sp.y
-	r.net_id = ksess.session_spawn(&self.ses, ROCK_TYPE, r, &rock_set, owner = self.ses.me)
-	self.rocks[r.net_id] = r
-	self.nodes[r.net_id] = node
-	append(&self.flying, Cave_Rock {
-		p = kcombat.Projectile {
-			pos  = {sp.x, sp.y, 0},
-			vel  = {dx / n * ROCK_SPEED, dy / n * ROCK_SPEED, 0},
-			left = ROCK_TTL,
+	return kcombat.Fire {
+			shooter = shooter,
+			origin  = {sp.x, sp.y, 0},
+			vel     = {dx / n * ROCK_SPEED, dy / n * ROCK_SPEED, 0},
+			ttl     = ROCK_TTL,
+			kind    = FIRE_ROCK,
 		},
-		shooter = shooter,
-		id      = r.net_id,
+		true
+}
+
+// A rock on THIS screen: a plain Label (no entity, no wire) flown by the
+// same sim math the host's damage runs on.
+@(private = "file")
+add_visual_rock :: proc(self: ^CaveLobby, f: kcombat.Fire) {
+	node := gd.new_label()
+	gd.set_string(cast(gd.Object)node, "text", "\xE2\x97\x8F") // ●
+	gd.add_child(self.world, cast(gd.Node)node)
+	gd.control_set_position(cast(gd.Control)node, {f.origin.x, f.origin.y}, false)
+	append(&self.visuals, Visual_Rock {
+		p = kcombat.Projectile{pos = f.origin, vel = f.vel, left = f.ttl},
+		shooter = f.shooter,
+		node = node,
 	})
+}
+
+// Host: a confirmed throw launches the AUTHORITATIVE rock (the only kind
+// that hurts), shows the host its own visual, and announces the fire so
+// every other peer draws theirs. The shooter's visual already flew at cast
+// time — it skips its own announcement.
+@(private = "file")
+cave_launch_rock :: proc(self: ^CaveLobby, shooter: knet.Player_Id, sp: ^Spelunker) {
+	f, ok := rock_fire(shooter, sp)
+	if !ok {return}
+	append(&self.flying, Cave_Rock{p = kcombat.Projectile{pos = f.origin, vel = f.vel, left = f.ttl}, shooter = shooter})
+	if shooter != self.ses.me {
+		add_visual_rock(self, f) // the host's screen (its own casts drew at cast time)
+	}
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	kcombat.fire_write(&w, f)
+	ksess.session_app_send(&self.ses, ksess.BROADCAST_PEER, TAG_FIRE, knet.writer_bytes(&w))
+}
+
+// Every peer: a fire announcement — draw the rock, unless it's my own echo
+// (mine flew at cast time). Only the host authors these.
+@(private = "file")
+cave_on_fire :: proc(user: rawptr, from: knet.Player_Id, from_peer: int, r: ^knet.Reader) {
+	self := cast(^CaveLobby)user
+	if self.ses.is_host || from_peer != ksess.HOST_PEER {return}
+	f, ok := kcombat.fire_read(r)
+	if !ok || f.shooter == self.ses.me {return}
+	add_visual_rock(self, f)
+}
+
+// Every peer, once per net tick: fly MY screen's rocks and, on visual
+// contact with a body, play the impact NOW — a predicted hp dip (overlay,
+// never the replicated field) and the effect. Truth arrives a beat later
+// and squares the number; if the host saw a miss, the dip heals back.
+@(private = "file")
+cave_visual_tick :: proc(self: ^CaveLobby) {
+	now := now_s()
+	for i := 0; i < len(self.visuals); {
+		v := &self.visuals[i]
+		from := v.p.pos
+		alive := kcombat.projectile_step(&v.p)
+		gd.control_set_position(cast(gd.Control)v.node, {v.p.pos.x, v.p.pos.y}, false)
+
+		targets := make([dynamic]kcombat.Target, context.temp_allocator)
+		for id, sp in self.spelunkers {
+			if id == self.avatar_of[v.shooter] || sp.hp <= 0 {continue}
+			append(&targets, kcombat.Target{id = u32(id), pos = {sp.x, sp.y, 0}, radius = BODY_RADIUS})
+		}
+		if hit, hit_ok := kcombat.projectile_hit(from, v.p.vel, targets[:]); hit_ok {
+			victim := self.spelunkers[knet.Net_Id(hit.id)]
+			truth := victim.hp
+			kcombat.php_note_hit(&victim.php, victim.hp, ROCK_DMG, now)
+			view := kcombat.php_display(&victim.php, victim.hp, now)
+			refresh_hud(self)
+			gd.print_str(fmt.tprintf("CAVE_IMPACT mine=%v view=%d truth=%d", v.shooter == self.ses.me, view, truth))
+			gd.node_queue_free(cast(gd.Node)v.node)
+			unordered_remove(&self.visuals, i)
+			continue
+		}
+		if !alive {
+			gd.node_queue_free(cast(gd.Node)v.node)
+			unordered_remove(&self.visuals, i)
+			continue
+		}
+		i += 1
+	}
 }
 
 // Host: death spills the whole bag onto the floor — phase 3's pickups are
@@ -445,16 +516,6 @@ cave_spill_bag :: proc(self: ^CaveLobby, sp: ^Spelunker) {
 		cave_mint_pickup(self, sp)
 	}
 	sp.bag = {}
-}
-
-@(private = "file")
-cave_remove_rock :: proc(self: ^CaveLobby, id: knet.Net_Id) {
-	ksess.session_despawn(&self.ses, id)
-	if node, ok := self.nodes[id]; ok {
-		gd.node_queue_free(node)
-		delete_key(&self.nodes, id)
-	}
-	delete_key(&self.rocks, id)
 }
 
 // The host's game tick (once per 20 Hz net tick): decay ability clocks and
@@ -475,10 +536,6 @@ cave_host_tick :: proc(self: ^CaveLobby) {
 		fl := &self.flying[i]
 		from := fl.p.pos
 		alive := kcombat.projectile_step(&fl.p)
-		if r, ok := self.rocks[fl.id]; ok {
-			r.x = fl.p.pos.x // the entity shows what the sim computes
-			r.y = fl.p.pos.y
-		}
 
 		targets := make([dynamic]kcombat.Target, context.temp_allocator)
 		for id, sp in self.spelunkers {
@@ -500,12 +557,10 @@ cave_host_tick :: proc(self: ^CaveLobby) {
 			} else {
 				_ = kcombat.effects_add(victim.fx[:], CHILL, 50, 40) // 2s of cold feet
 			}
-			cave_remove_rock(self, fl.id)
 			unordered_remove(&self.flying, i)
 			continue
 		}
 		if !alive {
-			cave_remove_rock(self, fl.id)
 			unordered_remove(&self.flying, i)
 			continue
 		}
@@ -659,9 +714,15 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 	}
 
 	ticks, _ := ksess.session_tick(&self.ses, delta, now_s())
-	if self.ses.is_host && self.started {
+	if self.started {
 		for _ in 0 ..< ticks {
-			cave_host_tick(self)
+			// Visuals fly FIRST: on the host, the impact you see and the
+			// damage the authority deals share a tick — noting the dip
+			// before the truth applies lets the overlay consume it cleanly.
+			cave_visual_tick(self) // every peer flies its own screen's rocks
+			if self.ses.is_host {
+				cave_host_tick(self)
+			}
 		}
 	}
 
@@ -760,6 +821,7 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 			drive_spelunker(self, delta)
 		}
 		update_prompt(self)
+		refresh_hud(self) // live bar + cooldown text (hosts get no state events)
 	}
 }
 
@@ -891,8 +953,14 @@ cave_lobby_throw :: proc(self: ^CaveLobby, dx: gd.Float, dy: gd.Float) {
 	if !self.started || self.me_spel == nil {return}
 	self.issue_at = now_s()
 	applied := spelunker_throw_cmd(&self.ses.ctx, self.me_spel, f32(dx), f32(dy))
-	if applied && self.ses.is_host {
-		cave_launch_rock(self, self.ses.me, self.me_spel) // the authority's inline half
+	if applied {
+		// Press fire, SEE rock — my visual flies this frame, no round trip.
+		if f, ok := rock_fire(self.ses.me, self.me_spel); ok {
+			add_visual_rock(self, f)
+		}
+		if self.ses.is_host {
+			cave_launch_rock(self, self.ses.me, self.me_spel) // the authority's inline half
+		}
 	}
 	refresh_hud(self)
 	gd.print_str(fmt.tprintf("CAVE_THROW predicted=%v stamina=%d cd=%d", applied, self.me_spel.stamina, self.me_spel.cds[0]))
@@ -923,13 +991,20 @@ cave_lobby_pickups :: proc(self: ^CaveLobby) -> gd.Int {
 
 @(gd_method)
 cave_lobby_rocks :: proc(self: ^CaveLobby) -> gd.Int {
-	return gd.Int(len(self.rocks))
+	return gd.Int(len(self.visuals))
+}
+
+// What this peer DRAWS for an hp: truth plus any predicted dip from impacts
+// seen on this screen (kcombat.php_display squares it with deltas).
+@(private = "file")
+hp_view :: proc(sp: ^Spelunker) -> i32 {
+	return kcombat.php_display(&sp.php, sp.hp, now_s())
 }
 
 @(gd_method)
 cave_lobby_my_hp :: proc(self: ^CaveLobby) -> gd.Int {
 	if self.me_spel == nil {return 0}
-	return gd.Int(self.me_spel.hp)
+	return gd.Int(hp_view(self.me_spel))
 }
 
 // The other spelunker's hp, as this peer sees it (2-player test scaffolding).
@@ -938,7 +1013,7 @@ cave_lobby_their_hp :: proc(self: ^CaveLobby) -> gd.Int {
 	my_av := self.avatar_of[self.ses.me]
 	for id, sp in self.spelunkers {
 		if id != my_av {
-			return gd.Int(sp.hp)
+			return gd.Int(hp_view(sp))
 		}
 	}
 	return 0

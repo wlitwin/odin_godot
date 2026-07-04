@@ -125,6 +125,12 @@ attempt() {
 	# bag, a respawn, and a truthful scoreboard.
 	grep -q "CAVE_THROW predicted=true stamina=7 cd=20" "$glog" || { echo "  FAIL: cast not predicted instantly"; ok=0; }
 	grep -qE "CAVE_CONFIRM dt_ms=(19[0-9]|[2-9][0-9]{2}|[0-9]{4,})" "$glog" || { echo "  FAIL: confirm arrived impossibly fast (latency not proven)"; ok=0; }
+	# PEER-OWNED VISUALS: the shooter's own rock visually connects and the
+	# displayed hp dips to 65 WHILE the replicated truth still reads 100 —
+	# the impact you saw, a round trip before the wire agrees. The victim's
+	# screen plays the same impact from the host's fire announcement.
+	grep -q "CAVE_IMPACT mine=true view=65 truth=100" "$glog" || { echo "  FAIL: shooter's impact not predicted ahead of truth"; ok=0; }
+	grep -q "CAVE_IMPACT mine=false" "$hlog" || { echo "  FAIL: victim's screen never played the impact"; ok=0; }
 	for log in "$hlog" "$glog"; do
 		grep -q "CAVE_ARMED" "$log" || { echo "  FAIL: never armed in $(basename "$log")"; ok=0; }
 		grep -q "CAVE_HIT hp=65" "$log" || { echo "  FAIL: the rock never landed in $(basename "$log")"; ok=0; }

@@ -26,6 +26,7 @@ Spelunker :: struct {
 	fx:        [2]kcombat.Effect `gd:"replicate"`, // status effects, host-decayed
 	last_drop: kitems.Slot, // scratch for the drop hook — never on the wire
 	aim:       [2]f32, // scratch for the throw hook — never on the wire
+	php:       kcombat.Predicted_Hp, // scratch: impacts SEEN here, pre-truth
 }
 
 // Drop a bag slot at my feet: my bag empties on my screen this frame; the

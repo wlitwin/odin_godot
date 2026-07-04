@@ -198,6 +198,90 @@ projectile_hit :: proc "contextless" (from: [3]f32, vel: [3]f32, targets: []Targ
 	return
 }
 
+// ---- fire announcements: everyone draws their own rocks ---------------------------
+//
+// The wire half of peer-owned visuals: when the host confirms a cast it
+// broadcasts a Fire (over the session's SES_APP), and EVERY peer runs the
+// same projectile sim locally for the visual — the shooter starts theirs at
+// cast time (zero RTT), everyone else on the announcement. Because the
+// announcement and the eventual hp delta ride the same one-way path, remote
+// visual impacts and health drops naturally coincide.
+
+Fire :: struct {
+	shooter: knet.Player_Id,
+	origin:  [3]f32,
+	vel:     [3]f32, // per tick
+	ttl:     u16,
+	kind:    u8, // game-defined (which ability/visual)
+}
+
+fire_write :: proc(w: ^knet.Writer, f: Fire) {
+	knet.write_player_id(w, f.shooter)
+	for i in 0 ..< 3 {knet.write_f32(w, f.origin[i])}
+	for i in 0 ..< 3 {knet.write_f32(w, f.vel[i])}
+	knet.write_u16(w, f.ttl)
+	knet.write_u8(w, f.kind)
+}
+
+fire_read :: proc(r: ^knet.Reader) -> (f: Fire, ok: bool) {
+	f.shooter = knet.read_player_id(r)
+	for i in 0 ..< 3 {f.origin[i] = knet.read_f32(r)}
+	for i in 0 ..< 3 {f.vel[i] = knet.read_f32(r)}
+	f.ttl = knet.read_u16(r)
+	f.kind = knet.read_u8(r)
+	return f, !r.err
+}
+
+// ---- predicted hp: the impact you SAW, before the wire agrees ---------------------
+//
+// When your local rock visually contacts a body, the health you display may
+// dip immediately — but the REPLICATED hp field is never touched (that is
+// how phantom damage stays impossible). The dip lives in this overlay:
+//
+//     kcombat.php_note_hit(&sp.php, sp.hp, ROCK_DMG, now)   // at visual contact
+//     shown := kcombat.php_display(&sp.php, sp.hp, now)     // wherever hp renders
+//
+// When the authoritative drop lands (a delta moves the real field), the
+// overlay is CONSUMED — the displayed number doesn't move twice. If truth
+// never confirms it (the host saw a miss), the overlay expires and the bar
+// heals back: wrong for a heartbeat, honest forever after. Overlay dips
+// never kill — clamp to 1 while the real hp is positive, so corpses appear
+// only on truth.
+
+Predicted_Hp :: struct {
+	pending: i32, // damage shown locally but not yet confirmed by a delta
+	basis:   i32, // the authoritative hp when the overlay was last squared
+	expires: f64, // heal-back deadline (seconds, caller's clock)
+}
+
+PHP_TTL :: 0.6 // seconds a dip may outrun truth (a generous round trip)
+
+php_note_hit :: proc "contextless" (ph: ^Predicted_Hp, hp_now: i32, amount: i32, now: f64) {
+	if ph.pending == 0 {
+		ph.basis = hp_now
+	}
+	ph.pending += amount
+	ph.expires = now + PHP_TTL
+}
+
+// The number to DRAW. Consumes the overlay as authoritative drops arrive;
+// expires it when truth never came.
+php_display :: proc "contextless" (ph: ^Predicted_Hp, hp_now: i32, now: f64) -> i32 {
+	if ph.pending > 0 {
+		if now >= ph.expires {
+			ph.pending = 0 // the host never agreed: heal back
+		} else if consumed := ph.basis - hp_now; consumed > 0 {
+			ph.pending = max(0, ph.pending - consumed) // truth landed: don't dip twice
+			ph.basis = hp_now
+		}
+	}
+	shown := max(0, hp_now - ph.pending)
+	if hp_now > 0 {
+		shown = max(shown, 1) // predictions wound; only truth kills
+	}
+	return shown
+}
+
 // ---- auto-published combat stats -------------------------------------------------
 
 Combat_Cols :: struct {
