@@ -219,6 +219,9 @@ refresh_hud :: proc(self: ^CaveLobby) {
 	kui.hp_refresh(&self.hud_hp, hp_view(self.me_spel), MAX_HP)
 	defs := [?]kcombat.Ability_Def{ROCK_ABILITY, HEAL_ABILITY}
 	kui.abilities_refresh(&self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.stamina)
+	// The bag too: hosts get no state events, and a verb-only repaint left
+	// the host's grid showing loot its death had long since spilled.
+	kui.inv_refresh(&self.inv, self.me_spel.bag[:], &self.table)
 }
 
 cave_lobby_ready :: proc(self: ^CaveLobby) {
