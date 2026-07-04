@@ -92,6 +92,9 @@ TESTS=(
     # kit/nav adapter: a U-shaped NavigationPolygon the engine path must bend
     # through, followed by a kit/ai walker with the next_point cursor.
     "kitnav|KITNAV_OK|tests/kitnav/run.sh"
+    # kit/save envelope: the save saga (save, die, resume, rejoin by token,
+    # still-playable) + foreign/corrupt saves refusing to parse.
+    "kitsave|KITSAVE_OK|tests/kitsave/run.sh"
     # gd:"replicate" codegen contract: scriptgen -> knet.Entity_Desc tables, POD
     # enforcement at scriptgen time (engine types) + consumer compile (#assert).
     "repgen|REPGEN_OK|tests/repgen/run.sh"

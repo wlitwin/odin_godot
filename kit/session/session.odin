@@ -685,49 +685,56 @@ backup_target :: proc(s: ^Session) -> knet.Player_Id {
 	return best
 }
 
-// The re-hostable snapshot: everything a client needs to BECOME the host of
-// this run — identity table (hashed tokens), roster names, allocation
-// cursors, the stat registry, and every entity as a spawn tuple. The client
-// stores it opaquely; session_host_resume parses it.
+// The re-hostable snapshot: everything needed to BECOME the host of this
+// run — identity table (hashed tokens), roster names, allocation cursors,
+// the stat registry, and every entity as a spawn tuple. session_host_resume
+// parses it. Two consumers: the backup-host wire (below) and kit/save, which
+// wraps it in a versioned file envelope — saving a run and surviving a dead
+// host are the SAME contract.
 //
 // Layout: [next_player u64]
 //         [cols u8] x [name string]
 //         [players u16] x ([id u64][name string][token_hash u64][cols x i64])
 //         [next_net_id u32]
 //         [entities u16] x the SES_SPAWN tuple
-@(private = "file")
-send_backup :: proc(s: ^Session, peer: int) {
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	knet.write_u8(&w, SES_BACKUP)
-	knet.write_u64(&w, u64(s.next_player))
-	knet.write_u8(&w, u8(len(s.stat_names)))
+session_snapshot :: proc(s: ^Session, w: ^knet.Writer) {
+	assert(s.is_host, "the authority owns the truth being snapshotted")
+	knet.write_u64(w, u64(s.next_player))
+	knet.write_u8(w, u8(len(s.stat_names)))
 	for n in s.stat_names {
-		knet.write_string(&w, n)
+		knet.write_string(w, n)
 	}
 	assert(len(s.players) <= int(max(u16)))
-	knet.write_u16(&w, u16(len(s.players)))
+	knet.write_u16(w, u16(len(s.players)))
 	for _, p in s.players {
-		knet.write_player_id(&w, p.id)
-		knet.write_string(&w, p.name)
+		knet.write_player_id(w, p.id)
+		knet.write_string(w, p.name)
 		hash := u64(0)
 		for h, id in s.tokens {
 			if id == p.id {
 				hash = h
 			}
 		}
-		knet.write_u64(&w, hash) // 0 for the host itself (hosts never JOINed)
+		knet.write_u64(w, hash) // 0 for the host itself (hosts never JOINed)
 		row, _ := s.stats[p.id]
 		for i in 0 ..< len(s.stat_names) {
-			knet.write_i64(&w, row[i])
+			knet.write_i64(w, row[i])
 		}
 	}
-	knet.write_u32(&w, u32(s.reg.next_id))
+	knet.write_u32(w, u32(s.reg.next_id))
 	assert(knet.registry_count(&s.reg) <= int(max(u16)))
-	knet.write_u16(&w, u16(knet.registry_count(&s.reg)))
+	knet.write_u16(w, u16(knet.registry_count(&s.reg)))
 	for id in s.types {
-		write_spawn_tuple(s, &w, id)
+		write_spawn_tuple(s, w, id)
 	}
+}
+
+@(private = "file")
+send_backup :: proc(s: ^Session, peer: int) {
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_u8(&w, SES_BACKUP)
+	session_snapshot(s, &w)
 	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
 }
 
