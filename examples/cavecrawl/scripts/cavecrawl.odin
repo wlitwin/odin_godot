@@ -58,12 +58,9 @@ TORCH :: kitems.Item_Id(2)
 SPEL_TYPE :: ksess.Entity_Type(1)
 CHEST_TYPE :: ksess.Entity_Type(2)
 DOOR_TYPE :: ksess.Entity_Type(3)
+PICKUP_TYPE :: ksess.Entity_Type(4)
 
 WALK_SPEED :: f32(120) // px/s
-
-// Spelunkers declare no commands, so scriptgen emits only their descriptor;
-// the registry still wants a set.
-spelunker_set := knet.Command_Set{entity_desc = &spelunker_net_desc}
 
 CaveLobby :: struct {
 	owner:     gd.Node,
@@ -82,6 +79,7 @@ CaveLobby :: struct {
 	spelunkers:  map[knet.Net_Id]^Spelunker,
 	chests:      map[knet.Net_Id]^Chest,
 	doors:       map[knet.Net_Id]^Door,
+	pickups:     map[knet.Net_Id]^Pickup,
 	nodes:       map[knet.Net_Id]gd.Node, // for freeing on despawn
 	avatar_of:   map[knet.Player_Id]knet.Net_Id,
 	me_spel:     ^Spelunker, // my avatar (nil until spawned)
@@ -221,7 +219,14 @@ cave_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 		self.nodes[id] = node
 		sp := rt.script_of(node, Spelunker)
 		track_spelunker(self, id, sp, owner)
-		return sp, &spelunker_set
+		return sp, &spelunker_command_set
+	case PICKUP_TYPE:
+		node := spawn_node(self, "res://scripts/pickup.odin")
+		self.nodes[id] = node
+		p := rt.script_of(node, Pickup)
+		p.net_id = id
+		self.pickups[id] = p
+		return p, &pickup_command_set
 	case CHEST_TYPE:
 		node := spawn_node(self, "res://scripts/chest.odin")
 		self.nodes[id] = node
@@ -250,6 +255,7 @@ cave_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	delete_key(&self.spelunkers, id)
 	delete_key(&self.chests, id)
 	delete_key(&self.doors, id)
+	delete_key(&self.pickups, id)
 }
 
 // THE CROSS-ENTITY HALF of looting, host only (see chest.odin): a successful
@@ -265,6 +271,37 @@ cave_credit :: proc(self: ^CaveLobby, player: knet.Player_Id, chest: ^Chest) {
 	}
 }
 
+// Host: mint the Pickup a drop left behind (the dropper's scratch tells us
+// what; the host's view of their avatar tells us where).
+@(private = "file")
+cave_mint_pickup :: proc(self: ^CaveLobby, sp: ^Spelunker) {
+	node := spawn_node(self, "res://scripts/pickup.odin")
+	p := rt.script_of(node, Pickup)
+	p.x = sp.x + 24 // at their feet, not under them
+	p.y = sp.y
+	p.item = sp.last_drop.item
+	p.count = sp.last_drop.count
+	p.net_id = ksess.session_spawn(&self.ses, PICKUP_TYPE, p, &pickup_command_set)
+	self.pickups[p.net_id] = p
+	self.nodes[p.net_id] = node
+}
+
+// Host: a grab succeeded — credit the grabber and remove the pickup for
+// everyone (clients free through the factory; the host frees its own node).
+@(private = "file")
+cave_settle_grab :: proc(self: ^CaveLobby, player: knet.Player_Id, id: knet.Net_Id, p: ^Pickup) {
+	if av, has := self.avatar_of[player]; has {
+		sp := self.spelunkers[av]
+		_ = kitems.add(&self.table, sp.bag[:], p.last_grab.item, p.last_grab.count)
+	}
+	ksess.session_despawn(&self.ses, id)
+	if node, ok := self.nodes[id]; ok {
+		gd.node_queue_free(node)
+		delete_key(&self.nodes, id)
+	}
+	delete_key(&self.pickups, id)
+}
+
 // Client commands land here right after they execute on the host.
 @(private = "file")
 cave_command_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
@@ -272,6 +309,14 @@ cave_command_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net
 	if !ok {return}
 	if chest, is_chest := self.chests[entity]; is_chest && cmd == 0 {
 		cave_credit(self, player, chest)
+		return
+	}
+	if sp, is_spel := self.spelunkers[entity]; is_spel && cmd == 0 {
+		cave_mint_pickup(self, sp)
+		return
+	}
+	if p, is_pickup := self.pickups[entity]; is_pickup && cmd == 0 {
+		cave_settle_grab(self, player, entity, p)
 	}
 }
 
@@ -308,7 +353,7 @@ cave_lobby_on_start :: proc(self: ^CaveLobby) {
 		sp.x = 80 + f32(i) * 60
 		sp.y = 120
 		i += 1
-		id := ksess.session_spawn(&self.ses, SPEL_TYPE, sp, &spelunker_set, owner = p.id)
+		id := ksess.session_spawn(&self.ses, SPEL_TYPE, sp, &spelunker_command_set, owner = p.id)
 		self.nodes[id] = node
 		track_spelunker(self, id, sp, p.id)
 	}
@@ -526,6 +571,9 @@ update_prompt :: proc(self: ^CaveLobby) {
 	for id, d in self.doors {
 		append(&cands, kinter.Candidate{id = u32(id), pos = {d.x, d.y, 0}})
 	}
+	for id, p in self.pickups {
+		append(&cands, kinter.Candidate{id = u32(id), pos = {p.x, p.y, 0}})
+	}
 	best, ok := kinter.pick(cands[:], {me.x, me.y, 0}, REACH)
 	if !ok {
 		self.target_kind = 0
@@ -536,6 +584,10 @@ update_prompt :: proc(self: ^CaveLobby) {
 	if _, is_chest := self.chests[self.target_id]; is_chest {
 		self.target_kind = 1
 		kui.prompt_set(&self.prompt, "E — loot chest")
+	} else if _, is_pickup := self.pickups[self.target_id]; is_pickup {
+		self.target_kind = 3
+		p := self.pickups[self.target_id]
+		kui.prompt_set(&self.prompt, fmt.ctprintf("E — pick up %s", kitems.items_name(&self.table, p.item)))
 	} else {
 		self.target_kind = 2
 		door := self.doors[self.target_id]
@@ -573,7 +625,33 @@ cave_lobby_interact :: proc(self: ^CaveLobby) {
 		door := self.doors[self.target_id]
 		applied := door_toggle_cmd(&self.ses.ctx, door, me.x, me.y)
 		gd.print_str(fmt.tprintf("CAVE_TOGGLE applied=%v open=%v", applied, door.open))
+	case 3:
+		id := self.target_id
+		p := self.pickups[id]
+		applied := pickup_grab_cmd(&self.ses.ctx, p, me.x, me.y)
+		if applied && self.ses.is_host {
+			cave_settle_grab(self, self.ses.me, id, p) // the authority's inline half
+			kui.inv_refresh(&self.inv, me.bag[:], &self.table)
+		}
+		gd.print_str(fmt.tprintf("CAVE_GRAB applied=%v", applied))
 	}
+}
+
+// Drop a bag slot at my feet (a real game binds this to a key / drag-out).
+@(gd_method)
+cave_lobby_drop :: proc(self: ^CaveLobby, slot: gd.Int) {
+	if !self.started || self.me_spel == nil {return}
+	applied := spelunker_drop_cmd(&self.ses.ctx, self.me_spel, i32(slot))
+	if applied && self.ses.is_host {
+		cave_mint_pickup(self, self.me_spel) // the authority's inline half
+	}
+	kui.inv_refresh(&self.inv, self.me_spel.bag[:], &self.table)
+	gd.print_str(fmt.tprintf("CAVE_DROP applied=%v", applied))
+}
+
+@(gd_method)
+cave_lobby_pickups :: proc(self: ^CaveLobby) -> gd.Int {
+	return gd.Int(len(self.pickups))
 }
 
 @(gd_method)
@@ -662,6 +740,11 @@ cave_lobby_world_gems :: proc(self: ^CaveLobby) -> gd.Int {
 	}
 	for _, sp in self.spelunkers {
 		total += kitems.count_of(sp.bag[:], GEM)
+	}
+	for _, p in self.pickups {
+		if p.item == GEM {
+			total += int(p.count)
+		}
 	}
 	return gd.Int(total)
 }

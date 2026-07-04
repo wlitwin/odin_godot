@@ -45,8 +45,9 @@ Chest :: struct {
 }
 
 Spelunker :: struct {
-	x, y: f32, // owner-streamed
-	bag:  [4]kitems.Slot, // replicated (host-authoritative; only the hook writes it)
+	x, y:      f32, // owner-streamed
+	bag:       [4]kitems.Slot, // replicated (host-authoritative; only the hook writes it)
+	last_drop: kitems.Slot, // scratch for the drop hook
 }
 
 Door :: struct {
@@ -54,8 +55,19 @@ Door :: struct {
 	open: bool, // replicated
 }
 
+// A dropped stack lying on the cave floor: an ordinary entity, spawned by
+// the drop hook, despawned by the grab hook.
+Pickup :: struct {
+	x, y:      f32,
+	item:      kitems.Item_Id, // replicated
+	count:     u16, // replicated (0 = already grabbed; predicted grabs zero it)
+	last_grab: kitems.Slot, // scratch for the grab hook
+}
+
 CHEST_TAKE :: u16(0) // args: [slot u8][count u16][px f32][py f32]
 DOOR_TOGGLE :: u16(0) // args: [px f32][py f32]
+SPEL_DROP :: u16(0) // args: [slot u8]
+PICKUP_GRAB :: u16(0) // args: [px f32][py f32]
 
 // The whole loot rule, written once, zero role branches: the predicting
 // client and the host run this same proc from byte-identical args.
@@ -83,6 +95,33 @@ door_cmd_toggle :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
 	return true
 }
 
+// Drop a bag slot on the floor: mutates MY avatar only (bag out, scratch in);
+// the hook turns the scratch into a Pickup entity at my feet.
+spel_cmd_drop :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+	sp := cast(^Spelunker)entity
+	slot := int(knet.read_u8(r))
+	if r.err {return false}
+	dropped := kitems.take(sp.bag[:], slot, max(u16))
+	if dropped.count == 0 {return false}
+	sp.last_drop = dropped
+	return true
+}
+
+// Grab a pickup: the contended race in its smallest form — one field pair,
+// zeroed by whoever the host says got there first.
+pickup_cmd_grab :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+	p := cast(^Pickup)entity
+	px := knet.read_f32(r)
+	py := knet.read_f32(r)
+	if r.err {return false}
+	if !kinter.in_range({px, py, 0}, {p.x, p.y, 0}, REACH) {return false}
+	if p.count == 0 {return false}
+	p.last_grab = kitems.Slot{item = p.item, count = p.count}
+	p.item = kitems.ITEM_NONE
+	p.count = 0
+	return true
+}
+
 // File-scope like generated code: the registry and factories keep pointers.
 chest_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Chest, x), size = size_of(f32)},
@@ -99,7 +138,18 @@ spel_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Spelunker, bag), size = size_of([4]kitems.Slot)},
 }
 spel_desc := knet.Entity_Desc{fields = spel_fields[:]}
-spel_set := knet.Command_Set{entity_desc = &spel_desc}
+spel_cmds := [?]knet.Command_Desc{{name = "drop", predict = true, invoke = spel_cmd_drop}}
+spel_set := knet.Command_Set{entity_desc = &spel_desc, commands = spel_cmds[:]}
+
+pickup_fields := [?]knet.Field_Desc {
+	{offset = offset_of(Pickup, x), size = size_of(f32)},
+	{offset = offset_of(Pickup, y), size = size_of(f32)},
+	{offset = offset_of(Pickup, item), size = size_of(kitems.Item_Id)},
+	{offset = offset_of(Pickup, count), size = size_of(u16)},
+}
+pickup_desc := knet.Entity_Desc{fields = pickup_fields[:]}
+pickup_cmds := [?]knet.Command_Desc{{name = "grab", predict = true, invoke = pickup_cmd_grab}}
+pickup_set := knet.Command_Set{entity_desc = &pickup_desc, commands = pickup_cmds[:]}
 
 door_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Door, x), size = size_of(f32)},
@@ -113,6 +163,7 @@ door_set := knet.Command_Set{entity_desc = &door_desc, commands = door_cmds[:]}
 CHEST_TYPE :: ksess.Entity_Type(1)
 SPEL_TYPE :: ksess.Entity_Type(2)
 DOOR_TYPE :: ksess.Entity_Type(3)
+PICKUP_TYPE :: ksess.Entity_Type(4)
 
 // ---- the peer harness ----------------------------------------------------------
 
@@ -129,7 +180,9 @@ Peer_Box :: struct {
 	chests:     map[knet.Net_Id]^Chest,
 	spelunkers: map[knet.Net_Id]^Spelunker,
 	doors:      map[knet.Net_Id]^Door,
+	pickups:    map[knet.Net_Id]^Pickup,
 	avatar_of:  map[knet.Player_Id]knet.Net_Id,
+	freed:      int, // factory frees observed (pickups despawn on grab)
 }
 
 box_send :: proc(user: rawptr, to_peer: int, bytes: []u8, channel: ksess.Channel) {
@@ -157,6 +210,10 @@ box_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, 
 		d := new(Door)
 		b.doors[id] = d
 		return d, &door_set
+	case PICKUP_TYPE:
+		p := new(Pickup)
+		b.pickups[id] = p
+		return p, &pickup_set
 	}
 	return nil, nil
 }
@@ -166,23 +223,46 @@ box_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	delete_key(&b.chests, id)
 	delete_key(&b.spelunkers, id)
 	delete_key(&b.doors, id)
+	delete_key(&b.pickups, id)
 	free(entity)
+	b.freed += 1
 }
 
-// THE cross-entity half, host only: a successful chest take credits the
-// issuer's bag; what doesn't fit goes back in the chest. Items cannot vanish.
+// THE cross-entity half, host only. Chest take: credit the issuer's bag,
+// overflow back in the chest. Drop: mint a Pickup entity at the dropper's
+// feet. Grab: credit and DESPAWN. Items cannot vanish anywhere in this.
 loot_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
 	b := cast(^Peer_Box)user
-	if !ok || cmd != CHEST_TAKE {return}
-	chest, is_chest := b.chests[entity]
-	if !is_chest {return}
+	if !ok {return}
 	av, has_avatar := b.avatar_of[player]
 	if !has_avatar {return}
 	spel := b.spelunkers[av]
-	credited := kitems.add(&b.table, spel.bag[:], chest.last_take.item, chest.last_take.count)
-	if leftover := chest.last_take.count - credited; leftover > 0 {
-		returned := kitems.add(&b.table, chest.slots[:], chest.last_take.item, leftover)
-		assert(returned == leftover, "the chest slot we just drained must have room back")
+
+	if chest, is_chest := b.chests[entity]; is_chest && cmd == CHEST_TAKE {
+		credited := kitems.add(&b.table, spel.bag[:], chest.last_take.item, chest.last_take.count)
+		if leftover := chest.last_take.count - credited; leftover > 0 {
+			returned := kitems.add(&b.table, chest.slots[:], chest.last_take.item, leftover)
+			assert(returned == leftover, "the chest slot we just drained must have room back")
+		}
+		return
+	}
+	if dropper, is_spel := b.spelunkers[entity]; is_spel && cmd == SPEL_DROP {
+		p := new(Pickup)
+		p.x = dropper.x
+		p.y = dropper.y
+		p.item = dropper.last_drop.item
+		p.count = dropper.last_drop.count
+		id := ksess.session_spawn(&b.s, PICKUP_TYPE, p, &pickup_set)
+		b.pickups[id] = p
+		return
+	}
+	if pickup, is_pickup := b.pickups[entity]; is_pickup && cmd == PICKUP_GRAB {
+		grabbed := pickup.last_grab
+		credited := kitems.add(&b.table, spel.bag[:], grabbed.item, grabbed.count)
+		assert(credited == grabbed.count, "test bags have room for grabs")
+		ksess.session_despawn(&b.s, entity)
+		delete_key(&b.pickups, entity)
+		free(pickup)
 	}
 }
 
@@ -203,9 +283,11 @@ box_destroy :: proc(b: ^Peer_Box) {
 	for _, c in b.chests {free(c)}
 	for _, sp in b.spelunkers {free(sp)}
 	for _, d in b.doors {free(d)}
+	for _, p in b.pickups {free(p)}
 	delete(b.chests)
 	delete(b.spelunkers)
 	delete(b.doors)
+	delete(b.pickups)
 	delete(b.avatar_of)
 	kitems.table_destroy(&b.table)
 	ksess.session_destroy(&b.s)
@@ -337,7 +419,25 @@ gems_in_view :: proc(b: ^Peer_Box) -> int {
 	for _, sp in b.spelunkers {
 		total += kitems.count_of(sp.bag[:], GEM)
 	}
+	for _, p in b.pickups {
+		if p.item == GEM {
+			total += int(p.count)
+		}
+	}
 	return total
+}
+
+drop_cmd :: proc(b: ^Peer_Box, avatar: knet.Net_Id, slot: u8) -> bool {
+	knet.command_begin(&b.s.ctx, avatar, SPEL_DROP)
+	knet.write_u8(&b.s.ctx.msg, slot)
+	return knet.command_issue(&b.s.ctx, b.spelunkers[avatar], &spel_set, SPEL_DROP)
+}
+
+grab_cmd :: proc(b: ^Peer_Box, pickup: knet.Net_Id, px, py: f32) -> bool {
+	knet.command_begin(&b.s.ctx, pickup, PICKUP_GRAB)
+	knet.write_f32(&b.s.ctx.msg, px)
+	knet.write_f32(&b.s.ctx.msg, py)
+	return knet.command_issue(&b.s.ctx, b.pickups[pickup], &pickup_set, PICKUP_GRAB)
 }
 
 // ---- tests -----------------------------------------------------------------------
@@ -496,6 +596,104 @@ overflow_goes_back_in_the_chest :: proc(t: ^testing.T) {
 		testing.expect_value(t, kitems.count_of(b.chests[cv.chest_id].slots[:], TORCH), 3)
 		testing.expect_value(t, kitems.count_of(bag.bag[:], TORCH), 20) // 18 + the 2 that fit
 	}
+}
+
+@(test)
+dropped_loot_lies_where_it_fell :: proc(t: ^testing.T) {
+	cv: Cave
+	cave_make(&cv)
+	defer cave_destroy(&cv)
+
+	// Alice loots 4 gems, walks off, and drops them. Her bag change is
+	// predicted; the pickup MATERIALIZES for everyone when the host's drop
+	// hook mints the entity at her feet.
+	testing.expect(t, take_cmd(&cv.alice, cv.chest_id, 0, 4, 0, 0))
+	pump(cv.boxes)
+	step(cv.boxes, &cv.now)
+
+	alice_av := cv.host.avatar_of[cv.alice.s.me]
+	cv.alice.spelunkers[alice_av].x = 9 // owner writes; streams carry it
+	cv.alice.spelunkers[alice_av].y = 7
+	step(cv.boxes, &cv.now) // a stream tick so the host knows where she stands
+	cv.host.spelunkers[alice_av].x = 9 // streams are interp-delayed; pin the
+	cv.host.spelunkers[alice_av].y = 7 // host view for a deterministic assert
+
+	bag_slot := u8(0)
+	testing.expect(t, drop_cmd(&cv.alice, alice_av, bag_slot))
+	testing.expect_value(t, kitems.count_of(cv.alice.spelunkers[alice_av].bag[:], GEM), 0) // predicted out
+	pump(cv.boxes) // hook mints the pickup
+	step(cv.boxes, &cv.now)
+
+	for b in cv.boxes {
+		testing.expect_value(t, len(b.pickups), 1)
+		for _, p in b.pickups {
+			testing.expect_value(t, p.item, GEM)
+			testing.expect_value(t, p.count, u16(4))
+			testing.expect_value(t, p.x, f32(9))
+			testing.expect_value(t, p.y, f32(7))
+		}
+		testing.expect_value(t, gems_in_view(b), 31) // conserved, floor included
+	}
+}
+
+@(test)
+grab_race_despawns_exactly_once :: proc(t: ^testing.T) {
+	cv: Cave
+	cave_make(&cv)
+	defer cave_destroy(&cv)
+
+	// Seed a pickup the honest way: alice loots and drops at the chest. The
+	// step between them matters — her PREDICTED drop needs the bag credit to
+	// have arrived (the cross-entity half is host-authoritative and rides a
+	// delta; you can't drop what your client doesn't hold yet).
+	testing.expect(t, take_cmd(&cv.alice, cv.chest_id, 3, 1, 0, 0))
+	pump(cv.boxes)
+	step(cv.boxes, &cv.now)
+	alice_av := cv.host.avatar_of[cv.alice.s.me]
+	testing.expect(t, drop_cmd(&cv.alice, alice_av, 0))
+	pump(cv.boxes)
+	step(cv.boxes, &cv.now)
+
+	pickup_id := knet.Net_Id(0)
+	for id in cv.alice.pickups {
+		pickup_id = id
+	}
+	testing.expect(t, pickup_id != 0)
+
+	// Both lunge for it before any packet moves — both predictions zero it.
+	testing.expect(t, grab_cmd(&cv.alice, pickup_id, 0, 0))
+	testing.expect(t, grab_cmd(&cv.bob, pickup_id, 0, 0))
+	pump(cv.boxes) // host: alice first (credit + DESPAWN), bob rejected on a gone entity
+	step(cv.boxes, &cv.now)
+
+	bob_av := cv.host.avatar_of[cv.bob.s.me]
+	for b in cv.boxes {
+		testing.expect_value(t, len(b.pickups), 0) // gone everywhere
+		testing.expect_value(t, kitems.count_of(b.spelunkers[alice_av].bag[:], GEM), 1)
+		testing.expect_value(t, kitems.count_of(b.spelunkers[bob_av].bag[:], GEM), 0)
+		testing.expect_value(t, gems_in_view(b), 31)
+	}
+	// The clients' factories freed exactly one entity each.
+	testing.expect_value(t, cv.alice.freed, 1)
+	testing.expect_value(t, cv.bob.freed, 1)
+
+	// Bob's grab named an entity the host had already despawned — no result
+	// can carry truth for a missing entity, so his pending rides the EXPIRY
+	// safety net (the despawn already cleaned his screen; this is pure
+	// bookkeeping). It must time out into a loud auto-revert, not linger.
+	testing.expect_value(t, knet.pending_count(&cv.bob.s.ctx.pending), 1)
+	_ = drain(&cv.bob.s)
+	for _ in 0 ..< 61 {
+		step(cv.boxes, &cv.now)
+	}
+	testing.expect_value(t, knet.pending_count(&cv.bob.s.ctx.pending), 0)
+	expired := false
+	for ev in drain(&cv.bob.s) {
+		if rej, is_rej := ev.(ksess.Ev_Command_Rejected); is_rej && rej.seq == 0 {
+			expired = true
+		}
+	}
+	testing.expect(t, expired, "expiry announces itself — silence means no")
 }
 
 @(test)

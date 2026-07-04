@@ -99,10 +99,19 @@ attempt() {
 	grep -q "CAVE_LOOT applied=true" "$hlog" || { echo "  FAIL: host loot failed"; ok=0; }
 	grep -q "CAVE_CHEST_EMPTY torches=2" "$hlog" || { echo "  FAIL: torches never reached the host's bag"; ok=0; }
 	grep -q "CAVE_LOOT_DENIED" "$glog" || { echo "  FAIL: empty-chest grab was not denied"; ok=0; }
-	# The bag in the REAL inventory UI, and the door toggle over the wire.
-	grep -qE "CAVE_FINAL \[.*gem x3.*\]" "$glog" || { echo "  FAIL: guest inventory UI missing gems"; ok=0; }
-	grep -qE "CAVE_FINAL \[.*torch x2.*\]" "$hlog" || { echo "  FAIL: host inventory UI missing torches"; ok=0; }
+	# The door toggle over the wire, and drops/pickups: the guest spills its
+	# gems, the pickup materializes on BOTH peers, the host scoops it up
+	# (authority path) and ends with the gems in ITS real inventory UI.
 	grep -q "CAVE_TOGGLE applied=true" "$glog" || { echo "  FAIL: guest door toggle failed"; ok=0; }
+	grep -q "CAVE_DROP applied=true" "$glog" || { echo "  FAIL: guest drop not predicted"; ok=0; }
+	for log in "$hlog" "$glog"; do
+		grep -q "CAVE_PICKUP n=1 gems=3" "$log" || { echo "  FAIL: pickup missing in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_GRABBED" "$log" || { echo "  FAIL: grab never settled in $(basename "$log")"; ok=0; }
+	done
+	grep -q "CAVE_GRAB applied=true" "$hlog" || { echo "  FAIL: host grab failed"; ok=0; }
+	grep -q "CAVE_GRABBED my_gems=3" "$hlog" || { echo "  FAIL: gems never reached the host's bag"; ok=0; }
+	grep -qE "CAVE_FINAL \[.*gem x3.*\]" "$hlog" || { echo "  FAIL: host inventory UI missing the grabbed gems"; ok=0; }
+	grep -qE "CAVE_FINAL \[.*torch x2.*\]" "$hlog" || { echo "  FAIL: host inventory UI missing torches"; ok=0; }
 	grep -q "HOST_DONE" "$hlog" || { echo "  FAIL: host did not finish"; ok=0; }
 	grep -q "GUEST_DONE" "$glog" || { echo "  FAIL: guest did not finish"; ok=0; }
 

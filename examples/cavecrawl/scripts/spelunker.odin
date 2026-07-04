@@ -13,10 +13,21 @@ import kitems "godot:kit/items"
 import knet "godot:kit/net"
 
 Spelunker :: struct {
-	owner:  gd.Label,
-	net_id: knet.Net_Id, // assigned by the session at spawn
-	x, y:   f32 `gd:"replicate,interp,owner"`,
-	bag:    [6]kitems.Slot `gd:"replicate"`,
+	owner:     gd.Label,
+	net_id:    knet.Net_Id, // assigned by the session at spawn
+	x, y:      f32 `gd:"replicate,interp,owner"`,
+	bag:       [6]kitems.Slot `gd:"replicate"`,
+	last_drop: kitems.Slot, // scratch for the drop hook — never on the wire
+}
+
+// Drop a bag slot at my feet: my bag empties on my screen this frame; the
+// host's drop hook mints the Pickup entity everyone sees.
+@(gd_command = "predict")
+spelunker_drop :: proc(self: ^Spelunker, slot: i32) -> bool {
+	dropped := kitems.take(self.bag[:], int(slot), max(u16))
+	if dropped.count == 0 {return false}
+	self.last_drop = dropped
+	return true
 }
 
 spelunker_ready :: proc(self: ^Spelunker) {

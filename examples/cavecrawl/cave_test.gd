@@ -156,8 +156,34 @@ func _process(_delta: float) -> bool:
 				cave.call("interact") # swing it open
 		if bool(cave.call("door_open")):
 			print("CAVE_DOOR_OPEN")
-			enter("wrap", now)
+			# The guest spills its gems on the floor by the door.
+			if role == "guest":
+				cave.call("drop", 0)
+			enter("drop", now)
 		elif timed_out(now, "door never opened, prompt=" + str(cave.call("prompt_kind"))):
+			quit(1); return true
+		return false
+
+	if phase == "drop":
+		# A pickup materializes for BOTH peers; the host walks over to it
+		# (guest stands at ~(560,150), so its drop lands at ~(584,150)).
+		if int(cave.call("pickups")) == 1:
+			print("CAVE_PICKUP n=1 gems=", cave.call("world_gems"))
+			if role == "host":
+				cave.call("walk_to", 584.0, 140.0)
+			enter("grab", now)
+		elif timed_out(now, "the drop never landed, pickups=" + str(cave.call("pickups"))):
+			quit(1); return true
+		return false
+
+	if phase == "grab":
+		if role == "host" and not acted and int(cave.call("prompt_kind")) == 3:
+			acted = true
+			cave.call("interact") # scoop it up (authority path)
+		if int(cave.call("pickups")) == 0 and (role == "guest" or int(cave.call("my_gems")) == 3):
+			print("CAVE_GRABBED my_gems=", cave.call("my_gems"))
+			enter("wrap", now)
+		elif timed_out(now, "grab never settled, pickups=" + str(cave.call("pickups"))):
 			quit(1); return true
 		return false
 
