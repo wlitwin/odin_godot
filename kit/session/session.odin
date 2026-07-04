@@ -187,6 +187,47 @@ SES_WORLD :: u8(13) // host -> one    [count u16] x the SES_SPAWN tuple (join sn
 SES_STATS :: u8(14) // host -> all    [cols u8] x [name] + [players u16] x ([id][cols x i64])
 @(private)
 SES_BACKUP :: u8(15) // host -> ONE   the full re-hostable session snapshot (opaque to the client)
+@(private)
+SES_APP :: u8(16) // any -> any      [tag u8][payload] — routed to the registered app handler
+
+// ---- app messages: the extension point for sibling kit packages ---------------
+//
+// SES_APP lets packages built ON TOP of the session (kit/comms is the first)
+// ride its transport hookup instead of asking the game for another kind byte
+// and another send glue proc: they register a handler under a small tag and
+// ship bytes with session_app_send. The session applies its seat gates before
+// routing — on the host `from` is the resolved sender (unseated peers are
+// nobody and get dropped); on a client `from` is PLAYER_ID_INVALID and the
+// handler checks from_peer == HOST_PEER when authority matters.
+
+MAX_APP_TAGS :: 8
+
+App_Handler :: proc(user: rawptr, from: knet.Player_Id, from_peer: int, r: ^knet.Reader)
+
+@(private)
+App_Route :: struct {
+	user:    rawptr,
+	handler: App_Handler,
+}
+
+// Register `handler` for app messages under `tag`. Call any time before
+// traffic flows (routes survive session_host_start/client_start/host_resume).
+session_app_route :: proc(s: ^Session, tag: u8, user: rawptr, handler: App_Handler) {
+	assert(int(tag) < MAX_APP_TAGS)
+	s.app[tag] = App_Route{user = user, handler = handler}
+}
+
+// Ship app payload bytes under `tag` on the reliable channel. `to_peer` is a
+// transport peer (HOST_PEER, a seated player's peer, or BROADCAST_PEER).
+session_app_send :: proc(s: ^Session, to_peer: int, tag: u8, bytes: []u8) {
+	assert(int(tag) < MAX_APP_TAGS)
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_u8(&w, SES_APP)
+	knet.write_u8(&w, tag)
+	append(&w.buf, ..bytes)
+	s.send(s.send_user, to_peer, knet.writer_bytes(&w), .Reliable)
+}
 
 // Remote entities render this far in the past (~3 net ticks at 20 Hz): almost
 // always a bracketing sample pair, smooth through jitter and single drops.
@@ -231,6 +272,9 @@ Session :: struct {
 	backup_target: knet.Player_Id, // host: who holds it
 	backup:        []u8, // client: the latest blob (opaque; owned)
 	backup_at:     f64, // client: when it arrived (session now)
+
+	// app-message routes (kit/comms and friends; survive re-init)
+	app: [MAX_APP_TAGS]App_Route,
 
 	// host bookkeeping
 	next_player: knet.Player_Id,
@@ -1180,6 +1224,27 @@ session_handle_packet :: proc(s: ^Session, from_peer: int, r: ^knet.Reader) {
 		}
 		_ = knet.registry_stream_time(r) // sender stamp (clock-mapped timelines later)
 		_ = knet.registry_apply_streams(r, &s.reg, s.me, s.now)
+	case SES_APP:
+		tag := knet.read_u8(r)
+		if r.err || int(tag) >= MAX_APP_TAGS {
+			return
+		}
+		route := s.app[tag]
+		if route.handler == nil {
+			return
+		}
+		from := knet.PLAYER_ID_INVALID
+		if s.is_host {
+			// Same trust gate as commands: a peer that never JOINed is nobody.
+			pid, seated := s.by_peer[from_peer]
+			if !seated {
+				return
+			}
+			from = pid
+		} else if !s.joined {
+			return // pre-seat app traffic is superseded by post-seat state
+		}
+		route.handler(route.user, from, from_peer, r)
 	case SES_PING:
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
