@@ -68,6 +68,9 @@ TESTS=(
     # Pure-Odin unit tests for kit/net — the friendslop toolkit's replication core
     # (wire, shadow-copy deltas, intent pipeline + dedup, tick/clock sync, interp).
     "kitnet|KITNET_OK|tests/kitnet/run.sh"
+    # Pure-Odin unit tests for kit/session — player identity (reconnect tokens ->
+    # stable Player_Ids), join/leave/reconnect, roster sync, zombie takeover.
+    "kitsession|KITSESSION_OK|tests/kitsession/run.sh"
     # gd:"replicate" codegen contract: scriptgen -> knet.Entity_Desc tables, POD
     # enforcement at scriptgen time (engine types) + consumer compile (#assert).
     "repgen|REPGEN_OK|tests/repgen/run.sh"
