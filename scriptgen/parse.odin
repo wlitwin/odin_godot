@@ -552,6 +552,68 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			continue
 		}
 
+		// friendslop toolkit: `gd:"replicate[,interp][,owner]"` — a kit/net replicated
+		// field. Only names + options are recorded here; generate.odin emits the
+		// knet.Entity_Desc (offset_of/size_of are the consumer compiler's job) plus a
+		// #assert that rejects non-POD fields at compile time with the field's name.
+		if tok0 == "replicate" {
+			// Engine handle/heap types can never be replicated fields: object handles
+			// and Rids are peer-local, and String/Array/Dictionary/Packed_* own heap
+			// memory a memcpy would corrupt. Rejected HERE (with the type's name)
+			// because the generated POD #assert can't see engine semantics — a
+			// gd.String is pointer-sized and memcmp-safe, and still wrong to ship.
+			// POD engine value types (Vector2/3/4, Color, Transform*, ...) replicate fine.
+			if vi, vok := map_variant(type_text); vok {
+				denied := vi.enum_name == ".Object" ||
+					vi.enum_name == ".String" ||
+					vi.enum_name == ".String_Name" ||
+					vi.enum_name == ".Node_Path" ||
+					vi.enum_name == ".Array" ||
+					vi.enum_name == ".Dictionary" ||
+					vi.enum_name == ".Callable" ||
+					vi.enum_name == ".Signal" ||
+					vi.enum_name == ".Rid" ||
+					strings.has_prefix(vi.enum_name, ".Packed_")
+				if denied {
+					error_at(
+						floc,
+						"%s.%s: %q cannot be a replicated field — handles and heap-backed types don't cross the wire. Replicate POD state (ints/floats/bools/enums/vectors) and rebuild engine objects locally; send text/collections as explicit messages.",
+						s.struct_name,
+						field_label,
+						type_text,
+					)
+					continue
+				}
+			}
+			rep := Replicate_Info{}
+			for spec_raw in specs[1:] {
+				spec := strings.trim_space(spec_raw)
+				switch spec {
+				case "interp":
+					rep.interp = true
+				case "owner":
+					rep.owner = true
+				case "":
+				case:
+					error_at(
+						floc,
+						"%s.%s: unknown replicate option %q (expected `interp` / `owner`)",
+						s.struct_name,
+						field_label,
+						spec,
+					)
+				}
+			}
+			// Multi-name fields (`x, y: f32 `gd:"replicate"``) replicate each name.
+			for nm in f.names {
+				ident, iok := nm.derived.(^ast.Ident)
+				if !iok || ident == nil {continue}
+				rep.field = ident.name
+				append(&s.replicates, rep)
+			}
+			continue
+		}
+
 		if tok0 != "export" {
 			if strings.has_prefix(tok0, "args=") {
 				error_at(
@@ -567,7 +629,7 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			// that would otherwise silently leave the field un-exported.
 			error_at(
 				floc,
-				"%s.%s: unknown gd tag %q (expected `export` or `onready=PATH`)",
+				"%s.%s: unknown gd tag %q (expected `export`, `replicate`, or `onready=PATH`)",
 				s.struct_name,
 				field_label,
 				tok0,

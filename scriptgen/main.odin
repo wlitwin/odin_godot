@@ -314,6 +314,16 @@ Rpc_Info :: struct {
 	channel:    int,
 }
 
+// A `gd:"replicate[,interp][,owner]"` field — a kit/net replicated field (friendslop
+// toolkit). scriptgen records only name + options; the generated knet.Entity_Desc uses
+// offset_of/size_of, and a generated #assert enforces the POD-only contract at the
+// consumer's compile, naming the offending field.
+Replicate_Info :: struct {
+	field:  string,
+	interp: bool, // remote peers interpolate this field
+	owner:  bool, // part of the owner-authoritative unreliable stream
+}
+
 Script :: struct {
 	path:        string, // source file path (diagnostics)
 	godot_alias: string, // the file's `godot:godot` import alias ("" = not imported)
@@ -331,6 +341,7 @@ Script :: struct {
 	signals:     [dynamic]Signal_Info,
 	connections: [dynamic]Connection_Info,
 	rpcs:        [dynamic]Rpc_Info,
+	replicates:  [dynamic]Replicate_Info,
 }
 
 had_error: bool

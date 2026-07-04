@@ -23,6 +23,12 @@ generate :: proc(s: ^Script) -> string {
 	w(&b, "import gd \"godot:godot\"\n")
 	w(&b, "import \"godot:gdext\"\n")
 	w(&b, "import rt \"godot:runtime\"\n")
+	// Conditional: an unused import is a compile error, so these appear only when a
+	// gd:"replicate" field needs the kit/net descriptor + the POD compile-time check.
+	if len(s.replicates) > 0 {
+		w(&b, "import knet \"godot:kit/net\"\n")
+		w(&b, "import \"base:intrinsics\"\n")
+	}
 	// The trampolines/lifecycle wrappers establish `context = rt.script_context()` before
 	// calling the user's plain Odin procs. On native that is `runtime.default_context()`
 	// (heap-backed); on web the core installs an engine-backed context with a working
@@ -387,6 +393,50 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			)
 		}
 		w(b, "}\n\n")
+	}
+
+	// kit/net replication descriptor (gd:"replicate" fields — friendslop toolkit).
+	// The #asserts enforce the POD-only contract where the field TYPE is actually
+	// known (this package's compile), failing the build with the field's name —
+	// a tagged string/slice/map can never silently ship. `type_of(Cls{}.f)` is an
+	// unevaluated expression: no instance is constructed.
+	if len(s.replicates) > 0 {
+		for r in s.replicates {
+			// nearly_simple_compare = memcmp-safe layout INCLUDING floats (plain
+			// simple_compare excludes them over NaN semantics — for shadow diffing,
+			// bitwise is exactly right). Pointers are memcmp-safe but meaningless on
+			// the wire, hence the explicit exclusion.
+			fmt.sbprintf(
+				b,
+				"#assert(intrinsics.type_is_nearly_simple_compare(type_of(%s{{}}.%s)) && !intrinsics.type_is_pointer(type_of(%s{{}}.%s)) && !intrinsics.type_is_multi_pointer(type_of(%s{{}}.%s)), \"%s.%s: gd:\\\"replicate\\\" fields must be POD (ints/floats/bools/enums/vectors/fixed arrays — no strings, slices, maps, or pointers)\")\n",
+				cls, r.field, cls, r.field, cls, r.field, cls, r.field,
+			)
+		}
+		fmt.sbprintf(b, "@(private = \"file\")\n_%s_net_fields := [?]knet.Field_Desc {{\n", snake)
+		for r in s.replicates {
+			flags := ""
+			switch {
+			case r.interp && r.owner:
+				flags = "{.Interp, .Owner_Stream}"
+			case r.interp:
+				flags = "{.Interp}"
+			case r.owner:
+				flags = "{.Owner_Stream}"
+			case:
+				flags = "{}"
+			}
+			fmt.sbprintf(
+				b,
+				"\t{{offset = offset_of(%s, %s), size = size_of(type_of(%s{{}}.%s)), flags = %s}},\n",
+				cls, r.field, cls, r.field, flags,
+			)
+		}
+		w(b, "}\n\n")
+		fmt.sbprintf(
+			b,
+			"// kit/net replication descriptor for %s — consumed by the toolkit session layer.\n%s_net_desc := knet.Entity_Desc{{fields = _%s_net_fields[:]}}\n\n",
+			cls, snake, snake,
+		)
 	}
 
 	// lifecycle literal

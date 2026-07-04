@@ -68,6 +68,9 @@ TESTS=(
     # Pure-Odin unit tests for kit/net — the friendslop toolkit's replication core
     # (wire, shadow-copy deltas, intent pipeline + dedup, tick/clock sync, interp).
     "kitnet|KITNET_OK|tests/kitnet/run.sh"
+    # gd:"replicate" codegen contract: scriptgen -> knet.Entity_Desc tables, POD
+    # enforcement at scriptgen time (engine types) + consumer compile (#assert).
+    "repgen|REPGEN_OK|tests/repgen/run.sh"
     # Pure-Odin unit tests for the runtime-reflection registration walk (register_class).
     "reflectregister|REFLECT_REGISTER_OK|tests/reflect_register/run.sh"
     "phase1|PHASE1_OK|tests/phase1/run.sh"
