@@ -28,11 +28,12 @@ export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
 # round trips). Casts must still bite instantly (prediction) while confirms
 # measurably ride the slow wire — that is the "never feels sloppy" proof.
 LATENCY_MS=120
+SAVE="$LOGDIR/save.fslp"
 
 launch() {
 	local role="$1" log="$2" port="$3" name="$4" token="$5"
 	ROLE="$role" CAVE_PORT="$port" CAVE_NAME="$name" CAVE_TOKEN="$token" \
-		CAVE_LATENCY="$LATENCY_MS" \
+		CAVE_LATENCY="$LATENCY_MS" CAVE_SAVE="$SAVE" \
 		"$GODOT" --headless --path "$PROJ" --script cave_test.gd \
 		>"$log" 2>&1 &
 	echo $!
@@ -42,6 +43,7 @@ attempt() {
 	local port="$1"
 	local hlog="$LOGDIR/host.log" glog="$LOGDIR/guest.log"
 	: >"$hlog"; : >"$glog"
+	rm -f "$SAVE"
 
 	local hp; hp=$(launch host "$hlog" "$port" hosty "")
 	local i=0
@@ -169,14 +171,61 @@ attempt() {
 	grep -q "HOST_DONE" "$hlog" || { echo "  FAIL: host did not finish"; ok=0; }
 	grep -q "GUEST_DONE" "$glog" || { echo "  FAIL: guest did not finish"; ok=0; }
 
+	if ((ok != 1)); then
+		echo "  --- host log tail ---"; tail -n 15 "$hlog" | sed 's/^/    /'
+		echo "  --- guest log tail ---"; tail -n 15 "$glog" | sed 's/^/    /'
+		return 1
+	fi
+
+	# ---- ACT 2 (phase 6): both processes are DEAD. Resume the run from the
+	# save file in fresh ones — the host under its saved identity, the guest
+	# reclaiming hers by token — and keep playing it.
+	local h2log="$LOGDIR/resume.log" g2log="$LOGDIR/rejoin.log"
+	: >"$h2log"; : >"$g2log"
+	[ -f "$SAVE" ] || { echo "  FAIL: no save file was written"; return 1; }
+
+	local h2; h2=$(launch resume "$h2log" "$port" hosty "")
+	local i=0
+	while ((i < 100)); do
+		grep -q "CAVE_RESUMED" "$h2log" && break
+		if ! kill -0 "$h2" 2>/dev/null; then break; fi
+		sleep 0.1; ((i++))
+	done
+	local g2; g2=$(launch rejoin "$g2log" "$port" guest cave-guest-token)
+	local waited=0
+	while ((waited < 400)); do
+		if ! kill -0 "$h2" 2>/dev/null && ! kill -0 "$g2" 2>/dev/null; then break; fi
+		sleep 0.1; ((waited++))
+	done
+	kill "$h2" "$g2" 2>/dev/null
+
+	grep -q "CAVE_SAVED ok=true" "$hlog" || { echo "  FAIL: the run was never saved"; ok=0; }
+	# The whole world back from disk, under the identity that saved it.
+	grep -qE "CAVE_RESUMED me=1 players=2 entities=[0-9]+ reg=[0-9]+ dwellers=3 gems=3 door=true" "$h2log" || { echo "  FAIL: the resumed world is wrong"; ok=0; }
+	# The GAME BLOB restored the campaign: wave 2 in progress, and the
+	# director must NOT restart wave 1 on top of the saved dwellers.
+	grep -q "CAVE_BLOB wave=2" "$h2log" || { echo "  FAIL: the game blob did not restore"; ok=0; }
+	grep -q "CAVE_WAVE n=1" "$h2log" && { echo "  FAIL: the director restarted the campaign"; ok=0; }
+	# The guest's persisted token reclaims her identity across process death.
+	grep -q "CAVE_SEATED me=2" "$g2log" || { echo "  FAIL: rejoiner did not reclaim her id"; ok=0; }
+	grep -q "CAVE_REJOINED dwellers=3 gems=3 door=true" "$g2log" || { echo "  FAIL: the rejoined world is wrong"; ok=0; }
+	# ...and the resumed run is PLAYABLE: she avenges herself on a dweller.
+	grep -qE "CAVE_RESUME_SLAIN dwellers=[0-2]" "$g2log" || { echo "  FAIL: the resumed run was not playable"; ok=0; }
+	# The scoreboard remembers her kill from the previous life.
+	grep -qE "CAVE_RESUME_SCORE \[.*guest \| [0-9]+ \| [0-9]+ \| 1 \| 0.*\]" "$h2log" || { echo "  FAIL: the ledger forgot"; ok=0; }
+	grep -q "RESUME_DONE" "$h2log" || { echo "  FAIL: resume host did not finish"; ok=0; }
+	grep -q "REJOIN_DONE" "$g2log" || { echo "  FAIL: rejoiner did not finish"; ok=0; }
+
 	if ((ok == 1)); then
 		echo "  PASS on port $port"
 		echo "  --- host ---"; grep -E "CAVE_" "$hlog" | sed 's/^/    /'
 		echo "  --- guest ---"; grep -E "CAVE_" "$glog" | sed 's/^/    /'
+		echo "  --- resume ---"; grep -E "CAVE_" "$h2log" | sed 's/^/    /'
+		echo "  --- rejoin ---"; grep -E "CAVE_" "$g2log" | sed 's/^/    /'
 		return 0
 	fi
-	echo "  --- host log tail ---"; tail -n 15 "$hlog" | sed 's/^/    /'
-	echo "  --- guest log tail ---"; tail -n 15 "$glog" | sed 's/^/    /'
+	echo "  --- resume log tail ---"; tail -n 15 "$h2log" | sed 's/^/    /'
+	echo "  --- rejoin log tail ---"; tail -n 15 "$g2log" | sed 's/^/    /'
 	return 1
 }
 

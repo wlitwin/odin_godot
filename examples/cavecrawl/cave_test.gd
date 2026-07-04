@@ -57,6 +57,74 @@ func timed_out(now: int, msg: String) -> bool:
 func _process(_delta: float) -> bool:
 	var now := Time.get_ticks_msec()
 
+	# ---- ACT 2 (phase 6): resume the saved run in fresh processes ----------
+	if role == "resume":
+		if phase == "init":
+			if not cave.is_inside_tree():
+				return false
+			cave.call("on_resume") # host the world back from the file
+			enter("await", now)
+			return false
+		if phase == "await":
+			# CAVE_RESUMED already printed the world's ledger; now the guest
+			# returns with her persisted token and reclaims herself.
+			if int(cave.call("get_players")) >= 2:
+				enter("board", now)
+			elif timed_out(now, "the guest never returned"):
+				quit(1); return true
+			return false
+		if phase == "board":
+			if not acted:
+				acted = true
+				cave.call("show_score", true)
+			var board := label_texts()
+			if board.contains("| 1 | 0"): # the guest's kill outlived every process
+				print("CAVE_RESUME_SCORE [", board, "]")
+				enter("linger", now)
+			elif timed_out(now, "the ledger forgot"):
+				quit(1); return true
+			return false
+		if phase == "linger":
+			# Stay hosting until the guest's post-resume kill lands — quitting
+			# now would tear the server down under her.
+			if int(cave.call("dwellers")) < 3:
+				print("RESUME_DONE")
+				quit(0); return true
+			if timed_out(now, "the guest never avenged herself"):
+				quit(1); return true
+			return false
+		return false
+
+	if role == "rejoin":
+		if phase == "init":
+			if not cave.is_inside_tree():
+				return false
+			cave.call("on_join")
+			enter("seat", now)
+			return false
+		if phase == "seat":
+			if bool(cave.call("is_seated")) and bool(cave.call("world_ready")):
+				print("CAVE_REJOINED dwellers=", cave.call("dwellers"), " gems=", cave.call("world_gems"), " door=", cave.call("door_open"))
+				enter("avenge", now)
+			elif timed_out(now, "never re-seated"):
+				quit(1); return true
+			return false
+		if phase == "avenge":
+			# The resumed run is PLAYABLE, not a diorama: rocks still fell
+			# dwellers (wave 2 came back mid-campaign with the game blob).
+			if int(cave.call("dwellers")) < 3:
+				print("CAVE_RESUME_SLAIN dwellers=", cave.call("dwellers"))
+				print("REJOIN_DONE")
+				quit(0); return true
+			if bool(cave.call("can_throw")):
+				var aim: Vector2 = cave.call("dweller_dir")
+				if aim != Vector2.ZERO:
+					cave.call("throw", aim.x, aim.y)
+			if timed_out(now, "no vengeance, dwellers=" + str(cave.call("dwellers"))):
+				quit(1); return true
+			return false
+		return false
+
 	if phase == "init":
 		if not cave.is_inside_tree():
 			return false
@@ -315,10 +383,13 @@ func _process(_delta: float) -> bool:
 		return false
 
 	if phase == "wrap":
-		# Let the last deltas settle, then the final ledger + the real UI.
+		# Let the last deltas settle, then the final ledger + the real UI —
+		# and the host etches the run to disk for act 2.
 		if now - t_acted > 800:
 			print("CAVE_GEMS total=", cave.call("world_gems"))
 			print("CAVE_FINAL [", label_texts(), "]")
+			if role == "host":
+				cave.call("save_run")
 			print(role.to_upper(), "_DONE")
 			quit(0); return true
 		return false
