@@ -321,6 +321,284 @@ interp_bracketing_and_clamps :: proc(t: ^testing.T) {
 	testing.expect_value(t, v, f32(60))
 }
 
+// ---- command loop ------------------------------------------------------------
+//
+// Hand-built thunks + Command_Set stand in for what @(gd_command) generates.
+// "Client" and "host" are two Probe copies wired through a capture callback —
+// the full intent→command→result loop without a socket.
+
+CMD_ADD :: u16(0) // predicted; rejects when state == 9 ("locked")
+CMD_TORN :: u16(1) // hostile: mutates BEFORE rejecting — restore must undo it
+CMD_MARK :: u16(2) // non-predicted host-only action
+
+probe_cmd_add :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+	p := cast(^Probe)entity
+	amount := knet.read_i32(r)
+	if r.err {return false}
+	if p.state == 9 {return false}
+	p.hp += amount
+	return true
+}
+
+probe_cmd_torn :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+	p := cast(^Probe)entity
+	p.hp = -999
+	p.x = -999
+	return false // "false = no mutation" must be enforced by the framework, not trusted
+}
+
+probe_cmd_mark :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+	p := cast(^Probe)entity
+	p.state = knet.read_u8(r)
+	return !r.err
+}
+
+probe_commands := [?]knet.Command_Desc {
+	{name = "add", predict = true, invoke = probe_cmd_add},
+	{name = "torn", predict = true, invoke = probe_cmd_torn},
+	{name = "mark", predict = false, invoke = probe_cmd_mark},
+}
+
+Capture :: struct {
+	msgs: [dynamic][]u8,
+}
+
+capture_send :: proc(user: rawptr, bytes: []u8) {
+	c := cast(^Capture)user
+	cloned := make([]u8, len(bytes))
+	copy(cloned, bytes)
+	append(&c.msgs, cloned)
+}
+
+capture_destroy :: proc(c: ^Capture) {
+	for m in c.msgs {delete(m)}
+	delete(c.msgs)
+}
+
+// Host side of the loop: dedup → execute → result bytes (what the session layer
+// will do per received command message).
+host_handle :: proc(host: ^Probe, set: ^knet.Command_Set, hctx: ^knet.Command_Ctx, peer: u64, msg: []u8, result: ^knet.Writer) -> (executed: bool) {
+	r := knet.reader_make(msg)
+	h := knet.command_read_header(&r)
+	if !knet.command_dedup(hctx, peer, h.seq) {
+		return false
+	}
+	ok := knet.command_execute(host, set, h.cmd, &r)
+	knet.command_result_write(result, h, ok, host, set)
+	return true
+}
+
+// Client side: read the result, confirm or reject(+truth).
+client_handle_result :: proc(cctx: ^knet.Command_Ctx, client: ^Probe, set: ^knet.Command_Set, bytes: []u8) {
+	r := knet.reader_make(bytes)
+	res := knet.command_result_read(&r)
+	if res.ok {
+		knet.command_confirm(cctx, res.seq)
+	} else {
+		knet.command_reject(cctx, res, &r, client, set)
+	}
+}
+
+@(test)
+command_predict_confirm :: proc(t: ^testing.T) {
+	desc := probe_desc()
+	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+
+	client := Probe{hp = 10}
+	host := Probe{hp = 10}
+
+	cap := Capture{}
+	defer capture_destroy(&cap)
+	cctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&cctx)
+	cctx.send = capture_send
+	cctx.send_user = &cap
+	hctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&hctx)
+	hctx.is_authority = true
+
+	// Issue add(+5): predicted immediately, message captured.
+	knet.command_begin(&cctx, knet.Net_Id(1), CMD_ADD)
+	knet.write_i32(&cctx.msg, 5)
+	predicted := knet.command_issue(&cctx, &client, &set, CMD_ADD)
+	testing.expect(t, predicted, "prediction should apply")
+	testing.expect_value(t, client.hp, i32(15))
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 1)
+	testing.expect_value(t, len(cap.msgs), 1)
+
+	// Host executes the same bytes and confirms.
+	result := knet.writer_make()
+	defer knet.writer_destroy(&result)
+	testing.expect(t, host_handle(&host, &set, &hctx, 7, cap.msgs[0], &result))
+	testing.expect_value(t, host.hp, i32(15)) // identical input, identical outcome
+
+	client_handle_result(&cctx, &client, &set, knet.writer_bytes(&result))
+	testing.expect_value(t, client.hp, i32(15)) // optimistic state stands, nothing replays
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
+}
+
+@(test)
+command_predict_reject_carries_truth :: proc(t: ^testing.T) {
+	desc := probe_desc()
+	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+
+	// The client is STALE: the host has moved on (hp 100, locked) but no delta
+	// arrived yet. The prediction applies locally, the host rejects, and the
+	// reject's embedded truth must win over the client's local revert (10).
+	client := Probe{hp = 10}
+	host := Probe{hp = 100, state = 9}
+
+	cap := Capture{}
+	defer capture_destroy(&cap)
+	cctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&cctx)
+	cctx.send = capture_send
+	cctx.send_user = &cap
+	hctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&hctx)
+
+	knet.command_begin(&cctx, knet.Net_Id(1), CMD_ADD)
+	knet.write_i32(&cctx.msg, 5)
+	testing.expect(t, knet.command_issue(&cctx, &client, &set, CMD_ADD))
+	testing.expect_value(t, client.hp, i32(15))
+
+	result := knet.writer_make()
+	defer knet.writer_destroy(&result)
+	_ = host_handle(&host, &set, &hctx, 7, cap.msgs[0], &result)
+	testing.expect_value(t, host.hp, i32(100)) // locked: rejected, untouched
+
+	client_handle_result(&cctx, &client, &set, knet.writer_bytes(&result))
+	testing.expect_value(t, client.hp, i32(100)) // truth, not the stale revert
+	testing.expect_value(t, client.state, u8(9))
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
+}
+
+@(test)
+command_local_reject_restores_and_still_sends :: proc(t: ^testing.T) {
+	desc := probe_desc()
+	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+
+	client := Probe{hp = 10, state = 9} // locked locally: prediction rejects
+	cap := Capture{}
+	defer capture_destroy(&cap)
+	cctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&cctx)
+	cctx.send = capture_send
+	cctx.send_user = &cap
+
+	knet.command_begin(&cctx, knet.Net_Id(1), CMD_ADD)
+	knet.write_i32(&cctx.msg, 5)
+	testing.expect(t, !knet.command_issue(&cctx, &client, &set, CMD_ADD))
+	testing.expect_value(t, client.hp, i32(10)) // restored
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
+	// Still sent: the local copy may be stale — only the host may say no.
+	testing.expect_value(t, len(cap.msgs), 1)
+}
+
+@(test)
+command_execute_restores_torn_state :: proc(t: ^testing.T) {
+	desc := probe_desc()
+	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+
+	// Host side: a proc that mutates then returns false must leave no trace.
+	host := Probe{hp = 42, x = 1}
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	r := knet.reader_make(knet.writer_bytes(&w)) // no args
+	testing.expect(t, !knet.command_execute(&host, &set, CMD_TORN, &r))
+	testing.expect_value(t, host.hp, i32(42))
+	testing.expect_value(t, host.x, f32(1))
+
+	// Client side: the predicted run of the same proc is restored the same way.
+	client := Probe{hp = 42, x = 1}
+	cctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&cctx)
+	knet.command_begin(&cctx, knet.Net_Id(1), CMD_TORN)
+	testing.expect(t, !knet.command_issue(&cctx, &client, &set, CMD_TORN))
+	testing.expect_value(t, client.hp, i32(42))
+	testing.expect_value(t, client.x, f32(1))
+}
+
+@(test)
+command_dedup_replay_executes_once :: proc(t: ^testing.T) {
+	desc := probe_desc()
+	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+
+	host := Probe{hp = 10}
+	cap := Capture{}
+	defer capture_destroy(&cap)
+	cctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&cctx)
+	cctx.send = capture_send
+	cctx.send_user = &cap
+	hctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&hctx)
+
+	client := Probe{hp = 10}
+	knet.command_begin(&cctx, knet.Net_Id(1), CMD_ADD)
+	knet.write_i32(&cctx.msg, 5)
+	_ = knet.command_issue(&cctx, &client, &set, CMD_ADD)
+
+	result := knet.writer_make()
+	defer knet.writer_destroy(&result)
+	testing.expect(t, host_handle(&host, &set, &hctx, 7, cap.msgs[0], &result), "first delivery executes")
+	testing.expect_value(t, host.hp, i32(15))
+	// Replay of the exact same bytes (retransmit / reconnect replay): dropped.
+	testing.expect(t, !host_handle(&host, &set, &hctx, 7, cap.msgs[0], &result), "replay must be dropped")
+	testing.expect_value(t, host.hp, i32(15))
+	// Same seq from a DIFFERENT peer is a different command: executes.
+	testing.expect(t, host_handle(&host, &set, &hctx, 8, cap.msgs[0], &result))
+	testing.expect_value(t, host.hp, i32(20))
+}
+
+@(test)
+command_malformed_input_rejects :: proc(t: ^testing.T) {
+	desc := probe_desc()
+	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+	host := Probe{hp = 10}
+
+	// Truncated args: the thunk sees r.err before calling the proc.
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_u16(&w, 0xFF) // 2 bytes where read_i32 wants 4
+	r := knet.reader_make(knet.writer_bytes(&w))
+	testing.expect(t, !knet.command_execute(&host, &set, CMD_ADD, &r))
+	testing.expect_value(t, host.hp, i32(10))
+
+	// Unknown command index from a hostile/mismatched peer: rejected, no panic.
+	r2 := knet.reader_make(nil)
+	testing.expect(t, !knet.command_execute(&host, &set, 200, &r2))
+}
+
+@(test)
+command_non_predicted_defers_to_host :: proc(t: ^testing.T) {
+	desc := probe_desc()
+	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+
+	client := Probe{state = 1}
+	cap := Capture{}
+	defer capture_destroy(&cap)
+	cctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&cctx)
+	cctx.send = capture_send
+	cctx.send_user = &cap
+
+	knet.command_begin(&cctx, knet.Net_Id(1), CMD_MARK)
+	knet.write_u8(&cctx.msg, 4)
+	testing.expect(t, !knet.command_issue(&cctx, &client, &set, CMD_MARK))
+	testing.expect_value(t, client.state, u8(1)) // untouched: no prediction declared
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
+	testing.expect_value(t, len(cap.msgs), 1) // but the intent went to the host
+
+	host := Probe{state = 1}
+	hctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&hctx)
+	result := knet.writer_make()
+	defer knet.writer_destroy(&result)
+	_ = host_handle(&host, &set, &hctx, 7, cap.msgs[0], &result)
+	testing.expect_value(t, host.state, u8(4))
+}
+
 @(test)
 interp_ring_wraps :: proc(t: ^testing.T) {
 	b := knet.Interp_Buffer(f32){}

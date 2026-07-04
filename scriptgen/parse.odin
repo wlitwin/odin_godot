@@ -483,6 +483,14 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 
 		floc := Loc{s.path, f.pos.line}
 
+		// Commands name their entity over the wire: remember whether the struct
+		// declares a `net_id` field (validated iff @(gd_command) procs exist).
+		for nm in f.names {
+			if ident, iok := nm.derived.(^ast.Ident); iok && ident != nil && ident.name == "net_id" {
+				s.net_id_type = strings.trim_space(node_text(src, f.type))
+			}
+		}
+
 		val, has := tag_gd_value(f.tag.text)
 		if !has && f.tag.text != "" {
 			// A tag that LOOKS like an attempted gd tag but isn't the required `gd:"..."` form
@@ -698,6 +706,16 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		first := pt.params.list[0]
 		if node_text(src, first.type) != self_type {continue}
 
+		// `@(gd_command[="predict"])` — a friendslop-toolkit command (kit/net command
+		// loop). NOT a Godot-callable method: it is issued from Odin code via the
+		// generated `<proc>_cmd` wrapper, so it never joins the method tables. Checked
+		// before the lifecycle match so a command can never be misread as a hook.
+		if has_attr(vd, "gd_command") {
+			config, _ := attr_value(vd, "gd_command")
+			parse_command(&s, src, Loc{s.path, name_ident.pos.line}, proc_name, pt, config)
+			continue
+		}
+
 		// `gd_rpc` implies `gd_method`: an RPC must be a registered method to be dispatchable.
 		is_gd_rpc := has_attr(vd, "gd_rpc")
 		is_gd_method := has_attr(vd, "gd_method") || is_gd_rpc
@@ -768,7 +786,121 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		}
 	}
 
+	// Commands lean on the replication machinery: prediction reverts, torn-state
+	// restore, and reject-truth snapshots all need the Entity_Desc, and the wire
+	// header needs the entity's net identity. Missing either is a build error HERE,
+	// with the fix spelled out — not a nil-descriptor crash at runtime.
+	if len(s.commands) > 0 {
+		if len(s.replicates) == 0 {
+			error_at(
+				Loc{path = s.path},
+				"%s declares @(gd_command) procs but no gd:\"replicate\" fields — commands mutate replicated state (prediction, revert, and reject-truth all run off the field descriptor)",
+				s.struct_name,
+			)
+		}
+		nt := s.net_id_type
+		if i := strings.last_index(nt, "."); i >= 0 {nt = nt[i + 1:]}
+		if nt != "Net_Id" {
+			error_at(
+				Loc{path = s.path},
+				"%s declares @(gd_command) procs but no `net_id: knet.Net_Id` field — commands name their entity over the wire; add the field (the session/registry layer assigns it)",
+				s.struct_name,
+			)
+		}
+	}
+
 	return s, true
+}
+
+// Map a command-arg type to kit/net's wire read_/write_ proc suffix plus the
+// spelling spliced into the generated wrapper signature. Net_Id/Player_Id are
+// normalized to the gen file's `knet.` qualifier whatever the author aliased
+// `godot:kit/net` as. ok=false = not wire-serializable (the caller errors).
+command_wire_type :: proc(type_text: string) -> (wire: string, splice: string, ok: bool) {
+	t := strings.trim_space(type_text)
+	base := t
+	if i := strings.last_index(base, "."); i >= 0 {
+		base = base[i + 1:]
+	}
+	switch base {
+	case "Net_Id":
+		return "net_id", "knet.Net_Id", true
+	case "Player_Id":
+		return "player_id", "knet.Player_Id", true
+	}
+	if base != t {
+		return "", "", false // qualified non-kit/net type (gd.Vector2, ...)
+	}
+	switch t {
+	case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "bool", "string":
+		return t, t, true
+	}
+	return "", "", false
+}
+
+// Parse one @(gd_command[="predict"]) proc into a Command_Info. Cheap build-time
+// contract checks live here: wire-serializable args only, and the proc must
+// return exactly `bool` (true = applied; false = rejected, which auto-reverts
+// the entity's declared fields on every peer).
+parse_command :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
+	cmd := Command_Info {
+		proc_name = proc_name,
+		name      = strip_struct_prefix(proc_name, s.struct_name),
+	}
+
+	for part in strings.split(config, ",") {
+		tok := strings.trim_space(part)
+		switch tok {
+		case "":
+		case "predict":
+			cmd.predict = true
+		case:
+			error_at(loc, "command %s: unknown config token %q (expected `predict`)", proc_name, tok)
+		}
+	}
+
+	for fi in 1 ..< len(pt.params.list) {
+		field := pt.params.list[fi]
+		atext := strings.trim_space(node_text(src, field.type))
+		wire, splice, ok := command_wire_type(atext)
+		if !ok {
+			if atext == "int" || atext == "uint" {
+				error_at(
+					loc,
+					"command %s: arg type %q has platform-dependent width — command args cross the wire; use a fixed-width integer (i32, u16, ...)",
+					proc_name,
+					atext,
+				)
+			} else {
+				error_at(
+					loc,
+					"command %s: unsupported arg type %q — command args must be wire primitives (fixed-width ints, f32/f64, bool, string, knet.Net_Id, knet.Player_Id)",
+					proc_name,
+					atext,
+				)
+			}
+			continue
+		}
+		for nm in field.names {
+			ident, iok := nm.derived.(^ast.Ident)
+			if !iok || ident == nil {continue}
+			append(&cmd.args, Command_Arg{name = ident.name, type_text = splice, wire = wire})
+		}
+	}
+
+	ret_ok := false
+	if pt.results != nil && len(pt.results.list) == 1 && len(pt.results.list[0].names) <= 1 {
+		ret_ok = strings.trim_space(node_text(src, pt.results.list[0].type)) == "bool"
+	}
+	if !ret_ok {
+		error_at(
+			loc,
+			"command %s must return exactly `bool` — true = applied, false = rejected (a rejection auto-reverts the declared fields)",
+			proc_name,
+		)
+	}
+
+	append(&s.commands, cmd)
 }
 
 // Extract the string value of a `@(name="value")` attribute. Returns ("", false) if the

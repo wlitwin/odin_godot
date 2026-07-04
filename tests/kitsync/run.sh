@@ -1,17 +1,26 @@
 #!/usr/bin/env bash
 # ----------------------------------------------------------------------------
-# Two-peer kit/net SYNC test — the friendslop toolkit's first real wire crossing.
-# Launches a SERVER + CLIENT (headless Godot, ENet localhost; harness mirrors
-# tests/rpc_net) and proves the WHOLE replication stack end to end:
+# Two-peer kit/net SYNC + COMMAND test — the friendslop toolkit's replication
+# stack over a real socket. Launches a SERVER + CLIENT (headless Godot, ENet
+# localhost; harness mirrors tests/rpc_net) and proves, end to end:
 #
-#   gd:"replicate" tag -> scriptgen's generated Entity_Desc -> kit/net shadow
-#   diff / full snapshot -> kit/netgd send_bytes -> ENet -> peer_packet ->
-#   kit/net apply -> verified field values on the remote peer.
+#   STATE:    gd:"replicate" tag -> scriptgen's generated Entity_Desc -> kit/net
+#             shadow diff / full snapshot -> kit/netgd send_bytes -> ENet ->
+#             peer_packet -> kit/net apply -> verified fields on the remote peer.
+#   COMMANDS: @(gd_command="predict") -> generated `<proc>_cmd` wrapper (the only
+#             role branch lives in generated code) -> optimistic local run ->
+#             wire -> host dedup + authoritative execute -> CONFIRM (prediction
+#             stands, pending drains) and, against silently-diverged host state,
+#             REJECT whose embedded truth snapshot corrects the stale client.
 #
 # Asserts (from captured stdout):
-#   server: HOST_OK, SYNC_SENT_FULL, SYNC_SENT_DELTA mask=3, SERVER_DONE
-#   client: SYNC_GOT_FULL ok=true (all four fields), SYNC_GOT_DELTA ok=true
-#           mask=3 (ONLY hp+x arrived; y/state untouched), CLIENT_DONE
+#   server: HOST_OK, SYNC_SENT_FULL, SYNC_SENT_DELTA mask=3,
+#           SYNC_CMD_EXEC ok=true hp=48, SYNC_CMD_EXEC ok=false hp=48, SERVER_DONE
+#   client: SYNC_GOT_FULL ok=true (all fields), SYNC_GOT_DELTA ok=true mask=3,
+#           SYNC_CMD_ISSUED predicted=true hp=48 pending=1,
+#           SYNC_CMD_CONFIRM ok=true hp=48 pending=0,
+#           SYNC_CMD_ISSUED predicted=true hp=53 pending=1,
+#           SYNC_CMD_REJECT ok=true hp=48 locked=1 pending=0, CLIENT_DONE
 #
 # Prints KITSYNC_OK. Run inside the Nix dev shell:
 #   nix develop --command bash -c 'bash tests/kitsync/run.sh'
@@ -79,6 +88,18 @@ attempt() {
 		|| { echo "  FAIL: client full-snapshot apply not verified"; ok=0; }
 	grep -qE "SYNC_GOT_DELTA ok=true mask=3 hp=43 x=4" "$clog" \
 		|| { echo "  FAIL: client delta apply not verified (subset fields, others untouched)"; ok=0; }
+	grep -qF "SYNC_CMD_EXEC ok=true hp=48" "$slog" \
+		|| { echo "  FAIL: host never executed the confirmed command"; ok=0; }
+	grep -qF "SYNC_CMD_EXEC ok=false hp=48" "$slog" \
+		|| { echo "  FAIL: host never rejected the stale command (hp must be untouched)"; ok=0; }
+	grep -qF "SYNC_CMD_ISSUED predicted=true hp=48 pending=1" "$clog" \
+		|| { echo "  FAIL: first bump was not predicted optimistically"; ok=0; }
+	grep -qF "SYNC_CMD_CONFIRM ok=true hp=48 pending=0" "$clog" \
+		|| { echo "  FAIL: confirm did not drain pending / keep the prediction"; ok=0; }
+	grep -qF "SYNC_CMD_ISSUED predicted=true hp=53 pending=1" "$clog" \
+		|| { echo "  FAIL: stale second bump was not predicted (client must not know locked)"; ok=0; }
+	grep -qF "SYNC_CMD_REJECT ok=true hp=48 locked=1 pending=0" "$clog" \
+		|| { echo "  FAIL: reject did not snap the client to the embedded truth"; ok=0; }
 	grep -q "SERVER_DONE" "$slog" || { echo "  FAIL: server did not finish cleanly"; ok=0; }
 	grep -q "CLIENT_DONE" "$clog" || { echo "  FAIL: client did not finish cleanly"; ok=0; }
 

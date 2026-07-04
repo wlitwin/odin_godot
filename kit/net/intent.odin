@@ -50,8 +50,15 @@ pending_table_destroy :: proc(t: ^Pending_Table) {
 pending_add :: proc(t: ^Pending_Table, entity: Net_Id, revert: []u8, now_tick: u64) -> Intent_Seq {
 	seq := t.next_seq
 	t.next_seq += 1
-	append(&t.entries, Pending{seq = seq, entity = entity, revert = revert, issued_tick = now_tick})
+	pending_record(t, seq, entity, revert, now_tick)
 	return seq
+}
+
+// Record a pending prediction under an ALREADY-allocated seq — the command loop
+// allocates the seq when it writes the message header (command_begin), but only
+// records the pending entry if the predicted run actually applied.
+pending_record :: proc(t: ^Pending_Table, seq: Intent_Seq, entity: Net_Id, revert: []u8, now_tick: u64) {
+	append(&t.entries, Pending{seq = seq, entity = entity, revert = revert, issued_tick = now_tick})
 }
 
 @(private = "file")

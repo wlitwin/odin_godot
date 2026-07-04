@@ -3,19 +3,39 @@
 package repgen_fixture
 
 // repgen fixture: exercises every gd:"replicate" shape scriptgen must handle —
-// bare, with options, multi-name fields, and mixing with export/plain fields.
+// bare, with options, multi-name fields, mixing with export/plain fields — plus
+// the @(gd_command) surface: predicted and host-only commands, wire-typed args
+// (including knet ids), and the required `net_id` identity field.
 
 import gd "godot:godot"
+import knet "godot:kit/net"
 
 Pawn :: struct {
-	owner: gd.Node2d,
-	hp:    i32 `gd:"replicate"`,
-	x, y:  f32 `gd:"replicate,interp,owner"`, // multi-name: one desc entry per name
-	state: u8 `gd:"replicate"`,
-	speed: f64 `gd:"export,range=0:10"`, // exports and replicates coexist
-	local: int, // untagged: never replicated
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id, // command wire identity (assigned by the session layer)
+	hp:     i32 `gd:"replicate"`,
+	x, y:   f32 `gd:"replicate,interp,owner"`, // multi-name: one desc entry per name
+	state:  u8 `gd:"replicate"`,
+	speed:  f64 `gd:"export,range=0:10"`, // exports and replicates coexist
+	local:  int, // untagged: never replicated
 }
 
 pawn_ready :: proc(self: ^Pawn) {
 	if self.hp == 0 {self.hp = 10}
+}
+
+// Predicted command: single-player-looking mutation, runs on the host AND
+// optimistically on the issuing client (same proc, byte-identical args).
+@(gd_command = "predict")
+pawn_hit :: proc(self: ^Pawn, amount: i32) -> bool {
+	if self.hp <= 0 {return false}
+	self.hp -= amount
+	return true
+}
+
+// Host-only command (no predict): string + id args exercise the wider wire types.
+@(gd_command)
+pawn_mark :: proc(self: ^Pawn, label: string, who: knet.Player_Id) -> bool {
+	self.state = 1
+	return true
 }

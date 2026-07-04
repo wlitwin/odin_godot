@@ -24,9 +24,13 @@ generate :: proc(s: ^Script) -> string {
 	w(&b, "import \"godot:gdext\"\n")
 	w(&b, "import rt \"godot:runtime\"\n")
 	// Conditional: an unused import is a compile error, so these appear only when a
-	// gd:"replicate" field needs the kit/net descriptor + the POD compile-time check.
-	if len(s.replicates) > 0 {
+	// gd:"replicate" field needs the kit/net descriptor + the POD compile-time check
+	// (commands imply replicates — parse validation enforces it — but keep the
+	// condition independent for robustness).
+	if len(s.replicates) > 0 || len(s.commands) > 0 {
 		w(&b, "import knet \"godot:kit/net\"\n")
+	}
+	if len(s.replicates) > 0 {
 		w(&b, "import \"base:intrinsics\"\n")
 	}
 	// The trampolines/lifecycle wrappers establish `context = rt.script_context()` before
@@ -437,6 +441,69 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			"// kit/net replication descriptor for %s — consumed by the toolkit session layer.\n%s_net_desc := knet.Entity_Desc{{fields = _%s_net_fields[:]}}\n\n",
 			cls, snake, snake,
 		)
+	}
+
+	// @(gd_command) dispatch + typed issue wrappers (friendslop toolkit).
+	// Three artifacts per class: decode thunks (client and host execute a command
+	// from byte-identical args — the thunk decodes, checks the reader, THEN calls
+	// the author's proc), the Command_Desc table, and one `<proc>_cmd` wrapper per
+	// command. The wrapper holds the ONLY role branch in the entire feature:
+	// authority runs the proc directly; clients predict (iff declared) and send.
+	if len(s.commands) > 0 {
+		w(b, "// ---- @(gd_command) dispatch + typed issue wrappers ----\n")
+		for c in s.commands {
+			fmt.sbprintf(b, "@(private = \"file\")\n_%s_cmd_%s :: proc(entity: rawptr, r: ^knet.Reader) -> bool {{\n", snake, c.name)
+			fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
+			for a, i in c.args {
+				fmt.sbprintf(b, "\t_a%d := knet.read_%s(r)\n", i, a.wire)
+			}
+			w(b, "\tif r.err {return false}\n")
+			fmt.sbprintf(b, "\treturn %s(self", c.proc_name)
+			for _, i in c.args {
+				fmt.sbprintf(b, ", _a%d", i)
+			}
+			w(b, ")\n}\n\n")
+		}
+
+		fmt.sbprintf(b, "@(private = \"file\")\n_%s_commands := [?]knet.Command_Desc {{\n", snake)
+		for c in s.commands {
+			fmt.sbprintf(b, "\t{{name = %q, predict = %v, invoke = _%s_cmd_%s}},\n", c.name, c.predict, snake, c.name)
+		}
+		w(b, "}\n\n")
+		fmt.sbprintf(
+			b,
+			"// kit/net command set for %s — the command table + the replicated-field descriptor.\n%s_command_set := knet.Command_Set{{entity_desc = &%s_net_desc, commands = _%s_commands[:]}}\n\n",
+			cls, snake, snake, snake,
+		)
+
+		for c, ci in s.commands {
+			fmt.sbprintf(b, "// Issue `%s` — the SAME call on every peer, zero role branches. Authority:\n", c.name)
+			if c.predict {
+				w(b, "// runs the proc directly. Client: predicts optimistically (rejection or a lost\n")
+				w(b, "// result auto-reverts the declared fields) and sends the command to the host.\n")
+			} else {
+				w(b, "// runs the proc directly. Client: sends the command to the host (no prediction\n")
+				w(b, "// declared); the state change arrives through normal replication.\n")
+			}
+			w(b, "// Returns whether the command applied locally (authoritative on the host,\n")
+			w(b, "// optimistic on a predicting client) — the host's result is always authoritative.\n")
+			fmt.sbprintf(b, "%s_cmd :: proc(ctx: ^knet.Command_Ctx, self: ^%s", c.proc_name, cls)
+			for a in c.args {
+				fmt.sbprintf(b, ", %s: %s", a.name, a.type_text)
+			}
+			w(b, ") -> bool {\n")
+			w(b, "\tif ctx.is_authority {\n")
+			fmt.sbprintf(b, "\t\treturn %s(self", c.proc_name)
+			for a in c.args {
+				fmt.sbprintf(b, ", %s", a.name)
+			}
+			w(b, ")\n\t}\n")
+			fmt.sbprintf(b, "\tknet.command_begin(ctx, self.net_id, %d)\n", ci)
+			for a in c.args {
+				fmt.sbprintf(b, "\tknet.write_%s(&ctx.msg, %s)\n", a.wire, a.name)
+			}
+			fmt.sbprintf(b, "\treturn knet.command_issue(ctx, self, &%s_command_set, %d)\n}}\n\n", snake, ci)
+		}
 	}
 
 	// lifecycle literal

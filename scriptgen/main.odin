@@ -324,6 +324,24 @@ Replicate_Info :: struct {
 	owner:  bool, // part of the owner-authoritative unreliable stream
 }
 
+// One @(gd_command) arg. Command args cross the wire, so the allowed types are
+// kit/net's wire primitives — `wire` is the read_/write_ proc suffix and
+// `type_text` the (knet.-normalized) spelling spliced into the wrapper signature.
+Command_Arg :: struct {
+	name:      string,
+	type_text: string,
+	wire:      string,
+}
+
+// One @(gd_command[="predict"]) proc — a host-authoritative action with optional
+// client-side optimistic execution (friendslop toolkit, kit/net command loop).
+Command_Info :: struct {
+	proc_name: string, // author proc (chest_open) — also names the `<proc>_cmd` wrapper
+	name:      string, // stripped verb (open) — knet.Command_Desc.name, diagnostics
+	predict:   bool,
+	args:      [dynamic]Command_Arg,
+}
+
 Script :: struct {
 	path:        string, // source file path (diagnostics)
 	godot_alias: string, // the file's `godot:godot` import alias ("" = not imported)
@@ -342,6 +360,8 @@ Script :: struct {
 	connections: [dynamic]Connection_Info,
 	rpcs:        [dynamic]Rpc_Info,
 	replicates:  [dynamic]Replicate_Info,
+	commands:    [dynamic]Command_Info,
+	net_id_type: string, // type text of a `net_id` field ("" = none) — commands require knet.Net_Id
 }
 
 had_error: bool

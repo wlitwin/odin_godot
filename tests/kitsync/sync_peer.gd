@@ -2,10 +2,12 @@ extends SceneTree
 
 # ----------------------------------------------------------------------------
 # Two-peer kit/net sync driver (tests/kitsync). ONE per process; ROLE + PORT from
-# the environment (mirrors tests/rpc_net). The server hosts, waits for the client,
-# then ships a FULL snapshot and a DELTA through kit/netgd; the client applies
-# them via kit/net and self-verifies (SYNC_GOT_* ok=true sentinels). The driver
-# only sequences — all wire logic lives in the Odin SyncNode.
+# the environment (mirrors tests/rpc_net). Phases:
+#   state:    server ships FULL + DELTA; client applies + self-verifies (got 1,2)
+#   commands: client issues the predicted `bump` command twice — the first is
+#             CONFIRMED (got 3), the second runs against silently-diverged host
+#             state and is REJECTED with embedded truth (got 4).
+# The driver only sequences — all wire logic lives in the Odin SyncNode.
 # ----------------------------------------------------------------------------
 
 var node: Node = null
@@ -17,7 +19,7 @@ var t0 := 0
 var t_acted := 0
 
 const TIMEOUT_MS := 15000
-const SETTLE_MS := 2000
+const SETTLE_MS := 1000
 
 func _initialize() -> void:
 	role = OS.get_environment("ROLE")
@@ -61,7 +63,7 @@ func _process(_delta: float) -> bool:
 				print("SERVER_SEES_CLIENT id=", client_id)
 				node.call("send_full", client_id)
 				node.call("send_delta", client_id)
-				phase = "settle"
+				phase = "serve"
 			else:
 				print("CLIENT_SEES_SERVER")
 				phase = "receive"
@@ -71,17 +73,47 @@ func _process(_delta: float) -> bool:
 			quit(1); return true
 		return false
 
-	# Client: wait until both packets arrived AND self-verified.
+	# Client: wait for both state packets, then run the command sequence.
 	if phase == "receive":
 		if int(node.call("get_got")) >= 2:
-			print("CLIENT_DONE")
-			quit(0); return true
-		if now - t_acted > TIMEOUT_MS:
+			node.call("issue_bump") # predicted; host will CONFIRM
+			phase = "cmd_confirm"
+			t_acted = now
+		elif now - t_acted > TIMEOUT_MS:
 			print("CLIENT_TIMEOUT: got=", node.call("get_got"))
 			quit(1); return true
 		return false
 
-	# Server: stay alive long enough for the reliable channel to deliver.
+	if phase == "cmd_confirm":
+		if int(node.call("get_got")) >= 3:
+			node.call("issue_bump") # stale prediction; host will REJECT with truth
+			phase = "cmd_reject"
+			t_acted = now
+		elif now - t_acted > TIMEOUT_MS:
+			print("CLIENT_TIMEOUT: confirm never verified, got=", node.call("get_got"))
+			quit(1); return true
+		return false
+
+	if phase == "cmd_reject":
+		if int(node.call("get_got")) >= 4:
+			print("CLIENT_DONE")
+			quit(0); return true
+		if now - t_acted > TIMEOUT_MS:
+			print("CLIENT_TIMEOUT: reject never verified, got=", node.call("get_got"))
+			quit(1); return true
+		return false
+
+	# Server: stay up until both commands executed, then settle so the final
+	# result flushes through the reliable channel.
+	if phase == "serve":
+		if int(node.call("get_cmds")) >= 2:
+			phase = "settle"
+			t_acted = now
+		elif now - t_acted > TIMEOUT_MS:
+			print("SERVER_TIMEOUT: cmds=", node.call("get_cmds"))
+			quit(1); return true
+		return false
+
 	if phase == "settle":
 		if now - t_acted > SETTLE_MS:
 			print("SERVER_DONE")
