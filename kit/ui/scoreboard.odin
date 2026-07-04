@@ -13,23 +13,29 @@ import "core:fmt"
 import "core:strings"
 
 Score :: struct {
-	root:   gd.Control, // centered VBox panel
+	root:   gd.Control, // centered PanelContainer (background + auto-size)
+	box:    gd.Control, // the VBox column inside it
 	header: gd.Label,
 	rows:   [dynamic]gd.Label, // reused across refreshes
 }
 
 score_make :: proc(parent: gd.Node) -> Score {
 	sb: Score
-	sb.root = cast(gd.Control)gd.new_v_box_container()
+	// A PanelContainer gives the overlay a themed background and sizes
+	// itself to its content; dead-center anchors + grow Both on both axes
+	// keep it centered as rows come and go. High z-index: an on-demand
+	// overlay reads on TOP of the HUD it happens to cover.
+	sb.root = cast(gd.Control)gd.new_panel_container()
 	gd.node_set_name(cast(gd.Node)sb.root, gd.new_string_name_cstring("Scoreboard", true))
 	gd.add_child(parent, cast(gd.Node)sb.root)
-	gd.control_set_anchors_preset(sb.root, .Preset_Center_Top, false)
-	// Keep the panel centered as rows change width, and off the top edge.
+	gd.control_set_anchors_preset(sb.root, .Preset_Center, false)
 	gd.control_set_h_grow_direction(sb.root, .Grow_Direction_Both)
-	gd.control_set_offset(sb.root, .Top, 24)
-	gd.control_set_offset(sb.root, .Bottom, 24)
+	gd.control_set_v_grow_direction(sb.root, .Grow_Direction_Both)
+	gd.canvas_item_set_z_index(cast(gd.Canvas_Item)sb.root, 10)
+	sb.box = cast(gd.Control)gd.new_v_box_container()
+	gd.add_child(cast(gd.Node)sb.root, cast(gd.Node)sb.box)
 	sb.header = gd.new_label()
-	gd.add_child(cast(gd.Node)sb.root, cast(gd.Node)sb.header)
+	gd.add_child(cast(gd.Node)sb.box, cast(gd.Node)sb.header)
 	gd.set_bool(cast(gd.Object)sb.root, "visible", false)
 	return sb
 }
@@ -71,7 +77,7 @@ score_refresh :: proc(sb: ^Score, s: ^ksess.Session) {
 			row = sb.rows[i]
 		} else {
 			row = gd.new_label()
-			gd.add_child(cast(gd.Node)sb.root, cast(gd.Node)row)
+			gd.add_child(cast(gd.Node)sb.box, cast(gd.Node)row)
 			append(&sb.rows, row)
 		}
 		gd.set_bool(cast(gd.Object)row, "visible", true)
