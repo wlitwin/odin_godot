@@ -87,6 +87,11 @@ TESTS=(
     # Phase-4 integration: rocks over the session pipeline — predicted casts,
     # host-validated hits, death/respawn, effects wearing off, the ledger.
     "kitarena|KITARENA_OK|tests/kitarena/run.sh"
+    # Pure-Odin unit tests for kit/ai (perception, steering, the wave director).
+    "kitai|KITAI_OK|tests/kitai/run.sh"
+    # kit/nav adapter: a U-shaped NavigationPolygon the engine path must bend
+    # through, followed by a kit/ai walker with the next_point cursor.
+    "kitnav|KITNAV_OK|tests/kitnav/run.sh"
     # gd:"replicate" codegen contract: scriptgen -> knet.Entity_Desc tables, POD
     # enforcement at scriptgen time (engine types) + consumer compile (#assert).
     "repgen|REPGEN_OK|tests/repgen/run.sh"

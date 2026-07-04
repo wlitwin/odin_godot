@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/navtest.odin" id="1_nav"]
+
+[sub_resource type="NavigationPolygon" id="np_u"]
+vertices = PackedVector2Array(0, 0, 100, 0, 100, 200, 100, 300, 0, 300, 200, 200, 200, 300, 200, 0, 300, 0, 300, 300)
+polygons = [PackedInt32Array(0, 1, 2, 3, 4), PackedInt32Array(2, 5, 6, 3), PackedInt32Array(7, 8, 9, 6, 5)]
+
+[node name="NavTest" type="Node2D"]
+script = ExtResource("1_nav")
+
+[node name="Region" type="NavigationRegion2D" parent="."]
+navigation_polygon = SubResource("np_u")

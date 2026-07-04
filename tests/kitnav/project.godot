@@ -1,0 +1,12 @@
+; kit/nav adapter test project — a U-shaped walkable NavigationPolygon the
+; path MUST bend through (see nav.tscn / scripts/navtest.odin).
+
+config_version=5
+
+[application]
+
+config/name="kitnav"
+
+[editor]
+
+script/search_in_file_extensions=PackedStringArray("gd", "gdshader", "odin")
