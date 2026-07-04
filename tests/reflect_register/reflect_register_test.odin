@@ -77,6 +77,7 @@ Bad :: struct {
 	two_hints: gd.Array `gd:"export,array=int,enum=A:B"`,
 	orphan_get: i32 `gd:"export,get=get_orphan"`,
 	fine:      i32 `gd:"export"`, // sanity: a good export among the bad ones survives
+	synced:    i32 `gd:"replicate,interp"`, // kit/net tag: scriptgen's, NOT an error, NOT an export
 }
 
 // Signal fields (gd.Signal0 … Signal4): detected by TYPE (tag optional), the field name
@@ -596,6 +597,7 @@ error_paths :: proc(t: ^testing.T) {
 	testing.expect(t, has(errs, "tex_arr"), "typed-collection resource element recorded")
 	testing.expect(t, has(errs, "two_hints"), "duplicate hint recorded")
 	testing.expect(t, has(errs, "orphan_get"), "get= without a wrapper recorded")
+	testing.expect(t, !has(errs, "synced"), "gd:\"replicate\" is a known (scriptgen-owned) tag — no error")
 	for e in errs {
 		testing.expect_value(t, string(e.class), "Bad")
 		testing.expect(t, e.msg != nil, "every error carries a message")
@@ -609,6 +611,8 @@ error_paths :: proc(t: ^testing.T) {
 	fine, fok := find_export(desc, "fine")
 	testing.expect(t, fok, "good export among bad ones must survive")
 	testing.expect_value(t, fine.offset, offset_of(Bad, fine))
+	_, rok := find_export(desc, "synced")
+	testing.expect(t, !rok, "replicate field is not an export (it belongs to kit/net)")
 	_, mok := find_export(desc, "mapping")
 	testing.expect(t, !mok, "unsupported-type export is dropped")
 	_, sok := find_export(desc, "misspelt")

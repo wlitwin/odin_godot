@@ -24,8 +24,17 @@ Intent_Seq :: distinct u32
 Pending :: struct {
 	seq:         Intent_Seq,
 	entity:      Net_Id,
-	revert:      []u8, // fields_capture buffer (shadow layout); ownership transfers back on confirm/reject/timeout
+	cmd:         u16, // command index — with `args`, enough to RE-RUN the prediction
+	args:        []u8, // the command's serialized args (owned copy; nil = not replayable)
+	revert:      []u8, // fields_capture buffer (shadow layout); freed via pending_dispose
 	issued_tick: u64,
+}
+
+// Free a Pending's owned buffers — every path that pops an entry (confirm,
+// reject, expire, despawned-entity cleanup) must end here exactly once.
+pending_dispose :: proc(p: Pending) {
+	delete(p.revert)
+	delete(p.args)
 }
 
 Pending_Table :: struct {
@@ -39,26 +48,29 @@ pending_table_make :: proc(allocator := context.allocator) -> Pending_Table {
 
 pending_table_destroy :: proc(t: ^Pending_Table) {
 	for e in t.entries {
-		delete(e.revert)
+		pending_dispose(e)
 	}
 	delete(t.entries)
 	t.entries = nil
 }
 
 // Allocate the next intent sequence and record the pending prediction. `revert`
-// ownership moves into the table.
+// ownership moves into the table. (Bookkeeping-only entry point — no cmd/args,
+// so the prediction is not replayable; the command loop uses pending_record.)
 pending_add :: proc(t: ^Pending_Table, entity: Net_Id, revert: []u8, now_tick: u64) -> Intent_Seq {
 	seq := t.next_seq
 	t.next_seq += 1
-	pending_record(t, seq, entity, revert, now_tick)
+	pending_record(t, seq, entity, 0, nil, revert, now_tick)
 	return seq
 }
 
 // Record a pending prediction under an ALREADY-allocated seq — the command loop
 // allocates the seq when it writes the message header (command_begin), but only
-// records the pending entry if the predicted run actually applied.
-pending_record :: proc(t: ^Pending_Table, seq: Intent_Seq, entity: Net_Id, revert: []u8, now_tick: u64) {
-	append(&t.entries, Pending{seq = seq, entity = entity, revert = revert, issued_tick = now_tick})
+// records the pending entry if the predicted run actually applied. `args` (an
+// owned copy of the serialized command args) is what makes the prediction
+// REPLAYABLE when authoritative state lands on top of it mid-flight.
+pending_record :: proc(t: ^Pending_Table, seq: Intent_Seq, entity: Net_Id, cmd: u16, args: []u8, revert: []u8, now_tick: u64) {
+	append(&t.entries, Pending{seq = seq, entity = entity, cmd = cmd, args = args, revert = revert, issued_tick = now_tick})
 }
 
 @(private = "file")
@@ -79,14 +91,14 @@ pending_take :: proc(t: ^Pending_Table, seq: Intent_Seq) -> (p: Pending, ok: boo
 pending_confirm :: proc(t: ^Pending_Table, seq: Intent_Seq) -> bool {
 	p, ok := pending_take(t, seq)
 	if ok {
-		delete(p.revert)
+		pending_dispose(p)
 	}
 	return ok
 }
 
 // The host rejected the prediction (or it can't apply anymore). Returns the
 // pending record; the CALLER restores the fields (it owns entity resolution)
-// and must delete(p.revert) afterwards.
+// and must pending_dispose(p) afterwards.
 pending_reject :: proc(t: ^Pending_Table, seq: Intent_Seq) -> (p: Pending, ok: bool) {
 	return pending_take(t, seq)
 }

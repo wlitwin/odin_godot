@@ -39,6 +39,7 @@ examples/*/.export_build/
 tests/.logs/
 tests/rpc_net/.runlogs/
 tests/kitsync/.runlogs/
+tests/kitacid/.runlogs/
 tests/repl_spike/.runlogs/
 examples/*/.cooplogs/
 examples/*/.coopsignal.log

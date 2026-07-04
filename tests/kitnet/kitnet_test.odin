@@ -217,7 +217,7 @@ pending_confirm_reject_expire :: proc(t: ^testing.T) {
 	e.hp = 0
 	knet.fields_restore(&e, &desc, p.revert)
 	testing.expect_value(t, e.hp, i32(5))
-	delete(p.revert)
+	knet.pending_dispose(p)
 
 	// Expire: s3 (issued at 108) ages out at tick 128 with max age 20.
 	expired := make([dynamic]knet.Pending)
@@ -226,7 +226,7 @@ pending_confirm_reject_expire :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(expired), 1)
 	testing.expect_value(t, expired[0].seq, s3)
 	testing.expect_value(t, knet.pending_count(&tbl), 0)
-	delete(expired[0].revert)
+	knet.pending_dispose(expired[0])
 }
 
 @(test)
@@ -765,6 +765,163 @@ registry_full_snapshot_roundtrip :: proc(t: ^testing.T) {
 	extra := Probe{}
 	nid := knet.registry_spawn(&creg, &extra, &pset)
 	testing.expect(t, nid != id1 && nid != id2)
+}
+
+// ---- prediction reconcile (unwind → apply → replay) -------------------------
+//
+// The race THE ACID TEST exposed: the host broadcasts a delta it wrote BEFORE
+// executing a command the client has already predicted. Reconcile must keep
+// the optimistic values alive by re-running the pending command on top of the
+// authoritative state (the SAME proc, the SAME wire bytes).
+
+@(test)
+registry_delta_replays_pending_prediction :: proc(t: ^testing.T) {
+	pdesc := probe_desc()
+	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+
+	sreg := knet.registry_make()
+	defer knet.registry_destroy(&sreg)
+	host := Probe{hp = 10}
+	id := knet.registry_spawn(&sreg, &host, &pset)
+
+	creg := knet.registry_make()
+	defer knet.registry_destroy(&creg)
+	client := Probe{hp = 10}
+	knet.registry_insert(&creg, id, &client, &pset)
+	knet.registry_commit_shadows(&sreg) // baseline delivered (join snapshot)
+
+	cap := Capture{}
+	defer capture_destroy(&cap)
+	cctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&cctx)
+	cctx.send = capture_send
+	cctx.send_user = &cap
+	hctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&hctx)
+	hctx.is_authority = true
+
+	// Client predicts TWO adds back to back: +5 then +3.
+	knet.command_begin(&cctx, id, CMD_ADD)
+	knet.write_i32(&cctx.msg, 5)
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	knet.command_begin(&cctx, id, CMD_ADD)
+	knet.write_i32(&cctx.msg, 3)
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	testing.expect_value(t, client.hp, i32(18))
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 2)
+
+	// Host executes ONLY the first command and answers it. On the ordered
+	// channel the result precedes any delta carrying its effect — so the
+	// client confirms (+5's pending pops) BEFORE that delta arrives.
+	res1 := knet.writer_make()
+	defer knet.writer_destroy(&res1)
+	rr := knet.reader_make(cap.msgs[0])
+	responded, ok := knet.registry_host_command(&sreg, &hctx, 7, &rr, &res1)
+	testing.expect(t, responded && ok)
+	testing.expect_value(t, host.hp, i32(15))
+	cr1 := knet.reader_make(knet.writer_bytes(&res1))
+	_ = knet.registry_client_result(&creg, &cctx, &cr1)
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 1)
+	testing.expect_value(t, client.hp, i32(18)) // confirm replays nothing
+
+	// The host's net tick: hp=15 (WITHOUT the second command). Naively applied,
+	// it would stomp the client back to 15; reconcile must land on 18.
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	testing.expect_value(t, knet.registry_write_deltas(&w, &sreg), 1)
+	dr := knet.reader_make(knet.writer_bytes(&w))
+	testing.expect_value(t, knet.registry_apply_deltas(&dr, &creg, &cctx), 1)
+	testing.expect(t, !dr.err)
+	testing.expect_value(t, client.hp, i32(18)) // authoritative 15 + replayed +3
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 1)
+
+	// The +3 lands host-side; its confirm drains the last pending. Converged.
+	res2 := knet.writer_make()
+	defer knet.writer_destroy(&res2)
+	rr2 := knet.reader_make(cap.msgs[1])
+	responded, ok = knet.registry_host_command(&sreg, &hctx, 7, &rr2, &res2)
+	testing.expect(t, responded && ok)
+	cr2 := knet.reader_make(knet.writer_bytes(&res2))
+	_ = knet.registry_client_result(&creg, &cctx, &cr2)
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
+	testing.expect_value(t, client.hp, i32(18))
+	testing.expect_value(t, host.hp, i32(18))
+}
+
+@(test)
+registry_delta_untouched_fields_do_not_double_apply :: proc(t: ^testing.T) {
+	pdesc := probe_desc()
+	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+
+	sreg := knet.registry_make()
+	defer knet.registry_destroy(&sreg)
+	host := Probe{hp = 10, state = 1}
+	id := knet.registry_spawn(&sreg, &host, &pset)
+
+	creg := knet.registry_make()
+	defer knet.registry_destroy(&creg)
+	client := Probe{hp = 10, state = 1}
+	knet.registry_insert(&creg, id, &client, &pset)
+	knet.registry_commit_shadows(&sreg)
+
+	cctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&cctx)
+
+	knet.command_begin(&cctx, id, CMD_ADD)
+	knet.write_i32(&cctx.msg, 5)
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	testing.expect_value(t, client.hp, i32(15))
+
+	// The host changed an UNRELATED field: the delta's mask does not carry hp.
+	// Unwind-then-replay must keep hp at exactly one prediction's worth (15),
+	// not re-add on top of the still-applied optimistic value (20).
+	host.state = 2
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	testing.expect_value(t, knet.registry_write_deltas(&w, &sreg), 1)
+	dr := knet.reader_make(knet.writer_bytes(&w))
+	testing.expect_value(t, knet.registry_apply_deltas(&dr, &creg, &cctx), 1)
+	testing.expect_value(t, client.hp, i32(15))
+	testing.expect_value(t, client.state, u8(2))
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 1)
+}
+
+@(test)
+registry_replay_precondition_failure_drops_prediction :: proc(t: ^testing.T) {
+	pdesc := probe_desc()
+	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+
+	sreg := knet.registry_make()
+	defer knet.registry_destroy(&sreg)
+	host := Probe{hp = 10, state = 1}
+	id := knet.registry_spawn(&sreg, &host, &pset)
+
+	creg := knet.registry_make()
+	defer knet.registry_destroy(&creg)
+	client := Probe{hp = 10, state = 1}
+	knet.registry_insert(&creg, id, &client, &pset)
+	knet.registry_commit_shadows(&sreg)
+
+	cctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&cctx)
+
+	knet.command_begin(&cctx, id, CMD_ADD)
+	knet.write_i32(&cctx.msg, 5)
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	testing.expect_value(t, client.hp, i32(15))
+
+	// Authoritative state now LOCKS the entity (CMD_ADD's reject condition):
+	// the replay must fail cleanly and leave pure authoritative values — the
+	// host's reject (in flight) will pop the pending with the same outcome.
+	host.state = 9
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	testing.expect_value(t, knet.registry_write_deltas(&w, &sreg), 1)
+	dr := knet.reader_make(knet.writer_bytes(&w))
+	testing.expect_value(t, knet.registry_apply_deltas(&dr, &creg, &cctx), 1)
+	testing.expect_value(t, client.hp, i32(10)) // prediction dropped, not doubled
+	testing.expect_value(t, client.state, u8(9))
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 1) // result still owed
 }
 
 @(test)

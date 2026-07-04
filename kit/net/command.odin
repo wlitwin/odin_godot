@@ -122,7 +122,12 @@ command_issue :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd:
 		revert := fields_capture(entity, set.entity_desc)
 		r := reader_make(ctx.msg.buf[ctx._args_start:])
 		if c.invoke(entity, &r) && !r.err {
-			pending_record(&ctx.pending, ctx._seq, ctx._entity, revert, ctx.now_tick)
+			// Keep a copy of the wire args: if authoritative state lands on this
+			// entity while the prediction is in flight, the registry re-runs the
+			// SAME proc from these bytes on top of it (registry replay).
+			args := make([]u8, len(ctx.msg.buf) - ctx._args_start)
+			copy(args, ctx.msg.buf[ctx._args_start:])
+			pending_record(&ctx.pending, ctx._seq, ctx._entity, cmd, args, revert, ctx.now_tick)
 			predicted = true
 		} else {
 			fields_restore(entity, set.entity_desc, revert)
@@ -225,6 +230,6 @@ command_reject :: proc(ctx: ^Command_Ctx, res: Command_Result, r: ^Reader, entit
 		fields_restore(entity, set.entity_desc, p.revert)
 	}
 	if had {
-		delete(p.revert)
+		pending_dispose(p)
 	}
 }

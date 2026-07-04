@@ -74,6 +74,13 @@ TESTS=(
     # Two-peer ENet sync: the toolkit's full replication stack across a REAL wire
     # (replicate tag -> desc -> shadow delta -> send_bytes -> peer_packet -> apply).
     "kitsync|KITSYNC_OK|tests/kitsync/run.sh"
+    # THE PHASE-0 ACID TEST: host + owning client + OBSERVER (three processes) over
+    # ENet with injected receive latency on every peer. A new entity in ~10 lines
+    # (orb.odin), zero role branches: predictions land before any round trip,
+    # in-flight deltas reconcile (unwind -> apply -> replay) instead of stomping
+    # them, the observer converges with no role code, and clock sync measures the
+    # real RTT. tests/kitacid/scripts/session.odin is the seed of kit/session.
+    "kitacid|KITACID_OK|tests/kitacid/run.sh"
     # Pure-Odin unit tests for the runtime-reflection registration walk (register_class).
     "reflectregister|REFLECT_REGISTER_OK|tests/reflect_register/run.sh"
     "phase1|PHASE1_OK|tests/phase1/run.sh"

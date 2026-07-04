@@ -129,14 +129,87 @@ registry_write_deltas :: proc(w: ^Writer, reg: ^Registry) -> int {
 	return count
 }
 
-// Apply a delta batch. An UNKNOWN id is unrecoverable mid-batch — field sizes
-// come from the entity's descriptor, which this peer doesn't have — so the
-// batch is abandoned there (r.err set) and the number of entities applied so
-// far is returned. The session layer prevents this by construction: spawn/
-// despawn messages ride the same reliable ordered channel as these batches, so
-// a peer always knows every id a batch can name. That ordering contract is THE
-// reason state batches go on the reliable channel rather than the stream one.
-registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry) -> int {
+// ---------------------------------------------------------------------------
+// Prediction reconcile — the client-side answer to the in-flight race the acid
+// test exposed: the host sends a delta BEFORE executing a command the client
+// already predicted, and the delta stomps the optimistic values. The fix is
+// the missing half of "prediction re-runs the SAME proc":
+//
+//   UNWIND  restore this entity's pending reverts newest-first, bringing the
+//           entity back to its pre-prediction baseline (needed for DELTAS only:
+//           a partial mask must not leave predicted values on fields it does
+//           not carry — replaying on top of those would double-apply).
+//   apply   the authoritative delta / full / reject-truth.
+//   REPLAY  re-run each pending command oldest-first from its stored wire
+//           bytes, recapturing its revert first — the fresh authoritative
+//           state becomes the prediction's new baseline, so a later timeout
+//           or truncated-truth fallback restores authoritative values, never
+//           stale ones. A replay whose precondition no longer holds is
+//           restored and effectively dropped locally; the host's result
+//           (still in flight) has the final word either way.
+//
+// CORRECTNESS RELIES ON CHANNEL ORDERING: a delta that already CONTAINS a
+// command's effect must arrive after that command's result — otherwise the
+// still-pending command replays on top of its own effect. The session layer
+// guarantees it by putting results and state batches on the same reliable
+// ordered channel (one more reason for that channel plan).
+
+// A pending takes part in reconcile iff it can replay: unwind and replay must
+// use the SAME predicate or the pair corrupts state.
+@(private = "file")
+pending_reconciles :: proc(p: Pending, e: Registry_Entry) -> bool {
+	return p.entity == e.id && p.args != nil && int(p.cmd) < len(e.set.commands)
+}
+
+@(private = "file")
+unwind_pending :: proc(ctx: ^Command_Ctx, e: Registry_Entry) {
+	#reverse for &p in ctx.pending.entries {
+		if pending_reconciles(p, e) {
+			fields_restore(e.entity, e.set.entity_desc, p.revert)
+		}
+	}
+}
+
+@(private = "file")
+replay_pending :: proc(ctx: ^Command_Ctx, e: Registry_Entry) {
+	for &p in ctx.pending.entries {
+		if !pending_reconciles(p, e) {
+			continue
+		}
+		delete(p.revert)
+		p.revert = fields_capture(e.entity, e.set.entity_desc)
+		r := reader_make(p.args)
+		if !(e.set.commands[p.cmd].invoke(e.entity, &r) && !r.err) {
+			fields_restore(e.entity, e.set.entity_desc, p.revert)
+		}
+	}
+}
+
+@(private = "file")
+has_pending_for :: proc(ctx: ^Command_Ctx, id: Net_Id) -> bool {
+	if ctx == nil {
+		return false
+	}
+	for &p in ctx.pending.entries {
+		if p.entity == id {
+			return true
+		}
+	}
+	return false
+}
+
+// Apply a delta batch. Pass the client's ctx so entities with in-flight
+// predictions are reconciled (unwind → apply → replay, above); nil ctx skips
+// that, which is what hosts and hand-driven tests want.
+//
+// An UNKNOWN id is unrecoverable mid-batch — field sizes come from the
+// entity's descriptor, which this peer doesn't have — so the batch is
+// abandoned there (r.err set) and the number of entities applied so far is
+// returned. The session layer prevents this by construction: spawn/despawn
+// messages ride the same reliable ordered channel as these batches, so a peer
+// always knows every id a batch can name. That ordering contract is THE reason
+// state batches go on the reliable channel rather than the stream one.
+registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = nil) -> int {
 	count := int(read_u16(r))
 	applied := 0
 	for _ in 0 ..< count {
@@ -149,9 +222,16 @@ registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry) -> int {
 			r.err = true // can't size the unknown entity's fields — abandon the rest
 			break
 		}
+		reconcile := has_pending_for(ctx, id)
+		if reconcile {
+			unwind_pending(ctx, e)
+		}
 		_ = apply_delta(r, e.entity, e.set.entity_desc)
 		if r.err {
 			break
+		}
+		if reconcile {
+			replay_pending(ctx, e)
 		}
 		applied += 1
 	}
@@ -170,7 +250,7 @@ registry_write_fulls :: proc(w: ^Writer, reg: ^Registry) -> int {
 	return len(reg.entries)
 }
 
-registry_apply_fulls :: proc(r: ^Reader, reg: ^Registry) -> int {
+registry_apply_fulls :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = nil) -> int {
 	count := int(read_u16(r))
 	applied := 0
 	for _ in 0 ..< count {
@@ -186,6 +266,11 @@ registry_apply_fulls :: proc(r: ^Reader, reg: ^Registry) -> int {
 		apply_full(r, e.entity, e.set.entity_desc)
 		if r.err {
 			break
+		}
+		// A full overwrites EVERY declared field — the baseline is authoritative
+		// outright, so no unwind is needed before replaying pendings on top.
+		if has_pending_for(ctx, id) {
+			replay_pending(ctx, e)
 		}
 		applied += 1
 	}
@@ -237,8 +322,13 @@ registry_client_result :: proc(reg: ^Registry, ctx: ^Command_Ctx, r: ^Reader) ->
 	}
 	if e, found := reg.entries[res.entity]; found {
 		command_reject(ctx, res, r, e.entity, e.set)
+		// The reject's truth snapshot (a full) stomped the entity — replay any
+		// LATER predictions still pending on it, exactly like an applied full.
+		if has_pending_for(ctx, res.entity) {
+			replay_pending(ctx, e)
+		}
 	} else if p, had := pending_reject(&ctx.pending, res.seq); had {
-		delete(p.revert)
+		pending_dispose(p)
 	}
 	return res
 }
@@ -253,7 +343,7 @@ registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks
 		if e, found := reg.entries[p.entity]; found {
 			fields_restore(e.entity, e.set.entity_desc, p.revert)
 		}
-		delete(p.revert)
+		pending_dispose(p)
 	}
 	return len(expired)
 }

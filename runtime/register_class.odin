@@ -209,13 +209,19 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 		return
 	}
 
+	// `gd:"replicate,…"` is the kit/net toolkit's tag — consumed entirely by
+	// scriptgen (Entity_Desc tables); nothing to reflect at runtime.
+	if tok0 == "replicate" {
+		return
+	}
+
 	if tok0 != "export" {
 		if strings.has_prefix(tok0, "args=") {
 			record_error(cls, name_c, "`args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)")
 			return
 		}
-		msg, _ := pool_cstr("unknown gd tag `", tok0, "` (expected `export` or `onready=PATH`)")
-		if msg == nil {msg = "unknown gd tag (expected `export` or `onready=PATH`)"}
+		msg, _ := pool_cstr("unknown gd tag `", tok0, "` (expected `export`, `onready=PATH`, or `replicate`)")
+		if msg == nil {msg = "unknown gd tag (expected `export`, `onready=PATH`, or `replicate`)"}
 		record_error(cls, name_c, msg)
 		return
 	}
