@@ -71,6 +71,9 @@ TESTS=(
     # gd:"replicate" codegen contract: scriptgen -> knet.Entity_Desc tables, POD
     # enforcement at scriptgen time (engine types) + consumer compile (#assert).
     "repgen|REPGEN_OK|tests/repgen/run.sh"
+    # Two-peer ENet sync: the toolkit's full replication stack across a REAL wire
+    # (replicate tag -> desc -> shadow delta -> send_bytes -> peer_packet -> apply).
+    "kitsync|KITSYNC_OK|tests/kitsync/run.sh"
     # Pure-Odin unit tests for the runtime-reflection registration walk (register_class).
     "reflectregister|REFLECT_REGISTER_OK|tests/reflect_register/run.sh"
     "phase1|PHASE1_OK|tests/phase1/run.sh"
