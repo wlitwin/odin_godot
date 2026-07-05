@@ -25,8 +25,9 @@ package kit_net
 
 import "core:math"
 
-// Byte size of one stream snapshot for a descriptor (just the streamed fields,
-// desc order, tightly packed). 0 = this entity type streams nothing.
+// Byte size of one stream snapshot in STRUCT layout (just the streamed fields,
+// desc order, tightly packed) — the shape ring blobs hold and blending reads.
+// 0 = this entity type streams nothing.
 stream_data_size :: proc(desc: ^Entity_Desc) -> int {
 	n := 0
 	for f in desc.fields {
@@ -37,19 +38,45 @@ stream_data_size :: proc(desc: ^Entity_Desc) -> int {
 	return n
 }
 
+// Byte size of one stream snapshot ON THE WIRE (Wire_Kind encodings applied).
+// Packets carry this; the receiver decodes to struct layout at the packet edge
+// (stream_decode) so rings, warps, and blending never see wire bytes.
+stream_wire_size :: proc(desc: ^Entity_Desc) -> int {
+	n := 0
+	for f in desc.fields {
+		if .Owner_Stream in f.flags {
+			n += field_wire_size(f)
+		}
+	}
+	return n
+}
+
+// Decode one wire-encoded stream snapshot into a struct-layout blob (the caller
+// sizes `dst` with stream_data_size). The packet-edge half of Wire_Kind.
+stream_decode :: proc(dst: []u8, wire: []u8, desc: ^Entity_Desc) {
+	doff, woff := 0, 0
+	for f in desc.fields {
+		if .Owner_Stream not_in f.flags {
+			continue
+		}
+		field_decode(&dst[doff], ([^]u8)(&wire[woff]), f)
+		doff += f.size
+		woff += field_wire_size(f)
+	}
+}
+
 @(private = "file")
 stream_field_ptr :: proc(entity: rawptr, f: Field_Desc) -> [^]u8 {
 	return ([^]u8)(rawptr(uintptr(entity) + f.offset))
 }
 
-// Owner side: append the streamed fields' current values.
+// Owner side: append the streamed fields' current values, wire-encoded.
 stream_write :: proc(w: ^Writer, entity: rawptr, desc: ^Entity_Desc) {
 	for f in desc.fields {
 		if .Owner_Stream not_in f.flags {
 			continue
 		}
-		ep := stream_field_ptr(entity, f)
-		append(&w.buf, ..ep[:f.size])
+		field_encode(w, stream_field_ptr(entity, f), f)
 	}
 }
 

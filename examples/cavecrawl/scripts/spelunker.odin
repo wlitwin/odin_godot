@@ -25,9 +25,11 @@ Spelunker :: struct {
 	glyph:     gd.Label `gd:"onready=Glyph"`,
 	pyre:      gd.Cpu_Particles2d `gd:"onready=Pyre"`, // authored death burst
 	net_id:    knet.Net_Id, // assigned by the session at spawn
-	x, y:      f32 `gd:"replicate,interp,owner"`,
+	x, y:      f32 `gd:"replicate,interp,owner,wire=f16"`, // half floats on the wire — cave
+	// coordinates fit f16 to sub-pixel; the struct (and everything local: shadows,
+	// prediction, ring blobs) stays full f32
 	bag:       [6]kitems.Slot `gd:"replicate"`,
-	hp:        i32 `gd:"replicate"`,
+	hp:        i32 `gd:"replicate,wire=spelunker_hp_codec"`, // 0..MAX_HP ships as ONE byte
 	stamina:   i32 `gd:"replicate"`,
 	cds:       [2]u16 `gd:"replicate"`, // ability cooldowns, host-decayed
 	fx:        [2]kcombat.Effect `gd:"replicate"`, // status effects, host-decayed
@@ -36,6 +38,16 @@ Spelunker :: struct {
 	cast_from: [2]f32, // scratch: where the throw REALLY left from (owner truth, leashed)
 	php:       kcombat.Predicted_Hp, // scratch: impacts SEEN here, pre-truth
 	was_dead:  bool, // scratch: death-edge detector for the pyre burst
+}
+
+// The hp wire codec: an i32 whose whole gameplay range is 0..MAX_HP has no
+// business spending four wire bytes. encode/decode are exact over that range,
+// so nothing downstream (death edges, the hp==REVIVE_HP contract) can drift —
+// pick codecs whose round trip is exact for every value the game produces.
+spelunker_hp_codec :: knet.Wire_Codec {
+	size   = 1,
+	encode = proc(wire, field: rawptr) {(^u8)(wire)^ = u8(clamp((^i32)(field)^, 0, 255))},
+	decode = proc(field, wire: rawptr) {(^i32)(field)^ = i32((^u8)(wire)^)},
 }
 
 // Drop a bag slot at my feet: my bag empties on my screen this frame; the

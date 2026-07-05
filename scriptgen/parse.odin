@@ -615,6 +615,42 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 					rep.blend = name
 					continue
 				}
+				// `wire=f16` / `wire=NAME`: how the field's bytes are ENCODED in
+				// packets — half floats (stock) or an author knet.Wire_Codec,
+				// spliced verbatim like a blend proc. The struct-side value is
+				// untouched: shadows, prediction, and rings never see wire bytes.
+				if strings.has_prefix(spec, "wire=") {
+					name := strings.trim_space(spec[len("wire="):])
+					if name == "" {
+						error_at(
+							floc,
+							"%s.%s: `wire=` needs `f16` or a codec name (a knet.Wire_Codec in this package)",
+							s.struct_name,
+							field_label,
+						)
+						continue
+					}
+					if name == "f16" {
+						// The same classifier bare `interp` uses: .F32 means
+						// "f32 elements all the way down" — exactly what a
+						// componentwise half-float encoding can carry.
+						if interp_lerp_kind(type_text) != ".F32" {
+							error_at(
+								floc,
+								"%s.%s: `wire=f16` needs f32 elements (f32, float vectors/colors, or fixed arrays of them) — %q has none to halve; use a custom codec with `wire=CODEC`",
+								s.struct_name,
+								field_label,
+								type_text,
+							)
+							continue
+						}
+						rep.wire = ".F16"
+					} else {
+						rep.wire = ".Custom"
+						rep.codec = name
+					}
+					continue
+				}
 				switch spec {
 				case "interp":
 					rep.interp = true
@@ -624,7 +660,7 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 				case:
 					error_at(
 						floc,
-						"%s.%s: unknown replicate option %q (expected `interp`, `interp=BLEND_PROC`, or `owner`)",
+						"%s.%s: unknown replicate option %q (expected `interp`, `interp=BLEND_PROC`, `owner`, `wire=f16`, or `wire=CODEC`)",
 						s.struct_name,
 						field_label,
 						spec,

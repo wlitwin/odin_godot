@@ -41,12 +41,16 @@ game in order and links each page below at the moment you need it.
 
 ## Beyond the basics
 
-Three former "post-v1" staples are in, demonstrated by cavecrawl's acid acts:
+The former "post-v1" staples are in, demonstrated by cavecrawl's acid acts:
 **ownership transfer** (`session_set_owner` — carry/mounts/possession; the
 relic), **downed/revive** (`spelunker_revive` — one predicted command, no
-hook), and **host takeover** (`session_backup_parts` + `session_host_resume`
+hook), **host takeover** (`session_backup_parts` + `session_host_resume`
 — the murdered host's run resumes under the backup holder, friends rejoin
-and reclaim themselves).
+and reclaim themselves), **shared-seed procgen** (replicate the dice, grow
+the world locally — the cavecrawl scatter), **wire codecs** (`wire=f16` /
+custom fixed-size encodings — [net](net.md)), and **entity blobs**
+(`session_set_blob` — variable-length state that rides joins, backups, and
+saves; [session](session.md)).
 
 **Voice, the stance:** not in the toolkit, deliberately. Friendslop groups
 already sit in a Discord call — building voice would spend the complexity
@@ -57,6 +61,6 @@ voice — the horror-co-op signature mechanic — which needs positional mixing
 the toolkit's replicated positions make easy to drive; revisit when a game
 needs it.
 
-Still deliberately out: shared-seed procgen (an example, someday), character-
-portable saves, private per-player replication. See the design notes in the
-repository's knowledge base.
+Still deliberately out (documented as recipes in [session](session.md), not
+code): character-portable saves and private per-player state. See the design
+notes in the repository's knowledge base.

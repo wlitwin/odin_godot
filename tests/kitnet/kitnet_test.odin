@@ -1329,3 +1329,198 @@ truth_and_revert_spare_owner_fields_on_the_owner :: proc(t: ^testing.T) {
 	testing.expect_value(t, me.hp, i32(40)) // reverted
 	testing.expect_value(t, me.x, f32(999)) // mine, untouched
 }
+
+// ---- wire codecs: encodings exist only inside packets ------------------------
+
+// The Walter case: a big deterministic structure both sides grow locally means
+// the wire only needs an INDEX into it. Here: a 32-step angle table — the f32
+// heading ships as one byte naming the nearest entry.
+@(private = "file")
+heading_table :: proc(i: u8) -> f32 {
+	return f32(i) * (360.0 / 32.0)
+}
+
+@(private = "file")
+heading_codec :: knet.Wire_Codec {
+	size   = 1,
+	encode = proc(wire, field: rawptr) {
+		deg := (^f32)(field)^
+		(^u8)(wire)^ = u8(int(deg / (360.0 / 32.0) + 0.5) % 32)
+	},
+	decode = proc(field, wire: rawptr) {
+		(^f32)(field)^ = heading_table((^u8)(wire)^)
+	},
+}
+
+Scout :: struct {
+	hp:      i32, // raw
+	px, py:  f32, // wire = .F16 (half floats on the wire, f32 in the struct)
+	heading: f32, // wire = .Custom (index into the shared table)
+	local:   int,
+}
+
+scout_desc :: proc() -> knet.Entity_Desc {
+	@(static) fields := [?]knet.Field_Desc{
+		{offset = offset_of(Scout, hp), size = size_of(i32)},
+		{offset = offset_of(Scout, px), size = size_of(f32), wire = .F16},
+		{offset = offset_of(Scout, py), size = size_of(f32), wire = .F16},
+		{offset = offset_of(Scout, heading), size = size_of(f32), wire = .Custom, codec = heading_codec},
+	}
+	return knet.Entity_Desc{fields = fields[:]}
+}
+
+@(test)
+wire_sizes_and_delta_roundtrip :: proc(t: ^testing.T) {
+	desc := scout_desc()
+	testing.expect_value(t, knet.desc_data_size(&desc), 16) // struct layout: 4+4+4+4
+	testing.expect_value(t, knet.desc_wire_size(&desc), 9) // wire: 4+2+2+1
+	testing.expect(t, knet.desc_has_wire(&desc))
+
+	sender := Scout{hp = 42, px = 640.5, py = 128.25, heading = 90}
+	shadow := knet.shadow_make(&desc)
+	defer delete(shadow)
+
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	mask := knet.write_delta(&w, &sender, shadow, &desc)
+	testing.expect_value(t, mask, u64(0b1111))
+	// 1 mask byte + the WIRE bytes, not the struct bytes.
+	testing.expect_value(t, len(knet.writer_bytes(&w)), 1 + 9)
+
+	receiver := Scout{local = 7}
+	r := knet.reader_make(knet.writer_bytes(&w))
+	applied := knet.apply_delta(&r, &receiver, &desc)
+	testing.expect(t, !r.err)
+	testing.expect_value(t, applied, u64(0b1111))
+	testing.expect_value(t, receiver.hp, i32(42))
+	// f16 carries these magnitudes to well under half a pixel.
+	testing.expect(t, abs(receiver.px - 640.5) < 0.5, "px survived the half-float trip")
+	testing.expect(t, abs(receiver.py - 128.25) < 0.25, "py survived the half-float trip")
+	// The codec decodes to an exact TABLE entry — the shared-structure contract.
+	testing.expect_value(t, receiver.heading, heading_table(8)) // 90° = entry 8
+	testing.expect_value(t, receiver.local, 7) // untouched, as ever
+
+	// The shadow committed STRUCT bytes: the sender is idle on the next diff
+	// even though its full-precision values differ from what receivers decoded.
+	testing.expect_value(t, knet.diff_mask(&sender, shadow, &desc), u64(0))
+}
+
+@(test)
+wire_full_snapshot_roundtrip :: proc(t: ^testing.T) {
+	desc := scout_desc()
+	src := Scout{hp = 9, px = 33, py = -12.5, heading = 180}
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_full(&w, &src, &desc)
+	testing.expect_value(t, len(knet.writer_bytes(&w)), 9) // wire size, no mask
+
+	dst := Scout{}
+	r := knet.reader_make(knet.writer_bytes(&w))
+	knet.apply_full(&r, &dst, &desc)
+	testing.expect(t, !r.err)
+	testing.expect_value(t, dst.hp, i32(9))
+	testing.expect(t, abs(dst.px - 33) < 0.1)
+	testing.expect(t, abs(dst.py - -12.5) < 0.1)
+	testing.expect_value(t, dst.heading, heading_table(16)) // 180° = entry 16
+}
+
+// Streamed fields with wire encodings: packets carry wire bytes, rings hold
+// struct-layout bytes (decoded at the packet edge), blending never knows.
+Glider :: struct {
+	x, y:  f32, // owner-streamed, lerped, f16 on the wire
+	local: int,
+}
+
+glider_desc :: proc() -> knet.Entity_Desc {
+	@(static) fields := [?]knet.Field_Desc{
+		{offset = offset_of(Glider, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32, wire = .F16},
+		{offset = offset_of(Glider, y), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32, wire = .F16},
+	}
+	return knet.Entity_Desc{fields = fields[:]}
+}
+
+@(test)
+wire_streams_decode_at_the_packet_edge :: proc(t: ^testing.T) {
+	desc := glider_desc()
+	testing.expect_value(t, knet.stream_data_size(&desc), 8) // ring blobs: struct layout
+	testing.expect_value(t, knet.stream_wire_size(&desc), 4) // packets: half floats
+
+	set := knet.Command_Set{entity_desc = &desc}
+	owner_side := knet.registry_make()
+	defer knet.registry_destroy(&owner_side)
+	remote_side := knet.registry_make()
+	defer knet.registry_destroy(&remote_side)
+
+	me := knet.Player_Id(2)
+	viewer := knet.Player_Id(3)
+	mine := Glider{x = 100, y = 200}
+	id := knet.registry_spawn(&owner_side, &mine, &set, me)
+	theirs := Glider{local = 5}
+	knet.registry_insert(&remote_side, id, &theirs, &set, me)
+
+	// Two ticks of owner motion, shipped as two stream batches.
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	testing.expect_value(t, knet.registry_write_streams(&w, &owner_side, me, 1.0), 1)
+	r := knet.reader_make(knet.writer_bytes(&w))
+	stamp := knet.registry_stream_time(&r)
+	testing.expect_value(t, knet.registry_apply_streams(&r, &remote_side, viewer, stamp), 1)
+
+	mine.x = 110
+	mine.y = 220
+	knet.writer_reset(&w)
+	testing.expect_value(t, knet.registry_write_streams(&w, &owner_side, me, 2.0), 1)
+	r = knet.reader_make(knet.writer_bytes(&w))
+	stamp = knet.registry_stream_time(&r)
+	testing.expect_value(t, knet.registry_apply_streams(&r, &remote_side, viewer, stamp), 1)
+
+	// Sampling midway lerps DECODED values — half-float precision, full blend.
+	testing.expect_value(t, knet.registry_sample_streams(&remote_side, 1.5, viewer), 1)
+	testing.expect(t, abs(theirs.x - 105) < 0.5, "x lerped between decoded samples")
+	testing.expect(t, abs(theirs.y - 210) < 0.5, "y lerped between decoded samples")
+	testing.expect_value(t, theirs.local, 5)
+}
+
+// ---- entity blobs: the variable-length escape hatch ---------------------------
+
+@(test)
+blob_set_apply_and_dedup :: proc(t: ^testing.T) {
+	desc := probe_desc()
+	set := knet.Command_Set{entity_desc = &desc}
+	reg := knet.registry_make()
+	defer knet.registry_destroy(&reg)
+
+	e := Probe{hp = 1}
+	id := knet.registry_spawn(&reg, &e, &set)
+
+	data, ver := knet.registry_blob(&reg, id)
+	testing.expect_value(t, len(data), 0)
+	testing.expect_value(t, ver, u32(0)) // never set
+
+	testing.expect(t, knet.registry_set_blob(&reg, id, []u8{0xCA, 0xFE}))
+	data, ver = knet.registry_blob(&reg, id)
+	testing.expect_value(t, ver, u32(1))
+	testing.expect_value(t, len(data), 2)
+	testing.expect_value(t, data[0], u8(0xCA))
+
+	// Receiver side: a fresh version applies, a re-received one is dropped
+	// (a rejoin re-receives the world — the game must not re-react).
+	reg2 := knet.registry_make()
+	defer knet.registry_destroy(&reg2)
+	e2 := Probe{}
+	knet.registry_insert(&reg2, id, &e2, &set)
+	testing.expect(t, knet.registry_apply_blob(&reg2, id, ver, data))
+	testing.expect(t, !knet.registry_apply_blob(&reg2, id, ver, data), "duplicate version must be dropped")
+	got, gv := knet.registry_blob(&reg2, id)
+	testing.expect_value(t, gv, u32(1))
+	testing.expect_value(t, got[1], u8(0xFE))
+
+	// Clearing: empty payload, version still moves (receivers hear about it).
+	testing.expect(t, knet.registry_set_blob(&reg, id, nil))
+	data, ver = knet.registry_blob(&reg, id)
+	testing.expect_value(t, len(data), 0)
+	testing.expect_value(t, ver, u32(2))
+
+	// Unknown ids refuse politely.
+	testing.expect(t, !knet.registry_set_blob(&reg, knet.Net_Id(999), []u8{1}))
+}

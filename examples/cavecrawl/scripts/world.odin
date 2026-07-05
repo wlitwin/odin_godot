@@ -252,6 +252,7 @@ cave_lobby_on_start :: proc(self: ^CaveLobby) {
 	lv.depth = 1
 	lv.seed = u32(i64(now_s() * 1000)) | 1 // the run's dice, minted once, never zero
 	ksess.session_spawn_send(&self.ses, lid)
+	cave_inscribe(self) // floor 1's inscription — late joiners get it with the world
 
 	cave_build_floor(self, 1)
 
@@ -278,6 +279,17 @@ cave_lobby_on_start :: proc(self: ^CaveLobby) {
 	enter_the_cave(self)
 	kcomms.comms_system(&self.comms, "the descent begins")
 	gd.print_str(fmt.tprintf("CAVE_STARTED spel=%d", i))
+}
+
+// Host: carve this floor's INSCRIPTION into the level entity — the entity-blob
+// pattern in its smallest form. The text is variable-length state a NEW
+// observer must see (not an event: a rejoiner wasn't there when it was set),
+// which is exactly what blobs are for — one session_set_blob and it ships
+// reliably now AND rides every later join snapshot, backup, and save with no
+// catch-up code. Every peer prints it off Ev_Blob_Changed.
+cave_inscribe :: proc(self: ^CaveLobby) {
+	text := fmt.tprintf("the walls of floor %d remember seed %d", self.level.depth, self.level.seed)
+	ksess.session_set_blob(&self.ses, self.level.net_id, transmute([]u8)text)
 }
 
 // Drop every LOCAL copy of the world — nodes and maps — without touching
@@ -333,6 +345,7 @@ cave_descend :: proc(self: ^CaveLobby) {
 
 	self.level.depth += 1
 	cave_build_floor(self, int(self.level.depth))
+	cave_inscribe(self)
 	kcomms.comms_system(&self.comms, fmt.tprintf("the party descends to depth %d", self.level.depth))
 	gd.print_str(fmt.tprintf("CAVE_DESCEND depth=%d", self.level.depth))
 }
@@ -382,6 +395,7 @@ cave_restart :: proc(self: ^CaveLobby) {
 	self.level.depth = 1
 	self.level.wave = 0
 	cave_build_floor(self, 1)
+	cave_inscribe(self)
 	kcomms.comms_system(&self.comms, "the descent begins anew")
 	gd.print_str("CAVE_RESTART")
 }

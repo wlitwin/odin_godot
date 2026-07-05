@@ -11,8 +11,11 @@ package kit_net
 // Replicated fields are POD ONLY (ints/floats/bools/enums/fixed arrays of these):
 // raw bytes are compared and copied — nothing here follows pointers. Strings and
 // dynamic data are NOT replicable fields; they travel as explicit reliable
-// messages. This single restriction is what makes shadows, reverts, and deltas
-// memcpy-simple and allocation-free on the hot path.
+// messages (or as an entity blob — see registry_set_blob). This single
+// restriction is what makes shadows, reverts, and deltas memcpy-simple and
+// allocation-free on the hot path. A field MAY re-encode its bytes on the wire
+// (Wire_Kind: half floats, custom fixed-size codecs) — but the encoding exists
+// only inside packets; everything held in memory stays struct-layout.
 //
 // The same field layout serves three masters (one serialization, three uses):
 //   * per-tick deltas          (write_delta / apply_delta)
@@ -23,13 +26,16 @@ package kit_net
 import "core:mem"
 
 // Per-field metadata. `offset` is into the ENTITY struct (offset_of); fields are
-// laid out in the shadow/wire in desc order, tightly packed.
+// laid out in the shadow in desc order, tightly packed. On the WIRE each field
+// occupies field_wire_size bytes (== size unless a Wire_Kind re-encodes it).
 Field_Desc :: struct {
 	offset: uintptr,
 	size:   int,
 	flags:  Field_Flags,
 	lerp:   Lerp_Kind, // how stream sampling blends this field (meaningful with .Interp)
 	blend:  Blend_Proc, // required iff lerp == .Custom
+	wire:   Wire_Kind, // how the field's bytes are ENCODED in packets (default: raw)
+	codec:  Wire_Codec, // required iff wire == .Custom
 }
 
 Field_Flag :: enum u8 {
@@ -49,6 +55,44 @@ Lerp_Kind :: enum u8 {
 	Quat,   // 4 x f32 quaternion: nlerp with hemisphere flip + renormalize (a raw
 	        // componentwise lerp collapses through zero when q and -q meet)
 	Custom, // author-supplied Blend_Proc (special math: wrapped angles, color spaces, …)
+}
+
+// How a field's bytes are ENCODED inside packets. The struct-side representation
+// never changes: shadows, dirty diffing, prediction capture/restore, and stream
+// rings all hold struct-layout bytes — wire bytes exist only between writer and
+// reader, encoded at write time and decoded at the packet edge. That containment
+// is what keeps custom encodings cheap: none of the comparison/revert machinery
+// ever sees them. The wire size must be FIXED per field (that fixed-size contract
+// is what lets a codec change the representation freely — quantize, pack, or ship
+// an index into a structure both sides grow deterministically). Variable-length
+// state doesn't belong in fields at all: use an entity blob or an app message.
+Wire_Kind :: enum u8 {
+	Raw,    // ship the struct bytes verbatim (the default)
+	F16,    // f32 elements ship as half floats — half the bytes, ~3 significant digits
+	        // (integers exact to 2048; a fit for friendslop-scale positions/velocities)
+	Custom, // author-supplied fixed-size codec (Wire_Codec)
+}
+
+// A fixed-size custom field encoding. `encode` writes exactly `size` wire bytes
+// from the struct field; `decode` is its inverse. Authors declare one via the tag:
+//
+//     heading: f32 `gd:"replicate,wire=heading_codec"`
+//
+//     heading_codec :: knet.Wire_Codec {
+//         size   = 1,
+//         encode = proc(wire, field: rawptr) {(^u8)(wire)^ = u8((^f32)(field)^ * 256.0 / 360.0)},
+//         decode = proc(field, wire: rawptr) {(^f32)(field)^ = f32((^u8)(wire)^) * 360.0 / 256.0},
+//     }
+//
+// decode(encode(x)) should be STABLE (a second round trip changes nothing):
+// receivers hold decoded values, and an unstable round trip makes confirmed
+// predictions micro-snap. Note dirtiness is still diffed on STRUCT bytes — a
+// change smaller than the wire precision still sends (and decodes to the same
+// value); harmless, but pick a precision at least as fine as gameplay cares about.
+Wire_Codec :: struct {
+	size:   int,
+	encode: proc(wire, field: rawptr), // struct field -> `size` wire bytes
+	decode: proc(field, wire: rawptr), // `size` wire bytes -> struct field
 }
 
 // Custom field blend: write the interpolation of the field bytes at `a` (earlier
@@ -76,13 +120,83 @@ Entity_Desc :: struct {
 
 MAX_REPLICATED_FIELDS :: 64
 
-// Total shadow/full-snapshot byte size for a descriptor.
+// Total shadow byte size for a descriptor (struct-layout — capture/restore/diff).
 desc_data_size :: proc(desc: ^Entity_Desc) -> int {
 	n := 0
 	for f in desc.fields {
 		n += f.size
 	}
 	return n
+}
+
+// One field's size ON THE WIRE (== .size unless a Wire_Kind re-encodes it).
+field_wire_size :: proc(f: Field_Desc) -> int {
+	switch f.wire {
+	case .Raw:
+		return f.size
+	case .F16:
+		return f.size / 2
+	case .Custom:
+		return f.codec.size
+	}
+	return f.size
+}
+
+// Total full-snapshot byte size on the wire (spawn tuples, joins, backups).
+desc_wire_size :: proc(desc: ^Entity_Desc) -> int {
+	n := 0
+	for f in desc.fields {
+		n += field_wire_size(f)
+	}
+	return n
+}
+
+// Whether any field re-encodes on the wire (lets hot paths skip decode shims).
+desc_has_wire :: proc(desc: ^Entity_Desc) -> bool {
+	for f in desc.fields {
+		if f.wire != .Raw {
+			return true
+		}
+	}
+	return false
+}
+
+// Append the field's wire encoding of the struct bytes at `src`. Byte order is
+// native, like every raw field byte this package ships.
+field_encode :: proc(w: ^Writer, src: rawptr, f: Field_Desc) {
+	switch f.wire {
+	case .Raw:
+		sp := ([^]u8)(src)
+		append(&w.buf, ..sp[:f.size])
+	case .F16:
+		sf := ([^]f32)(src)
+		for i in 0 ..< f.size / 4 {
+			h := f16(sf[i])
+			hp := ([^]u8)(&h)
+			append(&w.buf, ..hp[:2])
+		}
+	case .Custom:
+		old := len(w.buf)
+		resize(&w.buf, old + f.codec.size)
+		f.codec.encode(&w.buf[old], src)
+	}
+}
+
+// Decode field_wire_size(f) wire bytes at `wire` into the struct bytes at `dst`.
+field_decode :: proc(dst: rawptr, wire: [^]u8, f: Field_Desc) {
+	switch f.wire {
+	case .Raw:
+		mem.copy(dst, wire, f.size)
+	case .F16:
+		df := ([^]f32)(dst)
+		for i in 0 ..< f.size / 4 {
+			h: f16
+			mem.copy(&h, wire[i * 2:], 2)
+			df[i] = f32(h)
+		}
+	case .Custom:
+		f.codec.decode(dst, wire)
+	}
 }
 
 // Width of the wire dirty mask: only as many bytes as the field count needs.
@@ -98,9 +212,21 @@ field_ptr :: proc(entity: rawptr, f: Field_Desc) -> rawptr {
 
 // Allocate a zeroed shadow. Zero ≠ the entity's initial values, so the FIRST diff
 // after spawn marks every non-zero field dirty — which is exactly the initial
-// full send a fresh entity needs.
+// full send a fresh entity needs. Doubles as the descriptor's validation point
+// (every registered entity passes through here): a malformed Wire_Kind fails
+// loudly at registration instead of corrupting packets later.
 shadow_make :: proc(desc: ^Entity_Desc, allocator := context.allocator) -> []u8 {
 	assert(len(desc.fields) <= MAX_REPLICATED_FIELDS)
+	for f in desc.fields {
+		switch f.wire {
+		case .Raw:
+		case .F16:
+			assert(f.size % 4 == 0, "wire = .F16 needs f32 elements (size divisible by 4)")
+		case .Custom:
+			assert(f.codec.size > 0 && f.codec.encode != nil && f.codec.decode != nil,
+			       "wire = .Custom needs a complete Field_Desc.codec (size, encode, decode)")
+		}
+	}
 	return make([]u8, desc_data_size(desc), allocator)
 }
 
@@ -162,11 +288,9 @@ write_delta :: proc(w: ^Writer, entity: rawptr, shadow: []u8, desc: ^Entity_Desc
 	off := 0
 	for f, i in desc.fields {
 		if mask & (1 << u64(i)) != 0 {
-			ep := ([^]u8)(field_ptr(entity, f))
-			old := len(w.buf)
-			resize(&w.buf, old + f.size)
-			mem.copy(&w.buf[old], ep, f.size)
-			mem.copy(&shadow[off], ep, f.size) // commit shadow only for sent fields
+			ep := field_ptr(entity, f)
+			field_encode(w, ep, f)
+			mem.copy(&shadow[off], ep, f.size) // commit shadow: STRUCT bytes, never wire bytes
 		}
 		off += f.size
 	}
@@ -182,13 +306,13 @@ apply_delta :: proc(r: ^Reader, entity: rawptr, desc: ^Entity_Desc) -> u64 {
 	mask := read_mask(r, mask_bytes(desc))
 	for f, i in desc.fields {
 		if mask & (1 << u64(i)) != 0 {
-			buf := field_ptr(entity, f)
-			if r.err || r.off + f.size > len(r.data) {
+			n := field_wire_size(f)
+			if r.err || r.off + n > len(r.data) {
 				r.err = true
 				return mask
 			}
-			mem.copy(buf, &r.data[r.off], f.size)
-			r.off += f.size
+			field_decode(field_ptr(entity, f), ([^]u8)(&r.data[r.off]), f)
+			r.off += n
 		}
 	}
 	return mask
@@ -198,9 +322,7 @@ apply_delta :: proc(r: ^Reader, entity: rawptr, desc: ^Entity_Desc) -> u64 {
 // shipping, save/load all reuse this exact layout.
 write_full :: proc(w: ^Writer, entity: rawptr, desc: ^Entity_Desc) {
 	for f in desc.fields {
-		old := len(w.buf)
-		resize(&w.buf, old + f.size)
-		mem.copy(&w.buf[old], field_ptr(entity, f), f.size)
+		field_encode(w, field_ptr(entity, f), f)
 	}
 }
 
@@ -211,14 +333,15 @@ write_full :: proc(w: ^Writer, entity: rawptr, desc: ^Entity_Desc) {
 // still consumed; the fields are left alone.
 apply_full :: proc(r: ^Reader, entity: rawptr, desc: ^Entity_Desc, skip_owner := false) {
 	for f in desc.fields {
-		if r.err || r.off + f.size > len(r.data) {
+		n := field_wire_size(f)
+		if r.err || r.off + n > len(r.data) {
 			r.err = true
 			return
 		}
 		if !(skip_owner && .Owner_Stream in f.flags) {
-			mem.copy(field_ptr(entity, f), &r.data[r.off], f.size)
+			field_decode(field_ptr(entity, f), ([^]u8)(&r.data[r.off]), f)
 		}
-		r.off += f.size
+		r.off += n
 	}
 }
 

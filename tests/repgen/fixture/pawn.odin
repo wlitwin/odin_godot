@@ -17,6 +17,8 @@ Pawn :: struct {
 	x, y:   f32 `gd:"replicate,interp,owner"`, // multi-name: one desc entry per name
 	rot:    gd.Quaternion `gd:"replicate,interp,owner"`, // classified to hemisphere-safe nlerp
 	aim:    f32 `gd:"replicate,interp=pawn_blend_aim,owner"`, // custom blend math
+	heat:   f32 `gd:"replicate,wire=f16"`, // stock half-float wire encoding
+	charge: i32 `gd:"replicate,wire=pawn_charge_codec"`, // custom fixed-size codec
 	state:  u8 `gd:"replicate"`,
 	speed:  f64 `gd:"export,range=0:10"`, // exports and replicates coexist
 	local:  int, // untagged: never replicated
@@ -26,6 +28,14 @@ Pawn :: struct {
 // references it verbatim, so this consumer compile IS the signature check.
 pawn_blend_aim :: proc(dst, a, b: rawptr, alpha: f32) {
 	(^f32)(dst)^ = (^f32)(a)^ + ((^f32)(b)^ - (^f32)(a)^) * alpha
+}
+
+// The custom codec `charge` names — a knet.Wire_Codec: i32 charge (0..255)
+// ships as one byte. Same verbatim-splice contract as the blend proc.
+pawn_charge_codec :: knet.Wire_Codec {
+	size   = 1,
+	encode = proc(wire, field: rawptr) {(^u8)(wire)^ = u8(clamp((^i32)(field)^, 0, 255))},
+	decode = proc(field, wire: rawptr) {(^i32)(field)^ = i32((^u8)(wire)^)},
 }
 
 pawn_ready :: proc(self: ^Pawn) {

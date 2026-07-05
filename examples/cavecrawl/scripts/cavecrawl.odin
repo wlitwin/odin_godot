@@ -468,6 +468,13 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 					kcomms.comms_system(&self.comms, line)
 				}
 			}
+		case ksess.Ev_Blob_Changed:
+			// The floor's inscription (or any future blob) — variable-length
+			// state that arrived with the change, the join snapshot, or a
+			// resumed backup; one read, every path.
+			if self.level != nil && e.id == self.level.net_id {
+				gd.print_str(fmt.tprintf("CAVE_INSCRIPTION %s", string(ksess.session_blob(&self.ses, e.id))))
+			}
 		case ksess.Ev_State_Applied:
 			if self.me_spel != nil {
 				kui.inv_refresh(&self.inv, self.me_spel.bag[:], &self.table)

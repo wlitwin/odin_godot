@@ -32,6 +32,8 @@ Registry_Entry :: struct {
 	owner:  Player_Id, // PLAYER_ID_INVALID = host-owned
 	stream: Stream_Ring, // remote-owned entities: buffered owner-stream snapshots
 	warp:   u8, // owner side: bumped by registry_teleport; rides every stream snapshot
+	blob:     []u8, // the entity's opaque payload (registry_set_blob) — nil = never set
+	blob_ver: u32, // bumped per set; receivers use it to drop re-received duplicates
 }
 
 Registry :: struct {
@@ -46,6 +48,7 @@ registry_make :: proc(allocator := context.allocator) -> Registry {
 registry_destroy :: proc(reg: ^Registry) {
 	for _, &e in reg.entries {
 		delete(e.shadow)
+		delete(e.blob)
 		stream_ring_destroy(&e.stream)
 	}
 	delete(reg.entries)
@@ -93,6 +96,7 @@ registry_remove :: proc(reg: ^Registry, id: Net_Id) -> bool {
 		return false
 	}
 	delete(e.shadow)
+	delete(e.blob)
 	stream_ring_destroy(&e.stream)
 	delete_key(&reg.entries, id)
 	return true
@@ -307,6 +311,61 @@ registry_commit_shadows :: proc(reg: ^Registry) {
 }
 
 // ---------------------------------------------------------------------------
+// Entity blobs — the variable-length escape hatch.
+//
+// One opaque, AUTHOR-DIRTIED payload per entity. Deliberately not a field:
+// no diffing (the author says when it changed — which deletes the entire
+// "how do you memcmp a pointer-bearing value" problem), no interpolation, no
+// prediction capture/restore, no owner streams. The session layer ships it
+// reliably on set and folds it into every full snapshot, so late joiners,
+// backup hosts, and saves all carry it for free. Anything event-shaped still
+// belongs in app messages; a blob is for state a NEW observer must see.
+
+// Authority side: replace the entity's blob (bytes are copied; empty clears it).
+// Bumps the version so receivers can drop re-received duplicates.
+registry_set_blob :: proc(reg: ^Registry, id: Net_Id, data: []u8) -> bool {
+	e, ok := &reg.entries[id]
+	if !ok {
+		return false
+	}
+	delete(e.blob)
+	e.blob = nil
+	if len(data) > 0 {
+		e.blob = make([]u8, len(data))
+		copy(e.blob, data)
+	}
+	e.blob_ver += 1
+	return true
+}
+
+// Receiver side: install a blob that arrived with an explicit version (wire /
+// snapshot). Returns false when this version is already held — the caller
+// skips its change notification (a rejoin re-receives the world).
+registry_apply_blob :: proc(reg: ^Registry, id: Net_Id, ver: u32, data: []u8) -> bool {
+	e, ok := &reg.entries[id]
+	if !ok || ver == e.blob_ver {
+		return false
+	}
+	delete(e.blob)
+	e.blob = nil
+	if len(data) > 0 {
+		e.blob = make([]u8, len(data))
+		copy(e.blob, data)
+	}
+	e.blob_ver = ver
+	return true
+}
+
+// The entity's current blob (a view — valid until the next set/apply/remove)
+// and its version (0 = never set).
+registry_blob :: proc(reg: ^Registry, id: Net_Id) -> (data: []u8, ver: u32) {
+	if e, ok := &reg.entries[id]; ok {
+		return e.blob, e.blob_ver
+	}
+	return nil, 0
+}
+
+// ---------------------------------------------------------------------------
 // Owner streams: the per-tick walk for the fields the HOST does not own.
 //
 // Batch layout: [sender_time f64][count u16] then count × ([net_id u32]
@@ -366,7 +425,7 @@ registry_write_streams :: proc(w: ^Writer, reg: ^Registry, me: Player_Id, sender
 		if e.owner != me {
 			continue
 		}
-		n := stream_data_size(e.set.entity_desc)
+		n := stream_wire_size(e.set.entity_desc)
 		if n == 0 {
 			continue
 		}
@@ -407,8 +466,15 @@ registry_apply_streams :: proc(r: ^Reader, reg: ^Registry, me: Player_Id, stamp:
 		blob := r.data[r.off:r.off + n]
 		r.off += n
 		e, ok := &reg.entries[id]
-		if !ok || e.owner == me || n != stream_data_size(e.set.entity_desc) {
+		if !ok || e.owner == me || n != stream_wire_size(e.set.entity_desc) {
 			continue
+		}
+		// Wire encodings stop HERE: decode to struct layout before the ring, so
+		// sampling/blending/warps stay byte-shape-identical to the entity.
+		if desc_has_wire(e.set.entity_desc) {
+			decoded := make([]u8, stream_data_size(e.set.entity_desc), context.temp_allocator)
+			stream_decode(decoded, blob, e.set.entity_desc)
+			blob = decoded
 		}
 		stream_ring_push(&e.stream, stamp, blob, warp)
 		applied += 1

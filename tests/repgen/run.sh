@@ -48,6 +48,8 @@ for needle in \
 	'lerp = .F32' \
 	'lerp = .Quat' \
 	'lerp = .Custom, blend = pawn_blend_aim' \
+	'wire = .F16' \
+	'wire = .Custom, codec = pawn_charge_codec' \
 	'pawn_net_desc := knet.Entity_Desc' \
 	'intrinsics.type_is_nearly_simple_compare' \
 ; do
@@ -228,6 +230,44 @@ if ! echo "$LRP_OUT" | grep -q "needs a blend proc name"; then
 	exit 1
 fi
 echo "  ok  interp on a non-float and empty interp= rejected, both spelled out"
+
+# ---- (4c): wire=f16 on a non-f32 type + empty wire= — both errors ----
+WIR="$TMP/wir"
+mkdir -p "$WIR"
+cat > "$WIR/halved.odin" <<'EOF'
+//gd:extends Node
+//gd:class Halved
+package repgen_wir
+
+import gd "godot:godot"
+
+Halved :: struct {
+	owner: gd.Node,
+	kills: i32 `gd:"replicate,wire=f16"`, // nothing to halve: loud error
+	score: f32 `gd:"replicate,wire="`, // wire= with no codec named
+}
+
+halved_ready :: proc(self: ^Halved) {}
+EOF
+set +e
+WIR_OUT="$(run_scriptgen "$WIR" 2>&1)"
+WIR_RC=$?
+set -e
+if [ "$WIR_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: wire=f16 on an i32 / empty wire= was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$WIR_OUT" | grep -q "needs f32 elements"; then
+	echo "REPGEN_FAIL: missing the wire=f16-needs-floats error:"
+	echo "$WIR_OUT" | tail -4
+	exit 1
+fi
+if ! echo "$WIR_OUT" | grep -q "needs \`f16\` or a codec name"; then
+	echo "REPGEN_FAIL: missing the empty wire= error:"
+	echo "$WIR_OUT" | tail -4
+	exit 1
+fi
+echo "  ok  wire=f16 on a non-float and empty wire= rejected, both spelled out"
 
 # ---- (5a): a command without net_id AND without replicated fields — both errors ----
 CMD1="$TMP/cmd1"

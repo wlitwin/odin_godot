@@ -1328,3 +1328,74 @@ world_time_is_the_hosts_clock_everywhere :: proc(t: ^testing.T) {
 	dt := ksess.session_world_time(&alice.s) - host.s.now
 	testing.expect(t, abs(dt) < 0.01, "world time must track the host's clock")
 }
+
+// ---- entity blobs: variable-length state that new observers must see -----------
+
+@(test)
+entity_blobs_ride_change_join_and_backup :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	hbot := Bot{hp = 10}
+	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
+
+	// Set before the world goes live: the host hears its own event...
+	ksess.session_set_blob(&host.s, id, transmute([]u8)string("rune-1"))
+	saw := false
+	for ev in drain(&host.s) {
+		if b, ok := ev.(ksess.Ev_Blob_Changed); ok && b.id == id && b.size == 6 {
+			saw = true
+		}
+	}
+	testing.expect(t, saw, "the host reacts to its own blob like any peer")
+
+	// ...and a client that has never seen the entity gets the blob WITH the
+	// world — spawn first, then the blob event, no catch-up code anywhere.
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	ksess.session_start_replicating(&host.s)
+	pump(boxes)
+	spawn_at, blob_at := -1, -1
+	for ev, i in drain(&alice.s) {
+		#partial switch e in ev {
+		case ksess.Ev_Spawned:
+			if e.id == id {spawn_at = i}
+		case ksess.Ev_Blob_Changed:
+			if e.id == id {blob_at = i}
+		}
+	}
+	testing.expect(t, spawn_at >= 0 && blob_at > spawn_at, "join carry: blob event lands after the spawn")
+	testing.expect_value(t, string(ksess.session_blob(&alice.s, id)), "rune-1")
+
+	// A mid-run change ships reliably on its own.
+	ksess.session_set_blob(&host.s, id, transmute([]u8)string("rune-2 with more to say"))
+	pump(boxes)
+	saw = false
+	for ev in drain(&alice.s) {
+		if b, ok := ev.(ksess.Ev_Blob_Changed); ok && b.id == id {
+			saw = true
+		}
+	}
+	testing.expect(t, saw)
+	testing.expect_value(t, string(ksess.session_blob(&alice.s, id)), "rune-2 with more to say")
+
+	// The blob rides the backup: a resumed host holds it without any game code.
+	now := 50.0
+	for _ in 0 ..< 10 {
+		step(boxes, &now)
+	}
+	testing.expect(t, len(alice.s.backup) > 0)
+	_, snap, pok := ksess.session_backup_parts(&alice.s)
+	testing.expect(t, pok)
+	host2: Peer_Box
+	box_make(&host2, 1)
+	defer box_destroy(&host2)
+	testing.expect(t, ksess.session_host_resume(&host2.s, alice.s.me, "alice", snap))
+	testing.expect_value(t, string(ksess.session_blob(&host2.s, id)), "rune-2 with more to say")
+}

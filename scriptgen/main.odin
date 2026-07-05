@@ -324,6 +324,8 @@ Replicate_Info :: struct {
 	owner:  bool, // part of the owner-authoritative unreliable stream
 	lerp:   string, // knet.Lerp_Kind literal (".F32"/".F64"/".Quat"/".Custom"); "" = Snap
 	blend:  string, // `interp=NAME`: the author's knet.Blend_Proc, spliced verbatim
+	wire:   string, // knet.Wire_Kind literal (".F16"/".Custom"); "" = raw struct bytes
+	codec:  string, // `wire=NAME`: the author's knet.Wire_Codec, spliced verbatim
 }
 
 // One @(gd_command) arg. Command args cross the wire, so the allowed types are

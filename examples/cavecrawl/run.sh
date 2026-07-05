@@ -204,6 +204,17 @@ attempt() {
 		[ -n "$scat" ] || { echo "  FAIL: host never scattered floor $d"; ok=0; continue; }
 		grep -q "$scat" "$glog" || { echo "  FAIL: floor $d procgen diverged ($scat)"; ok=0; }
 	done
+	# ENTITY BLOBS: the host carves a variable-length inscription per floor
+	# (session_set_blob on the level); the change ships reliably and every
+	# peer prints the SAME text off Ev_Blob_Changed. The wire codecs ride
+	# silently underneath this whole act: spelunker/relic x,y cross as half
+	# floats and hp as one byte — every movement/combat assert above already
+	# proved they decode.
+	for d in 1 2; do
+		local insc; insc=$(grep -m1 -oE "CAVE_INSCRIPTION the walls of floor $d remember seed [0-9]+" "$hlog")
+		[ -n "$insc" ] || { echo "  FAIL: host never inscribed floor $d"; ok=0; continue; }
+		grep -q "$insc" "$glog" || { echo "  FAIL: floor $d inscription diverged ($insc)"; ok=0; }
+	done
 	for log in "$hlog" "$glog"; do
 		grep -q "CAVE_FLOOR depth=2" "$log" || { echo "  FAIL: owner never stepped to floor 2 in $(basename "$log")"; ok=0; }
 		grep -qE "CAVE_DESCENDED depth=2 door=false dwellers=[0-9] chest=6" "$log" || { echo "  FAIL: floor 2 wrong in $(basename "$log")"; ok=0; }
@@ -254,6 +265,15 @@ attempt() {
 	# The guest's persisted token reclaims her identity across process death.
 	grep -q "CAVE_SEATED me=2" "$g2log" || { echo "  FAIL: rejoiner did not reclaim her id"; ok=0; }
 	grep -q "CAVE_REJOINED dwellers=3 gems=3 door=true" "$g2log" || { echo "  FAIL: the rejoined world is wrong"; ok=0; }
+	# JOIN CARRY: the inscription was set BEFORE she rejoined and survived a
+	# SAVE + RESUME in between (the save is taken on floor 1, pre-descent) —
+	# the resumed host must hold it, and it must reach her with the world
+	# snapshot, byte-identical, with zero catch-up code anywhere in the game.
+	local insc2; insc2=$(grep -m1 -oE "CAVE_INSCRIPTION the walls of floor 1 remember seed [0-9]+" "$h2log")
+	[ -n "$insc2" ] || { echo "  FAIL: the inscription did not survive save/resume"; ok=0; }
+	if [ -n "$insc2" ]; then
+		grep -q "$insc2" "$g2log" || { echo "  FAIL: the inscription did not carry to the rejoiner"; ok=0; }
+	fi
 	# ...and the resumed run is PLAYABLE: she avenges herself on a dweller.
 	grep -qE "CAVE_RESUME_SLAIN dwellers=[0-2]" "$g2log" || { echo "  FAIL: the resumed run was not playable"; ok=0; }
 	# The scoreboard remembers her kill from the previous life.

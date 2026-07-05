@@ -135,6 +135,11 @@ Ev_Entity_Changed :: struct {
 	id: knet.Net_Id, // one entity a state batch touched (opt-in: Session_Config.change_events)
 }
 
+Ev_Blob_Changed :: struct {
+	id:   knet.Net_Id, // this entity's blob changed — read it with session_blob
+	size: int,
+}
+
 Ev_Command_Executed :: struct {
 	ok:     bool, // (host) a client command ran (or was rejected) authoritatively
 	player: knet.Player_Id, // who issued it
@@ -168,6 +173,7 @@ Event :: union {
 	Ev_Backup_Received,
 	Ev_State_Applied,
 	Ev_Entity_Changed,
+	Ev_Blob_Changed,
 	Ev_Command_Executed,
 	Ev_Command_Confirmed,
 	Ev_Command_Rejected,
@@ -266,6 +272,8 @@ SES_KICKED :: u8(18) // host -> one     you were removed on purpose (not a host 
 SES_SETOWNER :: u8(19) // host -> all   [id][owner] — ownership transfer (carry/mount/possess)
 @(private)
 SES_SUCCESSOR :: u8(20) // host -> all  [player][info] — who carries the torch if I die, and how to find them
+@(private)
+SES_BLOB :: u8(21) // host -> all  [id][ver u32][len u32][bytes] — an entity blob changed
 
 // ---- app messages: the extension point for sibling kit packages ---------------
 //
@@ -753,6 +761,40 @@ session_set_owner :: proc(s: ^Session, id: knet.Net_Id, owner: knet.Player_Id) {
 	}
 }
 
+// Host: replace an entity's BLOB — the variable-length escape hatch. One
+// opaque payload per entity, shipped reliably to every peer when YOU say it
+// changed (no diffing, no interpolation, no prediction interplay — it is not
+// a field). It rides every full snapshot, so late joiners, backup hosts, and
+// saves carry it with no extra code. Ev_Blob_Changed fires on every peer
+// (this one included). For per-tick state use replicated fields; for
+// event-shaped things use app messages — a blob is for variable-length state
+// a NEW observer must be able to see.
+session_set_blob :: proc(s: ^Session, id: knet.Net_Id, data: []u8) {
+	assert(s.is_host, "blobs are host truth; clients ask via commands or app messages")
+	if !knet.registry_set_blob(&s.reg, id, data) {
+		return
+	}
+	append(&s.events, Ev_Blob_Changed{id = id, size = len(data)})
+	if s.replicating {
+		_, ver := knet.registry_blob(&s.reg, id)
+		w := knet.writer_make()
+		defer knet.writer_destroy(&w)
+		knet.write_u8(&w, SES_BLOB)
+		knet.write_net_id(&w, id)
+		knet.write_u32(&w, ver)
+		knet.write_u32(&w, u32(len(data)))
+		append(&w.buf, ..data)
+		broadcast(s, knet.writer_bytes(&w), .Reliable)
+	}
+}
+
+// The entity's current blob — a view, valid until the next set/apply/despawn;
+// copy it if you keep it. Empty slice = never set (or cleared).
+session_blob :: proc(s: ^Session, id: knet.Net_Id) -> []u8 {
+	data, _ := knet.registry_blob(&s.reg, id)
+	return data
+}
+
 // Host: remove an entity from the session and tell everyone. SYMMETRIC with
 // clients: the installed factory free proc runs here too (so node/map
 // cleanup is written once), and Ev_Despawned fires. Clients' in-flight
@@ -797,17 +839,23 @@ session_start_replicating :: proc(s: ^Session) {
 	}
 }
 
-// [type][id][owner][len][full fields] — len makes unknown types skippable.
+// [type][id][owner][len u16][full fields][blob_ver u32][blob_len u32][blob]
+// — both lengths make unknown types skippable whole. The blob section is why
+// entity blobs need no separate catch-up path: joins, backups, and saves all
+// serialize entities through this one tuple.
 @(private = "file")
 write_spawn_tuple :: proc(s: ^Session, w: ^knet.Writer, id: knet.Net_Id) {
 	e, _ := knet.registry_get(&s.reg, id)
 	knet.write_u16(w, u16(s.types[id]))
 	knet.write_net_id(w, id)
 	knet.write_player_id(w, e.owner)
-	n := knet.desc_data_size(e.set.entity_desc)
+	n := knet.desc_wire_size(e.set.entity_desc)
 	assert(n <= int(max(u16)))
 	knet.write_u16(w, u16(n))
 	knet.write_full(w, e.entity, e.set.entity_desc)
+	knet.write_u32(w, e.blob_ver)
+	knet.write_u32(w, u32(len(e.blob)))
+	append(&w.buf, ..e.blob)
 }
 
 @(private = "file")
@@ -839,8 +887,22 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 	body := knet.reader_make(r.data[r.off:r.off + n])
 	r.off += n
 
+	// The blob section is consumed up front — every early-out below (already
+	// known, no factory, unknown type) must leave the reader past this tuple.
+	blob_ver := knet.read_u32(r)
+	blob_n := int(knet.read_u32(r))
+	if r.err || r.off + blob_n > len(r.data) {
+		r.err = true
+		return
+	}
+	blob := r.data[r.off:r.off + blob_n]
+	r.off += blob_n
+
 	if e, exists := knet.registry_get(&s.reg, id); exists {
 		knet.apply_full(&body, e.entity, e.set.entity_desc)
+		if knet.registry_apply_blob(&s.reg, id, blob_ver, blob) {
+			append(&s.events, Ev_Blob_Changed{id = id, size = blob_n})
+		}
 		return
 	}
 	if s.factory_make == nil {
@@ -854,6 +916,11 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 	s.types[id] = type
 	knet.apply_full(&body, entity, set.entity_desc)
 	append(&s.events, Ev_Spawned{id = id, type = type, owner = owner})
+	// Blob event AFTER Ev_Spawned: by the time the game hears about the blob,
+	// the entity it decorates exists on this peer.
+	if knet.registry_apply_blob(&s.reg, id, blob_ver, blob) {
+		append(&s.events, Ev_Blob_Changed{id = id, size = blob_n})
+	}
 }
 
 // Drive the session once per frame. `now` is the game's monotonic seconds
@@ -1735,6 +1802,19 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) 
 		prev := session_owner_of(s, id)
 		if knet.registry_set_owner(&s.reg, id, owner) {
 			append(&s.events, Ev_Owner_Changed{id = id, owner = owner, prev = prev})
+		}
+	case SES_BLOB:
+		if s.is_host || !s.joined {
+			return
+		}
+		id := knet.read_net_id(r)
+		ver := knet.read_u32(r)
+		n := int(knet.read_u32(r))
+		if r.err || r.off + n > len(r.data) {
+			return
+		}
+		if knet.registry_apply_blob(&s.reg, id, ver, r.data[r.off:r.off + n]) {
+			append(&s.events, Ev_Blob_Changed{id = id, size = n})
 		}
 	case SES_DESPAWN:
 		if s.is_host || !s.joined {

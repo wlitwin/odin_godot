@@ -36,7 +36,7 @@ import ksess "godot:kit/session"
 import "core:mem"
 
 MAGIC :: u32(0x46534C50) // "FSLP"
-FORMAT :: u16(1)
+FORMAT :: u16(2) // bumped with the session snapshot layout (2: entity blobs + wire codecs)
 
 Header :: struct {
 	game_version: u16,

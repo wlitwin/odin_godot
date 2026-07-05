@@ -433,10 +433,14 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			if len(r.blend) > 0 {
 				lerp = fmt.tprintf(", lerp = .Custom, blend = %s", r.blend)
 			}
+			wire := len(r.wire) > 0 ? fmt.tprintf(", wire = %s", r.wire) : ""
+			if len(r.codec) > 0 {
+				wire = fmt.tprintf(", wire = .Custom, codec = %s", r.codec)
+			}
 			fmt.sbprintf(
 				b,
-				"\t{{offset = offset_of(%s, %s), size = size_of(type_of(%s{{}}.%s)), flags = %s%s}},\n",
-				cls, r.field, cls, r.field, flags, lerp,
+				"\t{{offset = offset_of(%s, %s), size = size_of(type_of(%s{{}}.%s)), flags = %s%s%s}},\n",
+				cls, r.field, cls, r.field, flags, lerp, wire,
 			)
 		}
 		w(b, "}\n\n")

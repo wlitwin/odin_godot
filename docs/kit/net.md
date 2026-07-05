@@ -97,6 +97,8 @@ Field_Desc :: struct {
 	flags:  Field_Flags,
 	lerp:   Lerp_Kind, // how stream sampling blends this field (meaningful with .Interp)
 	blend:  Blend_Proc, // required iff lerp == .Custom
+	wire:   Wire_Kind, // how the field's bytes are ENCODED in packets (default: raw)
+	codec:  Wire_Codec, // required iff wire == .Custom
 }
 
 Entity_Desc :: struct {
@@ -115,6 +117,41 @@ fixed array counts as one field). `Lerp_Kind` covers `.Snap`, `.F32`, `.F64`, `.
 (nlerp with hemisphere flip), and `.Custom` with an author-supplied
 `Blend_Proc :: proc(dst, a, b: rawptr, alpha: f32)` — declared via
 `` heading: f32 `gd:"replicate,owner,interp=blend_heading"` ``.
+
+## Wire codecs
+
+A field may re-encode its bytes inside packets. The struct-side representation
+never changes — shadows, dirty diffing, prediction capture/restore, and stream
+rings all hold struct-layout bytes; wire bytes exist only between writer and
+reader, decoded at the packet edge. So a codec buys bandwidth (and lets the
+wire representation differ from the in-memory one) without touching any of the
+comparison/revert machinery.
+
+`` gd:"replicate,...,wire=f16" `` ships f32 elements as half floats — half the
+bytes, ~3 significant digits, integers exact to 2048. Cavecrawl's spelunker and
+relic positions cross this way. For everything else there's a fixed-size custom
+codec, declared like a blend proc:
+
+```odin
+hp: i32 `gd:"replicate,wire=spelunker_hp_codec"` // 0..100 has no business in four bytes
+
+spelunker_hp_codec :: knet.Wire_Codec {
+	size   = 1,
+	encode = proc(wire, field: rawptr) {(^u8)(wire)^ = u8(clamp((^i32)(field)^, 0, 255))},
+	decode = proc(field, wire: rawptr) {(^i32)(field)^ = i32((^u8)(wire)^)},
+}
+```
+
+The wire size is FIXED per field — that fixed-size contract is exactly what
+frees the representation: quantize, bit-pack, or ship an *index* into a
+structure both sides grow deterministically (a shared-seed table means the wire
+only needs to name an entry, not carry it). Two rules keep codecs honest:
+`decode(encode(x))` should be stable (receivers hold decoded values; an
+unstable round trip makes confirmed predictions micro-snap), and dirtiness is
+still diffed on struct bytes — a change smaller than the wire precision still
+sends, so pick a precision at least as fine as gameplay cares about.
+Variable-length state doesn't belong in fields at all: use an entity blob
+(kit/session) or an explicit message.
 
 ## Registering entities
 

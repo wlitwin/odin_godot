@@ -129,8 +129,9 @@ for {
 The event union: `Ev_Welcomed`, `Ev_Player_Joined` (with `rejoin`), `Ev_Player_Left`,
 `Ev_Host_Left` (v1 has no migration — the run is over), `Ev_Join_Failed`,
 `Ev_Join_Denied` (`.Full` / `.Locked` / `.Banned` — each a different sentence to the
-player), `Ev_Kicked`, `Ev_Spawned`, `Ev_Despawned`, `Ev_Stats_Updated`,
-`Ev_Backup_Received`, `Ev_State_Applied`, `Ev_Command_Executed` (host),
+player), `Ev_Kicked`, `Ev_Spawned`, `Ev_Despawned`, `Ev_Owner_Changed`, `Ev_Blob_Changed`,
+`Ev_Stats_Updated`, `Ev_Backup_Received`, `Ev_State_Applied`,
+`Ev_Entity_Changed` (opt-in), `Ev_Command_Executed` (host),
 `Ev_Command_Confirmed` / `Ev_Command_Rejected` (client; timeouts surface as rejections
 with the real seq/entity).
 
@@ -174,6 +175,29 @@ Free_Entity_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr)
 
 Returning nil from `make` skips the entity safely — the wire carries its length, so
 unknown types are stepped over whole.
+
+### Entity blobs
+
+```odin
+session_set_blob :: proc(s: ^Session, id: knet.Net_Id, data: []u8)
+session_blob :: proc(s: ^Session, id: knet.Net_Id) -> []u8
+```
+
+The variable-length escape hatch: one opaque, **author-dirtied** payload per
+entity. Deliberately not a field — no diffing (you say when it changed, which
+deletes the "how do you memcmp a pointer-bearing value" problem), no
+interpolation, no prediction interplay. The host sets it; it ships reliably to
+every peer, `Ev_Blob_Changed` fires everywhere (the host included), and — the
+real reason it exists — it rides every full snapshot, so late joiners, backup
+hosts, and saves carry it with **zero catch-up code**. Cavecrawl carves a
+per-floor inscription into the level entity this way; a rejoiner reads it off
+the same event as everyone else.
+
+Use per-tick replicated fields for simulation state, app messages for
+event-shaped things, and a blob for variable-length state a *new observer*
+must be able to see. `session_blob` returns a view (copy it if you keep it),
+and re-received duplicates — a rejoin re-delivers the world — are dropped by
+version, so the event never double-fires.
 
 ## Roster, moderation, stats
 
