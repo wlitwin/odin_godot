@@ -67,7 +67,14 @@ registry_spawn :: proc(reg: ^Registry, entity: rawptr, set: ^Command_Set, owner 
 // (host migration) can keep allocating without collisions.
 registry_insert :: proc(reg: ^Registry, id: Net_Id, entity: rawptr, set: ^Command_Set, owner := PLAYER_ID_INVALID) {
 	assert(id != NET_ID_INVALID)
-	assert(reg.entries[id].entity == nil, "net id registered twice")
+	// Comma-ok, NOT a bare missing-key index: indexing a map by an absent key
+	// of a large value type faults in the current compiler (see the stats-map
+	// note in kit/session) — and absent is this assert's NORMAL path.
+	_, exists := reg.entries[id]
+	assert(!exists, "net id registered twice")
+	if set.net_id_offset > 0 {
+		(cast(^Net_Id)(uintptr(entity) + uintptr(set.net_id_offset)))^ = id
+	}
 	reg.entries[id] = Registry_Entry {
 		id     = id,
 		entity = entity,
@@ -446,13 +453,24 @@ registry_client_result :: proc(reg: ^Registry, ctx: ^Command_Ctx, r: ^Reader, me
 // Revert every prediction whose result never arrived (loud auto-revert — a
 // silent host must read as "no"). Entities that despawned meanwhile are
 // skipped; every revert buffer is freed. Returns how many predictions expired.
-registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks: u64, me := PLAYER_ID_INVALID) -> int {
+// An expired prediction, reported so higher layers can emit an addressed
+// rejection (a zero-valued event is useless to UI keyed on seq/entity).
+Expired_Command :: struct {
+	seq:    Intent_Seq,
+	entity: Net_Id,
+	cmd:    u16,
+}
+
+registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks: u64, me := PLAYER_ID_INVALID, out: ^[dynamic]Expired_Command = nil) -> int {
 	expired := make([dynamic]Pending, context.temp_allocator)
 	pending_expire(&ctx.pending, ctx.now_tick, max_age_ticks, &expired)
 	for p in expired {
 		if e, found := reg.entries[p.entity]; found {
 			owned_here := me != PLAYER_ID_INVALID && e.owner == me
 			fields_restore(e.entity, e.set.entity_desc, p.revert, skip_owner = owned_here)
+		}
+		if out != nil {
+			append(out, Expired_Command{seq = p.seq, entity = p.entity, cmd = p.cmd})
 		}
 		pending_dispose(p)
 	}

@@ -61,17 +61,8 @@ score_refresh :: proc(sb: ^Score, s: ^ksess.Session) {
 	}
 	gd.set_string(cast(gd.Object)sb.header, "text", fmt.ctprintf("%s", strings.to_string(b)))
 
-	ids := make([dynamic]knet.Player_Id, context.temp_allocator)
-	for id in s.players {
-		append(&ids, id)
-	}
-	for i in 1 ..< len(ids) {
-		for j := i; j > 0 && ids[j] < ids[j - 1]; j -= 1 {
-			ids[j], ids[j - 1] = ids[j - 1], ids[j]
-		}
-	}
-
-	for id, i in ids {
+	roster := ksess.session_roster(s)
+	for p, i in roster {
 		row: gd.Label
 		if i < len(sb.rows) {
 			row = sb.rows[i]
@@ -82,15 +73,14 @@ score_refresh :: proc(sb: ^Score, s: ^ksess.Session) {
 		}
 		gd.set_bool(cast(gd.Object)row, "visible", true)
 
-		p, _ := ksess.session_player(s, id)
 		rb := strings.builder_make(context.temp_allocator)
 		strings.write_string(&rb, p.name)
 		for _, col in ksess.session_stat_names(s) {
-			fmt.sbprintf(&rb, " | %d", ksess.session_stat(s, id, ksess.Stat_Col(col)))
+			fmt.sbprintf(&rb, " | %d", ksess.session_stat(s, p.id, ksess.Stat_Col(col)))
 		}
 		gd.set_string(cast(gd.Object)row, "text", fmt.ctprintf("%s", strings.to_string(rb)))
 	}
-	for i in len(ids) ..< len(sb.rows) {
+	for i in len(roster) ..< len(sb.rows) {
 		gd.set_bool(cast(gd.Object)sb.rows[i], "visible", false)
 	}
 }

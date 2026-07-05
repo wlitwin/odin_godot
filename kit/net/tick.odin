@@ -13,7 +13,16 @@ package kit_net
 // delay (render remote entities ~100ms in their past) and the stat registry's
 // ping column. Friendslop-grade: no drift modeling, just a smoothed offset.
 
+import "core:time"
+
 DEFAULT_TICK_HZ :: 20
+
+// Monotonic seconds — THE clock the toolkit's time-taking APIs expect
+// (session_tick, php overlays, confirm-latency math). Every game was
+// writing this exact proc; it lives here now.
+now_s :: proc "contextless" () -> f64 {
+	return f64(time.tick_now()._nsec) / 1e9
+}
 
 Ticker :: struct {
 	dt:   f64, // seconds per tick

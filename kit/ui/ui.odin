@@ -95,20 +95,12 @@ lobby_show_menu :: proc(l: ^Lobby, menu: bool, start: bool) {
 // to "(away)", and the stat registry's ping when it has been measured.
 // Rows (Labels) are reused; extras hide. Call on any session event.
 lobby_refresh :: proc(l: ^Lobby, s: ^ksess.Session) {
-	ids: [dynamic]knet.Player_Id
-	defer delete(ids)
-	for id in s.players {
-		append(&ids, id)
-	}
-	// insertion sort: friendslop rosters are tiny
-	for i in 1 ..< len(ids) {
-		for j := i; j > 0 && ids[j] < ids[j - 1]; j -= 1 {
-			ids[j], ids[j - 1] = ids[j - 1], ids[j]
-		}
-	}
+	roster := ksess.session_roster(s)
+	// The crown follows the transport SEAT, not player id 1 — a resumed
+	// host returns under its old id.
+	host := ksess.session_host(s)
 
-	for id, i in ids {
-		p, _ := ksess.session_player(s, id)
+	for p, i in roster {
 		row: gd.Label
 		if i < len(l.rows) {
 			row = l.rows[i]
@@ -119,19 +111,19 @@ lobby_refresh :: proc(l: ^Lobby, s: ^ksess.Session) {
 		}
 		gd.set_bool(cast(gd.Object)row, "visible", true)
 
-		crown := id == 1 ? "\xF0\x9F\x91\x91 " : "" // the host wears it
-		you := id == s.me ? "  (you)" : ""
+		crown := p.id == host ? "\xF0\x9F\x91\x91 " : "" // the host wears it
+		you := p.id == s.me ? "  (you)" : ""
 		suffix := ""
 		if !p.connected {
 			suffix = "  (away)"
-		} else if ping := ksess.session_stat(s, id, ksess.STAT_PING); ping > 0 {
+		} else if ping := ksess.session_stat(s, p.id, ksess.STAT_PING); ping > 0 {
 			suffix = fmt.tprintf("  %dms", ping)
-		} else if id == 1 {
+		} else if p.id == host {
 			suffix = "  host"
 		}
 		gd.set_string(cast(gd.Object)row, "text", fmt.ctprintf("%s%s%s%s", crown, p.name, you, suffix))
 	}
-	for i in len(ids) ..< len(l.rows) {
+	for i in len(roster) ..< len(l.rows) {
 		gd.set_bool(cast(gd.Object)l.rows[i], "visible", false)
 	}
 }

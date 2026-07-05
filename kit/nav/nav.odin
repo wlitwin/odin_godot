@@ -6,7 +6,7 @@ package kit_nav
 // needs ergonomic, in both dimensions:
 //
 //     path := knav.path_2d(self.owner, from, to, context.temp_allocator)
-//     goal := knav.next_point(path, my_pos, reach = 8)
+//     goal := knav.next_point(path, &self.path_idx, my_pos, reach = 8)
 //
 // and the host's brain steps toward `goal` with kit/ai. Positions use the
 // toolkit's [3]f32 convention (2D in xy, z zero), so brain code doesn't care

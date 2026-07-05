@@ -48,8 +48,15 @@ Command_Desc :: struct {
 // Per entity TYPE: the command table + the replicated-field descriptor that
 // powers prediction reverts, torn-state restore, and reject-truth snapshots.
 Command_Set :: struct {
-	entity_desc: ^Entity_Desc,
-	commands:    []Command_Desc,
+	entity_desc:   ^Entity_Desc,
+	commands:      []Command_Desc,
+	// Byte offset of the entity struct's `net_id: Net_Id` field, or 0 for
+	// none — registry_insert writes the assigned id back through it, so no
+	// factory or spawn site ever forgets the assignment (forgetting used to
+	// mean commands silently targeting NET_ID_INVALID until the 3s expiry).
+	// 0 is safely "none": in script structs the owner handle occupies offset
+	// 0, so a real net_id field can never live there. scriptgen emits this.
+	net_id_offset: int,
 }
 
 // Complete outgoing message bytes → whoever owns the transport. The session
@@ -59,6 +66,12 @@ Send_Proc :: proc(user: rawptr, bytes: []u8)
 // One per session participant. Clients use pending/msg/send; the host uses
 // dedup. now_tick is stamped onto pending entries — the owner advances it with
 // the net ticker so pending_expire(&ctx.pending, …) can time out lost results.
+// The cross-entity half of a command: invoked on the AUTHORITY right after a
+// command executes — for commands arriving from clients AND for the host's
+// own local issues (the generated wrappers call command_hook_local), so games
+// never write an "authority inline half" beside each issue site.
+Command_Hook :: proc(user: rawptr, player: Player_Id, entity: Net_Id, cmd: u16, ok: bool)
+
 Command_Ctx :: struct {
 	is_authority: bool,
 	now_tick:     u64,
@@ -68,10 +81,26 @@ Command_Ctx :: struct {
 	dedup:        map[u64]Dedup_Window, // host: per-peer exactly-once windows
 	msg:          Writer, // outgoing command message scratch (reused per issue)
 
+	// the cross-entity hook, mirrored here so generated wrappers can fire it
+	// for the authority's own commands (the session installs all three)
+	hook:         Command_Hook,
+	hook_user:    rawptr,
+	me:           Player_Id, // who "a local issue" is attributed to in the hook
+
 	// in-flight between command_begin and command_issue (generated code only)
 	_entity:      Net_Id,
 	_seq:         Intent_Seq,
 	_args_start:  int,
+}
+
+// Fire the installed hook for a LOCALLY executed authoritative command — the
+// generated wrappers' authority branch calls this so the host's own issues
+// take the same cross-entity path client commands do. No-op without a hook
+// (and clients never reach it: only the authority branch calls).
+command_hook_local :: proc(ctx: ^Command_Ctx, entity: Net_Id, cmd: u16, ok: bool) {
+	if ctx.hook != nil {
+		ctx.hook(ctx.hook_user, ctx.me, entity, cmd, ok)
+	}
 }
 
 command_ctx_make :: proc(allocator := context.allocator) -> Command_Ctx {

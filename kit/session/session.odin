@@ -165,9 +165,10 @@ Free_Entity_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr)
 // field, plus this hook crediting the issuer's entity — a host-authoritative
 // mutation that reaches everyone as an ordinary delta. The loser of a race
 // gets a rejected chest command and no credit: phantom items are impossible.
-// (The host's OWN commands don't pass through here — the authority runs procs
-// directly; call your credit code inline right after.)
-Command_Hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool)
+// The host's OWN commands fire it too (the generated wrappers call it on the
+// authority branch), so the hook is the single home for cross-entity halves —
+// no "inline authority half" beside each issue site.
+Command_Hook :: knet.Command_Hook
 
 // ---- wire (sub-framed: the game's session kind byte comes first, then ours) --
 
@@ -307,6 +308,43 @@ Session :: struct {
 
 @(private = "file")
 session_init :: proc(s: ^Session) {
+	// RE-ENTRANT: host_start / client_start / host_resume may run on a
+	// session that already ran (back to lobby -> rehost, host after a failed
+	// join). Tear down the previous RUN's state — otherwise the old
+	// registry/ctx maps leak and stat_names grows a duplicate "ping" column
+	// that ships to every client — while preserving everything a game wires
+	// BEFORE start: transport, factory, hooks, app routes, interp tuning.
+	if len(s.stat_names) > 0 {
+		knet.registry_destroy(&s.reg)
+		knet.command_ctx_destroy(&s.ctx)
+		for _, p in s.players {
+			delete(p.name)
+		}
+		clear(&s.players)
+		clear(&s.events)
+		clear(&s.tokens)
+		clear(&s.by_peer)
+		clear(&s.clocks)
+		clear(&s.types)
+		for n in s.stat_names {
+			delete(n)
+		}
+		clear(&s.stat_names)
+		clear(&s.stats)
+		delete(s.backup)
+		s.backup = nil
+		delete(s.name)
+		s.name = ""
+		s.is_host = false
+		s.joined = false
+		s.replicating = false
+		s.stats_dirty = false
+		s.pongs = 0
+		s.next_player = {}
+		s.backup_tick = 0
+		s.backup_target = {}
+		s.backup_at = 0
+	}
 	s.reg = knet.registry_make()
 	s.ctx = knet.command_ctx_make()
 	s.ticker = knet.ticker_make()
@@ -314,6 +352,10 @@ session_init :: proc(s: ^Session) {
 	// Commands always go host-ward through the session's own framing.
 	s.ctx.send = ctx_send_command
 	s.ctx.send_user = s
+	// Re-mirror the cross-entity hook (installed in ready(), which runs
+	// before any *_start recreates this ctx — the survives-start contract).
+	s.ctx.hook = s.cmd_hook
+	s.ctx.hook_user = s.cmd_hook_user
 	s.backup_every = 100
 	append(&s.stat_names, strings.clone("ping")) // STAT_PING, fed by the session
 }
@@ -420,9 +462,13 @@ session_set_factory :: proc(s: ^Session, user: rawptr, make_entity: Make_Entity_
 }
 
 // Install the host-side command hook (see Command_Hook; survives session start).
+// Mirrored onto the command ctx so the generated wrappers fire it for the
+// authority's own local issues too.
 session_set_command_hook :: proc(s: ^Session, user: rawptr, hook: Command_Hook) {
 	s.cmd_hook_user = user
 	s.cmd_hook = hook
+	s.ctx.hook = hook
+	s.ctx.hook_user = user
 }
 
 // The Command_Ctx send hook: wrap raw command bytes in session framing and
@@ -655,9 +701,13 @@ net_tick :: proc(s: ^Session) {
 		}
 	}
 
-	if n := knet.registry_expire_pending(&s.reg, &s.ctx, DEFAULT_PENDING_MAX_AGE, s.me); n > 0 {
-		for _ in 0 ..< n {
-			append(&s.events, Ev_Command_Rejected{}) // loud auto-revert: silence means no
+	// Loud auto-revert: a silent host must read as "no" — and the rejection
+	// carries the REAL seq/entity so UI keyed on either matches the timeout
+	// path just like the explicit-reject path.
+	expired := make([dynamic]knet.Expired_Command, context.temp_allocator)
+	if knet.registry_expire_pending(&s.reg, &s.ctx, DEFAULT_PENDING_MAX_AGE, s.me, &expired) > 0 {
+		for x in expired {
+			append(&s.events, Ev_Command_Rejected{seq = x.seq, entity = x.entity})
 		}
 	}
 }
@@ -761,6 +811,7 @@ session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backu
 	s.is_host = true
 	s.ctx.is_authority = true
 	s.me = me
+	s.ctx.me = me
 	s.joined = true
 
 	r := knet.reader_make(backup)
@@ -863,6 +914,42 @@ session_player :: proc(s: ^Session, id: knet.Player_Id) -> (Player, bool) {
 	return p, ok
 }
 
+// The player currently seated as the AUTHORITY — by transport seat, not by
+// id: a resumed host returns under its old id, so "player 1" is wrong the
+// moment a run has been saved and brought back.
+session_host :: proc(s: ^Session) -> knet.Player_Id {
+	for id, p in s.players {
+		if p.connected && p.peer == HOST_PEER {
+			return id
+		}
+	}
+	return knet.PLAYER_ID_INVALID
+}
+
+// Every player, sorted by id (= join order) — the shape every roster UI
+// wants; departed players stay listed by design.
+session_roster :: proc(s: ^Session, allocator := context.temp_allocator) -> []Player {
+	out := make([dynamic]Player, 0, len(s.players), allocator)
+	for _, p in s.players {
+		append(&out, p)
+	}
+	for i in 1 ..< len(out) {
+		for j := i; j > 0 && out[j].id < out[j - 1].id; j -= 1 {
+			out[j], out[j - 1] = out[j - 1], out[j]
+		}
+	}
+	return out[:]
+}
+
+// Which player owns an entity (PLAYER_ID_INVALID = the host/world) — saves
+// games keeping their own reverse maps.
+session_owner_of :: proc(s: ^Session, id: knet.Net_Id) -> knet.Player_Id {
+	if e, ok := s.reg.entries[id]; ok {
+		return e.owner
+	}
+	return knet.PLAYER_ID_INVALID
+}
+
 session_count :: proc(s: ^Session, connected_only := false) -> int {
 	if !connected_only {
 		return len(s.players)
@@ -886,6 +973,7 @@ session_host_start :: proc(s: ^Session, name: string) {
 	s.ctx.is_authority = true
 	s.next_player = 1
 	s.me = s.next_player
+	s.ctx.me = s.me
 	s.next_player += 1
 	s.players[s.me] = Player {
 		id        = s.me,
@@ -1073,6 +1161,7 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 		roster_upsert(s, id, name, connected)
 	}
 	s.me = me
+	s.ctx.me = me
 	s.joined = true
 	append(&s.events, Ev_Welcomed{me = me})
 }
