@@ -1280,23 +1280,37 @@ stream_ring_snaps_across_teleport_warp :: proc(t: ^testing.T) {
 	knet.stream_write(&w, &owner, &desc)
 	knet.stream_ring_push(&ring, 2.0, knet.writer_bytes(&w), 0)
 
+	remote := Mover{}
+	// Inside one warp: ordinary interpolation.
+	testing.expect(t, knet.stream_ring_sample(&ring, 1.5, &remote, &desc))
+	testing.expect_value(t, remote.x, f32(5))
+
 	// The owner TELEPORTS across the map (level change, respawn): same
-	// stream, bumped warp counter.
+	// stream, bumped warp counter. A warp is a CUT — the push FLUSHES the
+	// buffered pre-warp timeline, so remote screens stop rendering the doomed
+	// tail immediately instead of finishing it for a full interp delay while
+	// the reliable channel's deltas have already moved the world on.
 	owner.x = 500
 	knet.writer_reset(&w)
 	knet.stream_write(&w, &owner, &desc)
 	knet.stream_ring_push(&ring, 3.0, knet.writer_bytes(&w), 1)
 
-	remote := Mover{}
-	// Inside the same warp: ordinary interpolation.
+	// The old timeline is GONE: any render time now lands on the far side of
+	// the jump — no slide through the void, and no lingering at the old spot.
 	testing.expect(t, knet.stream_ring_sample(&ring, 1.5, &remote, &desc))
-	testing.expect_value(t, remote.x, f32(5))
-	// Across the warp boundary: NO slide through the void — snap to the
-	// far side of the jump.
+	testing.expect_value(t, remote.x, f32(500))
 	testing.expect(t, knet.stream_ring_sample(&ring, 2.5, &remote, &desc))
 	testing.expect_value(t, remote.x, f32(500))
-	// Past the jump: normal again.
 	testing.expect(t, knet.stream_ring_sample(&ring, 3.0, &remote, &desc))
+	testing.expect_value(t, remote.x, f32(500))
+
+	// A straggler from BEFORE the jump (unreliable channel, reordered): its
+	// stamp is older than the post-warp sample — dropped, never re-blended.
+	owner.x = 20
+	knet.writer_reset(&w)
+	knet.stream_write(&w, &owner, &desc)
+	knet.stream_ring_push(&ring, 2.5, knet.writer_bytes(&w), 0)
+	testing.expect(t, knet.stream_ring_sample(&ring, 2.5, &remote, &desc))
 	testing.expect_value(t, remote.x, f32(500))
 }
 

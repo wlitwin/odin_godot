@@ -317,7 +317,7 @@ snap, never a blend.
 
 ## Recipes over existing pieces
 
-Two genre staples that need NO new machinery — write them down so nobody builds them twice:
+Genre staples that need NO new machinery — write them down so nobody builds them twice:
 
 **Character-portable saves** (the Valheim model: your character travels between servers,
 worlds stay with their hosts). The character is a client-side blob — bag, appearance,
@@ -335,6 +335,26 @@ complexity this toolkit deliberately refuses (every laptop in the room can alrea
 Wireshark; a friendslop saboteur's secret survives friends, not forensics). Keep the
 secret host-side, tell exactly who needs to know, and let CONSEQUENCES be public state
 like everything else.
+
+**Owner-detected events** (a ball drops in the cup, a cart reaches the checkpoint —
+anything derived from state some PLAYER's machine simulates). The rule: **position-derived
+events belong to the position authority.** If the host adjudicates them off its
+stream-sampled copy, the deciding eye runs ~a fifth of a second behind the owner's screen
+and everyone watches the ball roll past the hole (puttputt learned this live). Two shapes,
+both already primitives — the split is whether the event leaves a *signature in owner state*:
+
+- *State signature* (the common one): the owner's sim applies the event to its OWNED
+  fields — snap the ball into the cup and stop — and that rest state streams out like any
+  movement. The host runs its own predicate against its copy and fires the authoritative
+  CONSEQUENCE (advance the hole, credit the stat) when the signature arrives; convergence
+  is guaranteed because the signature is durable, and the wait happens off-screen.
+- *No natural signature* (or the consequence needs arguments): the owner issues a
+  **predicted command** — instant locally, validated by the host, consequences in the
+  command hook. This is the same machinery as every other verb.
+
+This is a recipe, not tooling, on purpose: the predicates and signatures are game logic —
+a generic "owner event" message would just be an unvalidated command, strictly worse than
+the command loop that already exists.
 
 ## Gotchas
 

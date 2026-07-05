@@ -110,9 +110,21 @@ stream_ring_reset :: proc(ring: ^Stream_Ring) {
 // Push one snapshot (copied). Stale arrivals — at or before the newest sample's
 // stamp — are dropped, mirroring interp_push (the unreliable-ORDERED channel
 // already discards reordered packets; this is the belt to those suspenders).
+//
+// A NEW WARP COUNTER FLUSHES THE RING: a warp is the owner declaring a CUT
+// (teleport, respawn, level change), and the buffered pre-warp samples are a
+// doomed timeline nobody should watch — without the flush, remote screens
+// keep rendering it for a full interp delay while the reliable channel's
+// deltas have already moved the world on (a ball lingering in the cup after
+// the next hole built itself, in puttputt's case). Flushing renders the cut
+// at delta latency; the warp check in stream_ring_sample stays as the belt
+// for a mixed-warp ring that can no longer normally occur.
 stream_ring_push :: proc(ring: ^Stream_Ring, t: f64, data: []u8, warp: u8 = 0, allocator := context.allocator) {
 	if ring.count > 0 && t <= ring.times[(ring.head + ring.count - 1) % INTERP_CAP] {
 		return
+	}
+	if ring.count > 0 && warp != ring.warps[(ring.head + ring.count - 1) % INTERP_CAP] {
+		stream_ring_reset(ring)
 	}
 	slot: int
 	if ring.count < INTERP_CAP {
