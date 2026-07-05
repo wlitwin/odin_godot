@@ -57,6 +57,7 @@ ticker_advance :: proc(t: ^Ticker, frame_dt: f64) -> int {
 Clock_Sync :: struct {
 	offset:      f64, // remote_clock - local_clock, seconds
 	rtt:         f64, // smoothed round trip, seconds
+	jitter:      f64, // smoothed |rtt - mean| deviation, seconds — the connection-QUALITY number: a steady 120ms link plays better than one wobbling 40..200
 	initialized: bool,
 }
 
@@ -73,6 +74,7 @@ clock_sample :: proc(c: ^Clock_Sync, local_send, remote_time, local_recv: f64) {
 		return
 	}
 	ALPHA :: 0.1 // gentle EWMA: one outlier ping barely moves the estimate
+	c.jitter += (abs(rtt - c.rtt) - c.jitter) * ALPHA // deviation vs the mean BEFORE this sample folds in
 	c.rtt += (rtt - c.rtt) * ALPHA
 	c.offset += (offset - c.offset) * ALPHA
 }

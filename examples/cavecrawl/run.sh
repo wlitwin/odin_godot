@@ -341,7 +341,7 @@ attempt() {
 	local g6; g6=$(launch mguest2 "$g6log" "$p4" walker cave-m-b)
 	local w5=0
 	while ((w5 < 400)); do
-		grep -q "CAVE_BACKUP_HELD" "$g5log" && break
+		grep -q "CAVE_BACKUP_HELD" "$g5log" "$g6log" && break
 		sleep 0.1; ((w5++))
 	done
 	kill -9 "$h4" 2>/dev/null # no goodbye, no FIN — the real crash shape
@@ -352,14 +352,21 @@ attempt() {
 	done
 	kill "$g5" "$g6" 2>/dev/null
 
-	grep -q "CAVE_BACKUP size=" "$g5log" || { echo "  FAIL: the backup never shipped"; ok=0; }
-	grep -qE "CAVE_TAKEOVER me=2 players=3 entities=[0-9]+ dwellers=[0-9]+" "$g5log" || { echo "  FAIL: the takeover failed"; ok=0; }
-	grep -q "CAVE_TORCH_SHARED players=2" "$g5log" || { echo "  FAIL: nobody rejoined the new host"; ok=0; }
-	grep -q "MGUEST_DONE" "$g5log" || { echo "  FAIL: new host did not finish"; ok=0; }
-	grep -q "CAVE_REJOINING" "$g6log" || { echo "  FAIL: the walker never rejoined"; ok=0; }
-	grep -q "CAVE_SEATED me=3" "$g6log" || { echo "  FAIL: the walker lost their identity"; ok=0; }
-	grep -qE "CAVE_RETURNED players=[2-3] dwellers=[0-9]+" "$g6log" || { echo "  FAIL: the walker's world is wrong"; ok=0; }
-	grep -q "MGUEST2_DONE" "$g6log" || { echo "  FAIL: walker did not finish"; ok=0; }
+	# The two guests' JOINs race over the shim, so which process is player 2
+	# is not ours to assume — the story is asserted across BOTH logs: exactly
+	# one bearer (named ahead of need, hears the succession, takes over, gets
+	# rejoined), exactly one chaser (chases, reclaims itself, sees the world).
+	grep -q "CAVE_BACKUP size=" "$g5log" "$g6log" || { echo "  FAIL: the backup never shipped"; ok=0; }
+	grep -qE "CAVE_TORCH_NAMED player=2 addr=" "$h4log" || { echo "  FAIL: the successor was never named"; ok=0; }
+	local mine; mine=$(cat "$g5log" "$g6log" | grep -c "CAVE_TORCH_MINE")
+	((mine == 1)) || { echo "  FAIL: torch bearers heard: $mine (want exactly 1)"; ok=0; }
+	grep -qE "CAVE_TAKEOVER me=[0-9]+ players=3 entities=[0-9]+ dwellers=[0-9]+" "$g5log" "$g6log" || { echo "  FAIL: the takeover failed"; ok=0; }
+	grep -q "CAVE_TORCH_SHARED players=2" "$g5log" "$g6log" || { echo "  FAIL: nobody rejoined the new host"; ok=0; }
+	grep -qE "CAVE_CHASE_TORCH try=[0-9]+" "$g5log" "$g6log" || { echo "  FAIL: nobody chased the torch"; ok=0; }
+	grep -q "CAVE_REJOINING" "$g5log" "$g6log" || { echo "  FAIL: the chaser never rejoined"; ok=0; }
+	grep -qE "CAVE_RETURNED players=[2-3] dwellers=[0-9]+" "$g5log" "$g6log" || { echo "  FAIL: the chaser's world is wrong"; ok=0; }
+	grep -q "MGUEST_DONE" "$g5log" || { echo "  FAIL: mguest did not finish"; ok=0; }
+	grep -q "MGUEST2_DONE" "$g6log" || { echo "  FAIL: mguest2 did not finish"; ok=0; }
 
 	if ((ok != 1)); then
 		echo "  --- mhost log tail ---"; tail -n 12 "$h4log" | sed 's/^/    /'

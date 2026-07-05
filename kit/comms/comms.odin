@@ -154,6 +154,21 @@ comms_ping :: proc(c: ^Comms, kind: u8, pos: [3]f32) {
 	ksess.session_app_flush(c.ses, ksess.HOST_PEER)
 }
 
+// The whole drop-in ritual, in the one order that works: replay the log to
+// the joiner FIRST (skipped on rejoin — they may still hold this run's log),
+// THEN mint the join line, so the replay cannot duplicate the line it is
+// about to receive from the broadcast. The GAME words the line ("" = say
+// nothing). Call from Ev_Player_Joined and stop thinking about ordering.
+comms_welcome :: proc(c: ^Comms, player: knet.Player_Id, rejoin: bool, line: string) {
+	assert(c.ses.is_host)
+	if !rejoin {
+		comms_catchup(c, player)
+	}
+	if line != "" {
+		comms_system(c, line)
+	}
+}
+
 // Host: replay the whole log to one player — call on Ev_Player_Joined so a
 // drop-in joiner sees what they missed. Skip it when `rejoin` is true if the
 // player might still hold this run's log (same-session reconnect duplicates).

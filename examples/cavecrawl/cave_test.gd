@@ -151,43 +151,36 @@ func _process(_delta: float) -> bool:
 				quit(1); return true
 			return false
 		if phase == "hold":
-			# The run just... runs. The eldest guest announces when the
-			# backup lands (run.sh keys the host-kill on that line); both
-			# guests move on when the transport says the host is gone.
+			# The run just... runs. WHICHEVER guest the backup lands on
+			# announces it (the two joins race over the shim, so player ids
+			# are not ours to assume — run.sh keys the host-kill on the line
+			# appearing in either log). Guests move on when the latched
+			# succession count ticks (host_gone flips back within a frame).
 			cave.call("heal")
-			if role == "mguest" and not acted and bool(cave.call("has_backup")):
+			if role != "mhost" and not acted and bool(cave.call("has_backup")):
 				acted = true
 				print("CAVE_BACKUP_HELD")
-			if role != "mhost" and bool(cave.call("host_gone")):
+			if role != "mhost" and int(cave.call("successions")) > 0:
 				enter("torch", now)
 				return false
 			if now - t_acted > TIMEOUT_MS:
-				if role == "mhost":
-					t_acted = now # the host serves until run.sh reaps it
-				else:
-					print(role.to_upper(), "_TIMEOUT: hold — the lights never went out")
-					quit(1); return true
+				t_acted = now # everyone serves until run.sh acts; its outer wait caps the act
 			return false
 		if phase == "torch":
+			# HANDS-FREE from here: the game's Ev_Succession handler runs the
+			# takeover on the torch bearer and the rejoin-chase on everyone
+			# else. The driver only OBSERVES — and branches on what this
+			# process BECAME, not on which role launched it.
 			cave.call("heal")
-			if role == "mguest":
-				# THE TAKEOVER: same process, same port, same identity.
-				if not acted:
-					acted = true
-					cave.call("on_takeover")
-				if int(cave.call("get_players")) >= 2: # mguest2 came home
+			if bool(cave.call("is_hosting")):
+				if int(cave.call("get_players")) >= 2: # the chaser came home
 					print("CAVE_TORCH_SHARED players=", cave.call("get_players"))
 					print(role.to_upper(), "_DONE")
 					quit(0); return true
-				elif timed_out(now, "nobody rejoined the new host"):
+				elif timed_out(now, "the torch lit but nobody rejoined"):
 					quit(1); return true
 			else:
-				# mguest2: give the takeover a beat to bind, then rejoin the
-				# same address with the same token.
-				if not acted and now - t_acted > 2000:
-					acted = true
-					cave.call("on_rejoin")
-				if acted and bool(cave.call("is_seated")) and bool(cave.call("world_ready")):
+				if not bool(cave.call("host_gone")) and bool(cave.call("is_seated")) and bool(cave.call("world_ready")) and int(cave.call("get_players")) >= 2:
 					print("CAVE_RETURNED players=", cave.call("get_players"), " dwellers=", cave.call("dwellers"))
 					print(role.to_upper(), "_DONE")
 					quit(0); return true

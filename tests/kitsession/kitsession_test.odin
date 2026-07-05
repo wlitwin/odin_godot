@@ -1186,3 +1186,66 @@ ownership_transfer_hands_the_stream_over :: proc(t: ^testing.T) {
 	_, _ = ksess.session_tick(&host.s, 0.0, now)
 	testing.expect_value(t, hbot.x, f32(78))
 }
+
+
+@(test)
+succession_names_the_torch_bearer_ahead_of_need :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+
+	hbot := Bot{hp = 10}
+	_ = ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
+	ksess.session_start_replicating(&host.s)
+	now := 50.0
+	for _ in 0 ..< 12 { // let a backup ship and the target event fire
+		step(boxes, &now)
+	}
+
+	// The host learns WHO holds the backup, computes the rendezvous, names it.
+	named := knet.PLAYER_ID_INVALID
+	for ev in drain(&host.s) {
+		if bt, ok := ev.(ksess.Ev_Backup_Target); ok {
+			named = bt.player
+		}
+	}
+	testing.expect_value(t, named, alice.s.me) // the eldest client
+	ksess.session_set_successor_info(&host.s, {1, 2, 7})
+	pump(boxes)
+
+	// EVERY peer holds the answer before the lights go out.
+	for b in ([]^Peer_Box{&alice, &bob}) {
+		succ, info := ksess.session_successor(&b.s)
+		testing.expect_value(t, succ, alice.s.me)
+		testing.expect_value(t, len(info), 3)
+		testing.expect_value(t, info[2], u8(7))
+	}
+	drain(&alice.s)
+	drain(&bob.s)
+
+	// The host dies. Both clients hear the succession alongside host-left.
+	ksess.session_peer_disconnected(&alice.s, ksess.HOST_PEER)
+	ksess.session_peer_disconnected(&bob.s, ksess.HOST_PEER)
+	for b in ([]^Peer_Box{&alice, &bob}) {
+		evs := drain(&b.s)
+		heard := false
+		for ev in evs {
+			if sc, ok := ev.(ksess.Ev_Succession); ok {
+				heard = sc.successor == alice.s.me
+			}
+		}
+		testing.expect(t, heard, "the succession must fire with the host-left")
+	}
+}

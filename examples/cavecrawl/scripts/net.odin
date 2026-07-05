@@ -122,10 +122,14 @@ cave_lobby_kick :: proc(self: ^CaveLobby, player: gd.Int) {
 // token — the new host's WELCOME + SES_WORLD give us ourselves back.
 @(gd_method)
 cave_lobby_on_rejoin :: proc(self: ^CaveLobby) {
+	cave_rejoin_to(self, "127.0.0.1", port())
+}
+
+cave_rejoin_to :: proc(self: ^CaveLobby, addr: string, to_port: int) {
 	if !self.running || self.ses.is_host || !self.host_gone {return}
 	cave_wipe_local(self)
 	gd.multiplayer_clear_peer(self.owner)
-	if !gd.join(self.owner, "127.0.0.1", port()) {
+	if !gd.join(self.owner, fmt.ctprintf("%s", addr), to_port) {
 		kui.lobby_set_status(&self.ui, "Could not start rejoining")
 		return
 	}

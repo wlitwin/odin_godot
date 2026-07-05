@@ -48,7 +48,15 @@ hook), and **host takeover** (`session_backup_parts` + `session_host_resume`
 — the murdered host's run resumes under the backup holder, friends rejoin
 and reclaim themselves).
 
-Still deliberately out: LIVE host migration (election + automatic rendezvous
-— the takeover above is the manual stepping stone), shared-seed procgen,
-voice (assume Discord). See the design notes in the repository's knowledge
-base.
+**Voice, the stance:** not in the toolkit, deliberately. Friendslop groups
+already sit in a Discord call — building voice would spend the complexity
+budget on a solved problem. If you ship on Steam, GodotSteam exposes Steam
+voice as a near-free add-on ([steamgd](steamgd.md) gives you the singleton
+access pattern). The one thing that would change this calculus is PROXIMITY
+voice — the horror-co-op signature mechanic — which needs positional mixing
+the toolkit's replicated positions make easy to drive; revisit when a game
+needs it.
+
+Still deliberately out: shared-seed procgen (an example, someday), character-
+portable saves, private per-player replication. See the design notes in the
+repository's knowledge base.

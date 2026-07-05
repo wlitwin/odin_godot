@@ -93,17 +93,15 @@ if refresh_chat {
 }
 ```
 
-The host's join handling — **catchup, then the join line**, in that order:
+The host's join handling is one call — `comms_welcome` owns the ordering (catchup first,
+skipped on rejoin, THEN the join line) so you don't have to:
 
 ```odin
 case ksess.Ev_Player_Joined:
     if self.ses.is_host {
         if p, ok := ksess.session_player(&self.ses, e.id); ok {
-            if !e.rejoin {
-                kcomms.comms_catchup(&self.comms, e.id)
-            }
             verb := e.rejoin ? "returned to" : "joined"
-            kcomms.comms_system(&self.comms, fmt.tprintf("%s %s the cave", p.name, verb))
+            kcomms.comms_welcome(&self.comms, e.id, e.rejoin, fmt.tprintf("%s %s the cave", p.name, verb))
         }
     }
 ```
@@ -113,10 +111,11 @@ case ksess.Ev_Player_Joined:
 - **No kind byte for chat.** Comms frames live *inside* the session's SES_APP framing under
   one tag — the game never multiplexes chat into its own packets. If your game also uses
   SES_APP, claim a different tag (see [session.md](session.md)).
-- **Catchup BEFORE the join line.** `comms_catchup` replays history the joiner missed; the
-  join line is about to be minted and broadcast to everyone *including* the joiner. Replay
-  first or the joiner sees their own arrival twice. And skip catchup when `rejoin` is true —
-  a same-session reconnect may still hold this run's log, and replay would duplicate it.
+- **Catchup BEFORE the join line** — the reason `comms_welcome` exists. The join line is
+  about to be minted and broadcast to everyone *including* the joiner; replay first or the
+  joiner sees their own arrival twice. Rejoins skip catchup (a same-session reconnect may
+  still hold this run's log). Use `comms_catchup`/`comms_system` directly only when your
+  ritual differs.
 - **Your own line does not echo locally** (on a client). It lands when the host's broadcast
   comes back. That's the point — shared order — but don't paint an optimistic local copy or
   you'll double it.

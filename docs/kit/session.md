@@ -246,13 +246,31 @@ session_set_backup_blob :: proc(s: ^Session, user: rawptr, write: Backup_Blob_Pr
 session_backup_parts :: proc(s: ^Session, allocator := context.temp_allocator) -> (game_blob: []u8, snapshot: []u8, ok: bool)
 ```
 
-**The takeover recipe** (host migration's stepping-stone shape, live in cavecrawl's
-`cave_lobby_on_takeover`): on `Ev_Host_Left`, the peer holding a backup splits it with
-`session_backup_parts` (it returns copies — the resume's re-init frees the stored
-payload), wipes its LOCAL world copies (nodes and game maps — the factory is about to
-rebuild them), rebinds its transport as a server, calls `session_host_resume` with its own
-id, and parses the game blob back. Friends rejoin the same address with their tokens and
-reclaim themselves.
+**The takeover recipe** (live in cavecrawl's `cave_lobby_on_takeover`): on `Ev_Host_Left`,
+the peer holding a backup splits it with `session_backup_parts` (it returns copies — the
+resume's re-init frees the stored payload), wipes its LOCAL world copies (nodes and game
+maps — the factory is about to rebuild them), rebinds its transport as a server, calls
+`session_host_resume` with its own id, and parses the game blob back. Friends rejoin the
+same address with their tokens and reclaim themselves.
+
+**Live migration** makes that hands-free — the missing piece is that everyone must know
+WHO carries the torch and WHERE to find them *before* the host dies:
+
+```odin
+Ev_Backup_Target :: struct { player: knet.Player_Id } // (host) holder changed — name them
+session_set_successor_info :: proc(s: ^Session, info: []u8)
+session_successor :: proc(s: ^Session) -> (knet.Player_Id, []u8)
+Ev_Succession :: struct { successor: knet.Player_Id } // (client) host gone, torch named
+```
+
+The session names WHO (the backup holder); the TRANSPORT knows where — the info blob is
+opaque to the session (address:port for ENet via `netgd.peer_address`, a lobby id for
+Steam, a room code for WebRTC). It broadcasts immediately and to every later joiner. On
+host loss, `Ev_Succession` fires beside `Ev_Host_Left` on every client: the bearer runs
+the takeover recipe, everyone else rejoins the info — and because the event RE-FIRES on
+every failed reconnect, chasing a successor that hasn't bound yet retries for free (cap
+your attempts). Cavecrawl's acid act 4 kills the host with `kill -9` and the run survives
+with nobody pressing anything.
 
 ## Ownership transfer
 

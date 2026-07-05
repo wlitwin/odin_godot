@@ -207,7 +207,11 @@ interp_render_time :: proc(c: ^Clock_Sync, local_now: f64, delay: f64) -> f64
 `ticker_advance` returns how many net ticks fire this frame (capped at 8 — a multi-second
 stall resumes cleanly instead of bursting a backlog; deltas are last-value, nothing is
 lost). `Clock_Sync` is an EWMA over ping samples — friendslop-grade, no drift modeling —
-and feeds both interpolation timelines and the session's automatic ping stat.
+and feeds both interpolation timelines and the session's automatic ping stat. It also
+tracks `jitter` (smoothed |rtt − mean| deviation): the connection-QUALITY number — a
+steady 120ms link plays better than one wobbling 40..200ms. Read it per peer via
+`session_clock(s, peer)` and surface it however your game likes (a colored dot beats a
+number).
 
 ## Gotchas
 

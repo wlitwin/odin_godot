@@ -94,6 +94,17 @@ Ev_Join_Denied :: struct {
 
 Ev_Kicked :: struct {} // (client) removed on purpose — distinct from Ev_Host_Left
 
+Ev_Backup_Target :: struct {
+	player: knet.Player_Id, // (host) the designated backup holder changed — compute and
+	// session_set_successor_info how peers can find them if you want LIVE migration
+}
+
+Ev_Succession :: struct {
+	successor: knet.Player_Id, // (client) the host is gone and THIS player holds the
+	// backup — if it's you, take over; otherwise rejoin them (session_successor has
+	// the transport info). Re-fires on every failed reconnect: a natural retry pulse.
+}
+
 Ev_Spawned :: struct {
 	id:    knet.Net_Id, // (client) the factory made it and the snapshot applied
 	type:  Entity_Type,
@@ -144,6 +155,8 @@ Event :: union {
 	Ev_Join_Failed,
 	Ev_Join_Denied,
 	Ev_Kicked,
+	Ev_Backup_Target,
+	Ev_Succession,
 	Ev_Spawned,
 	Ev_Despawned,
 	Ev_Owner_Changed,
@@ -246,6 +259,8 @@ SES_DENIED :: u8(17) // host -> joiner  [reason u8] — the join was refused (fu
 SES_KICKED :: u8(18) // host -> one     you were removed on purpose (not a host crash)
 @(private)
 SES_SETOWNER :: u8(19) // host -> all   [id][owner] — ownership transfer (carry/mount/possess)
+@(private)
+SES_SUCCESSOR :: u8(20) // host -> all  [player][info] — who carries the torch if I die, and how to find them
 
 // ---- app messages: the extension point for sibling kit packages ---------------
 //
@@ -390,6 +405,13 @@ Session :: struct {
 	backup_blob_user: rawptr, // pre-start wiring: the game's blob writer rides every backup
 	backup_blob:      Backup_Blob_Proc,
 
+	// SUCCESSION (live migration): the host names the backup holder and how
+	// to reach them BEFORE dying; every peer holds the answer when the
+	// lights go out.
+	succ_info:      []u8, // host: the game's transport rendezvous blob (owned)
+	successor:      knet.Player_Id, // client: who carries the torch
+	successor_info: []u8, // client: how to find them (owned; see session_successor)
+
 	// app-message routes (kit/comms and friends; survive re-init)
 	app:   [MAX_APP_TAGS]App_Route,
 	app_w: knet.Writer, // scratch for session_app_begin/flush (reused per message)
@@ -437,6 +459,11 @@ session_init :: proc(s: ^Session) {
 		clear(&s.stats)
 		delete(s.backup)
 		s.backup = nil
+		delete(s.succ_info)
+		s.succ_info = nil
+		delete(s.successor_info)
+		s.successor_info = nil
+		s.successor = {}
 		delete(s.name)
 		s.name = ""
 		s.is_host = false
@@ -507,6 +534,8 @@ session_destroy :: proc(s: ^Session) {
 	delete(s.stat_names)
 	delete(s.stats)
 	delete(s.backup)
+	delete(s.succ_info)
+	delete(s.successor_info)
 	knet.writer_destroy(&s.app_w)
 	s^ = {}
 }
@@ -919,6 +948,12 @@ net_tick :: proc(s: ^Session) {
 			target := backup_target(s)
 			if target != knet.PLAYER_ID_INVALID &&
 			   (target != s.backup_target || t - s.backup_tick >= s.backup_every) {
+				if target != s.backup_target {
+					// The torch-bearer changed: tell the game (it computes
+					// the rendezvous info) — the successor broadcast follows
+					// from session_set_successor_info.
+					append(&s.events, Ev_Backup_Target{player = target})
+				}
 				s.backup_target = target
 				s.backup_tick = t
 				p, _ := s.players[target]
@@ -1048,6 +1083,41 @@ session_backup_parts :: proc(s: ^Session, allocator := context.temp_allocator) -
 	snapshot = make([]u8, len(s.backup) - r.off - n, allocator)
 	copy(snapshot, s.backup[r.off + n:])
 	return game_blob, snapshot, true
+}
+
+// Host: how peers find the successor if you die — an opaque transport blob
+// (address:port for ENet, a lobby id for Steam, a room code for WebRTC).
+// Call from Ev_Backup_Target (the session names WHO; the transport layer
+// knows WHERE); broadcast immediately and to every later joiner. With no
+// info set, host loss stays v1-shaped: Ev_Host_Left, run over, no auto arc.
+session_set_successor_info :: proc(s: ^Session, info: []u8) {
+	assert(s.is_host)
+	delete(s.succ_info)
+	s.succ_info = make([]u8, len(info))
+	copy(s.succ_info, info)
+	send_successor(s, BROADCAST_PEER)
+}
+
+// Client: who carries the torch, and the host-provided rendezvous blob.
+session_successor :: proc(s: ^Session) -> (knet.Player_Id, []u8) {
+	return s.successor, s.successor_info
+}
+
+@(private = "file")
+send_successor :: proc(s: ^Session, to: Peer_Id) {
+	if len(s.succ_info) == 0 {
+		return
+	}
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_u8(&w, SES_SUCCESSOR)
+	knet.write_player_id(&w, s.backup_target)
+	knet.write_bytes(&w, s.succ_info)
+	if to == BROADCAST_PEER {
+		broadcast(s, knet.writer_bytes(&w), .Reliable)
+	} else {
+		s.send(s.send_user, to, knet.writer_bytes(&w), .Reliable)
+	}
 }
 
 @(private = "file")
@@ -1306,6 +1376,12 @@ session_peer_disconnected :: proc(s: ^Session, peer: Peer_Id) {
 	if !s.is_host {
 		if peer == HOST_PEER {
 			append(&s.events, Ev_Host_Left{})
+			if s.successor != knet.PLAYER_ID_INVALID && s.successor != 0 {
+				// LIVE MIGRATION: everyone already knows who carries the
+				// torch. Fires again on every failed reconnect — the retry
+				// pulse for peers chasing a successor that isn't up yet.
+				append(&s.events, Ev_Succession{successor = s.successor})
+			}
 		}
 		return
 	}
@@ -1439,6 +1515,7 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 		send_world(s, peer)
 	}
 	send_stats(s, peer)
+	send_successor(s, peer)
 
 	append(&s.events, Ev_Player_Joined{id = id, rejoin = rejoin})
 }
@@ -1602,6 +1679,19 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) 
 			return
 		}
 		apply_spawn_tuple(s, r)
+	case SES_SUCCESSOR:
+		if s.is_host || !s.joined {
+			return
+		}
+		succ := knet.read_player_id(r)
+		info := knet.read_bytes(r)
+		if r.err {
+			return
+		}
+		s.successor = succ
+		delete(s.successor_info)
+		s.successor_info = make([]u8, len(info))
+		copy(s.successor_info, info)
 	case SES_SETOWNER:
 		if s.is_host || !s.joined {
 			return

@@ -26,6 +26,7 @@ package kit_netgd
 // client haunts the roster forever and a failed join hangs on "Joining...".
 
 import gd "godot:godot"
+import "godot:gdext"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
@@ -164,6 +165,30 @@ wire_drop :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id, after := 0.75) {
 // the same way.
 wire_set_latency :: proc(wire: ^Session_Wire, ms: int) {
 	wire.latency = f64(ms) / 1000.0
+}
+
+// A connected peer's remote address as the HOST sees it — the rendezvous
+// info for live migration over ENet (session Ev_Backup_Target -> read the
+// designated holder's address -> session_set_successor_info). Same-subnet
+// truth only: across NAT the address the host sees may not be reachable by
+// the other peers (Steam and room-code transports don't have this problem —
+// their rendezvous blobs are lobby ids). ok=false off-ENet or unknown peer.
+peer_address :: proc(node: gd.Node, peer: ksess.Peer_Id, allocator := context.temp_allocator) -> (addr: string, ok: bool) {
+	mp := gd.node_get_multiplayer(node)
+	if cast(rawptr)mp == nil {return "", false}
+	p := gd.multiplayer_api_get_multiplayer_peer(mp)
+	if cast(rawptr)p == nil {return "", false}
+	if !bool(gd.object_is_class(cast(gd.Object)p, gd.gstr("ENetMultiplayerPeer"))) {return "", false}
+	pkt := gd.e_net_multiplayer_peer_get_peer(cast(gd.E_Net_Multiplayer_Peer)p, gd.Int(peer))
+	if cast(rawptr)pkt == nil {return "", false}
+	gs := gd.e_net_packet_peer_get_remote_address(pkt)
+	defer gd.free_string(gs)
+	buf: [64]u8
+	n := gdext.string_to_utf8_chars(cast(gdext.StringPtr)&gs, cast(cstring)&buf[0], len(buf) - 1)
+	if n <= 0 {return "", false}
+	out := make([]u8, min(int(n), len(buf) - 1), allocator)
+	copy(out, buf[:len(out)])
+	return string(out), true
 }
 
 // Sever a peer's transport connection — the second half of a kick:

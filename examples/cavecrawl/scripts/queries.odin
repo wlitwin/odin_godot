@@ -80,6 +80,16 @@ cave_lobby_relic_pos :: proc(self: ^CaveLobby) -> gd.Vector2 {
 }
 
 @(gd_method)
+cave_lobby_successions :: proc(self: ^CaveLobby) -> gd.Int {
+	return gd.Int(self.succ_seen)
+}
+
+@(gd_method)
+cave_lobby_is_hosting :: proc(self: ^CaveLobby) -> gd.Bool {
+	return gd.Bool(self.ses.is_host)
+}
+
+@(gd_method)
 cave_lobby_host_gone :: proc(self: ^CaveLobby) -> gd.Bool {
 	return gd.Bool(self.host_gone)
 }

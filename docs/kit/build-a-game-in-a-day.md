@@ -257,9 +257,15 @@ The backup snapshots that ship every few seconds (phase 1 machinery) plus
 the host survivable: the holder splits the payload with
 `session_backup_parts`, wipes its local world, rebinds as a server, and
 `session_host_resume`s under its own identity. Everyone else rejoins with
-their tokens and reclaims themselves. Cavecrawl's `on_takeover`/`on_rejoin`
-pair is the whole recipe, and acid act 4 kills the host with `kill -9` to
-prove it.
+their tokens and reclaims themselves.
+
+Make it HANDS-FREE with succession: on `Ev_Backup_Target` the host names the
+holder and how to reach them (`netgd.peer_address` +
+`session_set_successor_info`); on host loss every client gets
+`Ev_Succession` — the bearer auto-takes-over, the rest auto-chase (the event
+re-fires on each failed reconnect, so retry is free). Cavecrawl's
+`on_takeover`/`cave_rejoin_to` pair is the whole recipe, and acid act 4
+kills the host with `kill -9` to prove nobody has to press anything.
 
 ## 10. Ship it on Steam (1 hour + a friend)
 

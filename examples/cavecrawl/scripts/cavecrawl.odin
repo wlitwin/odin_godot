@@ -199,6 +199,8 @@ CaveLobby :: struct {
 	chat_sent:  bool, // the Enter that submitted a line must not also re-open chat
 	was_dead:   bool, // owner-side respawn edge detector
 	host_gone:  bool, // Ev_Host_Left seen — the takeover/rejoin window is open
+	succ_seen:  int, // Ev_Succession count (latched; drivers poll it — host_gone flips back within a frame)
+	rejoin_tries: int, // auto-rejoin attempts chasing the successor (capped)
 	issue_at:   f64, // when my last command left (confirm latency proof)
 
 	// the transport binding (send adapter, packet route, latency shim)
@@ -349,6 +351,7 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 		#partial switch e in ev {
 		case ksess.Ev_Welcomed:
 			kui.lobby_set_status(&self.ui, "In the cave — waiting for the host to start")
+			self.rejoin_tries = 0 // seated: the chase (if any) is over
 			gd.print_str(fmt.tprintf("CAVE_SEATED me=%d", u64(e.me)))
 			refresh = true
 		case ksess.Ev_Player_Joined:
@@ -359,11 +362,8 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 			// join line it is about to receive from the broadcast.
 			if self.ses.is_host {
 				if p, ok := ksess.session_player(&self.ses, e.id); ok {
-					if !e.rejoin {
-						kcomms.comms_catchup(&self.comms, e.id)
-					}
 					verb := e.rejoin ? "returned to" : "joined"
-					kcomms.comms_system(&self.comms, fmt.tprintf("%s %s the cave", p.name, verb))
+					kcomms.comms_welcome(&self.comms, e.id, e.rejoin, fmt.tprintf("%s %s the cave", p.name, verb))
 				}
 			}
 		case ksess.Ev_Player_Left:
@@ -385,6 +385,45 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 				_, _, held := ksess.session_backup_parts(&self.ses)
 				kui.lobby_set_status(&self.ui, held ? "The host left — you hold the backup. Resume?" : "The host left — this run is over")
 				gd.print_str("CAVE_HOST_LEFT")
+			}
+		case ksess.Ev_Backup_Target:
+			// LIVE MIGRATION, the host's half: the session named WHO carries
+			// the torch; the transport knows WHERE they are. Convention: the
+			// successor re-binds the same port everyone already uses.
+			if p, ok := ksess.session_player(&self.ses, e.player); ok {
+				addr, aok := netgd.peer_address(self.owner, p.peer)
+				if !aok {
+					addr = "127.0.0.1"
+				}
+				w := knet.writer_make()
+				defer knet.writer_destroy(&w)
+				knet.write_string(&w, addr)
+				knet.write_u16(&w, u16(port()))
+				ksess.session_set_successor_info(&self.ses, knet.writer_bytes(&w))
+				gd.print_str(fmt.tprintf("CAVE_TORCH_NAMED player=%d addr=%s", u64(e.player), addr))
+			}
+		case ksess.Ev_Succession:
+			// LIVE MIGRATION, everyone else's half: hands-free. The torch
+			// bearer takes over; the rest chase them (this event re-fires on
+			// every failed reconnect — the natural retry pulse).
+			self.succ_seen += 1
+			if !self.kicked_out && !self.ses.is_host {
+				if e.successor == self.ses.me {
+					gd.print_str("CAVE_TORCH_MINE")
+					cave_lobby_on_takeover(self)
+				} else if self.rejoin_tries < 12 {
+					self.rejoin_tries += 1
+					_, info := ksess.session_successor(&self.ses)
+					ir := knet.reader_make(info)
+					addr := knet.read_string(&ir)
+					sport := int(knet.read_u16(&ir))
+					if !ir.err {
+						gd.print_str(fmt.tprintf("CAVE_CHASE_TORCH try=%d", self.rejoin_tries))
+						cave_rejoin_to(self, addr, sport)
+					}
+				} else {
+					kui.lobby_set_status(&self.ui, "The torch went out — this run is over")
+				}
 			}
 		case ksess.Ev_Backup_Received:
 			// We are the designated backup host from this moment on.
