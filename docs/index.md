@@ -42,6 +42,15 @@ use → ship.**
   independently on save. Covers the cost model (when NOT to use them), the no-cross-imports
   rule and why, cross-module communication patterns, reload/collision semantics, and export.
 
+## Build multiplayer: the friendslop toolkit
+
+- **[kit/ overview](kit/index.md)** — reusable multiplayer game systems (`godot:kit/*`):
+  host-authoritative sessions with reconnect identity, declarative replication with
+  client prediction, chat, items, combat, NPCs, save/resume, moderation, ENet + Steam
+  transports — for 2–8 player "you and your friends" games.
+- **[Build a game in a day](kit/build-a-game-in-a-day.md)** — the tutorial: a co-op cave
+  crawler from empty scene to Steam invite, the same arc `examples/cavecrawl` proves.
+
 ## Learn from the examples
 
 - **[examples/survivors](../examples/survivors/README.md)** — the headline single-player
@@ -50,6 +59,9 @@ use → ship.**
 - **[examples/coop_arena](../examples/coop_arena/README.md)** — the canonical
   **peer-authoritative co-op** reference: one codebase, three modes (single-player, native
   ENet, browser WebRTC with a room-code lobby).
+- `examples/cavecrawl` — the **friendslop toolkit** reference (see [kit/](kit/index.md)):
+  every toolkit package in one game, grown brick-by-brick with a latency-injected
+  two-process acid test (`run.sh`) that doubles as the pattern to steal.
 - `tests/showcase/` — the smallest "everything wired" pure-Odin scene (coin collector).
 
 ## Ship it

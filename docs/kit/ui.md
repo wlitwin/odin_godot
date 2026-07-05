@@ -1,0 +1,149 @@
+# kit/ui — stock-theme widgets
+
+The toolkit's stock widgets, built programmatically — no scene assets to install; any script
+can summon them. Lobby, chat box, scoreboard, and the HUD set (interact prompt, inventory
+grid/hotbar, health bar, ability bar). Styling is deliberately stock Godot theme —
+friendslop lobbies are for friends, and games that care can theme the returned nodes.
+
+```odin
+import kui "godot:kit/ui"
+```
+
+## Mental model
+
+**kit/ui builds controls, it never owns flow.** Every widget follows the same contract: a
+`*_make` builds nodes under a parent you supply and hands back the handles; the GAME wires
+the buttons/input and decides when to repaint (`*_refresh` on events, not per frame — except
+the HUD, which the owner repaints live). `*_destroy` frees only the tracking arrays — the
+node tree belongs to the scene and is freed with the owner.
+
+Refresh procs reuse their row Labels across repaints and hide extras; nothing reallocates
+per frame.
+
+The package's **public API speaks `string`, not `cstring`** — callers use `fmt.tprintf` and
+never think about NUL termination or c-allocator lifetimes.
+
+## API by task
+
+**Lobby** — title, status line, live roster, three buttons:
+
+```odin
+lobby_make :: proc(parent: gd.Node, title: string) -> Lobby
+lobby_destroy :: proc(l: ^Lobby)
+lobby_set_status :: proc(l: ^Lobby, text: string)
+lobby_show_menu :: proc(l: ^Lobby, menu: bool, start: bool)
+lobby_refresh :: proc(l: ^Lobby, s: ^ksess.Session)
+```
+
+`Lobby` exposes `host_btn`, `join_btn`, `start_btn` (`gd.Button`) for the game to connect —
+`start_btn` starts hidden until the host likes the roster (`lobby_show_menu`).
+`lobby_refresh` repaints the roster from the [session](session.md): sorted by `Player_Id`
+(join order — stable), the host crowned, yourself marked `(you)`, departed players dimmed to
+`(away)`, and the stat registry's auto-fed ping when measured.
+
+**Chat box** — a bounded scrollback of [kit/comms](comms.md) lines plus a `Line_Edit`
+(`CHAT_SHOW :: 8` rows painted; the comms log keeps more):
+
+```odin
+chat_make :: proc(parent: gd.Node) -> Chat
+chat_destroy :: proc(ch: ^Chat)
+chat_show :: proc(ch: ^Chat, visible: bool)
+chat_clear_input :: proc(ch: ^Chat)
+chat_refresh :: proc(ch: ^Chat, c: ^kcomms.Comms)
+```
+
+Paints `name: text` for speech, `* text` for system lines. The game connects
+`chat.input`'s `text_submitted` and calls `comms_say` + `chat_clear_input` from it.
+
+**Scoreboard** — players × whatever stat columns the game registered (ping auto-fed,
+damage/kills/deaths from [kit/combat](combat.md), the game's own counters), straight from the
+session's stat registry. kit/ui renders what the registry holds; it declares nothing:
+
+```odin
+score_make :: proc(parent: gd.Node) -> Score
+score_destroy :: proc(sb: ^Score)
+score_show :: proc(sb: ^Score, visible: bool)          // classically: while Tab is held
+score_refresh :: proc(sb: ^Score, s: ^ksess.Session)
+```
+
+Departed players stay listed — their tallies survive disconnects by design.
+
+**HUD** — prompt, inventory/hotbar, health, abilities:
+
+```odin
+prompt_make :: proc(parent: gd.Node) -> Prompt
+prompt_set :: proc(p: ^Prompt, text: string)           // "" hides the prompt
+
+inv_make :: proc(parent: gd.Node, capacity: int) -> Inv
+inv_show :: proc(inv: ^Inv, visible: bool)
+inv_refresh :: proc(inv: ^Inv, slots: []kitems.Slot, table: ^kitems.Table, selected := -1)
+inv_destroy :: proc(inv: ^Inv)
+
+hp_make :: proc(parent: gd.Node) -> Health_Bar
+hp_refresh :: proc(hb: ^Health_Bar, current, max_hp: i32)
+
+abilities_make :: proc(parent: gd.Node, capacity: int) -> Ability_Bar
+abilities_refresh :: proc(bar: ^Ability_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_rate := 20)
+abilities_destroy :: proc(bar: ^Ability_Bar)
+```
+
+All text blocks over stock theme: the health bar renders `hp ▓▓▓▓▓▓▓░░░ 70/100` (zero art to
+install, and a test can read the exact fill back out of the tree); abilities render `[rock]`
+ready, `[rock 1.2s]` cooling, `[rock $]` ready-but-unaffordable — cooldowns count ticks, so
+pass the session's tick rate. With `selected`, the inventory row doubles as a hotbar.
+
+## Worked excerpt (cavecrawl)
+
+```odin
+self.ui = kui.lobby_make(self.owner, "C A V E C R A W L")
+kui.lobby_set_status(&self.ui, "Host a cave, or join one at localhost")
+gd.connect_to(cast(gd.Object)self.ui.host_btn, "pressed", self.owner, "on_host")
+gd.connect_to(cast(gd.Object)self.ui.join_btn, "pressed", self.owner, "on_join")
+gd.connect_to(cast(gd.Object)self.ui.start_btn, "pressed", self.owner, "on_start")
+
+self.chat = kui.chat_make(self.owner)
+kui.chat_show(&self.chat, false)   // chat with nobody wired is just a text box
+gd.connect_to(cast(gd.Object)self.chat.input, "text_submitted", self.owner, "on_chat")
+
+// The LAYOUT is the game's call, not the kit's: status cluster stacked
+// in the top-left (kit widgets spawn at the anchor origin by default).
+gd.control_set_position(cast(gd.Control)self.hud_hp.label, {8, 4}, false)
+gd.control_set_position(self.hud_ab.root, {8, 22}, false)
+gd.control_set_position(self.inv.root, {8, 40}, false)
+```
+
+And the owner's live repaint (hosts get no state events, so the HUD repaints in process):
+
+```odin
+kui.hp_refresh(&self.hud_hp, hp_view(self.me_spel), MAX_HP)
+defs := [?]kcombat.Ability_Def{ROCK_ABILITY, HEAL_ABILITY}
+kui.abilities_refresh(&self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.stamina, ksess.session_tick_hz(&self.ses))
+```
+
+## Gotchas
+
+- **Anchor presets set ANCHORS only — not grow directions.** An auto-sizing label placed at
+  the exact bottom edge grows DOWN, off screen. Pair `control_set_anchors_preset` with grow
+  directions and anchor-relative offsets, the way the prompt does:
+
+  ```odin
+  gd.control_set_anchors_preset(cast(gd.Control)p.label, .Preset_Center_Bottom, false)
+  gd.control_set_v_grow_direction(cast(gd.Control)p.label, .Grow_Direction_Begin)  // grow UP
+  gd.control_set_h_grow_direction(cast(gd.Control)p.label, .Grow_Direction_Both)   // keep centered
+  gd.control_set_offset(cast(gd.Control)p.label, .Top, -34)                        // lifted baseline,
+  gd.control_set_offset(cast(gd.Control)p.label, .Bottom, -34)                     // tracks resizes
+  ```
+
+- **The crown follows the transport SEAT, not player id 1.** `lobby_refresh` crowns
+  `session_host(s)` — a resumed host returns under its old id (see [save.md](save.md)), so
+  "host" is a seat, never an id you hardcode.
+- **Refresh on events, not every frame** — `lobby_refresh` on session events,
+  `chat_refresh` on `Ev_Line`, `score_refresh` on `Ev_Stats_Updated`. The exception is the
+  owner's own HUD (live cooldown text, and hosts get no state events).
+- **`*_destroy` does not free nodes.** The tree belongs to the scene; destroy only drops the
+  Odin-side tracking arrays.
+- Widgets spawn at the anchor origin — position them yourself; layout is the game's call.
+
+Siblings: [session.md](session.md) (roster, stats, `session_tick_hz`) ·
+[comms.md](comms.md) (the chat log) · [combat.md](combat.md) (`Ability_Def`, cooldowns) ·
+[items.md](items.md) (`Slot`, `Table`).
