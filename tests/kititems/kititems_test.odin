@@ -191,3 +191,78 @@ gates_are_dimension_agnostic :: proc(t: ^testing.T) {
 	testing.expect(t, !kinter.in_range({0, 0, 0}, {1, 2, 2}, 2.9))
 	testing.expect(t, kinter.facing_ok({0, 0, 0}, {0, 0, 5}, {0, 0, 1}, 0.99))
 }
+
+// ---- packing: grid inventories where shape is the mechanic ---------------------
+
+RIFLE :: kitems.Item_Id(10) // 3x1
+CRATE :: kitems.Item_Id(11) // 2x2
+BOOT :: kitems.Item_Id(12) // L-shaped
+
+@(test)
+packing_shapes_and_placement :: proc(t: ^testing.T) {
+	L := kitems.shape_of("X.", "X.", "XX")
+	testing.expect_value(t, L.w, u8(2))
+	testing.expect_value(t, L.h, u8(3))
+	testing.expect_value(t, size_of(kitems.Packed_Entry), 10) // stays POD-tight
+
+	grid: [8]kitems.Packed_Entry // a 4x4 board
+	BW, BH :: 4, 4
+
+	rifle := kitems.shape_of("XXX")
+	testing.expect(t, kitems.pack_place(grid[:], BW, BH, RIFLE, 1, rifle, 0, 0))
+	// Overlap refused: the L's top cell would land on the rifle's row.
+	testing.expect(t, !kitems.pack_place(grid[:], BW, BH, BOOT, 1, L, 2, 0))
+	// The L fits below — its EMPTY cells may overhang occupied ones? No:
+	// mask cells only collide where SOLID. (1,1) puts its solid column clear.
+	testing.expect(t, kitems.pack_place(grid[:], BW, BH, BOOT, 1, L, 1, 1))
+	// Out of bounds refused even when cells are free.
+	testing.expect(t, !kitems.pack_place(grid[:], BW, BH, CRATE, 1, kitems.shape_of("XX", "XX"), 3, 3))
+
+	// Hit-testing resolves solid cells to their entry — and only solid ones.
+	idx, ok := kitems.pack_at(grid[:], 1, 3) // the L's bottom-left
+	testing.expect(t, ok)
+	testing.expect_value(t, grid[idx].item, BOOT)
+	_, hole := kitems.pack_at(grid[:], 2, 1) // inside the L's box but NOT solid
+	testing.expect(t, !hole, "mask holes are empty board")
+
+	// Move: revalidates, ignores itself (a one-cell nudge overlaps its own
+	// old footprint — that must not count as a collision).
+	testing.expect(t, kitems.pack_move(grid[:], BW, BH, idx, 2, 1))
+	testing.expect(t, !kitems.pack_move(grid[:], BW, BH, idx, 0, 0), "would hit the rifle")
+
+	// Remove returns the stack and truly clears (delta-diff invariant).
+	out := kitems.pack_remove(grid[:], idx)
+	testing.expect_value(t, out.item, BOOT)
+	testing.expect_value(t, grid[idx], kitems.Packed_Entry{})
+}
+
+@(test)
+packing_add_stacks_then_packs :: proc(t: ^testing.T) {
+	table: kitems.Table
+	defer kitems.table_destroy(&table)
+	kitems.items_register(&table, GEM, "gem", max_stack = 99) // shapeless: 1x1
+	kitems.items_register(&table, CRATE, "crate", max_stack = 1, shape = kitems.shape_of("XX", "XX"))
+
+	grid: [6]kitems.Packed_Entry
+	BW, BH :: 3, 3
+
+	// Crates: 2x2 on a 3x3 board — exactly one fits, the second finds no spot.
+	testing.expect_value(t, kitems.pack_add(&table, grid[:], BW, BH, CRATE, 2), u16(1))
+	// Gems flow around it: stack tops up ONE entry, not one per gem.
+	testing.expect_value(t, kitems.pack_add(&table, grid[:], BW, BH, GEM, 30), u16(30))
+	testing.expect_value(t, kitems.pack_add(&table, grid[:], BW, BH, GEM, 80), u16(80)) // 99 + 11
+	entries := 0
+	for e in grid {
+		if e.item == GEM {entries += 1}
+	}
+	testing.expect_value(t, entries, 2) // 99-stack + 11-stack
+	testing.expect_value(t, kitems.pack_used_cells(grid[:]), 6) // 4 crate + 2 gem cells
+
+	// find_spot is deterministic (row-major): both peers of a predicted
+	// command land the same anchor from the same grid bytes.
+	x, y, ok := kitems.pack_find_spot(grid[:], BW, BH, kitems.SHAPE_SINGLE)
+	testing.expect(t, ok)
+	g2 := grid
+	x2, y2, _ := kitems.pack_find_spot(g2[:], BW, BH, kitems.SHAPE_SINGLE)
+	testing.expect(t, x == x2 && y == y2)
+}

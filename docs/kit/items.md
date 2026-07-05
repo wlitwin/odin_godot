@@ -145,6 +145,35 @@ cave_credit :: proc(self: ^CaveLobby, player: knet.Player_Id, chest: ^Chest) {
 took to the hook. [kit/ui](ui.md)'s `inv_refresh` renders the bag from the same slots and
 table.
 
+## Grid packing (shape as a mechanic)
+
+For inventories where the SHAPE matters — 2x3 rifles, 3x3 crates, attaché-case
+Tetris — `packing.odin` adds a second board type with the same replication
+story: a packed inventory is a fixed array of 10-byte `Packed_Entry` values
+inside a replicated struct, and board dimensions are game constants passed to
+the ops.
+
+```odin
+Stash :: struct {
+	grid: [12]kitems.Packed_Entry `gd:"replicate"`,
+}
+
+// ready(), every peer:
+items_register(&table, RIFLE, "rifle", shape = kitems.shape_of("XXX"))
+items_register(&table, BOOT, "boot", shape = kitems.shape_of("X.", "X.", "XX"))
+```
+
+Shapes are up to 4x4 with a solid-cell mask (`shape_of` reads row strings), and
+each placement is **self-describing** — the entry stores its shape — so THE
+RULE holds by construction: `pack_move`, `pack_remove`, `pack_at`, and
+`pack_fits` are table-free and command-safe (the drag-to-rearrange command is
+one predicted `pack_move`), while the growing ops (`pack_place` with a shape
+you looked up, `pack_add` which stacks then auto-places) live host/hook side
+with the table. `pack_find_spot` scans row-major, so a predicted command and
+the host derive the same anchor from the same grid bytes. Conflicts cost
+nothing, as ever: two players dragging into the same corner both predict, the
+host runs them in arrival order, the loser reverts.
+
 ## Gotchas
 
 - Keep command-side ops deterministic: no table, no allocation, no clocks — they re-run on

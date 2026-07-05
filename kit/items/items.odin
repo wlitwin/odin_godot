@@ -43,6 +43,7 @@ ITEM_NONE :: Item_Id(0)
 Item_Def :: struct {
 	name:      string, // owned by the table
 	max_stack: u16, // 1 = unstackable
+	shape:     Shape, // grid footprint (packing.odin); zero = 1x1
 }
 
 Table :: struct {
@@ -57,14 +58,24 @@ table_destroy :: proc(t: ^Table) {
 	t^ = {}
 }
 
-// Declare (or redeclare — safe in ready() every run) an item kind.
-items_register :: proc(t: ^Table, id: Item_Id, name: string, max_stack: u16 = 1) {
+// Declare (or redeclare — safe in ready() every run) an item kind. `shape`
+// only matters to packed grids (packing.odin); slot inventories ignore it.
+items_register :: proc(t: ^Table, id: Item_Id, name: string, max_stack: u16 = 1, shape := Shape{}) {
 	assert(id != ITEM_NONE, "item 0 is the empty-slot marker")
 	assert(max_stack >= 1)
 	if old, had := t.defs[id]; had {
 		delete(old.name)
 	}
-	t.defs[id] = Item_Def{name = strings.clone(name), max_stack = max_stack}
+	t.defs[id] = Item_Def{name = strings.clone(name), max_stack = max_stack, shape = shape}
+}
+
+// The item's grid footprint — SHAPE_SINGLE for shapeless/unknown items, so
+// packed boards accept plain items without ceremony.
+items_shape :: proc(t: ^Table, id: Item_Id) -> Shape {
+	if d, ok := t.defs[id]; ok && d.shape.w != 0 && d.shape.h != 0 {
+		return d.shape
+	}
+	return SHAPE_SINGLE
 }
 
 items_def :: proc(t: ^Table, id: Item_Id) -> (Item_Def, bool) {
@@ -95,7 +106,7 @@ normalize :: proc(s: ^Slot) {
 	}
 }
 
-@(private = "file")
+@(private) // package-visible: packing.odin's grow op shares the stacking rule
 stack_max :: proc(t: ^Table, item: Item_Id) -> u16 {
 	if d, ok := t.defs[item]; ok {
 		return d.max_stack
