@@ -14,9 +14,10 @@ package godot
 // (`singleton_input_map()`) plus the generated `input_map_*` procs and constructing the
 // InputEvent* objects for you:
 //
-//     gd.add_action("fire")
 //     gd.action_add_key("fire", i64(gd.Key.Space))         // or a raw keycode
 //     gd.action_add_mouse_button("fire", i64(gd.Mouse_Button.Left))
+//     // (the binders define the action on first use; call gd.add_action
+//     // yourself only to set a non-default analog deadzone)
 //     ...
 //     if gd.is_action_pressed("fire") { shoot() }
 //
@@ -46,25 +47,40 @@ erase_action :: proc "contextless" (name: cstring) {
 	input_map_erase_action(im, n)
 }
 
-// action_add_key binds a keyboard key to `action`. `keycode` is a Godot `Key` value
-// (pass `i64(gd.Key.Space)` etc.); both keycode and physical_keycode are set so the
-// binding works regardless of keyboard layout matching.
+// Adding an event to an UNDEFINED action is a silent no-op plus a runtime
+// error later at the poll site — the puttputt dogfood walked straight into
+// it. The binders define the action themselves (Godot default deadzone) so
+// the one-liner in the header comment is actually sufficient.
+@(private = "file")
+ensure_action :: proc "contextless" (im: Input_Map, n: String_Name) {
+	if !bool(input_map_has_action(im, n)) {
+		input_map_add_action(im, n, 0.5)
+	}
+}
+
+// action_add_key binds a keyboard key to `action` (defining the action on first
+// use). `keycode` is a Godot `Key` value (pass `i64(gd.Key.Space)` etc.); both
+// keycode and physical_keycode are set so the binding works regardless of
+// keyboard layout matching.
 action_add_key :: proc "contextless" (action: cstring, keycode: i64) {
 	im := singleton_input_map()
 	ev := new_input_event_key()
 	input_event_key_set_keycode(ev, Key(keycode))
 	input_event_key_set_physical_keycode(ev, Key(keycode))
 	n := new_string_name_cstring(action, true)
+	ensure_action(im, n)
 	input_map_action_add_event(im, n, ev)
 }
 
-// action_add_mouse_button binds a mouse button to `action`. `button_index` is a Godot
-// `Mouse_Button` value (pass `i64(gd.Mouse_Button.Left)` etc.).
+// action_add_mouse_button binds a mouse button to `action` (defining the action
+// on first use). `button_index` is a Godot `Mouse_Button` value (pass
+// `i64(gd.Mouse_Button.Left)` etc.).
 action_add_mouse_button :: proc "contextless" (action: cstring, button_index: i64) {
 	im := singleton_input_map()
 	ev := new_input_event_mouse_button()
 	input_event_mouse_button_set_button_index(ev, Mouse_Button(button_index))
 	n := new_string_name_cstring(action, true)
+	ensure_action(im, n)
 	input_map_action_add_event(im, n, ev)
 }
 
