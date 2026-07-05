@@ -32,6 +32,7 @@ import kfx "godot:kit/fx"
 import kitems "godot:kit/items"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
+import steamgd "godot:kit/steamgd"
 import kui "godot:kit/ui"
 import netgd "godot:kit/netgd"
 import "core:fmt"
@@ -163,6 +164,8 @@ CaveLobby :: struct {
 	seen_won:    bool, // match-over edge: end screen up on won=1, down on won=0
 	floors_n:    int, // how deep the cave goes (CAVE_FLOORS env shrinks it for tests)
 	kicked_out:  bool, // we were removed on purpose — mutes the host-left line that follows
+	steam_on:    bool, // GodotSteam present + initialized (kit/steamgd)
+	steam_lobby: u64, // the Steam lobby we host or sit in (invite target)
 	deny_reason: int, // last Ev_Join_Denied reason (-1 = none); drivers read it
 	started:     bool, // the world is live
 	walking:     bool, // headless drivers steer via walk_to
@@ -244,6 +247,15 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	gd.control_set_position(cast(gd.Control)self.hud_hp.label, {8, 4}, false)
 	gd.control_set_position(self.hud_ab.root, {8, 22}, false)
 	gd.control_set_position(self.inv.root, {8, 40}, false)
+	// STEAM, when the GodotSteam extension is in the project (and not
+	// switched off for tests): one transport swap, zero session changes.
+	if steamgd.available() && env_int("CAVE_STEAM", 1) != 0 {
+		self.steam_on = steamgd.init(env_int("CAVE_APPID", steamgd.TEST_APP_ID))
+		if self.steam_on {
+			steamgd.listen(self.owner, "on_lobby_created", "on_lobby_joined", "on_join_requested")
+		}
+	}
+	gd.print_str(fmt.tprintf("CAVE_STEAM %s", self.steam_on ? "on" : "off"))
 	self.floors_n = env_int("CAVE_FLOORS", 2)
 	self.deny_reason = -1
 	ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)

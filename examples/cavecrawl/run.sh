@@ -68,6 +68,10 @@ attempt() {
 
 	local ok=1
 	grep -q "CAVE_UI_READY" "$hlog" || { echo "  FAIL: host lobby UI never built"; ok=0; }
+	# kit/steamgd rides in every build BY NAME: with no GodotSteam installed
+	# it must answer "off" and leave the ENet path untouched (this grep is
+	# the headless half of the Steam story; the live half needs Steam).
+	grep -q "CAVE_STEAM off" "$hlog" || { echo "  FAIL: steamgd absence not graceful"; ok=0; }
 	grep -q "CAVE_HOSTING" "$hlog" || { echo "  FAIL: host never hosted"; ok=0; }
 	grep -q "CAVE_PLAYERS n=2" "$hlog" || { echo "  FAIL: host never saw 2 spelunkers"; ok=0; }
 	grep -q "CAVE_SEATED me=" "$glog" || { echo "  FAIL: guest was never seated"; ok=0; }

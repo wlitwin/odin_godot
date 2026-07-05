@@ -107,7 +107,7 @@ cave_lobby_save_run :: proc(self: ^CaveLobby) {
 @(gd_method)
 cave_lobby_on_resume :: proc(self: ^CaveLobby) {
 	if self.running {return}
-	blob, err := ksave.resume(&self.ses, my_name(), save_path(), GAME_VERSION)
+	blob, err := ksave.resume(&self.ses, my_name(self), save_path(), GAME_VERSION)
 	switch err {
 	case .No_File:
 		kui.lobby_set_status(&self.ui, "No saved run to resume")

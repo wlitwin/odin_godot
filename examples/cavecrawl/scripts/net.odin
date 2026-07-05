@@ -17,6 +17,7 @@ import knet "godot:kit/net"
 import netgd "godot:kit/netgd"
 import ksave "godot:kit/save"
 import ksess "godot:kit/session"
+import steamgd "godot:kit/steamgd"
 import kui "godot:kit/ui"
 import "core:fmt"
 import "core:strconv"
@@ -47,8 +48,15 @@ port :: proc() -> int {
 	return DEFAULT_PORT
 }
 
-my_name :: proc() -> string {
-	return env_string("CAVE_NAME", "spelunker")
+my_name :: proc(self: ^CaveLobby) -> string {
+	n := env_string("CAVE_NAME", "")
+	if n == "" && self.steam_on {
+		n = steamgd.persona_name() // your Steam name IS your name
+	}
+	if n == "" {
+		n = "spelunker"
+	}
+	return n
 }
 
 my_token :: proc() -> u64 {
@@ -112,17 +120,31 @@ cave_lobby_kick :: proc(self: ^CaveLobby, player: gd.Int) {
 @(gd_method)
 cave_lobby_on_host :: proc(self: ^CaveLobby) {
 	if self.running {return}
+	if self.steam_on {
+		// Hosting completes on the lobby_created signal.
+		steamgd.create_lobby(4)
+		kui.lobby_set_status(&self.ui, "Creating a Steam lobby...")
+		gd.print_str("CAVE_STEAM_LOBBY_PENDING")
+		return
+	}
 	if !gd.host(self.owner, port()) {
 		kui.lobby_set_status(&self.ui, "Could not host (port taken?)")
 		gd.print_str("CAVE_HOST_FAIL")
 		return
 	}
-	ksess.session_host_start(&self.ses, my_name())
+	begin_hosting(self)
+}
+
+// Everything hosting means AFTER a transport is up — shared verbatim by the
+// ENet path (gd.host above) and the Steam path (lobby_created below): the
+// session cannot tell the transports apart, which is the whole point.
+begin_hosting :: proc(self: ^CaveLobby) {
+	ksess.session_host_start(&self.ses, my_name(self))
 	self.cols = kcombat.combat_columns(&self.ses) // the ledger, on the scoreboard
 	self.slain_col = ksess.session_stat_column(&self.ses, "slain") // the game's own column
 	self.running = true
 	kui.lobby_show_menu(&self.ui, false, false)
-	kui.lobby_set_status(&self.ui, fmt.tprintf("Hosting on :%d — waiting for friends", port()))
+	kui.lobby_set_status(&self.ui, self.steam_on ? "Hosting a Steam lobby — invite friends via the overlay" : fmt.tprintf("Hosting on :%d — waiting for friends", port()))
 	kui.lobby_refresh(&self.ui, &self.ses)
 	kui.chat_show(&self.chat, true)
 	gd.print_str("CAVE_HOSTING")
@@ -131,14 +153,61 @@ cave_lobby_on_host :: proc(self: ^CaveLobby) {
 @(gd_method)
 cave_lobby_on_join :: proc(self: ^CaveLobby) {
 	if self.running {return}
+	if self.steam_on {
+		// Steam joins arrive through the overlay (join_requested below).
+		kui.lobby_set_status(&self.ui, "Accept a Steam invite to join (Shift+Tab)")
+		return
+	}
 	if !gd.join(self.owner, "127.0.0.1", port()) {
 		kui.lobby_set_status(&self.ui, "Could not start joining")
 		return
 	}
-	ksess.session_client_start(&self.ses, my_token(), my_name())
+	begin_joining(self)
+}
+
+begin_joining :: proc(self: ^CaveLobby) {
+	ksess.session_client_start(&self.ses, my_token(), my_name(self))
 	self.running = true
 	kui.lobby_show_menu(&self.ui, false, false)
 	kui.lobby_set_status(&self.ui, "Joining the cave...")
 	kui.chat_show(&self.chat, true)
 	gd.print_str("CAVE_JOINING")
+}
+
+// ---- the Steam lobby signals (see kit/steamgd's header for the flow) ----
+
+@(gd_method)
+cave_lobby_on_lobby_created :: proc(self: ^CaveLobby, result: gd.Int, lobby_id: gd.Int) {
+	if int(result) != 1 {
+		kui.lobby_set_status(&self.ui, "Steam could not make the lobby")
+		gd.print_str("CAVE_STEAM_LOBBY_FAIL")
+		return
+	}
+	self.steam_lobby = u64(lobby_id)
+	if !steamgd.host_peer(self.owner) {
+		kui.lobby_set_status(&self.ui, "Steam peer failed")
+		return
+	}
+	begin_hosting(self)
+	steamgd.invite_overlay(self.steam_lobby)
+}
+
+@(gd_method)
+cave_lobby_on_lobby_joined :: proc(self: ^CaveLobby, lobby_id: gd.Int, _perms: gd.Int, _locked: gd.Bool, _response: gd.Int) {
+	owner := steamgd.lobby_owner(u64(lobby_id))
+	if owner == 0 || owner == steamgd.my_steam_id() {
+		return // our own lobby (hosts join what they create), or no Steam
+	}
+	self.steam_lobby = u64(lobby_id)
+	if !steamgd.client_peer(self.owner, owner) {
+		kui.lobby_set_status(&self.ui, "Steam peer failed")
+		return
+	}
+	// connected_to_server will fire -> the wire's on_net_up seats us.
+	begin_joining(self)
+}
+
+@(gd_method)
+cave_lobby_on_join_requested :: proc(self: ^CaveLobby, lobby_id: gd.Int, _friend: gd.Int) {
+	steamgd.join_lobby(u64(lobby_id)) // the overlay's "Join Game" lands here
 }
