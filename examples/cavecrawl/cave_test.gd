@@ -485,8 +485,25 @@ func _process(_delta: float) -> bool:
 			print("CAVE_DESCENDED depth=", cave.call("depth"), " door=", cave.call("door_open"),
 				" dwellers=", cave.call("dwellers"), " chest=", cave.call("chest_items"),
 				" gems_bag=", cave.call("my_gems"), " pos=", cave.call("my_pos"))
+			if role == "guest":
+				# The guest just LEAVES (process exit, no goodbye) — the
+				# host must notice through the transport's disconnect
+				# signal, not a polite message.
+				print(role.to_upper(), "_DONE")
+				quit(0); return true
+			enter("alone", now)
+		return false
+
+	if phase == "alone":
+		# DISCONNECT DETECTION: the guest's process died without a goodbye.
+		# The peer_disconnected signal -> session_peer_disconnected marks the
+		# roster; without that wiring this phase hangs forever on a ghost.
+		if int(cave.call("get_players")) == 1:
+			print("CAVE_ALONE players=1")
 			print(role.to_upper(), "_DONE")
 			quit(0); return true
+		elif timed_out(now, "never noticed the guest leave"):
+			quit(1); return true
 		return false
 
 	return false

@@ -197,6 +197,10 @@ attempt() {
 		grep -qE "CAVE_DESCENDED depth=2 door=false dwellers=[0-9] chest=6" "$log" || { echo "  FAIL: floor 2 wrong in $(basename "$log")"; ok=0; }
 	done
 	grep -qE "CAVE_DESCENDED depth=2 door=false dwellers=[0-9] chest=6 gems_bag=3" "$glog" || { echo "  FAIL: the guest's bag did not cross the stairs"; ok=0; }
+	# DISCONNECT DETECTION: the guest exits without a goodbye; the host must
+	# see the roster shrink through the transport signal (an unwired signal
+	# means ghosts haunt rosters forever — every game's first playtest bug).
+	grep -q "CAVE_ALONE players=1" "$hlog" || { echo "  FAIL: host never noticed the guest leave"; ok=0; }
 	grep -q "HOST_DONE" "$hlog" || { echo "  FAIL: host did not finish"; ok=0; }
 	grep -q "GUEST_DONE" "$glog" || { echo "  FAIL: guest did not finish"; ok=0; }
 

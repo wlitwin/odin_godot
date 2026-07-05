@@ -10,7 +10,6 @@ import gd "godot:godot"
 import kcombat "godot:kit/combat"
 import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
-import netgd "godot:kit/netgd"
 import ksave "godot:kit/save"
 import ksess "godot:kit/session"
 import kui "godot:kit/ui"
@@ -123,9 +122,6 @@ cave_lobby_on_resume :: proc(self: ^CaveLobby) {
 		gd.print_str("CAVE_HOST_FAIL")
 		return
 	}
-	if netgd.listen_packets(self.owner, "on_packet") != .Ok {return}
-	self.ses.send = session_send
-	self.ses.send_user = self
 	if !ksave.save_restore(&self.ses, my_name(), &r, h) {
 		gd.print_str("CAVE_RESUME_FAIL snapshot")
 		return

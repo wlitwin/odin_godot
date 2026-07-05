@@ -71,34 +71,31 @@ my_token :: proc() -> u64 {
 	return token
 }
 
-session_send :: proc(user: rawptr, to_peer: int, bytes: []u8, channel: ksess.Channel) {
-	self := cast(^CaveLobby)user
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	knet.write_u8(&w, MSG_SESSION)
-	append(&w.buf, ..bytes)
-	if channel == .Stream {
-		_ = netgd.send_stream(self.owner, to_peer, knet.writer_bytes(&w))
-	} else {
-		_ = netgd.send_reliable(self.owner, to_peer, knet.writer_bytes(&w))
-	}
-}
+// The four transport forwards — Godot signals must land on @(gd_method)s of
+// the game's script; netgd.Session_Wire owns everything behind them.
 
 @(gd_method)
 cave_lobby_on_packet :: proc(self: ^CaveLobby, id: gd.Int, packet: gd.Packed_Byte_Array) {
-	packet := packet
-	view := netgd.pba_view(&packet)
-	if self.latency > 0 {
-		// The acid run: buffer everything, route when the fake wire delivers.
-		data := make([]u8, len(view))
-		copy(data, view)
-		append(&self.delayed, Delayed_Packet{due = now_s() + self.latency, from = int(id), data = data})
-		return
-	}
-	r := knet.reader_make(view)
-	if knet.read_u8(&r) == MSG_SESSION {
-		ksess.session_handle_packet(&self.ses, int(id), &r)
-	}
+	netgd.wire_receive(&self.wire, id, packet)
+}
+
+// A transport peer dropped non-gracefully (alt-F4, wifi loss): tell the
+// session so the roster shows it and the host stops sending to a ghost.
+@(gd_method)
+cave_lobby_on_peer_left :: proc(self: ^CaveLobby, id: gd.Int) {
+	ksess.session_peer_disconnected(&self.ses, int(id))
+}
+
+// Client: the transport handshake completed — ask the host for a seat.
+@(gd_method)
+cave_lobby_on_net_up :: proc(self: ^CaveLobby) {
+	ksess.session_client_join(&self.ses)
+}
+
+// Client: the connection failed or the server vanished — same as host loss.
+@(gd_method)
+cave_lobby_on_net_down :: proc(self: ^CaveLobby) {
+	ksess.session_peer_disconnected(&self.ses, ksess.HOST_PEER)
 }
 
 @(gd_method)
@@ -109,9 +106,6 @@ cave_lobby_on_host :: proc(self: ^CaveLobby) {
 		gd.print_str("CAVE_HOST_FAIL")
 		return
 	}
-	if netgd.listen_packets(self.owner, "on_packet") != .Ok {return}
-	self.ses.send = session_send
-	self.ses.send_user = self
 	ksess.session_host_start(&self.ses, my_name())
 	self.cols = kcombat.combat_columns(&self.ses) // the ledger, on the scoreboard
 	self.slain_col = ksess.session_stat_column(&self.ses, "slain") // the game's own column
@@ -130,9 +124,6 @@ cave_lobby_on_join :: proc(self: ^CaveLobby) {
 		kui.lobby_set_status(&self.ui, "Could not start joining")
 		return
 	}
-	if netgd.listen_packets(self.owner, "on_packet") != .Ok {return}
-	self.ses.send = session_send
-	self.ses.send_user = self
 	ksess.session_client_start(&self.ses, my_token(), my_name())
 	self.running = true
 	kui.lobby_show_menu(&self.ui, false, false)

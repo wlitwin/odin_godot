@@ -32,6 +32,7 @@ import kitems "godot:kit/items"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import kui "godot:kit/ui"
+import netgd "godot:kit/netgd"
 import "core:fmt"
 
 DEFAULT_PORT :: 4242
@@ -125,14 +126,6 @@ Visual_Rock :: struct {
 	node:    gd.Label,
 }
 
-// Injected receive latency for the acid run (CAVE_LATENCY ms): packets
-// buffer here before routing — the suite proves casts feel instant anyway.
-Delayed_Packet :: struct {
-	due:  f64,
-	from: int,
-	data: []u8,
-}
-
 CaveLobby :: struct {
 	owner:     gd.Node,
 	ses:       ksess.Session,
@@ -140,7 +133,6 @@ CaveLobby :: struct {
 	ui:        kui.Lobby,
 	chat:      kui.Chat,
 	running:   bool, // hosting or joining (transport is up)
-	join_sent: bool, // client: JOIN goes out once the transport connects
 
 	// The authored entity scenes, assigned in cave.tscn's inspector — the
 	// factory instantiates these; the entity structs only tag what
@@ -209,9 +201,8 @@ CaveLobby :: struct {
 	was_dead:   bool, // owner-side respawn edge detector
 	issue_at:   f64, // when my last command left (confirm latency proof)
 
-	// injected latency (CAVE_LATENCY ms; tests only)
-	latency: f64,
-	delayed: [dynamic]Delayed_Packet,
+	// the transport binding (send adapter, packet route, latency shim)
+	wire: netgd.Session_Wire,
 }
 
 now_s :: knet.now_s // the toolkit's monotonic clock, under the game's short name
@@ -262,10 +253,15 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	gd.control_set_position(cast(gd.Control)self.hud_hp.label, {8, 4}, false)
 	gd.control_set_position(self.hud_ab.root, {8, 22}, false)
 	gd.control_set_position(self.inv.root, {8, 40}, false)
-	self.latency = f64(env_int("CAVE_LATENCY", 0)) / 1000.0
 	ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
 	ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
 	ksess.session_app_route(&self.ses, TAG_FIRE, self, cave_on_fire)
+	// The transport binding: send adapter + packet route + the connection
+	// signals (peer loss, join success/failure) — four one-line forwards in
+	// net.odin own the @(gd_method) names.
+	netgd.wire_attach(&self.wire, self.owner, &self.ses, MSG_SESSION)
+	netgd.wire_listen(&self.wire, "on_packet", "on_peer_left", "on_net_up", "on_net_down")
+	netgd.wire_set_latency(&self.wire, env_int("CAVE_LATENCY", 0)) // the acid rig, now a kit shim
 	install_controls()
 	self.legend = gd.new_label()
 	gd.node_set_name(cast(gd.Node)self.legend, gd.new_string_name_cstring("Legend", true))
@@ -310,28 +306,7 @@ roster_changed :: proc(self: ^CaveLobby) {
 cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 	if !self.running {return}
 
-	// The fake wire delivers (acid runs only; self.latency == 0 otherwise).
-	for len(self.delayed) > 0 && self.delayed[0].due <= now_s() {
-		pkt := self.delayed[0]
-		ordered_remove(&self.delayed, 0)
-		r := knet.reader_make(pkt.data)
-		if knet.read_u8(&r) == MSG_SESSION {
-			ksess.session_handle_packet(&self.ses, pkt.from, &r)
-		}
-		delete(pkt.data)
-	}
-
-	// Client: seat ourselves as soon as the transport handshake completes.
-	if !self.ses.is_host && !self.join_sent {
-		mp := gd.node_get_multiplayer(self.owner)
-		if cast(rawptr)mp != nil && gd.multiplayer_api_has_multiplayer_peer(mp) {
-			peers := gd.multiplayer_api_get_peers(mp)
-			if gd.packed_int32_array_size(&peers) > 0 {
-				ksess.session_client_join(&self.ses)
-				self.join_sent = true
-			}
-		}
-	}
+	netgd.wire_pump(&self.wire, now_s()) // latency-shimmed packets deliver
 
 	ticks, _ := ksess.session_tick(&self.ses, delta, now_s())
 	if self.started {
@@ -386,6 +361,9 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 		case ksess.Ev_Host_Left:
 			kui.lobby_set_status(&self.ui, "The host left — this run is over")
 			gd.print_str("CAVE_HOST_LEFT")
+		case ksess.Ev_Join_Failed:
+			kui.lobby_set_status(&self.ui, "Could not reach the cave")
+			gd.print_str("CAVE_JOIN_FAILED")
 		case ksess.Ev_Spawned:
 			// The world reached this client (factory already made the node).
 			if !self.started {
