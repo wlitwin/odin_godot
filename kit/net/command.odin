@@ -59,9 +59,11 @@ Command_Set :: struct {
 	net_id_offset: int,
 }
 
-// Complete outgoing message bytes → whoever owns the transport. The session
-// layer prepends its own framing (message-kind byte) and sends reliable.
-Send_Proc :: proc(user: rawptr, bytes: []u8)
+// Complete outgoing COMMAND message bytes → whoever owns the transport. The
+// session layer prepends its own framing (message-kind byte) and sends
+// reliable. (Named apart from kit/session's Send_Proc — that one is the
+// peer-addressed transport hookup; this one is command-framing only.)
+Command_Send_Proc :: proc(user: rawptr, bytes: []u8)
 
 // One per session participant. Clients use pending/msg/send; the host uses
 // dedup. now_tick is stamped onto pending entries — the owner advances it with
@@ -75,7 +77,7 @@ Command_Hook :: proc(user: rawptr, player: Player_Id, entity: Net_Id, cmd: u16, 
 Command_Ctx :: struct {
 	is_authority: bool,
 	now_tick:     u64,
-	send:         Send_Proc,
+	send:         Command_Send_Proc,
 	send_user:    rawptr,
 	pending:      Pending_Table, // client: in-flight predictions
 	dedup:        map[u64]Dedup_Window, // host: per-peer exactly-once windows

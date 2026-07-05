@@ -68,7 +68,7 @@ cave_launch_rock :: proc(self: ^CaveLobby, shooter: knet.Player_Id, sp: ^Spelunk
 
 // Every peer: a fire announcement — draw the rock, unless it's my own echo
 // (mine flew at cast time). Only the host authors these.
-cave_on_fire :: proc(user: rawptr, from: knet.Player_Id, from_peer: int, r: ^knet.Reader) {
+cave_on_fire :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id, r: ^knet.Reader) {
 	self := cast(^CaveLobby)user
 	if self.ses.is_host || from_peer != ksess.HOST_PEER {return}
 	f, ok := kcombat.fire_read(r)

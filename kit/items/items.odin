@@ -23,6 +23,13 @@ package kit_items
 // the loser's optimistic state reverts. Conflict resolution costs nothing —
 // it IS the intent pipeline.
 //
+// WHICH OPS TAKE THE TABLE — the rule, not a quirk: ops that can GROW a stack
+// consult the defs for max_stack (`add`, `put`, `transfer`); ops that only
+// drain or read slots don't (`take`, `remove`, `count_of`). The table-free
+// ops are exactly the ones usable inside a @(gd_command) proc, which sees
+// only its entity and args — no ambient state, by design. Crediting with
+// stacking rules happens where the table lives: the command hook / host code.
+//
 // Item DEFINITIONS are code, not wire: every peer registers the same table in
 // ready() (ids are game constants), so only 4-byte slots ever ship.
 

@@ -14,26 +14,26 @@ import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
 Envelope :: struct {
-	to:   int,
+	to:   ksess.Peer_Id,
 	data: []u8,
 }
 
 Peer_Box :: struct {
-	peer:  int,
+	peer:  ksess.Peer_Id,
 	s:     ksess.Session,
 	out:   [dynamic]Envelope,
 	bots:  map[knet.Net_Id]^Bot, // factory-created entities (clients)
 	freed: int, // factory frees observed
 }
 
-box_send :: proc(user: rawptr, to_peer: int, bytes: []u8, channel: ksess.Channel) {
+box_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
 	b := cast(^Peer_Box)user
 	cloned := make([]u8, len(bytes))
 	copy(cloned, bytes)
 	append(&b.out, Envelope{to = to_peer, data = cloned})
 }
 
-box_make :: proc(b: ^Peer_Box, peer: int) {
+box_make :: proc(b: ^Peer_Box, peer: ksess.Peer_Id) {
 	b.peer = peer
 	b.s.send = box_send
 	b.s.send_user = b

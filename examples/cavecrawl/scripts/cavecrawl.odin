@@ -297,7 +297,7 @@ roster_changed :: proc(self: ^CaveLobby) {
 	n := ksess.session_count(&self.ses, connected_only = true)
 	gd.print_str(fmt.tprintf("CAVE_PLAYERS n=%d", n))
 	if self.ses.is_host {
-		kui.lobby_set_status(&self.ui, fmt.ctprintf("%d spelunkers ready", n))
+		kui.lobby_set_status(&self.ui, fmt.tprintf("%d spelunkers ready", n))
 		// Enough friends: the host may start (phase 3 gives Start a game).
 		kui.lobby_show_menu(&self.ui, false, n >= 2)
 	}

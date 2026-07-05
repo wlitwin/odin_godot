@@ -38,18 +38,18 @@ BOT_TYPE :: ksess.Entity_Type(7)
 TOKEN_ALICE :: u64(0xA11CE)
 
 Envelope :: struct {
-	to:   int,
+	to:   ksess.Peer_Id,
 	data: []u8,
 }
 
 Peer_Box :: struct {
-	peer: int,
+	peer: ksess.Peer_Id,
 	s:    ksess.Session,
 	out:  [dynamic]Envelope,
 	bots: map[knet.Net_Id]^Bot,
 }
 
-box_send :: proc(user: rawptr, to_peer: int, bytes: []u8, channel: ksess.Channel) {
+box_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
 	b := cast(^Peer_Box)user
 	cloned := make([]u8, len(bytes))
 	copy(cloned, bytes)
@@ -72,7 +72,7 @@ box_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	free(entity)
 }
 
-box_make :: proc(b: ^Peer_Box, peer: int) {
+box_make :: proc(b: ^Peer_Box, peer: ksess.Peer_Id) {
 	b.peer = peer
 	b.s.send = box_send
 	b.s.send_user = b

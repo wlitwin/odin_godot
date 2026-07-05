@@ -98,9 +98,12 @@ registry_remove :: proc(reg: ^Registry, id: Net_Id) -> bool {
 	return true
 }
 
-// Resolve a wire id to a live entry (nil entity = unknown/despawned).
-registry_get :: proc(reg: ^Registry, id: Net_Id) -> (Registry_Entry, bool) {
-	e, ok := reg.entries[id]
+// Resolve a wire id to a live entry. Returns a POINTER into the registry —
+// mutations land in place, no store-back needed — valid until the next
+// insert/remove. (The old by-value return copied a whole Stream_Ring per call
+// and invited mutate-the-copy-and-forget bugs.)
+registry_get :: proc(reg: ^Registry, id: Net_Id) -> (^Registry_Entry, bool) {
+	e, ok := &reg.entries[id]
 	return e, ok
 }
 
@@ -317,9 +320,8 @@ registry_commit_shadows :: proc(reg: ^Registry) {
 // snapshots makes it drop-proof on the unreliable channel: whichever
 // snapshot arrives first after the jump carries the new count.
 registry_teleport :: proc(reg: ^Registry, id: Net_Id) {
-	if e, found := reg.entries[id]; found {
+	if e, found := &reg.entries[id]; found {
 		e.warp += 1
-		reg.entries[id] = e
 	}
 }
 
@@ -374,12 +376,11 @@ registry_apply_streams :: proc(r: ^Reader, reg: ^Registry, me: Player_Id, stamp:
 		}
 		blob := r.data[r.off:r.off + n]
 		r.off += n
-		e, ok := reg.entries[id]
+		e, ok := &reg.entries[id]
 		if !ok || e.owner == me || n != stream_data_size(e.set.entity_desc) {
 			continue
 		}
 		stream_ring_push(&e.stream, stamp, blob, warp)
-		reg.entries[id] = e // ring bookkeeping changed; store back (no map addressing)
 		applied += 1
 	}
 	return applied

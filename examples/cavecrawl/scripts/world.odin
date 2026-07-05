@@ -275,7 +275,7 @@ update_prompt :: proc(self: ^CaveLobby) {
 	} else if _, is_pickup := self.pickups[self.target_id]; is_pickup {
 		self.target_kind = 3
 		p := self.pickups[self.target_id]
-		kui.prompt_set(&self.prompt, fmt.ctprintf("E — pick up %s", kitems.items_name(&self.table, p.item)))
+		kui.prompt_set(&self.prompt, fmt.tprintf("E — pick up %s", kitems.items_name(&self.table, p.item)))
 	} else {
 		self.target_kind = 2
 		door := self.doors[self.target_id]

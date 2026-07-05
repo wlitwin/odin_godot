@@ -83,7 +83,7 @@ cave_lobby_on_packet :: proc(self: ^CaveLobby, id: gd.Int, packet: gd.Packed_Byt
 // session so the roster shows it and the host stops sending to a ghost.
 @(gd_method)
 cave_lobby_on_peer_left :: proc(self: ^CaveLobby, id: gd.Int) {
-	ksess.session_peer_disconnected(&self.ses, int(id))
+	ksess.session_peer_disconnected(&self.ses, ksess.Peer_Id(id))
 }
 
 // Client: the transport handshake completed — ask the host for a seat.
@@ -111,7 +111,7 @@ cave_lobby_on_host :: proc(self: ^CaveLobby) {
 	self.slain_col = ksess.session_stat_column(&self.ses, "slain") // the game's own column
 	self.running = true
 	kui.lobby_show_menu(&self.ui, false, false)
-	kui.lobby_set_status(&self.ui, fmt.ctprintf("Hosting on :%d — waiting for friends", port()))
+	kui.lobby_set_status(&self.ui, fmt.tprintf("Hosting on :%d — waiting for friends", port()))
 	kui.lobby_refresh(&self.ui, &self.ses)
 	kui.chat_show(&self.chat, true)
 	gd.print_str("CAVE_HOSTING")

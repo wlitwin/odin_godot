@@ -37,8 +37,8 @@ prompt_make :: proc(parent: gd.Node) -> Prompt {
 }
 
 // What the player could use right now; "" hides the prompt.
-prompt_set :: proc(p: ^Prompt, text: cstring) {
-	gd.set_string(cast(gd.Object)p.label, "text", text)
+prompt_set :: proc(p: ^Prompt, text: string) {
+	set_text(cast(gd.Object)p.label, text)
 	gd.set_bool(cast(gd.Object)p.label, "visible", text != "")
 }
 

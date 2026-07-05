@@ -211,7 +211,7 @@ fire_announcements_round_trip :: proc(t: ^testing.T) {
 @(test)
 combat_stats_publish_into_the_registry :: proc(t: ^testing.T) {
 	s: ksess.Session
-	dummy_send :: proc(user: rawptr, to_peer: int, bytes: []u8, channel: ksess.Channel) {}
+	dummy_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {}
 	s.send = dummy_send
 	ksess.session_host_start(&s, "hosty")
 	defer ksess.session_destroy(&s)

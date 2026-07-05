@@ -168,12 +168,12 @@ PICKUP_TYPE :: ksess.Entity_Type(4)
 // ---- the peer harness ----------------------------------------------------------
 
 Envelope :: struct {
-	to:   int,
+	to:   ksess.Peer_Id,
 	data: []u8,
 }
 
 Peer_Box :: struct {
-	peer:       int,
+	peer:       ksess.Peer_Id,
 	s:          ksess.Session,
 	out:        [dynamic]Envelope,
 	table:      kitems.Table,
@@ -185,7 +185,7 @@ Peer_Box :: struct {
 	freed:      int, // factory frees observed (pickups despawn on grab)
 }
 
-box_send :: proc(user: rawptr, to_peer: int, bytes: []u8, channel: ksess.Channel) {
+box_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
 	b := cast(^Peer_Box)user
 	cloned := make([]u8, len(bytes))
 	copy(cloned, bytes)
@@ -266,7 +266,7 @@ loot_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd
 	}
 }
 
-box_make :: proc(b: ^Peer_Box, peer: int) {
+box_make :: proc(b: ^Peer_Box, peer: ksess.Peer_Id) {
 	b.peer = peer
 	b.s.send = box_send
 	b.s.send_user = b

@@ -15,7 +15,7 @@ package kit_netgd
 //
 //     // the four forwards:
 //     on_packet(id, packet)  -> netgd.wire_receive(&self.wire, id, packet)
-//     on_peer_left(id)       -> ksess.session_peer_disconnected(&self.ses, int(id))
+//     on_peer_left(id)       -> ksess.session_peer_disconnected(&self.ses, ksess.Peer_Id(id))
 //     on_net_up()            -> ksess.session_client_join(&self.ses)
 //     on_net_down()          -> ksess.session_peer_disconnected(&self.ses, ksess.HOST_PEER)
 //
@@ -42,7 +42,7 @@ Session_Wire :: struct {
 
 Wire_Delayed :: struct {
 	due:  f64,
-	from: int,
+	from: ksess.Peer_Id,
 	data: []u8,
 }
 
@@ -53,21 +53,20 @@ wire_attach :: proc(wire: ^Session_Wire, node: gd.Node, ses: ^ksess.Session, kin
 	wire.node = node
 	wire.ses = ses
 	wire.kind = kind
-	ses.send = wire_send
-	ses.send_user = wire
+	ksess.session_set_transport(ses, wire, wire_send)
 }
 
 @(private = "file")
-wire_send :: proc(user: rawptr, to_peer: int, bytes: []u8, channel: ksess.Channel) {
+wire_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
 	wire := cast(^Session_Wire)user
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_u8(&w, wire.kind)
 	append(&w.buf, ..bytes)
 	if channel == .Stream {
-		_ = send_stream(wire.node, to_peer, knet.writer_bytes(&w))
+		_ = send_stream(wire.node, int(to_peer), knet.writer_bytes(&w))
 	} else {
-		_ = send_reliable(wire.node, to_peer, knet.writer_bytes(&w))
+		_ = send_reliable(wire.node, int(to_peer), knet.writer_bytes(&w))
 	}
 }
 
@@ -112,11 +111,11 @@ wire_receive :: proc(wire: ^Session_Wire, id: gd.Int, packet: gd.Packed_Byte_Arr
 	if wire.latency > 0 {
 		data := make([]u8, len(view) - 1)
 		copy(data, view[1:])
-		append(&wire.delayed, Wire_Delayed{due = knet.now_s() + wire.latency, from = int(id), data = data})
+		append(&wire.delayed, Wire_Delayed{due = knet.now_s() + wire.latency, from = ksess.Peer_Id(id), data = data})
 		return
 	}
 	r := knet.reader_make(view[1:])
-	ksess.session_handle_packet(wire.ses, int(id), &r)
+	ksess.session_handle_packet(wire.ses, ksess.Peer_Id(id), &r)
 }
 
 // Per-frame: deliver latency-shimmed packets whose time has come. (Without a

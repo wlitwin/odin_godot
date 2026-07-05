@@ -20,6 +20,18 @@ import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import "core:fmt"
 
+// Set a node's "text" property from an Odin string. The package's PUBLIC API
+// speaks string, not cstring — callers use fmt.tprintf and never think about
+// NUL termination or c-allocator lifetimes.
+@(private)
+set_text :: proc(obj: gd.Object, text: string) {
+	s := gd.new_string_odin(text)
+	defer gd.free_string(s)
+	sv := gd.variant_from_string(&s)
+	defer gd.variant_destroy(&sv)
+	gd.set_value(obj, "text", sv)
+}
+
 Lobby :: struct {
 	root:      gd.Control, // full-rect CenterContainer under the owner node
 	panel:     gd.Control, // the VBox column (title/status/rows/buttons)
@@ -33,7 +45,7 @@ Lobby :: struct {
 }
 
 // Build the lobby under `parent` (any node in the tree). Call from ready().
-lobby_make :: proc(parent: gd.Node, title: cstring) -> Lobby {
+lobby_make :: proc(parent: gd.Node, title: string) -> Lobby {
 	l: Lobby
 
 	l.root = cast(gd.Control)gd.new_center_container()
@@ -45,7 +57,7 @@ lobby_make :: proc(parent: gd.Node, title: cstring) -> Lobby {
 	gd.add_child(cast(gd.Node)l.root, cast(gd.Node)l.panel)
 
 	l.title = gd.new_label()
-	gd.set_string(cast(gd.Object)l.title, "text", title)
+	set_text(cast(gd.Object)l.title, title)
 	gd.add_child(cast(gd.Node)l.panel, cast(gd.Node)l.title)
 
 	l.status = gd.new_label()
@@ -78,8 +90,8 @@ lobby_destroy :: proc(l: ^Lobby) {
 	// The node tree itself belongs to the scene (freed with the owner).
 }
 
-lobby_set_status :: proc(l: ^Lobby, text: cstring) {
-	gd.set_string(cast(gd.Object)l.status, "text", text)
+lobby_set_status :: proc(l: ^Lobby, text: string) {
+	set_text(cast(gd.Object)l.status, text)
 }
 
 // Once connected/hosting, the menu buttons make no sense; the host may show

@@ -246,7 +246,7 @@ deliver_line :: proc(c: ^Comms, player: knet.Player_Id, text: string) {
 }
 
 @(private = "file")
-comms_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: int, r: ^knet.Reader) {
+comms_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id, r: ^knet.Reader) {
 	c := cast(^Comms)user
 	kind := knet.read_u8(r)
 	if r.err {
