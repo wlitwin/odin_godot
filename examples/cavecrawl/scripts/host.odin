@@ -279,7 +279,12 @@ cave_host_tick :: proc(self: ^CaveLobby) {
 				}
 			}
 			if all_at_door {
-				cave_descend(self)
+				// The LAST floor's door doesn't go down — it goes OUT.
+				if int(self.level.depth) >= self.floors_n {
+					cave_win(self)
+				} else {
+					cave_descend(self)
+				}
 				break
 			}
 		}

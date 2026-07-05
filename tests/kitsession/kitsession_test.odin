@@ -969,3 +969,124 @@ resume_run_from_backup :: proc(t: ^testing.T) {
 	testing.expect(t, nid != wid && nid != pid)
 	testing.expect(t, host2.s.next_player > bob.s.me)
 }
+
+
+// ---- moderation: kick / ban / the door -----------------------------------------
+
+@(test)
+kick_with_ban_shuts_the_door :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+	drain(&host.s)
+	drain(&alice.s)
+	drain(&bob.s)
+
+	// Kick bob WITH a ban: he learns it was deliberate, alice sees an
+	// ordinary departure, and the host gets the seat back to sever.
+	was, ok := ksess.session_kick(&host.s, 3, ban = true)
+	testing.expect(t, ok)
+	testing.expect_value(t, was, ksess.Peer_Id(200))
+	pump(boxes)
+
+	bev := drain(&bob.s)
+	testing.expect_value(t, len(bev), 1)
+	_, kicked := bev[0].(ksess.Ev_Kicked)
+	testing.expect(t, kicked, "the target hears a deliberate removal, not a mystery")
+	testing.expect(t, !bob.s.joined)
+
+	aev := drain(&alice.s)
+	testing.expect_value(t, len(aev), 1)
+	l, _ := aev[0].(ksess.Ev_Player_Left)
+	testing.expect_value(t, l.id, knet.Player_Id(3))
+	testing.expect_value(t, ksess.session_count(&host.s, connected_only = true), 2)
+
+	// The banned token bounces — NEW process, NEW peer, same identity.
+	bob2: Peer_Box
+	box_make(&bob2, 300)
+	defer box_destroy(&bob2)
+	ksess.session_client_start(&bob2.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob2.s)
+	pump([]^Peer_Box{&host, &alice, &bob2})
+
+	dev := drain(&bob2.s)
+	testing.expect_value(t, len(dev), 1)
+	d, denied := dev[0].(ksess.Ev_Join_Denied)
+	testing.expect(t, denied)
+	testing.expect_value(t, d.reason, ksess.Deny_Reason.Banned)
+	testing.expect(t, !bob2.s.joined)
+	testing.expect_value(t, bob2.s.join_waited, -1) // a deliberate no disarms the timeout
+	testing.expect_value(t, ksess.session_count(&host.s, connected_only = true), 2)
+
+	// Kicking the departed (or yourself) is a no, not a crash.
+	_, again := ksess.session_kick(&host.s, 3)
+	testing.expect(t, !again)
+	_, self_kick := ksess.session_kick(&host.s, 1)
+	testing.expect(t, !self_kick)
+}
+
+@(test)
+locked_and_full_doors_spare_returning_seats :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+
+	ksess.session_configure(&host.s, {max_players = 2})
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump([]^Peer_Box{&host, &alice})
+	drain(&host.s)
+	drain(&alice.s)
+
+	// Room for 2, 2 seated: bob bounces off .Full.
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump([]^Peer_Box{&host, &alice, &bob})
+	bev := drain(&bob.s)
+	testing.expect_value(t, len(bev), 1)
+	d, _ := bev[0].(ksess.Ev_Join_Denied)
+	testing.expect_value(t, d.reason, ksess.Deny_Reason.Full)
+
+	// The host locks the door; even a freed seat refuses NEW identities...
+	ksess.session_peer_disconnected(&host.s, 100)
+	ksess.session_set_locked(&host.s, true)
+	pump([]^Peer_Box{&host})
+	drain(&host.s)
+	carol: Peer_Box
+	box_make(&carol, 300)
+	defer box_destroy(&carol)
+	ksess.session_client_start(&carol.s, u64(0xCA401), "carol")
+	ksess.session_client_join(&carol.s)
+	pump([]^Peer_Box{&host, &carol})
+	cev := drain(&carol.s)
+	testing.expect_value(t, len(cev), 1)
+	dl, _ := cev[0].(ksess.Ev_Join_Denied)
+	testing.expect_value(t, dl.reason, ksess.Deny_Reason.Locked)
+
+	// ...but alice's RETURN passes the lock — her seat is her own.
+	alice2: Peer_Box
+	box_make(&alice2, 400)
+	defer box_destroy(&alice2)
+	ksess.session_client_start(&alice2.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice2.s)
+	pump([]^Peer_Box{&host, &alice2})
+	testing.expect(t, alice2.s.joined, "a rejoin passes the locked door")
+	testing.expect_value(t, alice2.s.me, knet.Player_Id(2))
+}

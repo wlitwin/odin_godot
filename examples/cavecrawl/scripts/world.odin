@@ -191,7 +191,15 @@ cave_build_floor :: proc(self: ^CaveLobby, depth: int) {
 // gets the whole world; later joiners get it behind their welcome (drop-in).
 @(gd_method)
 cave_lobby_on_start :: proc(self: ^CaveLobby) {
-	if !self.ses.is_host || self.started {return}
+	if !self.ses.is_host {return}
+	if self.started {
+		// Mid-run Start is a no; Start on the end screen begins ANOTHER run
+		// in the same session — roster and the cumulative ledger stay.
+		if self.level != nil && self.level.won != 0 {
+			cave_restart(self)
+		}
+		return
+	}
 
 	lep, lid := ksess.session_spawn_make(&self.ses, LEVEL_TYPE)
 	lv := cast(^Level)lep
@@ -246,6 +254,52 @@ cave_descend :: proc(self: ^CaveLobby) {
 	cave_build_floor(self, int(self.level.depth))
 	kcomms.comms_system(&self.comms, fmt.tprintf("the party descends to depth %d", self.level.depth))
 	gd.print_str(fmt.tprintf("CAVE_DESCEND depth=%d", self.level.depth))
+}
+
+// Host: MATCH OVER — the party cleared the LAST floor's door. Flip the
+// replicated byte; every peer (this one included) shows its end screen off
+// the won edge in process. The world stays up behind the scoreboard: the
+// director is done, the floor is clear, nothing bites.
+cave_win :: proc(self: ^CaveLobby) {
+	if self.level.won != 0 {return} // the trigger holds while the party stands there; win ONCE
+	self.level.won = 1
+	kcomms.comms_system(&self.comms, "the cave is conquered")
+}
+
+// Host: ANOTHER RUN, same session. The old floor despawns exactly like a
+// descent; the spelunkers stay (identity, seats, the cumulative ledger) but
+// their host-side fields reset — bags, hp, cooldowns. Depth returns to 1 and
+// won to 0; owners teleport themselves on the depth edge, every peer clears
+// its end screen on the won edge. No re-JOIN, no re-seat, no new world
+// snapshot: a restart is just deltas.
+cave_restart :: proc(self: ^CaveLobby) {
+	doomed := make([dynamic]knet.Net_Id, context.temp_allocator)
+	for id in self.chests {append(&doomed, id)}
+	for id in self.doors {append(&doomed, id)}
+	for id in self.pickups {append(&doomed, id)}
+	for id in self.dwellers {append(&doomed, id)}
+	for id in doomed {
+		ksess.session_despawn(&self.ses, id)
+	}
+	clear(&self.brains)
+	clear(&self.respawn_at)
+	clear(&self.flying)
+	self.director = {}
+	self.dens_used = 0
+	self.last_wave = 0
+
+	for _, sp in self.spelunkers {
+		sp.hp = MAX_HP
+		sp.stamina = MAX_STAMINA
+		sp.bag = {}
+		sp.cds = {}
+	}
+	self.level.won = 0
+	self.level.depth = 1
+	self.level.wave = 0
+	cave_build_floor(self, 1)
+	kcomms.comms_system(&self.comms, "the descent begins anew")
+	gd.print_str("CAVE_RESTART")
 }
 
 // What can I use from here? The prompt and the host's command gate share

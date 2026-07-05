@@ -20,6 +20,7 @@ Level :: struct {
 	net_id: knet.Net_Id,
 	depth:  u8 `gd:"replicate"`,
 	wave:   u8 `gd:"replicate"`, // the director's current wave — every peer reads campaign progress off this byte, ordered with the spawns it paces
+	won:    u8 `gd:"replicate"`, // MATCH STATE: 1 = the last floor fell. One byte is the whole match-flow protocol — every peer keys its end screen (and its restart) off the same delta stream that built the world
 }
 
 level_process :: proc(self: ^Level, delta: f64) {

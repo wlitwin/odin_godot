@@ -68,6 +68,21 @@ cave_lobby_dwellers :: proc(self: ^CaveLobby) -> gd.Int {
 	return gd.Int(len(self.dwellers))
 }
 
+@(gd_method)
+cave_lobby_won :: proc(self: ^CaveLobby) -> gd.Bool {
+	return gd.Bool(self.level != nil && self.level.won != 0)
+}
+
+@(gd_method)
+cave_lobby_kicked :: proc(self: ^CaveLobby) -> gd.Bool {
+	return gd.Bool(self.kicked_out)
+}
+
+@(gd_method)
+cave_lobby_denied :: proc(self: ^CaveLobby) -> gd.Int {
+	return gd.Int(self.deny_reason)
+}
+
 // The angriest mood on the field (0 idle, 1 chase, 2 flee) — replicated
 // state, so any peer can watch a dweller lock on.
 @(gd_method)

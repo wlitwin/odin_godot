@@ -249,12 +249,63 @@ attempt() {
 	grep -q "RESUME_DONE" "$h2log" || { echo "  FAIL: resume host did not finish"; ok=0; }
 	grep -q "REJOIN_DONE" "$g2log" || { echo "  FAIL: rejoiner did not finish"; ok=0; }
 
+	# ---- ACT 3: MATCH FLOW + MODERATION. One floor deep (CAVE_FLOORS=1):
+	# clearing it WINS the run on every screen; Start on the end screen runs
+	# it back in the SAME session; then the host kicks the guest WITH A BAN
+	# and the same token bounces off the door.
+	local p3=$((port + 1))
+	local h3log="$LOGDIR/endhost.log" g3log="$LOGDIR/endguest.log" g4log="$LOGDIR/endguest2.log"
+	: >"$h3log"; : >"$g3log"; : >"$g4log"
+	local h3; h3=$(CAVE_FLOORS=1 launch endhost "$h3log" "$p3" hosty "")
+	local i3=0
+	while ((i3 < 50)); do
+		grep -q "CAVE_HOSTING" "$h3log" && break
+		if ! kill -0 "$h3" 2>/dev/null; then break; fi
+		sleep 0.1; ((i3++))
+	done
+	local g3; g3=$(launch endguest "$g3log" "$p3" guest cave-end-token)
+	local w3=0
+	while ((w3 < 900)); do
+		if ! kill -0 "$g3" 2>/dev/null; then break; fi
+		sleep 0.1; ((w3++))
+	done
+	local g4; g4=$(launch endguest2 "$g4log" "$p3" guest cave-end-token)
+	local w4=0
+	while ((w4 < 200)); do
+		if ! kill -0 "$g4" 2>/dev/null; then break; fi
+		sleep 0.1; ((w4++))
+	done
+	kill "$h3" "$g3" "$g4" 2>/dev/null
+
+	# THE WIN and the RESTART: one replicated byte each way, every screen.
+	for log in "$h3log" "$g3log"; do
+		grep -q "CAVE_WON depth=1" "$log" || { echo "  FAIL: never conquered in $(basename "$log")"; ok=0; }
+		grep -qE "CAVE_END_UI \[.*conquered.*\]" "$log" || { echo "  FAIL: no end screen in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_RESTARTED" "$log" || { echo "  FAIL: end screen never cleared in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_REBORN chest=5 hp=100 players=2" "$log" || { echo "  FAIL: the second run is wrong in $(basename "$log")"; ok=0; }
+	done
+	grep -q "CAVE_RESTART" "$h3log" || { echo "  FAIL: the host never ran it back"; ok=0; }
+	# THE KICK: deliberate, explained, enforced at the door.
+	grep -q "CAVE_KICKED player=2" "$h3log" || { echo "  FAIL: the kick never happened"; ok=0; }
+	grep -q "CAVE_KICK_ROSTER n=1" "$h3log" || { echo "  FAIL: the roster kept the kicked guest"; ok=0; }
+	grep -q "CAVE_KICKED_ME" "$g3log" || { echo "  FAIL: the guest was never told"; ok=0; }
+	grep -q "ENDGUEST_DONE" "$g3log" || { echo "  FAIL: end guest did not finish"; ok=0; }
+	grep -q "CAVE_DENIED reason=Banned" "$g4log" || { echo "  FAIL: the ban did not hold"; ok=0; }
+	grep -q "ENDGUEST2_DONE" "$g4log" || { echo "  FAIL: banned guest did not finish"; ok=0; }
+
+	if ((ok != 1)); then
+		echo "  --- endhost log tail ---"; tail -n 15 "$h3log" | sed 's/^/    /'
+		echo "  --- endguest log tail ---"; tail -n 15 "$g3log" | sed 's/^/    /'
+		echo "  --- endguest2 log tail ---"; tail -n 15 "$g4log" | sed 's/^/    /'
+	fi
+
 	if ((ok == 1)); then
 		echo "  PASS on port $port"
 		echo "  --- host ---"; grep -E "CAVE_" "$hlog" | sed 's/^/    /'
 		echo "  --- guest ---"; grep -E "CAVE_" "$glog" | sed 's/^/    /'
 		echo "  --- resume ---"; grep -E "CAVE_" "$h2log" | sed 's/^/    /'
 		echo "  --- rejoin ---"; grep -E "CAVE_" "$g2log" | sed 's/^/    /'
+		echo "  --- endgame ---"; grep -E "CAVE_" "$h3log" "$g3log" "$g4log" | sed 's/^/    /'
 		return 0
 	fi
 	echo "  --- resume log tail ---"; tail -n 15 "$h2log" | sed 's/^/    /'

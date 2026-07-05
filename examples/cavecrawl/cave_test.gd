@@ -125,6 +125,138 @@ func _process(_delta: float) -> bool:
 			return false
 		return false
 
+	# ---- ACT 3: MATCH FLOW (win -> run it back) + MODERATION (kick -> ban) --
+	if role == "endhost" or role == "endguest":
+		if phase == "init":
+			if not cave.is_inside_tree():
+				return false
+			cave.call("on_host" if role == "endhost" else "on_join")
+			enter("lobby3", now)
+			return false
+		if phase == "lobby3":
+			var seated := role == "endhost" or bool(cave.call("is_seated"))
+			if seated and int(cave.call("get_players")) >= 2:
+				if role == "endhost":
+					cave.call("on_start")
+				enter("world3", now)
+			elif timed_out(now, "players=" + str(cave.call("get_players"))):
+				quit(1); return true
+			return false
+		if phase == "world3":
+			if bool(cave.call("world_ready")):
+				enter("cull", now)
+			elif timed_out(now, "world never materialized"):
+				quit(1); return true
+			return false
+		if phase == "cull":
+			# The ONLY floor (CAVE_FLOORS=1): kill wave 1, healing through bites.
+			cave.call("heal")
+			if int(cave.call("dwellers")) > 0 and bool(cave.call("can_throw")):
+				var dir: Vector2 = cave.call("dweller_dir")
+				if dir != Vector2.ZERO:
+					cave.call("throw", dir.x, dir.y)
+			if int(cave.call("wave")) >= 2:
+				enter("brood", now)
+			elif timed_out(now, "wave 1 never fell, dwellers=" + str(cave.call("dwellers"))):
+				quit(1); return true
+			return false
+		if phase == "brood":
+			if int(cave.call("dwellers")) > 0:
+				enter("sweep", now)
+			elif timed_out(now, "wave 2 never came"):
+				quit(1); return true
+			return false
+		if phase == "sweep":
+			cave.call("heal")
+			if int(cave.call("dwellers")) > 0 and bool(cave.call("can_throw")):
+				var dir: Vector2 = cave.call("dweller_dir")
+				if dir != Vector2.ZERO:
+					cave.call("throw", dir.x, dir.y)
+			if int(cave.call("dwellers")) == 0 and int(cave.call("wave")) >= 2:
+				cave.call("walk_to", 560.0, 180.0) # the whole party to the door
+				enter("door3", now)
+			elif timed_out(now, "wave 2 never fell"):
+				quit(1); return true
+			return false
+		if phase == "door3":
+			# The LAST floor's open door doesn't descend — it WINS. The game's
+			# own won edge prints CAVE_WON on every peer.
+			cave.call("heal")
+			if not get_meta("opened", false) and role == "endguest" and int(cave.call("prompt_kind")) == 2:
+				set_meta("opened", true)
+				cave.call("interact")
+			if bool(cave.call("won")):
+				if not acted:
+					acted = true
+					set_meta("won_at", now)
+					print("CAVE_END_UI [", label_texts(), "]")
+				# The host DWELLS on the end screen before running it back — a
+				# human reads it, and the won byte must outlive a net tick to
+				# ship at all (a same-tick 1->0 pulse never survives the
+				# shadow diff: deltas carry STATE, not events).
+				if role == "endguest" or now - int(get_meta("won_at")) > 2500:
+					if role == "endhost":
+						cave.call("on_start") # Start on the end screen = ANOTHER RUN
+					enter("reborn", now)
+			elif timed_out(now, "never conquered, door=" + str(cave.call("door_open"))):
+				quit(1); return true
+			return false
+		if phase == "reborn":
+			# The same session runs it back: fresh chest, fresh hp, no re-seat.
+			if not bool(cave.call("won")) and int(cave.call("chest_items")) == 5 and int(cave.call("my_hp")) == 100:
+				if not acted:
+					acted = true
+					set_meta("reborn_at", now)
+					print("CAVE_REBORN chest=", cave.call("chest_items"), " hp=", cave.call("my_hp"), " players=", cave.call("get_players"))
+				if role == "endhost":
+					# Let the second run breathe before the kick — the guest's
+					# 120ms-late view of the restart must land first.
+					if now - int(get_meta("reborn_at")) > 2000:
+						cave.call("kick", 2) # moderation: the guest is out, with a ban
+						enter("lonely", now)
+				else:
+					enter("limbo", now)
+			elif timed_out(now, "second run never bloomed, chest=" + str(cave.call("chest_items")) + " won=" + str(cave.call("won"))):
+				quit(1); return true
+			return false
+		if phase == "lonely": # endhost: the kick must shrink the CONNECTED roster
+			if int(cave.call("get_players")) == 1:
+				print("CAVE_KICK_ROSTER n=1")
+				enter("serve", now)
+			elif timed_out(now, "the kick never landed"):
+				quit(1); return true
+			return false
+		if phase == "serve":
+			# Keep hosting so the banned token can come bounce off the door;
+			# run.sh reaps this process when the story is over.
+			return false
+		if phase == "limbo": # endguest: the game's handler prints CAVE_KICKED_ME
+			if bool(cave.call("kicked")):
+				print(role.to_upper(), "_DONE")
+				quit(0); return true
+			elif timed_out(now, "never told about the kick"):
+				quit(1); return true
+			return false
+		return false
+
+	if role == "endguest2":
+		# The banned identity returns: same token, new process — and the door
+		# says no, with a reason (the game's handler prints CAVE_DENIED).
+		if phase == "init":
+			if not cave.is_inside_tree():
+				return false
+			cave.call("on_join")
+			enter("bounce", now)
+			return false
+		if phase == "bounce":
+			if int(cave.call("denied")) >= 0:
+				print(role.to_upper(), "_DONE")
+				quit(0); return true
+			elif timed_out(now, "the ban never answered"):
+				quit(1); return true
+			return false
+		return false
+
 	if phase == "init":
 		if not cave.is_inside_tree():
 			return false

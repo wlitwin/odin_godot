@@ -12,6 +12,7 @@ package cavecrawl_scripts
 import gd "godot:godot"
 import "godot:gdext"
 import kcombat "godot:kit/combat"
+import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
 import netgd "godot:kit/netgd"
 import ksave "godot:kit/save"
@@ -19,7 +20,6 @@ import ksess "godot:kit/session"
 import kui "godot:kit/ui"
 import "core:fmt"
 import "core:strconv"
-import "core:time"
 
 env_string :: proc(name: cstring, fallback: string) -> string {
 	env := gd.os_get_environment(gd.singleton_os(), gd.new_string_cstring(name))
@@ -90,6 +90,23 @@ cave_lobby_on_net_up :: proc(self: ^CaveLobby) {
 @(gd_method)
 cave_lobby_on_net_down :: proc(self: ^CaveLobby) {
 	ksess.session_peer_disconnected(&self.ses, ksess.HOST_PEER)
+}
+
+// Host: show a player the door, with a run-scoped ban — the two-call kick:
+// the session unseats (and tells) them; the wire severs their socket.
+@(gd_method)
+cave_lobby_kick :: proc(self: ^CaveLobby, player: gd.Int) {
+	if !self.ses.is_host {return}
+	target := knet.Player_Id(player)
+	name := "someone"
+	if p, ok := ksess.session_player(&self.ses, target); ok {
+		name = p.name
+	}
+	was, ok := ksess.session_kick(&self.ses, target, ban = true)
+	if !ok {return}
+	netgd.wire_drop(&self.wire, was) // deferred: the KICKED message flushes first
+	kcomms.comms_system(&self.comms, fmt.tprintf("%s was shown the door", name))
+	gd.print_str(fmt.tprintf("CAVE_KICKED player=%d", u64(target)))
 }
 
 @(gd_method)

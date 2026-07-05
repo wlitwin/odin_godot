@@ -33,17 +33,23 @@ import ksess "godot:kit/session"
 // package globals); `latency` is the built-in acid-test shim — see
 // wire_set_latency.
 Session_Wire :: struct {
-	node:    gd.Node,
-	ses:     ^ksess.Session,
-	kind:    u8, // the game's one message byte for session traffic
-	latency: f64, // injected one-way receive delay, seconds (0 = off)
-	delayed: [dynamic]Wire_Delayed,
+	node:     gd.Node,
+	ses:      ^ksess.Session,
+	kind:     u8, // the game's one message byte for session traffic
+	latency:  f64, // injected one-way receive delay, seconds (0 = off)
+	delayed:  [dynamic]Wire_Delayed,
+	dropping: [dynamic]Wire_Drop, // sockets scheduled to close (kicks)
 }
 
 Wire_Delayed :: struct {
 	due:  f64,
 	from: ksess.Peer_Id,
 	data: []u8,
+}
+
+Wire_Drop :: struct {
+	due:  f64,
+	peer: ksess.Peer_Id,
 }
 
 // Install the session's Send_Proc (kind byte + reliable/stream channel pick).
@@ -118,9 +124,10 @@ wire_receive :: proc(wire: ^Session_Wire, id: gd.Int, packet: gd.Packed_Byte_Arr
 	ksess.session_handle_packet(wire.ses, ksess.Peer_Id(id), &r)
 }
 
-// Per-frame: deliver latency-shimmed packets whose time has come. (Without a
-// shim this is a no-op — still call it; the shim is how you acid-test YOUR
-// game's feel under real round trips: netgd.wire_set_latency(&wire, 120).)
+// Per-frame: deliver latency-shimmed packets whose time has come, and close
+// any sockets a kick scheduled. (Without a shim or a pending kick this is a
+// no-op — still call it; the shim is how you acid-test YOUR game's feel
+// under real round trips: netgd.wire_set_latency(&wire, 120).)
 wire_pump :: proc(wire: ^Session_Wire, now: f64) {
 	for len(wire.delayed) > 0 && wire.delayed[0].due <= now {
 		pkt := wire.delayed[0]
@@ -129,6 +136,25 @@ wire_pump :: proc(wire: ^Session_Wire, now: f64) {
 		ksess.session_handle_packet(wire.ses, pkt.from, &r)
 		delete(pkt.data)
 	}
+	for i := 0; i < len(wire.dropping); {
+		if wire.dropping[i].due <= knet.now_s() {
+			drop_peer(wire.node, wire.dropping[i].peer)
+			unordered_remove(&wire.dropping, i)
+			continue
+		}
+		i += 1
+	}
+}
+
+// Schedule a kicked peer's socket to close shortly — the second half of a
+// kick (session_kick unseats and returns the seat; this severs it). DEFERRED
+// on purpose: an immediate ENet disconnect races its own outgoing queue and
+// the SES_KICKED the session just sent is discarded — the kicked player then
+// sees a mystery host-crash instead of the truth. The delay lets the
+// reliable queue flush and ack; the session already ignores the unseated
+// peer, so nothing it sends in the gap matters.
+wire_drop :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id, after := 0.75) {
+	append(&wire.dropping, Wire_Drop{due = knet.now_s() + after, peer = peer})
 }
 
 // Inject one-way receive latency (milliseconds; 0 disables). Every packet
@@ -138,4 +164,18 @@ wire_pump :: proc(wire: ^Session_Wire, now: f64) {
 // the same way.
 wire_set_latency :: proc(wire: ^Session_Wire, ms: int) {
 	wire.latency = f64(ms) / 1000.0
+}
+
+// Sever a peer's transport connection — the second half of a kick:
+// session_kick unseats the player and returns the seat; this closes its
+// socket so the kicked client can't keep talking (the session would ignore
+// it, but the wire shouldn't hum). GRACEFUL (force=false) on purpose: the
+// SES_KICKED message the session just queued must flush before the socket
+// dies, or the kicked player sees a mystery host-crash instead of the truth.
+drop_peer :: proc "contextless" (node: gd.Node, peer: ksess.Peer_Id) {
+	mp := gd.node_get_multiplayer(node)
+	if cast(rawptr)mp == nil {return}
+	p := gd.multiplayer_api_get_multiplayer_peer(mp)
+	if cast(rawptr)p == nil {return}
+	gd.multiplayer_peer_disconnect_peer(p, gd.Int(peer), false)
 }

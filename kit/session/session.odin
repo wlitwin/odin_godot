@@ -81,6 +81,19 @@ Ev_Host_Left :: struct {} // (client) the run is over — v1 has no migration
 
 Ev_Join_Failed :: struct {} // (client) no WELCOME within the join timeout — surface it, don't hang on "Joining..."
 
+// Why a join was refused — each reason is a different sentence to the player.
+Deny_Reason :: enum u8 {
+	Full, // at max_players (Session_Config)
+	Locked, // the host closed the door (session_set_locked)
+	Banned, // a kicked-with-ban token came back
+}
+
+Ev_Join_Denied :: struct {
+	reason: Deny_Reason, // (client) the host said no — deliberately
+}
+
+Ev_Kicked :: struct {} // (client) removed on purpose — distinct from Ev_Host_Left
+
 Ev_Spawned :: struct {
 	id:    knet.Net_Id, // (client) the factory made it and the snapshot applied
 	type:  Entity_Type,
@@ -123,6 +136,8 @@ Event :: union {
 	Ev_Player_Left,
 	Ev_Host_Left,
 	Ev_Join_Failed,
+	Ev_Join_Denied,
+	Ev_Kicked,
 	Ev_Spawned,
 	Ev_Despawned,
 	Ev_Stats_Updated,
@@ -218,6 +233,10 @@ SES_STATS :: u8(14) // host -> all    [cols u8] x [name] + [players u16] x ([id]
 SES_BACKUP :: u8(15) // host -> ONE   the full re-hostable session snapshot (opaque to the client)
 @(private)
 SES_APP :: u8(16) // any -> any      [tag u8][payload] — routed to the registered app handler
+@(private)
+SES_DENIED :: u8(17) // host -> joiner  [reason u8] — the join was refused (full/locked/banned)
+@(private)
+SES_KICKED :: u8(18) // host -> one     you were removed on purpose (not a host crash)
 
 // ---- app messages: the extension point for sibling kit packages ---------------
 //
@@ -312,6 +331,7 @@ Session_Config :: struct {
 	command_timeout: f64, // prediction auto-revert horizon
 	join_timeout:    f64, // client_start -> Ev_Join_Failed horizon
 	backup_interval: f64, // backup-host snapshot refresh cadence
+	max_players:     int, // NEW joins refused past this many connected (0 = unlimited; rejoins always reclaim their seat)
 }
 
 Session :: struct {
@@ -367,6 +387,8 @@ Session :: struct {
 	next_player: knet.Player_Id,
 	tokens:      map[u64]knet.Player_Id, // reconnect identity, forever
 	by_peer:     map[Peer_Id]knet.Player_Id,
+	denied:      map[u64]knet.Player_Id, // banned token hashes -> who they were (run-scoped)
+	locked:      bool, // host: new joins refused (rejoins still reclaim their seat)
 
 	// client bookkeeping
 	token:       u64, // our reconnect secret (the game persists it across runs)
@@ -393,6 +415,8 @@ session_init :: proc(s: ^Session) {
 		clear(&s.events)
 		clear(&s.tokens)
 		clear(&s.by_peer)
+		clear(&s.denied)
+		s.locked = false
 		clear(&s.clocks)
 		clear(&s.types)
 		for n in s.stat_names {
@@ -460,6 +484,7 @@ session_destroy :: proc(s: ^Session) {
 	delete(s.events)
 	delete(s.tokens)
 	delete(s.by_peer)
+	delete(s.denied)
 	delete(s.name)
 	knet.registry_destroy(&s.reg)
 	knet.command_ctx_destroy(&s.ctx)
@@ -1146,6 +1171,51 @@ session_host_start :: proc(s: ^Session, name: string) {
 	s.joined = true
 }
 
+// Host: close (or reopen) the door. Locked = NEW joins are refused with
+// .Locked; players already in the roster still reconnect freely — their seat
+// is theirs. The standard move once a run starts, if drop-in isn't wanted.
+session_set_locked :: proc(s: ^Session, locked: bool) {
+	assert(s.is_host, "the authority owns the door")
+	s.locked = locked
+}
+
+// Host: remove a player on purpose. The target learns it was deliberate
+// (Ev_Kicked — not a mystery host-crash), everyone else sees an ordinary
+// departure, and with `ban` the token's hash lands on the denied list so the
+// same identity bounces off host_handle_join with .Banned for the rest of
+// the RUN (bans are run-scoped; persist them yourself if forever matters).
+// Returns the seat the player held so the game can also drop the transport
+// connection (netgd.drop_peer) — without that the kicked client still holds
+// a socket it can talk on, even though the session ignores unseated peers.
+session_kick :: proc(s: ^Session, player: knet.Player_Id, ban := false) -> (was: Peer_Id, ok: bool) {
+	assert(s.is_host, "the authority moderates")
+	p, exists := s.players[player]
+	if !exists || !p.connected || player == s.me {
+		return NO_PEER, false
+	}
+	if ban {
+		for hash, id in s.tokens {
+			if id == player {
+				s.denied[hash] = player
+			}
+		}
+	}
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_u8(&w, SES_KICKED)
+	s.send(s.send_user, p.peer, knet.writer_bytes(&w), .Reliable)
+
+	was = p.peer
+	delete_key(&s.by_peer, p.peer)
+	mark_left(s, player)
+	left := knet.writer_make()
+	defer knet.writer_destroy(&left)
+	knet.write_u8(&left, SES_LEFT)
+	knet.write_player_id(&left, player)
+	host_broadcast(s, knet.writer_bytes(&left), except = player)
+	return was, true
+}
+
 // The transport told us a peer vanished. A peer that never joined is nobody;
 // a player's departure is broadcast and the roster keeps them (disconnected)
 // so the same token can reclaim the identity later.
@@ -1189,6 +1259,15 @@ host_broadcast :: proc(s: ^Session, bytes: []u8, except := knet.PLAYER_ID_INVALI
 }
 
 @(private = "file")
+deny_join :: proc(s: ^Session, peer: Peer_Id, reason: Deny_Reason) {
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_u8(&w, SES_DENIED)
+	knet.write_u8(&w, u8(reason))
+	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
+}
+
+@(private = "file")
 host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 	token := knet.read_u64(r)
 	name := knet.read_string(r)
@@ -1196,7 +1275,25 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 		return
 	}
 
-	id, known := s.tokens[token_hash(token)]
+	// The gates, in order of severity. A RETURNING identity passes lock and
+	// capacity — its seat is its own (that is the whole reconnect promise);
+	// only a ban shuts a known token out.
+	hash := token_hash(token)
+	id, known := s.tokens[hash]
+	if _, banned := s.denied[hash]; banned {
+		deny_join(s, peer, .Banned)
+		return
+	}
+	if !known {
+		if s.locked {
+			deny_join(s, peer, .Locked)
+			return
+		}
+		if s.cfg.max_players > 0 && session_count(s, connected_only = true) >= s.cfg.max_players {
+			deny_join(s, peer, .Full)
+			return
+		}
+	}
 	rejoin := false
 	if known {
 		// The token IS the identity: reclaim it. If the roster still shows the
@@ -1354,6 +1451,26 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) 
 		if !s.is_host {
 			client_handle_welcome(s, r)
 		}
+	case SES_DENIED:
+		if s.is_host || s.joined {
+			return
+		}
+		reason := knet.read_u8(r)
+		if r.err || reason > u8(max(Deny_Reason)) {
+			return
+		}
+		s.join_waited = -1 // a deliberate no beats the timeout to the punch
+		append(&s.events, Ev_Join_Denied{reason = Deny_Reason(reason)})
+	case SES_KICKED:
+		if s.is_host || !s.joined {
+			return
+		}
+		// Deliberate removal: stop participating (no more pings/streams at
+		// the host) and tell the game — it shows its "you're out" screen and
+		// tears the transport down. The host will also drop the socket;
+		// whichever lands first, Ev_Kicked already explained it.
+		s.joined = false
+		append(&s.events, Ev_Kicked{})
 	case SES_UPSERT:
 		if s.is_host {
 			return

@@ -160,6 +160,10 @@ CaveLobby :: struct {
 	me_spel:     ^Spelunker, // my avatar (nil until spawned)
 	level:       ^Level, // the run's depth marker (nil until spawned)
 	seen_depth:  u8, // owner-side descent edge: teleport to the new floor's mouth
+	seen_won:    bool, // match-over edge: end screen up on won=1, down on won=0
+	floors_n:    int, // how deep the cave goes (CAVE_FLOORS env shrinks it for tests)
+	kicked_out:  bool, // we were removed on purpose — mutes the host-left line that follows
+	deny_reason: int, // last Ev_Join_Denied reason (-1 = none); drivers read it
 	started:     bool, // the world is live
 	walking:     bool, // headless drivers steer via walk_to
 	walk_target: gd.Vector2,
@@ -240,6 +244,8 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	gd.control_set_position(cast(gd.Control)self.hud_hp.label, {8, 4}, false)
 	gd.control_set_position(self.hud_ab.root, {8, 22}, false)
 	gd.control_set_position(self.inv.root, {8, 40}, false)
+	self.floors_n = env_int("CAVE_FLOORS", 2)
+	self.deny_reason = -1
 	ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
 	ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
 	ksess.session_app_route(&self.ses, TAG_FIRE, self, cave_on_fire)
@@ -346,8 +352,27 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 			refresh = true // ping column repaint
 			kui.score_refresh(&self.score, &self.ses)
 		case ksess.Ev_Host_Left:
-			kui.lobby_set_status(&self.ui, "The host left — this run is over")
-			gd.print_str("CAVE_HOST_LEFT")
+			if !self.kicked_out { // the kick already explained this teardown
+				kui.lobby_set_status(&self.ui, "The host left — this run is over")
+				gd.print_str("CAVE_HOST_LEFT")
+			}
+		case ksess.Ev_Kicked:
+			self.kicked_out = true
+			kui.lobby_set_status(&self.ui, "You were shown the door")
+			gd.print_str("CAVE_KICKED_ME")
+		case ksess.Ev_Join_Denied:
+			line: string
+			switch e.reason {
+			case .Full:
+				line = "The cave is full"
+			case .Locked:
+				line = "The cave is sealed"
+			case .Banned:
+				line = "You are not welcome here"
+			}
+			kui.lobby_set_status(&self.ui, line)
+			self.deny_reason = int(e.reason)
+			gd.print_str(fmt.tprintf("CAVE_DENIED reason=%v", e.reason))
 		case ksess.Ev_Join_Failed:
 			kui.lobby_set_status(&self.ui, "Could not reach the cave")
 			gd.print_str("CAVE_JOIN_FAILED")
@@ -412,6 +437,25 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 			gd.print_str(fmt.tprintf("CAVE_FLOOR depth=%d", self.level.depth))
 		}
 		self.seen_depth = self.level.depth
+	}
+	// MATCH FLOW, both directions of one replicated byte: won going 1 is the
+	// end screen (scoreboard + lobby status; the host's Start button reads
+	// as "again"), won going 0 is the next run starting — every peer clears
+	// its screen off the same delta that rebuilt the floor.
+	if self.level != nil {
+		if self.level.won != 0 && !self.seen_won {
+			self.seen_won = true
+			kui.score_show(&self.score, true)
+			gd.set_bool(cast(gd.Object)self.ui.root, "visible", true)
+			kui.lobby_set_status(&self.ui, "The cave is conquered!")
+			kui.lobby_show_menu(&self.ui, false, self.ses.is_host)
+			gd.print_str(fmt.tprintf("CAVE_WON depth=%d", self.level.depth))
+		} else if self.level.won == 0 && self.seen_won {
+			self.seen_won = false
+			kui.score_show(&self.score, false)
+			gd.set_bool(cast(gd.Object)self.ui.root, "visible", false)
+			gd.print_str("CAVE_RESTARTED")
+		}
 	}
 	if self.started && self.me_spel != nil {
 		// Owner-side respawn: hp coming back is the signal to walk out of
