@@ -3,12 +3,16 @@ package cavecrawl_scripts
 // Peer-owned projectile visuals — the zero-felt-lag machinery. Press fire and
 // YOUR screen's rock flies this frame; the host's authoritative rock (the
 // only kind that hurts, see host.odin) flies a beat later and announces the
-// cast so every OTHER screen draws it too. Impacts seen locally dip hp
-// through the kcombat.Predicted_Hp overlay; truth arrives as ordinary deltas
-// and squares the number.
+// cast so every OTHER screen draws it too. The flying/reaping/contact
+// mechanics live in kit/fx's tracer pool; this file keeps what is the CAVE's:
+// where a rock comes from (rock_fire), who it may hit (rock_targets), and
+// what an impact means (rock_impact — the predicted hp dip through the
+// kcombat.Predicted_Hp overlay, sparks, flash, hud; truth arrives as
+// ordinary deltas and squares the number).
 
 import gd "godot:godot"
 import kcombat "godot:kit/combat"
+import kfx "godot:kit/fx"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import "core:fmt"
@@ -31,22 +35,9 @@ rock_fire :: proc(shooter: knet.Player_Id, sp: ^Spelunker) -> (f: kcombat.Fire, 
 		true
 }
 
-// A rock on THIS screen: a plain Label (no entity, no wire). The Fire's
-// px/tick velocity and tick ttl become px/s and seconds here — visuals
-// live on the frame clock.
+// A rock on THIS screen: a ● tracer in the kit/fx pool (no entity, no wire).
 add_visual_rock :: proc(self: ^CaveLobby, f: kcombat.Fire) {
-	node := gd.new_label()
-	gd.set_string(cast(gd.Object)node, "text", "\xE2\x97\x8F") // ●
-	gd.add_child(self.world, cast(gd.Node)node)
-	gd.control_set_position(cast(gd.Control)node, {f.origin.x, f.origin.y}, false)
-	hz := f32(knet.DEFAULT_TICK_HZ)
-	append(&self.visuals, Visual_Rock {
-		pos = f.origin,
-		vel = f.vel * hz,
-		left = f32(f.ttl) / hz,
-		shooter = f.shooter,
-		node = node,
-	})
+	kfx.tracer_add(&self.tracers, self.world, f, "\xE2\x97\x8F", ksess.session_tick_hz(&self.ses))
 }
 
 // Host: a confirmed throw launches the AUTHORITATIVE rock (the only kind
@@ -60,10 +51,9 @@ cave_launch_rock :: proc(self: ^CaveLobby, shooter: knet.Player_Id, sp: ^Spelunk
 	if shooter != self.ses.me {
 		add_visual_rock(self, f) // the host's screen (its own casts drew at cast time)
 	}
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	kcombat.fire_write(&w, f)
-	ksess.session_app_send(&self.ses, ksess.BROADCAST_PEER, TAG_FIRE, knet.writer_bytes(&w))
+	w := ksess.session_app_begin(&self.ses, TAG_FIRE)
+	kcombat.fire_write(w, f)
+	ksess.session_app_flush(&self.ses, ksess.BROADCAST_PEER)
 }
 
 // Every peer: a fire announcement — draw the rock, unless it's my own echo
@@ -76,60 +66,49 @@ cave_on_fire :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_I
 	add_visual_rock(self, f)
 }
 
-// Every peer, once per FRAME: fly MY screen's rocks and, on visual contact
-// with a body, play the impact NOW — a predicted hp dip (overlay, never the
-// replicated field) and the effect. Truth arrives a beat later and squares
-// the number; if the host saw a miss, the dip heals back. Frame stepping
-// sweeps the same segments the host's tick sim does, just finer — contact
-// lands on the frame the crossing happens, never after the authority's tick.
+// Every peer, once per FRAME: kit/fx flies my screen's rocks and sweeps the
+// same segments the host's tick sim does, just finer — contact lands on the
+// frame the crossing happens, never after the authority's tick.
 cave_visual_frame :: proc(self: ^CaveLobby, delta: f64) {
-	now := now_s()
-	dt := f32(delta)
-	for i := 0; i < len(self.visuals); {
-		v := &self.visuals[i]
-		from := v.pos
-		step_vel := v.vel * dt
-		v.pos += step_vel
-		v.left -= dt
-		gd.control_set_position(cast(gd.Control)v.node, {v.pos.x, v.pos.y}, false)
+	kfx.tracers_frame(&self.tracers, delta, self, rock_targets, rock_impact)
+}
 
-		targets := make([dynamic]kcombat.Target, context.temp_allocator)
-		for id, sp in self.spelunkers {
-			if id == self.avatar_of[v.shooter] || sp.hp <= 0 {continue}
-			append(&targets, kcombat.Target{id = u32(id), pos = {sp.x, sp.y, 0}, radius = BODY_RADIUS})
-		}
-		for id, dw in self.dwellers {
-			if dw.hp > 0 {
-				append(&targets, kcombat.Target{id = u32(id), pos = {dw.x, dw.y, 0}, radius = BODY_RADIUS})
-			}
-		}
-		if hit, hit_ok := kcombat.projectile_hit(from, step_vel, targets[:]); hit_ok {
-			truth, view: i32
-			if victim, is_sp := self.spelunkers[knet.Net_Id(hit.id)]; is_sp {
-				truth = victim.hp
-				kcombat.php_note_hit(&victim.php, victim.hp, ROCK_DMG, now)
-				view = kcombat.php_display(&victim.php, victim.hp, now)
-			} else if dw, is_dw := self.dwellers[knet.Net_Id(hit.id)]; is_dw {
-				truth = dw.hp
-				kcombat.php_note_hit(&dw.php, dw.hp, ROCK_DMG, now)
-				view = kcombat.php_display(&dw.php, dw.hp, now)
-			}
-			// The impact you SEE is the impact you feel: sparks at the
-			// contact point, a red flash tweening back on the victim —
-			// same frame as the predicted hp dip, no round trip.
-			fx_burst_at(self, hit.pos.x, hit.pos.y, {1, 0.9, 0.4, 1})
-			fx_flash(self.nodes[knet.Net_Id(hit.id)], {1, 0.35, 0.35, 1})
-			refresh_hud(self)
-			gd.print_str(fmt.tprintf("CAVE_IMPACT mine=%v view=%d truth=%d", v.shooter == self.ses.me, view, truth))
-			gd.node_queue_free(cast(gd.Node)v.node)
-			unordered_remove(&self.visuals, i)
-			continue
-		}
-		if v.left <= 0 {
-			gd.node_queue_free(cast(gd.Node)v.node)
-			unordered_remove(&self.visuals, i)
-			continue
-		}
-		i += 1
+// Who a shooter's rock may hit right now: everybody alive except the
+// shooter's own avatar.
+rock_targets :: proc(user: rawptr, shooter: knet.Player_Id) -> []kcombat.Target {
+	self := cast(^CaveLobby)user
+	targets := make([dynamic]kcombat.Target, context.temp_allocator)
+	for id, sp in self.spelunkers {
+		if id == self.avatar_of[shooter] || sp.hp <= 0 {continue}
+		append(&targets, kcombat.Target{id = u32(id), pos = {sp.x, sp.y, 0}, radius = BODY_RADIUS})
 	}
+	for id, dw in self.dwellers {
+		if dw.hp > 0 {
+			append(&targets, kcombat.Target{id = u32(id), pos = {dw.x, dw.y, 0}, radius = BODY_RADIUS})
+		}
+	}
+	return targets[:]
+}
+
+// The impact you SEE is the impact you feel: a predicted hp dip (overlay,
+// never the replicated field), sparks at the victim, a red flash tweening
+// back — same frame as visual contact, no round trip. If the host saw a
+// miss, the dip heals back when truth lands.
+rock_impact :: proc(user: rawptr, hit: kfx.Tracer_Hit) {
+	self := cast(^CaveLobby)user
+	now := now_s()
+	truth, view: i32
+	if victim, is_sp := self.spelunkers[knet.Net_Id(hit.target)]; is_sp {
+		truth = victim.hp
+		kcombat.php_note_hit(&victim.php, victim.hp, ROCK_DMG, now)
+		view = kcombat.php_display(&victim.php, victim.hp, now)
+	} else if dw, is_dw := self.dwellers[knet.Net_Id(hit.target)]; is_dw {
+		truth = dw.hp
+		kcombat.php_note_hit(&dw.php, dw.hp, ROCK_DMG, now)
+		view = kcombat.php_display(&dw.php, dw.hp, now)
+	}
+	fx_burst_at(self, hit.pos.x, hit.pos.y, {1, 0.9, 0.4, 1})
+	fx_flash(self.nodes[knet.Net_Id(hit.target)], {1, 0.35, 0.35, 1})
+	refresh_hud(self)
+	gd.print_str(fmt.tprintf("CAVE_IMPACT mine=%v view=%d truth=%d", hit.shooter == self.ses.me, view, truth))
 }

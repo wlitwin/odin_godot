@@ -126,11 +126,10 @@ comms_say :: proc(c: ^Comms, text: string) {
 		host_line(c, c.ses.me, said)
 		return
 	}
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	knet.write_u8(&w, CO_SAY)
-	knet.write_string(&w, said)
-	ksess.session_app_send(c.ses, ksess.HOST_PEER, c.tag, knet.writer_bytes(&w))
+	w := ksess.session_app_begin(c.ses, c.tag)
+	knet.write_u8(w, CO_SAY)
+	knet.write_string(w, said)
+	ksess.session_app_flush(c.ses, ksess.HOST_PEER)
 }
 
 // A system line: host-authored flavor text with no speaker ("bob joined the
@@ -146,14 +145,13 @@ comms_ping :: proc(c: ^Comms, kind: u8, pos: [3]f32) {
 		host_marker(c, c.ses.me, kind, pos)
 		return
 	}
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	knet.write_u8(&w, CO_MARK)
-	knet.write_u8(&w, kind)
-	knet.write_f32(&w, pos.x)
-	knet.write_f32(&w, pos.y)
-	knet.write_f32(&w, pos.z)
-	ksess.session_app_send(c.ses, ksess.HOST_PEER, c.tag, knet.writer_bytes(&w))
+	w := ksess.session_app_begin(c.ses, c.tag)
+	knet.write_u8(w, CO_MARK)
+	knet.write_u8(w, kind)
+	knet.write_f32(w, pos.x)
+	knet.write_f32(w, pos.y)
+	knet.write_f32(w, pos.z)
+	ksess.session_app_flush(c.ses, ksess.HOST_PEER)
 }
 
 // Host: replay the whole log to one player — call on Ev_Player_Joined so a
@@ -166,10 +164,9 @@ comms_catchup :: proc(c: ^Comms, player: knet.Player_Id) {
 		return
 	}
 	for line in c.log {
-		w := knet.writer_make()
-		defer knet.writer_destroy(&w)
-		write_line(&w, line.player, line.text)
-		ksess.session_app_send(c.ses, p.peer, c.tag, knet.writer_bytes(&w))
+		w := ksess.session_app_begin(c.ses, c.tag)
+		write_line(w, line.player, line.text)
+		ksess.session_app_flush(c.ses, p.peer)
 	}
 }
 
@@ -214,24 +211,22 @@ write_line :: proc(w: ^knet.Writer, player: knet.Player_Id, text: string) {
 @(private = "file")
 host_line :: proc(c: ^Comms, player: knet.Player_Id, text: string) {
 	deliver_line(c, player, text)
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	write_line(&w, player, text)
-	ksess.session_app_send(c.ses, ksess.BROADCAST_PEER, c.tag, knet.writer_bytes(&w))
+	w := ksess.session_app_begin(c.ses, c.tag)
+	write_line(w, player, text)
+	ksess.session_app_flush(c.ses, ksess.BROADCAST_PEER)
 }
 
 @(private = "file")
 host_marker :: proc(c: ^Comms, player: knet.Player_Id, kind: u8, pos: [3]f32) {
 	append(&c.events, Ev_Marker{player = player, kind = kind, pos = pos})
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	knet.write_u8(&w, CO_MARKED)
-	knet.write_player_id(&w, player)
-	knet.write_u8(&w, kind)
-	knet.write_f32(&w, pos.x)
-	knet.write_f32(&w, pos.y)
-	knet.write_f32(&w, pos.z)
-	ksess.session_app_send(c.ses, ksess.BROADCAST_PEER, c.tag, knet.writer_bytes(&w))
+	w := ksess.session_app_begin(c.ses, c.tag)
+	knet.write_u8(w, CO_MARKED)
+	knet.write_player_id(w, player)
+	knet.write_u8(w, kind)
+	knet.write_f32(w, pos.x)
+	knet.write_f32(w, pos.y)
+	knet.write_f32(w, pos.z)
+	ksess.session_app_flush(c.ses, ksess.BROADCAST_PEER)
 }
 
 @(private = "file")

@@ -42,7 +42,7 @@ dweller_process :: proc(self: ^Dweller, delta: f64) {
 		self.seen = true
 		self.rx, self.ry = self.x, self.y
 	}
-	glide := DWELLER_SPEED * f32(knet.DEFAULT_TICK_HZ) * 1.5 * f32(delta)
+	glide := DWELLER_SPEED * f32(ksess.session_tick_hz(&lobby.ses)) * 1.5 * f32(delta)
 	p, _ := kai.step_toward({self.rx, self.ry, 0}, {self.x, self.y, 0}, glide)
 	self.rx, self.ry = p.x, p.y
 	gd.node2d_set_position(self.owner, {self.rx, self.ry})

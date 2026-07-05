@@ -60,7 +60,7 @@ cave_lobby_pickups :: proc(self: ^CaveLobby) -> gd.Int {
 
 @(gd_method)
 cave_lobby_rocks :: proc(self: ^CaveLobby) -> gd.Int {
-	return gd.Int(len(self.visuals))
+	return gd.Int(len(self.tracers.live))
 }
 
 @(gd_method)

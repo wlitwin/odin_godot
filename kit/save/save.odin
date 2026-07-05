@@ -76,6 +76,44 @@ save_restore :: proc(s: ^ksess.Session, name: string, r: ^knet.Reader, h: Header
 	return ksess.session_host_resume(s, h.saved_by, name, r.data[r.off:])
 }
 
+// Why a resume refused — each case is a different sentence to the player.
+Resume_Error :: enum {
+	Ok,
+	No_File, // nothing saved at `path`
+	Bad_Envelope, // wrong magic/format — not one of ours
+	Wrong_Version, // a different game (or older content) wrote it
+	Corrupt, // the session snapshot didn't parse
+}
+
+// The whole "Resume" button in one call: read the file, validate the
+// envelope, check the game's version stamp, restore the run (the caller is
+// seated as host; friends rejoin with their tokens like any reconnect).
+// Returns the GAME BLOB — temp-allocated, parse it immediately — for the
+// campaign state the session can't know about.
+//
+// Needs the factory installed (entities recreate through it). Transport
+// order is flexible: nothing sends until the session ticks, so bring the
+// wire up before or after — and a resume that succeeds before a transport
+// that fails is safe to abandon, the next *_start re-inits.
+resume :: proc(s: ^ksess.Session, name: string, path: cstring, game_version: u16) -> (game_blob: []u8, err: Resume_Error) {
+	bytes, read_ok := read_file(path, context.temp_allocator)
+	if !read_ok {
+		return nil, .No_File
+	}
+	r := knet.reader_make(bytes)
+	h, hok := save_read_header(&r)
+	if !hok {
+		return nil, .Bad_Envelope
+	}
+	if h.game_version != game_version {
+		return nil, .Wrong_Version
+	}
+	if !save_restore(s, name, &r, h) {
+		return nil, .Corrupt
+	}
+	return h.game_blob, .Ok
+}
+
 // ---- file helpers (FileAccess: user:// works everywhere, web included) ---------
 
 write_file :: proc(path: cstring, bytes: []u8) -> bool {

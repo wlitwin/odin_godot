@@ -28,6 +28,7 @@ import gd "godot:godot"
 import kai "godot:kit/ai"
 import kcombat "godot:kit/combat"
 import kcomms "godot:kit/comms"
+import kfx "godot:kit/fx"
 import kitems "godot:kit/items"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
@@ -112,20 +113,6 @@ Cave_Rock :: struct {
 	shooter: knet.Player_Id,
 }
 
-// One rock on THIS screen — a peer-owned visual flying the same trajectory
-// the host's damage sim walks in ticks, but per-FRAME in seconds: the wire
-// speaks px/tick, the screen speaks px/s, and 20 Hz steps on a 60 fps
-// screen is exactly the stutter that conversion removes. The shooter's
-// spawns at cast time (zero RTT: press fire, see rock); everyone else's
-// spawns on the host's fire announcement.
-Visual_Rock :: struct {
-	pos:     [3]f32,
-	vel:     [3]f32, // px/s
-	left:    f32, // seconds of flight remaining
-	shooter: knet.Player_Id,
-	node:    gd.Label,
-}
-
 CaveLobby :: struct {
 	owner:     gd.Node,
 	ses:       ksess.Session,
@@ -182,8 +169,8 @@ CaveLobby :: struct {
 	// ---- combat (phase 4) ----
 	cols:       kcombat.Combat_Cols, // host: the auto-published ledger columns
 	flying:     [dynamic]Cave_Rock, // host: the authoritative rock sim
-	visuals:    [dynamic]Visual_Rock, // every peer: the rocks on THIS screen
-	bursts:     [dynamic]Fx_Burst, // every peer: live particle bursts (fx.odin)
+	tracers:    kfx.Tracers, // every peer: the rocks on THIS screen (px/tick -> px/s, see rocks.odin)
+	fx:         kfx.Bursts, // every peer: live particle bursts (fx.odin narrates, kit/fx reaps)
 	respawn_at: map[knet.Net_Id]int, // host: resurrection clocks
 
 	// ---- dwellers (phase 5, host-side) ----
@@ -211,7 +198,7 @@ refresh_hud :: proc(self: ^CaveLobby) {
 	if self.me_spel == nil {return}
 	kui.hp_refresh(&self.hud_hp, hp_view(self.me_spel), MAX_HP)
 	defs := [?]kcombat.Ability_Def{ROCK_ABILITY, HEAL_ABILITY}
-	kui.abilities_refresh(&self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.stamina)
+	kui.abilities_refresh(&self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.stamina, ksess.session_tick_hz(&self.ses))
 	// The bag too: hosts get no state events, and a verb-only repaint left
 	// the host's grid showing loot its death had long since spilled.
 	kui.inv_refresh(&self.inv, self.me_spel.bag[:], &self.table)
@@ -315,7 +302,7 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 		// authority's tick deals the damage in the same frame — the
 		// overlay consumes that truth cleanly instead of double-dipping.
 		cave_visual_frame(self, delta) // every peer flies its own screen's rocks
-		fx_frame(self, delta) // reap spent particle bursts
+		kfx.frame(&self.fx, delta) // reap spent particle bursts
 		if self.ses.is_host {
 			for _ in 0 ..< ticks {
 				cave_host_tick(self)

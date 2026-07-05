@@ -62,13 +62,7 @@ my_token :: proc() -> u64 {
 	}
 	// The PERSISTED identity (phase 6): the token IS who you are across
 	// runs — reconnects, resumed saves, everything rides on keeping it.
-	if bytes, ok := ksave.read_file("user://cave_token", context.temp_allocator); ok && len(bytes) == 8 {
-		return (cast(^u64)raw_data(bytes))^
-	}
-	token := u64(time.tick_now()._nsec) * 0x9E3779B97F4A7C15 // first run: mint one
-	token_bytes := token
-	_ = ksave.write_file("user://cave_token", (cast([^]u8)&token_bytes)[:8])
-	return token
+	return ksave.persistent_token("user://cave_token")
 }
 
 // The four transport forwards — Godot signals must land on @(gd_method)s of

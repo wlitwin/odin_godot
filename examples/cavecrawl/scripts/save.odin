@@ -101,33 +101,33 @@ cave_lobby_save_run :: proc(self: ^CaveLobby) {
 // Host a RESUMED run: the world, the roster (everyone reclaimable), the
 // scoreboard, and this game's own campaign state, back from the file. The
 // original host returns under its saved identity; friends rejoin with their
-// persisted tokens like any reconnect.
+// persisted tokens like any reconnect. ksave.resume is the whole
+// file-envelope-restore arc; the transport comes up after (a resume left
+// standing by a failed host is fine — the next *_start re-inits).
 @(gd_method)
 cave_lobby_on_resume :: proc(self: ^CaveLobby) {
 	if self.running {return}
-	bytes, read_ok := ksave.read_file(save_path(), context.temp_allocator)
-	if !read_ok {
+	blob, err := ksave.resume(&self.ses, my_name(), save_path(), GAME_VERSION)
+	switch err {
+	case .No_File:
 		kui.lobby_set_status(&self.ui, "No saved run to resume")
 		gd.print_str("CAVE_RESUME_FAIL no-file")
 		return
-	}
-	r := knet.reader_make(bytes)
-	h, hok := ksave.save_read_header(&r)
-	if !hok || h.game_version != GAME_VERSION {
+	case .Bad_Envelope, .Wrong_Version:
 		kui.lobby_set_status(&self.ui, "That save is from another cave")
 		gd.print_str("CAVE_RESUME_FAIL header")
+		return
+	case .Corrupt:
+		gd.print_str("CAVE_RESUME_FAIL snapshot")
+		return
+	case .Ok:
+	}
+	if !read_game_blob(self, blob) {
+		gd.print_str("CAVE_RESUME_FAIL blob")
 		return
 	}
 	if !gd.host(self.owner, port()) {
 		gd.print_str("CAVE_HOST_FAIL")
-		return
-	}
-	if !ksave.save_restore(&self.ses, my_name(), &r, h) {
-		gd.print_str("CAVE_RESUME_FAIL snapshot")
-		return
-	}
-	if !read_game_blob(self, h.game_blob) {
-		gd.print_str("CAVE_RESUME_FAIL blob")
 		return
 	}
 	self.cols = kcombat.combat_columns(&self.ses) // find, not redeclare
