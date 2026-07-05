@@ -204,13 +204,20 @@ write_full :: proc(w: ^Writer, entity: rawptr, desc: ^Entity_Desc) {
 	}
 }
 
-apply_full :: proc(r: ^Reader, entity: rawptr, desc: ^Entity_Desc) {
+// `skip_owner` is set when the RECEIVING peer owns this entity: for
+// .Owner_Stream fields the owner IS the authority, so a host "truth"
+// snapshot of them is only a lagged echo — writing it back teleports the
+// owner (visibly, on every rejected cast while moving). The bytes are
+// still consumed; the fields are left alone.
+apply_full :: proc(r: ^Reader, entity: rawptr, desc: ^Entity_Desc, skip_owner := false) {
 	for f in desc.fields {
 		if r.err || r.off + f.size > len(r.data) {
 			r.err = true
 			return
 		}
-		mem.copy(field_ptr(entity, f), &r.data[r.off], f.size)
+		if !(skip_owner && .Owner_Stream in f.flags) {
+			mem.copy(field_ptr(entity, f), &r.data[r.off], f.size)
+		}
 		r.off += f.size
 	}
 }
@@ -224,11 +231,16 @@ fields_capture :: proc(entity: rawptr, desc: ^Entity_Desc, allocator := context.
 	return buf
 }
 
-fields_restore :: proc(entity: rawptr, desc: ^Entity_Desc, snapshot: []u8) {
+// `skip_owner` mirrors apply_full: an OWNER restoring a prediction revert
+// must not restore its own streamed fields — the capture is a stale copy of
+// state it kept writing while the command was in flight.
+fields_restore :: proc(entity: rawptr, desc: ^Entity_Desc, snapshot: []u8, skip_owner := false) {
 	assert(len(snapshot) == desc_data_size(desc))
 	off := 0
 	for f in desc.fields {
-		mem.copy(field_ptr(entity, f), &snapshot[off], f.size)
+		if !(skip_owner && .Owner_Stream in f.flags) {
+			mem.copy(field_ptr(entity, f), &snapshot[off], f.size)
+		}
 		off += f.size
 	}
 }

@@ -223,11 +223,16 @@ command_confirm :: proc(ctx: ^Command_Ctx, seq: Intent_Seq) -> bool {
 // Rejected: pop the pending entry and apply the embedded truth snapshot. If the
 // truth is unreadable (truncated packet) fall back to the local revert — a
 // rejection must never leave the optimistic state standing.
-command_reject :: proc(ctx: ^Command_Ctx, res: Command_Result, r: ^Reader, entity: rawptr, set: ^Command_Set) {
+//
+// `owned_here` = this peer OWNS the entity: its .Owner_Stream fields are
+// exempt from both the truth and the revert — the host's copy of them is a
+// lagged echo of state this peer is authoritative for, and restoring it
+// yanks a moving owner backwards on every rejection.
+command_reject :: proc(ctx: ^Command_Ctx, res: Command_Result, r: ^Reader, entity: rawptr, set: ^Command_Set, owned_here := false) {
 	p, had := pending_reject(&ctx.pending, res.seq)
-	apply_full(r, entity, set.entity_desc)
+	apply_full(r, entity, set.entity_desc, skip_owner = owned_here)
 	if r.err && had {
-		fields_restore(entity, set.entity_desc, p.revert)
+		fields_restore(entity, set.entity_desc, p.revert, skip_owner = owned_here)
 	}
 	if had {
 		pending_dispose(p)

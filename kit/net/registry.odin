@@ -31,6 +31,7 @@ Registry_Entry :: struct {
 	shadow: []u8,
 	owner:  Player_Id, // PLAYER_ID_INVALID = host-owned
 	stream: Stream_Ring, // remote-owned entities: buffered owner-stream snapshots
+	warp:   u8, // owner side: bumped by registry_teleport; rides every stream snapshot
 }
 
 Registry :: struct {
@@ -293,7 +294,7 @@ registry_commit_shadows :: proc(reg: ^Registry) {
 // Owner streams: the per-tick walk for the fields the HOST does not own.
 //
 // Batch layout: [sender_time f64][count u16] then count × ([net_id u32]
-// [len u16][streamed fields]). Unlike delta batches, every entity carries its
+// [warp u8][len u16][streamed fields]). Unlike delta batches, every entity carries its
 // byte LENGTH: streams ride the UNRELIABLE channel, so a batch may arrive
 // before the spawn that would make its ids known — an unknown id is simply
 // skipped by length instead of abandoning the batch (the next tick supersedes
@@ -301,6 +302,19 @@ registry_commit_shadows :: proc(reg: ^Registry) {
 // registry_stream_time before applying, then stamp the ring with whichever
 // timeline the session uses (arrival time, or sender time mapped through a
 // per-peer Clock_Sync).
+
+// TELEPORT: the owner declares a discontinuity in this entity's streamed
+// fields — a respawn, a level change, a blink. The warp counter rides every
+// subsequent stream snapshot; receivers never interpolate ACROSS a warp
+// boundary, they snap to the far side (see stream_ring_sample). Riding the
+// snapshots makes it drop-proof on the unreliable channel: whichever
+// snapshot arrives first after the jump carries the new count.
+registry_teleport :: proc(reg: ^Registry, id: Net_Id) {
+	if e, found := reg.entries[id]; found {
+		e.warp += 1
+		reg.entries[id] = e
+	}
+}
 
 // Write one stream batch for every entity owned by `me`. Returns the entity
 // count; 0 = nothing owned that streams (skip the send).
@@ -319,6 +333,7 @@ registry_write_streams :: proc(w: ^Writer, reg: ^Registry, me: Player_Id, sender
 		}
 		assert(n <= int(max(u16)))
 		write_net_id(w, e.id)
+		write_u8(w, e.warp)
 		write_u16(w, u16(n))
 		stream_write(w, e.entity, e.set.entity_desc)
 		count += 1
@@ -344,6 +359,7 @@ registry_apply_streams :: proc(r: ^Reader, reg: ^Registry, me: Player_Id, stamp:
 	applied := 0
 	for _ in 0 ..< count {
 		id := read_net_id(r)
+		warp := read_u8(r)
 		n := int(read_u16(r))
 		if r.err || r.off + n > len(r.data) {
 			r.err = true
@@ -355,7 +371,7 @@ registry_apply_streams :: proc(r: ^Reader, reg: ^Registry, me: Player_Id, stamp:
 		if !ok || e.owner == me || n != stream_data_size(e.set.entity_desc) {
 			continue
 		}
-		stream_ring_push(&e.stream, stamp, blob)
+		stream_ring_push(&e.stream, stamp, blob, warp)
 		reg.entries[id] = e // ring bookkeeping changed; store back (no map addressing)
 		applied += 1
 	}
@@ -404,7 +420,7 @@ registry_host_command :: proc(reg: ^Registry, ctx: ^Command_Ctx, peer_key: u64, 
 // Client side: route a received result to its entity. Unknown entity (it
 // despawned while the command was in flight): the pending entry is popped and
 // its revert freed — there is nothing to revert into.
-registry_client_result :: proc(reg: ^Registry, ctx: ^Command_Ctx, r: ^Reader) -> Command_Result {
+registry_client_result :: proc(reg: ^Registry, ctx: ^Command_Ctx, r: ^Reader, me := PLAYER_ID_INVALID) -> Command_Result {
 	res := command_result_read(r)
 	if r.err {
 		return res
@@ -414,7 +430,8 @@ registry_client_result :: proc(reg: ^Registry, ctx: ^Command_Ctx, r: ^Reader) ->
 		return res
 	}
 	if e, found := reg.entries[res.entity]; found {
-		command_reject(ctx, res, r, e.entity, e.set)
+		owned_here := me != PLAYER_ID_INVALID && e.owner == me
+		command_reject(ctx, res, r, e.entity, e.set, owned_here)
 		// The reject's truth snapshot (a full) stomped the entity — replay any
 		// LATER predictions still pending on it, exactly like an applied full.
 		if has_pending_for(ctx, res.entity) {
@@ -429,12 +446,13 @@ registry_client_result :: proc(reg: ^Registry, ctx: ^Command_Ctx, r: ^Reader) ->
 // Revert every prediction whose result never arrived (loud auto-revert — a
 // silent host must read as "no"). Entities that despawned meanwhile are
 // skipped; every revert buffer is freed. Returns how many predictions expired.
-registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks: u64) -> int {
+registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks: u64, me := PLAYER_ID_INVALID) -> int {
 	expired := make([dynamic]Pending, context.temp_allocator)
 	pending_expire(&ctx.pending, ctx.now_tick, max_age_ticks, &expired)
 	for p in expired {
 		if e, found := reg.entries[p.entity]; found {
-			fields_restore(e.entity, e.set.entity_desc, p.revert)
+			owned_here := me != PLAYER_ID_INVALID && e.owner == me
+			fields_restore(e.entity, e.set.entity_desc, p.revert, skip_owner = owned_here)
 		}
 		pending_dispose(p)
 	}

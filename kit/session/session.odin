@@ -459,6 +459,15 @@ session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet
 	return id
 }
 
+// TELEPORT: the OWNER of `id` declares a discontinuity in its streamed
+// fields (a respawn, a level change, a blink) — remote peers snap to the far
+// side of the jump instead of interpolating a slide across the map. Call it
+// on the same frame you write the jumped position; it costs one byte that
+// already rides every stream snapshot.
+session_teleport :: proc(s: ^Session, id: knet.Net_Id) {
+	knet.registry_teleport(&s.reg, id)
+}
+
 // Host: remove an entity from the session and tell everyone. The host game
 // frees its own node after this returns; remote peers free theirs through the
 // factory. Clients' in-flight predictions on the entity clean up on their own
@@ -646,7 +655,7 @@ net_tick :: proc(s: ^Session) {
 		}
 	}
 
-	if n := knet.registry_expire_pending(&s.reg, &s.ctx, DEFAULT_PENDING_MAX_AGE); n > 0 {
+	if n := knet.registry_expire_pending(&s.reg, &s.ctx, DEFAULT_PENDING_MAX_AGE, s.me); n > 0 {
 		for _ in 0 ..< n {
 			append(&s.events, Ev_Command_Rejected{}) // loud auto-revert: silence means no
 		}
@@ -1243,7 +1252,7 @@ session_handle_packet :: proc(s: ^Session, from_peer: int, r: ^knet.Reader) {
 		if s.is_host {
 			return
 		}
-		res := knet.registry_client_result(&s.reg, &s.ctx, r)
+		res := knet.registry_client_result(&s.reg, &s.ctx, r, s.me)
 		if res.seq == 0 {
 			return // truncated header: not a result at all (seqs start at 1)
 		}

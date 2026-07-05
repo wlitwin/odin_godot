@@ -1263,3 +1263,69 @@ stream_quat_and_custom_blend :: proc(t: ^testing.T) {
 	testing.expect(t, knet.stream_ring_sample(&ring, 1.25, &remote, &desc))
 	testing.expect(t, near(remote.heading, 355))
 }
+
+@(test)
+stream_ring_snaps_across_teleport_warp :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	owner := Mover{x = 0, y = 0, face = 1}
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	ring := knet.Stream_Ring{}
+	defer knet.stream_ring_destroy(&ring)
+
+	knet.stream_write(&w, &owner, &desc)
+	knet.stream_ring_push(&ring, 1.0, knet.writer_bytes(&w), 0)
+	owner.x = 10
+	knet.writer_reset(&w)
+	knet.stream_write(&w, &owner, &desc)
+	knet.stream_ring_push(&ring, 2.0, knet.writer_bytes(&w), 0)
+
+	// The owner TELEPORTS across the map (level change, respawn): same
+	// stream, bumped warp counter.
+	owner.x = 500
+	knet.writer_reset(&w)
+	knet.stream_write(&w, &owner, &desc)
+	knet.stream_ring_push(&ring, 3.0, knet.writer_bytes(&w), 1)
+
+	remote := Mover{}
+	// Inside the same warp: ordinary interpolation.
+	testing.expect(t, knet.stream_ring_sample(&ring, 1.5, &remote, &desc))
+	testing.expect_value(t, remote.x, f32(5))
+	// Across the warp boundary: NO slide through the void — snap to the
+	// far side of the jump.
+	testing.expect(t, knet.stream_ring_sample(&ring, 2.5, &remote, &desc))
+	testing.expect_value(t, remote.x, f32(500))
+	// Past the jump: normal again.
+	testing.expect(t, knet.stream_ring_sample(&ring, 3.0, &remote, &desc))
+	testing.expect_value(t, remote.x, f32(500))
+}
+
+@(test)
+truth_and_revert_spare_owner_fields_on_the_owner :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	// The host's "truth" snapshot of the OWNER's entity: its streamed x/y
+	// are a lagged echo (the owner kept moving while the command flew).
+	stale := Mover{hp = 40, x = 100, y = 100, face = 1}
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_full(&w, &stale, &desc)
+
+	// The owner, meanwhile, is HERE.
+	me := Mover{hp = 65, x = 300, y = 250, face = 2}
+	r := knet.reader_make(knet.writer_bytes(&w))
+	knet.apply_full(&r, &me, &desc, skip_owner = true)
+	testing.expect_value(t, me.hp, i32(40)) // host state: truth applies
+	testing.expect_value(t, me.x, f32(300)) // owner state: MINE, untouched
+	testing.expect_value(t, me.y, f32(250))
+	testing.expect_value(t, me.face, u8(2))
+	testing.expect(t, !r.err, "skipped fields still consume their bytes")
+
+	// Same contract for the local revert (expiry path): the capture's x/y
+	// are stale by the time it restores.
+	snap := knet.fields_capture(&me, &desc, context.temp_allocator)
+	me.hp = 1
+	me.x = 999 // kept moving
+	knet.fields_restore(&me, &desc, snap, skip_owner = true)
+	testing.expect_value(t, me.hp, i32(40)) // reverted
+	testing.expect_value(t, me.x, f32(999)) // mine, untouched
+}

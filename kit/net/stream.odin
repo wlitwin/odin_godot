@@ -59,6 +59,7 @@ stream_write :: proc(w: ^Writer, entity: rawptr, desc: ^Entity_Desc) {
 Stream_Ring :: struct {
 	times: [INTERP_CAP]f64,
 	blobs: [INTERP_CAP][]u8, // each stream_data_size bytes, allocated on first use
+	warps: [INTERP_CAP]u8, // the owner's teleport counter at each sample
 	head:  int, // oldest sample
 	count: int,
 }
@@ -73,7 +74,7 @@ stream_ring_destroy :: proc(ring: ^Stream_Ring) {
 // Push one snapshot (copied). Stale arrivals — at or before the newest sample's
 // stamp — are dropped, mirroring interp_push (the unreliable-ORDERED channel
 // already discards reordered packets; this is the belt to those suspenders).
-stream_ring_push :: proc(ring: ^Stream_Ring, t: f64, data: []u8, allocator := context.allocator) {
+stream_ring_push :: proc(ring: ^Stream_Ring, t: f64, data: []u8, warp: u8 = 0, allocator := context.allocator) {
 	if ring.count > 0 && t <= ring.times[(ring.head + ring.count - 1) % INTERP_CAP] {
 		return
 	}
@@ -91,6 +92,7 @@ stream_ring_push :: proc(ring: ^Stream_Ring, t: f64, data: []u8, allocator := co
 	assert(len(ring.blobs[slot]) == len(data), "stream snapshot size changed mid-session")
 	copy(ring.blobs[slot], data)
 	ring.times[slot] = t
+	ring.warps[slot] = warp
 }
 
 // Blend the streamed fields of `lo`/`hi` at `alpha` straight into the entity.
@@ -181,6 +183,14 @@ stream_ring_sample :: proc(ring: ^Stream_Ring, t: f64, entity: rawptr, desc: ^En
 		hi := (ring.head + i) % INTERP_CAP
 		if t <= ring.times[hi] {
 			lo := (ring.head + i - 1) % INTERP_CAP
+			// A TELEPORT boundary (the owner bumped its warp counter —
+			// respawn, level change, blink): never interpolate across the
+			// jump. Snap to the far side; the slide across the map is
+			// exactly the artifact the owner asked to skip.
+			if ring.warps[lo] != ring.warps[hi] {
+				stream_blend(entity, desc, ring.blobs[hi], ring.blobs[hi], 0)
+				return true
+			}
 			span := ring.times[hi] - ring.times[lo]
 			alpha := span > 0 ? f32((t - ring.times[lo]) / span) : 1
 			stream_blend(entity, desc, ring.blobs[lo], ring.blobs[hi], alpha)
