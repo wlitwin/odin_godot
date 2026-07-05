@@ -8,6 +8,10 @@ signals, `@export`, and methods — but they compile to fast native code.
 already discovered `odin_godot.gdextension`; you just need the Odin toolchain and your first
 script. This page gets you there. The full reference lives in [`docs/`](docs/index.md).
 
+Building a co-op game? The addon includes the **friendslop toolkit** (`godot:kit/*`) —
+multiplayer sessions, replication with prediction, items/combat/NPCs, save/resume, and
+ENet + Steam transports. Start at [docs/kit/](docs/kit/index.md).
+
 ---
 
 ## How it works (read this first)

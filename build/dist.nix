@@ -24,7 +24,7 @@ let
 in
 stdenvNoCC.mkDerivation ({
   pname = "odin_godot-addon";
-  version = "0.1.0";
+  version = "0.2.0";
   inherit src;
 
   nativeBuildInputs = [ odin ]
@@ -125,6 +125,9 @@ stdenvNoCC.mkDerivation ({
     mkdir -p $A/docs
     cp build/addon-docs/getting-started.md build/addon-docs/index.md $A/docs/
     cp docs/authoring-guide.md docs/workflow.md docs/exporting.md docs/debugging.md docs/modules.md docs/events.md $A/docs/
+    # The friendslop toolkit's pages ride along — the kit/ collection is in the
+    # addon, so its documentation must be too (one page per package + tutorial).
+    cp -r docs/kit $A/docs/kit
 
     # Stamp the EXACT Odin release the bundled core was just built with into the docs'
     # @ODIN_VERSION@ placeholders (README prerequisites + getting-started). The core<->
