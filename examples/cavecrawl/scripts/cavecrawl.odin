@@ -450,6 +450,9 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 			self.me_spel.x = SPAWN_X + f32(u64(self.ses.me) % 4) * 40
 			self.me_spel.y = SPAWN_Y
 			self.walking = false
+			// A jump, not a walk: remote screens snap instead of sliding
+			// my avatar across the whole map.
+			ksess.session_teleport(&self.ses, self.me_spel.net_id)
 			gd.print_str(fmt.tprintf("CAVE_FLOOR depth=%d", self.level.depth))
 		}
 		self.seen_depth = self.level.depth
@@ -467,6 +470,7 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 			self.was_dead = false
 			self.me_spel.x = SPAWN_X
 			self.me_spel.y = SPAWN_Y
+			ksess.session_teleport(&self.ses, self.me_spel.net_id) // out of the grave in one step, on every screen
 			gd.print_str("CAVE_RESPAWNED")
 		}
 		if self.me_spel.hp > 0 {

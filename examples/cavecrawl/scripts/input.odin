@@ -160,8 +160,13 @@ cave_lobby_interact :: proc(self: ^CaveLobby) {
 @(gd_method)
 cave_lobby_throw :: proc(self: ^CaveLobby, dx: gd.Float, dy: gd.Float) {
 	if !self.started || self.me_spel == nil {return}
-	self.issue_at = now_s()
 	me := self.me_spel
+	// Gate BEFORE issuing, like the bandage: a refused prediction still
+	// rides the wire for the authority's verdict, so a spammed fire button
+	// would flood the host with doomed casts (and each rejection is wire
+	// noise the game never needed to make).
+	if me.hp <= 0 || !kcombat.ability_ready(me.cds[:], 0) || me.stamina < ROCK_ABILITY.cost {return}
+	self.issue_at = now_s()
 	applied := spelunker_throw_cmd(&self.ses.ctx, me, f32(dx), f32(dy), me.x, me.y)
 	if applied {
 		// Press fire, SEE rock — my visual flies this frame, no round trip.
