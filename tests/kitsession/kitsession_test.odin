@@ -1399,3 +1399,65 @@ entity_blobs_ride_change_join_and_backup :: proc(t: ^testing.T) {
 	testing.expect(t, ksess.session_host_resume(&host2.s, alice.s.me, "alice", snap))
 	testing.expect_value(t, string(ksess.session_blob(&host2.s, id)), "rune-2 with more to say")
 }
+
+// ---- session_present: the two-timelines discipline in one call -----------------
+
+@(private = "file")
+Present_Log :: struct {
+	shown: [dynamic]u64,
+}
+
+@(private = "file")
+present_show :: proc(user: rawptr, id: knet.Net_Id, a: u64) {
+	l := cast(^Present_Log)user
+	append(&l.shown, a)
+}
+
+@(test)
+present_now_for_mine_render_delayed_for_theirs :: proc(t: ^testing.T) {
+	host: Peer_Box
+	box_make(&host, 1)
+	defer box_destroy(&host)
+	ksess.session_host_start(&host.s, "hosty")
+
+	log: Present_Log
+	defer delete(log.shown)
+
+	now := 100.0
+	_, _ = ksess.session_tick(&host.s, 0.05, now)
+
+	// MY simulation caused it: shown synchronously, nothing queued.
+	ksess.session_present(&host.s, true, &log, present_show, a = 1)
+	testing.expect_value(t, len(log.shown), 1)
+
+	// Someone else's: queued for the render timeline (now + interp_delay).
+	ksess.session_present(&host.s, false, &log, present_show, a = 2)
+	testing.expect_value(t, len(log.shown), 1)
+
+	// A tick just BEFORE the render clock arrives: still pending.
+	now += host.s.interp_delay - 0.01
+	_, _ = ksess.session_tick(&host.s, 0.0, now)
+	testing.expect_value(t, len(log.shown), 1)
+
+	// ...and on it: shown by the session's own drain.
+	now += 0.02
+	_, _ = ksess.session_tick(&host.s, 0.0, now)
+	testing.expect_value(t, len(log.shown), 2)
+	testing.expect_value(t, log.shown[1], u64(2))
+
+	// `extra` stacks on top — the authority's lingering despawn.
+	ksess.session_present(&host.s, false, &log, present_show, a = 3, extra = 1.0)
+	now += host.s.interp_delay + 0.5
+	_, _ = ksess.session_tick(&host.s, 0.0, now)
+	testing.expect_value(t, len(log.shown), 2) // interp alone is not enough
+	now += 0.6
+	_, _ = ksess.session_tick(&host.s, 0.0, now)
+	testing.expect_value(t, len(log.shown), 3)
+
+	// A restart drops pending presentations (they were the old run's world).
+	ksess.session_present(&host.s, false, &log, present_show, a = 4)
+	ksess.session_host_start(&host.s, "hosty2")
+	now += 10
+	_, _ = ksess.session_tick(&host.s, 0.0, now)
+	testing.expect_value(t, len(log.shown), 3)
+}

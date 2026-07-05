@@ -395,6 +395,7 @@ Session :: struct {
 	now:          f64, // the game's monotonic seconds, updated each session_tick
 	replicating:  bool, // host: the world is LIVE (deltas flow; joiners get SES_WORLD)
 	interp_delay: f64,
+	later:        knet.Later, // session_present's queue — drained every session_tick
 
 	// entity types + client-side factories
 	types:         map[knet.Net_Id]Entity_Type, // host: for (re-)announcing spawns
@@ -478,6 +479,7 @@ session_init :: proc(s: ^Session) {
 		delete(s.successor_info)
 		s.successor_info = nil
 		s.successor = {}
+		knet.later_clear(&s.later) // pending presentations were about the old run's world
 		delete(s.name)
 		s.name = ""
 		s.is_host = false
@@ -550,6 +552,7 @@ session_destroy :: proc(s: ^Session) {
 	delete(s.backup)
 	delete(s.succ_info)
 	delete(s.successor_info)
+	knet.later_destroy(&s.later)
 	knet.writer_destroy(&s.app_w)
 	s^ = {}
 }
@@ -574,9 +577,43 @@ session_tick_hz :: proc(s: ^Session) -> int {
 // The render-timeline lag: remote-owned entities DRAW this many seconds in
 // the past (stream sampling's buffer). It is also therefore the delay that
 // re-aligns a wire-fresh consequence with the rendered simulation that
-// caused it — see knet.Later and "The two timelines" in docs/kit/net.md.
+// caused it — see session_present and "The two timelines" in docs/kit/net.md.
 session_interp_delay :: proc(s: ^Session) -> f64 {
 	return s.interp_delay
+}
+
+// Present a consequence on the RIGHT timeline — the whole two-timelines
+// discipline in one call. `mine` states the one fact the kit cannot derive
+// from dirty bytes: whether THIS peer's own simulation caused the event (the
+// claimer, the striker, the authority whose AI did it). Your own sim presents
+// NOW (your screen is the truth everyone else is waiting to see); everyone
+// else's showing is queued for now + interp_delay, landing within jitter of
+// the rendered cause — because event and stream crossed the same wire, so
+// transit cancels. State never waits: mutate replicated fields immediately
+// like always; hand ONLY the showing (hide the node, burst, sound) to this.
+//
+// One presentation proc holds the whole effect — no verb enums, no drain
+// switch, no per-role branches at the call site:
+//
+//     // the taken-edge, ONE place, every peer:
+//     ksess.session_present(&g.ses, id == g.my_claim, g, present_gem_gone, id)
+//
+//     present_gem_gone :: proc(user: rawptr, id: knet.Net_Id, a: u64) {
+//         self := cast(^Golf)user
+//         if node, ok := self.nodes[id]; ok { gd.set_bool(cast(gd.Object)node, "visible", false) }
+//     }
+//
+// `extra` adds seconds on top (an authority lingering a despawn PAST the
+// slowest observer's showing — the edge-outlives-observers rule). The queue
+// drains inside session_tick; a *_start/resume drops whatever was pending
+// (those effects were about the old run's world).
+session_present :: proc(s: ^Session, mine: bool, user: rawptr, cb: knet.Later_Proc, id := knet.NET_ID_INVALID, a := u64(0), extra := 0.0) {
+	if mine && extra == 0 {
+		cb(user, id, a)
+		return
+	}
+	delay := extra + (mine ? 0 : s.interp_delay)
+	knet.later_push(&s.later, s.now + delay, user, cb, id, a)
 }
 
 // Install the transport hookup (netgd.wire_attach calls this; hand-rolled
@@ -941,6 +978,9 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 		net_tick(s)
 	}
 	sampled = knet.registry_sample_streams(&s.reg, now - s.interp_delay, s.me)
+	// Presentations whose render time has come (session_present) fire here,
+	// AFTER sampling — the rendered world they align with is current.
+	knet.later_drain(&s.later, now)
 	return
 }
 

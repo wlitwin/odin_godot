@@ -273,15 +273,28 @@ each thing presents on. The discipline is three lines:
    everyone else is waiting to see.
 2. **Consequences of remote simulations present on the render timeline** —
    both the event and the stream crossed the same wire, so transit cancels:
-   delay the *presentation* (never the state) by `session_interp_delay(s)` and
-   it lands within jitter of the rendered cause. `knet.Later` is the queue for
-   exactly this: push `(due, kind, id)` on the state edge, drain per frame,
-   show what's due. For spatial events you can be exact instead: gate the
-   visual on the RENDERED entity reaching the spot.
+   delay the *presentation* (never the state) by the interp delay and it lands
+   within jitter of the rendered cause. `ksess.session_present` is the whole
+   discipline in one call — you state the one fact the kit can't derive
+   (did MY simulation cause this?), it presents now or queues for the render
+   clock, and one presentation proc holds the whole effect (no verb enums, no
+   drain switch — the same one-proc shape that makes `@(gd_command)` pleasant):
+
+   ```odin
+   // the taken-edge, ONE place, identical on every peer:
+   ksess.session_present(&g.ses, id == g.my_claim, g, present_gem_gone, id)
+
+   present_gem_gone :: proc(user: rawptr, id: knet.Net_Id, a: u64) { /* hide, burst, sound */ }
+   ```
+
+   (`knet.Later` underneath stays public for engine-free tests and custom
+   clocks.) For spatial events you can be exact instead of statistical: gate
+   the visual on the RENDERED entity reaching the spot.
 3. **Edges must outlive the slowest observer** — the authority keeps the
    entity/state alive ≥ `interp_delay` past the event (a despawn dwell, a
-   sink dwell), or there is nothing left on screen to present when the render
-   clock gets there.
+   sink dwell — `session_present(..., extra = 0.4)` with a reaper proc), or
+   there is nothing left on screen to present when the render clock gets
+   there.
 
 Shrinking the gap globally (`interp_delay` down, `tick_hz` up via
 `session_configure`) trades smoothness under jitter for freshness — aligning

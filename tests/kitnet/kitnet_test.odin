@@ -1541,28 +1541,38 @@ blob_set_apply_and_dedup :: proc(t: ^testing.T) {
 
 // ---- later: presenting on the render timeline ---------------------------------
 
+@(private = "file")
+Later_Log :: struct {
+	calls: [dynamic]u64,
+}
+
+@(private = "file")
+log_call :: proc(user: rawptr, id: knet.Net_Id, a: u64) {
+	l := cast(^Later_Log)user
+	append(&l.calls, u64(id) * 100 + a)
+}
+
 @(test)
-later_presents_in_order_when_due :: proc(t: ^testing.T) {
+later_runs_handlers_in_order_when_due :: proc(t: ^testing.T) {
 	l: knet.Later
 	defer knet.later_destroy(&l)
+	log: Later_Log
+	defer delete(log.calls)
 
-	HIDE :: u16(1)
-	BURST :: u16(2)
-	knet.later_push(&l, 10.0, HIDE, knet.Net_Id(7))
-	knet.later_push(&l, 10.0, BURST, knet.Net_Id(7), 3) // same due: push order holds
-	knet.later_push(&l, 12.0, HIDE, knet.Net_Id(8))
+	knet.later_push(&l, 10.0, &log, log_call, knet.Net_Id(7), 1)
+	knet.later_push(&l, 10.0, &log, log_call, knet.Net_Id(7), 2) // same due: push order holds
+	knet.later_push(&l, 12.0, &log, log_call, knet.Net_Id(8), 3)
 
-	testing.expect_value(t, len(knet.later_drain(&l, 9.99)), 0)
+	testing.expect_value(t, knet.later_drain(&l, 9.99), 0)
 	testing.expect_value(t, knet.later_pending(&l), 3)
 
-	due := knet.later_drain(&l, 10.0)
-	testing.expect_value(t, len(due), 2)
-	testing.expect_value(t, due[0].kind, HIDE)
-	testing.expect_value(t, due[1].kind, BURST)
-	testing.expect_value(t, due[1].a, u64(3))
+	testing.expect_value(t, knet.later_drain(&l, 10.0), 2)
+	testing.expect_value(t, len(log.calls), 2)
+	testing.expect_value(t, log.calls[0], u64(701))
+	testing.expect_value(t, log.calls[1], u64(702))
 	testing.expect_value(t, knet.later_pending(&l), 1)
 
-	// A level change drops the pending world's events wholesale.
+	// A level change drops the pending world's effects wholesale.
 	knet.later_clear(&l)
-	testing.expect_value(t, len(knet.later_drain(&l, 99.0)), 0)
+	testing.expect_value(t, knet.later_drain(&l, 99.0), 0)
 }
