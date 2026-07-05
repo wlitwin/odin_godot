@@ -104,6 +104,7 @@ cave_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	delete_key(&self.doors, id)
 	delete_key(&self.pickups, id)
 	delete_key(&self.dwellers, id)
+	delete_key(&self.brains, id) // host-side mind (empty map on clients)
 	if self.level != nil && self.level.net_id == id {
 		self.level = nil
 	}
@@ -170,23 +171,19 @@ cave_build_floor :: proc(self: ^CaveLobby, depth: int) {
 	chest_at := marker_pos(self, "ChestSpawn")
 	door_at := marker_pos(self, "DoorSpawn")
 
-	chest_node := spawn_scene(self, self.chest_scene)
-	chest := rt.script_of(chest_node, Chest)
+	cep, cid := ksess.session_spawn_make(&self.ses, CHEST_TYPE)
+	chest := cast(^Chest)cep
 	chest.x = chest_at.x
 	chest.y = chest_at.y
 	chest.slots[0] = {GEM, u16(def.gems)}
 	chest.slots[1] = {TORCH, u16(def.torches)}
-	chest.net_id = ksess.session_spawn(&self.ses, CHEST_TYPE, chest, &chest_command_set)
-	self.chests[chest.net_id] = chest
-	self.nodes[chest.net_id] = chest_node
+	ksess.session_spawn_send(&self.ses, cid)
 
-	door_node := spawn_scene(self, self.door_scene)
-	door := rt.script_of(door_node, Door)
+	dep, did := ksess.session_spawn_make(&self.ses, DOOR_TYPE)
+	door := cast(^Door)dep
 	door.x = door_at.x
 	door.y = door_at.y
-	door.net_id = ksess.session_spawn(&self.ses, DOOR_TYPE, door, &door_command_set)
-	self.doors[door.net_id] = door
-	self.nodes[door.net_id] = door_node
+	ksess.session_spawn_send(&self.ses, did)
 }
 
 // Host, Start pressed: build the world — the depth marker, floor 1, and a
@@ -196,28 +193,24 @@ cave_build_floor :: proc(self: ^CaveLobby, depth: int) {
 cave_lobby_on_start :: proc(self: ^CaveLobby) {
 	if !self.ses.is_host || self.started {return}
 
-	level_node := spawn_scene(self, self.level_scene)
-	lv := rt.script_of(level_node, Level)
+	lep, lid := ksess.session_spawn_make(&self.ses, LEVEL_TYPE)
+	lv := cast(^Level)lep
 	lv.depth = 1
-	lv.net_id = ksess.session_spawn(&self.ses, LEVEL_TYPE, lv, &level_command_set)
-	self.level = lv
-	self.nodes[lv.net_id] = level_node
+	ksess.session_spawn_send(&self.ses, lid)
 
 	cave_build_floor(self, 1)
 
 	i := 0
 	for _, p in self.ses.players {
 		if !p.connected {continue}
-		node := spawn_scene(self, self.spelunker_scene)
-		sp := rt.script_of(node, Spelunker)
+		sep, sid := ksess.session_spawn_make(&self.ses, SPEL_TYPE, owner = p.id)
+		sp := cast(^Spelunker)sep
 		sp.x = SPAWN_X + f32(i) * 60
 		sp.y = SPAWN_Y
 		sp.hp = MAX_HP
 		sp.stamina = MAX_STAMINA
 		i += 1
-		id := ksess.session_spawn(&self.ses, SPEL_TYPE, sp, &spelunker_command_set, owner = p.id)
-		self.nodes[id] = node
-		track_spelunker(self, id, sp, p.id)
+		ksess.session_spawn_send(&self.ses, sid)
 	}
 
 	ksess.session_start_replicating(&self.ses)
@@ -240,15 +233,7 @@ cave_descend :: proc(self: ^CaveLobby) {
 	for id in self.pickups {append(&doomed, id)}
 	for id in self.dwellers {append(&doomed, id)}
 	for id in doomed {
-		ksess.session_despawn(&self.ses, id)
-		if node, ok := self.nodes[id]; ok {
-			gd.node_queue_free(node)
-			delete_key(&self.nodes, id)
-		}
-		delete_key(&self.chests, id)
-		delete_key(&self.doors, id)
-		delete_key(&self.pickups, id)
-		delete_key(&self.dwellers, id)
+		ksess.session_despawn(&self.ses, id) // the free proc handles node + maps, every role
 	}
 	clear(&self.brains)
 	clear(&self.respawn_at)

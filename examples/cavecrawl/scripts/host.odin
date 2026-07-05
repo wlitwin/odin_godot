@@ -31,18 +31,17 @@ cave_credit :: proc(self: ^CaveLobby, player: knet.Player_Id, chest: ^Chest) {
 	}
 }
 
-// Host: mint a pickup lying on the floor.
+// Host: mint a pickup lying on the floor — THROUGH THE FACTORY, the same
+// creation path clients run (make, set the per-spawn fields, send).
 @(private = "file")
 cave_mint_pickup_at :: proc(self: ^CaveLobby, item: kitems.Item_Id, count: u16, x, y: f32) {
-	node := spawn_scene(self, self.pickup_scene)
-	p := rt.script_of(node, Pickup)
+	ep, id := ksess.session_spawn_make(&self.ses, PICKUP_TYPE)
+	p := cast(^Pickup)ep
 	p.x = x
 	p.y = y
 	p.item = item
 	p.count = count
-	p.net_id = ksess.session_spawn(&self.ses, PICKUP_TYPE, p, &pickup_command_set)
-	self.pickups[p.net_id] = p
-	self.nodes[p.net_id] = node
+	ksess.session_spawn_send(&self.ses, id)
 }
 
 // Host: mint the Pickup a drop left behind (the dropper's scratch tells us
@@ -67,22 +66,17 @@ cave_hurt_spelunker :: proc(self: ^CaveLobby, victim_id: knet.Net_Id, victim: ^S
 }
 
 // Host: a dweller falls — credit the game's own "slain" column, drop its
-// torch where it died, and tell the director the field thinned.
+// torch where it died, and tell the director the field thinned. The despawn
+// runs cave_free_entity on EVERY role now (node, maps, death burst) — no
+// host-side cleanup to repeat here.
 @(private = "file")
 cave_slay_dweller :: proc(self: ^CaveLobby, id: knet.Net_Id, slayer: knet.Player_Id) {
 	dw := self.dwellers[id]
-	fx_burst_at(self, dw.x, dw.y, {0.8, 0.4, 1, 1}) // the host's screen; clients burst in cave_free_entity
 	cave_mint_pickup_at(self, TORCH, 1, dw.x, dw.y)
 	if slayer != knet.PLAYER_ID_INVALID {
 		ksess.session_stat_add(&self.ses, slayer, self.slain_col, 1)
 	}
 	ksess.session_despawn(&self.ses, id)
-	if node, ok := self.nodes[id]; ok {
-		gd.node_queue_free(node)
-		delete_key(&self.nodes, id)
-	}
-	delete_key(&self.dwellers, id)
-	delete_key(&self.brains, id)
 	kai.director_note_death(&self.director, u64(self.host_ticks), self.waves[:self.waves_n])
 	gd.print_str(fmt.tprintf("CAVE_SLAIN left=%d", len(self.dwellers)))
 }
@@ -92,16 +86,14 @@ cave_slay_dweller :: proc(self: ^CaveLobby, id: knet.Net_Id, slayer: knet.Player
 cave_spawn_dweller :: proc(self: ^CaveLobby) {
 	den := self.dens[self.dens_used % len(self.dens)]
 	self.dens_used += 1
-	node := spawn_scene(self, self.dweller_scene)
-	d := rt.script_of(node, Dweller)
+	ep, id := ksess.session_spawn_make(&self.ses, DWELLER_TYPE, owner = self.ses.me)
+	d := cast(^Dweller)ep
 	d.x = den.x
 	d.y = den.y
 	d.hp = DWELLER_HP
-	d.net_id = ksess.session_spawn(&self.ses, DWELLER_TYPE, d, &dweller_command_set, owner = self.ses.me)
-	self.dwellers[d.net_id] = d
-	self.nodes[d.net_id] = node
-	self.brains[d.net_id] = Dweller_Brain{home = den}
-	gd.print_str(fmt.tprintf("CAVE_DEN id=%d at=%.0f,%.0f", u32(d.net_id), den.x, den.y))
+	ksess.session_spawn_send(&self.ses, id)
+	self.brains[id] = Dweller_Brain{home = den}
+	gd.print_str(fmt.tprintf("CAVE_DEN id=%d at=%.0f,%.0f", u32(id), den.x, den.y))
 }
 
 // Host: one think-tick for every dweller — the WHOLE brain, written from
@@ -156,12 +148,7 @@ cave_settle_grab :: proc(self: ^CaveLobby, player: knet.Player_Id, id: knet.Net_
 		sp := self.spelunkers[av]
 		_ = kitems.add(&self.table, sp.bag[:], p.last_grab.item, p.last_grab.count)
 	}
-	ksess.session_despawn(&self.ses, id)
-	if node, ok := self.nodes[id]; ok {
-		gd.node_queue_free(node)
-		delete_key(&self.nodes, id)
-	}
-	delete_key(&self.pickups, id)
+	ksess.session_despawn(&self.ses, id) // the free proc handles node + maps, every role
 }
 
 // Client commands land here right after they execute on the host.

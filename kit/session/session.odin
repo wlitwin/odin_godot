@@ -70,6 +70,8 @@ Ev_Player_Left :: struct {
 
 Ev_Host_Left :: struct {} // (client) the run is over — v1 has no migration
 
+Ev_Join_Failed :: struct {} // (client) no WELCOME within the join timeout — surface it, don't hang on "Joining..."
+
 Ev_Spawned :: struct {
 	id:    knet.Net_Id, // (client) the factory made it and the snapshot applied
 	type:  Entity_Type,
@@ -111,6 +113,7 @@ Event :: union {
 	Ev_Player_Joined,
 	Ev_Player_Left,
 	Ev_Host_Left,
+	Ev_Join_Failed,
 	Ev_Spawned,
 	Ev_Despawned,
 	Ev_Stats_Updated,
@@ -301,9 +304,10 @@ Session :: struct {
 	by_peer:     map[int]knet.Player_Id,
 
 	// client bookkeeping
-	token:  u64, // our reconnect secret (the game persists it across runs)
-	name:   string, // owned; the name we asked for
-	joined: bool, // WELCOME received
+	token:       u64, // our reconnect secret (the game persists it across runs)
+	name:        string, // owned; the name we asked for
+	joined:      bool, // WELCOME received
+	join_waited: int, // ticks since client_start without a WELCOME (-1 = not waiting)
 }
 
 @(private = "file")
@@ -490,7 +494,10 @@ ctx_send_command :: proc(user: rawptr, bytes: []u8) {
 // type, and — once the world is live — announces it to every seated peer
 // (reliable, so the spawn always precedes any delta naming the id). The HOST
 // game creates its own entity however it likes; remote peers create theirs
-// through the factory when the announcement arrives.
+// through the factory when the announcement arrives. (Prefer the
+// session_spawn_make / session_spawn_send pair, which routes the host's own
+// creation through the SAME factory clients use — this one remains for
+// games that build entities by hand.)
 session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet.Command_Set, owner := knet.PLAYER_ID_INVALID) -> knet.Net_Id {
 	assert(s.is_host, "only the authority spawns; clients create via the factory")
 	id := knet.registry_spawn(&s.reg, entity, set, owner)
@@ -505,6 +512,38 @@ session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet
 	return id
 }
 
+// Host: spawn THROUGH THE FACTORY — the same Make_Entity_Proc clients run,
+// so every entity type's creation is written exactly once. Two-phase because
+// the spawn announcement carries a field snapshot: make, set your per-spawn
+// fields on the returned entity, then session_spawn_send. Ev_Spawned fires
+// here (the host reacts to spawns like any peer).
+session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_ID_INVALID) -> (entity: rawptr, id: knet.Net_Id) {
+	assert(s.is_host, "only the authority spawns; clients create via the factory")
+	assert(s.factory_make != nil, "session_spawn_make needs session_set_factory")
+	id = s.reg.next_id
+	s.reg.next_id += 1
+	set: ^knet.Command_Set
+	entity, set = s.factory_make(s.factory_user, type, id, owner)
+	assert(entity != nil, "the factory returned nil for a host-side spawn")
+	knet.registry_insert(&s.reg, id, entity, set, owner)
+	s.types[id] = type
+	append(&s.events, Ev_Spawned{id = id, type = type, owner = owner})
+	return
+}
+
+// Second half of session_spawn_make: announce the spawn (with the fields as
+// they stand NOW) to every seated peer.
+session_spawn_send :: proc(s: ^Session, id: knet.Net_Id) {
+	assert(s.is_host)
+	if s.replicating {
+		w := knet.writer_make()
+		defer knet.writer_destroy(&w)
+		knet.write_u8(&w, SES_SPAWN)
+		write_spawn_tuple(s, &w, id)
+		broadcast(s, knet.writer_bytes(&w), .Reliable)
+	}
+}
+
 // TELEPORT: the OWNER of `id` declares a discontinuity in its streamed
 // fields (a respawn, a level change, a blink) — remote peers snap to the far
 // side of the jump instead of interpolating a slide across the map. Call it
@@ -514,16 +553,25 @@ session_teleport :: proc(s: ^Session, id: knet.Net_Id) {
 	knet.registry_teleport(&s.reg, id)
 }
 
-// Host: remove an entity from the session and tell everyone. The host game
-// frees its own node after this returns; remote peers free theirs through the
-// factory. Clients' in-flight predictions on the entity clean up on their own
-// (results/expiry handle a missing entity).
+// Host: remove an entity from the session and tell everyone. SYMMETRIC with
+// clients: the installed factory free proc runs here too (so node/map
+// cleanup is written once), and Ev_Despawned fires. Clients' in-flight
+// predictions on the entity clean up on their own (results/expiry handle a
+// missing entity).
 session_despawn :: proc(s: ^Session, id: knet.Net_Id) {
 	assert(s.is_host)
+	entity: rawptr
+	if e, ok := s.reg.entries[id]; ok {
+		entity = e.entity
+	}
 	if !knet.registry_remove(&s.reg, id) {
 		return
 	}
 	delete_key(&s.types, id)
+	if s.factory_free != nil {
+		s.factory_free(s.factory_user, id, entity)
+	}
+	append(&s.events, Ev_Despawned{id = id})
 	if s.replicating {
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
@@ -621,10 +669,23 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 	return
 }
 
+// No WELCOME within this many ticks of session_client_start -> Ev_Join_Failed
+// (15s at the default 20 Hz — generous for a slow handshake, finite for a
+// dead address; without it a failed join hangs on "Joining..." forever).
+JOIN_TIMEOUT_TICKS :: 300
+
 @(private = "file")
 net_tick :: proc(s: ^Session) {
 	t := s.ticker.tick
 	s.ctx.now_tick = t
+
+	if !s.is_host && !s.joined && s.join_waited >= 0 {
+		s.join_waited += 1
+		if s.join_waited > JOIN_TIMEOUT_TICKS {
+			s.join_waited = -1
+			append(&s.events, Ev_Join_Failed{})
+		}
+	}
 
 	if s.is_host && s.replicating {
 		// Host state: ONE batched delta message for every dirty entity, to
@@ -634,8 +695,13 @@ net_tick :: proc(s: ^Session) {
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
 		knet.write_u8(&w, SES_STATE)
-		if knet.registry_write_deltas(&w, &s.reg) > 0 {
+		if dirty := knet.registry_write_deltas(&w, &s.reg); dirty > 0 {
 			broadcast(s, knet.writer_bytes(&w), .Reliable)
+			// The HOST gets the state event too: its own tick just changed
+			// these entities, and event-driven repaint code should not need
+			// a role branch (a host inventory once went stale for six
+			// phases because it didn't get this).
+			append(&s.events, Ev_State_Applied{entities = dirty})
 		}
 	}
 
@@ -1110,6 +1176,7 @@ session_client_start :: proc(s: ^Session, token: u64, name: string) {
 	s.is_host = false
 	s.token = token
 	s.name = strings.clone(name)
+	s.join_waited = 0 // the join-timeout clock arms; Ev_Join_Failed if no WELCOME
 }
 
 // Transport is connected: ask the host to seat us.
@@ -1163,6 +1230,7 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 	s.me = me
 	s.ctx.me = me
 	s.joined = true
+	s.join_waited = -1 // the join-timeout clock disarms
 	append(&s.events, Ev_Welcomed{me = me})
 }
 
