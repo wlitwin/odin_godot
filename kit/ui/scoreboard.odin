@@ -22,15 +22,15 @@ Score :: struct {
 score_make :: proc(parent: gd.Node) -> Score {
 	sb: Score
 	// A PanelContainer gives the overlay a themed background and sizes
-	// itself to its content; dead-center anchors + grow Both on both axes
-	// keep it centered as rows come and go. High z-index: an on-demand
-	// overlay reads on TOP of the HUD it happens to cover.
+	// itself to its content. Centering is done BY HAND in score_refresh:
+	// anchor presets only mean something under a Control parent, and kit
+	// widgets attach to whatever plain Node the game hands them — under one
+	// of those, ".Preset_Center" quietly measures a zero rect and the board
+	// sits in the top-left corner (puttputt found it live). High z-index: an
+	// on-demand overlay reads on TOP of the HUD it happens to cover.
 	sb.root = cast(gd.Control)gd.new_panel_container()
 	gd.node_set_name(cast(gd.Node)sb.root, gd.new_string_name_cstring("Scoreboard", true))
 	gd.add_child(parent, cast(gd.Node)sb.root)
-	gd.control_set_anchors_preset(sb.root, .Preset_Center, false)
-	gd.control_set_h_grow_direction(sb.root, .Grow_Direction_Both)
-	gd.control_set_v_grow_direction(sb.root, .Grow_Direction_Both)
 	gd.canvas_item_set_z_index(cast(gd.Canvas_Item)sb.root, 10)
 	sb.box = cast(gd.Control)gd.new_v_box_container()
 	gd.add_child(cast(gd.Node)sb.root, cast(gd.Node)sb.box)
@@ -83,4 +83,11 @@ score_refresh :: proc(sb: ^Score, s: ^ksess.Session) {
 	for i in len(roster) ..< len(sb.rows) {
 		gd.set_bool(cast(gd.Object)sb.rows[i], "visible", false)
 	}
+
+	// Center in the viewport by hand (see score_make): position from the
+	// panel's own minimum size, which reflects THIS refresh's content even
+	// before a layout pass has resized the control.
+	need := gd.control_get_combined_minimum_size(sb.root)
+	vp := gd.viewport_get_visible_rect(gd.node_get_viewport(cast(gd.Node)sb.root))
+	gd.control_set_position(sb.root, {(vp.size.x - need.x) * 0.5, (vp.size.y - need.y) * 0.5}, false)
 }
