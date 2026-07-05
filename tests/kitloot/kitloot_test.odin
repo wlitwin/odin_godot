@@ -689,8 +689,13 @@ grab_race_despawns_exactly_once :: proc(t: ^testing.T) {
 	testing.expect_value(t, knet.pending_count(&cv.bob.s.ctx.pending), 0)
 	expired := false
 	for ev in drain(&cv.bob.s) {
-		if rej, is_rej := ev.(ksess.Ev_Command_Rejected); is_rej && rej.seq == 0 {
+		if rej, is_rej := ev.(ksess.Ev_Command_Rejected); is_rej {
 			expired = true
+			// The timeout rejection is ADDRESSED like an explicit one: it
+			// names the real seq and the entity the doomed grab targeted —
+			// UI keyed on either matches both rejection paths.
+			testing.expect(t, rej.seq != 0, "expiry carries the pending's real seq")
+			testing.expect_value(t, rej.entity, pickup_id)
 		}
 	}
 	testing.expect(t, expired, "expiry announces itself — silence means no")
