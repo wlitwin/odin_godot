@@ -452,9 +452,18 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	// from byte-identical args — the thunk decodes, checks the reader, THEN calls
 	// the author's proc), the Command_Desc table, and one `<proc>_cmd` wrapper per
 	// command. The wrapper holds the ONLY role branch in the entire feature:
-	// authority runs the proc directly; clients predict (iff declared) and send.
+	// authority runs the proc directly (and fires the game's command hook, the
+	// same cross-entity path client commands take); clients predict (iff
+	// declared) and send.
+	upper := strings.to_upper(snake)
 	if len(s.commands) > 0 {
-		w(b, "// ---- @(gd_command) dispatch + typed issue wrappers ----\n")
+		w(b, "// ---- @(gd_command) dispatch + typed issue wrappers ----\n\n")
+		w(b, "// Command indices, by declaration order — for the game's command hook\n")
+		w(b, "// dispatch (never hand-sync these; reordering procs reorders them).\n")
+		for c, ci in s.commands {
+			fmt.sbprintf(b, "%s_CMD_%s :: u16(%d)\n", upper, strings.to_upper(c.name), ci)
+		}
+		w(b, "\n")
 		for c in s.commands {
 			fmt.sbprintf(b, "@(private = \"file\")\n_%s_cmd_%s :: proc(entity: rawptr, r: ^knet.Reader) -> bool {{\n", snake, c.name)
 			fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
@@ -474,12 +483,21 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			fmt.sbprintf(b, "\t{{name = %q, predict = %v, invoke = _%s_cmd_%s}},\n", c.name, c.predict, snake, c.name)
 		}
 		w(b, "}\n\n")
+	}
+
+	// The command set is emitted for EVERY entity with a descriptor — desc-only
+	// entities (no commands) used to force a hand-built set in the game.
+	if len(s.replicates) > 0 || len(s.commands) > 0 {
+		cmds := len(s.commands) > 0 ? fmt.tprintf(", commands = _%s_commands[:]", snake) : ""
+		net_id := s.net_id_type != "" ? fmt.tprintf(", net_id_offset = int(offset_of(%s, net_id))", cls) : ""
 		fmt.sbprintf(
 			b,
-			"// kit/net command set for %s — the command table + the replicated-field descriptor.\n%s_command_set := knet.Command_Set{{entity_desc = &%s_net_desc, commands = _%s_commands[:]}}\n\n",
-			cls, snake, snake, snake,
+			"// kit/net command set for %s — the command table + the replicated-field descriptor.\n%s_command_set := knet.Command_Set{{entity_desc = &%s_net_desc%s%s}}\n\n",
+			cls, snake, snake, cmds, net_id,
 		)
+	}
 
+	if len(s.commands) > 0 {
 		for c, ci in s.commands {
 			fmt.sbprintf(b, "// Issue `%s` — the SAME call on every peer, zero role branches. Authority:\n", c.name)
 			if c.predict {
@@ -497,11 +515,13 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			w(b, ") -> bool {\n")
 			w(b, "\tif ctx.is_authority {\n")
-			fmt.sbprintf(b, "\t\treturn %s(self", c.proc_name)
+			fmt.sbprintf(b, "\t\t_ok := %s(self", c.proc_name)
 			for a in c.args {
 				fmt.sbprintf(b, ", %s", a.name)
 			}
-			w(b, ")\n\t}\n")
+			w(b, ")\n")
+			fmt.sbprintf(b, "\t\tknet.command_hook_local(ctx, self.net_id, %d, _ok) // same cross-entity path client commands take\n", ci)
+			w(b, "\t\treturn _ok\n\t}\n")
 			fmt.sbprintf(b, "\tknet.command_begin(ctx, self.net_id, %d)\n", ci)
 			for a in c.args {
 				fmt.sbprintf(b, "\tknet.write_%s(&ctx.msg, %s)\n", a.wire, a.name)

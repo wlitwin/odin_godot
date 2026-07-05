@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="CaveLevelDef" format=3]
+[gd_resource type="Resource" script_class="CaveLevelDef" format=3 uid="uid://dpsd22y6sxppe"]
 
-[ext_resource type="Script" path="res://scripts/level_def.odin" id="1"]
+[ext_resource type="Script" uid="uid://bxhjup1nocovk" path="res://scripts/level_def.odin" id="1"]
 [ext_resource type="PackedScene" path="res://levels/level_1.tscn" id="2"]
 
 [resource]

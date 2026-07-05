@@ -33,7 +33,6 @@ import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import kui "godot:kit/ui"
 import "core:fmt"
-import "core:time"
 
 DEFAULT_PORT :: 4242
 MSG_SESSION :: u8(0) // all kit/session traffic under one game byte
@@ -71,10 +70,8 @@ CHILL :: u8(1) // rocks chill what they don't kill
 SPAWN_X :: f32(80)
 SPAWN_Y :: f32(120)
 
-// Command indices = @(gd_command) declaration order in spelunker.odin.
-SPEL_CMD_DROP :: u16(0)
-SPEL_CMD_THROW :: u16(1)
-SPEL_CMD_HEAL :: u16(2)
+// Command indices (SPELUNKER_CMD_THROW, CHEST_CMD_TAKE, ...) are GENERATED
+// per class — see the *.gen.odin files; never hand-sync them.
 
 // kit/comms rides SES_APP tag 0; fire announcements ride tag 1.
 TAG_FIRE :: u8(1)
@@ -101,10 +98,6 @@ FLEE_BELOW :: i32(35) // one rock in: it runs
 // deepest floor (the cave goes on).
 MAX_WAVES :: 8
 
-// Dwellers and the level marker declare no commands, so scriptgen emits
-// only their descriptors.
-dweller_set := knet.Command_Set{entity_desc = &dweller_net_desc}
-level_set := knet.Command_Set{entity_desc = &level_net_desc}
 
 // The host-side half of a dweller's mind (never on the wire).
 Dweller_Brain :: struct {
@@ -221,9 +214,7 @@ CaveLobby :: struct {
 	delayed: [dynamic]Delayed_Packet,
 }
 
-now_s :: proc "contextless" () -> f64 {
-	return f64(time.tick_now()._nsec) / 1e9
-}
+now_s :: knet.now_s // the toolkit's monotonic clock, under the game's short name
 
 refresh_hud :: proc(self: ^CaveLobby) {
 	if self.me_spel == nil {return}

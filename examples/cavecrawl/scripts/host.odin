@@ -57,10 +57,7 @@ cave_mint_pickup :: proc(self: ^CaveLobby, sp: ^Spelunker) {
 cave_hurt_spelunker :: proc(self: ^CaveLobby, victim_id: knet.Net_Id, victim: ^Spelunker, dmg: i32, attacker: knet.Player_Id, chill: bool) {
 	kcombat.credit_hit(&self.ses, self.cols, attacker, dmg)
 	if kcombat.hit(&victim.hp, dmg) {
-		victim_pid := knet.PLAYER_ID_INVALID
-		for pid, av in self.avatar_of {
-			if av == victim_id {victim_pid = pid}
-		}
+		victim_pid := ksess.session_owner_of(&self.ses, victim_id)
 		kcombat.credit_kill(&self.ses, self.cols, attacker, victim_pid)
 		cave_spill_bag(self, victim)
 		self.respawn_at[victim_id] = self.host_ticks + RESPAWN_TICKS
@@ -100,7 +97,7 @@ cave_spawn_dweller :: proc(self: ^CaveLobby) {
 	d.x = den.x
 	d.y = den.y
 	d.hp = DWELLER_HP
-	d.net_id = ksess.session_spawn(&self.ses, DWELLER_TYPE, d, &dweller_set, owner = self.ses.me)
+	d.net_id = ksess.session_spawn(&self.ses, DWELLER_TYPE, d, &dweller_command_set, owner = self.ses.me)
 	self.dwellers[d.net_id] = d
 	self.nodes[d.net_id] = node
 	self.brains[d.net_id] = Dweller_Brain{home = den}
@@ -171,20 +168,20 @@ cave_settle_grab :: proc(self: ^CaveLobby, player: knet.Player_Id, id: knet.Net_
 cave_command_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
 	self := cast(^CaveLobby)user
 	if !ok {return}
-	if chest, is_chest := self.chests[entity]; is_chest && cmd == 0 {
+	if chest, is_chest := self.chests[entity]; is_chest && cmd == CHEST_CMD_TAKE {
 		cave_credit(self, player, chest)
 		return
 	}
 	if sp, is_spel := self.spelunkers[entity]; is_spel {
 		switch cmd {
-		case SPEL_CMD_DROP:
+		case SPELUNKER_CMD_DROP:
 			cave_mint_pickup(self, sp)
-		case SPEL_CMD_THROW:
+		case SPELUNKER_CMD_THROW:
 			cave_launch_rock(self, player, sp)
 		}
 		return
 	}
-	if p, is_pickup := self.pickups[entity]; is_pickup && cmd == 0 {
+	if p, is_pickup := self.pickups[entity]; is_pickup && cmd == PICKUP_CMD_GRAB {
 		cave_settle_grab(self, player, entity, p)
 	}
 }

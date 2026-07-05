@@ -62,7 +62,7 @@ cave_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 		d := rt.script_of(node, Dweller)
 		d.net_id = id
 		self.dwellers[id] = d
-		return d, &dweller_set
+		return d, &dweller_command_set
 	case CHEST_TYPE:
 		node := spawn_scene(self, self.chest_scene)
 		self.nodes[id] = node
@@ -83,7 +83,7 @@ cave_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 		lv := rt.script_of(node, Level)
 		lv.net_id = id
 		self.level = lv
-		return lv, &level_set
+		return lv, &level_command_set
 	}
 	return nil, nil
 }
@@ -199,7 +199,7 @@ cave_lobby_on_start :: proc(self: ^CaveLobby) {
 	level_node := spawn_scene(self, self.level_scene)
 	lv := rt.script_of(level_node, Level)
 	lv.depth = 1
-	lv.net_id = ksess.session_spawn(&self.ses, LEVEL_TYPE, lv, &level_set)
+	lv.net_id = ksess.session_spawn(&self.ses, LEVEL_TYPE, lv, &level_command_set)
 	self.level = lv
 	self.nodes[lv.net_id] = level_node
 

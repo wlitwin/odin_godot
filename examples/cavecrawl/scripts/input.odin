@@ -133,11 +133,11 @@ cave_lobby_interact :: proc(self: ^CaveLobby) {
 			gd.print_str("CAVE_LOOT_DENIED empty")
 			return
 		}
+		// No "authority inline half" here: the host's own commands fire the
+		// command hook exactly like client commands do. The repaint is
+		// role-free UX: show the predicted/settled bag THIS frame.
 		applied := chest_take_cmd(&self.ses.ctx, chest, slot, me.x, me.y)
-		if applied && self.ses.is_host {
-			cave_credit(self, self.ses.me, chest) // the authority's inline half
-			kui.inv_refresh(&self.inv, me.bag[:], &self.table)
-		}
+		kui.inv_refresh(&self.inv, me.bag[:], &self.table)
 		gd.print_str(fmt.tprintf("CAVE_LOOT applied=%v slot=%d", applied, slot))
 	case 2:
 		door := self.doors[self.target_id]
@@ -147,10 +147,7 @@ cave_lobby_interact :: proc(self: ^CaveLobby) {
 		id := self.target_id
 		p := self.pickups[id]
 		applied := pickup_grab_cmd(&self.ses.ctx, p, me.x, me.y)
-		if applied && self.ses.is_host {
-			cave_settle_grab(self, self.ses.me, id, p) // the authority's inline half
-			kui.inv_refresh(&self.inv, me.bag[:], &self.table)
-		}
+		kui.inv_refresh(&self.inv, me.bag[:], &self.table)
 		gd.print_str(fmt.tprintf("CAVE_GRAB applied=%v", applied))
 	}
 }
@@ -170,11 +167,11 @@ cave_lobby_throw :: proc(self: ^CaveLobby, dx: gd.Float, dy: gd.Float) {
 	applied := spelunker_throw_cmd(&self.ses.ctx, me, f32(dx), f32(dy), me.x, me.y)
 	if applied {
 		// Press fire, SEE rock — my visual flies this frame, no round trip.
+		// (On the host the command hook already launched the authoritative
+		// rock; cave_launch_rock skips the authority's own visual, so this
+		// is the one visual either role adds here.)
 		if f, ok := rock_fire(self.ses.me, self.me_spel); ok {
 			add_visual_rock(self, f)
-		}
-		if self.ses.is_host {
-			cave_launch_rock(self, self.ses.me, self.me_spel) // the authority's inline half
 		}
 	}
 	refresh_hud(self)
@@ -210,9 +207,6 @@ cave_lobby_show_score :: proc(self: ^CaveLobby, visible: gd.Bool) {
 cave_lobby_drop :: proc(self: ^CaveLobby, slot: gd.Int) {
 	if !self.started || self.me_spel == nil {return}
 	applied := spelunker_drop_cmd(&self.ses.ctx, self.me_spel, i32(slot))
-	if applied && self.ses.is_host {
-		cave_mint_pickup(self, self.me_spel) // the authority's inline half
-	}
 	kui.inv_refresh(&self.inv, self.me_spel.bag[:], &self.table)
 	gd.print_str(fmt.tprintf("CAVE_DROP applied=%v", applied))
 }
