@@ -291,6 +291,27 @@ walks entities owned by me. In-flight packets from the old owner may land for ~a
 trip; they carry the pre-bump warp, so the first new-warp sample supersedes them with a
 snap, never a blend.
 
+## Recipes over existing pieces
+
+Two genre staples that need NO new machinery — write them down so nobody builds them twice:
+
+**Character-portable saves** (the Valheim model: your character travels between servers,
+worlds stay with their hosts). The character is a client-side blob — bag, appearance,
+whatever follows the PLAYER rather than the world. Persist it with [kit/save's](save.md)
+file helpers; on `Ev_Welcomed`, ship it to the host on an app tag
+(`session_app_send(HOST_PEER, TAG_CHARACTER, blob)`); the host validates and applies it to
+your avatar (an ordinary host-authoritative mutation — deltas carry it to everyone). Save
+it back on quit and on the host's periodic beat if you're paranoid. The host stays
+authoritative: a hacked blob is just input to validate, not truth to obey.
+
+**Private per-player state** (roles, a saboteur, secret objectives). Secrets are
+player-addressed app messages — `session_app_send_to(player, tag, bytes)` — not replicated
+fields: the delta walk broadcasts by design, and per-recipient field filtering is
+complexity this toolkit deliberately refuses (every laptop in the room can already run
+Wireshark; a friendslop saboteur's secret survives friends, not forensics). Keep the
+secret host-side, tell exactly who needs to know, and let CONSEQUENCES be public state
+like everything else.
+
 ## Gotchas
 
 - **`Session_Config` durations are seconds, resolved at `*_start`.** `session_init` bakes

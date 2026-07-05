@@ -123,7 +123,7 @@ registry_count :: proc(reg: ^Registry) -> int {
 // the zero count header — callers may skip sending the message entirely. Map
 // iteration order is unspecified and irrelevant: entries are independent and
 // receivers dispatch by id.
-registry_write_deltas :: proc(w: ^Writer, reg: ^Registry) -> int {
+registry_write_deltas :: proc(w: ^Writer, reg: ^Registry, changed: ^[dynamic]Net_Id = nil) -> int {
 	count_at := len(w.buf)
 	write_u16(w, 0) // patched below
 	count := 0
@@ -134,6 +134,9 @@ registry_write_deltas :: proc(w: ^Writer, reg: ^Registry) -> int {
 		if mask == 0 {
 			resize(&w.buf, mask_at) // idle: drop the id we speculatively wrote
 			continue
+		}
+		if changed != nil {
+			append(changed, e.id)
 		}
 		count += 1
 	}
@@ -223,7 +226,7 @@ has_pending_for :: proc(ctx: ^Command_Ctx, id: Net_Id) -> bool {
 // messages ride the same reliable ordered channel as these batches, so a peer
 // always knows every id a batch can name. That ordering contract is THE reason
 // state batches go on the reliable channel rather than the stream one.
-registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = nil) -> int {
+registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = nil, changed: ^[dynamic]Net_Id = nil) -> int {
 	count := int(read_u16(r))
 	applied := 0
 	for _ in 0 ..< count {
@@ -246,6 +249,9 @@ registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = ni
 		}
 		if reconcile {
 			replay_pending(ctx, e)
+		}
+		if changed != nil {
+			append(changed, id)
 		}
 		applied += 1
 	}

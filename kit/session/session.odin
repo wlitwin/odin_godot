@@ -131,6 +131,10 @@ Ev_State_Applied :: struct {
 	entities: int, // (client) a host state batch landed on this many entities
 }
 
+Ev_Entity_Changed :: struct {
+	id: knet.Net_Id, // one entity a state batch touched (opt-in: Session_Config.change_events)
+}
+
 Ev_Command_Executed :: struct {
 	ok:     bool, // (host) a client command ran (or was rejected) authoritatively
 	player: knet.Player_Id, // who issued it
@@ -163,6 +167,7 @@ Event :: union {
 	Ev_Stats_Updated,
 	Ev_Backup_Received,
 	Ev_State_Applied,
+	Ev_Entity_Changed,
 	Ev_Command_Executed,
 	Ev_Command_Confirmed,
 	Ev_Command_Rejected,
@@ -356,6 +361,7 @@ Session_Config :: struct {
 	join_timeout:    f64, // client_start -> Ev_Join_Failed horizon
 	backup_interval: f64, // backup-host snapshot refresh cadence
 	max_players:     int, // NEW joins refused past this many connected (0 = unlimited; rejoins always reclaim their seat)
+	change_events:   bool, // emit Ev_Entity_Changed per dirty entity per tick (repaint THAT, not everything). Off by default: at friendslop scale repaint-everything is usually fine
 }
 
 Session :: struct {
@@ -884,13 +890,22 @@ net_tick :: proc(s: ^Session) {
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
 		knet.write_u8(&w, SES_STATE)
-		if dirty := knet.registry_write_deltas(&w, &s.reg); dirty > 0 {
+		changed: [dynamic]knet.Net_Id
+		changed_out: ^[dynamic]knet.Net_Id
+		if s.cfg.change_events {
+			changed = make([dynamic]knet.Net_Id, context.temp_allocator)
+			changed_out = &changed
+		}
+		if dirty := knet.registry_write_deltas(&w, &s.reg, changed_out); dirty > 0 {
 			broadcast(s, knet.writer_bytes(&w), .Reliable)
 			// The HOST gets the state event too: its own tick just changed
 			// these entities, and event-driven repaint code should not need
 			// a role branch (a host inventory once went stale for six
 			// phases because it didn't get this).
 			append(&s.events, Ev_State_Applied{entities = dirty})
+			for id in changed {
+				append(&s.events, Ev_Entity_Changed{id = id})
+			}
 		}
 	}
 
@@ -987,6 +1002,22 @@ broadcast :: proc(s: ^Session, bytes: []u8, channel: Channel) {
 // This peer's clock estimate for `peer` (zero value until a pong lands).
 session_clock :: proc(s: ^Session, peer: Peer_Id) -> knet.Clock_Sync {
 	return s.clocks[peer]
+}
+
+// A timeline every peer roughly agrees on: the HOST's session clock.
+// Schedule shared moments against it — "the round ends at world_time + 30"
+// replicates as one f64 field and every screen counts down in sync (within
+// about half a ping). Before the first pong lands a client answers with its
+// own clock; gate on s.pongs > 0 if the difference matters to you.
+session_world_time :: proc(s: ^Session) -> f64 {
+	if s.is_host {
+		return s.now
+	}
+	c := s.clocks[HOST_PEER]
+	if !c.initialized {
+		return s.now
+	}
+	return knet.clock_remote_now(&c, s.now)
 }
 
 // The eldest connected client (lowest Player_Id) — deterministic, stable
@@ -1775,9 +1806,18 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) 
 		if s.is_host || !s.joined {
 			return
 		}
-		n := knet.registry_apply_deltas(r, &s.reg, &s.ctx)
+		changed: [dynamic]knet.Net_Id
+		changed_out: ^[dynamic]knet.Net_Id
+		if s.cfg.change_events {
+			changed = make([dynamic]knet.Net_Id, context.temp_allocator)
+			changed_out = &changed
+		}
+		n := knet.registry_apply_deltas(r, &s.reg, &s.ctx, changed_out)
 		if !r.err {
 			append(&s.events, Ev_State_Applied{entities = n})
+			for id in changed {
+				append(&s.events, Ev_Entity_Changed{id = id})
+			}
 		}
 	case SES_CMD:
 		if !s.is_host {

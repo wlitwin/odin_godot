@@ -196,6 +196,14 @@ attempt() {
 		grep -q "CAVE_CLEARED_FLOOR" "$log" || { echo "  FAIL: wave 2 never fell in $(basename "$log")"; ok=0; }
 	done
 	grep -q "CAVE_DESCEND depth=2" "$hlog" || { echo "  FAIL: the host never descended the run"; ok=0; }
+	# SHARED-SEED PROCGEN: both processes grew the same decoration from the
+	# replicated seed — the checksums must MATCH ACROSS PROCESSES, per floor
+	# (integer-math scatter; zero wire bytes for the world it implies).
+	for d in 1 2; do
+		local scat; scat=$(grep -m1 -oE "CAVE_SCATTER depth=$d sum=[0-9]+" "$hlog")
+		[ -n "$scat" ] || { echo "  FAIL: host never scattered floor $d"; ok=0; continue; }
+		grep -q "$scat" "$glog" || { echo "  FAIL: floor $d procgen diverged ($scat)"; ok=0; }
+	done
 	for log in "$hlog" "$glog"; do
 		grep -q "CAVE_FLOOR depth=2" "$log" || { echo "  FAIL: owner never stepped to floor 2 in $(basename "$log")"; ok=0; }
 		grep -qE "CAVE_DESCENDED depth=2 door=false dwellers=[0-9] chest=6" "$log" || { echo "  FAIL: floor 2 wrong in $(basename "$log")"; ok=0; }

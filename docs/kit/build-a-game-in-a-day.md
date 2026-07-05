@@ -267,6 +267,17 @@ re-fires on each failed reconnect, so retry is free). Cavecrawl's
 `on_takeover`/`cave_rejoin_to` pair is the whole recipe, and acid act 4
 kills the host with `kill -9` to prove nobody has to press anything.
 
+## 9d. Worlds from dice: shared-seed procgen (30 minutes)
+
+Replicate the SEED, not the scenery: one `seed: u32` field on your level
+entity, and every peer grows identical decoration locally — zero wire bytes
+for the world it implies. The one rule: **integer math end to end**
+(cavecrawl's `splitmix32` scatter). Floats are the classic procgen
+divergence trap — FMA contraction, libm differences, and fast-math flags all
+vary by platform, and a single divergent low bit becomes two different
+caves. Cavecrawl's acid proves convergence the honest way: both processes
+print a checksum of what they grew, and the test demands they match.
+
 ## 10. Ship it on Steam (1 hour + a friend)
 
 Swap the transport, change nothing else ([steamgd](steamgd.md)):

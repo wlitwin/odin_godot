@@ -1249,3 +1249,82 @@ succession_names_the_torch_bearer_ahead_of_need :: proc(t: ^testing.T) {
 		testing.expect(t, heard, "the succession must fire with the host-left")
 	}
 }
+
+
+@(test)
+change_events_name_the_dirty_entity :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	// Opt in on BOTH roles (pre-start wiring, like everything).
+	ksess.session_configure(&host.s, {change_events = true})
+	ksess.session_configure(&alice.s, {change_events = true})
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	hbot := Bot{hp = 10}
+	quiet := Bot{hp = 5}
+	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
+	_ = ksess.session_spawn(&host.s, BOT_TYPE, &quiet, &bot_command_set)
+	ksess.session_start_replicating(&host.s)
+	pump(boxes)
+	drain(&host.s)
+	drain(&alice.s)
+	now := 50.0
+
+	// One entity changes; BOTH roles hear exactly that one, by id.
+	hbot.hp = 9
+	step(boxes, &now)
+	for b in boxes {
+		evs := drain(&b.s)
+		hits := 0
+		for ev in evs {
+			if ch, ok := ev.(ksess.Ev_Entity_Changed); ok {
+				testing.expect_value(t, ch.id, id)
+				hits += 1
+			}
+		}
+		testing.expect_value(t, hits, 1)
+	}
+
+	// A quiet tick emits none.
+	step(boxes, &now)
+	for b in boxes {
+		for ev in drain(&b.s) {
+			if _, ok := ev.(ksess.Ev_Entity_Changed); ok {
+				testing.expect(t, false, "no change, no event")
+			}
+		}
+	}
+}
+
+@(test)
+world_time_is_the_hosts_clock_everywhere :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	now := 100.0
+	for _ in 0 ..< 30 { // let pings and pongs flow both ways
+		step(boxes, &now)
+	}
+	testing.expect(t, alice.s.pongs > 0, "the clock must be warm")
+	testing.expect_value(t, ksess.session_world_time(&host.s), host.s.now)
+	// In-box transport has zero latency: the shared timeline agrees tightly.
+	dt := ksess.session_world_time(&alice.s) - host.s.now
+	testing.expect(t, abs(dt) < 0.01, "world time must track the host's clock")
+}

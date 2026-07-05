@@ -131,7 +131,8 @@ cave_def :: proc(self: ^CaveLobby, depth: int) -> ^Level_Def {
 
 // Load this floor's SCENE on this peer (idempotent per depth): backdrop,
 // decoration, and the spawn markers, purely local — the wire carries only
-// the depth byte that told us to do this.
+// the depth byte that told us to do this. The authored scene then gets its
+// PROCEDURAL layer: decoration grown from the replicated seed (below).
 cave_load_scenery :: proc(self: ^CaveLobby, depth: int) {
 	if self.scenery != nil && int(self.scenery_depth) == depth {return}
 	if self.scenery != nil {
@@ -141,6 +142,39 @@ cave_load_scenery :: proc(self: ^CaveLobby, depth: int) {
 	self.scenery = gd.instantiate(cast(gd.Packed_Scene)def.scene)
 	gd.add_child(self.stage, self.scenery)
 	self.scenery_depth = u8(depth)
+	cave_scatter(self, depth)
+}
+
+// SHARED-SEED PROCGEN, the whole pattern: INTEGER math end to end from the
+// replicated seed, so the same (seed, depth, index) lands on the same pixel
+// on every machine — floats are the classic procgen divergence trap (FMA
+// contraction, libm differences, fast-math flags all vary by platform; keep
+// them out of anything that must agree). The printed checksum is the acid
+// test's proof that two processes grew the same cave.
+@(private = "file")
+splitmix32 :: proc(state: ^u32) -> u32 {
+	state^ += 0x9E3779B9
+	z := state^
+	z = (z ~ (z >> 16)) * 0x21F0AAAD
+	z = (z ~ (z >> 15)) * 0x735A2D97
+	return z ~ (z >> 15)
+}
+
+@(private = "file")
+cave_scatter :: proc(self: ^CaveLobby, depth: int) {
+	if self.level == nil || self.level.seed == 0 || self.scenery == nil {return}
+	state := self.level.seed ~ (u32(depth) * 0x9E3779B9)
+	sum := u32(0)
+	for i in 0 ..< 10 {
+		x := int(splitmix32(&state) % 560) + 30
+		y := int(splitmix32(&state) % 230) + 60
+		sum = sum * 31 + u32(x) * 7 + u32(y)
+		node := gd.new_label()
+		gd.set_string(cast(gd.Object)node, "text", i % 2 == 0 ? "\xF0\x9F\xAA\xA8" : "\xF0\x9F\x8D\x84") // 🪨 / 🍄
+		gd.add_child(self.scenery, cast(gd.Node)node)
+		gd.control_set_position(cast(gd.Control)node, {f32(x), f32(y)}, false)
+	}
+	gd.print_str(fmt.tprintf("CAVE_SCATTER depth=%d sum=%d", depth, sum))
 }
 
 // Where the floor's authoring says a thing goes: a Marker2D by name in the
@@ -216,6 +250,7 @@ cave_lobby_on_start :: proc(self: ^CaveLobby) {
 	lep, lid := ksess.session_spawn_make(&self.ses, LEVEL_TYPE)
 	lv := cast(^Level)lep
 	lv.depth = 1
+	lv.seed = u32(i64(now_s() * 1000)) | 1 // the run's dice, minted once, never zero
 	ksess.session_spawn_send(&self.ses, lid)
 
 	cave_build_floor(self, 1)

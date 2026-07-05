@@ -21,6 +21,7 @@ Level :: struct {
 	depth:  u8 `gd:"replicate"`,
 	wave:   u8 `gd:"replicate"`, // the director's current wave — every peer reads campaign progress off this byte, ordered with the spawns it paces
 	won:    u8 `gd:"replicate"`, // MATCH STATE: 1 = the last floor fell. One byte is the whole match-flow protocol — every peer keys its end screen (and its restart) off the same delta stream that built the world
+	seed:   u32 `gd:"replicate"`, // PROCGEN: the run's dice. Replicate the SEED, not the scenery — every peer grows identical decoration locally (see cave_scatter), zero wire bytes for the world it implies
 }
 
 level_process :: proc(self: ^Level, delta: f64) {
