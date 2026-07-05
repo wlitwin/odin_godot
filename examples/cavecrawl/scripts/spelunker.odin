@@ -17,6 +17,7 @@ package cavecrawl_scripts
 import gd "godot:godot"
 import kcombat "godot:kit/combat"
 import kitems "godot:kit/items"
+import kinter "godot:kit/interact"
 import knet "godot:kit/net"
 
 Spelunker :: struct {
@@ -66,6 +67,22 @@ spelunker_throw :: proc(self: ^Spelunker, dx: f32, dy: f32, ox: f32, oy: f32) ->
 	from := kcombat.leash({ox, oy, 0}, {self.x, self.y, 0}, CAST_LEASH)
 	self.cast_from = {from.x, from.y}
 	self.aim = {dx, dy}
+	return true
+}
+
+// REVIVE a downed friend — the co-op staple, as one ordinary command on
+// the DOWNED player's entity (it mutates only its target, so no hook is
+// needed). The reviver stands in reach; back up at REVIVE_HP, in place —
+// the was_dead edge in process tells a revive (hp < full) from a bleed-out
+// respawn (full hp at the spawn point) and skips the grave-walk teleport.
+// Add a channel timer on top if your game wants held-E revives.
+// PREDICTED: the friend is up on the reviver's screen this frame; a stale
+// revive (they bled out between screens) reverts through reject-truth.
+@(gd_command = "predict")
+spelunker_revive :: proc(self: ^Spelunker, px: f32, py: f32) -> bool {
+	if self.hp > 0 {return false} // not down: nothing to revive
+	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false}
+	self.hp = REVIVE_HP
 	return true
 }
 

@@ -104,6 +104,12 @@ Ev_Despawned :: struct {
 	id: knet.Net_Id, // (client) already removed; the factory's free ran
 }
 
+Ev_Owner_Changed :: struct {
+	id:    knet.Net_Id, // whose owner-stream fields changed hands
+	owner: knet.Player_Id, // who streams it now (INVALID = nobody — it rests)
+	prev:  knet.Player_Id,
+}
+
 Ev_Stats_Updated :: struct {} // (client) a stat snapshot landed — repaint scoreboards
 
 Ev_Backup_Received :: struct {
@@ -140,6 +146,7 @@ Event :: union {
 	Ev_Kicked,
 	Ev_Spawned,
 	Ev_Despawned,
+	Ev_Owner_Changed,
 	Ev_Stats_Updated,
 	Ev_Backup_Received,
 	Ev_State_Applied,
@@ -237,6 +244,8 @@ SES_APP :: u8(16) // any -> any      [tag u8][payload] — routed to the registe
 SES_DENIED :: u8(17) // host -> joiner  [reason u8] — the join was refused (full/locked/banned)
 @(private)
 SES_KICKED :: u8(18) // host -> one     you were removed on purpose (not a host crash)
+@(private)
+SES_SETOWNER :: u8(19) // host -> all   [id][owner] — ownership transfer (carry/mount/possess)
 
 // ---- app messages: the extension point for sibling kit packages ---------------
 //
@@ -373,11 +382,13 @@ Session :: struct {
 
 	// backup hosting (migration-readiness): the host periodically ships a
 	// complete re-hostable snapshot to the ELDEST connected client
-	backup_every:  u64, // net ticks between refreshes (default 100 = 5s)
-	backup_tick:   u64, // host: when the last one shipped
-	backup_target: knet.Player_Id, // host: who holds it
-	backup:        []u8, // client: the latest blob (opaque; owned)
-	backup_at:     f64, // client: when it arrived (session now)
+	backup_every:     u64, // net ticks between refreshes (default 100 = 5s)
+	backup_tick:      u64, // host: when the last one shipped
+	backup_target:    knet.Player_Id, // host: who holds it
+	backup:           []u8, // client: the latest payload (opaque; owned; split via session_backup_parts)
+	backup_at:        f64, // client: when it arrived (session now)
+	backup_blob_user: rawptr, // pre-start wiring: the game's blob writer rides every backup
+	backup_blob:      Backup_Blob_Proc,
 
 	// app-message routes (kit/comms and friends; survive re-init)
 	app:   [MAX_APP_TAGS]App_Route,
@@ -679,6 +690,34 @@ session_teleport :: proc(s: ^Session, id: knet.Net_Id) {
 	knet.registry_teleport(&s.reg, id)
 }
 
+// Host: OWNERSHIP TRANSFER — hand an entity's owner-stream authority to a
+// player (PLAYER_ID_INVALID hands it back to nobody: it rests where it is,
+// host-authoritative deltas still flow). Carrying, mounting, possession,
+// dragging a downed friend — all of them are this one call from a command
+// hook. Remote screens snap (never interpolate) across the handoff, the old
+// owner stops streaming by construction, and Ev_Owner_Changed fires on
+// every peer — the new owner starts gluing the entity to itself off that
+// event, role-free. Ordered with spawns and deltas on the reliable channel.
+session_set_owner :: proc(s: ^Session, id: knet.Net_Id, owner: knet.Player_Id) {
+	assert(s.is_host, "the authority hands things over; clients ask via commands")
+	prev := session_owner_of(s, id)
+	if prev == owner {
+		return
+	}
+	if !knet.registry_set_owner(&s.reg, id, owner) {
+		return
+	}
+	append(&s.events, Ev_Owner_Changed{id = id, owner = owner, prev = prev})
+	if s.replicating {
+		w := knet.writer_make()
+		defer knet.writer_destroy(&w)
+		knet.write_u8(&w, SES_SETOWNER)
+		knet.write_net_id(&w, id)
+		knet.write_player_id(&w, owner)
+		broadcast(s, knet.writer_bytes(&w), .Reliable)
+	}
+}
+
 // Host: remove an entity from the session and tell everyone. SYMMETRIC with
 // clients: the installed factory free proc runs here too (so node/map
 // cleanup is written once), and Ev_Despawned fires. Clients' in-flight
@@ -975,11 +1014,55 @@ session_snapshot :: proc(s: ^Session, w: ^knet.Writer) {
 	}
 }
 
+// Host-side state the SESSION cannot know about — wave directors, AI
+// clocks, quest flags — written into every backup so a would-be new host
+// resumes the CAMPAIGN, not just the roster and entities (the same split
+// kit/save's envelope makes; write the same bytes in both).
+Backup_Blob_Proc :: proc(user: rawptr, w: ^knet.Writer)
+
+// Install the game-blob writer for backups (pre-start wiring; survives
+// *_start like the rest). Without one, backups carry an empty blob and a
+// takeover restores the world but not the campaign around it.
+session_set_backup_blob :: proc(s: ^Session, user: rawptr, write: Backup_Blob_Proc) {
+	s.backup_blob_user = user
+	s.backup_blob = write
+}
+
+// Split a received backup payload into the game's blob and the re-hostable
+// session snapshot (what session_host_resume eats). ok=false when no backup
+// has arrived (we were never the designated holder) or it is malformed.
+// Returns COPIES (temp-allocated by default) on purpose: the resume you are
+// about to run RE-INITS the session, which frees the stored payload —
+// slices into it would dangle exactly when you need them.
+session_backup_parts :: proc(s: ^Session, allocator := context.temp_allocator) -> (game_blob: []u8, snapshot: []u8, ok: bool) {
+	if len(s.backup) < 4 {
+		return nil, nil, false
+	}
+	r := knet.reader_make(s.backup)
+	n := int(knet.read_u32(&r))
+	if r.err || r.off + n > len(s.backup) {
+		return nil, nil, false
+	}
+	game_blob = make([]u8, n, allocator)
+	copy(game_blob, s.backup[r.off:r.off + n])
+	snapshot = make([]u8, len(s.backup) - r.off - n, allocator)
+	copy(snapshot, s.backup[r.off + n:])
+	return game_blob, snapshot, true
+}
+
 @(private = "file")
 send_backup :: proc(s: ^Session, peer: Peer_Id) {
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_u8(&w, SES_BACKUP)
+	// [blob_len u32][game blob][session snapshot] — parts split it back out.
+	blob := knet.writer_make()
+	defer knet.writer_destroy(&blob)
+	if s.backup_blob != nil {
+		s.backup_blob(s.backup_blob_user, &blob)
+	}
+	knet.write_u32(&w, u32(len(knet.writer_bytes(&blob))))
+	append(&w.buf, ..knet.writer_bytes(&blob))
 	session_snapshot(s, &w)
 	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
 }
@@ -1519,6 +1602,19 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) 
 			return
 		}
 		apply_spawn_tuple(s, r)
+	case SES_SETOWNER:
+		if s.is_host || !s.joined {
+			return
+		}
+		id := knet.read_net_id(r)
+		owner := knet.read_player_id(r)
+		if r.err {
+			return
+		}
+		prev := session_owner_of(s, id)
+		if knet.registry_set_owner(&s.reg, id, owner) {
+			append(&s.events, Ev_Owner_Changed{id = id, owner = owner, prev = prev})
+		}
 	case SES_DESPAWN:
 		if s.is_host || !s.joined {
 			return

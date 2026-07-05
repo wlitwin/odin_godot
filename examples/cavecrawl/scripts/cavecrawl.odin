@@ -53,6 +53,7 @@ DOOR_TYPE :: ksess.Entity_Type(3)
 PICKUP_TYPE :: ksess.Entity_Type(4)
 DWELLER_TYPE :: ksess.Entity_Type(5)
 LEVEL_TYPE :: ksess.Entity_Type(6)
+RELIC_TYPE :: ksess.Entity_Type(7)
 
 WALK_SPEED :: f32(120) // px/s
 
@@ -70,6 +71,7 @@ CAST_LEASH :: f32(64) // how far a claimed cast origin may differ from the host'
 BODY_RADIUS :: f32(14)
 RESPAWN_TICKS :: 60 // 3s in the grave
 CHILL :: u8(1) // rocks chill what they don't kill
+REVIVE_HP :: i32(30) // where a revive leaves you: alive, not well
 SPAWN_X :: f32(80)
 SPAWN_Y :: f32(120)
 
@@ -131,6 +133,7 @@ CaveLobby :: struct {
 	pickup_scene:    ^gd.Resource `gd:"export,resource=PackedScene"`,
 	dweller_scene:   ^gd.Resource `gd:"export,resource=PackedScene"`,
 	level_scene:     ^gd.Resource `gd:"export,resource=PackedScene"`,
+	relic_scene:     ^gd.Resource `gd:"export,resource=PackedScene"`,
 
 	// The campaign: one CaveLevelDef data asset per floor (scene + loot +
 	// waves), authored in the inspector.
@@ -165,6 +168,8 @@ CaveLobby :: struct {
 	floors_n:    int, // how deep the cave goes (CAVE_FLOORS env shrinks it for tests)
 	kicked_out:  bool, // we were removed on purpose — mutes the host-left line that follows
 	steam_on:    bool, // GodotSteam present + initialized (kit/steamgd)
+	relic:       ^Relic, // the carryable (ownership-transfer demo); nil pre-world
+	relic_id:    knet.Net_Id,
 	steam_lobby: u64, // the Steam lobby we host or sit in (invite target)
 	deny_reason: int, // last Ev_Join_Denied reason (-1 = none); drivers read it
 	started:     bool, // the world is live
@@ -193,6 +198,7 @@ CaveLobby :: struct {
 	legend:     gd.Label, // the controls line, shown once the world is live
 	chat_sent:  bool, // the Enter that submitted a line must not also re-open chat
 	was_dead:   bool, // owner-side respawn edge detector
+	host_gone:  bool, // Ev_Host_Left seen — the takeover/rejoin window is open
 	issue_at:   f64, // when my last command left (confirm latency proof)
 
 	// the transport binding (send adapter, packet route, latency shim)
@@ -259,6 +265,7 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	self.floors_n = env_int("CAVE_FLOORS", 2)
 	self.deny_reason = -1
 	ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
+	ksess.session_set_backup_blob(&self.ses, self, cave_backup_blob)
 	ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
 	ksess.session_app_route(&self.ses, TAG_FIRE, self, cave_on_fire)
 	// The transport binding: send adapter + packet route + the connection
@@ -280,7 +287,7 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	gd.control_set_offset(cast(gd.Control)self.legend, .Left, -8)
 	gd.control_set_offset(cast(gd.Control)self.legend, .Top, -4)
 	gd.control_set_offset(cast(gd.Control)self.legend, .Bottom, -4)
-	gd.set_string(cast(gd.Object)self.legend, "text", "WASD walk · E use · click throw · Q drop · R heal · Tab scores · Enter chat")
+	gd.set_string(cast(gd.Object)self.legend, "text", "WASD walk · E use · click throw · Q drop · G set down · R heal · Tab scores · Enter chat")
 	gd.set_bool(cast(gd.Object)self.legend, "visible", false)
 	gd.print_str("CAVE_UI_READY")
 }
@@ -320,6 +327,13 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 		// authority's tick deals the damage in the same frame — the
 		// overlay consumes that truth cleanly instead of double-dipping.
 		cave_visual_frame(self, delta) // every peer flies its own screen's rocks
+		// CARRYING: if the relic is mine, it rides my shoulder — my writes
+		// stream to everyone (the same machinery that streams me).
+		if self.relic != nil && self.me_spel != nil &&
+		   ksess.session_owner_of(&self.ses, self.relic_id) == self.ses.me {
+			self.relic.x = self.me_spel.x + 10
+			self.relic.y = self.me_spel.y - 12
+		}
 		kfx.frame(&self.fx, delta) // reap spent particle bursts
 		if self.ses.is_host {
 			for _ in 0 ..< ticks {
@@ -364,10 +378,17 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 			refresh = true // ping column repaint
 			kui.score_refresh(&self.score, &self.ses)
 		case ksess.Ev_Host_Left:
+			self.host_gone = true
 			if !self.kicked_out { // the kick already explained this teardown
-				kui.lobby_set_status(&self.ui, "The host left — this run is over")
+				// The designated backup holder can carry the torch; everyone
+				// else rejoins whoever does (see on_takeover / on_rejoin).
+				_, _, held := ksess.session_backup_parts(&self.ses)
+				kui.lobby_set_status(&self.ui, held ? "The host left — you hold the backup. Resume?" : "The host left — this run is over")
 				gd.print_str("CAVE_HOST_LEFT")
 			}
+		case ksess.Ev_Backup_Received:
+			// We are the designated backup host from this moment on.
+			gd.print_str(fmt.tprintf("CAVE_BACKUP size=%d", e.size))
 		case ksess.Ev_Kicked:
 			self.kicked_out = true
 			kui.lobby_set_status(&self.ui, "You were shown the door")
@@ -394,6 +415,20 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 				enter_the_cave(self)
 			}
 			gd.print_str(fmt.tprintf("CAVE_SPAWN id=%d mine=%v", u32(e.id), e.owner == self.ses.me))
+		case ksess.Ev_Owner_Changed:
+			// The relic changed hands — every peer hears; the new carrier's
+			// process glue starts moving it (no role branch, no carrier map:
+			// ownership IS the carrier record).
+			if e.id == self.relic_id {
+				gd.print_str(fmt.tprintf("CAVE_RELIC owner=%d", u64(e.owner)))
+				if self.ses.is_host {
+					line := "the relic rests"
+					if p, ok := ksess.session_player(&self.ses, e.owner); ok {
+						line = fmt.tprintf("%s carries the relic", p.name)
+					}
+					kcomms.comms_system(&self.comms, line)
+				}
+			}
 		case ksess.Ev_State_Applied:
 			if self.me_spel != nil {
 				kui.inv_refresh(&self.inv, self.me_spel.bag[:], &self.table)
@@ -480,10 +515,16 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 			}
 		} else if self.was_dead {
 			self.was_dead = false
-			self.me_spel.x = SPAWN_X
-			self.me_spel.y = SPAWN_Y
-			ksess.session_teleport(&self.ses, self.me_spel.net_id) // out of the grave in one step, on every screen
-			gd.print_str("CAVE_RESPAWNED")
+			if self.me_spel.hp >= MAX_HP {
+				// BLED OUT and back: a fresh body at the spawn point.
+				self.me_spel.x = SPAWN_X
+				self.me_spel.y = SPAWN_Y
+				ksess.session_teleport(&self.ses, self.me_spel.net_id) // out of the grave in one step, on every screen
+				gd.print_str("CAVE_RESPAWNED")
+			} else {
+				// REVIVED where I fell — a friend got there before the clock.
+				gd.print_str("CAVE_REVIVED")
+			}
 		}
 		if self.me_spel.hp > 0 {
 			drive_spelunker(self, delta)

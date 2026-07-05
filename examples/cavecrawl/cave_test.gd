@@ -125,6 +125,77 @@ func _process(_delta: float) -> bool:
 			return false
 		return false
 
+	# ---- ACT 4: HOST MIGRATION (stepping stone) — the host dies without a
+	# goodbye; the designated backup holder RESUMES the run as the new host
+	# on the same port; the third player rejoins and reclaims themselves.
+	if role == "mhost" or role == "mguest" or role == "mguest2":
+		if phase == "init":
+			if not cave.is_inside_tree():
+				return false
+			cave.call("on_host" if role == "mhost" else "on_join")
+			enter("lobby4", now)
+			return false
+		if phase == "lobby4":
+			var seated := role == "mhost" or bool(cave.call("is_seated"))
+			if seated and int(cave.call("get_players")) >= 3:
+				if role == "mhost":
+					cave.call("on_start")
+				enter("world4", now)
+			elif timed_out(now, "players=" + str(cave.call("get_players"))):
+				quit(1); return true
+			return false
+		if phase == "world4":
+			if bool(cave.call("world_ready")):
+				enter("hold", now)
+			elif timed_out(now, "world never materialized"):
+				quit(1); return true
+			return false
+		if phase == "hold":
+			# The run just... runs. The eldest guest announces when the
+			# backup lands (run.sh keys the host-kill on that line); both
+			# guests move on when the transport says the host is gone.
+			cave.call("heal")
+			if role == "mguest" and not acted and bool(cave.call("has_backup")):
+				acted = true
+				print("CAVE_BACKUP_HELD")
+			if role != "mhost" and bool(cave.call("host_gone")):
+				enter("torch", now)
+				return false
+			if now - t_acted > TIMEOUT_MS:
+				if role == "mhost":
+					t_acted = now # the host serves until run.sh reaps it
+				else:
+					print(role.to_upper(), "_TIMEOUT: hold — the lights never went out")
+					quit(1); return true
+			return false
+		if phase == "torch":
+			cave.call("heal")
+			if role == "mguest":
+				# THE TAKEOVER: same process, same port, same identity.
+				if not acted:
+					acted = true
+					cave.call("on_takeover")
+				if int(cave.call("get_players")) >= 2: # mguest2 came home
+					print("CAVE_TORCH_SHARED players=", cave.call("get_players"))
+					print(role.to_upper(), "_DONE")
+					quit(0); return true
+				elif timed_out(now, "nobody rejoined the new host"):
+					quit(1); return true
+			else:
+				# mguest2: give the takeover a beat to bind, then rejoin the
+				# same address with the same token.
+				if not acted and now - t_acted > 2000:
+					acted = true
+					cave.call("on_rejoin")
+				if acted and bool(cave.call("is_seated")) and bool(cave.call("world_ready")):
+					print("CAVE_RETURNED players=", cave.call("get_players"), " dwellers=", cave.call("dwellers"))
+					print(role.to_upper(), "_DONE")
+					quit(0); return true
+				elif timed_out(now, "never re-seated with the new host"):
+					quit(1); return true
+			return false
+		return false
+
 	# ---- ACT 3: MATCH FLOW (win -> run it back) + MODERATION (kick -> ban) --
 	if role == "endhost" or role == "endguest":
 		if phase == "init":
@@ -143,10 +214,112 @@ func _process(_delta: float) -> bool:
 				quit(1); return true
 			return false
 		if phase == "world3":
+			# The relic rests at (120,80) — the guest goes to pick it up.
 			if bool(cave.call("world_ready")):
-				enter("cull", now)
+				if role == "endguest":
+					cave.call("walk_to", 120.0, 90.0)
+				enter("relic1", now)
 			elif timed_out(now, "world never materialized"):
 				quit(1); return true
+			return false
+		if phase == "relic1":
+			# OWNERSHIP TRANSFER, leg 1: the guest takes the carryable. Both
+			# processes advance on the REPLICATED owner, so they stay in step.
+			cave.call("heal")
+			if role == "endguest" and int(cave.call("prompt_kind")) == 4:
+				cave.call("interact")
+			if int(cave.call("relic_owner")) == 2:
+				if role == "endhost":
+					set_meta("relic0", cave.call("relic_pos"))
+				else:
+					cave.call("walk_to", 220.0, 160.0) # carry it somewhere
+				enter("relic2", now)
+			elif timed_out(now, "the relic was never taken, owner=" + str(cave.call("relic_owner"))):
+				quit(1); return true
+			return false
+		if phase == "relic2":
+			# Leg 2: the HOST'S screen watches the relic ride the guest —
+			# the carrier's writes stream like the carrier itself does.
+			cave.call("heal")
+			if role == "endhost":
+				var moved: Vector2 = Vector2(cave.call("relic_pos")) - get_meta("relic0")
+				if moved.length() > 60.0:
+					print("CAVE_RELIC_MOVED d=", moved.length())
+					enter("relic3", now)
+				elif timed_out(now, "the carried relic never moved, d=" + str(moved.length())):
+					quit(1); return true
+			else:
+				var mine: Vector2 = cave.call("my_pos")
+				if mine.distance_to(Vector2(220.0, 160.0)) < 6.0:
+					cave.call("drop_relic") # set it down here
+				if int(cave.call("relic_owner")) == 0:
+					enter("relic3", now)
+				elif timed_out(now, "never set the relic down"):
+					quit(1); return true
+			return false
+		if phase == "relic3":
+			# Leg 3: it rests where the guest left it; the host takes and
+			# releases it — a full hand-off cycle, then on with the run.
+			cave.call("heal")
+			if role == "endhost":
+				if int(cave.call("relic_owner")) == 0 and not acted:
+					acted = true
+					cave.call("walk_to", 220.0, 150.0)
+				if int(cave.call("prompt_kind")) == 4:
+					cave.call("interact")
+			if int(cave.call("relic_owner")) == 1:
+				# HOLD it a beat before setting it down: the guest's driver
+				# polls at frame rate, and a take-and-drop inside one tick
+				# window is a pulse its poll can miss (the EVENT fires on
+				# every peer regardless — this dwell is for the test's
+				# sampling, and it's what a human hand does anyway).
+				if role == "endguest":
+					enter("fell", now)
+				elif not get_meta("held", false):
+					set_meta("held", true)
+					set_meta("held_at", now)
+				elif now - int(get_meta("held_at")) > 1200:
+					cave.call("drop_relic")
+					enter("fell", now)
+			elif timed_out(now, "the host never took the relic, owner=" + str(cave.call("relic_owner"))):
+				quit(1); return true
+			return false
+		if phase == "fell":
+			# DOWNED, deliberately: the guest puts the host on the floor.
+			# The body keeps its position (owner-streamed — the owner just
+			# stopped moving it), the bag spills, the bleed clock arms.
+			cave.call("heal")
+			if role == "endguest":
+				if int(cave.call("their_hp")) > 0:
+					if bool(cave.call("can_throw")):
+						var d: Vector2 = (Vector2(cave.call("their_pos")) - Vector2(cave.call("my_pos"))).normalized()
+						if d != Vector2.ZERO:
+							cave.call("throw", d.x, d.y)
+				else:
+					enter("raise", now)
+			elif int(cave.call("my_hp")) <= 0:
+				enter("raise", now)
+			if timed_out(now, "the host never went down"):
+				quit(1); return true
+			return false
+		if phase == "raise":
+			# REVIVE: E on the body — back at REVIVE_HP, IN PLACE, before
+			# the bleed-out clock wins the race (CAVE_REVIVED vs the
+			# CAVE_RESPAWNED a bleed-out would print instead).
+			if role == "endguest":
+				if int(cave.call("prompt_kind")) == 5:
+					cave.call("interact")
+				if int(cave.call("their_hp")) > 0:
+					print("CAVE_RAISED their_hp=", cave.call("their_hp"))
+					enter("cull", now)
+				elif timed_out(now, "never revived, prompt=" + str(cave.call("prompt_kind"))):
+					quit(1); return true
+			else:
+				if int(cave.call("my_hp")) > 0:
+					print("CAVE_RAISED my_hp=", cave.call("my_hp"))
+					enter("cull", now)
+				elif timed_out(now, "never came back"):
+					quit(1); return true
 			return false
 		if phase == "cull":
 			# The ONLY floor (CAVE_FLOORS=1): kill wave 1, healing through bites.

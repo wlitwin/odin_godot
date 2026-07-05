@@ -235,7 +235,43 @@ session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backu
 `session_host_resume` is called on a fresh session with the factory already installed;
 every other player comes back disconnected and rejoins with their tokens, reclaiming ids,
 stats, and owned entities exactly like any reconnect. The dead run's host has no token
-(hosts never JOIN), so in v1 it returns as a new player. Returns false on a corrupt blob.
+(hosts never JOIN), so it returns as a new player. Returns false on a corrupt blob.
+
+Backups also carry the GAME'S campaign bytes — wave directors, AI clocks, whatever the
+session can't know — via the same blob split kit/save's envelope makes:
+
+```odin
+Backup_Blob_Proc :: proc(user: rawptr, w: ^knet.Writer)
+session_set_backup_blob :: proc(s: ^Session, user: rawptr, write: Backup_Blob_Proc)
+session_backup_parts :: proc(s: ^Session, allocator := context.temp_allocator) -> (game_blob: []u8, snapshot: []u8, ok: bool)
+```
+
+**The takeover recipe** (host migration's stepping-stone shape, live in cavecrawl's
+`cave_lobby_on_takeover`): on `Ev_Host_Left`, the peer holding a backup splits it with
+`session_backup_parts` (it returns copies — the resume's re-init frees the stored
+payload), wipes its LOCAL world copies (nodes and game maps — the factory is about to
+rebuild them), rebinds its transport as a server, calls `session_host_resume` with its own
+id, and parses the game blob back. Friends rejoin the same address with their tokens and
+reclaim themselves.
+
+## Ownership transfer
+
+Ownership is *which peer's writes stream out* of an entity's owner-stream fields —
+carrying, mounting, possession, and dragging a downed friend are all one call, usually
+from a command hook:
+
+```odin
+session_set_owner :: proc(s: ^Session, id: knet.Net_Id, owner: knet.Player_Id)
+```
+
+`PLAYER_ID_INVALID` hands it back to nobody: the entity rests where its last owner left
+it (host-authoritative deltas still flow). Every peer gets `Ev_Owner_Changed{id, owner,
+prev}` — the new carrier starts gluing the entity to itself off that event, role-free.
+Remote screens SNAP across the handoff (the transfer resets the stream ring and bumps the
+warp), and the old owner stops streaming by construction — `registry_write_streams` only
+walks entities owned by me. In-flight packets from the old owner may land for ~a round
+trip; they carry the pre-bump warp, so the first new-warp sample supersedes them with a
+snap, never a blend.
 
 ## Gotchas
 

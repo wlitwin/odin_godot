@@ -159,6 +159,23 @@ cave_command_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net
 		cave_credit(self, player, chest)
 		return
 	}
+	if entity == self.relic_id && self.relic != nil {
+		// THE HANDOFF ITSELF — ownership transfer from the hook, exactly one
+		// call each way. Grab: first-come (a later grab finds it carried and
+		// does nothing). Drop: only the carrier's counts; the proc mutates
+		// nothing replicated, so anyone else's accepted drop is a no-op.
+		switch cmd {
+		case RELIC_CMD_GRAB:
+			if ksess.session_owner_of(&self.ses, entity) == knet.PLAYER_ID_INVALID {
+				ksess.session_set_owner(&self.ses, entity, player)
+			}
+		case RELIC_CMD_DROP:
+			if ksess.session_owner_of(&self.ses, entity) == player {
+				ksess.session_set_owner(&self.ses, entity, knet.PLAYER_ID_INVALID)
+			}
+		}
+		return
+	}
 	if sp, is_spel := self.spelunkers[entity]; is_spel {
 		switch cmd {
 		case SPELUNKER_CMD_DROP:
@@ -254,8 +271,12 @@ cave_host_tick :: proc(self: ^CaveLobby) {
 	// Respawn restores STATE; position is owner-streamed, so each OWNER
 	// walks out of the grave themselves (see the was_dead edge in process).
 	for id, at in self.respawn_at {
-		if self.host_ticks >= at {
-			sp := self.spelunkers[id]
+		sp := self.spelunkers[id]
+		if sp.hp > 0 { // a friend revived them — the bleed-out clock stops
+			delete_key(&self.respawn_at, id)
+			continue
+		}
+		if self.host_ticks >= at { // bled out: a fresh body at the spawn
 			sp.hp = MAX_HP
 			sp.stamina = MAX_STAMINA
 			delete_key(&self.respawn_at, id)

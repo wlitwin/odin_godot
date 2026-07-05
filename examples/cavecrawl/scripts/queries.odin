@@ -69,6 +69,28 @@ cave_lobby_dwellers :: proc(self: ^CaveLobby) -> gd.Int {
 }
 
 @(gd_method)
+cave_lobby_relic_owner :: proc(self: ^CaveLobby) -> gd.Int {
+	return gd.Int(ksess.session_owner_of(&self.ses, self.relic_id))
+}
+
+@(gd_method)
+cave_lobby_relic_pos :: proc(self: ^CaveLobby) -> gd.Vector2 {
+	if self.relic == nil {return {}}
+	return {self.relic.x, self.relic.y}
+}
+
+@(gd_method)
+cave_lobby_host_gone :: proc(self: ^CaveLobby) -> gd.Bool {
+	return gd.Bool(self.host_gone)
+}
+
+@(gd_method)
+cave_lobby_has_backup :: proc(self: ^CaveLobby) -> gd.Bool {
+	_, _, held := ksess.session_backup_parts(&self.ses)
+	return gd.Bool(held)
+}
+
+@(gd_method)
 cave_lobby_won :: proc(self: ^CaveLobby) -> gd.Bool {
 	return gd.Bool(self.level != nil && self.level.won != 0)
 }

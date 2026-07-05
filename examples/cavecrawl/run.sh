@@ -281,6 +281,26 @@ attempt() {
 	done
 	kill "$h3" "$g3" "$g4" 2>/dev/null
 
+	# OWNERSHIP TRANSFER: the relic changes hands guest -> rests -> host, and
+	# the HOST'S screen watched it ride the guest (owner-streamed motion).
+	for log in "$h3log" "$g3log"; do
+		grep -q "CAVE_RELIC owner=2" "$log" || { echo "  FAIL: guest never carried the relic in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_RELIC owner=0" "$log" || { echo "  FAIL: the relic never rested in $(basename "$log")"; ok=0; }
+		grep -q "CAVE_RELIC owner=1" "$log" || { echo "  FAIL: host never carried the relic in $(basename "$log")"; ok=0; }
+	done
+	grep -qE "CAVE_RELIC_MOVED d=([6-9][0-9]|[0-9]{3,})" "$h3log" || { echo "  FAIL: the carried relic never moved on the host's screen"; ok=0; }
+
+	# DOWNED / REVIVE: the guest downs the host on purpose and raises them
+	# IN PLACE at REVIVE_HP before the bleed-out clock — CAVE_REVIVED is the
+	# in-place path; a bleed-out would print CAVE_RESPAWNED and fail this.
+	grep -q "CAVE_DIED" "$h3log" || { echo "  FAIL: the host never went down"; ok=0; }
+	grep -q "CAVE_REVIVED" "$h3log" || { echo "  FAIL: the host was never revived in place"; ok=0; }
+	grep -q "CAVE_REVIVE applied=true" "$g3log" || { echo "  FAIL: the guest's revive never applied"; ok=0; }
+	# No exact-hp assert here: the raised host is bitten/heals between
+	# samples (the mend-phase lesson). CAVE_REVIVED above already pins the
+	# in-place-below-max path; this just proves the guest SAW them rise.
+	grep -qE "CAVE_RAISED (their_hp|my_hp)=[0-9]+" "$g3log" || { echo "  FAIL: the guest never saw the host rise"; ok=0; }
+
 	# THE WIN and the RESTART: one replicated byte each way, every screen.
 	for log in "$h3log" "$g3log"; do
 		grep -q "CAVE_WON depth=1" "$log" || { echo "  FAIL: never conquered in $(basename "$log")"; ok=0; }
@@ -303,6 +323,50 @@ attempt() {
 		echo "  --- endguest2 log tail ---"; tail -n 15 "$g4log" | sed 's/^/    /'
 	fi
 
+	# ---- ACT 4: HOST MIGRATION. Three players; the host dies with kill -9
+	# (no goodbye, no socket close); the backup holder resumes the run as
+	# the new host on the SAME port; the third player rejoins and reclaims
+	# their identity — the whole stepping stone, end to end.
+	local p4=$((port + 2))
+	local h4log="$LOGDIR/mhost.log" g5log="$LOGDIR/mguest.log" g6log="$LOGDIR/mguest2.log"
+	: >"$h4log"; : >"$g5log"; : >"$g6log"
+	local h4; h4=$(launch mhost "$h4log" "$p4" hosty "")
+	local i4=0
+	while ((i4 < 50)); do
+		grep -q "CAVE_HOSTING" "$h4log" && break
+		if ! kill -0 "$h4" 2>/dev/null; then break; fi
+		sleep 0.1; ((i4++))
+	done
+	local g5; g5=$(launch mguest "$g5log" "$p4" guest cave-m-a)
+	local g6; g6=$(launch mguest2 "$g6log" "$p4" walker cave-m-b)
+	local w5=0
+	while ((w5 < 400)); do
+		grep -q "CAVE_BACKUP_HELD" "$g5log" && break
+		sleep 0.1; ((w5++))
+	done
+	kill -9 "$h4" 2>/dev/null # no goodbye, no FIN — the real crash shape
+	local w6=0
+	while ((w6 < 900)); do
+		if ! kill -0 "$g5" 2>/dev/null && ! kill -0 "$g6" 2>/dev/null; then break; fi
+		sleep 0.1; ((w6++))
+	done
+	kill "$g5" "$g6" 2>/dev/null
+
+	grep -q "CAVE_BACKUP size=" "$g5log" || { echo "  FAIL: the backup never shipped"; ok=0; }
+	grep -qE "CAVE_TAKEOVER me=2 players=3 entities=[0-9]+ dwellers=[0-9]+" "$g5log" || { echo "  FAIL: the takeover failed"; ok=0; }
+	grep -q "CAVE_TORCH_SHARED players=2" "$g5log" || { echo "  FAIL: nobody rejoined the new host"; ok=0; }
+	grep -q "MGUEST_DONE" "$g5log" || { echo "  FAIL: new host did not finish"; ok=0; }
+	grep -q "CAVE_REJOINING" "$g6log" || { echo "  FAIL: the walker never rejoined"; ok=0; }
+	grep -q "CAVE_SEATED me=3" "$g6log" || { echo "  FAIL: the walker lost their identity"; ok=0; }
+	grep -qE "CAVE_RETURNED players=[2-3] dwellers=[0-9]+" "$g6log" || { echo "  FAIL: the walker's world is wrong"; ok=0; }
+	grep -q "MGUEST2_DONE" "$g6log" || { echo "  FAIL: walker did not finish"; ok=0; }
+
+	if ((ok != 1)); then
+		echo "  --- mhost log tail ---"; tail -n 12 "$h4log" | sed 's/^/    /'
+		echo "  --- mguest log tail ---"; tail -n 12 "$g5log" | sed 's/^/    /'
+		echo "  --- mguest2 log tail ---"; tail -n 12 "$g6log" | sed 's/^/    /'
+	fi
+
 	if ((ok == 1)); then
 		echo "  PASS on port $port"
 		echo "  --- host ---"; grep -E "CAVE_" "$hlog" | sed 's/^/    /'
@@ -310,6 +374,7 @@ attempt() {
 		echo "  --- resume ---"; grep -E "CAVE_" "$h2log" | sed 's/^/    /'
 		echo "  --- rejoin ---"; grep -E "CAVE_" "$g2log" | sed 's/^/    /'
 		echo "  --- endgame ---"; grep -E "CAVE_" "$h3log" "$g3log" "$g4log" | sed 's/^/    /'
+		echo "  --- migration ---"; grep -E "CAVE_" "$g5log" "$g6log" | sed 's/^/    /'
 		return 0
 	fi
 	echo "  --- resume log tail ---"; tail -n 15 "$h2log" | sed 's/^/    /'

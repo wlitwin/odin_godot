@@ -8,6 +8,7 @@ package cavecrawl_scripts
 import gd "godot:godot"
 import "godot:gdext"
 import kcombat "godot:kit/combat"
+import ksess "godot:kit/session"
 import kcomms "godot:kit/comms"
 import kitems "godot:kit/items"
 import kui "godot:kit/ui"
@@ -30,6 +31,7 @@ install_controls :: proc "contextless" () {
 	bind("cave_interact", i64('E'))
 	bind("cave_drop", i64('Q'))
 	bind("cave_heal", i64('R'))
+	bind("cave_set_down", i64('G')) // set the relic down
 	bind("cave_score", i64(gd.Key.Tab))
 	bind("cave_talk", i64(gd.Key.Enter))
 	bind("cave_throw", i64(gd.Key.Space))
@@ -60,6 +62,9 @@ poll_controls :: proc(self: ^CaveLobby) {
 	}
 	if gd.is_action_just_pressed("cave_heal") {
 		cave_lobby_heal(self)
+	}
+	if gd.is_action_just_pressed("cave_set_down") {
+		cave_lobby_drop_relic(self)
 	}
 	if gd.is_action_just_pressed("cave_drop") {
 		for s, i in me.bag {
@@ -149,7 +154,24 @@ cave_lobby_interact :: proc(self: ^CaveLobby) {
 		applied := pickup_grab_cmd(&self.ses.ctx, p, me.x, me.y)
 		kui.inv_refresh(&self.inv, me.bag[:], &self.table)
 		gd.print_str(fmt.tprintf("CAVE_GRAB applied=%v", applied))
+	case 4:
+		applied := relic_grab_cmd(&self.ses.ctx, self.relic, me.x, me.y)
+		gd.print_str(fmt.tprintf("CAVE_RELIC_GRAB applied=%v", applied))
+	case 5:
+		sp := self.spelunkers[self.target_id]
+		applied := spelunker_revive_cmd(&self.ses.ctx, sp, me.x, me.y)
+		gd.print_str(fmt.tprintf("CAVE_REVIVE applied=%v", applied))
 	}
+}
+
+// Set the relic down where I stand. A verb like any other — the hook checks
+// I am actually the carrier, so a stray G is a harmless no.
+@(gd_method)
+cave_lobby_drop_relic :: proc(self: ^CaveLobby) {
+	if !self.started || self.relic == nil {return}
+	if ksess.session_owner_of(&self.ses, self.relic_id) != self.ses.me {return}
+	applied := relic_drop_cmd(&self.ses.ctx, self.relic)
+	gd.print_str(fmt.tprintf("CAVE_RELIC_DROP applied=%v", applied))
 }
 
 // Throw a rock toward (dx, dy) — the ONE author-surface call, every peer.

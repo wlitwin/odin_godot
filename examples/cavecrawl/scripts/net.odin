@@ -117,6 +117,24 @@ cave_lobby_kick :: proc(self: ^CaveLobby, player: gd.Int) {
 	gd.print_str(fmt.tprintf("CAVE_KICKED player=%d", u64(target)))
 }
 
+// Rejoin a run whose host CHANGED under us (takeover): drop the dead
+// transport and our stale world, then join the same address with the same
+// token — the new host's WELCOME + SES_WORLD give us ourselves back.
+@(gd_method)
+cave_lobby_on_rejoin :: proc(self: ^CaveLobby) {
+	if !self.running || self.ses.is_host || !self.host_gone {return}
+	cave_wipe_local(self)
+	gd.multiplayer_clear_peer(self.owner)
+	if !gd.join(self.owner, "127.0.0.1", port()) {
+		kui.lobby_set_status(&self.ui, "Could not start rejoining")
+		return
+	}
+	ksess.session_client_start(&self.ses, my_token(), my_name(self))
+	self.host_gone = false
+	kui.lobby_set_status(&self.ui, "Rejoining the cave...")
+	gd.print_str("CAVE_REJOINING")
+}
+
 @(gd_method)
 cave_lobby_on_host :: proc(self: ^CaveLobby) {
 	if self.running {return}

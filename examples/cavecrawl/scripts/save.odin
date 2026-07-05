@@ -27,6 +27,15 @@ save_path :: proc() -> cstring {
 	return "user://cave_save.fslp"
 }
 
+// The session's backup-blob hook: every backup that ships to the designated
+// holder carries the same campaign bytes a save file does — a takeover
+// resumes the RUN, not a diorama of it.
+cave_backup_blob :: proc(user: rawptr, w: ^knet.Writer) {
+	self := cast(^CaveLobby)user
+	if !self.ses.is_host || !self.started {return}
+	write_game_blob(self, w)
+}
+
 @(private = "file")
 write_game_blob :: proc(self: ^CaveLobby, w: ^knet.Writer) {
 	knet.write_u64(w, u64(self.host_ticks))
@@ -156,4 +165,55 @@ cave_lobby_on_resume :: proc(self: ^CaveLobby) {
 		),
 	)
 	gd.print_str(fmt.tprintf("CAVE_BLOB wave=%d ticks=%d brains=%d", self.director.wave, self.host_ticks, len(self.brains)))
+}
+
+
+// HOST MIGRATION, the stepping-stone shape: the designated backup holder
+// becomes the new host of the run they were just playing — same process,
+// same port, same identity. The dead run's local copies go first (the
+// factory rebuilds everything from the backup snapshot); friends rejoin
+// with their tokens and reclaim themselves, exactly like any reconnect
+// (see on_rejoin). No election, no live handoff: the friendslop version is
+// "the person holding the backup presses the button".
+@(gd_method)
+cave_lobby_on_takeover :: proc(self: ^CaveLobby) {
+	if self.ses.is_host || !self.host_gone {return}
+	game_blob, snap, held := ksess.session_backup_parts(&self.ses) // copies — survive the re-init
+	if !held {
+		kui.lobby_set_status(&self.ui, "No backup to carry")
+		gd.print_str("CAVE_TAKEOVER_FAIL no-backup")
+		return
+	}
+	me := self.ses.me
+	cave_wipe_local(self) // stale nodes and maps of the dead run
+	gd.multiplayer_clear_peer(self.owner)
+	if !gd.host(self.owner, port()) {
+		gd.print_str("CAVE_HOST_FAIL")
+		return
+	}
+	if !ksess.session_host_resume(&self.ses, me, my_name(self), snap) {
+		gd.print_str("CAVE_TAKEOVER_FAIL snapshot")
+		return
+	}
+	if !read_game_blob(self, game_blob) {
+		gd.print_str("CAVE_TAKEOVER_FAIL blob")
+		return
+	}
+	self.cols = kcombat.combat_columns(&self.ses)
+	self.slain_col = ksess.session_stat_column(&self.ses, "slain")
+	if self.level != nil {
+		cave_cache_floor(self, int(self.level.depth))
+	}
+	self.host_gone = false
+	kui.lobby_set_status(&self.ui, "You carry the torch now")
+	kcomms.comms_system(&self.comms, "the torch passes")
+	gd.print_str(
+		fmt.tprintf(
+			"CAVE_TAKEOVER me=%d players=%d entities=%d dwellers=%d",
+			u64(self.ses.me),
+			ksess.session_count(&self.ses),
+			knet.registry_count(&self.ses.reg),
+			len(self.dwellers),
+		),
+	)
 }

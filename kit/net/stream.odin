@@ -71,6 +71,15 @@ stream_ring_destroy :: proc(ring: ^Stream_Ring) {
 	ring^ = {}
 }
 
+// Forget every buffered sample but keep the allocations. An OWNERSHIP
+// TRANSFER calls this: the buffered timeline is the OLD owner's motion, and
+// sampling across the handoff would glide the entity from where the old
+// owner left it to wherever the new owner stands — a slide nobody performed.
+stream_ring_reset :: proc(ring: ^Stream_Ring) {
+	ring.head = 0
+	ring.count = 0
+}
+
 // Push one snapshot (copied). Stale arrivals — at or before the newest sample's
 // stamp — are dropped, mirroring interp_push (the unreliable-ORDERED channel
 // already discards reordered packets; this is the belt to those suspenders).

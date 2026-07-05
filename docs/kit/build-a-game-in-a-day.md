@@ -106,7 +106,7 @@ everyone. That is the whole replication story: **change a field, done.**
 Give players' avatars owner-streamed fields:
 
 ```odin
-x, y: f32 `gd:"replicate=owner_stream"`,
+x, y: f32 `gd:"replicate,interp,owner"`,
 ```
 
 The OWNER writes them every frame; the toolkit ships last-value snapshots on
@@ -235,6 +235,31 @@ The session snapshot already carries identity, stats, and every entity —
 saving is the backup-host contract pointed at a file. Your blob carries what
 only you know (wave director, AI clocks). Friends rejoin a resumed run with
 their persisted tokens like any reconnect. See [save](save.md).
+
+## 9b. Things your friends carry (30 minutes)
+
+Give an entity owner-streamed position and it can be CARRIED: a grab command
+whose hook calls `session_set_owner(ses, id, player)`, an `Ev_Owner_Changed`
+handler, and per-frame glue on the carrier (`relic.x = me.x + 10`). Drop
+hands it to `PLAYER_ID_INVALID` — it rests where it was left. Mounts,
+possession, and dragging bodies are the same three pieces.
+
+And the co-op staple on top: **downed/revive** is ONE predicted command on
+the downed player's entity (`hp = REVIVE_HP` behind a range gate), a
+bleed-out clock on the host, and an hp-at-the-edge check so the owner knows
+a revive-in-place from a bleed-out respawn. No new machinery — see
+cavecrawl's `spelunker_revive`.
+
+## 9c. When the host's cat unplugs the router (30 minutes)
+
+The backup snapshots that ship every few seconds (phase 1 machinery) plus
+`session_set_backup_blob` (your campaign bytes ride along) make the death of
+the host survivable: the holder splits the payload with
+`session_backup_parts`, wipes its local world, rebinds as a server, and
+`session_host_resume`s under its own identity. Everyone else rejoins with
+their tokens and reclaims themselves. Cavecrawl's `on_takeover`/`on_rejoin`
+pair is the whole recipe, and acid act 4 kills the host with `kill -9` to
+prove it.
 
 ## 10. Ship it on Steam (1 hour + a friend)
 

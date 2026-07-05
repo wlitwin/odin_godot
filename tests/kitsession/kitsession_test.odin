@@ -902,6 +902,10 @@ resume_run_from_backup :: proc(t: ^testing.T) {
 	kills := ksess.session_stat_column(&host.s, "kills")
 	ksess.session_stat_set(&host.s, bob.s.me, kills, 9)
 	world_bot.hp = 21 // post-spawn mutation: the backup must carry CURRENT state
+	// The game's own campaign state rides every backup (the kit/save split).
+	ksess.session_set_backup_blob(&host.s, nil, proc(user: rawptr, w: ^knet.Writer) {
+		knet.write_u64(w, 0xCAFE)
+	})
 
 	now := 50.0
 	for _ in 0 ..< 10 {
@@ -909,17 +913,18 @@ resume_run_from_backup :: proc(t: ^testing.T) {
 	}
 	testing.expect(t, len(alice.s.backup) > 0)
 
-	// THE HOST DIES. Alice's game copies the blob out of the dead session and
-	// resumes the run as the new host (fresh session, factory installed).
-	blob := make([]u8, len(alice.s.backup))
-	defer delete(blob)
-	copy(blob, alice.s.backup)
+	// THE HOST DIES. Alice's game splits the backup into the campaign blob
+	// and the snapshot, and resumes the run as the new host.
+	game_blob, snap, pok := ksess.session_backup_parts(&alice.s) // copies — safe across the re-init
+	testing.expect(t, pok, "the backup payload must split")
+	br := knet.reader_make(game_blob)
+	testing.expect_value(t, knet.read_u64(&br), u64(0xCAFE)) // the game's bytes round-trip
 	old_me := alice.s.me
 
 	host2: Peer_Box
 	box_make(&host2, 1)
 	defer box_destroy(&host2)
-	testing.expect(t, ksess.session_host_resume(&host2.s, old_me, "alice", blob))
+	testing.expect(t, ksess.session_host_resume(&host2.s, old_me, "alice", snap))
 
 	// The roster survived: 3 players, only alice connected; identity table
 	// intact for everyone who ever JOINed (the dead host has no token — v1).
@@ -1089,4 +1094,95 @@ locked_and_full_doors_spare_returning_seats :: proc(t: ^testing.T) {
 	pump([]^Peer_Box{&host, &alice2})
 	testing.expect(t, alice2.s.joined, "a rejoin passes the locked door")
 	testing.expect_value(t, alice2.s.me, knet.Player_Id(2))
+}
+
+
+// ---- ownership transfer ---------------------------------------------------------
+
+@(test)
+ownership_transfer_hands_the_stream_over :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+	drain(&host.s)
+	drain(&alice.s)
+	drain(&bob.s)
+
+	hbot := Bot{hp = 10, x = 1}
+	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set, owner = alice.s.me)
+	ksess.session_start_replicating(&host.s)
+	pump(boxes)
+	abot := alice.bots[id]
+	bbot := bob.bots[id]
+	drain(&host.s)
+	drain(&alice.s)
+	drain(&bob.s)
+	now := 100.0
+
+	// Alice owns the streamed x: her writes reach the host AND bob.
+	abot.x = 10
+	step(boxes, &now)
+	abot.x = 20
+	step(boxes, &now)
+	now += 1.0
+	_, _ = ksess.session_tick(&host.s, 0.0, now)
+	_, _ = ksess.session_tick(&bob.s, 0.0, now)
+	testing.expect_value(t, hbot.x, f32(20))
+	testing.expect_value(t, bbot.x, f32(20))
+
+	// THE HANDOFF: bob carries it now. Every peer hears the same transfer.
+	ksess.session_set_owner(&host.s, id, bob.s.me)
+	pump(boxes)
+	for b in boxes {
+		evs := drain(&b.s)
+		changed := false
+		for ev in evs {
+			if oc, ok := ev.(ksess.Ev_Owner_Changed); ok {
+				changed = oc.id == id && oc.owner == bob.s.me && oc.prev == alice.s.me
+			}
+		}
+		testing.expect(t, changed, "every peer must hear the handoff")
+	}
+	testing.expect_value(t, ksess.session_owner_of(&alice.s, id), bob.s.me)
+
+	// The OLD owner's writes now go nowhere — she no longer streams it.
+	abot.x = 55
+	step(boxes, &now)
+	step(boxes, &now)
+	now += 1.0
+	_, _ = ksess.session_tick(&host.s, 0.0, now)
+	testing.expect_value(t, hbot.x, f32(20))
+
+	// The NEW owner's writes drive every other screen — the host's, and the
+	// old owner's own copy (she samples now, like any remote).
+	bbot.x = 77
+	step(boxes, &now)
+	bbot.x = 78
+	step(boxes, &now)
+	now += 1.0
+	_, _ = ksess.session_tick(&host.s, 0.0, now)
+	_, _ = ksess.session_tick(&alice.s, 0.0, now)
+	testing.expect_value(t, hbot.x, f32(78))
+	testing.expect_value(t, abot.x, f32(78))
+
+	// And back to NOBODY: it rests where the last owner left it.
+	ksess.session_set_owner(&host.s, id, knet.PLAYER_ID_INVALID)
+	pump(boxes)
+	bbot.x = 99
+	step(boxes, &now)
+	now += 1.0
+	_, _ = ksess.session_tick(&host.s, 0.0, now)
+	testing.expect_value(t, hbot.x, f32(78))
 }

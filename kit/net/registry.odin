@@ -325,6 +325,30 @@ registry_teleport :: proc(reg: ^Registry, id: Net_Id) {
 	}
 }
 
+// OWNERSHIP TRANSFER: from now on, `owner`'s writes are what stream out of
+// this entity's .Owner_Stream fields (PLAYER_ID_INVALID = nobody streams —
+// host-authoritative deltas still flow like always). Ring and warp reset so
+// remote screens SNAP to the new owner's first snapshot instead of
+// interpolating across the handoff; the OLD owner stops streaming by
+// construction (registry_write_streams only walks entities owned by me).
+// In-flight packets from the old owner may land for ~a round trip — they
+// carry the pre-bump warp, so the first new-warp sample supersedes them with
+// a snap, never a blend. Every peer must apply the same transfer (the
+// session layer broadcasts it ordered with spawns and deltas).
+registry_set_owner :: proc(reg: ^Registry, id: Net_Id, owner: Player_Id) -> bool {
+	e, ok := &reg.entries[id]
+	if !ok {
+		return false
+	}
+	if e.owner == owner {
+		return true
+	}
+	e.owner = owner
+	stream_ring_reset(&e.stream)
+	e.warp += 1
+	return true
+}
+
 // Write one stream batch for every entity owned by `me`. Returns the entity
 // count; 0 = nothing owned that streams (skip the send).
 registry_write_streams :: proc(w: ^Writer, reg: ^Registry, me: Player_Id, sender_now: f64) -> int {

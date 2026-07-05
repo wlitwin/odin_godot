@@ -39,9 +39,16 @@ game in order and links each page below at the moment you need it.
 | [ui](ui.md) | `kit/ui` | Stock-theme lobby, chat, scoreboard, HUD widgets |
 | [fx](fx.md) | `kit/fx` | Bursts, flashes, and the projectile tracer pool |
 
-## Post-v1 (recorded, deliberate)
+## Beyond the basics
 
-Ownership transfer (carry/mounts/revive-dragging), downed/revive, live host
-migration (the backup snapshots already ship), shared-seed procgen, voice
-(v1 assumes Discord). The architecture holds the door open for all of these;
-see the design notes in the repository's knowledge base.
+Three former "post-v1" staples are in, demonstrated by cavecrawl's acid acts:
+**ownership transfer** (`session_set_owner` — carry/mounts/possession; the
+relic), **downed/revive** (`spelunker_revive` — one predicted command, no
+hook), and **host takeover** (`session_backup_parts` + `session_host_resume`
+— the murdered host's run resumes under the backup holder, friends rejoin
+and reclaim themselves).
+
+Still deliberately out: LIVE host migration (election + automatic rendezvous
+— the takeover above is the manual stepping stone), shared-seed procgen,
+voice (assume Discord). See the design notes in the repository's knowledge
+base.

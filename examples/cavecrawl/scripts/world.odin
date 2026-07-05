@@ -9,6 +9,7 @@ import gd "godot:godot"
 import rt "godot:runtime"
 import kai "godot:kit/ai"
 import kcomms "godot:kit/comms"
+import kfx "godot:kit/fx"
 import kinter "godot:kit/interact"
 import kitems "godot:kit/items"
 import knet "godot:kit/net"
@@ -56,6 +57,13 @@ cave_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 		p.net_id = id
 		self.pickups[id] = p
 		return p, &pickup_command_set
+	case RELIC_TYPE:
+		node := spawn_scene(self, self.relic_scene)
+		self.nodes[id] = node
+		rl := rt.script_of(node, Relic)
+		self.relic = rl
+		self.relic_id = id
+		return rl, &relic_command_set
 	case DWELLER_TYPE:
 		node := spawn_scene(self, self.dweller_scene)
 		self.nodes[id] = node
@@ -107,6 +115,10 @@ cave_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	delete_key(&self.brains, id) // host-side mind (empty map on clients)
 	if self.level != nil && self.level.net_id == id {
 		self.level = nil
+	}
+	if self.relic_id == id {
+		self.relic = nil
+		self.relic_id = 0
 	}
 }
 
@@ -208,6 +220,12 @@ cave_lobby_on_start :: proc(self: ^CaveLobby) {
 
 	cave_build_floor(self, 1)
 
+	// The relic: one per run, resting near the mouth until someone carries it.
+	rp, rid := ksess.session_spawn_make(&self.ses, RELIC_TYPE)
+	relic := cast(^Relic)rp
+	relic.x, relic.y = SPAWN_X + 40, SPAWN_Y - 40
+	ksess.session_spawn_send(&self.ses, rid)
+
 	i := 0
 	for _, p in self.ses.players {
 		if !p.connected {continue}
@@ -225,6 +243,34 @@ cave_lobby_on_start :: proc(self: ^CaveLobby) {
 	enter_the_cave(self)
 	kcomms.comms_system(&self.comms, "the descent begins")
 	gd.print_str(fmt.tprintf("CAVE_STARTED spel=%d", i))
+}
+
+// Drop every LOCAL copy of the world — nodes and maps — without touching
+// the session. The two callers rebuild through the factory right after: a
+// takeover (the backup snapshot respawns everything) and a rejoin (the new
+// host's SES_WORLD does). The registry's own teardown is session_init's.
+cave_wipe_local :: proc(self: ^CaveLobby) {
+	for _, node in self.nodes {
+		gd.node_queue_free(node)
+	}
+	clear(&self.nodes)
+	clear(&self.spelunkers)
+	clear(&self.chests)
+	clear(&self.doors)
+	clear(&self.pickups)
+	clear(&self.dwellers)
+	clear(&self.avatar_of)
+	clear(&self.brains)
+	clear(&self.respawn_at)
+	clear(&self.flying)
+	kfx.tracers_clear(&self.tracers)
+	self.me_spel = nil
+	self.level = nil
+	self.relic = nil
+	self.relic_id = 0
+	self.director = {}
+	self.dens_used = 0
+	self.last_wave = 0
 }
 
 // Host: LEVEL MIGRATION — the whole party stood at the open door, so the
@@ -294,6 +340,9 @@ cave_restart :: proc(self: ^CaveLobby) {
 		sp.bag = {}
 		sp.cds = {}
 	}
+	if self.relic != nil { // the relic returns to the mouth, uncarried
+		ksess.session_set_owner(&self.ses, self.relic_id, knet.PLAYER_ID_INVALID)
+	}
 	self.level.won = 0
 	self.level.depth = 1
 	self.level.wave = 0
@@ -316,6 +365,14 @@ update_prompt :: proc(self: ^CaveLobby) {
 	for id, p in self.pickups {
 		append(&cands, kinter.Candidate{id = u32(id), pos = {p.x, p.y, 0}})
 	}
+	if self.relic != nil && ksess.session_owner_of(&self.ses, self.relic_id) == knet.PLAYER_ID_INVALID {
+		append(&cands, kinter.Candidate{id = u32(self.relic_id), pos = {self.relic.x, self.relic.y, 0}})
+	}
+	for id, sp in self.spelunkers {
+		if sp != self.me_spel && sp.hp <= 0 {
+			append(&cands, kinter.Candidate{id = u32(id), pos = {sp.x, sp.y, 0}})
+		}
+	}
 	best, ok := kinter.pick(cands[:], {me.x, me.y, 0}, REACH)
 	if !ok {
 		self.target_kind = 0
@@ -330,6 +387,17 @@ update_prompt :: proc(self: ^CaveLobby) {
 		self.target_kind = 3
 		p := self.pickups[self.target_id]
 		kui.prompt_set(&self.prompt, fmt.tprintf("E — pick up %s", kitems.items_name(&self.table, p.item)))
+	} else if self.target_id == self.relic_id {
+		self.target_kind = 4
+		kui.prompt_set(&self.prompt, "E — take the relic")
+	} else if sp, is_spel := self.spelunkers[self.target_id]; is_spel {
+		self.target_kind = 5
+		name := "them"
+		if p, ok := ksess.session_player(&self.ses, ksess.session_owner_of(&self.ses, self.target_id)); ok {
+			name = p.name
+		}
+		kui.prompt_set(&self.prompt, fmt.tprintf("E — revive %s", name))
+		_ = sp
 	} else {
 		self.target_kind = 2
 		door := self.doors[self.target_id]
