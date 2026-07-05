@@ -571,6 +571,14 @@ session_tick_hz :: proc(s: ^Session) -> int {
 	return s.cfg.tick_hz > 0 ? s.cfg.tick_hz : knet.DEFAULT_TICK_HZ
 }
 
+// The render-timeline lag: remote-owned entities DRAW this many seconds in
+// the past (stream sampling's buffer). It is also therefore the delay that
+// re-aligns a wire-fresh consequence with the rendered simulation that
+// caused it — see knet.Later and "The two timelines" in docs/kit/net.md.
+session_interp_delay :: proc(s: ^Session) -> f64 {
+	return s.interp_delay
+}
+
 // Install the transport hookup (netgd.wire_attach calls this; hand-rolled
 // transports and tests call it directly). Survives *_start like all pre-start
 // wiring.

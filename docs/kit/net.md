@@ -250,6 +250,43 @@ steady 120ms link plays better than one wobbling 40..200ms. Read it per peer via
 `session_clock(s, peer)` and surface it however your game likes (a colored dot beats a
 number).
 
+## The two timelines (presenting consequences)
+
+A peer watching a remote simulation lives on two clocks, and mixing them up is
+the most common way a correct game looks wrong:
+
+- **The wire timeline.** Reliable state — deltas, spawns/despawns, command
+  results — applies the moment it arrives: ~one-way latency after it happened.
+- **The render timeline.** Remote-owned entities DRAW `interp_delay` in the
+  past; that buffer is what turns a 20 Hz stream into smooth motion.
+
+The skew between them is ~`interp_delay`, and it shows up whenever a
+consequence of someone else's simulation is applied on arrival: the gem
+vanishes before the rendered ball reaches it, the door opens before the
+rendered cart docks. This is the structural cost of interpolation netcode —
+resim engines collapse to one timeline by re-simulating the past, and pay in
+CPU, determinism requirements, and visible correction pops. This toolkit's
+model never mispredicts and never pops; in exchange, YOU choose the timeline
+each thing presents on. The discipline is three lines:
+
+1. **Your own simulation presents NOW** — the owner's screen is the truth
+   everyone else is waiting to see.
+2. **Consequences of remote simulations present on the render timeline** —
+   both the event and the stream crossed the same wire, so transit cancels:
+   delay the *presentation* (never the state) by `session_interp_delay(s)` and
+   it lands within jitter of the rendered cause. `knet.Later` is the queue for
+   exactly this: push `(due, kind, id)` on the state edge, drain per frame,
+   show what's due. For spatial events you can be exact instead: gate the
+   visual on the RENDERED entity reaching the spot.
+3. **Edges must outlive the slowest observer** — the authority keeps the
+   entity/state alive ≥ `interp_delay` past the event (a despawn dwell, a
+   sink dwell), or there is nothing left on screen to present when the render
+   clock gets there.
+
+Shrinking the gap globally (`interp_delay` down, `tick_hz` up via
+`session_configure`) trades smoothness under jitter for freshness — aligning
+presentation is almost always the better spend.
+
 ## Gotchas
 
 - **Deltas carry STATE, not events.** The walk memcmps entity-vs-shadow once per net tick;

@@ -1538,3 +1538,31 @@ blob_set_apply_and_dedup :: proc(t: ^testing.T) {
 	// Unknown ids refuse politely.
 	testing.expect(t, !knet.registry_set_blob(&reg, knet.Net_Id(999), []u8{1}))
 }
+
+// ---- later: presenting on the render timeline ---------------------------------
+
+@(test)
+later_presents_in_order_when_due :: proc(t: ^testing.T) {
+	l: knet.Later
+	defer knet.later_destroy(&l)
+
+	HIDE :: u16(1)
+	BURST :: u16(2)
+	knet.later_push(&l, 10.0, HIDE, knet.Net_Id(7))
+	knet.later_push(&l, 10.0, BURST, knet.Net_Id(7), 3) // same due: push order holds
+	knet.later_push(&l, 12.0, HIDE, knet.Net_Id(8))
+
+	testing.expect_value(t, len(knet.later_drain(&l, 9.99)), 0)
+	testing.expect_value(t, knet.later_pending(&l), 3)
+
+	due := knet.later_drain(&l, 10.0)
+	testing.expect_value(t, len(due), 2)
+	testing.expect_value(t, due[0].kind, HIDE)
+	testing.expect_value(t, due[1].kind, BURST)
+	testing.expect_value(t, due[1].a, u64(3))
+	testing.expect_value(t, knet.later_pending(&l), 1)
+
+	// A level change drops the pending world's events wholesale.
+	knet.later_clear(&l)
+	testing.expect_value(t, len(knet.later_drain(&l, 99.0)), 0)
+}
