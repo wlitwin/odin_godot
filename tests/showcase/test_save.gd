@@ -58,6 +58,33 @@ func _initialize() -> void:
 		if not fresh_ok:
 			print("SAVE_TEST_FRESH_DEBUG: err=%d exts=%s" % [fresh_err, fresh_exts])
 
+	# TEMPLATE PACKAGE FIXUP: a fresh template declares `package scripts` (the
+	# dialog can't know the destination), and saved NEXT TO siblings declaring
+	# another package that's a guaranteed build break — the saver must rewrite
+	# the line to match the siblings on the way to disk. (The probe above, at
+	# the project root with no siblings, pins the no-op case.)
+	var fixup_ok := false
+	var fx = ClassDB.instantiate("OdinScript")
+	if fx != null:
+		fx.set("source_code", "//gd:extends Node
+//gd:class FixMe
+package scripts
+")
+		var fx_probe := "res://scripts/__fixup_probe.odin"
+		var fx_os := ProjectSettings.globalize_path(fx_probe)
+		var fx_err = ResourceSaver.save(fx, fx_probe)
+		var fx_text := ""
+		if FileAccess.file_exists(fx_os):
+			fx_text = FileAccess.get_file_as_string(fx_os)
+			DirAccess.remove_absolute(fx_os)
+		var fx_uid := fx_os + ".uid"
+		if FileAccess.file_exists(fx_uid):
+			DirAccess.remove_absolute(fx_uid)
+		fixup_ok = fx_err == OK and fx_text.contains("package showcase_scripts") and not fx_text.contains("package scripts
+")
+		if not fixup_ok:
+			print("SAVE_TEST_FIXUP_DEBUG: err=%d text=<%s>" % [fx_err, fx_text])
+
 	# Format on save (core/format.odin): with the setting EXPLICITLY on (the headless
 	# override — the default only applies inside the editor) and odinfmt reachable, the
 	# BYTES ON DISK must come out formatted. Gated: run.sh sets SAVE_TEST_EXPECT_FMT only
@@ -82,9 +109,9 @@ func _initialize() -> void:
 		if not fmt_ok:
 			print("SAVE_TEST_FMT_DEBUG: err=%d text=<%s>" % [fmt_err, fmt_text])
 
-	var ok = err == OK and on_disk and scene_rejected and fresh_ok and fmt_ok
+	var ok = err == OK and on_disk and scene_rejected and fresh_ok and fixup_ok and fmt_ok
 	if ok:
 		print("SAVE_TEST_OK")
 	else:
-		print("SAVE_TEST_FAIL: err=%d on_disk=%s scene_err=%d fresh_ok=%s fmt_ok=%s" % [err, on_disk, scene_err, fresh_ok, fmt_ok])
+		print("SAVE_TEST_FAIL: err=%d on_disk=%s scene_err=%d fresh_ok=%s fixup_ok=%s fmt_ok=%s" % [err, on_disk, scene_err, fresh_ok, fixup_ok, fmt_ok])
 	quit(0 if ok else 1)

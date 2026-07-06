@@ -163,7 +163,16 @@
             ''
               mkdir -p $out
               # `addons/` at the archive root so it extracts straight into a project's res://.
-              ( cd ${addon} && zip -rX "$out/odin_godot-${addon.version}.zip" addons )
+              #
+              # STAGE A WRITABLE COPY FIRST: zipping the store path directly bakes the
+              # nix store's read-only modes (dr-xr-xr-x / r--r--r--) into the archive,
+              # and an installed read-only addon breaks the EDITOR — Godot must write
+              # .import/.uid sidecars beside addon resources (icon.svg first), and the
+              # failure cascades from icon-load spam into editor crashes. u+w restores
+              # normal 755/644-with-exec modes; go-w keeps the archive polite.
+              cp -r ${addon}/addons ./addons
+              chmod -R u+w,go-w ./addons
+              zip -rX "$out/odin_godot-${addon.version}.zip" addons
               ( cd $out && sha256sum ./*.zip > SHA256SUMS )
             '';
       });
