@@ -71,6 +71,10 @@ TESTS=(
     # Pure-Odin unit tests for kit/session — player identity (reconnect tokens ->
     # stable Player_Ids), join/leave/reconnect, roster sync, zombie takeover.
     "kitsession|KITSESSION_OK|tests/kitsession/run.sh"
+    # The kit's SCALE benchmark — delta walk / join snapshot / save-resume at
+    # 100/500/2000 entities. Correctness asserted hard; timings printed with
+    # loose O(n^2) tripwires only (see the STRESS table in the log).
+    "kitstress|KITSTRESS_OK|tests/kitstress/run.sh"
     # Pure-Odin unit tests for kit/comms — host-ordered chat, positional
     # markers, system lines, late-join catchup, and SES_APP route gating.
     "kitcomms|KITCOMMS_OK|tests/kitcomms/run.sh"
