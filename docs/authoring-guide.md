@@ -174,7 +174,7 @@ header that applies to that field and every export after it, until the next mark
 
 ```odin
 Player :: struct {
-	owner:   gd.CharacterBody2d,
+	owner:   gd.Character_Body2d,
 	speed:   f32 `gd:"export,group=Movement"`, // "Movement" header starts here
 	jump:    f32 `gd:"export"`,                 // …still under "Movement"
 	hp:      i32 `gd:"export,group=Combat"`,    // "Combat" header starts here
@@ -240,7 +240,7 @@ fully-resolved, non-null reference:
 
 ```odin
 Player :: struct {
-	owner:  gd.CharacterBody2d,
+	owner:  gd.Character_Body2d,
 	sprite: gd.Node2d `gd:"onready=Sprite"`,    // owner-relative node path
 	label:  gd.Node   `gd:"onready=HUD/Label"`,
 }
