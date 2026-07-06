@@ -11,6 +11,7 @@ package kit_ui
 //     kui.chat_refresh(&self.chat, &self.comms)   // on any Ev_Line
 
 import gd "godot:godot"
+import "godot:gdext"
 import kcomms "godot:kit/comms"
 import "core:fmt"
 
@@ -90,5 +91,26 @@ chat_refresh :: proc(ch: ^Chat, c: ^kcomms.Comms) {
 	}
 	for i in len(shown) ..< len(ch.rows) {
 		gd.set_bool(cast(gd.Object)ch.rows[i], "visible", false)
+	}
+}
+
+// The whole text_submitted handler: extract (clamped — the utf8 length
+// report exceeds the buffer on long lines, a bounds-check trap two games
+// hit), say it, clear the box, and PUT THE KEYS BACK ON THE WHEEL. The
+// focus release is the part that gets forgotten: without it a keyboard
+// player's WASD stays trapped in the chat box after every message. `sent`
+// (the game's latch) stops the submitting Enter from immediately re-opening
+// chat when the game binds Enter to "talk".
+chat_submit :: proc(ch: ^Chat, c: ^kcomms.Comms, text: gd.String, sent: ^bool = nil) {
+	text := text
+	buf: [512]u8
+	n := gdext.string_to_utf8_chars(cast(gdext.StringPtr)&text, cast(cstring)&buf[0], len(buf) - 1)
+	if n > 0 {
+		kcomms.comms_say(c, string(buf[:min(int(n), len(buf) - 1)]))
+	}
+	chat_clear_input(ch)
+	gd.control_release_focus(cast(gd.Control)ch.input)
+	if sent != nil {
+		sent^ = true
 	}
 }

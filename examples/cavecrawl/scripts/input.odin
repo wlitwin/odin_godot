@@ -6,6 +6,7 @@ package cavecrawl_scripts
 // another driver.
 
 import gd "godot:godot"
+import kboot "godot:kit/boot"
 import "godot:gdext"
 import kcombat "godot:kit/combat"
 import ksess "godot:kit/session"
@@ -43,9 +44,9 @@ install_controls :: proc "contextless" () {
 // also lands here as has_focus before this frame's poll, so it never
 // doubles as a throw).
 poll_controls :: proc(self: ^CaveLobby) {
-	if bool(gd.control_has_focus(cast(gd.Control)self.chat.input, false)) {return}
+	if bool(gd.control_has_focus(cast(gd.Control)self.boot.chat.input, false)) {return}
 	if gd.is_action_just_pressed("cave_talk") && !self.chat_sent {
-		gd.control_grab_focus(cast(gd.Control)self.chat.input, false)
+		gd.control_grab_focus(cast(gd.Control)self.boot.chat.input, false)
 		return
 	}
 	self.chat_sent = false
@@ -91,7 +92,7 @@ drive_spelunker :: proc(self: ^CaveLobby, delta: f64) {
 	}
 	step := speed * f32(delta)
 	dir := gd.Vector2{}
-	if !bool(gd.control_has_focus(cast(gd.Control)self.chat.input, false)) {
+	if !bool(gd.control_has_focus(cast(gd.Control)self.boot.chat.input, false)) {
 		dir = gd.get_vector("cave_left", "cave_right", "cave_up", "cave_down", 0.2)
 	}
 	if dir.x != 0 || dir.y != 0 {
@@ -219,8 +220,8 @@ cave_lobby_heal :: proc(self: ^CaveLobby) {
 
 @(gd_method)
 cave_lobby_show_score :: proc(self: ^CaveLobby, visible: gd.Bool) {
-	kui.score_show(&self.score, bool(visible))
-	kui.score_refresh(&self.score, &self.ses)
+	kui.score_show(&self.boot.score, bool(visible))
+	kui.score_refresh(&self.boot.score, &self.ses)
 }
 
 // Drop a bag slot at my feet (Q drops the first filled slot; a real game
@@ -243,15 +244,7 @@ cave_lobby_walk_to :: proc(self: ^CaveLobby, x: gd.Float, y: gd.Float) {
 @(gd_method)
 cave_lobby_on_chat :: proc(self: ^CaveLobby, text: gd.String) {
 	if !self.running {return}
-	text := text
-	buf: [512]u8
-	n := gdext.string_to_utf8_chars(cast(gdext.StringPtr)&text, cast(cstring)&buf[0], len(buf) - 1)
-	if n > 0 {
-		kcomms.comms_say(&self.comms, string(buf[:n]))
-	}
-	kui.chat_clear_input(&self.chat)
-	gd.control_release_focus(cast(gd.Control)self.chat.input) // Enter sends AND puts the keys back on the wheel
-	self.chat_sent = true
+	kboot.boot_chat(&self.boot, text, &self.chat_sent)
 }
 
 // Drop a marker (the test's stand-in for a ping keybind; kind 1 = "look here").

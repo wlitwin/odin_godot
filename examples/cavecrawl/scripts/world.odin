@@ -23,7 +23,7 @@ import "core:fmt"
 // collision) are the editor's department.
 spawn_scene :: proc(self: ^CaveLobby, scene: ^gd.Resource) -> gd.Node {
 	node := gd.instantiate(cast(gd.Packed_Scene)scene)
-	gd.add_child(self.world, node)
+	gd.add_child(self.boot.world, node)
 	return node
 }
 
@@ -140,7 +140,7 @@ cave_load_scenery :: proc(self: ^CaveLobby, depth: int) {
 	}
 	def := cave_def(self, depth)
 	self.scenery = gd.instantiate(cast(gd.Packed_Scene)def.scene)
-	gd.add_child(self.stage, self.scenery)
+	gd.add_child(self.boot.stage, self.scenery)
 	self.scenery_depth = u8(depth)
 	cave_scatter(self, depth)
 }

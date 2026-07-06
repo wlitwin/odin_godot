@@ -37,7 +37,7 @@ rock_fire :: proc(shooter: knet.Player_Id, sp: ^Spelunker) -> (f: kcombat.Fire, 
 
 // A rock on THIS screen: a ● tracer in the kit/fx pool (no entity, no wire).
 add_visual_rock :: proc(self: ^CaveLobby, f: kcombat.Fire) {
-	kfx.tracer_add(&self.tracers, self.world, f, "\xE2\x97\x8F", ksess.session_tick_hz(&self.ses))
+	kfx.tracer_add(&self.tracers, self.boot.world, f, "\xE2\x97\x8F", ksess.session_tick_hz(&self.ses))
 }
 
 // Host: a confirmed throw launches the AUTHORITATIVE rock (the only kind

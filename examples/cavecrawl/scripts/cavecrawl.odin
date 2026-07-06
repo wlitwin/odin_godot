@@ -26,6 +26,7 @@ package cavecrawl_scripts
 
 import gd "godot:godot"
 import kai "godot:kit/ai"
+import kboot "godot:kit/boot"
 import kcombat "godot:kit/combat"
 import kcomms "godot:kit/comms"
 import kfx "godot:kit/fx"
@@ -120,8 +121,7 @@ CaveLobby :: struct {
 	owner:     gd.Node,
 	ses:       ksess.Session,
 	comms:     kcomms.Comms,
-	ui:        kui.Lobby,
-	chat:      kui.Chat,
+	boot:      kboot.Boot, // lobby/chat/score/legend/wire/stage/world — kit-built, game-owned
 	running:   bool, // hosting or joining (transport is up)
 
 	// The authored entity scenes, assigned in cave.tscn's inspector — the
@@ -142,7 +142,6 @@ CaveLobby :: struct {
 
 	// The current floor, as loaded on THIS peer: the scene instance under
 	// `stage`, plus the host-side caches read from its def + markers.
-	stage:         gd.Node, // scenery container (behind `world` in draw order)
 	scenery:       gd.Node, // the loaded level_N.tscn instance (nil pre-game)
 	scenery_depth: u8, // which depth `scenery` shows
 	dens:          [2][3]f32, // host: den positions, from the floor's markers
@@ -151,7 +150,6 @@ CaveLobby :: struct {
 
 	// ---- the world (phase 3) ----
 	table:       kitems.Table,
-	world:       gd.Node, // entity nodes live under here
 	prompt:      kui.Prompt,
 	inv:         kui.Inv,
 	spelunkers:  map[knet.Net_Id]^Spelunker,
@@ -194,8 +192,6 @@ CaveLobby :: struct {
 	host_ticks: int, // host: game ticks elapsed
 	hud_hp:     kui.Health_Bar,
 	hud_ab:     kui.Ability_Bar,
-	score:      kui.Score,
-	legend:     gd.Label, // the controls line, shown once the world is live
 	chat_sent:  bool, // the Enter that submitted a line must not also re-open chat
 	was_dead:   bool, // owner-side respawn edge detector
 	host_gone:  bool, // Ev_Host_Left seen — the takeover/rejoin window is open
@@ -203,8 +199,6 @@ CaveLobby :: struct {
 	rejoin_tries: int, // auto-rejoin attempts chasing the successor (capped)
 	issue_at:   f64, // when my last command left (confirm latency proof)
 
-	// the transport binding (send adapter, packet route, latency shim)
-	wire: netgd.Session_Wire,
 }
 
 now_s :: knet.now_s // the toolkit's monotonic clock, under the game's short name
@@ -220,36 +214,31 @@ refresh_hud :: proc(self: ^CaveLobby) {
 }
 
 cave_lobby_ready :: proc(self: ^CaveLobby) {
-	self.ui = kui.lobby_make(self.owner, "C A V E C R A W L")
-	kui.lobby_set_status(&self.ui, "Host a cave, or join one at localhost")
-	gd.connect_to(cast(gd.Object)self.ui.host_btn, "pressed", self.owner, "on_host")
-	gd.connect_to(cast(gd.Object)self.ui.join_btn, "pressed", self.owner, "on_join")
-
-	gd.connect_to(cast(gd.Object)self.ui.start_btn, "pressed", self.owner, "on_start")
-
-	// Comms bind before the session starts (routes survive host/client start);
-	// the chat box stays hidden until there is a session to speak into.
-	kcomms.comms_init(&self.comms, &self.ses)
-	self.chat = kui.chat_make(self.owner)
-	kui.chat_show(&self.chat, false)
-	gd.connect_to(cast(gd.Object)self.chat.input, "text_submitted", self.owner, "on_chat")
-
 	// The cave (phase 3): item defs are code — every peer declares the same
 	// table. World hookups install now; entities exist only after Start.
 	kitems.items_register(&self.table, GEM, "gem", 99)
 	kitems.items_register(&self.table, TORCH, "torch", 5)
-	self.stage = gd.new_node()
-	gd.node_set_name(self.stage, gd.new_string_name_cstring("Stage", true))
-	gd.add_child(self.owner, self.stage) // scenery first: it draws BEHIND the world
-	self.world = gd.new_node()
-	gd.node_set_name(self.world, gd.new_string_name_cstring("World", true))
-	gd.add_child(self.owner, self.world)
+	ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
+	ksess.session_set_backup_blob(&self.ses, self, cave_backup_blob)
+	ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
+	ksess.session_app_route(&self.ses, TAG_FIRE, self, cave_on_fire)
+
+	// The stock stack — lobby, chat+comms, scoreboard, stage/world, wire,
+	// legend — is kit/boot's. Everything below is what makes this CAVECRAWL.
+	kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{
+		title = "C A V E C R A W L",
+		status = "Host a cave, or join one at localhost",
+		legend = "WASD walk · E use · click throw · Q drop · G set down · R heal · Tab scores · Enter chat",
+		msg_kind = MSG_SESSION,
+		latency_env = "CAVE_LATENCY",
+		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
+	})
+
 	self.prompt = kui.prompt_make(self.owner)
 	self.inv = kui.inv_make(self.owner, 6)
 	kui.inv_show(&self.inv, false)
 	self.hud_hp = kui.hp_make(self.owner)
 	self.hud_ab = kui.abilities_make(self.owner, 2)
-	self.score = kui.score_make(self.owner)
 	// The LAYOUT is the game's call, not the kit's: status cluster stacked
 	// in the top-left (kit widgets spawn at the anchor origin by default).
 	gd.control_set_position(cast(gd.Control)self.hud_hp.label, {8, 4}, false)
@@ -257,48 +246,24 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	gd.control_set_position(self.inv.root, {8, 40}, false)
 	// STEAM, when the GodotSteam extension is in the project (and not
 	// switched off for tests): one transport swap, zero session changes.
-	if steamgd.available() && env_int("CAVE_STEAM", 1) != 0 {
-		self.steam_on = steamgd.init(env_int("CAVE_APPID", steamgd.TEST_APP_ID))
+	if steamgd.available() && gd.env_int("CAVE_STEAM", 1) != 0 {
+		self.steam_on = steamgd.init(gd.env_int("CAVE_APPID", steamgd.TEST_APP_ID))
 		if self.steam_on {
 			steamgd.listen(self.owner, "on_lobby_created", "on_lobby_joined", "on_join_requested")
 		}
 	}
 	gd.print_str(fmt.tprintf("CAVE_STEAM %s", self.steam_on ? "on" : "off"))
-	self.floors_n = env_int("CAVE_FLOORS", 2)
+	self.floors_n = gd.env_int("CAVE_FLOORS", 2)
 	self.deny_reason = -1
-	ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
-	ksess.session_set_backup_blob(&self.ses, self, cave_backup_blob)
-	ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
-	ksess.session_app_route(&self.ses, TAG_FIRE, self, cave_on_fire)
-	// The transport binding: send adapter + packet route + the connection
-	// signals (peer loss, join success/failure) — four one-line forwards in
-	// net.odin own the @(gd_method) names.
-	netgd.wire_attach(&self.wire, self.owner, &self.ses, MSG_SESSION)
-	netgd.wire_listen(&self.wire, "on_packet", "on_peer_left", "on_net_up", "on_net_down")
-	netgd.wire_set_latency(&self.wire, env_int("CAVE_LATENCY", 0)) // the acid rig, now a kit shim
 	install_controls()
-	self.legend = gd.new_label()
-	gd.node_set_name(cast(gd.Node)self.legend, gd.new_string_name_cstring("Legend", true))
-	gd.add_child(self.owner, cast(gd.Node)self.legend)
-	// Bottom-RIGHT corner (chat owns bottom-left, the prompt the center);
-	// grow up-and-left so the label stays inside the screen as it sizes.
-	gd.control_set_anchors_preset(cast(gd.Control)self.legend, .Preset_Bottom_Right, false)
-	gd.control_set_v_grow_direction(cast(gd.Control)self.legend, .Grow_Direction_Begin)
-	gd.control_set_h_grow_direction(cast(gd.Control)self.legend, .Grow_Direction_Begin)
-	gd.control_set_offset(cast(gd.Control)self.legend, .Right, -8)
-	gd.control_set_offset(cast(gd.Control)self.legend, .Left, -8)
-	gd.control_set_offset(cast(gd.Control)self.legend, .Top, -4)
-	gd.control_set_offset(cast(gd.Control)self.legend, .Bottom, -4)
-	gd.set_string(cast(gd.Object)self.legend, "text", "WASD walk · E use · click throw · Q drop · G set down · R heal · Tab scores · Enter chat")
-	gd.set_bool(cast(gd.Object)self.legend, "visible", false)
 	gd.print_str("CAVE_UI_READY")
 }
 
 // Both roles flip to game mode the same way (host at Start, client at spawn).
 enter_the_cave :: proc(self: ^CaveLobby) {
 	self.started = true
-	gd.set_bool(cast(gd.Object)self.ui.root, "visible", false)
-	gd.set_bool(cast(gd.Object)self.legend, "visible", true)
+	gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
+	gd.set_bool(cast(gd.Object)self.boot.legend, "visible", true)
 	kui.inv_show(&self.inv, true)
 	if self.me_spel != nil {
 		kui.inv_refresh(&self.inv, self.me_spel.bag[:], &self.table)
@@ -306,23 +271,14 @@ enter_the_cave :: proc(self: ^CaveLobby) {
 	}
 }
 
-@(private = "file")
-roster_changed :: proc(self: ^CaveLobby) {
-	n := ksess.session_count(&self.ses, connected_only = true)
-	gd.print_str(fmt.tprintf("CAVE_PLAYERS n=%d", n))
-	if self.ses.is_host {
-		kui.lobby_set_status(&self.ui, fmt.tprintf("%d spelunkers ready", n))
-		// Enough friends: the host may start (phase 3 gives Start a game).
-		kui.lobby_show_menu(&self.ui, false, n >= 2)
-	}
-}
+
 
 cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 	if !self.running {return}
 
-	netgd.wire_pump(&self.wire, now_s()) // latency-shimmed packets deliver
-
-	ticks, _ := ksess.session_tick(&self.ses, delta, now_s())
+	// Preamble + boilerplate event reactions live in kit/boot; every event is
+	// re-yielded below, so the game switch stays complete.
+	events, marks, ticks := kboot.boot_pump(&self.boot, delta, now_s())
 	if self.started {
 		// Visuals fly FIRST, on the frame clock (smooth on any refresh
 		// rate): on the host, the impact you see is noted before the
@@ -344,19 +300,19 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 		}
 	}
 
-	refresh := false
-	for {
-		ev, ok := ksess.session_poll(&self.ses)
-		if !ok {break}
+	for ev in events {
 		#partial switch e in ev {
 		case ksess.Ev_Welcomed:
-			kui.lobby_set_status(&self.ui, "In the cave — waiting for the host to start")
+			// Seated = the host exists, BY DEFINITION — clear the loss latch
+			// here, not just at rejoin start: the OLD socket's death signals
+			// can land mid-rejoin (after cave_rejoin_to cleared the flag,
+			// before this WELCOME) and re-latch it against the LIVE host,
+			// blocking every "are we back?" gate forever.
+			self.host_gone = false
 			self.rejoin_tries = 0 // seated: the chase (if any) is over
 			gd.print_str(fmt.tprintf("CAVE_SEATED me=%d", u64(e.me)))
-			refresh = true
 		case ksess.Ev_Player_Joined:
-			roster_changed(self)
-			refresh = true
+			gd.print_str(fmt.tprintf("CAVE_PLAYERS n=%d", ksess.session_count(&self.ses, connected_only = true)))
 			// The host words the flavor lines; comms ships them. Catchup goes
 			// FIRST so a fresh joiner's replayed history doesn't duplicate the
 			// join line it is about to receive from the broadcast.
@@ -367,23 +323,19 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 				}
 			}
 		case ksess.Ev_Player_Left:
-			roster_changed(self)
-			refresh = true
+			gd.print_str(fmt.tprintf("CAVE_PLAYERS n=%d", ksess.session_count(&self.ses, connected_only = true)))
 			if self.ses.is_host {
 				if p, ok := ksess.session_player(&self.ses, e.id); ok {
 					kcomms.comms_system(&self.comms, fmt.tprintf("%s wandered off", p.name))
 				}
 			}
-		case ksess.Ev_Stats_Updated:
-			refresh = true // ping column repaint
-			kui.score_refresh(&self.score, &self.ses)
 		case ksess.Ev_Host_Left:
 			self.host_gone = true
 			if !self.kicked_out { // the kick already explained this teardown
 				// The designated backup holder can carry the torch; everyone
 				// else rejoins whoever does (see on_takeover / on_rejoin).
 				_, _, held := ksess.session_backup_parts(&self.ses)
-				kui.lobby_set_status(&self.ui, held ? "The host left — you hold the backup. Resume?" : "The host left — this run is over")
+				kui.lobby_set_status(&self.boot.ui, held ? "The host left — you hold the backup. Resume?" : "The host left — this run is over")
 				gd.print_str("CAVE_HOST_LEFT")
 			}
 		case ksess.Ev_Backup_Target:
@@ -422,7 +374,7 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 						cave_rejoin_to(self, addr, sport)
 					}
 				} else {
-					kui.lobby_set_status(&self.ui, "The torch went out — this run is over")
+					kui.lobby_set_status(&self.boot.ui, "The torch went out — this run is over")
 				}
 			}
 		case ksess.Ev_Backup_Received:
@@ -430,7 +382,7 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 			gd.print_str(fmt.tprintf("CAVE_BACKUP size=%d", e.size))
 		case ksess.Ev_Kicked:
 			self.kicked_out = true
-			kui.lobby_set_status(&self.ui, "You were shown the door")
+			kui.lobby_set_status(&self.boot.ui, "You were shown the door")
 			gd.print_str("CAVE_KICKED_ME")
 		case ksess.Ev_Join_Denied:
 			line: string
@@ -442,11 +394,10 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 			case .Banned:
 				line = "You are not welcome here"
 			}
-			kui.lobby_set_status(&self.ui, line)
+			kui.lobby_set_status(&self.boot.ui, line)
 			self.deny_reason = int(e.reason)
 			gd.print_str(fmt.tprintf("CAVE_DENIED reason=%v", e.reason))
 		case ksess.Ev_Join_Failed:
-			kui.lobby_set_status(&self.ui, "Could not reach the cave")
 			gd.print_str("CAVE_JOIN_FAILED")
 		case ksess.Ev_Spawned:
 			// The world reached this client (factory already made the node).
@@ -489,24 +440,9 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 			gd.print_str(fmt.tprintf("CAVE_REJECT entity=%d", u32(e.entity)))
 		}
 	}
-	if refresh {
-		kui.lobby_refresh(&self.ui, &self.ses)
-	}
-
-	refresh_chat := false
-	for {
-		cev, cok := kcomms.comms_poll(&self.comms)
-		if !cok {break}
-		switch e in cev {
-		case kcomms.Ev_Line:
-			refresh_chat = true
-		case kcomms.Ev_Marker:
-			// No world yet to draw it in — phase 3 gives markers a cave wall.
-			gd.print_str(fmt.tprintf("CAVE_MARK player=%d kind=%d x=%.1f", u64(e.player), e.kind, e.pos.x))
-		}
-	}
-	if refresh_chat {
-		kui.chat_refresh(&self.chat, &self.comms)
+	for m in marks {
+		// No world yet to draw it in — phase 3 gives markers a cave wall.
+		gd.print_str(fmt.tprintf("CAVE_MARK player=%d kind=%d x=%.1f", u64(m.player), m.kind, m.pos.x))
 	}
 
 	if self.started {
@@ -538,15 +474,15 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 	if self.level != nil {
 		if self.level.won != 0 && !self.seen_won {
 			self.seen_won = true
-			kui.score_show(&self.score, true)
-			gd.set_bool(cast(gd.Object)self.ui.root, "visible", true)
-			kui.lobby_set_status(&self.ui, "The cave is conquered!")
-			kui.lobby_show_menu(&self.ui, false, self.ses.is_host)
+			kui.score_show(&self.boot.score, true)
+			gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", true)
+			kui.lobby_set_status(&self.boot.ui, "The cave is conquered!")
+			kui.lobby_show_menu(&self.boot.ui, false, self.ses.is_host)
 			gd.print_str(fmt.tprintf("CAVE_WON depth=%d", self.level.depth))
 		} else if self.level.won == 0 && self.seen_won {
 			self.seen_won = false
-			kui.score_show(&self.score, false)
-			gd.set_bool(cast(gd.Object)self.ui.root, "visible", false)
+			kui.score_show(&self.boot.score, false)
+			gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
 			gd.print_str("CAVE_RESTARTED")
 		}
 	}

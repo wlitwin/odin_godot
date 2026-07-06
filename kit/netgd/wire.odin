@@ -215,3 +215,29 @@ drop_peer :: proc "contextless" (node: gd.Node, peer: ksess.Peer_Id) {
 	if cast(rawptr)p == nil {return}
 	gd.multiplayer_peer_disconnect_peer(p, gd.Int(peer), false)
 }
+// ---- the two buttons, minus the ceremony ---------------------------------------
+//
+// Every game's Host/Join handlers repeat the same two-step: bring the
+// transport up, then start the session over it. The UI around them (status
+// lines, menu hiding) stays the game's — or use kit/boot, which wraps these
+// with the stock lobby ritual.
+
+// Host on `port`. false = the transport refused (port taken) — the session
+// was NOT started; tell the player and let them try again.
+begin_host :: proc(wire: ^Session_Wire, port: int, name: string, max_peers := 32) -> bool {
+	if !gd.host(wire.node, port, max_peers) {
+		return false
+	}
+	ksess.session_host_start(wire.ses, name)
+	return true
+}
+
+// Join `addr:port` as `token`/`name`. false = the transport refused outright;
+// an unreachable host surfaces later as Ev_Join_Failed (the join timeout).
+begin_join :: proc(wire: ^Session_Wire, addr: cstring, port: int, token: u64, name: string) -> bool {
+	if !gd.join(wire.node, addr, port) {
+		return false
+	}
+	ksess.session_client_start(wire.ses, token, name)
+	return true
+}

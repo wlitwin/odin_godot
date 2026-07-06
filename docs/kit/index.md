@@ -25,6 +25,7 @@ game in order and links each page below at the moment you need it.
 
 | Page | Package | What it owns |
 | --- | --- | --- |
+| [boot](boot.md) | `kit/boot` | The first thirty lines of every game, written once: lobby/chat/score/wire attach + the frame pump |
 | [net](net.md) | `kit/net` | The engine-free core: wire format, registry, deltas, owner streams, the intent→command→result pipeline |
 | [session](session.md) | `kit/session` | Identity, roster, events, spawn/despawn via factory, stats, moderation, backup hosting |
 | [netgd](netgd.md) | `kit/netgd` | The Godot transport binding: Session_Wire, channels, the latency shim, kick-socket handling |
@@ -38,6 +39,7 @@ game in order and links each page below at the moment you need it.
 | [save](save.md) | `kit/save` | The versioned save envelope, one-call resume, persistent identity |
 | [ui](ui.md) | `kit/ui` | Stock-theme lobby, chat, scoreboard, HUD widgets |
 | [fx](fx.md) | `kit/fx` | Bursts, flashes, and the projectile tracer pool |
+| [testing](testing.md) | — | Acid-test your game: the shipped harness template and the conventions it encodes |
 
 ## Beyond the basics
 

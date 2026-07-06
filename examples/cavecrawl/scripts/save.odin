@@ -20,7 +20,7 @@ GAME_VERSION :: u16(11) // stamped into saves; bump when cave content shifts
 // Where the save lives; tests point it somewhere disposable via env.
 @(private = "file")
 save_path :: proc() -> cstring {
-	p := env_string("CAVE_SAVE", "")
+	p := gd.env_string("CAVE_SAVE")
 	if p != "" {
 		return fmt.ctprintf("%s", p)
 	}
@@ -119,11 +119,11 @@ cave_lobby_on_resume :: proc(self: ^CaveLobby) {
 	blob, err := ksave.resume(&self.ses, my_name(self), save_path(), GAME_VERSION)
 	switch err {
 	case .No_File:
-		kui.lobby_set_status(&self.ui, "No saved run to resume")
+		kui.lobby_set_status(&self.boot.ui, "No saved run to resume")
 		gd.print_str("CAVE_RESUME_FAIL no-file")
 		return
 	case .Bad_Envelope, .Wrong_Version:
-		kui.lobby_set_status(&self.ui, "That save is from another cave")
+		kui.lobby_set_status(&self.boot.ui, "That save is from another cave")
 		gd.print_str("CAVE_RESUME_FAIL header")
 		return
 	case .Corrupt:
@@ -148,7 +148,7 @@ cave_lobby_on_resume :: proc(self: ^CaveLobby) {
 	}
 	self.running = true
 	enter_the_cave(self)
-	kui.chat_show(&self.chat, true)
+	kui.chat_show(&self.boot.chat, true)
 	kcomms.comms_system(&self.comms, "the cave remembers")
 	door_open := false
 	for _, d in self.doors {door_open = d.open}
@@ -180,7 +180,7 @@ cave_lobby_on_takeover :: proc(self: ^CaveLobby) {
 	if self.ses.is_host || !self.host_gone {return}
 	game_blob, snap, held := ksess.session_backup_parts(&self.ses) // copies — survive the re-init
 	if !held {
-		kui.lobby_set_status(&self.ui, "No backup to carry")
+		kui.lobby_set_status(&self.boot.ui, "No backup to carry")
 		gd.print_str("CAVE_TAKEOVER_FAIL no-backup")
 		return
 	}
@@ -205,7 +205,7 @@ cave_lobby_on_takeover :: proc(self: ^CaveLobby) {
 		cave_cache_floor(self, int(self.level.depth))
 	}
 	self.host_gone = false
-	kui.lobby_set_status(&self.ui, "You carry the torch now")
+	kui.lobby_set_status(&self.boot.ui, "You carry the torch now")
 	kcomms.comms_system(&self.comms, "the torch passes")
 	gd.print_str(
 		fmt.tprintf(

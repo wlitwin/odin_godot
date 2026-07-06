@@ -11,7 +11,7 @@ import kfx "godot:kit/fx"
 // A one-shot spark burst at a world position, in `color` (world-parented so
 // it outlives despawns; kfx.frame in process reaps the spent emitters).
 fx_burst_at :: proc(self: ^CaveLobby, x, y: f32, color: gd.Color) {
-	kfx.burst_at(&self.fx, self.world, x, y, color)
+	kfx.burst_at(&self.fx, self.boot.world, x, y, color)
 	gd.print_str("CAVE_FX burst")
 }
 
