@@ -44,6 +44,12 @@ Ping :: struct {
 	scratch: int,                 // untagged -> private per-instance state
 }
 
+// Engine calls (add_child, connect_to, queue_free, ...) take `self.owner` —
+// NEVER `self`. `self` is this Odin struct; engine handles are raw pointers,
+// so both compile, but the engine dereferencing your struct is a segfault.
+// scriptgen rejects the bare-`self` form at build time
+// ("...is the ^Ping script struct, not an engine object — pass self.owner").
+
 // Lifecycle procs: matched by name (after stripping an optional `<struct>_`
 // prefix) against ready / process / physics_process / enter_tree / exit_tree, and
 // bound by the `^Ping` receiver. Write a plain Odin proc; codegen wraps it.

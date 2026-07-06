@@ -495,6 +495,7 @@ main :: proc() {
 	}
 	pending := make([dynamic]Pending)
 	helpers := make([dynamic]Helper)
+	lintable := make([dynamic]Helper) // EVERY package file — scripts and helpers both
 	for fi in files {
 		if fi.type == .Directory {continue}
 		if !strings.has_suffix(fi.name, ".odin") {continue}
@@ -518,6 +519,7 @@ main :: proc() {
 		// that used to suppress boot generation and break the dll's init handshake).
 		if scan_boot_decl(src) {has_boot = true}
 
+		append(&lintable, Helper{path = path, src = src})
 		script, has := parse_script(path, src)
 		if !has {
 			append(&helpers, Helper{path = path, src = src})
@@ -558,6 +560,14 @@ main :: proc() {
 			scan_bound_procs(&pend.script, h.path, h.src, &file)
 		}
 	}
+
+	// Lint every package file now that the full set of script structs is known —
+	// a helper file's `self: ^Golf` param is only recognizable once Golf's home
+	// file has been parsed (lint.odin: the self-vs-owner footgun).
+	script_structs := make(map[string]bool)
+	defer delete(script_structs)
+	for &pend in pending {script_structs[pend.script.struct_name] = true}
+	for l in lintable {lint_handles(l.path, l.src, script_structs)}
 
 	// Generate, now that every file's contribution is in (validation too — a
 	// @(gd_command) found in a helper still needs its class's replicate/net_id).

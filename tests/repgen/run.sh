@@ -344,4 +344,58 @@ echo "$CMD2_OUT" | grep -q "must return exactly \`bool\`" \
 	|| { echo "REPGEN_FAIL: missing the non-bool-return command error"; echo "$CMD2_OUT" | tail -3; exit 1; }
 echo "  ok  bad command signatures rejected at scriptgen time"
 
+# ---- (6): the self-vs-owner lint — bare `self` in a gd.* call is an error ----
+# Engine handles are rawptr aliases, so `gd.add_child(self, node)` COMPILES and
+# segfaults at runtime (a real consumer hit this three times in one feature).
+# Covers: a script's own file, a HELPER file's `^<Struct>` param (the struct set
+# is package-wide), and cast(gd.X)self. A clean `self.owner` must still pass.
+LNT="$TMP/lnt"
+mkdir -p "$LNT"
+cat > "$LNT/gemfx.odin" <<'EOF'
+//gd:extends Node2D
+//gd:class Gemfx
+package repgen_lnt
+
+import gd "godot:godot"
+
+Gemfx :: struct {
+	owner: gd.Node2d,
+}
+
+gemfx_ready :: proc(self: ^Gemfx) {
+	gd.connect_to(self.owner, "finished", self, "cleanup") // BAD: target is the struct
+	gd.node_queue_free(self.owner) // fine: the engine node
+}
+EOF
+cat > "$LNT/gemfx_helpers.odin" <<'EOF'
+package repgen_lnt
+
+import gd "godot:godot"
+
+gemfx_bury :: proc(fx: ^Gemfx, parent: gd.Node) {
+	gd.add_child(parent, fx) // BAD: helper param, same struct
+	_ = cast(gd.Object)fx    // BAD: the cast crashes identically
+}
+EOF
+set +e
+LNT_OUT="$(run_scriptgen "$LNT" 2>&1)"
+LNT_RC=$?
+set -e
+if [ "$LNT_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: bare script-struct pointers in gd.* calls were accepted by scriptgen"
+	exit 1
+fi
+echo "$LNT_OUT" | grep -q 'gd.connect_to: `self` is the ^Gemfx script struct' \
+	|| { echo "REPGEN_FAIL: missing the self-arg lint error (script file)"; echo "$LNT_OUT" | tail -4; exit 1; }
+echo "$LNT_OUT" | grep -q 'gd.add_child: `fx` is the ^Gemfx script struct' \
+	|| { echo "REPGEN_FAIL: missing the helper-param lint error"; echo "$LNT_OUT" | tail -4; exit 1; }
+echo "$LNT_OUT" | grep -q 'cast(gd.Object)fx' \
+	|| { echo "REPGEN_FAIL: missing the cast lint error"; echo "$LNT_OUT" | tail -4; exit 1; }
+if echo "$LNT_OUT" | grep -q 'node_queue_free'; then
+	echo "REPGEN_FAIL: the lint flagged a legitimate self.owner call"
+	echo "$LNT_OUT" | tail -4
+	exit 1
+fi
+echo "  ok  self-vs-owner lint: struct-as-handle rejected in scripts, helpers, and casts"
+
 echo "REPGEN_OK"
