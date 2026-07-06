@@ -296,6 +296,24 @@ each thing presents on. The discipline is three lines:
    there is nothing left on screen to present when the render clock gets
    there.
 
+Every consequence classifies into one of five bins, each with an existing
+tool — when something looks mistimed, find its row:
+
+| The consequence's cause | Present it | The tool |
+|---|---|---|
+| **My own simulation** (I claimed it, I struck it) | now | `session_present(mine = true)` — or just do it |
+| **A remote moving cause** (a streamed avatar/ball reaching a thing) | at the render clock | `session_present(mine = false)` |
+| **A per-peer local visual** (each screen flies its own projectile) | at *my* visual's moment | fx hooks ([kit/fx](fx.md) `On_Hit_Proc`) |
+| **No spatial cause** (scoreboards, inventories, objectives) | wire-fresh | nothing — *never* delay these |
+| **A global transition** (the won byte, the hole index) | after a dwell | edge-outlives-observers: hold state ≥ `interp_delay` |
+
+The bins are per-CONSEQUENCE, not per-entity: one looted chest updates the
+looter's bag UI wire-fresh (row 4) while its lid swings open on the render
+clock (row 2). And the timing decision hangs on one fact only the game knows —
+*did my simulation cause this?* — which is why `session_present` takes it as
+a boolean instead of guessing (a wrong guess here is Unreal's RepNotify
+double-fire, imported).
+
 Shrinking the gap globally (`interp_delay` down, `tick_hz` up via
 `session_configure`) trades smoothness under jitter for freshness — aligning
 presentation is almost always the better spend.
