@@ -35,6 +35,29 @@ func _initialize() -> void:
 	n.free()
 	var scene_rejected = scene_err != OK
 
+	# The EDITOR'S create-a-new-script flow, distinct from the load-then-save
+	# above: the Create-Script dialog mints a FRESH OdinScript (never loaded
+	# from disk) and saves it. A regression here surfaces to the user as
+	# "requested file format unknown: odin" when they attach a new script — so
+	# pin it, and assert the saver advertises "odin" (the extension the dialog
+	# validates against before it will even offer to save).
+	var fresh = ClassDB.instantiate("OdinScript")
+	var fresh_ok := false
+	if fresh != null:
+		fresh.set("source_code", "//gd:extends Node\n//gd:class Fresh\npackage showcase_scripts\n")
+		var fresh_probe := "res://__save_fresh_probe.odin"
+		var fresh_os := ProjectSettings.globalize_path(fresh_probe)
+		var fresh_err = ResourceSaver.save(fresh, fresh_probe)
+		var fresh_exts = ResourceSaver.get_recognized_extensions(fresh)
+		fresh_ok = fresh_err == OK and FileAccess.file_exists(fresh_os) and fresh_exts.has("odin")
+		if FileAccess.file_exists(fresh_os):
+			DirAccess.remove_absolute(fresh_os)
+		var fresh_uid := fresh_os + ".uid"
+		if FileAccess.file_exists(fresh_uid):
+			DirAccess.remove_absolute(fresh_uid)
+		if not fresh_ok:
+			print("SAVE_TEST_FRESH_DEBUG: err=%d exts=%s" % [fresh_err, fresh_exts])
+
 	# Format on save (core/format.odin): with the setting EXPLICITLY on (the headless
 	# override — the default only applies inside the editor) and odinfmt reachable, the
 	# BYTES ON DISK must come out formatted. Gated: run.sh sets SAVE_TEST_EXPECT_FMT only
@@ -59,9 +82,9 @@ func _initialize() -> void:
 		if not fmt_ok:
 			print("SAVE_TEST_FMT_DEBUG: err=%d text=<%s>" % [fmt_err, fmt_text])
 
-	var ok = err == OK and on_disk and scene_rejected and fmt_ok
+	var ok = err == OK and on_disk and scene_rejected and fresh_ok and fmt_ok
 	if ok:
 		print("SAVE_TEST_OK")
 	else:
-		print("SAVE_TEST_FAIL: err=%d on_disk=%s scene_err=%d fmt_ok=%s" % [err, on_disk, scene_err, fmt_ok])
+		print("SAVE_TEST_FAIL: err=%d on_disk=%s scene_err=%d fresh_ok=%s fmt_ok=%s" % [err, on_disk, scene_err, fresh_ok, fmt_ok])
 	quit(0 if ok else 1)
