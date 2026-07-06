@@ -221,6 +221,9 @@ shadow_make :: proc(desc: ^Entity_Desc, allocator := context.allocator) -> []u8 
 		switch f.wire {
 		case .Raw:
 		case .F16:
+			// Size is all a descriptor can check: a hand-built desc tagging
+			// non-f32 4-byte elements ships mangled bits — scriptgen rejects
+			// that at the tag level; hand-authors are on their honor here.
 			assert(f.size % 4 == 0, "wire = .F16 needs f32 elements (size divisible by 4)")
 		case .Custom:
 			assert(f.codec.size > 0 && f.codec.encode != nil && f.codec.decode != nil,

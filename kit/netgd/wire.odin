@@ -93,15 +93,26 @@ wire_listen :: proc "contextless" (
 	if err := gd.connect_to(cast(gd.Object)mp, "peer_packet", obj, on_packet); err != .Ok {
 		return err
 	}
+	// The optional signals propagate failures too: a typo'd method name that
+	// failed silently here produces exactly the bug this file's header warns
+	// about — an unwired peer_disconnected means ghosts haunt rosters forever.
 	if on_peer_left != "" {
-		gd.connect_to(cast(gd.Object)mp, "peer_disconnected", obj, on_peer_left)
+		if err := gd.connect_to(cast(gd.Object)mp, "peer_disconnected", obj, on_peer_left); err != .Ok {
+			return err
+		}
 	}
 	if on_net_up != "" {
-		gd.connect_to(cast(gd.Object)mp, "connected_to_server", obj, on_net_up)
+		if err := gd.connect_to(cast(gd.Object)mp, "connected_to_server", obj, on_net_up); err != .Ok {
+			return err
+		}
 	}
 	if on_net_down != "" {
-		gd.connect_to(cast(gd.Object)mp, "connection_failed", obj, on_net_down)
-		gd.connect_to(cast(gd.Object)mp, "server_disconnected", obj, on_net_down)
+		if err := gd.connect_to(cast(gd.Object)mp, "connection_failed", obj, on_net_down); err != .Ok {
+			return err
+		}
+		if err := gd.connect_to(cast(gd.Object)mp, "server_disconnected", obj, on_net_down); err != .Ok {
+			return err
+		}
 	}
 	return .Ok
 }
@@ -138,7 +149,7 @@ wire_pump :: proc(wire: ^Session_Wire, now: f64) {
 		delete(pkt.data)
 	}
 	for i := 0; i < len(wire.dropping); {
-		if wire.dropping[i].due <= knet.now_s() {
+		if wire.dropping[i].due <= now { // one clock rules the pump
 			drop_peer(wire.node, wire.dropping[i].peer)
 			unordered_remove(&wire.dropping, i)
 			continue

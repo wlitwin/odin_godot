@@ -169,7 +169,10 @@ read_string :: proc(r: ^Reader) -> string {
 // Zero-copy view, same lifetime rule as read_string.
 read_bytes :: proc(r: ^Reader) -> []u8 {
 	n := int(read_u32(r))
-	if r.err || r.off + n > len(r.data) {
+	// n < 0: on 32-bit targets (wasm32) a hostile length wraps negative and
+	// the off+n bound fails to catch it — the slice below would panic.
+	// Malformed input must set err, never crash the reader.
+	if r.err || n < 0 || r.off + n > len(r.data) {
 		r.err = true
 		return nil
 	}

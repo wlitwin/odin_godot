@@ -394,6 +394,7 @@ Session :: struct {
 	pongs:        int, // pong samples applied (games gate "clock is warm" on this)
 	now:          f64, // the game's monotonic seconds, updated each session_tick
 	replicating:  bool, // host: the world is LIVE (deltas flow; joiners get SES_WORLD)
+	ran:          bool, // session_init completed at least once — gates the re-entrant teardown
 	interp_delay: f64,
 	later:        knet.Later, // session_present's queue — drained every session_tick
 
@@ -453,7 +454,15 @@ session_init :: proc(s: ^Session) {
 	// registry/ctx maps leak and stat_names grows a duplicate "ping" column
 	// that ships to every client — while preserving everything a game wires
 	// BEFORE start: transport, factory, hooks, app routes, interp tuning.
-	if len(s.stat_names) > 0 {
+	// Pending presentations are dropped even on a FIRST start: session_present
+	// can legally run before any *_start (a lobby flourish), and those queued
+	// against a zero clock must not fire into the new run.
+	knet.later_clear(&s.later)
+	// `ran` (not stat_names) gates the teardown: a FAILED host_resume leaves
+	// stat_names empty but the roster/tokens/registry partially populated —
+	// judging by a side effect would skip the teardown exactly then, leaking
+	// the dead run's players into the next one.
+	if s.ran {
 		knet.registry_destroy(&s.reg)
 		knet.command_ctx_destroy(&s.ctx)
 		for _, p in s.players {
@@ -479,7 +488,6 @@ session_init :: proc(s: ^Session) {
 		delete(s.successor_info)
 		s.successor_info = nil
 		s.successor = {}
-		knet.later_clear(&s.later) // pending presentations were about the old run's world
 		delete(s.name)
 		s.name = ""
 		s.is_host = false
@@ -504,6 +512,7 @@ session_init :: proc(s: ^Session) {
 	s.reg = knet.registry_make()
 	s.ctx = knet.command_ctx_make()
 	s.ticker = knet.ticker_make(s.tick_hz)
+	s.ran = true
 	if s.app_w.buf == nil {
 		s.app_w = knet.writer_make()
 	}
@@ -936,7 +945,7 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 	// known, no factory, unknown type) must leave the reader past this tuple.
 	blob_ver := knet.read_u32(r)
 	blob_n := int(knet.read_u32(r))
-	if r.err || r.off + blob_n > len(r.data) {
+	if r.err || blob_n < 0 || r.off + blob_n > len(r.data) { // <0: 32-bit wrap on hostile lengths
 		r.err = true
 		return
 	}
@@ -1221,7 +1230,7 @@ session_backup_parts :: proc(s: ^Session, allocator := context.temp_allocator) -
 	}
 	r := knet.reader_make(s.backup)
 	n := int(knet.read_u32(&r))
-	if r.err || r.off + n > len(s.backup) {
+	if r.err || n < 0 || r.off + n > len(s.backup) { // <0: 32-bit wrap on hostile lengths
 		return nil, nil, false
 	}
 	game_blob = make([]u8, n, allocator)
@@ -1303,7 +1312,7 @@ session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backu
 	r := knet.reader_make(backup)
 	s.next_player = knet.Player_Id(knet.read_u64(&r))
 	cols := int(knet.read_u8(&r))
-	if r.err || cols > MAX_STAT_COLS {
+	if r.err || cols == 0 || cols > MAX_STAT_COLS { // 0: even a fresh run has "ping"
 		return false
 	}
 	for n in s.stat_names { // replace the init-time default schema wholesale
@@ -1380,6 +1389,12 @@ send_stats :: proc(s: ^Session, to_peer := BROADCAST_PEER) {
 	}
 	if to_peer == BROADCAST_PEER {
 		broadcast(s, knet.writer_bytes(&w), .Reliable)
+		// The host is a reader of the scoreboard too, and it never hears its
+		// own broadcast — without this, a game that repaints only on
+		// Ev_Stats_Updated ships a board that is permanently empty on the
+		// host's screen (both games independently discovered the workaround
+		// of refreshing at show time; now the event fires everywhere).
+		append(&s.events, Ev_Stats_Updated{})
 	} else {
 		s.send(s.send_user, to_peer, knet.writer_bytes(&w), .Reliable)
 	}
@@ -1858,7 +1873,7 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) 
 		id := knet.read_net_id(r)
 		ver := knet.read_u32(r)
 		n := int(knet.read_u32(r))
-		if r.err || r.off + n > len(r.data) {
+		if r.err || n < 0 || r.off + n > len(r.data) { // <0: 32-bit wrap on hostile lengths
 			return
 		}
 		if knet.registry_apply_blob(&s.reg, id, ver, r.data[r.off:r.off + n]) {

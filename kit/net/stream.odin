@@ -111,7 +111,7 @@ stream_ring_reset :: proc(ring: ^Stream_Ring) {
 // stamp — are dropped, mirroring interp_push (the unreliable-ORDERED channel
 // already discards reordered packets; this is the belt to those suspenders).
 //
-// A NEW WARP COUNTER FLUSHES THE RING: a warp is the owner declaring a CUT
+// A NEWER WARP COUNTER FLUSHES THE RING: a warp is the owner declaring a CUT
 // (teleport, respawn, level change), and the buffered pre-warp samples are a
 // doomed timeline nobody should watch — without the flush, remote screens
 // keep rendering it for a full interp delay while the reliable channel's
@@ -119,12 +119,30 @@ stream_ring_reset :: proc(ring: ^Stream_Ring) {
 // the next hole built itself, in puttputt's case). Flushing renders the cut
 // at delta latency; the warp check in stream_ring_sample stays as the belt
 // for a mixed-warp ring that can no longer normally occur.
+//
+// The warp comparison is u8 SERIAL arithmetic, not inequality, and it runs
+// BEFORE the stale-stamp guard. Both halves are load-bearing:
+//   * An OWNERSHIP TRANSFER bumps the warp and resets rings, but the OLD
+//     owner's in-flight packets (pre-bump warp) can land ~an RTT after the
+//     new owner's first sample. "Different warp = flush" would let each one
+//     wipe the ring and snap every screen BACKWARD, once per stale packet —
+//     an older serial must be DROPPED, never re-blended, exactly as the
+//     supersede contract in registry.odin promises.
+//   * Two packets pumped in one frame carry EQUAL stamps; if the second one
+//     carries the warp bump, a stamps-first guard would eat the cut.
 stream_ring_push :: proc(ring: ^Stream_Ring, t: f64, data: []u8, warp: u8 = 0, allocator := context.allocator) {
-	if ring.count > 0 && t <= ring.times[(ring.head + ring.count - 1) % INTERP_CAP] {
-		return
-	}
-	if ring.count > 0 && warp != ring.warps[(ring.head + ring.count - 1) % INTERP_CAP] {
-		stream_ring_reset(ring)
+	if ring.count > 0 {
+		newest := (ring.head + ring.count - 1) % INTERP_CAP
+		nw := ring.warps[newest]
+		if warp != nw {
+			if (warp - nw) & 0x80 == 0 { // strictly newer serial: the cut wins now
+				stream_ring_reset(ring)
+			} else { // a doomed timeline's straggler: drop, never re-blend
+				return
+			}
+		} else if t <= ring.times[newest] {
+			return // same timeline: the ordered channel's belt against reorders
+		}
 	}
 	slot: int
 	if ring.count < INTERP_CAP {

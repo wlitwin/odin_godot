@@ -1312,6 +1312,41 @@ stream_ring_snaps_across_teleport_warp :: proc(t: ^testing.T) {
 	knet.stream_ring_push(&ring, 2.5, knet.writer_bytes(&w), 0)
 	testing.expect(t, knet.stream_ring_sample(&ring, 2.5, &remote, &desc))
 	testing.expect_value(t, remote.x, f32(500))
+
+	// THE OWNERSHIP-HANDOFF RACE: an old-owner packet with a NEWER ARRIVAL
+	// STAMP but an OLDER WARP lands after the new owner's first sample (its
+	// path was slower by ~an RTT). Older serial = doomed timeline: dropped —
+	// a "different warp = flush" rule would wipe the good sample and snap
+	// every screen backward, once per straggler.
+	owner.x = 42
+	knet.writer_reset(&w)
+	knet.stream_write(&w, &owner, &desc)
+	knet.stream_ring_push(&ring, 3.5, knet.writer_bytes(&w), 0) // warp 0 < warp 1: serial-older
+	testing.expect(t, knet.stream_ring_sample(&ring, 3.5, &remote, &desc))
+	testing.expect_value(t, remote.x, f32(500)) // the new timeline stands
+
+	// EQUAL STAMPS across a warp (two packets pumped in one frame): the cut
+	// must still win — warp is checked before the stale-stamp guard.
+	owner.x = 900
+	knet.writer_reset(&w)
+	knet.stream_write(&w, &owner, &desc)
+	knet.stream_ring_push(&ring, 3.0, knet.writer_bytes(&w), 2) // same stamp as warp-1 sample
+	testing.expect(t, knet.stream_ring_sample(&ring, 3.0, &remote, &desc))
+	testing.expect_value(t, remote.x, f32(900))
+
+	// Serial wrap-around: 255 -> 0 is NEWER (u8 serial space), not older.
+	ring2 := knet.Stream_Ring{}
+	defer knet.stream_ring_destroy(&ring2)
+	owner.x = 1
+	knet.writer_reset(&w)
+	knet.stream_write(&w, &owner, &desc)
+	knet.stream_ring_push(&ring2, 1.0, knet.writer_bytes(&w), 255)
+	owner.x = 2
+	knet.writer_reset(&w)
+	knet.stream_write(&w, &owner, &desc)
+	knet.stream_ring_push(&ring2, 2.0, knet.writer_bytes(&w), 0)
+	testing.expect(t, knet.stream_ring_sample(&ring2, 2.0, &remote, &desc))
+	testing.expect_value(t, remote.x, f32(2))
 }
 
 @(test)

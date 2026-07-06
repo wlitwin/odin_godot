@@ -92,6 +92,7 @@ entry_covers :: proc(e: Packed_Entry, cx, cy: int) -> bool {
 // any occupied entry? `ignore` skips one entry index — pass the entry being
 // MOVED so it doesn't collide with itself.
 pack_fits :: proc(entries: []Packed_Entry, bw, bh: int, shape: Shape, x, y: int, ignore := -1) -> bool {
+	assert(bw <= 256 && bh <= 256, "packed anchors are u8 — boards cap at 256 a side")
 	for ly in 0 ..< int(shape.h) {
 		for lx in 0 ..< int(shape.w) {
 			if !shape_solid(shape, lx, ly) {
