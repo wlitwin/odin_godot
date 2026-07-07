@@ -50,14 +50,21 @@ Ability_Def :: struct {
 
 // The whole cast gate, shared by prediction and authority: ready + affordable
 // -> pay and start the cooldown. Call from inside the ability's command proc.
-ability_try :: proc "contextless" (cds: []u16, slot: int, def: Ability_Def, resource: ^i32) -> bool {
+// A cost-free ability may pass no resource at all (both games' first free
+// casts invented dummy locals for this).
+ability_try :: proc "contextless" (cds: []u16, slot: int, def: Ability_Def, resource: ^i32 = nil) -> bool {
 	if slot < 0 || slot >= len(cds) {
 		return false
 	}
-	if cds[slot] != 0 || resource^ < def.cost {
+	if cds[slot] != 0 {
 		return false
 	}
-	resource^ -= def.cost
+	if def.cost > 0 {
+		if resource == nil || resource^ < def.cost {
+			return false
+		}
+		resource^ -= def.cost
+	}
 	cds[slot] = def.cooldown
 	return true
 }
@@ -247,6 +254,45 @@ fire_read :: proc(r: ^knet.Reader) -> (f: Fire, ok: bool) {
 	f.ttl = knet.read_u16(r)
 	f.kind = knet.read_u8(r)
 	return f, !r.err
+}
+
+// The two halves of the announcement, PACKAGED — the second consumer game
+// reproduced cavecrawl's ~25 lines of tag plumbing and guard logic verbatim,
+// which is the extraction bar. The host announces a confirmed cast:
+fire_announce :: proc(s: ^ksess.Session, tag: u8, f: Fire) {
+	w := ksess.session_app_begin(s, tag)
+	fire_write(w, f)
+	ksess.session_app_flush(s, ksess.BROADCAST_PEER)
+}
+
+Fire_Proc :: proc(user: rawptr, f: Fire)
+
+// The listener's registration record. Owned by the GAME (a struct field, one
+// per session) — kit/combat keeps no globals, so parallel sessions in one
+// process (the test rig, dedicated hosts) never collide.
+Fire_Route :: struct {
+	ses:     ^ksess.Session,
+	user:    rawptr,
+	on_fire: Fire_Proc,
+}
+
+// ...and every peer listens. The guards each game used to hand-roll live
+// here now: only the HOST authors fires (a spoofed peer announcement is
+// dropped), the host itself skips (its screen drew at launch), and your own
+// echo skips (your screen drew at cast time). What reaches `on_fire` is
+// exactly "someone else's rock — draw it".
+fire_listen :: proc(fr: ^Fire_Route, s: ^ksess.Session, tag: u8, user: rawptr, on_fire: Fire_Proc) {
+	fr^ = Fire_Route{ses = s, user = user, on_fire = on_fire}
+	ksess.session_app_route(s, tag, fr, fire_handle)
+}
+
+@(private = "file")
+fire_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id, r: ^knet.Reader) {
+	fr := cast(^Fire_Route)user
+	if fr.ses.is_host || from_peer != ksess.HOST_PEER {return}
+	f, ok := fire_read(r)
+	if !ok || f.shooter == fr.ses.me {return}
+	fr.on_fire(fr.user, f)
 }
 
 // ---- predicted hp: the impact you SAW, before the wire agrees ---------------------

@@ -614,6 +614,15 @@ session_tick_hz :: proc(s: ^Session) -> int {
 	return s.cfg.tick_hz > 0 ? s.cfg.tick_hz : knet.DEFAULT_TICK_HZ
 }
 
+// The session's monotonic NET-TICK clock — the same counter commands and the
+// delta walk are stamped with. Games with tick-paced sims (kit/ai's director,
+// cooldown decay loops) read it here instead of accumulating their own:
+// a hand-rolled counter silently diverges across resume/migration. LOCAL to
+// this session's lifetime — never persist it, never compare it across peers.
+session_tick_no :: proc(s: ^Session) -> u64 {
+	return s.ticker.tick
+}
+
 // The render-timeline lag: remote-owned entities DRAW this many seconds in
 // the past (stream sampling's buffer). It is also therefore the delay that
 // re-aligns a wire-fresh consequence with the rendered simulation that

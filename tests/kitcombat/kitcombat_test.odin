@@ -55,6 +55,19 @@ casts_gate_on_cooldown_and_cost :: proc(t: ^testing.T) {
 	testing.expect(t, kcombat.ability_try(cds[:], 0, ROCK, &stamina))
 }
 
+@(test)
+free_casts_need_no_resource :: proc(t: ^testing.T) {
+	// A cost-0 ability passes no resource pointer at all — both games'
+	// first free casts invented dummy locals before this was allowed.
+	FREE :: kcombat.Ability_Def{name = "stomp", cooldown = 8, cost = 0}
+	cds: [2]u16
+	testing.expect(t, kcombat.ability_try(cds[:], 0, FREE))
+	testing.expect_value(t, cds[0], u16(8))
+	testing.expect(t, !kcombat.ability_try(cds[:], 0, FREE), "still hot")
+	// A COSTED ability with no resource is refused, never a nil deref.
+	testing.expect(t, !kcombat.ability_try(cds[:], 1, ROCK), "cost demands a purse")
+}
+
 CHILL :: u8(1)
 BURN :: u8(2)
 

@@ -132,6 +132,30 @@ fire_write :: proc(w: ^knet.Writer, f: Fire)
 fire_read :: proc(r: ^knet.Reader) -> (f: Fire, ok: bool)
 ```
 
+The plumbing is packaged — pick an app tag (0 is kit/comms), give the listener a home
+(a struct field; no package globals, so parallel sessions never collide), and the
+guards every game hand-rolled are the kit's problem now:
+
+```odin
+// host, when the command hook confirms a cast:
+kcombat.fire_announce(&self.ses, TAG_FIRE, f)
+
+// ready(), every peer — on_fire receives ONLY other screens' casts (the
+// host's own copy, your own echo, and non-host authors are all dropped):
+fires: kcombat.Fire_Route   // a field on your game struct
+kcombat.fire_listen(&self.fires, &self.ses, TAG_FIRE, self, on_fire)
+on_fire :: proc(user: rawptr, f: kcombat.Fire) { /* draw their rock */ }
+```
+
+Raw `fire_write`/`fire_read` stay public for games that need a different envelope.
+
+Tick-paced code (cooldown decay loops, [kit/ai's director](ai.md)) should read the
+session's own clock, `ksess.session_tick_no(s)`, not accumulate a counter — a
+hand-rolled count silently diverges across resume/migration. The exception is a
+**campaign clock** a game deliberately persists in its save blob (cavecrawl's
+`host_ticks` gates respawns across saves): that one must be the game's, because the
+session's tick is local to the session's lifetime.
+
 ## Predicted hp: the impact you saw, before the wire agrees
 
 When your local rock visually contacts a body, the health you *display* may dip

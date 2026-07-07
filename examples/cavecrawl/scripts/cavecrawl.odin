@@ -180,6 +180,7 @@ CaveLobby :: struct {
 	cols:       kcombat.Combat_Cols, // host: the auto-published ledger columns
 	flying:     [dynamic]Cave_Rock, // host: the authoritative rock sim
 	tracers:    kfx.Tracers, // every peer: the rocks on THIS screen (px/tick -> px/s, see rocks.odin)
+	fires:      kcombat.Fire_Route, // the announcement listener's registration
 	fx:         kfx.Bursts, // every peer: live particle bursts (fx.odin narrates, kit/fx reaps)
 	respawn_at: map[knet.Net_Id]int, // host: resurrection clocks
 
@@ -221,7 +222,7 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
 	ksess.session_set_backup_blob(&self.ses, self, cave_backup_blob)
 	ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
-	ksess.session_app_route(&self.ses, TAG_FIRE, self, cave_on_fire)
+	kcombat.fire_listen(&self.fires, &self.ses, TAG_FIRE, self, cave_on_fire)
 
 	// The stock stack — lobby, chat+comms, scoreboard, stage/world, wire,
 	// legend — is kit/boot's. Everything below is what makes this CAVECRAWL.
