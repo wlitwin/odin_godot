@@ -408,7 +408,8 @@ Session :: struct {
 	factory_make:  Make_Entity_Proc,
 	factory_free:  Free_Entity_Proc,
 	cmd_hook_user: rawptr,
-	cmd_hook:      Command_Hook, // host: the cross-entity half of commands
+	cmd_hook:      Command_Hook, // host: the cross-entity half of commands (the catch-all)
+	type_hooks:    map[Entity_Type]Type_Hook_Entry, // host: per-type routing (wins over the catch-all)
 
 	// the stat registry (host accumulates; everyone reads)
 	stat_names:  [dynamic]string, // owned; index = column
@@ -535,10 +536,10 @@ session_init :: proc(s: ^Session) {
 	// Commands always go host-ward through the session's own framing.
 	s.ctx.send = ctx_send_command
 	s.ctx.send_user = s
-	// Re-mirror the cross-entity hook (installed in ready(), which runs
+	// Re-install the hook dispatcher (hooks are wired in ready(), which runs
 	// before any *_start recreates this ctx — the survives-start contract).
-	s.ctx.hook = s.cmd_hook
-	s.ctx.hook_user = s.cmd_hook_user
+	s.ctx.hook = ctx_hook_dispatch
+	s.ctx.hook_user = s
 	append(&s.stat_names, strings.clone("ping")) // STAT_PING, fed by the session
 }
 
@@ -564,6 +565,7 @@ session_destroy :: proc(s: ^Session) {
 	delete(s.tokens)
 	delete(s.focus)
 	delete(s.interest)
+	delete(s.type_hooks)
 	delete(s.by_peer)
 	delete(s.denied)
 	delete(s.name)
@@ -717,14 +719,54 @@ session_set_factory :: proc(s: ^Session, user: rawptr, make_entity: Make_Entity_
 	s.factory_free = free_entity
 }
 
-// Install the host-side command hook (see Command_Hook; survives session start).
-// Mirrored onto the command ctx so the generated wrappers fire it for the
-// authority's own local issues too.
+// Install the host-side command hook (see Command_Hook; survives session
+// start). This is the CATCH-ALL: entities whose type has a
+// session_set_type_hook route there instead. All hooks reach the ctx through
+// one dispatcher, so the generated wrappers fire them for the authority's
+// own local issues too.
 session_set_command_hook :: proc(s: ^Session, user: rawptr, hook: Command_Hook) {
 	s.cmd_hook_user = user
 	s.cmd_hook = hook
-	s.ctx.hook = hook
-	s.ctx.hook_user = user
+	s.ctx.hook = ctx_hook_dispatch
+	s.ctx.hook_user = s
+}
+
+Type_Hook_Entry :: struct {
+	user: rawptr,
+	hook: Command_Hook,
+}
+
+// PER-TYPE hook routing: commands on entities of `type` fire THIS hook
+// instead of the catch-all. Why it exists: command ids collide across types
+// (every type's first command is 0), so a single hook must classify the
+// entity before switching on cmd — a page of is-it-a-chest chains that grows
+// into a misclassification liability. Routed by the session's own type
+// table, the wrong-type bug is structurally impossible, and each type's
+// consequences live next to its verbs. Survives starts, like the catch-all.
+session_set_type_hook :: proc(s: ^Session, type: Entity_Type, user: rawptr, hook: Command_Hook) {
+	s.type_hooks[type] = Type_Hook_Entry{user = user, hook = hook}
+	s.ctx.hook = ctx_hook_dispatch
+	s.ctx.hook_user = s
+}
+
+// The one place every executed command's hook fires — the host's own local
+// issues (via ctx) and the clients' (the SES_CMD handler) both land here.
+@(private = "file")
+session_dispatch_hook :: proc(s: ^Session, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
+	if t, known := s.types[entity]; known {
+		if th, routed := s.type_hooks[t]; routed {
+			th.hook(th.user, player, entity, cmd, ok)
+			return
+		}
+	}
+	if s.cmd_hook != nil {
+		s.cmd_hook(s.cmd_hook_user, player, entity, cmd, ok)
+	}
+}
+
+@(private = "file")
+ctx_hook_dispatch :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
+	session_dispatch_hook(cast(^Session)user, player, entity, cmd, ok)
 }
 
 // The Command_Ctx send hook: wrap raw command bytes in session framing and
@@ -2031,9 +2073,7 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) 
 		s.send(s.send_user, from_peer, knet.writer_bytes(&w), .Reliable)
 		// The hook runs BEFORE the result ships onward in game terms: scratch
 		// state the proc left on the entity is still exactly this command's.
-		if s.cmd_hook != nil {
-			s.cmd_hook(s.cmd_hook_user, pid, h.entity, h.cmd, ok)
-		}
+		session_dispatch_hook(s, pid, h.entity, h.cmd, ok)
 		append(&s.events, Ev_Command_Executed{ok = ok, player = pid, entity = h.entity, cmd = h.cmd})
 	case SES_RESULT:
 		if s.is_host {

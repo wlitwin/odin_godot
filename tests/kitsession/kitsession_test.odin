@@ -1580,3 +1580,71 @@ interest_streams_route_via_host_and_filter :: proc(t: ^testing.T) {
 	}
 	testing.expect(t, bbot.x >= before, "bob's copy moves again after re-entry")
 }
+
+// ---- per-type hook routing -------------------------------------------------------
+
+Hook_Log :: struct {
+	calls: [dynamic]u64, // (entity << 8 | cmd) per firing — order preserved
+}
+
+log_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
+	l := cast(^Hook_Log)user
+	if ok {append(&l.calls, u64(entity) << 8 | u64(cmd))}
+}
+
+@(test)
+type_hooks_route_and_catch_all_falls_back :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+	now := f64(1000)
+
+	typed, general: Hook_Log
+	defer delete(typed.calls)
+	defer delete(general.calls)
+	ksess.session_set_command_hook(&host.s, &general, log_hook)
+	ksess.session_set_type_hook(&host.s, BOT_TYPE, &typed, log_hook)
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	ksess.session_start_replicating(&host.s)
+
+	bot := Bot{hp = 10}
+	id := ksess.session_spawn(&host.s, BOT_TYPE, &bot, &bot_command_set)
+	stranger := Bot{hp = 10}
+	sid := ksess.session_spawn(&host.s, UNKNOWN_TYPE, &stranger, &bot_command_set)
+	pump(boxes)
+
+	// A CLIENT's command on the routed type fires the TYPE hook, not the
+	// catch-all — the wrong-classification bug is structurally impossible.
+	abot := alice.bots[id]
+	knet.command_begin(&alice.s.ctx, id, 0)
+	knet.write_i32(&alice.s.ctx.msg, 3)
+	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, 0))
+	step(boxes, &now)
+	testing.expect_value(t, len(typed.calls), 1)
+	testing.expect_value(t, typed.calls[0], u64(id) << 8)
+	testing.expect_value(t, len(general.calls), 0)
+
+	// The HOST's own local issue routes identically (one dispatcher).
+	hbot := cast(^Bot)host.s.reg.entries[id].entity
+	_ = hbot
+	// (games use the generated wrapper; the raw authority path is invoke+hook)
+	r := knet.reader_make([]u8{3, 0, 0, 0})
+	_ = bot_cmd_hit(host.s.reg.entries[id].entity, &r)
+	knet.command_hook_local(&host.s.ctx, id, 0, true)
+	testing.expect_value(t, len(typed.calls), 2)
+
+	// An UNROUTED type falls back to the catch-all.
+	if e, ok := host.s.reg.entries[sid]; ok {
+		_ = e
+		knet.command_hook_local(&host.s.ctx, sid, 0, true)
+	}
+	testing.expect_value(t, len(general.calls), 1)
+	testing.expect_value(t, general.calls[0], u64(sid) << 8)
+}

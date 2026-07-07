@@ -236,6 +236,24 @@ peer that didn't register the column, resolve BY NAME with `session_stat_find`
 (cheap — do it per read). Homestead's acid caught this as a resource gate passing
 on 254 milliseconds of latency.
 
+## Per-type hook routing
+
+Command ids collide across types (every type's first command is 0), so a
+single catch-all hook must classify the entity before switching on cmd —
+chains of "is it a chest?" that grow into a misclassification liability
+(forget one and a door toggle runs your chest logic, silently). Route by
+type instead:
+
+```odin
+ksess.session_set_type_hook(&self.ses, CHEST_TYPE, self, chest_hook)  // wins
+ksess.session_set_command_hook(&self.ses, self, game_hook)            // catch-all for the rest
+```
+
+A routed type's hook receives exactly that type's commands — the wrong-type
+bug is structurally impossible, and each type's consequences live next to
+its verbs. The host's own local issues and clients' commands land in the
+same dispatcher. Survives session starts, like the catch-all.
+
 ## Interest management (area of interest)
 
 **Existence global, freshness local.** Every peer still knows every entity —
