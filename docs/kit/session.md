@@ -130,8 +130,10 @@ for {
 The event union: `Ev_Welcomed`, `Ev_Player_Joined` (with `rejoin`), `Ev_Player_Left`,
 `Ev_Host_Left` (v1 has no migration — the run is over), `Ev_Join_Failed`,
 `Ev_Join_Denied` (`.Full` / `.Locked` / `.Banned` — each a different sentence to the
-player), `Ev_Kicked`, `Ev_Spawned`, `Ev_Despawned`, `Ev_Owner_Changed`, `Ev_Blob_Changed`,
-`Ev_Stats_Updated`, `Ev_Backup_Received`, `Ev_State_Applied`,
+player), `Ev_Kicked`, `Ev_Spawned`, `Ev_Resynced` (a KNOWN entity's fields caught up
+wholesale — interest re-entry, a snapshot over live state; re-seed `seen_*` edge scratch
+here or the missed changes present as fresh events), `Ev_Despawned`, `Ev_Owner_Changed`,
+`Ev_Blob_Changed`, `Ev_Stats_Updated`, `Ev_Backup_Received`, `Ev_State_Applied`,
 `Ev_Entity_Changed` (opt-in), `Ev_Command_Executed` (host),
 `Ev_Command_Confirmed` / `Ev_Command_Rejected` (client; timeouts surface as rejections
 with the real seq/entity).
@@ -277,7 +279,11 @@ Mechanics worth knowing:
 
 - **Re-entry resync.** A filtered delta is gone forever, so when an entity
   ENTERS a peer's interest the host sends that peer one full spawn tuple (the
-  same reconcile path a rejoin uses): fields and blob catch up at once.
+  same reconcile path a rejoin uses): fields and blob catch up at once. The
+  catch-up announces itself as `Ev_Resynced` (not a second `Ev_Spawned` — the
+  entity was never gone on this peer). The jump is history, not gameplay:
+  re-seed any `seen_*` edge scratch in that case (`seen_hp = hp`), or wounds
+  taken while out of interest present as fresh hits on re-entry.
   `hysteresis` widens the exit edge (enter at `radius`, leave at
   `radius + hysteresis`) so border-dancers don't thrash this.
 - **Streams route via the host.** Owners send their batches to the host

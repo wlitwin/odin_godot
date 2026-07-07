@@ -115,6 +115,16 @@ Ev_Spawned :: struct {
 	owner: knet.Player_Id,
 }
 
+Ev_Resynced :: struct {
+	// (client) a KNOWN entity's fields just caught up WHOLESALE — a spawn
+	// tuple applied over it (interest re-entry, a world snapshot over live
+	// state, a redundant spawn). The jump is not gameplay: re-seed any
+	// seen_* edge scratch here, or old wounds present as fresh hits.
+	id:    knet.Net_Id,
+	type:  Entity_Type,
+	owner: knet.Player_Id,
+}
+
 Ev_Despawned :: struct {
 	id: knet.Net_Id, // (client) already removed; the factory's free ran
 }
@@ -171,6 +181,7 @@ Event :: union {
 	Ev_Backup_Target,
 	Ev_Succession,
 	Ev_Spawned,
+	Ev_Resynced,
 	Ev_Despawned,
 	Ev_Owner_Changed,
 	Ev_Stats_Updated,
@@ -1019,6 +1030,11 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 
 	if e, exists := knet.registry_get(&s.reg, id); exists {
 		knet.apply_full(&body, e.entity, e.set.entity_desc)
+		// A known entity caught up wholesale (interest re-entry, snapshot
+		// over live state). The game hears it as Ev_Resynced, NOT a second
+		// Ev_Spawned — the entity was never gone HERE; edge scratch must
+		// re-seed, not re-dress. Blob event after, same order as birth.
+		append(&s.events, Ev_Resynced{id = id, type = type, owner = owner})
 		if knet.registry_apply_blob(&s.reg, id, blob_ver, blob) {
 			append(&s.events, Ev_Blob_Changed{id = id, size = blob_n})
 		}

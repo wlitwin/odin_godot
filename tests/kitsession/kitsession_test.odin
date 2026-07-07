@@ -1511,10 +1511,21 @@ interest_filters_deltas_and_resyncs_on_entry :: proc(t: ^testing.T) {
 	testing.expect_value(t, alice.bots[idf].hp, i32(20)) // STALE: filtered
 
 	// She walks over to the far one: the ENTER resync delivers everything
-	// she missed — the delta that was never sent is not lost truth.
+	// she missed — the delta that was never sent is not lost truth. The
+	// catch-up announces itself as Ev_Resynced (NOT a second Ev_Spawned:
+	// the entity was never gone here) — the game's cue to re-seed edge
+	// scratch, or the missed wounds present as fresh hits.
+	drain(&alice.s)
 	ksess.session_set_focus(&host.s, 2, 1000, 0)
 	step(boxes, &now)
 	testing.expect_value(t, alice.bots[idf].hp, i32(21)) // caught up whole
+	resynced, respawned := false, false
+	for ev in drain(&alice.s) {
+		if r, is_r := ev.(ksess.Ev_Resynced); is_r && r.id == idf {resynced = true}
+		if sp, is_s := ev.(ksess.Ev_Spawned); is_s && sp.id == idf {respawned = true}
+	}
+	testing.expect(t, resynced, "re-entry must announce itself as Ev_Resynced")
+	testing.expect(t, !respawned, "re-entry must not re-fire Ev_Spawned")
 	near.hp = 12
 	step(boxes, &now)
 	testing.expect_value(t, alice.bots[idn].hp, i32(11)) // now THIS one is stale
