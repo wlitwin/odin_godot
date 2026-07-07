@@ -91,10 +91,12 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 	kui.chat_show(&b.chat, false)
 	gd.connect_to(cast(gd.Object)b.chat.input, "text_submitted", node, opts.methods.chat)
 
-	b.stage = gd.new_node()
+	// Node2D containers (not plain Nodes) so games can offset them together —
+	// screen shake (kfx.Shake) nudges stage+world as one. Children unaffected.
+	b.stage = cast(gd.Node)gd.new_node2d()
 	gd.node_set_name(b.stage, gd.new_string_name_cstring("Stage", true))
 	gd.add_child(node, b.stage)
-	b.world = gd.new_node()
+	b.world = cast(gd.Node)gd.new_node2d()
 	gd.node_set_name(b.world, gd.new_string_name_cstring("World", true))
 	gd.add_child(node, b.world)
 

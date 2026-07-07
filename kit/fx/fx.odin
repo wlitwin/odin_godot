@@ -14,6 +14,7 @@ package kit_fx
 //     frame, its ashes are not. Spent emitters carry a time-to-live in a
 //     Bursts pool the game owns; call frame() once per frame to reap them.
 
+import "core:math"
 import gd "godot:godot"
 
 BURST_TTL :: f32(0.8) // seconds a spent emitter node lingers before reaping
@@ -84,4 +85,97 @@ flash :: proc(node: gd.Node, color: gd.Color) {
 	white := gd.Color{1, 1, 1, 1}
 	v := gd.variant_from_color(&white)
 	_ = gd.tween_tween_property(tw, cast(gd.Object)node, gd.new_node_path_string(gd.new_string_cstring("modulate")), v, 0.3)
+}
+
+// ---- floating text ---------------------------------------------------------------
+//
+// The "+2 wood" / "-14" number that pops off a spot and drifts up while
+// fading — the cheapest juice-per-line in the toolkit. Pool-driven like
+// Bursts: the game owns a Floats, calls floats_frame once per frame, and the
+// labels animate and reap themselves. Parent to the WORLD (they must outlive
+// whatever they announce).
+
+FLOAT_TTL :: f32(0.9) // seconds aloft
+FLOAT_RISE :: f32(46) // px/s upward drift
+
+Float :: struct {
+	node: gd.Label,
+	left: f32,
+}
+
+Floats :: struct {
+	live: [dynamic]Float,
+}
+
+floats_destroy :: proc(fx: ^Floats) {
+	delete(fx.live)
+	fx^ = {}
+}
+
+// Pop `text` at a parent-relative position in `color`. The cstring is copied
+// by the engine; temp-allocated text is fine.
+float_text :: proc(fx: ^Floats, parent: gd.Node, x, y: f32, text: cstring, color := gd.Color{1, 1, 1, 1}) {
+	l := gd.new_label()
+	gd.set_text(cast(gd.Object)l, text)
+	gd.add_child(parent, cast(gd.Node)l)
+	gd.control_set_position(cast(gd.Control)l, {x, y}, false)
+	gd.canvas_item_set_modulate(cast(gd.Canvas_Item)l, color)
+	append(&fx.live, Float{node = l, left = FLOAT_TTL})
+}
+
+floats_frame :: proc(fx: ^Floats, delta: f64) {
+	for i := 0; i < len(fx.live); {
+		f := &fx.live[i]
+		f.left -= f32(delta)
+		if f.left <= 0 {
+			gd.node_queue_free(cast(gd.Node)f.node)
+			unordered_remove(&fx.live, i)
+			continue
+		}
+		pos := gd.control_get_position(cast(gd.Control)f.node)
+		gd.control_set_position(cast(gd.Control)f.node, {pos.x, pos.y - FLOAT_RISE * f32(delta)}, false)
+		t := f.left / FLOAT_TTL
+		gd.canvas_item_set_modulate(cast(gd.Canvas_Item)f.node, {1, 1, 1, t < 0.6 ? t / 0.6 : 1})
+		i += 1
+	}
+}
+
+// ---- screen shake -----------------------------------------------------------------
+//
+// Trauma-model shake (the industry-standard feel): impacts ADD trauma,
+// trauma decays linearly, and the applied offset is trauma² times a jitter —
+// so small hits whisper and big ones slam, with no lingering wobble. Apply
+// it to the boot stage/world containers (Node2D since kit/boot made them
+// so): both nudge together and every child rides along.
+//
+//     kfx.shake_add(&self.shake, 0.3)                  // on impact
+//     kfx.shake_frame(&self.shake, delta,              // once per frame
+//         self.boot.stage, self.boot.world)
+
+Shake :: struct {
+	trauma: f32, // 0..1
+	t:      f32, // running clock driving the jitter
+}
+
+shake_add :: proc(s: ^Shake, amount: f32) {
+	s.trauma = min(s.trauma + amount, 1)
+}
+
+SHAKE_DECAY :: f32(1.6) // trauma/s — a full slam settles in ~0.6s
+SHAKE_MAX :: f32(7) // px at trauma 1
+
+shake_frame :: proc(s: ^Shake, delta: f64, nodes: ..gd.Node) {
+	if s.trauma <= 0 {
+		return
+	}
+	s.trauma = max(s.trauma - SHAKE_DECAY * f32(delta), 0)
+	s.t += f32(delta)
+	amp := s.trauma * s.trauma * SHAKE_MAX
+	// Two incommensurate sines beat like noise — deterministic, allocation-free.
+	ox := amp * math.sin(s.t * 91.7)
+	oy := amp * math.sin(s.t * 113.3 + 1.7)
+	if s.trauma == 0 {ox, oy = 0, 0} // settle EXACTLY home on the last frame
+	for n in nodes {
+		gd.node2d_set_position(cast(gd.Node2d)n, {ox, oy})
+	}
 }

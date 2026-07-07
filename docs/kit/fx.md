@@ -141,3 +141,31 @@ rock_impact :: proc(user: rawptr, hit: kfx.Tracer_Hit) {
 Siblings: [combat.md](combat.md) (`Fire`, `Target`, `projectile_hit`, predicted hp) ·
 [session.md](session.md) (`session_tick_hz`, SES_APP fire announcements) ·
 [ui.md](ui.md) (the HUD the impact repaints).
+
+## Floating text (`Floats` / `float_text` / `floats_frame`)
+
+The "+2 wood" / "-14" that pops off a spot, drifts up, and fades — the
+cheapest juice-per-line in the toolkit. Pool-driven exactly like Bursts: the
+game owns a `Floats`, calls `floats_frame(&fx, delta)` once per frame, and
+labels animate and reap themselves. Parent to the WORLD so they outlive
+whatever they announce; temp-allocated text (`fmt.ctprintf`) is fine — the
+engine copies it.
+
+```odin
+kfx.float_text(&self.floats, self.boot.world, x - 16, y - 34, "+1 wood")
+```
+
+## Screen shake (`Shake` / `shake_add` / `shake_frame`)
+
+Trauma-model shake: impacts ADD trauma (`shake_add(&s, 0.3)`), trauma decays
+linearly, and the applied offset is trauma² jitter — small hits whisper, big
+ones slam, no lingering wobble. Apply per frame to the boot containers (they
+are Node2D so everything rides along):
+
+```odin
+kfx.shake_frame(&self.shake, delta, self.boot.stage, self.boot.world)
+```
+
+The shake belongs to the CAUSER's screen: thump when MY chop lands (the
+`mine` path of a presentation proc — see homestead), not when I merely watch
+someone else's. It settles exactly home on its last frame.

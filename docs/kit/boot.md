@@ -32,7 +32,9 @@ for ev in events {
 
 **Everything stays yours.** Every widget is a public field on `Boot`
 (`boot.ui`, `boot.chat`, `boot.score`, `boot.legend`, `boot.wire`,
-`boot.stage`, `boot.world`) — reposition, restyle, or ignore them. The eight
+`boot.stage`, `boot.world`) — reposition, restyle, or ignore them. `stage`
+and `world` are Node2D containers, so screen shake ([kfx.Shake](fx.md)) can
+nudge them both as one. The eight
 `@(gd_method)` names are declared in *your* script (Godot signals must land on
 the game's class); their bodies are one-liners — see either example game's
 `net.odin`.
