@@ -13,10 +13,11 @@ import "core:fmt"
 import "core:strings"
 
 Score :: struct {
-	root:   gd.Control, // centered PanelContainer (background + auto-size)
-	box:    gd.Control, // the VBox column inside it
-	header: gd.Label,
-	rows:   [dynamic]gd.Label, // reused across refreshes
+	root:  gd.Control, // centered PanelContainer (background + auto-size)
+	grid:  gd.Control, // the GridContainer inside it — real columns, so
+	// names and tallies LINE UP (a VBox of pipe-joined strings drifted with
+	// every proportional-font digit; homestead found it live)
+	cells: [dynamic]gd.Label, // header + rows, row-major, reused across refreshes
 }
 
 score_make :: proc(parent: gd.Node) -> Score {
@@ -32,16 +33,16 @@ score_make :: proc(parent: gd.Node) -> Score {
 	gd.node_set_name(cast(gd.Node)sb.root, gd.new_string_name_cstring("Scoreboard", true))
 	gd.add_child(parent, cast(gd.Node)sb.root)
 	gd.canvas_item_set_z_index(cast(gd.Canvas_Item)sb.root, 10)
-	sb.box = cast(gd.Control)gd.new_v_box_container()
-	gd.add_child(cast(gd.Node)sb.root, cast(gd.Node)sb.box)
-	sb.header = gd.new_label()
-	gd.add_child(cast(gd.Node)sb.box, cast(gd.Node)sb.header)
+	grid := gd.new_grid_container()
+	gd.control_add_theme_constant_override(cast(gd.Control)grid, gd.new_string_name_cstring("h_separation", true), 22)
+	sb.grid = cast(gd.Control)grid
+	gd.add_child(cast(gd.Node)sb.root, cast(gd.Node)sb.grid)
 	gd.set_bool(cast(gd.Object)sb.root, "visible", false)
 	return sb
 }
 
 score_destroy :: proc(sb: ^Score) {
-	delete(sb.rows)
+	delete(sb.cells)
 	sb^ = {}
 	// The node tree itself belongs to the scene (freed with the owner).
 }
@@ -53,35 +54,38 @@ score_show :: proc(sb: ^Score, visible: bool) {
 // Repaint players × columns. Sorted by Player_Id (join order); departed
 // players stay listed — their tallies survive disconnects by design.
 score_refresh :: proc(sb: ^Score, s: ^ksess.Session) {
-	b := strings.builder_make(context.temp_allocator)
-	strings.write_string(&b, "spelunker")
-	for name in ksess.session_stat_names(s) {
-		strings.write_string(&b, " | ")
-		strings.write_string(&b, name)
-	}
-	gd.set_string(cast(gd.Object)sb.header, "text", fmt.ctprintf("%s", strings.to_string(b)))
+	names := ksess.session_stat_names(s)
+	gd.grid_container_set_columns(cast(gd.Grid_Container)sb.grid, gd.Int(1 + len(names)))
 
-	roster := ksess.session_roster(s)
-	for p, i in roster {
-		row: gd.Label
-		if i < len(sb.rows) {
-			row = sb.rows[i]
+	next := 0
+	cell :: proc(sb: ^Score, next: ^int, text: cstring, numeric: bool) {
+		l: gd.Label
+		if next^ < len(sb.cells) {
+			l = sb.cells[next^]
 		} else {
-			row = gd.new_label()
-			gd.add_child(cast(gd.Node)sb.box, cast(gd.Node)row)
-			append(&sb.rows, row)
+			l = gd.new_label()
+			gd.add_child(cast(gd.Node)sb.grid, cast(gd.Node)l)
+			append(&sb.cells, l)
 		}
-		gd.set_bool(cast(gd.Object)row, "visible", true)
-
-		rb := strings.builder_make(context.temp_allocator)
-		strings.write_string(&rb, p.name)
-		for _, col in ksess.session_stat_names(s) {
-			fmt.sbprintf(&rb, " | %d", ksess.session_stat(s, p.id, ksess.Stat_Col(col)))
-		}
-		gd.set_string(cast(gd.Object)row, "text", fmt.ctprintf("%s", strings.to_string(rb)))
+		next^ += 1
+		gd.set_bool(cast(gd.Object)l, "visible", true)
+		gd.set_string(cast(gd.Object)l, "text", text)
+		gd.label_set_horizontal_alignment(l, numeric ? .Right : .Left)
 	}
-	for i in len(roster) ..< len(sb.rows) {
-		gd.set_bool(cast(gd.Object)sb.rows[i], "visible", false)
+
+	cell(sb, &next, "player", false)
+	for name in names {
+		cell(sb, &next, fmt.ctprintf("%s", name), true)
+	}
+	roster := ksess.session_roster(s)
+	for p in roster {
+		cell(sb, &next, fmt.ctprintf("%s", p.name), false)
+		for _, col in names {
+			cell(sb, &next, fmt.ctprintf("%d", ksess.session_stat(s, p.id, ksess.Stat_Col(col))), true)
+		}
+	}
+	for i in next ..< len(sb.cells) {
+		gd.set_bool(cast(gd.Object)sb.cells[i], "visible", false)
 	}
 
 	// Center in the viewport by hand (see score_make): position from the

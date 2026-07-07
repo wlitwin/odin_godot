@@ -63,8 +63,9 @@ Boot :: struct {
 	score:  kui.Score,
 	legend: gd.Label, // nil when Options.legend was ""
 	wire:   netgd.Session_Wire,
-	stage:  gd.Node, // scenery container (draws behind world)
-	world:  gd.Node, // entity container
+	stage:    gd.Node, // scenery container (draws behind world)
+	world:    gd.Node, // entity container
+	ui_layer: gd.Node, // CanvasLayer all the widgets live on — ABOVE the field
 
 	ses:         ^ksess.Session,
 	comms:       ^kcomms.Comms,
@@ -78,7 +79,16 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 	b.comms = comms
 	b.min_players = opts.min_players > 0 ? opts.min_players : 2
 
-	b.ui = kui.lobby_make(node, opts.title)
+	// Every widget lives on a CanvasLayer: layers draw above world-space
+	// CanvasItems no matter what z_index entities carry, so a full-screen
+	// playfield can never bury the chat (homestead found it live — its
+	// grass covered the viewport and z>0 entities beat every Control).
+	layer := gd.new_canvas_layer()
+	gd.node_set_name(cast(gd.Node)layer, gd.new_string_name_cstring("BootUi", true))
+	gd.add_child(node, cast(gd.Node)layer)
+	b.ui_layer = cast(gd.Node)layer
+
+	b.ui = kui.lobby_make(b.ui_layer, opts.title)
 	if opts.status != "" {
 		kui.lobby_set_status(&b.ui, opts.status)
 	}
@@ -87,7 +97,7 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 	gd.connect_to(cast(gd.Object)b.ui.start_btn, "pressed", node, opts.methods.start)
 
 	kcomms.comms_init(comms, ses)
-	b.chat = kui.chat_make(node)
+	b.chat = kui.chat_make(b.ui_layer)
 	kui.chat_show(&b.chat, false)
 	gd.connect_to(cast(gd.Object)b.chat.input, "text_submitted", node, opts.methods.chat)
 
@@ -100,7 +110,7 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 	gd.node_set_name(b.world, gd.new_string_name_cstring("World", true))
 	gd.add_child(node, b.world)
 
-	b.score = kui.score_make(node)
+	b.score = kui.score_make(b.ui_layer)
 
 	netgd.wire_attach(&b.wire, node, ses, opts.msg_kind)
 	netgd.wire_listen(&b.wire, opts.methods.packet, opts.methods.peer_left, opts.methods.net_up, opts.methods.net_down)
@@ -110,7 +120,7 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 
 	if opts.legend != "" {
 		b.legend = gd.new_label()
-		gd.add_child(node, cast(gd.Node)b.legend)
+		gd.add_child(b.ui_layer, cast(gd.Node)b.legend)
 		gd.control_set_anchors_preset(cast(gd.Control)b.legend, .Preset_Bottom_Right, false)
 		gd.control_set_v_grow_direction(cast(gd.Control)b.legend, .Grow_Direction_Begin)
 		gd.control_set_h_grow_direction(cast(gd.Control)b.legend, .Grow_Direction_Begin)
