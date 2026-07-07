@@ -228,6 +228,13 @@ session_stat_add :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col, del
 session_stat :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col) -> i64
 ```
 
+**The client-column trap**: `session_stat_column` registers and runs on the HOST
+(typically in your Start handler) — a `Stat_Col` you stored there is zero-value on
+every client, and a client reading it reads **column 0, the auto-fed ping**. On any
+peer that didn't register the column, resolve BY NAME with `session_stat_find`
+(cheap — do it per read). Homestead's acid caught this as a resource gate passing
+on 254 milliseconds of latency.
+
 ## App messages
 
 `SES_APP` lets packages built on top of the session ([kit/comms](comms.md) is the first)
