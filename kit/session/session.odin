@@ -106,7 +106,11 @@ Ev_Succession :: struct {
 }
 
 Ev_Spawned :: struct {
-	id:    knet.Net_Id, // (client) the factory made it and the snapshot applied
+	// EVERY peer, and only once the entity is BORN — its spawn-time fields
+	// are set. Clients hear it after the snapshot applies; the host at
+	// session_spawn_send / session_spawn (never at spawn_make, whose entity
+	// is still an empty shell awaiting the caller's fields).
+	id:    knet.Net_Id,
 	type:  Entity_Type,
 	owner: knet.Player_Id,
 }
@@ -743,14 +747,16 @@ session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet
 		write_spawn_tuple(s, &w, id)
 		broadcast(s, knet.writer_bytes(&w), .Reliable)
 	}
+	append(&s.events, Ev_Spawned{id = id, type = type, owner = owner}) // pre-filled entity: born now
 	return id
 }
 
 // Host: spawn THROUGH THE FACTORY — the same Make_Entity_Proc clients run,
 // so every entity type's creation is written exactly once. Two-phase because
 // the spawn announcement carries a field snapshot: make, set your per-spawn
-// fields on the returned entity, then session_spawn_send. Ev_Spawned fires
-// here (the host reacts to spawns like any peer).
+// fields on the returned entity, then session_spawn_send — which is where
+// Ev_Spawned fires (the entity is BORN once its fields are set; an event at
+// make time would hand the game an empty shell).
 session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_ID_INVALID) -> (entity: rawptr, id: knet.Net_Id) {
 	assert(s.is_host, "only the authority spawns; clients create via the factory")
 	assert(s.factory_make != nil, "session_spawn_make needs session_set_factory")
@@ -761,7 +767,6 @@ session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_
 	assert(entity != nil, "the factory returned nil for a host-side spawn")
 	knet.registry_insert(&s.reg, id, entity, set, owner)
 	s.types[id] = type
-	append(&s.events, Ev_Spawned{id = id, type = type, owner = owner})
 	return
 }
 
@@ -775,6 +780,9 @@ session_spawn_send :: proc(s: ^Session, id: knet.Net_Id) {
 		knet.write_u8(&w, SES_SPAWN)
 		write_spawn_tuple(s, &w, id)
 		broadcast(s, knet.writer_bytes(&w), .Reliable)
+	}
+	if e, ok := knet.registry_get(&s.reg, id); ok {
+		append(&s.events, Ev_Spawned{id = id, type = s.types[id], owner = e.owner})
 	}
 }
 

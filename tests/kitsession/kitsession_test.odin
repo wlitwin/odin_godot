@@ -498,6 +498,7 @@ commands_from_unseated_peers_are_dropped :: proc(t: ^testing.T) {
 
 	hbot := Bot{hp = 10}
 	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
+	drain(&host.s) // the host hears its own spawn (Ev_Spawned = born, every peer)
 
 	// A raw SES_CMD from a transport peer that never JOINed: dropped whole —
 	// no execution, no result, no event.

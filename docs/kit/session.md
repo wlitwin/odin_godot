@@ -120,7 +120,8 @@ for {
 	if !ok {break}
 	#partial switch e in ev {
 	case ksess.Ev_Welcomed:  // (client) the host accepted us; the roster is seeded
-	case ksess.Ev_Spawned:   // the factory made it and the snapshot applied
+	case ksess.Ev_Spawned:   // BORN, on every peer: entity exists AND its spawn-time fields are set
+	                         // (host hears its own at spawn_send/session_spawn — dress/reveal here)
 	// ...
 	}
 }
