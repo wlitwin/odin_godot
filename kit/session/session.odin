@@ -448,6 +448,15 @@ Session :: struct {
 	name:        string, // owned; the name we asked for
 	joined:      bool, // WELCOME received
 	join_waited: int, // ticks since client_start without a WELCOME (-1 = not waiting)
+
+	// interest management (interest.odin) — off until session_set_interest
+	interest_r:    f32,
+	interest_hys:  f32,
+	interest_user: rawptr,
+	locator:       Locator_Proc,
+	focus:         map[knet.Player_Id][2]f32, // host: each peer's eyes
+	interest:      map[u64]bool, // host: (player, entity) pairs currently near
+	aoi_client:    bool, // client: the welcome said streams route via the host
 }
 
 @(private = "file")
@@ -485,6 +494,9 @@ session_init :: proc(s: ^Session) {
 		}
 		clear(&s.stat_names)
 		clear(&s.stats)
+		clear(&s.focus)
+		clear(&s.interest)
+		s.aoi_client = false
 		delete(s.backup)
 		s.backup = nil
 		delete(s.succ_info)
@@ -550,6 +562,8 @@ session_destroy :: proc(s: ^Session) {
 	delete(s.players)
 	delete(s.events)
 	delete(s.tokens)
+	delete(s.focus)
+	delete(s.interest)
 	delete(s.by_peer)
 	delete(s.denied)
 	delete(s.name)
@@ -872,6 +886,7 @@ session_despawn :: proc(s: ^Session, id: knet.Net_Id) {
 		return
 	}
 	delete_key(&s.types, id)
+	interest_forget_entity(s, id)
 	if s.factory_free != nil {
 		s.factory_free(s.factory_user, id, entity)
 	}
@@ -905,7 +920,7 @@ session_start_replicating :: proc(s: ^Session) {
 // — both lengths make unknown types skippable whole. The blob section is why
 // entity blobs need no separate catch-up path: joins, backups, and saves all
 // serialize entities through this one tuple.
-@(private = "file")
+@(private) // interest.odin's re-entry resync writes these too
 write_spawn_tuple :: proc(s: ^Session, w: ^knet.Writer, id: knet.Net_Id) {
 	e, _ := knet.registry_get(&s.reg, id)
 	knet.write_u16(w, u16(s.types[id]))
@@ -1015,21 +1030,31 @@ net_tick :: proc(s: ^Session) {
 	}
 
 	if s.is_host && s.replicating {
-		// Host state: ONE batched delta message for every dirty entity, to
-		// every joined peer, reliable (the shadow commits on send — a dropped
-		// delta would be lost forever; spawn/despawn shares this channel so
-		// ids are always known before a batch names them).
-		w := knet.writer_make()
-		defer knet.writer_destroy(&w)
-		knet.write_u8(&w, SES_STATE)
 		changed: [dynamic]knet.Net_Id
 		changed_out: ^[dynamic]knet.Net_Id
 		if s.cfg.change_events {
 			changed = make([dynamic]knet.Net_Id, context.temp_allocator)
 			changed_out = &changed
 		}
-		if dirty := knet.registry_write_deltas(&w, &s.reg, changed_out); dirty > 0 {
-			broadcast(s, knet.writer_bytes(&w), .Reliable)
+		dirty := 0
+		if interest_on(s) {
+			// Freshness is local: refresh who-sees-what (ENTER resyncs ride
+			// along), then compose per-recipient delta batches — one shadow
+			// commit either way.
+			interest_tick(s)
+			dirty = interest_send_state(s, changed_out)
+		} else {
+			// Host state: ONE batched delta message for every dirty entity,
+			// to every joined peer, reliable (the shadow commits on send — a
+			// dropped delta would be lost forever).
+			w := knet.writer_make()
+			defer knet.writer_destroy(&w)
+			knet.write_u8(&w, SES_STATE)
+			if dirty = knet.registry_write_deltas(&w, &s.reg, changed_out); dirty > 0 {
+				broadcast(s, knet.writer_bytes(&w), .Reliable)
+			}
+		}
+		if dirty > 0 {
 			// The HOST gets the state event too: its own tick just changed
 			// these entities, and event-driven repaint code should not need
 			// a role branch (a host inventory once went stale for six
@@ -1043,12 +1068,23 @@ net_tick :: proc(s: ^Session) {
 
 	// Owner streams: last-value snapshots of every entity WE own, unreliable
 	// (a drop is superseded by the next tick's snapshot). Any peer can own.
+	// Routing depends on interest: normally the transport's relay fans the
+	// batch out; with interest on, the HOST is the router — its own batch is
+	// split per recipient here, and clients send theirs to the host (the
+	// SES_STREAM handler forwards), which costs no extra hop: the relay was
+	// that same machine all along.
 	{
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
 		knet.write_u8(&w, SES_STREAM)
 		if knet.registry_write_streams(&w, &s.reg, s.me, s.now) > 0 {
-			broadcast(s, knet.writer_bytes(&w), .Stream)
+			if interest_on(s) {
+				interest_route_streams(s, knet.writer_bytes(&w)[1:], 0)
+			} else if !s.is_host && s.aoi_client {
+				s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Stream)
+			} else {
+				broadcast(s, knet.writer_bytes(&w), .Stream)
+			}
 		}
 	}
 
@@ -1126,7 +1162,7 @@ net_tick :: proc(s: ^Session) {
 // entities. Roster messages stay host-targeted (they need per-peer exclusion).
 BROADCAST_PEER :: Peer_Id(0)
 
-@(private = "file")
+@(private) // interest.odin composes per-peer sends beside this
 broadcast :: proc(s: ^Session, bytes: []u8, channel: Channel) {
 	s.send(s.send_user, BROADCAST_PEER, bytes, channel)
 }
@@ -1663,6 +1699,7 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 		knet.write_string(&w, p.name)
 		knet.write_bool(&w, p.connected)
 	}
+	knet.write_bool(&w, s.interest_r > 0 && s.locator != nil) // stream routing (interest.odin)
 	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
 
 	// Everyone else learns about (or re-learns) the joiner.
@@ -1751,6 +1788,9 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 	}
 	s.me = me
 	s.ctx.me = me
+	// Interest routing (older hosts simply end the payload here: read_bool
+	// on an exhausted reader yields false — broadcast, the old behavior).
+	s.aoi_client = knet.read_bool(r)
 	s.joined = true
 	s.join_waited = -1 // the join-timeout clock disarms
 	append(&s.events, Ev_Welcomed{me = me})
@@ -2014,8 +2054,12 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) 
 		if !s.joined {
 			return
 		}
+		raw := r.data[r.off:] // the batch, pre-parse (the host may forward it)
 		_ = knet.registry_stream_time(r) // sender stamp (clock-mapped timelines later)
 		_ = knet.registry_apply_streams(r, &s.reg, s.me, s.now)
+		if interest_on(s) {
+			interest_route_streams(s, raw, from_peer)
+		}
 	case SES_APP:
 		tag := knet.read_u8(r)
 		if r.err || int(tag) >= MAX_APP_TAGS {

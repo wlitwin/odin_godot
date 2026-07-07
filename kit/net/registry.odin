@@ -150,6 +150,35 @@ registry_write_deltas :: proc(w: ^Writer, reg: ^Registry, changed: ^[dynamic]Net
 	return count
 }
 
+// A dirty entity's delta segment inside a scratch writer — recorded as a
+// RANGE (the buffer relocates as it grows; slice it after the walk).
+Delta_Seg :: struct {
+	id:       Net_Id,
+	from, to: int,
+}
+
+// Interest-aware sibling of registry_write_deltas: the SAME walk and the same
+// single shadow commit, but every dirty entity's segment ([id][mask][bytes])
+// is recorded so the caller can compose PER-RECIPIENT batches (kit/session's
+// interest management). Segments carry no count header — the composer writes
+// its own per batch.
+registry_collect_deltas :: proc(scratch: ^Writer, reg: ^Registry, segs: ^[dynamic]Delta_Seg, changed: ^[dynamic]Net_Id = nil) -> int {
+	for _, &e in reg.entries {
+		start := len(scratch.buf)
+		write_net_id(scratch, e.id)
+		mask := write_delta(scratch, e.entity, e.shadow, e.set.entity_desc)
+		if mask == 0 {
+			resize(&scratch.buf, start)
+			continue
+		}
+		if changed != nil {
+			append(changed, e.id)
+		}
+		append(segs, Delta_Seg{id = e.id, from = start, to = len(scratch.buf)})
+	}
+	return len(segs)
+}
+
 // ---------------------------------------------------------------------------
 // Prediction reconcile — the client-side answer to the in-flight race the acid
 // test exposed: the host sends a delta BEFORE executing a command the client

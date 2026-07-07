@@ -1462,3 +1462,121 @@ present_now_for_mine_render_delayed_for_theirs :: proc(t: ^testing.T) {
 	_, _ = ksess.session_tick(&host.s, 0.0, now)
 	testing.expect_value(t, len(log.shown), 3)
 }
+
+// ---- interest management (interest.odin) ---------------------------------------
+//
+// "Existence global, freshness local": spawns reach everyone; per-tick state
+// only reaches peers whose FOCUS is near. The locator lends the session eyes
+// (Bot.x doubles as the position).
+
+bot_locate :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y: f32, always: bool) {
+	b := cast(^Bot)entity
+	return b.x, 0, false
+}
+
+@(test)
+interest_filters_deltas_and_resyncs_on_entry :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+	now := f64(1000)
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_set_interest(&host.s, 300, 50, nil, bot_locate)
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	ksess.session_start_replicating(&host.s)
+
+	near := Bot{hp = 10, x = 100}
+	far := Bot{hp = 20, x = 1000}
+	idn := ksess.session_spawn(&host.s, BOT_TYPE, &near, &bot_command_set)
+	idf := ksess.session_spawn(&host.s, BOT_TYPE, &far, &bot_command_set)
+	pump(boxes)
+
+	// EXISTENCE is global: alice materialized both, fields intact.
+	testing.expect_value(t, len(alice.bots), 2)
+	testing.expect_value(t, alice.bots[idf].hp, i32(20))
+
+	// Alice stands by the near bot; the far one goes quiet for her.
+	ksess.session_set_focus(&host.s, 2, 100, 0)
+	step(boxes, &now)
+	near.hp = 11
+	far.hp = 21
+	step(boxes, &now)
+	testing.expect_value(t, alice.bots[idn].hp, i32(11)) // fresh: in interest
+	testing.expect_value(t, alice.bots[idf].hp, i32(20)) // STALE: filtered
+
+	// She walks over to the far one: the ENTER resync delivers everything
+	// she missed — the delta that was never sent is not lost truth.
+	ksess.session_set_focus(&host.s, 2, 1000, 0)
+	step(boxes, &now)
+	testing.expect_value(t, alice.bots[idf].hp, i32(21)) // caught up whole
+	near.hp = 12
+	step(boxes, &now)
+	testing.expect_value(t, alice.bots[idn].hp, i32(11)) // now THIS one is stale
+
+	// Hysteresis: standing at the edge, the set doesn't flicker. The far bot
+	// sits at x=1000 and alice at 1000-320: outside enter radius (300), so a
+	// FRESH peer wouldn't see it — but alice is IN (from the visit) and 320 <
+	// 300+50 keeps her in.
+	ksess.session_set_focus(&host.s, 2, 680, 0)
+	far.hp = 22
+	step(boxes, &now)
+	testing.expect_value(t, alice.bots[idf].hp, i32(22)) // exit edge holds her in
+}
+
+@(test)
+interest_streams_route_via_host_and_filter :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+	now := f64(1000)
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_set_interest(&host.s, 300, 50, nil, bot_locate)
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+	testing.expect(t, alice.s.aoi_client, "the welcome routes alice's streams via the host")
+	ksess.session_start_replicating(&host.s)
+
+	// Alice owns a streaming bot at the origin; bob watches from far away.
+	pawn := Bot{hp = 5, x = 0}
+	id := ksess.session_spawn(&host.s, BOT_TYPE, &pawn, &bot_command_set, owner = alice.s.me)
+	pump(boxes)
+	abot := alice.bots[id]
+	bbot := bob.bots[id]
+	ksess.session_set_focus(&host.s, 2, 0, 0) // alice: near her own pawn
+	ksess.session_set_focus(&host.s, 3, 5000, 0) // bob: far away
+	step(boxes, &now)
+
+	// Alice strolls; her samples reach the HOST (it owns the routing) but
+	// never bob — his copy of the stream field stays exactly at spawn.
+	for _ in 0 ..< 10 {
+		abot.x += 3
+		step(boxes, &now)
+	}
+	testing.expect(t, host.s.reg.entries[id].entity != nil && (cast(^Bot)host.s.reg.entries[id].entity).x > 0, "the host heard the stream")
+	testing.expect_value(t, bbot.x, f32(0)) // filtered: not one sample
+
+	// Bob wanders over: the resync snaps the pawn to truth and the stream
+	// starts flowing (absolute samples — no special stream catch-up needed).
+	ksess.session_set_focus(&host.s, 3, abot.x, 0)
+	before := abot.x
+	for _ in 0 ..< 8 {
+		abot.x += 3
+		step(boxes, &now)
+	}
+	testing.expect(t, bbot.x >= before, "bob's copy moves again after re-entry")
+}

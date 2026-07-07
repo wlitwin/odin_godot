@@ -236,6 +236,43 @@ peer that didn't register the column, resolve BY NAME with `session_stat_find`
 (cheap — do it per read). Homestead's acid caught this as a resource gate passing
 on 254 milliseconds of latency.
 
+## Interest management (area of interest)
+
+**Existence global, freshness local.** Every peer still knows every entity —
+spawns, despawns, joins, saves, and migration backups are never filtered, so
+everything those give you for free stays free. What interest filters is the
+per-tick STATE traffic: a peer only receives deltas and owner-stream samples
+for entities near its **focus**. Off by default.
+
+```odin
+// host, once — the locator lends the session eyes (it can't read your fields):
+ksess.session_set_interest(&self.ses, 800, 120, self, my_locator)
+my_locator :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y: f32, always: bool) {
+	// return each entity's position; `always = true` for placeless entities
+	// (the world/level entity, global timers) — relevant to everyone, forever.
+}
+// host, every frame: where each player is looking from (their avatar):
+ksess.session_set_focus(&self.ses, pid, avatar.x, avatar.y)
+```
+
+Mechanics worth knowing:
+
+- **Re-entry resync.** A filtered delta is gone forever, so when an entity
+  ENTERS a peer's interest the host sends that peer one full spawn tuple (the
+  same reconcile path a rejoin uses): fields and blob catch up at once.
+  `hysteresis` widens the exit edge (enter at `radius`, leave at
+  `radius + hysteresis`) so border-dancers don't thrash this.
+- **Streams route via the host.** Owners send their batches to the host
+  instead of the transport's blind relay (the packets passed through that
+  machine anyway — no extra hop), and the host forwards per-recipient at
+  entity granularity. Streams need no resync: samples are absolute.
+- **Stale ghosts are yours to present.** An entity out of interest keeps its
+  last-known state on that peer's screen — frozen, not gone. Dim it, fog it,
+  or leave it; that's a game choice, deliberately.
+- **A peer with no focus yet receives everything** — filtering starts when
+  you start saying where they are. Commands, stats, chat, and everything
+  reliable-and-rare stay unfiltered.
+
 ## App messages
 
 `SES_APP` lets packages built on top of the session ([kit/comms](comms.md) is the first)
