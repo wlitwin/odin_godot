@@ -76,8 +76,10 @@ stdenvNoCC.mkDerivation ({
     # `core` + `scriptgen` are bundled too — `core` so the WEB build can pull it into the
     # scripts module, scriptgen for the //gd: codegen the build scripts run. flow/flowgd
     # (the sequencer) and events (the pure-Odin observer) are documented script-facing
-    # collections — a consumer following the authoring docs imports them.
-    cp -r core godot gdext libgd runtime flow flowgd events kit $A/
+    # collections — a consumer following the authoring docs imports them. `play` is the
+    # OPT-IN companion layer (edge/pace/fsm — higher-level game-structure helpers built ON
+    # kit's replication model; a game imports it only if it wants them).
+    cp -r core godot gdext libgd runtime flow flowgd events kit play $A/
     cp -r scriptgen $A/scriptgen
     # Only the CONSUMER-facing build scripts — not the repo's dev/test builders
     # (build_phase*.sh) or the nix package def (dist.nix), which a consumer never runs.
