@@ -1195,6 +1195,42 @@ registry_streams_end_to_end :: proc(t: ^testing.T) {
 	testing.expect_value(t, knet.registry_apply_streams(&r3, &rreg, ME, 3.0), 0)
 }
 
+@(test)
+stream_frequency_tier_skips_off_phase_ticks :: proc(t: ^testing.T) {
+	mdesc := mover_desc()
+	mset := knet.Command_Set{entity_desc = &mdesc}
+	ME :: knet.Player_Id(2)
+
+	oreg := knet.registry_make()
+	defer knet.registry_destroy(&oreg)
+	full := Mover{x = 1}
+	tiered := Mover{x = 2}
+	id_full := knet.registry_spawn(&oreg, &full, &mset, ME)
+	id_tier := knet.registry_spawn(&oreg, &tiered, &mset, ME)
+	knet.registry_set_stream_tier(&oreg, id_tier, 2) // 30Hz at a 60Hz base
+
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+
+	// The tier's phase is (tick + id) % tier == 0. Across two consecutive
+	// ticks the tiered entity sends on EXACTLY one of them, and the untiered
+	// one on both — so the pair alternates 2,1 (or 1,2), never 2,2.
+	knet.writer_reset(&w)
+	a := knet.registry_write_streams(&w, &oreg, ME, 1.0, 10)
+	knet.writer_reset(&w)
+	b := knet.registry_write_streams(&w, &oreg, ME, 1.0, 11)
+	testing.expect(t, a + b == 3, "over two ticks the tiered entity streams once, the untiered twice")
+	testing.expect(t, a == 1 || a == 2, "each tick carries the untiered entity plus maybe the tiered one")
+
+	// The untiered entity is ALWAYS present (tier 0 = every tick).
+	for tick in u64(100) ..< 106 {
+		knet.writer_reset(&w)
+		n := knet.registry_write_streams(&w, &oreg, ME, 1.0, tick)
+		testing.expect(t, n >= 1, "the full-rate entity streams on every tick")
+	}
+	_ = id_full
+}
+
 // ---- special interpolation math (quat nlerp + custom blends) ------------------
 
 Turret :: struct {

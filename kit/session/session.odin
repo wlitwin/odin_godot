@@ -871,6 +871,45 @@ session_teleport :: proc(s: ^Session, id: knet.Net_Id) {
 	knet.registry_teleport(&s.reg, id)
 }
 
+// STREAM FREQUENCY: the OWNER of `id` streams its position at (about) `hz`,
+// instead of the full net-tick rate. THE bandwidth lever for many cheap AI,
+// distant, or slow-moving entities — half the rate is half that entity's
+// stream bytes. Say it in Hz, like tick_hz: `session_set_stream_hz(s, mob, 30)`.
+//
+// A stream can only fire on a net tick, so the rate SNAPS to the nearest
+// achievable tick_hz/N (at 60Hz: 60, 30, 20, 15, 12, 10, …). The achieved Hz
+// is returned so you can see the snap — request 25 at a 60 base and you get 30.
+// hz <= 0 or >= tick_hz means every tick (the default, full rate).
+//
+// KEEP THE PERIOD UNDER interp_delay (1/hz < interp_delay) for entities that
+// INTERPOLATE, or remote motion stutters — the ring runs out of samples to
+// blend. A 10Hz stream (100ms) needs interp_delay >= ~200ms; that's fine for a
+// board game whose pieces SNAP (they move discretely — no blend to starve) but
+// wrong for a runner sliding across the floor. Only the sender's batch changes;
+// hp/other host DELTAS are untouched (event-driven already) and authoritative
+// hit tests read full-precision struct state at full rate. Send-side local hint,
+// not replicated — re-apply after a host migration, like interest.
+session_set_stream_hz :: proc(s: ^Session, id: knet.Net_Id, hz: int) -> (actual_hz: int) {
+	rate := session_tick_hz(s)
+	if hz <= 0 || hz >= rate {
+		knet.registry_set_stream_tier(&s.reg, id, 1)
+		return rate
+	}
+	// Nearest divisor: round(rate/hz), clamped so the u8 tier can't overflow
+	// or go below "every other tick".
+	tier := (rate + hz / 2) / hz
+	tier = clamp(tier, 2, 255)
+	knet.registry_set_stream_tier(&s.reg, id, u8(tier))
+	return rate / tier
+}
+
+// The raw divisor form of session_set_stream_hz, for exact control or when you
+// think in "every Nth tick" (tests, tools). 0/1 = every tick. Most games want
+// the Hz form above.
+session_set_stream_tier :: proc(s: ^Session, id: knet.Net_Id, tier: u8) {
+	knet.registry_set_stream_tier(&s.reg, id, tier)
+}
+
 // Host: OWNERSHIP TRANSFER — hand an entity's owner-stream authority to a
 // player (PLAYER_ID_INVALID hands it back to nobody: it rests where it is,
 // host-authoritative deltas still flow). Carrying, mounting, possession,
@@ -1144,7 +1183,7 @@ net_tick :: proc(s: ^Session) {
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
 		knet.write_u8(&w, SES_STREAM)
-		if knet.registry_write_streams(&w, &s.reg, s.me, s.now) > 0 {
+		if knet.registry_write_streams(&w, &s.reg, s.me, s.now, t) > 0 {
 			if interest_on(s) {
 				interest_route_streams(s, knet.writer_bytes(&w)[1:], 0)
 			} else if !s.is_host && s.aoi_client {

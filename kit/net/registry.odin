@@ -32,6 +32,12 @@ Registry_Entry :: struct {
 	owner:  Player_Id, // PLAYER_ID_INVALID = host-owned
 	stream: Stream_Ring, // remote-owned entities: buffered owner-stream snapshots
 	warp:   u8, // owner side: bumped by registry_teleport; rides every stream snapshot
+	tier:   u8, // owner side: stream every Nth tick (0/1 = every tick). A frequency
+	            // tier — cheap far/AI entities at 30Hz while players stay 60Hz.
+	            // Streams are unreliable last-value, so a skipped tick reads like a
+	            // dropped packet; interp smooths the sparser keyframes (keep the tier
+	            // PERIOD under interp_delay or remote motion stutters). Send-side
+	            // local hint, NOT replicated — a new authority re-applies it.
 	blob:     []u8, // the entity's opaque payload (registry_set_blob) — nil = never set
 	blob_ver: u32, // bumped per set; receivers use it to drop re-received duplicates
 }
@@ -443,9 +449,20 @@ registry_set_owner :: proc(reg: ^Registry, id: Net_Id, owner: Player_Id) -> bool
 	return true
 }
 
+// Owner side: this entity streams only every `tier` ticks (0/1 = every tick).
+// A frequency tier — the bandwidth lever for many cheap AI/far entities.
+registry_set_stream_tier :: proc(reg: ^Registry, id: Net_Id, tier: u8) {
+	if e, ok := &reg.entries[id]; ok {
+		e.tier = tier
+	}
+}
+
 // Write one stream batch for every entity owned by `me`. Returns the entity
-// count; 0 = nothing owned that streams (skip the send).
-registry_write_streams :: proc(w: ^Writer, reg: ^Registry, me: Player_Id, sender_now: f64) -> int {
+// count; 0 = nothing owned that streams (skip the send). `tick` gates the
+// per-entity frequency tier: a tiered entity is written only on the ticks its
+// id+tier phase selects, so different entities send on different ticks and the
+// byte rate stays smooth (~1/tier of them per tick) instead of pulsing.
+registry_write_streams :: proc(w: ^Writer, reg: ^Registry, me: Player_Id, sender_now: f64, tick: u64 = 0) -> int {
 	write_f64(w, sender_now)
 	count_at := len(w.buf)
 	write_u16(w, 0) // patched below
@@ -453,6 +470,9 @@ registry_write_streams :: proc(w: ^Writer, reg: ^Registry, me: Player_Id, sender
 	for _, &e in reg.entries {
 		if e.owner != me {
 			continue
+		}
+		if e.tier > 1 && (tick + u64(e.id)) % u64(e.tier) != 0 {
+			continue // off-phase this tick — the last snapshot still stands
 		}
 		n := stream_wire_size(e.set.entity_desc)
 		if n == 0 {
