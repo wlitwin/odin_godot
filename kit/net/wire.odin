@@ -89,7 +89,7 @@ write_string :: proc(w: ^Writer, s: string) {
 
 write_bytes :: proc(w: ^Writer, b: []u8) {
 	n := len(b)
-	assert(n <= int(max(u32)))
+	assert(u64(n) <= u64(max(u32))) // u64 compare: `int(max(u32))` overflows a 32-bit int (wasm)
 	write_u32(w, u32(n))
 	if n > 0 {
 		write_raw(w, raw_data(b), n)
