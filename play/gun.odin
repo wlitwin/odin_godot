@@ -15,8 +15,8 @@ package play
 // jam/clear state machine — resolved DETERMINISTICALLY inside the `gun_fire` command, which runs
 // on the host AND the predicting client from byte-identical input. So kit/net's own prediction
 // revert + reject-truth reconcile the gun for free (its replicated fields are in the entity
-// descriptor) — no client-side shadow copy, no hand-written reconcile. `gun_fire` returns TRUE iff
-// a live round actually left the barrel this pull (jams, empty-clicks, and clear-taps are false).
+// descriptor) — no client-side shadow copy, no hand-written reconcile. `g.fired` says whether a
+// live round left the barrel this pull (jams, empty-clicks, and clear-taps leave it false).
 //
 // WHAT STAYS YOURS — two seams, because they can't be general:
 //   * CADENCE — WHEN to pull. Responsive fire is a per-local-player wall-clock feel (the pacer
@@ -25,10 +25,9 @@ package play
 //     `g.def.reload_ticks` while `g.mode.cur == .Reloading`). The gun tells you its state; you
 //     time the trigger.
 //   * EFFECT — WHAT a shot does. A projectile / hitscan / damage touches the game's world, which
-//     the gun can't know. Read `gun_fire`'s return at the issue site to draw YOUR muzzle flash,
-//     and in the command hook (keyed by this command's index, gated on `ok`) to spawn the
-//     authoritative shot from `g.aim`. Cross-entity effects are the game's, exactly as any
-//     command's are.
+//     the gun can't know. Read `g.fired` at the issue site to draw YOUR muzzle flash, and in the
+//     command hook (keyed by this command's index) to spawn the authoritative shot from `g.aim`.
+//     Cross-entity effects are the game's, exactly as any command's are.
 //
 // The wielder is NOT threaded in (unlike a game-specific composed command): the gun is
 // self-contained through its knobs, so `gun_fire` reaches nothing outside the block — which is
@@ -58,6 +57,7 @@ Gun :: struct {
 	taps:         u8 `gd:"replicate"`,       // clear-taps left on a jam (replicated so the mash reads on every screen)
 	salt:         u32 `gd:"replicate"`,      // jam-seed context the game sets (floor/run/player); 0 is fine
 	aim_x, aim_y: f32,                       // scratch: the last pull's aim, for the game's effect hook (host-side)
+	fired:        bool,                      // scratch: did the last pull send a live round — the game's EFFECT signal
 }
 
 // gun_equip — host-only, at spawn or on a weapon swap: stamp the knobs, top off the mag, go
@@ -75,43 +75,42 @@ gun_equip :: proc(g: ^Gun, def: Gun_Def, salt: u32 = 0) {
 
 // gun_fire — PULL THE TRIGGER. A composed, PREDICTED command: scriptgen hoists it onto whatever
 // entity embeds the Gun (`weapon: Gun` -> `<entity>_weapon_fire`), and it runs identically on the
-// host and the predicting client. It resolves the mag/reload/jam FSM and returns whether a live
-// round LEFT THE BARREL this pull. The game issues it on its own cadence and reads the return to
-// drive the shot (see the module doc). `dx,dy` is the aim, stashed for the effect hook — the gun
-// itself is aim-agnostic.
+// host and the predicting client. It resolves the mag/reload/jam FSM in place. The bool it returns
+// is kit/net's APPLIED signal — a gun pull is ALWAYS a valid transition (fire, jam, reload, or
+// clear-tap), so it is always true; a `false` would tell kit/net to REVERT the transition, which a
+// jam or a reload must never do. Whether a live round actually LEFT THE BARREL is `g.fired`, which
+// the game reads at the issue site (draw the muzzle flash) and in its command hook (spawn the
+// shot). `dx,dy` is the aim, stashed for that hook — the gun itself is aim-agnostic.
 @(gd_command = "predict")
 gun_fire :: proc(g: ^Gun, dx, dy: f32) -> bool {
 	g.aim_x, g.aim_y = dx, dy
+	g.fired = false
 	switch g.mode.cur {
 	case .Reloading:
-		// The pacer holds through a reload; a stray pull that raced it does nothing.
-		return false
+	// The pacer holds through a reload; a stray pull that raced it is a no-op (still applied).
 	case .Jammed:
 		// Mash to clear — each pull chips a tap; no round leaves until it's Ready again.
 		if g.taps > 0 {g.taps -= 1}
 		if g.taps == 0 {set(&g.mode, Gun_Mode.Ready)}
-		return false
 	case .Ready:
 		if g.ammo == 0 {
 			// Empty — begin the reload; the host counts it down in gun_tick, the pacer holds.
 			set(&g.mode, Gun_Mode.Reloading)
 			g.reload_cd = g.def.reload_ticks
-			return false
-		}
-		if gun_jams(g) {
+		} else if gun_jams(g) {
 			g.ammo -= 1 // the dud is ejected
 			set(&g.mode, Gun_Mode.Jammed)
 			g.taps = g.def.jam_taps
-			return false
+		} else {
+			g.ammo -= 1
+			g.fired = true // a live round flew
+			if g.ammo == 0 {
+				set(&g.mode, Gun_Mode.Reloading)
+				g.reload_cd = g.def.reload_ticks
+			}
 		}
-		g.ammo -= 1
-		if g.ammo == 0 {
-			set(&g.mode, Gun_Mode.Reloading)
-			g.reload_cd = g.def.reload_ticks
-		}
-		return true // a live round flew
 	}
-	return false
+	return true // the pull applied — jam/reload/clear-tap are valid outcomes, not rejections
 }
 
 // gun_tick — HOST per-tick: run the reload dwell. Call once per net tick per gun on the host; the
