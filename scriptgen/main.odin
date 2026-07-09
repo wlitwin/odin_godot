@@ -259,10 +259,24 @@ Arg :: struct {
 
 Method_Info :: struct {
 	proc_name: string, // the user's Odin proc
-	gd_name:   string, // the name exposed to GDScript
+	gd_name:   string, // the name exposed to GDScript (namespaced for a composed block method)
 	args:      [dynamic]Arg,
 	ret:       Variant_Info, // .Nil kind => void
 	line:      int, // 1-based source line of the proc decl (duplicate-name diagnostics)
+	// Method-composition (the engine-facing dual of verb-composition): a @(gd_method)/@(gd_rpc)
+	// whose receiver is an EMBEDDED sub-struct is hoisted onto the entity's method table, routed
+	// into &self.<path>. Mirrors Command_Info: nil path = a direct method (routes to `self`);
+	// `owner` = a pointer param after the receiver (scriptgen passes `self`); pkg_* qualify + import
+	// the sub-proc's package. is_rpc/rpc/connect are captured for an INDEXED block method and
+	// re-emitted with the namespaced gd_name at hoist (a direct method's rpc/connect go straight to
+	// s.rpcs/s.connections in scan_bound_procs, so these stay zero there).
+	path:      []string,
+	owner:     bool,
+	pkg_alias: string,
+	pkg_path:  string,
+	is_rpc:    bool,
+	rpc:       Rpc_Info,
+	connect:   string, // @(gd_connect) signal on the block method, "" = none
 }
 
 Lifecycle_Info :: struct {
@@ -459,10 +473,12 @@ Struct_Def :: struct {
 	fields:      []Struct_Field,
 	imports:     map[string]string, // defining file's EXPLICIT-alias imports (alias -> "godot:kit/combat")
 	poly_params: []string, // generic parameter names ("$S" stripped to "S"), in order; nil = not generic
-	// @(gd_command) procs whose FIRST param is `^<this struct>` (verb-composition). An entity
-	// that embeds this struct hoists these onto its own command table (recurse_into). Collected
-	// on demand by index_pkg_dir alongside the fields. nil for a struct with no commands.
+	// @(gd_command) procs whose FIRST param is `^<this struct>` (verb-composition), and
+	// @(gd_method)/@(gd_rpc) procs likewise (method-composition). An entity that embeds this struct
+	// hoists these onto its own command / method tables (recurse_into). Collected on demand by
+	// index_pkg_dir alongside the fields. nil for a struct with none.
 	commands:    []Command_Info,
+	methods:     []Method_Info,
 }
 
 // dir -> (bare struct name -> def). The scripts package, plus any imported packages
@@ -490,6 +506,7 @@ index_pkg_dir :: proc(dir: string) {
 	// commands may live apart), so the receiver-keyed map lives at dir scope and is attached to
 	// the defs once every file is in.
 	cmds := make(map[string][dynamic]Command_Info)
+	meths := make(map[string][dynamic]Method_Info)
 	for fi in files {
 		if fi.type == .Directory {continue}
 		if !strings.has_suffix(fi.name, ".odin") {continue}
@@ -517,13 +534,13 @@ index_pkg_dir :: proc(dir: string) {
 				pkg[name_ident.name] = build_struct_def(dir, fi.fullpath, name_ident.name, st, src, alias, imports)
 				continue
 			}
-			// verb-composition: a `@(gd_command)` proc bound to a struct in THIS package (first
-			// param `^Name`, or `^Name($S)` for a generic block) — index it under that struct so
-			// an embedding entity can hoist it. Same receiver-by-first-param rule scan_bound_procs
-			// uses for entities. build_command_info reports contract violations loudly here, so a
-			// building block's commands are validated when a game first imports the package.
+			// verb-/method-composition: a bound proc on a struct in THIS package (first param
+			// `^Name`, or `^Name($S)` for a generic block) — index it under that struct so an
+			// embedding entity can hoist it. Same receiver rule scan_bound_procs uses for entities;
+			// build_* report contract violations loudly, so a block's verbs/methods are validated
+			// when a game first imports the package.
 			pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
-			if !is_proc || !has_attr(vd, "gd_command") {continue}
+			if !is_proc {continue}
 			pt := pl.type
 			if pt == nil || pt.params == nil || len(pt.params.list) == 0 {continue}
 			recv := strings.trim_space(node_text(src, pt.params.list[0].type))
@@ -532,18 +549,42 @@ index_pkg_dir :: proc(dir: string) {
 			if paren := strings.index_byte(base, '('); paren >= 0 {base = strings.trim_space(base[:paren])}
 			name_ident, _ := vd.names[0].derived.(^ast.Ident)
 			if name_ident == nil {continue}
-			config, _ := attr_value(vd, "gd_command")
-			if ci, cok := build_command_info(src, pt, Loc{fi.fullpath, name_ident.pos.line}, name_ident.name, base, config, true); cok {
-				arr := cmds[base]
-				append(&arr, ci)
-				cmds[base] = arr
+			loc := Loc{fi.fullpath, name_ident.pos.line}
+			if has_attr(vd, "gd_command") {
+				config, _ := attr_value(vd, "gd_command")
+				if ci, cok := build_command_info(src, pt, loc, name_ident.name, base, config, true); cok {
+					arr := cmds[base]
+					append(&arr, ci)
+					cmds[base] = arr
+				}
+				continue
+			}
+			is_rpc := has_attr(vd, "gd_rpc")
+			if has_attr(vd, "gd_method") || is_rpc {
+				if mi, mok := build_method_info(src, pt, loc, name_ident.name, base, true); mok {
+					if is_rpc {
+						mi.is_rpc = true
+						rconfig, _ := attr_value(vd, "gd_rpc")
+						mi.rpc = parse_rpc_config(mi.gd_name, rconfig)
+					}
+					if sig, has := attr_value(vd, "gd_connect"); has {mi.connect = sig}
+					arr := meths[base]
+					append(&arr, mi)
+					meths[base] = arr
+				}
 			}
 		}
 	}
-	// Attach each struct's commands (gathered across every file in the dir) to its def.
+	// Attach each struct's commands + methods (gathered across every file in the dir) to its def.
 	for name, arr in cmds {
 		if def, dok := pkg[name]; dok {
 			def.commands = arr[:]
+			pkg[name] = def
+		}
+	}
+	for name, arr in meths {
+		if def, dok := pkg[name]; dok {
+			def.methods = arr[:]
 			pkg[name] = def
 		}
 	}

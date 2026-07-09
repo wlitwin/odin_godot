@@ -169,6 +169,13 @@ package works identically: the generated file imports and qualifies it (`play.gu
 hook — the state machine is the block's, the cadence and the effect stay yours. It's the
 reference for the pattern; read `play/gun.odin`.
 
+**Engine-facing procs compose the same way.** A block's `@(gd_method)` (or `@(gd_rpc)`) hoists
+onto the embedding entity's method table under the same path-prefixed name (`gear_level` on a
+`gear: Gear` field becomes `robot_gear_level`… registered as `gear_level`), the trampoline routed
+into `&self.gear` and threading the owner if it asked. So a block can expose behavior to
+GDScript/the editor, not just to the command loop — the whole `//gd:` surface (state, commands,
+methods, rpcs) composes through an embed.
+
 ## Wire codecs
 
 A field may re-encode its bytes inside packets. The struct-side representation

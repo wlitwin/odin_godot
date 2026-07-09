@@ -736,48 +736,19 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 			}
 		}
 		if is_gd_method {
-			m := Method_Info {
-				proc_name = proc_name,
-				gd_name   = stripped,
-				ret       = Variant_Info{enum_name = ".Nil", kind = .Nil},
-			}
-			// args: params after self.
-			for fi in 1 ..< len(pt.params.list) {
-				field := pt.params.list[fi]
-				atext := node_text(src, field.type)
-				vi, vok := map_variant(atext)
-				if !vok {
-					errorf("method %s: unsupported arg type %q", proc_name, atext)
-					continue
-				}
-				for nm in field.names {
-					ident, _ := nm.derived.(^ast.Ident)
-					if ident == nil {continue}
-					append(&m.args, Arg{name = ident.name, type_text = atext, vi = vi})
-				}
-			}
-			// return type (first result, if any).
-			if pt.results != nil && len(pt.results.list) > 0 {
-				rtext := node_text(src, pt.results.list[0].type)
-				vi, vok := map_variant(rtext)
-				if !vok {
-					errorf("method %s: unsupported return type %q", proc_name, rtext)
-				} else {
-					m.ret = vi
-				}
-			}
+			m, _ := build_method_info(src, pt, Loc{path, name_ident.pos.line}, proc_name, s.struct_name, false)
 			append(&s.methods, m)
 
 			// `@(gd_connect="signal")` — auto-connect owner.signal -> this method on READY.
 			if sig, has := attr_value(vd, "gd_connect"); has {
-				append(&s.connections, Connection_Info{signal = sig, method = stripped})
+				append(&s.connections, Connection_Info{signal = sig, method = m.gd_name})
 			}
 
 			// `@(gd_rpc[="..."])` — expose this method to Godot's high-level multiplayer.
 			// `attr_value` is "" for the bare `@(gd_rpc)` form (=> all defaults).
 			if is_gd_rpc {
 				config, _ := attr_value(vd, "gd_rpc")
-				append(&s.rpcs, parse_rpc_config(stripped, config))
+				append(&s.rpcs, parse_rpc_config(m.gd_name, config))
 			}
 		}
 	}
@@ -976,6 +947,67 @@ parse_command :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: 
 	append(&s.commands, cmd)
 }
 
+// Build a Method_Info from a @(gd_method)/@(gd_rpc) proc: the GDScript-exposed name (stripped),
+// the Variant-mapped args, and the return. Shared by the entity scan (scan_bound_procs, direct
+// methods) and the imported-package index (index_pkg_dir, composed block methods). Like commands,
+// `allow_owner` (set for a composed method) treats a pointer param right after the receiver as the
+// embedding entity — scriptgen fills it with `self`, it is not a Variant arg. rpc/connect config is
+// the caller's to attach (it is attribute-based). ok=false = a contract violation was reported.
+build_method_info :: proc(
+	src: string,
+	pt: ^ast.Proc_Type,
+	loc: Loc,
+	proc_name, struct_name: string,
+	allow_owner: bool,
+) -> (
+	Method_Info,
+	bool,
+) {
+	m := Method_Info {
+		proc_name = proc_name,
+		gd_name   = strip_struct_prefix(proc_name, struct_name),
+		ret       = Variant_Info{enum_name = ".Nil", kind = .Nil},
+		line      = loc.line,
+	}
+	ok := true
+	// A composed method may name the embedding entity as its second param (a pointer, never a
+	// Variant arg). Detect and skip it — the trampoline passes `self` there.
+	start := 1
+	if allow_owner && len(pt.params.list) > 1 {
+		p1 := strings.trim_space(node_text(src, pt.params.list[1].type))
+		if strings.has_prefix(p1, "^") {
+			m.owner = true
+			start = 2
+		}
+	}
+	for fi in start ..< len(pt.params.list) {
+		field := pt.params.list[fi]
+		atext := node_text(src, field.type)
+		vi, vok := map_variant(atext)
+		if !vok {
+			error_at(loc, "method %s: unsupported arg type %q", proc_name, atext)
+			ok = false
+			continue
+		}
+		for nm in field.names {
+			ident, _ := nm.derived.(^ast.Ident)
+			if ident == nil {continue}
+			append(&m.args, Arg{name = ident.name, type_text = atext, vi = vi})
+		}
+	}
+	if pt.results != nil && len(pt.results.list) > 0 {
+		rtext := node_text(src, pt.results.list[0].type)
+		vi, vok := map_variant(rtext)
+		if !vok {
+			error_at(loc, "method %s: unsupported return type %q", proc_name, rtext)
+			ok = false
+		} else {
+			m.ret = vi
+		}
+	}
+	return m, ok
+}
+
 // Extract the string value of a `@(name="value")` attribute. Returns ("", false) if the
 // attribute is absent or not a string-valued Field_Value.
 attr_value :: proc(vd: ^ast.Value_Decl, name: string) -> (string, bool) {
@@ -1104,12 +1136,12 @@ join_path :: proc(path: []string) -> string {
 	return strings.join(path, ".")
 }
 
-// The entity-level name for a command composed from an embedded block: the access path joined
-// with the verb by underscores. {"gun"} + "fire" -> "gun_fire"; {"loadout","primary"} + "fire"
-// -> "loadout_primary_fire". Drives the index const (RUNNER_CMD_GUN_FIRE), the decode-thunk
-// name, and the issue wrapper (runner_gun_fire_cmd) — unique per field even for two blocks of
-// the same type (primary vs secondary).
-compose_command_name :: proc(path: []string, verb: string) -> string {
+// The entity-level name for a command or method composed from an embedded block: the access path
+// joined with the verb by underscores. {"gun"} + "fire" -> "gun_fire"; {"loadout","primary"} +
+// "fire" -> "loadout_primary_fire". Drives the command index const / decode thunk / issue wrapper
+// and the method's registered name / trampoline — unique per field even for two blocks of the same
+// type (primary vs secondary).
+compose_member_name :: proc(path: []string, verb: string) -> string {
 	b := strings.builder_make()
 	for seg in path {
 		strings.write_string(&b, seg)
@@ -1192,20 +1224,39 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 	visited[def.id] = true
 	defer delete_key(visited, def.id) // allow the same type at independent sibling positions
 
-	// verb-composition (the dual of the nested-replicate collection below): hoist this
-	// sub-struct's @(gd_command) procs onto the entity, keyed by the access PATH to this field.
-	// The entity's generated file routes each decode thunk into `&self.<path>` and (if the block
-	// declared an owner param) passes `self`. Deeper embeds recurse below and hoist under their
-	// longer paths, so a gun three levels down still registers on the entity that owns the net id.
-	if len(def.commands) > 0 {
+	// verb-/method-composition (the dual of the nested-replicate collection below): hoist this
+	// sub-struct's @(gd_command) and @(gd_method)/@(gd_rpc) procs onto the entity, keyed by the
+	// access PATH to this field. The entity's generated file routes each thunk/trampoline into
+	// `&self.<path>` and (if the block declared an owner param) passes `self`. Deeper embeds recurse
+	// below and hoist under their longer paths, so a gun three levels down still registers on the
+	// entity that owns the net id. The engine-facing name is path-prefixed (`weapon_reload`) so two
+	// blocks of the same type never collide.
+	if len(def.commands) > 0 || len(def.methods) > 0 {
 		alias, ppath := composed_pkg_ref(def.dir, dir_of(s.path))
 		for c in def.commands {
 			hoisted := c // shares the (read-only) args slice; path/name/pkg are entity-relative
 			hoisted.path = path
 			hoisted.pkg_alias = alias
 			hoisted.pkg_path = ppath
-			hoisted.name = compose_command_name(path, c.name)
+			hoisted.name = compose_member_name(path, c.name)
 			append(&s.commands, hoisted)
+		}
+		for mi in def.methods {
+			hm := mi // shares the (read-only) args slice
+			hm.path = path
+			hm.pkg_alias = alias
+			hm.pkg_path = ppath
+			hm.gd_name = compose_member_name(path, mi.gd_name)
+			append(&s.methods, hm)
+			// Re-emit the rpc / connect config under the namespaced method name.
+			if hm.is_rpc {
+				rpc := mi.rpc
+				rpc.method = hm.gd_name
+				append(&s.rpcs, rpc)
+			}
+			if hm.connect != "" {
+				append(&s.connections, Connection_Info{signal = hm.connect, method = hm.gd_name})
+			}
 		}
 	}
 

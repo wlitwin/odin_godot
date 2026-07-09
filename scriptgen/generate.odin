@@ -80,6 +80,11 @@ generate :: proc(s: ^Script) -> string {
 			imported[c.pkg_path] = true
 			fmt.sbprintf(&b, "import %s %q\n", c.pkg_alias, c.pkg_path)
 		}
+		for m in s.methods {
+			if m.pkg_path == "" || imported[m.pkg_path] {continue}
+			imported[m.pkg_path] = true
+			fmt.sbprintf(&b, "import %s %q\n", m.pkg_alias, m.pkg_path)
+		}
 	}
 	// The trampolines/lifecycle wrappers establish `context = rt.script_context()` before
 	// calling the user's plain Odin procs. On native that is `runtime.default_context()`
@@ -233,17 +238,19 @@ emit_method_trampoline :: proc(b: ^strings.Builder, s: ^Script, m: Method_Info) 
 		}
 	}
 
-	// Call the user proc.
+	// Call the user proc. A composed block method routes into &self.<path>, qualifies the proc with
+	// its package, and (if it declared one) passes `self` as the owner; a direct method runs `self`.
 	args_joined := strings.join(call_args[:], ", ")
 	defer delete(args_joined)
-	prefix := "self"
-	if len(call_args) > 0 {
-		prefix = fmt.tprintf("self, %s", args_joined)
-	}
+	recv := len(m.path) > 0 ? fmt.tprintf("&self.%s", join_path(m.path)) : "self"
+	qual := m.pkg_alias != "" ? fmt.tprintf("%s.", m.pkg_alias) : ""
+	prefix := recv
+	if m.owner {prefix = fmt.tprintf("%s, self", prefix)} // the block asked for its wielder
+	if len(call_args) > 0 {prefix = fmt.tprintf("%s, %s", prefix, args_joined)}
 	if m.ret.kind == .Nil {
-		fmt.sbprintf(b, "\t%s(%s)\n", m.proc_name, prefix)
+		fmt.sbprintf(b, "\t%s%s(%s)\n", qual, m.proc_name, prefix)
 	} else {
-		fmt.sbprintf(b, "\t_r := %s(%s)\n", m.proc_name, prefix)
+		fmt.sbprintf(b, "\t_r := %s%s(%s)\n", qual, m.proc_name, prefix)
 		tag := ctor_tag(m.ret.enum_name)
 		switch m.ret.kind {
 		case .Int:

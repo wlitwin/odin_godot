@@ -326,4 +326,40 @@ grep -q "TURRET_CMD_WEAPON_FIRE :: u16" "$tgen" || fail "play.Gun's verb must ho
 grep -q "size_of(type_of(Turret{}.weapon.def))" "$tgen" || fail "the Gun_Def knob-blob must replicate through the embed"
 grep -q "offset_of(type_of(Turret{}.weapon.mode), cur)" "$tgen" || fail "Machine(Gun_Mode) mode.cur must compose through the block"
 
+# ---- fixture 10: METHOD composition — a block's @(gd_method)/@(gd_rpc) hoist ------
+# The engine-facing dual of verb composition: a @(gd_method) (owner-threaded, with a return) and a
+# @(gd_rpc) whose receiver is an embedded sub-struct register on the ENTITY's method table under a
+# path-prefixed name, the trampoline routed into &self.<field>.
+mc="$work/methodcomp"
+mkdir -p "$mc"
+cat >"$mc/robot.odin" <<'ODIN'
+//gd:extends Node2D
+//gd:class Robot
+package methodcomp
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Gear :: struct { charge: i32 `gd:"replicate"` }
+// owner-threaded @(gd_method) with a return (the ^Robot 2nd param is not a Variant arg).
+@(gd_method)
+gear_level :: proc(g: ^Gear, owner: ^Robot, bonus: i32) -> i64 { return i64(g.charge + bonus) }
+// @(gd_rpc) (implies method), no owner, no args.
+@(gd_rpc)
+gear_ping :: proc(g: ^Gear) {}
+
+Robot :: struct {
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id,
+	hp:     u8 `gd:"replicate"`,
+	gear:   Gear,   // -> gear_level (method) + gear_ping (method + rpc) hoist onto Robot
+}
+ODIN
+if ! "$SGEN" "$mc" -godot:"$ROOT" >/dev/null 2>&1; then fail "method-composition must resolve, not error"; fi
+mgen="$mc/robot.gen.odin"
+grep -q '{name = "gear_level", trampoline = _robot_m_gear_level' "$mgen" || fail "composed method must register under the path-prefixed name gear_level"
+grep -q "gear_level(&self.gear, self, i32(_a0))" "$mgen" || fail "method trampoline must route into &self.gear, thread the owner (self), and pass the arg"
+grep -q '{name = "gear_ping", trampoline = _robot_m_gear_ping' "$mgen" || fail "@(gd_rpc) implies a composed method (gear_ping) too"
+grep -q "gear_ping(&self.gear)" "$mgen" || fail "no-owner composed method must route into &self.gear with no self/args"
+grep -q '{method = "gear_ping"' "$mgen" || fail "the composed @(gd_rpc) must register its RPC under the namespaced method name"
+
 echo "SCRIPTGEN_OK"
