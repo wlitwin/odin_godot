@@ -1,65 +1,63 @@
 package play
 
-// play/fsm — a state machine whose current state lives ON THE WIRE.
+// play/fsm — a state machine that OWNS its current state.
 //
-// The kit rule a networked FSM must obey, and the reason a naive one is a footgun:
-// the authoritative state has to be a flat, replicated field the HOST owns. If you
-// tuck the state INSIDE the machine struct, scriptgen never sees it (it reads tags
-// off a struct's direct fields, not through a nested value), so it never replicates
-// — and you have built a state machine that silently diverges per client. So the
-// Machine here deliberately does NOT store the state. It holds only a local edge
-// SHADOW (built on play/edge — an FSM is Edge + intent), and every call operates on
-// YOUR external replicated field:
+// The machine carries its state directly (`cur`, a replicated field) plus a local
+// edge shadow — you embed ONE field on your entity and drive it through set/step.
+// You never hand-wire a parallel shadow or keep the state as a separate flat field:
 //
 //   Runner :: struct {
-//       gun_state: u8 `gd:"replicate"`,   // <- authoritative, flat, host-owned
+//       gun: play.Machine(Gun_State),   // gun.cur replicates; gun.shadow stays local
 //       ...
 //   }
-//   Gun_View :: struct { fsm: play.Machine(u8) }   // <- local shadow, off the wire
+//   Gun_State :: enum u8 { Ready, Reload, Jam }
 //
-// The kit contract falls out as two calls with a clean split:
+// This is possible because scriptgen recurses into nested structs — including
+// generic instantiations — so embedding `play.Machine(S)` replicates its inner
+// `cur` like any flat field (the local `shadow` is untagged, so it never crosses
+// the wire). Before scriptgen learned nesting the state HAD to live outside the
+// machine with the shadow wired up separately; that indirection is gone. The
+// abstraction now hides its own mechanism, which is the point — the cost of the old
+// rule was mental overhead, and overhead is worse than the "magic" it avoided.
 //
+// The kit contract holds, now INSIDE the abstraction:
 //   HOST writes the transition (the only side that may):
-//     if play.set(&r.gun_state, GUN_RELOAD) { play.arm(&reload_pace, now + RELOAD_T) }
-//
-//   EVERY PEER reads the change and runs the SAME enter/exit locally — no RPC, no
-//   host-authored events; presentation stays a pure function of replicated state:
-//     from, to, moved := play.step(&view.fsm, r.gun_state)
+//     if play.set(&r.gun, .Reload) { play.arm(&reload_pace, now + RELOAD_T) }
+//   EVERY PEER reads the change and runs the SAME enter/exit locally, no RPC:
+//     from, to, moved := play.step(&r.gun)
 //     if moved {
-//         switch from { case GUN_RELOAD: stop_reload_anim() }   // on_exit
-//         switch to   { case GUN_JAM:    spark(); banner("JAM") // on_enter
-//                       case GUN_READY:  click() }
+//         #partial switch from { case .Reload: stop_reload_anim() }   // on_exit
+//         #partial switch to   { case .Jam:    spark(); banner("JAM") // on_enter
+//                                case .Ready:  click() }
 //     }
 //
-// The host sees its own `set` land; each client sees replication deliver it; both
-// drive `step` with the same field, so enter/exit fire identically on every screen.
-// The composition with the other primitives is the whole point: the STATE is an
-// fsm.Machine, each state's DWELL is a play.Pace, and the once-on-entry cues are
-// play.Edge underneath. Reload/jam/fire, phase machines, run stages — all this shape.
-//
-// The transition LOGIC stays ordinary code (a switch reading your world) — the
-// Machine guarantees the enter/exit hooks fire exactly once per change; it does not
-// take over your control flow. A library you call, not a framework you live inside.
+// The host sees its own `set` land; each client sees replication deliver `cur`; both
+// drive `step`, so enter/exit fire identically on every screen. `cur` is a plain
+// field — read it directly (`r.gun.cur`). State is host-authoritative by
+// construction (plain `replicate`); an owner-authored machine is a different animal
+// and would not use this. The composition is the point: STATE is a Machine, each
+// state's DWELL is a play.Pace, the once-on-entry cues are play.Edge underneath. A
+// library you call, not a framework you live inside.
 Machine :: struct($S: typeid) {
-	shadow: Edge(S),
+	cur:    S `gd:"replicate"`, // authoritative state — host writes via set, replicated to all peers
+	shadow: Edge(S),            // local per-peer scratch — the edge step reads to fire enter/exit
 }
 
-// step reports the transition seen since the last step: the state we LEFT, the
-// state we are in NOW, and whether it moved. Drive it every frame with your
-// replicated field and branch on (from, to) for exit/enter side effects. Call it on
-// host and client alike — the host observes its own writes, each client observes the
-// replicated change — so the hooks fire on every screen with no coordination.
-step :: proc(m: ^Machine($S), cur: S) -> (from, to: S, moved: bool) {
-	from, moved = see(&m.shadow, cur)
-	return from, cur, moved
-}
-
-// set writes the authoritative state — HOST ONLY — and returns whether it changed.
-// `cur` is your replicated field: `play.set(&w.stage, STAGE_CLEAR)`. Pure sugar over
-// `cur^ = to`, but it is the single greppable transition site and its `changed`
-// return gates the once-per-transition work (start a timer, bank a reward).
-set :: proc(cur: ^$S, to: S) -> (changed: bool) {
-	changed = cur^ != to
-	cur^ = to
+// set writes the state — HOST ONLY — and returns whether it changed, so the caller
+// can gate the once-per-transition work (start a timer, bank a reward, play a cue).
+// `play.set(&r.gun, .Jam)`.
+set :: proc(m: ^Machine($S), to: S) -> (changed: bool) {
+	changed = m.cur != to
+	m.cur = to
 	return changed
+}
+
+// step reports the transition since the last step: the state we LEFT, the state we
+// are in NOW, and whether it moved. Call it every frame on host and client alike and
+// branch on (from, to) for exit/enter side effects — the host observes its own set,
+// each client observes the replicated `cur`, so the hooks fire on every screen with
+// no coordination.
+step :: proc(m: ^Machine($S)) -> (from, to: S, moved: bool) {
+	from, moved = see(&m.shadow, m.cur)
+	return from, m.cur, moved
 }
