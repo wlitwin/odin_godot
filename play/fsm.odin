@@ -38,6 +38,12 @@ package play
 // and would not use this. The composition is the point: STATE is a Machine, each
 // state's DWELL is a play.Pace, the once-on-entry cues are play.Edge underneath. A
 // library you call, not a framework you live inside.
+//
+// THE MATCH-PHASE SINGLETON is just this at game scope: a Machine on your world /
+// session singleton entity, replicating the run's global phase (lobby → playing →
+// over, or waves, or day/night) to every screen. No separate primitive — scrapyard's
+// World.stage IS a match-phase Machine, read by every system to gate what it does;
+// per-phase timers ride a play.Pace beside it (scrapyard's over_at).
 Machine :: struct($S: typeid) {
 	cur:    S `gd:"replicate"`, // authoritative state — host writes via set, replicated to all peers
 	shadow: Edge(S),            // local per-peer scratch — the edge step reads to fire enter/exit
