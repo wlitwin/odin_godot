@@ -9,6 +9,40 @@ ctor_tag :: proc(enum_name: string) -> string {
 	return enum_name[1:] // drop leading '.'
 }
 
+// ---- replicated-field expressions (nested-replicate-fields) -------------------
+//
+// A replicated field is addressed by its PATH from the entity root (Replicate_Info.path):
+// {"hp"} for a top-level field, {"m","x"} for one reached through a `using`/embedded
+// sub-struct. These build the offset/size/type-of expressions the descriptor and the POD
+// #assert consume. A length-1 path emits byte-identical output to the pre-nesting code.
+
+// The value-type expression: {"hp"} -> `type_of(Cls{}.hp)`; {"m","x"} -> `type_of(Cls{}.m.x)`.
+field_type_expr :: proc(cls: string, path: []string) -> string {
+	return fmt.tprintf("type_of(%s{{}}.%s)", cls, join_path(path))
+}
+
+// The byte-offset expression. Nested paths compose per segment via `type_of` on the
+// container, so no intermediate struct type is ever NAMED — the generated file needs no
+// import of the sub-struct's package (works for imported bundles too):
+//   {"hp"}        -> offset_of(Cls, hp)
+//   {"m","x"}     -> offset_of(Cls, m) + offset_of(type_of(Cls{}.m), x)
+//   {"a","b","x"} -> offset_of(Cls, a) + offset_of(type_of(Cls{}.a), b) + offset_of(type_of(Cls{}.a.b), x)
+field_offset_expr :: proc(cls: string, path: []string) -> string {
+	if len(path) == 1 {
+		return fmt.tprintf("offset_of(%s, %s)", cls, path[0])
+	}
+	b := strings.builder_make()
+	for seg, i in path {
+		if i > 0 {strings.write_string(&b, " + ")}
+		if i == 0 {
+			fmt.sbprintf(&b, "offset_of(%s, %s)", cls, seg)
+		} else {
+			fmt.sbprintf(&b, "offset_of(type_of(%s{{}}.%s), %s)", cls, join_path(path[:i]), seg)
+		}
+	}
+	return strings.to_string(b)
+}
+
 // ---- main emitter ------------------------------------------------------------
 
 generate :: proc(s: ^Script) -> string {
@@ -410,10 +444,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			// simple_compare excludes them over NaN semantics — for shadow diffing,
 			// bitwise is exactly right). Pointers are memcmp-safe but meaningless on
 			// the wire, hence the explicit exclusion.
+			te := field_type_expr(cls, r.path)
 			fmt.sbprintf(
 				b,
-				"#assert(intrinsics.type_is_nearly_simple_compare(type_of(%s{{}}.%s)) && !intrinsics.type_is_pointer(type_of(%s{{}}.%s)) && !intrinsics.type_is_multi_pointer(type_of(%s{{}}.%s)), \"%s.%s: gd:\\\"replicate\\\" fields must be POD (ints/floats/bools/enums/vectors/fixed arrays — no strings, slices, maps, or pointers)\")\n",
-				cls, r.field, cls, r.field, cls, r.field, cls, r.field,
+				"#assert(intrinsics.type_is_nearly_simple_compare(%s) && !intrinsics.type_is_pointer(%s) && !intrinsics.type_is_multi_pointer(%s), \"%s.%s: gd:\\\"replicate\\\" fields must be POD (ints/floats/bools/enums/vectors/fixed arrays — no strings, slices, maps, or pointers)\")\n",
+				te, te, te, cls, join_path(r.path),
 			)
 		}
 		fmt.sbprintf(b, "@(private = \"file\")\n_%s_net_fields := [?]knet.Field_Desc {{\n", snake)
@@ -439,8 +474,8 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			fmt.sbprintf(
 				b,
-				"\t{{offset = offset_of(%s, %s), size = size_of(type_of(%s{{}}.%s)), flags = %s%s%s}},\n",
-				cls, r.field, cls, r.field, flags, lerp, wire,
+				"\t{{offset = %s, size = size_of(%s), flags = %s%s%s}},\n",
+				field_offset_expr(cls, r.path), field_type_expr(cls, r.path), flags, lerp, wire,
 			)
 		}
 		w(b, "}\n\n")

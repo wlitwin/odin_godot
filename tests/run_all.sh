@@ -65,6 +65,9 @@ TESTS=(
     "flow|FLOW_OK|tests/flow/run.sh"
     # Pure-Odin unit tests for the `events` observer (Event(T) subscribe/emit semantics).
     "events|EVENTS_OK|tests/events/run.sh"
+    # Golden test for scriptgen's nested replicated/tagged-field discovery (same-package,
+    # imported bundles, and the loud plain-nesting guardrail) — drives the binary, no Godot.
+    "scriptgen|SCRIPTGEN_OK|tests/scriptgen/run.sh"
     # Pure-Odin unit tests for kit/net — the friendslop toolkit's replication core
     # (wire, shadow-copy deltas, intent pipeline + dedup, tick/clock sync, interp).
     "kitnet|KITNET_OK|tests/kitnet/run.sh"

@@ -117,24 +117,8 @@ reflect_class_desc :: proc "contextless" (id: typeid, info: Class_Info) -> Class
 	exports_start := export_pool_count
 	onready_start := onready_pool_count
 	signals_start := signal_pool_count
-	for i in 0 ..< int(st.field_count) {
-		if i == 0 {continue} // the owner Object pointer, by convention — never a member
-		tag, has := reflect.struct_tag_lookup(reflect.Struct_Tag(st.tags[i]), "gd")
-		// A signal field declares itself by TYPE (gd.Signal0 … Signal4, or the general
-		// gd.SignalN) — the tag is OPTIONAL for the arity family (`gd:"args=..."` names
-		// the payload) and FORBIDDEN for SignalN, so these checks precede the
-		// tagged-fields-only skip below.
-		if arg_tis, is_signal := signal_field_args(st.types[i]); is_signal {
-			walk_signal_field(info, st.names[i], arg_tis, tag, has)
-			continue
-		}
-		if payload_ti, is_sn := signal_n_payload(st.types[i]); is_sn {
-			walk_signal_n_field(info, st.names[i], payload_ti, has)
-			continue
-		}
-		if !has {continue}
-		walk_field(info, st.names[i], st.types[i], st.offsets[i], tag)
-	}
+	walk_members(info, st, 0, "", true)
+	detect_dup_member_names(info.name, exports_start, signals_start)
 	if n := export_pool_count - exports_start; n > 0 {
 		desc.exports = raw_data(export_pool[exports_start:])
 		desc.exports_count = i32(n)
@@ -159,6 +143,78 @@ reflect_class_desc :: proc "contextless" (id: typeid, info: Class_Info) -> Class
 		desc.signals_count = i32(signal_pool_count - signals_start)
 	}
 	return desc
+}
+
+// Walk a struct's fields into the Export/Onready/Signal pools, recursing into UNTAGGED
+// embedded sub-structs so their members register with a computed NAME and cumulative
+// offset — the runtime half of nested tagged fields (nested-replicate-fields KB doc).
+//
+//   * `using` embeds FLATTEN: members register under their promoted leaf name (`prefix`
+//     unchanged) — Odin guarantees those are unique.
+//   * plain embeds NAMESPACE: members register under `<field>_<...>_<leaf>` (`prefix`
+//     grows by `<field>_`), mirroring the `self.field.x` access path. Two members that
+//     collide are caught by detect_dup_member_names, not silently last-wins.
+//
+// `base` is the byte offset of `st` within the registered entity; `skip_owner` drops
+// field 0 (the owner handle) at the TOP level only. Variant value types (Vector2/…) are
+// leaves, never bundles, so recursion skips them. (`replicate` fields are handled entirely
+// by scriptgen's Entity_Desc — walk_field returns early for them — so nesting them changes
+// nothing at runtime.)
+@(private = "file")
+walk_members :: proc(info: Class_Info, st: runtime.Type_Info_Struct, base: uintptr, prefix: string, skip_owner: bool) {
+	for i in 0 ..< int(st.field_count) {
+		if skip_owner && i == 0 {continue} // the owner Object pointer — never a member
+		// prefix "" (top level / all-`using` path) keeps the leaf name verbatim, so existing
+		// flat classes register byte-identically.
+		name := prefix == "" ? st.names[i] : strings.concatenate({prefix, st.names[i]})
+		tag, has := reflect.struct_tag_lookup(reflect.Struct_Tag(st.tags[i]), "gd")
+		// A signal field declares itself by TYPE (gd.Signal0 … Signal4, or the general
+		// gd.SignalN) — the tag is OPTIONAL for the arity family and FORBIDDEN for
+		// SignalN, so these checks precede the tagged-fields-only skip below.
+		if arg_tis, is_signal := signal_field_args(st.types[i]); is_signal {
+			walk_signal_field(info, name, arg_tis, tag, has)
+			continue
+		}
+		if payload_ti, is_sn := signal_n_payload(st.types[i]); is_sn {
+			walk_signal_n_field(info, name, payload_ti, has)
+			continue
+		}
+		if has {
+			walk_field(info, name, st.types[i], base + st.offsets[i], tag)
+			continue
+		}
+		// Untagged struct field: recurse. Skip Variant value types (Vector2/Transform/… —
+		// leaves, not component bundles) so we don't walk into engine math structs.
+		if _, is_variant := variant_type_for(st.types[i].id); is_variant {continue}
+		if sub, ok := runtime.type_info_base(st.types[i]).variant.(runtime.Type_Info_Struct); ok {
+			sub_prefix := st.usings[i] ? prefix : strings.concatenate({prefix, st.names[i], "_"})
+			walk_members(info, sub, base + st.offsets[i], sub_prefix, false)
+		}
+	}
+}
+
+// A plain embed can produce two members with the same registered name (a top-level
+// `aim_x` and `aim.x`, say). Odin can't catch that — the access paths differ — so a
+// duplicate is reported here as a loud error, never a silent last-wins. Scoped to THIS
+// class's pool run [start, count); O(n²) over a handful of members.
+@(private = "file")
+detect_dup_member_names :: proc(class: cstring, ex_start, sig_start: int) {
+	for i in ex_start ..< export_pool_count {
+		for j in ex_start ..< i {
+			if string(export_pool[i].name) == string(export_pool[j].name) {
+				record_error(class, export_pool[i].name, "duplicate member name from a nested embed — rename the field or reach it through `using`")
+				break
+			}
+		}
+	}
+	for i in sig_start ..< signal_pool_count {
+		for j in sig_start ..< i {
+			if string(signal_pool[i].name) == string(signal_pool[j].name) {
+				record_error(class, signal_pool[i].name, "duplicate signal name from a nested embed — rename the field or reach it through `using`")
+				break
+			}
+		}
+	}
 }
 
 // One tagged field -> an Export or Onready pool entry (or a recorded error). Ports

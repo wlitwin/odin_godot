@@ -73,8 +73,10 @@ build_scriptgen() {
 }
 
 # run_scriptgen <scripts_dir> — emit the *.gen.odin siblings beside the authored sources.
+# -godot:<root> lets scriptgen resolve nested `using` bundles imported from godot:kit/*
+# (nested-replicate-fields Phase 2) — the same collection root the binding compiles against.
 run_scriptgen() {
-    "$SGEN" "$1"
+    "$SGEN" "$1" -godot:"$ROOT"
 }
 
 # ----------------------------------------------------------------------------

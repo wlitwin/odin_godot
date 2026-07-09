@@ -319,7 +319,12 @@ Rpc_Info :: struct {
 // offset_of/size_of, and a generated #assert enforces the POD-only contract at the
 // consumer's compile, naming the offending field.
 Replicate_Info :: struct {
-	field:  string,
+	field:  string, // leaf field name (diagnostics/display)
+	// Access segments from the entity-struct root to this field, e.g. {"hp"} for a
+	// top-level field, {"move","x"} for a field reached through a `using`/embedded
+	// sub-struct. generate.odin turns this into the offset/size/POD expressions
+	// (nested-replicate-fields KB doc). Always at least length 1.
+	path:   []string,
 	interp: bool, // remote peers interpolate this field
 	owner:  bool, // part of the owner-authoritative unreliable stream
 	lerp:   string, // knet.Lerp_Kind literal (".F32"/".F64"/".Quat"/".Custom"); "" = Snap
@@ -416,6 +421,219 @@ warn_at :: proc(loc: Loc, format: string, args: ..any) {
 	fmt.eprintln()
 }
 
+// ---- struct index + cross-package resolver (nested-replicate-fields) ----------
+//
+// So a `gd:"replicate"` (or, through `using`, export/onready/signal) field reached
+// through an embedded sub-struct is discovered, the parser must resolve the sub-struct's
+// DEFINITION. Same-package types live in a sibling file; IMPORTED bundles (`using cs:
+// kcombat.State`) live in another package under the `godot:` collection. The index maps
+// each package DIR to its `Name :: struct {...}` defs; imported packages are parsed on
+// demand. Resolution is per-def: bare `Name` resolves in the def's own package, and
+// `alias.Name` resolves through the def's file imports into another package. See the
+// nested-replicate-fields KB doc.
+
+Struct_Field :: struct {
+	name:      string,
+	type_text: string, // rendered + gd.-normalized (ready for map_variant/POD checks)
+	tag:       string, // raw struct-tag text (may be "")
+	is_using:  bool,
+	loc:       Loc, // where this field is declared (for nested-field diagnostics)
+}
+
+Struct_Def :: struct {
+	id:          string, // "<dir>|<name>" — stable identity for cycle detection
+	dir:         string, // the package dir this struct lives in (bare-name resolution)
+	fields:      []Struct_Field,
+	imports:     map[string]string, // defining file's EXPLICIT-alias imports (alias -> "godot:kit/combat")
+	poly_params: []string, // generic parameter names ("$S" stripped to "S"), in order; nil = not generic
+}
+
+// dir -> (bare struct name -> def). The scripts package, plus any imported packages
+// pulled in on demand for nested-bundle resolution.
+g_pkgs: map[string]map[string]Struct_Def
+g_pkg_loaded: map[string]bool // dirs already parsed (incl. unreadable, so we never retry)
+g_godot_root: string // the `godot:` collection root (-godot: flag / ODIN_GODOT_ROOT); "" disables imported bundles
+
+// Parse every .odin in `dir` (idempotent) and record its struct decls. Parser diagnostics
+// stay silent — the emit loop / `odin build` report parse errors properly.
+index_pkg_dir :: proc(dir: string) {
+	if g_pkg_loaded[dir] {return}
+	g_pkg_loaded[dir] = true
+	// Populate `pkg` fully, then publish it on EVERY exit path. (An Odin map value is a
+	// header copied by value — inserting into a local after storing it would leave the
+	// stored copy stale once the backing grows; so we store the final header via defer.)
+	pkg := make(map[string]Struct_Def)
+	defer g_pkgs[dir] = pkg
+	dir_fh, oerr := os.open(dir)
+	if oerr != nil {return}
+	files, rderr := os.read_dir(dir_fh, -1, context.allocator)
+	os.close(dir_fh)
+	if rderr != nil {return}
+	for fi in files {
+		if fi.type == .Directory {continue}
+		if !strings.has_suffix(fi.name, ".odin") {continue}
+		if strings.has_suffix(fi.name, ".gen.odin") {continue}
+		src_bytes, rerr := os.read_entire_file_from_path(fi.fullpath, context.allocator)
+		if rerr != nil {continue}
+		src := string(src_bytes)
+		file := ast.File {
+			fullpath = fi.fullpath,
+			src      = src,
+		}
+		p := parser.default_parser()
+		p.err = silent_parse_diag
+		p.warn = silent_parse_diag
+		if !parser.parse_file(&p, &file) {continue}
+		alias := godot_import_alias(&file)
+		imports := collect_file_imports(&file)
+		for decl in file.decls {
+			vd, ok := decl.derived.(^ast.Value_Decl)
+			if !ok {continue}
+			if len(vd.names) != 1 || len(vd.values) != 1 {continue}
+			st, is_struct := vd.values[0].derived.(^ast.Struct_Type)
+			if !is_struct || st.fields == nil {continue}
+			name_ident, _ := vd.names[0].derived.(^ast.Ident)
+			if name_ident == nil {continue}
+			pkg[name_ident.name] = build_struct_def(dir, fi.fullpath, name_ident.name, st, src, alias, imports)
+		}
+	}
+}
+
+@(private = "file")
+build_struct_def :: proc(dir, path, name: string, st: ^ast.Struct_Type, src, alias: string, imports: map[string]string) -> Struct_Def {
+	fields := make([dynamic]Struct_Field)
+	for f in st.fields.list {
+		type_text := normalize_godot_qualifier(node_text(src, f.type), alias)
+		is_using := .Using in f.flags
+		tag := f.tag.text
+		for nm in f.names {
+			ident, ok := nm.derived.(^ast.Ident)
+			if !ok || ident == nil {continue}
+			append(
+				&fields,
+				Struct_Field {
+					name = ident.name,
+					type_text = type_text,
+					tag = tag,
+					is_using = is_using,
+					loc = Loc{path, ident.pos.line},
+				},
+			)
+		}
+	}
+	// Generic parameters (`struct($S: typeid, $N: int)`): record the names ("$S" -> "S")
+	// in order, so an instantiation `Machine(Gun_State)` can be zipped param->arg and the
+	// substitution applied to member types (nested-replicate-fields generics).
+	poly: [dynamic]string
+	if st.poly_params != nil {
+		for pf in st.poly_params.list {
+			for nm in pf.names {
+				pn := strings.trim_prefix(strings.trim_space(node_text(src, nm)), "$")
+				if pn != "" {append(&poly, pn)}
+			}
+		}
+	}
+
+	return Struct_Def {
+		id = strings.concatenate({dir, "|", name}),
+		dir = dir,
+		fields = fields[:],
+		imports = imports,
+		poly_params = poly[:],
+	}
+}
+
+// alias -> import fullpath, EXPLICIT aliases only (`import k "godot:kit/net"` — the
+// idiomatic form for kit packages). A default (unaliased) import's alias is the target's
+// package NAME, unknown without parsing it, so those don't resolve (no recursion, same as
+// before — no regression). godot:godot is excluded: its types are engine leaves.
+collect_file_imports :: proc(file: ^ast.File) -> map[string]string {
+	m := make(map[string]string)
+	for imp in file.imports {
+		if imp.name.text == "" || imp.name.text == "_" {continue} // no explicit alias
+		full := strings.trim(imp.fullpath, "\"")
+		if full == "godot:godot" {continue}
+		m[imp.name.text] = full
+	}
+	return m
+}
+
+// "godot:kit/combat" -> "<root>/kit/combat". Only the godot: collection resolves; other
+// collections (core:/base:/vendor:) and relative imports are not bundle sources here.
+resolve_import_dir :: proc(imp: string) -> (string, bool) {
+	colon := strings.index_byte(imp, ':')
+	if colon < 0 {return "", false}
+	if imp[:colon] != "godot" || g_godot_root == "" {return "", false}
+	rel := imp[colon + 1:]
+	return strings.concatenate({g_godot_root, "/", rel}), true
+}
+
+// Resolve a field's type text (seen inside `from`) to a struct def. Bare `Name` resolves
+// in `from`'s own package; `alias.Name` resolves through `from`'s imports into another
+// package (parsed on demand). ok=false for builtins, decorated types ([N]T / ^T /
+// parametric), engine (gd.) types, unresolved imports, or a name that isn't an indexed struct.
+lookup_struct :: proc(from: Struct_Def, type_text: string) -> (Struct_Def, bool) {
+	t := strings.trim_space(type_text)
+	if len(t) == 0 || t[0] == '^' || strings.contains(t, "[") || strings.contains(t, "(") {
+		return {}, false
+	}
+	if dot := strings.index_byte(t, '.'); dot >= 0 {
+		alias := t[:dot]
+		name := t[dot + 1:]
+		if alias == "gd" || alias == "godot" {return {}, false}
+		imp, has := from.imports[alias]
+		if !has {return {}, false}
+		dir, dok := resolve_import_dir(imp)
+		if !dok {return {}, false}
+		index_pkg_dir(dir) // lazy parse (idempotent)
+		if pkg, pok := g_pkgs[dir]; pok {
+			if def, sok := pkg[name]; sok {return def, true}
+		}
+		return {}, false
+	}
+	if pkg, pok := g_pkgs[from.dir]; pok {
+		if def, sok := pkg[t]; sok {return def, true}
+	}
+	return {}, false
+}
+
+// resolve_type resolves a field's type text (seen inside `from`, and already substituted
+// for any outer generic params) to a struct def, plus a substitution map for its OWN
+// generic parameters. A generic instantiation `Machine(Gun_State)` resolves the base
+// `Machine` and zips its params to the args (`{S = "Gun_State"}`); a plain name resolves
+// via lookup_struct with an empty substitution. ok=false for non-structs / pointers /
+// arrays / unresolved names — the caller skips recursion (nested-replicate-fields generics).
+resolve_type :: proc(from: Struct_Def, type_text: string) -> (Struct_Def, map[string]string, bool) {
+	t := strings.trim_space(type_text)
+	if len(t) == 0 || t[0] == '^' || strings.has_prefix(t, "[") {
+		return {}, nil, false
+	}
+	if paren := strings.index_byte(t, '('); paren >= 0 {
+		if !strings.has_suffix(t, ")") {return {}, nil, false}
+		base := strings.trim_space(t[:paren])
+		def, ok := lookup_struct(from, base)
+		if !ok {return {}, nil, false}
+		args := split_type_params(t[paren + 1:len(t) - 1]) // top-level comma split (parse.odin)
+		defer delete(args)
+		subst := make(map[string]string)
+		for p, i in def.poly_params {
+			if i < len(args) {subst[p] = strings.trim_space(args[i])}
+		}
+		return def, subst, true
+	}
+	def, ok := lookup_struct(from, t)
+	return def, nil, ok
+}
+
+// The directory containing a file path (normalized, no trailing slash).
+dir_of :: proc(path: string) -> string {
+	p := norm_path(path)
+	if i := strings.last_index(p, "/"); i >= 0 {
+		return p[:i]
+	}
+	return p
+}
+
 // ---- main --------------------------------------------------------------------
 
 main :: proc() {
@@ -431,7 +649,18 @@ main :: proc() {
 		if strings.has_prefix(a, "-res:") {
 			continue
 		}
+		// `-godot:<path>` — the `godot:` collection root, so nested `using` bundles
+		// imported from `godot:kit/*` can be resolved (nested-replicate-fields Phase 2).
+		if strings.has_prefix(a, "-godot:") {
+			g_godot_root = a[len("-godot:"):]
+			continue
+		}
 		scripts_dir = a
+	}
+	// Fallback to the env every test/build already exports; "" leaves imported bundles
+	// unresolved (same as same-package-only), never a silent wrong result.
+	if g_godot_root == "" {
+		g_godot_root = os.get_env("ODIN_GODOT_ROOT", context.allocator)
 	}
 	if scripts_dir == "" {
 		fmt.eprintln("usage: scriptgen <scripts_dir>")
@@ -467,6 +696,11 @@ main :: proc() {
 		fmt.eprintfln("scriptgen: cannot read dir %q", scripts_dir)
 		os.exit(1)
 	}
+
+	// Index the scripts package BEFORE parsing scripts, so parse_script can resolve
+	// nested `using`/embedded sub-structs to scan them for gd tags. Imported bundle
+	// packages are pulled in on demand during resolution (nested-replicate-fields).
+	index_pkg_dir(norm_path(scripts_dir))
 
 	emitted := 0
 	pkg := "" // the scripts package name (for the generated boot); from the first source file

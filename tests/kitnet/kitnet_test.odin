@@ -192,6 +192,110 @@ full_snapshot_and_revert :: proc(t: ^testing.T) {
 	testing.expect_value(t, src.state, u8(2))
 }
 
+// ---- nested replicated fields (through using/embedded sub-structs) ----------
+//
+// A gd:"replicate" field can live inside a sub-struct the entity embeds — promoted
+// (`using m: Nested_Move`) or plain (`d: Nested_Deep`, one level deeper). scriptgen
+// discovers those and emits COMPOSED offset expressions that name no intermediate
+// type (`offset_of(E, m) + offset_of(type_of(E{}.m), x)`), so the wire core sees an
+// ordinary flat descriptor. This fixture hand-builds exactly that descriptor — the
+// same shape widget.gen.odin emits — and proves the wire path replicates nested
+// fields identically to flat ones (nested-replicate-fields KB doc).
+
+Nested_Move :: struct {
+	x, y: f32,
+	vx:   f32,
+}
+
+Nested_Deep :: struct {
+	inner: Nested_Move,
+	flag:  u8,
+}
+
+Nested_Entity :: struct {
+	hp:      i32,
+	using m: Nested_Move, // promoted: self.x / self.y / self.vx
+	d:       Nested_Deep, // plain: self.d.inner.x / self.d.flag
+	tint:    u8,
+}
+
+// Depth-first, declaration order — the order scriptgen produces. Offsets are the
+// verbatim composed expressions from the generator.
+nested_desc :: proc() -> knet.Entity_Desc {
+	@(static) fields := [?]knet.Field_Desc {
+		{offset = offset_of(Nested_Entity, hp), size = size_of(i32)},
+		{offset = offset_of(Nested_Entity, m) + offset_of(type_of(Nested_Entity{}.m), x), size = size_of(f32), flags = {.Interp}, lerp = .F32},
+		{offset = offset_of(Nested_Entity, m) + offset_of(type_of(Nested_Entity{}.m), vx), size = size_of(f32)},
+		{offset = offset_of(Nested_Entity, d) + offset_of(type_of(Nested_Entity{}.d), inner) + offset_of(type_of(Nested_Entity{}.d.inner), x), size = size_of(f32), flags = {.Interp}, lerp = .F32},
+		{offset = offset_of(Nested_Entity, d) + offset_of(type_of(Nested_Entity{}.d), flag), size = size_of(u8)},
+		{offset = offset_of(Nested_Entity, tint), size = size_of(u8)},
+	}
+	return knet.Entity_Desc{fields = fields[:]}
+}
+
+@(test)
+nested_composed_offsets_match_layout :: proc(t: ^testing.T) {
+	// The composed offset a nested path emits must equal the field's true offset —
+	// the promoted equivalent for the `using` field, the manual chain for the plain one.
+	d := nested_desc()
+	testing.expect_value(t, d.fields[1].offset, offset_of(Nested_Entity, x)) // promoted
+	testing.expect_value(
+		t,
+		d.fields[3].offset,
+		offset_of(Nested_Entity, d) + offset_of(Nested_Deep, inner) + offset_of(Nested_Move, x),
+	)
+}
+
+@(test)
+nested_full_snapshot_roundtrip :: proc(t: ^testing.T) {
+	desc := nested_desc()
+	src := Nested_Entity{hp = 42, tint = 9}
+	src.x = 3.5;src.y = 1.0;src.vx = -2.0 // through `using m`
+	src.d.inner.x = 7.25;src.d.flag = 200 // deep plain path
+
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_full(&w, &src, &desc)
+
+	dst: Nested_Entity
+	r := knet.reader_make(knet.writer_bytes(&w))
+	knet.apply_full(&r, &dst, &desc)
+	testing.expect(t, !r.err)
+	testing.expect_value(t, dst.hp, i32(42))
+	testing.expect_value(t, dst.x, f32(3.5)) // nested via using
+	testing.expect_value(t, dst.vx, f32(-2.0))
+	testing.expect_value(t, dst.d.inner.x, f32(7.25)) // deep plain
+	testing.expect_value(t, dst.d.flag, u8(200))
+	testing.expect_value(t, dst.tint, u8(9))
+	testing.expect_value(t, dst.y, f32(0)) // y is not in the descriptor — untouched
+}
+
+@(test)
+nested_delta_roundtrip :: proc(t: ^testing.T) {
+	desc := nested_desc()
+	sender := Nested_Entity{hp = 42, tint = 9}
+	sender.d.inner.x = 7.25
+	shadow := knet.shadow_make(&desc)
+	defer delete(shadow)
+	knet.shadow_capture(&sender, shadow, &desc) // baselines agree
+
+	receiver := sender
+	sender.d.inner.x = 99.0 // mutate ONE deep nested field (descriptor index 3)
+
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	mask := knet.write_delta(&w, &sender, shadow, &desc)
+	testing.expect_value(t, mask, u64(0b001000)) // only bit 3
+
+	r := knet.reader_make(knet.writer_bytes(&w))
+	applied := knet.apply_delta(&r, &receiver, &desc)
+	testing.expect(t, !r.err)
+	testing.expect_value(t, applied, u64(0b001000))
+	testing.expect_value(t, receiver.d.inner.x, f32(99.0))
+	testing.expect_value(t, receiver.hp, i32(42)) // untouched
+	testing.expect_value(t, receiver.tint, u8(9)) // untouched
+}
+
 // ---- intent ----------------------------------------------------------------
 
 @(test)

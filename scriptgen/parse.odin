@@ -468,6 +468,13 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		s.class_name = s.struct_name
 	}
 
+	// The resolution context for nested `using`/embedded fields: this file's package dir
+	// (bare types) and its explicit-alias imports (imported bundles). See lookup_struct.
+	nest_ctx := Struct_Def {
+		dir     = dir_of(path),
+		imports = collect_file_imports(&file),
+	}
+
 	// Exports: struct fields (after owner) tagged `gd:"export"` (or `gd:"onready=PATH"`).
 	for f, i in struct_type.fields.list {
 		if i == 0 {continue} // owner
@@ -534,7 +541,28 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			}
 		}
 
-		if !has {continue}
+		if !has {
+			// No gd tag: this may be a `using`/embedded sub-struct whose fields carry
+			// gd tags. Resolve the field's type (same-package or imported bundle) and
+			// recurse so nested `gd:"replicate"` (and, through `using`, export/onready/
+			// signal) fields are discovered. Non-struct / unresolved / typo'd types
+			// don't resolve and are skipped, exactly as before (nested-replicate-fields).
+			nested := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
+			if def, subst, ok := resolve_type(nest_ctx, nested); ok {
+				entry_using := .Using in f.flags
+				for nm in f.names {
+					ident, iok := nm.derived.(^ast.Ident)
+					if !iok || ident == nil {continue}
+					// `using` flattens (members keep their leaf name); a plain embed
+					// namespaces them under `<field>_` (see recurse_into / walk_members).
+					name_prefix := entry_using ? "" : strings.concatenate({ident.name, "_"})
+					visited := make(map[string]bool)
+					recurse_into(&s, def, path_of(ident.name), &visited, name_prefix, subst)
+					delete(visited)
+				}
+			}
+			continue
+		}
 		// Tag is comma-separated tokens. The FIRST token selects the kind:
 		//   - `onready=PATH`  -> a private auto-wired node ref (richer-authoring #1)
 		//   - `export[,SPEC]` -> a serialized @export property
@@ -565,133 +593,16 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		// knet.Entity_Desc (offset_of/size_of are the consumer compiler's job) plus a
 		// #assert that rejects non-POD fields at compile time with the field's name.
 		if tok0 == "replicate" {
-			// Engine handle/heap types can never be replicated fields: object handles
-			// and Rids are peer-local, and String/Array/Dictionary/Packed_* own heap
-			// memory a memcpy would corrupt. Rejected HERE (with the type's name)
-			// because the generated POD #assert can't see engine semantics — a
-			// gd.String is pointer-sized and memcmp-safe, and still wrong to ship.
-			// POD engine value types (Vector2/3/4, Color, Transform*, ...) replicate fine.
-			if vi, vok := map_variant(type_text); vok {
-				denied := vi.enum_name == ".Object" ||
-					vi.enum_name == ".String" ||
-					vi.enum_name == ".String_Name" ||
-					vi.enum_name == ".Node_Path" ||
-					vi.enum_name == ".Array" ||
-					vi.enum_name == ".Dictionary" ||
-					vi.enum_name == ".Callable" ||
-					vi.enum_name == ".Signal" ||
-					vi.enum_name == ".Rid" ||
-					strings.has_prefix(vi.enum_name, ".Packed_")
-				if denied {
-					error_at(
-						floc,
-						"%s.%s: %q cannot be a replicated field — handles and heap-backed types don't cross the wire. Replicate POD state (ints/floats/bools/enums/vectors) and rebuild engine objects locally; send text/collections as explicit messages.",
-						s.struct_name,
-						field_label,
-						type_text,
-					)
-					continue
-				}
-			}
-			rep := Replicate_Info{}
-			for spec_raw in specs[1:] {
-				spec := strings.trim_space(spec_raw)
-				// `interp=NAME`: custom blend math — NAME is an author proc of type
-				// knet.Blend_Proc, spliced verbatim into the generated descriptor
-				// (a missing/mistyped proc fails the consumer compile on that line).
-				if strings.has_prefix(spec, "interp=") {
-					name := strings.trim_space(spec[len("interp="):])
-					if name == "" {
-						error_at(
-							floc,
-							"%s.%s: `interp=` needs a blend proc name (a knet.Blend_Proc in this package)",
-							s.struct_name,
-							field_label,
-						)
-						continue
-					}
-					rep.interp = true
-					rep.lerp = ".Custom"
-					rep.blend = name
-					continue
-				}
-				// `wire=f16` / `wire=NAME`: how the field's bytes are ENCODED in
-				// packets — half floats (stock) or an author knet.Wire_Codec,
-				// spliced verbatim like a blend proc. The struct-side value is
-				// untouched: shadows, prediction, and rings never see wire bytes.
-				if strings.has_prefix(spec, "wire=") {
-					name := strings.trim_space(spec[len("wire="):])
-					if name == "" {
-						error_at(
-							floc,
-							"%s.%s: `wire=` needs `f16` or a codec name (a knet.Wire_Codec in this package)",
-							s.struct_name,
-							field_label,
-						)
-						continue
-					}
-					if name == "f16" {
-						// The same classifier bare `interp` uses: .F32 means
-						// "f32 elements all the way down" — exactly what a
-						// componentwise half-float encoding can carry.
-						if interp_lerp_kind(type_text) != ".F32" {
-							error_at(
-								floc,
-								"%s.%s: `wire=f16` needs f32 elements (f32, float vectors/colors, or fixed arrays of them) — %q has none to halve; use a custom codec with `wire=CODEC`",
-								s.struct_name,
-								field_label,
-								type_text,
-							)
-							continue
-						}
-						rep.wire = ".F16"
-					} else {
-						rep.wire = ".Custom"
-						rep.codec = name
-					}
-					continue
-				}
-				switch spec {
-				case "interp":
-					rep.interp = true
-				case "owner":
-					rep.owner = true
-				case "":
-				case:
-					error_at(
-						floc,
-						"%s.%s: unknown replicate option %q (expected `interp`, `interp=BLEND_PROC`, `owner`, `wire=f16`, or `wire=CODEC`)",
-						s.struct_name,
-						field_label,
-						spec,
-					)
-				}
-			}
-			// Bare `interp` must know HOW to blend: classify the declared type into
-			// a knet.Lerp_Kind (quaternions get hemisphere-safe nlerp — a raw
-			// componentwise lerp garbles rotations near the antipode). Non-float
-			// types can only snap — rejected loudly so a tagged int doesn't
-			// silently stutter at the stream rate; `interp=BLEND_PROC` is the
-			// escape hatch for any POD type with special math.
-			if rep.interp && rep.lerp == "" {
-				rep.lerp = interp_lerp_kind(type_text)
-				if rep.lerp == "" {
-					error_at(
-						floc,
-						"%s.%s: `interp` needs a float-based field (f32/f64, float vectors/colors, or fixed arrays of them) — %q can only snap between samples; drop `interp`, use a float type, or supply custom math with `interp=BLEND_PROC`",
-						s.struct_name,
-						field_label,
-						type_text,
-					)
-					continue
-				}
-			}
+			rep, rok := parse_replicate_info(type_text, specs, floc, s.struct_name, field_label)
+			if !rok {continue}
 			// Multi-name fields (`x, y: f32 `gd:"replicate"``) replicate each name.
 			for nm in f.names {
 				ident, iok := nm.derived.(^ast.Ident)
 				if !iok || ident == nil {continue}
-				rep.field = ident.name
-				append(&s.replicates, rep)
+				r := rep
+				r.field = ident.name
+				r.path = path_of(ident.name)
+				append(&s.replicates, r)
 			}
 			continue
 		}
@@ -1119,4 +1030,234 @@ has_attr :: proc(vd: ^ast.Value_Decl, name: string) -> bool {
 		}
 	}
 	return false
+}
+
+// ---- nested replicated fields (through `using`/embedded sub-structs) ---------
+//
+// A `gd:"replicate"` field can live inside a sub-struct the entity embeds — either
+// promoted (`using m: Move`) or plain (`m: Move`, accessed `self.m.x`). parse_script
+// recurses into any untagged field whose type resolves to a package struct (the
+// g_struct_index), collecting each nested replicate field with its full ACCESS PATH
+// from the entity root. generate.odin turns the path into a composed offset expression
+// (`offset_of(Cls, m) + offset_of(type_of(Cls{}.m), x)`) that needs no import of the
+// sub-struct's type — so this works identically for same-package and (later) imported
+// bundles. See the nested-replicate-fields KB doc.
+
+// A one-segment path (a top-level field). Heap-allocated so it outlives parse_script.
+path_of :: proc(seg: string) -> []string {
+	p := make([]string, 1)
+	p[0] = seg
+	return p
+}
+
+// prefix + [leaf], freshly allocated (sibling nested fields must not share backing).
+extend_path :: proc(prefix: []string, leaf: string) -> []string {
+	p := make([]string, len(prefix) + 1)
+	copy(p, prefix)
+	p[len(prefix)] = leaf
+	return p
+}
+
+join_path :: proc(path: []string) -> string {
+	return strings.join(path, ".")
+}
+
+// apply_subst rewrites whole-identifier generic parameters in a type text to their
+// concrete args. With {S = "Gun_State"}: "S" -> "Gun_State", "Edge(S)" -> "Edge(Gun_State)",
+// "[N]f32" -> "[4]f32" (with {N = "4"}). Only WHOLE identifiers are replaced, never a
+// substring of a longer name. Empty subst returns the input untouched.
+apply_subst :: proc(type_text: string, subst: map[string]string) -> string {
+	if len(subst) == 0 {return type_text}
+	b := strings.builder_make()
+	i := 0
+	for i < len(type_text) {
+		c := type_text[i]
+		if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			j := i
+			for j < len(type_text) && is_ident_byte(type_text[j]) {j += 1}
+			word := type_text[i:j]
+			if repl, ok := subst[word]; ok {
+				strings.write_string(&b, repl)
+			} else {
+				strings.write_string(&b, word)
+			}
+			i = j
+		} else {
+			strings.write_byte(&b, c)
+			i += 1
+		}
+	}
+	return strings.to_string(b)
+}
+
+// Detect a typed signal field (gd.Signal0 … Signal4 / gd.SignalN) from its normalized
+// type text — used to reject signals inside nested structs (unsupported for now).
+is_signal_field_type :: proc(type_text: string) -> bool {
+	if _, _, ok := signal_type_params(type_text); ok {return true}
+	return strings.has_prefix(type_text, "gd.SignalN(") || strings.has_prefix(type_text, "godot.SignalN(")
+}
+
+// Walk a resolved struct def's fields, appending each `gd:"replicate"` field to
+// s.replicates (with its full access PATH, for the offset), generating a typed emit helper
+// for each nested signal, and recursing into further untagged sub-structs (resolved through
+// `def`'s own package + imports). `visited` (keyed by def id) guards cyclic type references.
+// `name_prefix` is the engine-registration name prefix for members here: "" under an
+// all-`using` path (members keep their promoted leaf name), or `<field>_<...>` accumulated
+// through plain embeds — the SAME rule register_class.odin's walk_members applies, so the
+// signal name scriptgen emits a helper for matches the name the runtime registers.
+//
+// Tag handling by kind:
+//   * replicate — scanned through ANY nesting (using or plain, same-package or imported);
+//     the wire keys fields by offset+order, so the name is irrelevant. scriptgen owns the descriptor.
+//   * export/onready — registered (and validated) by the RUNTIME reflection walk; scriptgen
+//     leaves them alone here (no line/doc/accessor metadata for nested exports yet).
+//   * signal — registered by the runtime walk; scriptgen generates the typed `*_emit_*`
+//     helper (arity family only — SignalN needs its AST payload node, which the index
+//     doesn't carry, so it registers at runtime without a typed helper).
+recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[string]bool, name_prefix: string, subst: map[string]string) {
+	if visited[def.id] {return} // a type reachable from itself — stop, don't loop
+	visited[def.id] = true
+	defer delete_key(visited, def.id) // allow the same type at independent sibling positions
+
+	for fld in def.fields {
+		fpath := extend_path(path, fld.name)
+		// If `def` is a generic instantiation, resolve this field's generic params to the
+		// concrete args first (`cur: S` -> `cur: Gun_State`) — so interp classification,
+		// POD checks, and deeper resolution all see the real type. The OFFSET itself is
+		// path-based (type_of at the consumer compile), so it resolves generics regardless.
+		ftype := apply_subst(fld.type_text, subst)
+		// Signals declare by TYPE (tag optional) — check before the tagged/skip branches.
+		if is_signal_field_type(ftype) {
+			if arity, params, ok := signal_type_params(ftype); ok {
+				v, h := tag_gd_value(fld.tag)
+				parse_signal_field(s, fld.loc, strings.concatenate({name_prefix, fld.name}), arity, params, v, h)
+			}
+			continue
+		}
+		val, has := tag_gd_value(fld.tag)
+		if has {
+			specs := strings.split(val, ",")
+			if len(specs) > 0 && strings.trim_space(specs[0]) == "replicate" {
+				rep, rok := parse_replicate_info(ftype, specs, fld.loc, s.struct_name, join_path(fpath))
+				if rok {
+					rep.field = fld.name
+					rep.path = fpath
+					append(&s.replicates, rep)
+				}
+			}
+			// export/onready (and any unknown tag) are the runtime reflection walk's to
+			// register and validate — scriptgen owns only `replicate` through nesting.
+			continue
+		}
+		if sub, sub_subst, ok := resolve_type(def, ftype); ok {
+			// `using` keeps the current name prefix; a plain embed extends it by `<field>_`.
+			sub_prefix := fld.is_using ? name_prefix : strings.concatenate({name_prefix, fld.name, "_"})
+			recurse_into(s, sub, fpath, visited, sub_prefix, sub_subst)
+		}
+	}
+}
+
+// Parse the OPTIONS half of a `gd:"replicate,..."` tag into a Replicate_Info (the
+// caller fills in `field`/`path`). Shared by the top-level field loop and the nested
+// walk. `specs` is the whole comma-split tag; specs[0] is "replicate". ok=false means
+// the field can't be replicated and was already reported (skip it).
+parse_replicate_info :: proc(
+	type_text: string,
+	specs: []string,
+	floc: Loc,
+	struct_name, field_label: string,
+) -> (
+	Replicate_Info,
+	bool,
+) {
+	// Engine handle/heap types can never be replicated fields: object handles and Rids
+	// are peer-local, and String/Array/Dictionary/Packed_* own heap memory a memcpy would
+	// corrupt. Rejected HERE (with the type's name) because the generated POD #assert
+	// can't see engine semantics — a gd.String is pointer-sized and memcmp-safe, and still
+	// wrong to ship. POD engine value types (Vector2/3/4, Color, Transform*, ...) are fine.
+	if vi, vok := map_variant(type_text); vok {
+		denied :=
+			vi.enum_name == ".Object" ||
+			vi.enum_name == ".String" ||
+			vi.enum_name == ".String_Name" ||
+			vi.enum_name == ".Node_Path" ||
+			vi.enum_name == ".Array" ||
+			vi.enum_name == ".Dictionary" ||
+			vi.enum_name == ".Callable" ||
+			vi.enum_name == ".Signal" ||
+			vi.enum_name == ".Rid" ||
+			strings.has_prefix(vi.enum_name, ".Packed_")
+		if denied {
+			error_at(
+				floc,
+				"%s.%s: %q cannot be a replicated field — handles and heap-backed types don't cross the wire. Replicate POD state (ints/floats/bools/enums/vectors) and rebuild engine objects locally; send text/collections as explicit messages.",
+				struct_name,
+				field_label,
+				type_text,
+			)
+			return {}, false
+		}
+	}
+	rep := Replicate_Info{}
+	for spec_raw in specs[1:] {
+		spec := strings.trim_space(spec_raw)
+		// `interp=NAME`: custom blend math — NAME is an author proc of type knet.Blend_Proc,
+		// spliced verbatim into the generated descriptor (a missing/mistyped proc fails the
+		// consumer compile on that line).
+		if strings.has_prefix(spec, "interp=") {
+			name := strings.trim_space(spec[len("interp="):])
+			if name == "" {
+				error_at(floc, "%s.%s: `interp=` needs a blend proc name (a knet.Blend_Proc in this package)", struct_name, field_label)
+				continue
+			}
+			rep.interp = true
+			rep.lerp = ".Custom"
+			rep.blend = name
+			continue
+		}
+		// `wire=f16` / `wire=NAME`: how the field's bytes are ENCODED in packets — half
+		// floats (stock) or an author knet.Wire_Codec, spliced verbatim like a blend proc.
+		// The struct-side value is untouched: shadows, prediction, and rings never see wire bytes.
+		if strings.has_prefix(spec, "wire=") {
+			name := strings.trim_space(spec[len("wire="):])
+			if name == "" {
+				error_at(floc, "%s.%s: `wire=` needs `f16` or a codec name (a knet.Wire_Codec in this package)", struct_name, field_label)
+				continue
+			}
+			if name == "f16" {
+				// The same classifier bare `interp` uses: .F32 means "f32 elements all the
+				// way down" — exactly what a componentwise half-float encoding can carry.
+				if interp_lerp_kind(type_text) != ".F32" {
+					error_at(floc, "%s.%s: `wire=f16` needs f32 elements (f32, float vectors/colors, or fixed arrays of them) — %q has none to halve; use a custom codec with `wire=CODEC`", struct_name, field_label, type_text)
+					continue
+				}
+				rep.wire = ".F16"
+			} else {
+				rep.wire = ".Custom"
+				rep.codec = name
+			}
+			continue
+		}
+		switch spec {
+		case "interp":
+			rep.interp = true
+		case "owner":
+			rep.owner = true
+		case "":
+		case:
+			error_at(floc, "%s.%s: unknown replicate option %q (expected `interp`, `interp=BLEND_PROC`, `owner`, `wire=f16`, or `wire=CODEC`)", struct_name, field_label, spec)
+		}
+	}
+	// Bare `interp` must know HOW to blend: classify the declared type into a knet.Lerp_Kind
+	// (quaternions get hemisphere-safe nlerp — a raw componentwise lerp garbles rotations near
+	// the antipode). Non-float types can only snap — rejected loudly so a tagged int doesn't
+	// silently stutter at the stream rate; `interp=BLEND_PROC` is the escape hatch.
+	if rep.interp && rep.lerp == "" {
+		rep.lerp = interp_lerp_kind(type_text)
+		if rep.lerp == "" {
+			error_at(floc, "%s.%s: `interp` needs a float-based field (f32/f64, float vectors/colors, or fixed arrays of them) — %q can only snap between samples; drop `interp`, use a float type, or supply custom math with `interp=BLEND_PROC`", struct_name, field_label, type_text)
+			return {}, false
+		}
+	}
+	return rep, true
 }

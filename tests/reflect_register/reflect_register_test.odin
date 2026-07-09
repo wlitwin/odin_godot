@@ -709,3 +709,143 @@ pool_exhaustion :: proc(t: ^testing.T) {
 	testing.expect(t, saw_exhaustion, "export pool exhaustion must be recorded, not silent")
 	rt.reflect_register_reset_for_tests()
 }
+
+// ---- nested members through `using` embeds (nested-replicate-fields) ------------
+//
+// export/onready/signal reached through `using` sub-structs register with their
+// promoted (flat) names and cumulative offsets. A plain (non-`using`) embed is NOT
+// recursed — scriptgen keeps its tagged members a build error until a naming
+// convention is chosen, so the runtime walk must leave them alone.
+
+Nested_Members :: struct {
+	max_hp: i32 `gd:"export"`,
+	sprite: gd.Node2d `gd:"onready=Body/Sprite"`,
+	fired:  gd.Signal1(int) `gd:"args=amount"`,
+	synced: i32 `gd:"replicate"`, // scriptgen's tag — never a runtime member, even nested
+}
+
+Deeper :: struct {
+	using nm: Nested_Members, // two levels of `using`
+	speed:    f32 `gd:"export"`,
+}
+
+Plain_Bundle :: struct {
+	ignored: i32 `gd:"export"`, // NON-using embed below -> must NOT register
+}
+
+Composed :: struct {
+	owner:   gd.Node,
+	hp:      i32 `gd:"export"`,
+	using d: Deeper, // using -> Deeper -> using nm -> Nested_Members
+	plain:   Plain_Bundle, // plain embed: its export is invisible to the runtime walk
+}
+
+@(test)
+nested_using_members_register :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	desc := rt.reflect_class_desc(Composed, info("Composed"))
+	testing.expect_value(t, len(new_errors_since(before)), 0)
+
+	// Exports, depth-first: hp (top), max_hp + speed (through `using`, promoted leaf names),
+	// and plain_ignored (through the PLAIN embed, namespaced `<field>_<leaf>`). The bare leaf
+	// `ignored` is absent (namespaced), and `synced` is a replicate tag, never an export.
+	testing.expect_value(t, int(desc.exports_count), 4)
+	hp, hok := find_export(desc, "hp")
+	testing.expect(t, hok, "hp exported")
+	testing.expect_value(t, hp.offset, offset_of(Composed, hp))
+	mx, mok := find_export(desc, "max_hp")
+	testing.expect(t, mok, "max_hp exported through using")
+	testing.expect_value(t, mx.offset, offset_of(Composed, max_hp)) // promoted -> cumulative offset
+	sp, spok := find_export(desc, "speed")
+	testing.expect(t, spok, "speed exported through using")
+	testing.expect_value(t, sp.offset, offset_of(Composed, speed))
+	pi, piok := find_export(desc, "plain_ignored")
+	testing.expect(t, piok, "a plain embed's export registers under `<field>_<leaf>`")
+	testing.expect_value(t, pi.offset, offset_of(Composed, plain) + offset_of(Plain_Bundle, ignored))
+	_, iok := find_export(desc, "ignored")
+	testing.expect(t, !iok, "the bare leaf name is not used for a plain embed member")
+	_, syok := find_export(desc, "synced")
+	testing.expect(t, !syok, "a replicate field is never a runtime member")
+
+	// onready through using: promoted name, cumulative offset, path intact.
+	testing.expect_value(t, int(desc.onready_count), 1)
+	ors := rt.desc_onready(desc)
+	testing.expect_value(t, ors[0].offset, offset_of(Composed, sprite))
+	testing.expect_value(t, string(ors[0].path), "Body/Sprite")
+
+	// signal through using: registered by its promoted name.
+	testing.expect_value(t, int(desc.signals_count), 1)
+	sigs := rt.desc_signals(desc)
+	testing.expect_value(t, string(sigs[0].name), "fired")
+	testing.expect_value(t, int(sigs[0].arg_types_count), 1)
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[0])[0]), "amount")
+}
+
+// ---- members through a PLAIN embed: namespaced `<field>_<leaf>` names -----------
+//
+// A plain (non-`using`) embed keeps the sub-object in the access path (`self.aim.x`), so
+// its exported/onready/signal members register under the underscore-joined path — nested
+// replicate is unaffected (it keys by offset). Mirrors register_class walk_members.
+
+Aim :: struct {
+	sensitivity: f32 `gd:"export,range=0.1:5"`,
+	reticle:     gd.Node2d `gd:"onready=UI/Reticle"`,
+	fired:       gd.Signal1(i64) `gd:"args=dir"`,
+}
+
+Fighter :: struct {
+	owner: gd.Node,
+	hp:    i32 `gd:"export"`,
+	aim:   Aim, // PLAIN embed -> aim_sensitivity / aim_reticle / aim_fired
+}
+
+@(test)
+nested_plain_members_register :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	desc := rt.reflect_class_desc(Fighter, info("Fighter"))
+	testing.expect_value(t, len(new_errors_since(before)), 0)
+
+	// export: hp (top) + aim_sensitivity (namespaced), cumulative offset.
+	testing.expect_value(t, int(desc.exports_count), 2)
+	sens, sok := find_export(desc, "aim_sensitivity")
+	testing.expect(t, sok, "plain embed export registers as aim_sensitivity")
+	testing.expect_value(t, sens.offset, offset_of(Fighter, aim) + offset_of(Aim, sensitivity))
+	testing.expect_value(t, sens.hint, i64(1)) // Range hint survives through the embed
+	_, bare := find_export(desc, "sensitivity")
+	testing.expect(t, !bare, "the bare leaf name is not registered for a plain embed")
+
+	// onready: cumulative offset, node path intact (its NAME isn't user-facing).
+	testing.expect_value(t, int(desc.onready_count), 1)
+	ors := rt.desc_onready(desc)
+	testing.expect_value(t, ors[0].offset, offset_of(Fighter, aim) + offset_of(Aim, reticle))
+	testing.expect_value(t, string(ors[0].path), "UI/Reticle")
+
+	// signal: namespaced name, payload intact.
+	testing.expect_value(t, int(desc.signals_count), 1)
+	sigs := rt.desc_signals(desc)
+	testing.expect_value(t, string(sigs[0].name), "aim_fired")
+	testing.expect_value(t, int(sigs[0].arg_types_count), 1)
+	testing.expect_value(t, string(rt.signal_arg_names(sigs[0])[0]), "dir")
+}
+
+Clash_Inner :: struct { x: i32 `gd:"export"` }
+
+// A top-level field literally named `a_x` AND a plain embed `a` whose member is `x` both
+// resolve to the registered name "a_x" — a collision Odin can't see (distinct paths).
+Clash :: struct {
+	owner: gd.Node,
+	a_x:   i32 `gd:"export"`,
+	a:     Clash_Inner, // a.x -> "a_x" collides with the top-level a_x
+}
+
+@(test)
+nested_plain_name_collision_is_loud :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	_ = rt.reflect_class_desc(Clash, info("Clash"))
+	errs := new_errors_since(before)
+	dup := false
+	for e in errs {
+		if e.field != nil && string(e.field) == "a_x" {dup = true}
+	}
+	testing.expect(t, dup, "a colliding nested member name must be reported, not silently last-wins")
+}

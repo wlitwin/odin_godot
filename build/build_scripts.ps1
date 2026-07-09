@@ -182,7 +182,10 @@ $lines
 $builtDlls = @()
 function BuildOneScriptsDir([string]$dir) {
     CheckModuleIsolation $dir
-    Run $scriptgenExe @($dir)
+    # -godot:<root> lets scriptgen resolve nested `using` bundles imported from godot:kit/*
+    # (nested-replicate-fields Phase 2) — same root the binding compiles against. KEEP IN
+    # SYNC with build/common.sh run_scriptgen.
+    Run $scriptgenExe @($dir, "-godot:$RootRel")
     $out = Join-Path $Bin (DllLeafForDir $dir)
     BuildDll $dir $out @("-custom-attribute:gd_method", "-custom-attribute:gd_connect", "-custom-attribute:gd_rpc", "-custom-attribute:gd_command")
     $script:builtDlls += $out
