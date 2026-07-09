@@ -362,4 +362,33 @@ grep -q '{name = "gear_ping", trampoline = _robot_m_gear_ping' "$mgen" || fail "
 grep -q "gear_ping(&self.gear)" "$mgen" || fail "no-owner composed method must route into &self.gear with no self/args"
 grep -q '{method = "gear_ping"' "$mgen" || fail "the composed @(gd_rpc) must register its RPC under the namespaced method name"
 
+# ---- fixture 11: play.Ability — two cooldown-cast blocks on one entity ---------
+# A second real library block (cooldown-gated cast): two instances prove the composed cast verbs
+# get distinct path-prefixed names and the cooldown state composes through each embed.
+ab="$work/abilcomp"
+mkdir -p "$ab"
+cat >"$ab/caster.odin" <<'ODIN'
+//gd:extends Node2D
+//gd:class Caster
+package abilcomp
+import gd "godot:godot"
+import knet "godot:kit/net"
+import play "godot:play"
+
+Caster :: struct {
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id,
+	hp:     u8 `gd:"replicate"`,
+	lob:    play.Ability,   // -> caster_lob_cast
+	cone:   play.Ability,   // -> caster_cone_cast (distinct)
+}
+ODIN
+if ! "$SGEN" "$ab" -godot:"$ROOT" >/dev/null 2>&1; then fail "play.Ability must compose into a consumer, not error"; fi
+agen="$ab/caster.gen.odin"
+grep -q "CASTER_CMD_LOB_CAST :: u16" "$agen" || fail "first ability's cast must hoist as CASTER_CMD_LOB_CAST"
+grep -q "CASTER_CMD_CONE_CAST :: u16" "$agen" || fail "second ability instance must get its own path-prefixed cast (CONE_CAST)"
+grep -q "return play.ability_cast(&self.lob, _a0, _a1)" "$agen" || fail "cast thunk must route into &self.lob (imported, qualified, no owner)"
+grep -q "size_of(type_of(Caster{}.lob.def))" "$agen" || fail "the Ability_Def cooldown knob must replicate through the embed"
+grep -q "offset_of(type_of(Caster{}.lob), cd)" "$agen" || fail "the cooldown cd must compose through the block"
+
 echo "SCRIPTGEN_OK"
