@@ -54,6 +54,12 @@ use → ship.**
   transports — for 2–8 player "you and your friends" games.
 - **[Build a game in a day](kit/build-a-game-in-a-day.md)** — the tutorial: a co-op cave
   crawler from empty scene to Steam invite, the same arc `examples/cavecrawl` proves.
+- **[Gameplay recipes: the kit + play recipe](recipes.md)** — the compositional *pattern*
+  the tutorial uses without naming: an entity is a struct of `play` primitives, and each
+  networked behavior is sliced into seven authority/time slots (State, Cadence, Intent,
+  Authority, Prediction, Reconcile, Cue). One worked example (a gun) and five real items
+  against the skeleton. Read this when "how do I structure *this* gameplay item?" is the
+  question — it's the multiplayer answer to Godot's component-composition articles.
 
 ## Learn from the examples
 

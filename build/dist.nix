@@ -126,7 +126,7 @@ stdenvNoCC.mkDerivation ({
     cp dist/addons/odin_godot/icon.svg $A/icon.svg
     mkdir -p $A/docs
     cp build/addon-docs/getting-started.md build/addon-docs/index.md $A/docs/
-    cp docs/authoring-guide.md docs/workflow.md docs/exporting.md docs/debugging.md docs/modules.md docs/events.md $A/docs/
+    cp docs/authoring-guide.md docs/workflow.md docs/exporting.md docs/debugging.md docs/modules.md docs/events.md docs/recipes.md $A/docs/
     # The friendslop toolkit's pages ride along — the kit/ collection is in the
     # addon, so its documentation must be too (one page per package + tutorial).
     cp -r docs/kit $A/docs/kit
