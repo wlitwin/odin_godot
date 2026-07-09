@@ -345,10 +345,23 @@ Command_Arg :: struct {
 // One @(gd_command[="predict"]) proc — a host-authoritative action with optional
 // client-side optimistic execution (friendslop toolkit, kit/net command loop).
 Command_Info :: struct {
-	proc_name: string, // author proc (chest_open) — also names the `<proc>_cmd` wrapper
-	name:      string, // stripped verb (open) — knet.Command_Desc.name, diagnostics
+	proc_name: string, // author proc (chest_open / gun_fire) — names the decode thunk (+ a direct command's wrapper)
+	name:      string, // entity-level command name: a direct command's stripped verb ("open"), or a
+	                   // COMPOSED one's "<path>_<verb>" ("gun_fire") — drives the index const + wrapper
 	predict:   bool,
 	args:      [dynamic]Command_Arg,
+	// Verb-composition: a command whose proc lives on an EMBEDDED sub-struct field is hoisted
+	// onto the entity (the dual of a nested `gd:"replicate"` field). `path` is the access path
+	// from the entity root to that field ({"gun"} or {"loadout","primary"}); nil/empty = a
+	// DIRECT command on the entity (the decode thunk routes to `self`). `owner` = the sub-proc
+	// takes a `^Entity` param right after its receiver — a pointer, so never a wire arg —
+	// which scriptgen fills with `self` so the block can read/write its wielder. pkg_alias /
+	// pkg_path qualify + import the sub-proc's package into the generated file ("" = the
+	// entity's own package: no qualifier, no import).
+	path:      []string,
+	owner:     bool,
+	pkg_alias: string,
+	pkg_path:  string,
 }
 
 Script :: struct {
@@ -446,6 +459,10 @@ Struct_Def :: struct {
 	fields:      []Struct_Field,
 	imports:     map[string]string, // defining file's EXPLICIT-alias imports (alias -> "godot:kit/combat")
 	poly_params: []string, // generic parameter names ("$S" stripped to "S"), in order; nil = not generic
+	// @(gd_command) procs whose FIRST param is `^<this struct>` (verb-composition). An entity
+	// that embeds this struct hoists these onto its own command table (recurse_into). Collected
+	// on demand by index_pkg_dir alongside the fields. nil for a struct with no commands.
+	commands:    []Command_Info,
 }
 
 // dir -> (bare struct name -> def). The scripts package, plus any imported packages
@@ -469,6 +486,10 @@ index_pkg_dir :: proc(dir: string) {
 	files, rderr := os.read_dir(dir_fh, -1, context.allocator)
 	os.close(dir_fh)
 	if rderr != nil {return}
+	// alias (the godot:godot import) is per-file; commands index ACROSS files (a struct and its
+	// commands may live apart), so the receiver-keyed map lives at dir scope and is attached to
+	// the defs once every file is in.
+	cmds := make(map[string][dynamic]Command_Info)
 	for fi in files {
 		if fi.type == .Directory {continue}
 		if !strings.has_suffix(fi.name, ".odin") {continue}
@@ -490,11 +511,40 @@ index_pkg_dir :: proc(dir: string) {
 			vd, ok := decl.derived.(^ast.Value_Decl)
 			if !ok {continue}
 			if len(vd.names) != 1 || len(vd.values) != 1 {continue}
-			st, is_struct := vd.values[0].derived.(^ast.Struct_Type)
-			if !is_struct || st.fields == nil {continue}
+			if st, is_struct := vd.values[0].derived.(^ast.Struct_Type); is_struct && st.fields != nil {
+				name_ident, _ := vd.names[0].derived.(^ast.Ident)
+				if name_ident == nil {continue}
+				pkg[name_ident.name] = build_struct_def(dir, fi.fullpath, name_ident.name, st, src, alias, imports)
+				continue
+			}
+			// verb-composition: a `@(gd_command)` proc bound to a struct in THIS package (first
+			// param `^Name`, or `^Name($S)` for a generic block) — index it under that struct so
+			// an embedding entity can hoist it. Same receiver-by-first-param rule scan_bound_procs
+			// uses for entities. build_command_info reports contract violations loudly here, so a
+			// building block's commands are validated when a game first imports the package.
+			pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
+			if !is_proc || !has_attr(vd, "gd_command") {continue}
+			pt := pl.type
+			if pt == nil || pt.params == nil || len(pt.params.list) == 0 {continue}
+			recv := strings.trim_space(node_text(src, pt.params.list[0].type))
+			if !strings.has_prefix(recv, "^") {continue}
+			base := strings.trim_space(recv[1:])
+			if paren := strings.index_byte(base, '('); paren >= 0 {base = strings.trim_space(base[:paren])}
 			name_ident, _ := vd.names[0].derived.(^ast.Ident)
 			if name_ident == nil {continue}
-			pkg[name_ident.name] = build_struct_def(dir, fi.fullpath, name_ident.name, st, src, alias, imports)
+			config, _ := attr_value(vd, "gd_command")
+			if ci, cok := build_command_info(src, pt, Loc{fi.fullpath, name_ident.pos.line}, name_ident.name, base, config, true); cok {
+				arr := cmds[base]
+				append(&arr, ci)
+				cmds[base] = arr
+			}
+		}
+	}
+	// Attach each struct's commands (gathered across every file in the dir) to its def.
+	for name, arr in cmds {
+		if def, dok := pkg[name]; dok {
+			def.commands = arr[:]
+			pkg[name] = def
 		}
 	}
 }

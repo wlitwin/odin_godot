@@ -222,4 +222,79 @@ kgen="$kit/hero.gen.odin"
 grep -q "offset_of(HeroB, cd) + offset_of(type_of(HeroB{}.cd), cds)" "$kgen" || fail "kcombat.Cooldowns(3) cds not discovered"
 grep -q "offset_of(HeroB, bag) + offset_of(type_of(HeroB{}.bag), slots)" "$kgen" || fail "kitems.Inventory(8) slots not discovered"
 
+# ---- fixture 7: VERB composition — same-package block, owner threading -------
+# A @(gd_command) whose receiver is an EMBEDDED sub-struct is hoisted onto the entity: the
+# decode thunk routes into &self.<field>, a pointer 2nd param (the wielder) is filled with
+# `self`, and two instances of the same block get path-prefixed, non-colliding names.
+vc="$work/composed"
+mkdir -p "$vc"
+cat >"$vc/runner.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Runner
+package composed
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Gun :: struct { ammo: u16 `gd:"replicate"` }
+// predicted, OWNER-THREADED (reads its wielder): the ^Runner 2nd param is not a wire arg.
+@(gd_command="predict")
+gun_fire :: proc(g: ^Gun, owner: ^Runner, dx: i32) -> bool { if owner.hp == 0 {return false}; g.ammo -= 1; return true }
+// plain (non-predicted), no owner, no args.
+@(gd_command)
+gun_reload :: proc(g: ^Gun) -> bool { g.ammo = 8; return true }
+
+Runner :: struct {
+	owner:     gd.Node,
+	net_id:    knet.Net_Id,
+	hp:        u8 `gd:"replicate"`,
+	primary:   Gun,   // -> primary_fire / primary_reload
+	secondary: Gun,   // -> secondary_fire / secondary_reload
+}
+ODIN
+if ! "$SGEN" "$vc" -godot:"$ROOT" >/dev/null 2>&1; then fail "verb-composition (same-package) must resolve, not error"; fi
+vgen="$vc/runner.gen.odin"
+grep -q "RUNNER_CMD_PRIMARY_FIRE :: u16" "$vgen" || fail "composed command index const RUNNER_CMD_PRIMARY_FIRE missing"
+grep -q "RUNNER_CMD_SECONDARY_FIRE :: u16" "$vgen" || fail "second instance must get its own path-prefixed index (SECONDARY_FIRE)"
+grep -q "RUNNER_CMD_PRIMARY_RELOAD :: u16" "$vgen" || fail "plain composed command RUNNER_CMD_PRIMARY_RELOAD missing"
+grep -q "return gun_fire(&self.primary, self, _a0)" "$vgen" || fail "decode thunk must route into &self.primary and pass self (owner)"
+grep -q "return gun_reload(&self.secondary)" "$vgen" || fail "plain composed thunk must route into &self.secondary with no owner/args"
+grep -q "runner_secondary_fire_cmd :: proc" "$vgen" || fail "issue wrapper must be named per-entity (runner_secondary_fire_cmd)"
+grep -q '{name = "primary_fire", predict = true' "$vgen" || fail "composed predict flag not carried"
+grep -q '{name = "primary_reload", predict = false' "$vgen" || fail "plain composed command must have predict = false"
+grep -q "offset_of(Runner, primary) + offset_of(type_of(Runner{}.primary), ammo)" "$vgen" || fail "the block's replicated state must compose upward beside its verbs"
+
+# ---- fixture 8: VERB composition — IMPORTED block (qualifier + import) --------
+# A block imported from a godot: package: the generated file must IMPORT that package and
+# qualify the routed proc (play.gun_fire). Owner is the poly `^$E` (a library block that
+# can't name the entity) — scriptgen still fills it with `self`.
+mkdir -p "$coll/play"
+cat >"$coll/play/gun.odin" <<'ODIN'
+package play
+Gun :: struct { ammo: u16 `gd:"replicate"` }
+@(gd_command="predict")
+gun_fire :: proc(g: ^Gun, owner: ^$E, dx: i32) -> bool { g.ammo -= 1; return true }
+ODIN
+ic="$work/impcmd"
+mkdir -p "$ic"
+cat >"$ic/mob.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Mob
+package impcmd
+import gd "godot:godot"
+import knet "godot:kit/net"
+import play "godot:play"
+
+Mob :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     u8 `gd:"replicate"`,
+	gun:    play.Gun,
+}
+ODIN
+if ! "$SGEN" "$ic" -godot:"$coll" >/dev/null 2>&1; then fail "verb-composition (imported block) must resolve, not error"; fi
+icgen="$ic/mob.gen.odin"
+grep -q 'import play "godot:play"' "$icgen" || fail "imported block's package must be imported into the generated file"
+grep -q "return play.gun_fire(&self.gun, self, _a0)" "$icgen" || fail "imported composed thunk must qualify (play.) and route + thread owner"
+grep -q "MOB_CMD_GUN_FIRE :: u16" "$icgen" || fail "imported composed command index MOB_CMD_GUN_FIRE missing"
+
 echo "SCRIPTGEN_OK"

@@ -67,6 +67,20 @@ generate :: proc(s: ^Script) -> string {
 	if len(s.replicates) > 0 {
 		w(&b, "import \"base:intrinsics\"\n")
 	}
+	// verb-composition: import each package a COMPOSED command's proc lives in (so the routed
+	// thunk can name `play.gun_fire`), deduped by path. "" = the entity's own package (no import).
+	// The fixed packages above are pre-seeded so a block that unusually lives in one isn't
+	// double-imported.
+	{
+		imported := make(map[string]bool)
+		imported["godot:godot"] = true
+		imported["godot:kit/net"] = true
+		for c in s.commands {
+			if c.pkg_path == "" || imported[c.pkg_path] {continue}
+			imported[c.pkg_path] = true
+			fmt.sbprintf(&b, "import %s %q\n", c.pkg_alias, c.pkg_path)
+		}
+	}
 	// The trampolines/lifecycle wrappers establish `context = rt.script_context()` before
 	// calling the user's plain Odin procs. On native that is `runtime.default_context()`
 	// (heap-backed); on web the core installs an engine-backed context with a working
@@ -504,13 +518,18 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		}
 		w(b, "\n")
 		for c in s.commands {
+			// A composed command routes into the embedded field (`&self.gun`) and qualifies the
+			// proc with its package (`play.gun_fire`); a direct one runs `runner_fire(self, …)`.
+			recv := len(c.path) > 0 ? fmt.tprintf("&self.%s", join_path(c.path)) : "self"
+			qual := c.pkg_alias != "" ? fmt.tprintf("%s.", c.pkg_alias) : ""
 			fmt.sbprintf(b, "@(private = \"file\")\n_%s_cmd_%s :: proc(entity: rawptr, r: ^knet.Reader) -> bool {{\n", snake, c.name)
 			fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
 			for a, i in c.args {
 				fmt.sbprintf(b, "\t_a%d := knet.read_%s(r)\n", i, a.wire)
 			}
 			w(b, "\tif r.err {return false}\n")
-			fmt.sbprintf(b, "\treturn %s(self", c.proc_name)
+			fmt.sbprintf(b, "\treturn %s%s(%s", qual, c.proc_name, recv)
+			if c.owner {w(b, ", self")} // the block asked for its wielder — pass the entity
 			for _, i in c.args {
 				fmt.sbprintf(b, ", _a%d", i)
 			}
@@ -538,6 +557,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 
 	if len(s.commands) > 0 {
 		for c, ci in s.commands {
+			// A composed command routes into the block and qualifies the proc; its wrapper is
+			// named per-entity (`runner_gun_fire_cmd`) so two blocks of the same type never collide.
+			recv := len(c.path) > 0 ? fmt.tprintf("&self.%s", join_path(c.path)) : "self"
+			qual := c.pkg_alias != "" ? fmt.tprintf("%s.", c.pkg_alias) : ""
+			wrapper := len(c.path) > 0 ? fmt.tprintf("%s_%s", snake, c.name) : c.proc_name
 			fmt.sbprintf(b, "// Issue `%s` — the SAME call on every peer, zero role branches. Authority:\n", c.name)
 			if c.predict {
 				w(b, "// runs the proc directly. Client: predicts optimistically (rejection or a lost\n")
@@ -548,13 +572,14 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			w(b, "// Returns whether the command applied locally (authoritative on the host,\n")
 			w(b, "// optimistic on a predicting client) — the host's result is always authoritative.\n")
-			fmt.sbprintf(b, "%s_cmd :: proc(ctx: ^knet.Command_Ctx, self: ^%s", c.proc_name, cls)
+			fmt.sbprintf(b, "%s_cmd :: proc(ctx: ^knet.Command_Ctx, self: ^%s", wrapper, cls)
 			for a in c.args {
 				fmt.sbprintf(b, ", %s: %s", a.name, a.type_text)
 			}
 			w(b, ") -> bool {\n")
 			w(b, "\tif ctx.is_authority {\n")
-			fmt.sbprintf(b, "\t\t_ok := %s(self", c.proc_name)
+			fmt.sbprintf(b, "\t\t_ok := %s%s(%s", qual, c.proc_name, recv)
+			if c.owner {w(b, ", self")}
 			for a in c.args {
 				fmt.sbprintf(b, ", %s", a.name)
 			}

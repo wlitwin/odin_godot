@@ -118,6 +118,51 @@ fixed array counts as one field). `Lerp_Kind` covers `.Snap`, `.F32`, `.F64`, `.
 `Blend_Proc :: proc(dst, a, b: rawptr, alpha: f32)` — declared via
 `` heading: f32 `gd:"replicate,owner,interp=blend_heading"` ``.
 
+## Composing verbs from embedded blocks
+
+Replicated fields compose through an embed — a `gd:"replicate"` field inside a sub-struct
+joins its wielder's descriptor via a composed offset, so a building block's state travels with
+it. **Its commands compose the same way.** A `@(gd_command)` proc whose receiver is an embedded
+sub-struct is hoisted onto whatever entity embeds it, generated onto *that* entity's command
+table — the dual of nested-field replication, and what turns a plain struct into a true drop-in
+gameplay block.
+
+Declare the verb on the block, embed the block, and the entity gets the command:
+
+```odin
+Gun :: struct {
+	ammo:      u8 `gd:"replicate"`,
+	fsm:       play.Machine(Gun_State),
+	reload_cd: u16 `gd:"replicate"`,
+}
+
+// The receiver is `^Gun` (the block), not the entity. An optional SECOND pointer param is the
+// WIELDER — scriptgen fills it with the embedding entity, so the block can read/write its holder
+// (stats, cooldowns) while staying reusable. A pointer can't ride the wire, so it is never a
+// wire arg; the args after it are.
+@(gd_command = "predict")
+gun_fire :: proc(g: ^Gun, owner: ^Runner, dx, dy: f32) -> bool { ... }
+
+Runner :: struct {
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id,
+	weapon: Gun,   // -> the entity gets `runner_weapon_fire`
+}
+```
+
+The entity's generated command is named by the **field path**, so two blocks of the same type
+never collide (`weapon: Gun` + `sidearm: Gun` → `runner_weapon_fire` + `runner_sidearm_fire`,
+distinct wire indices). Issue it exactly like a direct command —
+`runner_weapon_fire_cmd(ctx, self, dx, dy)` — the owner is passed for you, so only the wire args
+appear in the wrapper. Prediction reverts and reject-truth snapshots cover the block's replicated
+state for free (it's already in the entity's descriptor), and the block's cross-entity effects
+(spawning a projectile, applying damage) stay in the game's command hook, keyed by the composed
+index, exactly as a direct command's do.
+
+Owner threading is optional and detected by shape — write `^Runner` for a game-specific block, or
+`^$E` for a library block reused across entity types. A block imported from another `godot:`
+package works identically: the generated file imports and qualifies it (`play.gun_fire`).
+
 ## Wire codecs
 
 A field may re-encode its bytes inside packets. The struct-side representation

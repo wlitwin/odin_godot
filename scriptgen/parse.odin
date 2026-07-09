@@ -869,15 +869,34 @@ command_wire_type :: proc(type_text: string) -> (wire: string, splice: string, o
 	return "", "", false
 }
 
-// Parse one @(gd_command[="predict"]) proc into a Command_Info. Cheap build-time
-// contract checks live here: wire-serializable args only, and the proc must
-// return exactly `bool` (true = applied; false = rejected, which auto-reverts
-// the entity's declared fields on every peer).
-parse_command :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
+// Build a Command_Info from one @(gd_command[="predict"]) proc. Cheap build-time
+// contract checks live here: wire-serializable args only, and the proc must return
+// exactly `bool` (true = applied; false = rejected, which auto-reverts the entity's
+// declared fields on every peer). Shared by the entity scan (scan_bound_procs, direct
+// commands) and the imported-package index (index_pkg_dir, composed commands).
+//
+// `struct_name` names the RECEIVER (`Runner` for a direct command, `Gun` for a composed
+// one) — it only strips the proc-name prefix for the diagnostic verb. `allow_owner` is set
+// for COMPOSED commands: a pointer parameter right after the receiver is the embedding
+// entity (`owner: ^Entity` / `^$E`), which scriptgen fills with `self` rather than reading
+// from the wire — so the block can touch its wielder. A direct command's receiver already
+// IS the entity, so owner detection is off there and a pointer arg errors as un-wire-able.
+// ok=false = a hard contract violation was reported (the caller drops the command).
+build_command_info :: proc(
+	src: string,
+	pt: ^ast.Proc_Type,
+	loc: Loc,
+	proc_name, struct_name, config: string,
+	allow_owner: bool,
+) -> (
+	Command_Info,
+	bool,
+) {
 	cmd := Command_Info {
 		proc_name = proc_name,
-		name      = strip_struct_prefix(proc_name, s.struct_name),
+		name      = strip_struct_prefix(proc_name, struct_name),
 	}
+	ok := true
 
 	for part in strings.split(config, ",") {
 		tok := strings.trim_space(part)
@@ -887,14 +906,26 @@ parse_command :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: 
 			cmd.predict = true
 		case:
 			error_at(loc, "command %s: unknown config token %q (expected `predict`)", proc_name, tok)
+			ok = false
 		}
 	}
 
-	for fi in 1 ..< len(pt.params.list) {
+	// A composed command may name the embedding entity as its second param (a pointer, hence
+	// never a wire arg). Detect and skip it — the decode thunk passes `self` there.
+	start := 1
+	if allow_owner && len(pt.params.list) > 1 {
+		p1 := strings.trim_space(node_text(src, pt.params.list[1].type))
+		if strings.has_prefix(p1, "^") {
+			cmd.owner = true
+			start = 2
+		}
+	}
+
+	for fi in start ..< len(pt.params.list) {
 		field := pt.params.list[fi]
 		atext := strings.trim_space(node_text(src, field.type))
-		wire, splice, ok := command_wire_type(atext)
-		if !ok {
+		wire, splice, wok := command_wire_type(atext)
+		if !wok {
 			if atext == "int" || atext == "uint" {
 				error_at(
 					loc,
@@ -910,6 +941,7 @@ parse_command :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: 
 					atext,
 				)
 			}
+			ok = false
 			continue
 		}
 		for nm in field.names {
@@ -929,8 +961,18 @@ parse_command :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: 
 			"command %s must return exactly `bool` — true = applied, false = rejected (a rejection auto-reverts the declared fields)",
 			proc_name,
 		)
+		ok = false
 	}
 
+	return cmd, ok
+}
+
+// A direct @(gd_command) on the entity itself: build it (owner threading is only for
+// embedded blocks — the entity IS `self`) and append. Appended even on a contract error so
+// the diagnostic isn't compounded by a phantom "unknown command"; had_error stops the build
+// before generate() sees it.
+parse_command :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
+	cmd, _ := build_command_info(src, pt, loc, proc_name, s.struct_name, config, false)
 	append(&s.commands, cmd)
 }
 
@@ -1062,6 +1104,37 @@ join_path :: proc(path: []string) -> string {
 	return strings.join(path, ".")
 }
 
+// The entity-level name for a command composed from an embedded block: the access path joined
+// with the verb by underscores. {"gun"} + "fire" -> "gun_fire"; {"loadout","primary"} + "fire"
+// -> "loadout_primary_fire". Drives the index const (RUNNER_CMD_GUN_FIRE), the decode-thunk
+// name, and the issue wrapper (runner_gun_fire_cmd) — unique per field even for two blocks of
+// the same type (primary vs secondary).
+compose_command_name :: proc(path: []string, verb: string) -> string {
+	b := strings.builder_make()
+	for seg in path {
+		strings.write_string(&b, seg)
+		strings.write_byte(&b, '_')
+	}
+	strings.write_string(&b, verb)
+	return strings.to_string(b)
+}
+
+// How the entity's generated file must reach a composed command's proc: the import alias +
+// `godot:` path to qualify it with (play.gun_fire). ("","") when the block lives in the
+// entity's OWN package — no qualifier, no import. `def_dir` is the block's package dir;
+// `scripts_dir` the entity's. A `godot:kit/combat` block yields alias "kit_combat".
+composed_pkg_ref :: proc(def_dir, scripts_dir: string) -> (alias, path: string) {
+	if def_dir == scripts_dir || g_godot_root == "" {return "", ""}
+	if !strings.has_prefix(def_dir, g_godot_root) {return "", ""}
+	rel := strings.trim_prefix(def_dir[len(g_godot_root):], "/")
+	if rel == "" {return "", ""}
+	a := strings.builder_make()
+	for i in 0 ..< len(rel) {
+		strings.write_byte(&a, rel[i] == '/' ? '_' : rel[i])
+	}
+	return strings.to_string(a), strings.concatenate({"godot:", rel})
+}
+
 // apply_subst rewrites whole-identifier generic parameters in a type text to their
 // concrete args. With {S = "Gun_State"}: "S" -> "Gun_State", "Edge(S)" -> "Edge(Gun_State)",
 // "[N]f32" -> "[4]f32" (with {N = "4"}). Only WHOLE identifiers are replaced, never a
@@ -1118,6 +1191,23 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 	if visited[def.id] {return} // a type reachable from itself — stop, don't loop
 	visited[def.id] = true
 	defer delete_key(visited, def.id) // allow the same type at independent sibling positions
+
+	// verb-composition (the dual of the nested-replicate collection below): hoist this
+	// sub-struct's @(gd_command) procs onto the entity, keyed by the access PATH to this field.
+	// The entity's generated file routes each decode thunk into `&self.<path>` and (if the block
+	// declared an owner param) passes `self`. Deeper embeds recurse below and hoist under their
+	// longer paths, so a gun three levels down still registers on the entity that owns the net id.
+	if len(def.commands) > 0 {
+		alias, ppath := composed_pkg_ref(def.dir, dir_of(s.path))
+		for c in def.commands {
+			hoisted := c // shares the (read-only) args slice; path/name/pkg are entity-relative
+			hoisted.path = path
+			hoisted.pkg_alias = alias
+			hoisted.pkg_path = ppath
+			hoisted.name = compose_command_name(path, c.name)
+			append(&s.commands, hoisted)
+		}
+	}
 
 	for fld in def.fields {
 		fpath := extend_path(path, fld.name)
