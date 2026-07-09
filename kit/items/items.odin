@@ -219,3 +219,43 @@ transfer :: proc(t: ^Table, from: []Slot, from_idx: int, to: []Slot, count: u16)
 	}
 	return
 }
+
+// ---- inventory as an embeddable bundle ---------------------------------------
+//
+// The `slots: [N]Slot gd:"replicate"` field the module header describes, packaged: embed
+// it and the slot array replicates like a flat field (scriptgen recurses the nested
+// struct — nested-replicate-fields), while the ops below forward to `slots[:]`. N is the
+// slot count, chosen per container:
+//
+//     Chest :: struct { ..., using inv: kitems.Inventory(8) }
+//     kitems.inv_add(&table, &c.inv, WOOD, 3)   // in the host command hook
+//
+// The ops that can GROW a stack still take the Table (same rule as the raw ops); the
+// drain/read ops don't, so they stay usable inside a @(gd_command) proc.
+Inventory :: struct($N: int) {
+	slots: [N]Slot `gd:"replicate"`,
+}
+
+inv_add :: proc(t: ^Table, inv: ^Inventory($N), item: Item_Id, count: u16) -> (added: u16) {
+	return add(t, inv.slots[:], item, count)
+}
+
+inv_remove :: proc(inv: ^Inventory($N), item: Item_Id, count: u16) -> (removed: u16) {
+	return remove(inv.slots[:], item, count)
+}
+
+inv_count :: proc(inv: ^Inventory($N), item: Item_Id) -> (total: int) {
+	return count_of(inv.slots[:], item)
+}
+
+inv_take :: proc(inv: ^Inventory($N), idx: int, count: u16) -> (taken: Slot) {
+	return take(inv.slots[:], idx, count)
+}
+
+inv_put :: proc(t: ^Table, inv: ^Inventory($N), idx: int, item: Item_Id, count: u16) -> (accepted: u16) {
+	return put(t, inv.slots[:], idx, item, count)
+}
+
+inv_transfer :: proc(t: ^Table, from: ^Inventory($N), from_idx: int, to: ^Inventory($M), count: u16) -> (moved: u16) {
+	return transfer(t, from.slots[:], from_idx, to.slots[:], count)
+}

@@ -270,3 +270,21 @@ leash_passes_honest_offsets_and_drags_teleports :: proc(t: ^testing.T) {
 	// The anchor itself is a fixed point (the prediction's no-op case).
 	testing.expect_value(t, kcombat.leash(anchor, anchor, 64), anchor)
 }
+
+// The Cooldowns($N) embeddable bundle: the forwarders behave exactly like the raw
+// ability ops on `cds[:]` (the bundle is just where the replicated array lives).
+@(test)
+cooldowns_bundle :: proc(t: ^testing.T) {
+	cd: kcombat.Cooldowns(2)
+	res := i32(10)
+	testing.expect(t, kcombat.cd_ready(&cd, 0), "fresh slot is ready")
+	testing.expect(t, kcombat.cd_try(&cd, 0, ROCK, &res), "affordable + ready fires")
+	testing.expect_value(t, res, i32(7)) // ROCK.cost = 3
+	testing.expect_value(t, cd.cds[0], u16(20)) // ROCK.cooldown = 20 (promoted array visible)
+	testing.expect(t, !kcombat.cd_ready(&cd, 0), "on cooldown now")
+	testing.expect(t, !kcombat.cd_try(&cd, 0, ROCK, &res), "can't fire while cooling")
+	testing.expect_value(t, res, i32(7)) // rejected cast spends nothing
+	kcombat.cd_tick(&cd)
+	testing.expect_value(t, cd.cds[0], u16(19))
+	testing.expect(t, kcombat.cd_ready(&cd, 1), "other slots are independent")
+}

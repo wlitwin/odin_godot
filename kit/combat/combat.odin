@@ -82,6 +82,34 @@ abilities_tick :: proc "contextless" (cds: []u16) {
 	}
 }
 
+// ---- cooldowns as an embeddable bundle ---------------------------------------
+//
+// The `cds: [N]u16 gd:"replicate"` field every combatant declares by hand, packaged:
+// embed the bundle and the array replicates like a flat field (scriptgen recurses the
+// nested struct — nested-replicate-fields), while the ops below forward to `cds[:]` so
+// you never spell the slice. N is the ability-slot count, chosen per entity:
+//
+//     Runner :: struct { ..., using cd: kcombat.Cooldowns(3) }   // 3 ability slots
+//     if kcombat.cd_try(&r.cd, SLOT_GUN, GUN_ABILITY) { ...fire... }  // in the command
+//     kcombat.cd_tick(&r.cd)                                          // in the host tick
+//
+// `using` also promotes the array, so read sites stay `r.cds[SLOT]` (HUD gauges, etc.).
+Cooldowns :: struct($N: int) {
+	cds: [N]u16 `gd:"replicate"`,
+}
+
+cd_ready :: proc "contextless" (c: ^Cooldowns($N), slot: int) -> bool {
+	return ability_ready(c.cds[:], slot)
+}
+
+cd_try :: proc "contextless" (c: ^Cooldowns($N), slot: int, def: Ability_Def, resource: ^i32 = nil) -> bool {
+	return ability_try(c.cds[:], slot, def, resource)
+}
+
+cd_tick :: proc "contextless" (c: ^Cooldowns($N)) {
+	abilities_tick(c.cds[:])
+}
+
 // ---- status effects ------------------------------------------------------------
 
 // One buff/debuff: 4 POD bytes, embedded as a fixed array (`fx: [4]Effect`).

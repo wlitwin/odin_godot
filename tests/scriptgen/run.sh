@@ -16,6 +16,8 @@
 #      naming the offending path, never silently dropped.
 #   5. GENERIC structs (`Machine($S)`) resolve — the base is found and params are
 #      substituted, so `cur: S` and recursion into a param-typed field both work.
+#   6. REAL kit bundles (`using cd: kcombat.Cooldowns(3)`, `kitems.Inventory(8)`) —
+#      imported generic bundles resolve and their replicated fields are discovered.
 #
 # Prints SCRIPTGEN_OK on success. Run inside the Nix dev shell, e.g.:
 #   nix develop --command bash -c 'bash tests/scriptgen/run.sh'
@@ -192,5 +194,32 @@ if ! "$SGEN" "$gen" -godot:"$ROOT" >/dev/null 2>&1; then fail "generic instantia
 ggen="$gen/g.gen.odin"
 grep -q "offset_of(G, m) + offset_of(type_of(G{}.m), cur)" "$ggen" || fail "generic using field m.cur not resolved"
 grep -q "offset_of(type_of(G{}.hold.item), hp)" "$ggen" || fail "substitution into a param-typed field (hold.item.hp) failed"
+
+# ---- fixture 6: REAL kit bundles (imported generic) embed + replicate --------
+kit="$work/kitb"
+mkdir -p "$kit"
+cat >"$kit/hero.odin" <<'ODIN'
+//gd:extends Node
+//gd:class HeroB
+package kitb
+import gd "godot:godot"
+import knet "godot:kit/net"
+import kcombat "godot:kit/combat"
+import kitems "godot:kit/items"
+
+HeroB :: struct {
+	owner:    gd.Node,
+	net_id:   knet.Net_Id,
+	hp:       u8 `gd:"replicate"`,     // game-owned, stays flat
+	using cd:  kcombat.Cooldowns(3),   // cds:[3]u16 replicate (imported generic bundle)
+	using bag: kitems.Inventory(8),    // slots:[8]Slot replicate (imported generic bundle)
+}
+@(gd_command="predict")
+herob_fire :: proc(self: ^HeroB, slot: i32) -> bool { return kcombat.cd_try(&self.cd, int(slot), {cooldown = 10}) }
+ODIN
+if ! "$SGEN" "$kit" -godot:"$ROOT" >/dev/null 2>&1; then fail "embedding real kit bundles (Cooldowns/Inventory) must resolve"; fi
+kgen="$kit/hero.gen.odin"
+grep -q "offset_of(HeroB, cd) + offset_of(type_of(HeroB{}.cd), cds)" "$kgen" || fail "kcombat.Cooldowns(3) cds not discovered"
+grep -q "offset_of(HeroB, bag) + offset_of(type_of(HeroB{}.bag), slots)" "$kgen" || fail "kitems.Inventory(8) slots not discovered"
 
 echo "SCRIPTGEN_OK"

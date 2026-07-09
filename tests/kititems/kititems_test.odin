@@ -266,3 +266,28 @@ packing_add_stacks_then_packs :: proc(t: ^testing.T) {
 	x2, y2, _ := kitems.pack_find_spot(g2[:], BW, BH, kitems.SHAPE_SINGLE)
 	testing.expect(t, x == x2 && y == y2)
 }
+
+// The Inventory($N) embeddable bundle: the forwarders behave exactly like the raw slot
+// ops on `slots[:]` (the bundle is just where the replicated array lives).
+@(test)
+inventory_bundle :: proc(t: ^testing.T) {
+	tab := table()
+	defer kitems.table_destroy(&tab)
+	inv: kitems.Inventory(4)
+
+	testing.expect_value(t, kitems.inv_add(&tab, &inv, TORCH, 3), u16(3))
+	testing.expect_value(t, kitems.inv_count(&inv, TORCH), 3)
+	// 3 + 4 = 7: tops the first stack to 5 (TORCH's max), the rest opens a new slot.
+	testing.expect_value(t, kitems.inv_add(&tab, &inv, TORCH, 4), u16(4))
+	testing.expect_value(t, kitems.inv_count(&inv, TORCH), 7)
+	testing.expect_value(t, inv.slots[0].count, u16(5))
+	testing.expect_value(t, inv.slots[1].count, u16(2))
+
+	taken := kitems.inv_take(&inv, 0, 2)
+	testing.expect_value(t, taken.item, TORCH)
+	testing.expect_value(t, taken.count, u16(2))
+	testing.expect_value(t, kitems.inv_count(&inv, TORCH), 5)
+
+	testing.expect_value(t, kitems.inv_remove(&inv, TORCH, 100), u16(5)) // drains all remaining
+	testing.expect_value(t, kitems.inv_count(&inv, TORCH), 0)
+}
