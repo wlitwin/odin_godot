@@ -297,4 +297,33 @@ grep -q 'import play "godot:play"' "$icgen" || fail "imported block's package mu
 grep -q "return play.gun_fire(&self.gun, self, _a0)" "$icgen" || fail "imported composed thunk must qualify (play.) and route + thread owner"
 grep -q "MOB_CMD_GUN_FIRE :: u16" "$icgen" || fail "imported composed command index MOB_CMD_GUN_FIRE missing"
 
+# ---- fixture 9: the REAL play.Gun library block composes into a consumer ------
+# Embeds godot:play's Gun (state + the gun_fire verb) and asserts the whole block drops in: its
+# @(gd_command) verb hoists onto the entity (imported + qualified, NO owner param), its Gun_Def
+# knob-blob and its Machine(Gun_Mode) mode both compose into the descriptor.
+pg="$work/playgun"
+mkdir -p "$pg"
+cat >"$pg/turret.odin" <<'ODIN'
+//gd:extends Node2D
+//gd:class Turret
+package playgun
+import gd "godot:godot"
+import knet "godot:kit/net"
+import play "godot:play"
+
+Turret :: struct {
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id,
+	hp:     u8 `gd:"replicate"`,
+	weapon: play.Gun,   // the real library block: mag/reload/jam state + the gun_fire verb drop in
+}
+ODIN
+if ! "$SGEN" "$pg" -godot:"$ROOT" >/dev/null 2>&1; then fail "the real play.Gun block must compose into a consumer, not error"; fi
+tgen="$pg/turret.gen.odin"
+grep -q 'import play "godot:play"' "$tgen" || fail "play.Gun consumer must import godot:play"
+grep -q "return play.gun_fire(&self.weapon, _a0, _a1)" "$tgen" || fail "play.gun_fire must route into &self.weapon (imported, qualified, no owner)"
+grep -q "TURRET_CMD_WEAPON_FIRE :: u16" "$tgen" || fail "play.Gun's verb must hoist as TURRET_CMD_WEAPON_FIRE"
+grep -q "size_of(type_of(Turret{}.weapon.def))" "$tgen" || fail "the Gun_Def knob-blob must replicate through the embed"
+grep -q "offset_of(type_of(Turret{}.weapon.mode), cur)" "$tgen" || fail "Machine(Gun_Mode) mode.cur must compose through the block"
+
 echo "SCRIPTGEN_OK"

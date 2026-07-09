@@ -163,6 +163,12 @@ Owner threading is optional and detected by shape — write `^Runner` for a game
 `^$E` for a library block reused across entity types. A block imported from another `godot:`
 package works identically: the generated file imports and qualifies it (`play.gun_fire`).
 
+`godot:play` ships a worked one — **`play.Gun`** (mag + reload + jam, knob-configured by a
+`Gun_Def`, host-authoritative and client-predicted through its `gun_fire` verb). Embed
+`weapon: play.Gun`, `gun_equip` it with your knobs, pace the trigger and spawn the shot in your
+hook — the state machine is the block's, the cadence and the effect stay yours. It's the
+reference for the pattern; read `play/gun.odin`.
+
 ## Wire codecs
 
 A field may re-encode its bytes inside packets. The struct-side representation
