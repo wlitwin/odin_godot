@@ -1760,17 +1760,24 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 	// only a ban shuts a known token out.
 	hash := token_hash(token)
 	id, known := s.tokens[hash]
-	if known && id == s.me {
-		// The HOST's own token walking in the door is never a reconnect —
-		// this session IS the host, alive by construction. It's a second
-		// instance sharing the machine's identity file (a couch test, a
-		// second browser tab): seat it as a NEW player instead of letting it
-		// hijack the keeper's live seat. (A DEAD host's seat reclaims as
-		// ever — on a resumed session the old-host row sits disconnected and
-		// s.me is the heir's.) The shared hash then maps to the newest seat;
-		// same-file identities stay ambiguous by nature — distinct tokens
-		// (SY_TOKEN-style) are the real answer for same-machine play.
-		known = false
+	if known {
+		if p, live := s.players[id]; live && p.connected {
+			// A known token whose seat is still CONNECTED is never a reconnect:
+			// the wire cannot tell a crashed-socket zombie from a LIVE second
+			// instance sharing the machine's identity file (a couch test, extra
+			// browser tabs — same-origin storage hands every tab the same
+			// token; the third tab was seizing the second's seat). Seat it as
+			// a NEW player instead of hijacking the live one: the transport
+			// reaps real zombies within seconds, and a genuinely dead seat
+			// (its row disconnected — the crashed client, the old host on a
+			// resumed session) reclaims as ever; the revenant and the chase
+			// both ride that path. The shared hash then maps to the newest
+			// seat; same-file identities stay ambiguous by nature — distinct
+			// tokens (SY_TOKEN-style) are the real answer for deliberate
+			// same-machine play. (This subsumes the old id == s.me guard: a
+			// live host is just the most obvious connected seat.)
+			known = false
+		}
 	}
 	if _, banned := s.denied[hash]; banned {
 		deny_join(s, peer, .Banned)
@@ -1788,14 +1795,10 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 	}
 	rejoin := false
 	if known {
-		// The token IS the identity: reclaim it. If the roster still shows the
-		// player connected, the old peer is a zombie (crashed socket that
-		// hasn't timed out) — the new connection takes over.
+		// The token IS the identity and its seat sits DISCONNECTED (the guard
+		// above routes live-seat matches to the fresh-join arm): reclaim it.
 		rejoin = true
 		p := s.players[id]
-		if p.connected && p.peer != peer {
-			delete_key(&s.by_peer, p.peer)
-		}
 		delete(p.name)
 		p.name = strings.clone(name)
 		p.peer = peer

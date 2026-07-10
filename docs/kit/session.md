@@ -14,7 +14,11 @@ engine-free — the game script owns the sockets and framing, usually via
 persists it (`kit/save`'s `persistent_token` does the disk part). The host maps
 token → `Player_Id` forever: reconnecting with the same token — from a new transport peer,
 after a crash, mid-game — reclaims the same id, and with it name, stats, and owned
-entities. `Peer_Id` (a transport seat, reassigned on reconnect, meaningless across runs)
+entities. The one gate: a reclaim only takes a seat that is no longer CONNECTED. A known
+token walking in while its seat is live is a second instance sharing the identity file
+(a couch test, extra browser tabs — same-origin storage hands every tab the same token)
+and is seated as a NEW player; the transport reaps genuinely dead sockets within seconds,
+after which the reclaim proceeds as ever. `Peer_Id` (a transport seat, reassigned on reconnect, meaningless across runs)
 and `knet.Player_Id` (an identity) are distinct types on purpose, so the two can't
 silently cross at API boundaries. Departed players stay in the roster as disconnected for
 exactly this reason. Tokens are stored hashed, so a backup snapshot can carry the identity
@@ -327,8 +331,9 @@ session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backu
 
 `session_host_resume` is called on a fresh session with the factory already installed;
 every other player comes back disconnected and rejoins with their tokens, reclaiming ids,
-stats, and owned entities exactly like any reconnect. The dead run's host has no token
-(hosts never JOIN), so it returns as a new player. Returns false on a corrupt blob.
+stats, and owned entities exactly like any reconnect. The dead run's host reclaims its
+own seat the same way when it passed a token to `session_host_start` (with none, it
+returns as a new player). Returns false on a corrupt blob.
 
 Backups also carry the GAME'S campaign bytes — wave directors, AI clocks, whatever the
 session can't know — via the same blob split kit/save's envelope makes:
