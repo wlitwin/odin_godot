@@ -56,6 +56,7 @@ Gun :: struct {
 	reload_cd:    u16 `gd:"replicate"`,      // host countdown to reload done (0 = not reloading)
 	taps:         u8 `gd:"replicate"`,       // clear-taps left on a jam (replicated so the mash reads on every screen)
 	salt:         u32 `gd:"replicate"`,      // jam-seed context the game sets (floor/run/player); 0 is fine
+	spent:        u32 `gd:"replicate"`,      // lifetime rounds consumed since equip — the jam roll's never-repeating half
 	aim_x, aim_y: f32,                       // scratch: the last pull's aim, for the game's effect hook (host-side)
 	fired:        bool,                      // scratch: did the last pull send a live round — the game's EFFECT signal
 }
@@ -68,6 +69,7 @@ gun_equip :: proc(g: ^Gun, def: Gun_Def, salt: u32 = 0) {
 	g.def = def
 	g.ammo = def.mag
 	g.salt = salt
+	g.spent = 0
 	g.reload_cd = 0
 	g.taps = 0
 	set(&g.mode, Gun_Mode.Ready)
@@ -99,10 +101,12 @@ gun_fire :: proc(g: ^Gun, dx, dy: f32) -> bool {
 			g.reload_cd = g.def.reload_ticks
 		} else if gun_jams(g) {
 			g.ammo -= 1 // the dud is ejected
+			g.spent += 1
 			set(&g.mode, Gun_Mode.Jammed)
 			g.taps = g.def.jam_taps
 		} else {
 			g.ammo -= 1
+			g.spent += 1
 			g.fired = true // a live round flew
 			if g.ammo == 0 {
 				set(&g.mode, Gun_Mode.Reloading)
@@ -134,13 +138,15 @@ gun_step :: proc(g: ^Gun) -> (from, to: Gun_Mode, moved: bool) {
 	return step(&g.mode)
 }
 
-// gun_jams — the deterministic per-shot jam roll: seeded from the shared salt and the round being
-// fired (`ammo` decrements every shot, so the seed never repeats within a mag). Unpredictable to
-// the player, IDENTICAL on host and client — so the client predicts the jam and shows it with
+// gun_jams — the deterministic per-shot jam roll: seeded from the shared salt and the gun's
+// LIFETIME round counter, which never repeats. (It once seeded from the mag position — fine on a
+// 20-round iron, but a 3-shell drum re-rolled the SAME three verdicts every magazine, so one
+// cursed (salt, slot) pair read as a 33% jam rate for an entire floor.) Unpredictable to the
+// player, IDENTICAL on host and client — so the client predicts the jam and shows it with
 // zero lag while the host stays authoritative. `def.jam_per_mille == 0` never jams.
 gun_jams :: proc "contextless" (g: ^Gun) -> bool {
 	if g.def.jam_per_mille == 0 {return false}
-	h := g.salt * 2654435761 + u32(g.ammo) * 40503 + 668265263
+	h := g.salt * 2654435761 + g.spent * 40503 + 668265263
 	h ~= h >> 15
 	h *= 2246822519
 	h ~= h >> 13
