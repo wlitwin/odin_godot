@@ -196,6 +196,24 @@ credit_hit :: proc(s: ^ksess.Session, cols: Combat_Cols, attacker: knet.Player_I
 credit_kill :: proc(s: ^ksess.Session, cols: Combat_Cols, attacker, victim: knet.Player_Id)
 ```
 
+## Pools: one tick for a whole volley
+
+Every game that host-sims projectiles ends up with the same loop — sweep the tick's segment
+before stepping, remove on hit or expiry, don't corrupt the index while removing. `pool_tick`
+owns those mechanics; your callbacks own the meaning:
+
+```odin
+Slug :: struct { p: kcombat.Projectile, dmg: u8, shooter: knet.Player_Id }
+flying: [dynamic]Slug                 // a wrapper pool (or a bare [dynamic]kcombat.Projectile)
+
+kcombat.pool_tick(&self.flying, self, slug_targets, slug_hit, nil)   // hit-testing pool
+kcombat.pool_tick(&self.lobs, self, nil, nil, lob_splash)            // fly-out-and-splash pool
+```
+
+`targets` is called **per projectile**, not snapshotted — an `on_hit` that kills changes the
+census for the next projectile in the same pool. A hit always removes (no pool in the dogfoods
+pierces); `on_expire` is the fizzle's last word — a lob's splash *is* its expiry.
+
 ## Worked example: the host's tick flies the rocks
 
 From `examples/cavecrawl/scripts/host.odin` (`cave_host_tick`); the full pattern — launch

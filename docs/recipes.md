@@ -325,6 +325,21 @@ if dist2(sc.x, sc.y, r.x, r.y) <= reach*reach {
 }
 ```
 
+**🦷 Contact attack — the composition that doesn't need a block.** Every multiplayer game in
+this repo independently rebuilt "attacker in range + per-attacker cooldown → deal damage" (a
+scuttler's bite, a wolf's maul, an arena enemy's touch). Written against the blocks it's three
+lines — a `play.Pace` on the attacker's host brain, a range check, `play.health_hurt` on the
+victim — and that's the point: when the composition is this short, a `play.Melee` block would
+add a name while hiding nothing hard. Not everything 4-for-4 games repeat deserves a block;
+some things deserve an idiom:
+
+```odin
+// in the attacker's host brain (bite_cd: play.Pace(u64) rides the brain scratch):
+if dist2(m.x, m.y, prey.x, prey.y) <= reach*reach && play.ready(&m.brain.bite_cd, tick, BITE_CD) {
+    play.health_hurt(&prey.health, BITE_DMG)
+}
+```
+
 ---
 
 ## The discipline — a checklist for a new item
