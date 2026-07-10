@@ -256,8 +256,8 @@ begin_join :: proc(wire: ^Session_Wire, addr: cstring, port: int, token: u64, na
 // Host a room on the relay at `url` and start the session AT ONCE —
 // authoritative from the first tick; peers drop in when their channel comes
 // up. `token` is the host's reconnect identity, exactly as in begin_host.
-begin_host_web :: proc(wire: ^Session_Wire, url: cstring, name: string, token: u64 = 0) -> bool {
-	if !gd.webrtc_host(wire.node, url) {
+begin_host_web :: proc(wire: ^Session_Wire, url: cstring, name: string, token: u64 = 0, room: cstring = "") -> bool {
+	if !gd.webrtc_host(wire.node, url, room) {
 		return false
 	}
 	ksess.session_host_start(wire.ses, name, token)

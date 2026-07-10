@@ -55,7 +55,9 @@ func _ready() -> void:
 
 func _start() -> void:
 	if role == "host":
-		net.call("start_host", url)
+		# ?reserve=<CODE> pre-arranges the room code (the migration handoff):
+		# the relay must open the room UNDER that code, and WEBRTC_ROOM proves it.
+		net.call("start_host", url, String(_query().get("reserve", "")))
 	else:
 		net.call("start_join", url, room)
 	mp = net.get_multiplayer()

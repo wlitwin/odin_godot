@@ -97,7 +97,12 @@ wss.on("connection", (sock) => {
     switch (msg.type) {
       case "create": {
         if (sock._room) { send(sock, { type: "error", reason: "bad_msg" }); return; }
-        const code = newCode();
+        // An optional "room" reserves a code (host migration names tomorrow's
+        // room in advance): honored when valid and free, else minted fresh —
+        // mirroring the production relay exactly.
+        let code = (typeof msg.room === "string" && /^[A-Za-z0-9]{4,8}$/.test(msg.room))
+          ? msg.room.toUpperCase() : null;
+        if (!code || rooms.has(code)) code = newCode();
         rooms.set(code, { peers: new Map([[1, sock]]), nextId: 2 });
         sock._room = code; sock._id = 1;
         send(sock, { type: "created", room: code, id: 1, ice: ICE });

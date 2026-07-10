@@ -70,9 +70,13 @@ function makePeer(tag) {
 }
 
 // Every page waits for TWO remote peers (?peers=2): the host for both joiners' channels, each
-// joiner for the host plus the host-relayed roster entry of its sibling.
+// joiner for the host plus the host-relayed roster entry of its sibling. The host also
+// RESERVES its room code (the migration handoff pre-arranges tomorrow's room this way) —
+// the verdict requires the relay to open the room under exactly that code.
+const RESERVED = "CHASE9";
 const url = (role, room) =>
   `${PAGE}?role=${role}&peers=2&url=${encodeURIComponent(WSURL)}` +
+  (role === "host" ? `&reserve=${RESERVED}` : "") +
   (room ? `&room=${encodeURIComponent(room)}` : "");
 
 const hostBrowser = await puppeteer.launch({ executablePath: CHROME, headless: "new", args: LAUNCH_ARGS });
@@ -104,7 +108,7 @@ try {
     else await new Promise((r) => setTimeout(r, 250));
   }
   if (!roomCode) throw new Error("host never produced a room code");
-  console.log("room code from host:", roomCode);
+  console.log("room code from host:", roomCode, "(reserved:", RESERVED + ")");
   await c1Page.goto(url("join", roomCode), { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
   await c2Page.goto(url("join", roomCode), { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
 
@@ -165,6 +169,7 @@ try {
     c2.has(new RegExp(`RPC_RECV echo on=${cid2} from=${cid1} value=44`));
   const allDone = host.has(/WEBRTC_DONE/) && c1.has(/WEBRTC_DONE/) && c2.has(/WEBRTC_DONE/);
 
+  const reservedHonored = roomCode === RESERVED;
   const crashRe = /RuntimeError|indirect call|pageerror/i;
   const hostSawDrop = !!cid1 && host.has(new RegExp(`WEBRTC_PEER_GONE id=${cid1}`));
   const hostCrashed = host.lines.some((l) => crashRe.test(l));
@@ -173,6 +178,7 @@ try {
 
   console.log("\n==== VERDICT ====");
   console.log("joiner ids                 :", cid1, cid2);
+  console.log("reserved code honored      :", reservedHonored, `(${roomCode})`);
   console.log("host connected (id 1)      :", hostConnected);
   console.log("joiners connected, distinct:", joinersConnected);
   console.log("host->joiners ping 99      :", joinersGotHostPing);
@@ -184,8 +190,8 @@ try {
   console.log("drop: host alive, no crash :", hostAlive && !hostCrashed);
   console.log("drop: C2 alive, no crash   :", c2Alive && !c2Crashed);
 
-  green = hostConnected && joinersConnected && joinersGotHostPing && hostGotBothPings &&
-    hostCallLocalEcho && siblingsRelayed && allDone && dropSurvived;
+  green = reservedHonored && hostConnected && joinersConnected && joinersGotHostPing &&
+    hostGotBothPings && hostCallLocalEcho && siblingsRelayed && allDone && dropSurvived;
 } finally {
   await hostBrowser.close().catch(() => {});
   await c1Browser.close().catch(() => {});

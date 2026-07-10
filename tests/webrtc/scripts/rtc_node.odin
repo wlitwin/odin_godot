@@ -53,9 +53,10 @@ rtc_node_echo :: proc(self: ^RtcNode, value: gd.Int) {
 }
 
 // start_host hosts the WebRTC lobby (becomes peer id 1), connecting to the signaling URL.
+// A non-empty `room` RESERVES that code with the relay (the migration handoff rides this).
 @(gd_method)
-rtc_node_start_host :: proc(self: ^RtcNode, url: gd.String) {
-	if gd.webrtc_host(self.owner, _to_cstr(url)) {
+rtc_node_start_host :: proc(self: ^RtcNode, url: gd.String, room: gd.String) {
+	if gd.webrtc_host(self.owner, _to_cstr(url), _to_cstr2(room)) {
 		gd.print("RTC_HOST_OK")
 	} else {
 		gd.print("RTC_HOST_FAIL")

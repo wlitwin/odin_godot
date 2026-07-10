@@ -29,6 +29,9 @@ package godot
 // production Elixir relay spec EXACTLY — adhere to field names / message types / id semantics:
 //   client -> server:
 //     {"type":"create"}                                // make a room, become host (id 1)
+//     {"type":"create","room":"<CODE>"}                // ...reserving a code — honored when
+//                                                      // free/valid, else assigned (read the
+//                                                      // `created` reply for the truth)
 //     {"type":"join","room":"<CODE>"}                  // join a room
 //     {"type":"signal","to":<peerId>,"data":<opaque>}  // relay SDP/ICE to a peer
 //     {"type":"leave"}
@@ -197,12 +200,15 @@ _conn_count :: proc "contextless" (s: ^Webrtc_Session) -> int {
 
 // webrtc_host starts a WebRTC session as the HOST (peer id 1): it opens the signaling WebSocket
 // at `url` (e.g. "wss://relay.example.com/rtc"), sends `create`, and on `created` captures the
-// ROOM CODE (read it back with `gd.webrtc_room_code(node)` to share with a friend). The handshake
-// begins when the joining peer appears. Returns false if a session slot / the MultiplayerAPI /
-// the socket could not be set up. Pump it with `gd.webrtc_poll(node)` every frame; once
-// connected, use `gd.rpc`.
-webrtc_host :: proc "contextless" (node: Node, url: cstring) -> bool {
-	return _webrtc_start(node, url, "", true)
+// ROOM CODE (read it back with `gd.webrtc_room_code(node)` to share with a friend). A non-empty
+// `room` RESERVES that code — the relay honors it when free and valid, else assigns fresh (host
+// migration pre-arranges tomorrow's room this way, so survivors can chase a code they already
+// know; webrtc_room_code always reports the code that actually opened). The handshake begins
+// when the joining peer appears. Returns false if a session slot / the MultiplayerAPI / the
+// socket could not be set up. Pump it with `gd.webrtc_poll(node)` every frame; once connected,
+// use `gd.rpc`.
+webrtc_host :: proc "contextless" (node: Node, url: cstring, room: cstring = "") -> bool {
+	return _webrtc_start(node, url, room, true)
 }
 
 // webrtc_join starts a WebRTC session as a CLIENT: opens the signaling WebSocket at `url`, sends
@@ -233,10 +239,9 @@ _webrtc_start :: proc "contextless" (node: Node, url: cstring, room: cstring, is
 		ws      = ws,
 		state   = .Connecting_Ws,
 	}
-	// Stash the join code (host's is assigned by the server on `created`).
-	if !is_host {
-		s.room_len = _cstr_to_buf(room, s.room_buf[:])
-	}
+	// Stash the code: the client's join target, or the host's RESERVATION
+	// (the `created` reply overwrites it with whatever actually opened).
+	s.room_len = _cstr_to_buf(room, s.room_buf[:])
 	return true
 }
 
@@ -294,6 +299,9 @@ webrtc_poll :: proc "contextless" (node: Node) {
 		defer free_dictionary(m)
 		if s.is_host {
 			_dset(&m, "type", _vstr("create"))
+			if s.room_len > 0 { // a reservation rides along; the relay decides
+				_dset(&m, "room", _vstr_odin(string(s.room_buf[:s.room_len])))
+			}
 		} else {
 			_dset(&m, "type", _vstr("join"))
 			_dset(&m, "room", _vstr_odin(string(s.room_buf[:s.room_len])))

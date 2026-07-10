@@ -225,9 +225,11 @@ boot_join :: proc(b: ^Boot, addr: cstring, port: int, token: u64, name: string, 
 
 // The Host button, WebRTC flavor: room opened on the relay, session started,
 // menu hidden, status set (the CODE arrives async — netgd.web_poll it and
-// read gd.webrtc_room_code), chat shown. false = the relay socket refused.
-boot_host_web :: proc(b: ^Boot, url: cstring, name: string, token: u64 = 0) -> bool {
-	if !netgd.begin_host_web(&b.wire, url, name, token) {
+// read gd.webrtc_room_code), chat shown. A non-empty `room` RESERVES that
+// code (host migration pre-arranges tomorrow's room; the relay honors a free
+// valid code, else assigns). false = the relay socket refused.
+boot_host_web :: proc(b: ^Boot, url: cstring, name: string, token: u64 = 0, room: cstring = "") -> bool {
+	if !netgd.begin_host_web(&b.wire, url, name, token, room) {
 		kui.lobby_set_status(&b.ui, "Could not reach the relay")
 		return false
 	}
