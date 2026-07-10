@@ -419,4 +419,31 @@ grep -q "HERO_C_CMD_REV_CLAIM :: u16" "$cgen" || fail "the channel's claim must 
 grep -q "return play.channel_claim(&self.rev, _a0)" "$cgen" || fail "claim thunk must route into &self.rev with the wire target"
 grep -q '{name = "rev_claim", predict = false' "$cgen" || fail "the claim must be a PLAIN command (no prediction)"
 
+# ---- fixture 13: play.Health — a VERB-FREE block composes state only ----------
+# Health ships no @(gd_command) (damage is host-internal, not client intent): its hp/max must
+# compose into the descriptor, its Edge scratch must stay off the wire, and NO command artifacts
+# may appear for it.
+hl="$work/healthcomp"
+mkdir -p "$hl"
+cat >"$hl/pawn.odin" <<'ODIN'
+//gd:extends Node2D
+//gd:class Pawn
+package healthcomp
+import gd "godot:godot"
+import knet "godot:kit/net"
+import play "godot:play"
+
+Pawn :: struct {
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id,
+	health: play.Health,   // verb-free: state + edge only
+}
+ODIN
+if ! "$SGEN" "$hl" -godot:"$ROOT" >/dev/null 2>&1; then fail "play.Health must compose into a consumer, not error"; fi
+hgen="$hl/pawn.gen.odin"
+grep -q "offset_of(type_of(Pawn{}.health), hp)" "$hgen" || fail "health.hp must compose into the descriptor"
+grep -q "offset_of(type_of(Pawn{}.health), max)" "$hgen" || fail "health.max must compose into the descriptor"
+grep -q "offset_of(type_of(Pawn{}.health), seen)" "$hgen" && fail "the Edge scratch must stay OFF the wire"
+grep -q "_CMD_" "$hgen" && fail "a verb-free block must hoist NO commands"
+
 echo "SCRIPTGEN_OK"

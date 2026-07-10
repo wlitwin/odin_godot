@@ -171,10 +171,15 @@ package works identically: the generated file imports and qualifies it (`play.gu
 slow ability's gate dwarfs the round-trip), and **`play.Channel`** (hold-to-progress — the
 revive/capture/cast-bar: OWNER-authored, its `target`/`pct` ride the owner stream so every
 screen draws the bar, and its composed plain `claim` carries the target as a wire arg for
-your hook to re-check and honor). One block per authority model — host-written command
-prediction, cooldown gate, owner stream. The state machine is the block's; the effect, the
-world-gates (alive? in reach?), and for the gun the cadence, stay yours. They're the
-reference for the pattern; read `play/gun.odin`, `play/ability.odin`, `play/channel.odin`.
+your hook to re-check and honor), and **`play.Health`** (hp + max + the per-peer damage
+edge — VERB-FREE, because damage is host-internal, never a client intent: a block doesn't
+need commands to be worth composing; `health_hurt` returns the dealt/died pair your credit
+and death-payout logic branch on, `health_step` drives damage numbers and death cues on
+every screen). One block per authority model — host-written command prediction, cooldown
+gate, owner stream — plus the verb-free state block. The state machine is the block's; the
+effect, the world-gates (alive? in reach?), and for the gun the cadence, stay yours.
+They're the reference for the pattern; read `play/gun.odin`, `play/ability.odin`,
+`play/channel.odin`, `play/health.odin`.
 
 **Engine-facing procs compose the same way.** A block's `@(gd_method)` (or `@(gd_rpc)`) hoists
 onto the embedding entity's method table under the same path-prefixed name (`gear_level` on a
