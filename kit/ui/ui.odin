@@ -52,6 +52,14 @@ lobby_make :: proc(parent: gd.Node, title: string) -> Lobby {
 	gd.node_set_name(cast(gd.Node)l.root, gd.new_string_name_cstring("Lobby", true))
 	gd.add_child(parent, cast(gd.Node)l.root)
 	gd.control_set_anchors_preset(l.root, .Preset_Full_Rect, false)
+	// Full-rect anchors bind to a Control parent — under a plain Node (the
+	// usual game root) they bind to NOTHING and the lobby quietly hugs the
+	// top-left corner. Size the root to the viewport outright; the anchors
+	// still handle the Control-parent case, and the CenterContainer finally
+	// gets to do its one job everywhere. (Sized once: the lobby is transient.)
+	if vp := gd.node_get_viewport(parent); cast(rawptr)vp != nil {
+		gd.control_set_size(l.root, gd.viewport_get_visible_rect(vp).size, false)
+	}
 
 	l.panel = cast(gd.Control)gd.new_v_box_container()
 	gd.add_child(cast(gd.Node)l.root, cast(gd.Node)l.panel)
