@@ -1,18 +1,22 @@
 extends Node
 
 # ----------------------------------------------------------------------------
-# In-BROWSER driver for the two-peer WebRTC RPC test (tests/webrtc).
+# In-BROWSER driver for the N-peer WebRTC RPC test (tests/webrtc).
 #
 # This is the main scene of the web export, so it runs inside the wasm build in a real
 # browser (Godot routes `print` to the JS console, which drive.mjs captures). drive.mjs
-# launches TWO headless-Chrome instances of this same page, one with ?role=host and one with
-# ?role=join (plus the signaling ?url=...). Each:
-#   1. loads the Odin RtcNode script onto /root/Net (SAME path on both — required for RPC
+# launches THREE headless-Chrome instances of this same page — one ?role=host, two
+# ?role=join — all with ?peers=2 (how many REMOTE peers to wait for) and the signaling
+# ?url=... . Each:
+#   1. loads the Odin RtcNode script onto /root/Net (SAME path on all — required for RPC
 #      routing) and starts hosting/joining via gd.webrtc_host/join,
-#   2. waits (generous timeout) for the REAL WebRTC data channel to come up — i.e. the
-#      MultiplayerAPI reports a connected peer and a non-zero unique id,
-#   3. fires `@(gd_rpc)` calls across the WebRTC link in BOTH directions, then stays alive a
-#      moment to receive the other browser's RPCs,
+#   2. waits (generous timeout) for the REAL WebRTC data channels to come up — i.e. the
+#      MultiplayerAPI reports ?peers=N connected peers and a non-zero unique id (a JOINER
+#      only holds a channel to the host; it sees the other joiner because the host relays
+#      the peer roster — so this gate also proves the star's relay),
+#   3. fires `@(gd_rpc)` calls across the WebRTC links — targeted, broadcast, and call_local
+#      broadcast (which must transit the HOST to reach the other joiner) — then stays alive
+#      a moment to receive the other browsers' RPCs,
 #   4. prints sentinels (WEBRTC_CONNECTED / RPC_RECV.. / WEBRTC_DONE) that drive.mjs asserts.
 # ----------------------------------------------------------------------------
 
@@ -20,6 +24,7 @@ var net: Node = null
 var role := "host"
 var url := "ws://127.0.0.1:9080"
 var room := ""
+var expected := 1   # how many REMOTE peers to wait for before acting (?peers=N)
 var room_printed := false
 var mp: MultiplayerAPI = null
 var phase := "init"
@@ -34,6 +39,7 @@ func _ready() -> void:
 	role = String(q.get("role", "host"))
 	url = String(q.get("url", "ws://127.0.0.1:9080"))
 	room = String(q.get("room", ""))
+	expected = maxi(1, int(String(q.get("peers", "1"))))
 
 	var script: Script = load("res://scripts/rtc_node.odin")
 	if script == null:
@@ -72,17 +78,20 @@ func _process(_delta: float) -> void:
 			mp = net.get_multiplayer()
 			return
 		var peers: PackedInt32Array = mp.get_peers()
-		if peers.size() >= 1 and mp.get_unique_id() != 0:
+		if peers.size() >= expected and mp.get_unique_id() != 0:
 			net.call("report")
-			print("WEBRTC_CONNECTED role=", role, " my_id=", mp.get_unique_id(), " peer=", peers[0])
+			print("WEBRTC_CONNECTED role=", role, " my_id=", mp.get_unique_id(), " peers=", peers)
 			if role == "host":
-				# broadcast (non-call_local): runs on the CLIENT, proving host->client.
+				# broadcast (non-call_local): runs on every CLIENT, proving host->client.
 				net.rpc("ping", 99)
 				# call_local broadcast: positive control — runs locally on the host too.
 				net.rpc("echo", 88)
 			else:
 				# targeted to the host (peer id 1): proves client->host with the client's id.
 				net.rpc_id(1, "ping", 22)
+				# broadcast from a JOINER: reaches the other joiner only if the HOST relays
+				# it (a joiner holds no channel to its sibling) — the star's money shot.
+				net.rpc("echo", 44)
 			phase = "settle"
 			t_acted = now
 		elif now - t0 > TIMEOUT_MS:

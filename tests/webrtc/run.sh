@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 # ----------------------------------------------------------------------------
-# WebRTC web co-op milestone — TWO real browser peers exchange @(gd_rpc) calls over a genuine
-# browser-native WebRTC data channel (no port-forwarding), brokered by a tiny WebSocket
-# signaling server. The in-browser mirror of tests/rpc_net's ENet guarantees.
+# WebRTC web co-op milestone — THREE real browser peers (a host + two joiners, the relay's
+# N-peer STAR) exchange @(gd_rpc) calls over genuine browser-native WebRTC data channels (no
+# port-forwarding), brokered by a tiny WebSocket signaling server. The in-browser mirror of
+# tests/rpc_net's ENet guarantees — including joiner->joiner RPCs relayed THROUGH the host.
 #
 # Pipeline:
 #   1. build the FULL extension into one Emscripten SIDE_MODULE wasm (build_web.sh) AND the
 #      native core dll (build_scripts.sh) so the macOS export host packs the .odin script,
 #   2. headless web-export the project,
 #   3. start the WebSocket signaling server + the COOP/COEP static file server,
-#   4. drive TWO headless-Chrome instances (drive.mjs): one hosts, one joins; they establish
-#      WebRTC and exchange RPCs both directions; assert via each browser's console.
+#   4. drive THREE headless-Chrome instances (drive.mjs): one hosts, two join the same room
+#      code; all channels come up and RPCs cross every direction; assert via each console.
 #
-# Prints WEBRTC_OK on a verified two-browser run (GREEN), or WEBRTC_BUNDLED if the build+export
+# Prints WEBRTC_OK on a verified three-browser run (GREEN), or WEBRTC_BUNDLED if the build+export
 # succeeded but the browser step was skipped (YELLOW — no node/Chrome/puppeteer). Run inside
 # the Nix dev shell:  nix develop --command bash -c 'bash tests/webrtc/run.sh'
 # ----------------------------------------------------------------------------
@@ -45,8 +46,8 @@ CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 if ! command -v node >/dev/null 2>&1 || [[ ! -x "$CHROME" ]]; then
     echo "WEBRTC_BUNDLED: browser step skipped (no node and/or Chrome at \$CHROME)."
     echo "  Manual: start  node tests/webrtc/signal_server.mjs 9080  +  bash tests/web/serve.sh tests/webrtc/out $PORT"
-    echo "  open  http://127.0.0.1:$PORT/index.html?role=host&url=ws://127.0.0.1:9080/rtc  in one browser (prints WEBRTC_ROOM)"
-    echo "  then  http://127.0.0.1:$PORT/index.html?role=join&url=ws://127.0.0.1:9080/rtc&room=<CODE>  in another."
+    echo "  open  http://127.0.0.1:$PORT/index.html?role=host&peers=2&url=ws://127.0.0.1:9080/rtc  in one browser (prints WEBRTC_ROOM)"
+    echo "  then  http://127.0.0.1:$PORT/index.html?role=join&peers=2&url=ws://127.0.0.1:9080/rtc&room=<CODE>  in two others."
     exit 0
 fi
 
@@ -77,10 +78,10 @@ for _ in $(seq 1 20); do
     sleep 0.25
 done
 
-# Drive the two browsers. Retry once on a flaky handshake before declaring failure.
+# Drive the three browsers. Retry once on a flaky handshake before declaring failure.
 rc=1
 for try in 1 2; do
-    echo "==> two-browser attempt $try (signaling ws://127.0.0.1:$SIGPORT)"
+    echo "==> three-browser attempt $try (signaling ws://127.0.0.1:$SIGPORT)"
     if CHROME="$CHROME" node "$PROJ/drive.mjs" "http://127.0.0.1:$PORT/index.html" "ws://127.0.0.1:$SIGPORT"; then
         rc=0; break
     fi
@@ -90,6 +91,6 @@ if (( rc == 0 )); then
     echo "WEBRTC_OK"
     exit 0
 fi
-echo "WEBRTC_FAIL: two browsers did not exchange a WebRTC RPC"
+echo "WEBRTC_FAIL: three browsers did not exchange WebRTC RPCs"
 echo "  --- signaling server log ---"; tail -n 20 "$PROJ/.signal.log" 2>/dev/null | sed 's/^/    /'
 exit 1
