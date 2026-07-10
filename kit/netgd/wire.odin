@@ -223,12 +223,14 @@ drop_peer :: proc "contextless" (node: gd.Node, peer: ksess.Peer_Id) {
 // with the stock lobby ritual.
 
 // Host on `port`. false = the transport refused (port taken) — the session
-// was NOT started; tell the player and let them try again.
-begin_host :: proc(wire: ^Session_Wire, port: int, name: string, max_peers := 32) -> bool {
+// was NOT started; tell the player and let them try again. `token` is the
+// host's own reconnect identity (see session_host_start) — pass it so a
+// dead host can reclaim its seat from whoever resumes the run.
+begin_host :: proc(wire: ^Session_Wire, port: int, name: string, max_peers := 32, token: u64 = 0) -> bool {
 	if !gd.host(wire.node, port, max_peers) {
 		return false
 	}
-	ksess.session_host_start(wire.ses, name)
+	ksess.session_host_start(wire.ses, name, token)
 	return true
 }
 

@@ -1447,8 +1447,9 @@ send_backup :: proc(s: ^Session, peer: Peer_Id) {
 // Call on a FRESH session with the factory already installed; `me` is the
 // caller's own Player_Id from the dead run. Every other player comes back
 // disconnected — they rejoin with their tokens and reclaim ids, stats, and
-// owned entities exactly like any reconnect. The dead run's HOST has no
-// token (hosts never JOIN), so in v1 it returns as a NEW player.
+// owned entities exactly like any reconnect. That includes the dead HOST,
+// if it started with a token (session_host_start's `token` param); without
+// one it returns as a NEW player.
 // Returns false on a corrupt blob (destroy the session and start clean).
 session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backup: []u8) -> bool {
 	assert(s.factory_make != nil, "resume recreates entities through the factory — install it first")
@@ -1617,8 +1618,13 @@ session_count :: proc(s: ^Session, connected_only := false) -> int {
 // ---- host ------------------------------------------------------------------
 
 // Become the session authority. The host is a full player too (name, id,
-// stats) — it just never JOINs over the wire.
-session_host_start :: proc(s: ^Session, name: string) {
+// stats) — it just never JOINs over the wire. Pass the game's persistent
+// reconnect `token` so the host holds an identity like everyone else: its
+// hash rides every backup snapshot, and if this host dies mid-run it can
+// rejoin the resumed session and reclaim its own seat (stats, entities)
+// exactly like a client. Zero = the v1 shape: a dead host returns as a
+// NEW player.
+session_host_start :: proc(s: ^Session, name: string, token: u64 = 0) {
 	session_init(s)
 	s.is_host = true
 	s.ctx.is_authority = true
@@ -1631,6 +1637,10 @@ session_host_start :: proc(s: ^Session, name: string) {
 		name      = strings.clone(name),
 		peer      = HOST_PEER,
 		connected = true,
+	}
+	if token != 0 {
+		s.token = token
+		s.tokens[token_hash(token)] = s.me
 	}
 	s.joined = true
 }

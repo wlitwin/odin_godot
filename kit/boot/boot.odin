@@ -196,9 +196,11 @@ roster_changed :: proc(b: ^Boot) {
 }
 
 // The Host button, ceremony included: transport up, session started, menu
-// hidden, status set, chat shown. false = port taken (status already says so).
-boot_host :: proc(b: ^Boot, port: int, name: string, max_peers := 32) -> bool {
-	if !netgd.begin_host(&b.wire, port, name, max_peers) {
+// hidden, status set, chat shown. false = port taken (status already says
+// so). `token` is the host's own reconnect identity (session_host_start) —
+// pass it so a dead host can reclaim its seat from a resumed run.
+boot_host :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64 = 0) -> bool {
+	if !netgd.begin_host(&b.wire, port, name, max_peers, token) {
 		kui.lobby_set_status(&b.ui, "Could not host (port taken?)")
 		return false
 	}
