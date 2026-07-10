@@ -1760,6 +1760,18 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 	// only a ban shuts a known token out.
 	hash := token_hash(token)
 	id, known := s.tokens[hash]
+	if known && id == s.me {
+		// The HOST's own token walking in the door is never a reconnect —
+		// this session IS the host, alive by construction. It's a second
+		// instance sharing the machine's identity file (a couch test, a
+		// second browser tab): seat it as a NEW player instead of letting it
+		// hijack the keeper's live seat. (A DEAD host's seat reclaims as
+		// ever — on a resumed session the old-host row sits disconnected and
+		// s.me is the heir's.) The shared hash then maps to the newest seat;
+		// same-file identities stay ambiguous by nature — distinct tokens
+		// (SY_TOKEN-style) are the real answer for same-machine play.
+		known = false
+	}
 	if _, banned := s.denied[hash]; banned {
 		deny_join(s, peer, .Banned)
 		return
