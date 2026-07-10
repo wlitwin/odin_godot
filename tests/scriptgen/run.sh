@@ -391,4 +391,32 @@ grep -q "return play.ability_cast(&self.lob, _a0, _a1)" "$agen" || fail "cast th
 grep -q "size_of(type_of(Caster{}.lob.def))" "$agen" || fail "the Ability_Def cooldown knob must replicate through the embed"
 grep -q "offset_of(type_of(Caster{}.lob), cd)" "$agen" || fail "the cooldown cd must compose through the block"
 
+# ---- fixture 12: play.Channel — owner-streamed block state + a composed claim ----
+# The third authority model through an embed: the block's `gd:"replicate,owner"` fields must carry
+# the .Owner_Stream flag through composition, and its plain claim command must hoist.
+ch="$work/chancomp"
+mkdir -p "$ch"
+cat >"$ch/hero.odin" <<'ODIN'
+//gd:extends Node2D
+//gd:class HeroC
+package chancomp
+import gd "godot:godot"
+import knet "godot:kit/net"
+import play "godot:play"
+
+HeroC :: struct {
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id,
+	hp:     u8 `gd:"replicate"`,
+	rev:    play.Channel,   // -> heroc_rev_claim; target/pct owner-streamed through the embed
+}
+ODIN
+if ! "$SGEN" "$ch" -godot:"$ROOT" >/dev/null 2>&1; then fail "play.Channel must compose into a consumer, not error"; fi
+cgen="$ch/hero.gen.odin"
+grep -q 'offset_of(type_of(HeroC{}.rev), target).*flags = {.Owner_Stream}' "$cgen" || fail "the channel's owner flag must carry through the embed (rev.target)"
+grep -q 'offset_of(type_of(HeroC{}.rev), pct).*flags = {.Owner_Stream}' "$cgen" || fail "rev.pct must be owner-streamed through the embed"
+grep -q "HERO_C_CMD_REV_CLAIM :: u16" "$cgen" || fail "the channel's claim must hoist as HERO_C_CMD_REV_CLAIM"
+grep -q "return play.channel_claim(&self.rev, _a0)" "$cgen" || fail "claim thunk must route into &self.rev with the wire target"
+grep -q '{name = "rev_claim", predict = false' "$cgen" || fail "the claim must be a PLAIN command (no prediction)"
+
 echo "SCRIPTGEN_OK"

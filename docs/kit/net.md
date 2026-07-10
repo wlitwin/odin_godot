@@ -165,12 +165,16 @@ package works identically: the generated file imports and qualifies it (`play.gu
 
 `godot:play` ships worked ones — **`play.Gun`** (mag + reload + jam, knob-configured by a
 `Gun_Def`, host-authoritative and client-predicted through its `gun_fire` verb: embed
-`weapon: play.Gun`, `gun_equip` it, pace the trigger, spawn the shot in your hook) and
+`weapon: play.Gun`, `gun_equip` it, pace the trigger, spawn the shot in your hook),
 **`play.Ability`** (a cooldown-gated cast — the slow lob/cone/buff: embed one per slot,
 `ability_arm` it, run the effect in your hook on `ok`; the block owns its cooldown, since a
-slow ability's gate dwarfs the round-trip). The state machine is the block's; the effect —
-and for the gun, the cadence — stay yours. They're the reference for the pattern; read
-`play/gun.odin` and `play/ability.odin`.
+slow ability's gate dwarfs the round-trip), and **`play.Channel`** (hold-to-progress — the
+revive/capture/cast-bar: OWNER-authored, its `target`/`pct` ride the owner stream so every
+screen draws the bar, and its composed plain `claim` carries the target as a wire arg for
+your hook to re-check and honor). One block per authority model — host-written command
+prediction, cooldown gate, owner stream. The state machine is the block's; the effect, the
+world-gates (alive? in reach?), and for the gun the cadence, stay yours. They're the
+reference for the pattern; read `play/gun.odin`, `play/ability.odin`, `play/channel.odin`.
 
 **Engine-facing procs compose the same way.** A block's `@(gd_method)` (or `@(gd_rpc)`) hoists
 onto the embedding entity's method table under the same path-prefixed name (`gear_level` on a

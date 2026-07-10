@@ -136,6 +136,15 @@ Its states are `Ready → (fire) → Reloading` on an empty mag, or `Ready → J
 round that you mash the trigger to clear. It's host-authoritative — but it feels instant,
 because the client predicts every transition and the host only silently agrees.
 
+> **The packaged form exists.** This walkthrough shows the slots *hand-rolled*, because
+> that's the clearest way to learn what each slot is. In practice several of these items
+> now ship as drop-in blocks — `play.Gun` packages the gun's State + Authority + Prediction
+> (+ kit/net's built-in Reconcile), `play.Ability` a cooldown cast, `play.Channel` the
+> revive-style hold-to-progress — and scrapyard itself has since migrated onto them, so
+> some symbol names below no longer appear verbatim in its source. The slot anatomy is
+> unchanged; blocks just mean you *fill* most slots by embedding a field. See
+> [composing verbs from embedded blocks](kit/net.md#composing-verbs-from-embedded-blocks).
+
 Here's the item, slot by slot (code condensed to each slot's essence).
 
 **① State** — the minimum every screen needs to render the HUD and let the host gate:
