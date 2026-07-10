@@ -163,11 +163,14 @@ Owner threading is optional and detected by shape — write `^Runner` for a game
 `^$E` for a library block reused across entity types. A block imported from another `godot:`
 package works identically: the generated file imports and qualifies it (`play.gun_fire`).
 
-`godot:play` ships a worked one — **`play.Gun`** (mag + reload + jam, knob-configured by a
-`Gun_Def`, host-authoritative and client-predicted through its `gun_fire` verb). Embed
-`weapon: play.Gun`, `gun_equip` it with your knobs, pace the trigger and spawn the shot in your
-hook — the state machine is the block's, the cadence and the effect stay yours. It's the
-reference for the pattern; read `play/gun.odin`.
+`godot:play` ships worked ones — **`play.Gun`** (mag + reload + jam, knob-configured by a
+`Gun_Def`, host-authoritative and client-predicted through its `gun_fire` verb: embed
+`weapon: play.Gun`, `gun_equip` it, pace the trigger, spawn the shot in your hook) and
+**`play.Ability`** (a cooldown-gated cast — the slow lob/cone/buff: embed one per slot,
+`ability_arm` it, run the effect in your hook on `ok`; the block owns its cooldown, since a
+slow ability's gate dwarfs the round-trip). The state machine is the block's; the effect —
+and for the gun, the cadence — stay yours. They're the reference for the pattern; read
+`play/gun.odin` and `play/ability.odin`.
 
 **Engine-facing procs compose the same way.** A block's `@(gd_method)` (or `@(gd_rpc)`) hoists
 onto the embedding entity's method table under the same path-prefixed name (`gear_level` on a
