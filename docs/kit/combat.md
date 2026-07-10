@@ -52,6 +52,21 @@ The verb that issues it pre-gates with `ability_ready` (`input.odin`) — a refu
 prediction still rides the wire, so a key held at full hp would flood the host with doomed
 commands. [kit/ui](ui.md)'s ability bar renders the same `cds` and defs.
 
+> **Which layer to use — these helpers, or the `play` blocks?** `godot:play` ships
+> higher-level blocks built on the same machinery, and for the common cases they are the
+> default: **`play.Health`** instead of a raw hp field + `hit` (you get max, the damage
+> edge, and frac for free), and **`play.Ability`** instead of a `Cooldowns` slot + a
+> hand-written command (the cast command is *generated* onto the embedding entity, the
+> cooldown knob replicates, and the applied-vs-rejected semantics are already right). Reach
+> for the low-level pair here when you're outside the blocks' shape: `ability_try` when a
+> cast **spends a resource** (stamina, mana — `play.Ability` deliberately owns no resource;
+> that's a game gate), `Cooldowns(N)`'s slot array when slots are **dynamic** (castable
+> inventory items indexed at runtime, where named block fields can't), and `hit` when hp
+> lives somewhere a block can't (a transient, an off-entity pool). The examples split along
+> history: cavecrawl/homestead show the low-level way (they predate the blocks and double as
+> a view of the layer underneath); scrapyard shows the block way. New games: start with the
+> blocks. See [kit/net — composing verbs from embedded blocks](net.md#composing-verbs-from-embedded-blocks).
+
 ## Status effects
 
 One buff/debuff is 4 POD bytes, embedded as a fixed array (`fx: [4]Effect`); kind 0

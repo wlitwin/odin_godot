@@ -168,7 +168,9 @@ package works identically: the generated file imports and qualifies it (`play.gu
 `weapon: play.Gun`, `gun_equip` it, pace the trigger, spawn the shot in your hook),
 **`play.Ability`** (a cooldown-gated cast — the slow lob/cone/buff: embed one per slot,
 `ability_arm` it, run the effect in your hook on `ok`; the block owns its cooldown, since a
-slow ability's gate dwarfs the round-trip), and **`play.Channel`** (hold-to-progress — the
+slow ability's gate dwarfs the round-trip — for casts that spend a resource or slots indexed
+at runtime, drop down to `kcombat.Cooldowns`/`ability_try`, the layer underneath: see
+[kit/combat](combat.md#health-and-abilities)), and **`play.Channel`** (hold-to-progress — the
 revive/capture/cast-bar: OWNER-authored, its `target`/`pct` ride the owner stream so every
 screen draws the bar, and its composed plain `claim` carries the target as a wire arg for
 your hook to re-check and honor), and **`play.Health`** (hp + max + the per-peer damage
