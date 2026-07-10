@@ -243,3 +243,44 @@ begin_join :: proc(wire: ^Session_Wire, addr: cstring, port: int, token: u64, na
 	ksess.session_client_start(wire.ses, token, name)
 	return true
 }
+
+// ---- the same two buttons, WebRTC flavor -----------------------------------------------
+//
+// Browser co-op pairs through a ROOM CODE brokered by a signaling relay
+// instead of an address the joiner already knows — and the code is ASSIGNED
+// by the relay after the host connects, so it arrives async (read it back
+// with gd.webrtc_room_code once web_poll has pumped the handshake). The
+// session layer neither knows nor cares: once the data channel installs the
+// multiplayer peer, everything above these calls is the ENet path verbatim.
+
+// Host a room on the relay at `url` and start the session AT ONCE —
+// authoritative from the first tick; peers drop in when their channel comes
+// up. `token` is the host's reconnect identity, exactly as in begin_host.
+begin_host_web :: proc(wire: ^Session_Wire, url: cstring, name: string, token: u64 = 0) -> bool {
+	if !gd.webrtc_host(wire.node, url) {
+		return false
+	}
+	ksess.session_host_start(wire.ses, name, token)
+	return true
+}
+
+// Join `room` (the code the host shared) through the relay at `url`.
+begin_join_web :: proc(wire: ^Session_Wire, url: cstring, room: cstring, token: u64, name: string) -> bool {
+	if !gd.webrtc_join(wire.node, url, room) {
+		return false
+	}
+	ksess.session_client_start(wire.ses, token, name)
+	return true
+}
+
+// Pump the signaling handshake — every frame while a web session lives (the
+// data channel itself is engine-polled; this services the relay socket).
+web_poll :: proc(wire: ^Session_Wire) {
+	gd.webrtc_poll(wire.node)
+}
+
+// Tear a web session down COMPLETELY so a fresh begin_*_web can start clean
+// — the retry after a failed join, or a successor raising a new room.
+web_close :: proc(wire: ^Session_Wire) {
+	gd.webrtc_close(wire.node)
+}

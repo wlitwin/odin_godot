@@ -78,6 +78,34 @@ once. `wire_listen` connects `peer_packet` → `on_packet`, `peer_disconnected` 
 qualifies). Empty method names skip that signal — but see the next section before you skip
 any.
 
+## The two buttons — ENet and WebRTC flavors of the one door
+
+Every game's Host/Join handlers repeat the same two-step: bring the transport up, then start
+the session over it. The wire owns both flavors:
+
+```odin
+// native (ENet) — the address is known before dialing
+netgd.begin_host(&wire, port, name, max_peers = 32, token = 0) -> bool  // false = port taken
+netgd.begin_join(&wire, addr, port, token, name) -> bool
+
+// browser (WebRTC room codes) — the relay ASSIGNS the code after the host connects
+netgd.begin_host_web(&wire, url, name, token = 0) -> bool   // false = relay socket refused
+netgd.begin_join_web(&wire, url, room, token, name) -> bool
+netgd.web_poll(&wire)   // every frame: pumps the signaling handshake
+netgd.web_close(&wire)  // full teardown — retry a failed join, or a successor raising a new room
+```
+
+`token` is the host's own reconnect identity (see [session](session.md) — it makes a dead
+host reclaimable after a migration). The web pair differs from ENet in one structural way:
+the room code **does not exist yet** when `begin_host_web` returns — the relay assigns it
+async. Pump `web_poll` each frame and read it back with `gd.webrtc_room_code(node)` when it
+lands; `gd.webrtc_session_state` / `gd.webrtc_error_reason` narrate the handshake for your
+lobby. Everything ABOVE these calls — session, muster, commands, replication — is the same
+code path on both transports; the branch ends the moment the multiplayer peer installs.
+
+[kit/boot](boot.md) wraps both flavors with the stock lobby ceremony: `boot_host` /
+`boot_join` and their `boot_host_web` / `boot_join_web` twins.
+
 ## The disconnect signals are NOT optional plumbing
 
 - Unwired `peer_disconnected`: an alt-F4'd client haunts the roster forever, and the host
@@ -149,6 +177,7 @@ connects `peer_packet` to a single `@(gd_method)` on the same node's script.
 ## Swapping transports
 
 Nothing on this page mentions ENet specifics because the wire never sees the transport:
-SceneMultiplayer's signals fire identically over any `MultiplayerPeer`. Hosting over Steam
-instead of ENet is covered in [steamgd.md](steamgd.md) — the `Session_Wire` and the four
-forwards are byte-for-byte the same.
+SceneMultiplayer's signals fire identically over any `MultiplayerPeer`. The WebRTC doors
+above are the browser story; hosting over Steam instead is covered in
+[steamgd.md](steamgd.md) — the `Session_Wire` and the four forwards are byte-for-byte the
+same in every case.

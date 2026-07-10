@@ -223,6 +223,33 @@ boot_join :: proc(b: ^Boot, addr: cstring, port: int, token: u64, name: string, 
 	return true
 }
 
+// The Host button, WebRTC flavor: room opened on the relay, session started,
+// menu hidden, status set (the CODE arrives async — netgd.web_poll it and
+// read gd.webrtc_room_code), chat shown. false = the relay socket refused.
+boot_host_web :: proc(b: ^Boot, url: cstring, name: string, token: u64 = 0) -> bool {
+	if !netgd.begin_host_web(&b.wire, url, name, token) {
+		kui.lobby_set_status(&b.ui, "Could not reach the relay")
+		return false
+	}
+	kui.lobby_show_menu(&b.ui, false, false)
+	kui.lobby_set_status(&b.ui, "Opening a room…")
+	kui.chat_show(&b.chat, true)
+	return true
+}
+
+// The Join button, WebRTC flavor. A dead room resolves later through
+// gd.webrtc_session_state/.Failed (the relay answers no_room / full).
+boot_join_web :: proc(b: ^Boot, url: cstring, room: cstring, token: u64, name: string) -> bool {
+	if !netgd.begin_join_web(&b.wire, url, room, token, name) {
+		kui.lobby_set_status(&b.ui, "Could not reach the relay")
+		return false
+	}
+	kui.lobby_show_menu(&b.ui, false, false)
+	kui.lobby_set_status(&b.ui, fmt.tprintf("Joining room %s…", room))
+	kui.chat_show(&b.chat, true)
+	return true
+}
+
 // Chat's text_submitted, one call (see kui.chat_submit for the trap it fixes).
 boot_chat :: proc(b: ^Boot, text: gd.String, sent: ^bool = nil) {
 	kui.chat_submit(&b.chat, b.comms, text, sent)
