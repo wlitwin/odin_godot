@@ -175,7 +175,10 @@ your hook to re-check and honor), and **`play.Health`** (hp + max + the per-peer
 edge — VERB-FREE, because damage is host-internal, never a client intent: a block doesn't
 need commands to be worth composing; `health_hurt` returns the dealt/died pair your credit
 and death-payout logic branch on, `health_step` drives damage numbers and death cues on
-every screen). One block per authority model — host-written command prediction, cooldown
+every screen), and **`play.Telegraph`** (a wind-up that lands — the "get out of the circle"
+shape, also verb-free: `left` AND `wind` replicate so every peer draws the exact growth
+fraction even for a hastened wind-up, `telegraph_tick` lands the host payload once,
+`telegraph_step` erupts on every screen in lockstep, and a cancel goes quiet). One block per authority model — host-written command prediction, cooldown
 gate, owner stream — plus the verb-free state block. The state machine is the block's; the
 effect, the world-gates (alive? in reach?), and for the gun the cadence, stay yours.
 They're the reference for the pattern; read `play/gun.odin`, `play/ability.odin`,
