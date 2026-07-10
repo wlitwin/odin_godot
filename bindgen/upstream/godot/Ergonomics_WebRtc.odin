@@ -95,12 +95,23 @@ Webrtc_Error :: enum {
 // One live WebRTCPeerConnection to a REMOTE peer, plus the back-pointer the signal-relay
 // Callables need: their userdata must name both the session AND which remote's connection
 // emitted (an SDP/ICE payload is addressed to exactly one peer). The host fills one slot per
-// joiner; a client fills a single slot (the host's).
+// joiner; a client fills a single slot (the host's). `conn_id` is the connection's INSTANCE
+// ID: the engine owns post-connect teardown (its poll reaps dead channels and frees the
+// object), so before touching `conn` on a signaling message the slot must prove the object
+// still exists — instance ids are never reused, a nil lookup means freed.
 Webrtc_Conn :: struct {
 	used:      bool,
 	remote_id: int,
 	conn:      Web_Rtc_Peer_Connection,
+	conn_id:   u64,
 	ses:       ^Webrtc_Session,
+}
+
+// _conn_alive: the connection object still exists (the engine frees a reaped peer's
+// connection out from under the slot — see conn_id above).
+@(private = "file")
+_conn_alive :: proc "contextless" (c: ^Webrtc_Conn) -> bool {
+	return gdext.object_get_instance_from_id(gdext.ObjectInstanceId(c.conn_id)) != nil
 }
 
 // Remote-connection slots per session: the relay's room cap (host + seven joiners), so the
@@ -316,11 +327,12 @@ webrtc_close :: proc "contextless" (node: Node) {
 		}
 		web_socket_peer_close(s.ws, 1000, string_empty())
 	}
-	// Close every live remote connection, then detach the WebRTC multiplayer peer so the
-	// MultiplayerAPI returns to offline; the engine drops its ref to the (RefCounted)
-	// WebRTCMultiplayerPeer + its peer connections, which then free.
+	// Close every remote connection STILL STANDING (the engine frees reaped peers'
+	// connections out from under the slots — never touch a freed one), then detach the
+	// WebRTC multiplayer peer so the MultiplayerAPI returns to offline; the engine drops
+	// its ref to the (RefCounted) WebRTCMultiplayerPeer + its peer connections, which free.
 	for i in 0 ..< _WEBRTC_MAX_REMOTES {
-		if s.conns[i].used {
+		if s.conns[i].used && _conn_alive(&s.conns[i]) {
 			web_rtc_peer_connection_close(s.conns[i].conn)
 		}
 	}
@@ -377,12 +389,18 @@ _handle_packet :: proc "contextless" (s: ^Webrtc_Session) {
 		// Route by SENDER: each remote has its own connection (the host holds several).
 		c := _conn_find(s, _dget_int(&d, "from"))
 		if c != nil {
-			dv := _dget(&d, "data")
-			defer variant_destroy(&dv)
-			if gdext.variant_get_type(cast(gdext.VariantPtr)&dv) == .Dictionary {
-				dd := variant_to_dictionary(&dv)
-				defer free_dictionary(dd)
-				_apply_signal(c, &dd)
+			if !_conn_alive(c) {
+				// The engine already reaped this peer and freed the connection; a
+				// straggler SDP/ICE frame has nowhere to land. Forget the slot.
+				c^ = Webrtc_Conn{}
+			} else {
+				dv := _dget(&d, "data")
+				defer variant_destroy(&dv)
+				if gdext.variant_get_type(cast(gdext.VariantPtr)&dv) == .Dictionary {
+					dd := variant_to_dictionary(&dv)
+					defer free_dictionary(dd)
+					_apply_signal(c, &dd)
+				}
 			}
 		}
 
@@ -392,19 +410,34 @@ _handle_packet :: proc "contextless" (s: ^Webrtc_Session) {
 		id := _dget_int(&d, "id")
 		c := _conn_find(s, id)
 		if c == nil {break}
-		// Once the DTLS channel is live the media path is peer-to-peer and OUTLIVES its
-		// signaling socket — a relay blip must not kill a healthy game link (the engine
-		// notices real departures through the data channel itself). Only reap a
-		// connection that never came up.
-		if web_rtc_peer_connection_get_connection_state(c.conn) == .State_Connected {break}
-		web_rtc_multiplayer_peer_remove_peer(s.rtc, Int(id))
-		web_rtc_peer_connection_close(c.conn)
+		// THE PRODUCTION ORDER OF DEATH: media dies fast — the engine's poll notices
+		// the dead channel in seconds, reaps the peer, and FREES the connection —
+		// while a dead tab's signaling socket can linger to a TCP timeout, so this
+		// message often arrives AFTER the object is gone. Touch the connection only
+		// if it still exists, and reap it ourselves only when it never finished the
+		// handshake (nobody else will free THAT one). Everything post-connect is the
+		// ENGINE's teardown to run — racing it is how the web host died mid-game
+		// ("indirect call to null" through a freed connection). A LIVE connected
+		// link stays untouched entirely: a relay blip must not kill a healthy game
+		// (the engine notices real departures through the channel itself).
+		pre := false
+		if _conn_alive(c) {
+			st := web_rtc_peer_connection_get_connection_state(c.conn)
+			if st == .State_Connected {break} // healthy link; the slot stays too
+			pre = st == .State_New || st == .State_Connecting
+			if pre {
+				web_rtc_multiplayer_peer_remove_peer(s.rtc, Int(id))
+				web_rtc_peer_connection_close(c.conn)
+			}
+		}
 		c^ = Webrtc_Conn{}
-		if !s.is_host {
-			// Our one remote was the HOST: the lobby is over; surface it for the UI.
+		if !s.is_host && pre {
+			// The HOST vanished before the channel ever came up: the lobby is over;
+			// surface it for the UI. (A post-connect departure is the ENGINE's news
+			// — the game hears server_disconnected and decides.)
 			s.err = .Closed
 			s.state = .Failed
-		} else if _conn_count(s) == 0 {
+		} else if s.is_host && _conn_count(s) == 0 {
 			s.state = .Waiting_Peer
 		}
 
@@ -534,6 +567,7 @@ _setup_connection :: proc "contextless" (s: ^Webrtc_Session, remote_id: int) {
 		used      = true,
 		remote_id = remote_id,
 		conn      = conn,
+		conn_id   = object_get_instance_id(cast(Object)conn),
 		ses       = s,
 	}
 
@@ -584,6 +618,13 @@ _on_session_description :: proc "c" (
 	err: ^gdext.CallError,
 ) {
 	c := cast(^Webrtc_Conn)userdata
+	if !c.used || cast(rawptr)c.conn == nil {
+		// The slot was reaped between this signal queuing and firing (a dying
+		// connection's last gasp) — there is nothing left to describe.
+		if err != nil {err.error = .Ok}
+		if ret != nil {(cast(^Variant)ret)^ = Variant{}}
+		return
+	}
 	to_str := gdext.get_variant_to_type_constructor(.String)
 	type_s: String
 	sdp_s: String
@@ -616,6 +657,12 @@ _on_ice_candidate :: proc "c" (
 	err: ^gdext.CallError,
 ) {
 	c := cast(^Webrtc_Conn)userdata
+	if !c.used || cast(rawptr)c.conn == nil {
+		// Reaped slot (see _on_session_description) — drop the candidate.
+		if err != nil {err.error = .Ok}
+		if ret != nil {(cast(^Variant)ret)^ = Variant{}}
+		return
+	}
 	to_str := gdext.get_variant_to_type_constructor(.String)
 	to_int := gdext.get_variant_to_type_constructor(.Int)
 	media_s: String

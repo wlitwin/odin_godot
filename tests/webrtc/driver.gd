@@ -59,9 +59,17 @@ func _start() -> void:
 	else:
 		net.call("start_join", url, room)
 	mp = net.get_multiplayer()
+	_hook(mp)
 	t0 = Time.get_ticks_msec()
 	phase = "connect"
 	print("WEBRTC_BOOT role=", role, " url=", url, " room=", room)
+
+# Surface departures: drive.mjs closes one joiner's browser mid-session and
+# asserts the survivors both NOTICE (this sentinel) and stay alive (no wasm
+# crash) — the production web host died on exactly this.
+func _hook(m: MultiplayerAPI) -> void:
+	if m != null:
+		m.peer_disconnected.connect(func(id: int) -> void: print("WEBRTC_PEER_GONE id=", id))
 
 func _process(_delta: float) -> void:
 	var now := Time.get_ticks_msec()
@@ -76,6 +84,7 @@ func _process(_delta: float) -> void:
 	if phase == "connect":
 		if mp == null:
 			mp = net.get_multiplayer()
+			_hook(mp)
 			return
 		var peers: PackedInt32Array = mp.get_peers()
 		if peers.size() >= expected and mp.get_unique_id() != 0:

@@ -116,6 +116,24 @@ try {
     await new Promise((r) => setTimeout(r, 500));
   }
 
+  // ---- THE DROP: close C1's browser mid-session; the survivors must NOTICE and LIVE ----
+  // The production web host died on exactly this ("indirect call to null"): a client tab
+  // closing mid-game. The host must print WEBRTC_PEER_GONE for C1's id (the engine reaped
+  // the dead channel), keep executing (its page still evaluates), and neither survivor's
+  // console may show a wasm crash.
+  console.log("dropping C1 mid-session...");
+  await c1Browser.close().catch(() => {});
+  const dropDeadline = Date.now() + 20000;
+  while (Date.now() < dropDeadline && !host.has(/WEBRTC_PEER_GONE/)) {
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  // A beat longer: the crash fired from QUEUED callbacks after the teardown.
+  await new Promise((r) => setTimeout(r, 3000));
+  let hostAlive = false;
+  try { hostAlive = (await hostPage.evaluate(() => 1 + 1)) === 2; } catch {}
+  let c2Alive = false;
+  try { c2Alive = (await c2Page.evaluate(() => 1 + 1)) === 2; } catch {}
+
   for (const p of [host, c1, c2]) {
     console.log(`==== ${p.tag} console ====`);
     for (const l of p.lines) console.log(l);
@@ -147,6 +165,12 @@ try {
     c2.has(new RegExp(`RPC_RECV echo on=${cid2} from=${cid1} value=44`));
   const allDone = host.has(/WEBRTC_DONE/) && c1.has(/WEBRTC_DONE/) && c2.has(/WEBRTC_DONE/);
 
+  const crashRe = /RuntimeError|indirect call|pageerror/i;
+  const hostSawDrop = !!cid1 && host.has(new RegExp(`WEBRTC_PEER_GONE id=${cid1}`));
+  const hostCrashed = host.lines.some((l) => crashRe.test(l));
+  const c2Crashed = c2.lines.some((l) => crashRe.test(l));
+  const dropSurvived = hostSawDrop && hostAlive && c2Alive && !hostCrashed && !c2Crashed;
+
   console.log("\n==== VERDICT ====");
   console.log("joiner ids                 :", cid1, cid2);
   console.log("host connected (id 1)      :", hostConnected);
@@ -156,9 +180,12 @@ try {
   console.log("host call_local echo 88    :", hostCallLocalEcho);
   console.log("joiner<->joiner echo 44    :", siblingsRelayed, " (relayed through the host)");
   console.log("all done                   :", allDone);
+  console.log("drop: host saw C1 leave    :", hostSawDrop);
+  console.log("drop: host alive, no crash :", hostAlive && !hostCrashed);
+  console.log("drop: C2 alive, no crash   :", c2Alive && !c2Crashed);
 
   green = hostConnected && joinersConnected && joinersGotHostPing && hostGotBothPings &&
-    hostCallLocalEcho && siblingsRelayed && allDone;
+    hostCallLocalEcho && siblingsRelayed && allDone && dropSurvived;
 } finally {
   await hostBrowser.close().catch(() => {});
   await c1Browser.close().catch(() => {});
