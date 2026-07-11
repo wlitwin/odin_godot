@@ -104,6 +104,7 @@ slopball3_ready :: proc(self: ^Slopball3) {
 		interp_delay = f64(gd.env_int("SLOP3_INTERP_MS", max(3000 / hz, 16))) / 1000.0,
 	})
 	gd.engine_set_physics_ticks_per_second(gd.singleton_engine(), gd.Int(hz))
+	unthrottle_for_local_play() // two windows, one laptop: never pace the sim off the compositor
 	ksess.session_set_factory(&self.ses, self, slop3_make_entity, slop3_free_entity)
 
 	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
