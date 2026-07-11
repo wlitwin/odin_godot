@@ -195,6 +195,12 @@ slopball_process :: proc(self: ^Slopball, delta: f64) {
 // solver wakes; everyone else's freezes.
 seat_ball :: proc(self: ^Slopball, owner: knet.Player_Id) {
 	if self.ball == nil {return}
+	// The seed pose the new simulator wakes with IS this peer's current view —
+	// print it at every handoff so a stale view is visible in any log.
+	gd.print_str(fmt.tprintf(
+		"SB_SEAT owner=%d mine=%v x=%.0f y=%.0f",
+		u64(owner), owner == self.ses.me, self.ball.puppet.x, self.ball.puppet.y,
+	))
 	play.puppet_seat(&self.ball.puppet, owner == self.ses.me)
 }
 
@@ -230,5 +236,15 @@ ball_report :: proc(self: ^Slopball) {
 	t := ksess.session_tick_no(&self.ses)
 	if t == 0 || t == self.report_tick || t % 30 != 0 {return}
 	self.report_tick = t
-	gd.print_str(fmt.tprintf("SB_BALL tick=%d x=%.0f y=%.0f", t, self.ball.puppet.x, self.ball.puppet.y))
+	own, warp, ring := -1, -1, -1
+	if e, eok := knet.registry_get(&self.ses.reg, self.ball_id); eok {
+		own = int(e.owner)
+		warp = int(e.warp)
+		ring = int(e.stream.count)
+	}
+	bp := gd.node2d_get_position(cast(gd.Node2d)self.ball.owner)
+	gd.print_str(fmt.tprintf(
+		"SB_BALL tick=%d x=%.0f y=%.0f own=%d warp=%d ring=%d mine=%v body=%.0f,%.0f",
+		t, self.ball.puppet.x, self.ball.puppet.y, own, warp, ring, self.ball.puppet.mine, bp.x, bp.y,
+	))
 }

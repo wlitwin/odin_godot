@@ -97,7 +97,14 @@ kick_aim :: proc(self: ^Slopball, away: gd.Vector2) -> gd.Vector2 {
 // The striker walks at the ball (slightly behind it, so contact pushes goalward);
 // idle bots stand there being defenders.
 bot_steer :: proc(self: ^Slopball) -> gd.Vector2 {
-	if self.bot != "striker" || self.ball == nil || self.me_kick == nil {return {}}
+	if self.ball == nil || self.me_kick == nil {return {}}
+	if self.bot == "chaser" {
+		// The repro dog: runs at the ball forever, never kicks — possession
+		// trades by contact, the way humans dribble into each other.
+		d := gd.Vector2{self.ball.puppet.x - self.me_kick.x, self.ball.puppet.y - self.me_kick.y}
+		return normalized(d)
+	}
+	if self.bot != "striker" {return {}}
 	if self.ball.won != 0 {return {}}
 	me := self.me_kick
 	bx, by := self.ball.puppet.x, self.ball.puppet.y
