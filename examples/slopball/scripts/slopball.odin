@@ -41,8 +41,10 @@ BALL_TYPE :: ksess.Entity_Type(2)
 DEFAULT_PORT :: 4188
 
 KICKER_SPEED :: f32(150)
-KICK_REACH :: f32(26) // boot-kick range (body contact dribbles for free)
+KICK_REACH :: f32(26) // boot-kick range
 KICK_POWER :: f32(260)
+DRIBBLE_R :: f32(21) // contact-nudge range (kicker 9 + ball 8 + a hair)
+DRIBBLE_NUDGE :: f32(14) // per-contact-frame impulse — a push, not a shot
 TOUCH_R :: f32(30) // host grants the ball's sim seat inside this radius
 GRANT_COOL :: 0.3 // seconds between seat grants — no thrash in a scrum
 KICKOFF_HOLD :: 1.2 // ball frozen at center after a goal/kickoff
@@ -94,6 +96,7 @@ slopball_ready :: proc(self: ^Slopball) {
 		legend = "WASD move · Space kick · Tab scores · Enter chat",
 		msg_kind = MSG_SESSION,
 		latency_env = "SLOP_LATENCY",
+		min_players = 1, // a lone host may start and kick the ball around
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
 
@@ -165,7 +168,8 @@ slopball_process :: proc(self: ^Slopball, delta: f64) {
 		case ksess.Ev_Spawned:
 			if !self.started {
 				self.started = true
-				kui.lobby_show_menu(&self.boot.ui, false, false)
+				gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
+				gd.set_bool(cast(gd.Object)self.boot.legend, "visible", true)
 				gd.print_str("SB_STARTED")
 			}
 			if e.id == self.ball_id && self.ball != nil {

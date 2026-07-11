@@ -34,10 +34,11 @@ drive_my_kicker :: proc(self: ^Slopball, delta: f64) {
 		gd.node2d_set_position(cast(gd.Node2d)me.owner, {me.x, me.y})
 	}
 
+	typing := bool(gd.control_has_focus(cast(gd.Control)self.boot.chat.input, false))
 	dir: gd.Vector2
 	if self.bot != "" {
 		dir = bot_steer(self)
-	} else if !bool(gd.control_has_focus(cast(gd.Control)self.boot.chat.input, false)) {
+	} else if !typing {
 		if gd.is_action_pressed("slop_left") {dir.x -= 1}
 		if gd.is_action_pressed("slop_right") {dir.x += 1}
 		if gd.is_action_pressed("slop_up") {dir.y -= 1}
@@ -52,10 +53,25 @@ drive_my_kicker :: proc(self: ^Slopball, delta: f64) {
 	me.x = pos.x
 	me.y = pos.y
 
+	// DRIBBLE: move_and_slide does NOT push rigid bodies — a walking contact
+	// imparts nothing on its own (the classic Godot 4 gotcha). While MY solver
+	// runs the ball, nudge it along my motion each contact frame, capped so a
+	// dribbled ball never outruns a kicked one.
+	if self.ball != nil && (dir.x != 0 || dir.y != 0) &&
+	   ksess.session_owner_of(&self.ses, self.ball_id) == self.ses.me {
+		bdx := self.ball.puppet.x - me.x
+		bdy := self.ball.puppet.y - me.y
+		bv := self.ball.puppet
+		if bdx*bdx + bdy*bdy <= DRIBBLE_R * DRIBBLE_R &&
+		   bv.vx*bv.vx + bv.vy*bv.vy < KICKER_SPEED * KICKER_SPEED * 2 {
+			play.puppet_shove(&self.ball.puppet, dir.x * DRIBBLE_NUDGE, dir.y * DRIBBLE_NUDGE)
+		}
+	}
+
 	// The boot: while MY solver runs the ball and it's in reach, punt it away
 	// from me — all local, all instant (that is the whole point of the seat).
 	want_kick := (self.bot == "striker" && self.ball != nil && self.ball.won == 0) ||
-		(self.bot == "" && gd.is_action_just_pressed("slop_kick"))
+		(self.bot == "" && !typing && gd.is_action_just_pressed("slop_kick"))
 	if want_kick && self.ball != nil && now_s() >= self.kick_cool &&
 	   ksess.session_owner_of(&self.ses, self.ball_id) == self.ses.me {
 		bx, by := self.ball.puppet.x, self.ball.puppet.y
