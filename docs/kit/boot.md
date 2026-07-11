@@ -34,7 +34,8 @@ for ev in events {
 (`boot.ui`, `boot.chat`, `boot.score`, `boot.legend`, `boot.wire`,
 `boot.stage`, `boot.world`) — reposition, restyle, or ignore them. `stage`
 and `world` are Node2D containers, so screen shake ([kfx.Shake](fx.md)) can
-nudge them both as one. The eight
+nudge them both as one; a 3D game sets `Options.spatial = true` to get Node3D
+containers instead (see `examples/slopball3d`). The eight
 `@(gd_method)` names are declared in *your* script (Godot signals must land on
 the game's class); their bodies are one-liners — see either example game's
 `net.odin`.

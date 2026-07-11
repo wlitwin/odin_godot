@@ -178,6 +178,15 @@ TESTS=(
     # the striker's LOCAL solver drives the goal, the host scores it off the streamed pose,
     # and all three screens report the ball within a few px at the same session tick.
     "slopballnative|SLOPBALL_NATIVE_OK|examples/slopball/native_run.sh"
+    # ENGINE-PHYSICS soccer in 3D, SOLO: a RigidBody3D ball under real gravity (play.Puppet3,
+    # quaternion orientation) + an XZ-plane move_and_slide striker — lofted kick, goal off the
+    # replicated pose, match edge. The repo's only exercise of the 3D physics SOLVER headless.
+    "slopball3dsingle|SLOPBALL3D_SINGLE_OK|examples/slopball3d/run.sh"
+    # ENGINE-PHYSICS soccer in 3D, NATIVE (ENet, 3 peers): the Puppet3 proof — seat granted to
+    # the striker CLIENT, its LOCAL 3D solver (gravity + tumble) drives the goal, the host
+    # scores it off the streamed pose, the ball's QUATERNION nlerps on every watcher, and all
+    # three screens report the ball within centimeters at the same session tick.
+    "slopball3dnative|SLOPBALL3D_NATIVE_OK|examples/slopball3d/native_run.sh"
     "validate|VALIDATE_HARNESS_OK|tests/validate/run.sh"
     "complete|COMPLETE_HARNESS_OK|tests/complete/run.sh"
     "lookup|LOOKUP_OK|tests/lookup/run.sh"

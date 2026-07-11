@@ -1,0 +1,178 @@
+[gd_scene format=3 uid="uid://di4vn0oemfmkj"]
+
+[ext_resource type="Script" uid="uid://dh0wa2spy1vid" path="res://scripts/slopball3d.odin" id="1_slop"]
+[ext_resource type="PackedScene" path="res://kicker.tscn" id="2_kick"]
+[ext_resource type="PackedScene" path="res://ball.tscn" id="3_ball"]
+
+[sub_resource type="Environment" id="env"]
+background_mode = 1
+background_color = Color(0.04, 0.06, 0.05, 1)
+ambient_light_source = 2
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_energy = 0.55
+
+[sub_resource type="BoxShape3D" id="shape_floor"]
+size = Vector3(16, 0.2, 9)
+
+[sub_resource type="StandardMaterial3D" id="mat_turf"]
+albedo_color = Color(0.09, 0.16, 0.1, 1)
+
+[sub_resource type="BoxMesh" id="mesh_floor"]
+size = Vector3(16, 0.2, 9)
+
+[sub_resource type="StandardMaterial3D" id="mat_line"]
+albedo_color = Color(0.16, 0.24, 0.17, 1)
+
+[sub_resource type="BoxMesh" id="mesh_midline"]
+size = Vector3(0.1, 0.01, 8.6)
+
+[sub_resource type="StandardMaterial3D" id="mat_goal_l"]
+transparency = 1
+albedo_color = Color(0.22, 0.3, 0.5, 0.5)
+
+[sub_resource type="BoxMesh" id="mesh_mouth"]
+size = Vector3(0.3, 0.02, 2.5)
+
+[sub_resource type="StandardMaterial3D" id="mat_goal_r"]
+transparency = 1
+albedo_color = Color(0.55, 0.32, 0.2, 0.5)
+
+[sub_resource type="BoxShape3D" id="shape_side"]
+size = Vector3(16, 1, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="mat_wall"]
+albedo_color = Color(0.2, 0.22, 0.24, 1)
+
+[sub_resource type="BoxMesh" id="mesh_side"]
+size = Vector3(16, 1, 0.2)
+
+[sub_resource type="BoxShape3D" id="shape_goal_seg"]
+size = Vector3(0.2, 1, 3.25)
+
+[sub_resource type="BoxMesh" id="mesh_goal_seg"]
+size = Vector3(0.2, 1, 3.25)
+
+[sub_resource type="BoxShape3D" id="shape_backstop"]
+size = Vector3(0.2, 1.5, 3.5)
+
+[sub_resource type="BoxMesh" id="mesh_backstop"]
+size = Vector3(0.2, 1.5, 3.5)
+
+[node name="Slopball3d" type="Node3D" unique_id=1445814087]
+script = ExtResource("1_slop")
+kicker_scene = ExtResource("2_kick")
+ball_scene = ExtResource("3_ball")
+
+[node name="Env" type="WorldEnvironment" parent="." unique_id=1122339109]
+environment = SubResource("env")
+
+[node name="Camera" type="Camera3D" parent="." unique_id=696212685]
+transform = Transform3D(1, 0, 0, 0, 0.6157, 0.788, 0, -0.788, 0.6157, 8, 10.5, 13.5)
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=680223349]
+transform = Transform3D(0.866, 0.4096, -0.2868, 0, 0.5736, 0.8192, 0.5, -0.7094, 0.4967, 8, 6, 8)
+
+[node name="Floor" type="StaticBody3D" parent="." unique_id=1084122602]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, -0.1, 4.5)
+
+[node name="Shape" type="CollisionShape3D" parent="Floor" unique_id=402923651]
+shape = SubResource("shape_floor")
+
+[node name="Mesh" type="MeshInstance3D" parent="Floor" unique_id=1026336419]
+material_override = SubResource("mat_turf")
+mesh = SubResource("mesh_floor")
+
+[node name="MidLine" type="MeshInstance3D" parent="." unique_id=1700057422]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.006, 4.5)
+material_override = SubResource("mat_line")
+mesh = SubResource("mesh_midline")
+
+[node name="MouthLeft" type="MeshInstance3D" parent="." unique_id=197256970]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, 0.006, 4.5)
+material_override = SubResource("mat_goal_l")
+mesh = SubResource("mesh_mouth")
+
+[node name="MouthRight" type="MeshInstance3D" parent="." unique_id=1069312098]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.85, 0.006, 4.5)
+material_override = SubResource("mat_goal_r")
+mesh = SubResource("mesh_mouth")
+
+[node name="WallFar" type="StaticBody3D" parent="." unique_id=1398743223]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.5, 0.1)
+
+[node name="Shape" type="CollisionShape3D" parent="WallFar" unique_id=1232630771]
+shape = SubResource("shape_side")
+
+[node name="Mesh" type="MeshInstance3D" parent="WallFar" unique_id=1185431718]
+material_override = SubResource("mat_wall")
+mesh = SubResource("mesh_side")
+
+[node name="WallNear" type="StaticBody3D" parent="." unique_id=741485368]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.5, 8.9)
+
+[node name="Shape" type="CollisionShape3D" parent="WallNear" unique_id=1007885376]
+shape = SubResource("shape_side")
+
+[node name="Mesh" type="MeshInstance3D" parent="WallNear" unique_id=860313068]
+material_override = SubResource("mat_wall")
+mesh = SubResource("mesh_side")
+
+[node name="WallLeftUpper" type="StaticBody3D" parent="." unique_id=1811552075]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0.5, 1.625)
+
+[node name="Shape" type="CollisionShape3D" parent="WallLeftUpper" unique_id=1855566544]
+shape = SubResource("shape_goal_seg")
+
+[node name="Mesh" type="MeshInstance3D" parent="WallLeftUpper" unique_id=1192222865]
+material_override = SubResource("mat_wall")
+mesh = SubResource("mesh_goal_seg")
+
+[node name="WallLeftLower" type="StaticBody3D" parent="." unique_id=1945011945]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0.5, 7.375)
+
+[node name="Shape" type="CollisionShape3D" parent="WallLeftLower" unique_id=1399016663]
+shape = SubResource("shape_goal_seg")
+
+[node name="Mesh" type="MeshInstance3D" parent="WallLeftLower" unique_id=57378177]
+material_override = SubResource("mat_wall")
+mesh = SubResource("mesh_goal_seg")
+
+[node name="WallRightUpper" type="StaticBody3D" parent="." unique_id=1671593759]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.9, 0.5, 1.625)
+
+[node name="Shape" type="CollisionShape3D" parent="WallRightUpper" unique_id=1426352501]
+shape = SubResource("shape_goal_seg")
+
+[node name="Mesh" type="MeshInstance3D" parent="WallRightUpper" unique_id=2142856163]
+material_override = SubResource("mat_wall")
+mesh = SubResource("mesh_goal_seg")
+
+[node name="WallRightLower" type="StaticBody3D" parent="." unique_id=1400327628]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.9, 0.5, 7.375)
+
+[node name="Shape" type="CollisionShape3D" parent="WallRightLower" unique_id=1074917881]
+shape = SubResource("shape_goal_seg")
+
+[node name="Mesh" type="MeshInstance3D" parent="WallRightLower" unique_id=434194162]
+material_override = SubResource("mat_wall")
+mesh = SubResource("mesh_goal_seg")
+
+[node name="BackstopLeft" type="StaticBody3D" parent="." unique_id=1200952573]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3, 0.75, 4.5)
+
+[node name="Shape" type="CollisionShape3D" parent="BackstopLeft" unique_id=265063576]
+shape = SubResource("shape_backstop")
+
+[node name="Mesh" type="MeshInstance3D" parent="BackstopLeft" unique_id=678852638]
+material_override = SubResource("mat_wall")
+mesh = SubResource("mesh_backstop")
+
+[node name="BackstopRight" type="StaticBody3D" parent="." unique_id=1543316623]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.3, 0.75, 4.5)
+
+[node name="Shape" type="CollisionShape3D" parent="BackstopRight" unique_id=630682018]
+shape = SubResource("shape_backstop")
+
+[node name="Mesh" type="MeshInstance3D" parent="BackstopRight" unique_id=562538447]
+material_override = SubResource("mat_wall")
+mesh = SubResource("mesh_backstop")

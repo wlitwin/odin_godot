@@ -53,6 +53,7 @@ Options :: struct {
 	msg_kind:    u8, // the game's session sub-frame byte (netgd.wire_attach)
 	latency_env: cstring, // env var for the injected-latency shim ("" = off)
 	min_players: int, // host's Start button appears at this count (default 2)
+	spatial:     bool, // 3D game: stage/world become Node3D containers (default Node2D)
 	methods:     Methods,
 }
 
@@ -103,10 +104,12 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 
 	// Node2D containers (not plain Nodes) so games can offset them together —
 	// screen shake (kfx.Shake) nudges stage+world as one. Children unaffected.
-	b.stage = cast(gd.Node)gd.new_node2d()
+	// A SPATIAL game gets Node3D containers instead: 3D children then inherit
+	// a real 3D parent (and the same nudge-together trick works in meters).
+	b.stage = opts.spatial ? cast(gd.Node)gd.new_node3d() : cast(gd.Node)gd.new_node2d()
 	gd.node_set_name(b.stage, gd.new_string_name_cstring("Stage", true))
 	gd.add_child(node, b.stage)
-	b.world = cast(gd.Node)gd.new_node2d()
+	b.world = opts.spatial ? cast(gd.Node)gd.new_node3d() : cast(gd.Node)gd.new_node2d()
 	gd.node_set_name(b.world, gd.new_string_name_cstring("World", true))
 	gd.add_child(node, b.world)
 
