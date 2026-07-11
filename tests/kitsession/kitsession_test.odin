@@ -208,7 +208,7 @@ reconnect_reclaims_identity :: proc(t: ^testing.T) {
 }
 
 @(test)
-zombie_takeover_same_token :: proc(t: ^testing.T) {
+doppelganger_same_token_fresh_seat :: proc(t: ^testing.T) {
 	host, alice: Peer_Box
 	box_make(&host, 1)
 	box_make(&alice, 100)
@@ -222,9 +222,12 @@ zombie_takeover_same_token :: proc(t: ^testing.T) {
 	drain(&host.s)
 	drain(&alice.s)
 
-	// Alice's machine crashed and reconnected before the old socket timed out:
-	// the same token arrives from a new peer while the roster still shows her
-	// connected. The new connection takes over; the zombie peer is unmapped.
+	// The same token arrives from a NEW peer while alice's seat is still
+	// CONNECTED. The wire cannot tell a crashed-socket zombie from a LIVE
+	// second instance sharing the identity file (same-origin storage hands
+	// every browser tab the same token), so a live seat is never hijacked:
+	// the newcomer is seated FRESH. The transport reaps real zombies within
+	// seconds and a disconnected seat reclaims as ever.
 	alice2: Peer_Box
 	box_make(&alice2, 400)
 	defer box_destroy(&alice2)
@@ -232,17 +235,31 @@ zombie_takeover_same_token :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice2.s)
 	pump([]^Peer_Box{&host, &alice2})
 
-	testing.expect_value(t, alice2.s.me, knet.Player_Id(2))
+	testing.expect_value(t, alice2.s.me, knet.Player_Id(3)) // a fresh seat, not alice's
 	p, _ := ksess.session_player(&host.s, 2)
-	testing.expect_value(t, p.peer, 400)
+	testing.expect_value(t, p.peer, 100) // the live seat is untouched
 	testing.expect(t, p.connected)
+	hj := drain(&host.s)
+	testing.expect_value(t, len(hj), 1)
+	j, _ := hj[0].(ksess.Ev_Player_Joined)
+	testing.expect(t, j.id == 3 && !j.rejoin, "the doppelganger is a NEW player, not a rejoin")
 
-	// The zombie's eventual transport timeout must NOT mark the player gone —
-	// its peer id is no longer mapped to anyone.
+	// The zombie's eventual transport timeout reaps the OLD seat normally.
 	ksess.session_peer_disconnected(&host.s, 100)
 	p2, _ := ksess.session_player(&host.s, 2)
-	testing.expect(t, p2.connected, "stale peer timeout must not disconnect the taken-over player")
-	testing.expect_value(t, len(drain(&host.s)), 1) // only the rejoin event queued
+	testing.expect(t, !p2.connected, "the stale seat dies with its own peer")
+
+	// The shared token now maps to the NEWEST seat: once the doppelganger
+	// drops too, a reconnect reclaims id 3 — id 2 is abandoned for good.
+	ksess.session_peer_disconnected(&host.s, 400)
+	drain(&host.s)
+	alice3: Peer_Box
+	box_make(&alice3, 500)
+	defer box_destroy(&alice3)
+	ksess.session_client_start(&alice3.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice3.s)
+	pump([]^Peer_Box{&host, &alice3})
+	testing.expect_value(t, alice3.s.me, knet.Player_Id(3))
 }
 
 @(test)
