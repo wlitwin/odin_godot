@@ -58,6 +58,15 @@ body_impose :: proc(body: gd.Rigid_Body2d, x, y, rot: f32) {
 	)
 }
 
+// A CUT must not smear: with the engine's physics interpolation on, a
+// teleported body streaks between its last two physics states for a tick
+// unless the interpolation history is reset at the jump.
+@(private = "file")
+body_cut :: proc(body: gd.Rigid_Body2d, x, y, rot: f32) {
+	body_impose(body, x, y, rot)
+	gd.node_reset_physics_interpolation(cast(gd.Node)body)
+}
+
 @(private = "file")
 body_impel :: proc(body: gd.Rigid_Body2d, vx, vy: f32) {
 	vel := gd.Vector2{vx, vy}
@@ -71,7 +80,9 @@ body_impel :: proc(body: gd.Rigid_Body2d, vx, vy: f32) {
 
 Puppet :: struct {
 	x, y:   f32 `gd:"replicate,interp,owner,wire=f16"`, // pose: the owner stream every screen follows
-	rot:    f32 `gd:"replicate,interp,owner,wire=f16"`,
+	rot:    f32 `gd:"replicate,owner,wire=f16"`, // SNAP, never lerp: an angle
+	// interpolated componentwise sweeps the long way around the ±π wrap —
+	// a spinning kicked ball whipped its markings a full turn in one sample.
 	vx, vy: f32 `gd:"replicate,owner,wire=f16"`, // momentum: carried across ownership handoffs
 	body:   gd.Rigid_Body2d, // the wrapped node — attach-time, never on the wire
 	skin:   gd.Node2d, // optional visual child — render-error smoothing rides on it
@@ -150,7 +161,7 @@ puppet_claim :: proc(p: ^Puppet, hold: f32 = 0.6) {
 	p.claimed = true
 	p.claim_left = hold
 	gd.rigid_body2d_set_freeze_enabled(p.body, false)
-	body_impose(p.body, p.x, p.y, p.rot)
+	body_cut(p.body, p.x, p.y, p.rot)
 	body_impel(p.body, p.vx, p.vy)
 }
 
@@ -185,7 +196,7 @@ puppet_seat :: proc(p: ^Puppet, mine: bool) {
 		// state, so the seed must land on the LIVE body or it is erased.
 		was := gd.node2d_get_position(cast(gd.Node2d)p.body)
 		gd.rigid_body2d_set_freeze_enabled(p.body, false)
-		body_impose(p.body, p.x, p.y, p.rot)
+		body_cut(p.body, p.x, p.y, p.rot)
 		body_impel(p.body, p.vx, p.vy)
 		puppet_absorb(p, was.x, was.y, p.x, p.y) // the seed hop glides in
 	} else {
@@ -239,7 +250,7 @@ puppet_place :: proc(p: ^Puppet, x, y: f32, vx: f32 = 0, vy: f32 = 0) {
 	p.vx = vx
 	p.vy = vy
 	if cast(rawptr)p.body == nil {return}
-	body_impose(p.body, x, y, 0)
+	body_cut(p.body, x, y, 0)
 	if p.mine {
 		body_impel(p.body, vx, vy)
 	}

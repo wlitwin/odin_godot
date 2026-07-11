@@ -23,3 +23,7 @@ window/stretch/mode="canvas_items"
 [editor]
 
 script/search_in_file_extensions=PackedStringArray("gd", "gdshader", "odin")
+
+[physics]
+
+common/physics_interpolation=true
