@@ -31,6 +31,7 @@ game in order and links each page below at the moment you need it.
 | [netgd](netgd.md) | `kit/netgd` | The Godot transport binding: Session_Wire, channels, the latency shim, kick-socket handling |
 | [steamgd](steamgd.md) | `kit/steamgd` | Steam lobbies + invite overlay over GodotSteam, by name — same wire, different door |
 | [comms](comms.md) | `kit/comms` | Chat, system lines, positional pings, drop-in catchup |
+| [xfer](xfer.md) | `kit/xfer` | Chunked large payloads (sprays, skins, level files) — host-relayed, paced, web-safe |
 | [interact](interact.md) | `kit/interact` | Range/facing gates, candidate picking — prompt and host gate share the same math |
 | [items](items.md) | `kit/items` | Item defs + stack-aware slot inventories that replicate as plain fields |
 | [combat](combat.md) | `kit/combat` | Health/damage, host-validated projectiles, abilities, predicted-hp display |
