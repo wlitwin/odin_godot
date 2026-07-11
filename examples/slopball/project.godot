@@ -1,0 +1,13 @@
+config_version=5
+
+[application]
+
+config/name="Slopball"
+run/main_scene="res://slopball.tscn"
+config/features=PackedStringArray("4.6")
+
+[display]
+
+window/size/viewport_width=640
+window/size/viewport_height=360
+window/stretch/mode="canvas_items"

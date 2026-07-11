@@ -1,0 +1,28 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/ball.odin" id="1_ball"]
+
+[sub_resource type="CircleShape2D" id="shape_ball"]
+radius = 8.0
+
+[sub_resource type="PhysicsMaterial" id="mat_ball"]
+friction = 0.2
+bounce = 0.85
+
+[node name="Ball" type="RigidBody2D"]
+script = ExtResource("1_ball")
+gravity_scale = 0.0
+physics_material_override = SubResource("mat_ball")
+linear_damp = 0.55
+angular_damp = 1.0
+
+[node name="Shape" type="CollisionShape2D" parent="."]
+shape = SubResource("shape_ball")
+
+[node name="Skin" type="Polygon2D" parent="."]
+color = Color(0.95, 0.93, 0.85, 1)
+polygon = PackedVector2Array(8, 0, 5.7, 5.7, 0, 8, -5.7, 5.7, -8, 0, -5.7, -5.7, 0, -8, 5.7, -5.7)
+
+[node name="Dot" type="Polygon2D" parent="."]
+color = Color(0.2, 0.2, 0.25, 1)
+polygon = PackedVector2Array(3, -1.5, 3, 1.5, 6, 1.5, 6, -1.5)

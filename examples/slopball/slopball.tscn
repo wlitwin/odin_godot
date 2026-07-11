@@ -1,0 +1,84 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/slopball.odin" id="1_slop"]
+[ext_resource type="PackedScene" path="res://kicker.tscn" id="2_kick"]
+[ext_resource type="PackedScene" path="res://ball.tscn" id="3_ball"]
+
+[sub_resource type="RectangleShape2D" id="shape_h"]
+size = Vector2(640, 8)
+
+[sub_resource type="RectangleShape2D" id="shape_v"]
+size = Vector2(8, 122)
+
+[node name="Slopball" type="Node2D"]
+script = ExtResource("1_slop")
+kicker_scene = ExtResource("2_kick")
+ball_scene = ExtResource("3_ball")
+
+[node name="Pitch" type="Polygon2D" parent="."]
+z_index = -10
+color = Color(0.09, 0.16, 0.1, 1)
+polygon = PackedVector2Array(0, 0, 640, 0, 640, 360, 0, 360)
+
+[node name="MidLine" type="Polygon2D" parent="."]
+z_index = -9
+color = Color(0.16, 0.24, 0.17, 1)
+polygon = PackedVector2Array(318, 8, 322, 8, 322, 352, 318, 352)
+
+[node name="GoalLeft" type="Polygon2D" parent="."]
+z_index = -9
+color = Color(0.22, 0.3, 0.5, 0.5)
+polygon = PackedVector2Array(0, 130, 8, 130, 8, 230, 0, 230)
+
+[node name="GoalRight" type="Polygon2D" parent="."]
+z_index = -9
+color = Color(0.55, 0.32, 0.2, 0.5)
+polygon = PackedVector2Array(632, 130, 640, 130, 640, 230, 632, 230)
+
+[node name="WallTop" type="StaticBody2D" parent="."]
+position = Vector2(320, 4)
+
+[node name="Shape" type="CollisionShape2D" parent="WallTop"]
+shape = SubResource("shape_h")
+
+[node name="WallBottom" type="StaticBody2D" parent="."]
+position = Vector2(320, 356)
+
+[node name="Shape" type="CollisionShape2D" parent="WallBottom"]
+shape = SubResource("shape_h")
+
+[node name="WallLeftUpper" type="StaticBody2D" parent="."]
+position = Vector2(4, 69)
+
+[node name="Shape" type="CollisionShape2D" parent="WallLeftUpper"]
+shape = SubResource("shape_v")
+
+[node name="WallLeftLower" type="StaticBody2D" parent="."]
+position = Vector2(4, 291)
+
+[node name="Shape" type="CollisionShape2D" parent="WallLeftLower"]
+shape = SubResource("shape_v")
+
+[node name="WallRightUpper" type="StaticBody2D" parent="."]
+position = Vector2(636, 69)
+
+[node name="Shape" type="CollisionShape2D" parent="WallRightUpper"]
+shape = SubResource("shape_v")
+
+[node name="WallRightLower" type="StaticBody2D" parent="."]
+position = Vector2(636, 291)
+
+[node name="Shape" type="CollisionShape2D" parent="WallRightLower"]
+shape = SubResource("shape_v")
+
+[node name="BackstopLeft" type="StaticBody2D" parent="."]
+position = Vector2(-8, 180)
+
+[node name="Shape" type="CollisionShape2D" parent="BackstopLeft"]
+shape = SubResource("shape_v")
+
+[node name="BackstopRight" type="StaticBody2D" parent="."]
+position = Vector2(648, 180)
+
+[node name="Shape" type="CollisionShape2D" parent="BackstopRight"]
+shape = SubResource("shape_v")

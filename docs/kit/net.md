@@ -127,6 +127,11 @@ sub-struct is hoisted onto whatever entity embeds it, generated onto *that* enti
 table — the dual of nested-field replication, and what turns a plain struct into a true drop-in
 gameplay block.
 
+One spelling rule: the block's package must be imported **with an explicit alias**
+(`import play "godot:play"`). A bare `import "godot:play"` compiles fine, but scriptgen
+resolves cross-package types through the alias table, so the embed's fields and verbs are
+silently skipped — the entity builds, replicates its own fields, and the block's never move.
+
 Declare the verb on the block, embed the block, and the entity gets the command:
 
 ```odin

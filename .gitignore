@@ -73,3 +73,4 @@ examples/*/.coopsignal.log
 .idea/
 examples/cavecrawl/.runlogs/
 tests/kitnav/.runlogs/
+examples/slopball/.sloplogs/

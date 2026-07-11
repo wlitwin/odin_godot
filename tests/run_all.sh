@@ -169,6 +169,15 @@ TESTS=(
     # bullet immediacy (the firer's bullet exists the same tick, NO host round-trip) + broadcast,
     # a peer-authoritative kill agreed by both peers, despawn replication, XP to the firer.
     "arenanative|ARENA_NATIVE_OK|examples/coop_arena/coop_native_run.sh"
+    # ENGINE-PHYSICS soccer, SOLO: a real RigidBody2D ball (play.Puppet) + a move_and_slide
+    # striker run the whole loop headless — kick, goal off the replicated pose, match edge.
+    # The repo's only exercise of the 2D physics SOLVER under --headless.
+    "slopballsingle|SLOPBALL_SINGLE_OK|examples/slopball/run.sh"
+    # ENGINE-PHYSICS soccer, NATIVE (ENet, 3 peers): the Puppet proof — the host GRANTS the
+    # ball's simulation seat to the striker CLIENT (Ev_Owner_Changed on all three screens),
+    # the striker's LOCAL solver drives the goal, the host scores it off the streamed pose,
+    # and all three screens report the ball within a few px at the same session tick.
+    "slopballnative|SLOPBALL_NATIVE_OK|examples/slopball/native_run.sh"
     "validate|VALIDATE_HARNESS_OK|tests/validate/run.sh"
     "complete|COMPLETE_HARNESS_OK|tests/complete/run.sh"
     "lookup|LOOKUP_OK|tests/lookup/run.sh"

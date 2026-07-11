@@ -92,6 +92,7 @@ section) — the last column previews that.
 | `play.Machine(S)` | A state machine that **owns** its replicated `cur` (host writes, every peer steps). | ✅ | **State** (a mode) |
 | `play.anim` | Presentation float clocks — `decay`/`ramp`/`advance`/`hold`/`pulse`. | ✅ | **Cue** rendering |
 | `play.marker` | Lazy world-markers — `show`/`follow`/`fill`/`depth` over a built node. | ❌ engine | **Cue** rendering |
+| `play.Puppet` | Single-owner engine physics: the owner's RigidBody2D solver streams pose+velocity; every other screen freezes the body and glides it. `session_set_owner` moves the seat, momentum crosses the seam. | ❌ engine | **State** (a shared body) |
 
 The one wire rule to keep straight: **only `Machine.cur` crosses the wire** (it's a plain
 `gd:"replicate"` field). `Edge`, `Pace`, `anim` clocks, and marker handles are all *local
