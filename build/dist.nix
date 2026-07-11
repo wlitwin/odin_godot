@@ -24,7 +24,7 @@ let
 in
 stdenvNoCC.mkDerivation ({
   pname = "odin_godot-addon";
-  version = "0.2.0";
+  version = "0.3.0";
   inherit src;
 
   nativeBuildInputs = [ odin ]
