@@ -35,7 +35,16 @@ for ev in events {
 `boot.stage`, `boot.world`) — reposition, restyle, or ignore them. `stage`
 and `world` are Node2D containers, so screen shake ([kfx.Shake](fx.md)) can
 nudge them both as one; a 3D game sets `Options.spatial = true` to get Node3D
-containers instead (see `examples/slopball3d`). The eight
+containers instead (see `examples/slopball3d`).
+
+**Boot unthrottles desktop windows by default** (vsync off + a 120fps cap):
+every friendslop game gets playtested as two windows on one laptop, and with
+vsync on, the OS pacing an occluded window's present makes the background
+instance *simulate* slow, not just draw slow — the whole main loop blocks on
+the compositor, and every timeline-synced screen stutters for it. Headless and
+web runs are left untouched. A shipping build that prefers tear-free rendering
+opts out with `Options.keep_vsync = true` (and may set its own vsync/fps
+policy after `boot_attach`). The eight
 `@(gd_method)` names are declared in *your* script (Godot signals must land on
 the game's class); their bodies are one-liners — see either example game's
 `net.odin`.

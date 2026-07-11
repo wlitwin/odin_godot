@@ -33,6 +33,7 @@ package kit_boot
 // either example game's net.odin).
 
 import gd "godot:godot"
+import "godot:gdext"
 import kcomms "godot:kit/comms"
 import netgd "godot:kit/netgd"
 import ksess "godot:kit/session"
@@ -54,7 +55,32 @@ Options :: struct {
 	latency_env: cstring, // env var for the injected-latency shim ("" = off)
 	min_players: int, // host's Start button appears at this count (default 2)
 	spatial:     bool, // 3D game: stage/world become Node3D containers (default Node2D)
+	keep_vsync:  bool, // opt OUT of the desktop playtest unthrottle (see unthrottle_desktop)
 	methods:     Methods,
+}
+
+// TWO WINDOWS, ONE LAPTOP — every friendslop game gets playtested this way,
+// so boot unthrottles by default. macOS paces an occluded window's present,
+// and with vsync on the whole main loop blocks on it: the background instance
+// SIMULATES slow, not just draws slow (slopball's receipt: the two instances'
+// session-tick counters drifted ~90 ticks — 1.5s of lost simulation — after a
+// focus switch, and every timeline-synced screen stuttered for it). Pace by
+// timer instead: vsync off, fps capped so the loop never waits on the
+// compositor and the laptop doesn't render at 1000fps. Desktop windows only:
+// headless has no vsync (and the cap would slow the acids); the web display
+// server is paced by the browser, and background tabs are the browser's law.
+// A shipping build that prefers tear-free rendering sets Options.keep_vsync.
+@(private = "file")
+unthrottle_desktop :: proc() {
+	ds := gd.singleton_display_server()
+	name := gd.display_server_get_name(ds)
+	buf: [64]u8
+	n := gdext.string_to_utf8_chars(cast(gdext.StringPtr)&name, cast(cstring)&buf[0], len(buf) - 1)
+	if n <= 0 {return}
+	s := string(buf[:n])
+	if s == "headless" || s == "web" {return}
+	gd.display_server_window_set_vsync_mode(ds, .Vsync_Disabled, 0)
+	gd.engine_set_max_fps(gd.singleton_engine(), 120)
 }
 
 Boot :: struct {
@@ -79,6 +105,10 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 	b.ses = ses
 	b.comms = comms
 	b.min_players = opts.min_players > 0 ? opts.min_players : 2
+
+	if !opts.keep_vsync {
+		unthrottle_desktop()
+	}
 
 	// Every widget lives on a CanvasLayer: layers draw above world-space
 	// CanvasItems no matter what z_index entities carry, so a full-screen

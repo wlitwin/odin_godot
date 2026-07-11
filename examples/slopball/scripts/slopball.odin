@@ -116,7 +116,6 @@ slopball_ready :: proc(self: ^Slopball) {
 	// The net rate is only honest if the SOLVER steps at it too: a 120Hz
 	// session over 60Hz physics just streams duplicate poses.
 	gd.engine_set_physics_ticks_per_second(gd.singleton_engine(), gd.Int(hz))
-	unthrottle_for_local_play() // two windows, one laptop: never pace the sim off the compositor
 	ksess.session_set_factory(&self.ses, self, slop_make_entity, slop_free_entity)
 
 	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
