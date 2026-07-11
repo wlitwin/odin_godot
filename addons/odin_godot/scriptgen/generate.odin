@@ -9,6 +9,40 @@ ctor_tag :: proc(enum_name: string) -> string {
 	return enum_name[1:] // drop leading '.'
 }
 
+// ---- replicated-field expressions (nested-replicate-fields) -------------------
+//
+// A replicated field is addressed by its PATH from the entity root (Replicate_Info.path):
+// {"hp"} for a top-level field, {"m","x"} for one reached through a `using`/embedded
+// sub-struct. These build the offset/size/type-of expressions the descriptor and the POD
+// #assert consume. A length-1 path emits byte-identical output to the pre-nesting code.
+
+// The value-type expression: {"hp"} -> `type_of(Cls{}.hp)`; {"m","x"} -> `type_of(Cls{}.m.x)`.
+field_type_expr :: proc(cls: string, path: []string) -> string {
+	return fmt.tprintf("type_of(%s{{}}.%s)", cls, join_path(path))
+}
+
+// The byte-offset expression. Nested paths compose per segment via `type_of` on the
+// container, so no intermediate struct type is ever NAMED — the generated file needs no
+// import of the sub-struct's package (works for imported bundles too):
+//   {"hp"}        -> offset_of(Cls, hp)
+//   {"m","x"}     -> offset_of(Cls, m) + offset_of(type_of(Cls{}.m), x)
+//   {"a","b","x"} -> offset_of(Cls, a) + offset_of(type_of(Cls{}.a), b) + offset_of(type_of(Cls{}.a.b), x)
+field_offset_expr :: proc(cls: string, path: []string) -> string {
+	if len(path) == 1 {
+		return fmt.tprintf("offset_of(%s, %s)", cls, path[0])
+	}
+	b := strings.builder_make()
+	for seg, i in path {
+		if i > 0 {strings.write_string(&b, " + ")}
+		if i == 0 {
+			fmt.sbprintf(&b, "offset_of(%s, %s)", cls, seg)
+		} else {
+			fmt.sbprintf(&b, "offset_of(type_of(%s{{}}.%s), %s)", cls, join_path(path[:i]), seg)
+		}
+	}
+	return strings.to_string(b)
+}
+
 // ---- main emitter ------------------------------------------------------------
 
 generate :: proc(s: ^Script) -> string {
@@ -23,6 +57,35 @@ generate :: proc(s: ^Script) -> string {
 	w(&b, "import gd \"godot:godot\"\n")
 	w(&b, "import \"godot:gdext\"\n")
 	w(&b, "import rt \"godot:runtime\"\n")
+	// Conditional: an unused import is a compile error, so these appear only when a
+	// gd:"replicate" field needs the kit/net descriptor + the POD compile-time check
+	// (commands imply replicates — parse validation enforces it — but keep the
+	// condition independent for robustness).
+	if len(s.replicates) > 0 || len(s.commands) > 0 {
+		w(&b, "import knet \"godot:kit/net\"\n")
+	}
+	if len(s.replicates) > 0 {
+		w(&b, "import \"base:intrinsics\"\n")
+	}
+	// verb-composition: import each package a COMPOSED command's proc lives in (so the routed
+	// thunk can name `play.gun_fire`), deduped by path. "" = the entity's own package (no import).
+	// The fixed packages above are pre-seeded so a block that unusually lives in one isn't
+	// double-imported.
+	{
+		imported := make(map[string]bool)
+		imported["godot:godot"] = true
+		imported["godot:kit/net"] = true
+		for c in s.commands {
+			if c.pkg_path == "" || imported[c.pkg_path] {continue}
+			imported[c.pkg_path] = true
+			fmt.sbprintf(&b, "import %s %q\n", c.pkg_alias, c.pkg_path)
+		}
+		for m in s.methods {
+			if m.pkg_path == "" || imported[m.pkg_path] {continue}
+			imported[m.pkg_path] = true
+			fmt.sbprintf(&b, "import %s %q\n", m.pkg_alias, m.pkg_path)
+		}
+	}
 	// The trampolines/lifecycle wrappers establish `context = rt.script_context()` before
 	// calling the user's plain Odin procs. On native that is `runtime.default_context()`
 	// (heap-backed); on web the core installs an engine-backed context with a working
@@ -175,17 +238,19 @@ emit_method_trampoline :: proc(b: ^strings.Builder, s: ^Script, m: Method_Info) 
 		}
 	}
 
-	// Call the user proc.
+	// Call the user proc. A composed block method routes into &self.<path>, qualifies the proc with
+	// its package, and (if it declared one) passes `self` as the owner; a direct method runs `self`.
 	args_joined := strings.join(call_args[:], ", ")
 	defer delete(args_joined)
-	prefix := "self"
-	if len(call_args) > 0 {
-		prefix = fmt.tprintf("self, %s", args_joined)
-	}
+	recv := len(m.path) > 0 ? fmt.tprintf("&self.%s", join_path(m.path)) : "self"
+	qual := m.pkg_alias != "" ? fmt.tprintf("%s.", m.pkg_alias) : ""
+	prefix := recv
+	if m.owner {prefix = fmt.tprintf("%s, self", prefix)} // the block asked for its wielder
+	if len(call_args) > 0 {prefix = fmt.tprintf("%s, %s", prefix, args_joined)}
 	if m.ret.kind == .Nil {
-		fmt.sbprintf(b, "\t%s(%s)\n", m.proc_name, prefix)
+		fmt.sbprintf(b, "\t%s%s(%s)\n", qual, m.proc_name, prefix)
 	} else {
-		fmt.sbprintf(b, "\t_r := %s(%s)\n", m.proc_name, prefix)
+		fmt.sbprintf(b, "\t_r := %s%s(%s)\n", qual, m.proc_name, prefix)
 		tag := ctor_tag(m.ret.enum_name)
 		switch m.ret.kind {
 		case .Int:
@@ -387,6 +452,153 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			)
 		}
 		w(b, "}\n\n")
+	}
+
+	// kit/net replication descriptor (gd:"replicate" fields — friendslop toolkit).
+	// The #asserts enforce the POD-only contract where the field TYPE is actually
+	// known (this package's compile), failing the build with the field's name —
+	// a tagged string/slice/map can never silently ship. `type_of(Cls{}.f)` is an
+	// unevaluated expression: no instance is constructed.
+	if len(s.replicates) > 0 {
+		for r in s.replicates {
+			// nearly_simple_compare = memcmp-safe layout INCLUDING floats (plain
+			// simple_compare excludes them over NaN semantics — for shadow diffing,
+			// bitwise is exactly right). Pointers are memcmp-safe but meaningless on
+			// the wire, hence the explicit exclusion.
+			te := field_type_expr(cls, r.path)
+			fmt.sbprintf(
+				b,
+				"#assert(intrinsics.type_is_nearly_simple_compare(%s) && !intrinsics.type_is_pointer(%s) && !intrinsics.type_is_multi_pointer(%s), \"%s.%s: gd:\\\"replicate\\\" fields must be POD (ints/floats/bools/enums/vectors/fixed arrays — no strings, slices, maps, or pointers)\")\n",
+				te, te, te, cls, join_path(r.path),
+			)
+		}
+		fmt.sbprintf(b, "@(private = \"file\")\n_%s_net_fields := [?]knet.Field_Desc {{\n", snake)
+		for r in s.replicates {
+			flags := ""
+			switch {
+			case r.interp && r.owner:
+				flags = "{.Interp, .Owner_Stream}"
+			case r.interp:
+				flags = "{.Interp}"
+			case r.owner:
+				flags = "{.Owner_Stream}"
+			case:
+				flags = "{}"
+			}
+			lerp := len(r.lerp) > 0 ? fmt.tprintf(", lerp = %s", r.lerp) : ""
+			if len(r.blend) > 0 {
+				lerp = fmt.tprintf(", lerp = .Custom, blend = %s", r.blend)
+			}
+			wire := len(r.wire) > 0 ? fmt.tprintf(", wire = %s", r.wire) : ""
+			if len(r.codec) > 0 {
+				wire = fmt.tprintf(", wire = .Custom, codec = %s", r.codec)
+			}
+			fmt.sbprintf(
+				b,
+				"\t{{offset = %s, size = size_of(%s), flags = %s%s%s}},\n",
+				field_offset_expr(cls, r.path), field_type_expr(cls, r.path), flags, lerp, wire,
+			)
+		}
+		w(b, "}\n\n")
+		fmt.sbprintf(
+			b,
+			"// kit/net replication descriptor for %s — consumed by the toolkit session layer.\n%s_net_desc := knet.Entity_Desc{{fields = _%s_net_fields[:]}}\n\n",
+			cls, snake, snake,
+		)
+	}
+
+	// @(gd_command) dispatch + typed issue wrappers (friendslop toolkit).
+	// Three artifacts per class: decode thunks (client and host execute a command
+	// from byte-identical args — the thunk decodes, checks the reader, THEN calls
+	// the author's proc), the Command_Desc table, and one `<proc>_cmd` wrapper per
+	// command. The wrapper holds the ONLY role branch in the entire feature:
+	// authority runs the proc directly (and fires the game's command hook, the
+	// same cross-entity path client commands take); clients predict (iff
+	// declared) and send.
+	upper := strings.to_upper(snake)
+	if len(s.commands) > 0 {
+		w(b, "// ---- @(gd_command) dispatch + typed issue wrappers ----\n\n")
+		w(b, "// Command indices, by declaration order — for the game's command hook\n")
+		w(b, "// dispatch (never hand-sync these; reordering procs reorders them).\n")
+		for c, ci in s.commands {
+			fmt.sbprintf(b, "%s_CMD_%s :: u16(%d)\n", upper, strings.to_upper(c.name), ci)
+		}
+		w(b, "\n")
+		for c in s.commands {
+			// A composed command routes into the embedded field (`&self.gun`) and qualifies the
+			// proc with its package (`play.gun_fire`); a direct one runs `runner_fire(self, …)`.
+			recv := len(c.path) > 0 ? fmt.tprintf("&self.%s", join_path(c.path)) : "self"
+			qual := c.pkg_alias != "" ? fmt.tprintf("%s.", c.pkg_alias) : ""
+			fmt.sbprintf(b, "@(private = \"file\")\n_%s_cmd_%s :: proc(entity: rawptr, r: ^knet.Reader) -> bool {{\n", snake, c.name)
+			fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
+			for a, i in c.args {
+				fmt.sbprintf(b, "\t_a%d := knet.read_%s(r)\n", i, a.wire)
+			}
+			w(b, "\tif r.err {return false}\n")
+			fmt.sbprintf(b, "\treturn %s%s(%s", qual, c.proc_name, recv)
+			if c.owner {w(b, ", self")} // the block asked for its wielder — pass the entity
+			for _, i in c.args {
+				fmt.sbprintf(b, ", _a%d", i)
+			}
+			w(b, ")\n}\n\n")
+		}
+
+		fmt.sbprintf(b, "@(private = \"file\")\n_%s_commands := [?]knet.Command_Desc {{\n", snake)
+		for c in s.commands {
+			fmt.sbprintf(b, "\t{{name = %q, predict = %v, invoke = _%s_cmd_%s}},\n", c.name, c.predict, snake, c.name)
+		}
+		w(b, "}\n\n")
+	}
+
+	// The command set is emitted for EVERY entity with a descriptor — desc-only
+	// entities (no commands) used to force a hand-built set in the game.
+	if len(s.replicates) > 0 || len(s.commands) > 0 {
+		cmds := len(s.commands) > 0 ? fmt.tprintf(", commands = _%s_commands[:]", snake) : ""
+		net_id := s.net_id_type != "" ? fmt.tprintf(", net_id_offset = int(offset_of(%s, net_id))", cls) : ""
+		fmt.sbprintf(
+			b,
+			"// kit/net command set for %s — the command table + the replicated-field descriptor.\n%s_command_set := knet.Command_Set{{entity_desc = &%s_net_desc%s%s}}\n\n",
+			cls, snake, snake, cmds, net_id,
+		)
+	}
+
+	if len(s.commands) > 0 {
+		for c, ci in s.commands {
+			// A composed command routes into the block and qualifies the proc; its wrapper is
+			// named per-entity (`runner_gun_fire_cmd`) so two blocks of the same type never collide.
+			recv := len(c.path) > 0 ? fmt.tprintf("&self.%s", join_path(c.path)) : "self"
+			qual := c.pkg_alias != "" ? fmt.tprintf("%s.", c.pkg_alias) : ""
+			wrapper := len(c.path) > 0 ? fmt.tprintf("%s_%s", snake, c.name) : c.proc_name
+			fmt.sbprintf(b, "// Issue `%s` — the SAME call on every peer, zero role branches. Authority:\n", c.name)
+			if c.predict {
+				w(b, "// runs the proc directly. Client: predicts optimistically (rejection or a lost\n")
+				w(b, "// result auto-reverts the declared fields) and sends the command to the host.\n")
+			} else {
+				w(b, "// runs the proc directly. Client: sends the command to the host (no prediction\n")
+				w(b, "// declared); the state change arrives through normal replication.\n")
+			}
+			w(b, "// Returns whether the command applied locally (authoritative on the host,\n")
+			w(b, "// optimistic on a predicting client) — the host's result is always authoritative.\n")
+			fmt.sbprintf(b, "%s_cmd :: proc(ctx: ^knet.Command_Ctx, self: ^%s", wrapper, cls)
+			for a in c.args {
+				fmt.sbprintf(b, ", %s: %s", a.name, a.type_text)
+			}
+			w(b, ") -> bool {\n")
+			w(b, "\tif ctx.is_authority {\n")
+			fmt.sbprintf(b, "\t\t_ok := %s%s(%s", qual, c.proc_name, recv)
+			if c.owner {w(b, ", self")}
+			for a in c.args {
+				fmt.sbprintf(b, ", %s", a.name)
+			}
+			w(b, ")\n")
+			fmt.sbprintf(b, "\t\tknet.command_hook_local(ctx, self.net_id, %d, _ok) // same cross-entity path client commands take\n", ci)
+			w(b, "\t\treturn _ok\n\t}\n")
+			fmt.sbprintf(b, "\tknet.command_begin(ctx, self.net_id, %d)\n", ci)
+			for a in c.args {
+				fmt.sbprintf(b, "\tknet.write_%s(&ctx.msg, %s)\n", a.wire, a.name)
+			}
+			fmt.sbprintf(b, "\treturn knet.command_issue(ctx, self, &%s_command_set, %d)\n}}\n\n", snake, ci)
+		}
 	}
 
 	// lifecycle literal

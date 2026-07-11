@@ -17,6 +17,19 @@ Write Godot scripts in compiled Odin. New here? Start at the addon
 - **[Workflow](workflow.md)** — the day-to-day build/edit/iterate loop, editor DX
   (autocomplete, goto-definition, rebuild-on-save), and the honest limits of AOT scripting.
 
+## Build multiplayer
+
+- **[The friendslop toolkit](kit/index.md)** — reusable multiplayer systems under
+  `godot:kit/*`: host-authoritative sessions with reconnect identity, declarative
+  replication with client prediction, chat, items, combat, NPCs, save/resume,
+  moderation, and ENet + Steam transports — for 2-8 player co-op games.
+- **[Build a game in a day](kit/build-a-game-in-a-day.md)** — the tutorial arc.
+- **[Gameplay recipes](recipes.md)** — the compositional pattern for `kit` + `play`: an
+  entity is a struct of `play` primitives, and each networked behavior is sliced into seven
+  authority/time slots (State, Cadence, Intent, Authority, Prediction, Reconcile, Cue). One
+  worked gun, five real items against the skeleton — the multiplayer answer to Godot's
+  component-composition pattern.
+
 ## Ship
 
 - **[Exporting](exporting.md)** — compiling and bundling scripts for desktop and web exports.

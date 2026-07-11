@@ -8,6 +8,11 @@ signals, `@export`, and methods — but they compile to fast native code.
 already discovered `odin_godot.gdextension`; you just need the Odin toolchain and your first
 script. This page gets you there. The full reference lives in [`docs/`](docs/index.md).
 
+Building a co-op game? The addon includes the **friendslop toolkit** (`godot:kit/*`) —
+multiplayer sessions, replication with prediction, items/combat/NPCs, save/resume, live
+host migration, and ENet + Steam + WebRTC (browser) transports. Start at
+[docs/kit/](docs/kit/index.md).
+
 ---
 
 ## How it works (read this first)
@@ -128,6 +133,7 @@ Then just **Export → Web**. Full walkthrough — including serving headers —
 | Editor warns **"`odin` not found"** (validation/reload off) | The editor process can't see `odin` on PATH. Set the `odin_godot/odin_bin` project setting to the absolute path of your `odin`, or launch the editor from a shell where `odin` is on PATH. |
 | Web export logs **"Emscripten `emcc` not found"** | Install the Emscripten SDK (activate 4.0.20) and set the `odin_godot/emcc_bin` project setting to its `emcc`. See [docs/exporting.md](docs/exporting.md). |
 | Build error **"no Odin scripts found"** | You have no `scripts/` folder yet — copy the template (*Quick start*, step 1). |
+| **Headless/CI runs can't find the extension** ("No loader found for resource: …odin") | Godot registers the addon during the editor's import step, which headless runs skip. Run `godot --headless --path . --import` once (per fresh checkout / addon update) before `--script`/server runs — your CI script should do this unconditionally. |
 | Windows: odin errors on a path with spaces | The build scripts use relative paths to cope, but the most reliable fix is a space-free project path (e.g. `C:\games\mygame`). |
 
 ## Platform status (honest)

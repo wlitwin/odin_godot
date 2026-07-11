@@ -143,11 +143,26 @@ sv_save :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.T
         return
     }
 
+    // TEMPLATE PACKAGE FIXUP: the Create-Script dialog builds its template
+    // before a path exists, so a fresh script lands with `package scripts` —
+    // and saved into a directory whose siblings declare another package, that
+    // is a guaranteed build break one step later ("Different package name").
+    // The SAVE is the first moment both the text and the destination are
+    // known, so fix the line up here. Only the template's default is ever
+    // rewritten; user-authored package names are never touched.
+    fixed_src := template_package_fixup(os_path, odin_src)
+    if raw_data(fixed_src) != raw_data(odin_src) {
+        fs := godot.new_string_odin(fixed_src)
+        godot.script_set_source_code(cast(godot.Script)resource, fs)
+        format_sync_editor_buffer(path, fixed_src)
+    }
+    defer if raw_data(fixed_src) != raw_data(odin_src) {delete(fixed_src)}
+
     // Format on save (core/format.odin): odinfmt the text hitting disk, keep the resource
     // + the open editor buffer in sync. Falls back to the original bytes on any problem
     // (no odinfmt, mid-edit syntax errors) — saving must never fail because of formatting.
-    final_src := format_for_save(cast(godot.Script)resource, path, odin_src)
-    defer if raw_data(final_src) != raw_data(odin_src) {delete(final_src)}
+    final_src := format_for_save(cast(godot.Script)resource, path, fixed_src)
+    defer if raw_data(final_src) != raw_data(fixed_src) {delete(final_src)}
 
     if werr := os.write_entire_file(os_path, transmute([]u8)final_src); werr != nil {
         ret_int(ret, 12) // ERR_FILE_CANT_WRITE
@@ -164,6 +179,72 @@ sv_save :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.T
     reload_request()
 
     ret_int(ret, 0) // OK
+}
+
+// If `source` declares the template's default `package scripts` and a sibling
+// `.odin` file next to `os_path` declares something else, return a copy with
+// the package line rewritten; otherwise return `source` unchanged (callers
+// compare raw_data to know). Reads at most one sibling: any package mismatch
+// among siblings is already a build error the fixup cannot save anyone from.
+@(private = "file")
+template_package_fixup :: proc(os_path: string, source: string) -> string {
+    NEEDLE :: "\npackage scripts\n"
+    at := strings.index(source, NEEDLE)
+    if at < 0 {
+        if !strings.has_prefix(source, "package scripts\n") {
+            return source
+        }
+        at = -1 // package line first (no leading marker comments)
+    }
+    dir := os_path
+    if i := strings.last_index_byte(dir, '/'); i >= 0 {
+        dir = dir[:i]
+    }
+    sibling_pkg := ""
+    if fd, err := os.open(dir); err == nil {
+        defer os.close(fd)
+        if entries, rerr := os.read_dir(fd, -1, context.temp_allocator); rerr == nil {
+            for e in entries {
+                if !strings.has_suffix(e.name, ".odin") || strings.has_suffix(e.name, ".gen.odin") {
+                    continue
+                }
+                if e.fullpath == os_path {
+                    continue
+                }
+                data, rerr2 := os.read_entire_file(e.fullpath, context.temp_allocator)
+                if rerr2 != nil {
+                    continue
+                }
+                text := string(data)
+                for line in strings.split_lines_iterator(&text) {
+                    t := strings.trim_space(line)
+                    if strings.has_prefix(t, "package ") {
+                        sibling_pkg = strings.trim_space(t[len("package "):])
+                        break
+                    }
+                }
+                if sibling_pkg != "" {
+                    break
+                }
+            }
+        }
+    }
+    if sibling_pkg == "" || sibling_pkg == "scripts" {
+        return source
+    }
+    b := strings.builder_make()
+    if at < 0 {
+        strings.write_string(&b, "package ")
+        strings.write_string(&b, sibling_pkg)
+        strings.write_string(&b, source[len("package scripts"):])
+    } else {
+        strings.write_string(&b, source[:at])
+        strings.write_string(&b, "\npackage ")
+        strings.write_string(&b, sibling_pkg)
+        strings.write_string(&b, "\n")
+        strings.write_string(&b, source[at + len(NEEDLE):])
+    }
+    return strings.to_string(b)
 }
 
 odin_saver_register :: proc() {

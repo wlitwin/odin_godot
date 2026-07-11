@@ -167,7 +167,7 @@ make_odin_template :: proc(class_name, base: string) -> string {
     strings.write_string(&b, "import gd \"godot:godot\"\n\n")
     fmt.sbprintf(
         &b,
-        "%s :: struct {{\n\towner: gd.Node, // the node this script is attached to (retype for your base, e.g. gd.Node2d)\n}}\n\n",
+        "%s :: struct {{\n\t// The engine node this script is attached to (retype for your base, e.g.\n\t// gd.Node2d). Engine calls (add_child, connect_to, queue_free, ...) take\n\t// `self.owner` — NEVER `self`, which is this Odin struct: both compile\n\t// (engine handles are raw pointers), but `self` crashes at runtime.\n\towner: gd.Node,\n}}\n\n",
         class_name,
     )
     fmt.sbprintf(&b, "%s_ready :: proc(self: ^%s) {{\n\tgd.print(\"%s ready\")\n}}\n\n", snake, class_name, class_name)

@@ -468,6 +468,13 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		s.class_name = s.struct_name
 	}
 
+	// The resolution context for nested `using`/embedded fields: this file's package dir
+	// (bare types) and its explicit-alias imports (imported bundles). See lookup_struct.
+	nest_ctx := Struct_Def {
+		dir     = dir_of(path),
+		imports = collect_file_imports(&file),
+	}
+
 	// Exports: struct fields (after owner) tagged `gd:"export"` (or `gd:"onready=PATH"`).
 	for f, i in struct_type.fields.list {
 		if i == 0 {continue} // owner
@@ -482,6 +489,14 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		}
 
 		floc := Loc{s.path, f.pos.line}
+
+		// Commands name their entity over the wire: remember whether the struct
+		// declares a `net_id` field (validated iff @(gd_command) procs exist).
+		for nm in f.names {
+			if ident, iok := nm.derived.(^ast.Ident); iok && ident != nil && ident.name == "net_id" {
+				s.net_id_type = strings.trim_space(node_text(src, f.type))
+			}
+		}
 
 		val, has := tag_gd_value(f.tag.text)
 		if !has && f.tag.text != "" {
@@ -526,7 +541,28 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			}
 		}
 
-		if !has {continue}
+		if !has {
+			// No gd tag: this may be a `using`/embedded sub-struct whose fields carry
+			// gd tags. Resolve the field's type (same-package or imported bundle) and
+			// recurse so nested `gd:"replicate"` (and, through `using`, export/onready/
+			// signal) fields are discovered. Non-struct / unresolved / typo'd types
+			// don't resolve and are skipped, exactly as before (nested-replicate-fields).
+			nested := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
+			if def, subst, ok := resolve_type(nest_ctx, nested); ok {
+				entry_using := .Using in f.flags
+				for nm in f.names {
+					ident, iok := nm.derived.(^ast.Ident)
+					if !iok || ident == nil {continue}
+					// `using` flattens (members keep their leaf name); a plain embed
+					// namespaces them under `<field>_` (see recurse_into / walk_members).
+					name_prefix := entry_using ? "" : strings.concatenate({ident.name, "_"})
+					visited := make(map[string]bool)
+					recurse_into(&s, def, path_of(ident.name), &visited, name_prefix, subst)
+					delete(visited)
+				}
+			}
+			continue
+		}
 		// Tag is comma-separated tokens. The FIRST token selects the kind:
 		//   - `onready=PATH`  -> a private auto-wired node ref (richer-authoring #1)
 		//   - `export[,SPEC]` -> a serialized @export property
@@ -552,6 +588,25 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			continue
 		}
 
+		// friendslop toolkit: `gd:"replicate[,interp][,owner]"` — a kit/net replicated
+		// field. Only names + options are recorded here; generate.odin emits the
+		// knet.Entity_Desc (offset_of/size_of are the consumer compiler's job) plus a
+		// #assert that rejects non-POD fields at compile time with the field's name.
+		if tok0 == "replicate" {
+			rep, rok := parse_replicate_info(type_text, specs, floc, s.struct_name, field_label)
+			if !rok {continue}
+			// Multi-name fields (`x, y: f32 `gd:"replicate"``) replicate each name.
+			for nm in f.names {
+				ident, iok := nm.derived.(^ast.Ident)
+				if !iok || ident == nil {continue}
+				r := rep
+				r.field = ident.name
+				r.path = path_of(ident.name)
+				append(&s.replicates, r)
+			}
+			continue
+		}
+
 		if tok0 != "export" {
 			if strings.has_prefix(tok0, "args=") {
 				error_at(
@@ -567,7 +622,7 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			// that would otherwise silently leave the field un-exported.
 			error_at(
 				floc,
-				"%s.%s: unknown gd tag %q (expected `export` or `onready=PATH`)",
+				"%s.%s: unknown gd tag %q (expected `export`, `replicate`, or `onready=PATH`)",
 				s.struct_name,
 				field_label,
 				tok0,
@@ -619,7 +674,18 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		}
 	}
 
-	// Procs bound to the struct (first param `^<Struct>`).
+	scan_bound_procs(&s, path, src, &file)
+
+	return s, true
+}
+
+// scan_bound_procs collects the procs bound to `s`'s script struct (first param
+// `^<Struct>`) from ONE parsed file: the script's own file during parse_script,
+// then every top-level HELPER file (no owner-struct) in the package — a grown
+// class may spread its @(gd_method)/@(gd_command)/lifecycle procs across sibling
+// files instead of living in one monolith. `path`/`src` are the file being
+// SCANNED, so diagnostics point at the helper, not the class's home file.
+scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 	self_type := strings.concatenate({"^", s.struct_name})
 	for decl in file.decls {
 		vd, ok := decl.derived.(^ast.Value_Decl)
@@ -635,6 +701,16 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		if pt == nil || pt.params == nil || len(pt.params.list) == 0 {continue}
 		first := pt.params.list[0]
 		if node_text(src, first.type) != self_type {continue}
+
+		// `@(gd_command[="predict"])` — a friendslop-toolkit command (kit/net command
+		// loop). NOT a Godot-callable method: it is issued from Odin code via the
+		// generated `<proc>_cmd` wrapper, so it never joins the method tables. Checked
+		// before the lifecycle match so a command can never be misread as a hook.
+		if has_attr(vd, "gd_command") {
+			config, _ := attr_value(vd, "gd_command")
+			parse_command(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
+			continue
+		}
 
 		// `gd_rpc` implies `gd_method`: an RPC must be a registered method to be dispatchable.
 		is_gd_rpc := has_attr(vd, "gd_rpc")
@@ -660,53 +736,276 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			}
 		}
 		if is_gd_method {
-			m := Method_Info {
-				proc_name = proc_name,
-				gd_name   = stripped,
-				ret       = Variant_Info{enum_name = ".Nil", kind = .Nil},
-			}
-			// args: params after self.
-			for fi in 1 ..< len(pt.params.list) {
-				field := pt.params.list[fi]
-				atext := node_text(src, field.type)
-				vi, vok := map_variant(atext)
-				if !vok {
-					errorf("method %s: unsupported arg type %q", proc_name, atext)
-					continue
-				}
-				for nm in field.names {
-					ident, _ := nm.derived.(^ast.Ident)
-					if ident == nil {continue}
-					append(&m.args, Arg{name = ident.name, type_text = atext, vi = vi})
-				}
-			}
-			// return type (first result, if any).
-			if pt.results != nil && len(pt.results.list) > 0 {
-				rtext := node_text(src, pt.results.list[0].type)
-				vi, vok := map_variant(rtext)
-				if !vok {
-					errorf("method %s: unsupported return type %q", proc_name, rtext)
-				} else {
-					m.ret = vi
-				}
-			}
+			m, _ := build_method_info(src, pt, Loc{path, name_ident.pos.line}, proc_name, s.struct_name, false)
 			append(&s.methods, m)
 
 			// `@(gd_connect="signal")` — auto-connect owner.signal -> this method on READY.
 			if sig, has := attr_value(vd, "gd_connect"); has {
-				append(&s.connections, Connection_Info{signal = sig, method = stripped})
+				append(&s.connections, Connection_Info{signal = sig, method = m.gd_name})
 			}
 
 			// `@(gd_rpc[="..."])` — expose this method to Godot's high-level multiplayer.
 			// `attr_value` is "" for the bare `@(gd_rpc)` form (=> all defaults).
 			if is_gd_rpc {
 				config, _ := attr_value(vd, "gd_rpc")
-				append(&s.rpcs, parse_rpc_config(stripped, config))
+				append(&s.rpcs, parse_rpc_config(m.gd_name, config))
 			}
 		}
 	}
+}
 
-	return s, true
+// validate_script — contract checks that must wait until EVERY file's procs are
+// in (a @(gd_command) may live in a helper file, so parse_script alone can't see
+// the full set). Commands lean on the replication machinery: prediction reverts,
+// torn-state restore, and reject-truth snapshots all need the Entity_Desc, and
+// the wire header needs the entity's net identity. Missing either is a build
+// error HERE, with the fix spelled out — not a nil-descriptor crash at runtime.
+validate_script :: proc(s: ^Script) {
+	if len(s.commands) > 0 {
+		if len(s.replicates) == 0 {
+			error_at(
+				Loc{path = s.path},
+				"%s declares @(gd_command) procs but no gd:\"replicate\" fields — commands mutate replicated state (prediction, revert, and reject-truth all run off the field descriptor)",
+				s.struct_name,
+			)
+		}
+		nt := s.net_id_type
+		if i := strings.last_index(nt, "."); i >= 0 {nt = nt[i + 1:]}
+		if nt != "Net_Id" {
+			error_at(
+				Loc{path = s.path},
+				"%s declares @(gd_command) procs but no `net_id: knet.Net_Id` field — commands name their entity over the wire; add the field (the session/registry layer assigns it)",
+				s.struct_name,
+			)
+		}
+	}
+}
+
+// Classify a `gd:"replicate,interp"` field's type into a knet.Lerp_Kind literal
+// — how stream sampling blends it between two snapshots. f32/f64 scalars, fixed
+// arrays of them, and the engine's float value types (real_t = f32 in standard
+// builds) lerp; everything else returns "" and the caller rejects the tag.
+interp_lerp_kind :: proc(type_text: string) -> string {
+	t := strings.trim_space(type_text)
+	// fixed arrays: [N]f32 / [N]f64 (and nested, e.g. [2][2]f32)
+	if strings.has_prefix(t, "[") {
+		if i := strings.index_byte(t, ']'); i >= 0 {
+			return interp_lerp_kind(t[i + 1:])
+		}
+		return ""
+	}
+	switch t {
+	case "f32":
+		return ".F32"
+	case "f64":
+		return ".F64"
+	}
+	base := t
+	if i := strings.last_index(base, "."); i >= 0 {
+		base = base[i + 1:]
+	}
+	switch base {
+	case "Vector2", "Vector3", "Vector4", "Color":
+		return ".F32"
+	case "Quaternion":
+		// NOT componentwise: rotations need hemisphere-safe nlerp (q == -q).
+		return ".Quat"
+	}
+	return ""
+}
+
+// Map a command-arg type to kit/net's wire read_/write_ proc suffix plus the
+// spelling spliced into the generated wrapper signature. Net_Id/Player_Id are
+// normalized to the gen file's `knet.` qualifier whatever the author aliased
+// `godot:kit/net` as. ok=false = not wire-serializable (the caller errors).
+command_wire_type :: proc(type_text: string) -> (wire: string, splice: string, ok: bool) {
+	t := strings.trim_space(type_text)
+	base := t
+	if i := strings.last_index(base, "."); i >= 0 {
+		base = base[i + 1:]
+	}
+	switch base {
+	case "Net_Id":
+		return "net_id", "knet.Net_Id", true
+	case "Player_Id":
+		return "player_id", "knet.Player_Id", true
+	}
+	if base != t {
+		return "", "", false // qualified non-kit/net type (gd.Vector2, ...)
+	}
+	switch t {
+	case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "bool", "string":
+		return t, t, true
+	}
+	return "", "", false
+}
+
+// Build a Command_Info from one @(gd_command[="predict"]) proc. Cheap build-time
+// contract checks live here: wire-serializable args only, and the proc must return
+// exactly `bool` (true = applied; false = rejected, which auto-reverts the entity's
+// declared fields on every peer). Shared by the entity scan (scan_bound_procs, direct
+// commands) and the imported-package index (index_pkg_dir, composed commands).
+//
+// `struct_name` names the RECEIVER (`Runner` for a direct command, `Gun` for a composed
+// one) — it only strips the proc-name prefix for the diagnostic verb. `allow_owner` is set
+// for COMPOSED commands: a pointer parameter right after the receiver is the embedding
+// entity (`owner: ^Entity` / `^$E`), which scriptgen fills with `self` rather than reading
+// from the wire — so the block can touch its wielder. A direct command's receiver already
+// IS the entity, so owner detection is off there and a pointer arg errors as un-wire-able.
+// ok=false = a hard contract violation was reported (the caller drops the command).
+build_command_info :: proc(
+	src: string,
+	pt: ^ast.Proc_Type,
+	loc: Loc,
+	proc_name, struct_name, config: string,
+	allow_owner: bool,
+) -> (
+	Command_Info,
+	bool,
+) {
+	cmd := Command_Info {
+		proc_name = proc_name,
+		name      = strip_struct_prefix(proc_name, struct_name),
+	}
+	ok := true
+
+	for part in strings.split(config, ",") {
+		tok := strings.trim_space(part)
+		switch tok {
+		case "":
+		case "predict":
+			cmd.predict = true
+		case:
+			error_at(loc, "command %s: unknown config token %q (expected `predict`)", proc_name, tok)
+			ok = false
+		}
+	}
+
+	// A composed command may name the embedding entity as its second param (a pointer, hence
+	// never a wire arg). Detect and skip it — the decode thunk passes `self` there.
+	start := 1
+	if allow_owner && len(pt.params.list) > 1 {
+		p1 := strings.trim_space(node_text(src, pt.params.list[1].type))
+		if strings.has_prefix(p1, "^") {
+			cmd.owner = true
+			start = 2
+		}
+	}
+
+	for fi in start ..< len(pt.params.list) {
+		field := pt.params.list[fi]
+		atext := strings.trim_space(node_text(src, field.type))
+		wire, splice, wok := command_wire_type(atext)
+		if !wok {
+			if atext == "int" || atext == "uint" {
+				error_at(
+					loc,
+					"command %s: arg type %q has platform-dependent width — command args cross the wire; use a fixed-width integer (i32, u16, ...)",
+					proc_name,
+					atext,
+				)
+			} else {
+				error_at(
+					loc,
+					"command %s: unsupported arg type %q — command args must be wire primitives (fixed-width ints, f32/f64, bool, string, knet.Net_Id, knet.Player_Id)",
+					proc_name,
+					atext,
+				)
+			}
+			ok = false
+			continue
+		}
+		for nm in field.names {
+			ident, iok := nm.derived.(^ast.Ident)
+			if !iok || ident == nil {continue}
+			append(&cmd.args, Command_Arg{name = ident.name, type_text = splice, wire = wire})
+		}
+	}
+
+	ret_ok := false
+	if pt.results != nil && len(pt.results.list) == 1 && len(pt.results.list[0].names) <= 1 {
+		ret_ok = strings.trim_space(node_text(src, pt.results.list[0].type)) == "bool"
+	}
+	if !ret_ok {
+		error_at(
+			loc,
+			"command %s must return exactly `bool` — true = applied, false = rejected (a rejection auto-reverts the declared fields)",
+			proc_name,
+		)
+		ok = false
+	}
+
+	return cmd, ok
+}
+
+// A direct @(gd_command) on the entity itself: build it (owner threading is only for
+// embedded blocks — the entity IS `self`) and append. Appended even on a contract error so
+// the diagnostic isn't compounded by a phantom "unknown command"; had_error stops the build
+// before generate() sees it.
+parse_command :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
+	cmd, _ := build_command_info(src, pt, loc, proc_name, s.struct_name, config, false)
+	append(&s.commands, cmd)
+}
+
+// Build a Method_Info from a @(gd_method)/@(gd_rpc) proc: the GDScript-exposed name (stripped),
+// the Variant-mapped args, and the return. Shared by the entity scan (scan_bound_procs, direct
+// methods) and the imported-package index (index_pkg_dir, composed block methods). Like commands,
+// `allow_owner` (set for a composed method) treats a pointer param right after the receiver as the
+// embedding entity — scriptgen fills it with `self`, it is not a Variant arg. rpc/connect config is
+// the caller's to attach (it is attribute-based). ok=false = a contract violation was reported.
+build_method_info :: proc(
+	src: string,
+	pt: ^ast.Proc_Type,
+	loc: Loc,
+	proc_name, struct_name: string,
+	allow_owner: bool,
+) -> (
+	Method_Info,
+	bool,
+) {
+	m := Method_Info {
+		proc_name = proc_name,
+		gd_name   = strip_struct_prefix(proc_name, struct_name),
+		ret       = Variant_Info{enum_name = ".Nil", kind = .Nil},
+		line      = loc.line,
+	}
+	ok := true
+	// A composed method may name the embedding entity as its second param (a pointer, never a
+	// Variant arg). Detect and skip it — the trampoline passes `self` there.
+	start := 1
+	if allow_owner && len(pt.params.list) > 1 {
+		p1 := strings.trim_space(node_text(src, pt.params.list[1].type))
+		if strings.has_prefix(p1, "^") {
+			m.owner = true
+			start = 2
+		}
+	}
+	for fi in start ..< len(pt.params.list) {
+		field := pt.params.list[fi]
+		atext := node_text(src, field.type)
+		vi, vok := map_variant(atext)
+		if !vok {
+			error_at(loc, "method %s: unsupported arg type %q", proc_name, atext)
+			ok = false
+			continue
+		}
+		for nm in field.names {
+			ident, _ := nm.derived.(^ast.Ident)
+			if ident == nil {continue}
+			append(&m.args, Arg{name = ident.name, type_text = atext, vi = vi})
+		}
+	}
+	if pt.results != nil && len(pt.results.list) > 0 {
+		rtext := node_text(src, pt.results.list[0].type)
+		vi, vok := map_variant(rtext)
+		if !vok {
+			error_at(loc, "method %s: unsupported return type %q", proc_name, rtext)
+			ok = false
+		} else {
+			m.ret = vi
+		}
+	}
+	return m, ok
 }
 
 // Extract the string value of a `@(name="value")` attribute. Returns ("", false) if the
@@ -805,4 +1104,301 @@ has_attr :: proc(vd: ^ast.Value_Decl, name: string) -> bool {
 		}
 	}
 	return false
+}
+
+// ---- nested replicated fields (through `using`/embedded sub-structs) ---------
+//
+// A `gd:"replicate"` field can live inside a sub-struct the entity embeds — either
+// promoted (`using m: Move`) or plain (`m: Move`, accessed `self.m.x`). parse_script
+// recurses into any untagged field whose type resolves to a package struct (the
+// g_struct_index), collecting each nested replicate field with its full ACCESS PATH
+// from the entity root. generate.odin turns the path into a composed offset expression
+// (`offset_of(Cls, m) + offset_of(type_of(Cls{}.m), x)`) that needs no import of the
+// sub-struct's type — so this works identically for same-package and (later) imported
+// bundles. See the nested-replicate-fields KB doc.
+
+// A one-segment path (a top-level field). Heap-allocated so it outlives parse_script.
+path_of :: proc(seg: string) -> []string {
+	p := make([]string, 1)
+	p[0] = seg
+	return p
+}
+
+// prefix + [leaf], freshly allocated (sibling nested fields must not share backing).
+extend_path :: proc(prefix: []string, leaf: string) -> []string {
+	p := make([]string, len(prefix) + 1)
+	copy(p, prefix)
+	p[len(prefix)] = leaf
+	return p
+}
+
+join_path :: proc(path: []string) -> string {
+	return strings.join(path, ".")
+}
+
+// The entity-level name for a command or method composed from an embedded block: the access path
+// joined with the verb by underscores. {"gun"} + "fire" -> "gun_fire"; {"loadout","primary"} +
+// "fire" -> "loadout_primary_fire". Drives the command index const / decode thunk / issue wrapper
+// and the method's registered name / trampoline — unique per field even for two blocks of the same
+// type (primary vs secondary).
+compose_member_name :: proc(path: []string, verb: string) -> string {
+	b := strings.builder_make()
+	for seg in path {
+		strings.write_string(&b, seg)
+		strings.write_byte(&b, '_')
+	}
+	strings.write_string(&b, verb)
+	return strings.to_string(b)
+}
+
+// How the entity's generated file must reach a composed command's proc: the import alias +
+// `godot:` path to qualify it with (play.gun_fire). ("","") when the block lives in the
+// entity's OWN package — no qualifier, no import. `def_dir` is the block's package dir;
+// `scripts_dir` the entity's. A `godot:kit/combat` block yields alias "kit_combat".
+composed_pkg_ref :: proc(def_dir, scripts_dir: string) -> (alias, path: string) {
+	if def_dir == scripts_dir || g_godot_root == "" {return "", ""}
+	if !strings.has_prefix(def_dir, g_godot_root) {return "", ""}
+	rel := strings.trim_prefix(def_dir[len(g_godot_root):], "/")
+	if rel == "" {return "", ""}
+	a := strings.builder_make()
+	for i in 0 ..< len(rel) {
+		strings.write_byte(&a, rel[i] == '/' ? '_' : rel[i])
+	}
+	return strings.to_string(a), strings.concatenate({"godot:", rel})
+}
+
+// apply_subst rewrites whole-identifier generic parameters in a type text to their
+// concrete args. With {S = "Gun_State"}: "S" -> "Gun_State", "Edge(S)" -> "Edge(Gun_State)",
+// "[N]f32" -> "[4]f32" (with {N = "4"}). Only WHOLE identifiers are replaced, never a
+// substring of a longer name. Empty subst returns the input untouched.
+apply_subst :: proc(type_text: string, subst: map[string]string) -> string {
+	if len(subst) == 0 {return type_text}
+	b := strings.builder_make()
+	i := 0
+	for i < len(type_text) {
+		c := type_text[i]
+		if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			j := i
+			for j < len(type_text) && is_ident_byte(type_text[j]) {j += 1}
+			word := type_text[i:j]
+			if repl, ok := subst[word]; ok {
+				strings.write_string(&b, repl)
+			} else {
+				strings.write_string(&b, word)
+			}
+			i = j
+		} else {
+			strings.write_byte(&b, c)
+			i += 1
+		}
+	}
+	return strings.to_string(b)
+}
+
+// Detect a typed signal field (gd.Signal0 … Signal4 / gd.SignalN) from its normalized
+// type text — used to reject signals inside nested structs (unsupported for now).
+is_signal_field_type :: proc(type_text: string) -> bool {
+	if _, _, ok := signal_type_params(type_text); ok {return true}
+	return strings.has_prefix(type_text, "gd.SignalN(") || strings.has_prefix(type_text, "godot.SignalN(")
+}
+
+// Walk a resolved struct def's fields, appending each `gd:"replicate"` field to
+// s.replicates (with its full access PATH, for the offset), generating a typed emit helper
+// for each nested signal, and recursing into further untagged sub-structs (resolved through
+// `def`'s own package + imports). `visited` (keyed by def id) guards cyclic type references.
+// `name_prefix` is the engine-registration name prefix for members here: "" under an
+// all-`using` path (members keep their promoted leaf name), or `<field>_<...>` accumulated
+// through plain embeds — the SAME rule register_class.odin's walk_members applies, so the
+// signal name scriptgen emits a helper for matches the name the runtime registers.
+//
+// Tag handling by kind:
+//   * replicate — scanned through ANY nesting (using or plain, same-package or imported);
+//     the wire keys fields by offset+order, so the name is irrelevant. scriptgen owns the descriptor.
+//   * export/onready — registered (and validated) by the RUNTIME reflection walk; scriptgen
+//     leaves them alone here (no line/doc/accessor metadata for nested exports yet).
+//   * signal — registered by the runtime walk; scriptgen generates the typed `*_emit_*`
+//     helper (arity family only — SignalN needs its AST payload node, which the index
+//     doesn't carry, so it registers at runtime without a typed helper).
+recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[string]bool, name_prefix: string, subst: map[string]string) {
+	if visited[def.id] {return} // a type reachable from itself — stop, don't loop
+	visited[def.id] = true
+	defer delete_key(visited, def.id) // allow the same type at independent sibling positions
+
+	// verb-/method-composition (the dual of the nested-replicate collection below): hoist this
+	// sub-struct's @(gd_command) and @(gd_method)/@(gd_rpc) procs onto the entity, keyed by the
+	// access PATH to this field. The entity's generated file routes each thunk/trampoline into
+	// `&self.<path>` and (if the block declared an owner param) passes `self`. Deeper embeds recurse
+	// below and hoist under their longer paths, so a gun three levels down still registers on the
+	// entity that owns the net id. The engine-facing name is path-prefixed (`weapon_reload`) so two
+	// blocks of the same type never collide.
+	if len(def.commands) > 0 || len(def.methods) > 0 {
+		alias, ppath := composed_pkg_ref(def.dir, dir_of(s.path))
+		for c in def.commands {
+			hoisted := c // shares the (read-only) args slice; path/name/pkg are entity-relative
+			hoisted.path = path
+			hoisted.pkg_alias = alias
+			hoisted.pkg_path = ppath
+			hoisted.name = compose_member_name(path, c.name)
+			append(&s.commands, hoisted)
+		}
+		for mi in def.methods {
+			hm := mi // shares the (read-only) args slice
+			hm.path = path
+			hm.pkg_alias = alias
+			hm.pkg_path = ppath
+			hm.gd_name = compose_member_name(path, mi.gd_name)
+			append(&s.methods, hm)
+			// Re-emit the rpc / connect config under the namespaced method name.
+			if hm.is_rpc {
+				rpc := mi.rpc
+				rpc.method = hm.gd_name
+				append(&s.rpcs, rpc)
+			}
+			if hm.connect != "" {
+				append(&s.connections, Connection_Info{signal = hm.connect, method = hm.gd_name})
+			}
+		}
+	}
+
+	for fld in def.fields {
+		fpath := extend_path(path, fld.name)
+		// If `def` is a generic instantiation, resolve this field's generic params to the
+		// concrete args first (`cur: S` -> `cur: Gun_State`) — so interp classification,
+		// POD checks, and deeper resolution all see the real type. The OFFSET itself is
+		// path-based (type_of at the consumer compile), so it resolves generics regardless.
+		ftype := apply_subst(fld.type_text, subst)
+		// Signals declare by TYPE (tag optional) — check before the tagged/skip branches.
+		if is_signal_field_type(ftype) {
+			if arity, params, ok := signal_type_params(ftype); ok {
+				v, h := tag_gd_value(fld.tag)
+				parse_signal_field(s, fld.loc, strings.concatenate({name_prefix, fld.name}), arity, params, v, h)
+			}
+			continue
+		}
+		val, has := tag_gd_value(fld.tag)
+		if has {
+			specs := strings.split(val, ",")
+			if len(specs) > 0 && strings.trim_space(specs[0]) == "replicate" {
+				rep, rok := parse_replicate_info(ftype, specs, fld.loc, s.struct_name, join_path(fpath))
+				if rok {
+					rep.field = fld.name
+					rep.path = fpath
+					append(&s.replicates, rep)
+				}
+			}
+			// export/onready (and any unknown tag) are the runtime reflection walk's to
+			// register and validate — scriptgen owns only `replicate` through nesting.
+			continue
+		}
+		if sub, sub_subst, ok := resolve_type(def, ftype); ok {
+			// `using` keeps the current name prefix; a plain embed extends it by `<field>_`.
+			sub_prefix := fld.is_using ? name_prefix : strings.concatenate({name_prefix, fld.name, "_"})
+			recurse_into(s, sub, fpath, visited, sub_prefix, sub_subst)
+		}
+	}
+}
+
+// Parse the OPTIONS half of a `gd:"replicate,..."` tag into a Replicate_Info (the
+// caller fills in `field`/`path`). Shared by the top-level field loop and the nested
+// walk. `specs` is the whole comma-split tag; specs[0] is "replicate". ok=false means
+// the field can't be replicated and was already reported (skip it).
+parse_replicate_info :: proc(
+	type_text: string,
+	specs: []string,
+	floc: Loc,
+	struct_name, field_label: string,
+) -> (
+	Replicate_Info,
+	bool,
+) {
+	// Engine handle/heap types can never be replicated fields: object handles and Rids
+	// are peer-local, and String/Array/Dictionary/Packed_* own heap memory a memcpy would
+	// corrupt. Rejected HERE (with the type's name) because the generated POD #assert
+	// can't see engine semantics — a gd.String is pointer-sized and memcmp-safe, and still
+	// wrong to ship. POD engine value types (Vector2/3/4, Color, Transform*, ...) are fine.
+	if vi, vok := map_variant(type_text); vok {
+		denied :=
+			vi.enum_name == ".Object" ||
+			vi.enum_name == ".String" ||
+			vi.enum_name == ".String_Name" ||
+			vi.enum_name == ".Node_Path" ||
+			vi.enum_name == ".Array" ||
+			vi.enum_name == ".Dictionary" ||
+			vi.enum_name == ".Callable" ||
+			vi.enum_name == ".Signal" ||
+			vi.enum_name == ".Rid" ||
+			strings.has_prefix(vi.enum_name, ".Packed_")
+		if denied {
+			error_at(
+				floc,
+				"%s.%s: %q cannot be a replicated field — handles and heap-backed types don't cross the wire. Replicate POD state (ints/floats/bools/enums/vectors) and rebuild engine objects locally; send text/collections as explicit messages.",
+				struct_name,
+				field_label,
+				type_text,
+			)
+			return {}, false
+		}
+	}
+	rep := Replicate_Info{}
+	for spec_raw in specs[1:] {
+		spec := strings.trim_space(spec_raw)
+		// `interp=NAME`: custom blend math — NAME is an author proc of type knet.Blend_Proc,
+		// spliced verbatim into the generated descriptor (a missing/mistyped proc fails the
+		// consumer compile on that line).
+		if strings.has_prefix(spec, "interp=") {
+			name := strings.trim_space(spec[len("interp="):])
+			if name == "" {
+				error_at(floc, "%s.%s: `interp=` needs a blend proc name (a knet.Blend_Proc in this package)", struct_name, field_label)
+				continue
+			}
+			rep.interp = true
+			rep.lerp = ".Custom"
+			rep.blend = name
+			continue
+		}
+		// `wire=f16` / `wire=NAME`: how the field's bytes are ENCODED in packets — half
+		// floats (stock) or an author knet.Wire_Codec, spliced verbatim like a blend proc.
+		// The struct-side value is untouched: shadows, prediction, and rings never see wire bytes.
+		if strings.has_prefix(spec, "wire=") {
+			name := strings.trim_space(spec[len("wire="):])
+			if name == "" {
+				error_at(floc, "%s.%s: `wire=` needs `f16` or a codec name (a knet.Wire_Codec in this package)", struct_name, field_label)
+				continue
+			}
+			if name == "f16" {
+				// The same classifier bare `interp` uses: .F32 means "f32 elements all the
+				// way down" — exactly what a componentwise half-float encoding can carry.
+				if interp_lerp_kind(type_text) != ".F32" {
+					error_at(floc, "%s.%s: `wire=f16` needs f32 elements (f32, float vectors/colors, or fixed arrays of them) — %q has none to halve; use a custom codec with `wire=CODEC`", struct_name, field_label, type_text)
+					continue
+				}
+				rep.wire = ".F16"
+			} else {
+				rep.wire = ".Custom"
+				rep.codec = name
+			}
+			continue
+		}
+		switch spec {
+		case "interp":
+			rep.interp = true
+		case "owner":
+			rep.owner = true
+		case "":
+		case:
+			error_at(floc, "%s.%s: unknown replicate option %q (expected `interp`, `interp=BLEND_PROC`, `owner`, `wire=f16`, or `wire=CODEC`)", struct_name, field_label, spec)
+		}
+	}
+	// Bare `interp` must know HOW to blend: classify the declared type into a knet.Lerp_Kind
+	// (quaternions get hemisphere-safe nlerp — a raw componentwise lerp garbles rotations near
+	// the antipode). Non-float types can only snap — rejected loudly so a tagged int doesn't
+	// silently stutter at the stream rate; `interp=BLEND_PROC` is the escape hatch.
+	if rep.interp && rep.lerp == "" {
+		rep.lerp = interp_lerp_kind(type_text)
+		if rep.lerp == "" {
+			error_at(floc, "%s.%s: `interp` needs a float-based field (f32/f64, float vectors/colors, or fixed arrays of them) — %q can only snap between samples; drop `interp`, use a float type, or supply custom math with `interp=BLEND_PROC`", struct_name, field_label, type_text)
+			return {}, false
+		}
+	}
+	return rep, true
 }

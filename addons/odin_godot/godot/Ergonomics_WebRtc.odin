@@ -29,13 +29,16 @@ package godot
 // production Elixir relay spec EXACTLY — adhere to field names / message types / id semantics:
 //   client -> server:
 //     {"type":"create"}                                // make a room, become host (id 1)
+//     {"type":"create","room":"<CODE>"}                // ...reserving a code — honored when
+//                                                      // free/valid, else assigned (read the
+//                                                      // `created` reply for the truth)
 //     {"type":"join","room":"<CODE>"}                  // join a room
 //     {"type":"signal","to":<peerId>,"data":<opaque>}  // relay SDP/ICE to a peer
 //     {"type":"leave"}
 //   server -> client:
 //     {"type":"created","room":"<CODE>","id":1}
 //     {"type":"joined","room":"<CODE>","id":<n>}
-//     {"type":"peer","id":<peerId>}                    // both sides get it once 2 are in
+//     {"type":"peer","id":<peerId>}                    // host: one per joiner; joiner: the host
 //     {"type":"signal","from":<peerId>,"data":<opaque>}
 //     {"type":"peer_left","id":<peerId>}
 //     {"type":"error","reason":"no_room"|"full"|"bad_msg"}
@@ -58,9 +61,11 @@ package godot
 // they compile + run, but `WebRTCPeerConnection.initialize` fails unless godot-webrtc is
 // installed (out of scope). Prove + use them in the browser export.
 //
-// 2-PEER scope: this implements a host + one client lobby (exactly what the signaling server
-// brokers), so each side has a SINGLE remote peer connection — which is why no per-callable
-// peer disambiguation is needed. The structure generalizes, but the helpers target 2 peers.
+// N-PEER scope: the room is a STAR — one host (peer 1) plus up to seven joiners (the relay
+// assigns ids 2, 3, … in join order and never reuses one). Each JOINER holds a single
+// connection (to the host); the HOST holds one per joiner. Godot's WebRTCMultiplayerPeer in
+// server mode relays client<->client game traffic through the host, so joiners never
+// handshake with each other yet the SceneMultiplayer layer above sees every peer.
 // ----------------------------------------------------------------------------
 
 import gdext "godot:gdext"
@@ -90,6 +95,33 @@ Webrtc_Error :: enum {
 	Closed,
 }
 
+// One live WebRTCPeerConnection to a REMOTE peer, plus the back-pointer the signal-relay
+// Callables need: their userdata must name both the session AND which remote's connection
+// emitted (an SDP/ICE payload is addressed to exactly one peer). The host fills one slot per
+// joiner; a client fills a single slot (the host's). `conn_id` is the connection's INSTANCE
+// ID: the engine owns post-connect teardown (its poll reaps dead channels and frees the
+// object), so before touching `conn` on a signaling message the slot must prove the object
+// still exists — instance ids are never reused, a nil lookup means freed.
+Webrtc_Conn :: struct {
+	used:      bool,
+	remote_id: int,
+	conn:      Web_Rtc_Peer_Connection,
+	conn_id:   u64,
+	ses:       ^Webrtc_Session,
+}
+
+// _conn_alive: the connection object still exists (the engine frees a reaped peer's
+// connection out from under the slot — see conn_id above).
+@(private = "file")
+_conn_alive :: proc "contextless" (c: ^Webrtc_Conn) -> bool {
+	return gdext.object_get_instance_from_id(gdext.ObjectInstanceId(c.conn_id)) != nil
+}
+
+// Remote-connection slots per session: the relay's room cap (host + seven joiners), so the
+// host side can hold every joiner the relay will ever introduce.
+@(private = "file")
+_WEBRTC_MAX_REMOTES :: 8
+
 // A live WebRTC signaling+connection session, owned by these helpers (one per hosting/joining
 // node). Stored in a small fixed global pool so the helpers stay contextless + allocation-free
 // (like the rest of the binding) — there is realistically one lobby per game, a handful at most.
@@ -103,10 +135,8 @@ Webrtc_Session :: struct {
 	mp:        Multiplayer_Api,
 	ws:        Web_Socket_Peer,
 	rtc:       Web_Rtc_Multiplayer_Peer,
-	conn:      Web_Rtc_Peer_Connection,
-	have_conn: bool,
+	conns:     [_WEBRTC_MAX_REMOTES]Webrtc_Conn,
 	my_id:     int,
-	remote_id: int,
 	state:     Webrtc_State,
 	err:       Webrtc_Error,
 	room_buf:  [64]u8, // the room CODE (host: filled on `created`; client: the code it joins)
@@ -143,14 +173,42 @@ _find :: proc "contextless" (node: Node) -> ^Webrtc_Session {
 	return nil
 }
 
+@(private = "file")
+_conn_find :: proc "contextless" (s: ^Webrtc_Session, remote_id: int) -> ^Webrtc_Conn {
+	for i in 0 ..< _WEBRTC_MAX_REMOTES {
+		if s.conns[i].used && s.conns[i].remote_id == remote_id {return &s.conns[i]}
+	}
+	return nil
+}
+
+@(private = "file")
+_conn_free_slot :: proc "contextless" (s: ^Webrtc_Session) -> ^Webrtc_Conn {
+	for i in 0 ..< _WEBRTC_MAX_REMOTES {
+		if !s.conns[i].used {return &s.conns[i]}
+	}
+	return nil
+}
+
+@(private = "file")
+_conn_count :: proc "contextless" (s: ^Webrtc_Session) -> int {
+	n := 0
+	for i in 0 ..< _WEBRTC_MAX_REMOTES {
+		if s.conns[i].used {n += 1}
+	}
+	return n
+}
+
 // webrtc_host starts a WebRTC session as the HOST (peer id 1): it opens the signaling WebSocket
 // at `url` (e.g. "wss://relay.example.com/rtc"), sends `create`, and on `created` captures the
-// ROOM CODE (read it back with `gd.webrtc_room_code(node)` to share with a friend). The handshake
-// begins when the joining peer appears. Returns false if a session slot / the MultiplayerAPI /
-// the socket could not be set up. Pump it with `gd.webrtc_poll(node)` every frame; once
-// connected, use `gd.rpc`.
-webrtc_host :: proc "contextless" (node: Node, url: cstring) -> bool {
-	return _webrtc_start(node, url, "", true)
+// ROOM CODE (read it back with `gd.webrtc_room_code(node)` to share with a friend). A non-empty
+// `room` RESERVES that code — the relay honors it when free and valid, else assigns fresh (host
+// migration pre-arranges tomorrow's room this way, so survivors can chase a code they already
+// know; webrtc_room_code always reports the code that actually opened). The handshake begins
+// when the joining peer appears. Returns false if a session slot / the MultiplayerAPI / the
+// socket could not be set up. Pump it with `gd.webrtc_poll(node)` every frame; once connected,
+// use `gd.rpc`.
+webrtc_host :: proc "contextless" (node: Node, url: cstring, room: cstring = "") -> bool {
+	return _webrtc_start(node, url, room, true)
 }
 
 // webrtc_join starts a WebRTC session as a CLIENT: opens the signaling WebSocket at `url`, sends
@@ -181,10 +239,9 @@ _webrtc_start :: proc "contextless" (node: Node, url: cstring, room: cstring, is
 		ws      = ws,
 		state   = .Connecting_Ws,
 	}
-	// Stash the join code (host's is assigned by the server on `created`).
-	if !is_host {
-		s.room_len = _cstr_to_buf(room, s.room_buf[:])
-	}
+	// Stash the code: the client's join target, or the host's RESERVATION
+	// (the `created` reply overwrites it with whatever actually opened).
+	s.room_len = _cstr_to_buf(room, s.room_buf[:])
 	return true
 }
 
@@ -242,6 +299,9 @@ webrtc_poll :: proc "contextless" (node: Node) {
 		defer free_dictionary(m)
 		if s.is_host {
 			_dset(&m, "type", _vstr("create"))
+			if s.room_len > 0 { // a reservation rides along; the relay decides
+				_dset(&m, "room", _vstr_odin(string(s.room_buf[:s.room_len])))
+			}
 		} else {
 			_dset(&m, "type", _vstr("join"))
 			_dset(&m, "room", _vstr_odin(string(s.room_buf[:s.room_len])))
@@ -275,8 +335,15 @@ webrtc_close :: proc "contextless" (node: Node) {
 		}
 		web_socket_peer_close(s.ws, 1000, string_empty())
 	}
-	// Detach the WebRTC multiplayer peer so the MultiplayerAPI returns to offline; the engine drops
-	// its ref to the (RefCounted) WebRTCMultiplayerPeer + its peer connection, which then free.
+	// Close every remote connection STILL STANDING (the engine frees reaped peers'
+	// connections out from under the slots — never touch a freed one), then detach the
+	// WebRTC multiplayer peer so the MultiplayerAPI returns to offline; the engine drops
+	// its ref to the (RefCounted) WebRTCMultiplayerPeer + its peer connections, which free.
+	for i in 0 ..< _WEBRTC_MAX_REMOTES {
+		if s.conns[i].used && _conn_alive(&s.conns[i]) {
+			web_rtc_peer_connection_close(s.conns[i].conn)
+		}
+	}
 	if cast(rawptr)s.mp != nil {
 		none: Multiplayer_Peer
 		multiplayer_api_set_multiplayer_peer(s.mp, none)
@@ -324,23 +391,63 @@ _handle_packet :: proc "contextless" (s: ^Webrtc_Session) {
 		s.state = .Waiting_Peer
 
 	case "peer":
-		s.remote_id = _dget_int(&d, "id")
-		_setup_connection(s)
+		_setup_connection(s, _dget_int(&d, "id"))
 
 	case "signal":
-		dv := _dget(&d, "data")
-		defer variant_destroy(&dv)
-		if gdext.variant_get_type(cast(gdext.VariantPtr)&dv) == .Dictionary {
-			dd := variant_to_dictionary(&dv)
-			defer free_dictionary(dd)
-			_apply_signal(s, &dd)
+		// Route by SENDER: each remote has its own connection (the host holds several).
+		c := _conn_find(s, _dget_int(&d, "from"))
+		if c != nil {
+			if !_conn_alive(c) {
+				// The engine already reaped this peer and freed the connection; a
+				// straggler SDP/ICE frame has nowhere to land. Forget the slot.
+				c^ = Webrtc_Conn{}
+			} else {
+				dv := _dget(&d, "data")
+				defer variant_destroy(&dv)
+				if gdext.variant_get_type(cast(gdext.VariantPtr)&dv) == .Dictionary {
+					dd := variant_to_dictionary(&dv)
+					defer free_dictionary(dd)
+					_apply_signal(c, &dd)
+				}
+			}
 		}
 
 	case "peer_left":
-		// The other peer dropped. There is only one remote in a 2-peer lobby, so the session is
-		// effectively over; surface it for the lobby UI.
-		s.err = .Closed
-		s.state = .Failed
+		// The relay broadcasts departures to the whole room. A client hearing about
+		// ANOTHER joiner has no connection to it (star topology) — nothing to do.
+		id := _dget_int(&d, "id")
+		c := _conn_find(s, id)
+		if c == nil {break}
+		// THE PRODUCTION ORDER OF DEATH: media dies fast — the engine's poll notices
+		// the dead channel in seconds, reaps the peer, and FREES the connection —
+		// while a dead tab's signaling socket can linger to a TCP timeout, so this
+		// message often arrives AFTER the object is gone. Touch the connection only
+		// if it still exists, and reap it ourselves only when it never finished the
+		// handshake (nobody else will free THAT one). Everything post-connect is the
+		// ENGINE's teardown to run — racing it is how the web host died mid-game
+		// ("indirect call to null" through a freed connection). A LIVE connected
+		// link stays untouched entirely: a relay blip must not kill a healthy game
+		// (the engine notices real departures through the channel itself).
+		pre := false
+		if _conn_alive(c) {
+			st := web_rtc_peer_connection_get_connection_state(c.conn)
+			if st == .State_Connected {break} // healthy link; the slot stays too
+			pre = st == .State_New || st == .State_Connecting
+			if pre {
+				web_rtc_multiplayer_peer_remove_peer(s.rtc, Int(id))
+				web_rtc_peer_connection_close(c.conn)
+			}
+		}
+		c^ = Webrtc_Conn{}
+		if !s.is_host && pre {
+			// The HOST vanished before the channel ever came up: the lobby is over;
+			// surface it for the UI. (A post-connect departure is the ENGINE's news
+			// — the game hears server_disconnected and decides.)
+			s.err = .Closed
+			s.state = .Failed
+		} else if s.is_host && _conn_count(s) == 0 {
+			s.state = .Waiting_Peer
+		}
 
 	case "error":
 		rbuf: [16]u8
@@ -357,8 +464,20 @@ _handle_packet :: proc "contextless" (s: ^Webrtc_Session) {
 @(private = "file")
 _install_peer :: proc "contextless" (s: ^Webrtc_Session, server: bool) {
 	s.rtc = new_web_rtc_multiplayer_peer()
+	// The toolkit (kit/netgd) sends on channel 1 (RELIABLE — commands,
+	// snapshots) and channel 2 (UNRELIABLE_ORDERED — owner streams), beyond
+	// the engine's own channel 0. A WebRTCMultiplayerPeer created with an
+	// EMPTY config has only channel 0's three modes, so a send on channel 1/2
+	// fails with "channel N, max channels: 3". Declare the two extra channels
+	// with the modes the toolkit uses (config[i] = the mode for channel i+1).
+	// ENet games never hit this — ENet has channels for free; WebRTC must
+	// reserve them up front. (Harmless for channel-0-only RPC games.)
 	chans := new_array_default()
 	defer free_array(chans)
+	c1 := Int(Multiplayer_Peer_Transfer_Mode.Transfer_Mode_Reliable) // channel 1
+	c2 := Int(Multiplayer_Peer_Transfer_Mode.Transfer_Mode_Unreliable_Ordered) // channel 2
+	array_push_back(&chans, variant_from_int(&c1))
+	array_push_back(&chans, variant_from_int(&c2))
 	if server {
 		web_rtc_multiplayer_peer_create_server(s.rtc, chans)
 	} else {
@@ -402,10 +521,10 @@ _store_ice :: proc "contextless" (s: ^Webrtc_Session, d: ^Dictionary) {
 	s.have_ice = s.ice_len > 0
 }
 
-// _apply_signal applies a relayed SDP/ICE payload (the nested `data` object) to our connection.
+// _apply_signal applies a relayed SDP/ICE payload (the nested `data` object) to the sender's
+// connection.
 @(private = "file")
-_apply_signal :: proc "contextless" (s: ^Webrtc_Session, dd: ^Dictionary) {
-	if !s.have_conn {return}
+_apply_signal :: proc "contextless" (c: ^Webrtc_Conn, dd: ^Dictionary) {
 	if _dhas(dd, "sdp") {
 		tv := _dget(dd, "sdp_type")
 		defer variant_destroy(&tv)
@@ -415,7 +534,7 @@ _apply_signal :: proc "contextless" (s: ^Webrtc_Session, dd: ^Dictionary) {
 		defer variant_destroy(&sv)
 		sdp := variant_to_string(&sv)
 		defer free_string(sdp)
-		web_rtc_peer_connection_set_remote_description(s.conn, t, sdp)
+		web_rtc_peer_connection_set_remote_description(c.conn, t, sdp)
 	} else if _dhas(dd, "name") {
 		mv := _dget(dd, "media")
 		defer variant_destroy(&mv)
@@ -426,12 +545,15 @@ _apply_signal :: proc "contextless" (s: ^Webrtc_Session, dd: ^Dictionary) {
 		defer variant_destroy(&nv)
 		name := variant_to_string(&nv)
 		defer free_string(name)
-		web_rtc_peer_connection_add_ice_candidate(s.conn, media, Int(idx), name)
+		web_rtc_peer_connection_add_ice_candidate(c.conn, media, Int(idx), name)
 	}
 }
 
 @(private = "file")
-_setup_connection :: proc "contextless" (s: ^Webrtc_Session) {
+_setup_connection :: proc "contextless" (s: ^Webrtc_Session, remote_id: int) {
+	if _conn_find(s, remote_id) != nil {return} // duplicate `peer` — already wired
+	c := _conn_free_slot(s)
+	if c == nil {return} // more remotes than slots; the relay's room cap sits below this
 	conn := new_web_rtc_peer_connection()
 
 	// Configure ICE servers. Prefer the relay's server-provided `ice` array (captured on
@@ -447,23 +569,30 @@ _setup_connection :: proc "contextless" (s: ^Webrtc_Session) {
 	defer free_dictionary(cfg)
 	web_rtc_peer_connection_initialize(conn, cfg)
 
+	// Claim the slot BEFORE wiring signals: the Callables carry the slot pointer as their
+	// userdata (it names both the session and the remote this connection talks to).
+	c^ = Webrtc_Conn {
+		used      = true,
+		remote_id = remote_id,
+		conn      = conn,
+		conn_id   = object_get_instance_id(cast(Object)conn),
+		ses       = s,
+	}
+
 	// Route the connection's async outputs (SDP + ICE) into our relay procs via custom
-	// Callables that carry the session pointer — no per-game handler methods required.
+	// Callables that carry the conn-slot pointer — no per-game handler methods required.
 	// object_connect copies the Callable into the connection, so release our temporaries.
 	sd_sig := new_string_name_cstring("session_description_created", true)
 	ic_sig := new_string_name_cstring("ice_candidate_created", true)
-	sd_cb := _make_callable(_on_session_description, s)
+	sd_cb := _make_callable(_on_session_description, c)
 	defer free_callable(sd_cb)
-	ic_cb := _make_callable(_on_ice_candidate, s)
+	ic_cb := _make_callable(_on_ice_candidate, c)
 	defer free_callable(ic_cb)
 	object_connect(conn, sd_sig, sd_cb, 0)
 	object_connect(conn, ic_sig, ic_cb, 0)
 
-	s.conn = conn
-	s.have_conn = true
-
 	// add_peer builds the data channels the multiplayer peer needs; must precede create_offer.
-	web_rtc_multiplayer_peer_add_peer(s.rtc, conn, Int(s.remote_id), 1)
+	web_rtc_multiplayer_peer_add_peer(s.rtc, conn, Int(remote_id), 1)
 
 	// The host initiates with an offer; the client answers automatically when it
 	// set_remote_description's the offer.
@@ -487,7 +616,7 @@ _make_callable :: proc "contextless" (cf: gdext.ExtensionCallableCustomCall, ud:
 }
 
 // session_description_created(type: String, sdp: String): set it as our LOCAL description, then
-// relay it to the other peer as {"type":"signal","to":<remote>,"data":{"kind":"sdp",...}}.
+// relay it to that connection's remote as {"type":"signal","to":<remote>,"data":{"kind":"sdp",...}}.
 @(private = "file")
 _on_session_description :: proc "c" (
 	userdata: rawptr,
@@ -496,7 +625,14 @@ _on_session_description :: proc "c" (
 	ret: gdext.VariantPtr,
 	err: ^gdext.CallError,
 ) {
-	s := cast(^Webrtc_Session)userdata
+	c := cast(^Webrtc_Conn)userdata
+	if !c.used || cast(rawptr)c.conn == nil {
+		// The slot was reaped between this signal queuing and firing (a dying
+		// connection's last gasp) — there is nothing left to describe.
+		if err != nil {err.error = .Ok}
+		if ret != nil {(cast(^Variant)ret)^ = Variant{}}
+		return
+	}
 	to_str := gdext.get_variant_to_type_constructor(.String)
 	type_s: String
 	sdp_s: String
@@ -505,14 +641,14 @@ _on_session_description :: proc "c" (
 	to_str(cast(gdext.TypePtr)&sdp_s, args[1])
 	defer free_string(sdp_s)
 
-	web_rtc_peer_connection_set_local_description(s.conn, type_s, sdp_s)
+	web_rtc_peer_connection_set_local_description(c.conn, type_s, sdp_s)
 
 	data := new_dictionary_default()
 	defer free_dictionary(data)
 	_dset(&data, "kind", _vstr("sdp"))
 	_dset(&data, "sdp_type", _vstr_g(type_s))
 	_dset(&data, "sdp", _vstr_g(sdp_s))
-	_send_signal(s, &data)
+	_send_signal(c.ses, c.remote_id, &data)
 
 	if err != nil {err.error = .Ok}
 	if ret != nil {(cast(^Variant)ret)^ = Variant{}}
@@ -528,7 +664,13 @@ _on_ice_candidate :: proc "c" (
 	ret: gdext.VariantPtr,
 	err: ^gdext.CallError,
 ) {
-	s := cast(^Webrtc_Session)userdata
+	c := cast(^Webrtc_Conn)userdata
+	if !c.used || cast(rawptr)c.conn == nil {
+		// Reaped slot (see _on_session_description) — drop the candidate.
+		if err != nil {err.error = .Ok}
+		if ret != nil {(cast(^Variant)ret)^ = Variant{}}
+		return
+	}
 	to_str := gdext.get_variant_to_type_constructor(.String)
 	to_int := gdext.get_variant_to_type_constructor(.Int)
 	media_s: String
@@ -546,20 +688,20 @@ _on_ice_candidate :: proc "c" (
 	_dset(&data, "media", _vstr_g(media_s))
 	_dset(&data, "index", _vint(int(index)))
 	_dset(&data, "name", _vstr_g(name_s))
-	_send_signal(s, &data)
+	_send_signal(c.ses, c.remote_id, &data)
 
 	if err != nil {err.error = .Ok}
 	if ret != nil {(cast(^Variant)ret)^ = Variant{}}
 }
 
-// _send_signal wraps `data` in the {"type":"signal","to":<remote>,"data":<data>} envelope and
+// _send_signal wraps `data` in the {"type":"signal","to":<to>,"data":<data>} envelope and
 // sends it as a JSON text frame.
 @(private = "file")
-_send_signal :: proc "contextless" (s: ^Webrtc_Session, data: ^Dictionary) {
+_send_signal :: proc "contextless" (s: ^Webrtc_Session, to: int, data: ^Dictionary) {
 	msg := new_dictionary_default()
 	defer free_dictionary(msg)
 	_dset(&msg, "type", _vstr("signal"))
-	_dset(&msg, "to", _vint(s.remote_id))
+	_dset(&msg, "to", _vint(to))
 	_dset(&msg, "data", variant_from_dictionary(data)) // _dset consumes the Variant
 	_send_json(s.ws, &msg)
 }

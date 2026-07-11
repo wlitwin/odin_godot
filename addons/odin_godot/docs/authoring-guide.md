@@ -44,6 +44,12 @@ Ping :: struct {
 	scratch: int,                 // untagged -> private per-instance state
 }
 
+// Engine calls (add_child, connect_to, queue_free, ...) take `self.owner` —
+// NEVER `self`. `self` is this Odin struct; engine handles are raw pointers,
+// so both compile, but the engine dereferencing your struct is a segfault.
+// scriptgen rejects the bare-`self` form at build time
+// ("...is the ^Ping script struct, not an engine object — pass self.owner").
+
 // Lifecycle procs: matched by name (after stripping an optional `<struct>_`
 // prefix) against ready / process / physics_process / enter_tree / exit_tree, and
 // bound by the `^Ping` receiver. Write a plain Odin proc; codegen wraps it.
@@ -168,7 +174,7 @@ header that applies to that field and every export after it, until the next mark
 
 ```odin
 Player :: struct {
-	owner:   gd.CharacterBody2d,
+	owner:   gd.Character_Body2d,
 	speed:   f32 `gd:"export,group=Movement"`, // "Movement" header starts here
 	jump:    f32 `gd:"export"`,                 // …still under "Movement"
 	hp:      i32 `gd:"export,group=Combat"`,    // "Combat" header starts here
@@ -234,7 +240,7 @@ fully-resolved, non-null reference:
 
 ```odin
 Player :: struct {
-	owner:  gd.CharacterBody2d,
+	owner:  gd.Character_Body2d,
 	sprite: gd.Node2d `gd:"onready=Sprite"`,    // owner-relative node path
 	label:  gd.Node   `gd:"onready=HUD/Label"`,
 }
@@ -718,13 +724,14 @@ Practical rules for what runs where and who owns which allocation:
 2. runs `scriptgen <scriptsdir>` to emit the `*.gen.odin` build artifacts beside the
    authored sources (no resource stubs — the authored `.odin` is the attached resource),
 3. builds the scripts dll with `odin build <scriptsdir> -build-mode:dll
-   -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc ...`
+   -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc
+   -custom-attribute:gd_command ...`
    (the `.gen.odin` are in the same package and compile together),
 4. builds the core dll.
 
-The three `-custom-attribute:` flags are required so the Odin compiler accepts the
-`@(gd_method)` / `@(gd_connect)` / `@(gd_rpc)` marker attributes; the build script passes
-them for you.
+The four `-custom-attribute:` flags are required so the Odin compiler accepts the
+`@(gd_method)` / `@(gd_connect)` / `@(gd_rpc)` / `@(gd_command)` marker attributes; the
+build script passes them for you.
 
 The build, the **live-editing (show-on-save) loop**, the editor DX (validation / autocomplete
 / highlighting), debugging, and the editor settings (`odin_godot/odin_bin`,
