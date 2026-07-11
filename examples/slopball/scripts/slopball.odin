@@ -45,8 +45,11 @@ KICK_REACH :: f32(26) // boot-kick range
 KICK_POWER :: f32(260)
 DRIBBLE_R :: f32(21) // contact-nudge range (kicker 9 + ball 8 + a hair)
 DRIBBLE_NUDGE :: f32(14) // per-contact-frame impulse — a push, not a shot
-TOUCH_R :: f32(30) // host grants the ball's sim seat inside this radius
-GRANT_COOL :: 0.3 // seconds between seat grants — no thrash in a scrum
+TOUCH_R :: f32(44) // ANTICIPATORY seat radius: the grant round-trip (your streamed
+	// pose to the host + SETOWNER back) costs ~2 transits + an interp delay; granting
+	// before your foot arrives is what makes the touch feel local. Contact is ~17px.
+GRANT_COOL :: 0.45 // seconds between seat grants — no thrash in a scrum
+GRANT_EDGE :: f32(12) // a challenger must be this much CLOSER than the sitting owner
 KICKOFF_HOLD :: 1.2 // ball frozen at center after a goal/kickoff
 GOAL_MOUTH_TOP :: f32(130)
 GOAL_MOUTH_BOT :: f32(230)
@@ -88,6 +91,14 @@ Slopball :: struct {
 now_s :: knet.now_s
 
 slopball_ready :: proc(self: ^Slopball) {
+	// A physics game lives and dies on pipeline latency: 60Hz streams with a
+	// ~3-keyframe interp window (the kit default is 20Hz/100ms — fine for a
+	// dungeon crawl, mud for a ball you dribble). SLOP_HZ/SLOP_INTERP_MS
+	// keep the acid's A/B knobs.
+	ksess.session_configure(&self.ses, {
+		tick_hz = gd.env_int("SLOP_HZ", 60),
+		interp_delay = f64(gd.env_int("SLOP_INTERP_MS", 50)) / 1000.0,
+	})
 	ksess.session_set_factory(&self.ses, self, slop_make_entity, slop_free_entity)
 
 	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{

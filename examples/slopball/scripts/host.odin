@@ -10,6 +10,7 @@ import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import play "godot:play"
 import "core:fmt"
+import "core:math"
 
 slop_host_tick :: proc(self: ^Slopball) {
 	b := self.ball
@@ -29,18 +30,26 @@ slop_host_tick :: proc(self: ^Slopball) {
 		cur := ksess.session_owner_of(&self.ses, self.ball_id)
 		best: knet.Player_Id = knet.PLAYER_ID_INVALID
 		best_d := TOUCH_R * TOUCH_R
+		cur_d := f32(1e9) // the sitting owner's own distance (possession is sticky)
 		for _, k in self.kickers {
 			pid := knet.Player_Id(k.pid)
 			if p, ok := ksess.session_player(&self.ses, pid); !ok || !p.connected {continue}
 			dx := k.x - b.puppet.x
 			dy := k.y - b.puppet.y
 			d := dx*dx + dy*dy
+			if pid == cur {cur_d = d}
 			if d < best_d {
 				best_d = d
 				best = pid
 			}
 		}
-		if best != knet.PLAYER_ID_INVALID && best != cur {
+		// STICKY possession: in a scrum both stand inside TOUCH_R and a plain
+		// nearest-wins flips the seat every cooldown — the ball teleports
+		// between two delayed views. A challenger must beat the sitting owner
+		// by a real margin; the owner drifting away on its own loses nothing.
+		challenge_at := math.sqrt(cur_d) - GRANT_EDGE
+		if best != knet.PLAYER_ID_INVALID && best != cur &&
+		   (cur_d > TOUCH_R * TOUCH_R || math.sqrt(best_d) < challenge_at) {
 			ksess.session_set_owner(&self.ses, self.ball_id, best)
 			self.grant_at = now_s() + GRANT_COOL
 		}
