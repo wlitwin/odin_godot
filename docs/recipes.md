@@ -341,6 +341,23 @@ if dist2(m.x, m.y, prey.x, prey.y) <= reach*reach && play.ready(&m.brain.bite_cd
 }
 ```
 
+**⏪ The authority's ledger — positions, a moment ago.** Every receiver already keeps a ring
+of *where things were, as seen* (the interp buffer). Some mechanics need the authority-side
+twin: *where things were, as true* — a hitscan beam judged where the SHOOTER saw the mob
+(scrapyard's lance rewinds ping/2 + interp delay through it), a recall ability rewinding its
+owner, a death recap. The whole idiom is a fixed ring on host scratch, one write per tick,
+one modulo read at query time. Unwritten slots need a sentinel (or track validity) — a mob
+younger than the window tests live:
+
+```odin
+Mob_Brain :: struct { hist: [30][2]f32, ... }        // 30 ticks = 500ms at 60Hz
+m.brain.hist[tick % 30] = {m.x, m.y}                 // top of the host tick loop
+h := m.brain.hist[(tick - rewind) % 30]              // the query — clamp rewind to the window
+```
+
+Deliberately an idiom, not a block, until a second game needs it: four lines, and the block
+would have to guess the window, the value type, and whether it rides the host or the owner.
+
 ---
 
 ## The discipline — a checklist for a new item
