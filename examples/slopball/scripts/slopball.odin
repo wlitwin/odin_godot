@@ -54,6 +54,11 @@ CHALLENGE_HOLD :: 0.3 // a MOVING ball changes hands only after the challenger h
 	// the advantage this long — a kicked ball rolling PAST a bystander spends ~0.3s
 	// inside TOUCH_R, and a drive-by seat theft is a visible stutter on every screen.
 BALL_SLOW :: f32(60) // px/s: under this the ball is "at rest" — first touch grants instantly
+INTENT_SPEED :: f32(0.6) // px/tick of challenger motion: an IDLE bystander never claims —
+	// the seat exists so the toucher's kicks work; a statue needs nothing (the ball
+	// bounces off its body on the owner's screen regardless). Walter's last stutter
+	// was a parked host claiming a slowing pass that merely rolled by.
+CONTACT_R :: f32(22) // true contact: at this range a held claim resolves fast
 KICKOFF_HOLD :: 1.2 // ball frozen at center after a goal/kickoff
 GOAL_MOUTH_TOP :: f32(130)
 GOAL_MOUTH_BOT :: f32(230)

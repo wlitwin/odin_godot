@@ -33,11 +33,15 @@ slop_host_tick :: proc(self: ^Slopball) {
 		cur_d := f32(1e9) // the sitting owner's own distance (possession is sticky)
 		for _, k in self.kickers {
 			pid := knet.Player_Id(k.pid)
+			moved := abs(k.x - k.hx) + abs(k.y - k.hy) // intent: this tick's stride
+			k.hx = k.x
+			k.hy = k.y
 			if p, ok := ksess.session_player(&self.ses, pid); !ok || !p.connected {continue}
 			dx := k.x - b.puppet.x
 			dy := k.y - b.puppet.y
 			d := dx*dx + dy*dy
 			if pid == cur {cur_d = d}
+			if moved < INTENT_SPEED && pid != cur {continue} // statues never claim
 			if d < best_d {
 				best_d = d
 				best = pid
@@ -62,7 +66,11 @@ slop_host_tick :: proc(self: ^Slopball) {
 				self.challenge_since = now_s()
 			}
 			speed_sq := b.puppet.vx*b.puppet.vx + b.puppet.vy*b.puppet.vy
-			held := now_s() - self.challenge_since >= CHALLENGE_HOLD
+			// True contact resolves a held claim fast (a receiver trapping the
+			// pass at their feet); a claim from the anticipation ring waits out
+			// the full hold (a chaser converging on a through-ball).
+			hold := best_d <= CONTACT_R * CONTACT_R ? CHALLENGE_HOLD / 3 : CHALLENGE_HOLD
+			held := now_s() - self.challenge_since >= hold
 			if speed_sq <= BALL_SLOW * BALL_SLOW || held {
 				ksess.session_set_owner(&self.ses, self.ball_id, best)
 				self.grant_at = now_s() + GRANT_COOL

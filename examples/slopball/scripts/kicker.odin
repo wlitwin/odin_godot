@@ -21,6 +21,7 @@ Kicker :: struct {
 	pid:     u8 `gd:"replicate"`, // the seat this avatar belongs to (color + team)
 	mine:    bool, // set by the factory: this peer drives (and streams) this body
 	placed:  bool, // one-shot: the NODE adopts the spawned x/y (scenes instance at 0,0)
+	hx, hy:  f32, // HOST grant-loop scratch: last sampled pose (intent = displacement)
 	painted: bool, // one-shot: skin color + name tag applied
 }
 

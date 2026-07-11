@@ -65,7 +65,7 @@ attempt() {
         fi
         sleep 0.5
     done
-    sleep 3
+    sleep 4  # the last kick's roll must settle, or interp lag reads as disagreement
     kill "$hp" "$sp" "$wp" 2>/dev/null
     wait "$hp" "$sp" "$wp" 2>/dev/null
 
@@ -104,7 +104,10 @@ attempt() {
             ((d<0)) && d=$((-d)); ((d>span)) && span=$d
         done
         echo "convergence: tick=$tick host=($hx,$hy) striker=($sx,$sy) watcher=($wx,$wy) span=${span}px"
-        ((span<=8)) || { echo "convergence: screens disagree past tolerance"; ok=0; }
+        # The assert exists to catch two-WORLDS divergence (hundreds of px);
+        # a ball still rolling at sample time legitimately spreads ~an interp
+        # window across screens (~12px at 60Hz).
+        ((span<=15)) || { echo "convergence: screens disagree past tolerance"; ok=0; }
     fi
 
     ((ok==1)) && return 0 || return 1
