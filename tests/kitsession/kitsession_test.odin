@@ -893,6 +893,54 @@ backup_ships_to_the_eldest_client :: proc(t: ^testing.T) {
 	testing.expect(t, len(bob.s.backup) > 0, "the duty must move when the target leaves")
 }
 
+// ---- dedicated server: an infrastructure seat, and succession never arms -------
+
+@(test)
+dedicated_server_seat :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+
+	ksess.session_host_start(&host.s, "tower", dedicated = true)
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+
+	// The flag crossed the wire: a CLIENT sees the server's seat as
+	// infrastructure (the welcome roster carried it), and itself as a person.
+	sp, sok := ksess.session_player(&alice.s, host.s.me)
+	testing.expect(t, sok, "the server seat is on the client roster")
+	testing.expect(t, sp.dedicated, "the welcome carried the dedicated flag")
+	ap, aok := ksess.session_player(&alice.s, alice.s.me)
+	testing.expect(t, aok && !ap.dedicated, "a joiner is a person")
+
+	// Player gates skip it: three seats on the wire, two players in the game.
+	testing.expect_value(t, ksess.session_count(&host.s, connected_only = true), 3)
+	testing.expect_value(t, ksess.session_count(&host.s, connected_only = true, players_only = true), 2)
+
+	// SUCCESSION NEVER ARMS: replicate and run well past the first backup
+	// window — no torch-bearer is named, no blob ships to anyone. (A dead
+	// server restarts; migration answers a PLAYER-host leaving.)
+	ksess.session_start_replicating(&host.s)
+	now := 50.0
+	for _ in 0 ..< 20 {
+		step(boxes, &now)
+	}
+	testing.expect_value(t, len(alice.s.backup), 0)
+	testing.expect_value(t, len(bob.s.backup), 0)
+	for ev in drain(&host.s) {
+		_, is_bt := ev.(ksess.Ev_Backup_Target)
+		testing.expect(t, !is_bt, "a dedicated authority names no successor")
+	}
+}
+
 @(test)
 resume_run_from_backup :: proc(t: ^testing.T) {
 	host, alice, bob: Peer_Box

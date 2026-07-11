@@ -81,6 +81,19 @@ slopball_on_join :: proc(self: ^Slopball) {
 	gd.print_str("SB_JOINING")
 }
 
+// The dedicated-server door (env role `serve`, no button): the kit flags the
+// seat as infrastructure — this peer referees and simulates, but fields no
+// kicker, holds no roster row, and never hands anyone the succession torch.
+slopball_on_serve :: proc(self: ^Slopball) {
+	if self.running {return}
+	if !kboot.boot_serve(&self.boot, port(), my_name()) {
+		gd.print_str("SB_HOST_FAIL")
+		return
+	}
+	self.running = true
+	gd.print_str("SB_SERVING")
+}
+
 // Host presses Start (or the env role auto-fires it): build the world.
 @(gd_method)
 slopball_on_start :: proc(self: ^Slopball) {

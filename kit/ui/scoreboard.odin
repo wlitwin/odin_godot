@@ -102,6 +102,7 @@ score_refresh :: proc(sb: ^Score, s: ^ksess.Session) {
 	}
 	roster := ksess.session_roster(s)
 	for p in roster {
+		if p.dedicated {continue} // the server keeps no score
 		cell(sb, &next, fmt.ctprintf("%s", p.name), false)
 		for name, col in names {
 			if score_hidden(sb, name) {continue}

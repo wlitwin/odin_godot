@@ -178,6 +178,11 @@ TESTS=(
     # the striker's LOCAL solver drives the goal, the host scores it off the streamed pose,
     # and all three screens report the ball within a few px at the same session tick.
     "slopballnative|SLOPBALL_NATIVE_OK|examples/slopball/native_run.sh"
+    # DEDICATED SERVER: the kit's infrastructure seat end to end — an avatarless server
+    # (kboot.boot_serve → session_host_start dedicated=true) referees two real clients:
+    # player-only start gating, no kicker for the server on ANY screen (the flag rides the
+    # welcome roster), seat grants + goals unchanged. Succession never arms on a server.
+    "slopballserver|SLOPBALL_SERVER_OK|examples/slopball/server_run.sh"
     # ENGINE-PHYSICS soccer in 3D, SOLO: a RigidBody3D ball under real gravity (play.Puppet3,
     # quaternion orientation) + an XZ-plane move_and_slide striker — lofted kick, goal off the
     # replicated pose, match edge. The repo's only exercise of the 3D physics SOLVER headless.

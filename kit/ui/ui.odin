@@ -120,15 +120,18 @@ lobby_refresh :: proc(l: ^Lobby, s: ^ksess.Session) {
 	// host returns under its old id.
 	host := ksess.session_host(s)
 
-	for p, i in roster {
+	next := 0
+	for p in roster {
+		if p.dedicated {continue} // infrastructure, not a player — no row
 		row: gd.Label
-		if i < len(l.rows) {
-			row = l.rows[i]
+		if next < len(l.rows) {
+			row = l.rows[next]
 		} else {
 			row = gd.new_label()
 			gd.add_child(cast(gd.Node)l.rows_box, cast(gd.Node)row)
 			append(&l.rows, row)
 		}
+		next += 1
 		gd.set_bool(cast(gd.Object)row, "visible", true)
 
 		crown := p.id == host ? "\xF0\x9F\x91\x91 " : "" // the host wears it
@@ -143,7 +146,7 @@ lobby_refresh :: proc(l: ^Lobby, s: ^ksess.Session) {
 		}
 		gd.set_string(cast(gd.Object)row, "text", fmt.ctprintf("%s%s%s%s", crown, p.name, you, suffix))
 	}
-	for i in len(roster) ..< len(l.rows) {
+	for i in next ..< len(l.rows) {
 		gd.set_bool(cast(gd.Object)l.rows[i], "visible", false)
 	}
 }

@@ -61,6 +61,12 @@ boot's, so a game-specific status line simply overwrites the stock one.
 `boot_join(b, addr, port, token, name)` do transport-up + session-start + the
 menu/status/chat ritual (via `netgd.begin_host/begin_join`, which exist
 separately if you want the ritual your way — e.g. cavecrawl's Steam paths).
+`boot_serve(b, port, name)` is the **dedicated-server door**: same transport,
+but the authority holds an infrastructure seat (no avatar, no roster row,
+uncounted by player gates, succession never arms — see
+[session.md](session.md)). Nobody presses Start on a server, so auto-start
+your world once `session_count(players_only = true)` reaches your threshold
+(`examples/slopball`'s `serve` role is the model).
 `boot_chat(b, text, &sent)` is the whole `text_submitted` handler, focus
 release included ([kui.chat_submit](ui.md)).
 

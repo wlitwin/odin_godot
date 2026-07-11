@@ -222,7 +222,9 @@ roster_changed :: proc(b: ^Boot) {
 	kui.lobby_refresh(&b.ui, b.ses)
 	kui.score_refresh(&b.score, b.ses)
 	if b.ses.is_host {
-		n := ksess.session_count(b.ses, connected_only = true)
+		// players_only: a dedicated server's own seat is not one of the
+		// "%d players ready" (nor does it help reach min_players).
+		n := ksess.session_count(b.ses, connected_only = true, players_only = true)
 		kui.lobby_set_status(&b.ui, fmt.tprintf("%d players ready", n))
 		kui.lobby_show_menu(&b.ui, false, n >= b.min_players)
 	}
@@ -240,6 +242,25 @@ boot_host :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Hosting on :%d — waiting for friends", port))
 	kui.lobby_refresh(&b.ui, b.ses)
+	kui.chat_show(&b.chat, true)
+	return true
+}
+
+// The DEDICATED-SERVER door: transport up as an always-on authority holding
+// an INFRASTRUCTURE seat — no avatar to field (games skip `p.dedicated`
+// seats when spawning), no roster/scoreboard row, uncounted by player gates,
+// and succession never arms (a dead server restarts; it does not migrate).
+// Nobody presses Start on a server, so the game auto-starts its world —
+// typically once session_count(players_only = true) reaches its threshold
+// (see examples/slopball's `serve` role). Native only: a browser tab makes a
+// poor always-on box. false = the port was taken.
+boot_serve :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64 = 0) -> bool {
+	if !netgd.begin_host(&b.wire, port, name, max_peers, token, dedicated = true) {
+		kui.lobby_set_status(&b.ui, "Could not host (port taken?)")
+		return false
+	}
+	kui.lobby_show_menu(&b.ui, false, false)
+	kui.lobby_set_status(&b.ui, fmt.tprintf("Serving on :%d", port))
 	kui.chat_show(&b.chat, true)
 	return true
 }

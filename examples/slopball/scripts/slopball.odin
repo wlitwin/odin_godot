@@ -144,6 +144,11 @@ slopball_ready :: proc(self: ^Slopball) {
 	case "single":
 		self.auto_peers = 1
 		slopball_on_host(self)
+	case "serve":
+		// Dedicated pitch: an avatarless referee — kicks off once SLOP_PEERS
+		// actual PLAYERS are seated (the server's own seat never counts).
+		self.auto_peers = gd.env_int("SLOP_PEERS", 2)
+		slopball_on_serve(self)
 	}
 	gd.print_str("SB_UI_READY")
 }
@@ -163,7 +168,7 @@ slopball_process :: proc(self: ^Slopball, delta: f64) {
 		score_edges(self)
 		ball_report(self)
 	} else if self.ses.is_host && self.auto_peers > 0 &&
-	   ksess.session_count(&self.ses, connected_only = true) >= self.auto_peers {
+	   ksess.session_count(&self.ses, connected_only = true, players_only = true) >= self.auto_peers {
 		slopball_on_start(self)
 	}
 
@@ -272,7 +277,7 @@ ball_report :: proc(self: ^Slopball) {
 	}
 	bp := gd.node2d_get_position(cast(gd.Node2d)self.ball.owner)
 	gd.print_str(fmt.tprintf(
-		"SB_BALL tick=%d x=%.0f y=%.0f own=%d warp=%d ring=%d mine=%v body=%.0f,%.0f",
-		t, self.ball.puppet.x, self.ball.puppet.y, own, warp, ring, self.ball.puppet.mine, bp.x, bp.y,
+		"SB_BALL tick=%d x=%.0f y=%.0f kick=%d own=%d warp=%d ring=%d mine=%v body=%.0f,%.0f",
+		t, self.ball.puppet.x, self.ball.puppet.y, len(self.kickers), own, warp, ring, self.ball.puppet.mine, bp.x, bp.y,
 	))
 }

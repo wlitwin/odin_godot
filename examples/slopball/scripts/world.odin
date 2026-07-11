@@ -76,6 +76,7 @@ spawn_world :: proc(self: ^Slopball) {
 
 	for _, p in self.ses.players {
 		if !p.connected {continue}
+		if p.dedicated {continue} // the server referees; it fields no kicker
 		spawn_kicker(self, p.id)
 	}
 	// Go live: ship the full world to every seated client and start the
