@@ -95,10 +95,16 @@ slopball_ready :: proc(self: ^Slopball) {
 	// ~3-keyframe interp window (the kit default is 20Hz/100ms — fine for a
 	// dungeon crawl, mud for a ball you dribble). SLOP_HZ/SLOP_INTERP_MS
 	// keep the acid's A/B knobs.
+	hz := gd.env_int("SLOP_HZ", 60)
 	ksess.session_configure(&self.ses, {
-		tick_hz = gd.env_int("SLOP_HZ", 60),
-		interp_delay = f64(gd.env_int("SLOP_INTERP_MS", 50)) / 1000.0,
+		tick_hz = hz,
+		// Default the interp window to ~3 keyframes of the chosen rate (50ms
+		// at 60Hz, 25ms at 120) — SLOP_INTERP_MS overrides for A/B feel tests.
+		interp_delay = f64(gd.env_int("SLOP_INTERP_MS", max(3000 / hz, 16))) / 1000.0,
 	})
+	// The net rate is only honest if the SOLVER steps at it too: a 120Hz
+	// session over 60Hz physics just streams duplicate poses.
+	gd.engine_set_physics_ticks_per_second(gd.singleton_engine(), gd.Int(hz))
 	ksess.session_set_factory(&self.ses, self, slop_make_entity, slop_free_entity)
 
 	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
