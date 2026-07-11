@@ -55,16 +55,27 @@ drive_my_kicker :: proc(self: ^Slopball, delta: f64) {
 
 	// DRIBBLE: move_and_slide does NOT push rigid bodies — a walking contact
 	// imparts nothing on its own (the classic Godot 4 gotcha). While MY solver
-	// runs the ball, nudge it along my motion each contact frame, capped so a
-	// dribbled ball never outruns a kicked one.
-	if self.ball != nil && (dir.x != 0 || dir.y != 0) &&
-	   ksess.session_owner_of(&self.ses, self.ball_id) == self.ses.me {
-		bdx := self.ball.puppet.x - me.x
-		bdy := self.ball.puppet.y - me.y
-		bv := self.ball.puppet
-		if bdx*bdx + bdy*bdy <= DRIBBLE_R * DRIBBLE_R &&
-		   bv.vx*bv.vx + bv.vy*bv.vy < KICKER_SPEED * KICKER_SPEED * 2 {
-			play.puppet_shove(&self.ball.puppet, dir.x * DRIBBLE_NUDGE, dir.y * DRIBBLE_NUDGE)
+	// runs the ball — seated OR claimed — nudge it along my motion each
+	// contact frame, capped so a dribbled ball never outruns a kicked one.
+	if self.ball != nil && (dir.x != 0 || dir.y != 0) {
+		bp := gd.node2d_get_position(cast(gd.Node2d)self.ball.owner)
+		bdx := bp.x - me.x
+		bdy := bp.y - me.y
+		if bdx*bdx + bdy*bdy <= DRIBBLE_R * DRIBBLE_R {
+			has := ksess.session_owner_of(&self.ses, self.ball_id) == self.ses.me ||
+				self.ball.puppet.claimed
+			if !has && self.ball.won == 0 {
+				// PREDICTED POSSESSION: my screen sees the touch NOW; seize
+				// the sim on spec. The host's grant (intent + contact rules,
+				// the same ones we mirror by touching) confirms in ~a
+				// round-trip — or the claim melts away, smoothed.
+				play.puppet_claim(&self.ball.puppet)
+				has = true
+			}
+			bv := self.ball.puppet
+			if has && bv.vx*bv.vx + bv.vy*bv.vy < KICKER_SPEED * KICKER_SPEED * 2 {
+				play.puppet_shove(&self.ball.puppet, dir.x * DRIBBLE_NUDGE, dir.y * DRIBBLE_NUDGE)
+			}
 		}
 	}
 
@@ -73,8 +84,9 @@ drive_my_kicker :: proc(self: ^Slopball, delta: f64) {
 	want_kick := (self.bot == "striker" && self.ball != nil && self.ball.won == 0) ||
 		(self.bot == "" && !typing && gd.is_action_just_pressed("slop_kick"))
 	if want_kick && self.ball != nil && now_s() >= self.kick_cool &&
-	   ksess.session_owner_of(&self.ses, self.ball_id) == self.ses.me {
-		bx, by := self.ball.puppet.x, self.ball.puppet.y
+	   (ksess.session_owner_of(&self.ses, self.ball_id) == self.ses.me || self.ball.puppet.claimed) {
+		bpk := gd.node2d_get_position(cast(gd.Node2d)self.ball.owner)
+		bx, by := bpk.x, bpk.y
 		dx, dy := bx - pos.x, by - pos.y
 		if dx*dx + dy*dy <= KICK_REACH * KICK_REACH {
 			aim := kick_aim(self, {dx, dy})

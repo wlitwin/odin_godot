@@ -77,6 +77,8 @@ Puppet :: struct {
 	skin:   gd.Node2d, // optional visual child — render-error smoothing rides on it
 	ox, oy: f32, // the render error: TRUTH minus what was drawn, decaying to zero
 	mine:   bool, // is THIS peer the simulator right now? (puppet_seat's latch)
+	claimed: bool, // PREDICTED possession: simulating on spec, awaiting the referee
+	claim_left: f32, // seconds until an unconfirmed claim reverts
 }
 
 // RENDER-ERROR SMOOTHING: authority snaps (a seat seed, a handoff re-anchor)
@@ -133,15 +135,52 @@ puppet_attach :: proc(p: ^Puppet, body: gd.Rigid_Body2d, x, y: f32, skin: gd.Nod
 	body_impose(body, x, y, 0)
 }
 
+// puppet_claim — PREDICTED possession: seize the simulation on spec, the
+// frame YOUR screen sees the touch, without waiting for the referee. The
+// solver wakes immediately (your touch responds with zero latency); the
+// entity's registered owner is unchanged, so this peer does NOT stream —
+// the flight is private until the grant confirms it. Three endings:
+//   confirmed — Ev_Owner_Changed names you; the provisional flight becomes
+//               canon seamlessly (puppet_seat skips the re-seed);
+//   denied    — someone else is named; you freeze and snap back to their
+//               stream (render-error smoothing glides the correction);
+//   timed out — no ruling within `hold`: revert quietly the same way.
+puppet_claim :: proc(p: ^Puppet, hold: f32 = 0.6) {
+	if p.mine || p.claimed || cast(rawptr)p.body == nil {return}
+	p.claimed = true
+	p.claim_left = hold
+	gd.rigid_body2d_set_freeze_enabled(p.body, false)
+	body_impose(p.body, p.x, p.y, p.rot)
+	body_impel(p.body, p.vx, p.vy)
+}
+
+@(private = "file")
+puppet_claim_revert :: proc(p: ^Puppet) {
+	p.claimed = false
+	gd.rigid_body2d_set_freeze_enabled(p.body, true)
+	// The next glide snaps the body to the real owner's stream; the jump is
+	// absorbed by the skin offset — the wrong guess melts away.
+}
+
 // puppet_seat — the handoff: call with `owner == ses.me` on Ev_Owner_Changed
 // (and once after spawn/resync). The new simulator unfreezes and seeds the
 // solver from the streamed pose and velocity — momentum crosses the seam; a
 // demoted simulator freezes and goes back to gliding.
 puppet_seat :: proc(p: ^Puppet, mine: bool) {
-	if p.mine == mine {return}
+	if p.mine == mine {
+		if !mine && p.claimed {puppet_claim_revert(p)} // denied mid-claim
+		return
+	}
 	p.mine = mine
 	if cast(rawptr)p.body == nil {return}
 	if mine {
+		if p.claimed {
+			// The prediction CONFIRMED: the provisional flight is already
+			// the freshest truth there is — re-seeding from the (older)
+			// streamed fields would yank it backward. Just take the seat.
+			p.claimed = false
+			return
+		}
 		// Unfreeze FIRST: lifting the freeze restores the server's stored
 		// state, so the seed must land on the LIVE body or it is erased.
 		was := gd.node2d_get_position(cast(gd.Node2d)p.body)
@@ -150,6 +189,7 @@ puppet_seat :: proc(p: ^Puppet, mine: bool) {
 		body_impel(p.body, p.vx, p.vy)
 		puppet_absorb(p, was.x, was.y, p.x, p.y) // the seed hop glides in
 	} else {
+		p.claimed = false
 		gd.rigid_body2d_set_freeze_enabled(p.body, true)
 	}
 }
@@ -159,6 +199,17 @@ puppet_seat :: proc(p: ^Puppet, mine: bool) {
 // the interpolated fields.
 puppet_frame :: proc(p: ^Puppet, dt: f32 = 1.0 / 60) {
 	if cast(rawptr)p.body == nil {return}
+	if p.claimed {
+		// Simulating ON SPEC: the body is ours, the FIELDS are not — they
+		// keep tracking the registered owner's stream, held ready for the
+		// deny-snap. Publish nothing, impose nothing, watch the clock.
+		p.claim_left -= dt
+		if p.claim_left <= 0 {
+			puppet_claim_revert(p)
+		}
+		puppet_skin_frame(p, dt)
+		return
+	}
 	if p.mine {
 		pos := gd.node2d_get_position(cast(gd.Node2d)p.body)
 		vel := gd.rigid_body2d_get_linear_velocity(p.body)
@@ -196,10 +247,10 @@ puppet_place :: proc(p: ^Puppet, x, y: f32, vx: f32 = 0, vy: f32 = 0) {
 	p.oy = 0
 }
 
-// puppet_shove — the simulator's impulse verb (a kick, a blast). A no-op on
-// watchers by construction: impulses belong to the peer whose solver is live —
-// anyone else asks the owner (or takes the seat) first.
+// puppet_shove — the simulator's impulse verb (a kick, a blast). Claimed
+// counts: a predicted possession must kick like a real one, or the touch
+// the prediction bought still waits on the referee. A no-op on watchers.
 puppet_shove :: proc(p: ^Puppet, ix, iy: f32) {
-	if !p.mine || cast(rawptr)p.body == nil {return}
+	if (!p.mine && !p.claimed) || cast(rawptr)p.body == nil {return}
 	gd.rigid_body2d_apply_central_impulse(p.body, {ix, iy})
 }

@@ -144,7 +144,12 @@ stream_ring_seed :: proc(ring: ^Stream_Ring, t: f64, entity: rawptr, desc: ^Enti
 // The ownership-transfer snap: the freshest thing the old owner ever said,
 // applied before the ring is reset out from under it.
 stream_ring_flush_newest :: proc(ring: ^Stream_Ring, entity: rawptr, desc: ^Entity_Desc) {
-	if ring.count == 0 {
+	// A ring holding only its own handoff SEED is not received truth — an
+	// OWNER's ring gets no pushes, so at demotion it still holds the seed
+	// from its own grant. Flushing that rewound every watcher to the pose
+	// where the possession STARTED, flashed for an interp window, then
+	// snapped back as real samples superseded it.
+	if ring.count == 0 || (ring.seeded && ring.count == 1) {
 		return
 	}
 	newest := (ring.head + ring.count - 1) % INTERP_CAP
