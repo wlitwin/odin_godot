@@ -60,6 +60,9 @@ Player :: struct {
 	name:      string, // owned by the session
 	peer:      Peer_Id, // transport seat; NO_PEER while disconnected
 	connected: bool,
+	dedicated: bool, // an INFRASTRUCTURE seat (a dedicated server), not a person:
+	// fields no avatar, hidden from rosters/scoreboards, uncounted by player
+	// gates. Only the authority can hold one (session_host_start's flag).
 }
 
 // ---- events: everything the game reacts to, drained per frame --------------
@@ -248,7 +251,7 @@ Command_Hook :: knet.Command_Hook
 @(private)
 SES_JOIN :: u8(0) // client -> host  [token u64][name string]
 @(private)
-SES_WELCOME :: u8(1) // host -> client  [your_id][count u16] x ([id][name][connected u8])
+SES_WELCOME :: u8(1) // host -> client  [your_id][count u16] x ([id][name][connected u8][dedicated u8])
 @(private)
 SES_UPSERT :: u8(2) // host -> others  [id][name][connected u8][rejoin u8]
 @(private)
@@ -389,6 +392,10 @@ Session_Config :: struct {
 
 Session :: struct {
 	is_host:   bool,
+	dedicated: bool, // this authority is a DEDICATED SERVER: its seat is
+	// infrastructure (see Player.dedicated) and succession never arms — a
+	// dead server restarts, it does not migrate (the token/backup machinery
+	// belongs to the friends-host-for-friends peer model).
 	me:        knet.Player_Id,
 	players:   map[knet.Player_Id]Player,
 	events:    [dynamic]Event,
@@ -519,6 +526,7 @@ session_init :: proc(s: ^Session) {
 		delete(s.name)
 		s.name = ""
 		s.is_host = false
+		s.dedicated = false
 		s.joined = false
 		s.replicating = false
 		s.stats_dirty = false
@@ -924,7 +932,7 @@ session_set_owner :: proc(s: ^Session, id: knet.Net_Id, owner: knet.Player_Id) {
 	if prev == owner {
 		return
 	}
-	if !knet.registry_set_owner(&s.reg, id, owner) {
+	if !knet.registry_set_owner(&s.reg, id, owner, s.now) {
 		return
 	}
 	append(&s.events, Ev_Owner_Changed{id = id, owner = owner, prev = prev})
@@ -1233,7 +1241,9 @@ net_tick :: proc(s: ^Session) {
 		// Backup hosting: keep the ELDEST connected client holding a fresh
 		// re-hostable snapshot — refreshed on the interval, and immediately
 		// when the target changes (first client seats, old target leaves).
-		if s.replicating {
+		// Never on a DEDICATED server: migration is the peer model's answer
+		// to a host who is also a player leaving; a server just restarts.
+		if s.replicating && !s.dedicated {
 			target := backup_target(s)
 			if target != knet.PLAYER_ID_INVALID &&
 			   (target != s.backup_target || t - s.backup_tick >= s.backup_every) {
@@ -1602,15 +1612,18 @@ session_owner_of :: proc(s: ^Session, id: knet.Net_Id) -> knet.Player_Id {
 	return knet.PLAYER_ID_INVALID
 }
 
-session_count :: proc(s: ^Session, connected_only := false) -> int {
-	if !connected_only {
+// `players_only` skips dedicated seats — the count for anything gating on
+// PEOPLE (min-players, "everyone ready", max_players): a server is not a
+// player, however real its seat is to the wire.
+session_count :: proc(s: ^Session, connected_only := false, players_only := false) -> int {
+	if !connected_only && !players_only {
 		return len(s.players)
 	}
 	n := 0
 	for _, p in s.players {
-		if p.connected {
-			n += 1
-		}
+		if connected_only && !p.connected {continue}
+		if players_only && p.dedicated {continue}
+		n += 1
 	}
 	return n
 }
@@ -1624,9 +1637,16 @@ session_count :: proc(s: ^Session, connected_only := false) -> int {
 // rejoin the resumed session and reclaim its own seat (stats, entities)
 // exactly like a client. Zero = the v1 shape: a dead host returns as a
 // NEW player.
-session_host_start :: proc(s: ^Session, name: string, token: u64 = 0) {
+//
+// `dedicated` makes this authority a SERVER, not a player: its seat is
+// flagged infrastructure on every roster (games field it no avatar; kit UI
+// hides it; player gates don't count it) and SUCCESSION NEVER ARMS — a dead
+// server restarts, it does not migrate. The friends-host-for-friends model
+// is untouched; this is the always-on/public-hosting escape hatch.
+session_host_start :: proc(s: ^Session, name: string, token: u64 = 0, dedicated := false) {
 	session_init(s)
 	s.is_host = true
+	s.dedicated = dedicated
 	s.ctx.is_authority = true
 	s.next_player = 1
 	s.me = s.next_player
@@ -1637,6 +1657,7 @@ session_host_start :: proc(s: ^Session, name: string, token: u64 = 0) {
 		name      = strings.clone(name),
 		peer      = HOST_PEER,
 		connected = true,
+		dedicated = dedicated,
 	}
 	if token != 0 {
 		s.token = token
@@ -1788,7 +1809,8 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 			deny_join(s, peer, .Locked)
 			return
 		}
-		if s.cfg.max_players > 0 && session_count(s, connected_only = true) >= s.cfg.max_players {
+		// max_players caps PEOPLE — a dedicated server's own seat never eats one.
+		if s.cfg.max_players > 0 && session_count(s, connected_only = true, players_only = true) >= s.cfg.max_players {
 			deny_join(s, peer, .Full)
 			return
 		}
@@ -1829,6 +1851,7 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 		knet.write_player_id(&w, p.id)
 		knet.write_string(&w, p.name)
 		knet.write_bool(&w, p.connected)
+		knet.write_bool(&w, p.dedicated) // the server seat announces itself
 	}
 	knet.write_bool(&w, s.interest_r > 0 && s.locator != nil) // stream routing (interest.odin)
 	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
@@ -1889,7 +1912,7 @@ session_client_leave :: proc(s: ^Session) {
 }
 
 @(private = "file")
-roster_upsert :: proc(s: ^Session, id: knet.Player_Id, name: string, connected: bool, peer := NO_PEER) {
+roster_upsert :: proc(s: ^Session, id: knet.Player_Id, name: string, connected: bool, peer := NO_PEER, dedicated := false) {
 	if old, had := s.players[id]; had {
 		delete(old.name)
 	}
@@ -1898,6 +1921,7 @@ roster_upsert :: proc(s: ^Session, id: knet.Player_Id, name: string, connected: 
 		name      = strings.clone(name),
 		peer      = peer,
 		connected = connected,
+		dedicated = dedicated,
 	}
 }
 
@@ -1912,10 +1936,11 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 		id := knet.read_player_id(r)
 		name := knet.read_string(r)
 		connected := knet.read_bool(r)
+		dedicated := knet.read_bool(r)
 		if r.err {
 			return // partial roster is fine: entries already applied are valid
 		}
-		roster_upsert(s, id, name, connected)
+		roster_upsert(s, id, name, connected, dedicated = dedicated)
 	}
 	s.me = me
 	s.ctx.me = me
@@ -2042,7 +2067,7 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) 
 			return
 		}
 		prev := session_owner_of(s, id)
-		if knet.registry_set_owner(&s.reg, id, owner) {
+		if knet.registry_set_owner(&s.reg, id, owner, s.now) {
 			append(&s.events, Ev_Owner_Changed{id = id, owner = owner, prev = prev})
 		}
 	case SES_BLOB:

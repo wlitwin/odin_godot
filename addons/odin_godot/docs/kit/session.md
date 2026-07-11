@@ -99,7 +99,7 @@ netgd.wire_listen(&self.wire, "on_packet", "on_peer_left", "on_net_up", "on_net_
 ## Start, drive, drain
 
 ```odin
-session_host_start :: proc(s: ^Session, name: string)
+session_host_start :: proc(s: ^Session, name: string, token: u64 = 0, dedicated := false)
 session_client_start :: proc(s: ^Session, token: u64, name: string)
 session_client_join :: proc(s: ^Session)     // transport is connected: ask for a seat
 session_client_leave :: proc(s: ^Session)    // graceful goodbye
@@ -110,6 +110,17 @@ session_peer_disconnected :: proc(s: ^Session, peer: Peer_Id)
 ```
 
 The host is a full player too (name, id, stats) — it just never JOINs over the wire.
+
+**Dedicated servers**: `session_host_start(…, dedicated = true)` makes the
+authority a SERVER, not a player. Its seat is flagged `Player.dedicated` on
+every roster (the welcome carries it, so clients know too): games skip it when
+spawning avatars (`if p.dedicated {continue}`), the kit lobby/scoreboard hide
+it, `session_count(players_only = true)` doesn't count it, `max_players` caps
+humans only — and **succession never arms** (a dead server restarts; migration
+is the peer model's answer to a *player*-host leaving). The friendslop
+friends-host-for-friends model is untouched; this is the always-on/public
+escape hatch. One call door: [`kboot.boot_serve`](boot.md); proof:
+`examples/slopball/server_run.sh`.
 Clients call `session_client_start` when they begin connecting and `session_client_join`
 once the transport handshake completes; no WELCOME within `join_timeout` produces
 `Ev_Join_Failed` instead of hanging on "Joining…" forever.

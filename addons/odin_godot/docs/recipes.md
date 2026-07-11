@@ -92,6 +92,8 @@ section) — the last column previews that.
 | `play.Machine(S)` | A state machine that **owns** its replicated `cur` (host writes, every peer steps). | ✅ | **State** (a mode) |
 | `play.anim` | Presentation float clocks — `decay`/`ramp`/`advance`/`hold`/`pulse`. | ✅ | **Cue** rendering |
 | `play.marker` | Lazy world-markers — `show`/`follow`/`fill`/`depth` over a built node. | ❌ engine | **Cue** rendering |
+| `play.Puppet` | Single-owner engine physics: the owner's RigidBody2D solver streams pose+velocity; every other screen freezes the body and glides it. `session_set_owner` moves the seat, momentum crosses the seam. | ❌ engine | **State** (a shared body) |
+| `play.Puppet3` | The 3D sibling: RigidBody3D, quaternion rotation (stream-layer `.Quat` nlerp — 3D rotation interps *correctly*, unlike 2D's snap), angular velocity across the seam. Same feel ledger, meters. | ❌ engine | **State** (a shared body) |
 
 The one wire rule to keep straight: **only `Machine.cur` crosses the wire** (it's a plain
 `gd:"replicate"` field). `Edge`, `Pace`, `anim` clocks, and marker handles are all *local
@@ -339,6 +341,23 @@ if dist2(m.x, m.y, prey.x, prey.y) <= reach*reach && play.ready(&m.brain.bite_cd
     play.health_hurt(&prey.health, BITE_DMG)
 }
 ```
+
+**⏪ The authority's ledger — positions, a moment ago.** Every receiver already keeps a ring
+of *where things were, as seen* (the interp buffer). Some mechanics need the authority-side
+twin: *where things were, as true* — a hitscan beam judged where the SHOOTER saw the mob
+(scrapyard's lance rewinds ping/2 + interp delay through it), a recall ability rewinding its
+owner, a death recap. The whole idiom is a fixed ring on host scratch, one write per tick,
+one modulo read at query time. Unwritten slots need a sentinel (or track validity) — a mob
+younger than the window tests live:
+
+```odin
+Mob_Brain :: struct { hist: [30][2]f32, ... }        // 30 ticks = 500ms at 60Hz
+m.brain.hist[tick % 30] = {m.x, m.y}                 // top of the host tick loop
+h := m.brain.hist[(tick - rewind) % 30]              // the query — clamp rewind to the window
+```
+
+Deliberately an idiom, not a block, until a second game needs it: four lines, and the block
+would have to guess the window, the value type, and whether it rides the host or the owner.
 
 ---
 

@@ -81,6 +81,24 @@ Reload_State :: struct {
 
 	// One-time "odin not found" warning guard (don't spam on every save).
 	warned_no_odin: bool,
+
+	// THE DELETION PROBE (main thread only — touched exclusively from the
+	// frame pump, no mutex): a names-only fingerprint of the script tree,
+	// re-taken every ~2s. Saves already trigger rebuilds; DELETIONS never
+	// did — a script removed in the dock (or by git) left its `*.gen.odin`
+	// orphan breaking the next build, invisibly (the dock hides gen files).
+	// A changed name SET fires reload_request; scriptgen's orphan sweep does
+	// the rest. Catches creations from outside the editor as a bonus.
+	probe_hash: u64,
+	probe_tick: int,
+	// The edge trigger above can MISS a pulse: a source created and deleted
+	// inside one probe window samples as "no change" while the create already
+	// materialized its gen file (the editor's own import can kick that build).
+	// So the probe is also LEVEL-triggered on the inconsistent state itself —
+	// any `*.gen.odin` without its authored sibling forces a sweep. This
+	// remembers the orphan set already kicked, so a sweep that cannot succeed
+	// (read-only tree, ...) fires once instead of every two seconds.
+	probe_orphans: u64,
 }
 
 @(private)
@@ -507,8 +525,112 @@ print_build_errors :: proc(output: string) {
 // (Phase-4 `odin_scripts_reload`: copies to a unique path to dodge macOS dlopen caching,
 // re-pulls the manifest, re-binds live instances) and then refreshes the editor's
 // placeholder property lists so a newly-added `@export` appears in the Inspector.
+// Names-only fingerprint of the authored `.odin` set under `dir` (recursive,
+// generated artifacts skipped) — cheap enough for a ~2s cadence: readdir only,
+// no file contents.
+@(private = "file")
+names_hash_dir :: proc(dir: string, h: ^u64) {
+	fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
+	if err != nil {
+		return
+	}
+	for fi in fis {
+		if fi.type == .Directory {
+			if strings.has_prefix(fi.name, ".") || fi.name == "bin" {
+				continue
+			}
+			names_hash_dir(fi.fullpath, h)
+			continue
+		}
+		if !strings.has_suffix(fi.name, ".odin") || strings.has_suffix(fi.name, ".gen.odin") {
+			continue
+		}
+		h^ = hash.fnv64a(transmute([]byte)fi.name, h^)
+	}
+}
+
+// Fingerprint of the ORPHANED gen files under `dir` (recursive): every
+// `*.gen.odin` whose authored `<base>.odin` sibling is gone. The FNV basis
+// back means "no orphans".
+@(private = "file")
+orphans_hash_dir :: proc(dir: string, h: ^u64) {
+	fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
+	if err != nil {
+		return
+	}
+	for fi in fis {
+		if fi.type == .Directory {
+			if strings.has_prefix(fi.name, ".") || fi.name == "bin" {
+				continue
+			}
+			orphans_hash_dir(fi.fullpath, h)
+			continue
+		}
+		if !strings.has_suffix(fi.name, ".gen.odin") {
+			continue
+		}
+		src := strings.concatenate(
+			{fi.fullpath[:len(fi.fullpath) - len(".gen.odin")], ".odin"},
+			context.temp_allocator,
+		)
+		if !os.exists(src) {
+			h^ = hash.fnv64a(transmute([]byte)fi.name, h^)
+		}
+	}
+}
+
+// The frame pump's deletion probe (see Reload_State.probe_hash/probe_orphans).
+@(private = "file")
+reload_probe_fs :: proc() {
+	g_reload.probe_tick += 1
+	if g_reload.probe_tick < 120 { // ~2s at editor frame rates
+		return
+	}
+	g_reload.probe_tick = 0
+	context.allocator = core_allocator()
+	proj := reload_project_dir(context.temp_allocator)
+	scripts := reload_scripts_dir(proj, context.temp_allocator)
+
+	// LEVEL trigger first: an orphaned gen file IS the broken state, however
+	// the tree got there — force past the unchanged-sources skip (deleting an
+	// EMPTY source leaves the content aggregate untouched) so scriptgen's
+	// sweep always runs. One shot per distinct orphan set.
+	FNV_BASIS :: u64(0xcbf29ce484222325)
+	fired := false
+	orphans := FNV_BASIS
+	orphans_hash_dir(scripts, &orphans)
+	if orphans != FNV_BASIS {
+		if orphans != g_reload.probe_orphans {
+			g_reload.probe_orphans = orphans
+			fired = true
+			godot.print_str("odin_godot: orphaned .gen.odin on disk (source deleted) — rebuilding to sweep")
+			reload_request(force = true)
+		}
+	} else {
+		g_reload.probe_orphans = 0
+	}
+
+	// EDGE trigger: a changed authored-name set (creations from git pulls,
+	// external tools, ... — deletions too, when the pulse is visible).
+	h := FNV_BASIS
+	names_hash_dir(scripts, &h)
+	if h == FNV_BASIS {
+		return // unreadable/empty: leave the baseline alone
+	}
+	old := g_reload.probe_hash
+	g_reload.probe_hash = h
+	if old != 0 && old != h && !fired {
+		// (!fired: the orphan sweep already kicked a rebuild this tick)
+		godot.print_str("odin_godot: script set changed on disk — rebuilding (stale gen files sweep with it)")
+		reload_request()
+	}
+}
+
 @(private)
 reload_pump_main_thread :: proc() {
+	if bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
+		reload_probe_fs()
+	}
 	sync.lock(&g_reload.mutex)
 	// Don't swap while a coalesced follow-up build is STILL RUNNING: build A set
 	// swap_ready, but build B's linker may be rewriting the dll right now — the swap

@@ -34,7 +34,17 @@ for ev in events {
 (`boot.ui`, `boot.chat`, `boot.score`, `boot.legend`, `boot.wire`,
 `boot.stage`, `boot.world`) — reposition, restyle, or ignore them. `stage`
 and `world` are Node2D containers, so screen shake ([kfx.Shake](fx.md)) can
-nudge them both as one. The eight
+nudge them both as one; a 3D game sets `Options.spatial = true` to get Node3D
+containers instead (see `examples/slopball3d`).
+
+**Boot unthrottles desktop windows by default** (vsync off + a 120fps cap):
+every friendslop game gets playtested as two windows on one laptop, and with
+vsync on, the OS pacing an occluded window's present makes the background
+instance *simulate* slow, not just draw slow — the whole main loop blocks on
+the compositor, and every timeline-synced screen stutters for it. Headless and
+web runs are left untouched. A shipping build that prefers tear-free rendering
+opts out with `Options.keep_vsync = true` (and may set its own vsync/fps
+policy after `boot_attach`). The eight
 `@(gd_method)` names are declared in *your* script (Godot signals must land on
 the game's class); their bodies are one-liners — see either example game's
 `net.odin`.
@@ -51,6 +61,12 @@ boot's, so a game-specific status line simply overwrites the stock one.
 `boot_join(b, addr, port, token, name)` do transport-up + session-start + the
 menu/status/chat ritual (via `netgd.begin_host/begin_join`, which exist
 separately if you want the ritual your way — e.g. cavecrawl's Steam paths).
+`boot_serve(b, port, name)` is the **dedicated-server door**: same transport,
+but the authority holds an infrastructure seat (no avatar, no roster row,
+uncounted by player gates, succession never arms — see
+[session.md](session.md)). Nobody presses Start on a server, so auto-start
+your world once `session_count(players_only = true)` reaches your threshold
+(`examples/slopball`'s `serve` role is the model).
 `boot_chat(b, text, &sent)` is the whole `text_submitted` handler, focus
 release included ([kui.chat_submit](ui.md)).
 

@@ -33,6 +33,7 @@ package kit_boot
 // either example game's net.odin).
 
 import gd "godot:godot"
+import "godot:gdext"
 import kcomms "godot:kit/comms"
 import netgd "godot:kit/netgd"
 import ksess "godot:kit/session"
@@ -53,7 +54,33 @@ Options :: struct {
 	msg_kind:    u8, // the game's session sub-frame byte (netgd.wire_attach)
 	latency_env: cstring, // env var for the injected-latency shim ("" = off)
 	min_players: int, // host's Start button appears at this count (default 2)
+	spatial:     bool, // 3D game: stage/world become Node3D containers (default Node2D)
+	keep_vsync:  bool, // opt OUT of the desktop playtest unthrottle (see unthrottle_desktop)
 	methods:     Methods,
+}
+
+// TWO WINDOWS, ONE LAPTOP — every friendslop game gets playtested this way,
+// so boot unthrottles by default. macOS paces an occluded window's present,
+// and with vsync on the whole main loop blocks on it: the background instance
+// SIMULATES slow, not just draws slow (slopball's receipt: the two instances'
+// session-tick counters drifted ~90 ticks — 1.5s of lost simulation — after a
+// focus switch, and every timeline-synced screen stuttered for it). Pace by
+// timer instead: vsync off, fps capped so the loop never waits on the
+// compositor and the laptop doesn't render at 1000fps. Desktop windows only:
+// headless has no vsync (and the cap would slow the acids); the web display
+// server is paced by the browser, and background tabs are the browser's law.
+// A shipping build that prefers tear-free rendering sets Options.keep_vsync.
+@(private = "file")
+unthrottle_desktop :: proc() {
+	ds := gd.singleton_display_server()
+	name := gd.display_server_get_name(ds)
+	buf: [64]u8
+	n := gdext.string_to_utf8_chars(cast(gdext.StringPtr)&name, cast(cstring)&buf[0], len(buf) - 1)
+	if n <= 0 {return}
+	s := string(buf[:n])
+	if s == "headless" || s == "web" {return}
+	gd.display_server_window_set_vsync_mode(ds, .Vsync_Disabled, 0)
+	gd.engine_set_max_fps(gd.singleton_engine(), 120)
 }
 
 Boot :: struct {
@@ -79,6 +106,10 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 	b.comms = comms
 	b.min_players = opts.min_players > 0 ? opts.min_players : 2
 
+	if !opts.keep_vsync {
+		unthrottle_desktop()
+	}
+
 	// Every widget lives on a CanvasLayer: layers draw above world-space
 	// CanvasItems no matter what z_index entities carry, so a full-screen
 	// playfield can never bury the chat (homestead found it live — its
@@ -103,10 +134,12 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 
 	// Node2D containers (not plain Nodes) so games can offset them together —
 	// screen shake (kfx.Shake) nudges stage+world as one. Children unaffected.
-	b.stage = cast(gd.Node)gd.new_node2d()
+	// A SPATIAL game gets Node3D containers instead: 3D children then inherit
+	// a real 3D parent (and the same nudge-together trick works in meters).
+	b.stage = opts.spatial ? cast(gd.Node)gd.new_node3d() : cast(gd.Node)gd.new_node2d()
 	gd.node_set_name(b.stage, gd.new_string_name_cstring("Stage", true))
 	gd.add_child(node, b.stage)
-	b.world = cast(gd.Node)gd.new_node2d()
+	b.world = opts.spatial ? cast(gd.Node)gd.new_node3d() : cast(gd.Node)gd.new_node2d()
 	gd.node_set_name(b.world, gd.new_string_name_cstring("World", true))
 	gd.add_child(node, b.world)
 
@@ -189,7 +222,9 @@ roster_changed :: proc(b: ^Boot) {
 	kui.lobby_refresh(&b.ui, b.ses)
 	kui.score_refresh(&b.score, b.ses)
 	if b.ses.is_host {
-		n := ksess.session_count(b.ses, connected_only = true)
+		// players_only: a dedicated server's own seat is not one of the
+		// "%d players ready" (nor does it help reach min_players).
+		n := ksess.session_count(b.ses, connected_only = true, players_only = true)
 		kui.lobby_set_status(&b.ui, fmt.tprintf("%d players ready", n))
 		kui.lobby_show_menu(&b.ui, false, n >= b.min_players)
 	}
@@ -207,6 +242,25 @@ boot_host :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Hosting on :%d — waiting for friends", port))
 	kui.lobby_refresh(&b.ui, b.ses)
+	kui.chat_show(&b.chat, true)
+	return true
+}
+
+// The DEDICATED-SERVER door: transport up as an always-on authority holding
+// an INFRASTRUCTURE seat — no avatar to field (games skip `p.dedicated`
+// seats when spawning), no roster/scoreboard row, uncounted by player gates,
+// and succession never arms (a dead server restarts; it does not migrate).
+// Nobody presses Start on a server, so the game auto-starts its world —
+// typically once session_count(players_only = true) reaches its threshold
+// (see examples/slopball's `serve` role). Native only: a browser tab makes a
+// poor always-on box. false = the port was taken.
+boot_serve :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64 = 0) -> bool {
+	if !netgd.begin_host(&b.wire, port, name, max_peers, token, dedicated = true) {
+		kui.lobby_set_status(&b.ui, "Could not host (port taken?)")
+		return false
+	}
+	kui.lobby_show_menu(&b.ui, false, false)
+	kui.lobby_set_status(&b.ui, fmt.tprintf("Serving on :%d", port))
 	kui.chat_show(&b.chat, true)
 	return true
 }

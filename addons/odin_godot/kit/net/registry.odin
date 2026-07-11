@@ -435,7 +435,7 @@ registry_teleport :: proc(reg: ^Registry, id: Net_Id) {
 // carry the pre-bump warp, so the first new-warp sample supersedes them with
 // a snap, never a blend. Every peer must apply the same transfer (the
 // session layer broadcasts it ordered with spawns and deltas).
-registry_set_owner :: proc(reg: ^Registry, id: Net_Id, owner: Player_Id) -> bool {
+registry_set_owner :: proc(reg: ^Registry, id: Net_Id, owner: Player_Id, now: f64 = -1) -> bool {
 	e, ok := &reg.entries[id]
 	if !ok {
 		return false
@@ -444,7 +444,20 @@ registry_set_owner :: proc(reg: ^Registry, id: Net_Id, owner: Player_Id) -> bool
 		return true
 	}
 	e.owner = owner
+	// The handoff SNAP the docs promise: flush the freshest buffered sample
+	// into the fields BEFORE the ring dies. Without it, the new owner seeds
+	// its sim from the render view — interp_delay behind — and a possession
+	// shorter than that delay hands the NEXT owner a pose one possession
+	// stale (slopball's rubber-band: every quick trade snapped the ball back
+	// to the previous owner's previous spot). Watchers re-anchor too.
+	stream_ring_flush_newest(&e.stream, e.entity, e.set.entity_desc)
 	stream_ring_reset(&e.stream)
+	// ...and BRIDGE the seam: seed the fresh ring with those same fields so
+	// watcher interpolation flows through the handoff instead of pausing an
+	// interp window waiting for the new owner's first sample to come of age.
+	if now >= 0 {
+		stream_ring_seed(&e.stream, now, e.entity, e.set.entity_desc)
+	}
 	e.warp += 1
 	return true
 }
