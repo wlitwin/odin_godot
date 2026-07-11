@@ -37,7 +37,7 @@ export ODIN_GODOT_ROOT="$ROOT"
 
 echo "== editor --headless --script test_reload_exports.gd =="
 LOG="$(mktemp)"
-trap 'rm -f "$LOG"; git -C "$ROOT" checkout -- tests/reload_exports/scripts/widget.odin 2>/dev/null || true' EXIT
+trap 'rm -f "$LOG" "$SCRIPTS"/doomed.odin "$SCRIPTS"/doomed.gen.odin "$SCRIPTS"/doomed.odin.uid "$SCRIPTS"/doomed.gen.odin.uid; git -C "$ROOT" checkout -- tests/reload_exports/scripts/widget.odin 2>/dev/null || true' EXIT
 set +e
 "$GODOT" --editor --headless --path "$PROJ" --script test_reload_exports.gd >"$LOG" 2>&1
 RC=$?
@@ -58,6 +58,11 @@ if ! grep -q "RELOAD_EXPORTS_OK" "$LOG"; then
 	exit 1
 fi
 
+if ! grep -q "GEN_ORPHAN_SWEPT" "$LOG"; then
+	echo "RELOAD_EXPORTS_FAIL: the deletion probe never swept the orphaned gen file"
+	exit 1
+fi
 echo "  ok  new @export appeared in-process after save+rebuild+reload (no restart)"
+echo "  ok  a deleted script's gen file swept itself (the deletion probe)"
 echo "  (visual-only, not asserted)  live Inspector PANEL redraw"
 echo "RELOAD_EXPORTS_OK"

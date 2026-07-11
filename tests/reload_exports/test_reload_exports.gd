@@ -134,6 +134,55 @@ func _run() -> void:
 	if int(got) != 42:
 		print("  note: new_field value round-trip read back %s (placeholder default), not load-bearing for this test" % str(got))
 
+	# ===== 6. the DELETION PROBE: a removed script's gen file must sweep itself =====
+	# Create a throwaway script ON DISK (no save event — only the ~2s names-only
+	# probe can notice), wait for the probe-triggered rebuild to emit its gen
+	# file, then DELETE the source and wait for the sweep to reap the orphan.
+	# This is the dock-delete papercut: the gen file is hidden from the editor
+	# tree, so nothing but the probe can heal it.
+	var doomed := "res://scripts/doomed.odin"
+	var doomed_gen := "res://scripts/doomed.gen.odin"
+	var f := FileAccess.open(doomed, FileAccess.WRITE)
+	f.store_string("""//gd:extends Node2D
+//gd:class Doomed
+package reload_exports_scripts
+
+import gd "godot:godot"
+
+Doomed :: struct {
+	owner: gd.Node2d,
+	beat:  int,
+}
+
+doomed_process :: proc(self: ^Doomed, delta: f64) {
+	self.beat += 1
+}
+""")
+	f.close()
+
+	var gen_appeared := false
+	for i in range(4800): # probe fires ~every 120 frames; the build takes seconds
+		await process_frame
+		if FileAccess.file_exists(doomed_gen):
+			gen_appeared = true
+			break
+	if not gen_appeared:
+		_fail("the creation probe never generated doomed.gen.odin")
+		return
+	print("GEN_ORPHAN_CREATED (probe noticed the new script)")
+
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(doomed))
+	var swept := false
+	for i in range(4800):
+		await process_frame
+		if not FileAccess.file_exists(doomed_gen):
+			swept = true
+			break
+	if not swept:
+		_fail("doomed.gen.odin was never swept after its source was deleted")
+		return
+	print("GEN_ORPHAN_SWEPT (probe rebuilt; the sweep reaped the orphan)")
+
 	print("RELOAD_EXPORTS_OK")
 	done = true
 	quit(0)
