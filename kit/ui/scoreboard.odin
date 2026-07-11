@@ -18,6 +18,7 @@ Score :: struct {
 	// names and tallies LINE UP (a VBox of pipe-joined strings drifted with
 	// every proportional-font digit; homestead found it live)
 	cells: [dynamic]gd.Label, // header + rows, row-major, reused across refreshes
+	hidden: [dynamic]string, // column names the game declared PLUMBING (score_hide)
 }
 
 score_make :: proc(parent: gd.Node) -> Score {
@@ -43,6 +44,7 @@ score_make :: proc(parent: gd.Node) -> Score {
 
 score_destroy :: proc(sb: ^Score) {
 	delete(sb.cells)
+	delete(sb.hidden)
 	sb^ = {}
 	// The node tree itself belongs to the scene (freed with the owner).
 }
@@ -51,11 +53,31 @@ score_show :: proc(sb: ^Score, visible: bool) {
 	gd.set_bool(cast(gd.Object)sb.root, "visible", visible)
 }
 
+// Hide a column by NAME. Some stat columns are PLUMBING, not score — a
+// loadout choice replicated through the registry (scrapyard's look/iron,
+// the muster's ready bit) has no business on the board. Call once after
+// the columns are declared; unknown names are a harmless no-op.
+score_hide :: proc(sb: ^Score, name: string) {
+	append(&sb.hidden, name)
+}
+
+@(private = "file")
+score_hidden :: proc(sb: ^Score, name: string) -> bool {
+	for h in sb.hidden {
+		if h == name {return true}
+	}
+	return false
+}
+
 // Repaint players × columns. Sorted by Player_Id (join order); departed
 // players stay listed — their tallies survive disconnects by design.
 score_refresh :: proc(sb: ^Score, s: ^ksess.Session) {
 	names := ksess.session_stat_names(s)
-	gd.grid_container_set_columns(cast(gd.Grid_Container)sb.grid, gd.Int(1 + len(names)))
+	shown := 0
+	for name, _ in names {
+		if !score_hidden(sb, name) {shown += 1}
+	}
+	gd.grid_container_set_columns(cast(gd.Grid_Container)sb.grid, gd.Int(1 + shown))
 
 	next := 0
 	cell :: proc(sb: ^Score, next: ^int, text: cstring, numeric: bool) {
@@ -75,12 +97,14 @@ score_refresh :: proc(sb: ^Score, s: ^ksess.Session) {
 
 	cell(sb, &next, "player", false)
 	for name in names {
+		if score_hidden(sb, name) {continue}
 		cell(sb, &next, fmt.ctprintf("%s", name), true)
 	}
 	roster := ksess.session_roster(s)
 	for p in roster {
 		cell(sb, &next, fmt.ctprintf("%s", p.name), false)
-		for _, col in names {
+		for name, col in names {
+			if score_hidden(sb, name) {continue}
 			cell(sb, &next, fmt.ctprintf("%d", ksess.session_stat(s, p.id, ksess.Stat_Col(col))), true)
 		}
 	}
