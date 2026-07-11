@@ -34,6 +34,40 @@ package play
 // x/y like any owner field; frozen-kinematic remote pucks stay solid to them.
 
 import gd "godot:godot"
+import "core:math"
+
+// THE ENGINE TRAP this block exists to hide: a RigidBody2D IGNORES node
+// transform writes — live ones are stomped by the server's next sync, and
+// writes made while frozen vanish when the freeze lifts (the server restores
+// its own state; slopball's ball snapped back to wherever THIS peer last
+// simulated it, one possession stale, every time it took the seat). Every
+// pose the puppet imposes goes through PhysicsServer2D.body_set_state; the
+// node is written too, but only because the node is what gets drawn.
+@(private = "file")
+body_impose :: proc(body: gd.Rigid_Body2d, x, y, rot: f32) {
+	gd.node2d_set_position(cast(gd.Node2d)body, {x, y})
+	gd.node2d_set_rotation(cast(gd.Node2d)body, gd.Float(rot))
+	c := math.cos(rot)
+	sn := math.sin(rot)
+	t := gd.Transform2d{x = {c, sn}, y = {-sn, c}, origin = {x, y}}
+	v := gd.variant_from_transform2d(&t)
+	gd.physics_server2d_body_set_state(
+		gd.singleton_physics_server2d(),
+		gd.collision_object2d_get_rid(cast(gd.Collision_Object2d)body),
+		.Body_State_Transform, v,
+	)
+}
+
+@(private = "file")
+body_impel :: proc(body: gd.Rigid_Body2d, vx, vy: f32) {
+	vel := gd.Vector2{vx, vy}
+	v := gd.variant_from_vector2(&vel)
+	gd.physics_server2d_body_set_state(
+		gd.singleton_physics_server2d(),
+		gd.collision_object2d_get_rid(cast(gd.Collision_Object2d)body),
+		.Body_State_Linear_Velocity, v,
+	)
+}
 
 Puppet :: struct {
 	x, y:   f32 `gd:"replicate,interp,owner,wire=f16"`, // pose: the owner stream every screen follows
@@ -53,7 +87,7 @@ puppet_attach :: proc(p: ^Puppet, body: gd.Rigid_Body2d, x, y: f32) {
 	p.y = y
 	gd.rigid_body2d_set_freeze_mode(body, .Freeze_Mode_Kinematic)
 	gd.rigid_body2d_set_freeze_enabled(body, true)
-	gd.node2d_set_position(cast(gd.Node2d)body, {x, y})
+	body_impose(body, x, y, 0)
 }
 
 // puppet_seat — the handoff: call with `owner == ses.me` on Ev_Owner_Changed
@@ -65,10 +99,11 @@ puppet_seat :: proc(p: ^Puppet, mine: bool) {
 	p.mine = mine
 	if cast(rawptr)p.body == nil {return}
 	if mine {
-		gd.node2d_set_position(cast(gd.Node2d)p.body, {p.x, p.y})
-		gd.node2d_set_rotation(cast(gd.Node2d)p.body, gd.Float(p.rot))
+		// Unfreeze FIRST: lifting the freeze restores the server's stored
+		// state, so the seed must land on the LIVE body or it is erased.
 		gd.rigid_body2d_set_freeze_enabled(p.body, false)
-		gd.rigid_body2d_set_linear_velocity(p.body, {p.vx, p.vy})
+		body_impose(p.body, p.x, p.y, p.rot)
+		body_impel(p.body, p.vx, p.vy)
 	} else {
 		gd.rigid_body2d_set_freeze_enabled(p.body, true)
 	}
@@ -88,8 +123,10 @@ puppet_frame :: proc(p: ^Puppet) {
 		p.vx = vel.x
 		p.vy = vel.y
 	} else {
-		gd.node2d_set_position(cast(gd.Node2d)p.body, {p.x, p.y})
-		gd.node2d_set_rotation(cast(gd.Node2d)p.body, gd.Float(p.rot))
+		// The server write matters here too: a node-only glide leaves the
+		// PHYSICS body at its stale spot — your avatar collides with an
+		// invisible ghost ball while the drawn one slides elsewhere.
+		body_impose(p.body, p.x, p.y, p.rot)
 	}
 }
 
@@ -103,10 +140,9 @@ puppet_place :: proc(p: ^Puppet, x, y: f32, vx: f32 = 0, vy: f32 = 0) {
 	p.vx = vx
 	p.vy = vy
 	if cast(rawptr)p.body == nil {return}
-	gd.node2d_set_position(cast(gd.Node2d)p.body, {x, y})
-	gd.node2d_set_rotation(cast(gd.Node2d)p.body, 0)
+	body_impose(p.body, x, y, 0)
 	if p.mine {
-		gd.rigid_body2d_set_linear_velocity(p.body, {vx, vy})
+		body_impel(p.body, vx, vy)
 	}
 }
 
