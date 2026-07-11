@@ -30,6 +30,7 @@ Tracer :: struct {
 	left:    f32, // seconds
 	shooter: knet.Player_Id,
 	node:    gd.Label,
+	half:    gd.Vector2, // half the glyph's box — Controls anchor TOP-LEFT, flights are centers
 }
 
 Tracers :: struct {
@@ -72,7 +73,13 @@ tracer_add :: proc(t: ^Tracers, parent: gd.Node, f: kcombat.Fire, glyph: string,
 	defer gd.variant_destroy(&sv)
 	gd.set_value(cast(gd.Object)node, "text", sv)
 	gd.add_child(parent, cast(gd.Node)node)
-	gd.control_set_position(cast(gd.Control)node, {f.origin.x, f.origin.y}, false)
+	// A Label positions by its TOP-LEFT, but a flight position is the slug's
+	// CENTER — uncorrected, every glyph hangs half a line-height below (and
+	// right of) the true line, which reads as "bullets leave below the
+	// barrel". Center the box on the flight.
+	min_sz := gd.control_get_combined_minimum_size(cast(gd.Control)node)
+	half := gd.Vector2{min_sz.x / 2, min_sz.y / 2}
+	gd.control_set_position(cast(gd.Control)node, {f.origin.x - half.x, f.origin.y - half.y}, false)
 	hz := f32(tick_hz)
 	append(&t.live, Tracer {
 		pos = f.origin,
@@ -80,6 +87,7 @@ tracer_add :: proc(t: ^Tracers, parent: gd.Node, f: kcombat.Fire, glyph: string,
 		left = f32(f.ttl) / hz,
 		shooter = f.shooter,
 		node = node,
+		half = half,
 	})
 }
 
@@ -95,7 +103,7 @@ tracers_frame :: proc(t: ^Tracers, delta: f64, user: rawptr, targets: Targets_Pr
 		step_vel := v.vel * dt
 		v.pos += step_vel
 		v.left -= dt
-		gd.control_set_position(cast(gd.Control)v.node, {v.pos.x, v.pos.y}, false)
+		gd.control_set_position(cast(gd.Control)v.node, {v.pos.x - v.half.x, v.pos.y - v.half.y}, false)
 
 		if hit, hit_ok := kcombat.projectile_hit(from, step_vel, targets(user, v.shooter)); hit_ok {
 			on_hit(user, Tracer_Hit{shooter = v.shooter, target = hit.id, pos = hit.pos})
