@@ -924,7 +924,7 @@ session_set_owner :: proc(s: ^Session, id: knet.Net_Id, owner: knet.Player_Id) {
 	if prev == owner {
 		return
 	}
-	if !knet.registry_set_owner(&s.reg, id, owner) {
+	if !knet.registry_set_owner(&s.reg, id, owner, s.now) {
 		return
 	}
 	append(&s.events, Ev_Owner_Changed{id = id, owner = owner, prev = prev})
@@ -2042,7 +2042,7 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) 
 			return
 		}
 		prev := session_owner_of(s, id)
-		if knet.registry_set_owner(&s.reg, id, owner) {
+		if knet.registry_set_owner(&s.reg, id, owner, s.now) {
 			append(&s.events, Ev_Owner_Changed{id = id, owner = owner, prev = prev})
 		}
 	case SES_BLOB:

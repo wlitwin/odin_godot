@@ -7,6 +7,8 @@ radius = 9.0
 
 [node name="Kicker" type="CharacterBody2D"]
 script = ExtResource("1_kick")
+collision_layer = 2
+collision_mask = 5
 
 [node name="Shape" type="CollisionShape2D" parent="."]
 shape = SubResource("shape_kick")

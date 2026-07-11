@@ -11,6 +11,8 @@ bounce = 0.85
 
 [node name="Ball" type="RigidBody2D"]
 script = ExtResource("1_ball")
+collision_layer = 4
+collision_mask = 3
 gravity_scale = 0.0
 physics_material_override = SubResource("mat_ball")
 linear_damp = 0.55

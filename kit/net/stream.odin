@@ -87,6 +87,7 @@ Stream_Ring :: struct {
 	times: [INTERP_CAP]f64,
 	blobs: [INTERP_CAP][]u8, // each stream_data_size bytes, allocated on first use
 	warps: [INTERP_CAP]u8, // the owner's teleport counter at each sample
+	seeded: bool, // slot 0 is a handoff seed (see stream_ring_seed) awaiting its first real sample
 	head:  int, // oldest sample
 	count: int,
 }
@@ -105,6 +106,38 @@ stream_ring_destroy :: proc(ring: ^Stream_Ring) {
 stream_ring_reset :: proc(ring: ^Stream_Ring) {
 	ring.head = 0
 	ring.count = 0
+	ring.seeded = false
+}
+
+// Seed a fresh ring with the entity's CURRENT streamed fields as a lone
+// synthetic sample stamped `t` — the HANDOFF BRIDGE. A ring reset at an
+// ownership transfer starts empty, and render time (now - interp delay)
+// then sits BEFORE the new owner's first sample for a full interp window:
+// every watcher's motion PAUSES ~a window at every handoff. The seed is
+// this peer's freshest truth at the seam; interpolation spans seed -> first
+// real sample and motion flows straight through.
+stream_ring_seed :: proc(ring: ^Stream_Ring, t: f64, entity: rawptr, desc: ^Entity_Desc, allocator := context.allocator) {
+	n := stream_data_size(desc)
+	if n == 0 {
+		return
+	}
+	if ring.blobs[0] == nil {
+		ring.blobs[0] = make([]u8, n, allocator)
+	}
+	off := 0
+	for f in desc.fields {
+		if .Owner_Stream not_in f.flags {
+			continue
+		}
+		src := stream_field_ptr(entity, f)
+		copy(ring.blobs[0][off:off + f.size], src[:f.size])
+		off += f.size
+	}
+	ring.head = 0
+	ring.count = 1
+	ring.times[0] = t
+	ring.warps[0] = 0
+	ring.seeded = true
 }
 
 // Write the ring's NEWEST sample straight into the entity — no render delay.
@@ -142,6 +175,13 @@ stream_ring_flush_newest :: proc(ring: ^Stream_Ring, entity: rawptr, desc: ^Enti
 //   * Two packets pumped in one frame carry EQUAL stamps; if the second one
 //     carries the warp bump, a stamps-first guard would eat the cut.
 stream_ring_push :: proc(ring: ^Stream_Ring, t: f64, data: []u8, warp: u8 = 0, allocator := context.allocator) {
+	if ring.seeded && ring.count == 1 {
+		// The lone sample is the handoff SEED — this peer's own fields at the
+		// transfer, stamped warp-less. Adopt the first REAL sample's warp so
+		// the blend spans the seam instead of snapping at a phantom warp edge.
+		ring.warps[0] = warp
+		ring.seeded = false
+	}
 	if ring.count > 0 {
 		newest := (ring.head + ring.count - 1) % INTERP_CAP
 		nw := ring.warps[newest]
