@@ -107,6 +107,17 @@ stream_ring_reset :: proc(ring: ^Stream_Ring) {
 	ring.count = 0
 }
 
+// Write the ring's NEWEST sample straight into the entity — no render delay.
+// The ownership-transfer snap: the freshest thing the old owner ever said,
+// applied before the ring is reset out from under it.
+stream_ring_flush_newest :: proc(ring: ^Stream_Ring, entity: rawptr, desc: ^Entity_Desc) {
+	if ring.count == 0 {
+		return
+	}
+	newest := (ring.head + ring.count - 1) % INTERP_CAP
+	stream_blend(entity, desc, ring.blobs[newest], ring.blobs[newest], 0)
+}
+
 // Push one snapshot (copied). Stale arrivals — at or before the newest sample's
 // stamp — are dropped, mirroring interp_push (the unreliable-ORDERED channel
 // already discards reordered packets; this is the belt to those suspenders).
