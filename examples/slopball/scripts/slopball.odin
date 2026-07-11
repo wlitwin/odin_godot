@@ -50,6 +50,10 @@ TOUCH_R :: f32(44) // ANTICIPATORY seat radius: the grant round-trip (your strea
 	// before your foot arrives is what makes the touch feel local. Contact is ~17px.
 GRANT_COOL :: 0.45 // seconds between seat grants — no thrash in a scrum
 GRANT_EDGE :: f32(12) // a challenger must be this much CLOSER than the sitting owner
+CHALLENGE_HOLD :: 0.3 // a MOVING ball changes hands only after the challenger holds
+	// the advantage this long — a kicked ball rolling PAST a bystander spends ~0.3s
+	// inside TOUCH_R, and a drive-by seat theft is a visible stutter on every screen.
+BALL_SLOW :: f32(60) // px/s: under this the ball is "at rest" — first touch grants instantly
 KICKOFF_HOLD :: 1.2 // ball frozen at center after a goal/kickoff
 GOAL_MOUTH_TOP :: f32(130)
 GOAL_MOUTH_BOT :: f32(230)
@@ -75,6 +79,8 @@ Slopball :: struct {
 
 	// Host scratch (empty elsewhere).
 	grant_at:   f64, // last seat grant (GRANT_COOL)
+	challenger: knet.Player_Id, // who is contesting the moving ball...
+	challenge_since: f64, // ...and since when (CHALLENGE_HOLD)
 	kickoff_at: f64, // until when the ball rests at center
 	goals_to:   int, // first to N takes the match (SLOP_GOALS)
 

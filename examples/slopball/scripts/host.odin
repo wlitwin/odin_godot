@@ -48,10 +48,26 @@ slop_host_tick :: proc(self: ^Slopball) {
 		// between two delayed views. A challenger must beat the sitting owner
 		// by a real margin; the owner drifting away on its own loses nothing.
 		challenge_at := math.sqrt(cur_d) - GRANT_EDGE
-		if best != knet.PLAYER_ID_INVALID && best != cur &&
-		   (cur_d > TOUCH_R * TOUCH_R || math.sqrt(best_d) < challenge_at) {
-			ksess.session_set_owner(&self.ses, self.ball_id, best)
-			self.grant_at = now_s() + GRANT_COOL
+		challenging := best != knet.PLAYER_ID_INVALID && best != cur &&
+			(cur_d > TOUCH_R * TOUCH_R || math.sqrt(best_d) < challenge_at)
+		if !challenging {
+			self.challenger = knet.PLAYER_ID_INVALID
+		} else {
+			// A MOVING ball demands a HELD claim: a pass rolling by a
+			// bystander clips their radius for a beat — stealing the seat
+			// mid-flight stutters every screen. A resting ball grants on
+			// the first tick (the first touch stays snappy).
+			if best != self.challenger {
+				self.challenger = best
+				self.challenge_since = now_s()
+			}
+			speed_sq := b.puppet.vx*b.puppet.vx + b.puppet.vy*b.puppet.vy
+			held := now_s() - self.challenge_since >= CHALLENGE_HOLD
+			if speed_sq <= BALL_SLOW * BALL_SLOW || held {
+				ksess.session_set_owner(&self.ses, self.ball_id, best)
+				self.grant_at = now_s() + GRANT_COOL
+				self.challenger = knet.PLAYER_ID_INVALID
+			}
 		}
 	}
 
