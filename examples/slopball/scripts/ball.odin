@@ -19,6 +19,7 @@ import play "godot:play"
 
 Ball :: struct {
 	owner:   gd.Rigid_Body2d,
+	look:    gd.Node2d `gd:"onready=Look"`, // the drawn ball — render-error smoothing rides here
 	net_id:  knet.Net_Id,
 	puppet:  play.Puppet, // pose + velocity replicate through the embed
 	score_l: u8 `gd:"replicate"`, // host: goals by the LEFT team (defends left, scores right)
@@ -27,9 +28,9 @@ Ball :: struct {
 }
 
 ball_ready :: proc(self: ^Ball) {
-	play.puppet_attach(&self.puppet, self.owner, PITCH_W / 2, PITCH_H / 2)
+	play.puppet_attach(&self.puppet, self.owner, PITCH_W / 2, PITCH_H / 2, skin = self.look)
 }
 
 ball_process :: proc(self: ^Ball, delta: f64) {
-	play.puppet_frame(&self.puppet)
+	play.puppet_frame(&self.puppet, f32(delta))
 }

@@ -74,14 +74,57 @@ Puppet :: struct {
 	rot:    f32 `gd:"replicate,interp,owner,wire=f16"`,
 	vx, vy: f32 `gd:"replicate,owner,wire=f16"`, // momentum: carried across ownership handoffs
 	body:   gd.Rigid_Body2d, // the wrapped node — attach-time, never on the wire
+	skin:   gd.Node2d, // optional visual child — render-error smoothing rides on it
+	ox, oy: f32, // the render error: TRUTH minus what was drawn, decaying to zero
 	mine:   bool, // is THIS peer the simulator right now? (puppet_seat's latch)
+}
+
+// RENDER-ERROR SMOOTHING: authority snaps (a seat seed, a handoff re-anchor)
+// move the BODY instantly — physics must live at the truth — but the drawn
+// skin holds its ground and glides in over ~100ms: the error offset decays
+// while the skin counter-translates by it. Small hops vanish; deliberate CUTS
+// (kickoff teleports) still snap outright past PUPPET_CUT.
+PUPPET_SMOOTH_MIN :: f32(6) // one-frame jumps under this are ordinary motion
+PUPPET_CUT :: f32(90) // past this it is a teleport — smoothing a cut looks worse
+PUPPET_DECAY :: f32(11) // error half-life ~63ms
+
+@(private = "file")
+puppet_absorb :: proc(p: ^Puppet, from_x, from_y, to_x, to_y: f32) {
+	if cast(rawptr)p.skin == nil {return}
+	jx := to_x - from_x
+	jy := to_y - from_y
+	d := math.abs(jx) + math.abs(jy)
+	if d < PUPPET_SMOOTH_MIN || d > PUPPET_CUT {
+		p.ox = 0
+		p.oy = 0
+		return
+	}
+	p.ox -= jx // the skin stays where the eye last saw the ball...
+	p.oy -= jy
+}
+
+@(private = "file")
+puppet_skin_frame :: proc(p: ^Puppet, dt: f32) {
+	if cast(rawptr)p.skin == nil {return}
+	decay := math.exp(-dt * PUPPET_DECAY)
+	p.ox *= decay
+	p.oy *= decay
+	if math.abs(p.ox) + math.abs(p.oy) < 0.5 {
+		p.ox = 0
+		p.oy = 0
+	}
+	// ...expressed in the BODY's local space (the body may spin under it).
+	c := math.cos(-p.rot)
+	sn := math.sin(-p.rot)
+	gd.node2d_set_position(p.skin, {c*p.ox - sn*p.oy, sn*p.ox + c*p.oy})
 }
 
 // puppet_attach — every peer, at spawn: wrap the body. Everyone starts as a
 // watcher (frozen kinematic — solid to the local scene, moved by the stream);
 // the first puppet_seat(true) wakes the simulator's solver.
-puppet_attach :: proc(p: ^Puppet, body: gd.Rigid_Body2d, x, y: f32) {
+puppet_attach :: proc(p: ^Puppet, body: gd.Rigid_Body2d, x, y: f32, skin: gd.Node2d = nil) {
 	p.body = body
+	p.skin = skin
 	p.mine = false
 	p.x = x
 	p.y = y
@@ -101,9 +144,11 @@ puppet_seat :: proc(p: ^Puppet, mine: bool) {
 	if mine {
 		// Unfreeze FIRST: lifting the freeze restores the server's stored
 		// state, so the seed must land on the LIVE body or it is erased.
+		was := gd.node2d_get_position(cast(gd.Node2d)p.body)
 		gd.rigid_body2d_set_freeze_enabled(p.body, false)
 		body_impose(p.body, p.x, p.y, p.rot)
 		body_impel(p.body, p.vx, p.vy)
+		puppet_absorb(p, was.x, was.y, p.x, p.y) // the seed hop glides in
 	} else {
 		gd.rigid_body2d_set_freeze_enabled(p.body, true)
 	}
@@ -112,7 +157,7 @@ puppet_seat :: proc(p: ^Puppet, mine: bool) {
 // puppet_frame — every peer, every frame, after the solver ran. The simulator
 // publishes the body onto the stream; watchers glide the frozen body along
 // the interpolated fields.
-puppet_frame :: proc(p: ^Puppet) {
+puppet_frame :: proc(p: ^Puppet, dt: f32 = 1.0 / 60) {
 	if cast(rawptr)p.body == nil {return}
 	if p.mine {
 		pos := gd.node2d_get_position(cast(gd.Node2d)p.body)
@@ -126,8 +171,11 @@ puppet_frame :: proc(p: ^Puppet) {
 		// The server write matters here too: a node-only glide leaves the
 		// PHYSICS body at its stale spot — your avatar collides with an
 		// invisible ghost ball while the drawn one slides elsewhere.
+		was := gd.node2d_get_position(cast(gd.Node2d)p.body)
 		body_impose(p.body, p.x, p.y, p.rot)
+		puppet_absorb(p, was.x, was.y, p.x, p.y) // handoff re-anchors glide in
 	}
+	puppet_skin_frame(p, dt)
 }
 
 // puppet_place — the simulator teleports the body (kickoff, round reset).
@@ -144,6 +192,8 @@ puppet_place :: proc(p: ^Puppet, x, y: f32, vx: f32 = 0, vy: f32 = 0) {
 	if p.mine {
 		body_impel(p.body, vx, vy)
 	}
+	p.ox = 0 // a place IS a cut — never glide across a kickoff
+	p.oy = 0
 }
 
 // puppet_shove — the simulator's impulse verb (a kick, a blast). A no-op on
