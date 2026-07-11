@@ -31,6 +31,29 @@ SLOP_NAME=righty godot --path .    # Join
 WASD moves, Space kicks, first to `SLOP_GOALS` (default 3) takes the match. Odd seats
 defend the left goal, even the right.
 
+## The feel ledger
+
+Seven layers of stutter hid under each other, each found by live playtest and
+fixed at the right layer. The short version, for the next physics game:
+
+1. **RigidBody2D ignores node transform writes** — live ones are stomped by the
+   server sync; frozen ones vanish when the freeze lifts. Every imposed pose
+   goes through `PhysicsServer2D.body_set_state` (`play.Puppet` does this).
+2. **Ownership transfers must flush the freshest sample** into the fields
+   before the ring resets, and **seed the fresh ring** so watcher interp flows
+   through the seam instead of pausing an interp window (kit does both now).
+3. **Run the session at the solver's rate** (60Hz here; `SLOP_HZ` drives both).
+4. **Arbitration is feel**: grant the seat *before* contact (anticipation),
+   make possession sticky, debounce moving-ball challenges, and let statues
+   never claim — an idle body doesn't need the seat.
+5. **Smooth corrections, never authority**: the body snaps to truth; the drawn
+   skin glides in (~63ms half-life). Deliberate cuts snap outright.
+6. **Predict possession**: `puppet_claim` seizes the sim the frame your screen
+   sees the touch; the host confirms (seamless) or denies (smoothed snap).
+7. **The last stutter wasn't netcode**: physics-tick stepping vs display
+   refresh. `physics/common/physics_interpolation=true`, reset it at cuts,
+   and never lerp an angle across the ±π wrap.
+
 ## The acid
 
 - `run.sh` — solo gate (`SLOPBALL_SINGLE_OK`): the striker bot runs the whole loop
