@@ -23,7 +23,7 @@ script_virtuals: [dynamic]Virtual_Entry
 OdinScript :: struct {
     object:           gdext.ObjectPtr,
     source_utf8:      []u8, // owned copy of the `.odin` source
-    base_type:        string, // owned copy of the parsed `extends` base (default "Node")
+    base_type:        string, // owned copy of the parsed `extends` base ("" = no marker; edges read "" as "Node")
     class_name:       string, // owned copy of the parsed `//gd:class <Name>` (default "")
     icon:             string, // owned copy of the parsed `//gd:icon <res-path>` (default "")
     warned_ambiguous: bool, // one-shot: ambiguous base-type class resolution already warned
@@ -37,9 +37,13 @@ odin_script_binding_callbacks := gdext.InstanceBindingCallbacks {
 }
 
 // Parse the Phase-1 base-type convention: a marker comment `//gd:extends <Type>`.
-// Falls back to "Node" when absent. (Real struct-tag class declarations are Phase 2/3.)
-// Package-visible: the global-class virtuals (language.odin `_get_global_class_name`)
-// reparse a `.odin` file's markers straight from its path.
+// Returns "" when the marker is ABSENT — that is the stored convention (see the
+// base_type field note); engine-facing reads default "" to "Node" at the edge.
+// (Returning "Node" here made a marker-less HELPER file indistinguishable from a
+// script that explicitly extends Node, which is what forced the one-Node-class
+// rule on every package.) Package-visible: the global-class virtuals
+// (language.odin `_get_global_class_name`) reparse a `.odin` file's markers
+// straight from its path.
 @(private)
 parse_base_type :: proc(source: string) -> string {
     it := source
@@ -52,7 +56,7 @@ parse_base_type :: proc(source: string) -> string {
             }
         }
     }
-    return "Node"
+    return ""
 }
 
 // Parse the Phase-2 class-binding convention: a marker comment `//gd:class <Name>`.
@@ -160,7 +164,16 @@ odin_script_resolve_desc :: proc(self: ^OdinScript) -> (rt.Class_Desc, bool) {
             return desc, true
         }
     }
-    base := self.base_type != "" ? self.base_type : "Node"
+    // NO markers at all = a package HELPER, not a script — it has no class to bind
+    // and never did; the placeholder is its correct identity, silently. (This used
+    // to fall through to the "Node" default below, which bound every helper file to
+    // THE class extending plain Node — and a second Node class then sprayed one
+    // ambiguity warning per helper per editor scan. Attachable scripts declare
+    // `//gd:extends`; the repo attaches no marker-less file, and the docs agree.)
+    if self.base_type == "" {
+        return {}, false
+    }
+    base := self.base_type
     found: rt.Class_Desc
     count := 0
     for _, desc in scripts_classes {

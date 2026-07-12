@@ -238,6 +238,9 @@ lv_get_global_class_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr,
     name := parse_class_name(odin_text)
     if name != "" {
         base := parse_base_type(odin_text)
+        if base == "" {
+            base = "Node" // a named class with no //gd:extends registers under the default base
+        }
         icon := parse_icon(odin_text)
         if icon == "" {
             icon = resolved_default_icon() // bundled Odin mark when the script sets no //gd:icon

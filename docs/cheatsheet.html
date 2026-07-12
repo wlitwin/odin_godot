@@ -128,7 +128,7 @@ player_enter_tree / _exit_tree / _reload   // reload = re-capture cached ptrs af
 <tr><td class="k"><b>@(gd_command="predict")</b></td><td>client applies optimistically; reject/timeout auto-reverts, reject carries truth. Return bool = APPLIED</td></tr>
 <tr><td class="k"><b>@(gd_connect="signal")</b></td><td>auto-connect owner.signal → this method at ready (must be gd_method)</td></tr>
 </table>
-<div class="warn"><b>THE METHOD TRAP:</b> a class's proc scan covers its OWN file + HEADERLESS helper files only. A <code>^Game</code> @(gd_method) written in a file that declares <code>//gd:class Other</code> binds to NOTHING — silently (connects fail only when pressed). Keep entity methods in headerless files. Corollary: keep exactly ONE class extending plain <code>Node</code> — headerless files resolve to it in the editor script map.</div>
+<div class="warn"><b>THE METHOD TRAP:</b> a class's proc scan covers its OWN file + HEADERLESS helper files only. A <code>^Game</code> @(gd_method) written in a file that declares <code>//gd:class Other</code> binds to NOTHING — silently (connects fail only when pressed). Keep entity methods in headerless files. (Marker-less helper files resolve to no class at all — as of 2026-07 the loader treats them as helpers, so any number of classes may extend plain <code>Node</code>.)</div>
 </div><div>
 <h3>Field tags <span class="d">(gd:"…" — first token selects kind)</span></h3>
 <table>
@@ -454,7 +454,7 @@ fslp_verdict MYGAME</pre>
 <li>Control anchors bind to a Control parent or the viewport under a CanvasLayer; under a plain Node they bind NOTHING (top-left hug). Containers overrule set_size — custom_minimum_size is the contract.</li>
 <li>TextureRect default expand_mode grows the control to its texture — set expand_mode=1 for fixed panes. Labels auto-grow to min size.</li>
 <li>Scene sample text is for the EDITOR — ship such nodes visible=false; the frame feed shows them.</li>
-<li>Editor script-map: headerless package files resolve to THE class extending Node — keep exactly one. Verify editor-facing work with <code>godot --headless --editor --quit</code> (catches warnings the game run never shows).</li>
+<li>Marker-less files are HELPERS — no class identity (pre-2026-07 loaders bound them to THE Node class, forcing one-Node-class packages). Verify editor-facing work with <code>godot --headless --editor --quit</code> (catches warnings the game run never shows).</li>
 <li>CanvasLayer children draw above world z-index — UI on a layer, never trust entity z against it.</li>
 </ul>
 </div><div>
@@ -468,6 +468,7 @@ fslp_verdict MYGAME</pre>
 <h3>Process / tooling</h3>
 <ul>
 <li>Editor reload builds race CLI builds — PID-scoped temps fixed it, but gates still want the game's editor closed (auto-save can stomp the tree: check lsof on mystery reverts).</li>
+<li>CONSUMER core path: an addon-layout project loads the CORE from <code>addons/odin_godot/bin/&lt;platform&gt;/</code> — build_scripts.sh's <code>res://bin/</code> core output is unused there. Kit-CORE changes must land in the addon bin (kit/play/scriptgen changes ride the scripts dll and don't).</li>
 <li>build_scripts.sh publishes atomically (temp + mv) — an interrupted rebuild never removes the previous dll. Deleted .odin files: the deletion probe sweeps orphan .gen.odin every ~2s.</li>
 <li>Working directory persists across shell calls — background launches inherit the LAST cd; write multi-line commands with the cd on its own line.</li>
 <li>Verdicts from literal log lines, not exit codes (a FAIL run can exit 0). Count retry attempts (<code>grep -c attempt</code>) — retries mask flakes.</li>
