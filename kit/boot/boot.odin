@@ -56,6 +56,15 @@ Options :: struct {
 	min_players: int, // host's Start button appears at this count (default 2)
 	spatial:     bool, // 3D game: stage/world become Node3D containers (default Node2D)
 	keep_vsync:  bool, // opt OUT of the desktop playtest unthrottle (see unthrottle_desktop)
+	// FULL REPLACEMENT (nil = the kit's stock build): a game that wants its
+	// own look authors a scene in the editor and the kit ADOPTS it — resolves
+	// the nodes it drives by NAME and pours the stock behavior in. The
+	// contracts live on each widget's *_adopt in kit/ui: the lobby wants
+	// Title/Status/Players/Host/Join/Start; chat wants Lines/Input; the
+	// scoreboard wants Grid. Anything else in a scene is the game's own.
+	lobby_scene: gd.Packed_Scene,
+	chat_scene:  gd.Packed_Scene,
+	score_scene: gd.Packed_Scene,
 	methods:     Methods,
 }
 
@@ -119,7 +128,11 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 	gd.add_child(node, cast(gd.Node)layer)
 	b.ui_layer = cast(gd.Node)layer
 
-	b.ui = kui.lobby_make(b.ui_layer, opts.title)
+	if cast(rawptr)opts.lobby_scene != nil {
+		b.ui = kui.lobby_adopt(b.ui_layer, opts.lobby_scene, opts.title)
+	} else {
+		b.ui = kui.lobby_make(b.ui_layer, opts.title)
+	}
 	if opts.status != "" {
 		kui.lobby_set_status(&b.ui, opts.status)
 	}
@@ -128,7 +141,11 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 	gd.connect_to(cast(gd.Object)b.ui.start_btn, "pressed", node, opts.methods.start)
 
 	kcomms.comms_init(comms, ses)
-	b.chat = kui.chat_make(b.ui_layer)
+	if cast(rawptr)opts.chat_scene != nil {
+		b.chat = kui.chat_adopt(b.ui_layer, opts.chat_scene)
+	} else {
+		b.chat = kui.chat_make(b.ui_layer)
+	}
 	kui.chat_show(&b.chat, false)
 	gd.connect_to(cast(gd.Object)b.chat.input, "text_submitted", node, opts.methods.chat)
 
@@ -143,7 +160,11 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 	gd.node_set_name(b.world, gd.new_string_name_cstring("World", true))
 	gd.add_child(node, b.world)
 
-	b.score = kui.score_make(b.ui_layer)
+	if cast(rawptr)opts.score_scene != nil {
+		b.score = kui.score_adopt(b.ui_layer, opts.score_scene)
+	} else {
+		b.score = kui.score_make(b.ui_layer)
+	}
 
 	netgd.wire_attach(&b.wire, node, ses, opts.msg_kind)
 	netgd.wire_listen(&b.wire, opts.methods.packet, opts.methods.peer_left, opts.methods.net_up, opts.methods.net_down)

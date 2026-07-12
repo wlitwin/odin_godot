@@ -14,6 +14,14 @@ package kit_ui
 //
 // Styling is deliberately stock Godot theme — friendslop lobbies are for
 // friends, and games that care can theme the returned nodes.
+//
+// FULL REPLACEMENT: the kit provides the implementation, never the final
+// look. A game that wants its own lobby/chat/scoreboard authors a scene in
+// the editor and hands it to boot (Options.lobby_scene / chat_scene /
+// score_scene) — the kit ADOPTS it: resolves the nodes it drives BY NAME
+// (any depth; see each widget's *_adopt contract) and pours the same
+// behavior into them. Everything else in the scene is the game's own chrome;
+// the kit never touches what it didn't name.
 
 import gd "godot:godot"
 import knet "godot:kit/net"
@@ -25,11 +33,27 @@ import "core:fmt"
 // NUL termination or c-allocator lifetimes.
 @(private)
 set_text :: proc(obj: gd.Object, text: string) {
+	if cast(rawptr)obj == nil {return} 	// a violated adopt contract already screamed; don't also crash
 	s := gd.new_string_odin(text)
 	defer gd.free_string(s)
 	sv := gd.variant_from_string(&s)
 	defer gd.variant_destroy(&sv)
 	gd.set_value(obj, "text", sv)
+}
+
+// Resolve an adopted scene's contract node by NAME, searching the whole tree
+// — the game nests its chrome however it likes. A missing node is reported
+// LOUDLY (once, at boot, greppable) and comes back nil; the setters tolerate
+// nil so a violated contract degrades to a dead widget, not a crash.
+@(private)
+adopt_child :: proc(root: gd.Node, name: cstring, widget: string) -> gd.Node {
+	pat := gd.new_string_cstring(name)
+	defer gd.free_string(pat)
+	n := gd.node_find_child(root, pat, true, false)
+	if cast(rawptr)n == nil {
+		gd.print_str(fmt.tprintf("kit/ui: adopted %s scene has no node named \"%s\"", widget, name))
+	}
+	return n
 }
 
 Lobby :: struct {
@@ -89,6 +113,38 @@ lobby_make :: proc(parent: gd.Node, title: string) -> Lobby {
 	gd.add_child(cast(gd.Node)l.panel, cast(gd.Node)l.start_btn)
 	gd.set_bool(cast(gd.Object)l.start_btn, "visible", false)
 
+	return l
+}
+
+// Adopt a game-authored lobby scene (full replacement — see the header).
+// The CONTRACT, by node name at any depth:
+//
+//   Title (Label) · Status (Label) · Players (any container — rows land here)
+//   Host (Button) · Join (Button) · Start (Button)
+//
+// The kit instances the scene, wires those six, and drives them exactly as it
+// drives its stock build (Start ships hidden; refresh pours rows into
+// Players). Extra nodes — a Single Player key, an address field, the plate —
+// are the game's to wire after boot_attach, through l.root. The scene owns
+// its OWN layout (anchors under the boot layer bind to the viewport); none
+// of the stock builder's sizing hacks apply.
+lobby_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene, title: string) -> Lobby {
+	l: Lobby
+	node := gd.instantiate(scene)
+	gd.add_child(parent, node)
+	l.root = cast(gd.Control)node
+	// (l.panel stays nil — "the column" is a stock-builder detail; an adopted
+	// scene arranges itself.)
+	l.title = cast(gd.Label)adopt_child(node, "Title", "lobby")
+	l.status = cast(gd.Label)adopt_child(node, "Status", "lobby")
+	l.rows_box = cast(gd.Control)adopt_child(node, "Players", "lobby")
+	l.host_btn = cast(gd.Button)adopt_child(node, "Host", "lobby")
+	l.join_btn = cast(gd.Button)adopt_child(node, "Join", "lobby")
+	l.start_btn = cast(gd.Button)adopt_child(node, "Start", "lobby")
+	set_text(cast(gd.Object)l.title, title)
+	if cast(rawptr)l.start_btn != nil {
+		gd.set_bool(cast(gd.Object)l.start_btn, "visible", false)
+	}
 	return l
 }
 

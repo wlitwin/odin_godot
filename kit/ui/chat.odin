@@ -52,6 +52,23 @@ chat_make :: proc(parent: gd.Node) -> Chat {
 	return ch
 }
 
+// Adopt a game-authored chat scene (full replacement — see ui.odin's header).
+// The CONTRACT, by node name at any depth:
+//
+//   Lines (any container — the scrollback rows land here) · Input (LineEdit)
+//
+// The scene owns its own anchoring; the kit only pours lines and reads the
+// input. Row Labels are kit-created — theme them from the scene root.
+chat_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene) -> Chat {
+	ch: Chat
+	node := gd.instantiate(scene)
+	gd.add_child(parent, node)
+	ch.root = cast(gd.Control)node
+	ch.lines_box = cast(gd.Control)adopt_child(node, "Lines", "chat")
+	ch.input = cast(gd.Line_Edit)adopt_child(node, "Input", "chat")
+	return ch
+}
+
 chat_destroy :: proc(ch: ^Chat) {
 	delete(ch.rows)
 	ch^ = {}

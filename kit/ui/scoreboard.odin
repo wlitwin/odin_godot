@@ -19,6 +19,7 @@ Score :: struct {
 	// every proportional-font digit; homestead found it live)
 	cells: [dynamic]gd.Label, // header + rows, row-major, reused across refreshes
 	hidden: [dynamic]string, // column names the game declared PLUMBING (score_hide)
+	authored: bool, // scene-adopted: the scene's anchors own position (skip the hand-centering)
 }
 
 score_make :: proc(parent: gd.Node) -> Score {
@@ -38,6 +39,25 @@ score_make :: proc(parent: gd.Node) -> Score {
 	gd.control_add_theme_constant_override(cast(gd.Control)grid, gd.new_string_name_cstring("h_separation", true), 22)
 	sb.grid = cast(gd.Control)grid
 	gd.add_child(cast(gd.Node)sb.root, cast(gd.Node)sb.grid)
+	gd.set_bool(cast(gd.Object)sb.root, "visible", false)
+	return sb
+}
+
+// Adopt a game-authored scoreboard scene (full replacement — see ui.odin's
+// header). The CONTRACT, by node name at any depth:
+//
+//   Grid (GridContainer — the kit sets its column count and pours the cells)
+//
+// The scene root is the panel: anchor it however you like (the stock build's
+// hand-centering is skipped for adopted scenes). Cell Labels are kit-created
+// — theme them from the scene root.
+score_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene) -> Score {
+	sb: Score
+	node := gd.instantiate(scene)
+	gd.add_child(parent, node)
+	sb.root = cast(gd.Control)node
+	sb.grid = cast(gd.Control)adopt_child(node, "Grid", "scoreboard")
+	sb.authored = true
 	gd.set_bool(cast(gd.Object)sb.root, "visible", false)
 	return sb
 }
@@ -115,8 +135,11 @@ score_refresh :: proc(sb: ^Score, s: ^ksess.Session) {
 
 	// Center in the viewport by hand (see score_make): position from the
 	// panel's own minimum size, which reflects THIS refresh's content even
-	// before a layout pass has resized the control.
-	need := gd.control_get_combined_minimum_size(sb.root)
-	vp := gd.viewport_get_visible_rect(gd.node_get_viewport(cast(gd.Node)sb.root))
-	gd.control_set_position(sb.root, {(vp.size.x - need.x) * 0.5, (vp.size.y - need.y) * 0.5}, false)
+	// before a layout pass has resized the control. An ADOPTED scene anchors
+	// itself — the kit must not fight the game's layout.
+	if !sb.authored {
+		need := gd.control_get_combined_minimum_size(sb.root)
+		vp := gd.viewport_get_visible_rect(gd.node_get_viewport(cast(gd.Node)sb.root))
+		gd.control_set_position(sb.root, {(vp.size.x - need.x) * 0.5, (vp.size.y - need.y) * 0.5}, false)
+	}
 }
