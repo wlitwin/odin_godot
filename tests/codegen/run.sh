@@ -14,6 +14,12 @@ PROJ="$ROOT/tests/codegen"
 # Build the scripts dll (Probe + boot) + the core dll via the codegen pipeline.
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
 
+# Bare-import composition (bare.odin): `import "godot:play"` without an alias must
+# bind the package name and register the embed's replicated fields — the old
+# alias-only rule skipped them SILENTLY (compiled fine, never replicated).
+grep -q 'offset_of(BareProbe, health)' "$PROJ/scripts/bare.gen.odin" \
+  || { echo "CODEGEN_FAIL: bare-import embed did not compose (no health descriptor in bare.gen.odin)"; exit 1; }
+
 # Make the scripts dll path unambiguous for the core's dynlib load.
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
 

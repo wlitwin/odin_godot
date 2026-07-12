@@ -634,17 +634,65 @@ build_struct_def :: proc(dir, path, name: string, st: ^ast.Struct_Type, src, ali
 	}
 }
 
-// alias -> import fullpath, EXPLICIT aliases only (`import k "godot:kit/net"` — the
-// idiomatic form for kit packages). A default (unaliased) import's alias is the target's
-// package NAME, unknown without parsing it, so those don't resolve (no recursion, same as
-// before — no regression). godot:godot is excluded: its types are engine leaves.
+// dir -> the `package` name its files declare ("" = none found). Lazy cache for
+// bare-import resolution below — deliberately independent of index_pkg_dir, so a
+// name lookup never recurses into (or waits on) full struct indexing.
+g_pkg_names: map[string]string
+
+// The package NAME a directory's files declare — parse authored .odin files until
+// one yields it. Misses are cached too, so an unreadable dir asks the disk once.
+package_name_of :: proc(dir: string) -> string {
+	if name, ok := g_pkg_names[dir]; ok {return name}
+	g_pkg_names[dir] = "" // publish the miss first; overwrite on success
+	dir_fh, oerr := os.open(dir)
+	if oerr != nil {return ""}
+	files, rderr := os.read_dir(dir_fh, -1, context.allocator)
+	os.close(dir_fh)
+	if rderr != nil {return ""}
+	for fi in files {
+		if fi.type == .Directory {continue}
+		if !strings.has_suffix(fi.name, ".odin") {continue}
+		if strings.has_suffix(fi.name, ".gen.odin") {continue}
+		src_bytes, rerr := os.read_entire_file_from_path(fi.fullpath, context.allocator)
+		if rerr != nil {continue}
+		file := ast.File {
+			fullpath = fi.fullpath,
+			src      = string(src_bytes),
+		}
+		p := parser.default_parser()
+		p.err = silent_parse_diag
+		p.warn = silent_parse_diag
+		if !parser.parse_file(&p, &file) {continue}
+		if file.pkg_name != "" {
+			g_pkg_names[dir] = file.pkg_name
+			return file.pkg_name
+		}
+	}
+	return ""
+}
+
+// alias -> import fullpath. Explicit aliases map directly (`import k "godot:kit/net"`).
+// A BARE import binds the target's package NAME — resolved by reading the imported
+// dir's package clause (package_name_of, cached) — so `import "godot:play"` composes
+// exactly like the aliased form. (It used to be alias-only: a bare import silently
+// skipped the embed's fields and verbs, which cost a real debugging session — the
+// gun compiled, ran, and just never replicated.) Only the godot: collection resolves;
+// other collections stay engine/core leaves. godot:godot is excluded (engine types);
+// `_` imports are side-effect only.
 collect_file_imports :: proc(file: ^ast.File) -> map[string]string {
 	m := make(map[string]string)
 	for imp in file.imports {
-		if imp.name.text == "" || imp.name.text == "_" {continue} // no explicit alias
+		if imp.name.text == "_" {continue}
 		full := strings.trim(imp.fullpath, "\"")
 		if full == "godot:godot" {continue}
-		m[imp.name.text] = full
+		name := imp.name.text
+		if name == "" {
+			dir, dok := resolve_import_dir(full)
+			if !dok {continue}
+			name = package_name_of(dir)
+			if name == "" {continue}
+		}
+		m[name] = full
 	}
 	return m
 }

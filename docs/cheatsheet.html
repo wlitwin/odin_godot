@@ -139,8 +139,8 @@ player_enter_tree / _exit_tree / _reload   // reload = re-capture cached ptrs af
 <tr><td class="k"><b>///</b> doc comment</td><td>above field = property tooltip; above struct = class doc</td></tr>
 </table>
 <h3>Verb / method composition (blocks)</h3>
-<pre>import play "godot:play"          // MUST be aliased — bare import silently
-                                  // skips the embed's fields & verbs!
+<pre>import play "godot:play"          // alias or bare — both compose (bare
+                                  // resolves via the package clause)
 Runner :: struct {
     owner:  gd.Node2d,
     net_id: knet.Net_Id,
@@ -478,7 +478,7 @@ fslp_verdict MYGAME</pre>
 </ul>
 <h3>Kit-specific traps</h3>
 <ul>
-<li>Block imports MUST be aliased (<code>import play "godot:play"</code>) — bare import silently skips embedded fields/verbs.</li>
+<li>Block imports: alias and bare both compose (bare resolves via the package clause). Pre-2026-07 scriptgen skipped bare-import embeds silently — alias there.</li>
 <li>xfer default tag collides with your session tags — pick explicit tag bytes (comms 0, fire 1, xfer 2, vault 3…).</li>
 <li>comms_destroy before session; Ev_Line.text and session_blob return VIEWS — copy to keep.</li>
 <li>kick = session_kick + wire_drop (deferred — the kicked message must flush first).</li>
