@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>odin_godot cheat sheet</title>
+<style>
+:root{--bg:#111418;--fg:#cfd6e0;--dim:#7d8794;--acc:#e0b34c;--acc2:#6fb3d2;--card:#181d24;--line:#242b35;--code:#1c222b;--good:#7cc47c;--bad:#d97a6c;--tag:#2a3340}
+@media (prefers-color-scheme: light){:root{--bg:#f5f4f0;--fg:#23272d;--dim:#6b7280;--acc:#8a6410;--acc2:#1d6f95;--card:#fdfcf9;--line:#dcd8cf;--code:#eeece5;--good:#2c7a2c;--bad:#a33d2e;--tag:#e3dfd4}}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:52px}
+body{background:var(--bg);color:var(--fg);font:13px/1.5 "SF Mono",Menlo,Consolas,"Liberation Mono",monospace}
+a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
+header{position:sticky;top:0;z-index:9;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header b{color:var(--acc);white-space:nowrap}
+header input{background:var(--code);border:1px solid var(--line);color:var(--fg);font:inherit;padding:4px 8px;border-radius:4px;width:220px}
+nav{display:flex;gap:10px;flex-wrap:wrap;font-size:12px}
+nav a{color:var(--dim)}nav a:hover{color:var(--acc2)}
+main{max-width:1200px;margin:0 auto;padding:14px}
+section{margin-bottom:34px}
+h2{color:var(--acc);font-size:16px;border-bottom:1px solid var(--line);padding:18px 0 4px;margin-bottom:10px}
+h3{color:var(--acc2);font-size:13px;margin:16px 0 6px}
+h4{color:var(--fg);font-size:12.5px;margin:12px 0 4px}
+p{margin:6px 0;color:var(--fg)}
+.d{color:var(--dim)}
+ul{margin:4px 0 8px 18px}li{margin:2px 0}
+table{border-collapse:collapse;width:100%;margin:6px 0 12px}
+td,th{border:1px solid var(--line);padding:3px 8px;vertical-align:top;text-align:left;overflow-wrap:anywhere}
+th{background:var(--card);color:var(--acc2);font-weight:600}
+td.k{white-space:pre-wrap;color:var(--fg);background:var(--card);width:46%;font-size:12px}
+td.k b{color:var(--acc)}
+pre{background:var(--code);border:1px solid var(--line);border-radius:4px;padding:8px 10px;overflow-x:auto;margin:6px 0 12px;font-size:12px;line-height:1.45}
+code{background:var(--code);padding:0 4px;border-radius:3px;font-size:12px}
+pre code{background:none;padding:0}
+.tag{display:inline-block;background:var(--tag);color:var(--acc);border-radius:3px;padding:0 6px;font-size:11px;margin-right:4px}
+.warn{border-left:3px solid var(--bad);padding:4px 10px;background:var(--card);margin:8px 0}
+.tip{border-left:3px solid var(--good);padding:4px 10px;background:var(--card);margin:8px 0}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:0 24px}
+.cols>div{min-width:0}
+.hide{display:none!important}
+footer{color:var(--dim);padding:20px 0;border-top:1px solid var(--line);font-size:11px}
+@media(max-width:700px){td.k{width:auto}header input{width:140px}}
+</style>
+</head>
+<body>
+<header>
+<b>odin_godot / friendslop — cheat sheet</b>
+<input id="q" type="search" placeholder="filter rows… (esc clears)">
+<nav>
+<a href="#boot">boot</a><a href="#authoring">authoring</a><a href="#binding">binding</a><a href="#play">play</a><a href="#kit">kit</a><a href="#recipes">recipes</a><a href="#gotchas">gotchas</a><a href="#tooling">tooling</a>
+</nav>
+</header>
+<main>
+
+<!-- ============================ BOOT ============================ -->
+<section id="boot">
+<h2>0 · Quick start</h2>
+<div class="cols"><div>
+<h3>A project is three pieces</h3>
+<ul>
+<li><code>*.gdextension</code> at project root — loads the CORE dll only (<code>entry_symbol = "odin_godot_init"</code>, <code>compatibility_minimum = "4.6"</code>; scripts dll is loaded by the core at runtime, never listed). Keep native entries even for web.</li>
+<li><code>scripts/</code> — ONE Odin package (same <code>package</code> line in every file). Boot shim <code>odin_godot_boot.gen.odin</code> is generated.</li>
+<li>Build → <code>bin/libodinscripts.dylib</code> + <code>bin/libodin_godot.dylib</code>.</li>
+</ul>
+<h3>Build / run</h3>
+<pre>bash build/build_scripts.sh &lt;project&gt; [scripts_dir]   # scriptgen → *.gen.odin → dlls
+ODIN_GODOT_ROOT=…/addons/odin_godot SKIP_CORE=1 \
+  bash addons/odin_godot/build/build_scripts.sh .     # addon-consumer form
+bash build/build_web.sh &lt;project&gt;                     # one SIDE_MODULE wasm
+bash build/serve.sh export_dir                        # COOP/COEP server :8099
+make test | make showcase | make web | make bindings</pre>
+<p class="d">In-editor: Project → Tools → Build Odin Scripts (saving auto-rebuilds + hot-swaps; instances keep state). Fresh dir: Project → Tools → Set Up Odin Scripts.</p>
+</div><div>
+<h3>The one struct + ready ceremony (kboot)</h3>
+<pre>Game :: struct {
+    owner: gd.Node,
+    ses:   ksess.Session,
+    comms: kcomms.Comms,
+    boot:  kboot.Boot,
+    // entity maps, UI handles, campaign state… NO globals
+}
+game_ready :: proc(self: ^Game) {
+    ksess.session_configure(&self.ses, {tick_hz = 60})
+    ksess.session_set_factory(&self.ses, self, make_entity, free_entity)
+    ksess.session_set_type_hook(&self.ses, PLAYER_TYPE, self, player_hook)
+    kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{
+        title = "MY GAME", msg_kind = MSG_SESSION, latency_env = "MY_LATENCY",
+        methods = {"on_host","on_join","on_start","on_chat",
+                   "on_packet","on_peer_left","on_net_up","on_net_down"},
+    })
+}
+game_process :: proc(self: ^Game, delta: f64) {
+    events, marks, ticks := kboot.boot_pump(&self.boot, delta, knet.now_s())
+    if self.ses.is_host { for _ in 0..&lt;ticks { host_tick(self) } }
+    for ev in events { #partial switch e in ev { /* game cases only */ } }
+}</pre>
+<p class="d">The 8 <code>@(gd_method)</code> pads are one-liners: <code>wire_receive</code> / <code>session_peer_disconnected</code> / <code>session_client_join</code> / <code>session_peer_disconnected(HOST_PEER)</code> + host/join/start/chat buttons. Never skip the disconnect forwards.</p>
+</div></div>
+</section>
+
+<!-- ============================ AUTHORING ============================ -->
+<section id="authoring">
+<h2>1 · Authoring contract (scriptgen)</h2>
+<p>Write a clean <code>.odin</code>; scriptgen emits a sibling <code>&lt;file&gt;.gen.odin</code> (trampolines, command tables, signal emitters, <code>@(init)</code> registration). Export hints are read at runtime by reflection from the same tags.</p>
+<div class="cols"><div>
+<h3>Header markers <span class="d">(above <code>package</code>, top-level files only)</span></h3>
+<table>
+<tr><td class="k"><b>//gd:extends</b> Node2D</td><td>REQUIRED for a script file — Godot base class</td></tr>
+<tr><td class="k"><b>//gd:class</b> Name</td><td>class name the loader binds (default: struct name); unique per package</td></tr>
+<tr><td class="k"><b>//gd:tool</b></td><td>runs in editor too (pair with <code>gd.is_editor()</code>)</td></tr>
+<tr><td class="k"><b>//gd:icon</b> res://p.svg</td><td>class icon</td></tr>
+</table>
+<h3>Struct rules</h3>
+<ul>
+<li>FIRST field must be <code>owner: gd.&lt;Base&gt;</code> (offset 0). Engine calls go through <code>self.owner</code>, never bare <code>self</code>.</li>
+<li>Commands require a <code>net_id: knet.Net_Id</code> field + at least one <code>replicate</code> field.</li>
+<li>Untagged struct-typed fields are RECURSED: nested tagged fields register with the entity. <code>using</code> embed FLATTENS names; plain embed NAMESPACES (<code>&lt;field&gt;_&lt;leaf&gt;</code>). Generic instantiations substitute through.</li>
+</ul>
+<h3>Lifecycle procs <span class="d">(name = &lt;struct_snake&gt;_&lt;keyword&gt;)</span></h3>
+<pre>player_ready / _process(delta) / _physics_process(delta)
+player_enter_tree / _exit_tree / _reload   // reload = re-capture cached ptrs after hot swap</pre>
+<p class="d">delta param optional on process/physics_process; the others take just <code>self</code>. A near-miss name (edit distance 1) warns.</p>
+<h3>Proc attributes</h3>
+<table>
+<tr><td class="k"><b>@(gd_method)</b></td><td>callable from GDScript/signals/acid drivers; binds by FIRST param <code>^Struct</code></td></tr>
+<tr><td class="k"><b>@(gd_rpc)</b> / @(gd_rpc="any_peer,unreliable,call_local,channel=2")</td><td>implies gd_method; Godot high-level RPC (tokens: authority|any_peer, reliable|unreliable|unreliable_ordered, call_local, channel=N)</td></tr>
+<tr><td class="k"><b>@(gd_command)</b></td><td>kit/net verb, host-runs; issued from Odin via generated <code>&lt;proc&gt;_cmd</code> (the ONLY role branch lives in gen code)</td></tr>
+<tr><td class="k"><b>@(gd_command="predict")</b></td><td>client applies optimistically; reject/timeout auto-reverts, reject carries truth. Return bool = APPLIED</td></tr>
+<tr><td class="k"><b>@(gd_connect="signal")</b></td><td>auto-connect owner.signal → this method at ready (must be gd_method)</td></tr>
+</table>
+<div class="warn"><b>THE METHOD TRAP:</b> a class's proc scan covers its OWN file + HEADERLESS helper files only. A <code>^Game</code> @(gd_method) written in a file that declares <code>//gd:class Other</code> binds to NOTHING — silently (connects fail only when pressed). Keep entity methods in headerless files. Corollary: keep exactly ONE class extending plain <code>Node</code> — headerless files resolve to it in the editor script map.</div>
+</div><div>
+<h3>Field tags <span class="d">(gd:"…" — first token selects kind)</span></h3>
+<table>
+<tr><td class="k"><b>export</b>[,SPEC…]</td><td>@export property. One hint: <code>range=0:100:5</code> · <code>enum=A:B:C</code> · <code>multiline</code> · <code>file=*.png</code> · <code>dir</code> · <code>resource=Texture2D</code> · <code>array=int</code> · <code>dict=String;PackedScene</code>. Plus <code>group=</code>/<code>subgroup=</code>/<code>default=</code>/<code>get=</code>/<code>set=</code>. Typed_Array/Typed_Dictionary derive hints from type.</td></tr>
+<tr><td class="k"><b>onready=</b>Path/To/Node</td><td>auto-wired node ref at ready (before gd_connect and your ready); deep paths ok; object-handle field, NOT an export; re-resolved on hot reload</td></tr>
+<tr><td class="k"><b>replicate</b>[,interp][,owner][,wire=f16]</td><td>kit/net field. <code>interp</code>: remotes lerp (f32/f64/Quat; <code>interp=my_blend</code> custom). <code>owner</code>: owner-authoritative unreliable stream. <code>wire=f16</code> half-float encode (f32 only); <code>wire=my_codec</code> custom. POD ONLY — handles/strings/arrays rejected at compile with field name. Max 64 fields (fixed array = 1).</td></tr>
+<tr><td class="k">signals: <b>gd.Signal0…Signal4</b> field `gd:"args=a,b"` · <b>gd.SignalN(struct{…})</b></td><td>field name = signal name; emit via generated <code>&lt;snake&gt;_emit_&lt;name&gt;(self, …)</code></td></tr>
+<tr><td class="k"><b>///</b> doc comment</td><td>above field = property tooltip; above struct = class doc</td></tr>
+</table>
+<h3>Verb / method composition (blocks)</h3>
+<pre>import play "godot:play"          // MUST be aliased — bare import silently
+                                  // skips the embed's fields & verbs!
+Runner :: struct {
+    owner:  gd.Node2d,
+    net_id: knet.Net_Id,
+    weapon: play.Gun,             // replicated fields join Runner's descriptor
+    sidearm: play.Gun,            // verbs hoist: runner_weapon_fire, runner_sidearm_fire
+}</pre>
+<p class="d">A block command's optional 2nd pointer param (<code>^Runner</code> / <code>^$E</code>) is auto-filled with the wielder — a pointer, never a wire arg.</p>
+<h3>Odin-for-this-stack</h3>
+<ul>
+<li>Unused imports are hard errors; <code>@(private="file")</code> for local helpers; <code>proc "contextless"</code> = no allocator/context; <code>proc "c"</code> = engine ABI.</li>
+<li><code>context.temp_allocator</code> resets per frame — never stash. Persistent strings: <code>context.allocator</code>, caller frees.</li>
+<li>Cross-target: <code>when ODIN_ARCH == .wasm32</code> / <code>when ODIN_OS != .Freestanding</code>; both arms of an <code>if IS_WEB</code>-style constant must compile on both targets.</li>
+<li>wasm32: Odin <code>int</code> is 32-bit — engine 64-bit values (instance ids) go in <code>i64</code>/<code>gd.Int</code>. No <code>core:os</code> on web.</li>
+<li>Loop-bound trap: a range expression is re-evaluated per iteration — hoist calls out (<code>for i in 0..&lt;director_tick(...)</code> drains the wave).</li>
+</ul>
+</div></div>
+</section>
+
+<!-- ============================ BINDING ============================ -->
+<section id="binding">
+<h2>2 · gd binding conventions + ergonomics</h2>
+<div class="cols"><div>
+<h3>Conventions</h3>
+<ul>
+<li><b>Handles alias to Object</b>: any handle passes where Object/Node is taken, no cast; downcast with <code>cast(gd.Node2d)v</code>. Nil-check: <code>cast(rawptr)h == nil</code>.</li>
+<li><b>StringName intern trap</b>: NAME args (signal/method/action/group/property) intern a STATIC StringName — pass string LITERALS only, never <code>ctprintf</code>. Dynamic name: <code>new_string_name_cstring(n,false)</code> + <code>free_string_name</code>.</li>
+<li><b>Temporaries</b>: PATH/text args may be dynamic (helper builds + frees String/NodePath). Returned <code>String</code>/<code>Callable</code>/<code>Variant</code> from gstr/callable/get_value: CALLER frees (<code>free_string</code>/<code>variant_destroy</code>).</li>
+<li><b>Singletons</b>: <code>gd.singleton_engine() / _os() / _input() / _time() / _audio_server() / _display_server() / _physics_server2d()…</code></li>
+<li><b>Printing</b>: format first (<code>fmt.ctprintf→cstring</code>, <code>fmt.tprintf→string</code>) then <code>gd.print / print_str / warn / error / error_str</code>. Panics land as <code>ODIN_SCRIPT_PANIC</code>; crashes symbolize as <code>ODIN_GODOT_CRASH</code>.</li>
+<li><b>Threads</b>: everything script-facing is main-thread; <code>rt.script_of</code> main-thread + module-local (nil across modules).</li>
+</ul>
+<h3>Nodes / scenes / properties</h3>
+<table>
+<tr><td class="k">get_node(node, "Path/To") → Node</td><td>path may be dynamic (freed temp)</td></tr>
+<tr><td class="k">add_child(parent, child) · add_child_deferred</td><td>deferred = physics-callback safe</td></tr>
+<tr><td class="k">load(path)→Resource · load_scene · instantiate(scene)→Node · spawn(parent, path)→Node</td><td>load+instantiate+add_child in one</td></tr>
+<tr><td class="k">set_int/float/bool/string(obj,"prop",v) · get_int/… · set_value/get_value(Variant)</td><td>dynamic by-name Object get/set; get_string allocates</td></tr>
+<tr><td class="k">set_text(obj, ctext) · get_text(obj)</td><td>any Control with a text property</td></tr>
+<tr><td class="k">add_to_group / is_in_group / remove_from_group</td><td>group names = literals (interned)</td></tr>
+<tr><td class="k">node2d_set_x/_y · control_set_width/… </td><td>one-component setters, 2D/3D/Control</td></tr>
+</table>
+</div><div>
+<h3>Signals / input / multiplayer</h3>
+<table>
+<tr><td class="k">connect(obj,"sig","method") · connect_to(emitter,"sig",target,"method")</td><td>self / cross-object</td></tr>
+<tr><td class="k">emit(obj,"sig") · emit_args(obj,"sig",..Variant)</td><td>payload via variant_from_*</td></tr>
+<tr><td class="k">add_action("a",dz) · action_add_key("a", i64(gd.Key.E)) · action_add_mouse_button</td><td>defines action on first use</td></tr>
+<tr><td class="k">is_action_pressed / just_pressed / just_released · get_action_strength · get_axis(neg,pos) · get_vector(nx,px,ny,py)</td><td>polled input; action_press/release synthesize</td></tr>
+<tr><td class="k">host(node,port) · join(node,addr,port) · is_server · my_peer_id · rpc_sender_id · connected_peers · rpc / rpc_id</td><td>ENet + high-level RPC (web: host/join return false)</td></tr>
+<tr><td class="k">webrtc_host(node,url,room="") · webrtc_join(node,url,room) · webrtc_poll (every frame) · webrtc_room_code · webrtc_session_state · webrtc_error_reason · webrtc_close</td><td>browser transport; N-peer star (host+7); same @(gd_rpc) code path</td></tr>
+<tr><td class="k">animation_play/stop · sprite_play/stop · audio_play/stop(2d)</td><td>gameplay one-liners</td></tr>
+<tr><td class="k">env_string("NAME","fallback") · env_int("NAME", 0)</td><td>env knobs (acid harness style)</td></tr>
+<tr><td class="k">sname(lit) · gstr(ctext) · callable(obj,"m") · variant_destroy(&v)</td><td>intern / build / release</td></tr>
+</table>
+<h3>Editor / debug</h3>
+<ul>
+<li><code>gd.is_editor()</code> gates tool logic. LLDB: Project → Tools → Debug Game (LLDB), or <code>build/debug_game.sh --break file.odin:51 proj</code>. No in-editor breakpoints — AOT native.</li>
+<li>Project settings/env: <code>odin_godot/odin_bin</code>(ODIN), <code>ols_bin</code>, <code>emcc_bin</code>(EMCC), <code>root</code>(ODIN_GODOT_ROOT), <code>export_optimization</code>(ODIN_EXPORT_OPT), <code>show_generated_files</code>.</li>
+</ul>
+</div></div>
+</section>
+
+<!-- ============================ PLAY ============================ -->
+<section id="play">
+<h2>3 · play blocks <span class="d">(import play "godot:play" — alias REQUIRED)</span></h2>
+<p class="d">Pure scratch (Edge/Pace/Machine/anim/Trail) is safe anywhere including host ticks; engine-bound (marker/Puppet) is render-path only. Replicated state travels through the embed; verbs hoist onto the wielder as <code>&lt;entity&gt;_&lt;field&gt;_&lt;verb&gt;</code>.</p>
+<table>
+<tr><th>block</th><th>state (replicated ⇢ tagged)</th><th>verbs / procs</th><th>contract</th></tr>
+<tr><td class="k"><b>Edge($T)</b>{seen}</td><td>— (never on wire)</td><td>see(&e,cur)→(prev,changed) · sync(&e,cur)</td><td>fire-once change detection; <code>sync</code> in resync pre-pass so catch-up isn't a fake transition</td></tr>
+<tr><td class="k"><b>Pace($T)</b>{next} · Deadlines($K,$T)</td><td>—</td><td>due(p,now) · arm(p,at) · ready(p,now,interval)</td><td>re-armable deadline; re-arm is now+interval (no catch-up burst); generic clock (tick u64 / secs f64)</td></tr>
+<tr><td class="k"><b>Machine($S)</b></td><td>cur ⇢ replicate</td><td>set(m,to)→changed (HOST) · step(m)→(from,to,moved) (every peer/frame)</td><td>host writes, all peers run identical enter/exit off the replicated byte — no RPC</td></tr>
+<tr><td class="k"><b>anim clocks</b> (f32)</td><td>—</td><td>decay(t,dt,rate)→0 · ramp→1 · advance (free-run) · hold(on) · pulse(t)∈[−1,1] · pulse01∈[0,1]</td><td>presentation math only</td></tr>
+<tr><td class="k"><b>marker</b></td><td>—</td><td>show(node,on) · follow(node,x,y) · fill(node,pct) · depth(node,z)</td><td>engine-bound; lazy build guard <code>cast(rawptr)node==nil</code></td></tr>
+<tr><td class="k"><b>Ability</b></td><td>def{cooldown}, cd ⇢ replicate</td><td>ability_arm(a,def) (host) · <b>ability_cast(a,dx,dy)</b> @(gd_command="predict") · ability_tick(a) (host/tick) · ability_ready(a)</td><td>return IS applied; EFFECT is yours in the command hook (gate on ok, read aim)</td></tr>
+<tr><td class="k"><b>Channel</b></td><td>target,pct ⇢ replicate,owner</td><td>channel_run(c,target,dt,secs)→done (owner/frame) · channel_drop(c) · <b>channel_claim(c,target)</b> @(gd_command) · channel_active(c)</td><td>hold-to-progress on the OWNER stream; claim carries target as wire arg; host re-checks range in hook (reads .claimed)</td></tr>
+<tr><td class="k"><b>Health</b></td><td>hp,max ⇢ replicate</td><td>health_arm(h,max) · health_hurt(h,dmg)→(dealt,died) · health_kill · health_heal · health_dead · health_frac · health_step(h)→(prev,cur,moved) (every peer) · health_sync</td><td>VERB-FREE — damage is host-internal; peers present off step edges (prev&gt;cur hit, cur==0 death, prev==0 revive; birth ≠ hit)</td></tr>
+<tr><td class="k"><b>Telegraph</b></td><td>left,wind ⇢ replicate</td><td>telegraph_start(t,wind) · telegraph_tick(t)→landed (host) · telegraph_cancel · telegraph_active · telegraph_frac · telegraph_step(t)→landed (peers) · telegraph_sync</td><td>both fields replicate so a varying wind still grows 0→1 on every screen; geometry+payload yours</td></tr>
+<tr><td class="k"><b>Gun</b></td><td>def{mag,reload_ticks,jam_per_mille,jam_taps}, ammo, mode.cur, reload_cd, taps, salt, spent ⇢ replicate</td><td>gun_equip(g,def,salt) (host) · <b>gun_fire(g,dx,dy)</b> @(gd_command="predict") always-true · gun_tick(g) (host) · gun_step(g)→(from,to,moved) · gun_jams · gun_reloading · gun_jammed</td><td>CADENCE is the wielder's (pace on own wall clock — cooldown&lt;RTT needs a client pacer); EFFECT = read <code>g.fired</code> at issue site; jam roll = hash(salt,spent) — monotone counter, never cycling state</td></tr>
+<tr><td class="k"><b>Puppet</b> (RigidBody2D)</td><td>x,y ⇢ replicate,interp,owner,wire=f16 · rot ⇢ owner,f16 (SNAP) · vx,vy ⇢ owner,f16</td><td>puppet_attach(p,body,x,y,skin=nil) · puppet_claim(p,hold=.6) (predicted possession) · puppet_seat(p,mine) (Ev_Owner_Changed) · puppet_frame(p,dt) (after solver) · puppet_place · puppet_shove(ix,iy)</td><td>ONE peer simulates, others obey; poses via PhysicsServer body_set_state (RigidBody ignores transform writes); velocity crosses the handoff</td></tr>
+<tr><td class="k"><b>Puppet3</b> (RigidBody3D)</td><td>pos ⇢ interp,owner,f16 · rot: Quaternion ⇢ interp,owner (nlerp, NO f16) · vel,avel ⇢ owner,f16</td><td>puppet3_attach/claim/seat/frame/place/shove</td><td>3D deltas: quat interp is correct (better than 2D snap), angular velocity crosses the seam, thresholds in meters</td></tr>
+<tr><td class="k"><b>Trail($N)</b>{at,tick}</td><td>— (derived; NEVER replicate)</td><td>trail_note(t,tick,x,y) (authority, per tick) · trail_read(t,tick)→(at,ok)</td><td>authority's history ring — lag-comp hitscan, recall, death recap</td></tr>
+</table>
+</section>
+
+<!-- ============================ KIT ============================ -->
+<section id="kit">
+<h2>4 · kit reference <span class="d">(godot:kit/* — knet · ksess · netgd · kboot · kcomms · kcombat · kfx · kui · ksave · kxfer · kinter · kitems · kai · knav · steamgd)</span></h2>
+<p>Model: <b>owner-authoritative streams</b> (movement; unreliable last-value, remotes interpolate ~interp_delay in the past) + <b>host-authoritative deltas</b> (everything else; per-tick shadow-diff on reliable) + <b>intent→command→result</b> (predict, confirm, reject-carries-truth, timeout-reverts). Zero role branches in gameplay code. A player IS a reconnect token.</p>
+
+<h3>kit/session (ksess) — identity, roster, world driver</h3>
+<table>
+<tr><td class="k">session_configure(&s, Session_Config{tick_hz, interp_delay, command_timeout, join_timeout, backup_interval, max_players, change_events})</td><td>before *_start; zero field = default (20Hz, .15s, 3s, 15s, 5s, ∞); durations in SECONDS, resolved at start</td></tr>
+<tr><td class="k">session_set_transport(&s,user,send) · session_set_factory(&s,user,make,free) · session_set_command_hook(&s,user,hook) · session_set_type_hook(&s,TYPE,user,hook) · session_set_backup_blob(&s,user,write)</td><td>ready() wiring; survives re-init. Type hook wins over catch-all (cmd ids collide across types — every type's first cmd is 0)</td></tr>
+<tr><td class="k">session_host_start(&s,name,token=0,dedicated=false) · session_client_start(&s,token,name) · session_client_join(&s) · session_client_leave(&s) · session_host_resume(&s,me,name,backup)→bool</td><td>join when transport up (on_net_up); dedicated seat = server-not-player (roster flags it, succession never arms)</td></tr>
+<tr><td class="k">session_tick(&s,dt,now)→(ticks,sampled) · session_poll(&s)→(Event,ok) · session_handle_packet(&s,from_peer,&r) · session_peer_disconnected(&s,peer)</td><td>the frame drive; drain poll until !ok. Events not callbacks (factory make is the one sync call)</td></tr>
+<tr><td class="k">session_spawn_make(&s,type,owner=INVALID)→(entity,id) … set fields … session_spawn_send(&s,id)</td><td>two-phase spawn through the SAME factory every peer runs; Ev_Spawned fires at send with fields set</td></tr>
+<tr><td class="k">session_despawn · session_teleport(id) · session_set_owner(&s,id,owner) · session_owner_of(id) · session_start_replicating(&s)</td><td>teleport = stream discontinuity (else remotes slide); set_owner = carry/mount/possess (Ev_Owner_Changed, remotes snap); start_replicating = host go-live</td></tr>
+<tr><td class="k">session_set_blob(&s,id,data) · session_blob(&s,id)→[]u8 (view)</td><td>per-entity opaque variable-length payload; author-dirtied, reliable, rides EVERY snapshot (late join/backup/save free); Ev_Blob_Changed everywhere</td></tr>
+<tr><td class="k">session_set_stream_hz(&s,id,hz)→actual · session_set_stream_tier(&s,id,tier)</td><td>bandwidth lever; keep 1/hz &lt; interp_delay</td></tr>
+<tr><td class="k">session_stat_column(&s,"name")→Stat_Col (host, idempotent) · session_stat_find(&s,"name")→(col,ok) · session_stat_set/add · session_stat(&s,player,col)→i64</td><td>named i64 counters, host-fed, ~2Hz snapshot; col 0 = ping. CLIENTS resolve BY NAME (a stored col is 0 there = ping)</td></tr>
+<tr><td class="k">session_app_route(&s,tag,user,handler) · session_app_begin(&s,tag)→^Writer + session_app_flush(&s,to) · session_app_send(&s,to,tag,bytes) · session_app_send_to(&s,player,tag,bytes)</td><td>SES_APP extension point (comms tag 0, fire tag 1, xfer tag 2 by convention — pick yours). send_to = private per-player state</td></tr>
+<tr><td class="k">session_player · session_roster(temp) · session_host (by seat!) · session_count(connected_only, players_only) · session_tick_hz · session_tick_no (never persist) · session_world_time · session_clock(peer)</td><td>queries; host crown follows the SEAT (resumed host returns under old id)</td></tr>
+<tr><td class="k">session_set_locked · session_kick(player,ban=false)→(seat,ok)</td><td>kick doesn't sever the socket — also netgd.wire_drop(seat) AFTER the message flushes; bans run-scoped; rejoins pass lock/capacity by design</td></tr>
+<tr><td class="k">session_snapshot(&s,&w) · session_backup_parts(&s)→(game_blob,snapshot,ok) · session_set_successor_info(&s,info) · session_successor(&s)</td><td>migration kit; info blob opaque (addr:port / lobby id / room code / "web" sentinel)</td></tr>
+<tr><td class="k">session_present(&s,mine,user,cb,id,a,extra=0)</td><td>two-timelines: mine=now, else render clock (+extra dwell). Presentation only</td></tr>
+<tr><td class="k">session_set_interest(&s,radius,hysteresis,user,locator) + session_set_focus(&s,pid,x,y)</td><td>opt-in: existence global, freshness local; re-entry = Ev_Resynced (re-seed edges)</td></tr>
+</table>
+<p class="d">Events: Ev_Welcomed · Ev_Player_Joined{rejoin} · Ev_Player_Left · Ev_Host_Left · Ev_Join_Failed/Denied{Full,Locked,Banned} · Ev_Kicked · Ev_Spawned (dress here) · Ev_Resynced (re-seed Edge scratch!) · Ev_Despawned · Ev_Owner_Changed{id,owner,prev} · Ev_Stats_Updated · Ev_Blob_Changed · Ev_Backup_Received/Target · Ev_Succession · Ev_State_Applied · Ev_Entity_Changed (opt-in) · Ev_Command_Executed (host) / _Confirmed / _Rejected (client; timeout ⇒ rejection). Hosts don't get client events — repaint on State_Applied/Spawned/Command_Executed.</p>
+
+<h3>kit/netgd — transport binding <span class="d">(only Godot-touching net code)</span></h3>
+<table>
+<tr><td class="k">wire_attach(&w,node,&ses,MSG_KIND) · wire_listen(&w,"on_packet","on_peer_left","on_net_up","on_net_down") · wire_receive · wire_pump(&w,now)</td><td>attach once (survives *_start); listen after in-tree; pump per frame. Channels: 1 reliable (commands/state), 2 stream (unreliable-ordered)</td></tr>
+<tr><td class="k">begin_host(&w,port,name,max=32,token=0,dedicated=false)→bool · begin_join(&w,addr,port,token,name)→bool</td><td>native ENet two-button; false = port taken / dial fail</td></tr>
+<tr><td class="k">begin_host_web(&w,url,name,token=0,room="")→bool · begin_join_web(&w,url,room,token,name)→bool · web_poll(&w) every frame · web_close(&w)</td><td>WebRTC twins; relay assigns code async — read gd.webrtc_room_code; room param = succession reservation</td></tr>
+<tr><td class="k">wire_set_latency(&w,ms) · wire_drop(&w,peer,after=.75) · peer_address(node,peer)→(string,ok) · drop_peer · pba_view(&pba)→[]u8 · send_reliable/send_stream/listen_packets</td><td>acid latency shim · deferred kick close (flush first) · zero-copy packet view (clone to keep)</td></tr>
+</table>
+
+<h3>kit/boot (kboot)</h3>
+<table>
+<tr><td class="k">boot_attach(&b,node,&ses,&comms,Options{title,status,legend,msg_kind,latency_env,min_players,spatial,keep_vsync, lobby_scene,chat_scene,score_scene, methods})</td><td>lobby+chat+score+stage/world containers+wire, once. spatial ⇒ Node3D containers. Desktop unthrottles by default (vsync off + 120fps — occluded vsync windows SIMULATE slow); keep_vsync opts out. *_scene = full UI replacement (kit adopts named nodes)</td></tr>
+<tr><td class="k">boot_pump(&b,delta,now)→(events,marks,ticks)</td><td>wire_pump + session_tick + stock reactions; re-yields everything (temp)</td></tr>
+<tr><td class="k">boot_host / boot_join / boot_serve (dedicated) / boot_host_web / boot_join_web / boot_chat(&b,text,&sent)</td><td>b.ui/chat/score/legend/wire/stage/world/ui_layer all public</td></tr>
+</table>
+
+<h3>kit/comms (kcomms)</h3>
+<table>
+<tr><td class="k">comms_init(&c,&ses,tag=0) · comms_say(text≤240B) · comms_system(text) host-only · comms_ping(kind,pos) · comms_welcome(&c,id,rejoin,line) · comms_catchup(&c,player) · comms_poll→(Ev_Line|Ev_Marker,ok) · comms_lines · comms_line_name</td><td>host-ordered chat/pings; your own line echoes back (don't local-echo); Ev_Line.text points into log — copy to keep</td></tr>
+</table>
+
+<h3>kit/combat (kcombat)</h3>
+<table>
+<tr><td class="k">Fire{shooter,origin,vel(per-tick),ttl,kind} · fire_announce(&ses,tag,f) host · fire_listen(&route,&ses,tag,user,on_fire)</td><td>projectile events, never entities; listener auto-skips own echo + non-host authors</td></tr>
+<tr><td class="k">Effect{kind,power,left} · effects_add(fx,kind,power,ticks) (same-kind refreshes strongest+longest) · effects_tick · effect_of</td><td>4-byte POD statuses in a replicated fixed array</td></tr>
+<tr><td class="k">Ability_Def{name,cooldown,cost} · ability_try(cds,slot,def,&resource)→bool · abilities_tick · Cooldowns($N) block (cd_try/cd_ready/cd_tick)</td><td>low-level ability path (blocks preferred; ability_try when a cast spends resource)</td></tr>
+<tr><td class="k">projectile_step(&p)→alive · projectile_hit(from,vel,targets)→(best,ok) swept · leash(claimed,anchor,r)</td><td>hit-test BEFORE step; leash clamps claimed origins (no-op on own prediction)</td></tr>
+<tr><td class="k">pool_tick(&pool,user,targets_proc,on_hit,on_expire)</td><td>host projectile pool: sweep-before-step, remove-during-iter; targets called per projectile</td></tr>
+<tr><td class="k">php_note_hit(&ph,hp_now,amount,now) · php_display(&ph,hp_now,now)→i32 · PHP_TTL .6</td><td>predicted hp overlay — dips displayed hp at visual contact; only truth kills</td></tr>
+<tr><td class="k">combat_columns(&s)→{damage,kills,deaths} · credit_hit · credit_kill · hit(&hp,amount)→died</td><td>auto-published stats; killing blow reported once</td></tr>
+</table>
+
+<h3>kit/fx (kfx) · kit/ui (kui)</h3>
+<table>
+<tr><td class="k">burst_at(&bursts,parent,x,y,color) + frame(&bursts,delta) · float_text(&floats,parent,x,y,ctext,color) + floats_frame · flash(node,color) · shake_add(&s,amt) + shake_frame(&s,delta,stage,world)</td><td>parent fx to WORLD; call the reapers every frame; trauma² shake belongs to the CAUSER's screen</td></tr>
+<tr><td class="k">tracer_add(&t,parent,f:Fire,glyph,tick_hz) · tracers_frame(&t,delta,user,targets,on_hit) · tracers_clear</td><td>visual half of Fire; pass real session_tick_hz (px/tick→px/s); never mutate replicated state in on_hit; use BUNDLED-font glyphs (· • *) — system-font glyphs are boxes on web</td></tr>
+<tr><td class="k">lobby_make(parent,title) / lobby_adopt(parent,scene,title) — contract: Title/Status/Players/Host/Join/Start · lobby_set_status · lobby_show_menu(menu,start) · lobby_refresh(&l,&ses)</td><td>full replacement: kit resolves named nodes at any depth, pours behavior; missing node = one loud line + dead widget, never crash</td></tr>
+<tr><td class="k">chat_make/chat_adopt (Lines/Input) · chat_show · chat_refresh(&ch,&comms) · chat_submit(&ch,&comms,text,&sent) · score_make/score_adopt (Grid) · score_show · score_hide("col") · score_refresh(&sb,&ses)</td><td>chat_submit releases focus (keys back on the wheel); score_hide for plumbing columns (loadout picks, ready bits); adopted scenes own their anchors</td></tr>
+<tr><td class="k">prompt_make/prompt_set · inv_make/inv_refresh(slots,table,selected) · hp_make/hp_refresh · abilities_make/abilities_refresh(defs,cds,resource,tick_rate)</td><td>stock HUD widgets</td></tr>
+</table>
+
+<h3>kit/save · kit/xfer · kit/interact · kit/items · kit/ai · kit/nav · kit/steamgd</h3>
+<table>
+<tr><td class="k">ksave: save_write(&s,&w,GAME_VERSION,blob) · resume(&s,name,path,GAME_VERSION)→(blob,err{Ok,No_File,Bad_Envelope,Wrong_Version,Corrupt}) · persistent_token(path)→u64 · token(Token_Options{env,path,per_instance},pid) · write_file/read_file/file_exists</td><td>resume = whole Resume button (blob temp-allocated — parse now); token IS the player (never regenerate); per_instance OFF when saves/succession matter</td></tr>
+<tr><td class="k">kxfer: xfer_init(&x,&ses,MY_TAG) · xfer_send(&x,id,bytes≤512K)→bool · xfer_pump(&x) once per NET TICK · xfer_poll→(Ev_Started|Ev_Done{from,id,bytes},ok)</td><td>chunked payloads via host (8K frames, fits WebRTC ~16K cap); (sender,id)-keyed, re-send supersedes</td></tr>
+<tr><td class="k">kinter: in_range(a,b,reach,radius=0) · facing_ok(a,b,facing,min_dot) · pick(cands,origin,reach,facing,min_dot)→(best,ok)</td><td>same procs for client prompt AND host gate — share the REACH constant; host view is truth, keep reach generous</td></tr>
+<tr><td class="k">kitems: items_register(&t,id,name,max_stack=1,shape) · add/put/transfer (take Table — can grow stacks; host side) · take/remove/count_of (command-safe) · Inventory($N) · pack_move/pack_at/pack_fits (command-safe) · pack_place/pack_add/pack_find_spot (host) · shape_of("XX.","XXX")</td><td>inventory = [N]Slot replicated field — replication/prediction already solved; returns are budgets not booleans</td></tr>
+<tr><td class="k">kai: nearest(from,targets,max_range,blocker,user) · in_reach · step_toward(pos,goal,speed)→(next,arrived) · step_away · patrol_next · Wave{count,rest} · director_tick(&d,tick,waves)→spawn (1/tick) · director_note_death · director_wave</td><td>NPC = host-owned entity + a switch over a replicated state byte; per-NPC scratch in a host map (rebuilt on resume)</td></tr>
+<tr><td class="k">knav: path_2d/path_3d(node,from,to,alloc)→[][3]f32 · next_point(path,&idx,pos,reach)→(goal,ok) · map_2d/map_3d</td><td>host-tick only (touches engine); regions sync on physics cadence — frame-1 query is empty, re-query per think tick; cursor resets to 0 per fresh path</td></tr>
+<tr><td class="k">steamgd: available() · init(app_id=480) · listen(node,cbs) · create_lobby(max,type) · join_lobby · lobby_owner · my_steam_id · persona_name · invite_overlay · host_peer(node) · client_peer(node,host_id)</td><td>by-name GodotSteam — compiles/no-ops without it; Session_Wire unchanged. Guard: lobby_joined fires for the HOST's own lobby too (skip if owner==me)</td></tr>
+</table>
+</section>
+
+<!-- ============================ RECIPES ============================ -->
+<section id="recipes">
+<h2>5 · Recipes</h2>
+<h3>The 7-slot recipe <span class="d">(where each part of a behavior lives)</span></h3>
+<p>① <b>State</b> — replicated field / play.Machine · ② <b>Cadence</b> — play.Pace (client wall-clock pacer when cooldown &lt; RTT) · ③ <b>Intent</b> — @(gd_command) · ④ <b>Authority</b> — command hook + host_*_tick · ⑤ <b>Prediction</b> — predict body (only what's deterministic from shared inputs) · ⑥ <b>Reconcile</b> — snap on host TRANSITIONS, not every frame · ⑦ <b>Cue</b> — Edge/step → anim/marker/sfx (never decide there). An item's shape IS which slots it skips: gun fills all 7; revive skips ⑤⑥; mob brain is host-only (skips ③⑤⑥); match phase = one singleton Machine; pickup = proximity scan (no command).</p>
+<div class="cols"><div>
+<h3>Replicated entity</h3>
+<pre>//gd:extends Node2D
+Crate :: struct {
+    owner:  gd.Node2d,
+    net_id: knet.Net_Id,
+    x, y:   f32 `gd:"replicate,interp,owner,wire=f16"`,
+    slots:  [8]kitems.Slot `gd:"replicate"`,
+}
+// factory (EVERY peer, host included):
+case CRATE_TYPE:
+    node := gd.instantiate(cast(gd.Packed_Scene)self.crate_scene)
+    gd.add_child(self.boot.world, node)
+    c := rt.script_of(node, Crate)
+    self.crates[id] = c
+    return c, &crate_command_set
+// host spawn:
+e, id := ksess.session_spawn_make(&s.ses, CRATE_TYPE, owner=pid)
+(cast(^Crate)e).x = 100
+ksess.session_spawn_send(&s.ses, id)     // dress on Ev_Spawned</pre>
+<h3>Predicted verb + cross-entity hook</h3>
+<pre>@(gd_command = "predict")
+crate_loot :: proc(c: ^Crate) -> bool {          // gate BEFORE issuing too
+    if c.slots[0].item == kitems.ITEM_NONE { return false }  // reverts everywhere
+    c.slots[0] = {}
+    return true
+}
+// issue (any peer):  crate_loot_cmd(&self.ses.ctx, crate)
+// cross-entity effect (host, in the type hook, fires for host's own too):
+hook :: proc(user, player, entity, cmd, ok) { if ok && cmd == CRATE_CMD_LOOT { /* into looter's bag */ } }</pre>
+<h3>Bullets — projectiles are never entities</h3>
+<ol>
+<li>Cast = predicted command (cooldown/ammo inside it). Shooter draws NOW: <code>kfx.tracer_add(&t, world, fire, "·", ksess.session_tick_hz(&ses))</code>.</li>
+<li>Host (hook, gated on ok): simulate authoritative projectile (append to pool; <code>kcombat.leash</code> the claimed origin) + <code>fire_announce</code>.</li>
+<li><code>fire_listen</code> draws everyone else's; own echo auto-skipped.</li>
+<li>Host tick: <code>pool_tick(&flying, self, targets, on_hit, on_expire)</code> — only host's projectile hurts.</li>
+<li>Impact NOW on each screen (sparks + <code>php_note_hit</code>); truth heals a miss later.</li>
+</ol>
+<div class="warn"><b>Shooter-stamp rule:</b> client-PREDICTED fires (guns/lobs/cones — caster already drew) are announced with the CASTER stamp; HOST-AUTHORED instants (novas/zones/buffs/reactions + re-announces) must stamp the HOST — fire_listen drops shooter==me, and a caster-stamped instant leaves the caster blind to his own visual.</div>
+<h3>Statuses + combo rulebook (scrapyard pattern)</h3>
+<ul>
+<li><code>fx: [2]kcombat.Effect `gd:"replicate"`</code> on mobs AND runners; every screen tints off <code>effect_of</code>; host alone ticks decay + dots.</li>
+<li>apply_status checks the COMBO table before stacking: (present, incoming) → detonate / transmute / spread; consume flag; outputs re-enter (chain cap ~4; cycles fizzle). Same-status pairs hit the table too — free design axis.</li>
+<li>Reactions are positional + indiscriminate (friendly fire is a design decision); aimed instants keep targeting.</li>
+</ul>
+<h3>Data-driven defs (.tres → wire → mods)</h3>
+<ol>
+<li>Author shapes as custom Resources (<code>//gd:extends Resource</code>, export hints) → designers edit .tres in Inspector.</li>
+<li>Boot: scan res://data/*, flatten via <code>rt.script_of(res, Def)</code> into POD row tables placed by declared wire id (later filename wins = override).</li>
+<li>Host publishes merged tables as the WORLD entity's blob (<code>session_set_blob</code>) — spawn tuple/joins/backups/saves carry it; clients need no data files; <code>Ev_Blob_Changed</code> is the one client hook.</li>
+<li>Mods = user://mods/*.json overlay (whole-row replace), host-only files reach every screen. Ordered rows: numbered filenames = precedence, mods append.</li>
+</ol>
+<h3>Waves</h3>
+<pre>plan := []kai.Wave{{n,300},{n/2,300},{2*n/3,0}}   // zero-count TAIL waves stall the clear
+spawn := kai.director_tick(&d, tick, plan)         // hoist out of range exprs!
+for _ in 0..&lt;spawn { host_spawn_mob(self, wave_kind(...)) }
+kai.director_note_death(&d, tick, plan)            // on each death
+clear := d.done && live_count == 0</pre>
+<h3>Carry / mount / possess (ownership transfer)</h3>
+<p>Grab command → hook calls <code>session_set_owner(ses,id,player)</code> → Ev_Owner_Changed handler + per-frame glue on the carrier. Drop = INVALID. Remotes SNAP on transfer (ring reset); seed velocity across the seam (Puppet does this).</p>
+<h3>Downed / revive</h3>
+<p>hp==0 = downed (meaning is yours). Reviver holds: <code>play.Channel</code> — <code>channel_run</code> per owner frame vs a range gate shared with the host (<code>kinter.in_range</code>, same REACH), claim command at full, host re-checks in hook and sets <code>hp = REVIVE_HP</code>. Bar reads replicated pct on every screen.</p>
+</div><div>
+<h3>Host migration / succession</h3>
+<ol>
+<li>Host: <code>session_set_backup_blob</code> (director clocks, campaign) — snapshots flow to a backup target automatically.</li>
+<li>On <code>Ev_Backup_Target{player}</code>: host names how to reach the heir — <code>session_set_successor_info(addr:port | "web" | room code)</code>. WITHOUT info, SES_SUCCESSOR is never broadcast.</li>
+<li>On <code>Ev_Succession{successor}</code>: bearer = takeover (<code>session_backup_parts</code> → wipe local census → raise transport → <code>session_host_resume</code>); others = chase (reconnect to info; event re-fires per failed attempt → retries free). Copy session-owned strings out BEFORE *_start frees them.</li>
+<li>Web chase: the torch names TOMORROW's room — host mints a reservation code, heir hosts under it, survivors knock every ~2.5s.</li>
+<li>Reclaim rule: a token only reclaims a DEAD seat; a live match demotes to fresh join (doppelgänger rule — tabs share user://).</li>
+</ol>
+<h3>Dedicated server</h3>
+<p><code>boot_serve(port,name)</code> / <code>session_host_start(dedicated=true)</code>: authority-not-player. Skip it when spawning avatars (<code>if p.dedicated {continue}</code>); <code>session_count(players_only=true)</code>; succession never arms (a server restarts).</p>
+<h3>Web co-op</h3>
+<ol>
+<li><code>begin_host_web(&wire, "wss://…/rtc", name)</code> — relay assigns the room code async: surface <code>gd.webrtc_room_code</code> when it lands; <code>web_poll</code> every frame.</li>
+<li>Same session code as native (transport-agnostic). N-peer star: host + 7 joiners; joiner↔joiner traffic relays through the host.</li>
+<li>Export: <code>build_web.sh</code>, SharedArrayBuffer headers, keep native .gdextension entries. Payloads &gt;16K go through kxfer.</li>
+</ol>
+<h3>Lag-comp hitscan (lance/mender pattern)</h3>
+<p>Host keeps <code>play.Trail</code> per target (<code>trail_note</code> each tick). On a hitscan command: rewind targets to the SHOOTER's render time (tick − interp_delay·hz), segment-vs-circle judge against rewound positions, apply damage/heal to live state. Shooter's crosshair truth ≈ host judgment.</p>
+<h3>Shared-seed procgen</h3>
+<p>Replicate the SEED, not the scenery: every peer grows identical decoration locally. INTEGER math end to end (splitmix32) — floats diverge (FMA/libm/fast-math). Acid asserts a checksum on every peer. Art law: rosters index by <code>k % len</code> — never delete entries, swap art IN PLACE (same index, same footprint) or every seeded layout reshuffles.</p>
+<h3>Scene-authored UI (game side)</h3>
+<pre>//gd:extends Control
+//gd:class Hud
+Hud :: struct {
+    owner:  gd.Control,
+    status: gd.Label `gd:"onready=Status"`,        // deep paths fine: `gd:"onready=Boss/Fill"`
+    cards:  [9]gd.Button,                           // arrays can't onready → wire in hud_ready
+}
+hud_ready :: proc(self: ^Hud) { for i in 0..&lt;9 { self.cards[i] = cast(gd.Button)gd.get_node(self.owner, fmt.ctprintf("Shop/Card%d", i)) } }
+// game: node := gd.instantiate(scene); gd.add_child(ui_layer, node); self.hud = rt.script_of(node, Hud)
+// behavior wiring stays game-side: gd.connect_to(btn, "pressed", self.owner, "on_buy")</pre>
+<p class="d">Anchors replace layout math. Dynamic position over an anchored node: shift the AUTHORED offsets (get_offset at ready, set base−dy per frame) — absolute set_position discards the editor's numbers. Kit widgets: pass Options.lobby_scene etc. — the kit adopts named nodes; extras are yours to wire by name after boot_attach.</p>
+<h3>The workbench (scene testing with dependencies)</h3>
+<p>Mock nothing: a dev scene instances the REAL main.tscn as a child, sets the solo-role env in code before instancing (F6 needs no env), and forces UI states from inspector toggles through the same dev hooks the acid drives. Force states honestly (kill mobs through damage paths so the stage machine flips itself). Statuses for dioramas: a non-combining, non-DOT pair — the rulebook applies to benches too.</p>
+<h3>SFX / juice discipline</h3>
+<ul>
+<li>Sounds hang off the SAME presentation edges as visuals (health_step, gun_step, telegraph_step) — never off commands or host ticks; acid stays deaf.</li>
+<li>Shake on the causer's screen (<code>shake_add</code> + frame on stage+world together); zoom kicks decay via <code>play.decay</code>; positional pools + flat UI pool.</li>
+<li>Procedural WAVs generated in-repo beat silent placeholders (tools/gen_sfx.py pattern).</li>
+</ul>
+<h3>Sprite rigs</h3>
+<p>Strips as Sprite2D + hframes; row switch on state (dead &gt; attack &gt; walk &gt; idle) resets the frame clock on row change; facing = flip_h from aim or velocity sign; 24px art wants ~2× camera zoom + nearest filtering. Owner-animated presentation (aim, dash flare) belongs ON the owner stream (replicate aim_x/aim_y, a dash_seq lap counter); announces only sample it — remotes adopt first-sight silently.</p>
+<h3>The acid test habit</h3>
+<pre>source addons/odin_godot/template/test/harness.sh
+fslp_build
+hpid=$(fslp_launch host h.log MY_PORT=4307); gpid=$(fslp_launch guest g.log MY_PORT=4307)
+fslp_wait_all 90 "$hpid" "$gpid"
+expect      h.log "GAME_STARTED"             "never started"
+expect_same h.log g.log "SCATTER sum=[0-9]+" "worlds diverged"
+fslp_verdict MYGAME</pre>
+<ul>
+<li>Verdicts from LOG LINES, never exit codes. A <code>queries.odin</code> of tiny @(gd_method)s is the driver's window; drive the same methods keys drive.</li>
+<li>Assert each fact on EVERY peer that observes it; <code>expect_same</code> where determinism matters; retry whole attempts on fresh ports; count attempts — a flaky green demands re-runs until the failure shows.</li>
+<li>A client's *_TRY print is a PREDICTION — assert the effect on the wire (the other peer's log), not the try.</li>
+<li>Acts must respect the game's own rules (friendly fire, range rings) and their data must OUTLIVE the act's timeline.</li>
+</ul>
+</div></div>
+</section>
+
+<!-- ============================ GOTCHAS ============================ -->
+<section id="gotchas">
+<h2>6 · Gotchas</h2>
+<div class="cols"><div>
+<h3>Replication / netcode</h3>
+<ul>
+<li><b>Deltas carry STATE, not events</b> — a byte flipped 1→0 inside one tick never ships. Edges need dwells; use seq counters for pulses (dash_seq).</li>
+<li><b>Only the owner moves the owner</b> — knockback/respawn are replicated state the owner reacts to. Jumps are teleports (<code>session_teleport</code>) or remotes slide.</li>
+<li><b>Two timelines</b>: my sim presents NOW; remote causes present at render time (<code>session_present(mine,…)</code>); no-spatial-cause facts (scoreboards) present wire-fresh; global transitions after a dwell.</li>
+<li><b>The pacer</b>: cooldown &lt; RTT can't be paced by replicated cds — pace the trigger on the client's wall clock (play.Pace), host still gates.</li>
+<li><b>Tick loops, not frames</b>: anything counted in ticks lives in the <code>for _ in 0..&lt;ticks</code> loop — per-frame countdowns track fps (a 120fps unthrottle halved a 3s countdown). Read <code>session_tick_no</code>, never hand-roll a counter (diverges on resume).</li>
+<li><b>Prediction gates twice</b>: gate before issuing (refused predictions still ride the wire) AND in the command body.</li>
+<li><b>registry_get pointer</b> valid only until next insert/remove; Ev_Resynced ⇒ re-seed Edge scratch or missed changes present as fresh events.</li>
+<li><b>Stat_Col on clients is zero-value</b> (column 0 = ping) — resolve by name with session_stat_find.</li>
+<li><b>Replicated-state UI echoing MY change</b> needs a prediction read (2Hz stats cadence looks broken otherwise — muster row pattern).</li>
+<li><b>Jam/crit rolls</b>: seed from MONOTONE counters (lifetime spent), never cycling state (salt,ammo re-rolled the same verdicts every mag).</li>
+<li><b>Reconnect identity</b>: a known token only reclaims a DEAD seat; live seat ⇒ fresh join (doppelgänger). Every identity added to a reclaim table must be audited against the still-connected rule.</li>
+<li><b>Localhost inverts web disconnect ordering</b> (ws instant, DTLS lingers) — a localhost pass proves ONE ordering of a signaling-vs-media race; production dies media-first. Gate every signaling callback on instance-id liveness.</li>
+</ul>
+<h3>Engine / UI</h3>
+<ul>
+<li>RigidBody ignores node transform writes — pose via PhysicsServer body_set_state (Puppet does).</li>
+<li>Control anchors bind to a Control parent or the viewport under a CanvasLayer; under a plain Node they bind NOTHING (top-left hug). Containers overrule set_size — custom_minimum_size is the contract.</li>
+<li>TextureRect default expand_mode grows the control to its texture — set expand_mode=1 for fixed panes. Labels auto-grow to min size.</li>
+<li>Scene sample text is for the EDITOR — ship such nodes visible=false; the frame feed shows them.</li>
+<li>Editor script-map: headerless package files resolve to THE class extending Node — keep exactly one. Verify editor-facing work with <code>godot --headless --editor --quit</code> (catches warnings the game run never shows).</li>
+<li>CanvasLayer children draw above world z-index — UI on a layer, never trust entity z against it.</li>
+</ul>
+</div><div>
+<h3>Web / wasm</h3>
+<ul>
+<li>Odin int is 32-bit on wasm32 (i64 for instance ids); no core:os (gd.singleton_os()); core:time can be STUCK — use Godot's clock for pacing on web.</li>
+<li>Bundled-font glyphs only (· • *) — system-font fallbacks render as boxes.</li>
+<li>WebRTC message cap ~16K — big payloads through kxfer. TURN needed for symmetric NAT. web_poll every frame.</li>
+<li>COOP/COEP headers required (serve.sh; itch = SharedArrayBuffer checkbox). Pin Emscripten (4.0.20 known-good).</li>
+</ul>
+<h3>Process / tooling</h3>
+<ul>
+<li>Editor reload builds race CLI builds — PID-scoped temps fixed it, but gates still want the game's editor closed (auto-save can stomp the tree: check lsof on mystery reverts).</li>
+<li>build_scripts.sh publishes atomically (temp + mv) — an interrupted rebuild never removes the previous dll. Deleted .odin files: the deletion probe sweeps orphan .gen.odin every ~2s.</li>
+<li>Working directory persists across shell calls — background launches inherit the LAST cd; write multi-line commands with the cd on its own line.</li>
+<li>Verdicts from literal log lines, not exit codes (a FAIL run can exit 0). Count retry attempts (<code>grep -c attempt</code>) — retries mask flakes.</li>
+<li>Regex sweeps that abstract a pattern must exclude the new helper's own body (self-recursion) — write the helper AFTER the sweep.</li>
+<li>zsh: backticks command-substitute inside double-quoted git -m; == expands; single-quote message bodies.</li>
+<li>Module rule: no imports between modules (a package in two dlls silently forks its globals); cross-module = engine-mediated by name.</li>
+<li>Print-receipt tests can't see ART — presentation changes need a viewport-grab probe (SY_SHOT pattern: env path + save viewport texture every 2s).</li>
+</ul>
+<h3>Kit-specific traps</h3>
+<ul>
+<li>Block imports MUST be aliased (<code>import play "godot:play"</code>) — bare import silently skips embedded fields/verbs.</li>
+<li>xfer default tag collides with your session tags — pick explicit tag bytes (comms 0, fire 1, xfer 2, vault 3…).</li>
+<li>comms_destroy before session; Ev_Line.text and session_blob return VIEWS — copy to keep.</li>
+<li>kick = session_kick + wire_drop (deferred — the kicked message must flush first).</li>
+<li>steam lobby_joined fires for the host's own lobby (guard owner==me). Steam can't be verified headless — live checklist.</li>
+<li>Kit-source changes need the KIT suite re-run, not just the consumer's acid.</li>
+</ul>
+</div></div>
+</section>
+
+<!-- ============================ TOOLING ============================ -->
+<section id="tooling">
+<h2>7 · Tooling / distribution</h2>
+<table>
+<tr><td class="k">build/build_scripts.sh [proj] [scripts]</td><td>scriptgen → *.gen.odin → scripts dll (+ per-module dlls) → core dll. ODIN=, SKIP_CORE=1, BUILD_MODULES=0, SGEN_BIN=. Custom attributes: gd_method,gd_connect,gd_rpc,gd_command</td></tr>
+<tr><td class="k">build/build_web.sh [proj] → bin/libodin_godot.wasm</td><td>one Emscripten SIDE_MODULE (core+binding+scripts); -define:ODIN_GODOT_WEB=true; ODIN_EXPORT_OPT= none|minimal|size|speed|aggressive</td></tr>
+<tr><td class="k">build/build_cross.sh linux|windows proj</td><td>obj emit + Nix cross-gcc link (nix develop .#cross); exit 3 = no-toolchain SKIP</td></tr>
+<tr><td class="k">build/debug_game.sh --break file.odin:51 proj</td><td>lldb with DWARF + godot_lldb.py; also editor Tools → Debug Game (LLDB)</td></tr>
+<tr><td class="k">build/release.sh [--tag]</td><td>version from build/dist.nix; assembles orphan release branch in a temp worktree (addon-only tree); pushes NOTHING — prints the push line. AssetLib serves the tag's commit zip</td></tr>
+<tr><td class="k">Exporting</td><td>OdinExportPlugin AOT-builds at export + bundles the scripts dll (core auto). Keep scripts self-contained (transitive native deps NOT bundled). macOS: universal arch + import_etc2_astc for arm64. Consumers: xattr -dr com.apple.quarantine addons/odin_godot</td></tr>
+<tr><td class="k">Editor reload pump</td><td>save → background build (coalesced) → hot-swap next frame (state kept; exported values preserved by name; private fields reset; each reload leaks the old dll image). Failure keeps the old dll live + shows the log</td></tr>
+<tr><td class="k">Modules (res://modules/&lt;name&gt;/)</td><td>opt-in at hundreds of scripts (~0.85s/dll floor); own package + unique class names; no cross-module imports; per-module hot swap resets that module's globals</td></tr>
+<tr><td class="k">Headless quirk</td><td>godot --import can crash at exit AFTER success — don't gate CI on its exit code</td></tr>
+</table>
+<p class="d">Examples: cavecrawl (kit reference, 4-act acid) · survivors (single-player, resources/.tres) · coop_arena (peer-authoritative, 3 transports) · barrage (#soa + MultiMesh, module isolation, events.Event) · slopball/slopball3d (Puppet/Puppet3, feel ledger, dedicated server) · showcase (smallest everything) · template/test (harness). Dogfood games live outside the repo: homestead (scale), scrapyard (60Hz speed — defs pipeline, rulebook, waves, succession, web, scene UI, workbench).</p>
+</section>
+
+<footer>odin_godot / friendslop toolkit — working reference. Godot 4.6 · Odin (nix-pinned) · generated from source + docs; when in doubt the source header comments are the contract. Filter box matches table rows and list items.</footer>
+</main>
+<script>
+const q=document.getElementById('q');
+q.addEventListener('input',()=>{const f=q.value.trim().toLowerCase();
+document.querySelectorAll('main tr').forEach(tr=>{if(tr.querySelector('th'))return;
+tr.classList.toggle('hide',f&&!tr.textContent.toLowerCase().includes(f));});
+document.querySelectorAll('main li').forEach(li=>li.classList.toggle('hide',f&&!li.textContent.toLowerCase().includes(f)));});
+q.addEventListener('keydown',e=>{if(e.key==='Escape'){q.value='';q.dispatchEvent(new Event('input'));}});
+</script>
+</body>
+</html>
