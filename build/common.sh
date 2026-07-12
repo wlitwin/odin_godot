@@ -146,14 +146,18 @@ atomic_odin_dll() {
     leaf="$(basename "$out")"
     ext="${leaf##*.}"
     base="${leaf%.*}"
-    tmp="$dir/.$base.tmp.$ext"
+    # PID-scoped temp: the EDITOR's reload builds and a CLI gate build race on
+    # the same output dir constantly (a live playtest plus an agent gate is
+    # the normal state of this project) — fixed temp names made each one eat
+    # the other's intermediates mid-link.
+    tmp="$dir/.$base.tmp.$$.$ext"
 
     local link_flags=()
     if [[ "$ext" == "dylib" ]]; then
         link_flags=(-extra-linker-flags:"-Wl,-install_name,$out")
     fi
 
-    rm -f "$tmp" "$dir/.$base.tmp-"*.o
+    rm -f "$tmp" "$dir/.$base.tmp.$$"*.o
     # -use-single-module: REQUIRED for usable debug info on macOS. Odin's default for
     # -o:none/-o:minimal is separate modules (one .o per package), and ld then emits a
     # broken one-entry debug map (a single N_OSO stab pointing at one arbitrary .o), so
@@ -176,5 +180,5 @@ atomic_odin_dll() {
         mv -f "$tmp.dSYM" "$out.dSYM"
     fi
     mv -f "$tmp" "$out"
-    rm -f "$dir/.$base.tmp-"*.o
+    rm -f "$dir/.$base.tmp.$$"*.o
 }
