@@ -30,6 +30,7 @@ package kit_session
 // brick) keep the door open.
 
 import knet "godot:kit/net"
+import "core:fmt"
 import "core:strings"
 
 // Which wire the message rides — maps to kit/netgd's channel plan.
@@ -80,7 +81,10 @@ Ev_Player_Left :: struct {
 	id: knet.Player_Id, // stays in the roster, disconnected (may reconnect)
 }
 
-Ev_Host_Left :: struct {} // (client) the run is over — v1 has no migration
+Ev_Host_Left :: struct {} // (client) the host is gone. Alone it ends the run; with
+// succession armed, Ev_Succession fires BESIDE it and the run survives — the
+// named bearer runs the takeover recipe, everyone else rejoins the successor
+// info (see "Backup hosting and resume" in session.md).
 
 Ev_Join_Failed :: struct {} // (client) no WELCOME within the join timeout — surface it, don't hang on "Joining..."
 
@@ -207,12 +211,21 @@ Event :: union {
 // like everything else. Column 0 is always "ping": the host pings its clients
 // and feeds each player's measured RTT (ms) in automatically.
 
+// A column HANDLE, 1-based on purpose: the zero value is INVALID and every
+// read/write asserts on it. Why: `session_stat_column` registers on the HOST
+// (typically in a Start handler) — a Stat_Col stored there is zero-value on
+// every client, and when 0 meant "column 0" a client's read silently returned
+// the auto-fed PING (homestead's acid caught a resource gate passing on 254
+// milliseconds of latency). Now the same mistake is a loud assert pointing at
+// `session_stat_find` — resolve BY NAME on peers that didn't register.
 Stat_Col :: distinct u8
 
 MAX_STAT_COLS :: 16
 
+STAT_COL_INVALID :: Stat_Col(0) // the zero value: never a real column
+
 // Always declared, always fed by the session itself.
-STAT_PING :: Stat_Col(0)
+STAT_PING :: Stat_Col(1)
 
 // ---- entity factories --------------------------------------------------------
 //
@@ -432,6 +445,7 @@ Session :: struct {
 
 	// entity types + client-side factories
 	types:         map[knet.Net_Id]Entity_Type, // host: for (re-)announcing spawns
+	unsent:        map[knet.Net_Id]u64, // host: spawn_make'd, spawn_send still owed (tick-stamped)
 	factory_user:  rawptr,
 	factory_make:  Make_Entity_Proc,
 	factory_free:  Free_Entity_Proc,
@@ -519,6 +533,7 @@ session_init :: proc(s: ^Session) {
 		s.locked = false
 		clear(&s.clocks)
 		clear(&s.types)
+		clear(&s.unsent)
 		for n in s.stat_names {
 			delete(n)
 		}
@@ -607,6 +622,7 @@ session_destroy :: proc(s: ^Session) {
 	knet.command_ctx_destroy(&s.ctx)
 	delete(s.clocks)
 	delete(s.types)
+	delete(s.unsent)
 	for n in s.stat_names {
 		delete(n)
 	}
@@ -708,17 +724,28 @@ session_stat_column :: proc(s: ^Session, name: string) -> Stat_Col {
 	assert(len(s.stat_names) < MAX_STAT_COLS, "too many stat columns")
 	append(&s.stat_names, strings.clone(name))
 	s.stats_dirty = true
-	return Stat_Col(len(s.stat_names) - 1)
+	return Stat_Col(len(s.stat_names)) // 1-based handle (index + 1)
 }
 
 // Look a column up by name — how clients resolve what the scoreboard shows.
 session_stat_find :: proc(s: ^Session, name: string) -> (Stat_Col, bool) {
 	for n, i in s.stat_names {
 		if n == name {
-			return Stat_Col(i), true
+			return Stat_Col(i + 1), true
 		}
 	}
-	return 0, false
+	return STAT_COL_INVALID, false
+}
+
+// Handle -> row index, with THE trap turned into a message: a zero-value
+// Stat_Col is a column that was registered on another peer (or never).
+@(private = "file")
+stat_idx :: proc(col: Stat_Col) -> int {
+	assert(
+		col != STAT_COL_INVALID,
+		"zero-value Stat_Col — session_stat_column registers on the HOST; on a peer that didn't register, resolve by name with session_stat_find (cheap — do it per read)",
+	)
+	return int(col) - 1
 }
 
 session_stat_names :: proc(s: ^Session) -> []string {
@@ -730,29 +757,32 @@ session_stat_names :: proc(s: ^Session) -> []string {
 // acid test's crash reporter; a missing player must read as an all-zero row).
 session_stat_set :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col, value: i64) {
 	assert(s.is_host, "stats are host-accumulated")
+	idx := stat_idx(col)
 	row, _ := s.stats[player]
-	if row[col] == value {
+	if row[idx] == value {
 		return
 	}
-	row[col] = value
+	row[idx] = value
 	s.stats[player] = row
 	s.stats_dirty = true
 }
 
 session_stat_add :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col, delta: i64) {
 	assert(s.is_host, "stats are host-accumulated")
+	idx := stat_idx(col)
 	row, _ := s.stats[player]
-	row[col] += delta
+	row[idx] += delta
 	s.stats[player] = row
 	s.stats_dirty = true
 }
 
 session_stat :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col) -> i64 {
+	idx := stat_idx(col)
 	row, ok := s.stats[player]
 	if !ok {
 		return 0
 	}
-	return row[col]
+	return row[idx]
 }
 
 // Install the client-side entity factory (do it before joining). The factory's
@@ -882,6 +912,11 @@ session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_
 	assert(entity != nil, "the factory returned nil for a host-side spawn")
 	knet.registry_insert(&s.reg, id, entity, set, owner)
 	s.types[id] = type
+	// The send is OWED: a make whose send never comes is a half-spawn that
+	// exists on the host and on late joiners (SES_WORLD walks the registry)
+	// but never on already-seated peers — per-join-order worlds. net_tick
+	// asserts if this entry survives a tick boundary.
+	s.unsent[id] = s.ticker.tick
 	return
 }
 
@@ -889,6 +924,7 @@ session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_
 // they stand NOW) to every seated peer.
 session_spawn_send :: proc(s: ^Session, id: knet.Net_Id) {
 	assert(s.is_host)
+	delete_key(&s.unsent, id) // the owed send arrived
 	if s.replicating {
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
@@ -1026,6 +1062,7 @@ session_despawn :: proc(s: ^Session, id: knet.Net_Id) {
 		return
 	}
 	delete_key(&s.types, id)
+	delete_key(&s.unsent, id) // a make despawned before its send owes nothing
 	interest_forget_entity(s, id)
 	if s.factory_free != nil {
 		s.factory_free(s.factory_user, id, entity)
@@ -1165,6 +1202,19 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 net_tick :: proc(s: ^Session) {
 	t := s.ticker.tick
 	s.ctx.now_tick = t
+
+	// The spawn pair's contract: make, set fields, SEND — same frame. An
+	// entry that survives a tick boundary is a forgotten session_spawn_send,
+	// which reads as an entity that exists for late joiners (SES_WORLD walks
+	// the registry) but never for already-seated peers. Loud beats haunted.
+	for id, made in s.unsent {
+		if t > made + 1 {
+			assert(
+				false,
+				fmt.tprintf("entity %d (type %d) was session_spawn_make'd but never session_spawn_send'd — the pair is make, set fields, send (same frame)", u32(id), u16(s.types[id])),
+			)
+		}
+	}
 
 	if !s.is_host && !s.joined && s.join_waited >= 0 {
 		s.join_waited += 1

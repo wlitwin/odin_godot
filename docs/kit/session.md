@@ -150,7 +150,8 @@ for {
 ```
 
 The event union: `Ev_Welcomed`, `Ev_Player_Joined` (with `rejoin`), `Ev_Player_Left`,
-`Ev_Host_Left` (v1 has no migration — the run is over), `Ev_Join_Failed`,
+`Ev_Host_Left` (alone it ends the run; with [succession](#backup-hosting-and-resume)
+armed, `Ev_Succession` fires beside it and the run survives), `Ev_Join_Failed`,
 `Ev_Join_Denied` (`.Full` / `.Locked` / `.Banned` — each a different sentence to the
 player), `Ev_Kicked`, `Ev_Spawned`, `Ev_Resynced` (a KNOWN entity's fields caught up
 wholesale — interest re-entry, a snapshot over live state; re-seed `seen_*` edge scratch
@@ -257,12 +258,14 @@ session_stat_add :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col, del
 session_stat :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col) -> i64
 ```
 
-**The client-column trap**: `session_stat_column` registers and runs on the HOST
-(typically in your Start handler) — a `Stat_Col` you stored there is zero-value on
-every client, and a client reading it reads **column 0, the auto-fed ping**. On any
+**The client-column trap, defused**: `session_stat_column` registers and runs on
+the HOST (typically in your Start handler) — a `Stat_Col` you stored there is
+zero-value on every client. Handles are 1-BASED so that zero value is
+`STAT_COL_INVALID`, and every read/write **asserts on it with the fix in the
+message** instead of silently returning column 0 (the auto-fed ping — homestead's
+acid once caught a resource gate passing on 254 milliseconds of latency). On any
 peer that didn't register the column, resolve BY NAME with `session_stat_find`
-(cheap — do it per read). Homestead's acid caught this as a resource gate passing
-on 254 milliseconds of latency.
+(cheap — do it per read).
 
 ## Command hooks (the generic layer under _then)
 
@@ -386,7 +389,10 @@ Ev_Succession :: struct { successor: knet.Player_Id } // (client) host gone, tor
 
 The session names WHO (the backup holder); the TRANSPORT knows where — the info blob is
 opaque to the session (address:port for ENet via `netgd.peer_address`, a lobby id for
-Steam, a room code for WebRTC). It broadcasts immediately and to every later joiner. On
+Steam, a room code for WebRTC). For ENet and WebRTC the whole rendezvous ceremony —
+minting the reserved room, wording the torch, raising the heir, the knock-on-a-timer
+chase — is [`netgd.Succession`](netgd.md#succession-the-rendezvous-ceremony-written-once),
+written once. It broadcasts immediately and to every later joiner. On
 host loss, `Ev_Succession` fires beside `Ev_Host_Left` on every client: the bearer runs
 the takeover recipe, everyone else rejoins the info — and because the event RE-FIRES on
 every failed reconnect, chasing a successor that hasn't bound yet retries for free (cap

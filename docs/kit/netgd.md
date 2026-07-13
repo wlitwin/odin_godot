@@ -120,6 +120,28 @@ every literal method name passed to `wire_listen` / `listen_packets` (and `boot_
 `methods`) against the script's registered `@(gd_method)`s — a typo is a build error; an
 empty string stays a deliberate skip.
 
+## Succession: the rendezvous ceremony, written once
+
+The session names WHO carries the torch ([session](session.md#backup-hosting-and-resume));
+`netgd.Succession` owns HOW the survivors find them — extracted from the game
+that shipped it (most of scrapyard's 400-line succession file was this):
+
+- **native** — the torch carries "addr:port": the bearer's address as the host
+  saw it, plus the seat-derived port the bearer will bind.
+- **web** — the relay honors reservations on create, so the host MINTS
+  tomorrow's room code today ("web:CODE" in the torch); the heir hosts UNDER
+  it and survivors knock on a timer (a browser cannot block, and the heir
+  needs a breath to open the room).
+
+Configure once (`Succession{web, signal_url, base_port, token, name}`), then:
+`succession_torch` on `Ev_Backup_Target` (host), `succession_raise` /
+`succession_chase` from `Ev_Succession` (the heir / everyone else — wipe your
+census first; `succession_named` peeks so a no-successor torch leaves the
+world standing), `succession_pulse` every frame (the web knock pump — word
+its `.Knocking`/`.Gave_Up` steps), and `succession_done` on `Ev_Welcomed`.
+The game keeps its campaign blob, its census wipe, and its words — see
+scrapyard's `succession.odin` for the worked consumer.
+
 ## wire_receive and the kind byte
 
 Every wire packet leads with the game's one message byte (the `kind` passed to

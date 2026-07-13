@@ -126,7 +126,8 @@ score_refresh :: proc(sb: ^Score, s: ^ksess.Session) {
 		cell(sb, &next, fmt.ctprintf("%s", p.name), false)
 		for name, col in names {
 			if score_hidden(sb, name) {continue}
-			cell(sb, &next, fmt.ctprintf("%d", ksess.session_stat(s, p.id, ksess.Stat_Col(col))), true)
+			// Stat_Col handles are 1-based (0 = the unregistered-column trap).
+			cell(sb, &next, fmt.ctprintf("%d", ksess.session_stat(s, p.id, ksess.Stat_Col(col + 1))), true)
 		}
 	}
 	for i in next ..< len(sb.cells) {

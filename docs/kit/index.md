@@ -25,7 +25,8 @@ game in order and links each page below at the moment you need it.
 
 | Page | Package | What it owns |
 | --- | --- | --- |
-| [boot](boot.md) | `kit/boot` | The first thirty lines of every game, written once: lobby/chat/score/wire attach + the frame pump |
+| [boot](boot.md) | `kit/boot` | The first thirty lines of every game, written once: lobby/chat/score/wire attach, the frame pump, the generated entity factory |
+| [play](play.md) | `godot:play` | Drop-in gameplay blocks: Gun/Ability/Channel/Health/Telegraph verbs, FSM/edge/anim scratch, and Puppet — engine physics with one simulator per body |
 | [net](net.md) | `kit/net` | The engine-free core: wire format, registry, deltas, owner streams, the intent→command→result pipeline |
 | [session](session.md) | `kit/session` | Identity, roster, events, spawn/despawn via factory, stats, moderation, backup hosting |
 | [netgd](netgd.md) | `kit/netgd` | The Godot transport binding: Session_Wire, channels, the latency shim, kick-socket handling |

@@ -44,7 +44,22 @@ instance *simulate* slow, not just draw slow — the whole main loop blocks on
 the compositor, and every timeline-synced screen stutters for it. Headless and
 web runs are left untouched. A shipping build that prefers tear-free rendering
 opts out with `Options.keep_vsync = true` (and may set its own vsync/fps
-policy after `boot_attach`). The eight
+policy after `boot_attach`).
+
+**Count game time in NET TICKS, never frames.** The unthrottle above means
+frame rate is 120 on one machine and whatever vsync says on another — a
+"3-second" countdown counted in frames halves or doubles per screen
+(scrapyard shipped exactly that: its stage clock ran off frames and the
+120fps unthrottle cut the countdown in half). `boot_pump` returns `ticks` —
+how many fixed net ticks fired this frame — and that is the clock the host's
+simulation and every timer should count:
+
+```odin
+events, _, ticks := kboot.boot_pump(&self.boot, delta, now_s())
+if self.ses.is_host { for _ in 0 ..< ticks { my_game_tick(self) } } // timers decrement HERE
+```
+
+The eight
 `@(gd_method)` names are declared in *your* script (Godot signals must land on
 the game's class); their bodies are one-liners — see either example game's
 `net.odin` — and **scriptgen validates every name in `methods` against the

@@ -735,7 +735,7 @@ stats_declare_accumulate_replicate :: proc(t: ^testing.T) {
 
 	kills := ksess.session_stat_column(&host.s, "kills")
 	testing.expect_value(t, ksess.session_stat_column(&host.s, "kills"), kills) // idempotent
-	testing.expect_value(t, kills, ksess.Stat_Col(1)) // 0 is always ping
+	testing.expect_value(t, kills, ksess.Stat_Col(2)) // handles are 1-based; handle 1 is always ping
 	// Reading a player with no row yet (nil/missing map entry) is all zeros —
 	// the acid test's crash reporter caught a compiler fault on the plain index.
 	testing.expect_value(t, ksess.session_stat(&host.s, alice.s.me, kills), i64(0))
