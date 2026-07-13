@@ -198,6 +198,7 @@ Runner :: struct {
 <h3>Editor / debug</h3>
 <ul>
 <li><code>gd.is_editor()</code> gates tool logic. LLDB: Project → Tools → Debug Game (LLDB), or <code>build/debug_game.sh --break file.odin:51 proj</code>. No in-editor breakpoints — AOT native.</li>
+<li>Squiggles are two-tier: syntax errors from an in-process parse (~0.1ms, first debounce); type errors from an async <code>odin check</code> of the whole package (~0.5s warm, never blocks). Completions ride one persistent warm <code>ols</code> (~20ms).</li>
 <li>Project settings/env: <code>odin_godot/odin_bin</code>(ODIN), <code>ols_bin</code>, <code>emcc_bin</code>(EMCC), <code>root</code>(ODIN_GODOT_ROOT), <code>export_optimization</code>(ODIN_EXPORT_OPT), <code>show_generated_files</code>.</li>
 </ul>
 </div></div>

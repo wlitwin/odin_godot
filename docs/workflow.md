@@ -120,12 +120,18 @@ missing they warn once and the editor keeps working.
 ### Live error squiggles (`_validate`)
 
 The editor surfaces real **Odin compiler** errors as inline squiggles + Errors-panel entries
-as you type. Because a single `.odin` file isn't a compile unit, it type-checks the file's
-**package**: it copies the package to a temp overlay, overwrites the one edited file with your
+as you type, in **two tiers**. **Syntax errors** — the everyday while-typing state: the
+half-typed expression, the missing brace — come from the compiler's own parser running
+**in-process** (~0.1 ms), so the squiggle lands on the very first debounce and the slow check
+is never scheduled for a buffer it couldn't type-check anyway. **Type errors** need the real
+checker: because a single `.odin` file isn't a compile unit, it type-checks the file's
+**package** — it copies the package to a temp overlay, overwrites the one edited file with your
 unsaved buffer, runs `odin check`, and maps `‹file›(‹line›:‹col›) Error: ‹msg›` back to the
-editor. It runs on a **background worker** with a result cache, so it never freezes the UI
-(first-call latency ~0.03 ms; the check itself completes a moment later and the squiggles
-update on the next debounce). The `godot` collection root resolves `odin_godot/root` setting →
+editor. That check runs on a **background worker** with a result cache, so it never freezes the
+UI (first-call latency ~0.03 ms; the check itself — ~0.5 s warm on a game-sized package —
+completes a moment later and the squiggles update on the next debounce). Routing diagnostics
+through a persistent `ols` was measured and rejected: ols computes them by spawning the **same**
+`odin check`, so it could never be faster than running the check ourselves. The `godot` collection root resolves `odin_godot/root` setting →
 `ODIN_GODOT_ROOT` env → **auto-derived from the installed addon's own location** — so a normal
 `addons/odin_godot/` install needs no configuration; set `odin_godot/root` only if you keep the
 collection somewhere non-standard.

@@ -38,6 +38,8 @@ fail :: proc(msg: string) {
 }
 
 BROKEN :: "package validate_fixture\n\nbad :: proc() {\n\ty: int = \"oops\"\n}\n"
+// Half-typed expression — the everyday while-typing state the syntax tier exists for.
+SYNTAX_BROKEN :: "package validate_fixture\n\nbad :: proc() {\n\tx := (1 +\n}\n"
 
 free_diags :: proc(ds: []diag.Diagnostic) {
     for x in ds {delete(x.message)}
@@ -102,6 +104,80 @@ main :: proc() {
     if strings.index(d.message, "Cannot convert") == -1 {
         fail(fmt.tprintf("unexpected message: %q", d.message))
     }
+
+    // ------------------------------------------------------------------
+    // 1.5 TIER 1 — the resident parser: SYNTAX errors are caught in-process, without the
+    //     checker. A type-only error (BROKEN) and the clean fixture must parse silently;
+    //     a syntactically broken buffer must report, and orders of magnitude faster than
+    //     the check.
+    // ------------------------------------------------------------------
+    t_parse := time.now()
+    syn := diag.parse_syntax(SYNTAX_BROKEN, fixture)
+    parse_dur := time.since(t_parse)
+    fmt.printf(
+        "syntax-broken -> %d syntax diagnostic(s)  (parse duration: %.3f ms)\n",
+        len(syn),
+        time.duration_milliseconds(parse_dur),
+    )
+    if len(syn) == 0 {
+        fail("syntax-broken buffer reported NO syntax errors")
+    }
+    fmt.printf("first syntax diagnostic: line=%d column=%d message=%q\n", syn[0].line, syn[0].column, syn[0].message)
+    if syn[0].line < 4 || syn[0].line > 5 {
+        fail(fmt.tprintf("expected the syntax error near line 4-5, got line %d", syn[0].line))
+    }
+    if parse_dur >= check_dur / 10 {
+        fail(fmt.tprintf("parse tier (%.3f ms) is not clearly faster than the check (%.1f ms)", time.duration_milliseconds(parse_dur), time.duration_milliseconds(check_dur)))
+    }
+    for x in syn {delete(x.message)}
+    delete(syn)
+    syn_type := diag.parse_syntax(BROKEN, fixture) // a TYPE error parses clean
+    if len(syn_type) != 0 {
+        fail(fmt.tprintf("type-only BROKEN buffer reported %d syntax errors: %v", len(syn_type), syn_type[:]))
+    }
+    delete(syn_type)
+    syn_clean := diag.parse_syntax(string(clean), fixture)
+    if len(syn_clean) != 0 {
+        fail(fmt.tprintf("clean fixture reported %d syntax errors: %v", len(syn_clean), syn_clean[:]))
+    }
+    delete(syn_clean)
+
+    // ------------------------------------------------------------------
+    // 1.6 validate_async on a SYNTAX-broken buffer: the diagnostic comes back on the very
+    //     FIRST call (no worker, no wait), the slow check is never scheduled, and the fresh
+    //     flag stays consumed (the result reached a real caller — no poke owed).
+    // ------------------------------------------------------------------
+    sstate: diag.Async_State
+    t_syn := time.now()
+    sdiags, svalid := diag.validate_async(&sstate, SYNTAX_BROKEN, fixture, root, odin_bin)
+    syn_lat := time.since(t_syn)
+    fmt.printf(
+        "async syntax-broken first call: %.3f ms -> valid=%v diags=%d\n",
+        time.duration_milliseconds(syn_lat),
+        svalid,
+        len(sdiags),
+    )
+    if svalid || len(sdiags) == 0 {
+        fail("syntax-broken buffer must be invalid with >=1 diagnostic on the FIRST async call")
+    }
+    free_diags(sdiags)
+    if syn_lat > 200 * time.Millisecond {
+        fail(fmt.tprintf("syntax tier took %.1f ms — it must not run the check", time.duration_milliseconds(syn_lat)))
+    }
+    ss := snapshot(&sstate)
+    if ss.worker_running || ss.pending {
+        fail("syntax-broken buffer must NOT schedule the slow check (worker/pending set)")
+    }
+    if diag.take_fresh(&sstate) {
+        fail("syntax tier result was returned directly — the fresh poke must not be armed")
+    }
+    // Cache hit on the same broken content: same answer, still no worker.
+    sdiags2, svalid2 := diag.validate_async(&sstate, SYNTAX_BROKEN, fixture, root, odin_bin)
+    if svalid2 || len(sdiags2) == 0 {
+        fail("cached syntax result lost on the second call")
+    }
+    free_diags(sdiags2)
+    fmt.println("syntax tier: instant diagnostic, no worker scheduled, cache serves repeats")
 
     // ------------------------------------------------------------------
     // 2. NON-BLOCKING: the first async call returns immediately even though the cold check is
