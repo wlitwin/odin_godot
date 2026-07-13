@@ -30,6 +30,7 @@ game in order and links each page below at the moment you need it.
 | [net](net.md) | `kit/net` | The engine-free core: wire format, registry, deltas, owner streams, the intent→command→result pipeline |
 | [session](session.md) | `kit/session` | Identity, roster, events, spawn/despawn via factory, stats, moderation, backup hosting |
 | [netgd](netgd.md) | `kit/netgd` | The Godot transport binding: Session_Wire, channels, the latency shim, kick-socket handling |
+| [sim](sim.md) | `kit/sim` | The server-authority resim companion: inputs-only up, tick snapshots down, rollback reconcile, lag compensation — for the contested games the coop model isn't |
 | [steamgd](steamgd.md) | `kit/steamgd` | Steam lobbies + invite overlay over GodotSteam, by name — same wire, different door |
 | [comms](comms.md) | `kit/comms` | Chat, system lines, positional pings, drop-in catchup |
 | [xfer](xfer.md) | `kit/xfer` | Chunked large payloads (sprays, skins, level files) — host-relayed, paced, web-safe |

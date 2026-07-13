@@ -744,6 +744,13 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 			continue
 		}
 
+		// `@(gd_tick)` — the class's sim-lane step (kit/sim). Like commands it is
+		// never a Godot method: the generated thunk + Sim_Set are its only callers.
+		if has_attr(vd, "gd_tick") {
+			parse_tick(s, src, Loc{path, name_ident.pos.line}, proc_name, pt)
+			continue
+		}
+
 		// `gd_rpc` implies `gd_method`: an RPC must be a registered method to be dispatchable.
 		is_gd_rpc := has_attr(vd, "gd_rpc")
 		is_gd_method := has_attr(vd, "gd_method") || is_gd_rpc
@@ -807,6 +814,22 @@ validate_script :: proc(s: ^Script) {
 			error_at(
 				Loc{path = s.path},
 				"%s declares @(gd_command) procs but no `net_id: knet.Net_Id` field — commands name their entity over the wire; add the field (the session/registry layer assigns it)",
+				s.struct_name,
+			)
+		}
+	}
+	if s.tick.proc_name != "" {
+		has_predict := false
+		for r in s.replicates {
+			if r.predict {
+				has_predict = true
+				break
+			}
+		}
+		if !has_predict {
+			error_at(
+				Loc{path = s.path, line = s.tick.line},
+				"%s declares @(gd_tick) but no gd:\"replicate,predict\" fields — the sim lane snapshots and reconciles predicted state; tag the fields the tick mutates",
 				s.struct_name,
 			)
 		}
@@ -1267,6 +1290,77 @@ parse_command :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: 
 	append(&s.commands, cmd)
 }
 
+// One @(gd_tick) proc — the class's sim-lane step. Accepted shapes, receiver first:
+//
+//   proc(self: ^T)                                  // inputless (a ball, a mover)
+//   proc(self: ^T, input: T_Input)                  // driven by the owner's input
+//   proc(self: ^T, lane: ^ksim.Lane)                // inputless, wants the lane (tick number, queries)
+//   proc(self: ^T, input: T_Input, lane: ^ksim.Lane)
+//
+// A pointer param is the LANE (its type must end in `Lane`); a value param is
+// the INPUT (a POD struct — it crosses the wire raw; the generated #assert
+// enforces PODness at the consumer compile). No results: mutation IS the
+// outcome — validation and rejection belong to @(gd_command) verbs.
+parse_tick :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type) {
+	if s.tick.proc_name != "" {
+		error_at(
+			loc,
+			"%s: second @(gd_tick) proc %q — %q already ticks this class; one tick per class, compose behavior inside it",
+			s.struct_name, proc_name, s.tick.proc_name,
+		)
+		return
+	}
+	tk := Tick_Info{proc_name = proc_name, line = loc.line}
+	ok := true
+
+	// Flatten the params after the receiver (one field entry may declare
+	// several names — each is a param).
+	types := make([dynamic]string, context.temp_allocator)
+	for field in pt.params.list[1:] {
+		text := strings.trim_space(node_text(src, field.type))
+		for _ in 0 ..< max(1, len(field.names)) {
+			append(&types, text)
+		}
+	}
+	for text, i in types {
+		if strings.has_prefix(text, "^") {
+			base := text[1:]
+			if j := strings.last_index(base, "."); j >= 0 {base = base[j + 1:]}
+			if base != "Lane" || tk.wants_lane || i != len(types) - 1 {
+				error_at(loc, "tick %s: unsupported param %q — the shape is (self[, input][, lane: ^ksim.Lane]); other state rides the entity or the lane", proc_name, text)
+				ok = false
+				continue
+			}
+			tk.wants_lane = true
+			continue
+		}
+		if tk.input_type != "" {
+			error_at(loc, "tick %s: a second value param %q — one input struct per tick; compose the fields into it", proc_name, text)
+			ok = false
+			continue
+		}
+		if text == "int" || text == "uint" {
+			error_at(loc, "tick %s: input type %q has platform-dependent width — inputs cross the wire; wrap fixed-width fields in a struct", proc_name, text)
+			ok = false
+			continue
+		}
+		tk.input_type = text
+	}
+
+	if pt.results != nil && len(pt.results.list) > 0 {
+		error_at(
+			loc,
+			"tick %s returns a value — tick procs return nothing (mutation IS the outcome; validation and rejection belong to @(gd_command) verbs)",
+			proc_name,
+		)
+		ok = false
+	}
+
+	if ok {
+		s.tick = tk
+	}
+}
+
 // Build a Method_Info from a @(gd_method)/@(gd_rpc) proc: the GDScript-exposed name (stripped),
 // the Variant-mapped args, and the return. Shared by the entity scan (scan_bound_procs, direct
 // methods) and the imported-package index (index_pkg_dir, composed block methods). Like commands,
@@ -1704,10 +1798,19 @@ parse_replicate_info :: proc(
 			rep.interp = true
 		case "owner":
 			rep.owner = true
+		case "predict":
+			rep.predict = true
 		case "":
 		case:
-			error_at(floc, "%s.%s: unknown replicate option %q (expected `interp`, `interp=BLEND_PROC`, `owner`, `wire=f16`, or `wire=CODEC`)", struct_name, field_label, spec)
+			error_at(floc, "%s.%s: unknown replicate option %q (expected `interp`, `interp=BLEND_PROC`, `owner`, `predict`, `wire=f16`, or `wire=CODEC`)", struct_name, field_label, spec)
 		}
+	}
+	// A field has ONE authority lane: `owner` streams from its owning peer,
+	// `predict` is server-simulated and client-reconciled (kit/sim). Both at
+	// once would mean two writers fighting over the same bytes every tick.
+	if rep.predict && rep.owner {
+		error_at(floc, "%s.%s: `owner` and `predict` are mutually exclusive — a field is owner-streamed OR server-sim-predicted, never both (pick the lane that owns its writes)", struct_name, field_label)
+		return {}, false
 	}
 	// Bare `interp` must know HOW to blend: classify the declared type into a knet.Lerp_Kind
 	// (quaternions get hemisphere-safe nlerp — a raw componentwise lerp garbles rotations near

@@ -9,6 +9,7 @@ package repgen_fixture
 
 import gd "godot:godot"
 import knet "godot:kit/net"
+import ksim "godot:kit/sim"
 
 Pawn :: struct {
 	owner:  gd.Node2d,
@@ -19,6 +20,8 @@ Pawn :: struct {
 	aim:    f32 `gd:"replicate,interp=pawn_blend_aim,owner"`, // custom blend math
 	heat:   f32 `gd:"replicate,wire=f16"`, // stock half-float wire encoding
 	charge: i32 `gd:"replicate,wire=pawn_charge_codec"`, // custom fixed-size codec
+	px, py: f32 `gd:"replicate,predict,interp"`, // kit/sim lane: server-sim truth, client resim
+	fuel:   u16 `gd:"replicate,predict"`, // predicted without interp: steps, never lerps
 	state:  u8 `gd:"replicate"`,
 	speed:  f64 `gd:"export,range=0:10"`, // exports and replicates coexist
 	local:  int, // untagged: never replicated
@@ -28,6 +31,23 @@ Pawn :: struct {
 // references it verbatim, so this consumer compile IS the signature check.
 pawn_blend_aim :: proc(dst, a, b: rawptr, alpha: f32) {
 	(^f32)(dst)^ = (^f32)(a)^ + ((^f32)(b)^ - (^f32)(a)^) * alpha
+}
+
+// The sim-lane surface: a POD input struct (discovered from the tick proc's
+// signature — no tag) and the @(gd_tick) step, full shape (input + lane).
+Pawn_Input :: struct {
+	move:    [2]i8,
+	buttons: u8,
+}
+
+@(gd_tick)
+pawn_tick :: proc(self: ^Pawn, input: Pawn_Input, lane: ^ksim.Lane) {
+	self.px += f32(input.move[0])
+	self.py += f32(input.move[1])
+	if input.buttons != 0 && self.fuel > 0 {
+		self.fuel -= 1
+	}
+	_ = lane
 }
 
 // The custom codec `charge` names — a knet.Wire_Codec: i32 charge (0..255)

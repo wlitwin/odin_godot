@@ -166,7 +166,7 @@ run_check_overlay :: proc(
 
     // 3. Type/parse-check the overlay; capture stdout+stderr.
     check := fmt.ctprintf(
-        "%s check %s -collection:godot=%s -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command > %s 2>&1",
+        "%s check %s -collection:godot=%s -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick > %s 2>&1",
         shell_quote(odin_bin, context.temp_allocator),
         q_work,
         shell_quote(root, context.temp_allocator),

@@ -17,11 +17,11 @@ ODIN="${ODIN:-odin}"
 # needs so authors can mark procs with @(gd_method) / @(gd_connect) / @(gd_rpc) /
 # @(gd_command) — the codegen markers scriptgen consumes.
 # KEEP IN SYNC with:
-#   - build/build_scripts.ps1  (the Windows-native build hardcodes the same four flags)
+#   - build/build_scripts.ps1  (the Windows-native build hardcodes the same five flags)
 #   - core/diag/diag.odin      (the in-editor `odin check` diagnostics pass hardcodes them
 #                               so @(gd_*) attributes don't produce phantom errors)
 #   - core/export_plugin.odin  (the generated ols.json checker_args)
-ODIN_GD_ATTRS=(-custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command)
+ODIN_GD_ATTRS=(-custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick)
 
 # Host shared-library extension for NATIVE builds (cross builds pick their own — see
 # build/build_cross.sh). Windows native builds use build_scripts.ps1, not these scripts.

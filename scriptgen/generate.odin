@@ -67,6 +67,10 @@ generate :: proc(s: ^Script) -> string {
 	if len(s.replicates) > 0 {
 		w(&b, "import \"base:intrinsics\"\n")
 	}
+	// @(gd_tick) generates the sim-lane thunk + Sim_Set (kit/sim).
+	if s.tick.proc_name != "" {
+		w(&b, "import ksim \"godot:kit/sim\"\n")
+	}
 	// entity tables (`entity=Name:id` scene fields) name ksess.Entity_Type and
 	// build kboot.Entity_Kind rows.
 	if len(s.entities) > 0 {
@@ -488,10 +492,14 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			switch {
 			case r.interp && r.owner:
 				flags = "{.Interp, .Owner_Stream}"
+			case r.interp && r.predict:
+				flags = "{.Interp, .Predicted}"
 			case r.interp:
 				flags = "{.Interp}"
 			case r.owner:
 				flags = "{.Owner_Stream}"
+			case r.predict:
+				flags = "{.Predicted}"
 			case:
 				flags = "{}"
 			}
@@ -676,6 +684,41 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			fmt.sbprintf(b, "\treturn knet.command_issue(ctx, self, &%s_command_set, %d)\n}}\n\n", snake, ci)
 		}
+	}
+
+	// ---- @(gd_tick): the sim-lane step thunk + Sim_Set (kit/sim) ----
+	// The thunk is the whole bridge: the lane drives entities through rawptrs
+	// (live ticks AND resim replays take the identical path), the author's
+	// proc stays typed and single-player-shaped. The input struct crosses the
+	// wire raw, so the same POD contract as replicated fields is #asserted at
+	// the consumer compile, naming the type.
+	if s.tick.proc_name != "" {
+		w(b, "// ---- @(gd_tick) sim-lane step ----\n\n")
+		if s.tick.input_type != "" {
+			fmt.sbprintf(
+				b,
+				"#assert(intrinsics.type_is_nearly_simple_compare(%s) && !intrinsics.type_is_pointer(%s) && !intrinsics.type_is_multi_pointer(%s), \"%s: @(gd_tick) input structs must be POD (they cross the wire raw — no strings, slices, maps, or pointers)\")\n\n",
+				s.tick.input_type, s.tick.input_type, s.tick.input_type, s.tick.input_type,
+			)
+		}
+		fmt.sbprintf(b, "@(private = \"file\")\n_%s_tick_step :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane) {{\n", snake)
+		if s.tick.input_type != "" {
+			w(b, "\tif input == nil {return} // no input drives this entity here this tick: coast\n")
+		}
+		fmt.sbprintf(b, "\t%s(cast(^%s)entity", s.tick.proc_name, cls)
+		if s.tick.input_type != "" {
+			fmt.sbprintf(b, ", (cast(^%s)input)^", s.tick.input_type)
+		}
+		if s.tick.wants_lane {
+			w(b, ", lane")
+		}
+		w(b, ")\n}\n\n")
+		in_size := s.tick.input_type != "" ? fmt.tprintf("size_of(%s)", s.tick.input_type) : "0"
+		fmt.sbprintf(
+			b,
+			"// kit/sim set for %s — ksim.lane_track_set(&lane, id, self, &%s_sim_set, owner)\n%s_sim_set := ksim.Sim_Set{{entity_desc = &%s_net_desc, tick = _%s_tick_step, input_size = %s}}\n\n",
+			cls, snake, snake, snake, snake, in_size,
+		)
 	}
 
 	// ---- entity kinds: `entity=Name:id` scene fields -> the kboot table ----

@@ -341,6 +341,7 @@ Replicate_Info :: struct {
 	path:   []string,
 	interp: bool, // remote peers interpolate this field
 	owner:  bool, // part of the owner-authoritative unreliable stream
+	predict: bool, // kit/sim lane: server-sim-authoritative, client-predicted + reconciled
 	lerp:   string, // knet.Lerp_Kind literal (".F32"/".F64"/".Quat"/".Custom"); "" = Snap
 	blend:  string, // `interp=NAME`: the author's knet.Blend_Proc, spliced verbatim
 	wire:   string, // knet.Wire_Kind literal (".F16"/".Custom"); "" = raw struct bytes
@@ -405,6 +406,16 @@ Entity_Tag :: struct {
 	freed:   string, // <target_snake>_freed
 }
 
+// The one @(gd_tick) proc a class may declare — its sim-lane step (kit/sim).
+// scriptgen generates the rawptr thunk and the `<snake>_sim_set` the game
+// hands to ksim.lane_track_set.
+Tick_Info :: struct {
+	proc_name:  string,
+	input_type: string, // the input param's type text, spliced verbatim ("" = inputless)
+	wants_lane: bool, // trailing `lane: ^ksim.Lane` param — threaded by the thunk
+	line:       int,
+}
+
 Script :: struct {
 	path:        string, // source file path (diagnostics)
 	godot_alias: string, // the file's `godot:godot` import alias ("" = not imported)
@@ -426,6 +437,7 @@ Script :: struct {
 	commands:    [dynamic]Command_Info,
 	entities:    [dynamic]Entity_Tag, // entity=Name:id scene fields (the kboot table)
 	net_id_type: string, // type text of a `net_id` field ("" = none) — commands require knet.Net_Id
+	tick:        Tick_Info, // proc_name == "" = the class doesn't tick
 }
 
 had_error: bool

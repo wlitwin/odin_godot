@@ -35,7 +35,7 @@ CI, headless builds, or working from the source repo.
    never edit these; the loader ignores them as attachable scripts),
 3. builds the scripts dll (`odin build <scriptsdir> -build-mode:dll` with
    `-custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc
-   -custom-attribute:gd_command` — those
+   -custom-attribute:gd_command -custom-attribute:gd_tick` — those
    flags let the Odin compiler accept the marker attributes), and
 4. builds the core dll.
 

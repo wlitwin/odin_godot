@@ -47,6 +47,10 @@ for needle in \
 	'offset_of(Pawn, x)' \
 	'offset_of(Pawn, y)' \
 	'{.Interp, .Owner_Stream}' \
+	'{.Interp, .Predicted}' \
+	'{.Predicted}' \
+	'offset_of(Pawn, px)' \
+	'offset_of(Pawn, fuel)' \
 	'lerp = .F32' \
 	'lerp = .Quat' \
 	'lerp = .Custom, blend = pawn_blend_aim' \
@@ -100,6 +104,28 @@ if grep -qF '_pawn_m_hit' "$GEN"; then
 	exit 1
 fi
 echo "  ok  command thunks, table, set, and typed issue wrappers generated"
+
+# @(gd_tick) artifacts: the ksim import, the input POD assert, the rawptr
+# thunk (nil input coasts; the author call stays typed), and the Sim_Set the
+# game hands to lane_track_set. Never a Godot method.
+for needle in \
+	'import ksim "godot:kit/sim"' \
+	'intrinsics.type_is_nearly_simple_compare(Pawn_Input)' \
+	'_pawn_tick_step :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane)' \
+	'if input == nil {return}' \
+	'pawn_tick(cast(^Pawn)entity, (cast(^Pawn_Input)input)^, lane)' \
+	'pawn_sim_set := ksim.Sim_Set{entity_desc = &pawn_net_desc, tick = _pawn_tick_step, input_size = size_of(Pawn_Input)}' \
+; do
+	if ! grep -qF "$needle" "$GEN"; then
+		echo "REPGEN_FAIL: generated file is missing tick artifact: $needle"
+		exit 1
+	fi
+done
+if grep -qF '_pawn_m_tick' "$GEN"; then
+	echo "REPGEN_FAIL: the @(gd_tick) proc leaked into the method trampolines"
+	exit 1
+fi
+echo "  ok  tick thunk + sim set generated (POD-asserted input, coast-on-nil)"
 
 # Entity-table artifacts (board.odin's `entity=Pawn:7` scene tag): the TYPE
 # const, the kboot.Entity_Kind row reading the scene THROUGH the field
@@ -221,6 +247,106 @@ if ! echo "$SGEN_OUT" | grep -q "unknown replicate option"; then
 	exit 1
 fi
 echo "  ok  unknown replicate option rejected at scriptgen time"
+
+# ---- (4a): `owner` and `predict` on one field — two authority lanes, an error ----
+LANES="$TMP/lanes"
+mkdir -p "$LANES"
+cat > "$LANES/torn.odin" <<'EOF'
+//gd:extends Node
+//gd:class Torn
+package repgen_lanes
+
+import gd "godot:godot"
+
+Torn :: struct {
+	owner: gd.Node,
+	x:     f32 `gd:"replicate,owner,predict"`, // two writers, one field: refused
+}
+
+torn_ready :: proc(self: ^Torn) {}
+EOF
+set +e
+LANES_OUT="$(run_scriptgen "$LANES" 2>&1)"
+LANES_RC=$?
+set -e
+if [ "$LANES_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: owner+predict on one field was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$LANES_OUT" | grep -q "mutually exclusive"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't explain the lane conflict:"
+	echo "$LANES_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  owner+predict lane conflict rejected at scriptgen time"
+
+# ---- (4a2): @(gd_tick) contract violations — returns a value / no predict fields ----
+TIK="$TMP/tik"
+mkdir -p "$TIK"
+cat > "$TIK/spinny.odin" <<'EOF'
+//gd:extends Node
+//gd:class Spinny
+package repgen_tik
+
+import gd "godot:godot"
+
+Spinny :: struct {
+	owner: gd.Node,
+	angle: f32 `gd:"replicate,predict"`,
+}
+
+@(gd_tick)
+spinny_tick :: proc(self: ^Spinny) -> bool { // tick procs return NOTHING
+	self.angle += 1
+	return true
+}
+EOF
+set +e
+TIK_OUT="$(run_scriptgen "$TIK" 2>&1)"
+TIK_RC=$?
+set -e
+if [ "$TIK_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a value-returning @(gd_tick) was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$TIK_OUT" | grep -q "return nothing"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't explain the tick-return rule:"
+	echo "$TIK_OUT" | tail -3
+	exit 1
+fi
+NOP="$TMP/nop"
+mkdir -p "$NOP"
+cat > "$NOP/stately.odin" <<'EOF'
+//gd:extends Node
+//gd:class Stately
+package repgen_nop
+
+import gd "godot:godot"
+
+Stately :: struct {
+	owner: gd.Node,
+	hp:    i32 `gd:"replicate"`, // delta lane only — nothing for a tick to reconcile
+}
+
+@(gd_tick)
+stately_tick :: proc(self: ^Stately) {
+	self.hp += 1
+}
+EOF
+set +e
+NOP_OUT="$(run_scriptgen "$NOP" 2>&1)"
+NOP_RC=$?
+set -e
+if [ "$NOP_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: @(gd_tick) without predict fields was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$NOP_OUT" | grep -q 'replicate,predict'; then
+	echo "REPGEN_FAIL: scriptgen error doesn't point at the missing predict tag:"
+	echo "$NOP_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  tick contract violations rejected: return value, no predict fields"
 
 # ---- (4b): interp on a non-float + interp= with no proc — both errors ----
 LRP="$TMP/lrp"
