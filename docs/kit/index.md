@@ -66,5 +66,6 @@ the toolkit's replicated positions make easy to drive; revisit when a game
 needs it.
 
 Still deliberately out (documented as recipes in [session](session.md), not
-code): character-portable saves and private per-player state. See the design
-notes in the repository's knowledge base.
+code): character-portable saves, private per-player state, and player-to-
+player trade (the mediating-entity transaction). See the design notes in the
+repository's knowledge base.

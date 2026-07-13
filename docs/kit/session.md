@@ -439,6 +439,80 @@ Wireshark; a friendslop saboteur's secret survives friends, not forensics). Keep
 secret host-side, tell exactly who needs to know, and let CONSEQUENCES be public state
 like everything else.
 
+**Player-to-player trade** (the mediating entity — every true multi-party
+transaction). A trade mutates TWO players' bags atomically, and a command may
+only mutate its target — so make the TRANSACTION the target. The trade window
+is an ordinary entity the host spawns when two players shake hands: its
+replicated fields are the offer slots (item + count, a *reference* — the bags
+stay untouched until commit) and one confirm byte per side. Every edit is a
+single-target predicted command on the Trade, which means every trade race is
+already solved by machinery you have: two edits to the same slot serialize in
+host arrival order, the loser reverts through reject-truth like any contended
+chest.
+
+```odin
+Trade :: struct {
+	owner:      gd.Node2d,
+	net_id:     knet.Net_Id,
+	a, b:       u64 `gd:"replicate"`, // the two Player_Ids at the table
+	offer_a:    [4]kitems.Slot `gd:"replicate"`,
+	offer_b:    [4]kitems.Slot `gd:"replicate"`,
+	confirm_a:  bool `gd:"replicate"`,
+	confirm_b:  bool `gd:"replicate"`,
+	state:      u8 `gd:"replicate"`, // OPEN / DONE / FAILED — an edge every screen words
+}
+
+// THE DUPE-GUARD, single-target and therefore race-proof: ANY offer edit
+// clears BOTH confirms in the same verb, so the switch-the-item-at-the-last-
+// second scam is structurally dead — a confirm racing an edit lands on
+// cleared state and the commit below refuses.
+@(gd_command = "predict")
+trade_offer :: proc(self: ^Trade, side: u8, slot: u8, item: u16, count: u16) -> bool {
+	if self.state != TRADE_OPEN {return false}
+	(side == 0 ? &self.offer_a[slot] : &self.offer_b[slot])^ = {kitems.Item_Id(item), count}
+	self.confirm_a = false
+	self.confirm_b = false
+	return true
+}
+
+@(gd_command = "predict")
+trade_confirm :: proc(self: ^Trade, side: u8) -> (ok: bool, sealed: bool) {
+	if self.state != TRADE_OPEN {return false, false}
+	if side == 0 {self.confirm_a = true} else {self.confirm_b = true}
+	return true, self.confirm_a && self.confirm_b // the second confirm seals it
+}
+
+// The NOTARY: the confirm's consequence, host only. The verb could only see
+// the table; the consequence sees the world — it re-validates that both
+// offers still sit in their bags (someone may have dropped a promised item
+// mid-trade) and either moves everything or fails the whole table. Both
+// outcomes are ordinary host mutations: deltas carry the verdict and the
+// items to every screen at once, and phantom items are impossible — nothing
+// was predicted into anyone's bag.
+trade_confirm_then :: proc(game: ^MyGame, self: ^Trade, by: knet.Player_Id, side: u8, sealed: bool) {
+	if !sealed {return}
+	if game_move_offers(game, self) { // validate both bags, then swap
+		self.state = TRADE_DONE
+	} else {
+		self.state = TRADE_FAILED // the run words it; the goods never moved
+	}
+}
+```
+
+What falls out free is the point: the trade is an entity, so a mid-trade
+host migration resumes with the window intact, a reconnecting player finds
+their table where they left it, and a late joiner spectating the market sees
+it — zero catch-up code. `Ev_Player_Left` is the one edge you own: the host
+despawns any table naming the departed (their seat may reclaim it later, but
+an open offer must not outlive its owner's presence). Escrow is the variant
+when a promised item must not be double-promised to two windows — the offer's
+`_then` moves the item bag→table on the host instead of referencing it, and
+the failed-commit path hands it back; start with references and reach for
+escrow only when your economy needs the exclusivity. And note what is
+deliberately NOT here: predicting the bags themselves. Items landing one beat
+after the seal reads as a handshake; items vanishing from your bag on a
+rejected prediction reads as theft.
+
 **Owner-detected events** (a ball drops in the cup, a cart reaches the checkpoint —
 anything derived from state some PLAYER's machine simulates). The rule: **position-derived
 events belong to the position authority.** If the host adjudicates them off its

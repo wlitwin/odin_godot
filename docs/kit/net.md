@@ -167,8 +167,15 @@ proc that silently never fires: the shape (`[game,] self, by, wire args…,
 payload…`) is validated against the verb, an unclaimed `*_then` proc warns,
 and a direct verb whose payload nobody consumes warns too. When something
 needs to react to commands *generically* (metrics, receipts, replays), the
-untyped [command hook](session.md#per-type-hook-routing) remains underneath —
-`_then` is generated dispatch over the same authority path.
+untyped [command hook](session.md#command-hooks-the-generic-layer-under-_then)
+remains underneath — `_then` is generated dispatch over the same authority path.
+
+**The one shape this deliberately doesn't grow into**: a verb that mutates
+TWO entities (a trade touching both players' bags). Multi-target commands
+would drag revert capture, reject-truth, and replay-reconcile across entity
+boundaries — and invite predicting the other party's state, which feels
+worse, not better. The answer is to make the transaction itself the target:
+the [mediating-entity recipe](session.md#recipes-over-existing-pieces).
 
 ## Composing verbs from embedded blocks
 
