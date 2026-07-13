@@ -128,7 +128,7 @@ player_enter_tree / _exit_tree / _reload   // reload = re-capture cached ptrs af
 <tr><td class="k"><b>@(gd_command="predict")</b></td><td>client applies optimistically; reject/timeout auto-reverts, reject carries truth. Return bool = APPLIED</td></tr>
 <tr><td class="k"><b>@(gd_connect="signal")</b></td><td>auto-connect owner.signal → this method at ready (must be gd_method)</td></tr>
 </table>
-<div class="warn"><b>THE METHOD TRAP:</b> a class's proc scan covers its OWN file + HEADERLESS helper files only. A <code>^Game</code> @(gd_method) written in a file that declares <code>//gd:class Other</code> binds to NOTHING — silently (connects fail only when pressed). Keep entity methods in headerless files. (Marker-less helper files resolve to no class at all — as of 2026-07 the loader treats them as helpers, so any number of classes may extend plain <code>Node</code>.)</div>
+<div class="warn"><b>THE METHOD TRAP (now a build error):</b> a class's proc scan covers its OWN file + HEADERLESS helper files only — an attributed or lifecycle-named <code>^Game</code> proc written in a file that declares <code>//gd:class Other</code> binds to nothing, so scriptgen refuses the build and tells you to move it to a headerless file. Plain cross-class helper procs stay legal. (Marker-less files are HELPERS — no class identity; any number of classes may extend plain <code>Node</code>.)</div>
 </div><div>
 <h3>Field tags <span class="d">(gd:"…" — first token selects kind)</span></h3>
 <table>
@@ -262,7 +262,7 @@ Runner :: struct {
 <table>
 <tr><td class="k">boot_attach(&b,node,&ses,&comms,Options{title,status,legend,msg_kind,latency_env,min_players,spatial,keep_vsync, lobby_scene,chat_scene,score_scene, methods})</td><td>lobby+chat+score+stage/world containers+wire, once. spatial ⇒ Node3D containers. Desktop unthrottles by default (vsync off + 120fps — occluded vsync windows SIMULATE slow); keep_vsync opts out. *_scene = full UI replacement (kit adopts named nodes)</td></tr>
 <tr><td class="k">boot_pump(&b,delta,now)→(events,marks,ticks)</td><td>wire_pump + session_tick + stock reactions; re-yields everything (temp)</td></tr>
-<tr><td class="k">boot_host / boot_join / boot_serve (dedicated) / boot_host_web / boot_join_web / boot_chat(&b,text,&sent)</td><td>b.ui/chat/score/legend/wire/stage/world/ui_layer all public</td></tr>
+<tr><td class="k">boot_host / boot_join / boot_serve (dedicated) / boot_host_web / boot_join_web / boot_chat(&b,text,&sent) / boot_kick(&b,player,ban=false)</td><td>b.ui/chat/score/legend/wire/stage/world/ui_layer all public</td></tr>
 </table>
 
 <h3>kit/comms (kcomms)</h3>
@@ -460,7 +460,7 @@ fslp_verdict MYGAME</pre>
 </div><div>
 <h3>Web / wasm</h3>
 <ul>
-<li>Odin int is 32-bit on wasm32 (i64 for instance ids); no core:os (gd.singleton_os()); core:time can be STUCK — use Godot's clock for pacing on web.</li>
+<li>Odin int is 32-bit on wasm32 (i64 for instance ids); no core:os (gd.singleton_os()). core:time is STUCK on wasm — knet's clock auto-swaps to the engine's at wire_attach (knet.set_clock), so kit pacers/tickers just work; only game code reading core:time directly still needs Godot's clock.</li>
 <li>Bundled-font glyphs only (· • *) — system-font fallbacks render as boxes.</li>
 <li>WebRTC message cap ~16K — big payloads through kxfer. TURN needed for symmetric NAT. web_poll every frame.</li>
 <li>COOP/COEP headers required (serve.sh; itch = SharedArrayBuffer checkbox). Pin Emscripten (4.0.20 known-good).</li>
@@ -468,7 +468,7 @@ fslp_verdict MYGAME</pre>
 <h3>Process / tooling</h3>
 <ul>
 <li>Editor reload builds race CLI builds — PID-scoped temps fixed it, but gates still want the game's editor closed (auto-save can stomp the tree: check lsof on mystery reverts).</li>
-<li>CONSUMER core path: an addon-layout project loads the CORE from <code>addons/odin_godot/bin/&lt;platform&gt;/</code> — build_scripts.sh's <code>res://bin/</code> core output is unused there. Kit-CORE changes must land in the addon bin (kit/play/scriptgen changes ride the scripts dll and don't).</li>
+<li>CONSUMER core path: an addon-layout project loads the CORE from <code>addons/odin_godot/bin/&lt;platform&gt;/</code> — build_scripts.sh now detects the layout and publishes the core there automatically (kit/play/scriptgen changes ride the scripts dll and never needed this).</li>
 <li>build_scripts.sh publishes atomically (temp + mv) — an interrupted rebuild never removes the previous dll. Deleted .odin files: the deletion probe sweeps orphan .gen.odin every ~2s.</li>
 <li>Working directory persists across shell calls — background launches inherit the LAST cd; write multi-line commands with the cd on its own line.</li>
 <li>Verdicts from literal log lines, not exit codes (a FAIL run can exit 0). Count retry attempts (<code>grep -c attempt</code>) — retries mask flakes.</li>
@@ -480,9 +480,9 @@ fslp_verdict MYGAME</pre>
 <h3>Kit-specific traps</h3>
 <ul>
 <li>Block imports: alias and bare both compose (bare resolves via the package clause). Pre-2026-07 scriptgen skipped bare-import embeds silently — alias there.</li>
-<li>xfer default tag collides with your session tags — pick explicit tag bytes (comms 0, fire 1, xfer 2, vault 3…).</li>
+<li>App-tag collisions are LOUD now — session_app_route asserts when a tag is re-routed to a different handler (same-route re-registration stays legal). Still pick explicit tag bytes (comms 0, fire 1, xfer 2, vault 3…).</li>
 <li>comms_destroy before session; Ev_Line.text and session_blob return VIEWS — copy to keep.</li>
-<li>kick = session_kick + wire_drop (deferred — the kicked message must flush first).</li>
+<li>kick: <code>kboot.boot_kick(&b, player, ban)</code> does both halves (seat + deferred socket close after the kicked message flushes); hand-rolled = session_kick + wire_drop.</li>
 <li>steam lobby_joined fires for the host's own lobby (guard owner==me). Steam can't be verified headless — live checklist.</li>
 <li>Kit-source changes need the KIT suite re-run, not just the consumer's acid.</li>
 </ul>

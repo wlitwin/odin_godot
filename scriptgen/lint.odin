@@ -19,6 +19,7 @@ package scriptgen
 import "core:odin/ast"
 import "core:odin/parser"
 import "core:odin/tokenizer"
+import "core:strings"
 
 // Parse diagnostics stay silent (same rule as main's helper pass): a file that
 // doesn't parse is reported properly by `odin build` — never double-print.
@@ -122,4 +123,50 @@ lint_visit :: proc(node: ^ast.Node) -> bool {
 		}
 	}
 	return true
+}
+
+
+// THE METHOD TRAP, made loud. A class's proc scan covers its OWN home file
+// plus HEADERLESS helper files — so an attributed (or lifecycle-named) proc
+// whose receiver is a DIFFERENT script struct, written inside some class's
+// home file, binds to NOTHING: the home's scan rejects the receiver, and the
+// receiver's scan never visits another class's home. It compiles, connects,
+// and fails only when the signal actually fires (a day of dead shop-card
+// clicks). Named at build time instead. Plain cross-class helpers (no
+// attribute, no lifecycle name) are legitimate and stay silent.
+lint_misplaced :: proc(path, src, own: string, script_structs: map[string]bool) {
+	file := ast.File {
+		fullpath = path,
+		src      = src,
+	}
+	p := parser.default_parser()
+	p.err = lint_parse_diag
+	p.warn = lint_parse_diag
+	if !parser.parse_file(&p, &file) {return}
+	for decl in file.decls {
+		vd, ok := decl.derived.(^ast.Value_Decl)
+		if !ok || len(vd.names) != 1 || len(vd.values) != 1 {continue}
+		pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
+		if !is_proc || pl.type == nil || pl.type.params == nil || len(pl.type.params.list) == 0 {continue}
+		name_ident, _ := vd.names[0].derived.(^ast.Ident)
+		if name_ident == nil {continue}
+		t := strings.trim_space(node_text(src, pl.type.params.list[0].type))
+		if len(t) < 2 || t[0] != '^' {continue}
+		recv := t[1:]
+		if recv == own || !script_structs[recv] {continue}
+		attributed :=
+			has_attr(vd, "gd_method") ||
+			has_attr(vd, "gd_rpc") ||
+			has_attr(vd, "gd_command") ||
+			has_attr(vd, "gd_connect")
+		_, is_lc := lifecycle_keyword(strip_struct_prefix(name_ident.name, recv))
+		if !attributed && !is_lc {continue}
+		error_at(
+			Loc{path = path, line = name_ident.pos.line},
+			"%s takes ^%s but lives in %s's home file — it binds to NOTHING there (a class's scan covers its own file + headerless helpers only); move it to a headerless file",
+			name_ident.name,
+			recv,
+			own,
+		)
+	}
 }

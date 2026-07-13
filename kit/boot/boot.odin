@@ -35,6 +35,7 @@ package kit_boot
 import gd "godot:godot"
 import "godot:gdext"
 import kcomms "godot:kit/comms"
+import knet "godot:kit/net"
 import netgd "godot:kit/netgd"
 import ksess "godot:kit/session"
 import kui "godot:kit/ui"
@@ -284,6 +285,18 @@ boot_serve :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u6
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Serving on :%d", port))
 	kui.chat_show(&b.chat, true)
 	return true
+}
+
+// The WHOLE kick: seat revoked + socket closed AFTER the kicked message
+// flushes — session_kick alone leaves the transport open, and every game
+// hand-rolled the second half (or forgot it: the ghost stayed seated on the
+// wire). ban=true also shuts the token out for the rest of the run.
+boot_kick :: proc(b: ^Boot, player: knet.Player_Id, ban := false) -> bool {
+	seat, ok := ksess.session_kick(b.ses, player, ban)
+	if ok {
+		netgd.wire_drop(&b.wire, seat)
+	}
+	return ok
 }
 
 // The Join button. An unreachable host resolves later as Ev_Join_Failed.

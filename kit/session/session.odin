@@ -317,6 +317,16 @@ App_Route :: struct {
 // traffic flows (routes survive session_host_start/client_start/host_resume).
 session_app_route :: proc(s: ^Session, tag: u8, user: rawptr, handler: App_Handler) {
 	assert(int(tag) < MAX_APP_TAGS)
+	// A tag collision is LOUD: two subsystems on one tag silently steal each
+	// other's packets (kxfer's default tag once landed on a game's own tag).
+	// The HANDLER proc identifies the subsystem — re-registering the same
+	// handler stays legal (re-init builds fresh structs, so the user pointer
+	// changes), and a nil handler is an explicit UNROUTE (comms_destroy).
+	prev := s.app[tag]
+	assert(
+		handler == nil || prev.handler == nil || prev.handler == handler,
+		"session_app_route: tag already routed to a different handler — pick distinct tag bytes",
+	)
 	s.app[tag] = App_Route{user = user, handler = handler}
 }
 

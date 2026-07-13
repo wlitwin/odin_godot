@@ -446,4 +446,36 @@ grep -q "offset_of(type_of(Pawn{}.health), max)" "$hgen" || fail "health.max mus
 grep -q "offset_of(type_of(Pawn{}.health), seen)" "$hgen" && fail "the Edge scratch must stay OFF the wire"
 grep -q "_CMD_" "$hgen" && fail "a verb-free block must hoist NO commands"
 
+# ---- fixture 14: THE METHOD TRAP is a build error -------------------------------
+# An attributed proc receiving a DIFFERENT script struct, written in a class's
+# HOME file, used to bind to nothing SILENTLY (dead shop-card clicks for a day).
+# scriptgen must now refuse the build and say where to move it.
+mt="$work/methodtrap"
+mkdir -p "$mt"
+cat >"$mt/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Game
+package methodtrap
+import gd "godot:godot"
+
+Game :: struct {
+	owner: gd.Node,
+}
+ODIN
+cat >"$mt/panel.odin" <<'ODIN'
+//gd:extends Control
+//gd:class Panel
+package methodtrap
+import gd "godot:godot"
+
+Panel :: struct {
+	owner: gd.Control,
+}
+
+@(gd_method)
+game_on_click :: proc(self: ^Game) {} // ^Game method in Panel's home = the trap
+ODIN
+if "$SGEN" "$mt" -godot:"$ROOT" >"$mt/out.log" 2>&1; then fail "a ^Game @(gd_method) in Panel's home file must FAIL the build"; fi
+grep -q "binds to NOTHING" "$mt/out.log" || fail "the method-trap error must name the fix (move to a headerless file)"
+
 echo "SCRIPTGEN_OK"

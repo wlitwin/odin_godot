@@ -61,6 +61,19 @@ wire_attach :: proc(wire: ^Session_Wire, node: gd.Node, ses: ^ksess.Session, kin
 	wire.ses = ses
 	wire.kind = kind
 	ksess.session_set_transport(ses, wire, wire_send)
+	// WEB: core:time is stuck inside the wasm module — every knet pacer and
+	// ticker freezes on it. Swap the toolkit clock for the engine's before
+	// anything reads it (native keeps the core:time path untouched).
+	when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+		knet.set_clock(web_clock)
+	}
+}
+
+when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	@(private = "file")
+	web_clock :: proc "contextless" () -> f64 {
+		return f64(gd.time_get_ticks_usec(gd.singleton_time())) / 1e6
+	}
 }
 
 @(private = "file")

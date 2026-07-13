@@ -17,10 +17,23 @@ import "core:time"
 
 DEFAULT_TICK_HZ :: 20
 
+// The clock is SWAPPABLE once at boot, for platforms where core:time is
+// broken: in the wasm module time.tick_now is STUCK, which froze every
+// pacer and ticker (a gun that shot once and never again — each web game
+// rediscovered it). netgd installs a Godot-backed clock on web targets;
+// native never calls this, and headless kit tests see the nil default.
+@(private = "file")
+g_now: proc "contextless" () -> f64
+
+set_clock :: proc "contextless" (clock: proc "contextless" () -> f64) {
+	g_now = clock
+}
+
 // Monotonic seconds — THE clock the toolkit's time-taking APIs expect
 // (session_tick, php overlays, confirm-latency math). Every game was
 // writing this exact proc; it lives here now.
 now_s :: proc "contextless" () -> f64 {
+	if g_now != nil {return g_now()}
 	return f64(time.tick_now()._nsec) / 1e9
 }
 

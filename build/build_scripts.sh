@@ -117,7 +117,23 @@ fi
 
 # 4. Build the core ScriptLanguageExtension dll (same atomic temp+mv publish as the scripts
 #    dlls above, so a failed/interrupted core build never deletes the live core dll either).
+# CONSUMER LAYOUT: an addon install's .gdextension loads the core from
+# addons/odin_godot/bin/<platform>/ — a core built to the project's bin/ is
+# dead weight there (a fixed core "didn't take" for a full debugging hour).
+# Publish the core where the manifest actually points.
 CORE_DLL="$BIN/libodin_godot.$DLL_EXT"
+if [[ "$ROOT" == */addons/odin_godot ]]; then
+    case "$DLL_EXT" in
+        dylib) CORE_PLAT=macos ;;
+        so)    CORE_PLAT=linux ;;
+        dll)   CORE_PLAT=windows ;;
+        *)     CORE_PLAT="" ;;
+    esac
+    if [[ -n "$CORE_PLAT" ]]; then
+        mkdir -p "$ROOT/bin/$CORE_PLAT"
+        CORE_DLL="$ROOT/bin/$CORE_PLAT/libodin_godot.$DLL_EXT"
+    fi
+fi
 atomic_odin_dll "$ROOT/core" "$CORE_DLL" -debug
 
 echo "Built:"

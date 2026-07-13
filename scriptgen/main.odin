@@ -942,6 +942,18 @@ main :: proc() {
 	for &pend in pending {script_structs[pend.script.struct_name] = true}
 	for l in lintable {lint_handles(l.path, l.src, script_structs)}
 
+	// THE METHOD TRAP lint: inside a class's HOME file, an attributed or
+	// lifecycle-named proc receiving a DIFFERENT script struct binds to
+	// nothing — name it at build time with the move-it instruction.
+	home := make(map[string]string) // script home path -> its struct name
+	defer delete(home)
+	for &pend in pending {home[pend.script.path] = pend.script.struct_name}
+	for l in lintable {
+		if own, is_home := home[l.path]; is_home {
+			lint_misplaced(l.path, l.src, own, script_structs)
+		}
+	}
+
 	// Generate, now that every file's contribution is in (validation too — a
 	// @(gd_command) found in a helper still needs its class's replicate/net_id).
 	for &pend in pending {
