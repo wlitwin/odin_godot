@@ -71,6 +71,10 @@ TESTS=(
     # Pure-Odin unit tests for kit/net — the friendslop toolkit's replication core
     # (wire, shadow-copy deltas, intent pipeline + dedup, tick/clock sync, interp).
     "kitnet|KITNET_OK|tests/kitnet/run.sh"
+    # Pure-Odin unit tests for kit/sim — the server-authority resim companion's
+    # engine-free core (predict subset, history ledger, input pipeline + hold-last,
+    # sim ticker/lead control, the compare -> rewind -> replay reconcile).
+    "kitsim|KITSIM_OK|tests/kitsim/run.sh"
     # Pure-Odin unit tests for kit/session — player identity (reconnect tokens ->
     # stable Player_Ids), join/leave/reconnect, roster sync, zombie takeover.
     "kitsession|KITSESSION_OK|tests/kitsession/run.sh"

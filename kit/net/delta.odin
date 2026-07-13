@@ -42,6 +42,11 @@ Field_Flag :: enum u8 {
 	Interp,       // remote peers interpolate this field (stream sampling lerps it)
 	Owner_Stream, // owner-authoritative: travels ONLY via streams + full snapshots,
 	              // NEVER in authority delta batches (diff_mask skips it)
+	Predicted,    // server-sim-authoritative (kit/sim): travels ONLY via tick-stamped
+	              // snapshots + full snapshots, NEVER in delta batches — the third
+	              // lane, disjoint from the other two the same way at the mask level.
+	              // Mutually exclusive with .Owner_Stream: a field is predicted-and-
+	              // reconciled or owner-streamed, never both.
 }
 
 Field_Flags :: bit_set[Field_Flag; u8]
@@ -241,10 +246,16 @@ shadow_make :: proc(desc: ^Entity_Desc, allocator := context.allocator) -> []u8 
 // peer (the host SAMPLES those fields locally, which would re-dirty them each
 // tick). Excluding them at the mask level makes deltas and streams disjoint by
 // construction.
+//
+// PREDICTED FIELDS ARE EXCLUDED THE SAME WAY: they travel via kit/sim's
+// tick-stamped snapshot lane and are reconciled by rollback+resim on clients —
+// a reliable delta landing on one would stomp a client's prediction outside
+// the reconcile (no tick stamp, no history note, no replay). Same rule, third
+// lane: the tag decides the wire, and the wires can never fight over a field.
 diff_mask :: proc(entity: rawptr, shadow: []u8, desc: ^Entity_Desc) -> (mask: u64) {
 	off := 0
 	for f, i in desc.fields {
-		if .Owner_Stream not_in f.flags {
+		if .Owner_Stream not_in f.flags && .Predicted not_in f.flags {
 			ep := ([^]u8)(field_ptr(entity, f))
 			if mem.compare(ep[:f.size], shadow[off:off + f.size]) != 0 {
 				mask |= 1 << u64(i)
