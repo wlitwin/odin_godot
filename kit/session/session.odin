@@ -357,18 +357,24 @@ session_app_begin :: proc(s: ^Session, tag: u8) -> ^knet.Writer {
 }
 
 // Ship the message started by session_app_begin. `to_peer` is a transport
-// peer (HOST_PEER, a seated player's peer, or BROADCAST_PEER).
-session_app_flush :: proc(s: ^Session, to_peer: Peer_Id) {
-	s.send(s.send_user, to_peer, knet.writer_bytes(&s.app_w), .Reliable)
+// peer (HOST_PEER, a seated player's peer, or BROADCAST_PEER). `channel`
+// defaults to reliable — the right lane for anything event-shaped or that a
+// consumer must not miss. Pass .Stream ONLY for tick-stamped, self-
+// superseding payloads where the next send makes a lost one worthless
+// (kit/sim's inputs and snapshot batches — the first taker): the receive
+// side routes both channels identically, but nothing re-delivers a dropped
+// .Stream message and nothing orders it against the reliable lane.
+session_app_flush :: proc(s: ^Session, to_peer: Peer_Id, channel: Channel = .Reliable) {
+	s.send(s.send_user, to_peer, knet.writer_bytes(&s.app_w), channel)
 }
 
-// Ship app payload bytes under `tag` on the reliable channel — the one-call
-// form when the payload already exists as a slice (begin/flush avoids the
-// extra copy when you are building it anyway).
-session_app_send :: proc(s: ^Session, to_peer: Peer_Id, tag: u8, bytes: []u8) {
+// Ship app payload bytes under `tag` — the one-call form when the payload
+// already exists as a slice (begin/flush avoids the extra copy when you are
+// building it anyway). Same channel rule as session_app_flush.
+session_app_send :: proc(s: ^Session, to_peer: Peer_Id, tag: u8, bytes: []u8, channel: Channel = .Reliable) {
 	w := session_app_begin(s, tag)
 	append(&w.buf, ..bytes)
-	session_app_flush(s, to_peer)
+	session_app_flush(s, to_peer, channel)
 }
 
 // Ship app payload bytes to a PLAYER — resolves the seat on the authority, so
