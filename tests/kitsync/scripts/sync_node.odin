@@ -185,7 +185,8 @@ sync_node_on_packet :: proc(self: ^SyncNode, id: gd.Int, packet: gd.Packed_Byte_
 			gd.print_str(fmt.tprintf("SYNC_CMD_DUP seq=%d", u32(h.seq)))
 			return
 		}
-		ok := knet.command_execute(self, &sync_node_command_set, h.cmd, &r)
+		env := knet.Command_Env{authority = true, by = knet.Player_Id(id)}
+		ok := knet.command_execute(self, &sync_node_command_set, h.cmd, &r, &env)
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
 		knet.write_u8(&w, MSG_RESULT)

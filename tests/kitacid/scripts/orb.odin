@@ -13,6 +13,7 @@ package kitacid_scripts
 
 import gd "godot:godot"
 import knet "godot:kit/net"
+import "core:fmt"
 
 Orb :: struct {
 	owner:   gd.Node,
@@ -23,11 +24,22 @@ Orb :: struct {
 }
 
 // Spend stamina to strike: authoritative on the host, predicted on the issuing
-// client, replicated to everyone else — the SAME proc everywhere.
+// client, replicated to everyone else — the SAME proc everywhere. Results after
+// the applied bool are the verb's PAYLOAD: in-process facts handed to the
+// consequence below, never wire bytes.
 @(gd_command = "predict")
-orb_strike :: proc(self: ^Orb, cost: i32) -> bool {
-	if self.stamina < cost {return false}
+orb_strike :: proc(self: ^Orb, cost: i32) -> (ok: bool, dealt: i32) {
+	if self.stamina < cost {return false, 0}
 	self.stamina -= cost
 	self.hp -= cost * 2
-	return true
+	return true, cost * 2
+}
+
+// The strike's consequence — the name-paired, typed "and then…": fires ONCE,
+// on the AUTHORITY, after the verb applies, with the issuer + wire args +
+// payload. Predictions, replays, rejections, and retransmits never reach it —
+// the acid greps exactly two ACID_THEN lines on the server and ZERO on the
+// clients, under injected latency.
+orb_strike_then :: proc(self: ^Orb, by: knet.Player_Id, cost: i32, dealt: i32) {
+	gd.print_str(fmt.tprintf("ACID_THEN cost=%d dealt=%d hp=%d by_ok=%v", cost, dealt, self.hp, by != knet.PLAYER_ID_INVALID))
 }

@@ -14,7 +14,8 @@ class, custom resources, autoloads, `@tool`/editor plugins, multiplayer RPCs, ho
 > and the Asset-Library drop-in layout), plus 7 browser-gated web tests that verify the WASM
 > export in a real headless Chrome when one is available. The headline examples are a pure-Odin coin-collector
 > (`tests/showcase/`), a complete top-down arena shooter (`examples/survivors/`), and a
-> peer-authoritative co-op arena (`examples/coop_arena/`) — **zero GDScript gameplay code**.
+> drop-in co-op cave crawler on the friendslop multiplayer toolkit
+> (`examples/cavecrawl/`) — **zero GDScript gameplay code**.
 
 ## What you can do (the 60-second tour)
 
@@ -58,7 +59,7 @@ matter:
 | **Methods** | `@(gd_method)` — callable from GDScript, as signal targets, and **typed cross-script** (`rt.script_of`) |
 | **Classes** | `extends` any engine class, global `class_name`, custom **resources** (`.tres`), **autoload** singletons |
 | **Editor** | `@tool` scripts, `gd.is_editor()`, custom icons, **EditorPlugin**, live error squiggles + autocomplete |
-| **Multiplayer** | `@(gd_rpc)` annotations mirroring GDScript's `@rpc` |
+| **Multiplayer** | the [friendslop co-op toolkit](docs/kit/index.md): `gd:"replicate"` fields, predicted commands + `_then` consequences, generated entity factories, drop-in join, reconnect, host migration — plus `@(gd_rpc)` mirroring GDScript's `@rpc` for the engine-native path |
 | **Ship it** | hot reload on save, native desktop export, WebAssembly export |
 | **Scale it** | opt-in [script modules](docs/modules.md) — one dll per `res://modules/<name>`, rebuilt + hot-swapped independently so save latency stays flat in large projects |
 
@@ -107,11 +108,30 @@ script from empty file to a moving node.
 
 ## Examples
 
+**Building multiplayer? Start with the [friendslop toolkit](docs/kit/index.md)** — these
+three are its references:
+
+- **`examples/cavecrawl/`** — THE co-op reference: a drop-in-join cave crawler exercising
+  every toolkit package (replicated fields, predicted commands + `_then` consequences,
+  generated entity factory, reconnect, save/resume, host migration, Steam), grown
+  brick-by-brick with a latency-injected acid test.
+- **`examples/slopball/`** — the smallest complete kit game: a physics co-op ball pitch
+  (~850 lines), engine physics replicated through `play.Puppet`. Start here to see the
+  whole multiplayer surface in one sitting.
+- **`examples/slopball3d/`** — the same pitch in 3D: proof the toolkit's model is
+  dimension-blind (`play.Puppet3`, Node3D containers).
+
+Single-player and engine-plumbing references:
+
 - **`examples/survivors/`** — a complete top-down arena shooter in pure Odin; each script is
-  commented to teach one slice of the binding ([README](examples/survivors/README.md)).
-- **`examples/coop_arena/`** — the canonical co-op / multiplayer reference: ONE
-  peer-authoritative codebase that runs single-player, over native ENet, and in the browser
-  over WebRTC (room-code lobby) ([README](examples/coop_arena/README.md)).
+  commented to teach one slice of the binding ([README](examples/survivors/README.md)). Its
+  net layer uses the ENGINE-NATIVE path (`MultiplayerSpawner`/`@(gd_rpc)`) — kept as the
+  GDScript-parity demonstration, not the recommended way to build co-op (that's the kit).
+- **`examples/coop_arena/`** — the engine-native multiplayer path end-to-end: ONE
+  peer-authoritative codebase over `MultiplayerSynchronizer` + `@(gd_rpc)` that runs
+  single-player, over native ENet, and in the browser over WebRTC (room-code lobby)
+  ([README](examples/coop_arena/README.md)). Predates the friendslop toolkit; it shows the
+  raw engine surface the kit absorbs.
 - **`tests/showcase/`** — a minimal pure-Odin coin-collector; the smallest "everything wired"
   scene. Run it: `$GODOT --path tests/showcase`.
 - **`examples/hello/`** — the lowest-level path: a hand-registered GDExtension class (not a

@@ -471,7 +471,7 @@ CMD_ADD :: u16(0) // predicted; rejects when state == 9 ("locked")
 CMD_TORN :: u16(1) // hostile: mutates BEFORE rejecting — restore must undo it
 CMD_MARK :: u16(2) // non-predicted host-only action
 
-probe_cmd_add :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+probe_cmd_add :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
 	p := cast(^Probe)entity
 	amount := knet.read_i32(r)
 	if r.err {return false}
@@ -480,14 +480,14 @@ probe_cmd_add :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
 	return true
 }
 
-probe_cmd_torn :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+probe_cmd_torn :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
 	p := cast(^Probe)entity
 	p.hp = -999
 	p.x = -999
 	return false // "false = no mutation" must be enforced by the framework, not trusted
 }
 
-probe_cmd_mark :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+probe_cmd_mark :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
 	p := cast(^Probe)entity
 	p.state = knet.read_u8(r)
 	return !r.err
@@ -523,7 +523,8 @@ host_handle :: proc(host: ^Probe, set: ^knet.Command_Set, hctx: ^knet.Command_Ct
 	if !knet.command_dedup(hctx, peer, h.seq) {
 		return false
 	}
-	ok := knet.command_execute(host, set, h.cmd, &r)
+	env := knet.Command_Env{authority = true, user = hctx.game_user, by = knet.Player_Id(peer)}
+	ok := knet.command_execute(host, set, h.cmd, &r, &env)
 	knet.command_result_write(result, h, ok, host, set)
 	return true
 }
@@ -645,7 +646,8 @@ command_execute_restores_torn_state :: proc(t: ^testing.T) {
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	r := knet.reader_make(knet.writer_bytes(&w)) // no args
-	testing.expect(t, !knet.command_execute(&host, &set, CMD_TORN, &r))
+	env := knet.Command_Env{authority = true}
+	testing.expect(t, !knet.command_execute(&host, &set, CMD_TORN, &r, &env))
 	testing.expect_value(t, host.hp, i32(42))
 	testing.expect_value(t, host.x, f32(1))
 
@@ -691,6 +693,82 @@ command_dedup_replay_executes_once :: proc(t: ^testing.T) {
 	testing.expect_value(t, host.hp, i32(20))
 }
 
+// ---- consequence pairing (`<verb>_then`) ---------------------------------------
+//
+// probe_cmd_loot mirrors what scriptgen emits for a verb with a payload return
+// and a name-paired consequence:
+//   probe_loot :: proc(self: ^Probe, amount: i32) -> (ok: bool, total: i32)
+//   probe_loot_then :: proc(game: ^Then_Log, self: ^Probe, by: knet.Player_Id, amount: i32, total: i32)
+
+Then_Log :: struct {
+	fires: int,
+	by:    knet.Player_Id,
+	got:   i32,
+}
+
+probe_loot_then :: proc(game: ^Then_Log, self: ^Probe, by: knet.Player_Id, amount: i32, total: i32) {
+	game.fires += 1
+	game.by = by
+	game.got = total
+}
+
+probe_cmd_loot :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
+	self := cast(^Probe)entity
+	_a0 := knet.read_i32(r)
+	if r.err {return false}
+	_ok, _p0 := true, i32(0)
+	if self.state == 9 {
+		_ok = false
+	} else {
+		self.hp += _a0
+		_p0 = self.hp
+	}
+	if _ok && env.authority {
+		probe_loot_then(cast(^Then_Log)env.user, self, env.by, _a0, _p0)
+	}
+	return _ok
+}
+
+@(test)
+command_then_fires_on_authority_only :: proc(t: ^testing.T) {
+	desc := probe_desc()
+	cmds := [?]knet.Command_Desc{{name = "loot", predict = true, invoke = probe_cmd_loot}}
+	set := knet.Command_Set{entity_desc = &desc, commands = cmds[:]}
+
+	log := Then_Log{}
+	host := Probe{hp = 10}
+	client := Probe{hp = 10}
+	cap := Capture{}
+	defer capture_destroy(&cap)
+	cctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&cctx)
+	cctx.send = capture_send
+	cctx.send_user = &cap
+	cctx.me = knet.Player_Id(42)
+	// Deliberately NO cctx.game_user: a predicted run must never reach for it.
+	hctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&hctx)
+	hctx.game_user = &log
+
+	knet.command_begin(&cctx, knet.Net_Id(1), 0)
+	knet.write_i32(&cctx.msg, 5)
+	testing.expect(t, knet.command_issue(&cctx, &client, &set, 0), "prediction applies")
+	testing.expect_value(t, client.hp, i32(15))
+	testing.expect_value(t, log.fires, 0) // on spec: the consequence stays quiet
+
+	result := knet.writer_make()
+	defer knet.writer_destroy(&result)
+	testing.expect(t, host_handle(&host, &set, &hctx, 7, cap.msgs[0], &result))
+	testing.expect_value(t, host.hp, i32(15))
+	testing.expect_value(t, log.fires, 1) // once, on the authority
+	testing.expect_value(t, log.by, knet.Player_Id(7)) // attributed to the resolved sender
+	testing.expect_value(t, log.got, i32(15)) // the verb's payload, not a scratch field
+
+	// A retransmit is deduped before execution: the consequence can't double-fire.
+	testing.expect(t, !host_handle(&host, &set, &hctx, 7, cap.msgs[0], &result))
+	testing.expect_value(t, log.fires, 1)
+}
+
 @(test)
 command_malformed_input_rejects :: proc(t: ^testing.T) {
 	desc := probe_desc()
@@ -702,12 +780,13 @@ command_malformed_input_rejects :: proc(t: ^testing.T) {
 	defer knet.writer_destroy(&w)
 	knet.write_u16(&w, 0xFF) // 2 bytes where read_i32 wants 4
 	r := knet.reader_make(knet.writer_bytes(&w))
-	testing.expect(t, !knet.command_execute(&host, &set, CMD_ADD, &r))
+	env := knet.Command_Env{authority = true}
+	testing.expect(t, !knet.command_execute(&host, &set, CMD_ADD, &r, &env))
 	testing.expect_value(t, host.hp, i32(10))
 
 	// Unknown command index from a hostile/mismatched peer: rejected, no panic.
 	r2 := knet.reader_make(nil)
-	testing.expect(t, !knet.command_execute(&host, &set, 200, &r2))
+	testing.expect(t, !knet.command_execute(&host, &set, 200, &r2, &env))
 }
 
 @(test)

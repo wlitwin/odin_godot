@@ -85,7 +85,7 @@ now_s :: proc "contextless" () -> f64 {
 
 // THE session glue a game writes: prefix our kind byte, pick the channel.
 @(private = "file")
-session_send :: proc(user: rawptr, to_peer: int, bytes: []u8, channel: ksess.Channel) {
+session_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
 	self := cast(^AcidSession)user
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
@@ -93,9 +93,9 @@ session_send :: proc(user: rawptr, to_peer: int, bytes: []u8, channel: ksess.Cha
 	append(&w.buf, ..bytes)
 	err: gd.Error
 	if channel == .Stream {
-		err = netgd.send_stream(self.owner, to_peer, knet.writer_bytes(&w))
+		err = netgd.send_stream(self.owner, int(to_peer), knet.writer_bytes(&w))
 	} else {
-		err = netgd.send_reliable(self.owner, to_peer, knet.writer_bytes(&w))
+		err = netgd.send_reliable(self.owner, int(to_peer), knet.writer_bytes(&w))
 	}
 	if err != .Ok {
 		gd.print_str(fmt.tprintf("ACID_ERR session send err=%v", err))
@@ -267,7 +267,7 @@ drain_events :: proc(self: ^AcidSession, now: f64) {
 	for {
 		ev, ok := ksess.session_poll(&self.ses)
 		if !ok {break}
-		switch e in ev {
+		#partial switch e in ev {
 		case ksess.Ev_Welcomed:
 			gd.print_str(fmt.tprintf("ACID_SEATED me=%d", u64(e.me)))
 		case ksess.Ev_Spawned:
@@ -398,7 +398,7 @@ route_packet :: proc(self: ^AcidSession, from: int, data: []u8) {
 	r := knet.reader_make(data)
 	switch knet.read_u8(&r) {
 	case MSG_SESSION:
-		ksess.session_handle_packet(&self.ses, from, &r)
+		ksess.session_handle_packet(&self.ses, ksess.Peer_Id(from), &r)
 	case MSG_DONE:
 		self.dones += 1
 	case:

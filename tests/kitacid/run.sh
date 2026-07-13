@@ -39,7 +39,9 @@ mkdir -p "$LOGDIR"
 
 LATENCY_MS="${LATENCY_MS:-100}"
 
-bash "$ROOT/build/build_scripts.sh" "$PROJ"
+# A failed build MUST fail the test — without this the peers launch against a
+# stale dll and the whole acid silently proves yesterday's binary.
+bash "$ROOT/build/build_scripts.sh" "$PROJ" || { echo "KITACID_FAIL (scripts build)"; exit 1; }
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
 
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
@@ -108,6 +110,12 @@ attempt() {
 		|| { echo "  FAIL: host never executed strike 2"; ok=0; }
 	grep -qF "ACID_EXEC ok=false hp=84 st=2" "$slog" \
 		|| { echo "  FAIL: host never rejected the empty-stamina strike (state must be untouched)"; ok=0; }
+	grep -qF "ACID_THEN cost=4 dealt=8 hp=92 by_ok=true" "$slog" \
+		|| { echo "  FAIL: strike 1's consequence did not fire on the authority (issuer + wire args + payload)"; ok=0; }
+	grep -qF "ACID_THEN cost=4 dealt=8 hp=84 by_ok=true" "$slog" \
+		|| { echo "  FAIL: strike 2's consequence did not fire on the authority"; ok=0; }
+	[[ "$(grep -c "ACID_THEN" "$slog")" == "2" ]] \
+		|| { echo "  FAIL: the consequence must fire EXACTLY twice — never for the rejected strike or a retransmit"; ok=0; }
 	grep -qF "ACID_STREAM ok=true" "$slog" \
 		|| { echo "  FAIL: the HOST did not verify smooth sampled motion (it is a remote for owner streams)"; ok=0; }
 	grep -qF "ACID_PING ok=true" "$slog" \
@@ -137,6 +145,8 @@ attempt() {
 		|| { echo "  FAIL: owner scoreboard (strikes + measured ping) not verified"; ok=0; }
 	grep -q "ACID_STREAM" "$wlog" \
 		&& { echo "  FAIL: the owner sampled its own stream (it is authoritative for it)"; ok=0; }
+	grep -q "ACID_THEN" "$wlog" \
+		&& { echo "  FAIL: a PREDICTED strike fired its consequence on the issuing client"; ok=0; }
 	grep -q "OWNER_DONE" "$wlog" || { echo "  FAIL: owner did not finish cleanly"; ok=0; }
 
 	# ---- observer: converges with ZERO role-specific code ----
@@ -157,6 +167,8 @@ attempt() {
 		|| { echo "  FAIL: observer scoreboard (strikes + measured ping) not verified"; ok=0; }
 	grep -q "ACID_ISSUE" "$olog" \
 		&& { echo "  FAIL: the observer issued a command?!"; ok=0; }
+	grep -q "ACID_THEN" "$olog" \
+		&& { echo "  FAIL: the observer fired a consequence?!"; ok=0; }
 	grep -q "OBSERVER_DONE" "$olog" || { echo "  FAIL: observer did not finish cleanly"; ok=0; }
 
 	# ---- backup hosting: exactly ONE client holds the re-hostable snapshot ----

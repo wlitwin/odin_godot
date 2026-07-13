@@ -1,13 +1,16 @@
 package cavecrawl_scripts
 
-// The world: entity nodes, the spawn factory, and the interact prompt. The
-// session announces WHAT exists; this file decides what that looks like on
-// this screen (a scene per entity type) and keeps the by-type maps every
-// other file navigates with.
+// The world: the entity census and the interact prompt. The session
+// announces WHAT exists; the GENERATED factory table (each scene field's
+// `entity=Name:id` tag in cavecrawl.odin) decides what that looks like —
+// instantiate the scene, free the node, keep the id→node ledger. What's left
+// here is the genuinely game-shaped half: the typed *_spawned/*_freed hooks
+// that keep the by-type maps every other file navigates with.
 
 import gd "godot:godot"
 import rt "godot:runtime"
 import kai "godot:kit/ai"
+import kboot "godot:kit/boot"
 import kcomms "godot:kit/comms"
 import kfx "godot:kit/fx"
 import kinter "godot:kit/interact"
@@ -17,108 +20,78 @@ import ksess "godot:kit/session"
 import kui "godot:kit/ui"
 import "core:fmt"
 
-// Instantiate one of the game's AUTHORED entity scenes (the exported slots
-// cave.tscn assigns) under the world node. The scene root carries the
-// entity's .odin script; children (glyphs, particles, future sprites and
-// collision) are the editor's department.
-spawn_scene :: proc(self: ^CaveLobby, scene: ^gd.Resource) -> gd.Node {
-	node := gd.instantiate(cast(gd.Packed_Scene)scene)
-	gd.add_child(self.boot.world, node)
-	return node
-}
+// ---- the census: name-paired spawn/free hooks (fired by the kboot driver;
+// ---- spawn-time fields are NOT set yet — dressing belongs on Ev_Spawned) ----
 
-@(private = "file")
-track_spelunker :: proc(self: ^CaveLobby, id: knet.Net_Id, sp: ^Spelunker, owner: knet.Player_Id) {
-	sp.net_id = id
-	self.spelunkers[id] = sp
+spelunker_spawned :: proc(game: ^CaveLobby, self: ^Spelunker, id: knet.Net_Id, owner: knet.Player_Id) {
+	game.spelunkers[id] = self
 	if owner != knet.PLAYER_ID_INVALID {
-		self.avatar_of[owner] = id
-		if owner == self.ses.me {
-			self.me_spel = sp
+		game.avatar_of[owner] = id
+		if owner == game.ses.me {
+			game.me_spel = self
 		}
 	}
 }
 
-// The session announces a spawn by type: make the node, hand back the struct
-// and its generated command set. This runs on CLIENTS (and on resume).
-cave_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (rawptr, ^knet.Command_Set) {
-	self := cast(^CaveLobby)user
-	switch type {
-	case SPEL_TYPE:
-		node := spawn_scene(self, self.spelunker_scene)
-		self.nodes[id] = node
-		sp := rt.script_of(node, Spelunker)
-		track_spelunker(self, id, sp, owner)
-		return sp, &spelunker_command_set
-	case PICKUP_TYPE:
-		node := spawn_scene(self, self.pickup_scene)
-		self.nodes[id] = node
-		p := rt.script_of(node, Pickup)
-		p.net_id = id
-		self.pickups[id] = p
-		return p, &pickup_command_set
-	case RELIC_TYPE:
-		node := spawn_scene(self, self.relic_scene)
-		self.nodes[id] = node
-		rl := rt.script_of(node, Relic)
-		self.relic = rl
-		self.relic_id = id
-		return rl, &relic_command_set
-	case DWELLER_TYPE:
-		node := spawn_scene(self, self.dweller_scene)
-		self.nodes[id] = node
-		d := rt.script_of(node, Dweller)
-		d.net_id = id
-		self.dwellers[id] = d
-		return d, &dweller_command_set
-	case CHEST_TYPE:
-		node := spawn_scene(self, self.chest_scene)
-		self.nodes[id] = node
-		c := rt.script_of(node, Chest)
-		c.net_id = id
-		self.chests[id] = c
-		return c, &chest_command_set
-	case DOOR_TYPE:
-		node := spawn_scene(self, self.door_scene)
-		self.nodes[id] = node
-		d := rt.script_of(node, Door)
-		d.net_id = id
-		self.doors[id] = d
-		return d, &door_command_set
-	case LEVEL_TYPE:
-		node := spawn_scene(self, self.level_scene)
-		self.nodes[id] = node
-		lv := rt.script_of(node, Level)
-		lv.net_id = id
-		self.level = lv
-		return lv, &level_command_set
-	}
-	return nil, nil
+spelunker_freed :: proc(game: ^CaveLobby, self: ^Spelunker, id: knet.Net_Id) {
+	delete_key(&game.spelunkers, id)
 }
 
-cave_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
-	self := cast(^CaveLobby)user
-	// A despawned dweller was slain — its node is gone this frame, so the
-	// death burst is parented to the world, not the corpse.
-	if dw, was_dweller := self.dwellers[id]; was_dweller {
-		fx_burst_at(self, dw.x, dw.y, {0.8, 0.4, 1, 1})
+chest_spawned :: proc(game: ^CaveLobby, self: ^Chest, id: knet.Net_Id, owner: knet.Player_Id) {
+	game.chests[id] = self
+}
+
+chest_freed :: proc(game: ^CaveLobby, self: ^Chest, id: knet.Net_Id) {
+	delete_key(&game.chests, id)
+}
+
+door_spawned :: proc(game: ^CaveLobby, self: ^Door, id: knet.Net_Id, owner: knet.Player_Id) {
+	game.doors[id] = self
+}
+
+door_freed :: proc(game: ^CaveLobby, self: ^Door, id: knet.Net_Id) {
+	delete_key(&game.doors, id)
+}
+
+pickup_spawned :: proc(game: ^CaveLobby, self: ^Pickup, id: knet.Net_Id, owner: knet.Player_Id) {
+	game.pickups[id] = self
+}
+
+pickup_freed :: proc(game: ^CaveLobby, self: ^Pickup, id: knet.Net_Id) {
+	delete_key(&game.pickups, id)
+}
+
+dweller_spawned :: proc(game: ^CaveLobby, self: ^Dweller, id: knet.Net_Id, owner: knet.Player_Id) {
+	game.dwellers[id] = self
+}
+
+// A despawned dweller was slain — the hook runs BEFORE the node dies, so the
+// death burst still reads the corpse's position (parented to the world).
+dweller_freed :: proc(game: ^CaveLobby, self: ^Dweller, id: knet.Net_Id) {
+	fx_burst_at(game, self.x, self.y, {0.8, 0.4, 1, 1})
+	delete_key(&game.dwellers, id)
+	delete_key(&game.brains, id) // host-side mind (empty map on clients)
+}
+
+level_spawned :: proc(game: ^CaveLobby, self: ^Level, id: knet.Net_Id, owner: knet.Player_Id) {
+	game.level = self
+}
+
+level_freed :: proc(game: ^CaveLobby, self: ^Level, id: knet.Net_Id) {
+	if game.level == self {
+		game.level = nil
 	}
-	if node, ok := self.nodes[id]; ok {
-		gd.node_queue_free(node)
-		delete_key(&self.nodes, id)
-	}
-	delete_key(&self.spelunkers, id)
-	delete_key(&self.chests, id)
-	delete_key(&self.doors, id)
-	delete_key(&self.pickups, id)
-	delete_key(&self.dwellers, id)
-	delete_key(&self.brains, id) // host-side mind (empty map on clients)
-	if self.level != nil && self.level.net_id == id {
-		self.level = nil
-	}
-	if self.relic_id == id {
-		self.relic = nil
-		self.relic_id = 0
+}
+
+relic_spawned :: proc(game: ^CaveLobby, self: ^Relic, id: knet.Net_Id, owner: knet.Player_Id) {
+	game.relic = self
+	game.relic_id = id
+}
+
+relic_freed :: proc(game: ^CaveLobby, self: ^Relic, id: knet.Net_Id) {
+	if game.relic_id == id {
+		game.relic = nil
+		game.relic_id = 0
 	}
 }
 
@@ -265,7 +238,7 @@ cave_lobby_on_start :: proc(self: ^CaveLobby) {
 	i := 0
 	for _, p in self.ses.players {
 		if !p.connected {continue}
-		sep, sid := ksess.session_spawn_make(&self.ses, SPEL_TYPE, owner = p.id)
+		sep, sid := ksess.session_spawn_make(&self.ses, SPELUNKER_TYPE, owner = p.id)
 		sp := cast(^Spelunker)sep
 		sp.x = SPAWN_X + f32(i) * 60
 		sp.y = SPAWN_Y
@@ -297,10 +270,7 @@ cave_inscribe :: proc(self: ^CaveLobby) {
 // takeover (the backup snapshot respawns everything) and a rejoin (the new
 // host's SES_WORLD does). The registry's own teardown is session_init's.
 cave_wipe_local :: proc(self: ^CaveLobby) {
-	for _, node in self.nodes {
-		gd.node_queue_free(node)
-	}
-	clear(&self.nodes)
+	kboot.boot_entities_clear(&self.boot) // the driver's node ledger
 	clear(&self.spelunkers)
 	clear(&self.chests)
 	clear(&self.doors)

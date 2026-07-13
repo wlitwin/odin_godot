@@ -57,3 +57,18 @@ pawn_mark :: proc(self: ^Pawn, label: string, who: knet.Player_Id) -> bool {
 	self.state = 1
 	return true
 }
+
+// Payload verb + name-paired consequence: results after the applied bool are
+// in-process facts threaded into `pawn_loot_then` — fired on the AUTHORITY
+// only, with the issuer and the verb's own wire args. Entity-local shape
+// (no leading game param); the game-threaded shape is proven by the examples.
+@(gd_command = "predict")
+pawn_loot :: proc(self: ^Pawn, slot: i32) -> (ok: bool, got: u8) {
+	if self.state != 0 {return false, 0}
+	self.state = 1
+	return true, u8(slot)
+}
+
+pawn_loot_then :: proc(self: ^Pawn, by: knet.Player_Id, slot: i32, got: u8) {
+	self.hp += i32(got) // host-side consequence — an ordinary delta carries it
+}

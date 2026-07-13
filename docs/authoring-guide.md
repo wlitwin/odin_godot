@@ -132,7 +132,11 @@ float; `multiline` for a `gd.String`. **`array=ELEM`** (on a `gd.Array` field) a
 **`dict=KEY;VALUE`** (on a `gd.Dictionary` field) declare *typed* collections — the same
 Inspector editors GDScript's `Array[T]` / `Dictionary[K,V]` produce. Each element/key/value
 is a builtin (`int`, `float`, `String`, `Vector2`, `Color`, …) or a Resource class name
-(`Texture2D`, `PackedScene`, …). At most one hint per field. Example:
+(`Texture2D`, `PackedScene`, …). At most one hint per field. A PackedScene export may
+additionally carry **`entity=Name:id`** — a build-time declaration (the Inspector sees an
+ordinary export) that this scene bodies the wire entity `Name` under stable id `id`;
+scriptgen generates the multiplayer factory table from it ([kit/boot](kit/boot.md)'s
+`boot_entities`). Example:
 
 ```odin
 Probe :: struct {
@@ -384,6 +388,19 @@ target, use `gd.connect_to` from `_ready` instead. (`@(gd_connect)` requires the
 `-custom-attribute:gd_connect` build flag, which `build/build_scripts.sh` passes for you.)
 
 ## Multiplayer RPCs (`@(gd_rpc)`)
+
+> **Two multiplayer stories — pick before you read on.** This section is the
+> ENGINE-NATIVE surface: `@(gd_rpc)` mirroring GDScript's `@rpc`, plus the
+> `MultiplayerSpawner`/`MultiplayerSynchronizer` interop it enables — the right
+> tool for GDScript parity, porting an existing RPC design, or talking to
+> non-Odin peers. **Building a co-op game from scratch? Use the
+> [friendslop toolkit](kit/index.md) instead** — replicated struct fields,
+> predicted commands with typed `_then` consequences, generated entity
+> factories, drop-in join, reconnect, and host migration, with zero RPCs to
+> design. The [tutorial](kit/build-a-game-in-a-day.md) builds a whole co-op
+> game on it; `examples/cavecrawl` and `examples/slopball` are its references
+> (`examples/coop_arena` and `examples/survivors` demonstrate the raw path
+> below).
 
 Mark a `@(gd_method)` proc with `@(gd_rpc)` to expose it to Godot's high-level multiplayer,
 exactly like GDScript's `@rpc(...)` annotation. The annotation only declares the *config*;

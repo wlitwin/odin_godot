@@ -349,6 +349,9 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 			want_get = true
 		case "set":
 			want_set = true
+		case "entity":
+			// `entity=Name:id` — a BUILD-TIME declaration (scriptgen generates the
+			// kboot entity table from it); the Inspector sees an ordinary export.
 		case:
 			// Anything else is a hint spec (range/enum/multiline/file/resource/...).
 			if has_hint {

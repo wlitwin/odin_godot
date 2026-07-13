@@ -30,8 +30,10 @@ The transfer-mode aliases (`RELIABLE`, `UNRELIABLE_ORDERED`) and the raw send pr
 
 `Session_Wire` is the session's transport binding — the ~50 lines every game used to write
 by hand (the `Send_Proc` adapter with its kind byte + channel pick, the packet route, the
-engine's connection signals, the client's join handshake). It lives as a field on the game's
-script struct.
+engine's connection signals, the client's join handshake). In a stock game it lives inside
+[kit/boot](boot.md)'s `Boot` (`boot.wire` — `boot_attach` runs the `wire_attach`/
+`wire_listen` calls below for you); games that skip boot keep it as a field on the script
+struct and wire it directly.
 
 Godot signals **must land on `@(gd_method)`s of a script** — scriptgen only processes game
 scripts, so the kit cannot own the receiving methods. The contract: the game keeps four
@@ -112,6 +114,11 @@ code path on both transports; the branch ends the moment the multiplayer peer in
   keeps sending to a ghost.
 - Unwired `connection_failed`: a failed join hangs on "Joining..." with no way out. The same
   forward handles `server_disconnected` — treating a vanished server as host loss.
+
+A MISSPELLED forward is the same bug wearing a compile-clean coat, so scriptgen validates
+every literal method name passed to `wire_listen` / `listen_packets` (and `boot_attach`'s
+`methods`) against the script's registered `@(gd_method)`s — a typo is a build error; an
+empty string stays a deliberate skip.
 
 ## wire_receive and the kind byte
 

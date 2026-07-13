@@ -18,7 +18,7 @@ Bot :: struct {
 	x:  f32,
 }
 
-bot_cmd_poke :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+bot_cmd_poke :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
 	b := cast(^Bot)entity
 	amount := knet.read_i32(r)
 	if r.err {return false}

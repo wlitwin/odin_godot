@@ -48,13 +48,9 @@ REACH :: f32(40) // interaction reach in pixels — prompt AND host gate use it
 GEM :: kitems.Item_Id(1)
 TORCH :: kitems.Item_Id(2)
 
-SPEL_TYPE :: ksess.Entity_Type(1)
-CHEST_TYPE :: ksess.Entity_Type(2)
-DOOR_TYPE :: ksess.Entity_Type(3)
-PICKUP_TYPE :: ksess.Entity_Type(4)
-DWELLER_TYPE :: ksess.Entity_Type(5)
-LEVEL_TYPE :: ksess.Entity_Type(6)
-RELIC_TYPE :: ksess.Entity_Type(7)
+// (The SPELUNKER_TYPE..RELIC_TYPE wire-id consts are GENERATED now — each
+// scene field below declares its entity and stable id in its tag, and
+// scriptgen emits the consts + the factory table. See world.odin's hooks.)
 
 WALK_SPEED :: f32(120) // px/s
 
@@ -124,16 +120,19 @@ CaveLobby :: struct {
 	boot:      kboot.Boot, // lobby/chat/score/legend/wire/stage/world — kit-built, game-owned
 	running:   bool, // hosting or joining (transport is up)
 
-	// The authored entity scenes, assigned in cave.tscn's inspector — the
-	// factory instantiates these; the entity structs only tag what
-	// replicates. Bodies, particles, and layout live in the editor.
-	spelunker_scene: ^gd.Resource `gd:"export,resource=PackedScene"`,
-	chest_scene:     ^gd.Resource `gd:"export,resource=PackedScene"`,
-	door_scene:      ^gd.Resource `gd:"export,resource=PackedScene"`,
-	pickup_scene:    ^gd.Resource `gd:"export,resource=PackedScene"`,
-	dweller_scene:   ^gd.Resource `gd:"export,resource=PackedScene"`,
-	level_scene:     ^gd.Resource `gd:"export,resource=PackedScene"`,
-	relic_scene:     ^gd.Resource `gd:"export,resource=PackedScene"`,
+	// The authored entity scenes, assigned in cave.tscn's inspector. Each
+	// tag's `entity=Name:id` IS the factory declaration: the struct this
+	// scene bodies and its stable wire id — scriptgen generates the TYPE
+	// consts, the kind table, and the typed hooks' dispatch from these;
+	// kboot.boot_entities (ready(), below) drives it. Bodies, particles,
+	// and layout stay in the editor.
+	spelunker_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Spelunker:1"`,
+	chest_scene:     ^gd.Resource `gd:"export,resource=PackedScene,entity=Chest:2"`,
+	door_scene:      ^gd.Resource `gd:"export,resource=PackedScene,entity=Door:3"`,
+	pickup_scene:    ^gd.Resource `gd:"export,resource=PackedScene,entity=Pickup:4"`,
+	dweller_scene:   ^gd.Resource `gd:"export,resource=PackedScene,entity=Dweller:5"`,
+	level_scene:     ^gd.Resource `gd:"export,resource=PackedScene,entity=Level:6"`,
+	relic_scene:     ^gd.Resource `gd:"export,resource=PackedScene,entity=Relic:7"`,
 
 	// The campaign: one CaveLevelDef data asset per floor (scene + loot +
 	// waves), authored in the inspector.
@@ -157,7 +156,6 @@ CaveLobby :: struct {
 	doors:       map[knet.Net_Id]^Door,
 	pickups:     map[knet.Net_Id]^Pickup,
 	dwellers:    map[knet.Net_Id]^Dweller,
-	nodes:       map[knet.Net_Id]gd.Node, // for freeing on despawn
 	avatar_of:   map[knet.Player_Id]knet.Net_Id,
 	me_spel:     ^Spelunker, // my avatar (nil until spawned)
 	level:       ^Level, // the run's depth marker (nil until spawned)
@@ -219,9 +217,7 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	// table. World hookups install now; entities exist only after Start.
 	kitems.items_register(&self.table, GEM, "gem", 99)
 	kitems.items_register(&self.table, TORCH, "torch", 5)
-	ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
 	ksess.session_set_backup_blob(&self.ses, self, cave_backup_blob)
-	ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
 	kcombat.fire_listen(&self.fires, &self.ses, TAG_FIRE, self, cave_on_fire)
 
 	// The stock stack — lobby, chat+comms, scoreboard, stage/world, wire,
@@ -234,6 +230,11 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 		latency_env = "CAVE_LATENCY",
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
+	// The factory, written by nobody: the generated table (from the scene
+	// fields' entity= tags) instantiates/frees under boot.world; the typed
+	// *_spawned/*_freed hooks in world.odin keep the census. `self` is also
+	// what every `<verb>_then` consequence receives as its game param.
+	kboot.boot_entities(&self.boot, self, cave_lobby_entity_kinds[:])
 
 	self.prompt = kui.prompt_make(self.owner)
 	self.inv = kui.inv_make(self.owner, 6)

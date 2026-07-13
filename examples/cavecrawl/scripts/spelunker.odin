@@ -33,9 +33,6 @@ Spelunker :: struct {
 	stamina:   i32 `gd:"replicate"`,
 	cds:       [2]u16 `gd:"replicate"`, // ability cooldowns, host-decayed
 	fx:        [2]kcombat.Effect `gd:"replicate"`, // status effects, host-decayed
-	last_drop: kitems.Slot, // scratch for the drop hook — never on the wire
-	aim:       [2]f32, // scratch for the throw hook — never on the wire
-	cast_from: [2]f32, // scratch: where the throw REALLY left from (owner truth, leashed)
 	php:       kcombat.Predicted_Hp, // scratch: impacts SEEN here, pre-truth
 	was_dead:  bool, // scratch: death-edge detector for the pyre burst
 }
@@ -51,19 +48,23 @@ spelunker_hp_codec :: knet.Wire_Codec {
 }
 
 // Drop a bag slot at my feet: my bag empties on my screen this frame; the
-// host's drop hook mints the Pickup entity everyone sees.
+// host's consequence below mints the Pickup entity everyone sees.
 @(gd_command = "predict")
-spelunker_drop :: proc(self: ^Spelunker, slot: i32) -> bool {
-	if self.hp <= 0 {return false} // the dead drop everything on their own
-	dropped := kitems.take(self.bag[:], int(slot), max(u16))
-	if dropped.count == 0 {return false}
-	self.last_drop = dropped
-	return true
+spelunker_drop :: proc(self: ^Spelunker, slot: i32) -> (ok: bool, dropped: kitems.Slot) {
+	if self.hp <= 0 {return false, {}} // the dead drop everything on their own
+	dropped = kitems.take(self.bag[:], int(slot), max(u16))
+	return dropped.count > 0, dropped
+}
+
+// Host only: what left the bag becomes a Pickup on the floor.
+spelunker_drop_then :: proc(game: ^CaveLobby, self: ^Spelunker, by: knet.Player_Id, slot: i32, dropped: kitems.Slot) {
+	cave_mint_pickup(game, self, dropped)
 }
 
 // Throw a rock: the WHOLE cast, zero role branches. The gate (alive +
 // cooldown + stamina) bites instantly on the thrower's screen and refuses
-// identically on the host; the host's hook launches the authoritative rock.
+// identically on the host; the consequence below launches the authoritative
+// rock from the leashed origin the verb returns as payload.
 //
 // The cast carries its ORIGIN (ox, oy): a moving shooter's own screen is
 // the truth for where the rock left from — its position is owner-streamed,
@@ -72,14 +73,17 @@ spelunker_drop :: proc(self: ^Spelunker, slot: i32) -> bool {
 // shooter SAW hit. Leashed against our copy: honest latency offsets pass,
 // teleports don't (on the caster's own prediction ox,oy == x,y — no-op).
 @(gd_command = "predict")
-spelunker_throw :: proc(self: ^Spelunker, dx: f32, dy: f32, ox: f32, oy: f32) -> bool {
-	if self.hp <= 0 {return false}
-	if dx == 0 && dy == 0 {return false}
-	if !kcombat.ability_try(self.cds[:], 0, ROCK_ABILITY, &self.stamina) {return false}
+spelunker_throw :: proc(self: ^Spelunker, dx: f32, dy: f32, ox: f32, oy: f32) -> (ok: bool, fx: f32, fy: f32) {
+	if self.hp <= 0 {return false, 0, 0}
+	if dx == 0 && dy == 0 {return false, 0, 0}
+	if !kcombat.ability_try(self.cds[:], 0, ROCK_ABILITY, &self.stamina) {return false, 0, 0}
 	from := kcombat.leash({ox, oy, 0}, {self.x, self.y, 0}, CAST_LEASH)
-	self.cast_from = {from.x, from.y}
-	self.aim = {dx, dy}
-	return true
+	return true, from.x, from.y
+}
+
+// Host only: the confirmed cast launches the one rock that hurts.
+spelunker_throw_then :: proc(game: ^CaveLobby, self: ^Spelunker, by: knet.Player_Id, dx: f32, dy: f32, ox: f32, oy: f32, fx: f32, fy: f32) {
+	cave_launch_rock(game, by, {fx, fy}, {dx, dy})
 }
 
 // REVIVE a downed friend — the co-op staple, as one ordinary command on

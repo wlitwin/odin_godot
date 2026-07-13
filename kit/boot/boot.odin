@@ -107,6 +107,14 @@ Boot :: struct {
 	ses:         ^ksess.Session,
 	comms:       ^kcomms.Comms,
 	min_players: int,
+
+	// boot_entities' state (entities.odin): the generated kind table, the
+	// game pointer the typed hooks receive, and the per-entity node ledger
+	// games used to keep by hand.
+	ent_kinds: []Entity_Kind,
+	ent_game:  rawptr,
+	ent_nodes: map[knet.Net_Id]gd.Node,
+	ent_types: map[knet.Net_Id]ksess.Entity_Type,
 }
 
 // The ready() ceremony. Call once, after installing your factory/hooks is

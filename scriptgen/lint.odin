@@ -170,3 +170,129 @@ lint_misplaced :: proc(path, src, own: string, script_structs: map[string]bool) 
 		)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// The method-NAME lint. boot_attach's Options.methods, netgd.wire_listen, and
+// netgd.listen_packets connect Godot signals to @(gd_method)s BY STRING — a
+// typo'd name compiles, connects nothing, and fails as behavior: an unwired
+// `peer_disconnected` forward is the alt-F4'd-friend-haunts-the-roster bug,
+// an unwired `connection_failed` hangs a failed join on "Joining..." forever.
+// scriptgen knows every registered method name, so a bad string is a BUILD
+// error here. An empty string stays a deliberate skip. Names built at runtime
+// (variables, concatenations) are skipped — this catches the literal, which
+// is how every game writes them.
+
+Method_Claim :: struct {
+	struct_name: string, // the script whose methods the name must resolve in
+	method:      string,
+	call:        string, // which call claimed it — for the diagnostic
+	path:        string,
+	line:        int,
+}
+
+@(private = "file")
+Claim_State :: struct {
+	claims:      ^[dynamic]Method_Claim,
+	path:        string,
+	src:         string,
+	struct_name: string, // the enclosing proc's script (first `^Struct` param)
+}
+
+// Collect method-name string literals from one parsed file. The enclosing
+// proc's first `^<script>` param names the script the strings must resolve
+// against (boot_attach in a helper file still binds to the game's class).
+scan_method_claims :: proc(claims: ^[dynamic]Method_Claim, path, src: string, file: ^ast.File, script_structs: map[string]bool) {
+	st := Claim_State {
+		claims = claims,
+		path   = path,
+		src    = src,
+	}
+	for decl in file.decls {
+		vd, ok := decl.derived.(^ast.Value_Decl)
+		if !ok || len(vd.values) != 1 {continue}
+		pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
+		if !is_proc || pl.body == nil || pl.type == nil || pl.type.params == nil || len(pl.type.params.list) == 0 {continue}
+		first := pl.type.params.list[0]
+		if first.type == nil {continue}
+		ptr, is_ptr := first.type.derived.(^ast.Pointer_Type)
+		if !is_ptr {continue}
+		elem, is_ident := ptr.elem.derived.(^ast.Ident)
+		if !is_ident || elem.name not_in script_structs {continue}
+		st.struct_name = elem.name
+		context.user_ptr = &st
+		ast.inspect(pl.body, claim_visit)
+		context.user_ptr = nil
+	}
+}
+
+@(private = "file")
+claim_add :: proc(st: ^Claim_State, e: ^ast.Expr, call: string) {
+	expr := e
+	// The named-field Methods form (`{host = "on_host"}`) claims through its value.
+	if fv, is_fv := expr.derived.(^ast.Field_Value); is_fv {
+		expr = fv.value
+	}
+	bl, ok := expr.derived.(^ast.Basic_Lit)
+	if !ok || bl.tok.kind != .String {return}
+	name := strings.trim(node_text(st.src, expr), "\"`")
+	if name == "" {return} // empty = skip this signal, on purpose
+	append(st.claims, Method_Claim{struct_name = st.struct_name, method = name, call = call, path = st.path, line = expr.pos.line})
+}
+
+@(private = "file")
+claim_visit :: proc(node: ^ast.Node) -> bool {
+	if node == nil {return false}
+	st := cast(^Claim_State)context.user_ptr
+	call, ok := node.derived.(^ast.Call_Expr)
+	if !ok {return true}
+	callee := node_text(st.src, call.expr)
+	if i := strings.last_index(callee, "."); i >= 0 {callee = callee[i + 1:]}
+	switch callee {
+	case "wire_listen", "listen_packets":
+		// (wire/node first, then the receiving method names, positionally)
+		if len(call.args) < 2 {return true}
+		for arg in call.args[1:] {
+			claim_add(st, arg, callee)
+		}
+	case "boot_attach":
+		// Find the Options literal's `methods = {...}` field, wherever it sits.
+		for arg in call.args {
+			cl, is_cl := arg.derived.(^ast.Comp_Lit)
+			if !is_cl {continue}
+			for elem in cl.elems {
+				fv, is_fv := elem.derived.(^ast.Field_Value)
+				if !is_fv {continue}
+				if node_text(st.src, fv.field) != "methods" {continue}
+				mcl, is_m := fv.value.derived.(^ast.Comp_Lit)
+				if !is_m {continue}
+				for me in mcl.elems {
+					claim_add(st, me, "boot_attach methods")
+				}
+			}
+		}
+	}
+	return true
+}
+
+// Validate the claims once every script's method table is complete (methods
+// may live in helper files — pass 2 must have run).
+lint_method_claims :: proc(claims: []Method_Claim, by_struct: map[string]^Script) {
+	for c in claims {
+		s, known := by_struct[c.struct_name]
+		if !known {continue}
+		found := false
+		for m in s.methods {
+			if m.gd_name == c.method {
+				found = true
+				break
+			}
+		}
+		if !found {
+			error_at(
+				Loc{path = c.path, line = c.line},
+				"%s: %q names no @(gd_method) of %s — the signal will never connect (declare `@(gd_method) %s_%s :: proc(self: ^%s, ...)`, or pass \"\" to skip on purpose)",
+				c.call, c.method, c.struct_name, to_snake(c.struct_name), c.method, c.struct_name,
+			)
+		}
+	}
+}

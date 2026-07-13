@@ -228,6 +228,9 @@ unwind_pending :: proc(ctx: ^Command_Ctx, e: Registry_Entry) {
 
 @(private = "file")
 replay_pending :: proc(ctx: ^Command_Ctx, e: Registry_Entry) {
+	// Replays are re-predictions, never authoritative: the env keeps each
+	// re-run's `_then` consequence quiet, exactly like the original prediction.
+	env := Command_Env{authority = false, user = ctx.game_user, by = ctx.me}
 	for &p in ctx.pending.entries {
 		if !pending_reconciles(p, e) {
 			continue
@@ -235,7 +238,7 @@ replay_pending :: proc(ctx: ^Command_Ctx, e: Registry_Entry) {
 		delete(p.revert)
 		p.revert = fields_capture(e.entity, e.set.entity_desc)
 		r := reader_make(p.args)
-		if !(e.set.commands[p.cmd].invoke(e.entity, &r) && !r.err) {
+		if !(e.set.commands[p.cmd].invoke(e.entity, &r, &env) && !r.err) {
 			fields_restore(e.entity, e.set.entity_desc, p.revert)
 		}
 	}
@@ -578,7 +581,11 @@ registry_host_command :: proc(reg: ^Registry, ctx: ^Command_Ctx, peer_key: u64, 
 	if !found {
 		return false, false, h
 	}
-	ok = command_execute(e.entity, e.set, h.cmd, r)
+	// THE authoritative run: the verb's `_then` consequence fires inside the
+	// thunk. peer_key doubles as the issuer — the session keys dedup by
+	// Player_Id, so the id and the key are the same value on this path.
+	env := Command_Env{authority = true, user = ctx.game_user, by = Player_Id(peer_key)}
+	ok = command_execute(e.entity, e.set, h.cmd, r, &env)
 	command_result_write(out, h, ok, e.entity, e.set)
 	return true, ok, h
 }

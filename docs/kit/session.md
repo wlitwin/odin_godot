@@ -80,23 +80,30 @@ Session_Config :: struct {
 }
 ```
 
-The **command hook** is the sanctioned spot for the cross-entity half of a command: a
-command proc may only mutate its target (that's what the predict/revert/reject-truth
-machinery protects), so "loot chest → items appear in MY bag" is a chest-only proc that
-records what it took in a non-replicated scratch field, plus the hook crediting the
-issuer's entity on the host — a mutation that reaches everyone as an ordinary delta. The
-loser of a race gets a rejected chest command and no credit: phantom items are impossible.
+The cross-entity half of a command — a command proc may only mutate its target
+(that's what the predict/revert/reject-truth machinery protects) — lives in the verb's
+name-paired **[`<verb>_then` consequence](net.md#consequences-verb_then)**: "loot chest
+→ items appear in MY bag" is a chest-only proc that *returns* what it took, plus a
+`chest_take_then` crediting the issuer on the host — a mutation that reaches everyone
+as an ordinary delta. The loser of a race gets a rejected chest command and no credit:
+phantom items are impossible. The consequence's `game` param is the factory's `user` —
+the session's one game pointer. (The untyped command hook underneath remains for
+*generic* reactions; see [hooks](#command-hooks-the-generic-layer-under-_then).)
 
 In practice the transport hookup is one line — from cavecrawl's `ready`:
 
 ```odin
 ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
-ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
 netgd.wire_attach(&self.wire, self.owner, &self.ses, MSG_SESSION)
 netgd.wire_listen(&self.wire, "on_packet", "on_peer_left", "on_net_up", "on_net_down")
 ```
 
 ## Start, drive, drain
+
+([kit/boot](boot.md) drives this whole section for you — `boot_host`/
+`boot_join` call the starts, `boot_pump` ticks and drains. What follows is
+the layer underneath, which stays public for games that want the ritual
+their own way.)
 
 ```odin
 session_host_start :: proc(s: ^Session, name: string, token: u64 = 0, dedicated := false)
@@ -191,8 +198,12 @@ Make_Entity_Proc :: proc(user: rawptr, type: Entity_Type, id: knet.Net_Id, owner
 Free_Entity_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr)
 ```
 
-Returning nil from `make` skips the entity safely — the wire carries its length, so
-unknown types are stepped over whole.
+Games rarely write one anymore: tag each exported entity scene with
+`entity=Name:id` and [kboot.boot_entities](boot.md) installs the GENERATED
+factory (scene under `boot.world`, node ledger, typed `*_spawned`/`*_freed`
+census hooks). `session_set_factory` remains the escape hatch for exotic
+creation, and returning nil from `make` skips the entity safely — the wire
+carries its length, so unknown types are stepped over whole.
 
 ### Entity blobs
 
@@ -253,23 +264,24 @@ peer that didn't register the column, resolve BY NAME with `session_stat_find`
 (cheap — do it per read). Homestead's acid caught this as a resource gate passing
 on 254 milliseconds of latency.
 
-## Per-type hook routing
+## Command hooks (the generic layer under _then)
 
-Command ids collide across types (every type's first command is 0), so a
-single catch-all hook must classify the entity before switching on cmd —
-chains of "is it a chest?" that grow into a misclassification liability
-(forget one and a door toggle runs your chest logic, silently). Route by
-type instead:
+Per-verb consequences belong in [`<verb>_then` procs](net.md#consequences-verb_then) —
+typed, name-paired, next to the verb. The untyped hooks remain underneath for
+*generic* reactions that cut across verbs: metrics, acid-test receipts, replay
+logs — anything keyed on "a command ran" rather than on one verb's meaning.
+Route by type to avoid classifying entities by hand (command ids collide
+across types — every type's first command is 0):
 
 ```odin
 ksess.session_set_type_hook(&self.ses, CHEST_TYPE, self, chest_hook)  // wins
 ksess.session_set_command_hook(&self.ses, self, game_hook)            // catch-all for the rest
 ```
 
-A routed type's hook receives exactly that type's commands — the wrong-type
-bug is structurally impossible, and each type's consequences live next to
-its verbs. The host's own local issues and clients' commands land in the
-same dispatcher. Survives session starts, like the catch-all.
+A routed type's hook receives exactly that type's commands. The host's own
+local issues and clients' commands land in the same dispatcher, which runs
+AFTER the verb's `_then`. Survives session starts, like everything wired in
+`ready()`.
 
 ## Interest management (area of interest)
 

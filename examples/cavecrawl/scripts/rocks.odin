@@ -11,6 +11,7 @@ package cavecrawl_scripts
 // ordinary deltas and squares the number).
 
 import gd "godot:godot"
+import kboot "godot:kit/boot"
 import kcombat "godot:kit/combat"
 import kfx "godot:kit/fx"
 import knet "godot:kit/net"
@@ -18,16 +19,17 @@ import ksess "godot:kit/session"
 import "core:fmt"
 import "core:math"
 
-rock_fire :: proc(shooter: knet.Player_Id, sp: ^Spelunker) -> (f: kcombat.Fire, ok: bool) {
-	dx, dy := sp.aim.x, sp.aim.y
+rock_fire :: proc(shooter: knet.Player_Id, origin: [2]f32, aim: [2]f32) -> (f: kcombat.Fire, ok: bool) {
+	dx, dy := aim.x, aim.y
 	n := math.sqrt(dx * dx + dy * dy)
 	if n == 0 {return}
 	return kcombat.Fire {
 			shooter = shooter,
-			// The cast's OWN origin (owner truth, leashed in spelunker_throw)
-			// — NOT the host's lagged copy of the shooter: the authoritative
-			// rock must fly the same line the shooter's screen saw hit.
-			origin  = {sp.cast_from.x, sp.cast_from.y, 0},
+			// The cast's OWN origin (owner truth, leashed in spelunker_throw,
+			// returned as the verb's payload) — NOT the host's lagged copy of
+			// the shooter: the authoritative rock must fly the same line the
+			// shooter's screen saw hit.
+			origin  = {origin.x, origin.y, 0},
 			vel     = {dx / n * ROCK_SPEED, dy / n * ROCK_SPEED, 0},
 			ttl     = ROCK_TTL,
 			kind    = FIRE_ROCK,
@@ -40,12 +42,12 @@ add_visual_rock :: proc(self: ^CaveLobby, f: kcombat.Fire) {
 	kfx.tracer_add(&self.tracers, self.boot.world, f, "\xE2\x97\x8F", ksess.session_tick_hz(&self.ses))
 }
 
-// Host: a confirmed throw launches the AUTHORITATIVE rock (the only kind
-// that hurts), shows the host its own visual, and announces the fire so
-// every other peer draws theirs. The shooter's visual already flew at cast
-// time — it skips its own announcement.
-cave_launch_rock :: proc(self: ^CaveLobby, shooter: knet.Player_Id, sp: ^Spelunker) {
-	f, ok := rock_fire(shooter, sp)
+// Host: a confirmed throw (spelunker_throw_then) launches the AUTHORITATIVE
+// rock (the only kind that hurts), shows the host its own visual, and
+// announces the fire so every other peer draws theirs. The shooter's visual
+// already flew at cast time — it skips its own announcement.
+cave_launch_rock :: proc(self: ^CaveLobby, shooter: knet.Player_Id, origin: [2]f32, aim: [2]f32) {
+	f, ok := rock_fire(shooter, origin, aim)
 	if !ok {return}
 	append(&self.flying, Cave_Rock{p = kcombat.Projectile{pos = f.origin, vel = f.vel, left = f.ttl}, shooter = shooter})
 	if shooter != self.ses.me {
@@ -103,7 +105,8 @@ rock_impact :: proc(user: rawptr, hit: kfx.Tracer_Hit) {
 		view = kcombat.php_display(&dw.php, dw.hp, now)
 	}
 	fx_burst_at(self, hit.pos.x, hit.pos.y, {1, 0.9, 0.4, 1})
-	fx_flash(self.nodes[knet.Net_Id(hit.target)], {1, 0.35, 0.35, 1})
+	victim_node, _ := kboot.boot_node(&self.boot, knet.Net_Id(hit.target))
+	fx_flash(victim_node, {1, 0.35, 0.35, 1})
 	refresh_hud(self)
 	gd.print_str(fmt.tprintf("CAVE_IMPACT mine=%v view=%d truth=%d", hit.shooter == self.ses.me, view, truth))
 }

@@ -43,7 +43,10 @@ decode thunk, a `Command_Desc` table, and a typed `<proc>_cmd` issue wrapper hol
 client serializes the args once, optionally re-runs the *same* proc from those bytes
 (prediction — client and host execute from byte-identical input), and ships the command to
 the host. Prediction needs no hand-written undo: the declared-field snapshot captured
-before the optimistic run is the automatic revert. Then:
+before the optimistic run is the automatic revert. The verb's cross-entity half — credit
+the looter, launch the projectile, hand off ownership — is a second plain proc named
+`<verb>_then` ([consequences](#consequences-verb_then), below), which fires on the
+authority only, right after the verb applies. Then:
 
 - **Confirm** — header only; the optimistic state already matches, nothing replays.
 - **Reject carries truth** — a full field snapshot of the entity, so a stale client snaps
@@ -70,20 +73,23 @@ In a game you tag fields and mark procs; scriptgen emits the descriptor. From
 
 ```odin
 Chest :: struct {
-	owner:     gd.Node2d,
-	net_id:    knet.Net_Id,
-	x, y:      f32 `gd:"replicate"`,
-	slots:     [8]kitems.Slot `gd:"replicate"`,
-	last_take: kitems.Slot, // scratch for the command hook — never on the wire
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id,
+	x, y:   f32 `gd:"replicate"`,
+	slots:  [8]kitems.Slot `gd:"replicate"`,
 }
 
 @(gd_command = "predict")
-chest_take :: proc(self: ^Chest, slot: i32, px: f32, py: f32) -> bool {
-	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false}
-	taken := kitems.take(self.slots[:], int(slot), 99) // the whole stack
-	if taken.count == 0 {return false}
-	self.last_take = taken
-	return true
+chest_take :: proc(self: ^Chest, slot: i32, px: f32, py: f32) -> (ok: bool, taken: kitems.Slot) {
+	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false, {}}
+	taken = kitems.take(self.slots[:], int(slot), 99) // the whole stack
+	return taken.count > 0, taken
+}
+
+// Fires on the HOST only, after the take applies: the cross-entity half,
+// typed, next to its verb (see "Consequences" below).
+chest_take_then :: proc(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: i32, px: f32, py: f32, taken: kitems.Slot) {
+	cave_credit(game, by, self, taken)
 }
 ```
 
@@ -117,6 +123,52 @@ fixed array counts as one field). `Lerp_Kind` covers `.Snap`, `.F32`, `.F64`, `.
 (nlerp with hemisphere flip), and `.Custom` with an author-supplied
 `Blend_Proc :: proc(dst, a, b: rawptr, alpha: f32)` — declared via
 `` heading: f32 `gd:"replicate,owner,interp=blend_heading"` ``.
+
+## Consequences (`<verb>_then`)
+
+A command proc may only mutate its **target** — that's what the predict/revert/
+reject-truth machinery protects. The verb's *other* half ("…and the items land
+in the looter's bag", "…and the rock launches") is host-side code, and it has a
+name-paired home: declare a plain proc named after the verb's wrapper plus
+`_then`, and scriptgen threads it the issuer, the verb's wire args, and the
+verb's returned **payload**, firing it on the AUTHORITY only, right after the
+verb applies. Two shapes, detected by the leading param:
+
+```odin
+chest_take_then :: proc(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: i32, px: f32, py: f32, taken: kitems.Slot)
+door_toggle_then :: proc(self: ^Door, by: knet.Player_Id)   // entity-local: no game param
+```
+
+**Payload returns.** A verb may return `(bool, facts…)` — results after the
+applied bool are in-process values handed straight to the `_then` (they never
+cross the wire), which is what deletes the scratch-field idiom: the chest used
+to record `last_take` in an untagged field for the hook to read; now the verb
+*returns* what it took. Payload types are unconstrained — the generated call
+site lets the compiler hold the `_then` signature to them.
+
+**The guarantees.** A consequence fires exactly once per applied command — on
+the host's own issues too (the wrapper's authority branch), and never on a
+client's optimistic run, a registry replay, a rejection, or a deduped
+retransmit. It runs before the result ships and before the tick's delta diff,
+so its mutations reach every peer in the same batch as the verb's own. The
+`game` param is the session's one game pointer — the `user` you handed
+`session_set_factory`.
+
+**Composed verbs pair on the hoisted name.** A block's command
+(`weapon: play.Gun` hoisting `gun_fire` as `runner_weapon_fire`) pairs with
+`runner_weapon_fire_then` — the block ships the verb and its state machine,
+the game keeps the consequence, and no index keying or entity-classifying
+switch ever appears. A composed verb's payload is the block's *offer*
+("a live round left the barrel"); a game that doesn't care simply declares no
+`_then`.
+
+**Build-time contract.** A mispaired consequence is a scriptgen error, not a
+proc that silently never fires: the shape (`[game,] self, by, wire args…,
+payload…`) is validated against the verb, an unclaimed `*_then` proc warns,
+and a direct verb whose payload nobody consumes warns too. When something
+needs to react to commands *generically* (metrics, receipts, replays), the
+untyped [command hook](session.md#per-type-hook-routing) remains underneath —
+`_then` is generated dispatch over the same authority path.
 
 ## Composing verbs from embedded blocks
 
@@ -162,8 +214,9 @@ distinct wire indices). Issue it exactly like a direct command —
 `runner_weapon_fire_cmd(ctx, self, dx, dy)` — the owner is passed for you, so only the wire args
 appear in the wrapper. Prediction reverts and reject-truth snapshots cover the block's replicated
 state for free (it's already in the entity's descriptor), and the block's cross-entity effects
-(spawning a projectile, applying damage) stay in the game's command hook, keyed by the composed
-index, exactly as a direct command's do.
+(spawning a projectile, applying damage) live in the game's `runner_weapon_fire_then`
+[consequence](#consequences-verb_then), exactly as a direct command's do — the block ships the
+verb, the game keeps the "and then".
 
 Owner threading is optional and detected by shape — write `^Runner` for a game-specific block, or
 `^$E` for a library block reused across entity types. A block imported from another `godot:`

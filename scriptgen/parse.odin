@@ -638,10 +638,13 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 
 		// Hints/groups/defaults are parsed by the RUNTIME reflection walk from this same
 		// tag (runtime/register_class.odin) — scriptgen only extracts what codegen itself
-		// consumes: the `get=`/`set=` accessor proc names (wrapper emission) and the
-		// field's Variant type (wrapper marshalling + the ctor set).
+		// consumes: the `get=`/`set=` accessor proc names (wrapper emission), the
+		// field's Variant type (wrapper marshalling + the ctor set), and the
+		// `entity=Name:id` declaration (the kboot entity table).
 		getter := ""
 		setter := ""
+		entity_val := ""
+		resource_val := ""
 		for si in 1 ..< len(specs) {
 			spec := strings.trim_space(specs[si])
 			if spec == "" {continue}
@@ -656,6 +659,35 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 				getter = value
 			case "set":
 				setter = value
+			case "entity":
+				entity_val = value
+			case "resource":
+				resource_val = value
+			}
+		}
+
+		// `entity=Name:id` — this exported scene BODIES a wire entity: the tag
+		// is the whole factory declaration (resolve_entities validates the
+		// target and pairs the typed hooks once the full module is parsed).
+		if entity_val != "" {
+			target, sep, id_text := strings.partition(entity_val, ":")
+			id, id_ok := strconv.parse_int(strings.trim_space(id_text))
+			switch {
+			case sep != ":" || !id_ok:
+				error_at(floc, "%s.%s: `entity=` wants `Name:id` — the struct this scene bodies and its stable wire id (e.g. entity=Mob:3)", s.struct_name, field_label)
+			case id <= 0 || id > 65535:
+				error_at(floc, "%s.%s: entity id %d is out of range — pick 1..65535 (0 reads as \"none\", and the id must stay STABLE across builds: saves, rejoins, and backups carry it)", s.struct_name, field_label, id)
+			case resource_val != "PackedScene":
+				error_at(floc, "%s.%s: `entity=` belongs on a PackedScene export — tag the field `gd:\"export,resource=PackedScene,entity=%s\"`", s.struct_name, field_label, entity_val)
+			case len(f.names) != 1:
+				error_at(floc, "%s.%s: one scene field per entity — split the multi-name declaration", s.struct_name, field_label)
+			case:
+				append(&s.entities, Entity_Tag{
+					field   = field_label,
+					target  = strings.trim_space(target),
+					type_id = id,
+					line    = f.pos.line,
+				})
 			}
 		}
 
@@ -777,6 +809,284 @@ validate_script :: proc(s: ^Script) {
 				"%s declares @(gd_command) procs but no `net_id: knet.Net_Id` field — commands name their entity over the wire; add the field (the session/registry layer assigns it)",
 				s.struct_name,
 			)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Consequence pairing: `<wrapper>_then` (verbs-and-consequences)
+//
+// A command's cross-entity half used to live in the untyped command hook —
+// a switch on (entity type, cmd index) reading scratch fields the verb left
+// behind. The name-paired consequence replaces that: declare a plain proc
+// named after the command's WRAPPER plus `_then` and scriptgen threads it the
+// issuer, the verb's wire args, and the verb's returned payload, firing it on
+// the AUTHORITY only, right after the verb applies. Shapes (game form casts
+// ctx.game_user — the session installs the factory's user there):
+//
+//   chest_take_then :: proc(game: ^Cave, self: ^Chest, by: knet.Player_Id, slot: i32, taken: kitems.Slot)
+//   door_toggle_then :: proc(self: ^Door, by: knet.Player_Id)
+//
+// Composed commands pair on the hoisted name (`runner_weapon_fire_then`), so
+// a block ships the verb and the game keeps the consequence — no index keying.
+
+Then_Candidate :: struct {
+	path:    string,
+	line:    int,
+	src:     string,
+	pt:      ^ast.Proc_Type,
+	vd:      ^ast.Value_Decl,
+	claimed: bool, // paired with a command — unclaimed survivors get a likely-typo warning
+}
+
+// Collect every top-level name-paired candidate in one parsed file: `*_then`
+// (command consequences), `*_spawned` / `*_freed` (entity-table hooks).
+// Pairing happens in resolve_then / resolve_entities once every script's
+// full command table and entity tags are known.
+scan_then_procs :: proc(idx: ^map[string]Then_Candidate, path, src: string, file: ^ast.File) {
+	for decl in file.decls {
+		vd, ok := decl.derived.(^ast.Value_Decl)
+		if !ok {continue}
+		if len(vd.names) != 1 || len(vd.values) != 1 {continue}
+		pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
+		if !is_proc {continue}
+		name_ident, _ := vd.names[0].derived.(^ast.Ident)
+		if name_ident == nil {continue}
+		if !strings.has_suffix(name_ident.name, "_then") &&
+		   !strings.has_suffix(name_ident.name, "_spawned") &&
+		   !strings.has_suffix(name_ident.name, "_freed") {continue}
+		if pl.type == nil {continue}
+		idx[name_ident.name] = Then_Candidate{
+			path = path,
+			line = name_ident.pos.line,
+			src  = src,
+			pt   = pl.type,
+			vd   = vd,
+		}
+	}
+}
+
+// Pair `s`'s commands with their `<wrapper>_then` consequences and validate the
+// contract at build time — a mispaired consequence must be a build error here,
+// not a proc that silently never fires (the exact bug class the pairing kills).
+resolve_then :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
+	for &cmd in s.commands {
+		wrapper := len(cmd.path) > 0 ? fmt.tprintf("%s_%s", to_snake(s.struct_name), cmd.name) : cmd.proc_name
+		then_name := fmt.tprintf("%s_then", wrapper)
+		cand, found := idx[then_name]
+		if !found {
+			// A direct verb's payload has exactly one consumer — its consequence.
+			// (A COMPOSED verb's payload is the block's offer; declining is fine.)
+			if cmd.payload_count > 0 && len(cmd.path) == 0 {
+				warn_at(
+					Loc{path = s.path},
+					"command %s returns a payload but no `%s` consequence proc consumes it",
+					cmd.proc_name,
+					then_name,
+				)
+			}
+			continue
+		}
+		cand.claimed = true
+		idx[then_name] = cand
+		loc := Loc{path = cand.path, line = cand.line}
+
+		if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
+			error_at(loc, "consequence %s must be a plain proc — it is generated into the command's authority path, never registered", then_name)
+			continue
+		}
+
+		// Flatten param type texts (a field entry may declare several names).
+		types := make([dynamic]string, context.temp_allocator)
+		if cand.pt.params != nil {
+			for f in cand.pt.params.list {
+				t := strings.trim_space(node_text(cand.src, f.type))
+				for _ in 0 ..< max(1, len(f.names)) {
+					append(&types, t)
+				}
+			}
+		}
+
+		self_type := fmt.tprintf("^%s", s.struct_name)
+		at := 0
+		game := ""
+		if len(types) > at && strings.has_prefix(types[at], "^") && types[at] != self_type {
+			game = types[at][1:] // the leading game param — generated code casts ctx.game_user to it
+			at += 1
+		}
+		if !(len(types) > at && types[at] == self_type) {
+			error_at(
+				loc,
+				"consequence %s: expected `self: %s` %s — the shapes are (self, by, args…, payload…) or (game, self, by, args…, payload…)",
+				then_name, self_type, game == "" ? "first" : "after the game param",
+			)
+			continue
+		}
+		at += 1
+
+		by_ok := false
+		if len(types) > at {
+			base := types[at]
+			if j := strings.last_index(base, "."); j >= 0 {base = base[j + 1:]}
+			by_ok = base == "Player_Id"
+		}
+		if !by_ok {
+			error_at(loc, "consequence %s: the param after `self` must be the issuer (`by: knet.Player_Id`)", then_name)
+			continue
+		}
+		at += 1
+
+		rest := len(types) - at
+		if rest != len(cmd.args) + cmd.payload_count {
+			error_at(
+				loc,
+				"consequence %s: expected the verb's %d wire arg(s) then its %d payload value(s) after `by` — found %d param(s)",
+				then_name, len(cmd.args), cmd.payload_count, rest,
+			)
+			continue
+		}
+		args_ok := true
+		for a, k in cmd.args {
+			wire, _, wok := command_wire_type(types[at + k])
+			if !wok || wire != a.wire {
+				error_at(
+					loc,
+					"consequence %s: param %q must have the verb's wire arg type %s (found %s)",
+					then_name, a.name, a.type_text, types[at + k],
+				)
+				args_ok = false
+			}
+		}
+		if !args_ok {continue}
+		// Payload param TYPES are the compiler's to hold: the generated call
+		// site passes the verb's returned values straight through.
+
+		cmd.then_proc = then_name
+		cmd.then_game = game
+	}
+}
+
+// After every script resolved: an unclaimed pairing candidate is very likely
+// a typo'd name — the proc would silently never fire. `_then` always warns
+// (its prefix is a command wrapper name, unguessable here); `_spawned`/
+// `_freed` warn only when the prefix IS a script struct in this module (an
+// innocent `node_freed` helper stays quiet).
+warn_unclaimed_thens :: proc(idx: ^map[string]Then_Candidate, script_snakes: map[string]bool) {
+	for name, cand in idx {
+		if cand.claimed {continue}
+		loc := Loc{path = cand.path, line = cand.line}
+		switch {
+		case strings.has_suffix(name, "_then"):
+			warn_at(
+				loc,
+				"proc %q looks like a command consequence, but no @(gd_command) generates a `%s` wrapper — it will never fire",
+				name,
+				strings.trim_suffix(name, "_then"),
+			)
+		case strings.has_suffix(name, "_spawned"):
+			if script_snakes[strings.trim_suffix(name, "_spawned")] {
+				warn_at(loc, "proc %q looks like an entity spawn hook, but no scene field declares `entity=...` for that struct — it will never fire", name)
+			}
+		case strings.has_suffix(name, "_freed"):
+			if script_snakes[strings.trim_suffix(name, "_freed")] {
+				warn_at(loc, "proc %q looks like an entity free hook, but no scene field declares `entity=...` for that struct — it will never fire", name)
+			}
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Entity tables: `entity=Name:id` on exported PackedScene fields
+//
+// The tag is the whole factory declaration — scriptgen emits the TYPE consts,
+// typed thunks, and the kboot.Entity_Kind table; kit/boot's boot_entities
+// drives it. Validation is a build error HERE: a dangling target, a duplicate
+// wire id, or a mis-shaped hook must never become a silently absent entity.
+
+// Validate a `<target>_spawned` / `<target>_freed` hook's shape. The fixed
+// shapes (owner rides only the spawn):
+//   <t>_spawned :: proc(game: ^Game, self: ^Target, id: knet.Net_Id, owner: knet.Player_Id)
+//   <t>_freed   :: proc(game: ^Game, self: ^Target, id: knet.Net_Id)
+@(private = "file")
+validate_entity_hook :: proc(cand: Then_Candidate, name, game_struct, target: string, want_owner: bool) -> bool {
+	loc := Loc{path = cand.path, line = cand.line}
+	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
+		error_at(loc, "entity hook %s must be a plain proc — the generated table dispatches it, it is never registered", name)
+		return false
+	}
+	types := make([dynamic]string, context.temp_allocator)
+	if cand.pt.params != nil {
+		for f in cand.pt.params.list {
+			t := strings.trim_space(node_text(cand.src, f.type))
+			for _ in 0 ..< max(1, len(f.names)) {
+				append(&types, t)
+			}
+		}
+	}
+	want := want_owner ? 4 : 3
+	shape := fmt.tprintf("proc(game: ^%s, self: ^%s, id: knet.Net_Id)", game_struct, target)
+	if want_owner {
+		shape = fmt.tprintf("proc(game: ^%s, self: ^%s, id: knet.Net_Id, owner: knet.Player_Id)", game_struct, target)
+	}
+	if len(types) != want ||
+	   types[0] != fmt.tprintf("^%s", game_struct) ||
+	   types[1] != fmt.tprintf("^%s", target) ||
+	   type_base(types[2]) != "Net_Id" ||
+	   (want_owner && type_base(types[3]) != "Player_Id") {
+		error_at(loc, "entity hook %s: expected `%s` — the game param is the struct carrying the entity= tags", name, shape)
+		return false
+	}
+	return true
+}
+
+@(private = "file")
+type_base :: proc(t: string) -> string {
+	base := t
+	if i := strings.last_index(base, "."); i >= 0 {base = base[i + 1:]}
+	return base
+}
+
+// Pair and validate one script's entity tags against the module. `by_struct`
+// maps every script struct name to its parsed Script; `seen_ids` accumulates
+// wire-id claims across the whole module (ids collide across FILES too).
+resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^map[int]string, idx: ^map[string]Then_Candidate) {
+	for &e in s.entities {
+		loc := Loc{path = s.path, line = e.line}
+		target, known := by_struct[e.target]
+		if !known {
+			error_at(loc, "entity %s: no script struct named %q in this module — the tag names the struct the scene bodies (its //gd:class file)", e.target, e.target)
+			continue
+		}
+		if len(target.replicates) == 0 && len(target.commands) == 0 {
+			error_at(
+				loc,
+				"entity %s: the struct has no gd:\"replicate\" fields or @(gd_command) procs — a wire entity needs a descriptor (tag its state, or drop the entity= declaration)",
+				e.target,
+			)
+			continue
+		}
+		if prev, dup := seen_ids[e.type_id]; dup {
+			error_at(loc, "entity %s: wire id %d is already claimed by %s — ids are the entity's wire identity and must be unique", e.target, e.type_id, prev)
+			continue
+		}
+		seen_ids[e.type_id] = fmt.aprintf("%s (%s:%d)", e.target, s.path, e.line)
+
+		tsnake := to_snake(e.target)
+		sp_name := strings.concatenate({tsnake, "_spawned"})
+		if cand, found := idx[sp_name]; found {
+			if validate_entity_hook(cand, sp_name, s.struct_name, e.target, want_owner = true) {
+				e.spawned = sp_name
+			}
+			cand.claimed = true
+			idx[sp_name] = cand
+		}
+		fr_name := strings.concatenate({tsnake, "_freed"})
+		if cand, found := idx[fr_name]; found {
+			if validate_entity_hook(cand, fr_name, s.struct_name, e.target, want_owner = false) {
+				e.freed = fr_name
+			}
+			cand.claimed = true
+			idx[fr_name] = cand
 		}
 	}
 }
@@ -922,14 +1232,24 @@ build_command_info :: proc(
 		}
 	}
 
+	// The FIRST result must be the applied bool. Results after it are the verb's
+	// PAYLOAD — facts the run learned ("what was taken", "did a round leave") —
+	// which never cross the wire: they thread straight into the name-paired
+	// `<wrapper>_then` consequence on the authority, replacing the scratch-field
+	// idiom. Payload types are unconstrained (in-process only); the generated
+	// call site lets the compiler hold the `_then` signature to them.
 	ret_ok := false
-	if pt.results != nil && len(pt.results.list) == 1 && len(pt.results.list[0].names) <= 1 {
+	if pt.results != nil && len(pt.results.list) > 0 && len(pt.results.list[0].names) <= 1 {
 		ret_ok = strings.trim_space(node_text(src, pt.results.list[0].type)) == "bool"
+		for extra in pt.results.list[1:] {
+			cmd.payload_count += max(1, len(extra.names))
+		}
 	}
 	if !ret_ok {
 		error_at(
 			loc,
-			"command %s must return exactly `bool` — true = applied, false = rejected (a rejection auto-reverts the declared fields)",
+			"command %s must return `bool` first — true = applied, false = rejected (a rejection auto-reverts the declared fields); results after it are the payload handed to a `%s_then` consequence",
+			proc_name,
 			proc_name,
 		)
 		ok = false

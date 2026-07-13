@@ -190,10 +190,11 @@ cave_lobby_throw :: proc(self: ^CaveLobby, dx: gd.Float, dy: gd.Float) {
 	applied := spelunker_throw_cmd(&self.ses.ctx, me, f32(dx), f32(dy), me.x, me.y)
 	if applied {
 		// Press fire, SEE rock — my visual flies this frame, no round trip.
-		// (On the host the command hook already launched the authoritative
-		// rock; cave_launch_rock skips the authority's own visual, so this
-		// is the one visual either role adds here.)
-		if f, ok := rock_fire(self.ses.me, self.me_spel); ok {
+		// (On the host spelunker_throw_then already launched the authoritative
+		// rock; cave_launch_rock skips the authority's own visual, so this is
+		// the one visual either role adds here. On my own cast the leash is a
+		// no-op, so origin == my position — the same line the payload carries.)
+		if f, ok := rock_fire(self.ses.me, {me.x, me.y}, {f32(dx), f32(dy)}); ok {
 			add_visual_rock(self, f)
 		}
 	}

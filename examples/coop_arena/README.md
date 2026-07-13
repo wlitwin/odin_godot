@@ -1,12 +1,18 @@
-# Co-op Arena — the peer-authoritative "friendslop done right" reference
+# Co-op Arena — the ENGINE-NATIVE multiplayer path, end to end
+
+> **Building a co-op game? Use the [friendslop toolkit](../../docs/kit/index.md)
+> instead** — `examples/cavecrawl` and `examples/slopball` are its references.
+> This example predates the toolkit and is kept as the demonstration of the RAW
+> engine surface the toolkit absorbs: `MultiplayerSynchronizer`, `@(gd_rpc)`,
+> and ~1,100 lines of hand-rolled netcode the kit games never write.
 
 A pure-Odin / Polygon2D co-op survivors example where **ONE gameplay codebase runs in THREE
 modes** — single-player, co-op over native ENet, and co-op in the browser over WebRTC — and the
 netcode is **owner / peer-authoritative** so your own actions are instant (no host round-trip).
 
-This is the **canonical co-op reference**. `examples/survivors` remains the single-player
-gameplay reference; its co-op layer is retained as the *host-authoritative* variant + the
-regression tests for the replication machinery (see its README).
+`examples/survivors` remains the single-player gameplay reference; its co-op layer is
+retained as the *host-authoritative* engine-native variant + the regression tests for the
+engine replication interop (see its README).
 
 ```
 nix develop --command bash -c 'bash examples/coop_arena/run.sh'              # single-player  -> ARENA_SINGLE_OK

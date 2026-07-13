@@ -33,8 +33,8 @@ import play "godot:play"
 
 MSG_SESSION :: u8(0) // all kit/session traffic under one game byte
 
-KICKER_TYPE :: ksess.Entity_Type(1)
-BALL_TYPE :: ksess.Entity_Type(2)
+// (KICKER3_TYPE/BALL3_TYPE are GENERATED from the scene fields' entity= tags —
+// each tag declares what its scene bodies and the entity's stable wire id.)
 
 DEFAULT_PORT :: 4189
 
@@ -64,12 +64,13 @@ Slopball3 :: struct {
 	running: bool, // transport up (hosting or joining)
 	started: bool, // the world reached this peer
 
-	// The authored bodies — the factory instantiates these.
-	kicker_scene: ^gd.Resource `gd:"export,resource=PackedScene"`,
-	ball_scene:   ^gd.Resource `gd:"export,resource=PackedScene"`,
+	// The authored bodies. Each tag's `entity=Name:id` IS the factory
+	// declaration — scriptgen generates the TYPE consts + the kind table,
+	// and kboot.boot_entities (ready(), below) instantiates/frees them.
+	kicker_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Kicker3:1"`,
+	ball_scene:   ^gd.Resource `gd:"export,resource=PackedScene,entity=Ball3:2"`,
 
 	kickers:   map[knet.Net_Id]^Kicker3,
-	nodes:     map[knet.Net_Id]gd.Node,
 	avatar_of: map[knet.Player_Id]knet.Net_Id,
 	me_kick:   ^Kicker3, // my avatar (nil until spawned)
 	ball:      ^Ball3,
@@ -104,7 +105,6 @@ slopball3_ready :: proc(self: ^Slopball3) {
 		interp_delay = f64(gd.env_int("SLOP3_INTERP_MS", max(3000 / hz, 16))) / 1000.0,
 	})
 	gd.engine_set_physics_ticks_per_second(gd.singleton_engine(), gd.Int(hz))
-	ksess.session_set_factory(&self.ses, self, slop3_make_entity, slop3_free_entity)
 
 	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
 		title = "S L O P B A L L  3 D",
@@ -116,6 +116,10 @@ slopball3_ready :: proc(self: ^Slopball3) {
 		spatial = true, // 3D game: Node3D stage/world containers
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
+	// The factory, written by nobody: the generated table (from the entity=
+	// tags above) makes/frees under boot.world; world.odin's *_spawned/
+	// *_freed hooks keep the kicker/ball census.
+	kboot.boot_entities(&self.boot, self, slopball3_entity_kinds[:])
 
 	self.goals_to = gd.env_int("SLOP3_GOALS", 3)
 	self.bot = gd.env_string("SLOP3_BOT", "")

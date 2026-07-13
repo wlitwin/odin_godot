@@ -35,8 +35,8 @@ import play "godot:play"
 
 MSG_SESSION :: u8(0) // all kit/session traffic under one game byte
 
-KICKER_TYPE :: ksess.Entity_Type(1)
-BALL_TYPE :: ksess.Entity_Type(2)
+// (KICKER_TYPE/BALL_TYPE are GENERATED from the scene fields' entity= tags —
+// each tag declares what its scene bodies and the entity's stable wire id.)
 
 DEFAULT_PORT :: 4188
 
@@ -71,12 +71,13 @@ Slopball :: struct {
 	running: bool, // transport up (hosting or joining)
 	started: bool, // the world reached this peer
 
-	// The authored bodies — the factory instantiates these.
-	kicker_scene: ^gd.Resource `gd:"export,resource=PackedScene"`,
-	ball_scene:   ^gd.Resource `gd:"export,resource=PackedScene"`,
+	// The authored bodies. Each tag's `entity=Name:id` IS the factory
+	// declaration — scriptgen generates the TYPE consts + the kind table,
+	// and kboot.boot_entities (ready(), below) instantiates/frees them.
+	kicker_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Kicker:1"`,
+	ball_scene:   ^gd.Resource `gd:"export,resource=PackedScene,entity=Ball:2"`,
 
 	kickers:   map[knet.Net_Id]^Kicker,
-	nodes:     map[knet.Net_Id]gd.Node,
 	avatar_of: map[knet.Player_Id]knet.Net_Id,
 	me_kick:   ^Kicker, // my avatar (nil until spawned)
 	ball:      ^Ball,
@@ -116,7 +117,6 @@ slopball_ready :: proc(self: ^Slopball) {
 	// The net rate is only honest if the SOLVER steps at it too: a 120Hz
 	// session over 60Hz physics just streams duplicate poses.
 	gd.engine_set_physics_ticks_per_second(gd.singleton_engine(), gd.Int(hz))
-	ksess.session_set_factory(&self.ses, self, slop_make_entity, slop_free_entity)
 
 	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
 		title = "S L O P B A L L",
@@ -127,6 +127,10 @@ slopball_ready :: proc(self: ^Slopball) {
 		min_players = 1, // a lone host may start and kick the ball around
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
+	// The factory, written by nobody: the generated table (from the entity=
+	// tags above) makes/frees under boot.world; world.odin's *_spawned/
+	// *_freed hooks keep the kicker/ball census.
+	kboot.boot_entities(&self.boot, self, slopball_entity_kinds[:])
 
 	self.goals_to = gd.env_int("SLOP_GOALS", 3)
 	self.bot = gd.env_string("SLOP_BOT", "")

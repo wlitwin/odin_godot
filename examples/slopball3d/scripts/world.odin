@@ -1,64 +1,42 @@
 package slopball3d
 
-// The factory + spawns: the session announces entities by type, this file
-// instantiates the authored scenes and hands back struct + command set.
+// Spawns + the census hooks. The FACTORY is generated: each scene field's
+// `entity=Name:id` tag (slopball3d.odin) declares what the scene bodies and
+// its wire id; kboot.boot_entities instantiates/frees under boot.world and
+// keeps the id→node ledger. What's left here is the game-shaped half — the
+// typed *_spawned/*_freed hooks that keep the by-type maps.
 
 import gd "godot:godot"
 import knet "godot:kit/net"
-import rt "godot:runtime"
 import ksess "godot:kit/session"
 
-@(private = "file")
-spawn_scene :: proc(self: ^Slopball3, scene: ^gd.Resource) -> gd.Node {
-	node := gd.instantiate(cast(gd.Packed_Scene)scene)
-	gd.add_child(self.boot.world, node)
-	return node
+kicker3_spawned :: proc(game: ^Slopball3, self: ^Kicker3, id: knet.Net_Id, owner: knet.Player_Id) {
+	game.kickers[id] = self
+	if owner != knet.PLAYER_ID_INVALID {
+		game.avatar_of[owner] = id
+		if owner == game.ses.me {
+			self.mine = true
+			game.me_kick = self
+		}
+	}
 }
 
-slop3_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (rawptr, ^knet.Command_Set) {
-	self := cast(^Slopball3)user
-	switch type {
-	case KICKER_TYPE:
-		node := spawn_scene(self, self.kicker_scene)
-		self.nodes[id] = node
-		k := rt.script_of(node, Kicker3)
-		k.net_id = id
-		self.kickers[id] = k
-		if owner != knet.PLAYER_ID_INVALID {
-			self.avatar_of[owner] = id
-			if owner == self.ses.me {
-				k.mine = true
-				self.me_kick = k
-			}
-		}
-		return k, &kicker3_command_set
-	case BALL_TYPE:
-		node := spawn_scene(self, self.ball_scene)
-		self.nodes[id] = node
-		b := rt.script_of(node, Ball3)
-		b.net_id = id
-		self.ball = b
-		self.ball_id = id
-		return b, &ball3_command_set
+kicker3_freed :: proc(game: ^Slopball3, self: ^Kicker3, id: knet.Net_Id) {
+	if self == game.me_kick {
+		game.me_kick = nil
 	}
-	return nil, nil
+	delete_key(&game.kickers, id)
 }
 
-slop3_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
-	self := cast(^Slopball3)user
-	if node, ok := self.nodes[id]; ok {
-		gd.node_queue_free(node)
-		delete_key(&self.nodes, id)
-	}
-	if k, ok := self.kickers[id]; ok {
-		if k == self.me_kick {
-			self.me_kick = nil
-		}
-		delete_key(&self.kickers, id)
-	}
-	if self.ball_id == id {
-		self.ball = nil
-		self.ball_id = 0
+ball3_spawned :: proc(game: ^Slopball3, self: ^Ball3, id: knet.Net_Id, owner: knet.Player_Id) {
+	game.ball = self
+	game.ball_id = id
+}
+
+ball3_freed :: proc(game: ^Slopball3, self: ^Ball3, id: knet.Net_Id) {
+	if game.ball_id == id {
+		game.ball = nil
+		game.ball_id = 0
 	}
 }
 
@@ -66,7 +44,7 @@ slop3_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 // seated player, spread along their team's half.
 spawn_world :: proc(self: ^Slopball3) {
 	if self.ball != nil {return} // the started flag flips on the EVENT; this guard is synchronous
-	bp, bid := ksess.session_spawn_make(&self.ses, BALL_TYPE, owner = self.ses.me)
+	bp, bid := ksess.session_spawn_make(&self.ses, BALL3_TYPE, owner = self.ses.me)
 	ball := cast(^Ball3)bp
 	ball.puppet.pos = {PITCH_W / 2, BALL_REST_Y, PITCH_D / 2}
 	ksess.session_spawn_send(&self.ses, bid)
@@ -86,7 +64,7 @@ spawn_world :: proc(self: ^Slopball3) {
 // Host: one avatar for `pid`, placed on its team's side of the center line.
 spawn_kicker :: proc(self: ^Slopball3, pid: knet.Player_Id) {
 	if _, has := self.avatar_of[pid]; has {return}
-	kp, kid := ksess.session_spawn_make(&self.ses, KICKER_TYPE, owner = pid)
+	kp, kid := ksess.session_spawn_make(&self.ses, KICKER3_TYPE, owner = pid)
 	k := cast(^Kicker3)kp
 	k.pid = u8(pid)
 	team := kicker3_team(k.pid)

@@ -15,7 +15,9 @@
 #       a #assert that FAILS the consumer compile, naming the field.
 #   (4) An unknown replicate option is a scriptgen-time error.
 #   (5) Command contract violations are scriptgen-time errors: no net_id field /
-#       no replicated fields, platform-width int args, non-bool returns.
+#       no replicated fields, platform-width int args, non-bool-first returns,
+#       and mispaired `<verb>_then` consequences (the shape is validated at
+#       build time — a consequence can never silently not fire).
 #
 # Prints REPGEN_OK. Run inside the Nix dev shell, e.g.:
 #   nix develop --command bash -c 'bash tests/repgen/run.sh'
@@ -66,9 +68,12 @@ fi
 echo "  ok  descriptor generated (fields, multi-name expansion, flags, POD asserts)"
 
 # @(gd_command) artifacts: thunks decode-check-call, table carries predict flags,
-# wrappers are typed and role-branch on ctx.is_authority.
+# wrappers are typed and role-branch on ctx.is_authority. The `<verb>_then`
+# consequence pairs by name: payload returns are captured and threaded, the
+# call is gated on the authoritative run (env.authority in the thunk; the
+# wrapper's authority branch fires it for the host's own issues).
 for needle in \
-	'_pawn_cmd_hit :: proc(entity: rawptr, r: ^knet.Reader) -> bool' \
+	'_pawn_cmd_hit :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool' \
 	'_a0 := knet.read_i32(r)' \
 	'if r.err {return false}' \
 	'{name = "hit", predict = true, invoke = _pawn_cmd_hit}' \
@@ -79,6 +84,10 @@ for needle in \
 	'if ctx.is_authority {' \
 	'knet.command_begin(ctx, self.net_id, 0)' \
 	'knet.write_player_id(&ctx.msg, who)' \
+	'_ok, _p0 := pawn_loot(self, _a0)' \
+	'if _ok && env.authority {' \
+	'pawn_loot_then(self, env.by, _a0, _p0)' \
+	'pawn_loot_then(self, ctx.me, slot, _p0)' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
 		echo "REPGEN_FAIL: generated file is missing command artifact: $needle"
@@ -91,6 +100,26 @@ if grep -qF '_pawn_m_hit' "$GEN"; then
 	exit 1
 fi
 echo "  ok  command thunks, table, set, and typed issue wrappers generated"
+
+# Entity-table artifacts (board.odin's `entity=Pawn:7` scene tag): the TYPE
+# const, the kboot.Entity_Kind row reading the scene THROUGH the field
+# offset, and the typed dispatch for the name-paired census hooks.
+BGEN="$GOOD/board.gen.odin"
+[ -f "$BGEN" ] || { echo "REPGEN_FAIL: scriptgen produced no board.gen.odin"; exit 1; }
+for needle in \
+	'PAWN_TYPE :: ksess.Entity_Type(7)' \
+	'board_entity_kinds := [?]kboot.Entity_Kind' \
+	'scene_offset = offset_of(Board, pawn_scene)' \
+	'spawned = _board_ent_spawned_pawn' \
+	'freed = _board_ent_freed_pawn' \
+	'return rt.script_of(node, Pawn)' \
+; do
+	if ! grep -qF "$needle" "$BGEN"; then
+		echo "REPGEN_FAIL: generated file is missing entity artifact: $needle"
+		exit 1
+	fi
+done
+echo "  ok  entity table generated (TYPE const, kinds row, typed census hooks)"
 
 "$ODIN" check "$GOOD" -collection:godot="$ROOT" -no-entry-point \
 	${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"}
@@ -340,9 +369,153 @@ if [ "$CMD2_RC" -eq 0 ]; then
 fi
 echo "$CMD2_OUT" | grep -q "platform-dependent width" \
 	|| { echo "REPGEN_FAIL: missing the int-width command error"; echo "$CMD2_OUT" | tail -3; exit 1; }
-echo "$CMD2_OUT" | grep -q "must return exactly \`bool\`" \
+echo "$CMD2_OUT" | grep -q "must return \`bool\` first" \
 	|| { echo "REPGEN_FAIL: missing the non-bool-return command error"; echo "$CMD2_OUT" | tail -3; exit 1; }
 echo "  ok  bad command signatures rejected at scriptgen time"
+
+# ---- (5c): a mispaired `_then` consequence is a scriptgen-time error ----
+CMD3="$TMP/cmd3"
+mkdir -p "$CMD3"
+cat > "$CMD3/odd.odin" <<'EOF'
+//gd:extends Node
+//gd:class Odd
+package repgen_cmd3
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Odd :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 `gd:"replicate"`,
+}
+
+@(gd_command)
+odd_hit :: proc(self: ^Odd, amount: i32) -> bool {
+	return true
+}
+
+odd_hit_then :: proc(self: ^Odd, amount: i32) { // missing the issuer param
+}
+EOF
+set +e
+CMD3_OUT="$(run_scriptgen "$CMD3" 2>&1)"
+CMD3_RC=$?
+set -e
+if [ "$CMD3_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a consequence missing its issuer param was accepted by scriptgen"
+	exit 1
+fi
+echo "$CMD3_OUT" | grep -q "must be the issuer" \
+	|| { echo "REPGEN_FAIL: missing the consequence-shape error"; echo "$CMD3_OUT" | tail -3; exit 1; }
+echo "  ok  mispaired _then consequence rejected at scriptgen time"
+
+# ---- (5d): entity-table contract violations are scriptgen-time errors ----
+ENT="$TMP/ent"
+mkdir -p "$ENT"
+cat > "$ENT/gremlin.odin" <<'EOF'
+//gd:extends Node
+//gd:class Gremlin
+package repgen_ent
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Gremlin :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 `gd:"replicate"`,
+}
+
+gremlin_ready :: proc(self: ^Gremlin) {
+}
+EOF
+cat > "$ENT/den.odin" <<'EOF'
+//gd:extends Node2D
+//gd:class Den
+package repgen_ent
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Den :: struct {
+	owner:   gd.Node2d,
+	a_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Gremlin:5"`,
+	b_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Gremlin:5"`, // duplicate wire id
+	c_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Ghost:9"`,   // no such struct
+}
+
+gremlin_spawned :: proc(game: ^Den, self: ^Gremlin, id: knet.Net_Id) { // missing the owner param
+}
+
+den_ready :: proc(self: ^Den) {
+}
+EOF
+set +e
+ENT_OUT="$(run_scriptgen "$ENT" 2>&1)"
+ENT_RC=$?
+set -e
+if [ "$ENT_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: entity-table contract violations were accepted by scriptgen"
+	exit 1
+fi
+echo "$ENT_OUT" | grep -q "already claimed" \
+	|| { echo "REPGEN_FAIL: missing the duplicate-wire-id error"; echo "$ENT_OUT" | tail -4; exit 1; }
+echo "$ENT_OUT" | grep -q "no script struct named" \
+	|| { echo "REPGEN_FAIL: missing the unknown-entity-struct error"; echo "$ENT_OUT" | tail -4; exit 1; }
+echo "$ENT_OUT" | grep -q "entity hook gremlin_spawned: expected" \
+	|| { echo "REPGEN_FAIL: missing the census-hook-shape error"; echo "$ENT_OUT" | tail -4; exit 1; }
+echo "  ok  entity-table violations rejected: duplicate id, unknown struct, hook shape"
+
+# ---- (5e): a typo'd method NAME in boot_attach/wire_listen is a scriptgen error ----
+# (the strings connect Godot signals — a typo compiles and fails as behavior:
+# the alt-F4'd-friend-haunts-the-roster bug. "" stays a deliberate skip.)
+BM="$TMP/bm"
+mkdir -p "$BM"
+cat > "$BM/hall.odin" <<'EOF'
+//gd:extends Node
+//gd:class Hall
+package repgen_bm
+
+import gd "godot:godot"
+import kboot "godot:kit/boot"
+import netgd "godot:kit/netgd"
+
+Hall :: struct {
+	owner: gd.Node,
+	boot:  kboot.Boot,
+}
+
+@(gd_method)
+hall_on_host :: proc(self: ^Hall) {
+}
+
+hall_ready :: proc(self: ^Hall) {
+	kboot.boot_attach(&self.boot, self.owner, nil, nil, kboot.Options{
+		methods = {"on_host", "on_hots", ""},
+	})
+	netgd.wire_listen(&self.boot.wire, "on_pakcet", "")
+}
+EOF
+set +e
+BM_OUT="$(run_scriptgen "$BM" 2>&1)"
+BM_RC=$?
+set -e
+if [ "$BM_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: typo'd signal method names were accepted by scriptgen"
+	exit 1
+fi
+echo "$BM_OUT" | grep -q '"on_hots" names no @(gd_method) of Hall' \
+	|| { echo "REPGEN_FAIL: missing the boot_attach method-name error"; echo "$BM_OUT" | tail -4; exit 1; }
+echo "$BM_OUT" | grep -q '"on_pakcet" names no @(gd_method) of Hall' \
+	|| { echo "REPGEN_FAIL: missing the wire_listen method-name error"; echo "$BM_OUT" | tail -4; exit 1; }
+if echo "$BM_OUT" | grep -q '"on_host" names no'; then
+	echo "REPGEN_FAIL: the lint flagged a correctly declared method"
+	exit 1
+fi
+[ "$(echo "$BM_OUT" | grep -c 'names no @(gd_method)')" = "2" ] \
+	|| { echo "REPGEN_FAIL: empty-string skips must not be flagged"; echo "$BM_OUT" | tail -5; exit 1; }
+echo "  ok  typo'd signal method names rejected; \"\" skips stay silent"
 
 # ---- (6): the self-vs-owner lint — bare `self` in a gd.* call is an error ----
 # Engine handles are rawptr aliases, so `gd.add_child(self, node)` COMPILES and

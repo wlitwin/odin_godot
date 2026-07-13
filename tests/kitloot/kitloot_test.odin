@@ -71,7 +71,7 @@ PICKUP_GRAB :: u16(0) // args: [px f32][py f32]
 
 // The whole loot rule, written once, zero role branches: the predicting
 // client and the host run this same proc from byte-identical args.
-chest_cmd_take :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+chest_cmd_take :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
 	c := cast(^Chest)entity
 	slot := int(knet.read_u8(r))
 	count := knet.read_u16(r)
@@ -85,7 +85,7 @@ chest_cmd_take :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
 	return true
 }
 
-door_cmd_toggle :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+door_cmd_toggle :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
 	d := cast(^Door)entity
 	px := knet.read_f32(r)
 	py := knet.read_f32(r)
@@ -97,7 +97,7 @@ door_cmd_toggle :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
 
 // Drop a bag slot on the floor: mutates MY avatar only (bag out, scratch in);
 // the hook turns the scratch into a Pickup entity at my feet.
-spel_cmd_drop :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+spel_cmd_drop :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
 	sp := cast(^Spelunker)entity
 	slot := int(knet.read_u8(r))
 	if r.err {return false}
@@ -109,7 +109,7 @@ spel_cmd_drop :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
 
 // Grab a pickup: the contended race in its smallest form — one field pair,
 // zeroed by whoever the host says got there first.
-pickup_cmd_grab :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+pickup_cmd_grab :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
 	p := cast(^Pickup)entity
 	px := knet.read_f32(r)
 	py := knet.read_f32(r)
@@ -724,7 +724,8 @@ the_host_loots_like_anyone :: proc(t: ^testing.T) {
 	knet.write_f32(&w, 0)
 	knet.write_f32(&w, 0)
 	r := knet.reader_make(knet.writer_bytes(&w))
-	testing.expect(t, chest_cmd_take(chest, &r))
+	env := knet.Command_Env{authority = true, by = cv.host.s.me}
+	testing.expect(t, chest_cmd_take(chest, &r, &env))
 	loot_hook(&cv.host, cv.host.s.me, cv.chest_id, CHEST_TAKE, true)
 
 	step(cv.boxes, &cv.now)

@@ -61,11 +61,17 @@ generate :: proc(s: ^Script) -> string {
 	// gd:"replicate" field needs the kit/net descriptor + the POD compile-time check
 	// (commands imply replicates — parse validation enforces it — but keep the
 	// condition independent for robustness).
-	if len(s.replicates) > 0 || len(s.commands) > 0 {
+	if len(s.replicates) > 0 || len(s.commands) > 0 || len(s.entities) > 0 {
 		w(&b, "import knet \"godot:kit/net\"\n")
 	}
 	if len(s.replicates) > 0 {
 		w(&b, "import \"base:intrinsics\"\n")
+	}
+	// entity tables (`entity=Name:id` scene fields) name ksess.Entity_Type and
+	// build kboot.Entity_Kind rows.
+	if len(s.entities) > 0 {
+		w(&b, "import ksess \"godot:kit/session\"\n")
+		w(&b, "import kboot \"godot:kit/boot\"\n")
 	}
 	// verb-composition: import each package a COMPOSED command's proc lives in (so the routed
 	// thunk can name `play.gun_fire`), deduped by path. "" = the entity's own package (no import).
@@ -75,6 +81,10 @@ generate :: proc(s: ^Script) -> string {
 		imported := make(map[string]bool)
 		imported["godot:godot"] = true
 		imported["godot:kit/net"] = true
+		if len(s.entities) > 0 {
+			imported["godot:kit/session"] = true
+			imported["godot:kit/boot"] = true
+		}
 		for c in s.commands {
 			if c.pkg_path == "" || imported[c.pkg_path] {continue}
 			imported[c.pkg_path] = true
@@ -514,7 +524,10 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	// command. The wrapper holds the ONLY role branch in the entire feature:
 	// authority runs the proc directly (and fires the game's command hook, the
 	// same cross-entity path client commands take); clients predict (iff
-	// declared) and send.
+	// declared) and send. A name-paired `<wrapper>_then` consequence, when the
+	// game declares one, fires on the authority right after the verb applies —
+	// in the thunk for received commands, in the wrapper for the host's own —
+	// with the issuer, the wire args, and the verb's returned payload.
 	upper := strings.to_upper(snake)
 	if len(s.commands) > 0 {
 		w(b, "// ---- @(gd_command) dispatch + typed issue wrappers ----\n\n")
@@ -529,18 +542,56 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			// proc with its package (`play.gun_fire`); a direct one runs `runner_fire(self, …)`.
 			recv := len(c.path) > 0 ? fmt.tprintf("&self.%s", join_path(c.path)) : "self"
 			qual := c.pkg_alias != "" ? fmt.tprintf("%s.", c.pkg_alias) : ""
-			fmt.sbprintf(b, "@(private = \"file\")\n_%s_cmd_%s :: proc(entity: rawptr, r: ^knet.Reader) -> bool {{\n", snake, c.name)
+			fmt.sbprintf(b, "@(private = \"file\")\n_%s_cmd_%s :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {{\n", snake, c.name)
 			fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
 			for a, i in c.args {
 				fmt.sbprintf(b, "\t_a%d := knet.read_%s(r)\n", i, a.wire)
 			}
 			w(b, "\tif r.err {return false}\n")
-			fmt.sbprintf(b, "\treturn %s%s(%s", qual, c.proc_name, recv)
-			if c.owner {w(b, ", self")} // the block asked for its wielder — pass the entity
+			// The verb call — payload returns are captured for the consequence
+			// (or blanked when nothing consumes them).
+			if c.then_proc == "" && c.payload_count == 0 {
+				fmt.sbprintf(b, "\treturn %s%s(%s", qual, c.proc_name, recv)
+				if c.owner {w(b, ", self")} // the block asked for its wielder — pass the entity
+				for _, i in c.args {
+					fmt.sbprintf(b, ", _a%d", i)
+				}
+				w(b, ")\n}\n\n")
+				continue
+			}
+			w(b, "\t_ok")
+			for i in 0 ..< c.payload_count {
+				if c.then_proc != "" {
+					fmt.sbprintf(b, ", _p%d", i)
+				} else {
+					w(b, ", _") // payload declined — the block offered, nobody consumes
+				}
+			}
+			fmt.sbprintf(b, " := %s%s(%s", qual, c.proc_name, recv)
+			if c.owner {w(b, ", self")}
 			for _, i in c.args {
 				fmt.sbprintf(b, ", _a%d", i)
 			}
-			w(b, ")\n}\n\n")
+			w(b, ")\n")
+			if c.then_proc != "" {
+				// The consequence: authority-only, once, after the verb applied —
+				// predictions and replays run this same thunk with authority=false.
+				w(b, "\tif _ok && env.authority {\n")
+				if c.then_game != "" {
+					fmt.sbprintf(b, "\t\tassert(env.user != nil, \"%s needs the game pointer — session_set_factory's user is what consequences receive (tests: set ctx.game_user)\")\n", c.then_proc)
+					fmt.sbprintf(b, "\t\t%s(cast(^%s)env.user, self, env.by", c.then_proc, c.then_game)
+				} else {
+					fmt.sbprintf(b, "\t\t%s(self, env.by", c.then_proc)
+				}
+				for _, i in c.args {
+					fmt.sbprintf(b, ", _a%d", i)
+				}
+				for i in 0 ..< c.payload_count {
+					fmt.sbprintf(b, ", _p%d", i)
+				}
+				w(b, ")\n\t}\n")
+			}
+			w(b, "\treturn _ok\n}\n\n")
 		}
 
 		fmt.sbprintf(b, "@(private = \"file\")\n_%s_commands := [?]knet.Command_Desc {{\n", snake)
@@ -585,12 +636,38 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			w(b, ") -> bool {\n")
 			w(b, "\tif ctx.is_authority {\n")
-			fmt.sbprintf(b, "\t\t_ok := %s%s(%s", qual, c.proc_name, recv)
+			w(b, "\t\t_ok")
+			for i in 0 ..< c.payload_count {
+				if c.then_proc != "" {
+					fmt.sbprintf(b, ", _p%d", i)
+				} else {
+					w(b, ", _")
+				}
+			}
+			fmt.sbprintf(b, " := %s%s(%s", qual, c.proc_name, recv)
 			if c.owner {w(b, ", self")}
 			for a in c.args {
 				fmt.sbprintf(b, ", %s", a.name)
 			}
 			w(b, ")\n")
+			if c.then_proc != "" {
+				// The host's own issue takes the same consequence path a client's
+				// command does (fired in the receive thunk there).
+				w(b, "\t\tif _ok {\n")
+				if c.then_game != "" {
+					fmt.sbprintf(b, "\t\t\tassert(ctx.game_user != nil, \"%s needs the game pointer — session_set_factory's user is what consequences receive (tests: set ctx.game_user)\")\n", c.then_proc)
+					fmt.sbprintf(b, "\t\t\t%s(cast(^%s)ctx.game_user, self, ctx.me", c.then_proc, c.then_game)
+				} else {
+					fmt.sbprintf(b, "\t\t\t%s(self, ctx.me", c.then_proc)
+				}
+				for a in c.args {
+					fmt.sbprintf(b, ", %s", a.name)
+				}
+				for i in 0 ..< c.payload_count {
+					fmt.sbprintf(b, ", _p%d", i)
+				}
+				w(b, ")\n\t\t}\n")
+			}
 			fmt.sbprintf(b, "\t\tknet.command_hook_local(ctx, self.net_id, %d, _ok) // same cross-entity path client commands take\n", ci)
 			w(b, "\t\treturn _ok\n\t}\n")
 			fmt.sbprintf(b, "\tknet.command_begin(ctx, self.net_id, %d)\n", ci)
@@ -599,6 +676,48 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			fmt.sbprintf(b, "\treturn knet.command_issue(ctx, self, &%s_command_set, %d)\n}}\n\n", snake, ci)
 		}
+	}
+
+	// ---- entity kinds: `entity=Name:id` scene fields -> the kboot table ----
+	// The tag on the exported PackedScene field is the whole factory
+	// declaration: TYPE consts (the wire ids games used to hand-keep), typed
+	// rt.script_of thunks, typed spawn/free hook thunks, and one
+	// kboot.Entity_Kind row per tag. kit/boot's boot_entities drives it.
+	if len(s.entities) > 0 {
+		w(b, "// ---- entity kinds (gd:\"...,entity=Name:id\" scene fields) ----\n\n")
+		w(b, "// The stable wire ids, named like the hand-kept consts they replace.\n")
+		for e in s.entities {
+			fmt.sbprintf(b, "%s_TYPE :: ksess.Entity_Type(%d)\n", strings.to_upper(to_snake(e.target)), e.type_id)
+		}
+		w(b, "\n")
+		for e in s.entities {
+			tsnake := to_snake(e.target)
+			fmt.sbprintf(b, "@(private = \"file\")\n_%s_ent_make_%s :: proc(node: gd.Node) -> rawptr {{\n\treturn rt.script_of(node, %s)\n}}\n\n", snake, tsnake, e.target)
+			if e.spawned != "" {
+				fmt.sbprintf(b, "@(private = \"file\")\n_%s_ent_spawned_%s :: proc(game: rawptr, entity: rawptr, id: knet.Net_Id, owner: knet.Player_Id) {{\n\t%s(cast(^%s)game, cast(^%s)entity, id, owner)\n}}\n\n", snake, tsnake, e.spawned, cls, e.target)
+			}
+			if e.freed != "" {
+				fmt.sbprintf(b, "@(private = \"file\")\n_%s_ent_freed_%s :: proc(game: rawptr, entity: rawptr, id: knet.Net_Id) {{\n\t%s(cast(^%s)game, cast(^%s)entity, id)\n}}\n\n", snake, tsnake, e.freed, cls, e.target)
+			}
+		}
+		fmt.sbprintf(b, "// The factory table — pass to kboot.boot_entities(&self.boot, self, %s_entity_kinds[:]).\n", snake)
+		fmt.sbprintf(b, "%s_entity_kinds := [?]kboot.Entity_Kind {{\n", snake)
+		for e in s.entities {
+			tsnake := to_snake(e.target)
+			fmt.sbprintf(
+				b,
+				"\t{{type = %s_TYPE, name = %q, set = &%s_command_set, script_of = _%s_ent_make_%s, scene_offset = offset_of(%s, %s)",
+				strings.to_upper(tsnake), e.target, tsnake, snake, tsnake, cls, e.field,
+			)
+			if e.spawned != "" {
+				fmt.sbprintf(b, ", spawned = _%s_ent_spawned_%s", snake, tsnake)
+			}
+			if e.freed != "" {
+				fmt.sbprintf(b, ", freed = _%s_ent_freed_%s", snake, tsnake)
+			}
+			w(b, "},\n")
+		}
+		w(b, "}\n\n")
 	}
 
 	// lifecycle literal

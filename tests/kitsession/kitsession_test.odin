@@ -336,7 +336,7 @@ Bot :: struct {
 	x:  f32,
 }
 
-bot_cmd_hit :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+bot_cmd_hit :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
 	b := cast(^Bot)entity
 	amount := knet.read_i32(r)
 	if r.err {return false}
@@ -1713,7 +1713,8 @@ type_hooks_route_and_catch_all_falls_back :: proc(t: ^testing.T) {
 	_ = hbot
 	// (games use the generated wrapper; the raw authority path is invoke+hook)
 	r := knet.reader_make([]u8{3, 0, 0, 0})
-	_ = bot_cmd_hit(host.s.reg.entries[id].entity, &r)
+	env := knet.Command_Env{authority = true, by = host.s.me}
+	_ = bot_cmd_hit(host.s.reg.entries[id].entity, &r, &env)
 	knet.command_hook_local(&host.s.ctx, id, 0, true)
 	testing.expect_value(t, len(typed.calls), 2)
 

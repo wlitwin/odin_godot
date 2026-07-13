@@ -1,11 +1,12 @@
 package cavecrawl_scripts
 
-// The authority: everything only the HOST runs. The command hook settles the
-// cross-entity half of each verb (a command proc may only mutate its own
-// target — see chest.odin/spelunker.odin), the game tick decays clocks and
-// deals damage, and the dwellers think here. Every consequence written to a
-// replicated field travels as a plain delta; no file below kit/ knows any
-// of this exists.
+// The authority: everything only the HOST runs. Each verb's cross-entity
+// half lives in its `<verb>_then` consequence NEXT TO the verb (a command
+// proc may only mutate its own target — see chest.odin/spelunker.odin);
+// this file keeps the host helpers those consequences call, the game tick
+// that decays clocks and deals damage, and the dwellers' thinking. Every
+// consequence written to a replicated field travels as a plain delta; no
+// file below kit/ knows any of this exists.
 
 import gd "godot:godot"
 import rt "godot:runtime"
@@ -19,15 +20,16 @@ import ksess "godot:kit/session"
 import "core:fmt"
 
 
-// THE CROSS-ENTITY HALF of looting, host only (see chest.odin): a successful
-// take credits the issuer's bag; what doesn't fit goes back in the chest.
-cave_credit :: proc(self: ^CaveLobby, player: knet.Player_Id, chest: ^Chest) {
+// THE CROSS-ENTITY HALF of looting, host only (fired by chest_take_then): a
+// successful take credits the issuer's bag; what doesn't fit goes back in
+// the chest.
+cave_credit :: proc(self: ^CaveLobby, player: knet.Player_Id, chest: ^Chest, taken: kitems.Slot) {
 	av, has := self.avatar_of[player]
 	if !has {return}
 	sp := self.spelunkers[av]
-	credited := kitems.add(&self.table, sp.bag[:], chest.last_take.item, chest.last_take.count)
-	if leftover := chest.last_take.count - credited; leftover > 0 {
-		_ = kitems.add(&self.table, chest.slots[:], chest.last_take.item, leftover)
+	credited := kitems.add(&self.table, sp.bag[:], taken.item, taken.count)
+	if leftover := taken.count - credited; leftover > 0 {
+		_ = kitems.add(&self.table, chest.slots[:], taken.item, leftover)
 	}
 }
 
@@ -44,10 +46,10 @@ cave_mint_pickup_at :: proc(self: ^CaveLobby, item: kitems.Item_Id, count: u16, 
 	ksess.session_spawn_send(&self.ses, id)
 }
 
-// Host: mint the Pickup a drop left behind (the dropper's scratch tells us
-// what; the host's view of their avatar tells us where).
-cave_mint_pickup :: proc(self: ^CaveLobby, sp: ^Spelunker) {
-	cave_mint_pickup_at(self, sp.last_drop.item, sp.last_drop.count, sp.x + 24, sp.y)
+// Host: mint the Pickup a drop left behind (the verb's payload says what;
+// the host's view of the dropper's avatar says where).
+cave_mint_pickup :: proc(self: ^CaveLobby, sp: ^Spelunker, dropped: kitems.Slot) {
+	cave_mint_pickup_at(self, dropped.item, dropped.count, sp.x + 24, sp.y)
 }
 
 // Host: damage a spelunker from any source — a rock (attacker credited, a
@@ -141,54 +143,22 @@ cave_dwellers_think :: proc(self: ^CaveLobby) {
 	}
 }
 
-// Host: a grab succeeded — credit the grabber and remove the pickup for
-// everyone (clients free through the factory; the host frees its own node).
-cave_settle_grab :: proc(self: ^CaveLobby, player: knet.Player_Id, id: knet.Net_Id, p: ^Pickup) {
+// Host: a grab succeeded (fired by pickup_grab_then) — credit the grabber
+// and remove the pickup for everyone (clients free through the factory; the
+// host frees its own node).
+cave_settle_grab :: proc(self: ^CaveLobby, player: knet.Player_Id, id: knet.Net_Id, grabbed: kitems.Slot) {
 	if av, has := self.avatar_of[player]; has {
 		sp := self.spelunkers[av]
-		_ = kitems.add(&self.table, sp.bag[:], p.last_grab.item, p.last_grab.count)
+		_ = kitems.add(&self.table, sp.bag[:], grabbed.item, grabbed.count)
 	}
 	ksess.session_despawn(&self.ses, id) // the free proc handles node + maps, every role
 }
 
-// Client commands land here right after they execute on the host.
-cave_command_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
-	self := cast(^CaveLobby)user
-	if !ok {return}
-	if chest, is_chest := self.chests[entity]; is_chest && cmd == CHEST_CMD_TAKE {
-		cave_credit(self, player, chest)
-		return
-	}
-	if entity == self.relic_id && self.relic != nil {
-		// THE HANDOFF ITSELF — ownership transfer from the hook, exactly one
-		// call each way. Grab: first-come (a later grab finds it carried and
-		// does nothing). Drop: only the carrier's counts; the proc mutates
-		// nothing replicated, so anyone else's accepted drop is a no-op.
-		switch cmd {
-		case RELIC_CMD_GRAB:
-			if ksess.session_owner_of(&self.ses, entity) == knet.PLAYER_ID_INVALID {
-				ksess.session_set_owner(&self.ses, entity, player)
-			}
-		case RELIC_CMD_DROP:
-			if ksess.session_owner_of(&self.ses, entity) == player {
-				ksess.session_set_owner(&self.ses, entity, knet.PLAYER_ID_INVALID)
-			}
-		}
-		return
-	}
-	if sp, is_spel := self.spelunkers[entity]; is_spel {
-		switch cmd {
-		case SPELUNKER_CMD_DROP:
-			cave_mint_pickup(self, sp)
-		case SPELUNKER_CMD_THROW:
-			cave_launch_rock(self, player, sp)
-		}
-		return
-	}
-	if p, is_pickup := self.pickups[entity]; is_pickup && cmd == PICKUP_CMD_GRAB {
-		cave_settle_grab(self, player, entity, p)
-	}
-}
+// (Client commands used to land in a command hook here — a switch over
+// entity maps and cmd indices reading scratch fields. Each verb's
+// consequence now lives NEXT TO the verb as its `<verb>_then` proc, typed,
+// with the wire args and the verb's payload handed in: see chest.odin,
+// relic.odin, spelunker.odin, pickup.odin.)
 
 // Host: death spills the whole bag onto the floor — phase 3's pickups are
 // suddenly a combat mechanic. (Loot the fallen, or guard them.)
@@ -196,8 +166,7 @@ cave_command_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net
 cave_spill_bag :: proc(self: ^CaveLobby, sp: ^Spelunker) {
 	for slot in sp.bag {
 		if slot.item == kitems.ITEM_NONE {continue}
-		sp.last_drop = slot
-		cave_mint_pickup(self, sp)
+		cave_mint_pickup(self, sp, slot)
 	}
 	sp.bag = {}
 }

@@ -63,15 +63,18 @@ use → ship.**
 
 ## Learn from the examples
 
+- `examples/cavecrawl` — THE **co-op reference** (see [kit/](kit/index.md)): every
+  friendslop-toolkit package in one game, grown brick-by-brick with a latency-injected
+  multi-process acid test (`run.sh`) that doubles as the pattern to steal.
+- `examples/slopball` / `examples/slopball3d` — the **smallest complete kit games**: a
+  physics co-op pitch (engine physics via `play.Puppet`), in 2D and 3D.
 - **[examples/survivors](../examples/survivors/README.md)** — the headline single-player
   example: a complete survivors-like in pure Odin, with a per-file feature map. Its co-op
-  layer is retained as the **host-authoritative** variant + regression tests.
-- **[examples/coop_arena](../examples/coop_arena/README.md)** — the canonical
-  **peer-authoritative co-op** reference: one codebase, three modes (single-player, native
-  ENet, browser WebRTC with a room-code lobby).
-- `examples/cavecrawl` — the **friendslop toolkit** reference (see [kit/](kit/index.md)):
-  every toolkit package in one game, grown brick-by-brick with a latency-injected
-  two-process acid test (`run.sh`) that doubles as the pattern to steal.
+  layer is the ENGINE-NATIVE (host-authoritative) variant, retained for the interop tests.
+- **[examples/coop_arena](../examples/coop_arena/README.md)** — the engine-native
+  **peer-authoritative** path end-to-end: one codebase, three modes (single-player, native
+  ENet, browser WebRTC with a room-code lobby). Predates the toolkit; shows the raw surface
+  the kit absorbs.
 - `tests/showcase/` — the smallest "everything wired" pure-Odin scene (coin collector).
 
 ## Ship it

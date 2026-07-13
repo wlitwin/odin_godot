@@ -47,7 +47,9 @@ opts out with `Options.keep_vsync = true` (and may set its own vsync/fps
 policy after `boot_attach`). The eight
 `@(gd_method)` names are declared in *your* script (Godot signals must land on
 the game's class); their bodies are one-liners — see either example game's
-`net.odin`.
+`net.odin` — and **scriptgen validates every name in `methods` against the
+class's registered methods at build time**: a typo'd forward is a build
+error, not a haunted roster ("" still skips a signal on purpose).
 
 **`boot_pump` handles the boilerplate and re-yields everything.** It runs
 `wire_pump` + `session_tick`, reacts to the five events every game reacts to
@@ -56,6 +58,36 @@ gating at `min_players`; Stats → score repaint; Join_Failed/Host_Left →
 status lines), then returns **every** session event plus the comms markers
 (temp-allocated) so your switch sees the full stream. Your cases run *after*
 boot's, so a game-specific status line simply overwrites the stock one.
+
+**The factory, written by nobody:** tag each exported entity scene with what
+it bodies and its stable wire id, and pass the GENERATED table to
+`boot_entities` — the make/free switches, the `TYPE` consts, the
+`spawn_scene` helper, and the id→node map all stop existing:
+
+```odin
+// on the game struct — ordinary drag-drop exports, plus the declaration:
+mob_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Mob:3"`,
+
+// ready(), after boot_attach (the factory parents under boot.world):
+kboot.boot_entities(&self.boot, self, scrapyard_entity_kinds[:])
+
+// the game-shaped half stays yours, as typed name-paired hooks (optional):
+mob_spawned :: proc(game: ^Scrapyard, self: ^Mob, id: knet.Net_Id, owner: knet.Player_Id) {
+	game.mobs[id] = self   // bookkeeping — fields NOT set yet; dress on Ev_Spawned
+}
+mob_freed :: proc(game: ^Scrapyard, self: ^Mob, id: knet.Net_Id) {
+	delete_key(&game.mobs, id) // node + fields still alive — death fx go here
+}
+```
+
+The id is EXPLICIT on purpose — it rides saves, rejoins, and migration
+backups, so auto-numbering would scramble worlds across builds; scriptgen
+errors on duplicates, unknown structs, and mis-shaped hooks at build time.
+`boot_node(b, id)` looks up an entity's node (the old `nodes[id]` map);
+`boot_entities_clear(b)` is the back-to-lobby/takeover wipe. The scene is
+read through the field at spawn time, so editor wiring and hot reload keep
+working — and `session_set_factory` remains the escape hatch for exotic
+creation.
 
 **The buttons:** `boot_host(b, port, name)` and
 `boot_join(b, addr, port, token, name)` do transport-up + session-start + the

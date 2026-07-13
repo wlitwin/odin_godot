@@ -435,6 +435,7 @@ Session :: struct {
 	factory_user:  rawptr,
 	factory_make:  Make_Entity_Proc,
 	factory_free:  Free_Entity_Proc,
+	game_user:     rawptr, // session_set_game's explicit override (nil = the factory user)
 	cmd_hook_user: rawptr,
 	cmd_hook:      Command_Hook, // host: the cross-entity half of commands (the catch-all)
 	type_hooks:    map[Entity_Type]Type_Hook_Entry, // host: per-type routing (wins over the catch-all)
@@ -567,8 +568,12 @@ session_init :: proc(s: ^Session) {
 	s.ctx.send_user = s
 	// Re-install the hook dispatcher (hooks are wired in ready(), which runs
 	// before any *_start recreates this ctx — the survives-start contract).
+	// game_user rides the same contract: `_then` consequences keep their game
+	// pointer across rehosts and resumes (explicit session_set_game wins,
+	// else the factory's user).
 	s.ctx.hook = ctx_hook_dispatch
 	s.ctx.hook_user = s
+	s.ctx.game_user = s.game_user != nil ? s.game_user : s.factory_user
 	append(&s.stat_names, strings.clone("ping")) // STAT_PING, fed by the session
 }
 
@@ -750,11 +755,27 @@ session_stat :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col) -> i64 
 	return row[col]
 }
 
-// Install the client-side entity factory (do it before joining).
+// Install the client-side entity factory (do it before joining). The factory's
+// `user` doubles as THE game pointer — what every `<verb>_then` consequence
+// proc receives as its game param — unless session_set_game named a different
+// one (kboot's boot_entities does: its factory user is the Boot, so it names
+// the game explicitly). Survives starts via session_init's re-install.
 session_set_factory :: proc(s: ^Session, user: rawptr, make_entity: Make_Entity_Proc, free_entity: Free_Entity_Proc) {
 	s.factory_user = user
 	s.factory_make = make_entity
 	s.factory_free = free_entity
+	if s.game_user == nil {
+		s.ctx.game_user = user
+	}
+}
+
+// Name THE game pointer explicitly — what `<verb>_then` consequences receive.
+// Only needed when the factory's user is NOT the game (a driver like kboot's
+// boot_entities sits between); defaults to the factory user otherwise. Wins
+// regardless of call order and survives starts.
+session_set_game :: proc(s: ^Session, user: rawptr) {
+	s.game_user = user
+	s.ctx.game_user = user
 }
 
 // Install the host-side command hook (see Command_Hook; survives session

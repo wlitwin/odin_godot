@@ -376,6 +376,33 @@ Command_Info :: struct {
 	owner:     bool,
 	pkg_alias: string,
 	pkg_path:  string,
+	// Consequence pairing (`<wrapper>_then`): a verb may return `(bool, payload…)`
+	// and the game may declare a name-paired consequence proc — the typed,
+	// authority-only "and then…" that replaces scratch fields + the untyped hook
+	// switch. `payload_count` is how many results ride behind the applied bool
+	// (they never cross the wire — the consequence runs in the same process as
+	// the authoritative verb). `then_proc` = "" means no consequence declared;
+	// `then_game` is the leading game param's pointee ("Scrapyard", "" = the
+	// entity-local form) — generated code casts ctx.game_user/env.user to it.
+	payload_count: int,
+	then_proc:     string,
+	then_game:     string,
+}
+
+// An `entity=Name:id` declaration on an exported PackedScene field — one row
+// of the kboot entity table (factory consolidation): the scene stays an
+// editor-wired export; the tag names the entity struct it bodies and its
+// STABLE wire id (explicit on purpose — auto-numbering would silently
+// renumber saves/rejoins/backups on any edit).
+Entity_Tag :: struct {
+	field:   string, // the scene field (offset_of target on the game struct)
+	target:  string, // the entity struct the scene bodies ("Mob")
+	type_id: int,    // the stable ksess.Entity_Type value
+	line:    int,
+	// Resolved by resolve_entities (module-wide): the optional name-paired
+	// typed hooks ("" = not declared).
+	spawned: string, // <target_snake>_spawned
+	freed:   string, // <target_snake>_freed
 }
 
 Script :: struct {
@@ -397,6 +424,7 @@ Script :: struct {
 	rpcs:        [dynamic]Rpc_Info,
 	replicates:  [dynamic]Replicate_Info,
 	commands:    [dynamic]Command_Info,
+	entities:    [dynamic]Entity_Tag, // entity=Name:id scene fields (the kboot table)
 	net_id_type: string, // type text of a `net_id` field ("" = none) — commands require knet.Net_Id
 }
 
@@ -953,6 +981,44 @@ main :: proc() {
 			lint_misplaced(l.path, l.src, own, script_structs)
 		}
 	}
+
+	// Pass 3: name pairing. Collect every `*_then` / `*_spawned` / `*_freed`
+	// proc in the package (they may live anywhere — a game-threaded proc's
+	// first param is the GAME struct, so the per-class bound-proc scan never
+	// claims them), then pair each script's commands with their consequences
+	// and each entity tag with its hooks, validating every shape.
+	then_idx := make(map[string]Then_Candidate)
+	defer delete(then_idx)
+	method_claims := make([dynamic]Method_Claim)
+	defer delete(method_claims)
+	for l in lintable {
+		file := ast.File {
+			fullpath = l.path,
+			src      = l.src,
+		}
+		p := parser.default_parser()
+		p.err = silent_parse_diag
+		p.warn = silent_parse_diag
+		if !parser.parse_file(&p, &file) {continue}
+		scan_then_procs(&then_idx, l.path, l.src, &file)
+		scan_method_claims(&method_claims, l.path, l.src, &file, script_structs)
+	}
+	by_struct := make(map[string]^Script)
+	defer delete(by_struct)
+	script_snakes := make(map[string]bool)
+	defer delete(script_snakes)
+	for &pend in pending {
+		by_struct[pend.script.struct_name] = &pend.script
+		script_snakes[to_snake(pend.script.struct_name)] = true
+	}
+	seen_entity_ids := make(map[int]string)
+	defer delete(seen_entity_ids)
+	for &pend in pending {
+		resolve_then(&pend.script, &then_idx)
+		resolve_entities(&pend.script, by_struct, &seen_entity_ids, &then_idx)
+	}
+	warn_unclaimed_thens(&then_idx, script_snakes)
+	lint_method_claims(method_claims[:], by_struct)
 
 	// Generate, now that every file's contribution is in (validation too — a
 	// @(gd_command) found in a helper still needs its class's replicate/net_id).

@@ -34,10 +34,25 @@ package kit_net
 // installs it); entity resolution (Net_Id → pointer) is the caller's — commands
 // name entities, the registry finds them.
 
+// Everything a command run knows about the run itself — who issued it, whether
+// THIS execution is the authoritative one, and the game pointer consequences
+// receive. The thunk uses it to fire the verb's `<verb>_then` consequence
+// (generated from the name-paired proc) exactly once, on the authority, after
+// the verb applies: client predictions and registry replays re-run the VERB
+// from the same bytes but carry authority=false, so a consequence can never
+// double-fire or fire on spec.
+Command_Env :: struct {
+	authority: bool,      // this run is the authoritative one — consequences fire
+	user:      rawptr,    // the game pointer `_then` procs receive (ctx.game_user)
+	by:        Player_Id, // who issued the command (ctx.me locally; the resolved sender on the host)
+}
+
 // Decode-args-and-run thunk, generated per command by scriptgen. Contract: decode
 // ALL args, check r.err, only then call the author proc — a truncated packet must
-// never reach gameplay code (generated thunks do this; hand-written ones must).
-Command_Proc :: proc(entity: rawptr, r: ^Reader) -> bool
+// never reach gameplay code; when the proc applies and env.authority is set, fire
+// the command's `_then` consequence (generated thunks do all of this; hand-written
+// ones must).
+Command_Proc :: proc(entity: rawptr, r: ^Reader, env: ^Command_Env) -> bool
 
 Command_Desc :: struct {
 	name:    string, // stripped verb ("open") — diagnostics only
@@ -88,6 +103,11 @@ Command_Ctx :: struct {
 	hook:         Command_Hook,
 	hook_user:    rawptr,
 	me:           Player_Id, // who "a local issue" is attributed to in the hook
+
+	// THE GAME pointer `<verb>_then` consequences receive (the session installs
+	// the factory's user here — the same `self` make_entity gets). Distinct from
+	// hook_user, which the session points at ITSELF to route the dispatcher.
+	game_user:    rawptr,
 
 	// in-flight between command_begin and command_issue (generated code only)
 	_entity:      Net_Id,
@@ -152,7 +172,10 @@ command_issue :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd:
 	if c.predict {
 		revert := fields_capture(entity, set.entity_desc)
 		r := reader_make(ctx.msg.buf[ctx._args_start:])
-		if c.invoke(entity, &r) && !r.err {
+		// A predicted run is ON SPEC: authority=false keeps the verb's `_then`
+		// consequence quiet — it fires once, on the host, when this arrives.
+		env := Command_Env{authority = false, user = ctx.game_user, by = ctx.me}
+		if c.invoke(entity, &r, &env) && !r.err {
 			// Keep a copy of the wire args: if authoritative state lands on this
 			// entity while the prediction is in flight, the registry re-runs the
 			// SAME proc from these bytes on top of it (registry replay).
@@ -203,13 +226,15 @@ command_dedup :: proc(ctx: ^Command_Ctx, peer_key: u64, seq: Intent_Seq) -> bool
 // Run a received command authoritatively. Unknown command index, truncated
 // args, and proc rejection all return false — and rejection can never leave
 // torn state: declared fields are captured first and restored on any failure.
-command_execute :: proc(entity: rawptr, set: ^Command_Set, cmd: u16, r: ^Reader) -> bool {
+// `env` is this run's identity (authority + issuer + game pointer) — the thunk
+// fires the verb's `_then` consequence off it when the proc applies.
+command_execute :: proc(entity: rawptr, set: ^Command_Set, cmd: u16, r: ^Reader, env: ^Command_Env) -> bool {
 	if int(cmd) >= len(set.commands) {
 		return false
 	}
 	revert := fields_capture(entity, set.entity_desc)
 	defer delete(revert)
-	if set.commands[cmd].invoke(entity, r) && !r.err {
+	if set.commands[cmd].invoke(entity, r, env) && !r.err {
 		return true
 	}
 	fields_restore(entity, set.entity_desc, revert)

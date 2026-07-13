@@ -10,7 +10,8 @@ The promise you are holding the toolkit to: **gameplay code has zero role
 branches.** You write mutation code that looks single-player; the host runs
 it authoritatively, clients predict it, rejections revert it, and remote
 screens interpolate it — without you checking `is_host` in gameplay. Where a
-role branch would creep in, the toolkit hands you a hook instead.
+role branch would creep in, the toolkit hands you a name-paired proc instead
+(a verb's `_then`, an entity's `_spawned`).
 
 ## 0. The one struct
 
@@ -20,55 +21,66 @@ Everything hangs off your main script (cavecrawl calls it `CaveLobby`):
 CaveLobby :: struct {
 	owner: gd.Node,
 	ses:   ksess.Session,
-	wire:  netgd.Session_Wire,
+	comms: kcomms.Comms,
+	boot:  kboot.Boot,
 	// ...your world: entity maps, UI handles, campaign state
 }
 ```
 
-One session, one wire, no globals. Everything the toolkit needs to survive a
-re-host or a resumed save lives in the session; everything transport-shaped
-lives in the wire.
+One session, one boot, no globals. Everything the toolkit needs to survive a
+re-host or a resumed save lives in the session; everything engine-shaped —
+lobby, chat, scoreboard, the stage/world containers, the transport wire —
+lives in the boot ([kit/boot](boot.md)), every widget a public field you may
+restyle or ignore.
 
-## 1. Wire and lobby (15 minutes)
+## 1. Boot and lobby (15 minutes)
 
 In `ready()`:
 
 ```odin
-ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
-ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
-netgd.wire_attach(&self.wire, self.owner, &self.ses, MSG_SESSION)
-netgd.wire_listen(&self.wire, "on_packet", "on_peer_left", "on_net_up", "on_net_down")
-self.ui = kui.lobby_make(self.owner, "MY GAME")
+kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{
+	title    = "MY GAME",
+	status   = "Host a cave, or join one at localhost",
+	msg_kind = MSG_SESSION,
+	methods  = {"on_host", "on_join", "on_start", "on_chat",
+	            "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
+})
 ```
 
-Godot signals must land on script methods, so your game keeps four one-line
-forwards (`wire_receive`, `session_peer_disconnected`, `session_client_join`,
-`session_peer_disconnected(HOST_PEER)`) — see [netgd](netgd.md). **Do not skip
+That is a hosted, joinable lobby: title, status line, player list, Host/Join/
+Start buttons, chat, scoreboard, and the session's transport wire. Godot
+signals must land on script methods, so your game declares the eight names
+above and keeps their one-line bodies — Host presses land on
+`kboot.boot_host(&self.boot, port, name)`, Join on
+`kboot.boot_join(&self.boot, addr, port, token, name)`, packets on
+`netgd.wire_receive` (copy either example game's `net.odin`). **Do not skip
 the disconnect forwards.** An unwired `peer_disconnected` means an alt-F4'd
 friend haunts your roster forever; an unwired `connection_failed` means a
 failed join hangs on "Joining..." — the first playtest bug of every
 multiplayer game ever shipped.
 
-Host button → `gd.host` + `session_host_start`. Join button → `gd.join` +
-`session_client_start(ksave.persistent_token("user://my_token"), name)`.
+The join's `token` IS the player
+(`ksave.token({env = "MY_TOKEN", path = "user://my_token"})`). Same token
+later — after a crash, a quit, a resumed save — reclaims the same identity,
+stats, and entities. Persist it; never regenerate it. See
+[session](session.md).
 
-That token IS the player. Same token later — after a crash, a quit, a resumed
-save — reclaims the same identity, stats, and entities. Persist it; never
-regenerate it. See [session](session.md).
-
-In `process()`, drive everything and drain events:
+In `process()`, one call pumps the wire, ticks the session, reacts to the
+five events every game handles identically (lobby/scoreboard repaints, the
+join-failed status line), and RE-YIELDS every event for your own switch:
 
 ```odin
-ticks, _ := ksess.session_tick(&self.ses, delta, now)
-netgd.wire_pump(&self.wire, now)
-for {
-	ev, ok := ksess.session_poll(&self.ses)
-	if !ok {break}
-	switch e in ev { /* react: joins, spawns, state, rejections... */ }
+events, _, ticks := kboot.boot_pump(&self.boot, delta, now_s())
+if self.ses.is_host { for _ in 0 ..< ticks { my_game_tick(self) } }
+for ev in events {
+	#partial switch e in ev { /* ONLY game cases: spawns, state, rejections... */ }
 }
 ```
 
-Events, not callbacks: nothing calls into your half-initialized script.
+Events, not callbacks: nothing calls into your half-initialized script. (The
+raw layer underneath — `wire_attach`/`wire_pump`, `session_tick`/
+`session_poll` — stays public for games that want the ritual their own way:
+[netgd](netgd.md), [session](session.md).)
 
 ## 2. Your first replicated entity (30 minutes)
 
@@ -86,10 +98,29 @@ Chest :: struct {
 ```
 
 scriptgen generates the serialization, dirty-tracking, and a `Command_Set`;
-`registry_insert` writes `net_id` back so you can't forget it. Your factory
-(one switch, used by EVERY peer — the host included) instantiates the scene
-and returns the struct + generated set. The host spawns with the two-phase
-pair, so creation code exists exactly once:
+`registry_insert` writes `net_id` back so you can't forget it. The FACTORY is
+one tag on the scene export you already have — what the scene bodies, and its
+stable wire id:
+
+```odin
+// on CaveLobby — an ordinary drag-drop export, plus the declaration:
+chest_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Chest:2"`,
+```
+
+`kboot.boot_entities(&self.boot, self, cave_lobby_entity_kinds[:])` — one call
+in `ready()`, after `boot_attach` — installs the GENERATED table: every peer,
+the host included, builds a spawn the same way (instantiate under
+`boot.world`, free on despawn, id→node ledger). Your bookkeeping is a typed,
+name-paired hook:
+
+```odin
+chest_spawned :: proc(game: ^CaveLobby, self: ^Chest, id: knet.Net_Id, owner: knet.Player_Id) {
+	game.chests[id] = self
+}
+```
+
+The host spawns with the two-phase pair, so world-building code exists
+exactly once (`CHEST_TYPE` is generated from the tag):
 
 ```odin
 ep, id := ksess.session_spawn_make(&self.ses, CHEST_TYPE)
@@ -126,31 +157,30 @@ A verb is a plain proc on the entity it mutates:
 
 ```odin
 @(gd_command = "predict")
-chest_take :: proc(self: ^Chest, slot: u8, count: u16, px, py: f32) -> bool {
-	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false}
-	taken := kitems.take(self.slots[:], int(slot), count)
-	if taken.count == 0 {return false}
-	self.last_take = taken // non-replicated scratch for the hook
-	return true
+chest_take :: proc(self: ^Chest, slot: u8, count: u16, px, py: f32) -> (ok: bool, taken: kitems.Slot) {
+	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false, {}}
+	taken = kitems.take(self.slots[:], int(slot), count)
+	return taken.count > 0, taken
 }
 ```
 
 Single-player-looking code, zero role branches. The generated `chest_take_cmd`
 wrapper runs it authoritatively on the host and predictively on clients;
-`false` means NO — state auto-reverts on every peer, and a rejection carries
-the authoritative truth back. Two players race the last item: both predict
-success, the host runs them in arrival order, the loser reverts. Conflict
-resolution costs you nothing — it IS the pipeline.
+a false first return means NO — state auto-reverts on every peer, and a
+rejection carries the authoritative truth back. Two players race the last
+item: both predict success, the host runs them in arrival order, the loser
+reverts. Conflict resolution costs you nothing — it IS the pipeline.
 
 A command may only mutate its target. The cross-entity half — "loot lands in
-MY bag" — goes in the **command hook**, which fires on the authority for
-client commands AND the host's own (no "inline authority half" beside each
-issue site):
+MY bag" — is the verb's name-paired **[consequence](net.md#consequences-verb_then)**:
+results after the applied bool are its PAYLOAD, threaded into `<verb>_then`
+with the issuer and the wire args, on the AUTHORITY only — for client
+commands AND the host's own (no "inline authority half" beside each issue
+site), and never for a prediction:
 
 ```odin
-cave_command_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
-	if !ok {return}
-	switch cmd { case CHEST_CMD_TAKE: /* credit player's bag from last_take */ }
+chest_take_then :: proc(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: u8, count: u16, px, py: f32, taken: kitems.Slot) {
+	cave_credit(game, by, self, taken) // an ordinary host mutation — deltas carry it to everyone
 }
 ```
 
@@ -181,8 +211,9 @@ shooter's OWN origin (their screen's truth), not the host's lagged copy of
 their position — leashed within reach on the host (`kcombat.leash`). Without
 it, a strafing shooter watches rocks connect while the host sails them wide.
 
-Prove the feel with the latency shim before you trust it:
-`netgd.wire_set_latency(&self.wire, 120)`.
+Prove the feel with the latency shim before you trust it: set
+`Options.latency_env = "MY_LATENCY"` and run under `MY_LATENCY=120` (or call
+`netgd.wire_set_latency(&self.boot.wire, 120)` directly).
 
 ## 6. Things that bite back (1 hour)
 
@@ -239,7 +270,7 @@ their persisted tokens like any reconnect. See [save](save.md).
 ## 9b. Things your friends carry (30 minutes)
 
 Give an entity owner-streamed position and it can be CARRIED: a grab command
-whose hook calls `session_set_owner(ses, id, player)`, an `Ev_Owner_Changed`
+whose `_then` calls `session_set_owner(ses, id, by)`, an `Ev_Owner_Changed`
 handler, and per-frame glue on the carrier (`relic.x = me.x + 10`). Drop
 hands it to `PLAYER_ID_INVALID` — it rests where it was left. Mounts,
 possession, and dragging bodies are the same three pieces.

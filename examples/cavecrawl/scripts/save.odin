@@ -157,7 +157,7 @@ cave_lobby_on_resume :: proc(self: ^CaveLobby) {
 			"CAVE_RESUMED me=%d players=%d entities=%d reg=%d dwellers=%d gems=%d door=%v",
 			u64(self.ses.me),
 			ksess.session_count(&self.ses),
-			len(self.nodes),
+			len(self.boot.ent_nodes),
 			knet.registry_count(&self.ses.reg),
 			len(self.dwellers),
 			int(cave_lobby_world_gems(self)),

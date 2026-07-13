@@ -45,7 +45,7 @@ BRAWLER_TYPE :: ksess.Entity_Type(1)
 CMD_THROW :: u16(0) // args: [dx f32][dy f32]
 
 // The whole cast, zero role branches: gate, pay, remember the aim.
-brawler_cmd_throw :: proc(entity: rawptr, r: ^knet.Reader) -> bool {
+brawler_cmd_throw :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
 	b := cast(^Brawler)entity
 	dx := knet.read_f32(r)
 	dy := knet.read_f32(r)

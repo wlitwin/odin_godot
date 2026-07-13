@@ -46,31 +46,32 @@ looks.
 ## Entities: the world as a table of structs
 
 Replicated structs are **entities** in a registry. Each has a type, a numeric
-`net_id`, and an owner. You provide one factory proc — and this is the
-detail to sit with — **the same factory runs on every machine, host
-included**:
+`net_id`, and an owner. Declaring one is a tag on the scene you already
+export — what the scene bodies, and its stable wire id:
 
 ```odin
-golf_make_entity :: proc(user: rawptr, type: ksess.Entity_Type,
-                         id: knet.Net_Id, owner: knet.Player_Id) -> (rawptr, ^knet.Command_Set) {
-	self := cast(^Golf)user
-	switch type {
-	case HOLE_TYPE:
-		node := spawn_scene(self, self.hole_scene)   // instantiate + add_child
-		h := rt.script_of(node, Hole)
-		return h, &hole_command_set                  // the struct + its generated verbs
-	// ... BALL_TYPE, POWERUP_TYPE
-	}
-	return nil, nil
+Golf :: struct {
+	owner: gd.Node2d,
+	...
+	hole_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Hole:1"`,
+	ball_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Ball:2"`,
+}
+
+// Optional, typed, name-paired: your bookkeeping when one is born or freed.
+hole_spawned :: proc(game: ^Golf, self: ^Hole, id: knet.Net_Id, owner: knet.Player_Id) {
+	game.holes[id] = self
 }
 ```
 
-There is no "server spawns, then sends a spawn message you handle
-differently." The host asks the session to spawn; the session runs *your
-factory locally* and tells everyone else to run *the same factory*. Creation
-code exists once. A player who joins mid-game? The session replays the
-registry through the same factory. A resumed save? Same factory. You have
-already written the drop-in-join and load-game code without noticing.
+scriptgen turns those tags into a factory table, and — this is the detail to
+sit with — **the same factory runs on every machine, host included**. There
+is no "server spawns, then sends a spawn message you handle differently."
+The host asks the session to spawn; the session builds the scene *locally*
+and tells everyone else to build *the same scene*. Creation code exists —
+nowhere, actually, but the one declaration exists once. A player who joins
+mid-game? The session replays the registry through the same table. A resumed
+save? Same table. You have already written the drop-in-join and load-game
+code without noticing.
 
 ## The ceremony (there barely is one)
 
@@ -79,8 +80,6 @@ declaring what's yours and attaching:
 
 ```odin
 golf_ready :: proc(self: ^Golf) {
-	ksess.session_set_factory(&self.ses, self, golf_make_entity, golf_free_entity)
-	ksess.session_set_command_hook(&self.ses, self, golf_command_hook)   // post 4
 	kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{
 		title    = "P U T T P U T T",
 		status   = "Host a course, or join one at localhost",
@@ -88,6 +87,7 @@ golf_ready :: proc(self: ^Golf) {
 		methods  = {"on_host", "on_join", "on_start", "on_chat",
 		            "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
+	kboot.boot_entities(&self.boot, self, golf_entity_kinds[:]) // the generated factory
 }
 
 golf_process :: proc(self: ^Golf, delta: f64) {
