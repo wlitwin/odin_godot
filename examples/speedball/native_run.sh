@@ -67,6 +67,7 @@ for port in 4190 4197; do
         grep -q "SPEEDBALL_DONE" "$mlog" && grep -q "SPEEDBALL_DONE" "$slog" && grep -q "SPEEDBALL_DONE" "$wlog" && break
         sleep 0.1; ((i++))
     done
+    sleep 2 # a beat of REST so the post-goal probes show the ball at its predicted center
     kill "$mp" "$sp" "$wp" 2>/dev/null
     wait "$mp" "$sp" "$wp" 2>/dev/null
 

@@ -54,6 +54,14 @@ ball_tick :: proc(self: ^Ball) -> (scored: u8) {
 
 	self.vx *= FRICTION
 	self.vy *= FRICTION
+	// The speed ceiling — deterministic, in the tick, so every peer's
+	// prediction clamps identically.
+	sp2 := self.vx * self.vx + self.vy * self.vy
+	if sp2 > BALL_MAX * BALL_MAX {
+		s := BALL_MAX / f32(sqrt_f32(sp2))
+		self.vx *= s
+		self.vy *= s
+	}
 	self.x += self.vx
 	self.y += self.vy
 

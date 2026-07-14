@@ -264,14 +264,19 @@ sp_step :: proc(user: rawptr, tick: u64) {
 			ksim.lane_claim(&g.lane, b.net_id)
 		}
 
-		// Dribble: walking through the ball nudges it along.
+		// Dribble: walking through the ball nudges it along — capped, so a
+		// per-contact-tick push can never compound past dribble pace
+		// (slopball's cap, ported; without it the ball exits a one-second
+		// chase at 30+ px/tick and ricochets like static).
 		reach := KICKER_R + BALL_R
 		if d2 < reach * reach {
 			push := normalized({dx, dy})
 			b.x = k.x + push.x * reach
 			b.y = k.y + push.y * reach
-			b.vx += push.x * DRIBBLE_PUSH
-			b.vy += push.y * DRIBBLE_PUSH
+			if b.vx * b.vx + b.vy * b.vy < DRIBBLE_MAX * DRIBBLE_MAX {
+				b.vx += push.x * DRIBBLE_PUSH
+				b.vy += push.y * DRIBBLE_PUSH
+			}
 		}
 
 		// The kick: your foot answers on YOUR screen, this tick.
