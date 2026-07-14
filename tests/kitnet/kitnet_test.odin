@@ -1830,3 +1830,41 @@ later_runs_handlers_in_order_when_due :: proc(t: ^testing.T) {
 	knet.later_clear(&l)
 	testing.expect_value(t, knet.later_drain(&l, 99.0), 0)
 }
+
+// ---- the third lane vs the command loop -------------------------------------
+
+// A reject-truth may only land on the DELTA-lane fields a command could
+// touch: .Predicted fields belong to kit/sim's reconcile on every client,
+// and stomping them would fight the resim with an un-ledgered write.
+Mixed :: struct {
+	hp: i32, // delta lane — commands' territory
+	px: f32, // predicted — the sim lane's territory
+}
+
+mixed_desc :: proc() -> knet.Entity_Desc {
+	@(static) fields := [?]knet.Field_Desc{
+		{offset = offset_of(Mixed, hp), size = size_of(i32)},
+		{offset = offset_of(Mixed, px), size = size_of(f32), flags = {.Predicted}},
+	}
+	return knet.Entity_Desc{fields = fields[:]}
+}
+
+@(test)
+reject_truth_spares_the_sim_lane :: proc(t: ^testing.T) {
+	desc := mixed_desc()
+	set := knet.Command_Set{entity_desc = &desc}
+	ctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&ctx)
+
+	truth := Mixed{hp = 99, px = 111} // the host's full snapshot in the reject
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	knet.write_full(&w, &truth, &desc)
+
+	live := Mixed{hp = 5, px = 42} // px = the client's CURRENT sim-lane state
+	r := knet.reader_make(knet.writer_bytes(&w))
+	knet.command_reject(&ctx, knet.Command_Result{seq = 1, entity = 1, ok = false}, &r, &live, &set)
+
+	testing.expect_value(t, live.hp, 99) // truth landed on the delta lane...
+	testing.expect_value(t, live.px, 42) // ...and the sim lane was spared
+}

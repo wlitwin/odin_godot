@@ -343,16 +343,20 @@ write_full :: proc(w: ^Writer, entity: rawptr, desc: ^Entity_Desc) {
 // `skip_owner` is set when the RECEIVING peer owns this entity: for
 // .Owner_Stream fields the owner IS the authority, so a host "truth"
 // snapshot of them is only a lagged echo — writing it back teleports the
-// owner (visibly, on every rejected cast while moving). The bytes are
-// still consumed; the fields are left alone.
-apply_full :: proc(r: ^Reader, entity: rawptr, desc: ^Entity_Desc, skip_owner := false) {
+// owner (visibly, on every rejected cast while moving). `skip_predicted`
+// is the same argument for the THIRD lane: on a client, .Predicted fields
+// are the sim lane's property (kit/sim reconciles them against tick-stamped
+// truth) — a command reject-truth stomping them would fight the resim with
+// an unstamped, un-ledgered write. Join/backup seeding passes neither flag.
+// The bytes are still consumed; the fields are left alone.
+apply_full :: proc(r: ^Reader, entity: rawptr, desc: ^Entity_Desc, skip_owner := false, skip_predicted := false) {
 	for f in desc.fields {
 		n := field_wire_size(f)
 		if r.err || r.off + n > len(r.data) {
 			r.err = true
 			return
 		}
-		if !(skip_owner && .Owner_Stream in f.flags) {
+		if !(skip_owner && .Owner_Stream in f.flags) && !(skip_predicted && .Predicted in f.flags) {
 			field_decode(field_ptr(entity, f), ([^]u8)(&r.data[r.off]), f)
 		}
 		r.off += n
@@ -370,12 +374,14 @@ fields_capture :: proc(entity: rawptr, desc: ^Entity_Desc, allocator := context.
 
 // `skip_owner` mirrors apply_full: an OWNER restoring a prediction revert
 // must not restore its own streamed fields — the capture is a stale copy of
-// state it kept writing while the command was in flight.
-fields_restore :: proc(entity: rawptr, desc: ^Entity_Desc, snapshot: []u8, skip_owner := false) {
+// state it kept writing while the command was in flight. `skip_predicted`
+// likewise: on a client the sim lane kept simulating those fields while the
+// command flew, and a revert would rewind them outside the reconcile.
+fields_restore :: proc(entity: rawptr, desc: ^Entity_Desc, snapshot: []u8, skip_owner := false, skip_predicted := false) {
 	assert(len(snapshot) == desc_data_size(desc))
 	off := 0
 	for f in desc.fields {
-		if !(skip_owner && .Owner_Stream in f.flags) {
+		if !(skip_owner && .Owner_Stream in f.flags) && !(skip_predicted && .Predicted in f.flags) {
 			mem.copy(field_ptr(entity, f), &snapshot[off], f.size)
 		}
 		off += f.size

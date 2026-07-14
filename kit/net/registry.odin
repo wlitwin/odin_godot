@@ -221,7 +221,8 @@ pending_reconciles :: proc(p: Pending, e: Registry_Entry) -> bool {
 unwind_pending :: proc(ctx: ^Command_Ctx, e: Registry_Entry) {
 	#reverse for &p in ctx.pending.entries {
 		if pending_reconciles(p, e) {
-			fields_restore(e.entity, e.set.entity_desc, p.revert)
+			// Client-only path: predicted fields belong to the sim lane.
+			fields_restore(e.entity, e.set.entity_desc, p.revert, skip_predicted = true)
 		}
 	}
 }
@@ -239,7 +240,7 @@ replay_pending :: proc(ctx: ^Command_Ctx, e: Registry_Entry) {
 		p.revert = fields_capture(e.entity, e.set.entity_desc)
 		r := reader_make(p.args)
 		if !(e.set.commands[p.cmd].invoke(e.entity, &r, &env) && !r.err) {
-			fields_restore(e.entity, e.set.entity_desc, p.revert)
+			fields_restore(e.entity, e.set.entity_desc, p.revert, skip_predicted = true)
 		}
 	}
 }
@@ -633,7 +634,7 @@ registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks
 	for p in expired {
 		if e, found := reg.entries[p.entity]; found {
 			owned_here := me != PLAYER_ID_INVALID && e.owner == me
-			fields_restore(e.entity, e.set.entity_desc, p.revert, skip_owner = owned_here)
+			fields_restore(e.entity, e.set.entity_desc, p.revert, skip_owner = owned_here, skip_predicted = true)
 		}
 		if out != nil {
 			append(out, Expired_Command{seq = p.seq, entity = p.entity, cmd = p.cmd})
