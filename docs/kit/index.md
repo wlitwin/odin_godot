@@ -34,7 +34,7 @@ game in order and links each page below at the moment you need it.
 | [timelines](timelines.md) | — | Choosing a timeline model: coop, predict-self, contested object, predict-world, lockstep — what each never-shows-you costs, and the eight laws the showcases learned |
 | [steamgd](steamgd.md) | `kit/steamgd` | Steam lobbies + invite overlay over GodotSteam, by name — same wire, different door |
 | [comms](comms.md) | `kit/comms` | Chat, system lines, positional pings, drop-in catchup |
-| [xfer](xfer.md) | `kit/xfer` | Chunked large payloads (sprays, skins, level files) — host-relayed, paced, web-safe |
+| [xfer](xfer.md) | `kit/xfer` | Chunked large payloads (sprays, skins, level files) — host-relayed, paced, web-safe; the ALBUM keeps the latest per (player, kind) and catches late joiners up |
 | [interact](interact.md) | `kit/interact` | Range/facing gates, candidate picking — prompt and host gate share the same math |
 | [items](items.md) | `kit/items` | Item defs + stack-aware slot inventories that replicate as plain fields |
 | [combat](combat.md) | `kit/combat` | Health/damage, host-validated projectiles, abilities, predicted-hp display |

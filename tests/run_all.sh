@@ -85,6 +85,9 @@ TESTS=(
     # Pure-Odin unit tests for kit/comms — host-ordered chat, positional
     # markers, system lines, late-join catchup, and SES_APP route gating.
     "kitcomms|KITCOMMS_OK|tests/kitcomms/run.sh"
+    # Pure-Odin unit tests for kit/xfer's ALBUM — kept payloads per (player,
+    # kind), own-copy short circuit, supersede, late-join catch-up.
+    "kitxfer|KITXFER_OK|tests/kitxfer/run.sh"
     # Pure-Odin unit tests for kit/items (stack-aware slot ops, deterministic +
     # allocation-free for predicted commands) and kit/interact (range/facing gates).
     "kititems|KITITEMS_OK|tests/kititems/run.sh"

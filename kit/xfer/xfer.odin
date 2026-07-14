@@ -84,12 +84,12 @@ Xfer :: struct {
 
 // ---- wire (inside the session's SES_APP framing) ---------------------------
 
-@(private = "file")
+@(private)
 XF_CHUNK :: u8(0) // client -> host  [id u8][seq u16][chunks u16][total u32][bytes]
-@(private = "file")
+@(private)
 XF_CAST :: u8(1) // host -> all      [from player_id][id][seq][chunks][total][bytes]
 
-@(private = "file")
+@(private)
 key_of :: proc "contextless" (from: knet.Player_Id, id: u8) -> u32 {
 	return u32(from) << 8 | u32(id)
 }
