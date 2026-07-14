@@ -744,10 +744,12 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 			continue
 		}
 
-		// `@(gd_tick)` — the class's sim-lane step (kit/sim). Like commands it is
-		// never a Godot method: the generated thunk + Sim_Set are its only callers.
+		// `@(gd_tick[="contested"])` — the class's sim-lane step (kit/sim). Like
+		// commands it is never a Godot method: the generated thunk + Sim_Set
+		// are its only callers.
 		if has_attr(vd, "gd_tick") {
-			parse_tick(s, src, Loc{path, name_ident.pos.line}, proc_name, pt)
+			config, _ := attr_value(vd, "gd_tick")
+			parse_tick(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
 			continue
 		}
 
@@ -1303,7 +1305,7 @@ parse_command :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: 
 // the INPUT (a POD struct — it crosses the wire raw; the generated #assert
 // enforces PODness at the consumer compile). No results: mutation IS the
 // outcome — validation and rejection belong to @(gd_command) verbs.
-parse_tick :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type) {
+parse_tick :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
 	if s.tick.proc_name != "" {
 		error_at(
 			loc,
@@ -1314,6 +1316,20 @@ parse_tick :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^as
 	}
 	tk := Tick_Info{proc_name = proc_name, line = loc.line}
 	ok := true
+
+	for part in strings.split(config, ",") {
+		tok := strings.trim_space(part)
+		switch tok {
+		case "":
+		case "contested":
+			// EVERY peer predicts this entity (the ball, the crown): contact
+			// resolves on each screen's own timeline; the server reconciles.
+			tk.contested = true
+		case:
+			error_at(loc, "tick %s: unknown config token %q (expected `contested`)", proc_name, tok)
+			ok = false
+		}
+	}
 
 	// Flatten the params after the receiver (one field entry may declare
 	// several names — each is a param).

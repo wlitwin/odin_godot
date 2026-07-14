@@ -1,0 +1,15 @@
+[configuration]
+
+entry_symbol = "odin_godot_init"
+compatibility_minimum = "4.6"
+
+[libraries]
+macos.debug = "res://bin/libodin_godot.dylib"
+macos.release = "res://bin/libodin_godot.dylib"
+macos.debug.arm64 = "res://bin/libodin_godot.dylib"
+macos.release.arm64 = "res://bin/libodin_godot.dylib"
+
+; Web: the full extension (core + binding + scripts) AOT-compiled into one Emscripten
+; SIDE_MODULE wasm (built by build/build_web.sh at export).
+web.debug.wasm32 = "res://bin/libodin_godot.wasm"
+web.release.wasm32 = "res://bin/libodin_godot.wasm"

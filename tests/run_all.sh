@@ -120,6 +120,14 @@ TESTS=(
     # screen renders it. Lag comp ON: the shots land (kill -> respawn). The
     # SAME duel judged live: they miss. The gap is the feature, proved A/B.
     "quickdrawnative|QUICKDRAW_NATIVE_OK|examples/quickdraw/native_run.sh"
+    # speedball solo gate: the contested-ball loop headless — dribble, kick,
+    # predicted goal reset, delta-lane score via ball_tick_then.
+    "speedballsingle|SPEEDBALL_SINGLE_OK|examples/speedball/run.sh"
+    # THE CONTESTED-BALL ACID (three processes, ENet, 120ms each way):
+    # @(gd_tick="contested") — the striker's own screen kicks its own
+    # predicted ball at 240ms RTT, the goal reset predicts everywhere, the
+    # score rides the delta lane, three screens agree.
+    "speedballnative|SPEEDBALL_NATIVE_OK|examples/speedball/native_run.sh"
     # THE PHASE-0 ACID TEST: host + owning client + OBSERVER (three processes) over
     # ENet with injected receive latency on every peer. A new entity in ~10 lines
     # (orb.odin), zero role branches: predictions land before any round trip,

@@ -1,0 +1,30 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/speedball.odin" id="1_spb"]
+[ext_resource type="PackedScene" path="res://kicker.tscn" id="2_kick"]
+[ext_resource type="PackedScene" path="res://ball.tscn" id="3_ball"]
+
+[node name="Speedball" type="Node2D"]
+script = ExtResource("1_spb")
+kicker_scene = ExtResource("2_kick")
+ball_scene = ExtResource("3_ball")
+
+[node name="Pitch" type="Polygon2D" parent="."]
+z_index = -10
+color = Color(0.09, 0.16, 0.1, 1)
+polygon = PackedVector2Array(0, 0, 640, 0, 640, 360, 0, 360)
+
+[node name="MidLine" type="Polygon2D" parent="."]
+z_index = -9
+color = Color(0.16, 0.24, 0.17, 1)
+polygon = PackedVector2Array(318, 12, 322, 12, 322, 348, 318, 348)
+
+[node name="GoalLeft" type="Polygon2D" parent="."]
+z_index = -9
+color = Color(0.22, 0.3, 0.5, 0.5)
+polygon = PackedVector2Array(0, 130, 12, 130, 12, 230, 0, 230)
+
+[node name="GoalRight" type="Polygon2D" parent="."]
+z_index = -9
+color = Color(0.55, 0.32, 0.2, 0.5)
+polygon = PackedVector2Array(628, 130, 640, 130, 640, 230, 628, 230)

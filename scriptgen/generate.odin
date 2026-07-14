@@ -774,10 +774,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		}
 		w(b, "}\n\n")
 		in_size := s.tick.input_type != "" ? fmt.tprintf("size_of(%s)", s.tick.input_type) : "0"
+		contested := s.tick.contested ? ", contested = true" : ""
 		fmt.sbprintf(
 			b,
-			"// kit/sim set for %s — ksim.lane_track_set(&lane, id, self, &%s_sim_set, owner)\n%s_sim_set := ksim.Sim_Set{{entity_desc = &%s_net_desc, tick = _%s_tick_step, input_size = %s}}\n\n",
-			cls, snake, snake, snake, snake, in_size,
+			"// kit/sim set for %s — ksim.lane_track_set(&lane, id, self, &%s_sim_set, owner)\n%s_sim_set := ksim.Sim_Set{{entity_desc = &%s_net_desc, tick = _%s_tick_step, input_size = %s%s}}\n\n",
+			cls, snake, snake, snake, snake, in_size, contested,
 		)
 	}
 

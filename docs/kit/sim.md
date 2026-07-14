@@ -175,6 +175,26 @@ supported — the boot and the thunks are sugar over exactly that.
   swaps the entity between predicted and watched, seeding the new ledger
   from the freshest received truth.
 
+## The contested object
+
+Predict-self leaves shared fast objects — the ball, the crown, the flag —
+watched, which means rendered in the past and touchable only after a round
+trip. `@(gd_tick = "contested")` is the middle path (the Rocket League
+model): **every peer predicts this entity**, so contact with it resolves on
+each screen's own timeline instantly. The server's simulation stays the only
+truth; a wrong guess (the opponent you render in the past touched it first)
+reconciles and glides like any other mispredict. The costs are honest and
+you opt into them per entity: resim CPU on every peer, and exactly that
+mispredict class. Design the tick so consequences that must not double-fire
+stay in `_then` (authority) — but keep RESETS in the tick itself where they
+predict: speedball's goal detection and kickoff freeze live in the ball's
+own tick, so every screen snaps the ball home the instant its simulation
+crosses the line, while the score lands authority-side. Contact belongs in
+the world pass, applied only to the pairs this peer HAS INPUTS for — yours
+on your screen, everyone's on the server; a remote touch reaches you as the
+server's word, never as a local guess. See `examples/speedball` (and read it
+against `examples/slopball` — the same game on the coop model — to choose).
+
 ## Lag compensation
 
 ```odin

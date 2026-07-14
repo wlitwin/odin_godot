@@ -82,6 +82,13 @@ Sim_Set :: struct {
 	entity_desc: ^knet.Entity_Desc,
 	tick:        Tick_Thunk,
 	input_size:  int, // size of the tick proc's input struct (0 = inputless)
+	// @(gd_tick="contested"): EVERY peer predicts this entity, owner or not —
+	// the predict-the-contested-object pattern (the ball, the crown, the
+	// flag). Contact with it resolves on YOUR timeline instantly; the
+	// server's word reconciles the fights, and the glide hides the losses.
+	// Costs resim CPU per peer and honest mispredicts whenever a REMOTE
+	// player (rendered in the past) touches it first — the documented trade.
+	contested:   bool,
 }
 
 Lane_Config :: struct {
@@ -271,6 +278,14 @@ lane_track_set :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, set: ^Sim_Set,
 	tr := &l.tracked[len(l.tracked) - 1]
 	tr.tick = set.tick
 	tr.has_in = set.input_size > 0
+	if set.contested && tr.watched {
+		// Contested: this client predicts it like its own — ledger, entries,
+		// reconcile — instead of watching it from the past.
+		tr.watched = false
+		tr.hist = new(History, allocator)
+		tr.hist^ = history_make(tr.desc, l.slots, allocator)
+		append(&l.entries, Entry{id = id, entity = entity, hist = tr.hist})
+	}
 }
 
 lane_untrack :: proc(l: ^Lane, id: knet.Net_Id) -> bool {

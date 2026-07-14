@@ -415,6 +415,7 @@ Tick_Info :: struct {
 	input_type:    string, // the input param's type text, spliced verbatim ("" = inputless)
 	wants_lane:    bool, // trailing `lane: ^ksim.Lane` param — threaded by the thunk
 	line:          int,
+	contested:     bool, // @(gd_tick="contested"): every peer predicts this entity
 	payload_count: int, // results = FACTS the tick learned (fired, dashed, landed) —
 	                    // threaded to the name-paired halves below, never wire'd
 	then_proc:     string, // `<proc>_then`: AUTHORITY-only consequence ("" = none)

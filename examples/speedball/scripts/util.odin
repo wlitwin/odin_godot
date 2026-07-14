@@ -1,0 +1,48 @@
+package speedball
+
+// util — the pitch's shared math (no //gd:class, scriptgen skips this file).
+// All pure, all per-tick: the ball and the kickers are resimmable arithmetic.
+
+import gd "godot:godot"
+import "core:math"
+
+PITCH_W :: f32(640)
+PITCH_H :: f32(360)
+PITCH_WALL :: f32(12)
+KICKER_R :: f32(9)
+BALL_R :: f32(8)
+
+RUN_SPEED :: f32(2.2) // px/tick at 60 Hz
+KICK_REACH :: f32(30)
+KICK_POWER :: f32(6.5) // px/tick impulse
+KICK_CD :: u16(20)
+DRIBBLE_PUSH :: f32(1.1) // contact nudge — a push, not a shot
+FRICTION :: f32(0.985) // ball velocity retained per tick
+KICKOFF_HOLD :: u16(72) // ~1.2s frozen at center after a goal
+
+GOAL_TOP :: f32(130)
+GOAL_BOT :: f32(230)
+GOAL_LINE_L :: f32(PITCH_WALL + BALL_R)
+GOAL_LINE_R :: f32(PITCH_W - PITCH_WALL - BALL_R)
+
+normalized :: proc "contextless" (v: gd.Vector2) -> gd.Vector2 {
+	length := math.sqrt(v.x * v.x + v.y * v.y)
+	if length <= 0.00001 {return gd.Vector2{0, 0}}
+	return gd.Vector2{v.x / length, v.y / length}
+}
+
+peer_color :: proc "contextless" (player_id: int) -> gd.Color {
+	switch player_id % 4 {
+	case 1:  return gd.Color{0.35, 0.65, 1.0, 1}
+	case 2:  return gd.Color{1.0, 0.62, 0.2, 1}
+	case 3:  return gd.Color{0.5, 0.9, 0.4, 1}
+	case:    return gd.Color{0.9, 0.45, 0.9, 1}
+	}
+}
+
+// Team by seat, slopball's rule: odd ids defend the LEFT goal.
+team_of :: proc "contextless" (pid: u8) -> u8 {
+	return pid % 2 == 1 ? u8(1) : u8(2)
+}
+
+SPAWNS := [4][2]f32{{200, 100}, {440, 260}, {200, 260}, {440, 100}}
