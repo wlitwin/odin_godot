@@ -162,6 +162,48 @@ For hand-driven setups (tests, generated-code-free games) `lane_init` +
 `lane_track_set` + explicit `lane_frame`/`lane_present` calls remain fully
 supported — the generated wiring and the thunks are sugar over exactly that.
 
+## The predicted shelf — godot:play/sim
+
+Blocks compose on this lane the way `godot:play`'s compose on the coop one:
+embed a field and the entity gains the block's predicted state (its
+`gd:"replicate,predict"` fields flatten into the descriptor) AND its
+`@(gd_tick)` step, hoisted to run after the entity's own tick — the entity
+writes intent, blocks integrate. The shelf ships the shapes the showcase
+games kept hand-rolling; the blessed alias is `psim`:
+
+```odin
+import psim "godot:play/sim"
+
+Kicker :: struct {
+	...
+	run:  psim.Mover, // momentum movement: the tick writes run.tx/ty, the block integrates
+	kick: psim.Cool,  // predicted cooldown: psim.ready(&k.kick, KICK_CD) gates and re-arms
+}
+```
+
+- **`psim.Cool`** — the predicted cooldown, and play.Pace's TWIN NOUN: the
+  same three verbs (`due` / `arm` / `ready`), the other timeline. Pace holds
+  a deadline against a clock you pass in (host scratch, never on the wire);
+  Cool counts itself down inside the sim, so a revolver's cadence or a
+  kick's recovery answers the click at any latency and replays exactly.
+- **`psim.Mover`** — momentum 2D movement (law #4: inertia is the
+  extrapolation smoother). Intent-through-fields: the entity's tick writes
+  the velocity it WANTS every tick and the block approaches it — `accel = 1`
+  collapses the approach to an exact snap for twitch games. Config (accel,
+  bounds) is law, not state: plain untagged fields, stamped at spawn on
+  every peer, never on the wire.
+- **`psim.Roller`** — the contested rolling body, laws #5 and #6 packaged:
+  self-simulating friction, a hard speed ceiling, and energy-eating wall
+  bounce. The game keeps the consequences — speedball's ball detects goals
+  off the roller's clamp (a crossing lands exactly ON the line for one
+  tick) and predicts its own reset.
+
+The namespaces police themselves: embed a predict-tagged block from the
+root `godot:play` shelf and scriptgen errors it toward `play/sim`; embed a
+`play/sim` block that carries no predict fields and it errors back.
+Game-local blocks compose however they like — the lint is the SHELF's
+contract, so `psim.` at a call site always means "this state resims".
+
 ## What the lane does underneath
 
 - **Anchoring.** A client neither ticks nor sends until the first batch
@@ -438,14 +480,14 @@ event worth drawing).
 
 The runtime and the authoring surface are complete and proven headless:
 input pipeline, ledgers, snapshots, reconcile, lane driver, lag comp,
-watched interp, render-error smoothing, possession, and the
-`@(gd_tick)`/`predict` codegen — 26 kitsim tests (including
+watched interp, render-error smoothing, possession, the
+`@(gd_tick)`/`predict` codegen, tick composition through embedded blocks
+(the `play/sim` shelf above), and two worked example games (quickdraw,
+speedball) with native duel acids — the kitsim tests (including
 loss-and-blackout convergence acids and the glide-vs-snap assertion) plus
-the repgen contract pins. Still to come: `@(gd_tick)` composition through
-embedded blocks (a `play`-style block contributing fields AND its tick
-step), commands-as-tick-inputs for entities that mix lanes, and a worked
-example game.
+the repgen contract pins hold all of it. Still to come:
+commands-as-tick-inputs for entities that mix lanes.
 
 See also: [net](net.md) (the shared descriptor core), [session](session.md)
-(identity and everything reliable), [play](play.md) (Puppet — the coop
-model's physics answer, and where sim-lane smoothing will land).
+(identity and everything reliable), [play](play.md) (the coop shelf —
+Puppet is that model's physics answer, `play/sim` is this one's).

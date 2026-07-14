@@ -82,7 +82,8 @@ state does the same. One session carries all of it.
    speeds in the tick (every peer clamps identically), separate overlaps
    gradually along STABLE directions (center-to-center flips sign in deep
    overlap), push along motion. Prediction quality and feel are the same
-   fix.
+   fix. (`psim.Roller` packages #5 and #6 — embed it and both hold by
+   construction; speedball's ball is the worked proof.)
 7. **Corrections are for divergence, not float noise.** Exact compares
    resim on every batch of held-input drift; a float epsilon
    (`Lane_Config.tolerance`) lets sub-pixel drift ride until it

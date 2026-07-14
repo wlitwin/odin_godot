@@ -24,6 +24,15 @@ markers — rings, bars, beacons), `play.Pace` (the re-armed deadline every
 host tick loop re-spells), and `play.Trail` (the authority's
 where-was-it-a-moment-ago ledger — lag-compensated hitscan reads it).
 
+PREDICTED blocks live on the sibling shelf, `godot:play/sim` (blessed alias
+`psim`): `psim.Cool` (Pace's twin — the same due/arm/ready verbs, counting
+itself down inside the sim), `psim.Mover` (momentum movement), and
+`psim.Roller` (the contested rolling body). Same embedding, the other
+timeline — their `replicate,predict` fields resim, and their block ticks
+hoist onto the entity's. scriptgen polices the split both ways, so the
+shelf an import names IS the lane the state lives on; the block list and
+the contract live in [sim](sim.md#the-predicted-shelf--godotplaysim).
+
 A block's cross-entity effects stay YOURS, as the composed verb's
 [`_then` consequence](net.md#consequences-verb_then):
 `runner_weapon_fire_then` spawns the slug; `play.Gun` only resolves the
