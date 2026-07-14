@@ -37,9 +37,14 @@ BTN_KICK :: u8(1)
 
 @(gd_tick = "contested")
 kicker_tick :: proc(self: ^Kicker, input: Kicker_Input) {
+	// Momentum, deliberately: velocity APPROACHES the stick instead of
+	// snapping to it. Feel-wise it is a touch of weight; netcode-wise it is
+	// the held-input extrapolation smoother — an input change (the one
+	// moment extrapolation guesses wrong) now diverges gradually, so remote
+	// stops and turns correct by a glide, not a pull-back.
 	dir := normalized({f32(input.move[0]), f32(input.move[1])})
-	self.vx = dir.x * RUN_SPEED
-	self.vy = dir.y * RUN_SPEED
+	self.vx += (dir.x * RUN_SPEED - self.vx) * RUN_ACCEL
+	self.vy += (dir.y * RUN_SPEED - self.vy) * RUN_ACCEL
 	self.x = clamp(self.x + self.vx, PITCH_WALL + KICKER_R, PITCH_W - PITCH_WALL - KICKER_R)
 	self.y = clamp(self.y + self.vy, PITCH_WALL + KICKER_R, PITCH_H - PITCH_WALL - KICKER_R)
 	if self.kick_cd > 0 {

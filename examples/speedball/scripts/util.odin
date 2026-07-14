@@ -13,6 +13,10 @@ KICKER_R :: f32(9)
 BALL_R :: f32(8)
 
 RUN_SPEED :: f32(2.2) // px/tick at 60 Hz
+RUN_ACCEL :: f32(0.35) // velocity approach per tick — MOMENTUM is the
+	// extrapolation smoother (the Rocket League trick): a kicker that can't
+	// stop instantly diverges SLOWLY from its held-input extrapolation, so a
+	// remote stop reads as "slowed a beat late", not a 20px pull-back
 KICK_REACH :: f32(30)
 KICK_POWER :: f32(6.5) // px/tick impulse
 KICK_CD :: u16(20)
