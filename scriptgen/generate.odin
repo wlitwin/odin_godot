@@ -76,7 +76,7 @@ generate :: proc(s: ^Script) -> string {
 			break
 		}
 	}
-	if s.tick.proc_name != "" || ticked_entities {
+	if s.tick.proc_name != "" || len(s.block_ticks) > 0 || ticked_entities {
 		w(&b, "import ksim \"godot:kit/sim\"\n")
 	}
 	// entity tables (`entity=Name:id` scene fields) name ksess.Entity_Type and
@@ -106,6 +106,11 @@ generate :: proc(s: ^Script) -> string {
 			if m.pkg_path == "" || imported[m.pkg_path] {continue}
 			imported[m.pkg_path] = true
 			fmt.sbprintf(&b, "import %s %q\n", m.pkg_alias, m.pkg_path)
+		}
+		for bt in s.block_ticks {
+			if bt.pkg_path == "" || imported[bt.pkg_path] {continue}
+			imported[bt.pkg_path] = true
+			fmt.sbprintf(&b, "import %s %q\n", bt.pkg_alias, bt.pkg_path)
 		}
 	}
 	// The trampolines/lifecycle wrappers establish `context = rt.script_context()` before
@@ -700,7 +705,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	// proc stays typed and single-player-shaped. The input struct crosses the
 	// wire raw, so the same POD contract as replicated fields is #asserted at
 	// the consumer compile, naming the type.
-	if s.tick.proc_name != "" {
+	if s.tick.proc_name != "" || len(s.block_ticks) > 0 {
 		w(b, "// ---- @(gd_tick) sim-lane step ----\n\n")
 		if s.tick.input_type != "" {
 			fmt.sbprintf(
@@ -710,39 +715,55 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			)
 		}
 		fmt.sbprintf(b, "@(private = \"file\")\n_%s_tick_step :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner: knet.Player_Id) {{\n", snake)
-		if s.tick.input_type != "" {
+		if s.tick.proc_name != "" && s.tick.input_type != "" {
 			w(b, "\tif input == nil {return} // no input drives this entity here this tick: coast\n")
 		}
 		consumed := s.tick.then_proc != "" || s.tick.fx_proc != ""
-		if consumed {
+		need_self := consumed || len(s.block_ticks) > 0
+		if need_self {
 			fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
 		}
-		if s.tick.payload_count > 0 {
-			w(b, "\t")
-			for i in 0 ..< s.tick.payload_count {
-				if i > 0 {w(b, ", ")}
-				if consumed {
-					fmt.sbprintf(b, "_p%d", i)
-				} else {
-					w(b, "_") // payload offered, nobody consumes (warned at build)
+		if s.tick.proc_name != "" {
+			if s.tick.payload_count > 0 {
+				w(b, "\t")
+				for i in 0 ..< s.tick.payload_count {
+					if i > 0 {w(b, ", ")}
+					if consumed {
+						fmt.sbprintf(b, "_p%d", i)
+					} else {
+						w(b, "_") // payload offered, nobody consumes (warned at build)
+					}
 				}
+				w(b, " := ")
+			} else {
+				w(b, "\t")
 			}
-			w(b, " := ")
-		} else {
-			w(b, "\t")
+			if need_self {
+				fmt.sbprintf(b, "%s(self", s.tick.proc_name)
+			} else {
+				fmt.sbprintf(b, "%s(cast(^%s)entity", s.tick.proc_name, cls)
+			}
+			if s.tick.input_type != "" {
+				fmt.sbprintf(b, ", (cast(^%s)input)^", s.tick.input_type)
+			}
+			if s.tick.wants_lane {
+				w(b, ", lane")
+			}
+			w(b, ")\n")
 		}
-		if consumed {
-			fmt.sbprintf(b, "%s(self", s.tick.proc_name)
-		} else {
-			fmt.sbprintf(b, "%s(cast(^%s)entity", s.tick.proc_name, cls)
+		// Composed block ticks, AFTER the entity's own step in field order —
+		// the entity writes intent first, blocks integrate.
+		for bt in s.block_ticks {
+			qual := bt.pkg_alias != "" ? fmt.tprintf("%s.", bt.pkg_alias) : ""
+			fmt.sbprintf(b, "\t%s%s(&self.%s", qual, bt.proc_name, join_path(bt.path))
+			if bt.wants_owner {
+				w(b, ", self")
+			}
+			if bt.wants_lane {
+				w(b, ", lane")
+			}
+			w(b, ")\n")
 		}
-		if s.tick.input_type != "" {
-			fmt.sbprintf(b, ", (cast(^%s)input)^", s.tick.input_type)
-		}
-		if s.tick.wants_lane {
-			w(b, ", lane")
-		}
-		w(b, ")\n")
 		// The role gates the game used to hand-write, held HERE: the
 		// consequence on the authority (which never resims), the fx on the
 		// owning peer's live pass only — a replay re-runs the tick, never

@@ -118,6 +118,7 @@ for needle in \
 	'pawn_tick_then(self, owner, _p0)' \
 	'if owner == ksim.lane_me(lane) && !lane.resimming {' \
 	'pawn_tick_fx(self, _p0)' \
+	'pace_tick(&self.pace)' \
 	'pawn_sim_set := ksim.Sim_Set{entity_desc = &pawn_net_desc, tick = _pawn_tick_step, input_size = size_of(Pawn_Input)}' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
@@ -356,6 +357,51 @@ if ! echo "$NOP_OUT" | grep -q 'replicate,predict'; then
 	exit 1
 fi
 echo "  ok  tick contract violations rejected: mispaired _then, no predict fields"
+
+# ---- (4a3): a block tick with an input param — blocks are INPUTLESS ----
+BTK="$TMP/btk"
+mkdir -p "$BTK"
+cat > "$BTK/wheel.odin" <<'EOF'
+//gd:extends Node
+//gd:class Wheel
+package repgen_btk
+
+import gd "godot:godot"
+
+Hub :: struct {
+	spin: f32 `gd:"replicate,predict"`,
+}
+
+Hub_In :: struct {
+	torque: i8,
+}
+
+@(gd_tick)
+hub_tick :: proc(h: ^Hub, input: Hub_In) { // blocks read intent from FIELDS
+	h.spin += f32(input.torque)
+}
+
+Wheel :: struct {
+	owner: gd.Node,
+	hub:   Hub,
+}
+
+wheel_ready :: proc(self: ^Wheel) {}
+EOF
+set +e
+BTK_OUT="$(run_scriptgen "$BTK" 2>&1)"
+BTK_RC=$?
+set -e
+if [ "$BTK_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a block tick with an input param was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$BTK_OUT" | grep -q "INPUTLESS"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't explain the inputless-block rule:"
+	echo "$BTK_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  block ticks are inputless — a value param is a build error"
 
 # ---- (4b): interp on a non-float + interp= with no proc — both errors ----
 LRP="$TMP/lrp"

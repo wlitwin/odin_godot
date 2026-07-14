@@ -446,6 +446,7 @@ Script :: struct {
 	entities:    [dynamic]Entity_Tag, // entity=Name:id scene fields (the kboot table)
 	net_id_type: string, // type text of a `net_id` field ("" = none) — commands require knet.Net_Id
 	tick:        Tick_Info, // proc_name == "" = the class doesn't tick
+	block_ticks: [dynamic]Hoisted_Tick, // embedded blocks' ticks, entity-tick-first order
 }
 
 had_error: bool
@@ -527,6 +528,37 @@ Struct_Def :: struct {
 	// index_pkg_dir alongside the fields. nil for a struct with none.
 	commands:    []Command_Info,
 	methods:     []Method_Info,
+	// The block's @(gd_tick), if declared (tick-composition): INPUTLESS by
+	// contract — intent flows through fields the wielder's tick writes — and
+	// hoisted to run AFTER the entity's own tick, in field order.
+	tick:        Block_Tick,
+}
+
+// A block's @(gd_tick): `proc(b: ^Block)`, optionally +owner pointer
+// (scriptgen passes the embedding entity), optionally +`lane: ^ksim.Lane`
+// last. No input (blocks read intent from their fields), no results
+// (payloads are the entity tick's), no config (contested is the entity's
+// declaration).
+Block_Tick :: struct {
+	proc_name:   string, // "" = the struct doesn't tick
+	wants_owner: bool,
+	wants_lane:  bool,
+	// Why this tick can't compose ("" = it can). Set at index time, ERRORED
+	// only at an embed site: the same dir holds entity ticks (inputs,
+	// payloads, config — all fine for entities), which only become contract
+	// violations if something tries to embed them as blocks.
+	bad:         string,
+}
+
+// A block tick hoisted onto an embedding entity (recurse_into), routed into
+// `&self.<path>` by the generated thunk.
+Hoisted_Tick :: struct {
+	path:        []string,
+	pkg_alias:   string,
+	pkg_path:    string,
+	proc_name:   string,
+	wants_owner: bool,
+	wants_lane:  bool,
 }
 
 // dir -> (bare struct name -> def). The scripts package, plus any imported packages
@@ -555,6 +587,7 @@ index_pkg_dir :: proc(dir: string) {
 	// the defs once every file is in.
 	cmds := make(map[string][dynamic]Command_Info)
 	meths := make(map[string][dynamic]Method_Info)
+	ticks := make(map[string]Block_Tick)
 	for fi in files {
 		if fi.type == .Directory {continue}
 		if !strings.has_suffix(fi.name, ".odin") {continue}
@@ -607,6 +640,15 @@ index_pkg_dir :: proc(dir: string) {
 				}
 				continue
 			}
+			if has_attr(vd, "gd_tick") {
+				config, _ := attr_value(vd, "gd_tick")
+				bt := build_block_tick(src, pt, name_ident.name, config)
+				if prev, dup := ticks[base]; dup {
+					bt.bad = fmt.tprintf("declares two @(gd_tick) procs (%s and %s) — one tick per block", prev.proc_name, name_ident.name)
+				}
+				ticks[base] = bt
+				continue
+			}
 			is_rpc := has_attr(vd, "gd_rpc")
 			if has_attr(vd, "gd_method") || is_rpc {
 				if mi, mok := build_method_info(src, pt, loc, name_ident.name, base, true); mok {
@@ -636,6 +678,61 @@ index_pkg_dir :: proc(dir: string) {
 			pkg[name] = def
 		}
 	}
+	for name, bt in ticks {
+		if def, dok := pkg[name]; dok {
+			def.tick = bt
+			pkg[name] = def
+		}
+	}
+}
+
+// Classify a @(gd_tick) as a COMPOSABLE block tick. The contract is TIGHTER
+// than an entity's: no input (blocks read intent from their own fields; the
+// input struct belongs to the avatar), no results (payloads are the entity
+// tick's), no config (contested is the entity's declaration). Allowed after
+// the receiver: an owner pointer (the embedding entity — scriptgen passes
+// `self`), then optionally `lane: ^ksim.Lane` last. A violation is recorded
+// in `bad`, NOT errored — the same dir holds entity ticks, and their richer
+// shapes only become violations if something embeds them.
+build_block_tick :: proc(src: string, pt: ^ast.Proc_Type, proc_name, config: string) -> Block_Tick {
+	bt := Block_Tick{proc_name = proc_name}
+	if strings.trim_space(config) != "" {
+		bt.bad = fmt.tprintf("%s declares config %q — `contested` (and any future config) is the EMBEDDING entity's declaration, not the block's", proc_name, config)
+		return bt
+	}
+	if pt.results != nil && len(pt.results.list) > 0 {
+		bt.bad = fmt.tprintf("%s returns a value — payloads and their _then/_fx halves belong to the entity's own tick", proc_name)
+		return bt
+	}
+	types := make([dynamic]string, context.temp_allocator)
+	for f in pt.params.list[1:] {
+		t := strings.trim_space(node_text(src, f.type))
+		for _ in 0 ..< max(1, len(f.names)) {
+			append(&types, t)
+		}
+	}
+	for text, i in types {
+		if !strings.has_prefix(text, "^") {
+			bt.bad = fmt.tprintf("%s takes value param %q — block ticks are INPUTLESS; intent flows through fields the wielder's tick writes", proc_name, text)
+			return bt
+		}
+		base := text[1:]
+		if j := strings.last_index(base, "."); j >= 0 {base = base[j + 1:]}
+		if base == "Lane" {
+			if bt.wants_lane || i != len(types) - 1 {
+				bt.bad = fmt.tprintf("%s: the lane param comes last, once", proc_name)
+				return bt
+			}
+			bt.wants_lane = true
+		} else {
+			if bt.wants_owner || bt.wants_lane {
+				bt.bad = fmt.tprintf("%s: unsupported param %q — the composable shape is (block[, owner][, lane: ^ksim.Lane])", proc_name, text)
+				return bt
+			}
+			bt.wants_owner = true
+		}
+	}
+	return bt
 }
 
 @(private = "file")

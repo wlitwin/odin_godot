@@ -820,7 +820,7 @@ validate_script :: proc(s: ^Script) {
 			)
 		}
 	}
-	if s.tick.proc_name != "" {
+	if s.tick.proc_name != "" || len(s.block_ticks) > 0 {
 		has_predict := false
 		for r in s.replicates {
 			if r.predict {
@@ -831,7 +831,7 @@ validate_script :: proc(s: ^Script) {
 		if !has_predict {
 			error_at(
 				Loc{path = s.path, line = s.tick.line},
-				"%s declares @(gd_tick) but no gd:\"replicate,predict\" fields — the sim lane snapshots and reconciles predicted state; tag the fields the tick mutates",
+				"%s ticks (own @(gd_tick) or an embedded block's) but no gd:\"replicate,predict\" fields — the sim lane snapshots and reconciles predicted state; tag the fields the ticks mutate",
 				s.struct_name,
 			)
 		}
@@ -1096,7 +1096,7 @@ resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^m
 			continue
 		}
 		seen_ids[e.type_id] = fmt.aprintf("%s (%s:%d)", e.target, s.path, e.line)
-		e.has_tick = target.tick.proc_name != "" // the kinds row carries the Sim_Set
+		e.has_tick = target.tick.proc_name != "" || len(target.block_ticks) > 0 // the kinds row carries the Sim_Set
 
 		tsnake := to_snake(e.target)
 		sp_name := strings.concatenate({tsnake, "_spawned"})
@@ -1768,8 +1768,29 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 	// below and hoist under their longer paths, so a gun three levels down still registers on the
 	// entity that owns the net id. The engine-facing name is path-prefixed (`weapon_reload`) so two
 	// blocks of the same type never collide.
-	if len(def.commands) > 0 || len(def.methods) > 0 {
+	if len(def.commands) > 0 || len(def.methods) > 0 || def.tick.proc_name != "" {
 		alias, ppath := composed_pkg_ref(def.dir, dir_of(s.path))
+		// Tick-composition: the block's step hoists onto the entity, routed
+		// into `&self.<path>`, run AFTER the entity's own tick in field
+		// order — the entity writes intent first, blocks integrate. A tick
+		// that doesn't fit the block contract errors HERE, at the embed —
+		// where block-ness is actually asserted.
+		if def.tick.proc_name != "" && def.tick.bad != "" {
+			error_at(
+				Loc{path = s.path},
+				"%s embeds %s (as %q), but its @(gd_tick) can't compose: %s",
+				s.struct_name, def.id, join_path(path), def.tick.bad,
+			)
+		} else if def.tick.proc_name != "" {
+			append(&s.block_ticks, Hoisted_Tick{
+				path        = path,
+				pkg_alias   = alias,
+				pkg_path    = ppath,
+				proc_name   = def.tick.proc_name,
+				wants_owner = def.tick.wants_owner,
+				wants_lane  = def.tick.wants_lane,
+			})
+		}
 		for c in def.commands {
 			hoisted := c // shares the (read-only) args slice; path/name/pkg are entity-relative
 			hoisted.path = path

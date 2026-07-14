@@ -22,6 +22,7 @@ Pawn :: struct {
 	charge: i32 `gd:"replicate,wire=pawn_charge_codec"`, // custom fixed-size codec
 	px, py: f32 `gd:"replicate,predict,interp"`, // kit/sim lane: server-sim truth, client resim
 	fuel:   u16 `gd:"replicate,predict"`, // predicted without interp: steps, never lerps
+	pace:   Pace, // TICK-COMPOSITION: the block's step hoists, runs after pawn_tick
 	state:  u8 `gd:"replicate"`,
 	speed:  f64 `gd:"export,range=0:10"`, // exports and replicates coexist
 	local:  int, // untagged: never replicated
@@ -50,6 +51,19 @@ pawn_tick :: proc(self: ^Pawn, input: Pawn_Input, lane: ^ksim.Lane) -> (dashed: 
 	}
 	_ = lane
 	return
+}
+
+// A tick BLOCK: inputless by contract (intent flows through fields the
+// wielder's tick writes), hoisted to run after the entity's own step.
+Pace :: struct {
+	heat: u16 `gd:"replicate,predict"`,
+}
+
+@(gd_tick)
+pace_tick :: proc(p: ^Pace) {
+	if p.heat > 0 {
+		p.heat -= 1
+	}
 }
 
 // The tick's name-paired halves (self-first shapes; quickdraw exercises the
