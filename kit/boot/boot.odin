@@ -38,6 +38,7 @@ import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
 import netgd "godot:kit/netgd"
 import ksess "godot:kit/session"
+import ksim "godot:kit/sim"
 import kui "godot:kit/ui"
 import "core:fmt"
 
@@ -106,6 +107,7 @@ Boot :: struct {
 
 	ses:         ^ksess.Session,
 	comms:       ^kcomms.Comms,
+	lane:        ^ksim.Lane, // nil = no sim lane (boot_lane installs one)
 	min_players: int,
 
 	// boot_entities' state (entities.odin): the generated kind table, the
@@ -115,6 +117,20 @@ Boot :: struct {
 	ent_game:  rawptr,
 	ent_nodes: map[knet.Net_Id]gd.Node,
 	ent_types: map[knet.Net_Id]ksess.Entity_Type,
+}
+
+// Install the sim lane (kit/sim), and the boot drives ALL of it: boot_pump
+// runs lane_frame + lane_present each frame and forwards ownership moves;
+// the generated entity table's rows carry each class's Sim_Set, so the
+// factory tracks/untracks entities on the lane automatically. After this
+// call a sim-lane game's remaining surface is its @(gd_tick) procs, their
+// `_then`/`_fx` halves, and lane_init's config.
+//
+//     ksim.lane_init(&self.lane, &self.ses, size_of(Runner_Input))
+//     ksim.lane_set_sim(&self.lane, self, game_sample, nil)
+//     kboot.boot_lane(&self.boot, &self.lane)
+boot_lane :: proc(b: ^Boot, lane: ^ksim.Lane) {
+	b.lane = lane
 }
 
 // The ready() ceremony. Call once, after installing your factory/hooks is
@@ -209,7 +225,14 @@ boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, mar
 		if !ok {
 			break
 		}
-		#partial switch _ in ev {
+		#partial switch e in ev {
+		case ksess.Ev_Owner_Changed:
+			// The lane must always hear ownership moves (predicted↔watched,
+			// whose inputs drive it, whom rewinds spare) — forwarded here so
+			// no game ever forgets the line.
+			if b.lane != nil {
+				ksim.lane_set_owner(b.lane, e.id, e.owner)
+			}
 		case ksess.Ev_Welcomed:
 			// The roster RODE the welcome — paint it now, not at the next change.
 			kui.lobby_refresh(&b.ui, b.ses)
@@ -243,6 +266,15 @@ boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, mar
 	}
 	if refresh_chat {
 		kui.chat_refresh(&b.chat, b.comms)
+	}
+
+	// The sim lane's whole frame drive, when one is installed: predict/
+	// simulate, then present (watched interp + the reconcile glide) — after
+	// the event drain so ownership moves land first, before the game's
+	// _process dresses nodes from the fields.
+	if b.lane != nil {
+		ksim.lane_frame(b.lane, delta)
+		ksim.lane_present(b.lane, delta)
 	}
 	return evs[:], mks[:], ticks
 }

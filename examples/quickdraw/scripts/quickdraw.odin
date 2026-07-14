@@ -60,7 +60,6 @@ Quickdraw :: struct {
 	// Env roles + the acid's probes.
 	auto_peers: int,
 	bot:        string, // QD_BOT: "" | "orbit" | "strafer" | "deadeye"
-	norewind:   bool, // QD_NOREWIND=1: judge shots LIVE — the acid's control arm
 	shot_count: int,
 }
 
@@ -83,12 +82,17 @@ quickdraw_ready :: proc(self: ^Quickdraw) {
 	// half-second rewind ceiling — a shooter's view is transit + lead +
 	// watch-delay old (~400ms at the acid's 240ms RTT), and a quickdraw
 	// favors the shooter by premise. Competitive games tighten this knob.
-	ksim.lane_init(&self.lane, &self.ses, size_of(Gunner_Input), cfg = ksim.Lane_Config{smooth_cut = 48, rewind_max = 30})
+	// judge_live is the acid's control arm — feel free to feel the difference.
+	ksim.lane_init(&self.lane, &self.ses, size_of(Gunner_Input), cfg = ksim.Lane_Config{
+		smooth_cut = 48,
+		rewind_max = 30,
+		judge_live = gd.env_int("QD_NOREWIND", 0) != 0,
+	})
 	ksim.lane_set_sim(&self.lane, self, qd_sample, qd_step)
+	kboot.boot_lane(&self.boot, &self.lane) // the boot drives the lane from here on
 
 	install_controls()
 	self.bot = gd.env_string("QD_BOT", "")
-	self.norewind = gd.env_int("QD_NOREWIND", 0) != 0
 
 	role := gd.env_string("QD_ROLE", "")
 	switch role {
@@ -110,13 +114,11 @@ quickdraw_ready :: proc(self: ^Quickdraw) {
 quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 	if !self.running {return}
 
+	// boot_pump drives EVERYTHING now — wire, session, and the sim lane
+	// (predict/simulate, then present) — before this returns.
 	events, _, _ := kboot.boot_pump(&self.boot, delta, now_s())
 
-	if self.started {
-		// The whole netcode drive: predict/simulate, then present.
-		ksim.lane_frame(&self.lane, delta)
-		ksim.lane_present(&self.lane, delta)
-	} else if self.ses.is_host && self.auto_peers > 0 &&
+	if !self.started && self.ses.is_host && self.auto_peers > 0 &&
 	   ksess.session_count(&self.ses, connected_only = true, players_only = true) >= self.auto_peers {
 		quickdraw_on_start(self)
 	}
@@ -137,9 +139,6 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 		case ksess.Ev_Host_Left:
 			kui.lobby_set_status(&self.boot.ui, "The marshal left — duel's off")
 			gd.print_str("QD_HOST_LEFT")
-		case ksess.Ev_Owner_Changed:
-			// Not used by quickdraw's rules, but the lane must always hear it.
-			ksim.lane_set_owner(&self.lane, e.id, e.owner)
 		case ksess.Ev_Spawned:
 			if !self.started {
 				self.started = true
@@ -243,49 +242,38 @@ bot_sample :: proc(g: ^Quickdraw, tick: u64, input: ^Gunner_Input) {
 	input.aim = angle_to_wire(aim)
 }
 
-// ---- the world pass: where shots happen ---------------------------------------
+// ---- the shot, as two name-paired halves ---------------------------------------
 //
-// Movement lives in gunner_tick (per-entity, predicted). Shots are the
-// CROSS-ENTITY half, so they live here — and they are not predicted state at
-// all: the muzzle answer is shooter-local presentation, the verdict is
-// host-only adjudication, the tracer/damage everyone sees ride the delta
-// lane. Skipping resim replays is therefore CORRECT (nothing here writes
-// predicted fields) as well as polite (no double flashes).
+// gunner_tick returns `fired` — a fact — and the generated thunk routes it,
+// holding every role gate the old world pass hand-wrote: the consequence on
+// the authority, the fx on this player's live pass, never a resim, never a
+// double fire. What's left is single-player-looking on both sides.
 
+// AUTHORITY: the shot's consequence — judge it where the shooter's screen
+// aimed, land the damage as delta-lane state.
+gunner_tick_then :: proc(g: ^Quickdraw, self: ^Gunner, by: knet.Player_Id, fired: bool) {
+	if !fired {return}
+	adjudicate_shot(g, self.net_id, self, by, self.aim, ksim.lane_now(&g.lane))
+}
+
+// THIS PLAYER, live pass only: the muzzle answers the click NOW.
+gunner_tick_fx :: proc(g: ^Quickdraw, self: ^Gunner, fired: bool) {
+	if fired {
+		gunner_beam(self, self.aim)
+		gd.print_str("QD_FIRE")
+	}
+}
+
+// The world pass keeps only genuinely WORLD-shaped authority work: respawns
+// and the acid's convergence probe.
 qd_step :: proc(user: rawptr, tick: u64) {
 	g := cast(^Quickdraw)user
-	if g.lane.resimming {return}
+	if !g.ses.is_host {return}
 
-	for id, gun in g.gunners {
-		pid := g.owner_pid[id]
-		in_bytes, _ := ksim.lane_input(&g.lane, pid)
-		if in_bytes == nil {continue} // a remote player on a client: not ours to trigger
-		input := (cast(^Gunner_Input)raw_data(in_bytes))^
-
-		want := input.buttons & BTN_FIRE != 0
-		edge := want && !gun.fire_prev
-		gun.fire_prev = want
-		if gun.fire_cd > 0 {gun.fire_cd -= 1}
-		if !edge || gun.fire_cd > 0 || gun.hp <= 0 {continue}
-		gun.fire_cd = FIRE_CD
-
-		a := angle_of(input.aim)
-		if gun.mine {
-			gunner_beam(gun, a) // my muzzle answers NOW — the whole point of prediction
-			gd.print_str("QD_FIRE")
-		}
-		if g.ses.is_host {
-			adjudicate_shot(g, id, gun, pid, a, tick)
-		}
-	}
-
-	if g.ses.is_host {
-		run_respawns(g, tick)
-		// The acid's convergence probe: server-truth positions on a cadence.
-		if tick % 60 == 0 {
-			for pid, gun2 in g.gunners {
-				gd.print_str(fmt.tprintf("QD_POS tick=%d id=%d x=%.1f y=%.1f hp=%d", tick, u32(pid), gun2.x, gun2.y, gun2.hp))
-			}
+	run_respawns(g, tick)
+	if tick % 60 == 0 {
+		for pid, gun in g.gunners {
+			gd.print_str(fmt.tprintf("QD_POS tick=%d id=%d x=%.1f y=%.1f hp=%d", tick, u32(pid), gun.x, gun.y, gun.hp))
 		}
 	}
 }
@@ -323,12 +311,9 @@ adjudicate_shot :: proc(g: ^Quickdraw, shooter_id: knet.Net_Id, gun: ^Gunner, pi
 		dy      = math.sin(a),
 		best    = shot_wall_limit(gun.x, gun.y, a),
 	}
-	judged := tick
-	if g.norewind {
-		shot_probe(&ctx) // the acid's control arm: judge the LIVE world and watch the duel break
-	} else {
-		judged = ksim.lane_rewound(&g.lane, pid, &ctx, shot_probe)
-	}
+	// judge_live (the QD_NOREWIND acid knob) lives in Lane_Config now — one
+	// call, no fork, on or off.
+	judged := ksim.lane_rewound(&g.lane, pid, &ctx, shot_probe)
 
 	// The tracer + the verdict reach every screen as STATE (the delta lane).
 	gun.shot_seq += 1

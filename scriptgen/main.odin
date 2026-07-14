@@ -404,16 +404,23 @@ Entity_Tag :: struct {
 	// typed hooks ("" = not declared).
 	spawned: string, // <target_snake>_spawned
 	freed:   string, // <target_snake>_freed
+	has_tick: bool, // the target declares @(gd_tick) — the kinds row carries its Sim_Set
 }
 
 // The one @(gd_tick) proc a class may declare — its sim-lane step (kit/sim).
 // scriptgen generates the rawptr thunk and the `<snake>_sim_set` the game
 // hands to ksim.lane_track_set.
 Tick_Info :: struct {
-	proc_name:  string,
-	input_type: string, // the input param's type text, spliced verbatim ("" = inputless)
-	wants_lane: bool, // trailing `lane: ^ksim.Lane` param — threaded by the thunk
-	line:       int,
+	proc_name:     string,
+	input_type:    string, // the input param's type text, spliced verbatim ("" = inputless)
+	wants_lane:    bool, // trailing `lane: ^ksim.Lane` param — threaded by the thunk
+	line:          int,
+	payload_count: int, // results = FACTS the tick learned (fired, dashed, landed) —
+	                    // threaded to the name-paired halves below, never wire'd
+	then_proc:     string, // `<proc>_then`: AUTHORITY-only consequence ("" = none)
+	then_game:     string, // its optional leading game param type ("" = self-first shape)
+	fx_proc:       string, // `<proc>_fx`: owning peer's LIVE-pass presentation ("" = none)
+	fx_game:       string,
 }
 
 Script :: struct {
@@ -1027,6 +1034,7 @@ main :: proc() {
 	defer delete(seen_entity_ids)
 	for &pend in pending {
 		resolve_then(&pend.script, &then_idx)
+		resolve_tick_then(&pend.script, &then_idx)
 		resolve_entities(&pend.script, by_struct, &seen_entity_ids, &then_idx)
 	}
 	warn_unclaimed_thens(&then_idx, script_snakes)

@@ -67,8 +67,16 @@ generate :: proc(s: ^Script) -> string {
 	if len(s.replicates) > 0 {
 		w(&b, "import \"base:intrinsics\"\n")
 	}
-	// @(gd_tick) generates the sim-lane thunk + Sim_Set (kit/sim).
-	if s.tick.proc_name != "" {
+	// @(gd_tick) generates the sim-lane thunk + Sim_Set (kit/sim) — and an
+	// entity TABLE references a target's Sim_Set when that class ticks.
+	ticked_entities := false
+	for e in s.entities {
+		if e.has_tick {
+			ticked_entities = true
+			break
+		}
+	}
+	if s.tick.proc_name != "" || ticked_entities {
 		w(&b, "import ksim \"godot:kit/sim\"\n")
 	}
 	// entity tables (`entity=Name:id` scene fields) name ksess.Entity_Type and
@@ -701,18 +709,70 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				s.tick.input_type, s.tick.input_type, s.tick.input_type, s.tick.input_type,
 			)
 		}
-		fmt.sbprintf(b, "@(private = \"file\")\n_%s_tick_step :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane) {{\n", snake)
+		fmt.sbprintf(b, "@(private = \"file\")\n_%s_tick_step :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner: knet.Player_Id) {{\n", snake)
 		if s.tick.input_type != "" {
 			w(b, "\tif input == nil {return} // no input drives this entity here this tick: coast\n")
 		}
-		fmt.sbprintf(b, "\t%s(cast(^%s)entity", s.tick.proc_name, cls)
+		consumed := s.tick.then_proc != "" || s.tick.fx_proc != ""
+		if consumed {
+			fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
+		}
+		if s.tick.payload_count > 0 {
+			w(b, "\t")
+			for i in 0 ..< s.tick.payload_count {
+				if i > 0 {w(b, ", ")}
+				if consumed {
+					fmt.sbprintf(b, "_p%d", i)
+				} else {
+					w(b, "_") // payload offered, nobody consumes (warned at build)
+				}
+			}
+			w(b, " := ")
+		} else {
+			w(b, "\t")
+		}
+		if consumed {
+			fmt.sbprintf(b, "%s(self", s.tick.proc_name)
+		} else {
+			fmt.sbprintf(b, "%s(cast(^%s)entity", s.tick.proc_name, cls)
+		}
 		if s.tick.input_type != "" {
 			fmt.sbprintf(b, ", (cast(^%s)input)^", s.tick.input_type)
 		}
 		if s.tick.wants_lane {
 			w(b, ", lane")
 		}
-		w(b, ")\n}\n\n")
+		w(b, ")\n")
+		// The role gates the game used to hand-write, held HERE: the
+		// consequence on the authority (which never resims), the fx on the
+		// owning peer's live pass only — a replay re-runs the tick, never
+		// the presentation, and never double-fires a consequence.
+		if s.tick.then_proc != "" {
+			w(b, "\tif ksim.lane_is_authority(lane) {\n\t\t")
+			if s.tick.then_game != "" {
+				fmt.sbprintf(b, "assert(ksim.lane_game(lane) != nil, \"%s needs the game pointer — lane_set_sim's user is what tick consequences receive\")\n\t\t", s.tick.then_proc)
+				fmt.sbprintf(b, "%s(cast(^%s)ksim.lane_game(lane), self, owner", s.tick.then_proc, s.tick.then_game)
+			} else {
+				fmt.sbprintf(b, "%s(self, owner", s.tick.then_proc)
+			}
+			for i in 0 ..< s.tick.payload_count {
+				fmt.sbprintf(b, ", _p%d", i)
+			}
+			w(b, ")\n\t}\n")
+		}
+		if s.tick.fx_proc != "" {
+			w(b, "\tif owner == ksim.lane_me(lane) && !lane.resimming {\n\t\t")
+			if s.tick.fx_game != "" {
+				fmt.sbprintf(b, "%s(cast(^%s)ksim.lane_game(lane), self", s.tick.fx_proc, s.tick.fx_game)
+			} else {
+				fmt.sbprintf(b, "%s(self", s.tick.fx_proc)
+			}
+			for i in 0 ..< s.tick.payload_count {
+				fmt.sbprintf(b, ", _p%d", i)
+			}
+			w(b, ")\n\t}\n")
+		}
+		w(b, "}\n\n")
 		in_size := s.tick.input_type != "" ? fmt.tprintf("size_of(%s)", s.tick.input_type) : "0"
 		fmt.sbprintf(
 			b,
@@ -757,6 +817,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			if e.freed != "" {
 				fmt.sbprintf(b, ", freed = _%s_ent_freed_%s", snake, tsnake)
+			}
+			if e.has_tick {
+				// The class ticks: the row carries its Sim_Set, so boot_lane's
+				// factory puts every spawn on the sim lane — no game code.
+				fmt.sbprintf(b, ", sim_set = &%s_sim_set", tsnake)
 			}
 			w(b, "},\n")
 		}

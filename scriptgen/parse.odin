@@ -876,6 +876,7 @@ scan_then_procs :: proc(idx: ^map[string]Then_Candidate, path, src: string, file
 		name_ident, _ := vd.names[0].derived.(^ast.Ident)
 		if name_ident == nil {continue}
 		if !strings.has_suffix(name_ident.name, "_then") &&
+		   !strings.has_suffix(name_ident.name, "_fx") &&
 		   !strings.has_suffix(name_ident.name, "_spawned") &&
 		   !strings.has_suffix(name_ident.name, "_freed") {continue}
 		if pl.type == nil {continue}
@@ -1093,6 +1094,7 @@ resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^m
 			continue
 		}
 		seen_ids[e.type_id] = fmt.aprintf("%s (%s:%d)", e.target, s.path, e.line)
+		e.has_tick = target.tick.proc_name != "" // the kinds row carries the Sim_Set
 
 		tsnake := to_snake(e.target)
 		sp_name := strings.concatenate({tsnake, "_spawned"})
@@ -1347,18 +1349,123 @@ parse_tick :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^as
 		tk.input_type = text
 	}
 
-	if pt.results != nil && len(pt.results.list) > 0 {
-		error_at(
-			loc,
-			"tick %s returns a value — tick procs return nothing (mutation IS the outcome; validation and rejection belong to @(gd_command) verbs)",
-			proc_name,
-		)
-		ok = false
+	// Results are the tick's PAYLOAD — facts it learned this tick (fired,
+	// dashed, landed), threaded into the name-paired `<proc>_then` (authority
+	// consequence) and `<proc>_fx` (owner's live presentation). They never
+	// cross the wire and they are not verdicts: a tick can't reject.
+	if pt.results != nil {
+		for r in pt.results.list {
+			tk.payload_count += max(1, len(r.names))
+		}
 	}
 
 	if ok {
 		s.tick = tk
 	}
+}
+
+// Pair a script's @(gd_tick) with its name-paired halves and validate the
+// shapes at build time — the tick-domain mirror of resolve_then. The
+// generated THUNK holds the role gates game code used to hand-write:
+//
+//   gunner_tick_then :: proc(game: ^Quickdraw, self: ^Gunner, by: knet.Player_Id, fired: bool, aim: f32)
+//     AUTHORITY only, live and never resim (the authority never resims) —
+//     the cross-entity consequence: adjudication, damage, pickups.
+//   gunner_tick_fx :: proc(game: ^Quickdraw, self: ^Gunner, fired: bool, aim: f32)
+//     the OWNING peer's LIVE pass only — muzzle flashes, sounds, shakes;
+//     a resim replay never re-fires it.
+//
+// Both optional, both also accept the game-less (self-first) shape. Payload
+// param TYPES are the compiler's to hold — the call site passes the tick's
+// returned values straight through.
+resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
+	if s.tick.proc_name == "" {
+		return
+	}
+	then_name := fmt.tprintf("%s_then", s.tick.proc_name)
+	fx_name := fmt.tprintf("%s_fx", s.tick.proc_name)
+	if game, ok := claim_tick_half(s, idx, then_name, true); ok {
+		s.tick.then_proc = then_name
+		s.tick.then_game = game
+	}
+	if game, ok := claim_tick_half(s, idx, fx_name, false); ok {
+		s.tick.fx_proc = fx_name
+		s.tick.fx_game = game
+	}
+	if s.tick.payload_count > 0 && s.tick.then_proc == "" && s.tick.fx_proc == "" {
+		warn_at(
+			Loc{path = s.path, line = s.tick.line},
+			"tick %s returns a payload but neither `%s` nor `%s` consumes it",
+			s.tick.proc_name, then_name, fx_name,
+		)
+	}
+}
+
+@(private = "file")
+claim_tick_half :: proc(s: ^Script, idx: ^map[string]Then_Candidate, name: string, wants_by: bool) -> (game: string, ok: bool) {
+	cand, found := idx[name]
+	if !found {
+		return "", false
+	}
+	cand.claimed = true
+	idx[name] = cand
+	loc := Loc{path = cand.path, line = cand.line}
+
+	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") || has_attr(cand.vd, "gd_tick") {
+		error_at(loc, "%s must be a plain proc — the generated tick thunk calls it, it is never registered", name)
+		return "", false
+	}
+
+	types := make([dynamic]string, context.temp_allocator)
+	if cand.pt.params != nil {
+		for f in cand.pt.params.list {
+			t := strings.trim_space(node_text(cand.src, f.type))
+			for _ in 0 ..< max(1, len(f.names)) {
+				append(&types, t)
+			}
+		}
+	}
+
+	self_type := fmt.tprintf("^%s", s.struct_name)
+	at := 0
+	if len(types) > at && strings.has_prefix(types[at], "^") && types[at] != self_type {
+		game = types[at][1:]
+		at += 1
+	}
+	if !(len(types) > at && types[at] == self_type) {
+		error_at(
+			loc,
+			"%s: expected `self: %s` %s — the shapes are (self%s, payload…) or (game, self%s, payload…)",
+			name, self_type, game == "" ? "first" : "after the game param",
+			wants_by ? ", by" : "", wants_by ? ", by" : "",
+		)
+		return "", false
+	}
+	at += 1
+
+	if wants_by {
+		by_ok := false
+		if len(types) > at {
+			base := types[at]
+			if j := strings.last_index(base, "."); j >= 0 {base = base[j + 1:]}
+			by_ok = base == "Player_Id"
+		}
+		if !by_ok {
+			error_at(loc, "%s: the param after `self` must be the driving seat (`by: knet.Player_Id`)", name)
+			return "", false
+		}
+		at += 1
+	}
+
+	if len(types) - at != s.tick.payload_count {
+		error_at(
+			loc,
+			"%s: expected the tick's %d payload value(s) after %s — found %d param(s)",
+			name, s.tick.payload_count, wants_by ? "`by`" : "`self`", len(types) - at,
+		)
+		return "", false
+	}
+	return game, true
 }
 
 // Build a Method_Info from a @(gd_method)/@(gd_rpc) proc: the GDScript-exposed name (stripped),

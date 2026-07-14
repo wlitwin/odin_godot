@@ -35,6 +35,7 @@ package kit_boot
 import gd "godot:godot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
+import ksim "godot:kit/sim"
 import "core:fmt"
 
 // One row of the generated table — pure data, no state (state lives on Boot;
@@ -47,6 +48,8 @@ Entity_Kind :: struct {
 	scene_offset: uintptr, // the ^gd.Resource field's offset on the GAME struct
 	spawned:      proc(game: rawptr, entity: rawptr, id: knet.Net_Id, owner: knet.Player_Id), // nil = no hook
 	freed:        proc(game: rawptr, entity: rawptr, id: knet.Net_Id), // nil = no hook
+	sim_set:      ^ksim.Sim_Set, // generated from @(gd_tick); with boot_lane the
+	                             // factory tracks/untracks the entity on the lane itself
 }
 
 // Install the table as the session's factory. `game` is the struct carrying
@@ -105,6 +108,11 @@ boot_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 			// it (dressing belongs on Ev_Spawned, which fires once fields land).
 			k.spawned(b.ent_game, entity, id, owner)
 		}
+		if k.sim_set != nil && b.lane != nil {
+			// The sim-lane line nobody writes anymore: predicted on its
+			// owner's screen, truth-ledgered on the host, watched elsewhere.
+			ksim.lane_track_set(b.lane, id, entity, k.sim_set, owner)
+		}
 		return entity, k.set
 	}
 	// Unknown type: skipped whole by the session (the wire carries lengths) —
@@ -128,6 +136,9 @@ boot_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 			}
 			break
 		}
+	}
+	if b.lane != nil {
+		ksim.lane_untrack(b.lane, id) // no-op for entities the lane never tracked
 	}
 	if node, ok := b.ent_nodes[id]; ok {
 		gd.node_queue_free(node)

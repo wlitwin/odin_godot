@@ -111,9 +111,13 @@ echo "  ok  command thunks, table, set, and typed issue wrappers generated"
 for needle in \
 	'import ksim "godot:kit/sim"' \
 	'intrinsics.type_is_nearly_simple_compare(Pawn_Input)' \
-	'_pawn_tick_step :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane)' \
+	'_pawn_tick_step :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner: knet.Player_Id)' \
 	'if input == nil {return}' \
-	'pawn_tick(cast(^Pawn)entity, (cast(^Pawn_Input)input)^, lane)' \
+	'_p0 := pawn_tick(self, (cast(^Pawn_Input)input)^, lane)' \
+	'if ksim.lane_is_authority(lane) {' \
+	'pawn_tick_then(self, owner, _p0)' \
+	'if owner == ksim.lane_me(lane) && !lane.resimming {' \
+	'pawn_tick_fx(self, _p0)' \
 	'pawn_sim_set := ksim.Sim_Set{entity_desc = &pawn_net_desc, tick = _pawn_tick_step, input_size = size_of(Pawn_Input)}' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
@@ -138,6 +142,7 @@ for needle in \
 	'scene_offset = offset_of(Board, pawn_scene)' \
 	'spawned = _board_ent_spawned_pawn' \
 	'freed = _board_ent_freed_pawn' \
+	'sim_set = &pawn_sim_set' \
 	'return rt.script_of(node, Pawn)' \
 ; do
 	if ! grep -qF "$needle" "$BGEN"; then
@@ -280,7 +285,7 @@ if ! echo "$LANES_OUT" | grep -q "mutually exclusive"; then
 fi
 echo "  ok  owner+predict lane conflict rejected at scriptgen time"
 
-# ---- (4a2): @(gd_tick) contract violations — returns a value / no predict fields ----
+# ---- (4a2): @(gd_tick) contract violations — mispaired _then / no predict fields ----
 TIK="$TMP/tik"
 mkdir -p "$TIK"
 cat > "$TIK/spinny.odin" <<'EOF'
@@ -296,9 +301,13 @@ Spinny :: struct {
 }
 
 @(gd_tick)
-spinny_tick :: proc(self: ^Spinny) -> bool { // tick procs return NOTHING
+spinny_tick :: proc(self: ^Spinny) -> (spun: bool) {
 	self.angle += 1
 	return true
+}
+
+spinny_tick_then :: proc(self: ^Spinny, spun: bool) { // missing `by` — the driving seat
+	_ = spun
 }
 EOF
 set +e
@@ -306,11 +315,11 @@ TIK_OUT="$(run_scriptgen "$TIK" 2>&1)"
 TIK_RC=$?
 set -e
 if [ "$TIK_RC" -eq 0 ]; then
-	echo "REPGEN_FAIL: a value-returning @(gd_tick) was accepted by scriptgen"
+	echo "REPGEN_FAIL: a mispaired tick _then (no issuer param) was accepted by scriptgen"
 	exit 1
 fi
-if ! echo "$TIK_OUT" | grep -q "return nothing"; then
-	echo "REPGEN_FAIL: scriptgen error doesn't explain the tick-return rule:"
+if ! echo "$TIK_OUT" | grep -q "driving seat"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't explain the tick-then shape:"
 	echo "$TIK_OUT" | tail -3
 	exit 1
 fi
@@ -346,7 +355,7 @@ if ! echo "$NOP_OUT" | grep -q 'replicate,predict'; then
 	echo "$NOP_OUT" | tail -3
 	exit 1
 fi
-echo "  ok  tick contract violations rejected: return value, no predict fields"
+echo "  ok  tick contract violations rejected: mispaired _then, no predict fields"
 
 # ---- (4b): interp on a non-float + interp= with no proc — both errors ----
 LRP="$TMP/lrp"

@@ -41,13 +41,29 @@ Pawn_Input :: struct {
 }
 
 @(gd_tick)
-pawn_tick :: proc(self: ^Pawn, input: Pawn_Input, lane: ^ksim.Lane) {
+pawn_tick :: proc(self: ^Pawn, input: Pawn_Input, lane: ^ksim.Lane) -> (dashed: bool) {
 	self.px += f32(input.move[0])
 	self.py += f32(input.move[1])
 	if input.buttons != 0 && self.fuel > 0 {
 		self.fuel -= 1
+		dashed = true
 	}
 	_ = lane
+	return
+}
+
+// The tick's name-paired halves (self-first shapes; quickdraw exercises the
+// game-first ones): the consequence on the authority, the fx on the owning
+// peer's live pass — the generated thunk holds the role gates.
+pawn_tick_then :: proc(self: ^Pawn, by: knet.Player_Id, dashed: bool) {
+	if dashed && self.hp > 1 {
+		self.hp -= 1
+	}
+	_ = by
+}
+
+pawn_tick_fx :: proc(self: ^Pawn, dashed: bool) {
+	_ = dashed
 }
 
 // The custom codec `charge` names — a knet.Wire_Codec: i32 charge (0..255)

@@ -228,7 +228,7 @@ lane_pair :: proc(host: ^Lane_Box, alice: ^Lane_Box, desc: ^knet.Entity_Desc) {
 
 // The hand-built stand-in for what scriptgen emits from @(gd_tick): cast,
 // call, coast on nil input. Entities carrying this need NO game step proc.
-mover_tick_thunk :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane) {
+mover_tick_thunk :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner: knet.Player_Id) {
 	if input == nil {
 		return
 	}

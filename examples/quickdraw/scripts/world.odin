@@ -9,7 +9,6 @@ import "core:fmt"
 import gd "godot:godot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
-import ksim "godot:kit/sim"
 
 gunner_spawned :: proc(game: ^Quickdraw, self: ^Gunner, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.gunners[id] = self
@@ -21,15 +20,12 @@ gunner_spawned :: proc(game: ^Quickdraw, self: ^Gunner, id: knet.Net_Id, owner: 
 			game.me_gun = self
 		}
 	}
-	// The sim-lane line: predicted on its owner's screen, truth-ledgered on
-	// the host, watched everywhere else — the Sim_Set is generated from
-	// gunner.odin's @(gd_tick).
-	ksim.lane_track_set(&game.lane, id, self, &gunner_sim_set, owner)
+	// (The sim lane tracks this spawn ITSELF: the generated kinds row carries
+	// gunner_sim_set, and boot_lane's factory does the rest.)
 	gd.print_str(fmt.tprintf("QD_SPAWN id=%d mine=%v", u32(id), owner == game.ses.me))
 }
 
 gunner_freed :: proc(game: ^Quickdraw, self: ^Gunner, id: knet.Net_Id) {
-	ksim.lane_untrack(&game.lane, id)
 	if self == game.me_gun {
 		game.me_gun = nil
 	}

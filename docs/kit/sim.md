@@ -56,15 +56,18 @@ difference away — degradation, not desync.
 
 ## Write the entity, not the netcode
 
-Tag the state, declare the input struct by USING it, mark the step:
+Tag the state, declare the input struct by USING it, mark the step — and
+return FACTS. The name-paired halves consume them, and the generated thunk
+holds every role gate:
 
 ```odin
 Runner :: struct {
-	owner:  gd.Node2d,
-	net_id: knet.Net_Id,
-	x, y:   f32 `gd:"replicate,predict,interp"`,
-	vx, vy: f32 `gd:"replicate,predict"`,
-	hp:     i32 `gd:"replicate"`, // delta lane: never resimmed, wire-fresh
+	owner:   gd.Node2d,
+	net_id:  knet.Net_Id,
+	x, y:    f32 `gd:"replicate,predict,interp"`,
+	vx, vy:  f32 `gd:"replicate,predict"`,
+	fire_cd: u16 `gd:"replicate,predict"`, // even the trigger is predicted state
+	hp:      i32 `gd:"replicate"`, // delta lane: never resimmed, wire-fresh
 }
 
 Runner_Input :: struct { // no tag — discovered from the tick proc's signature
@@ -73,33 +76,48 @@ Runner_Input :: struct { // no tag — discovered from the tick proc's signature
 }
 
 @(gd_tick)
-runner_tick :: proc(self: ^Runner, input: Runner_Input, lane: ^ksim.Lane) {
+runner_tick :: proc(self: ^Runner, input: Runner_Input) -> (fired: bool) {
 	self.vx = f32(input.move[0]) * SPEED // single-player-looking, fixed dt implicit
 	self.x += self.vx
+	if self.fire_cd > 0 {self.fire_cd -= 1}
+	if input.buttons & FIRE != 0 && self.fire_cd == 0 {
+		self.fire_cd = COOLDOWN
+		fired = true // a FACT, not a verdict — ticks can't reject
+	}
+	return
+}
+
+// AUTHORITY only (never resims): the cross-entity consequence.
+runner_tick_then :: proc(g: ^Game, self: ^Runner, by: knet.Player_Id, fired: bool) {
+	if fired { adjudicate_shot(g, self, by) } // lane_rewound lives here
+}
+
+// THIS PLAYER's live pass only (never a resim replay): presentation.
+runner_tick_fx :: proc(g: ^Game, self: ^Runner, fired: bool) {
+	if fired { muzzle_flash(self) } // answers the click NOW, at any latency
 }
 ```
 
-scriptgen emits the rawptr thunk and `runner_sim_set`, POD-asserts the input
-struct (it crosses the wire raw), and refuses a tick with a return value or
-without `predict` fields at build time. Accepted shapes: `(self)`,
-`(self, input)`, `(self, lane)`, `(self, input, lane)` — a pointer param is
-the lane, a value param is the input. The wiring left to the game:
+scriptgen emits the rawptr thunk (with the `is_host` / `mine` / `resimming`
+gates you never write), `runner_sim_set`, POD-asserts the input struct, and
+refuses mispaired halves or a tick without `predict` fields at build time.
+Tick shapes: `(self)`, `(self, input)`, `(self, lane)`, `(self, input, lane)`
+— a pointer param is the lane, a value param is the input; both halves also
+accept game-less (self-first) shapes. The wiring left to the game, ALL of it:
 
 ```odin
-// beside your session wiring, once:
+// ready(), beside boot_attach + boot_entities:
 ksim.lane_init(&self.lane, &self.ses, size_of(Runner_Input))
-ksim.lane_set_sim(&self.lane, self, game_sample, nil) // step proc optional now
-
-// where sim entities are born on this peer (factory / Ev_Spawned):
-ksim.lane_track_set(&self.lane, id, runner, &runner_sim_set, owner)
-
-// once per frame, beside session_tick:
-ksim.lane_frame(&self.lane, delta)   // drive: tick, predict, send, reconcile
-ksim.lane_present(&self.lane, delta) // then smooth watched avatars (clients)
+ksim.lane_set_sim(&self.lane, self, game_sample, nil) // world pass optional
+kboot.boot_lane(&self.boot, &self.lane)
 ```
 
-`game_sample` reads the device into your input struct — the one place that
-touches hardware, never called during a resim:
+`boot_lane` makes the boot drive everything: the generated entity table
+carries each ticking class's `Sim_Set`, so the factory tracks and untracks
+entities on the lane itself; `boot_pump` runs `lane_frame` + `lane_present`
+every frame and forwards `Ev_Owner_Changed`. `game_sample` reads the device
+into your input struct — the one place that touches hardware, never called
+during a resim:
 
 ```odin
 game_sample :: proc(user: rawptr, tick: u64, dst: rawptr) {
@@ -112,14 +130,14 @@ game_sample :: proc(user: rawptr, tick: u64, dst: rawptr) {
 Entity thunks run every simulated tick — live and replay identically, in
 track order — each fed its owner's input (`nil` coasts: an inputless entity
 type, or a remote player on a client whose truth is already inbound). The
-optional `Step_Proc` runs AFTER entity ticks as the world pass: cross-entity
-work like spawning a predicted projectile or resolving a contested pickup.
-One input TYPE per lane, by design — the wire ships one input blob per
-player per tick; compose per-entity intent into the one struct.
+optional `Step_Proc` runs AFTER entity ticks as the world pass, for
+genuinely WORLD-shaped authority work (respawn queues, wave directors). One
+input TYPE per lane, by design — the wire ships one input blob per player
+per tick; compose per-entity intent into the one struct.
 
-For hand-driven setups (tests, generated-code-free games) `lane_track` +
-a Step_Proc that loops entities via `lane_input` remains fully supported —
-the thunks are sugar over exactly that.
+For hand-driven setups (tests, generated-code-free games) `lane_track` /
+`lane_track_set` + explicit `lane_frame`/`lane_present` calls remain fully
+supported — the boot and the thunks are sugar over exactly that.
 
 ## What the lane does underneath
 

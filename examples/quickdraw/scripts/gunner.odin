@@ -29,11 +29,14 @@ Gunner :: struct {
 	beam:   gd.Polygon2d `gd:"onready=Beam"`,
 	net_id: knet.Net_Id,
 
-	// The sim lane (server-simulated, client-predicted, reconciled).
+	// The sim lane (server-simulated, client-predicted, reconciled). The
+	// TRIGGER lives here too: fire_cd is predicted state, so your revolver's
+	// cadence answers the click instantly and replays exactly.
 	x, y:    f32 `gd:"replicate,predict,interp"`,
 	vx, vy:  f32 `gd:"replicate,predict"`,
 	aim:     f32 `gd:"replicate,predict"`,
 	dash_cd: u16 `gd:"replicate,predict"`,
+	fire_cd: u16 `gd:"replicate,predict"`,
 
 	// The delta lane, beside it (host-authoritative, never resimmed).
 	hp:       i32 `gd:"replicate"`,
@@ -44,8 +47,6 @@ Gunner :: struct {
 	// Local scratch — never on the wire.
 	mine:      bool, // set by the census hook: my avatar
 	painted:   bool,
-	fire_prev: bool, // input edge scratch (host: adjudication; client: own muzzle fx)
-	fire_cd:   u16,
 	seen_shot: u8, // tracer edge (remote shots)
 	seen_hp:   i32, // hurt-flash edge
 	flash_ttl: f64,
@@ -64,12 +65,16 @@ Gunner_Input :: struct {
 BTN_FIRE :: u8(1)
 BTN_DASH :: u8(2)
 
-// The sim-lane step: pure (predicted fields, input) → predicted fields. Runs
-// authoritatively on the server, speculatively on your screen, and again in
-// replays — the identical proc, which is the whole promise. No clocks, no
-// nodes, no PhysicsServer: walls and crates are util.odin arithmetic.
+// The sim-lane step: pure (predicted fields, input) → predicted fields, plus
+// a returned PAYLOAD — the facts this tick learned. Runs authoritatively on
+// the server, speculatively on your screen, and again in replays — the
+// identical proc, which is the whole promise. The payload routes itself:
+// `gunner_tick_then` fires on the AUTHORITY (the shot's consequence),
+// `gunner_tick_fx` on this player's LIVE pass (the muzzle answer) — the
+// generated thunk holds every role gate. No clocks, no nodes, no
+// PhysicsServer: walls and crates are util.odin arithmetic.
 @(gd_tick)
-gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) {
+gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) -> (fired: bool) {
 	// Reading delta-lane hp here is a KNOWN mispredict source at the death
 	// edge (the client learns you died ~a transit late, predicts a step the
 	// server refused, and reconciles it back — the glide eats the pop). The
@@ -78,9 +83,20 @@ gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) {
 	if self.hp <= 0 {
 		self.vx = 0
 		self.vy = 0
-		return
+		return false
 	}
 	self.aim = angle_of(input.aim)
+
+	// The trigger: hold to fan the hammer at the revolver's cadence. Pure
+	// predicted state — your cadence gates locally with zero round trips,
+	// and a replay re-derives the same shots from the same inputs.
+	if self.fire_cd > 0 {
+		self.fire_cd -= 1
+	}
+	if input.buttons & BTN_FIRE != 0 && self.fire_cd == 0 {
+		self.fire_cd = FIRE_CD
+		fired = true
+	}
 
 	dashing := self.dash_cd > DASH_CD - DASH_LEN
 	if !dashing {
@@ -106,6 +122,7 @@ gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) {
 	for c in CRATES {
 		crate_pushout(&self.x, &self.y, c)
 	}
+	return
 }
 
 // The muzzle answer: shooter-local, instant, presentation-only (quickdraw.odin
