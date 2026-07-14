@@ -173,6 +173,7 @@ lane_two_peers_converge :: proc(t: ^testing.T) {
 		ksim.lane_frame(&host.lane, DT)
 		lane_pump(boxes)
 		ksim.lane_frame(&alice.lane, DT)
+		ksim.lane_present(&alice.lane, DT) // watched fields belong to the presenter
 
 		// Blackout: alice's packets vanish for 20 frames STRADDLING her
 		// intent flip — wider than the redundancy window, so the server
@@ -276,6 +277,7 @@ lane_auto_tick_drives_entities :: proc(t: ^testing.T) {
 		ksim.lane_frame(&host.lane, DT)
 		lane_pump(boxes)
 		ksim.lane_frame(&alice.lane, DT)
+		ksim.lane_present(&alice.lane, DT) // watched fields belong to the presenter
 		if i >= 115 && i < 135 {
 			for p in alice.out {
 				delete(p.data)

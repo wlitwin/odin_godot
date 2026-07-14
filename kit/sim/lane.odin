@@ -146,6 +146,11 @@ Lane :: struct {
 	peers:           map[knet.Player_Id]^Lane_Peer,
 
 	step_tick:       u64, // the tick being stepped/resimmed — lane_input reads it
+	// True while a reconcile replay is re-running ticks. Gate PRESENTATION
+	// side effects on it (muzzle flashes, sounds, screen shake fire once, on
+	// the live pass) — sim mutations must NEVER branch on it, or prediction
+	// and replay diverge by construction.
+	resimming:       bool,
 	scratch:         []u8, // one input's bytes for the sample proc
 
 	// running tallies, game-readable (a resim burst is a netgraph datum)
@@ -475,10 +480,13 @@ client_frame :: proc(l: ^Lane, dt: f64) -> int {
 		note_all(l.entries[:], t)
 	}
 	if n > 0 && l.sample != nil {
+		// Ack FIRST: the receiver tags every input in this packet with it —
+		// the snap ack is the sender's world view, and binding them is what
+		// lets a rewound query judge the view each input was AIMED with.
 		w := ksess.session_app_begin(l.ses, l.tag)
 		knet.write_u8(w, SIM_INPUT)
-		input_write(w, &l.ring, l.input_ack, l.redundancy)
 		snap_ack_write(w, &l.rx)
+		input_write(w, &l.ring, l.input_ack, l.redundancy)
 		ksess.session_app_flush(l.ses, ksess.HOST_PEER, .Stream)
 	}
 	return n
@@ -499,6 +507,7 @@ client_ingest :: proc(l: ^Lane) {
 	if tick == 0 {
 		return
 	}
+	ack_advanced := input_ack > l.input_ack // the server is still HEARING us
 	l.input_ack = input_ack
 
 	if !l.anchored {
@@ -516,6 +525,7 @@ client_ingest :: proc(l: ^Lane) {
 		return
 	}
 
+	watched_fallback := l.rx.applied_count < 2 // pre-bracket: ingest paints watched directly
 	l.stat_reconciles += 1
 	// What the screen last showed, per predicted entity — the continuity a
 	// correction must glide from. Fields hold last present's visual (or the
@@ -526,7 +536,9 @@ client_ingest :: proc(l: ^Lane) {
 		predict_capture(shown[i], e.entity, e.hist.desc)
 	}
 	mism := make([dynamic]knet.Net_Id, context.temp_allocator)
+	l.resimming = true
 	l.stat_resims += reconcile(l.entries[:], truths[:], tick, l.ticker.tick, l, client_resim, &mism)
+	l.resimming = false
 	for id in mism {
 		for &tr, i in l.tracked {
 			if tr.id != id || tr.hist == nil {
@@ -548,16 +560,42 @@ client_ingest :: proc(l: ^Lane) {
 			break
 		}
 	}
-	for tr in truths {
-		if find_lane_entry(l, tr.id) == nil {
-			apply_truth(l, tr) // watched: the server's word lands as-is
+	// Watched fields belong to the PRESENTER once a bracket exists: between
+	// ingest and lane_present they must keep holding last frame's DELAYED
+	// view — that is what the player's screen shows, what their aim samples
+	// mean, and what the server's rewound judgment reconstructs. Painting
+	// fresh truth here would let a sample read a future nobody rendered.
+	// Before two batches exist there is nothing to blend, so ingest paints.
+	if watched_fallback {
+		for tr in truths {
+			if find_lane_entry(l, tr.id) == nil {
+				apply_truth(l, tr)
+			}
 		}
 	}
 
 	// input_ack − tick = how far our inputs ran ahead of the server's sim
-	// when this batch left: the observed lead. Bend toward the target.
+	// when this batch left: the observed lead. Small errors BEND the clock;
+	// a hole too deep to bend out of inside a second — the fresh anchor
+	// under real transit (the batch we anchored to was already a transit
+	// old), or a long stall — JUMPS the head instead. Skipped ticks are
+	// never simulated or ledgered: the server holds-last through the gap
+	// and the next reconcile seeds the new timeline. Until the first input
+	// ack exists there is nothing to measure, so probe forward briskly.
+	// A FROZEN ack is the other story — an upstream blackout, not a lead
+	// deficit — and jumping on it would run away forward; there the bend's
+	// saturation is the honest response and redundancy does the healing.
 	observed := f64(i64(input_ack) - i64(tick))
-	lead_control(&l.ticker, f64(l.margin) - observed)
+	err := f64(l.margin) - observed
+	if input_ack == 0 {
+		l.ticker.tick += 3 // nothing acked yet: probe forward briskly
+		lead_control(&l.ticker, 0)
+	} else if err > 8 && ack_advanced {
+		l.ticker.tick += u64(err)
+		lead_control(&l.ticker, 0)
+	} else {
+		lead_control(&l.ticker, err)
+	}
 }
 
 @(private = "file")
@@ -602,12 +640,25 @@ lane_rewind_tick :: proc(l: ^Lane, shooter: knet.Player_Id) -> u64 {
 	if shooter == l.ses.me {
 		return t // the host's own screen IS the live world
 	}
+	// The view bound to the INPUT BEING EXECUTED — the ack that rode in the
+	// same packet — not the shooter's latest ack: between sampling and
+	// adjudication their acks kept advancing by a whole lead-plus-transit,
+	// and a rewind to the fresher view judges a world they never saw.
 	view := u64(0)
 	if p, ok := l.peers[shooter]; ok {
-		view = p.acked
+		view = p.buf.tag
 	}
 	if view == 0 || view >= t {
 		return t // no confirmed view yet: judge live
+	}
+	// The ack names the newest batch they HOLD; their screen draws watched
+	// entities watch_delay ticks behind it (lane_present's watch clock — the
+	// same config, compiled into both peers). Judge what was DRAWN, not what
+	// was delivered.
+	if view > u64(l.watch_delay) + 1 {
+		view -= u64(l.watch_delay)
+	} else {
+		view = 1
 	}
 	floor := t > u64(l.rewind_max) ? t - u64(l.rewind_max) : 1
 	return max(view, floor)
@@ -754,8 +805,8 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 			p.buf = input_buffer_make(l.ring.size, l.slots)
 			l.peers[from] = p
 		}
-		input_buffer_apply(&p.buf, r)
 		acked := snap_ack_read(r)
+		input_buffer_apply(&p.buf, r, tag = acked)
 		if !r.err && acked > p.acked {
 			p.acked = acked // regressions are stale reordering, not truth
 		}

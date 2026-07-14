@@ -168,9 +168,15 @@ judged_at := ksim.lane_rewound(&g.lane, shooter, g, proc(user: rawptr) {
 })
 ```
 
-The rewind tick is **derived, never trusted**: the shooter's newest snapshot
-ack is a fact (it is literally their delta baseline), and what they rendered
-when they fired is within a batch of it. Clamped to `rewind_max` (default
+The rewind tick is **derived, never trusted**: every input arrives in a
+packet that also carries the sender's snapshot ack, and the buffer tags each
+input with the ack it TRAVELED WITH — so when the server executes the input
+that pulled the trigger, it knows exactly which batch the shooter held at
+aim time (a fact: it is literally their delta baseline), and their screen
+draws watched entities `watch_delay` ticks behind that. Rewind =
+`view_tag − watch_delay`: the world as DRAWN at the moment of aiming, not
+the shooter's freshest ack (which advances a whole lead-plus-transit between
+sampling and adjudication — quickdraw's acid caught that one live). Clamped to `rewind_max` (default
 ~250 ms) — the favor-the-shooter ceiling; past it a laggy shooter aims at
 the live world like everyone else. The cost of the favor is the classic one:
 occasionally you are hit just after reaching cover. That is the trade this

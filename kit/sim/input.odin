@@ -130,27 +130,33 @@ input_read :: proc(r: ^Input_Ring, tick: u64) -> (input: []u8, ok: bool) {
 // ack in one packet, and a conditionally-absent segment would desync every
 // read behind it.
 input_write :: proc(w: ^knet.Writer, r: ^Input_Ring, acked: u64, redundancy := INPUT_REDUNDANCY) -> int {
+	// The window is the CONTIGUOUS run of noted ticks ending at head, walked
+	// downward — never assumed. The ring legitimately has holes: a lead-
+	// controller JUMP skips ticks wholesale (they were never simulated), and
+	// the wire format can only describe a gapless run.
 	first := r.head + 1 // the empty window, self-describing
 	count := 0
 	if r.head > 0 {
-		red := u64(min(redundancy, r.slots))
-		first = r.head + 1 - min(red, r.head) // window floor by redundancy
-		if acked + 1 > first {
-			first = acked + 1 // everything ≤ acked is confirmed delivered
+		red := min(redundancy, r.slots)
+		for t := r.head; count < red && t > acked; t -= 1 {
+			if _, ok := input_read(r, t); !ok {
+				break // a hole (jump / lap): the window ends here
+			}
+			count += 1
+			first = t
+			if t == 1 {
+				break
+			}
 		}
-		if first < r.tail {
-			first = r.tail // the ring's history starts where the sim did
-		}
-		if first <= r.head {
-			count = int(r.head - first + 1)
+		if count == 0 {
+			first = r.head + 1
 		}
 	}
 	knet.write_u64(w, first)
 	knet.write_u8(w, u8(count))
 	knet.write_u16(w, u16(r.size))
 	for t := first; t < first + u64(count); t += 1 {
-		blob, ok := input_read(r, t)
-		assert(ok, "input window inside the ring by construction")
+		blob, _ := input_read(r, t)
 		write_blob(w, blob)
 	}
 	return count
@@ -164,6 +170,10 @@ Input_Buffer :: struct {
 	slots:      int,
 	data:       []u8,
 	tick:       []u64,
+	tags:       []u64, // per-tick rider: the value `apply` was given for the packet
+	                   // that delivered the tick (the sim lane rides the snap ack here —
+	                   // it binds each input to the WORLD VIEW its sender aimed with)
+	tag:        u64, // the last popped tick's rider, held-last across gaps like the input
 	newest:     u64, // newest tick ever received — the ack the client trims by
 	popped:     u64, // last tick consumed (0 = none): older arrivals are stale
 	held:       []u8, // the hold-last copy a gap tick repeats (zeroed = neutral input until the first pop)
@@ -187,6 +197,7 @@ input_buffer_make :: proc(size: int, slots: int, allocator := context.allocator)
 		slots = slots,
 		data  = make([]u8, slots * size, allocator),
 		tick  = make([]u64, slots, allocator),
+		tags  = make([]u64, slots, allocator),
 		held  = make([]u8, size, allocator),
 	}
 }
@@ -194,9 +205,11 @@ input_buffer_make :: proc(size: int, slots: int, allocator := context.allocator)
 input_buffer_destroy :: proc(b: ^Input_Buffer) {
 	delete(b.data)
 	delete(b.tick)
+	delete(b.tags)
 	delete(b.held)
 	b.data = nil
 	b.tick = nil
+	b.tags = nil
 	b.held = nil
 }
 
@@ -205,7 +218,7 @@ input_buffer_destroy :: proc(b: ^Input_Buffer) {
 // Duplicates (redundancy re-delivering, out-of-order arrival) and stale ticks
 // (≤ popped) are skipped silently; that is the redundancy story working, not
 // an error. Returns how many genuinely new inputs were buffered.
-input_buffer_apply :: proc(b: ^Input_Buffer, r: ^knet.Reader) -> int {
+input_buffer_apply :: proc(b: ^Input_Buffer, r: ^knet.Reader, tag: u64 = 0) -> int {
 	first := knet.read_u64(r)
 	count := int(knet.read_u8(r))
 	size := int(knet.read_u16(r))
@@ -220,7 +233,17 @@ input_buffer_apply :: proc(b: ^Input_Buffer, r: ^knet.Reader) -> int {
 		if r.err {
 			return fresh
 		}
-		if t == 0 || t <= b.popped {
+		if t == 0 {
+			continue
+		}
+		if t > b.newest {
+			// The ack tracks RECEIPT, stale or not: a client digging out of a
+			// lead deficit needs its late inputs acknowledged to MEASURE the
+			// hole (the lane's catch-up jump), and acked inputs leave the
+			// redundant window either way.
+			b.newest = t
+		}
+		if t <= b.popped {
 			continue // stale: its tick already simulated (hold-last covered it)
 		}
 		i := int(t % u64(b.slots))
@@ -232,10 +255,8 @@ input_buffer_apply :: proc(b: ^Input_Buffer, r: ^knet.Reader) -> int {
 		}
 		copy(b.data[i * b.size:(i + 1) * b.size], blob)
 		b.tick[i] = t
+		b.tags[i] = tag
 		fresh += 1
-		if t > b.newest {
-			b.newest = t
-		}
 	}
 	// One headroom sample per packet, against the next tick to be consumed.
 	if b.newest > 0 {
@@ -263,9 +284,10 @@ input_buffer_pop :: proc(b: ^Input_Buffer, tick: u64) -> (input: []u8, fresh: bo
 	i := int(tick % u64(b.slots))
 	if b.tick[i] == tick {
 		copy(b.held, b.data[i * b.size:(i + 1) * b.size])
+		b.tag = b.tags[i]
 		b.fresh_count += 1
 		return b.held, true
 	}
-	b.held_count += 1
+	b.held_count += 1 // b.tag holds the last real rider, like the input itself
 	return b.held, false
 }
