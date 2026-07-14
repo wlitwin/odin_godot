@@ -174,6 +174,58 @@ history_matches :: proc(h: ^History, tick: u64, blob: []u8) -> bool {
 	return mem.compare(stored, blob) == 0
 }
 
+// The TOLERANT compare: float fields (Lerp_Kind .F32/.F64 — scriptgen
+// classifies predict fields' float-ness even without interp) match within
+// `eps` per component; everything else matches EXACTLY — a differing flag
+// byte is a real event, only continuous drift earns slack. This is what
+// keeps predict-world from resimming on every batch of held-input noise:
+// sub-epsilon drift rides until it accumulates past the line, then one
+// normal reconcile absorbs it.
+predict_within :: proc(a: []u8, b: []u8, desc: ^knet.Entity_Desc, eps: f32) -> bool {
+	off := 0
+	for f in desc.fields {
+		if .Predicted not_in f.flags {
+			continue
+		}
+		defer off += f.size
+		#partial switch f.lerp {
+		case .F32:
+			for i in 0 ..< f.size / 4 {
+				av := (^f32)(rawptr(&a[off + i * 4]))^
+				bv := (^f32)(rawptr(&b[off + i * 4]))^
+				if abs(av - bv) > eps {
+					return false
+				}
+			}
+		case .F64:
+			for i in 0 ..< f.size / 8 {
+				av := (^f64)(rawptr(&a[off + i * 8]))^
+				bv := (^f64)(rawptr(&b[off + i * 8]))^
+				if abs(av - bv) > f64(eps) {
+					return false
+				}
+			}
+		case:
+			if mem.compare(a[off:off + f.size], b[off:off + f.size]) != 0 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// history_matches with the tolerant compare (eps = 0 falls back to exact).
+history_within :: proc(h: ^History, tick: u64, blob: []u8, eps: f32) -> bool {
+	if eps <= 0 {
+		return history_matches(h, tick, blob)
+	}
+	stored, ok := history_read(h, tick)
+	if !ok {
+		return false
+	}
+	return predict_within(stored, blob, h.desc, eps)
+}
+
 // ---------------------------------------------------------------------------
 // Rewind — the lag-compensation scope, as a paired begin/end.
 //

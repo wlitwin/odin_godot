@@ -1946,5 +1946,14 @@ parse_replicate_info :: proc(
 			return {}, false
 		}
 	}
+	// PREDICT fields get their float-ness classified even without `interp`:
+	// kit/sim's reconcile TOLERANCE compares float fields within an epsilon
+	// (held-input drift is continuous) and everything else exactly (a flag
+	// byte differing is a real event). Blending still gates on .Interp, so
+	// this is metadata only — and predict-only, keeping every coop-lane
+	// generated file byte-identical.
+	if rep.predict && !rep.interp && rep.lerp == "" {
+		rep.lerp = interp_lerp_kind(type_text) // "" for non-floats: exact compare
+	}
 	return rep, true
 }

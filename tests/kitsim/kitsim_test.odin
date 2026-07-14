@@ -444,3 +444,29 @@ reconcile_ignores_unknown_ids :: proc(t: ^testing.T) {
 	testing.expect_value(t, ksim.reconcile(entries, truths, 4, 10, &world, world_resim), 0)
 	testing.expect_value(t, m.x, 55)
 }
+
+// The tolerant compare: float predicted fields (Lerp_Kind-classified) match
+// within eps; discrete fields exactly — only continuous drift earns slack.
+@(test)
+predict_within_eps :: proc(t: ^testing.T) {
+	@(static) fields := [?]knet.Field_Desc{
+		{offset = offset_of(Mover, x), size = size_of(f32), flags = {.Predicted, .Interp}, lerp = .F32},
+		{offset = offset_of(Mover, vx), size = size_of(f32), flags = {.Predicted}, lerp = .F32},
+		{offset = offset_of(Mover, hp), size = size_of(i32), flags = {.Predicted}}, // discrete: exact
+	}
+	desc := knet.Entity_Desc{fields = fields[:]}
+	a := Mover{x = 10, vx = 2, hp = 3}
+	b := Mover{x = 10.3, vx = 1.8, hp = 3}
+	ab := make([]u8, ksim.predict_size(&desc))
+	bb := make([]u8, ksim.predict_size(&desc))
+	defer delete(ab)
+	defer delete(bb)
+	ksim.predict_capture(ab, &a, &desc)
+	ksim.predict_capture(bb, &b, &desc)
+
+	testing.expect(t, ksim.predict_within(ab, bb, &desc, 0.5), "drift under eps rides")
+	testing.expect(t, !ksim.predict_within(ab, bb, &desc, 0.1), "drift past eps reconciles")
+	b.hp = 4 // a discrete difference is a real event at ANY eps
+	ksim.predict_capture(bb, &b, &desc)
+	testing.expect(t, !ksim.predict_within(ab, bb, &desc, 100), "discrete fields never earn slack")
+}

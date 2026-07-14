@@ -75,7 +75,9 @@ speedball_ready :: proc(self: ^Speedball) {
 	// every kicker AND the ball — one timeline for the whole pitch (the
 	// Rocket League model). No claim dance; constant small glided corrections
 	// on remote avatars instead of delayed-but-accurate ones.
-	ksim.lane_init(&self.lane, &self.ses, size_of(Kicker_Input), cfg = ksim.Lane_Config{smooth_cut = 60, echo_inputs = true})
+	// tolerance: sub-half-pixel held-input drift rides uncorrected — the
+	// reconcile fires on real divergence, not float noise.
+	ksim.lane_init(&self.lane, &self.ses, size_of(Kicker_Input), cfg = ksim.Lane_Config{smooth_cut = 60, echo_inputs = true, tolerance = 0.5})
 	ksim.lane_set_sim(&self.lane, self, sp_sample, sp_step)
 	kboot.boot_lane(&self.boot, &self.lane)
 

@@ -112,6 +112,10 @@ Lane_Config :: struct {
 	// echo per player per batch. Compile-time config: every peer of a game
 	// agrees by construction.
 	echo_inputs: bool,
+	tolerance: f32, // reconcile slack for FLOAT predicted fields, world units
+	                // (0 = exact). Predict-world's anti-churn: held-input
+	                // drift below this rides uncorrected until it accumulates
+	                // past the line; discrete fields always compare exactly.
 }
 
 // Host-side per-player state, created on a player's first input packet.
@@ -150,6 +154,7 @@ Lane :: struct {
 	smooth_halflife: f64,
 	smooth_cut:      f32,
 	judge_live:      bool,
+	tolerance:       f32,
 	echo_on:         bool,
 	echo:            map[knet.Player_Id][]u8, // last-known input per REMOTE player (predict-world)
 	ticker:          Sim_Ticker,
@@ -204,6 +209,7 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 	l.judge_live = cfg.judge_live
 	l.echo_on = cfg.echo_inputs
 	l.echo = make(map[knet.Player_Id][]u8, allocator)
+	l.tolerance = cfg.tolerance
 	l.ticker = sim_ticker_make(hz)
 	l.tracked = make([dynamic]Tracked, allocator)
 	l.entries = make([dynamic]Entry, allocator)
@@ -695,7 +701,7 @@ client_ingest :: proc(l: ^Lane) {
 	}
 	mism := make([dynamic]knet.Net_Id, context.temp_allocator)
 	l.resimming = true
-	l.stat_resims += reconcile(l.entries[:], truths[:], tick, l.ticker.tick, l, client_resim, &mism)
+	l.stat_resims += reconcile(l.entries[:], truths[:], tick, l.ticker.tick, l, client_resim, &mism, l.tolerance)
 	l.resimming = false
 	for id in mism {
 		for &tr, i in l.tracked {

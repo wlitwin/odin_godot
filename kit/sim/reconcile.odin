@@ -82,6 +82,7 @@ reconcile :: proc(
 	user: rawptr,
 	resim: Resim_Proc,
 	mismatched: ^[dynamic]knet.Net_Id = nil,
+	eps: f32 = 0, // tolerant float compare (predict-world's anti-churn; 0 = exact)
 ) -> int {
 	if auth_tick == 0 || len(truths) == 0 {
 		return 0
@@ -96,7 +97,7 @@ reconcile :: proc(
 			continue // not under reconcile here (unknown / not predicted)
 		}
 		assert(len(t.blob) == e.hist.size, "truth blob must be the entity's predict-set size")
-		if !history_matches(e.hist, auth_tick, t.blob) {
+		if !history_within(e.hist, auth_tick, t.blob, eps) {
 			wrong += 1
 			if mismatched != nil {
 				append(mismatched, t.id)
