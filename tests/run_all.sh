@@ -112,6 +112,14 @@ TESTS=(
     # Two-peer ENet sync: the toolkit's full replication stack across a REAL wire
     # (replicate tag -> desc -> shadow delta -> send_bytes -> peer_packet -> apply).
     "kitsync|KITSYNC_OK|tests/kitsync/run.sh"
+    # kit/sim solo gate: the sim-lane loop headless end to end — @(gd_tick)
+    # movement, the world pass, a lane_rewound shot — host-with-no-peers.
+    "quickdrawsingle|QUICKDRAW_SINGLE_OK|examples/quickdraw/run.sh"
+    # THE DUEL ACID (three processes, ENet, 120ms injected latency each way):
+    # a deadeye fires at a perpendicular-crossing strafer exactly where its
+    # screen renders it. Lag comp ON: the shots land (kill -> respawn). The
+    # SAME duel judged live: they miss. The gap is the feature, proved A/B.
+    "quickdrawnative|QUICKDRAW_NATIVE_OK|examples/quickdraw/native_run.sh"
     # THE PHASE-0 ACID TEST: host + owning client + OBSERVER (three processes) over
     # ENet with injected receive latency on every peer. A new entity in ~10 lines
     # (orb.odin), zero role branches: predictions land before any round trip,

@@ -1,0 +1,28 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/quickdraw.odin" id="1_qd"]
+[ext_resource type="PackedScene" path="res://gunner.tscn" id="2_gun"]
+
+[node name="Quickdraw" type="Node2D"]
+script = ExtResource("1_qd")
+gunner_scene = ExtResource("2_gun")
+
+[node name="Dust" type="Polygon2D" parent="."]
+z_index = -10
+color = Color(0.22, 0.18, 0.13, 1)
+polygon = PackedVector2Array(0, 0, 640, 0, 640, 360, 0, 360)
+
+[node name="Border" type="Polygon2D" parent="."]
+z_index = -9
+color = Color(0.13, 0.1, 0.08, 1)
+polygon = PackedVector2Array(0, 0, 640, 0, 640, 360, 0, 360, 0, 12, 12, 12, 12, 348, 628, 348, 628, 12, 0, 12)
+
+[node name="CrateLeft" type="Polygon2D" parent="."]
+z_index = -8
+color = Color(0.42, 0.3, 0.17, 1)
+polygon = PackedVector2Array(180, 70, 230, 70, 230, 150, 180, 150)
+
+[node name="CrateRight" type="Polygon2D" parent="."]
+z_index = -8
+color = Color(0.42, 0.3, 0.17, 1)
+polygon = PackedVector2Array(410, 70, 460, 70, 460, 150, 410, 150)
