@@ -20,11 +20,17 @@ persistent_token :: proc(path: cstring) -> u64 {
 	if bytes, ok := read_file(path, context.temp_allocator); ok && len(bytes) == 8 {
 		return (cast(^u64)raw_data(bytes))^
 	}
-	// First run: mint from the monotonic clock, scrambled (golden-ratio
-	// multiply) so near-simultaneous first launches don't collide on the
-	// low bits. Cryptographic strength is not the bar — unguessable-by-
-	// friends is (this is friendslop; see the voice-of-v1 stance).
-	token := u64(time.tick_now()._nsec) * 0x9E3779B97F4A7C15
+	// First run: mint from the ENGINE clock — core:time is stuck inside the
+	// wasm module (the same freeze the netgd clock swap exists for), and a
+	// frozen mint would hand every fresh web player the SAME token, whose
+	// holder's seat the next joiner then legitimately steals. core:time is
+	// folded back in for extra native entropy (a harmless constant on web),
+	// scrambled (golden-ratio multiply) so near-simultaneous first launches
+	// don't collide on the low bits. Cryptographic strength is not the bar —
+	// unguessable-by-friends is (this is friendslop; see the voice-of-v1
+	// stance).
+	usec := u64(gd.time_get_ticks_usec(gd.singleton_time()))
+	token := (usec ~ u64(time.tick_now()._nsec)) * 0x9E3779B97F4A7C15
 	bits := token
 	_ = write_file(path, (cast([^]u8)&bits)[:8])
 	return token
