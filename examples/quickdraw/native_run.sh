@@ -95,11 +95,12 @@ for port in 4189 4196; do
 
     # The claim, both directions: rewound aim lands repeatedly on the
     # crossing target; live-judged aim (the identical duel) almost never
-    # does — the residues are the strafer's brief direction flips (live)
-    # and single-tick rewind quantizing against the watch clock's
-    # interpolation (rewound; the interpolated-rewind refinement will
-    # tighten it). Observed across runs: rewound 6-10, live 0-1.
-    if ((HITS_A >= 4)) && ((HITS_B <= 2)) && ((HITS_A > HITS_B + 2)); then
+    # does. INTERPOLATED rewind reconstructs the exact bracket blend the
+    # shooter's screen drew (the render offset rides the input packet),
+    # so most aimable shots land — the misses left are dead-window shots
+    # after each kill and the strafer's brief direction flips. Observed
+    # across runs: rewound 11-12 of ~23, live 0-1.
+    if ((HITS_A >= 8)) && ((HITS_B <= 2)) && ((HITS_A > HITS_B + 5)); then
         grep -q "QD_KILL by=3" "$LOGDIR/rewound-marshal.log" || { echo "hits never became a kill"; exit 1; }
         grep -q "QD_RESPAWN" "$LOGDIR/rewound-marshal.log" || { echo "the kill never respawned"; exit 1; }
         echo "QUICKDRAW_NATIVE_OK proved: at 240ms RTT the rewound duel lands ($HITS_A hits -> kill -> respawn) while the live-judged control misses ($HITS_B)"

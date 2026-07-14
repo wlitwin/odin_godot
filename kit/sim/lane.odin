@@ -23,7 +23,7 @@ package kit_sim
 // both on the .Stream channel (tick-stamped, self-superseding — a lost one
 // is worthless by the time it could be resent):
 //
-//     SIM_INPUT  client → host   [input window][snap ack]
+//     SIM_INPUT  client → host   [snap ack][render off][input window]
 //     SIM_SNAP   host → client   [snapshot batch]
 //
 // EVENTS, NOT CALLBACKS: handlers only file bytes into lane-owned state
@@ -505,14 +505,33 @@ client_frame :: proc(l: ^Lane, dt: f64) -> int {
 	if n > 0 && l.sample != nil {
 		// Ack FIRST: the receiver tags every input in this packet with it —
 		// the snap ack is the sender's world view, and binding them is what
-		// lets a rewound query judge the view each input was AIMED with.
+		// lets a rewound query judge the view each input was AIMED with. The
+		// render offset beside it says WHERE INSIDE that view the watch clock
+		// was drawing (fractional ticks behind the ack, 1/8-tick fixed point):
+		// a bounded claim — the server clamps it inside the window the ack
+		// proves — that lets the rewind BLEND the same bracket the shooter's
+		// screen blended, instead of quantizing to a tick.
 		w := ksess.session_app_begin(l.ses, l.tag)
 		knet.write_u8(w, SIM_INPUT)
 		snap_ack_write(w, &l.rx)
+		knet.write_u8(w, render_off8(l))
 		input_write(w, &l.ring, l.input_ack, l.redundancy)
 		ksess.session_app_flush(l.ses, ksess.HOST_PEER, .Stream)
 	}
 	return n
+}
+
+// How far behind the acked batch this screen is DRAWING watched entities, in
+// 1/8-tick units. Falls back to the watch target when the clock hasn't run
+// (a game that never presents keeps the old single-tick behavior).
+@(private = "file")
+render_off8 :: proc(l: ^Lane) -> u8 {
+	off := f64(l.watch_delay)
+	if l.watch_clock > 0 && f64(l.rx.acked) > l.watch_clock {
+		off = f64(l.rx.acked) - l.watch_clock
+	}
+	off = clamp(off, 0, min(f64(2 * l.watch_delay + 4), 31.5))
+	return u8(off * 8)
 }
 
 // Process the newest batch the handler filed: anchor or reconcile the
@@ -656,35 +675,42 @@ find_lane_entry :: proc(l: ^Lane, id: knet.Net_Id) -> ^Entry {
 // Clamped to rewind_max, the favor-the-shooter ceiling: past it, a laggy
 // shooter aims at the live world like everyone else.
 
-// The tick a rewound query for `shooter` winds back to (host, inside a step).
-lane_rewind_tick :: proc(l: ^Lane, shooter: knet.Player_Id) -> u64 {
+// The view a rewound query for `shooter` reconstructs (host, inside a step):
+// the bracketing lower tick and the blend fraction toward the next — the
+// SAME pair-and-alpha shape their watch clock drew with. Sources, in trust
+// order: the ack bound to the INPUT BEING EXECUTED (a fact — it rode the
+// trigger's packet; the shooter's latest ack is a whole lead-plus-transit
+// fresher and describes a world they never saw), minus the render offset
+// that rode beside it (a claim, clamped inside the window the ack proves).
+lane_rewind_view :: proc(l: ^Lane, shooter: knet.Player_Id) -> (lo: u64, alpha: f32) {
 	assert(l.ses.is_host, "lag compensation is the authority's job")
 	t := l.step_tick
 	if shooter == l.ses.me {
-		return t // the host's own screen IS the live world
+		return t, 0 // the host's own screen IS the live world
 	}
-	// The view bound to the INPUT BEING EXECUTED — the ack that rode in the
-	// same packet — not the shooter's latest ack: between sampling and
-	// adjudication their acks kept advancing by a whole lead-plus-transit,
-	// and a rewind to the fresher view judges a world they never saw.
-	view := u64(0)
+	tag := u64(0)
 	if p, ok := l.peers[shooter]; ok {
-		view = p.buf.tag
+		tag = p.buf.tag
 	}
-	if view == 0 || view >= t {
-		return t // no confirmed view yet: judge live
+	ack := tag >> 8
+	if ack == 0 || ack >= t {
+		return t, 0 // no confirmed view yet: judge live
 	}
-	// The ack names the newest batch they HOLD; their screen draws watched
-	// entities watch_delay ticks behind it (lane_present's watch clock — the
-	// same config, compiled into both peers). Judge what was DRAWN, not what
-	// was delivered.
-	if view > u64(l.watch_delay) + 1 {
-		view -= u64(l.watch_delay)
-	} else {
-		view = 1
+	off := clamp(f64(tag & 0xFF) / 8, 0, min(f64(2 * l.watch_delay + 4), 31.5))
+	view := f64(ack) - off
+	floor_ := t > u64(l.rewind_max) ? t - u64(l.rewind_max) : 1
+	if view <= f64(floor_) {
+		return floor_, 0 // the favor-the-shooter ceiling
 	}
-	floor := t > u64(l.rewind_max) ? t - u64(l.rewind_max) : 1
-	return max(view, floor)
+	lo = u64(view)
+	return lo, f32(view - f64(lo))
+}
+
+// The whole-tick floor of the view — kept for callers that only need the
+// bound (diagnostics, damage falloff by age).
+lane_rewind_tick :: proc(l: ^Lane, shooter: knet.Player_Id) -> u64 {
+	lo, _ := lane_rewind_view(l, shooter)
+	return lo
 }
 
 Rewound_Query :: proc(user: rawptr)
@@ -697,11 +723,18 @@ Rewound_Query :: proc(user: rawptr)
 // couldn't have seen anyway). Host-only, inside your Step_Proc; returns the
 // tick the world was judged at.
 lane_rewound :: proc(l: ^Lane, shooter: knet.Player_Id, user: rawptr, query: Rewound_Query) -> u64 {
-	tick := l.judge_live ? l.step_tick : lane_rewind_tick(l, shooter)
-	if tick >= l.step_tick {
+	lo, alpha := lane_rewind_view(l, shooter)
+	if l.judge_live {
+		lo = l.step_tick // the A/B knob: judge the live world
+	}
+	if lo >= l.step_tick {
 		query(user)
 		return l.step_tick
 	}
+	// Wind every target back to the BLENDED pose the shooter's screen drew —
+	// the same bracket pair and fraction their watch clock used, from the
+	// truth ledger (single-tick rewind quantized against the interpolation
+	// and cost near-tangent shots; the duel acid measured it).
 	Wound :: struct {
 		tr:   ^Tracked,
 		live: []u8,
@@ -711,15 +744,25 @@ lane_rewound :: proc(l: ^Lane, shooter: knet.Player_Id, user: rawptr, query: Rew
 		if tr.owner == shooter || tr.hist == nil {
 			continue
 		}
-		if live, ok := history_rewind_begin(tr.hist, tick, tr.entity); ok {
-			append(&wound, Wound{tr = &tr, live = live})
+		a, aok := history_read(tr.hist, lo)
+		if !aok {
+			continue // the ledger no longer holds it (fresh spawn): test live
 		}
+		live := make([]u8, tr.hist.size, context.temp_allocator)
+		predict_capture(live, tr.entity, tr.desc)
+		b, bok := history_read(tr.hist, lo + 1)
+		if alpha > 0.001 && bok {
+			predict_blend(tr.entity, tr.desc, a, b, alpha)
+		} else {
+			predict_restore(tr.entity, tr.desc, a)
+		}
+		append(&wound, Wound{tr = &tr, live = live})
 	}
 	query(user)
 	for w in wound {
-		history_rewind_end(w.tr.hist, w.tr.entity, w.live)
+		predict_restore(w.tr.entity, w.tr.desc, w.live)
 	}
-	return tick
+	return lo
 }
 
 // ---------------------------------------------------------------------------
@@ -829,7 +872,10 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 			l.peers[from] = p
 		}
 		acked := snap_ack_read(r)
-		input_buffer_apply(&p.buf, r, tag = acked)
+		off8 := knet.read_u8(r)
+		// One rider per input: the ack AND the render offset that traveled
+		// with it, packed (ticks fit 56 bits by ~38 million years).
+		input_buffer_apply(&p.buf, r, tag = (acked << 8) | u64(off8))
 		if !r.err && acked > p.acked {
 			p.acked = acked // regressions are stale reordering, not truth
 		}

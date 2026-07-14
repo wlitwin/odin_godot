@@ -323,11 +323,16 @@ lane_rewound_judges_the_shooters_view :: proc(t: ^testing.T) {
 	}
 
 	testing.expect(t, host.fired, "the probe tick ran")
-	// The rewind tick is alice's snap ack: confirmed, recent, and bounded.
+	// The rewind view is alice's bound ack minus her render offset:
+	// confirmed, recent, and bounded.
 	testing.expect(t, host.rewound_to < 100, "a remote shooter's view is in the past")
 	testing.expect(t, host.rewound_to >= 100 - u64(host.lane.rewind_max), "clamped to the rewind ceiling")
-	// The rewound world showed exactly the ledgered truth of that tick...
-	testing.expect_value(t, host.saw_live - host.saw_past, f32(2 * (100 - host.rewound_to)))
+	// The rewound world showed the ledgered truth AT the view — interpolated
+	// rewind blends toward the next tick, so allow one blended tick (the
+	// mover moves 2/tick).
+	diff := host.saw_live - host.saw_past
+	expected := f32(2 * (100 - host.rewound_to))
+	testing.expect(t, abs(diff - expected) <= 2.0, "rewound pose within one blended tick of the ledger")
 	// ...and the live world came back untouched.
 	testing.expect_value(t, host.saw_restored, host.saw_live)
 	// The shooter's own avatar is never wound back (its owner IS the view).
