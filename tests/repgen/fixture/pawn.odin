@@ -10,6 +10,7 @@ package repgen_fixture
 import gd "godot:godot"
 import knet "godot:kit/net"
 import ksim "godot:kit/sim"
+import psim "godot:play/sim"
 
 Pawn :: struct {
 	owner:  gd.Node2d,
@@ -23,6 +24,7 @@ Pawn :: struct {
 	px, py: f32 `gd:"replicate,predict,interp"`, // kit/sim lane: server-sim truth, client resim
 	fuel:   u16 `gd:"replicate,predict"`, // predicted without interp: steps, never lerps
 	pace:   Pace, // TICK-COMPOSITION: the block's step hoists, runs after pawn_tick
+	chill:  psim.Cool, // IMPORTED-shelf tick block: the hoist crosses packages
 	state:  u8 `gd:"replicate"`,
 	speed:  f64 `gd:"export,range=0:10"`, // exports and replicates coexist
 	local:  int, // untagged: never replicated

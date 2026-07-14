@@ -51,6 +51,7 @@ for needle in \
 	'{.Predicted}' \
 	'offset_of(Pawn, px)' \
 	'offset_of(Pawn, fuel)' \
+	'offset_of(Pawn, chill) + offset_of(type_of(Pawn{}.chill), left)' \
 	'lerp = .F32' \
 	'lerp = .Quat' \
 	'lerp = .Custom, blend = pawn_blend_aim' \
@@ -126,6 +127,8 @@ for needle in \
 	'if owner == ksim.lane_me(lane) && !lane.resimming {' \
 	'pawn_tick_fx(self, _p0)' \
 	'pace_tick(&self.pace)' \
+	'import play_sim "godot:play/sim"' \
+	'play_sim.cool_tick(&self.chill)' \
 	'pawn_sim_set := ksim.Sim_Set{entity_desc = &pawn_net_desc, tick = _pawn_tick_step, input_size = size_of(Pawn_Input), commands = _pawn_sim_cmds[:]}' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
@@ -137,7 +140,7 @@ if grep -qF '_pawn_m_tick' "$GEN"; then
 	echo "REPGEN_FAIL: the @(gd_tick) proc leaked into the method trampolines"
 	exit 1
 fi
-echo "  ok  tick thunk + sim set generated (POD-asserted input, coast-on-nil)"
+echo "  ok  tick thunk + sim set generated (POD-asserted input, coast-on-nil, imported-shelf block hoisted)"
 
 # Entity-table artifacts (board.odin's `entity=Pawn:7` scene tag): the TYPE
 # const, the kboot.Entity_Kind row reading the scene THROUGH the field
@@ -582,6 +585,98 @@ if ! echo "$BTK_OUT" | grep -q "INPUTLESS"; then
 	exit 1
 fi
 echo "  ok  block ticks are inputless — a value param is a build error"
+
+# ---- (4a4): THE SHELF LINT — blocks must sit on the lane their shelf names ----
+# A fabricated godot: root stands in for the real shelves (the lint keys on
+# the block's dir under -godot:, exactly play / play/sim): a predict-tagged
+# block on the root shelf errors toward play/sim, and a sim-shelf block with
+# no predict fields errors back. Game-local blocks stay out of scope.
+SHF="$TMP/shf"
+mkdir -p "$SHF/root/play/sim" "$SHF/hot" "$SHF/flat"
+cat > "$SHF/root/play/heat.odin" <<'EOF'
+package play
+
+Heat :: struct {
+	warmth: u16 `gd:"replicate,predict"`,
+}
+
+@(gd_tick)
+heat_tick :: proc(h: ^Heat) {
+	if h.warmth > 0 {h.warmth -= 1}
+}
+EOF
+cat > "$SHF/root/play/sim/tally.odin" <<'EOF'
+package play_sim
+
+Tally :: struct {
+	score: u8 `gd:"replicate"`,
+}
+EOF
+cat > "$SHF/hot/carrier.odin" <<'EOF'
+//gd:extends Node
+//gd:class Carrier
+package repgen_shf_hot
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+import play "godot:play"
+
+Carrier :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	heat:   play.Heat, // predict-tagged block on the ROOT shelf: rejected
+}
+
+carrier_ready :: proc(self: ^Carrier) {}
+EOF
+set +e
+SHF_OUT="$("$SGEN" "$SHF/hot" -godot:"$SHF/root" 2>&1)"
+SHF_RC=$?
+set -e
+if [ "$SHF_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a predict-tagged block on the root play shelf was accepted"
+	exit 1
+fi
+if ! echo "$SHF_OUT" | grep -q "move it to play/sim"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't point the predicted block at play/sim:"
+	echo "$SHF_OUT" | tail -3
+	exit 1
+fi
+cat > "$SHF/flat/keeper.odin" <<'EOF'
+//gd:extends Node
+//gd:class Keeper
+package repgen_shf_flat
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+import psim "godot:play/sim"
+
+Keeper :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	x:      f32 `gd:"replicate,predict"`,
+	tally:  psim.Tally, // no predict fields on the SIM shelf: rejected
+}
+
+@(gd_tick)
+keeper_tick :: proc(self: ^Keeper) {
+	self.x += 1
+}
+EOF
+set +e
+SHF2_OUT="$("$SGEN" "$SHF/flat" -godot:"$SHF/root" 2>&1)"
+SHF2_RC=$?
+set -e
+if [ "$SHF2_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a predict-free block on the play/sim shelf was accepted"
+	exit 1
+fi
+if ! echo "$SHF2_OUT" | grep -q "timeline-free and coop blocks live on godot:play"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't point the flat block back at play:"
+	echo "$SHF2_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  shelf lint: predicted blocks belong in play/sim, flat ones in play — both directions rejected"
 
 # ---- (4b): interp on a non-float + interp= with no proc — both errors ----
 LRP="$TMP/lrp"

@@ -2003,6 +2003,46 @@ composed_pkg_ref :: proc(def_dir, scripts_dir: string) -> (alias, path: string) 
 	return strings.to_string(a), strings.concatenate({"godot:", rel})
 }
 
+// THE SHELF LINT — the namespace contract, enforced where block-ness is
+// actually asserted (the embed). `godot:play` is the coop/scratch shelf: its
+// blocks ride the delta lane or stay local, so a gd:"replicate,predict"
+// field there means the block was shelved one lane short — it belongs in
+// `godot:play/sim`. And the mirror: a `godot:play/sim` block with NO
+// predict-tagged fields isn't a sim block at all. Scoped to the two SHELF
+// packages only (the block's dir under the godot: root at exactly play /
+// play/sim) — game-local blocks compose however they like. Direct fields
+// decide: a shelf block declares its own wire state.
+shelf_lint :: proc(s: ^Script, def: Struct_Def, path: []string) {
+	if g_godot_root == "" || !strings.has_prefix(def.dir, g_godot_root) {return}
+	rel := strings.trim_prefix(def.dir[len(g_godot_root):], "/")
+	if rel != "play" && rel != "play/sim" {return}
+	has_predict := false
+	for fld in def.fields {
+		val, has := tag_gd_value(fld.tag)
+		if !has {continue}
+		specs := strings.split(val, ",", context.temp_allocator)
+		if len(specs) == 0 || strings.trim_space(specs[0]) != "replicate" {continue}
+		for spec in specs[1:] {
+			if strings.trim_space(spec) == "predict" {
+				has_predict = true
+			}
+		}
+	}
+	if rel == "play" && has_predict {
+		error_at(
+			Loc{path = s.path},
+			"%s embeds %s (as %q) from the godot:play shelf, but the block carries gd:\"replicate,predict\" fields — predicted blocks live on the sim shelf: move it to play/sim (import psim \"godot:play/sim\")",
+			s.struct_name, def.id, join_path(path),
+		)
+	} else if rel == "play/sim" && !has_predict {
+		error_at(
+			Loc{path = s.path},
+			"%s embeds %s (as %q) from the godot:play/sim shelf, but the block carries no gd:\"replicate,predict\" fields — the sim shelf is for predicted blocks; timeline-free and coop blocks live on godot:play",
+			s.struct_name, def.id, join_path(path),
+		)
+	}
+}
+
 // apply_subst rewrites whole-identifier generic parameters in a type text to their
 // concrete args. With {S = "Gun_State"}: "S" -> "Gun_State", "Edge(S)" -> "Edge(Gun_State)",
 // "[N]f32" -> "[4]f32" (with {N = "4"}). Only WHOLE identifiers are replaced, never a
@@ -2059,6 +2099,8 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 	if visited[def.id] {return} // a type reachable from itself — stop, don't loop
 	visited[def.id] = true
 	defer delete_key(visited, def.id) // allow the same type at independent sibling positions
+
+	shelf_lint(s, def, path) // shelf blocks must sit on the lane their shelf names
 
 	// verb-/method-composition (the dual of the nested-replicate collection below): hoist this
 	// sub-struct's @(gd_command) and @(gd_method)/@(gd_rpc) procs onto the entity, keyed by the
