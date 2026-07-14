@@ -50,6 +50,10 @@ Speedball :: struct {
 
 	goals_to: u8,
 
+	// Presentation scratch: my touch is still the ball's flight's CAUSE, so
+	// the claim holds until the flight ends or an opponent contests it.
+	i_touched: bool,
+
 	// Presentation edges + the acid's probes.
 	seen_l, seen_r, seen_won: u8,
 	auto_peers: int,
@@ -240,10 +244,37 @@ sp_step :: proc(user: rawptr, tick: u64) {
 	g := cast(^Speedball)user
 	b := g.ball
 	if b == nil {return}
+	live := !g.lane.resimming // presentation scratch only mutates on the live pass
 	// The acid's convergence probe reports through holds and match end.
 	if g.ses.is_host && tick % 60 == 0 {
 		gd.print_str(fmt.tprintf("SPB_POS tick=%d x=%.1f y=%.1f l=%d r=%d", tick, b.x, b.y, b.score_l, b.score_r))
 	}
+
+	// CLAIM RETENTION: my kick's FLIGHT is my simulation's consequence, so
+	// the claim follows the cause, not my proximity — releasing by distance
+	// pulls your own kick backward mid-flight (the fade target is the
+	// watched view, speed × timeline-skew behind a fast ball). Hold until
+	// the ball slows (the timelines nearly coincide — an invisible handback)
+	// or an opponent's rendered avatar contests it.
+	if live && g.i_touched {
+		speed2 := b.vx * b.vx + b.vy * b.vy
+		contested := false
+		for id2, k2 in g.kickers {
+			if g.owner_pid[id2] == g.ses.me {continue}
+			cdx := b.x - k2.x
+			cdy := b.y - k2.y
+			if cdx * cdx + cdy * cdy < (KICK_REACH * 1.5) * (KICK_REACH * 1.5) {
+				contested = true
+				break
+			}
+		}
+		if speed2 < 1.5 * 1.5 || contested || b.hold > 0 {
+			g.i_touched = false
+		} else {
+			ksim.lane_claim(&g.lane, b.net_id)
+		}
+	}
+
 	if b.won != 0 || b.hold > 0 {return}
 
 	for id, k in g.kickers {
@@ -262,6 +293,9 @@ sp_step :: proc(user: rawptr, tick: u64) {
 		// ball a whole lead before its kicker visibly arrives.
 		if k.mine && d2 < (KICK_REACH * 2) * (KICK_REACH * 2) {
 			ksim.lane_claim(&g.lane, b.net_id)
+			if live {
+				g.i_touched = true
+			}
 		}
 
 		// Dribble: SOFT contact. Resolve half the overlap per tick along a

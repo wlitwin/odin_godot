@@ -210,6 +210,15 @@ Two rules keep the pattern honest:
   otherwise ship: predicted ball, past-rendered players, one screen). The
   claim rises instantly, decays over ~a quarter second — net.md's "did MY
   simulation cause this?" boolean, asked continuously.
+- **The claim follows the CAUSE, and releases when the cause ends.** Your
+  kick's whole FLIGHT is your simulation's consequence — keep claiming while
+  the ball is fast from your touch, and release when it SLOWS (the two
+  timelines nearly coincide, so the handback is invisible) or when an
+  opponent contests it. Releasing on mere distance pulls your own kick
+  backward mid-flight: the fade target is the watched view, sitting
+  speed × timeline-skew behind a fast ball, and blending across that gap
+  cancels its forward motion on your screen (speedball shipped this bug for
+  one playtest; its claim-retention block is the reference).
 
 See `examples/speedball` (and read it
 against `examples/slopball` — the same game on the coop model — to choose).
