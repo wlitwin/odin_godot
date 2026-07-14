@@ -100,3 +100,8 @@ state does the same. One session carries all of it.
 [slopball](../../examples/slopball/README.md), the same game on the coop
 model, to feel what each arbiter buys. The design history, playtest by
 playtest, lives in the project's `server-authority-resim-companion` ledger.
+
+Already shipped on the coop model and outgrowing it? The choice is not
+all-or-nothing: sim.md's **"Promoting a coop game"** checklist migrates one
+contested entity at a time (slopball → speedball is the worked diff), and a
+hybrid is a supported end state.

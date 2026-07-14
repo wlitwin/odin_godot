@@ -498,6 +498,21 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			}
 		}
 
+		// A kboot.Boot field is the "this game rides the boot" declaration —
+		// scriptgen generates the four standard transport forwards for the
+		// class (on_packet/on_peer_left/on_net_up/on_net_down), unless the
+		// game defines its own (hand-written wins, name by name).
+		{
+			ftype := strings.trim_space(node_text(src, f.type))
+			if ftype == "kboot.Boot" || strings.has_suffix(ftype, ".Boot") {
+				for nm in f.names {
+					if ident, iok := nm.derived.(^ast.Ident); iok && ident != nil {
+						s.boot_field = ident.name
+					}
+				}
+			}
+		}
+
 		val, has := tag_gd_value(f.tag.text)
 		if !has && f.tag.text != "" {
 			// A tag that LOOKS like an attempted gd tag but isn't the required `gd:"..."` form
@@ -750,6 +765,20 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 		if has_attr(vd, "gd_tick") {
 			config, _ := attr_value(vd, "gd_tick")
 			parse_tick(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
+			continue
+		}
+
+		// `@(gd_sample)` / `@(gd_step[="authority"])` — the lane's GAME half:
+		// the device read and the world pass. Never Godot methods: the
+		// generated `<snake>_lane_init` wiring is their only caller.
+		if has_attr(vd, "gd_sample") {
+			config, _ := attr_value(vd, "gd_sample")
+			parse_sample(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
+			continue
+		}
+		if has_attr(vd, "gd_step") {
+			config, _ := attr_value(vd, "gd_step")
+			parse_step(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
 			continue
 		}
 
@@ -1377,6 +1406,215 @@ parse_tick :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^as
 
 	if ok {
 		s.tick = tk
+	}
+}
+
+// One @(gd_sample) proc — the lane's device read, the ONE place that touches
+// hardware (never called during a resim). Shape, receiver first:
+//
+//   proc(self: ^Game, tick: u64, input: ^Game_Input)
+//
+// The generated thunk writes through the pointer; resolve_sim pins T to the
+// package's @(gd_tick) input struct at build time, so sampling into the
+// wrong struct dies here instead of desyncing quietly.
+parse_sample :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
+	if config != "" {
+		error_at(loc, "sample %s: @(gd_sample) takes no config (got %q)", proc_name, config)
+		return
+	}
+	if s.sample.proc_name != "" {
+		error_at(
+			loc,
+			"%s: second @(gd_sample) proc %q — %q already reads the device; one sample per lane, compose intent inside it",
+			s.struct_name, proc_name, s.sample.proc_name,
+		)
+		return
+	}
+	types := flatten_param_types(src, pt)
+	if len(types) != 2 || types[0] != "u64" || !strings.has_prefix(types[1], "^") {
+		error_at(loc, "sample %s: the shape is (self: ^%s, tick: u64, input: ^Your_Input)", proc_name, s.struct_name)
+		return
+	}
+	if pt.results != nil {
+		error_at(loc, "sample %s: no results — a sample WRITES the input struct; facts belong to ticks", proc_name)
+		return
+	}
+	s.sample = Sim_Proc_Info{proc_name = proc_name, line = loc.line, input_type = types[1][1:]}
+}
+
+// One @(gd_step) proc — the lane's world pass, run AFTER entity ticks:
+// contact between the pairs this peer has inputs for, respawn queues, wave
+// directors. `@(gd_step = "authority")` runs it on the host alone — the
+// role gate an authority-work pass used to open with, held by the lane.
+// Shape, receiver first: proc(self: ^Game, tick: u64), no results.
+parse_step :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
+	if s.step.proc_name != "" {
+		error_at(
+			loc,
+			"%s: second @(gd_step) proc %q — %q already steps the world; one world pass per lane",
+			s.struct_name, proc_name, s.step.proc_name,
+		)
+		return
+	}
+	authority := false
+	for part in strings.split(config, ",") {
+		tok := strings.trim_space(part)
+		switch tok {
+		case "":
+		case "authority":
+			authority = true
+		case:
+			error_at(loc, "step %s: unknown config token %q (expected `authority`)", proc_name, tok)
+			return
+		}
+	}
+	types := flatten_param_types(src, pt)
+	if len(types) != 1 || types[0] != "u64" {
+		error_at(loc, "step %s: the shape is (self: ^%s, tick: u64)", proc_name, s.struct_name)
+		return
+	}
+	if pt.results != nil {
+		error_at(loc, "step %s: no results — world-pass facts are state; entity ticks carry payloads", proc_name)
+		return
+	}
+	s.step = Sim_Proc_Info{proc_name = proc_name, line = loc.line, authority = authority}
+}
+
+// The param type texts AFTER the receiver, one entry per declared name.
+@(private = "file")
+flatten_param_types :: proc(src: string, pt: ^ast.Proc_Type) -> []string {
+	types := make([dynamic]string, context.temp_allocator)
+	for field in pt.params.list[1:] {
+		text := strings.trim_space(node_text(src, field.type))
+		for _ in 0 ..< max(1, len(field.names)) {
+			append(&types, text)
+		}
+	}
+	return types[:]
+}
+
+// Every top-level proc name in one file — the package-wide name set that
+// lets generated conveniences (census accessors) yield to hand-written
+// procs name by name instead of colliding.
+scan_proc_names :: proc(taken: ^map[string]bool, file: ^ast.File) {
+	for decl in file.decls {
+		vd, ok := decl.derived.(^ast.Value_Decl)
+		if !ok || len(vd.names) != 1 || len(vd.values) != 1 {continue}
+		if _, is_proc := vd.values[0].derived.(^ast.Proc_Lit); !is_proc {continue}
+		if ident, iok := vd.names[0].derived.(^ast.Ident); iok && ident != nil {
+			taken[ident.name] = true
+		}
+	}
+}
+
+// The typed census accessors yield to the game, name by name: an existing
+// `runner_of` (scrapyard predates the generation with a player-keyed one)
+// keeps its meaning; the other three still generate. Sets the per-tag flags
+// generate() honors.
+resolve_census :: proc(s: ^Script, taken: map[string]bool) {
+	for &e in s.entities {
+		tsnake := to_snake(e.target)
+		e.gen_of = !taken[fmt.tprintf("%s_of", tsnake)]
+		e.gen_owned = !taken[fmt.tprintf("%s_owned_by", tsnake)]
+		e.gen_my = !taken[fmt.tprintf("my_%s", tsnake)]
+		e.gen_ids = !taken[fmt.tprintf("%s_ids", tsnake)]
+	}
+}
+
+// The four standard transport forwards, written by nobody: a kboot.Boot
+// field on the script struct declares them. Every session game wrote the
+// same four one-liners (packet → wire_receive, peer_left/net_down →
+// session_peer_disconnected, net_up → session_client_join) — and skipping
+// the disconnect pair was the classic first playtest bug (an alt-F4'd
+// friend haunts the roster; a failed join hangs on "Joining..."). Now the
+// forwards exist by construction; a hand-written method of the same name
+// wins, name by name. Runs BEFORE the method-name lint so boot_attach's
+// methods list resolves against them like any @(gd_method).
+resolve_boot_forwards :: proc(s: ^Script) {
+	if s.boot_field == "" {
+		return
+	}
+	vi_int, iok := map_variant("gd.Int")
+	vi_pba, pok := map_variant("gd.Packed_Byte_Array")
+	if !iok || !pok {
+		return // unreachable: both are core Variant types
+	}
+	snake := to_snake(s.struct_name)
+	add :: proc(s: ^Script, snake, name: string, args: ..Arg) {
+		for m in s.methods {
+			if m.gd_name == name {
+				return // hand-written wins
+			}
+		}
+		m := Method_Info {
+			proc_name = fmt.tprintf("_%s_std_%s", snake, name),
+			gd_name   = name,
+			ret       = Variant_Info{enum_name = ".Nil", kind = .Nil},
+		}
+		for a in args {
+			append(&m.args, a)
+		}
+		append(&s.methods, m)
+		append(&s.std_forwards, name)
+	}
+	add(s, snake, "on_packet", Arg{name = "id", type_text = "gd.Int", vi = vi_int}, Arg{name = "packet", type_text = "gd.Packed_Byte_Array", vi = vi_pba})
+	add(s, snake, "on_peer_left", Arg{name = "id", type_text = "gd.Int", vi = vi_int})
+	add(s, snake, "on_net_up")
+	add(s, snake, "on_net_down")
+}
+
+// Resolve the package's lane authoring surface, module-wide:
+//
+//   - ONE input struct per lane — two ticks disagreeing is a build error
+//     here, not a runtime assert in lane_track_set;
+//   - the @(gd_sample)'s pointee IS that struct;
+//   - @(gd_sample)/@(gd_step) live on ONE class — the game whose gen file
+//     carries `<snake>_lane_init`.
+resolve_sim :: proc(scripts: []^Script) {
+	input_type, input_from := "", ""
+	for s in scripts {
+		if s.tick.proc_name == "" || s.tick.input_type == "" {continue}
+		if input_type == "" {
+			input_type, input_from = s.tick.input_type, s.struct_name
+			continue
+		}
+		if s.tick.input_type != input_type {
+			error_at(
+				Loc{path = s.path, line = s.tick.line},
+				"%s ticks with input %s, but %s already ticks with %s — one input TYPE per lane (the wire ships one blob per player per tick); compose both intents into one struct",
+				s.struct_name, s.tick.input_type, input_from, input_type,
+			)
+		}
+	}
+	owner: ^Script
+	for s in scripts {
+		if s.sample.proc_name == "" && s.step.proc_name == "" {continue}
+		if owner != nil {
+			error_at(
+				Loc{path = s.path, line = max(s.sample.line, s.step.line)},
+				"%s declares @(gd_sample)/@(gd_step), but %s already does — one lane per package; a second lane is the hand-driven lane_set_sim's job",
+				s.struct_name, owner.struct_name,
+			)
+			continue
+		}
+		owner = s
+	}
+	if owner == nil {return}
+	owner.lane_input_type = input_type
+	if owner.sample.proc_name != "" {
+		if input_type == "" {
+			error_at(
+				Loc{path = owner.path, line = owner.sample.line},
+				"%s: @(gd_sample) writes %s, but no @(gd_tick) in the package takes an input — the sample would feed nobody",
+				owner.sample.proc_name, owner.sample.input_type,
+			)
+		} else if owner.sample.input_type != input_type {
+			error_at(
+				Loc{path = owner.path, line = owner.sample.line},
+				"%s samples into %s, but the lane's ticks read %s (%s's tick) — one input struct, both ends",
+				owner.sample.proc_name, owner.sample.input_type, input_type, input_from,
+			)
+		}
 	}
 }
 

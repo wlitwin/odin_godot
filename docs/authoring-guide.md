@@ -742,13 +742,14 @@ Practical rules for what runs where and who owns which allocation:
    authored sources (no resource stubs — the authored `.odin` is the attached resource),
 3. builds the scripts dll with `odin build <scriptsdir> -build-mode:dll
    -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc
-   -custom-attribute:gd_command -custom-attribute:gd_tick ...`
+   -custom-attribute:gd_command -custom-attribute:gd_tick
+   -custom-attribute:gd_sample -custom-attribute:gd_step ...`
    (the `.gen.odin` are in the same package and compile together),
 4. builds the core dll.
 
-The five `-custom-attribute:` flags are required so the Odin compiler accepts the
-`@(gd_method)` / `@(gd_connect)` / `@(gd_rpc)` / `@(gd_command)` / `@(gd_tick)` marker
-attributes; the build script passes them for you.
+The seven `-custom-attribute:` flags are required so the Odin compiler accepts the
+`@(gd_method)` / `@(gd_connect)` / `@(gd_rpc)` / `@(gd_command)` / `@(gd_tick)` /
+`@(gd_sample)` / `@(gd_step)` marker attributes; the build script passes them for you.
 
 The build, the **live-editing (show-on-save) loop**, the editor DX (validation / autocomplete
 / highlighting), debugging, and the editor settings (`odin_godot/odin_bin`,

@@ -72,6 +72,70 @@ boot_node :: proc(b: ^Boot, id: knet.Net_Id) -> (gd.Node, bool) {
 	return node, ok
 }
 
+// ---------------------------------------------------------------------------
+// The census, without the maps. Every game kept `map[Net_Id]^T` + an
+// owner mirror + an avatar_of mirror beside the factory — bookkeeping of
+// state the kit already holds (the registry's entity + owner, this ledger's
+// type). These queries read it back; scriptgen wraps them per `entity=` tag
+// as typed `<snake>_of` / `my_<snake>` / `<snake>_owned_by` / `<snake>_ids`,
+// so the census hooks shrink to the genuinely game-shaped bookkeeping (or
+// vanish). Lookups are map hits; the owned/ids scans walk the type ledger —
+// friendslop-sized, cache it yourself if a game ever makes it hot.
+
+// The entity behind an id, IF it is of `type` (a stale id or a different
+// kind returns false rather than a mis-cast).
+boot_entity :: proc(b: ^Boot, id: knet.Net_Id, type: ksess.Entity_Type) -> (rawptr, bool) {
+	t, tracked := b.ent_types[id]
+	if !tracked || t != type || b.ses == nil {
+		return nil, false
+	}
+	if e, ok := knet.registry_get(&b.ses.reg, id); ok {
+		return e.entity, true
+	}
+	return nil, false
+}
+
+// Who owns an entity (PLAYER_ID_INVALID = host-owned / unknown id) — the
+// `owner_pid` map every world pass hand-kept.
+boot_entity_owner :: proc(b: ^Boot, id: knet.Net_Id) -> knet.Player_Id {
+	if b.ses == nil {
+		return knet.PLAYER_ID_INVALID
+	}
+	if e, ok := knet.registry_get(&b.ses.reg, id); ok {
+		return e.owner
+	}
+	return knet.PLAYER_ID_INVALID
+}
+
+// A player's entity of `type` — the `avatar_of` map. First match wins (one
+// avatar per player per type is the friendslop shape).
+boot_owned_entity :: proc(b: ^Boot, type: ksess.Entity_Type, owner: knet.Player_Id) -> (entity: rawptr, id: knet.Net_Id, ok: bool) {
+	if b.ses == nil || owner == knet.PLAYER_ID_INVALID {
+		return nil, 0, false
+	}
+	for eid, t in b.ent_types {
+		if t != type {
+			continue
+		}
+		if e, found := knet.registry_get(&b.ses.reg, eid); found && e.owner == owner {
+			return e.entity, eid, true
+		}
+	}
+	return nil, 0, false
+}
+
+// Every live id of `type`, temp-allocated by default — range it and resolve
+// each through the typed `<snake>_of`.
+boot_entity_ids :: proc(b: ^Boot, type: ksess.Entity_Type, allocator := context.temp_allocator) -> []knet.Net_Id {
+	ids := make([dynamic]knet.Net_Id, allocator)
+	for eid, t in b.ent_types {
+		if t == type {
+			append(&ids, eid)
+		}
+	}
+	return ids[:]
+}
+
 // Free every entity node and forget the ledger — the back-to-lobby / host-
 // takeover wipe ("the factory is about to rebuild them"). The SESSION's
 // registry is torn down by its own re-init; this clears the engine half.

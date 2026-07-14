@@ -35,6 +35,11 @@ Lane_Box :: struct {
 	saw_live:     f32,
 	saw_past:     f32,
 	saw_restored: f32,
+
+	// the same judgment through the inline pair — must agree to the byte
+	inline_to:       u64,
+	saw_inline:      f32,
+	inline_restored: f32,
 }
 
 lbox_probe :: proc(user: rawptr) {
@@ -110,16 +115,22 @@ lbox_sample :: proc(user: rawptr, tick: u64, dst: rawptr) {
 lbox_step :: proc(user: rawptr, tick: u64) {
 	b := cast(^Lane_Box)user
 	for id, m in b.movers {
-		in_bytes, _ := ksim.lane_input(&b.lane, b.owners[id])
-		if in_bytes == nil {
+		ax, drives := ksim.lane_input_of(&b.lane, b.owners[id], i8)
+		if !drives {
 			continue
 		}
-		lane_mover_step(m, transmute(i8)in_bytes[0])
+		lane_mover_step(m, ax)
 	}
 	if b.fire_at != 0 && tick == b.fire_at && b.s.is_host {
 		b.saw_live = b.movers[b.probe_id].x
 		b.rewound_to = ksim.lane_rewound(&b.lane, b.shooter, b, lbox_probe)
 		b.saw_restored = b.movers[b.probe_id].x
+		// The inline pair is the same judgment written at the call site:
+		// same view, same bytes, same restore.
+		b.inline_to = ksim.lane_rewound_begin(&b.lane, b.shooter)
+		b.saw_inline = b.movers[b.probe_id].x
+		ksim.lane_rewound_end(&b.lane)
+		b.inline_restored = b.movers[b.probe_id].x
 		b.fired = true
 	}
 }
@@ -235,6 +246,113 @@ mover_tick_thunk :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner:
 	lane_mover_step(cast(^Mover)entity, (cast(^i8)input)^)
 }
 
+// The surge verb — the full tick-command shape in one proc: rejectable
+// (an empty purse says no), cross-lane (hp is the delta-lane purse), with
+// a predicted effect (x jumps). Check-then-mutate, the verb contract.
+mover_surge_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool {
+	m := cast(^Mover)entity
+	if m.hp <= 0 {return false}
+	m.hp -= 1
+	m.x += 50
+	return true
+}
+
+@(test)
+lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	cmds := [?]ksim.Sim_Cmd{{exec = mover_surge_exec}}
+	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds[:]}
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
+	ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
+	for b in boxes {
+		for id in ([]knet.Net_Id{10, 20}) {
+			m := new(Mover)
+			b.movers[id] = m
+			b.owners[id] = id == 10 ? 1 : 2
+			ksim.lane_track_set(&b.lane, id, m, &set, b.owners[id])
+		}
+	}
+
+	// A QUIET world — intent stays zero throughout, so x moves ONLY by verbs.
+	DT :: 1.0 / 60.0
+	settle :: proc(boxes: []^Lane_Box, frames: int) {
+		for _ in 0 ..< frames {
+			ksim.lane_frame(&boxes[0].lane, DT)
+			lane_pump(boxes)
+			ksim.lane_frame(&boxes[1].lane, DT)
+			// Watched fields belong to the presenter once a bracket exists —
+			// without this, a remote verb's effect never reaches the fields.
+			ksim.lane_present(&boxes[1].lane, DT)
+			lane_pump(boxes)
+		}
+	}
+	settle(boxes, 60) // anchor + converge
+	host.movers[20].hp = 1 // alice's purse, seeded on BOTH copies (spawn-time
+	alice.movers[20].hp = 1 // state; the delta WALK is kit/net's job, absent here)
+
+	// 1) SPECULATION: the effect lands on alice's screen before any round trip.
+	testing.expect(t, ksim.lane_command(&alice.lane, 20, 0, nil), "the verb schedules")
+	ksim.lane_frame(&alice.lane, DT) // executes at her next tick — nothing delivered yet
+	testing.expect_value(t, alice.movers[20].x, f32(50))
+	testing.expect_value(t, alice.movers[20].hp, i32(0))
+	testing.expect_value(t, host.movers[20].x, f32(0))
+
+	// ...and the authority's execution converges with it, resims included.
+	// (Alice's fields hold PRESENTED values after settle — sim truth plus a
+	// decaying glide that never quite zeroes — so her floats get a hair of
+	// tolerance; the host's are sim-exact.)
+	near :: proc(a, b: f32) -> bool {return abs(a - b) < 0.01}
+	lane_pump(boxes)
+	settle(boxes, 90)
+	testing.expect_value(t, host.movers[20].x, f32(50))
+	testing.expect_value(t, host.movers[20].hp, i32(0))
+	testing.expect(t, near(alice.movers[20].x, 50), "alice converged on the accepted surge")
+	testing.expect_value(t, alice.movers[20].hp, i32(0))
+
+	// 2) HONEST REJECTION: an empty purse says no on both timelines; nothing moves.
+	testing.expect(t, ksim.lane_command(&alice.lane, 20, 0, nil), "a rejectable verb still schedules")
+	settle(boxes, 90)
+	testing.expect(t, near(alice.movers[20].x, 50), "an empty purse moved nothing")
+	testing.expect_value(t, host.movers[20].x, f32(50))
+
+	// 3) DIVERGENT REJECTION — the revert path: alice's stale purse says yes,
+	// the authority's truth says no. Her speculation applies, the verdict
+	// unwinds the delta-lane write, the reconcile scrubs the predicted one.
+	alice.movers[20].hp = 1 // stale client-side delta state, deliberately
+	testing.expect(t, ksim.lane_command(&alice.lane, 20, 0, nil), "schedules on stale state")
+	ksim.lane_frame(&alice.lane, DT)
+	testing.expect_value(t, alice.movers[20].x, f32(100)) // speculated
+	testing.expect_value(t, alice.movers[20].hp, i32(0))
+	lane_pump(boxes)
+	settle(boxes, 90)
+	testing.expect(t, near(alice.movers[20].x, 50), "predicted half: scrubbed") // reconcile + glide
+	testing.expect_value(t, alice.movers[20].hp, i32(1)) // delta half: reverted
+	testing.expect_value(t, host.movers[20].x, f32(50))
+
+	// 4) The AUTHORITY's own verb: no wire, no speculation — its execution is
+	// the truth, and the watched view carries it to every client.
+	host.movers[10].hp = 1
+	testing.expect(t, ksim.lane_command(&host.lane, 10, 0, nil), "the host schedules its own verb")
+	settle(boxes, 90)
+	testing.expect_value(t, host.movers[10].x, f32(50))
+	testing.expect(t, near(alice.movers[10].x, 50), "the watched view carried the verb") // blended
+}
+
 @(test)
 lane_auto_tick_drives_entities :: proc(t: ^testing.T) {
 	desc := mover_desc()
@@ -335,6 +453,11 @@ lane_rewound_judges_the_shooters_view :: proc(t: ^testing.T) {
 	testing.expect(t, abs(diff - expected) <= 2.0, "rewound pose within one blended tick of the ledger")
 	// ...and the live world came back untouched.
 	testing.expect_value(t, host.saw_restored, host.saw_live)
+	// The inline begin/end pair is the identical judgment: same tick, same
+	// rewound bytes, same byte-exact restore.
+	testing.expect_value(t, host.inline_to, host.rewound_to)
+	testing.expect_value(t, host.saw_inline, host.saw_past)
+	testing.expect_value(t, host.inline_restored, host.saw_live)
 	// The shooter's own avatar is never wound back (its owner IS the view).
 	testing.expect_value(t, ksim.lane_rewind_tick(&host.lane, 1), host.lane.ticker.tick)
 }

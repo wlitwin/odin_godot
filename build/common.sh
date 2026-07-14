@@ -21,7 +21,7 @@ ODIN="${ODIN:-odin}"
 #   - core/diag/diag.odin      (the in-editor `odin check` diagnostics pass hardcodes them
 #                               so @(gd_*) attributes don't produce phantom errors)
 #   - core/export_plugin.odin  (the generated ols.json checker_args)
-ODIN_GD_ATTRS=(-custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick)
+ODIN_GD_ATTRS=(-custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_sample -custom-attribute:gd_step)
 
 # Host shared-library extension for NATIVE builds (cross builds pick their own — see
 # build/build_cross.sh). Windows native builds use build_scripts.ps1, not these scripts.

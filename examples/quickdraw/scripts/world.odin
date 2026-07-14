@@ -10,18 +10,16 @@ import gd "godot:godot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
+// The census hooks, down to the genuinely game-shaped lines: the generated
+// queries (gunner_of / my_gunner / gunner_ids) answer everything the old
+// three maps did, straight from the kit's own ledgers. (The sim lane tracks
+// this spawn ITSELF: the generated kinds row carries gunner_sim_set, and
+// boot_lane's factory does the rest.)
 gunner_spawned :: proc(game: ^Quickdraw, self: ^Gunner, id: knet.Net_Id, owner: knet.Player_Id) {
-	game.gunners[id] = self
-	game.owner_pid[id] = owner
-	if owner != knet.PLAYER_ID_INVALID {
-		game.avatar_of[owner] = id
-		if owner == game.ses.me {
-			self.mine = true
-			game.me_gun = self
-		}
+	if owner != knet.PLAYER_ID_INVALID && owner == game.ses.me {
+		self.mine = true
+		game.me_gun = self
 	}
-	// (The sim lane tracks this spawn ITSELF: the generated kinds row carries
-	// gunner_sim_set, and boot_lane's factory does the rest.)
 	gd.print_str(fmt.tprintf("QD_SPAWN id=%d mine=%v", u32(id), owner == game.ses.me))
 }
 
@@ -29,18 +27,11 @@ gunner_freed :: proc(game: ^Quickdraw, self: ^Gunner, id: knet.Net_Id) {
 	if self == game.me_gun {
 		game.me_gun = nil
 	}
-	if pid, ok := game.owner_pid[id]; ok {
-		if game.avatar_of[pid] == id {
-			delete_key(&game.avatar_of, pid)
-		}
-	}
-	delete_key(&game.owner_pid, id)
-	delete_key(&game.gunners, id)
 }
 
 // Host: the duel fills — one gunner per seated player, corners first.
 spawn_world :: proc(self: ^Quickdraw) {
-	if len(self.gunners) > 0 {return}
+	if len(gunner_ids(&self.boot)) > 0 {return}
 	self.kills_col = ksess.session_stat_column(&self.ses, "kills")
 	self.deaths_col = ksess.session_stat_column(&self.ses, "deaths")
 	for _, p in self.ses.players {
@@ -53,11 +44,12 @@ spawn_world :: proc(self: ^Quickdraw) {
 }
 
 spawn_gunner :: proc(self: ^Quickdraw, pid: knet.Player_Id) {
-	if _, has := self.avatar_of[pid]; has {return}
+	if _, has := gunner_owned_by(&self.boot, pid); has {return}
 	gp, gid := ksess.session_spawn_make(&self.ses, GUNNER_TYPE, owner = pid)
 	g := cast(^Gunner)gp
 	g.pid = u8(pid)
 	g.hp = MAX_HP
+	g.gold = u8(gd.env_int("QD_GOLD", 0)) // the solo gate's starting purse; duels earn theirs
 	spot := SPAWNS[int(pid) % len(SPAWNS)]
 	g.x = spot[0]
 	g.y = spot[1]

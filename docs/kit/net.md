@@ -12,7 +12,9 @@ transport lives in [kit/netgd](netgd.md).
 ## The mental model
 
 **Two authorities, disjoint by construction.** This is a command + owned-streams hybrid,
-not tick-rollback netcode:
+not tick-rollback netcode — when a game needs the tick-rollback kind (contested,
+cheat-resistant, twitch-fair), that is [kit/sim](sim.md), a third lane BESIDE these two,
+per field, not a different library ([choosing a model](timelines.md)):
 
 - **Owner-authoritative streams** — state with a personal owner (your movement, your aim)
   is authoritative on its owner and *interpolated* by everyone else, host included. Sent as
@@ -484,4 +486,6 @@ presentation is almost always the better spend.
   peer per session.
 
 See also: [kit/session](session.md) (drives all of this), [kit/netgd](netgd.md)
-(transport), [kit/comms](comms.md), [kit/combat](combat.md), [kit/save](save.md).
+(transport), [kit/sim](sim.md) (the server-authority resim lane beside these two —
+[timelines](timelines.md) chooses), [kit/comms](comms.md), [kit/combat](combat.md),
+[kit/save](save.md).

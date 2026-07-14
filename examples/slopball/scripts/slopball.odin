@@ -77,11 +77,11 @@ Slopball :: struct {
 	kicker_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Kicker:1"`,
 	ball_scene:   ^gd.Resource `gd:"export,resource=PackedScene,entity=Ball:2"`,
 
-	kickers:   map[knet.Net_Id]^Kicker,
-	avatar_of: map[knet.Player_Id]knet.Net_Id,
-	me_kick:   ^Kicker, // my avatar (nil until spawned)
-	ball:      ^Ball,
-	ball_id:   knet.Net_Id,
+	// The census is GENERATED (kicker_of / kicker_ids / kicker_owned_by) —
+	// what's left is the hot pointers the input and probes poke every frame.
+	me_kick: ^Kicker, // my avatar (nil until spawned)
+	ball:    ^Ball,
+	ball_id: knet.Net_Id,
 
 	// Host scratch (empty elsewhere).
 	grant_at:   f64, // last seat grant (GRANT_COOL)
@@ -123,7 +123,7 @@ slopball_ready :: proc(self: ^Slopball) {
 		status = "Host a pitch, or join one at localhost",
 		legend = "WASD move · Space kick · Tab scores · Enter chat",
 		msg_kind = MSG_SESSION,
-		latency_env = "SLOP_LATENCY",
+		env = "SLOP", // SLOP_PORT/_NAME/_TOKEN identity + the SLOP_LATENCY shim
 		min_players = 1, // a lone host may start and kick the ball around
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
@@ -282,6 +282,6 @@ ball_report :: proc(self: ^Slopball) {
 	bp := gd.node2d_get_position(cast(gd.Node2d)self.ball.owner)
 	gd.print_str(fmt.tprintf(
 		"SB_BALL tick=%d x=%.0f y=%.0f kick=%d own=%d warp=%d ring=%d mine=%v body=%.0f,%.0f",
-		t, self.ball.puppet.x, self.ball.puppet.y, len(self.kickers), own, warp, ring, self.ball.puppet.mine, bp.x, bp.y,
+		t, self.ball.puppet.x, self.ball.puppet.y, len(kicker_ids(&self.boot)), own, warp, ring, self.ball.puppet.mine, bp.x, bp.y,
 	))
 }

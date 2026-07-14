@@ -51,6 +51,8 @@ SIM_TAG :: u8(3) // default SES_APP tag (comms holds 0, xfer holds 2)
 
 SIM_INPUT: u8 : 0 // client → host, inside the tag
 SIM_SNAP: u8 : 1 // host → client
+SIM_CMD: u8 : 2 // client → host, RELIABLE: a tick-stamped verb (command.odin)
+SIM_VERDICT: u8 : 3 // host → client, RELIABLE: that verb's accept/reject
 
 // Fill the LOCAL player's input for `tick` into dst (input_size bytes).
 // Read the device here and nowhere else — a resim never calls this.
@@ -82,6 +84,7 @@ Sim_Set :: struct {
 	entity_desc: ^knet.Entity_Desc,
 	tick:        Tick_Thunk,
 	input_size:  int, // size of the tick proc's input struct (0 = inputless)
+	commands:    []Sim_Cmd, // the class's @(gd_command) verbs, tick-scheduled (command.odin)
 	// @(gd_tick="contested"): EVERY peer predicts this entity, owner or not —
 	// the predict-the-contested-object pattern (the ball, the crown, the
 	// flag). Contact with it resolves on YOUR timeline instantly; the
@@ -126,7 +129,7 @@ Lane_Peer :: struct {
 	fresh: bool, // did their input for the CURRENT tick actually arrive
 }
 
-@(private = "file")
+@(private) // command.odin's scheduler walks the track list too
 Tracked :: struct {
 	id:      knet.Net_Id,
 	entity:  rawptr,
@@ -136,6 +139,7 @@ Tracked :: struct {
 	watched: bool, // client-side remote-owned: truth applies directly, no resim
 	tick:    Tick_Thunk, // nil = the game's Step_Proc moves this entity
 	has_in:  bool, // the thunk wants its owner's input (Sim_Set.input_size > 0)
+	cmds:    []Sim_Cmd, // tick-scheduled verbs (nil = the class declares none)
 	err:     []u8, // render-error blob (predict-subset layout), alloc'd on the first correction
 	contested: bool, // predicted here but NOT mine: presentation follows `claim`
 	claim:     f32, // 1 = my sim drives it (present predicted), decaying to 0 (present the watched view)
@@ -162,6 +166,7 @@ Lane :: struct {
 	user:            rawptr,
 	sample:          Sample_Proc, // nil = this seat plays nobody (dedicated)
 	step:            Step_Proc,
+	step_auth:       bool, // the step is authority work: run it on the host only
 
 	tracked:         [dynamic]Tracked,
 	entries:         [dynamic]Entry, // ledgered subset of tracked (host: all; client: mine)
@@ -188,6 +193,16 @@ Lane :: struct {
 	// running tallies, game-readable (a resim burst is a netgraph datum)
 	stat_resims:     int,
 	stat_reconciles: int,
+
+	// active inline rewind (lane_rewound_begin/end) — live captures to restore
+	wound:           [dynamic]Wound,
+	rewound:         bool,
+
+	// tick-scheduled verbs (command.odin): the client's issued ledger and
+	// the host's arrival queue
+	cmd_seq:         u32,
+	cmd_out:         [dynamic]Cmd_Out,
+	cmd_in:          [dynamic]Cmd_In,
 }
 
 // Bind to a session (host or client, before or after it starts) — wiring
@@ -218,6 +233,9 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 	l.pending = make([dynamic]u8, allocator)
 	l.peers = make(map[knet.Player_Id]^Lane_Peer, allocator)
 	l.scratch = make([]u8, input_size, allocator)
+	l.wound = make([dynamic]Wound, allocator)
+	l.cmd_out = make([dynamic]Cmd_Out, allocator)
+	l.cmd_in = make([dynamic]Cmd_In, allocator)
 	ksess.session_app_route(ses, tag, l, lane_handle)
 }
 
@@ -247,16 +265,30 @@ lane_destroy :: proc(l: ^Lane) {
 	}
 	delete(l.echo)
 	delete(l.scratch)
+	delete(l.wound)
+	for &c in l.cmd_out {
+		cmd_out_free(&c)
+	}
+	delete(l.cmd_out)
+	for c in l.cmd_in {
+		delete(c.args)
+	}
+	delete(l.cmd_in)
 }
 
 // The two game procs. `sample` may be nil on a seat that plays nobody (a
 // dedicated server). `step` is the world pass; with lane_track_set entities
 // it becomes optional — entity thunks carry the per-entity simulation, the
 // step keeps only the cross-entity work (and may be nil when there is none).
-lane_set_sim :: proc(l: ^Lane, user: rawptr, sample: Sample_Proc, step: Step_Proc) {
+// `step_authority` runs the step on the authority only — the role gate an
+// authority-work world pass (respawn queues, adjudication sweeps) used to
+// open with; a PURE-SIM world pass (contact for pairs this peer has inputs
+// for) leaves it false and runs everywhere, live and resim alike.
+lane_set_sim :: proc(l: ^Lane, user: rawptr, sample: Sample_Proc, step: Step_Proc, step_authority := false) {
 	l.user = user
 	l.sample = sample
 	l.step = step
+	l.step_auth = step_authority
 }
 
 // Put an entity on the sim lane — call where the entity is born on this peer
@@ -303,6 +335,7 @@ lane_track_set :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, set: ^Sim_Set,
 	tr := &l.tracked[len(l.tracked) - 1]
 	tr.tick = set.tick
 	tr.has_in = set.input_size > 0
+	tr.cmds = set.commands
 	if set.contested && tr.watched {
 		// Contested: this client predicts it like its own — ledger, entries,
 		// reconcile — instead of watching it from the past. PRESENTATION
@@ -449,6 +482,24 @@ lane_input :: proc(l: ^Lane, player: knet.Player_Id) -> (input: []u8, ok: bool) 
 	return nil, false
 }
 
+// The typed view of lane_input, for the world pass:
+//
+//	input, drives := ksim.lane_input_of(&g.lane, owner, Kicker_Input)
+//	if !drives {continue} // a pair this peer doesn't simulate
+//
+// `drives` means an input EXISTS to drive with — held gaps repeat the last
+// real one, because driving through loss is the point; the raw lane_input's
+// ok is the FRESHNESS bit, for the rare caller that cares. Passing a struct
+// that isn't this lane's input type is an assert, not a silent misread.
+lane_input_of :: proc(l: ^Lane, player: knet.Player_Id, $T: typeid) -> (input: T, drives: bool) {
+	bytes, _ := lane_input(l, player)
+	if bytes == nil {
+		return {}, false
+	}
+	assert(len(bytes) == size_of(T), "lane_input_of: not this lane's input struct (size mismatch)")
+	return (cast(^T)raw_data(bytes))^, true
+}
+
 // The tick being stepped — for tick procs that derive per-tick values
 // (ksim RNG seeds, cooldown arithmetic) without touching a wall clock.
 lane_now :: proc(l: ^Lane) -> u64 {
@@ -503,7 +554,11 @@ run_tick :: proc(l: ^Lane, t: u64) {
 		}
 		tr.tick(tr.entity, in_ptr, l, tr.owner)
 	}
-	if l.step != nil {
+	// Tick-scheduled verbs: after entity thunks, before the world pass —
+	// ticks integrate, verbs mutate the settled state, the world pass
+	// adjudicates (command.odin).
+	run_cmds(l, t)
+	if l.step != nil && (!l.step_auth || l.ses.is_host) {
 		l.step(l.user, t)
 	}
 }
@@ -583,6 +638,7 @@ client_frame :: proc(l: ^Lane, dt: f64) -> int {
 	if !l.anchored {
 		return 0
 	}
+	cmd_settle(l) // land verdicts/timeouts on the frame, not in a handler
 	n := sim_ticker_advance(&l.ticker, dt)
 	if n > 0 {
 		// Fields may hold last frame's PRESENTED values (sim + decaying
@@ -703,6 +759,7 @@ client_ingest :: proc(l: ^Lane) {
 	l.resimming = true
 	l.stat_resims += reconcile(l.entries[:], truths[:], tick, l.ticker.tick, l, client_resim, &mism, l.tolerance)
 	l.resimming = false
+	cmd_retire(l, tick) // ticks at or before the truth are settled history
 	for id in mism {
 		for &tr, i in l.tracked {
 			if tr.id != id || tr.hist == nil {
@@ -837,6 +894,12 @@ lane_rewind_tick :: proc(l: ^Lane, shooter: knet.Player_Id) -> u64 {
 
 Rewound_Query :: proc(user: rawptr)
 
+@(private = "file")
+Wound :: struct {
+	tr:   ^Tracked,
+	live: []u8,
+}
+
 // Run `query` against the world as `shooter` rendered it: every tracked
 // entity EXCEPT the shooter's own is wound back to lane_rewind_tick for the
 // duration, then the live state returns — snapshots via the truth ledger,
@@ -844,24 +907,43 @@ Rewound_Query :: proc(user: rawptr)
 // ledger no longer holds the tick stay live (a fresh spawn the shooter
 // couldn't have seen anyway). Host-only, inside your Step_Proc; returns the
 // tick the world was judged at.
+//
+// This is exactly lane_rewound_begin + query + lane_rewound_end — take the
+// inline pair when a context struct just to cross the rawptr boundary would
+// outweigh the hit test itself.
 lane_rewound :: proc(l: ^Lane, shooter: knet.Player_Id, user: rawptr, query: Rewound_Query) -> u64 {
+	judged := lane_rewound_begin(l, shooter)
+	query(user)
+	lane_rewound_end(l)
+	return judged
+}
+
+// The inline form: wind the world back to what `shooter`'s screen showed,
+// write the hit test right here, then put the world back —
+//
+//	judged := ksim.lane_rewound_begin(&g.lane, by)
+//	for id, gun in g.gunners { ... }  // every OTHER entity stands where the
+//	                                  // shooter saw it; their own stay live
+//	ksim.lane_rewound_end(&g.lane)
+//
+// Same contract as lane_rewound: host-only, inside your step; returns the
+// judged tick. Begin and end must pair within the same frame (captures ride
+// the temp allocator), never nest, and nothing may track/untrack lane
+// entities in between (the restore holds pointers into the track list).
+lane_rewound_begin :: proc(l: ^Lane, shooter: knet.Player_Id) -> u64 {
+	assert(!l.rewound, "lane_rewound_begin: the world is already rewound — pair every begin with lane_rewound_end")
+	l.rewound = true
 	lo, alpha := lane_rewind_view(l, shooter)
 	if l.judge_live {
 		lo = l.step_tick // the A/B knob: judge the live world
 	}
 	if lo >= l.step_tick {
-		query(user)
 		return l.step_tick
 	}
 	// Wind every target back to the BLENDED pose the shooter's screen drew —
 	// the same bracket pair and fraction their watch clock used, from the
 	// truth ledger (single-tick rewind quantized against the interpolation
 	// and cost near-tangent shots; the duel acid measured it).
-	Wound :: struct {
-		tr:   ^Tracked,
-		live: []u8,
-	}
-	wound := make([dynamic]Wound, context.temp_allocator)
 	for &tr in l.tracked {
 		if tr.owner == shooter || tr.hist == nil {
 			continue
@@ -878,13 +960,18 @@ lane_rewound :: proc(l: ^Lane, shooter: knet.Player_Id, user: rawptr, query: Rew
 		} else {
 			predict_restore(tr.entity, tr.desc, a)
 		}
-		append(&wound, Wound{tr = &tr, live = live})
-	}
-	query(user)
-	for w in wound {
-		predict_restore(w.tr.entity, w.tr.desc, w.live)
+		append(&l.wound, Wound{tr = &tr, live = live})
 	}
 	return lo
+}
+
+lane_rewound_end :: proc(l: ^Lane) {
+	assert(l.rewound, "lane_rewound_end without a begin")
+	l.rewound = false
+	for w in l.wound {
+		predict_restore(w.tr.entity, w.tr.desc, w.live)
+	}
+	clear(&l.wound)
 }
 
 // ---------------------------------------------------------------------------
@@ -1031,6 +1118,18 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 		if !r.err && acked > p.acked {
 			p.acked = acked // regressions are stale reordering, not truth
 		}
+	case SIM_CMD:
+		// Host only; the session already resolved the seat.
+		if !l.ses.is_host || from == knet.PLAYER_ID_INVALID {
+			return
+		}
+		cmd_handle(l, from, r)
+	case SIM_VERDICT:
+		// Client only, and only the authority's word counts.
+		if l.ses.is_host || from_peer != ksess.HOST_PEER {
+			return
+		}
+		cmd_handle_verdict(l, r)
 	case SIM_SNAP:
 		// Client only, and only the authority's word counts.
 		if l.ses.is_host || from_peer != ksess.HOST_PEER {

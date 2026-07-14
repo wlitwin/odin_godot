@@ -71,30 +71,35 @@ if grep -qF 'offset_of(Pawn, local)' "$GEN"; then
 fi
 echo "  ok  descriptor generated (fields, multi-name expansion, flags, POD asserts)"
 
-# @(gd_command) artifacts: thunks decode-check-call, table carries predict flags,
-# wrappers are typed and role-branch on ctx.is_authority. The `<verb>_then`
-# consequence pairs by name: payload returns are captured and threaded, the
-# call is gated on the authoritative run (env.authority in the thunk; the
-# wrapper's authority branch fires it for the host's own issues).
+# @(gd_command) artifacts on a TICKING class: the verbs route through the sim
+# lane (tick-scheduled — kit/sim command.odin), not the knet command loop.
+# Exec thunks decode-check-call with the authority-gated `_then` inside;
+# wrappers take the lane and schedule via lane_command; the knet set stays
+# desc-only (the two replay mechanisms never share a baseline).
 for needle in \
-	'_pawn_cmd_hit :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool' \
-	'_a0 := knet.read_i32(r)' \
+	'_pawn_simcmd_hit :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool' \
+	'_a0 := knet.read_i32(&r)' \
 	'if r.err {return false}' \
-	'{name = "hit", predict = true, invoke = _pawn_cmd_hit}' \
-	'{name = "mark", predict = false, invoke = _pawn_cmd_mark}' \
+	'{exec = _pawn_simcmd_hit}' \
+	'{exec = _pawn_simcmd_mark}' \
 	'pawn_command_set := knet.Command_Set{entity_desc = &pawn_net_desc' \
-	'pawn_hit_cmd :: proc(ctx: ^knet.Command_Ctx, self: ^Pawn, amount: i32) -> bool' \
-	'pawn_mark_cmd :: proc(ctx: ^knet.Command_Ctx, self: ^Pawn, label: string, who: knet.Player_Id) -> bool' \
-	'if ctx.is_authority {' \
-	'knet.command_begin(ctx, self.net_id, 0)' \
-	'knet.write_player_id(&ctx.msg, who)' \
+	'pawn_hit_cmd :: proc(l: ^ksim.Lane, self: ^Pawn, amount: i32) -> bool' \
+	'pawn_mark_cmd :: proc(l: ^ksim.Lane, self: ^Pawn, label: string, who: knet.Player_Id) -> bool' \
+	'knet.write_player_id(&_w, who)' \
+	'ksim.lane_command(l, self.net_id, 0, knet.writer_bytes(&_w))' \
 	'_ok, _p0 := pawn_loot(self, _a0)' \
-	'if _ok && env.authority {' \
-	'pawn_loot_then(self, env.by, _a0, _p0)' \
-	'pawn_loot_then(self, ctx.me, slot, _p0)' \
+	'if _ok && ksim.lane_is_authority(lane) {' \
+	'pawn_loot_then(self, by, _a0, _p0)' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
-		echo "REPGEN_FAIL: generated file is missing command artifact: $needle"
+		echo "REPGEN_FAIL: generated file is missing sim-command artifact: $needle"
+		exit 1
+	fi
+done
+# ...and the knet loop's artifacts must NOT appear beside them: one arbiter.
+for stale in '_pawn_cmd_hit' 'invoke = ' 'ctx.is_authority' 'commands = _pawn_commands'; do
+	if grep -qF "$stale" "$GEN"; then
+		echo "REPGEN_FAIL: a ticking class still emits knet command artifact: $stale"
 		exit 1
 	fi
 done
@@ -103,7 +108,7 @@ if grep -qF '_pawn_m_hit' "$GEN"; then
 	echo "REPGEN_FAIL: a @(gd_command) proc leaked into the method trampolines"
 	exit 1
 fi
-echo "  ok  command thunks, table, set, and typed issue wrappers generated"
+echo "  ok  sim-command thunks, table, lane wrappers generated; knet loop skipped"
 
 # @(gd_tick) artifacts: the ksim import, the input POD assert, the rawptr
 # thunk (nil input coasts; the author call stays typed), and the Sim_Set the
@@ -119,7 +124,7 @@ for needle in \
 	'if owner == ksim.lane_me(lane) && !lane.resimming {' \
 	'pawn_tick_fx(self, _p0)' \
 	'pace_tick(&self.pace)' \
-	'pawn_sim_set := ksim.Sim_Set{entity_desc = &pawn_net_desc, tick = _pawn_tick_step, input_size = size_of(Pawn_Input)}' \
+	'pawn_sim_set := ksim.Sim_Set{entity_desc = &pawn_net_desc, tick = _pawn_tick_step, input_size = size_of(Pawn_Input), commands = _pawn_sim_cmds[:]}' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
 		echo "REPGEN_FAIL: generated file is missing tick artifact: $needle"
@@ -145,6 +150,10 @@ for needle in \
 	'freed = _board_ent_freed_pawn' \
 	'sim_set = &pawn_sim_set' \
 	'return rt.script_of(node, Pawn)' \
+	'pawn_of :: proc(b: ^kboot.Boot, id: knet.Net_Id) -> (^Pawn, bool)' \
+	'pawn_owned_by :: proc(b: ^kboot.Boot, owner: knet.Player_Id) -> (^Pawn, bool)' \
+	'my_pawn :: proc(b: ^kboot.Boot) -> (^Pawn, bool)' \
+	'pawn_ids :: proc(b: ^kboot.Boot, allocator := context.temp_allocator) -> []knet.Net_Id' \
 ; do
 	if ! grep -qF "$needle" "$BGEN"; then
 		echo "REPGEN_FAIL: generated file is missing entity artifact: $needle"
@@ -152,6 +161,47 @@ for needle in \
 	fi
 done
 echo "  ok  entity table generated (TYPE const, kinds row, typed census hooks)"
+
+# @(gd_sample)/@(gd_step) artifacts (board.odin's lane game half): the rawptr
+# thunks holding the casts, and `board_lane_init` carrying the input size and
+# the step's authority gate — the wiring nobody writes.
+for needle in \
+	'_board_lane_sample :: proc(user: rawptr, tick: u64, dst: rawptr)' \
+	'board_sample(cast(^Board)user, tick, cast(^Pawn_Input)dst)' \
+	'_board_lane_step :: proc(user: rawptr, tick: u64)' \
+	'board_step(cast(^Board)user, tick)' \
+	'board_lane_init :: proc(self: ^Board, l: ^ksim.Lane, ses: ^ksess.Session, tag := ksim.SIM_TAG, cfg := ksim.Lane_Config{})' \
+	'ksim.lane_init(l, ses, size_of(Pawn_Input), tag, cfg)' \
+	'ksim.lane_set_sim(l, self, _board_lane_sample, _board_lane_step, step_authority = true)' \
+; do
+	if ! grep -qF "$needle" "$BGEN"; then
+		echo "REPGEN_FAIL: generated file is missing lane-wiring artifact: $needle"
+		exit 1
+	fi
+done
+echo "  ok  lane wiring generated (typed sample/step thunks, board_lane_init, authority gate)"
+
+# The standard transport forwards (board.odin's kboot.Boot field): generated
+# bodies wired through the boot's own pointers — and hand-written wins, name
+# by name (board_on_net_down suppresses only its own).
+for needle in \
+	'_board_std_on_packet :: proc(self: ^Board, id: gd.Int, packet: gd.Packed_Byte_Array)' \
+	'netgd.wire_receive(&self.boot.wire, id, packet)' \
+	'_board_std_on_peer_left :: proc(self: ^Board, id: gd.Int)' \
+	'ksess.session_peer_disconnected(self.boot.ses, ksess.Peer_Id(id))' \
+	'_board_std_on_net_up :: proc(self: ^Board)' \
+	'ksess.session_client_join(self.boot.ses)' \
+; do
+	if ! grep -qF "$needle" "$BGEN"; then
+		echo "REPGEN_FAIL: generated file is missing transport-forward artifact: $needle"
+		exit 1
+	fi
+done
+if grep -qF '_board_std_on_net_down' "$BGEN"; then
+	echo "REPGEN_FAIL: hand-written on_net_down did not suppress the generated forward"
+	exit 1
+fi
+echo "  ok  standard transport forwards generated; hand-written wins name by name"
 
 "$ODIN" check "$GOOD" -collection:godot="$ROOT" -no-entry-point \
 	${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"}
@@ -357,6 +407,91 @@ if ! echo "$NOP_OUT" | grep -q 'replicate,predict'; then
 	exit 1
 fi
 echo "  ok  tick contract violations rejected: mispaired _then, no predict fields"
+
+# ---- (4a2b): @(gd_sample)/@(gd_step) contract violations ----
+# A sample writing a struct the lane's ticks don't read is the silent-desync
+# bug the attribute exists to kill — scriptgen must name both structs.
+MIS="$TMP/mis"
+mkdir -p "$MIS"
+cat > "$MIS/racer.odin" <<'EOF'
+//gd:extends Node
+//gd:class Racer
+package repgen_mis
+
+import gd "godot:godot"
+
+Racer :: struct {
+	owner: gd.Node,
+	x:     f32 `gd:"replicate,predict"`,
+}
+
+Racer_Input :: struct {
+	steer: i8,
+}
+
+Wrong_Input :: struct {
+	steer: i8,
+}
+
+@(gd_tick)
+racer_tick :: proc(self: ^Racer, input: Racer_Input) {
+	self.x += f32(input.steer)
+}
+
+@(gd_sample)
+racer_sample :: proc(self: ^Racer, tick: u64, input: ^Wrong_Input) {
+}
+EOF
+set +e
+MIS_OUT="$(run_scriptgen "$MIS" 2>&1)"
+MIS_RC=$?
+set -e
+if [ "$MIS_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a @(gd_sample) writing the wrong input struct was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$MIS_OUT" | grep -q "one input struct, both ends"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't name the sample/tick input mismatch:"
+	echo "$MIS_OUT" | tail -3
+	exit 1
+fi
+STK="$TMP/stk"
+mkdir -p "$STK"
+cat > "$STK/refy.odin" <<'EOF'
+//gd:extends Node
+//gd:class Refy
+package repgen_stk
+
+import gd "godot:godot"
+
+Refy :: struct {
+	owner: gd.Node,
+	x:     f32 `gd:"replicate,predict"`,
+}
+
+@(gd_tick)
+refy_tick :: proc(self: ^Refy) {
+	self.x += 1
+}
+
+@(gd_step = "host_only")
+refy_step :: proc(self: ^Refy, tick: u64) {
+}
+EOF
+set +e
+STK_OUT="$(run_scriptgen "$STK" 2>&1)"
+STK_RC=$?
+set -e
+if [ "$STK_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: an unknown @(gd_step) config token was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$STK_OUT" | grep -q 'expected `authority`'; then
+	echo "REPGEN_FAIL: scriptgen error doesn't name the step token contract:"
+	echo "$STK_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  lane-wiring violations rejected: sample/tick input mismatch, unknown step token"
 
 # ---- (4a3): a block tick with an input param — blocks are INPUTLESS ----
 BTK="$TMP/btk"

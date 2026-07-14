@@ -42,10 +42,9 @@ Speedball :: struct {
 	kicker_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Kicker:1"`,
 	ball_scene:   ^gd.Resource `gd:"export,resource=PackedScene,entity=Ball:2"`,
 
-	kickers:   map[knet.Net_Id]^Kicker,
-	avatar_of: map[knet.Player_Id]knet.Net_Id,
-	owner_pid: map[knet.Net_Id]knet.Player_Id,
-	me_kick:   ^Kicker,
+	// The census is GENERATED (kicker_of / kicker_ids / kicker_owned_by) —
+	// what's left is the hot pointers the sample, bots, and probes poke.
+	me_kick: ^Kicker,
 	ball:      ^Ball,
 
 	goals_to: u8,
@@ -65,7 +64,7 @@ speedball_ready :: proc(self: ^Speedball) {
 		status = "Host a pitch, or join one at localhost — the contested twin",
 		legend = "WASD move · Space kick · Tab scores · Enter chat",
 		msg_kind = MSG_SESSION,
-		latency_env = "SPB_LATENCY",
+		env = "SPB", // SPB_PORT/_NAME/_TOKEN identity + the SPB_LATENCY shim
 		min_players = 1,
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
@@ -77,8 +76,7 @@ speedball_ready :: proc(self: ^Speedball) {
 	// on remote avatars instead of delayed-but-accurate ones.
 	// tolerance: sub-half-pixel held-input drift rides uncorrected — the
 	// reconcile fires on real divergence, not float noise.
-	ksim.lane_init(&self.lane, &self.ses, size_of(Kicker_Input), cfg = ksim.Lane_Config{smooth_cut = 60, echo_inputs = true, tolerance = 0.5})
-	ksim.lane_set_sim(&self.lane, self, sp_sample, sp_step)
+	speedball_lane_init(self, &self.lane, &self.ses, cfg = ksim.Lane_Config{smooth_cut = 60, echo_inputs = true, tolerance = 0.5})
 	kboot.boot_lane(&self.boot, &self.lane)
 
 	install_controls()
@@ -185,15 +183,14 @@ install_controls :: proc "contextless" () {
 	bind("spb_kick", i64(gd.Key.Space))
 }
 
-sp_sample :: proc(user: rawptr, tick: u64, dst: rawptr) {
-	g := cast(^Speedball)user
-	input := cast(^Kicker_Input)dst
+@(gd_sample)
+sp_sample :: proc(self: ^Speedball, tick: u64, input: ^Kicker_Input) {
 	input^ = {}
-	if g.bot != "" {
-		bot_sample(g, tick, input)
+	if self.bot != "" {
+		bot_sample(self, tick, input)
 		return
 	}
-	typing := bool(gd.control_has_focus(cast(gd.Control)g.boot.chat.input, false))
+	typing := bool(gd.control_has_focus(cast(gd.Control)self.boot.chat.input, false))
 	if typing {return}
 	if gd.is_action_pressed("spb_left") {input.move[0] -= 1}
 	if gd.is_action_pressed("spb_right") {input.move[0] += 1}
@@ -257,8 +254,8 @@ bot_sample :: proc(g: ^Speedball, tick: u64, input: ^Kicker_Input) {
 // batch's truth corrects whatever the held inputs got wrong (the glide
 // hides it). That constant small correction is the model's whole price.
 
-sp_step :: proc(user: rawptr, tick: u64) {
-	g := cast(^Speedball)user
+@(gd_step)
+sp_step :: proc(g: ^Speedball, tick: u64) {
 	b := g.ball
 	if b == nil {return}
 	// The acid's convergence probe reports through holds and match end.
@@ -276,10 +273,10 @@ sp_step :: proc(user: rawptr, tick: u64) {
 
 	if b.won != 0 || b.hold > 0 {return}
 
-	for id, k in g.kickers {
-		in_bytes, _ := ksim.lane_input(&g.lane, g.owner_pid[id])
-		if in_bytes == nil {continue} // a pair this peer doesn't simulate
-		input := (cast(^Kicker_Input)raw_data(in_bytes))^
+	for id in kicker_ids(&g.boot) {
+		k, _ := kicker_of(&g.boot, id)
+		input, drives := ksim.lane_input_of(&g.lane, kboot.boot_entity_owner(&g.boot, id), Kicker_Input)
+		if !drives {continue} // a pair this peer doesn't simulate
 
 		dx := b.x - k.x
 		dy := b.y - k.y

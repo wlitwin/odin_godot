@@ -43,6 +43,11 @@ Gunner :: struct {
 	pid:      u8 `gd:"replicate"`,
 	shot_seq: u8 `gd:"replicate"`, // bumps per adjudicated shot — the tracer edge
 	shot_aim: f32 `gd:"replicate"`,
+	gold:     u8 `gd:"replicate"`, // kill bounty — the shop's purse
+
+	// The shop's effect: PREDICTED, so your boots answer the buy at your
+	// next tick, not a round trip later. The buy itself is the verb below.
+	gear: u8 `gd:"replicate,predict"`,
 
 	// Local scratch — never on the wire.
 	mine:      bool, // set by the census hook: my avatar
@@ -98,11 +103,15 @@ gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) -> (fired: bool) {
 		fired = true
 	}
 
+	// The boots the shop sold you — predicted state read by the predicted
+	// sim, so the speed answers the buy on YOUR timeline.
+	speed := self.gear == GEAR_BOOTS ? RUN_SPEED * 1.3 : RUN_SPEED
+
 	dashing := self.dash_cd > DASH_CD - DASH_LEN
 	if !dashing {
 		dir := normalized({f32(input.move[0]), f32(input.move[1])})
-		self.vx = dir.x * RUN_SPEED
-		self.vy = dir.y * RUN_SPEED
+		self.vx = dir.x * speed
+		self.vy = dir.y * speed
 		if input.buttons & BTN_DASH != 0 && self.dash_cd == 0 && (dir.x != 0 || dir.y != 0) {
 			// The dash is the twitch-feel demo: an impulse your screen takes
 			// THIS tick, at any latency — locked to its start direction.
@@ -123,6 +132,25 @@ gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) -> (fired: bool) {
 		crate_pushout(&self.x, &self.y, c)
 	}
 	return
+}
+
+// THE BOUNTY SHOP — the tick-scheduled verb, showcased. Everything an input
+// bit can't be: an ARGUMENT (which item), a VERDICT (an empty purse says
+// no), a cross-lane read (gold, delta lane), and a predicted effect (gear —
+// your boots answer at your next tick, ~15 ticks before the server's word
+// returns at 240ms RTT). The generated `gunner_buy_cmd(&lane, gun, item)`
+// schedules it; a rejection unwinds the gold and the reconcile scrubs the
+// gear, the same glide as any mispredict.
+GEAR_BOOTS :: u8(1)
+BOOTS_PRICE :: u8(1)
+
+@(gd_command)
+gunner_buy :: proc(self: ^Gunner, item: u8) -> bool {
+	if item != GEAR_BOOTS || self.gear == item {return false}
+	if self.gold < BOOTS_PRICE {return false}
+	self.gold -= BOOTS_PRICE
+	self.gear = item
+	return true
 }
 
 // The muzzle answer: shooter-local, instant, presentation-only (quickdraw.odin

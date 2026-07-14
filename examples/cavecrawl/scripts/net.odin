@@ -46,32 +46,9 @@ my_token :: proc() -> u64 {
 	return ksave.token({env = "CAVE_TOKEN", path = "user://cave_token"})
 }
 
-// The four transport forwards — Godot signals must land on @(gd_method)s of
-// the game's script; netgd.Session_Wire owns everything behind them.
-
-@(gd_method)
-cave_lobby_on_packet :: proc(self: ^CaveLobby, id: gd.Int, packet: gd.Packed_Byte_Array) {
-	netgd.wire_receive(&self.boot.wire, id, packet)
-}
-
-// A transport peer dropped non-gracefully (alt-F4, wifi loss): tell the
-// session so the roster shows it and the host stops sending to a ghost.
-@(gd_method)
-cave_lobby_on_peer_left :: proc(self: ^CaveLobby, id: gd.Int) {
-	ksess.session_peer_disconnected(&self.ses, ksess.Peer_Id(id))
-}
-
-// Client: the transport handshake completed — ask the host for a seat.
-@(gd_method)
-cave_lobby_on_net_up :: proc(self: ^CaveLobby) {
-	ksess.session_client_join(&self.ses)
-}
-
-// Client: the connection failed or the server vanished — same as host loss.
-@(gd_method)
-cave_lobby_on_net_down :: proc(self: ^CaveLobby) {
-	ksess.session_peer_disconnected(&self.ses, ksess.HOST_PEER)
-}
+// (The four transport forwards — on_packet/on_peer_left/on_net_up/
+// on_net_down — are GENERATED now: the kboot.Boot field on CaveLobby
+// declares them, and netgd.Session_Wire owns everything behind them.)
 
 // Host: show a player the door, with a run-scoped ban — the two-call kick:
 // the session unseats (and tells) them; the wire severs their socket.

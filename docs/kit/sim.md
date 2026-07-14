@@ -103,29 +103,41 @@ gates you never write), `runner_sim_set`, POD-asserts the input struct, and
 refuses mispaired halves or a tick without `predict` fields at build time.
 Tick shapes: `(self)`, `(self, input)`, `(self, lane)`, `(self, input, lane)`
 — a pointer param is the lane, a value param is the input; both halves also
-accept game-less (self-first) shapes. The wiring left to the game, ALL of it:
+accept game-less (self-first) shapes.
+
+The game's own half — the device read and the world pass — is typed and
+attributed the same way. `@(gd_sample)` marks the ONE place that touches
+hardware (never called during a resim); scriptgen pins its input struct to
+the ticks' at build time, so sampling into the wrong struct can't compile.
+`@(gd_step)` is the world pass, AFTER entity ticks; the `"authority"` token
+holds the role gate an authority-work pass used to open with:
+
+```odin
+@(gd_sample)
+game_sample :: proc(self: ^Game, tick: u64, input: ^Runner_Input) {
+	input.move = quantize_axes()
+	input.buttons = read_buttons()
+}
+
+@(gd_step = "authority") // omit the token for a pure-sim pass (runs everywhere)
+game_step :: proc(self: ^Game, tick: u64) {
+	run_respawns(self, tick)
+}
+```
+
+The wiring left to the game, ALL of it — `<class>_lane_init` is generated,
+carrying the input size, the typed procs, and the authority gate:
 
 ```odin
 // ready(), beside boot_attach + boot_entities:
-ksim.lane_init(&self.lane, &self.ses, size_of(Runner_Input))
-ksim.lane_set_sim(&self.lane, self, game_sample, nil) // world pass optional
+game_lane_init(self, &self.lane, &self.ses) // cfg = ksim.Lane_Config{...} to tune
 kboot.boot_lane(&self.boot, &self.lane)
 ```
 
 `boot_lane` makes the boot drive everything: the generated entity table
 carries each ticking class's `Sim_Set`, so the factory tracks and untracks
 entities on the lane itself; `boot_pump` runs `lane_frame` + `lane_present`
-every frame and forwards `Ev_Owner_Changed`. `game_sample` reads the device
-into your input struct — the one place that touches hardware, never called
-during a resim:
-
-```odin
-game_sample :: proc(user: rawptr, tick: u64, dst: rawptr) {
-	in := cast(^Runner_Input)dst
-	in.move = quantize_axes()
-	in.buttons = read_buttons()
-}
-```
+every frame and forwards `Ev_Owner_Changed`.
 
 Entity thunks run every simulated tick — live and replay identically, in
 track order — each fed its owner's input (`nil` coasts: an inputless entity
@@ -133,11 +145,22 @@ type, or a remote player on a client whose truth is already inbound). The
 optional `Step_Proc` runs AFTER entity ticks as the world pass, for
 genuinely WORLD-shaped authority work (respawn queues, wave directors). One
 input TYPE per lane, by design — the wire ships one input blob per player
-per tick; compose per-entity intent into the one struct.
+per tick; compose per-entity intent into the one struct. Quantize by
+DECLARING the quantized type — what the struct holds is what crosses the
+wire (quickdraw's aim is a `u16` turn fraction, ~0.005° resolution, with a
+two-line codec pair at the sample/tick boundary; there is no per-field wire
+machinery on inputs, on purpose — the blob memcpys). A world pass that
+reads inputs takes the typed view:
 
-For hand-driven setups (tests, generated-code-free games) `lane_track` /
+```odin
+input, drives := ksim.lane_input_of(&g.lane, owner, Kicker_Input)
+if !drives {continue} // a pair this peer doesn't simulate
+```
+
+For hand-driven setups (tests, generated-code-free games) `lane_init` +
+`lane_set_sim` (rawptr sample/step, `step_authority` flag) + `lane_track` /
 `lane_track_set` + explicit `lane_frame`/`lane_present` calls remain fully
-supported — the boot and the thunks are sugar over exactly that.
+supported — the generated wiring and the thunks are sugar over exactly that.
 
 ## What the lane does underneath
 
@@ -239,13 +262,18 @@ against `examples/slopball` — the same game on the coop model — to choose).
 ## Lag compensation
 
 ```odin
-// HOST, inside game_step, validating a hitscan from `shooter`:
-judged_at := ksim.lane_rewound(&g.lane, shooter, g, proc(user: rawptr) {
-	g := cast(^Game)user
-	g.hit = trace_shot(g) // every OTHER entity is wound back to what the
-	                      // shooter's screen showed; the shooter's own stay live
-})
+// HOST, judging a hitscan from `shooter` (inside a _then or the world pass):
+judged_at := ksim.lane_rewound_begin(&g.lane, shooter)
+g.hit = trace_shot(g) // every OTHER entity is wound back to what the
+                      // shooter's screen showed; the shooter's own stay live
+ksim.lane_rewound_end(&g.lane)
 ```
+
+Write the hit test inline between begin and end — no context struct across a
+rawptr. The pair must not nest, and nothing may track/untrack entities in
+between. `lane_rewound(l, shooter, user, query)` is the same judgment as a
+callback, for the places a proc value reads better (tests, table-driven
+weapons).
 
 The rewind view is **fact-anchored and interpolated**: every input arrives
 in a packet that also carries the sender's snapshot ack and its render
@@ -265,6 +293,86 @@ the live world like everyone else. The cost of the favor is the classic one:
 occasionally you are hit just after reaching cover. That is the trade this
 model makes; the coop model makes the opposite one.
 
+## Discrete verbs on the lane
+
+A verb is everything an input bit isn't: it carries arguments, it can be
+REJECTED, and it fires once. On a ticking class, `@(gd_command)` keeps the
+exact coop authoring shape — predicate-then-mutate, name-paired `_then` on
+the authority — but executes INSIDE the tick pipeline, because the coop
+loop's optimistic-apply/revert and the lane's rewind/replay must never
+share a baseline:
+
+```odin
+@(gd_command)
+gunner_buy :: proc(self: ^Gunner, item: u8) -> bool {
+	if self.gold < price_of(item) {return false}
+	self.gold -= price_of(item) // delta lane: reverted on rejection
+	self.gear = item            // predicted: replayed by every resim
+	return true
+}
+
+// anywhere with the lane in reach (a key edge, a bot):
+gunner_buy_cmd(&g.lane, g.me_gun, ITEM_BOOTS)
+```
+
+The generated wrapper schedules the verb at your next tick and ships it
+tick-stamped on the reliable channel — the client's lead exists precisely
+so it arrives before the server simulates that tick (a lag spike executes
+at the server's next tick instead; history is never rewritten). Your screen
+runs the verb ONCE at that tick; resims re-apply its predicted-field
+footprint rather than re-running it (a replayed predicate would read the
+gold it already spent). The server executes at the stamped tick — verbs run
+after entity thunks, before the world pass — and answers with a verdict: a
+rejection unwinds the delta-lane writes on the spot and the next reconcile
+scrubs the predicted ones, the same glide as any mispredict.
+
+Rules, enforced both ends: you may only command entities you OWN
+(predicted-self — the server drops anything else), one verb may be pending
+per entity at a time, and the wrapper returns whether it SCHEDULED — the
+verdict is state (watch the fields, or the authority's `_then`). Prefer
+absolute mutations of predicted fields in a verb (`gear = item` over
+`vx += impulse`): replays re-apply what the verb wrote, not what it meant.
+
+## Promoting a coop game
+
+Because `predict` is a lane per FIELD, a friendslop game that grows
+competitive ambitions migrates incrementally — no rewrite, no fork. The
+worked diff is `examples/slopball` → `examples/speedball` (the same soccer
+game on the two models); the checklist, per contested entity:
+
+1. **Touch nothing session-shaped.** Identity, roster, chat, stats, spawns,
+   saves, the doors, the factory — all of it rides both models unchanged.
+   Chests, inventories, scores stay on the delta lane with their verbs.
+2. **Retag the contested fast state.** `replicate,owner` (movement the peer
+   owned) becomes `replicate,predict` — the field's writer changes from "its
+   owner's stream" to "the server's simulation, predicted locally". Keep
+   `interp` on drawn floats. The retag is the whole wire migration.
+3. **Move its writes into a `@(gd_tick)`.** Frame-rate mutation becomes a
+   fixed-rate pure step: (predicted fields, input) → predicted fields. This
+   is the one honest rewrite — and where engine physics must become
+   query-based kinematics (slopball's `play.Puppet` ball became speedball's
+   forty lines of bounce arithmetic; see Gotchas).
+4. **Compose the input struct** from what the entity used to read off the
+   devices per frame, and sample it in `@(gd_sample)` — the one place that
+   still touches hardware.
+5. **Sort the consequences.** Cross-entity outcomes move to `<tick>_then`
+   (authority), local presentation to `<tick>_fx` (live pass). Discrete
+   verbs on delta-lane state keep their `@(gd_command)`s.
+6. **Delete the authority workarounds.** Whatever arbitrated "who simulates
+   this" on the coop model goes whole — speedball's diff deletes slopball's
+   entire seat-grant machinery (host.odin's proximity arbitration): the
+   server simulates everything, and `contested` + `lane_claim` answer the
+   feel questions the seat used to.
+7. **Wire once:** `<game>_lane_init(self, &self.lane, &self.ses, cfg)` +
+   `kboot.boot_lane(&self.boot, &self.lane)`, and cross entities off one at
+   a time — a hybrid game is a supported end state, not a transition.
+
+What you buy: positions are no longer client-trusted (the cheat-resistance
+motive), and lag-compensated hit validation becomes available. What you pay:
+the fixed-tick authoring contract for exactly the entities you promote, and
+a server that simulates them. [Timelines](timelines.md) is the model-choice
+guide if you are deciding rather than migrating.
+
 ## Tuning
 
 `Lane_Config` (zero = the default): `hz` 60 · `snap_every` 3 (20 Hz batches)
@@ -281,14 +389,20 @@ event worth drawing).
   from the tick — `knet.now_s()` in a step proc is a mispredict factory.
   Sample devices in `game_sample` only.
 - **Predicted fields are the resim's property.** Don't mutate them outside
-  the step proc on a client — the next reconcile will erase your write (that
-  is its job). Server-side discrete mutations of predicted state belong in
-  the step (tick-scheduled), not in `@(gd_command)` procs — commands keep
-  owning the delta-lane fields.
+  the tick pipeline on a client — the next reconcile will erase your write
+  (that is its job). Discrete mutations go through `@(gd_command)` verbs,
+  which on a ticking class are tick-scheduled and replayed by construction
+  (see "Discrete verbs on the lane").
 - **Engine physics can't re-step.** Predicted movement must be query-based
   kinematics (ray/shape casts are stateless and re-runnable); a rigid body
   can be sim-lane state only if you own its integration in the step proc.
   This is the same line every Godot rollback system draws.
+- **Reading delta-lane fields in a tick is legal — and a mispredict source
+  at their change edges.** A replay sees the field's CURRENT value, not the
+  value it held at the replayed tick, and a client learns the change a
+  transit late (quickdraw's `if self.hp <= 0` gate predicts a step the
+  server refused around every death — the glide eats the pop). Fine when
+  the edge is rare; mirror the fact into a predicted field when it's hot.
 - **Watched entities render in the past** (`watch_delay`), just like owner
   streams — the two-timelines discipline mutates, it doesn't vanish. Your
   own avatar is the one thing that never waits.

@@ -104,6 +104,36 @@ read through the field at spawn time, so editor wiring and hot reload keep
 working — and `session_set_factory` remains the escape hatch for exotic
 creation.
 
+**The census, written by nobody.** Every `entity=` tag also generates the
+typed queries the hand-kept `map[Net_Id]^T` + owner + `avatar_of` mirrors
+existed for — they read the kit's own ledgers (the registry's entity+owner,
+the boot's type table):
+
+```odin
+mob, ok := mob_of(&self.boot, id)          // the entity behind an id
+mine, ok := my_mob(&self.boot)             // this player's avatar
+theirs, ok := mob_owned_by(&self.boot, pid)
+for id in mob_ids(&self.boot) { ... }      // every live Mob (temp-alloc)
+owner := kboot.boot_entity_owner(&self.boot, id) // the old owner_pid map
+```
+
+The hooks above shrink to the genuinely game-shaped lines (a hot `me_*`
+pointer, death fx) — or vanish. The owned/ids scans walk the type ledger:
+friendslop-sized; keep a map yourself in the rare game that makes them hot.
+
+**The forwards, written by nobody:** the four transport forwards every
+session game used to copy (`on_packet`/`on_peer_left`/`on_net_up`/
+`on_net_down`) are generated from the `boot: kboot.Boot` field on your
+script struct — routed through the boot's own wire/session pointers,
+name-dispatched (so they survive hot reload), overridable by hand-writing a
+same-named `@(gd_method)`. The `Options.methods` list still names them (the
+method-name lint holds), but their bodies are no longer yours to get wrong.
+
+**Identity from one prefix:** `Options.env = "MY"` makes `boot_port(b, def)`
+/ `boot_name(b, def)` / `boot_token(b)` read `MY_PORT`/`MY_NAME`/`MY_TOKEN`
+(token persisted in `user://my_token`), and the latency shim answers
+`MY_LATENCY` without `latency_env` — the per-game env trio, absorbed.
+
 **The buttons:** `boot_host(b, port, name)` and
 `boot_join(b, addr, port, token, name)` do transport-up + session-start + the
 menu/status/chat ritual (via `netgd.begin_host/begin_join`, which exist

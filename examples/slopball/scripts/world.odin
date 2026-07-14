@@ -10,14 +10,12 @@ import gd "godot:godot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
+// The census hooks, down to the game-shaped lines — the generated queries
+// (kicker_of / kicker_ids / kicker_owned_by) answer what the old maps did.
 kicker_spawned :: proc(game: ^Slopball, self: ^Kicker, id: knet.Net_Id, owner: knet.Player_Id) {
-	game.kickers[id] = self
-	if owner != knet.PLAYER_ID_INVALID {
-		game.avatar_of[owner] = id
-		if owner == game.ses.me {
-			self.mine = true
-			game.me_kick = self
-		}
+	if owner != knet.PLAYER_ID_INVALID && owner == game.ses.me {
+		self.mine = true
+		game.me_kick = self
 	}
 }
 
@@ -25,7 +23,6 @@ kicker_freed :: proc(game: ^Slopball, self: ^Kicker, id: knet.Net_Id) {
 	if self == game.me_kick {
 		game.me_kick = nil
 	}
-	delete_key(&game.kickers, id)
 }
 
 ball_spawned :: proc(game: ^Slopball, self: ^Ball, id: knet.Net_Id, owner: knet.Player_Id) {
@@ -65,7 +62,7 @@ spawn_world :: proc(self: ^Slopball) {
 
 // Host: one avatar for `pid`, placed on its team's side of the center line.
 spawn_kicker :: proc(self: ^Slopball, pid: knet.Player_Id) {
-	if _, has := self.avatar_of[pid]; has {return}
+	if _, has := kicker_owned_by(&self.boot, pid); has {return}
 	kp, kid := ksess.session_spawn_make(&self.ses, KICKER_TYPE, owner = pid)
 	k := cast(^Kicker)kp
 	k.pid = u8(pid)

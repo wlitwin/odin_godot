@@ -64,8 +64,10 @@ run_phase() {
     done
     dp=$(launch join deadeye deadeye 9103 "$dlog" "$port" 0)
 
-    # 35s of dueling is ~20 deadeye shots.
-    sleep 35
+    # 60s of dueling is ~40 deadeye shots — enough statistics that a loaded
+    # machine's low tail stays clear of the thresholds (35s flaked: observed
+    # 6..12 hits against a >=8 bar, clean HEAD included).
+    sleep 60
     kill "$mp" "$sp" "$dp" 2>/dev/null
     wait "$mp" "$sp" "$dp" 2>/dev/null
 
@@ -99,14 +101,34 @@ for port in 4189 4196; do
     # shooter's screen drew (the render offset rides the input packet),
     # so most aimable shots land — the misses left are dead-window shots
     # after each kill and the strafer's brief direction flips. Observed
-    # across runs: rewound 11-12 of ~23, live 0-1.
-    if ((HITS_A >= 8)) && ((HITS_B <= 2)) && ((HITS_A > HITS_B + 5)); then
+    # across runs at 60s: rewound ~15-20 of ~40, live 0-3; the thresholds
+    # sit under the loaded-machine low tail, not the mean.
+    if ((HITS_A >= 10)) && ((HITS_B <= 3)) && ((HITS_A > HITS_B + 6)); then
         grep -q "QD_KILL by=3" "$LOGDIR/rewound-marshal.log" || { echo "hits never became a kill"; exit 1; }
         grep -q "QD_RESPAWN" "$LOGDIR/rewound-marshal.log" || { echo "the kill never respawned"; exit 1; }
-        echo "QUICKDRAW_NATIVE_OK proved: at 240ms RTT the rewound duel lands ($HITS_A hits -> kill -> respawn) while the live-judged control misses ($HITS_B)"
+
+        # THE SHOP, mid-duel: the kill's bounty reaches the deadeye as delta
+        # state, its buy is a tick-scheduled verb — and the boots go on at
+        # the CLIENT'S next tick, ~15 ticks before the server's word can
+        # return at this RTT. That local flip is the whole point.
+        DLOG="$LOGDIR/rewound-deadeye.log"
+        grep -q "QD_BUY_SENT" "$DLOG" || { echo "the deadeye never bought"; exit 1; }
+        grep -q "QD_GEAR_LOCAL gear=1" "$DLOG" || { echo "the boots never went on locally"; exit 1; }
+        grep -q "QD_BUY by=3 item=1" "$LOGDIR/rewound-marshal.log" || { echo "the marshal never honored the buy"; exit 1; }
+        if (($(grep -c "QD_BUY by=" "$LOGDIR/rewound-marshal.log" || true) != 1)); then
+            echo "the shop sold other than exactly once"; exit 1
+        fi
+        SENT=$(grep -m1 "QD_BUY_SENT" "$DLOG" | sed 's/.*tick=//')
+        WORN=$(grep -m1 "QD_GEAR_LOCAL gear=1" "$DLOG" | sed 's/.*tick=//')
+        if ((WORN - SENT > 3)); then
+            echo "the buy waited on the wire (sent tick $SENT, worn tick $WORN) — speculation is broken"
+            exit 1
+        fi
+
+        echo "QUICKDRAW_NATIVE_OK proved: at 240ms RTT the rewound duel lands ($HITS_A hits -> kill -> respawn), the live-judged control misses ($HITS_B), and the bounty shop's verb wore boots at tick $WORN — $((WORN - SENT)) ticks after issue, no round trip"
         exit 0
     fi
-    echo "QUICKDRAW_NATIVE_FAIL: hits rewound=$HITS_A live=$HITS_B (want >=3 and <=1)"
+    echo "QUICKDRAW_NATIVE_FAIL: hits rewound=$HITS_A live=$HITS_B (want rewound>=10, live<=3, gap>6)"
     exit 1
 done
 echo "QUICKDRAW_NATIVE_FAIL: no free port"

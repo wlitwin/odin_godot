@@ -46,12 +46,20 @@ use → ship.**
   independently on save. Covers the cost model (when NOT to use them), the no-cross-imports
   rule and why, cross-module communication patterns, reload/collision semantics, and export.
 
-## Build multiplayer: the friendslop toolkit
+## Build multiplayer: the friendslop toolkit — and the server-authority companion
 
 - **[kit/ overview](kit/index.md)** — reusable multiplayer game systems (`godot:kit/*`):
   host-authoritative sessions with reconnect identity, declarative replication with
   client prediction, chat, items, combat, NPCs, save/resume, moderation, ENet + Steam
   transports — for 2–8 player "you and your friends" games.
+- **[kit/sim](kit/sim.md)** — the OTHER netcode, beside the coop kit not instead of it:
+  server-authoritative rollback/resimulation for contested, cheat-resistant, twitch-fair
+  games. Tag fields `predict`, write a `@(gd_tick)`, and lag-compensated hitscan, client
+  prediction, and reconcile come generated. Per-FIELD opt-in — hybrid games compose.
+- **[Timelines: choosing a model](kit/timelines.md)** — whose timeline is each thing
+  presenting from, and who arbitrates disagreement: the four shipped answers (coop,
+  predict-self, contested-object, predict-world) with their worked games, and the
+  choose-by-what-is-contested guide. Read this when picking between the two kits.
 - **[Build a game in a day](kit/build-a-game-in-a-day.md)** — the tutorial: a co-op cave
   crawler from empty scene to Steam invite, the same arc `examples/cavecrawl` proves.
 - **[Gameplay recipes: the kit + play recipe](recipes.md)** — the compositional *pattern*
@@ -68,6 +76,12 @@ use → ship.**
   multi-process acid test (`run.sh`) that doubles as the pattern to steal.
 - `examples/slopball` / `examples/slopball3d` — the **smallest complete kit games**: a
   physics co-op pitch (engine physics via `play.Puppet`), in 2D and 3D.
+- `examples/quickdraw` — the **server-authority reference** (kit/sim): a western duel
+  whose premise is lag compensation — hitscan judged where the shooter's screen aimed,
+  proven by an A/B acid at 240 ms RTT.
+- `examples/speedball` — **the contested object** (kit/sim): slopball's soccer premise
+  on the other netcode — every peer predicts the ball, touches resolve locally. Read
+  the two side by side to pick a model.
 - **[examples/survivors](../examples/survivors/README.md)** — the headline single-player
   example: a complete survivors-like in pure Odin, with a per-file feature map. Its co-op
   layer is the ENGINE-NATIVE (host-authoritative) variant, retained for the interop tests.

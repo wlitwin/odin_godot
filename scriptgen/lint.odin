@@ -159,7 +159,9 @@ lint_misplaced :: proc(path, src, own: string, script_structs: map[string]bool) 
 			has_attr(vd, "gd_rpc") ||
 			has_attr(vd, "gd_command") ||
 			has_attr(vd, "gd_connect") ||
-			has_attr(vd, "gd_tick")
+			has_attr(vd, "gd_tick") ||
+			has_attr(vd, "gd_sample") ||
+			has_attr(vd, "gd_step")
 		_, is_lc := lifecycle_keyword(strip_struct_prefix(name_ident.name, recv))
 		if !attributed && !is_lc {continue}
 		error_at(

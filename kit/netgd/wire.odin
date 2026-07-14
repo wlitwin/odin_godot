@@ -3,8 +3,9 @@ package kit_netgd
 // The SESSION transport binding — the ~50 lines every game used to write by
 // hand: the Send_Proc adapter (kind byte + channel pick), the packet route,
 // the engine's connection signals, and the client's join handshake. Godot
-// signals must land on @(gd_method)s of a script (scriptgen only processes
-// game scripts), so the game keeps four ONE-LINE methods; this file owns
+// signals must land on @(gd_method)s of a script, and those four forwards
+// are GENERATED now — a kboot.Boot field on the game's struct declares them
+// (hand-written same-name methods win, name by name). This file owns
 // everything behind them:
 //
 //     wire: netgd.Session_Wire   // a field on the game's script struct
@@ -13,7 +14,7 @@ package kit_netgd
 //     netgd.wire_attach(&self.wire, self.owner, &self.ses, MSG_GAME)
 //     netgd.wire_listen(&self.wire, "on_packet", "on_peer_left", "on_net_up", "on_net_down")
 //
-//     // the four forwards:
+//     // the four forwards (generated; shown for the hand-driven path):
 //     on_packet(id, packet)  -> netgd.wire_receive(&self.wire, id, packet)
 //     on_peer_left(id)       -> ksess.session_peer_disconnected(&self.ses, ksess.Peer_Id(id))
 //     on_net_up()            -> ksess.session_client_join(&self.ses)
@@ -23,7 +24,8 @@ package kit_netgd
 //     netgd.wire_pump(&self.wire, now)
 //
 // The disconnect signals are NOT optional plumbing: without them an alt-F4'd
-// client haunts the roster forever and a failed join hangs on "Joining...".
+// client haunts the roster forever and a failed join hangs on "Joining..." —
+// which is exactly why the forwards now exist by construction.
 
 import gd "godot:godot"
 import "godot:gdext"

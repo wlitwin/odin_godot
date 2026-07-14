@@ -37,10 +37,12 @@ import "godot:gdext"
 import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
 import netgd "godot:kit/netgd"
+import ksave "godot:kit/save"
 import ksess "godot:kit/session"
 import ksim "godot:kit/sim"
 import kui "godot:kit/ui"
 import "core:fmt"
+import "core:strings"
 
 // The eight signal landing pads, in one fixed order: host/join/start button
 // presses, chat submit, then the four transport forwards.
@@ -54,7 +56,11 @@ Options :: struct {
 	status:      string, // the first status line ("" = none)
 	legend:      string, // bottom-right control hints ("" = no legend label)
 	msg_kind:    u8, // the game's session sub-frame byte (netgd.wire_attach)
-	latency_env: cstring, // env var for the injected-latency shim ("" = off)
+	// The game's env-var prefix ("QD"): boot_port/boot_name/boot_token read
+	// <ENV>_PORT/_NAME/_TOKEN (same-machine playtests pick distinct seats),
+	// and the latency shim answers <ENV>_LATENCY without latency_env.
+	env:         string,
+	latency_env: cstring, // env var for the injected-latency shim ("" = <ENV>_LATENCY, or off)
 	min_players: int, // host's Start button appears at this count (default 2)
 	spatial:     bool, // 3D game: stage/world become Node3D containers (default Node2D)
 	keep_vsync:  bool, // opt OUT of the desktop playtest unthrottle (see unthrottle_desktop)
@@ -109,6 +115,7 @@ Boot :: struct {
 	comms:       ^kcomms.Comms,
 	lane:        ^ksim.Lane, // nil = no sim lane (boot_lane installs one)
 	min_players: int,
+	env:         string, // Options.env — the game's env-var prefix ("" = none)
 
 	// boot_entities' state (entities.odin): the generated kind table, the
 	// game pointer the typed hooks receive, and the per-entity node ledger
@@ -191,10 +198,15 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 		b.score = kui.score_make(b.ui_layer)
 	}
 
+	b.env = opts.env
 	netgd.wire_attach(&b.wire, node, ses, opts.msg_kind)
 	netgd.wire_listen(&b.wire, opts.methods.packet, opts.methods.peer_left, opts.methods.net_up, opts.methods.net_down)
-	if opts.latency_env != "" {
-		netgd.wire_set_latency(&b.wire, gd.env_int(opts.latency_env, 0))
+	latency_env := opts.latency_env
+	if latency_env == "" && opts.env != "" {
+		latency_env = fmt.ctprintf("%s_LATENCY", opts.env)
+	}
+	if latency_env != "" {
+		netgd.wire_set_latency(&b.wire, gd.env_int(latency_env, 0))
 	}
 
 	if opts.legend != "" {
@@ -290,6 +302,32 @@ roster_changed :: proc(b: ^Boot) {
 		kui.lobby_set_status(&b.ui, fmt.tprintf("%d players ready", n))
 		kui.lobby_show_menu(&b.ui, false, n >= b.min_players)
 	}
+}
+
+// The env-identity trio — the port()/my_name()/my_token() helpers every
+// game kept per-prefix, absorbed behind Options.env ("QD" reads QD_PORT /
+// QD_NAME / QD_TOKEN, persists user://qd_token). Same-machine playtests
+// pick distinct seats via env; shipped builds ride the defaults. The token
+// IS the player: same token later — after a crash, a quit, a resumed save —
+// reclaims the same identity; never regenerate it.
+
+boot_port :: proc(b: ^Boot, def: int) -> int {
+	if b.env == "" {return def}
+	return gd.env_int(fmt.ctprintf("%s_PORT", b.env), def)
+}
+
+boot_name :: proc(b: ^Boot, def: string) -> string {
+	if b.env == "" {return def}
+	n := gd.env_string(fmt.ctprintf("%s_NAME", b.env))
+	return n == "" ? def : n
+}
+
+boot_token :: proc(b: ^Boot) -> u64 {
+	lower := strings.to_lower(b.env, context.temp_allocator)
+	return ksave.token({
+		env  = fmt.ctprintf("%s_TOKEN", b.env),
+		path = fmt.ctprintf("user://%s_token", lower),
+	})
 }
 
 // The Host button, ceremony included: transport up, session started, menu

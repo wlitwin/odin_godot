@@ -76,14 +76,21 @@ generate :: proc(s: ^Script) -> string {
 			break
 		}
 	}
-	if s.tick.proc_name != "" || len(s.block_ticks) > 0 || ticked_entities {
+	has_lane_wiring := s.sample.proc_name != "" || s.step.proc_name != ""
+	if s.tick.proc_name != "" || len(s.block_ticks) > 0 || ticked_entities || has_lane_wiring {
 		w(&b, "import ksim \"godot:kit/sim\"\n")
 	}
 	// entity tables (`entity=Name:id` scene fields) name ksess.Entity_Type and
-	// build kboot.Entity_Kind rows.
-	if len(s.entities) > 0 {
+	// build kboot.Entity_Kind rows; the lane wiring names ksess.Session; the
+	// standard transport forwards route into netgd/ksess.
+	if len(s.entities) > 0 || has_lane_wiring || len(s.std_forwards) > 0 {
 		w(&b, "import ksess \"godot:kit/session\"\n")
+	}
+	if len(s.entities) > 0 {
 		w(&b, "import kboot \"godot:kit/boot\"\n")
+	}
+	if len(s.std_forwards) > 0 {
+		w(&b, "import netgd \"godot:kit/netgd\"\n")
 	}
 	// verb-composition: import each package a COMPOSED command's proc lives in (so the routed
 	// thunk can name `play.gun_fire`), deduped by path. "" = the entity's own package (no import).
@@ -550,7 +557,13 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	// in the thunk for received commands, in the wrapper for the host's own —
 	// with the issuer, the wire args, and the verb's returned payload.
 	upper := strings.to_upper(snake)
-	if len(s.commands) > 0 {
+	// A class that TICKS executes its verbs inside the tick pipeline instead
+	// (kit/sim command scheduling) — the knet command loop's optimistic-apply
+	// and the lane's resim would otherwise fight over one baseline. Its knet
+	// command table and ctx-shaped wrappers are skipped whole; the sim block
+	// below emits the tick-scheduled equivalents.
+	is_sim := s.tick.proc_name != "" || len(s.block_ticks) > 0
+	if len(s.commands) > 0 && !is_sim {
 		w(b, "// ---- @(gd_command) dispatch + typed issue wrappers ----\n\n")
 		w(b, "// Command indices, by declaration order — for the game's command hook\n")
 		w(b, "// dispatch (never hand-sync these; reordering procs reorders them).\n")
@@ -623,9 +636,10 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	}
 
 	// The command set is emitted for EVERY entity with a descriptor — desc-only
-	// entities (no commands) used to force a hand-built set in the game.
+	// entities (no commands) used to force a hand-built set in the game. A
+	// ticking class's set stays desc-only: its verbs ride the lane.
 	if len(s.replicates) > 0 || len(s.commands) > 0 {
-		cmds := len(s.commands) > 0 ? fmt.tprintf(", commands = _%s_commands[:]", snake) : ""
+		cmds := len(s.commands) > 0 && !is_sim ? fmt.tprintf(", commands = _%s_commands[:]", snake) : ""
 		net_id := s.net_id_type != "" ? fmt.tprintf(", net_id_offset = int(offset_of(%s, net_id))", cls) : ""
 		fmt.sbprintf(
 			b,
@@ -634,7 +648,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		)
 	}
 
-	if len(s.commands) > 0 {
+	if len(s.commands) > 0 && !is_sim {
 		for c, ci in s.commands {
 			// A composed command routes into the block and qualifies the proc; its wrapper is
 			// named per-entity (`runner_gun_fire_cmd`) so two blocks of the same type never collide.
@@ -794,12 +808,170 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			w(b, ")\n\t}\n")
 		}
 		w(b, "}\n\n")
+		// ---- @(gd_command) on a ticking class: tick-scheduled verbs ----
+		// The verb executes INSIDE the tick pipeline on both ends (kit/sim
+		// command.odin): the client speculates at its next tick and resims
+		// re-apply the captured patch; the authority executes at the stamped
+		// tick and its `_then` fires there — the exec thunk holds that gate.
+		if len(s.commands) > 0 {
+			w(b, "// Command indices, by declaration order.\n")
+			for c, ci in s.commands {
+				fmt.sbprintf(b, "%s_CMD_%s :: u16(%d)\n", upper, strings.to_upper(c.name), ci)
+			}
+			w(b, "\n")
+			for c in s.commands {
+				recv := len(c.path) > 0 ? fmt.tprintf("&self.%s", join_path(c.path)) : "self"
+				qual := c.pkg_alias != "" ? fmt.tprintf("%s.", c.pkg_alias) : ""
+				fmt.sbprintf(b, "@(private = \"file\")\n_%s_simcmd_%s :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool {{\n", snake, c.name)
+				fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
+				if len(c.args) > 0 {
+					w(b, "\tr := knet.reader_make(args)\n")
+					for a, i in c.args {
+						fmt.sbprintf(b, "\t_a%d := knet.read_%s(&r)\n", i, a.wire)
+					}
+					w(b, "\tif r.err {return false}\n")
+				}
+				w(b, "\t_ok")
+				for i in 0 ..< c.payload_count {
+					if c.then_proc != "" {
+						fmt.sbprintf(b, ", _p%d", i)
+					} else {
+						w(b, ", _")
+					}
+				}
+				fmt.sbprintf(b, " := %s%s(%s", qual, c.proc_name, recv)
+				if c.owner {w(b, ", self")}
+				for _, i in c.args {
+					fmt.sbprintf(b, ", _a%d", i)
+				}
+				w(b, ")\n")
+				if c.then_proc != "" {
+					w(b, "\tif _ok && ksim.lane_is_authority(lane) {\n")
+					if c.then_game != "" {
+						fmt.sbprintf(b, "\t\tassert(ksim.lane_game(lane) != nil, \"%s needs the game pointer — lane_set_sim's user is what consequences receive\")\n", c.then_proc)
+						fmt.sbprintf(b, "\t\t%s(cast(^%s)ksim.lane_game(lane), self, by", c.then_proc, c.then_game)
+					} else {
+						fmt.sbprintf(b, "\t\t%s(self, by", c.then_proc)
+					}
+					for _, i in c.args {
+						fmt.sbprintf(b, ", _a%d", i)
+					}
+					for i in 0 ..< c.payload_count {
+						fmt.sbprintf(b, ", _p%d", i)
+					}
+					w(b, ")\n\t}\n")
+				}
+				w(b, "\treturn _ok\n}\n\n")
+			}
+			fmt.sbprintf(b, "@(private = \"file\")\n_%s_sim_cmds := [?]ksim.Sim_Cmd {{\n", snake)
+			for c in s.commands {
+				fmt.sbprintf(b, "\t{{exec = _%s_simcmd_%s}},\n", snake, c.name)
+			}
+			w(b, "}\n\n")
+			for c, ci in s.commands {
+				wrapper := len(c.path) > 0 ? fmt.tprintf("%s_%s", snake, c.name) : c.proc_name
+				fmt.sbprintf(b, "// Issue `%s` — tick-scheduled on the sim lane: the SAME call on every peer,\n", c.name)
+				w(b, "// zero role branches. Your own entity speculates at your next tick; the\n")
+				w(b, "// authority executes at the stamped tick and answers with a verdict — a\n")
+				w(b, "// rejection unwinds the delta-lane writes and the reconcile scrubs the\n")
+				w(b, "// predicted ones. Returns whether it SCHEDULED; the verdict is state.\n")
+				fmt.sbprintf(b, "%s_cmd :: proc(l: ^ksim.Lane, self: ^%s", wrapper, cls)
+				for a in c.args {
+					fmt.sbprintf(b, ", %s: %s", a.name, a.type_text)
+				}
+				w(b, ") -> bool {\n")
+				if len(c.args) > 0 {
+					w(b, "\t_w := knet.writer_make(64, context.temp_allocator)\n")
+					for a in c.args {
+						fmt.sbprintf(b, "\tknet.write_%s(&_w, %s)\n", a.wire, a.name)
+					}
+					fmt.sbprintf(b, "\treturn ksim.lane_command(l, self.net_id, %d, knet.writer_bytes(&_w))\n}}\n\n", ci)
+				} else {
+					fmt.sbprintf(b, "\treturn ksim.lane_command(l, self.net_id, %d, nil)\n}}\n\n", ci)
+				}
+			}
+		}
+
 		in_size := s.tick.input_type != "" ? fmt.tprintf("size_of(%s)", s.tick.input_type) : "0"
 		contested := s.tick.contested ? ", contested = true" : ""
+		sim_cmds := len(s.commands) > 0 ? fmt.tprintf(", commands = _%s_sim_cmds[:]", snake) : ""
 		fmt.sbprintf(
 			b,
-			"// kit/sim set for %s — ksim.lane_track_set(&lane, id, self, &%s_sim_set, owner)\n%s_sim_set := ksim.Sim_Set{{entity_desc = &%s_net_desc, tick = _%s_tick_step, input_size = %s%s}}\n\n",
-			cls, snake, snake, snake, snake, in_size, contested,
+			"// kit/sim set for %s — ksim.lane_track_set(&lane, id, self, &%s_sim_set, owner)\n%s_sim_set := ksim.Sim_Set{{entity_desc = &%s_net_desc, tick = _%s_tick_step, input_size = %s%s%s}}\n\n",
+			cls, snake, snake, snake, snake, in_size, contested, sim_cmds,
+		)
+	}
+
+	// ---- the standard transport forwards (a kboot.Boot field declares them) ----
+	// Bodies for the Method_Info entries resolve_boot_forwards synthesized:
+	// the four one-liners every session game used to copy, wired through the
+	// boot's own wire/session pointers. Name-dispatched like any method, so
+	// they survive hot reload; a hand-written same-name method suppressed the
+	// synthesis entirely.
+	for name in s.std_forwards {
+		switch name {
+		case "on_packet":
+			fmt.sbprintf(
+				b,
+				"@(private = \"file\")\n_%s_std_on_packet :: proc(self: ^%s, id: gd.Int, packet: gd.Packed_Byte_Array) {{\n\tnetgd.wire_receive(&self.%s.wire, id, packet)\n}}\n\n",
+				snake, cls, s.boot_field,
+			)
+		case "on_peer_left":
+			fmt.sbprintf(
+				b,
+				"@(private = \"file\")\n_%s_std_on_peer_left :: proc(self: ^%s, id: gd.Int) {{\n\tif self.%s.ses == nil {{return}}\n\tksess.session_peer_disconnected(self.%s.ses, ksess.Peer_Id(id))\n}}\n\n",
+				snake, cls, s.boot_field, s.boot_field,
+			)
+		case "on_net_up":
+			fmt.sbprintf(
+				b,
+				"@(private = \"file\")\n_%s_std_on_net_up :: proc(self: ^%s) {{\n\tif self.%s.ses == nil {{return}}\n\tksess.session_client_join(self.%s.ses)\n}}\n\n",
+				snake, cls, s.boot_field, s.boot_field,
+			)
+		case "on_net_down":
+			fmt.sbprintf(
+				b,
+				"@(private = \"file\")\n_%s_std_on_net_down :: proc(self: ^%s) {{\n\tif self.%s.ses == nil {{return}}\n\tksess.session_peer_disconnected(self.%s.ses, ksess.HOST_PEER)\n}}\n\n",
+				snake, cls, s.boot_field, s.boot_field,
+			)
+		}
+	}
+
+	// ---- @(gd_sample)/@(gd_step): the lane wiring, written by nobody ----
+	// The thunks hold the rawptr casts; `<snake>_lane_init` carries the input
+	// size (from the package's tick input struct — resolve_sim pinned the
+	// sample to it) and the step's authority gate. Game wiring is two lines:
+	// `<snake>_lane_init(self, &self.lane, &self.ses, cfg = {...})` beside
+	// boot_attach, then `kboot.boot_lane(&self.boot, &self.lane)`.
+	if s.sample.proc_name != "" || s.step.proc_name != "" {
+		w(b, "// ---- @(gd_sample)/@(gd_step) lane wiring ----\n\n")
+		if s.sample.proc_name != "" {
+			fmt.sbprintf(
+				b,
+				"@(private = \"file\")\n_%s_lane_sample :: proc(user: rawptr, tick: u64, dst: rawptr) {{\n\t%s(cast(^%s)user, tick, cast(^%s)dst)\n}}\n\n",
+				snake, s.sample.proc_name, cls, s.sample.input_type,
+			)
+		}
+		if s.step.proc_name != "" {
+			fmt.sbprintf(
+				b,
+				"@(private = \"file\")\n_%s_lane_step :: proc(user: rawptr, tick: u64) {{\n\t%s(cast(^%s)user, tick)\n}}\n\n",
+				snake, s.step.proc_name, cls,
+			)
+		}
+		lane_in_size := s.lane_input_type != "" ? fmt.tprintf("size_of(%s)", s.lane_input_type) : "0"
+		sample_ref := s.sample.proc_name != "" ? fmt.tprintf("_%s_lane_sample", snake) : "nil"
+		step_ref := s.step.proc_name != "" ? fmt.tprintf("_%s_lane_step", snake) : "nil"
+		auth := s.step.authority ? "true" : "false"
+		fmt.sbprintf(
+			b,
+			"// The lane beside the session: input size, typed sample, world pass, and\n"+
+			"// the authority gate — all from the attributes. cfg tunes; zero = defaults.\n"+
+			"%s_lane_init :: proc(self: ^%s, l: ^ksim.Lane, ses: ^ksess.Session, tag := ksim.SIM_TAG, cfg := ksim.Lane_Config{{}}) {{\n"+
+			"\tksim.lane_init(l, ses, %s, tag, cfg)\n"+
+			"\tksim.lane_set_sim(l, self, %s, %s, step_authority = %s)\n"+
+			"}}\n\n",
+			snake, cls, lane_in_size, sample_ref, step_ref, auth,
 		)
 	}
 
@@ -848,6 +1020,54 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			w(b, "},\n")
 		}
 		w(b, "}\n\n")
+
+		// The typed census — the registry/boot ledgers queried back, so the
+		// hand-kept `map[Net_Id]^T` + owner + avatar_of mirrors become the
+		// exception (genuinely game-shaped bookkeeping), not the tax. A
+		// hand-written proc of the same name suppresses that accessor
+		// (resolve_census) and keeps its own meaning.
+		for e in s.entities {
+			tsnake := to_snake(e.target)
+			if e.gen_of || e.gen_owned || e.gen_my || e.gen_ids {
+				fmt.sbprintf(
+					b,
+					"// Census for %s: %s_of(id), my_%s(), %s_owned_by(player), %s_ids() —\n// no game-side maps for the common shape.\n",
+					e.target, tsnake, tsnake, tsnake, tsnake,
+				)
+			}
+			if e.gen_of {
+				fmt.sbprintf(
+					b,
+					"%s_of :: proc(b: ^kboot.Boot, id: knet.Net_Id) -> (^%s, bool) {{\n\te, ok := kboot.boot_entity(b, id, %s_TYPE)\n\treturn cast(^%s)e, ok\n}}\n\n",
+					tsnake, e.target, strings.to_upper(tsnake), e.target,
+				)
+			}
+			if e.gen_owned {
+				fmt.sbprintf(
+					b,
+					"%s_owned_by :: proc(b: ^kboot.Boot, owner: knet.Player_Id) -> (^%s, bool) {{\n\te, _, ok := kboot.boot_owned_entity(b, %s_TYPE, owner)\n\treturn cast(^%s)e, ok\n}}\n\n",
+					tsnake, e.target, strings.to_upper(tsnake), e.target,
+				)
+			}
+			if e.gen_my {
+				my_body :=
+					e.gen_owned \
+					? fmt.tprintf("return %s_owned_by(b, b.ses.me)", tsnake) \
+					: fmt.tprintf("e, _, ok := kboot.boot_owned_entity(b, %s_TYPE, b.ses.me)\n\treturn cast(^%s)e, ok", strings.to_upper(tsnake), e.target)
+				fmt.sbprintf(
+					b,
+					"my_%s :: proc(b: ^kboot.Boot) -> (^%s, bool) {{\n\t%s\n}}\n\n",
+					tsnake, e.target, my_body,
+				)
+			}
+			if e.gen_ids {
+				fmt.sbprintf(
+					b,
+					"%s_ids :: proc(b: ^kboot.Boot, allocator := context.temp_allocator) -> []knet.Net_Id {{\n\treturn kboot.boot_entity_ids(b, %s_TYPE, allocator)\n}}\n\n",
+					tsnake, strings.to_upper(tsnake),
+				)
+			}
+		}
 	}
 
 	// lifecycle literal

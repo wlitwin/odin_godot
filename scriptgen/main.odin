@@ -405,6 +405,22 @@ Entity_Tag :: struct {
 	spawned: string, // <target_snake>_spawned
 	freed:   string, // <target_snake>_freed
 	has_tick: bool, // the target declares @(gd_tick) — the kinds row carries its Sim_Set
+	// Which census accessors to emit (resolve_census): a hand-written proc
+	// of the same name suppresses that one, keeping its meaning.
+	gen_of, gen_owned, gen_my, gen_ids: bool,
+}
+
+// The class's @(gd_sample)/@(gd_step) procs — the lane's GAME half (kit/sim).
+// scriptgen generates the rawptr thunks and a `<snake>_lane_init` wiring proc
+// that carries the input size, the typed sample destination, and the step's
+// authority gate — game code never casts a rawptr or repeats size_of, and
+// sampling into the wrong struct is a build error (resolve_sim), not a
+// haunted misread.
+Sim_Proc_Info :: struct {
+	proc_name:  string,
+	line:       int,
+	input_type: string, // sample only: the `input: ^T` param's T
+	authority:  bool,   // step only: @(gd_step = "authority") — the host alone runs it
 }
 
 // The one @(gd_tick) proc a class may declare — its sim-lane step (kit/sim).
@@ -447,6 +463,11 @@ Script :: struct {
 	net_id_type: string, // type text of a `net_id` field ("" = none) — commands require knet.Net_Id
 	tick:        Tick_Info, // proc_name == "" = the class doesn't tick
 	block_ticks: [dynamic]Hoisted_Tick, // embedded blocks' ticks, entity-tick-first order
+	sample:      Sim_Proc_Info, // @(gd_sample): the lane's device read (proc_name == "" = none)
+	step:        Sim_Proc_Info, // @(gd_step): the lane's world pass
+	lane_input_type: string, // resolved package-wide (resolve_sim): the ONE input struct the lane ships
+	boot_field:  string, // the kboot.Boot field's name ("" = none) — generates the standard transport forwards
+	std_forwards: [dynamic]string, // which standard forwards were synthesized (bodies emitted by generate)
 }
 
 had_error: bool
@@ -1108,6 +1129,8 @@ main :: proc() {
 	defer delete(then_idx)
 	method_claims := make([dynamic]Method_Claim)
 	defer delete(method_claims)
+	proc_names := make(map[string]bool)
+	defer delete(proc_names)
 	for l in lintable {
 		file := ast.File {
 			fullpath = l.path,
@@ -1119,6 +1142,7 @@ main :: proc() {
 		if !parser.parse_file(&p, &file) {continue}
 		scan_then_procs(&then_idx, l.path, l.src, &file)
 		scan_method_claims(&method_claims, l.path, l.src, &file, script_structs)
+		scan_proc_names(&proc_names, &file)
 	}
 	by_struct := make(map[string]^Script)
 	defer delete(by_struct)
@@ -1134,6 +1158,14 @@ main :: proc() {
 		resolve_then(&pend.script, &then_idx)
 		resolve_tick_then(&pend.script, &then_idx)
 		resolve_entities(&pend.script, by_struct, &seen_entity_ids, &then_idx)
+		resolve_census(&pend.script, proc_names)
+		resolve_boot_forwards(&pend.script)
+	}
+	{
+		// The lane's module-wide contracts: one input struct, one wired class.
+		all := make([dynamic]^Script, context.temp_allocator)
+		for &pend in pending {append(&all, &pend.script)}
+		resolve_sim(all[:])
 	}
 	warn_unclaimed_thens(&then_idx, script_snakes)
 	lint_method_claims(method_claims[:], by_struct)

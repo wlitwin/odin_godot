@@ -31,6 +31,13 @@ on the one before.
    what you get for free once the model holds: reconnects, drop-in joins,
    saves, host migration, Steam — and the testing habit that keeps it all true.
 
+Building something contested and competitive rather than co-op — a duel, a
+ranked arena, anything where clients must not be trusted with their own
+position? The same declarative surface has a second story:
+[kit/sim](../kit/sim.md), server-authoritative rollback/resimulation, chosen
+per FIELD so a game can be both. [Timelines](../kit/timelines.md) is the
+choosing guide.
+
 **Who this is for:** Godot developers comfortable with the editor, scenes, and
 nodes. No Odin experience assumed — the language is small enough to learn from
 the code in front of you. No netcode experience assumed either; in fact the

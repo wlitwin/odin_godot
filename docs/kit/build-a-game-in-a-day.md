@@ -42,28 +42,29 @@ kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{
 	title    = "MY GAME",
 	status   = "Host a cave, or join one at localhost",
 	msg_kind = MSG_SESSION,
+	env      = "MY", // MY_PORT/_NAME/_TOKEN identity + the MY_LATENCY shim
 	methods  = {"on_host", "on_join", "on_start", "on_chat",
 	            "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 })
 ```
 
 That is a hosted, joinable lobby: title, status line, player list, Host/Join/
-Start buttons, chat, scoreboard, and the session's transport wire. Godot
-signals must land on script methods, so your game declares the eight names
-above and keeps their one-line bodies — Host presses land on
+Start buttons, chat, scoreboard, and the session's transport wire. The four
+transport forwards (`on_packet`/`on_peer_left`/`on_net_up`/`on_net_down`)
+are **generated** — your `boot: kboot.Boot` field declares them, and the
+alt-F4'd-friend-haunts-the-roster bug they used to guard is dead by
+construction (hand-write a same-named method to override one). You declare
+the four game-shaped doors: Host presses land on
 `kboot.boot_host(&self.boot, port, name)`, Join on
-`kboot.boot_join(&self.boot, addr, port, token, name)`, packets on
-`netgd.wire_receive` (copy either example game's `net.odin`). **Do not skip
-the disconnect forwards.** An unwired `peer_disconnected` means an alt-F4'd
-friend haunts your roster forever; an unwired `connection_failed` means a
-failed join hangs on "Joining..." — the first playtest bug of every
-multiplayer game ever shipped.
+`kboot.boot_join(&self.boot, addr, port, token, name)` — each a guard, the
+boot call, a flavor status line, done. Copy either example game's `net.odin`
+to start (it is ~60 lines now, all doors).
 
-The join's `token` IS the player
-(`ksave.token({env = "MY_TOKEN", path = "user://my_token"})`). Same token
-later — after a crash, a quit, a resumed save — reclaims the same identity,
-stats, and entities. Persist it; never regenerate it. See
-[session](session.md).
+The join's `token` IS the player (`kboot.boot_token(&self.boot)` — persisted
+in `user://my_token`, overridable via `MY_TOKEN` so same-machine tests pick
+distinct seats). Same token later — after a crash, a quit, a resumed save —
+reclaims the same identity, stats, and entities. Persist it; never
+regenerate it. See [session](session.md).
 
 In `process()`, one call pumps the wire, ticks the session, reacts to the
 five events every game handles identically (lobby/scoreboard repaints, the
@@ -335,3 +336,16 @@ the moving-cast miss, the kicked-message race, and the pulse-swallow above
 were all caught by greps, not playtests. Steal the pattern: your game's
 `@(gd_method)` surface is drivable by a test script exactly like keys drive
 it in play.
+
+## 12. The second story, when you need it
+
+This tutorial built the friendslop shape: host-authoritative, friends-only,
+trust-your-peers. If the game you actually want is CONTESTED — a duel, a
+ranked ladder, anything where a client must not be trusted with its own
+position — the same declarative surface has a server-authoritative twin:
+tag fields `replicate,predict`, move their writes into a `@(gd_tick)`, and
+rollback-resimulation with lag compensation comes generated. It is chosen
+per FIELD, so everything you built today (sessions, entities, verbs, chat,
+saves) carries over and the two models compose in one game. Read
+[timelines](timelines.md) to choose, [sim](sim.md) to build — including the
+"Promoting a coop game" checklist for exactly the game you just finished.

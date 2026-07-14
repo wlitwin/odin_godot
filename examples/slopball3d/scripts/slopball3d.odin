@@ -111,7 +111,7 @@ slopball3_ready :: proc(self: ^Slopball3) {
 		status = "Host a pitch, or join one at localhost",
 		legend = "WASD move · Space kick · Tab scores · Enter chat",
 		msg_kind = MSG_SESSION,
-		latency_env = "SLOP3_LATENCY",
+		env = "SLOP3", // SLOP3_PORT/_NAME/_TOKEN identity + the SLOP3_LATENCY shim
 		min_players = 1, // a lone host may start and kick the ball around
 		spatial = true, // 3D game: Node3D stage/world containers
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},

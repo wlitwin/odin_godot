@@ -31,7 +31,8 @@ slop_host_tick :: proc(self: ^Slopball) {
 		best: knet.Player_Id = knet.PLAYER_ID_INVALID
 		best_d := TOUCH_R * TOUCH_R
 		cur_d := f32(1e9) // the sitting owner's own distance (possession is sticky)
-		for _, k in self.kickers {
+		for kid in kicker_ids(&self.boot) {
+			k, _ := kicker_of(&self.boot, kid)
 			pid := knet.Player_Id(k.pid)
 			moved := abs(k.x - k.hx) + abs(k.y - k.hy) // intent: this tick's stride
 			k.hx = k.x

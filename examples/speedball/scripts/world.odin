@@ -9,15 +9,13 @@ import gd "godot:godot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
+// The census hooks, down to the game-shaped lines — the generated queries
+// (kicker_of / kicker_ids / kicker_owned_by, kboot.boot_entity_owner) answer
+// everything the old three maps did.
 kicker_spawned :: proc(game: ^Speedball, self: ^Kicker, id: knet.Net_Id, owner: knet.Player_Id) {
-	game.kickers[id] = self
-	game.owner_pid[id] = owner
-	if owner != knet.PLAYER_ID_INVALID {
-		game.avatar_of[owner] = id
-		if owner == game.ses.me {
-			self.mine = true
-			game.me_kick = self
-		}
+	if owner != knet.PLAYER_ID_INVALID && owner == game.ses.me {
+		self.mine = true
+		game.me_kick = self
 	}
 	gd.print_str(fmt.tprintf("SPB_SPAWN id=%d mine=%v", u32(id), owner == game.ses.me))
 }
@@ -26,13 +24,6 @@ kicker_freed :: proc(game: ^Speedball, self: ^Kicker, id: knet.Net_Id) {
 	if self == game.me_kick {
 		game.me_kick = nil
 	}
-	if pid, ok := game.owner_pid[id]; ok {
-		if game.avatar_of[pid] == id {
-			delete_key(&game.avatar_of, pid)
-		}
-	}
-	delete_key(&game.owner_pid, id)
-	delete_key(&game.kickers, id)
 }
 
 ball_spawned :: proc(game: ^Speedball, self: ^Ball, id: knet.Net_Id, owner: knet.Player_Id) {
@@ -64,7 +55,7 @@ spawn_world :: proc(self: ^Speedball) {
 }
 
 spawn_kicker :: proc(self: ^Speedball, pid: knet.Player_Id) {
-	if _, has := self.avatar_of[pid]; has {return}
+	if _, has := kicker_owned_by(&self.boot, pid); has {return}
 	kp, kid := ksess.session_spawn_make(&self.ses, KICKER_TYPE, owner = pid)
 	k := cast(^Kicker)kp
 	k.pid = u8(pid)

@@ -47,10 +47,10 @@ Quickdraw :: struct {
 
 	gunner_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Gunner:1"`,
 
-	gunners:   map[knet.Net_Id]^Gunner,
-	avatar_of: map[knet.Player_Id]knet.Net_Id,
-	owner_pid: map[knet.Net_Id]knet.Player_Id,
-	me_gun:    ^Gunner,
+	// The census is GENERATED (gunner_of / my_gunner / gunner_owned_by /
+	// gunner_ids read the kit's own ledgers) — the only bookkeeping left is
+	// the hot my-avatar pointer the sample and bots poke every tick.
+	me_gun: ^Gunner,
 
 	// Host scratch.
 	kills_col:  ksess.Stat_Col,
@@ -61,6 +61,7 @@ Quickdraw :: struct {
 	auto_peers: int,
 	bot:        string, // QD_BOT: "" | "orbit" | "strafer" | "deadeye"
 	shot_count: int,
+	gear_seen:  u8, // my avatar's last shown gear — the local-flip edge the acid times
 }
 
 now_s :: knet.now_s
@@ -71,24 +72,26 @@ quickdraw_ready :: proc(self: ^Quickdraw) {
 		status = "Host a duel, or join one at localhost",
 		legend = "WASD move · Mouse aim · Click fire · Space dash · Tab scores · Enter chat",
 		msg_kind = MSG_SESSION,
-		latency_env = "QD_LATENCY",
+		env = "QD", // QD_PORT/_NAME/_TOKEN identity + the QD_LATENCY shim
 		min_players = 1,
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
 	kboot.boot_entities(&self.boot, self, quickdraw_entity_kinds[:])
 
-	// The sim lane beside the session: 60 Hz ticks, snapshots every 3 (20 Hz),
-	// respawn teleports big enough to CUT instead of glide, and a GENEROUS
-	// half-second rewind ceiling — a shooter's view is transit + lead +
-	// watch-delay old (~400ms at the acid's 240ms RTT), and a quickdraw
-	// favors the shooter by premise. Competitive games tighten this knob.
-	// judge_live is the acid's control arm — feel free to feel the difference.
-	ksim.lane_init(&self.lane, &self.ses, size_of(Gunner_Input), cfg = ksim.Lane_Config{
+	// The sim lane beside the session — the wiring is GENERATED from the
+	// @(gd_sample)/@(gd_step) attributes (typed procs, input size, and the
+	// step's authority gate all come from the declarations). Config: 60 Hz
+	// ticks, snapshots every 3 (20 Hz), respawn teleports big enough to CUT
+	// instead of glide, and a GENEROUS half-second rewind ceiling — a
+	// shooter's view is transit + lead + watch-delay old (~400ms at the
+	// acid's 240ms RTT), and a quickdraw favors the shooter by premise.
+	// Competitive games tighten this knob. judge_live is the acid's control
+	// arm — feel free to feel the difference.
+	quickdraw_lane_init(self, &self.lane, &self.ses, cfg = ksim.Lane_Config{
 		smooth_cut = 48,
 		rewind_max = 30,
 		judge_live = gd.env_int("QD_NOREWIND", 0) != 0,
 	})
-	ksim.lane_set_sim(&self.lane, self, qd_sample, qd_step)
 	kboot.boot_lane(&self.boot, &self.lane) // the boot drives the lane from here on
 
 	install_controls()
@@ -121,6 +124,24 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 	if !self.started && self.ses.is_host && self.auto_peers > 0 &&
 	   ksess.session_count(&self.ses, connected_only = true, players_only = true) >= self.auto_peers {
 		quickdraw_on_start(self)
+	}
+
+	// THE SHOP DOOR — a tick-scheduled verb, issued like any coop command
+	// (a key edge, or the bots' own hands): your gear flips at your NEXT
+	// TICK, the server's verdict lands a round trip later. The gear edge
+	// below is the acid's watch: QD_GEAR_LOCAL fires the moment MY screen
+	// wears the boots — ~15 ticks before truth can possibly return at the
+	// acid's 240ms RTT.
+	if self.me_gun != nil {
+		buy := gd.is_action_just_pressed("qd_buy") ||
+			(self.bot != "" && self.me_gun.gear == 0 && self.me_gun.gold >= BOOTS_PRICE)
+		if buy && gunner_buy_cmd(&self.lane, self.me_gun, GEAR_BOOTS) {
+			gd.print_str(fmt.tprintf("QD_BUY_SENT tick=%d", ksim.lane_now(&self.lane)))
+		}
+		if self.me_gun.gear != self.gear_seen {
+			self.gear_seen = self.me_gun.gear
+			gd.print_str(fmt.tprintf("QD_GEAR_LOCAL gear=%d tick=%d", self.me_gun.gear, ksim.lane_now(&self.lane)))
+		}
 	}
 
 	for ev in events {
@@ -169,19 +190,19 @@ install_controls :: proc "contextless" () {
 	bind("qd_up", i64('W'), i64(gd.Key.Up))
 	bind("qd_down", i64('S'), i64(gd.Key.Down))
 	bind("qd_dash", i64(gd.Key.Space))
+	bind("qd_buy", i64('B'))
 	gd.add_action("qd_fire")
 	gd.action_add_mouse_button("qd_fire", i64(gd.Mouse_Button.Left))
 }
 
-qd_sample :: proc(user: rawptr, tick: u64, dst: rawptr) {
-	g := cast(^Quickdraw)user
-	input := cast(^Gunner_Input)dst
+@(gd_sample)
+qd_sample :: proc(self: ^Quickdraw, tick: u64, input: ^Gunner_Input) {
 	input^ = {}
-	if g.bot != "" {
-		bot_sample(g, tick, input)
+	if self.bot != "" {
+		bot_sample(self, tick, input)
 		return
 	}
-	typing := bool(gd.control_has_focus(cast(gd.Control)g.boot.chat.input, false))
+	typing := bool(gd.control_has_focus(cast(gd.Control)self.boot.chat.input, false))
 	if !typing {
 		if gd.is_action_pressed("qd_left") {input.move[0] -= 1}
 		if gd.is_action_pressed("qd_right") {input.move[0] += 1}
@@ -190,9 +211,9 @@ qd_sample :: proc(user: rawptr, tick: u64, dst: rawptr) {
 		if gd.is_action_pressed("qd_dash") {input.buttons |= BTN_DASH}
 		if gd.is_action_pressed("qd_fire") {input.buttons |= BTN_FIRE}
 	}
-	if g.me_gun != nil {
-		m := gd.canvas_item_get_global_mouse_position(cast(gd.Canvas_Item)g.owner)
-		input.aim = angle_to_wire(math.atan2(f32(m.y) - g.me_gun.y, f32(m.x) - g.me_gun.x))
+	if self.me_gun != nil {
+		m := gd.canvas_item_get_global_mouse_position(cast(gd.Canvas_Item)self.owner)
+		input.aim = angle_to_wire(math.atan2(f32(m.y) - self.me_gun.y, f32(m.x) - self.me_gun.x))
 	}
 }
 
@@ -228,7 +249,8 @@ bot_sample :: proc(g: ^Quickdraw, tick: u64, input: ^Gunner_Input) {
 	aim := f32(0)
 	if g.me_gun != nil {
 		best := f32(1e9)
-		for _, gun in g.gunners {
+		for id in gunner_ids(&g.boot) {
+			gun, _ := gunner_of(&g.boot, id)
 			if gun == g.me_gun || gun.hp <= 0 {continue}
 			dx := gun.x - g.me_gun.x // presentation truth: where MY SCREEN shows them
 			dy := gun.y - g.me_gun.y
@@ -264,56 +286,47 @@ gunner_tick_fx :: proc(g: ^Quickdraw, self: ^Gunner, fired: bool) {
 	}
 }
 
+// The buy's consequence — AUTHORITY only, at the verb's execution tick: the
+// receipt every screen can trust (the acid greps it on the marshal).
+gunner_buy_then :: proc(g: ^Quickdraw, self: ^Gunner, by: knet.Player_Id, item: u8) {
+	gd.print_str(fmt.tprintf("QD_BUY by=%d item=%d tick=%d", u64(by), item, ksim.lane_now(&g.lane)))
+}
+
 // The world pass keeps only genuinely WORLD-shaped authority work: respawns
-// and the acid's convergence probe.
-qd_step :: proc(user: rawptr, tick: u64) {
-	g := cast(^Quickdraw)user
-	if !g.ses.is_host {return}
-
-	run_respawns(g, tick)
+// and the acid's convergence probe. `authority` holds the role gate the
+// game used to open with — the lane runs this on the host alone.
+@(gd_step = "authority")
+qd_step :: proc(self: ^Quickdraw, tick: u64) {
+	run_respawns(self, tick)
 	if tick % 60 == 0 {
-		for pid, gun in g.gunners {
-			gd.print_str(fmt.tprintf("QD_POS tick=%d id=%d x=%.1f y=%.1f hp=%d", tick, u32(pid), gun.x, gun.y, gun.hp))
-		}
-	}
-}
-
-// The lag-comp probe's world view (package-scope: no closures on the wire path).
-Shot_Ctx :: struct {
-	g:       ^Quickdraw,
-	shooter: knet.Net_Id,
-	sx, sy:  f32,
-	dx, dy:  f32,
-	best:    f32,
-	victim:  knet.Net_Id,
-}
-
-shot_probe :: proc(user: rawptr) {
-	c := cast(^Shot_Ctx)user
-	// Inside lane_rewound every OTHER gunner stands where the SHOOTER saw it.
-	for id, gun in c.g.gunners {
-		if id == c.shooter || gun.hp <= 0 {continue}
-		t := ray_body(c.sx, c.sy, c.dx, c.dy, gun.x, gun.y, c.best)
-		if t < c.best {
-			c.best = t
-			c.victim = id
+		for id in gunner_ids(&self.boot) {
+			gun, _ := gunner_of(&self.boot, id)
+			gd.print_str(fmt.tprintf("QD_POS tick=%d id=%d x=%.1f y=%.1f hp=%d gear=%d gold=%d", tick, u32(id), gun.x, gun.y, gun.hp, gun.gear, gun.gold))
 		}
 	}
 }
 
 adjudicate_shot :: proc(g: ^Quickdraw, shooter_id: knet.Net_Id, gun: ^Gunner, pid: knet.Player_Id, a: f32, tick: u64) {
-	ctx := Shot_Ctx{
-		g       = g,
-		shooter = shooter_id,
-		sx      = gun.x,
-		sy      = gun.y,
-		dx      = math.cos(a),
-		dy      = math.sin(a),
-		best    = shot_wall_limit(gun.x, gun.y, a),
+	sx, sy := gun.x, gun.y // the shooter's own pose stays live either way
+	dx, dy := math.cos(a), math.sin(a)
+	best := shot_wall_limit(sx, sy, a)
+	victim := knet.Net_Id(0)
+
+	// Between begin and end every OTHER gunner stands where the SHOOTER's
+	// screen showed them — the hit test is written right here, no context
+	// struct across a rawptr. judge_live (the QD_NOREWIND acid knob) lives
+	// in Lane_Config — one call, no fork, on or off.
+	judged := ksim.lane_rewound_begin(&g.lane, pid)
+	for id in gunner_ids(&g.boot) {
+		target, _ := gunner_of(&g.boot, id)
+		if id == shooter_id || target.hp <= 0 {continue}
+		t := ray_body(sx, sy, dx, dy, target.x, target.y, best)
+		if t < best {
+			best = t
+			victim = id
+		}
 	}
-	// judge_live (the QD_NOREWIND acid knob) lives in Lane_Config now — one
-	// call, no fork, on or off.
-	judged := ksim.lane_rewound(&g.lane, pid, &ctx, shot_probe)
+	ksim.lane_rewound_end(&g.lane)
 
 	// The tracer + the verdict reach every screen as STATE (the delta lane).
 	gun.shot_seq += 1
@@ -321,15 +334,17 @@ adjudicate_shot :: proc(g: ^Quickdraw, shooter_id: knet.Net_Id, gun: ^Gunner, pi
 	g.shot_count += 1
 	gd.print_str(fmt.tprintf("QD_SHOT by=%d tick=%d judged=%d", u64(pid), tick, judged))
 
-	if ctx.victim == 0 {return}
-	victim := g.gunners[ctx.victim]
-	victim.hp -= 1
-	gd.print_str(fmt.tprintf("QD_HIT by=%d on=%d hp=%d", u64(pid), u64(g.owner_pid[ctx.victim]), victim.hp))
-	if victim.hp <= 0 {
+	if victim == 0 {return}
+	hit, _ := gunner_of(&g.boot, victim)
+	vpid := kboot.boot_entity_owner(&g.boot, victim)
+	hit.hp -= 1
+	gd.print_str(fmt.tprintf("QD_HIT by=%d on=%d hp=%d", u64(pid), u64(vpid), hit.hp))
+	if hit.hp <= 0 {
 		ksess.session_stat_add(&g.ses, pid, g.kills_col, 1)
-		ksess.session_stat_add(&g.ses, g.owner_pid[ctx.victim], g.deaths_col, 1)
-		append(&g.respawns, Respawn{id = ctx.victim, at = tick + RESPAWN_TICKS})
-		gd.print_str(fmt.tprintf("QD_KILL by=%d on=%d", u64(pid), u64(g.owner_pid[ctx.victim])))
+		ksess.session_stat_add(&g.ses, vpid, g.deaths_col, 1)
+		gun.gold += 1 // the bounty — the shop's purse fills authority-side
+		append(&g.respawns, Respawn{id = victim, at = tick + RESPAWN_TICKS})
+		gd.print_str(fmt.tprintf("QD_KILL by=%d on=%d", u64(pid), u64(vpid)))
 	}
 }
 
@@ -344,7 +359,7 @@ run_respawns :: proc(g: ^Quickdraw, tick: u64) {
 		}
 		id := g.respawns[i].id
 		ordered_remove(&g.respawns, i)
-		gun, ok := g.gunners[id]
+		gun, ok := gunner_of(&g.boot, id)
 		if !ok {continue}
 		spot := SPAWNS[int(gun.pid) % len(SPAWNS)]
 		gun.x = spot[0]

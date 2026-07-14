@@ -564,5 +564,7 @@ the command loop that already exists.
   should key on.
 
 See also: [kit/net](net.md) (the core underneath), [kit/netgd](netgd.md) (the transport
-binding), [kit/comms](comms.md), [kit/combat](combat.md), [kit/items](items.md),
-[kit/ui](ui.md), [kit/save](save.md), [kit/steamgd](steamgd.md).
+binding), [kit/sim](sim.md) (the server-authority resim lane — everything on this page,
+identity through moderation, works unchanged beside it), [kit/comms](comms.md),
+[kit/combat](combat.md), [kit/items](items.md), [kit/ui](ui.md), [kit/save](save.md),
+[kit/steamgd](steamgd.md).

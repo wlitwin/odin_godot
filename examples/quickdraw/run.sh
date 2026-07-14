@@ -27,23 +27,33 @@ if grep -qE "signal 11|must be overridden|Required virtual" "$ELOG"; then
 fi
 echo "quickdraw: editor-open smoke clean"
 
-# ---- (2) the solo loop: one orbiting bot, shots into empty air ----
+# ---- (2) the solo loop: one orbiting bot, shots into empty air, and THE
+# SHOP: QD_GOLD seeds a one-boot purse, the bot buys at its first frame (a
+# tick-scheduled verb on the authority's own seat), and a second buy never
+# lands — gear guards it locally, the empty purse guards it after.
 SLOG="$(mktemp)"; trap 'rm -f "$ELOG" "$SLOG"' EXIT
 set +e
-QD_ROLE=single QD_BOT=orbit QD_TOKEN=901 \
+QD_ROLE=single QD_BOT=orbit QD_TOKEN=901 QD_GOLD=1 \
     "$GODOT" --headless --path "$PROJ" --quit-after 900 >"$SLOG" 2>&1
 set -e
 
 ok=1
-for want in "QD_HOSTING" "QD_WORLD_UP" "QD_STARTED" "QD_FIRE" "QD_SHOT by=1"; do
+for want in "QD_HOSTING" "QD_WORLD_UP" "QD_STARTED" "QD_FIRE" "QD_SHOT by=1" \
+            "QD_BUY by=1 item=1" "gear=1 gold=0"; do
     grep -q "$want" "$SLOG" || { echo "missing: $want"; ok=0; }
 done
+if (($(grep -c "QD_BUY by=" "$SLOG" || true) != 1)); then
+    echo "quickdraw: the shop sold other than exactly once"; ok=0
+fi
+if grep -q "gear=0 gold=1" "$SLOG" && ! grep -q "gear=1 gold=0" "$SLOG"; then
+    echo "quickdraw: the purse never became boots"; ok=0
+fi
 if grep -qE "SCRIPT ERROR|signal 11" "$SLOG"; then
     echo "quickdraw: runtime errors in the solo log"; ok=0
 fi
 
 if ((ok==1)); then
-    echo "QUICKDRAW_SINGLE_OK proved: headless sim-lane loop — tick, world pass, rewound shot, solo"
+    echo "QUICKDRAW_SINGLE_OK proved: headless sim-lane loop — tick, world pass, rewound shot, one bought boot, solo"
     exit 0
 fi
 tail -n 40 "$SLOG"
