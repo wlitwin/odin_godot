@@ -388,6 +388,10 @@ Command_Info :: struct {
 	payload_count: int,
 	then_proc:     string,
 	then_game:     string,
+	// `<proc>_apply` (SIM-lane verbs only): the predicted-effect half resims
+	// RE-RUN with the ledgered wire args — exact relative effects where the
+	// recorded-bytes patch would re-pin stale absolutes. "" = patch mode.
+	apply_proc:    string,
 }
 
 // An `entity=Name:id` declaration on an exported PackedScene field — one row
@@ -1157,6 +1161,7 @@ main :: proc() {
 	for &pend in pending {
 		resolve_then(&pend.script, &then_idx)
 		resolve_tick_then(&pend.script, &then_idx)
+		resolve_command_applies(&pend.script, &then_idx)
 		resolve_entities(&pend.script, by_struct, &seen_entity_ids, &then_idx)
 		resolve_census(&pend.script, proc_names)
 		resolve_boot_forwards(&pend.script)

@@ -106,6 +106,32 @@ ball_tick :: proc(self: ^Ball) -> (scored: u8) {
 	return
 }
 
+// THE SPIKE — a tick-scheduled verb on a CONTESTED entity, showcased: any
+// kicker in reach slams the ball away from where they stand. Everything the
+// world pass's held-kick contact isn't: DISCRETE (a press), REJECTABLE (out
+// of reach, dead ball — the predicate arbitrates two same-tick spikes by
+// execution order), and RELATIVE — so the impulse lives in the _apply half,
+// which resims re-run with the ledgered args against corrected state. The
+// position args are the issuer's own screen's (the door_toggle pattern);
+// bursts inside one RTT ride the pending chain.
+@(gd_command)
+ball_spike :: proc(self: ^Ball, px, py: f32) -> bool {
+	if self.won != 0 || self.hold > 0 {return false}
+	dx := self.x - px
+	dy := self.y - py
+	if dx * dx + dy * dy > SPIKE_REACH * SPIKE_REACH {return false}
+	return true
+}
+
+ball_spike_apply :: proc(self: ^Ball, px, py: f32) {
+	dir := normalized({self.x - px, self.y - py})
+	if dir.x == 0 && dir.y == 0 {
+		dir = {1, 0} // dead-center spike: pick a lane, deterministically
+	}
+	self.vx += dir.x * SPIKE_POWER
+	self.vy += dir.y * SPIKE_POWER
+}
+
 ball_process :: proc(self: ^Ball, delta: f64) {
 	if !self.placed {
 		self.placed = true

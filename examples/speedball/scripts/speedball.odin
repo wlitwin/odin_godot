@@ -52,8 +52,11 @@ Speedball :: struct {
 	// Presentation edges + the acid's probes.
 	seen_l, seen_r, seen_won: u8,
 	auto_peers: int,
-	bot:        string, // SPB_BOT: "" | "striker" | "idle"
+	bot:        string, // SPB_BOT: "" | "striker" | "spiker" | "idle"
 	done:       bool,
+	spiked:     bool, // the spiker's one burst fired (two verbs, one RTT — the chain)
+	spike_seen: bool, // the acid's local-effect edge landed
+	spike_from: [2]f32, // where the ball stood at issue — displacement proves the local apply
 }
 
 now_s :: knet.now_s
@@ -103,6 +106,37 @@ speedball_ready :: proc(self: ^Speedball) {
 speedball_process :: proc(self: ^Speedball, delta: f64) {
 	if !self.running {return}
 	events, _, _ := kboot.boot_pump(&self.boot, delta, now_s())
+
+	// THE SPIKE DOOR — a verb on the contested ball, issued like any command
+	// (a key edge, or the spiker bot's one two-verb burst — two schedules
+	// inside one RTT, riding the pending chain). The displacement watch is
+	// the acid's proof that MY screen's ball answered within a tick or two,
+	// a full round trip before the authority's word could return.
+	if self.me_kick != nil && self.ball != nil {
+		b := self.ball
+		want := gd.is_action_just_pressed("spb_spike")
+		if self.bot == "spiker" && !self.spiked && b.hold == 0 && b.won == 0 {
+			dx := b.x - self.me_kick.x
+			dy := b.y - self.me_kick.y
+			want = want || dx * dx + dy * dy < SPIKE_REACH * SPIKE_REACH
+		}
+		if want && ball_spike_cmd(&self.lane, b, self.me_kick.x, self.me_kick.y) {
+			if !self.spiked {
+				self.spiked = true
+				self.spike_from = {b.x, b.y}
+				_ = ball_spike_cmd(&self.lane, b, self.me_kick.x, self.me_kick.y) // the burst's second verb
+				gd.print_str(fmt.tprintf("SPB_SPIKE_SENT tick=%d", ksim.lane_now(&self.lane)))
+			}
+		}
+		if self.spiked && !self.spike_seen {
+			dx := b.x - self.spike_from[0]
+			dy := b.y - self.spike_from[1]
+			if dx * dx + dy * dy > 12 * 12 {
+				self.spike_seen = true
+				gd.print_str(fmt.tprintf("SPB_SPIKE_LOCAL tick=%d", ksim.lane_now(&self.lane)))
+			}
+		}
+	}
 
 	if !self.started && self.ses.is_host && self.auto_peers > 0 &&
 	   ksess.session_count(&self.ses, connected_only = true, players_only = true) >= self.auto_peers {
@@ -181,6 +215,7 @@ install_controls :: proc "contextless" () {
 	bind("spb_up", i64('W'), i64(gd.Key.Up))
 	bind("spb_down", i64('S'), i64(gd.Key.Down))
 	bind("spb_kick", i64(gd.Key.Space))
+	bind("spb_spike", i64('E'))
 }
 
 @(gd_sample)
@@ -205,6 +240,14 @@ sp_sample :: proc(self: ^Speedball, tick: u64, input: ^Kicker_Input) {
 // never anti-phase around the reach edge); otherwise it loops to the far
 // side first. Production sample path, no side doors.
 bot_sample :: proc(g: ^Speedball, tick: u64, input: ^Kicker_Input) {
+	// The spiker: walk at the ball it predicts, never kick — its one move is
+	// the verb burst (speedball_process), fired the moment the ball's in reach.
+	if g.bot == "spiker" && g.me_kick != nil && g.ball != nil && !g.spiked {
+		steer := normalized({g.ball.x - g.me_kick.x, g.ball.y - g.me_kick.y})
+		if steer.x > 0.3 {input.move[0] = 1} else if steer.x < -0.3 {input.move[0] = -1}
+		if steer.y > 0.3 {input.move[1] = 1} else if steer.y < -0.3 {input.move[1] = -1}
+		return
+	}
 	if g.bot != "striker" || g.me_kick == nil || g.ball == nil {return}
 	me := g.me_kick
 	b := g.ball
@@ -326,6 +369,12 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 }
 
 // ---- the goal's consequence: authority only, name-paired ------------------------
+
+// The spike's receipt — AUTHORITY only, at the verb's execution tick (the
+// acid counts these on the marshal: the burst must land exactly twice).
+ball_spike_then :: proc(g: ^Speedball, self: ^Ball, by: knet.Player_Id, px, py: f32) {
+	gd.print_str(fmt.tprintf("SPB_SPIKE by=%d tick=%d", u64(by), ksim.lane_now(&g.lane)))
+}
 
 ball_tick_then :: proc(g: ^Speedball, self: ^Ball, by: knet.Player_Id, scored: u8) {
 	if scored == 0 {return}

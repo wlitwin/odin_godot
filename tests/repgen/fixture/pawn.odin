@@ -101,6 +101,13 @@ pawn_hit :: proc(self: ^Pawn, amount: i32) -> bool {
 	return true
 }
 
+// The verb's PREDICTED-EFFECT half (sim-lane verbs only): resims re-run it
+// with the ledgered wire args — relative effects stay exact. The verb above
+// keeps the predicate and the delta-lane write, execute-once.
+pawn_hit_apply :: proc(self: ^Pawn, amount: i32) {
+	self.px += f32(amount) // knockback: relative, the patch can't express it
+}
+
 // Host-only command (no predict): string + id args exercise the wider wire types.
 @(gd_command)
 pawn_mark :: proc(self: ^Pawn, label: string, who: knet.Player_Id) -> bool {

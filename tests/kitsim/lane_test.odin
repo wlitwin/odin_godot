@@ -353,6 +353,186 @@ lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 	testing.expect(t, near(alice.movers[10].x, 50), "the watched view carried the verb") // blended
 }
 
+// Patch-mode, ungated: a relative nudge (chain-test filler).
+mover_dash_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool {
+	m := cast(^Mover)entity
+	m.x += 25
+	return true
+}
+
+// Apply-mode pair: the verb keeps the predicate + the delta write (execute
+// once); the apply half carries the RELATIVE predicted effect and is what
+// resims re-run. The exec calls the apply on success — the generated
+// thunks' contract, mimicked by hand here.
+mover_boost_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool {
+	m := cast(^Mover)entity
+	if m.hp <= 0 {return false}
+	m.hp -= 1
+	mover_boost_apply(entity, args, lane)
+	return true
+}
+mover_boost_apply :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane) {
+	m := cast(^Mover)entity
+	m.x += 50 // relative — exactly what recorded-bytes replay can't express
+}
+
+@(test)
+lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	cmds := [?]ksim.Sim_Cmd{{exec = mover_surge_exec}, {exec = mover_dash_exec}}
+	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds[:]}
+	set_c := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds[:], contested = true}
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
+	ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
+	for b in boxes {
+		for id in ([]knet.Net_Id{10, 30}) {
+			m := new(Mover)
+			b.movers[id] = m
+			b.owners[id] = 1 // both the host's — 30 is CONTESTED, 10 is not
+			ksim.lane_track_set(&b.lane, id, m, id == 30 ? &set_c : &set, 1)
+		}
+	}
+
+	DT :: 1.0 / 60.0
+	settle :: proc(boxes: []^Lane_Box, frames: int) {
+		for _ in 0 ..< frames {
+			ksim.lane_frame(&boxes[0].lane, DT)
+			lane_pump(boxes)
+			ksim.lane_frame(&boxes[1].lane, DT)
+			ksim.lane_present(&boxes[1].lane, DT)
+			lane_pump(boxes)
+		}
+	}
+	near :: proc(a, b: f32) -> bool {return abs(a - b) < 0.01}
+	settle(boxes, 60)
+
+	// Not contested, not mine: the gate holds.
+	testing.expect(t, !ksim.lane_command(&alice.lane, 10, 0, nil), "a host-owned entity refuses a client's verb")
+
+	// CONTESTED: any seat's verb speculates on its own predicted timeline.
+	host.movers[30].hp = 1
+	alice.movers[30].hp = 1
+	testing.expect(t, ksim.lane_command(&alice.lane, 30, 0, nil), "a contested entity takes any seat's verb")
+	ksim.lane_frame(&alice.lane, DT)
+	testing.expect_value(t, alice.movers[30].x, f32(50)) // before any round trip
+	testing.expect_value(t, host.movers[30].x, f32(0))
+	lane_pump(boxes)
+	settle(boxes, 90)
+	testing.expect_value(t, host.movers[30].x, f32(50))
+	testing.expect(t, near(alice.movers[30].x, 50), "the contested verb converged")
+
+	// THE CHAIN: two verbs in flight; the FIRST is rejected on divergent
+	// state, the second survives — the unwind must not clobber it.
+	alice.movers[30].hp = 1 // stale purse: the authority's is spent
+	testing.expect(t, ksim.lane_command(&alice.lane, 30, 0, nil), "surge schedules on stale state")
+	testing.expect(t, ksim.lane_command(&alice.lane, 30, 1, nil), "a second verb queues behind it")
+	ksim.lane_frame(&alice.lane, DT)
+	testing.expect_value(t, alice.movers[30].x, f32(125)) // 50 kept + 50 spec + 25 spec
+	testing.expect_value(t, alice.movers[30].hp, i32(0))
+	lane_pump(boxes)
+	settle(boxes, 90)
+	testing.expect_value(t, host.movers[30].x, f32(75)) // truth: dash only
+	testing.expect_value(t, host.movers[30].hp, i32(0))
+	testing.expect(t, near(alice.movers[30].x, 75), "the rejected surge scrubbed; the dash survived")
+	testing.expect_value(t, alice.movers[30].hp, i32(1)) // the unwound stale purse
+}
+
+@(test)
+lane_apply_verbs_ride_resims :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	cmds := [?]ksim.Sim_Cmd{{exec = mover_boost_exec, apply = mover_boost_apply}}
+	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds[:]}
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
+	ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
+	for b in boxes {
+		m := new(Mover)
+		b.movers[20] = m
+		b.owners[20] = 2
+		ksim.lane_track_set(&b.lane, 20, m, &set, 2)
+	}
+
+	DT :: 1.0 / 60.0
+	near :: proc(a, b: f32) -> bool {return abs(a - b) < 0.01}
+	for _ in 0 ..< 60 {
+		ksim.lane_frame(&host.lane, DT)
+		lane_pump(boxes)
+		ksim.lane_frame(&alice.lane, DT)
+		ksim.lane_present(&alice.lane, DT)
+		lane_pump(boxes)
+	}
+	host.movers[20].hp = 1
+	alice.movers[20].hp = 1
+
+	// Issue INTO a blackout: the verb and ten frames of traffic sit HELD
+	// (reliable = delayed, never lost — the pipe has no retransmit to model
+	// loss with) while alice keeps simulating. The server executes the late
+	// verb at ITS next tick — the reschedule path — and every replay re-RUNS
+	// the apply half against corrected state instead of re-pinning bytes.
+	testing.expect(t, ksim.lane_command(&alice.lane, 20, 0, nil), "the boost schedules")
+	for _ in 0 ..< 10 {
+		alice.ax = 1 // moving through the blackout: corrections will cross the verb tick
+		ksim.lane_frame(&alice.lane, DT)
+		ksim.lane_present(&alice.lane, DT)
+		ksim.lane_frame(&host.lane, DT)
+		// no pumping: both queues accumulate and land in one late burst
+	}
+	testing.expect_value(t, alice.movers[20].hp, i32(0)) // the delta half, once
+	alice.ax = 0
+	for _ in 0 ..< 120 {
+		ksim.lane_frame(&host.lane, DT)
+		lane_pump(boxes)
+		ksim.lane_frame(&alice.lane, DT)
+		ksim.lane_present(&alice.lane, DT)
+		lane_pump(boxes)
+	}
+	testing.expect_value(t, host.movers[20].hp, i32(0))
+	testing.expect(t, near(alice.movers[20].x, host.movers[20].x), "the relative apply converged exactly through the blackout")
+	testing.expect(t, host.movers[20].x >= 50, "the boost is in the truth")
+
+	// An empty purse says no on both timelines — apply never fires.
+	before := host.movers[20].x
+	testing.expect(t, ksim.lane_command(&alice.lane, 20, 0, nil), "a rejectable boost still schedules")
+	for _ in 0 ..< 90 {
+		ksim.lane_frame(&host.lane, DT)
+		lane_pump(boxes)
+		ksim.lane_frame(&alice.lane, DT)
+		ksim.lane_present(&alice.lane, DT)
+		lane_pump(boxes)
+	}
+	testing.expect_value(t, host.movers[20].x, before)
+	testing.expect(t, near(alice.movers[20].x, before), "the second boost moved nothing")
+}
+
 @(test)
 lane_auto_tick_drives_entities :: proc(t: ^testing.T) {
 	desc := mover_desc()

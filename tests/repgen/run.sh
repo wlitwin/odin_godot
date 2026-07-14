@@ -80,7 +80,6 @@ for needle in \
 	'_pawn_simcmd_hit :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool' \
 	'_a0 := knet.read_i32(&r)' \
 	'if r.err {return false}' \
-	'{exec = _pawn_simcmd_hit}' \
 	'{exec = _pawn_simcmd_mark}' \
 	'pawn_command_set := knet.Command_Set{entity_desc = &pawn_net_desc' \
 	'pawn_hit_cmd :: proc(l: ^ksim.Lane, self: ^Pawn, amount: i32) -> bool' \
@@ -90,6 +89,9 @@ for needle in \
 	'_ok, _p0 := pawn_loot(self, _a0)' \
 	'if _ok && ksim.lane_is_authority(lane) {' \
 	'pawn_loot_then(self, by, _a0, _p0)' \
+	'if _ok {pawn_hit_apply(self, _a0)}' \
+	'_pawn_simcmd_hit_apply :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane)' \
+	'{exec = _pawn_simcmd_hit, apply = _pawn_simcmd_hit_apply}' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
 		echo "REPGEN_FAIL: generated file is missing sim-command artifact: $needle"
@@ -492,6 +494,49 @@ if ! echo "$STK_OUT" | grep -q 'expected `authority`'; then
 	exit 1
 fi
 echo "  ok  lane-wiring violations rejected: sample/tick input mismatch, unknown step token"
+
+# ---- (4a2c): a <verb>_apply on a class that doesn't tick ----
+# The apply half is the resim's property; a coop-loop verb reverts whole.
+APL="$TMP/apl"
+mkdir -p "$APL"
+cat > "$APL/still.odin" <<'EOF'
+//gd:extends Node
+//gd:class Still
+package repgen_apl
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Still :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 `gd:"replicate"`,
+}
+
+@(gd_command)
+still_poke :: proc(self: ^Still, amount: i32) -> bool {
+	if self.hp <= 0 {return false}
+	self.hp -= amount
+	return true
+}
+
+still_poke_apply :: proc(self: ^Still, amount: i32) {
+}
+EOF
+set +e
+APL_OUT="$(run_scriptgen "$APL" 2>&1)"
+APL_RC=$?
+set -e
+if [ "$APL_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a _apply half on a non-ticking class was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$APL_OUT" | grep -q "doesn't tick"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't explain the _apply/tick contract:"
+	echo "$APL_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  a _apply half on a non-ticking class rejected at scriptgen time"
 
 # ---- (4a3): a block tick with an input param — blocks are INPUTLESS ----
 BTK="$TMP/btk"

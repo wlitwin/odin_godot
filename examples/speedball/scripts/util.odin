@@ -20,6 +20,8 @@ RUN_ACCEL :: f32(0.35) // velocity approach per tick — MOMENTUM is the
 KICK_REACH :: f32(30)
 KICK_POWER :: f32(6.5) // px/tick impulse
 KICK_CD :: u16(20)
+SPIKE_REACH :: f32(44) // the verb reaches a little past the dribble scrum
+SPIKE_POWER :: f32(5.5) // per spike; the burst doubles it (BALL_MAX ceilings)
 DRIBBLE_PUSH :: f32(1.1) // contact nudge — a push, not a shot
 DRIBBLE_MAX :: f32(3.2) // dribbling never accelerates a ball already at dribble pace
 BALL_MAX :: f32(9.0) // px/tick ceiling — slopball's lesson, ported: an uncapped

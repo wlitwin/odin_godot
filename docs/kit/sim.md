@@ -326,12 +326,34 @@ after entity thunks, before the world pass — and answers with a verdict: a
 rejection unwinds the delta-lane writes on the spot and the next reconcile
 scrubs the predicted ones, the same glide as any mispredict.
 
-Rules, enforced both ends: you may only command entities you OWN
-(predicted-self — the server drops anything else), one verb may be pending
-per entity at a time, and the wrapper returns whether it SCHEDULED — the
-verdict is state (watch the fields, or the authority's `_then`). Prefer
-absolute mutations of predicted fields in a verb (`gear = item` over
-`vx += impulse`): replays re-apply what the verb wrote, not what it meant.
+You may command entities you OWN — and CONTESTED ones, which live on your
+prediction ledger by construction: a spike on the ball speculates exactly
+like a touch does, any seat may issue it, and two same-tick verbs run in
+execution order with the predicate arbitrating (speedball's spike is the
+worked example). Watched entities can't speculate — command them from the
+authority, or promote them to contested. Bursts are fine: verbs QUEUE per
+entity, and a rejection unwinds the delta-lane speculation chain in order
+without disturbing the survivors. The wrapper returns whether it SCHEDULED
+— the verdict is state (watch the fields, or the authority's `_then`).
+
+Replays re-apply what a verb WROTE (recorded bytes), not what it meant — so
+prefer absolute mutations (`gear = item`) in the verb itself. When the
+effect is genuinely relative (an impulse, a knockback), give the verb an
+**`_apply` half**: `<verb>_apply(self, <wire args>)` holds the
+predicted-field effect, and resims RE-RUN it with the ledgered args against
+corrected state — exact where the byte patch can't be. With an apply half,
+the verb keeps its hands off predicted fields: the predicate and the
+delta-lane writes stay execute-once.
+
+```odin
+@(gd_command)
+ball_spike :: proc(self: ^Ball, px, py: f32) -> bool {
+	return self.hold == 0 && in_reach(self, px, py) // verdict + (any) delta writes
+}
+ball_spike_apply :: proc(self: ^Ball, px, py: f32) {
+	self.vx += ... // RELATIVE — re-run by every resim, never re-pinned
+}
+```
 
 ## Promoting a coop game
 

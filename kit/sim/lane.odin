@@ -140,6 +140,7 @@ Tracked :: struct {
 	tick:    Tick_Thunk, // nil = the game's Step_Proc moves this entity
 	has_in:  bool, // the thunk wants its owner's input (Sim_Set.input_size > 0)
 	cmds:    []Sim_Cmd, // tick-scheduled verbs (nil = the class declares none)
+	set:     ^Sim_Set, // the class's set (lane_track_set) — nil for hand-tracked entities
 	err:     []u8, // render-error blob (predict-subset layout), alloc'd on the first correction
 	contested: bool, // predicted here but NOT mine: presentation follows `claim`
 	claim:     f32, // 1 = my sim drives it (present predicted), decaying to 0 (present the watched view)
@@ -336,6 +337,7 @@ lane_track_set :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, set: ^Sim_Set,
 	tr.tick = set.tick
 	tr.has_in = set.input_size > 0
 	tr.cmds = set.commands
+	tr.set = set
 	if set.contested && tr.watched {
 		// Contested: this client predicts it like its own — ledger, entries,
 		// reconcile — instead of watching it from the past. PRESENTATION

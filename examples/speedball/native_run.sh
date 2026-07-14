@@ -59,7 +59,7 @@ for port in 4190 4197; do
         kill -0 "$sp" 2>/dev/null || break
         sleep 0.1; ((i++))
     done
-    wp=$(launch join idle watcher 9203 "$wlog" "$port")
+    wp=$(launch join spiker watcher 9203 "$wlog" "$port")
 
     # One goal ends it; give the duel of one a generous minute.
     i=0
@@ -83,6 +83,21 @@ for port in 4190 4197; do
         grep -q "SPB_SCORE l=0 r=1" "$log" || { echo "score edge missing in $(basename "$log")"; ok=0; }
         grep -q "SPEEDBALL_DONE" "$log" || { echo "match edge missing in $(basename "$log")"; ok=0; }
     done
+    # THE SPIKE — a verb on the contested ball from the WATCHER's seat (an
+    # entity nobody owns; owner-only died today): its two-verb burst rides
+    # the pending chain and both land on the authority; the ball answers the
+    # watcher's OWN screen within a couple ticks — a round trip is ~15.
+    grep -q "SPB_SPIKE_SENT" "$wlog" || { echo "the spiker never spiked"; ok=0; }
+    grep -q "SPB_SPIKE_LOCAL" "$wlog" || { echo "the spike never moved the spiker's own ball"; ok=0; }
+    spikes=$(grep -c "SPB_SPIKE by=3" "$mlog" || true)
+    if [ "$spikes" != "2" ]; then
+        echo "the burst landed $spikes times on the marshal (want exactly 2)"; ok=0
+    fi
+    SSENT=$(grep -m1 "SPB_SPIKE_SENT" "$wlog" | sed 's/.*tick=//')
+    SWORN=$(grep -m1 "SPB_SPIKE_LOCAL" "$wlog" | sed 's/.*tick=//')
+    if [ -n "$SSENT" ] && [ -n "$SWORN" ] && ((SWORN - SSENT > 4)); then
+        echo "the spike waited on the wire (sent $SSENT, moved $SWORN) — speculation is broken"; ok=0
+    fi
     if grep -qE "SCRIPT ERROR|signal 11|ODIN_SCRIPT_PANIC" "$mlog" "$slog" "$wlog"; then
         echo "runtime errors in the logs"; ok=0
     fi

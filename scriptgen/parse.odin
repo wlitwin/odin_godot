@@ -908,6 +908,7 @@ scan_then_procs :: proc(idx: ^map[string]Then_Candidate, path, src: string, file
 		if name_ident == nil {continue}
 		if !strings.has_suffix(name_ident.name, "_then") &&
 		   !strings.has_suffix(name_ident.name, "_fx") &&
+		   !strings.has_suffix(name_ident.name, "_apply") &&
 		   !strings.has_suffix(name_ident.name, "_spawned") &&
 		   !strings.has_suffix(name_ident.name, "_freed") {continue}
 		if pl.type == nil {continue}
@@ -1615,6 +1616,66 @@ resolve_sim :: proc(scripts: []^Script) {
 				owner.sample.proc_name, owner.sample.input_type, input_type, input_from,
 			)
 		}
+	}
+}
+
+// Pair a SIM-lane verb with its `<verb>_apply` half: the predicted-effect
+// proc resims RE-RUN with the ledgered wire args (exact relative effects —
+// an impulse — where the recorded-bytes patch would re-pin stale
+// absolutes). Shape: (self: ^T, <the verb's wire args>), no results, no
+// game param — it replays inside the tick pipeline, where only sim state
+// exists. Declaring one on a class that doesn't tick is a build error: the
+// half IS the resim's property.
+resolve_command_applies :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
+	ticks := s.tick.proc_name != "" || len(s.block_ticks) > 0
+	for &c in s.commands {
+		name := fmt.tprintf("%s_apply", c.proc_name)
+		cand, found := idx[name]
+		if !found {
+			continue
+		}
+		loc := Loc{path = cand.path, line = cand.line}
+		if !ticks {
+			error_at(
+				loc,
+				"%s pairs a TICKING class's verb — %s doesn't tick, so its commands ride the knet loop and revert whole; predicted effects need the sim lane",
+				name, s.struct_name,
+			)
+			continue
+		}
+		cand.claimed = true
+		idx[name] = cand
+		if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") || has_attr(cand.vd, "gd_tick") {
+			error_at(loc, "%s must be a plain proc — the generated verb thunk calls it, it is never registered", name)
+			continue
+		}
+		types := make([dynamic]string, context.temp_allocator)
+		if cand.pt.params != nil {
+			for f in cand.pt.params.list {
+				txt := strings.trim_space(node_text(cand.src, f.type))
+				for _ in 0 ..< max(1, len(f.names)) {
+					append(&types, txt)
+				}
+			}
+		}
+		ok := len(types) == 1 + len(c.args) && types[0] == fmt.tprintf("^%s", s.struct_name)
+		if ok {
+			for a, i in c.args {
+				if types[1 + i] != a.type_text {
+					ok = false
+					break
+				}
+			}
+		}
+		if !ok || cand.pt.results != nil {
+			error_at(
+				loc,
+				"%s: the shape is (self: ^%s, <%s's wire args>) with no results — resims re-run it with the LEDGERED args; facts belong to the verb",
+				name, s.struct_name, c.proc_name,
+			)
+			continue
+		}
+		c.apply_proc = name
 	}
 }
 

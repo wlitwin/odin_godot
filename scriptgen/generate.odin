@@ -845,6 +845,15 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 					fmt.sbprintf(b, ", _a%d", i)
 				}
 				w(b, ")\n")
+				if c.apply_proc != "" {
+					// The predicted-effect half, on the live pass — resims
+					// re-run it alone, with the ledgered args.
+					fmt.sbprintf(b, "\tif _ok {{%s(self", c.apply_proc)
+					for _, i in c.args {
+						fmt.sbprintf(b, ", _a%d", i)
+					}
+					w(b, ")}\n")
+				}
 				if c.then_proc != "" {
 					w(b, "\tif _ok && ksim.lane_is_authority(lane) {\n")
 					if c.then_game != "" {
@@ -862,10 +871,33 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 					w(b, ")\n\t}\n")
 				}
 				w(b, "\treturn _ok\n}\n\n")
+				if c.apply_proc != "" {
+					// The resim's door into the apply half: decode the
+					// LEDGERED args, re-run the effect against corrected
+					// pre-state — never the verb, never its delta writes.
+					fmt.sbprintf(b, "@(private = \"file\")\n_%s_simcmd_%s_apply :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane) {{\n", snake, c.name)
+					fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
+					if len(c.args) > 0 {
+						w(b, "\tr := knet.reader_make(args)\n")
+						for a, i in c.args {
+							fmt.sbprintf(b, "\t_a%d := knet.read_%s(&r)\n", i, a.wire)
+						}
+						w(b, "\tif r.err {return}\n")
+					}
+					fmt.sbprintf(b, "\t%s(self", c.apply_proc)
+					for _, i in c.args {
+						fmt.sbprintf(b, ", _a%d", i)
+					}
+					w(b, ")\n}\n\n")
+				}
 			}
 			fmt.sbprintf(b, "@(private = \"file\")\n_%s_sim_cmds := [?]ksim.Sim_Cmd {{\n", snake)
 			for c in s.commands {
-				fmt.sbprintf(b, "\t{{exec = _%s_simcmd_%s}},\n", snake, c.name)
+				if c.apply_proc != "" {
+					fmt.sbprintf(b, "\t{{exec = _%s_simcmd_%s, apply = _%s_simcmd_%s_apply}},\n", snake, c.name, snake, c.name)
+				} else {
+					fmt.sbprintf(b, "\t{{exec = _%s_simcmd_%s}},\n", snake, c.name)
+				}
 			}
 			w(b, "}\n\n")
 			for c, ci in s.commands {
