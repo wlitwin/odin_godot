@@ -65,14 +65,15 @@ ball_tick :: proc(self: ^Ball) -> (scored: u8) {
 	self.x += self.vx
 	self.y += self.vy
 
-	// Walls bounce; the goal mouths swallow.
+	// Walls bounce (with restitution — full-speed returns made every rally a
+	// ping-pong); the goal mouths swallow.
 	in_mouth := self.y > GOAL_TOP && self.y < GOAL_BOT
 	if self.x <= GOAL_LINE_L {
 		if in_mouth {
 			scored = 2 // the RIGHT team put it in the LEFT goal
 		} else {
 			self.x = GOAL_LINE_L
-			self.vx = -self.vx
+			self.vx = -self.vx * WALL_BOUNCE
 		}
 	}
 	if self.x >= GOAL_LINE_R {
@@ -80,16 +81,16 @@ ball_tick :: proc(self: ^Ball) -> (scored: u8) {
 			scored = 1
 		} else {
 			self.x = GOAL_LINE_R
-			self.vx = -self.vx
+			self.vx = -self.vx * WALL_BOUNCE
 		}
 	}
 	if self.y <= PITCH_WALL + BALL_R {
 		self.y = PITCH_WALL + BALL_R
-		self.vy = -self.vy
+		self.vy = -self.vy * WALL_BOUNCE
 	}
 	if self.y >= PITCH_H - PITCH_WALL - BALL_R {
 		self.y = PITCH_H - PITCH_WALL - BALL_R
-		self.vy = -self.vy
+		self.vy = -self.vy * WALL_BOUNCE
 	}
 
 	if scored != 0 {

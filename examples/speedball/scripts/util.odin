@@ -22,6 +22,8 @@ BALL_MAX :: f32(9.0) // px/tick ceiling — slopball's lesson, ported: an uncapp
 	// contact-per-tick push compounds into a wall-ricocheting blur that reads
 	// as jitter on every screen (the truth itself thrashes)
 FRICTION :: f32(0.985) // ball velocity retained per tick
+WALL_BOUNCE :: f32(0.55) // restitution — walls eat energy, so a kicked ball
+	// doesn't ping-pong back at full speed into the foot that sent it
 KICKOFF_HOLD :: u16(72) // ~1.2s frozen at center after a goal
 
 GOAL_TOP :: f32(130)

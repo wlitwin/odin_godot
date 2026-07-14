@@ -264,18 +264,29 @@ sp_step :: proc(user: rawptr, tick: u64) {
 			ksim.lane_claim(&g.lane, b.net_id)
 		}
 
-		// Dribble: walking through the ball nudges it along — capped, so a
-		// per-contact-tick push can never compound past dribble pace
-		// (slopball's cap, ported; without it the ball exits a one-second
-		// chase at 30+ px/tick and ricochets like static).
+		// Dribble: SOFT contact. Resolve half the overlap per tick along a
+		// STABLE direction, and nudge velocity along the KICKER'S MOTION —
+		// not center-to-center, which flips sign frame-to-frame in a deep
+		// overlap and teleported the ball to alternating sides of your feet
+		// (the "erratic bump" of the first playtest). Capped, so contact
+		// never compounds past dribble pace.
 		reach := KICKER_R + BALL_R
 		if d2 < reach * reach {
-			push := normalized({dx, dy})
-			b.x = k.x + push.x * reach
-			b.y = k.y + push.y * reach
-			if b.vx * b.vx + b.vy * b.vy < DRIBBLE_MAX * DRIBBLE_MAX {
-				b.vx += push.x * DRIBBLE_PUSH
-				b.vy += push.y * DRIBBLE_PUSH
+			dist := sqrt_f32(d2)
+			sep: gd.Vector2
+			if dist > 0.5 {
+				sep = {dx / dist, dy / dist}
+			} else {
+				sep = normalized({k.vx, k.vy}) // coincident: shove along my motion
+				if sep.x == 0 && sep.y == 0 {sep = {1, 0}}
+			}
+			overlap := reach - dist
+			b.x += sep.x * overlap * 0.5
+			b.y += sep.y * overlap * 0.5
+			mv := normalized({k.vx, k.vy})
+			if (mv.x != 0 || mv.y != 0) && b.vx * b.vx + b.vy * b.vy < DRIBBLE_MAX * DRIBBLE_MAX {
+				b.vx += mv.x * DRIBBLE_PUSH
+				b.vy += mv.y * DRIBBLE_PUSH
 			}
 		}
 
