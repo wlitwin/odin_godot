@@ -103,6 +103,15 @@ Lane_Config :: struct {
 	smooth_cut: f32, // an error component past this is a deliberate cut and SNAPS, world units (0 = never cut)
 	judge_live: bool, // A/B knob: lane_rewound queries the LIVE world instead of rewinding —
 	                  // feel lag comp by turning it off; never a game-code fork
+	// PREDICT-WORLD (the Rocket League model): batches echo every player's
+	// last-known input, and clients tick contested entities owned by REMOTE
+	// players with those held inputs — one timeline for everything, no claim
+	// dance, constant small glided corrections instead of delayed-but-
+	// accurate remote views. Mark the avatars @(gd_tick="contested") too.
+	// Costs: resim on nearly every batch (held inputs drift), a few bytes of
+	// echo per player per batch. Compile-time config: every peer of a game
+	// agrees by construction.
+	echo_inputs: bool,
 }
 
 // Host-side per-player state, created on a player's first input packet.
@@ -141,6 +150,8 @@ Lane :: struct {
 	smooth_halflife: f64,
 	smooth_cut:      f32,
 	judge_live:      bool,
+	echo_on:         bool,
+	echo:            map[knet.Player_Id][]u8, // last-known input per REMOTE player (predict-world)
 	ticker:          Sim_Ticker,
 
 	user:            rawptr,
@@ -191,6 +202,8 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 	l.smooth_halflife = cfg.smooth_halflife > 0 ? cfg.smooth_halflife : 0.063
 	l.smooth_cut = cfg.smooth_cut
 	l.judge_live = cfg.judge_live
+	l.echo_on = cfg.echo_inputs
+	l.echo = make(map[knet.Player_Id][]u8, allocator)
 	l.ticker = sim_ticker_make(hz)
 	l.tracked = make([dynamic]Tracked, allocator)
 	l.entries = make([dynamic]Entry, allocator)
@@ -223,6 +236,10 @@ lane_destroy :: proc(l: ^Lane) {
 		free(p)
 	}
 	delete(l.peers)
+	for _, blob in l.echo {
+		delete(blob)
+	}
+	delete(l.echo)
 	delete(l.scratch)
 }
 
@@ -415,6 +432,14 @@ lane_input :: proc(l: ^Lane, player: knet.Player_Id) -> (input: []u8, ok: bool) 
 			return p.buf.held, p.fresh
 		}
 	}
+	if l.echo_on {
+		// Predict-world: a remote player's LAST-KNOWN input (the batch echo)
+		// — held, never fresh; the extrapolation every peer ticks remotes
+		// with, corrected by the next batch's truth.
+		if held, found := l.echo[player]; found {
+			return held, false
+		}
+	}
 	return nil, false
 }
 
@@ -514,8 +539,36 @@ snap_broadcast :: proc(l: ^Lane, tick: u64) {
 		w := ksess.session_app_begin(l.ses, l.tag)
 		knet.write_u8(w, SIM_SNAP)
 		snap_write(w, l.entries[:], tick, acked, input_ack)
+		if l.echo_on {
+			echo_write(l, w, tick)
+		}
 		ksess.session_app_flush(l.ses, p.peer, .Stream)
 	}
+}
+
+// The predict-world rider: every player's input AS THE SERVER SIMULATED IT
+// this tick (its own from the ring, each peer's from the hold-last buffer),
+// appended after the batch rows — [count u8] count × [player u64][bytes].
+// Clients tick remote contested entities from these held inputs, which is
+// what puts every avatar on one predicted timeline.
+@(private = "file")
+echo_write :: proc(l: ^Lane, w: ^knet.Writer, tick: u64) {
+	count_at := len(w.buf)
+	knet.write_u8(w, 0)
+	count := 0
+	if l.sample != nil {
+		if blob, ok := input_read(&l.ring, tick); ok {
+			knet.write_player_id(w, l.ses.me)
+			append(&w.buf, ..blob)
+			count += 1
+		}
+	}
+	for pid, p in l.peers {
+		knet.write_player_id(w, pid)
+		append(&w.buf, ..p.buf.held)
+		count += 1
+	}
+	w.buf[count_at] = u8(count)
 }
 
 @(private = "file")
@@ -585,6 +638,28 @@ client_ingest :: proc(l: ^Lane) {
 	truths := make([dynamic]Truth, context.temp_allocator)
 	r := knet.reader_make(l.pending[:])
 	tick, input_ack, _ := snap_rx_apply(&l.rx, &r, &truths)
+	if tick != 0 && l.echo_on {
+		// The predict-world rider follows the rows: last-known inputs for
+		// every player, last-value by batch (older batches already dropped).
+		ec := int(knet.read_u8(&r))
+		for _ in 0 ..< ec {
+			pid := knet.read_player_id(&r)
+			if r.err || r.off + l.ring.size > len(r.data) {
+				break
+			}
+			blob := r.data[r.off:r.off + l.ring.size]
+			r.off += l.ring.size
+			if pid == l.ses.me {
+				continue // my inputs live in my ring
+			}
+			held, ok := l.echo[pid]
+			if !ok {
+				held = make([]u8, l.ring.size)
+				l.echo[pid] = held
+			}
+			copy(held, blob)
+		}
+	}
 	clear(&l.pending)
 	l.pending_tick = 0
 	if tick == 0 {
@@ -867,6 +942,13 @@ lane_present :: proc(l: ^Lane, dt: f64) {
 			continue
 		}
 		if tr.contested {
+			// PREDICT-WORLD (echo mode): one timeline — every contested
+			// entity presents its predicted pose (glide included), because
+			// every avatar that could touch it is predicted too. The claim
+			// dance exists only for MIXED timelines.
+			if l.echo_on {
+				continue
+			}
 			// The claim-weighted timeline. Fully mine: the predicted pose
 			// (already in the fields, glide included) stands — your dribble
 			// answers your feet. Unclaimed: the watched view, so a REMOTE

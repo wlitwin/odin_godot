@@ -25,11 +25,14 @@ sim crosses the line), while the SCORE is authority-only (`ball_tick_then`,
 delta lane). The world pass is pure sim — contact and kicks for whichever
 kicker⟷ball pairs this peer has inputs for, no role gates anywhere.
 
-And the pattern's finishing move, `lane_claim`: the ball's SIM is predicted
-everywhere, but its PRESENTATION follows the claim — near your kicker it
-draws from your predicted timeline (your touches answer your feet); loose,
-it draws the watched view, so an opponent's kick moves it beside their
-rendered avatar instead of a whole lead early.
+And the full send: speedball runs PREDICT-WORLD (`echo_inputs` — the Rocket
+League model). The kickers are `contested` too, batches echo every player's
+held input, and every peer simulates the whole pitch on one predicted
+timeline — your touches answer your feet, an opponent's tackle plays out
+beside their avatar immediately, and the server's word arrives as small
+glided corrections. (The claim-weighted middle path — predict only the
+ball, watch the players — remains in the lane for games that want it; see
+docs/kit/sim.md's contested section for when to pick which.)
 
 ```sh
 bash build/build_scripts.sh examples/speedball

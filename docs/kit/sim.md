@@ -210,6 +210,19 @@ Two rules keep the pattern honest:
   otherwise ship: predicted ball, past-rendered players, one screen). The
   claim rises instantly, decays over ~a quarter second — net.md's "did MY
   simulation cause this?" boolean, asked continuously.
+- **Or go all the way: PREDICT-WORLD** (`Lane_Config.echo_inputs`, the
+  Rocket League model — what speedball ships). Batches echo every player's
+  held input; mark the AVATARS `contested` too and every peer ticks every
+  entity — remote ones extrapolated with held inputs — so the whole scene
+  lives on ONE predicted timeline. No claim dance at all (contested
+  presentation is simply the predicted pose), remote touches play out beside
+  the avatars making them, immediately. The price: resim on nearly every
+  batch (held inputs drift — small, constant, glided corrections on remote
+  avatars instead of delayed-but-accurate ones) and a few echo bytes per
+  player per batch. Pick per game: predict-world for contact-driven games,
+  predict-self + lag comp where accurate rendered targets matter (quickdraw
+  keeps hitscan honest by NOT extrapolating its targets). The claim-mode
+  rules below serve games that predict only the object.
 - **The claim follows the CAUSE, and releases when the cause ends.** Your
   kick's whole FLIGHT is your simulation's consequence — keep claiming while
   the ball is fast from your touch, and release when it SLOWS (the two

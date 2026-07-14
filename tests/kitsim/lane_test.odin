@@ -577,6 +577,66 @@ lane_contested_presents_on_the_claim :: proc(t: ^testing.T) {
 	testing.expect(t, gap_claimed >= -30, "bounded by the lead, not runaway")
 }
 
+// PREDICT-WORLD (echo mode): batches carry every player's held input, so a
+// client ticks a REMOTE-owned contested entity every tick with them — one
+// timeline, presentation = predicted pose, legitimately front-running the
+// server instead of trailing a watched view.
+@(test)
+lane_echo_extrapolates_remote_avatars :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	set_c := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, contested = true}
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2, echo_inputs = true}
+	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
+	ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
+	for b in boxes {
+		m := new(Mover)
+		b.movers[10] = m
+		b.owners[10] = 1 // the HOST's avatar — remote from alice's seat
+		ksim.lane_track_set(&b.lane, 10, m, &set_c, 1)
+	}
+
+	DT :: 1.0 / 60.0
+	moved_frames := 0
+	prev := f32(0)
+	gap := f32(0)
+	for i in 1 ..= 190 {
+		host.ax = 1 // the echoed held input alice extrapolates with
+		alice.ax = 0
+		ksim.lane_frame(&host.lane, DT)
+		lane_pump(boxes)
+		ksim.lane_frame(&alice.lane, DT)
+		ksim.lane_present(&alice.lane, DT)
+		if i > 120 {
+			if alice.movers[10].x > prev + 0.5 {
+				moved_frames += 1
+			}
+			gap = host.movers[10].x - alice.movers[10].x
+		}
+		prev = alice.movers[10].x
+		lane_pump(boxes)
+	}
+
+	// Extrapolation, not batch-stepping: the remote avatar advances nearly
+	// every frame on alice's screen...
+	testing.expect(t, moved_frames > 55, "held-input extrapolation moves the remote avatar per-frame")
+	// ...on the PREDICTED timeline: at or ahead of the server's live pose,
+	// never trailing a watched view.
+	testing.expect(t, gap <= 4, "echo-mode presentation front-runs or matches the live world")
+	testing.expect(t, gap >= -30, "bounded by the lead")
+}
+
 @(test)
 lane_present_smooths_watched_motion :: proc(t: ^testing.T) {
 	desc := mover_desc()

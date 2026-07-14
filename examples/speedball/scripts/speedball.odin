@@ -50,10 +50,6 @@ Speedball :: struct {
 
 	goals_to: u8,
 
-	// Presentation scratch: my touch is still the ball's flight's CAUSE, so
-	// the claim holds until the flight ends or an opponent contests it.
-	i_touched: bool,
-
 	// Presentation edges + the acid's probes.
 	seen_l, seen_r, seen_won: u8,
 	auto_peers: int,
@@ -75,7 +71,11 @@ speedball_ready :: proc(self: ^Speedball) {
 	})
 	kboot.boot_entities(&self.boot, self, speedball_entity_kinds[:])
 
-	ksim.lane_init(&self.lane, &self.ses, size_of(Kicker_Input), cfg = ksim.Lane_Config{smooth_cut = 60})
+	// PREDICT-WORLD: batches echo every player's held input, every peer ticks
+	// every kicker AND the ball — one timeline for the whole pitch (the
+	// Rocket League model). No claim dance; constant small glided corrections
+	// on remote avatars instead of delayed-but-accurate ones.
+	ksim.lane_init(&self.lane, &self.ses, size_of(Kicker_Input), cfg = ksim.Lane_Config{smooth_cut = 60, echo_inputs = true})
 	ksim.lane_set_sim(&self.lane, self, sp_sample, sp_step)
 	kboot.boot_lane(&self.boot, &self.lane)
 
@@ -221,58 +221,55 @@ bot_sample :: proc(g: ^Speedball, tick: u64, input: ^Kicker_Input) {
 			input.buttons |= BTN_KICK // held: the crossing through reach fires it
 		}
 	} else {
-		// Loop to the far side of the ball first, a body's width behind it.
+		// Loop AROUND to the far side — never through the ball: motion-drag
+		// dribble means plowing across it herds it the wrong way (the first
+		// echo-mode acid wedged itself and the ball into a corner this way).
 		tx := b.x - to_goal.x * (KICKER_R + BALL_R + 14)
 		ty := b.y - to_goal.y * (KICKER_R + BALL_R + 14)
 		steer = normalized({tx - me.x, ty - me.y})
+		d2b := rel.x * rel.x + rel.y * rel.y
+		orbit := (KICKER_R + BALL_R + 12)
+		if d2b < orbit * orbit * 4 {
+			// Near the ball while mispositioned: orbit tangentially with an
+			// outward bias instead of walking into it.
+			nrel := normalized(rel)
+			tangent := gd.Vector2{-nrel.y, nrel.x}
+			if tangent.x * steer.x + tangent.y * steer.y < 0 {
+				tangent = {-tangent.x, -tangent.y}
+			}
+			steer = normalized({tangent.x - nrel.x * 0.6, tangent.y - nrel.y * 0.6})
+		}
 	}
 	if steer.x > 0.3 {input.move[0] = 1} else if steer.x < -0.3 {input.move[0] = -1}
 	if steer.y > 0.3 {input.move[1] = 1} else if steer.y < -0.3 {input.move[1] = -1}
 }
 
-// ---- the world pass: contact, on every peer that can simulate it ----------------
+// ---- the world pass: contact, on every peer, one timeline ----------------------
 //
 // PURE SIM, no role gates: it reads inputs and writes predicted state, so it
 // runs identically live and in replays, on the server and on every
-// predicting client. Each peer resolves the kicker⟷ball pairs it HAS INPUTS
-// for — mine on my screen, everyone's on the server. A remote player's touch
-// therefore lands on my screen only via the server's word: the reconcile
-// snaps my predicted ball and the glide hides it — the pattern's honest cost,
-// paid exactly where it belongs.
+// predicting client. In PREDICT-WORLD mode every pair has an input here —
+// mine fresh from my ring, remote kickers' HELD from the batch echo — so
+// every peer simulates every touch on its own timeline: a remote tackle
+// plays out beside the remote avatar making it, immediately, and the next
+// batch's truth corrects whatever the held inputs got wrong (the glide
+// hides it). That constant small correction is the model's whole price.
 
 sp_step :: proc(user: rawptr, tick: u64) {
 	g := cast(^Speedball)user
 	b := g.ball
 	if b == nil {return}
-	live := !g.lane.resimming // presentation scratch only mutates on the live pass
 	// The acid's convergence probe reports through holds and match end.
 	if g.ses.is_host && tick % 60 == 0 {
 		gd.print_str(fmt.tprintf("SPB_POS tick=%d x=%.1f y=%.1f l=%d r=%d", tick, b.x, b.y, b.score_l, b.score_r))
 	}
-
-	// CLAIM RETENTION: my kick's FLIGHT is my simulation's consequence, so
-	// the claim follows the cause, not my proximity — releasing by distance
-	// pulls your own kick backward mid-flight (the fade target is the
-	// watched view, speed × timeline-skew behind a fast ball). Hold until
-	// the ball slows (the timelines nearly coincide — an invisible handback)
-	// or an opponent's rendered avatar contests it.
-	if live && g.i_touched {
-		speed2 := b.vx * b.vx + b.vy * b.vy
-		contested := false
-		for id2, k2 in g.kickers {
-			if g.owner_pid[id2] == g.ses.me {continue}
-			cdx := b.x - k2.x
-			cdy := b.y - k2.y
-			if cdx * cdx + cdy * cdy < (KICK_REACH * 1.5) * (KICK_REACH * 1.5) {
-				contested = true
-				break
-			}
+	if !g.ses.is_host && !g.lane.resimming && tick % 60 == 0 {
+		mx, my := f32(-1), f32(-1)
+		if g.me_kick != nil {
+			mx = g.me_kick.x
+			my = g.me_kick.y
 		}
-		if speed2 < 1.5 * 1.5 || contested || b.hold > 0 {
-			g.i_touched = false
-		} else {
-			ksim.lane_claim(&g.lane, b.net_id)
-		}
+		gd.print_str(fmt.tprintf("SPB_CVIEW tick=%d bx=%.1f by=%.1f mex=%.1f mey=%.1f resims=%d", tick, b.x, b.y, mx, my, g.lane.stat_resims))
 	}
 
 	if b.won != 0 || b.hold > 0 {return}
@@ -285,18 +282,6 @@ sp_step :: proc(user: rawptr, tick: u64) {
 		dx := b.x - k.x
 		dy := b.y - k.y
 		d2 := dx * dx + dy * dy
-
-		// Near the ball with MY avatar: claim its presentation — my screen
-		// draws MY predicted timeline while I'm the one playing it, and
-		// eases back to the watched view (aligned with remote avatars)
-		// when I'm not. This is what keeps a REMOTE kick from moving the
-		// ball a whole lead before its kicker visibly arrives.
-		if k.mine && d2 < (KICK_REACH * 2) * (KICK_REACH * 2) {
-			ksim.lane_claim(&g.lane, b.net_id)
-			if live {
-				g.i_touched = true
-			}
-		}
 
 		// Dribble: SOFT contact. Resolve half the overlap per tick along a
 		// STABLE direction, and nudge velocity along the KICKER'S MOTION —

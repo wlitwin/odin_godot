@@ -2,10 +2,13 @@
 //gd:class Kicker
 package speedball
 
-// A KICKER — one player's avatar on the sim lane. Movement is the familiar
-// predicted tick; the kick COOLDOWN is predicted state too, but the kick
-// itself lives in the world pass (speedball.odin) — it mutates the BALL,
-// and cross-entity writes are the world pass's whole job.
+// A KICKER — one player's avatar on the sim lane, marked CONTESTED like the
+// ball: in predict-world (echo) mode EVERY peer ticks every kicker — yours
+// from your ring, the others from the batch-echoed held inputs — so the
+// whole pitch lives on one predicted timeline. The kick COOLDOWN is
+// predicted state; the kick itself lives in the world pass (speedball.odin),
+// because it mutates the BALL and cross-entity writes are the world pass's
+// whole job.
 
 import gd "godot:godot"
 import knet "godot:kit/net"
@@ -32,7 +35,7 @@ Kicker_Input :: struct {
 
 BTN_KICK :: u8(1)
 
-@(gd_tick)
+@(gd_tick = "contested")
 kicker_tick :: proc(self: ^Kicker, input: Kicker_Input) {
 	dir := normalized({f32(input.move[0]), f32(input.move[1])})
 	self.vx = dir.x * RUN_SPEED
