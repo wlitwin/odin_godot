@@ -26,6 +26,7 @@ import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import ksim "godot:kit/sim"
 import kui "godot:kit/ui"
+import psim "godot:play/sim"
 
 MSG_SESSION :: u8(0)
 DEFAULT_PORT :: 4190
@@ -114,23 +115,24 @@ speedball_process :: proc(self: ^Speedball, delta: f64) {
 	// a full round trip before the authority's word could return.
 	if self.me_kick != nil && self.ball != nil {
 		b := self.ball
+		me := self.me_kick
 		want := gd.is_action_just_pressed("spb_spike")
 		if self.bot == "spiker" && !self.spiked && b.hold == 0 && b.won == 0 {
-			dx := b.x - self.me_kick.x
-			dy := b.y - self.me_kick.y
+			dx := b.roll.x - me.run.x
+			dy := b.roll.y - me.run.y
 			want = want || dx * dx + dy * dy < SPIKE_REACH * SPIKE_REACH
 		}
-		if want && ball_spike_cmd(&self.lane, b, self.me_kick.x, self.me_kick.y) {
+		if want && ball_spike_cmd(&self.lane, b, me.run.x, me.run.y) {
 			if !self.spiked {
 				self.spiked = true
-				self.spike_from = {b.x, b.y}
-				_ = ball_spike_cmd(&self.lane, b, self.me_kick.x, self.me_kick.y) // the burst's second verb
+				self.spike_from = {b.roll.x, b.roll.y}
+				_ = ball_spike_cmd(&self.lane, b, me.run.x, me.run.y) // the burst's second verb
 				gd.print_str(fmt.tprintf("SPB_SPIKE_SENT tick=%d", ksim.lane_now(&self.lane)))
 			}
 		}
 		if self.spiked && !self.spike_seen {
-			dx := b.x - self.spike_from[0]
-			dy := b.y - self.spike_from[1]
+			dx := b.roll.x - self.spike_from[0]
+			dy := b.roll.y - self.spike_from[1]
 			if dx * dx + dy * dy > 12 * 12 {
 				self.spike_seen = true
 				gd.print_str(fmt.tprintf("SPB_SPIKE_LOCAL tick=%d", ksim.lane_now(&self.lane)))
@@ -243,7 +245,7 @@ bot_sample :: proc(g: ^Speedball, tick: u64, input: ^Kicker_Input) {
 	// The spiker: walk at the ball it predicts, never kick — its one move is
 	// the verb burst (speedball_process), fired the moment the ball's in reach.
 	if g.bot == "spiker" && g.me_kick != nil && g.ball != nil && !g.spiked {
-		steer := normalized({g.ball.x - g.me_kick.x, g.ball.y - g.me_kick.y})
+		steer := normalized({g.ball.roll.x - g.me_kick.run.x, g.ball.roll.y - g.me_kick.run.y})
 		if steer.x > 0.3 {input.move[0] = 1} else if steer.x < -0.3 {input.move[0] = -1}
 		if steer.y > 0.3 {input.move[1] = 1} else if steer.y < -0.3 {input.move[1] = -1}
 		return
@@ -252,8 +254,8 @@ bot_sample :: proc(g: ^Speedball, tick: u64, input: ^Kicker_Input) {
 	me := g.me_kick
 	b := g.ball
 	gx: f32 = team_of(me.pid) == 1 ? PITCH_W : 0 // team 1 scores RIGHT
-	to_goal := normalized({gx - b.x, PITCH_H / 2 - b.y})
-	rel := gd.Vector2{b.x - me.x, b.y - me.y}
+	to_goal := normalized({gx - b.roll.x, PITCH_H / 2 - b.roll.y})
+	rel := gd.Vector2{b.roll.x - me.run.x, b.roll.y - me.run.y}
 	aligned := rel.x * to_goal.x + rel.y * to_goal.y // >0: the ball is between me and the goal
 
 	steer: gd.Vector2
@@ -266,9 +268,9 @@ bot_sample :: proc(g: ^Speedball, tick: u64, input: ^Kicker_Input) {
 		// Loop AROUND to the far side — never through the ball: motion-drag
 		// dribble means plowing across it herds it the wrong way (the first
 		// echo-mode acid wedged itself and the ball into a corner this way).
-		tx := b.x - to_goal.x * (KICKER_R + BALL_R + 14)
-		ty := b.y - to_goal.y * (KICKER_R + BALL_R + 14)
-		steer = normalized({tx - me.x, ty - me.y})
+		tx := b.roll.x - to_goal.x * (KICKER_R + BALL_R + 14)
+		ty := b.roll.y - to_goal.y * (KICKER_R + BALL_R + 14)
+		steer = normalized({tx - me.run.x, ty - me.run.y})
 		d2b := rel.x * rel.x + rel.y * rel.y
 		orbit := (KICKER_R + BALL_R + 12)
 		if d2b < orbit * orbit * 4 {
@@ -303,15 +305,15 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 	if b == nil {return}
 	// The acid's convergence probe reports through holds and match end.
 	if g.ses.is_host && tick % 60 == 0 {
-		gd.print_str(fmt.tprintf("SPB_POS tick=%d x=%.1f y=%.1f l=%d r=%d", tick, b.x, b.y, b.score_l, b.score_r))
+		gd.print_str(fmt.tprintf("SPB_POS tick=%d x=%.1f y=%.1f l=%d r=%d", tick, b.roll.x, b.roll.y, b.score_l, b.score_r))
 	}
 	if !g.ses.is_host && !g.lane.resimming && tick % 60 == 0 {
 		mx, my := f32(-1), f32(-1)
 		if g.me_kick != nil {
-			mx = g.me_kick.x
-			my = g.me_kick.y
+			mx = g.me_kick.run.x
+			my = g.me_kick.run.y
 		}
-		gd.print_str(fmt.tprintf("SPB_CVIEW tick=%d bx=%.1f by=%.1f mex=%.1f mey=%.1f resims=%d", tick, b.x, b.y, mx, my, g.lane.stat_resims))
+		gd.print_str(fmt.tprintf("SPB_CVIEW tick=%d bx=%.1f by=%.1f mex=%.1f mey=%.1f resims=%d", tick, b.roll.x, b.roll.y, mx, my, g.lane.stat_resims))
 	}
 
 	if b.won != 0 || b.hold > 0 {return}
@@ -321,8 +323,8 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 		input, drives := ksim.lane_input_of(&g.lane, kboot.boot_entity_owner(&g.boot, id), Kicker_Input)
 		if !drives {continue} // a pair this peer doesn't simulate
 
-		dx := b.x - k.x
-		dy := b.y - k.y
+		dx := b.roll.x - k.run.x
+		dy := b.roll.y - k.run.y
 		d2 := dx * dx + dy * dy
 
 		// Dribble: SOFT contact. Resolve half the overlap per tick along a
@@ -330,7 +332,8 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 		// not center-to-center, which flips sign frame-to-frame in a deep
 		// overlap and teleported the ball to alternating sides of your feet
 		// (the "erratic bump" of the first playtest). Capped, so contact
-		// never compounds past dribble pace.
+		// never compounds past dribble pace. Cross-entity by nature, so it
+		// stays HERE — the roller owns the flight, not the feet.
 		reach := KICKER_R + BALL_R
 		if d2 < reach * reach {
 			dist := sqrt_f32(d2)
@@ -338,30 +341,31 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 			if dist > 0.5 {
 				sep = {dx / dist, dy / dist}
 			} else {
-				sep = normalized({k.vx, k.vy}) // coincident: shove along my motion
+				sep = normalized({k.run.vx, k.run.vy}) // coincident: shove along my motion
 				if sep.x == 0 && sep.y == 0 {sep = {1, 0}}
 			}
 			overlap := reach - dist
-			b.x += sep.x * overlap * 0.5
-			b.y += sep.y * overlap * 0.5
-			mv := normalized({k.vx, k.vy})
-			if (mv.x != 0 || mv.y != 0) && b.vx * b.vx + b.vy * b.vy < DRIBBLE_MAX * DRIBBLE_MAX {
-				b.vx += mv.x * DRIBBLE_PUSH
-				b.vy += mv.y * DRIBBLE_PUSH
+			b.roll.x += sep.x * overlap * 0.5
+			b.roll.y += sep.y * overlap * 0.5
+			mv := normalized({k.run.vx, k.run.vy})
+			if (mv.x != 0 || mv.y != 0) && b.roll.vx * b.roll.vx + b.roll.vy * b.roll.vy < DRIBBLE_MAX * DRIBBLE_MAX {
+				b.roll.vx += mv.x * DRIBBLE_PUSH
+				b.roll.vy += mv.y * DRIBBLE_PUSH
 			}
 		}
 
-		// The kick: your foot answers on YOUR screen, this tick.
-		if input.buttons & BTN_KICK != 0 && k.kick_cd == 0 && d2 < KICK_REACH * KICK_REACH {
+		// The kick: your foot answers on YOUR screen, this tick. (ready()
+		// sits LAST in the guard — it re-arms the cooldown only when the
+		// press and the reach already held.)
+		if input.buttons & BTN_KICK != 0 && d2 < KICK_REACH * KICK_REACH && psim.ready(&k.kick, KICK_CD) {
 			aim := normalized({f32(input.move[0]), f32(input.move[1])})
 			if aim.x == 0 && aim.y == 0 {
 				aim = normalized({dx, dy})
 			}
-			b.vx += aim.x * KICK_POWER
-			b.vy += aim.y * KICK_POWER
-			k.kick_cd = KICK_CD
+			b.roll.vx += aim.x * KICK_POWER
+			b.roll.vy += aim.y * KICK_POWER
 			if k.mine && !g.lane.resimming {
-				gd.print_str(fmt.tprintf("SPB_KICK tick=%d bvx=%.1f bvy=%.1f", tick, b.vx, b.vy))
+				gd.print_str(fmt.tprintf("SPB_KICK tick=%d bvx=%.1f bvy=%.1f", tick, b.roll.vx, b.roll.vy))
 			}
 		}
 	}

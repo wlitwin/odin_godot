@@ -13,24 +13,30 @@ package speedball
 // resim CPU on every peer, and a mispredict whenever a REMOTE kicker beats
 // you to a touch you already predicted.
 //
-// Even the GOAL RESET is predicted: detection and the kickoff freeze live in
-// this tick, so every screen snaps the ball to center the instant ITS
-// simulation sees the line crossed — no round trip on the reset. Only the
-// SCORE is authority business: the tick returns `scored` as a fact, and
-// ball_tick_then (speedball.odin) lands it on the delta lane.
+// The FLIGHT is the shelf's now: psim.Roller carries x/y/vx/vy (predicted
+// through the embed) and integrates friction, the BALL_MAX ceiling, and the
+// energy-eating wall bounce — timelines laws #5 and #6, packaged. What this
+// tick keeps is the GAME: the kickoff freeze and the goal. Detection reads
+// the roller's last clamp (block ticks run after this proc, so a crossing
+// landed exactly ON the goal line last tick); even the RESET is predicted —
+// every screen snaps the ball to center the instant ITS simulation sees the
+// line crossed, no round trip. Only the SCORE is authority business: the
+// tick returns `scored` as a fact, and ball_tick_then (speedball.odin)
+// lands it on the delta lane.
 
 import gd "godot:godot"
 import knet "godot:kit/net"
+import psim "godot:play/sim"
 
 Ball :: struct {
 	owner:  gd.Node2d,
 	skin:   gd.Polygon2d `gd:"onready=Skin"`,
 	net_id: knet.Net_Id,
 
-	// The sim lane — contested: predicted on every screen.
-	x, y:   f32 `gd:"replicate,predict,interp"`,
-	vx, vy: f32 `gd:"replicate,predict"`,
-	hold:   u16 `gd:"replicate,predict"`, // kickoff freeze, itself predicted
+	// The sim lane — contested: predicted on every screen. The physics ride
+	// the embed (config — friction/cap/bounce/walls — is set at spawn).
+	roll: psim.Roller,
+	hold: u16 `gd:"replicate,predict"`, // kickoff freeze, itself predicted
 
 	// The delta lane beside it — the authority's ledger of consequence.
 	score_l: u8 `gd:"replicate"`,
@@ -44,63 +50,36 @@ Ball :: struct {
 @(gd_tick = "contested")
 ball_tick :: proc(self: ^Ball) -> (scored: u8) {
 	if self.won != 0 || self.hold > 0 {
-		self.vx = 0
-		self.vy = 0
+		// Frozen: zero the intent and the roller integrates a no-op.
+		self.roll.vx = 0
+		self.roll.vy = 0
 		if self.hold > 0 {
 			self.hold -= 1
 		}
 		return
 	}
 
-	self.vx *= FRICTION
-	self.vy *= FRICTION
-	// The speed ceiling — deterministic, in the tick, so every peer's
-	// prediction clamps identically.
-	sp2 := self.vx * self.vx + self.vy * self.vy
-	if sp2 > BALL_MAX * BALL_MAX {
-		s := BALL_MAX / f32(sqrt_f32(sp2))
-		self.vx *= s
-		self.vy *= s
+	// The goal: the roller clamps a crossing exactly ON the line (walls
+	// bounce, with restitution — full-speed returns made every rally a
+	// ping-pong), so a ball AT the line with its post-move y in the mouth
+	// crossed there last tick. Outside the mouth the bounce already turned
+	// it around — no goal, same as ever.
+	in_mouth := self.roll.y > GOAL_TOP && self.roll.y < GOAL_BOT
+	if in_mouth && self.roll.x <= GOAL_LINE_L {
+		scored = 2 // the RIGHT team put it in the LEFT goal
 	}
-	self.x += self.vx
-	self.y += self.vy
-
-	// Walls bounce (with restitution — full-speed returns made every rally a
-	// ping-pong); the goal mouths swallow.
-	in_mouth := self.y > GOAL_TOP && self.y < GOAL_BOT
-	if self.x <= GOAL_LINE_L {
-		if in_mouth {
-			scored = 2 // the RIGHT team put it in the LEFT goal
-		} else {
-			self.x = GOAL_LINE_L
-			self.vx = -self.vx * WALL_BOUNCE
-		}
-	}
-	if self.x >= GOAL_LINE_R {
-		if in_mouth {
-			scored = 1
-		} else {
-			self.x = GOAL_LINE_R
-			self.vx = -self.vx * WALL_BOUNCE
-		}
-	}
-	if self.y <= PITCH_WALL + BALL_R {
-		self.y = PITCH_WALL + BALL_R
-		self.vy = -self.vy * WALL_BOUNCE
-	}
-	if self.y >= PITCH_H - PITCH_WALL - BALL_R {
-		self.y = PITCH_H - PITCH_WALL - BALL_R
-		self.vy = -self.vy * WALL_BOUNCE
+	if in_mouth && self.roll.x >= GOAL_LINE_R {
+		scored = 1
 	}
 
 	if scored != 0 {
 		// The reset is SIM, so it predicts: every screen's own simulation
 		// snaps the ball home and starts the freeze the moment IT sees the
 		// goal — the authority's score arrives as ordinary deltas meanwhile.
-		self.x = PITCH_W / 2
-		self.y = PITCH_H / 2
-		self.vx = 0
-		self.vy = 0
+		self.roll.x = PITCH_W / 2
+		self.roll.y = PITCH_H / 2
+		self.roll.vx = 0
+		self.roll.vy = 0
 		self.hold = KICKOFF_HOLD
 	}
 	return
@@ -117,19 +96,19 @@ ball_tick :: proc(self: ^Ball) -> (scored: u8) {
 @(gd_command)
 ball_spike :: proc(self: ^Ball, px, py: f32) -> bool {
 	if self.won != 0 || self.hold > 0 {return false}
-	dx := self.x - px
-	dy := self.y - py
+	dx := self.roll.x - px
+	dy := self.roll.y - py
 	if dx * dx + dy * dy > SPIKE_REACH * SPIKE_REACH {return false}
 	return true
 }
 
 ball_spike_apply :: proc(self: ^Ball, px, py: f32) {
-	dir := normalized({self.x - px, self.y - py})
+	dir := normalized({self.roll.x - px, self.roll.y - py})
 	if dir.x == 0 && dir.y == 0 {
 		dir = {1, 0} // dead-center spike: pick a lane, deterministically
 	}
-	self.vx += dir.x * SPIKE_POWER
-	self.vy += dir.y * SPIKE_POWER
+	self.roll.vx += dir.x * SPIKE_POWER
+	self.roll.vy += dir.y * SPIKE_POWER
 }
 
 ball_process :: proc(self: ^Ball, delta: f64) {
@@ -137,5 +116,5 @@ ball_process :: proc(self: ^Ball, delta: f64) {
 		self.placed = true
 		gd.polygon2d_set_color(self.skin, {0.95, 0.95, 0.9, 1})
 	}
-	gd.node2d_set_position(cast(gd.Node2d)self.owner, {self.x, self.y})
+	gd.node2d_set_position(cast(gd.Node2d)self.owner, {self.roll.x, self.roll.y})
 }

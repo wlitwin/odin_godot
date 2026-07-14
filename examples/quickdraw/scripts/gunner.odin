@@ -21,6 +21,7 @@ package quickdraw
 
 import gd "godot:godot"
 import knet "godot:kit/net"
+import psim "godot:play/sim"
 
 Gunner :: struct {
 	owner:  gd.Node2d,
@@ -30,13 +31,17 @@ Gunner :: struct {
 	net_id: knet.Net_Id,
 
 	// The sim lane (server-simulated, client-predicted, reconciled). The
-	// TRIGGER lives here too: fire_cd is predicted state, so your revolver's
-	// cadence answers the click instantly and replays exactly.
+	// TRIGGER lives here too: the cadence is a psim.Cool, its countdown
+	// predicted through the embed, so your revolver answers the click
+	// instantly and replays exactly. (Movement stays hand-rolled: the crate
+	// pushout runs mid-pipeline — after the clamp, before the shot's
+	// adjudication — where a block tick, which runs after this whole proc,
+	// can't reach.)
 	x, y:    f32 `gd:"replicate,predict,interp"`,
 	vx, vy:  f32 `gd:"replicate,predict"`,
 	aim:     f32 `gd:"replicate,predict"`,
 	dash_cd: u16 `gd:"replicate,predict"`,
-	fire_cd: u16 `gd:"replicate,predict"`,
+	fire:    psim.Cool,
 
 	// The delta lane, beside it (host-authoritative, never resimmed).
 	hp:       i32 `gd:"replicate"`,
@@ -88,18 +93,20 @@ gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) -> (fired: bool) {
 	if self.hp <= 0 {
 		self.vx = 0
 		self.vy = 0
+		// Dead men hold the hammer: the Cool block's decrement still runs
+		// after this return, so prepay it — the cooldown freezes with the
+		// body, exactly as the hand-rolled early return froze it.
+		if self.fire.left > 0 {
+			self.fire.left += 1
+		}
 		return false
 	}
 	self.aim = angle_of(input.aim)
 
 	// The trigger: hold to fan the hammer at the revolver's cadence. Pure
-	// predicted state — your cadence gates locally with zero round trips,
-	// and a replay re-derives the same shots from the same inputs.
-	if self.fire_cd > 0 {
-		self.fire_cd -= 1
-	}
-	if input.buttons & BTN_FIRE != 0 && self.fire_cd == 0 {
-		self.fire_cd = FIRE_CD
+	// predicted state — psim.Cool's countdown gates locally with zero round
+	// trips, and a replay re-derives the same shots from the same inputs.
+	if input.buttons & BTN_FIRE != 0 && psim.ready(&self.fire, FIRE_CD) {
 		fired = true
 	}
 

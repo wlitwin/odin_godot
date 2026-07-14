@@ -13,6 +13,13 @@ import ksess "godot:kit/session"
 // (kicker_of / kicker_ids / kicker_owned_by, kboot.boot_entity_owner) answer
 // everything the old three maps did.
 kicker_spawned :: proc(game: ^Speedball, self: ^Kicker, id: knet.Net_Id, owner: knet.Player_Id) {
+	// The mover's LAW half — config is never on the wire, so every peer
+	// stamps the same numbers here, before the first tick.
+	self.run.accel = RUN_ACCEL
+	self.run.min_x = PITCH_WALL + KICKER_R
+	self.run.max_x = PITCH_W - PITCH_WALL - KICKER_R
+	self.run.min_y = PITCH_WALL + KICKER_R
+	self.run.max_y = PITCH_H - PITCH_WALL - KICKER_R
 	if owner != knet.PLAYER_ID_INVALID && owner == game.ses.me {
 		self.mine = true
 		game.me_kick = self
@@ -27,6 +34,15 @@ kicker_freed :: proc(game: ^Speedball, self: ^Kicker, id: knet.Net_Id) {
 }
 
 ball_spawned :: proc(game: ^Speedball, self: ^Ball, id: knet.Net_Id, owner: knet.Player_Id) {
+	// The roller's LAW half — friction, ceiling, restitution, walls: the
+	// same numbers on every peer, stamped before the first tick.
+	self.roll.friction = FRICTION
+	self.roll.max_speed = BALL_MAX
+	self.roll.bounce = WALL_BOUNCE
+	self.roll.min_x = GOAL_LINE_L
+	self.roll.max_x = GOAL_LINE_R
+	self.roll.min_y = PITCH_WALL + BALL_R
+	self.roll.max_y = PITCH_H - PITCH_WALL - BALL_R
 	game.ball = self
 }
 
@@ -40,8 +56,8 @@ spawn_world :: proc(self: ^Speedball) {
 	if self.ball != nil {return}
 	bp, bid := ksess.session_spawn_make(&self.ses, BALL_TYPE)
 	b := cast(^Ball)bp
-	b.x = PITCH_W / 2
-	b.y = PITCH_H / 2
+	b.roll.x = PITCH_W / 2
+	b.roll.y = PITCH_H / 2
 	b.hold = KICKOFF_HOLD
 	ksess.session_spawn_send(&self.ses, bid)
 
@@ -60,7 +76,7 @@ spawn_kicker :: proc(self: ^Speedball, pid: knet.Player_Id) {
 	k := cast(^Kicker)kp
 	k.pid = u8(pid)
 	spot := SPAWNS[int(pid) % len(SPAWNS)]
-	k.x = spot[0]
-	k.y = spot[1]
+	k.run.x = spot[0]
+	k.run.y = spot[1]
 	ksess.session_spawn_send(&self.ses, kid)
 }
