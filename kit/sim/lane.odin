@@ -124,6 +124,8 @@ Tracked :: struct {
 	tick:    Tick_Thunk, // nil = the game's Step_Proc moves this entity
 	has_in:  bool, // the thunk wants its owner's input (Sim_Set.input_size > 0)
 	err:     []u8, // render-error blob (predict-subset layout), alloc'd on the first correction
+	contested: bool, // predicted here but NOT mine: presentation follows `claim`
+	claim:     f32, // 1 = my sim drives it (present predicted), decaying to 0 (present the watched view)
 }
 
 Lane :: struct {
@@ -280,11 +282,32 @@ lane_track_set :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, set: ^Sim_Set,
 	tr.has_in = set.input_size > 0
 	if set.contested && tr.watched {
 		// Contested: this client predicts it like its own — ledger, entries,
-		// reconcile — instead of watching it from the past.
+		// reconcile — instead of watching it from the past. PRESENTATION
+		// stays claim-weighted (lane_present): the predicted timeline while
+		// MY sim drives it, the watched view otherwise — so a remote touch
+		// lands beside the remote avatar that made it, not a lead early.
 		tr.watched = false
+		tr.contested = true
 		tr.hist = new(History, allocator)
 		tr.hist^ = history_make(tr.desc, l.slots, allocator)
 		append(&l.entries, Entry{id = id, entity = entity, hist = tr.hist})
+	}
+}
+
+// MY simulation is influencing this contested entity right now — touching
+// it, inside reach of it, just kicked it. Call it every tick the influence
+// holds (the world pass's contact block is the natural spot): the claim
+// rises INSTANTLY, so your first touch presents from your predicted
+// timeline with zero delay, and decays over ~a quarter second once the
+// influence stops, easing the entity back onto the watched view. This is
+// net.md's "did MY simulation cause this?" boolean — the one fact the lane
+// cannot derive — asked continuously.
+lane_claim :: proc(l: ^Lane, id: knet.Net_Id) {
+	for &tr in l.tracked {
+		if tr.id == id {
+			tr.claim = 1
+			return
+		}
 	}
 }
 
@@ -334,6 +357,9 @@ lane_set_owner :: proc(l: ^Lane, id: knet.Net_Id, owner: knet.Player_Id, allocat
 			return true // truth ledgers don't care who steers
 		}
 		gaining := owner == l.ses.me
+		if gaining {
+			tr.contested = false // mine now: the predicted timeline, no claim dance
+		}
 		if gaining && tr.watched {
 			tr.watched = false
 			tr.hist = new(History, allocator)
@@ -837,8 +863,20 @@ lane_present :: proc(l: ^Lane, dt: f64) {
 		alpha = clamp(alpha, 0, 1)
 	}
 	for &tr in l.tracked {
-		if !tr.watched {
+		if !tr.watched && !tr.contested {
 			continue
+		}
+		if tr.contested {
+			// The claim-weighted timeline. Fully mine: the predicted pose
+			// (already in the fields, glide included) stands — your dribble
+			// answers your feet. Unclaimed: the watched view, so a REMOTE
+			// touch moves the ball beside the remote avatar that made it
+			// instead of a whole lead early (the mixed-timelines artifact).
+			// Between: blend, easing ~a quarter second back to watched.
+			tr.claim = max(tr.claim - f32(dt / 0.25), 0)
+			if tr.claim >= 0.999 {
+				continue
+			}
 		}
 		e := find_rx_entry(&l.rx, tr.id)
 		if e == nil {
@@ -848,6 +886,17 @@ lane_present :: proc(l: ^Lane, dt: f64) {
 		b, bok := history_read(&e.hist, next)
 		if !aok || !bok {
 			continue // a skipped row at one end: hold ingest's last apply
+		}
+		if tr.contested && tr.claim > 0.001 {
+			// Mid-fade: capture the predicted pose, paint the watched view,
+			// then blend the two by the claim.
+			pred := make([]u8, tr.hist.size, context.temp_allocator)
+			predict_capture(pred, tr.entity, tr.desc)
+			predict_blend(tr.entity, tr.desc, a, b, alpha)
+			watched := make([]u8, tr.hist.size, context.temp_allocator)
+			predict_capture(watched, tr.entity, tr.desc)
+			predict_blend(tr.entity, tr.desc, watched, pred, tr.claim)
+			continue
 		}
 		predict_blend(tr.entity, tr.desc, a, b, alpha)
 	}

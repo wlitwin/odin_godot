@@ -255,6 +255,15 @@ sp_step :: proc(user: rawptr, tick: u64) {
 		dy := b.y - k.y
 		d2 := dx * dx + dy * dy
 
+		// Near the ball with MY avatar: claim its presentation — my screen
+		// draws MY predicted timeline while I'm the one playing it, and
+		// eases back to the watched view (aligned with remote avatars)
+		// when I'm not. This is what keeps a REMOTE kick from moving the
+		// ball a whole lead before its kicker visibly arrives.
+		if k.mine && d2 < (KICK_REACH * 2) * (KICK_REACH * 2) {
+			ksim.lane_claim(&g.lane, b.net_id)
+		}
+
 		// Dribble: walking through the ball nudges it along.
 		reach := KICKER_R + BALL_R
 		if d2 < reach * reach {

@@ -25,6 +25,12 @@ sim crosses the line), while the SCORE is authority-only (`ball_tick_then`,
 delta lane). The world pass is pure sim — contact and kicks for whichever
 kicker⟷ball pairs this peer has inputs for, no role gates anywhere.
 
+And the pattern's finishing move, `lane_claim`: the ball's SIM is predicted
+everywhere, but its PRESENTATION follows the claim — near your kicker it
+draws from your predicted timeline (your touches answer your feet); loose,
+it draws the watched view, so an opponent's kick moves it beside their
+rendered avatar instead of a whole lead early.
+
 ```sh
 bash build/build_scripts.sh examples/speedball
 $GODOT --path examples/speedball                  # host, join from a second window

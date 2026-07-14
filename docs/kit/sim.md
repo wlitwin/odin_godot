@@ -192,7 +192,26 @@ own tick, so every screen snaps the ball home the instant its simulation
 crosses the line, while the score lands authority-side. Contact belongs in
 the world pass, applied only to the pairs this peer HAS INPUTS for — yours
 on your screen, everyone's on the server; a remote touch reaches you as the
-server's word, never as a local guess. See `examples/speedball` (and read it
+server's word, never as a local guess.
+
+Two rules keep the pattern honest:
+
+- **Contested entities must be SELF-SIMULATING** — a ball integrates its own
+  motion, which is what makes every peer's between-batch prediction good. An
+  input-driven avatar would coast frozen client-side and fight corrections
+  forever.
+- **Presentation follows the CLAIM.** A contested entity's sim runs on your
+  predicted timeline, but its PRESENTATION is claim-weighted: call
+  `lane_claim(l, id)` every tick YOUR sim influences it (the world pass's
+  contact block), and the entity draws from your predicted pose — instantly,
+  legitimately front-running the server. Unclaimed, it draws the WATCHED
+  view, so a remote touch moves it beside the remote avatar that made it
+  instead of a whole lead early (the mixed-timelines artifact you will
+  otherwise ship: predicted ball, past-rendered players, one screen). The
+  claim rises instantly, decays over ~a quarter second — net.md's "did MY
+  simulation cause this?" boolean, asked continuously.
+
+See `examples/speedball` (and read it
 against `examples/slopball` — the same game on the coop model — to choose).
 
 ## Lag compensation

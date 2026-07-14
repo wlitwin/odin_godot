@@ -509,6 +509,74 @@ lane_possession_switches_the_driver :: proc(t: ^testing.T) {
 	}
 }
 
+// A contested entity is SELF-SIMULATING (a ball integrates its own motion —
+// that's what makes every peer's prediction good between batches; an
+// input-driven avatar would coast frozen and fight corrections forever).
+glide_thunk :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner: knet.Player_Id) {
+	m := cast(^Mover)entity
+	m.x += m.vx
+}
+
+// A contested entity presents on the CLAIM-weighted timeline: the watched
+// view while nobody local drives it (so remote touches land beside remote
+// avatars), the predicted pose while claimed (so YOUR touches answer now —
+// and legitimately FRONT-RUN the server: it is your timeline).
+@(test)
+lane_contested_presents_on_the_claim :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	set_c := ksim.Sim_Set{entity_desc = &desc, tick = glide_thunk, input_size = 0, contested = true}
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
+	ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
+	for b in boxes {
+		m := new(Mover)
+		b.movers[10] = m
+		b.owners[10] = 1
+		ksim.lane_track_set(&b.lane, 10, m, &set_c, 1)
+	}
+	host.movers[10].vx = 2 // the authority sets it rolling; every sim integrates it
+
+	DT :: 1.0 / 60.0
+	gap_unclaimed, gap_claimed := f32(0), f32(0)
+	for i in 1 ..= 190 {
+		host.ax = 0
+		alice.ax = 0
+		ksim.lane_frame(&host.lane, DT)
+		lane_pump(boxes)
+		ksim.lane_frame(&alice.lane, DT)
+		if i > 150 {
+			ksim.lane_claim(&alice.lane, 10) // my sim "touches" it now
+		}
+		ksim.lane_present(&alice.lane, DT)
+		if i == 150 {
+			gap_unclaimed = host.movers[10].x - alice.movers[10].x
+		}
+		if i == 190 {
+			gap_claimed = host.movers[10].x - alice.movers[10].x
+		}
+		lane_pump(boxes)
+	}
+
+	// Unclaimed: the watched view, a real render delay behind the live world.
+	testing.expect(t, gap_unclaimed >= 6, "unclaimed contested pose rides the delayed watched view")
+	// Claimed: the predicted timeline — decisively fresher, and allowed to
+	// front-run the server's live pose (the client runs AHEAD by its lead).
+	testing.expect(t, gap_claimed <= gap_unclaimed - 4, "a claim pulls presentation onto the predicted timeline")
+	testing.expect(t, gap_claimed >= -30, "bounded by the lead, not runaway")
+}
+
 @(test)
 lane_present_smooths_watched_motion :: proc(t: ^testing.T) {
 	desc := mover_desc()
