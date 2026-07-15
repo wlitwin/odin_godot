@@ -21,7 +21,7 @@ Pawn :: struct {
 	aim:    f32 `gd:"replicate,interp=pawn_blend_aim,owner"`, // custom blend math
 	heat:   f32 `gd:"replicate,wire=f16"`, // stock half-float wire encoding
 	charge: i32 `gd:"replicate,wire=pawn_charge_codec"`, // custom fixed-size codec
-	px, py: f32 `gd:"replicate,predict,interp"`, // kit/sim lane: server-sim truth, client resim
+	px, py: f32 `gd:"replicate,predict,interp,slack=0.5,glide=0.1,cut=32"`, // kit/sim: per-field reconcile slack + render-error glide/cut
 	fuel:   u16 `gd:"replicate,predict"`, // predicted without interp: steps, never lerps
 	pace:   Pace, // TICK-COMPOSITION: the block's step hoists, runs after pawn_tick
 	chill:  psim.Cool, // IMPORTED-shelf tick block: the hoist crosses packages

@@ -531,10 +531,13 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			if len(r.codec) > 0 {
 				wire = fmt.tprintf(", wire = .Custom, codec = %s", r.codec)
 			}
+			slack := len(r.slack) > 0 ? fmt.tprintf(", slack = %s", r.slack) : ""
+			glide := len(r.glide) > 0 ? fmt.tprintf(", glide = %s", r.glide) : ""
+			cut := len(r.cut) > 0 ? fmt.tprintf(", cut = %s", r.cut) : ""
 			fmt.sbprintf(
 				b,
-				"\t{{offset = %s, size = size_of(%s), flags = %s%s%s}},\n",
-				field_offset_expr(cls, r.path), field_type_expr(cls, r.path), flags, lerp, wire,
+				"\t{{offset = %s, size = size_of(%s), flags = %s%s%s%s%s%s}},\n",
+				field_offset_expr(cls, r.path), field_type_expr(cls, r.path), flags, lerp, wire, slack, glide, cut,
 			)
 		}
 		w(b, "}\n\n")
@@ -972,10 +975,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	// ---- @(gd_sample)/@(gd_step): the lane wiring, written by nobody ----
 	// The thunks hold the rawptr casts; `<snake>_lane_init` carries the input
 	// size (from the package's tick input struct — resolve_sim pinned the
-	// sample to it) and the step's authority gate. Game wiring is two lines:
+	// sample to it) and up to two world passes: @(gd_step) runs everywhere,
+	// @(gd_step="authority") on the host alone. Game wiring is two lines:
 	// `<snake>_lane_init(self, &self.lane, &self.ses, cfg = {...})` beside
 	// boot_attach, then `kboot.boot_lane(&self.boot, &self.lane)`.
-	if s.sample.proc_name != "" || s.step.proc_name != "" {
+	if s.sample.proc_name != "" || s.step.proc_name != "" || s.step_auth.proc_name != "" {
 		w(b, "// ---- @(gd_sample)/@(gd_step) lane wiring ----\n\n")
 		if s.sample.proc_name != "" {
 			fmt.sbprintf(
@@ -991,19 +995,27 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				snake, s.step.proc_name, cls,
 			)
 		}
+		if s.step_auth.proc_name != "" {
+			fmt.sbprintf(
+				b,
+				"@(private = \"file\")\n_%s_lane_step_auth :: proc(user: rawptr, tick: u64) {{\n\t%s(cast(^%s)user, tick)\n}}\n\n",
+				snake, s.step_auth.proc_name, cls,
+			)
+		}
 		lane_in_size := s.lane_input_type != "" ? fmt.tprintf("size_of(%s)", s.lane_input_type) : "0"
 		sample_ref := s.sample.proc_name != "" ? fmt.tprintf("_%s_lane_sample", snake) : "nil"
 		step_ref := s.step.proc_name != "" ? fmt.tprintf("_%s_lane_step", snake) : "nil"
-		auth := s.step.authority ? "true" : "false"
+		step_auth_ref := s.step_auth.proc_name != "" ? fmt.tprintf("_%s_lane_step_auth", snake) : "nil"
 		fmt.sbprintf(
 			b,
-			"// The lane beside the session: input size, typed sample, world pass, and\n"+
-			"// the authority gate — all from the attributes. cfg tunes; zero = defaults.\n"+
+			"// The lane beside the session: input size, typed sample, and up to two\n"+
+			"// world passes (everywhere + authority) — all from the attributes. cfg\n"+
+			"// tunes; zero = defaults.\n"+
 			"%s_lane_init :: proc(self: ^%s, l: ^ksim.Lane, ses: ^ksess.Session, tag := ksim.SIM_TAG, cfg := ksim.Lane_Config{{}}) {{\n"+
 			"\tksim.lane_init(l, ses, %s, tag, cfg)\n"+
-			"\tksim.lane_set_sim(l, self, %s, %s, step_authority = %s)\n"+
+			"\tksim.lane_set_sim(l, self, %s, %s, %s)\n"+
 			"}}\n\n",
-			snake, cls, lane_in_size, sample_ref, step_ref, auth,
+			snake, cls, lane_in_size, sample_ref, step_ref, step_auth_ref,
 		)
 	}
 

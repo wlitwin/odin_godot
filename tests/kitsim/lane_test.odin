@@ -25,6 +25,18 @@ Lane_Box :: struct {
 	owners: map[knet.Net_Id]knet.Player_Id,
 	ax:     i8, // the local player's current intent
 
+	// two-step-slot probe: how often each world pass ran on this peer
+	step_calls: int, // the EVERYWHERE pass (live + resim)
+	auth_calls: int, // the AUTHORITY pass (host only, live only)
+
+	// predicted-spawn (projectile) probe
+	proj_set:     ^ksim.Sim_Set,
+	cli_proj:     ^Mover, // this client's predicted projectile
+	cli_proj_id:  knet.Net_Id, // its provisional id
+	host_proj:    ^Mover, // the authority's projectile
+	host_proj_id: knet.Net_Id,
+	proj_ids:     int, // authoritative projectile id counter (host)
+
 	// lag-comp probe (host): at step `fire_at`, judge `probe_id` through a
 	// rewound query for `shooter` and record what both worlds showed.
 	fire_at:      u64,
@@ -114,6 +126,7 @@ lbox_sample :: proc(user: rawptr, tick: u64, dst: rawptr) {
 // its truth is on the way.
 lbox_step :: proc(user: rawptr, tick: u64) {
 	b := cast(^Lane_Box)user
+	b.step_calls += 1
 	for id, m in b.movers {
 		ax, drives := ksim.lane_input_of(&b.lane, b.owners[id], i8)
 		if !drives {
@@ -133,6 +146,14 @@ lbox_step :: proc(user: rawptr, tick: u64) {
 		b.inline_restored = b.movers[b.probe_id].x
 		b.fired = true
 	}
+}
+
+// The AUTHORITY world pass: the host alone runs it, once per real tick (never
+// a resim). Just counts here — a real game adjudicates, sweeps respawns, ticks
+// a match clock.
+lbox_step_auth :: proc(user: rawptr, tick: u64) {
+	b := cast(^Lane_Box)user
+	b.auth_calls += 1
 }
 
 lbox_track :: proc(b: ^Lane_Box, id: knet.Net_Id, owner: knet.Player_Id, desc: ^knet.Entity_Desc) {
@@ -594,6 +615,67 @@ lane_auto_tick_drives_entities :: proc(t: ^testing.T) {
 	}
 }
 
+// Two world passes, split by role: the EVERYWHERE step runs live and in every
+// resim, on both peers; the AUTHORITY step runs on the host alone, once per
+// real tick. No hand-written `if is_host` — the lane holds the gate.
+@(test)
+lane_two_step_slots_split_by_role :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+	// Both slots wired: lbox_step everywhere, lbox_step_auth on the authority.
+	ksim.lane_set_sim(&host.lane, &host, lbox_sample, lbox_step, lbox_step_auth)
+	ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, lbox_step, lbox_step_auth)
+	HOSTY :: knet.Net_Id(10)
+	ALICE :: knet.Net_Id(20)
+	lbox_track(&host, HOSTY, 1, &desc)
+	lbox_track(&host, ALICE, 2, &desc)
+	lbox_track(&alice, HOSTY, 1, &desc)
+	lbox_track(&alice, ALICE, 2, &desc)
+
+	// The converge weather: an intent flip inside an input blackout forces
+	// alice to reconcile and resim — the everywhere pass must re-run there.
+	DT :: 1.0 / 60.0
+	for i in 1 ..= 240 {
+		host.ax = i <= 180 ? 1 : 0
+		alice.ax = i <= 120 ? 1 : (i <= 180 ? -2 : 0)
+		ksim.lane_frame(&host.lane, DT)
+		lane_pump(boxes)
+		ksim.lane_frame(&alice.lane, DT)
+		if i >= 115 && i < 135 {
+			for p in alice.out {
+				delete(p.data)
+			}
+			clear(&alice.out)
+		} else {
+			lane_pump(boxes)
+		}
+	}
+
+	// The authority pass is host-only, full stop.
+	testing.expect_value(t, alice.auth_calls, 0)
+	testing.expect(t, host.auth_calls > 0, "the host runs the authority pass")
+	// On the host both passes fire once per real tick — it never resims.
+	testing.expect_value(t, host.step_calls, host.auth_calls)
+	// The client resimmed, and the everywhere pass re-ran through those resims
+	// (step_calls = live ticks + every resimmed tick > the resim count alone).
+	testing.expect(t, alice.lane.stat_resims > 0, "the blackout forced resims")
+	testing.expect(t, alice.step_calls > alice.lane.stat_resims, "the everywhere pass rode the resims")
+}
+
 @(test)
 lane_rewound_judges_the_shooters_view :: proc(t: ^testing.T) {
 	desc := mover_desc()
@@ -657,7 +739,7 @@ predict_error_blob_math :: proc(t: ^testing.T) {
 	testing.expect_value(t, (^f32)(rawptr(&err[0]))^, 10)
 	testing.expect_value(t, (^f32)(rawptr(&err[4]))^, 0) // discrete fields carry no error
 
-	ksim.predict_error_decay(err, &desc, 0.5)
+	ksim.predict_error_decay(err, &desc, 1.0, 1.0) // dt == half-life → k = 0.5
 	testing.expect_value(t, (^f32)(rawptr(&err[0]))^, 5)
 
 	m := Mover{x = 5, vx = 1}
@@ -669,6 +751,44 @@ predict_error_blob_math :: proc(t: ^testing.T) {
 	// snap shows, because smoothing a cut looks worse than the cut.
 	ksim.predict_error(err, shown, truth, &desc, 8)
 	testing.expect_value(t, (^f32)(rawptr(&err[0]))^, 0)
+}
+
+// Per-field glide + cut: with the lane default in play, one field decays at its
+// OWN half-life and snaps at its OWN threshold, while its neighbor uses the
+// lane's — a slow avatar and a snappy ball in one lane. The cut stays entity-
+// coherent: any field past ITS threshold snaps the whole pose.
+@(test)
+predict_error_per_field_glide_and_cut :: proc(t: ^testing.T) {
+	// Two interp float fields (x fast-gliding + a low cut, vx on the lane default).
+	@(static) fields := [?]knet.Field_Desc{
+		{offset = offset_of(Mover, x), size = size_of(f32), flags = {.Predicted, .Interp}, lerp = .F32, glide = 0.5, cut = 5},
+		{offset = offset_of(Mover, vx), size = size_of(f32), flags = {.Predicted, .Interp}, lerp = .F32},
+	}
+	desc := knet.Entity_Desc{fields = fields[:]}
+	shown := []u8{0, 0, 0, 0, 0, 0, 0, 0}
+	truth := []u8{0, 0, 0, 0, 0, 0, 0, 0}
+	err := []u8{0, 0, 0, 0, 0, 0, 0, 0}
+
+	// Errors of 4 on both fields — under x's cut (5), so nothing snaps yet.
+	(^f32)(rawptr(&shown[0]))^ = 4 // x
+	(^f32)(rawptr(&shown[4]))^ = 4 // vx
+	ksim.predict_error(err, shown, truth, &desc, 0) // lane cut 0 = never
+	testing.expect_value(t, (^f32)(rawptr(&err[0]))^, 4)
+	testing.expect_value(t, (^f32)(rawptr(&err[4]))^, 4)
+
+	// One decay, dt = 1s. x uses its 0.5s half-life → k = 0.5^2 = 0.25 (4→1);
+	// vx uses the lane default 1s → k = 0.5 (4→2). Same lane, different glides.
+	ksim.predict_error_decay(err, &desc, 1.0, 1.0)
+	testing.expect_value(t, (^f32)(rawptr(&err[0]))^, 1)
+	testing.expect_value(t, (^f32)(rawptr(&err[4]))^, 2)
+
+	// x's error jumps past ITS cut (5) while vx has none — the WHOLE pose snaps
+	// (entity-coherent), even though the lane default cut is still 0.
+	(^f32)(rawptr(&shown[0]))^ = 6 // x: 6 > its cut 5
+	(^f32)(rawptr(&shown[4]))^ = 3 // vx: no cut of its own
+	ksim.predict_error(err, shown, truth, &desc, 0)
+	testing.expect_value(t, (^f32)(rawptr(&err[0]))^, 0)
+	testing.expect_value(t, (^f32)(rawptr(&err[4]))^, 0)
 }
 
 @(test)
@@ -990,4 +1110,203 @@ lane_present_smooths_watched_motion :: proc(t: ^testing.T) {
 	// Rendered a bounded few ticks in the past: the price of the bracket.
 	testing.expect(t, max_deficit > 0, "watched view trails the live world")
 	testing.expect(t, max_deficit < 2 * f32(host.lane.watch_delay + 8), "but only by the watch delay plus transit slack")
+}
+
+// ---- predicted spawns: a fired projectile ---------------------------------------
+
+PROJ_TYPE :: ksess.Entity_Type(7)
+PROJ_LAND :: f32(200) // the projectile flies +vx/tick until it lands here, then rests
+
+// A self-integrating projectile: no input, flies its own arc (like the ball),
+// landing at PROJ_LAND so convergence is a clean equality, not a moving target.
+proj_fly_thunk :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner: knet.Player_Id) {
+	m := cast(^Mover)entity
+	if m.vx == 0 {return}
+	m.x += m.vx
+	if m.x >= PROJ_LAND {
+		m.x = PROJ_LAND
+		m.vx = 0
+	}
+}
+
+// The shooter's FIRE verb: spawn a projectile at the muzzle — authoritative on
+// the host (a real id, lane_track_set), predicted on the client (a provisional
+// id, lane_spawn_predicted). A real game hides this role branch behind a boot
+// helper; the test spells it out. The projectile's Sim_Set rides the Lane_Box.
+shooter_fire_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool {
+	b := cast(^Lane_Box)ksim.lane_game(lane)
+	shooter := cast(^Mover)entity
+	if shooter.hp <= 0 {return false} // out of ammo — the authority may refuse a stale-purse fire
+	shooter.hp -= 1
+	p := new(Mover)
+	p.x = shooter.x
+	p.vx = 3
+	if ksim.lane_is_authority(lane) {
+		b.proj_ids += 1
+		id := knet.Net_Id(600 + b.proj_ids)
+		b.movers[id] = p
+		ksim.lane_track_set(&b.lane, id, p, b.proj_set, by)
+		b.host_proj = p
+		b.host_proj_id = id
+	} else {
+		id := ksim.lane_spawn_predicted(&b.lane, p, b.proj_set, by, PROJ_TYPE)
+		b.movers[id] = p
+		b.cli_proj = p
+		b.cli_proj_id = id
+	}
+	return true
+}
+
+@(test)
+lane_predicted_projectile :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	proj_set := ksim.Sim_Set{entity_desc = &desc, tick = proj_fly_thunk, input_size = 0}
+	fire := [?]ksim.Sim_Cmd{{exec = shooter_fire_exec}}
+	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = fire[:]}
+
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	host.proj_set = &proj_set
+	alice.proj_set = &proj_set
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
+	ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
+
+	// The shooter, owned by alice (predicted on her screen, truth on the host),
+	// parked at the muzzle x=100 (intent stays 0 — only verbs and flight move x).
+	SHOOTER :: knet.Net_Id(20)
+	for b in boxes {
+		s := new(Mover)
+		s.x = 100
+		s.hp = 10 // ammo (delta-lane state; the walk is kit/net's job, seeded here)
+		b.movers[SHOOTER] = s
+		b.owners[SHOOTER] = 2
+		ksim.lane_track_set(&b.lane, SHOOTER, s, &set, 2)
+	}
+
+	DT :: 1.0 / 60.0
+	settle :: proc(boxes: []^Lane_Box, frames: int) {
+		for _ in 0 ..< frames {
+			ksim.lane_frame(&boxes[0].lane, DT)
+			lane_pump(boxes)
+			ksim.lane_frame(&boxes[1].lane, DT)
+			ksim.lane_present(&boxes[1].lane, DT)
+			lane_pump(boxes)
+		}
+	}
+	settle(boxes, 60) // anchor + converge
+
+	// FIRE — the shot leaves alice's screen this instant, before any round trip.
+	testing.expect(t, ksim.lane_command(&alice.lane, SHOOTER, 0, nil), "the fire schedules")
+	ksim.lane_frame(&alice.lane, DT) // executes at her next tick
+	born := alice.lane.ticker.tick
+	testing.expect(t, alice.cli_proj != nil, "alice's projectile exists the instant she fires")
+	testing.expect(t, ksim.lane_id_provisional(knet.Net_Id(0x8000_0001)), "provisional ids are high-bit tagged")
+	testing.expect(t, host.host_proj == nil, "the authority hasn't seen the fire yet")
+	spawn_x := alice.cli_proj.x
+	lane_pump(boxes) // the reliable fire reaches the host
+
+	// A short INPUT blackout right after the fire: alice's shooter mispredicts,
+	// so reconciles land BEFORE the projectile's spawn tick (the host runs a
+	// transit behind) — the born-gating path. The reliable fire already landed.
+	for i in 0 ..< 16 {
+		ksim.lane_frame(&host.lane, DT)
+		ksim.lane_frame(&alice.lane, DT)
+		for p in alice.out {delete(p.data)}
+		clear(&alice.out) // drop alice's outgoing (inputs) — host holds-last
+		lane_pump(boxes) // host -> alice batches still flow
+	}
+	// BORN-GATING, exactly: through those reconciles the projectile flew its own
+	// deterministic arc, ONE step per tick since birth — no over-integration.
+	flown := alice.lane.ticker.tick - born
+	testing.expect_value(t, alice.cli_proj.x, spawn_x + f32(flown) * 3)
+	testing.expect(t, host.host_proj != nil, "the authority spawned its projectile")
+
+	// MATCH — the authority's spawn arrives (a real game fires this on Ev_Spawned).
+	entity, _, matched := ksim.lane_spawn_match(&alice.lane, host.host_proj_id, 2, PROJ_TYPE)
+	testing.expect(t, matched, "the authority's spawn matched alice's prediction")
+	testing.expect(t, entity == rawptr(alice.cli_proj), "and it rekeyed the very projectile she predicted")
+
+	// After the match the projectile reconciles against the authority, and both
+	// land at the wall — a clean quiescent convergence.
+	settle(boxes, 160)
+	near :: proc(a, b: f32) -> bool {return abs(a - b) < 0.01}
+	testing.expect_value(t, host.host_proj.x, PROJ_LAND)
+	testing.expect(t, near(alice.cli_proj.x, PROJ_LAND), "alice's projectile converged on the authority's")
+}
+
+@(test)
+lane_predicted_projectile_rejected :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	proj_set := ksim.Sim_Set{entity_desc = &desc, tick = proj_fly_thunk, input_size = 0}
+	fire := [?]ksim.Sim_Cmd{{exec = shooter_fire_exec}}
+	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = fire[:]}
+
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	host.proj_set = &proj_set
+	alice.proj_set = &proj_set
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
+	ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
+
+	SHOOTER :: knet.Net_Id(20)
+	for b in boxes {
+		s := new(Mover)
+		s.x = 100
+		b.movers[SHOOTER] = s
+		b.owners[SHOOTER] = 2
+		ksim.lane_track_set(&b.lane, SHOOTER, s, &set, 2)
+	}
+
+	DT :: 1.0 / 60.0
+	settle :: proc(boxes: []^Lane_Box, frames: int) {
+		for _ in 0 ..< frames {
+			ksim.lane_frame(&boxes[0].lane, DT)
+			lane_pump(boxes)
+			ksim.lane_frame(&boxes[1].lane, DT)
+			ksim.lane_present(&boxes[1].lane, DT)
+			lane_pump(boxes)
+		}
+	}
+	settle(boxes, 60)
+
+	// Divergent ammo: alice's client thinks she has a round, the authority knows
+	// the magazine is empty (delta-lane state, seeded by hand here).
+	alice.movers[SHOOTER].hp = 1
+	host.movers[SHOOTER].hp = 0
+	testing.expect(t, ksim.lane_command(&alice.lane, SHOOTER, 0, nil), "the fire schedules on stale ammo")
+	ksim.lane_frame(&alice.lane, DT) // client speculates the spawn
+	testing.expect(t, alice.cli_proj != nil, "the shot leaves alice's screen optimistically")
+	testing.expect(t, ksim.lane_tracks(&alice.lane, alice.cli_proj_id), "and it's tracked, flying, provisional")
+
+	// The authority refuses (empty magazine); the verdict despawns the projectile.
+	lane_pump(boxes)
+	settle(boxes, 90)
+	testing.expect(t, !ksim.lane_tracks(&alice.lane, alice.cli_proj_id), "the refused fire culled its projectile")
+	testing.expect(t, host.host_proj == nil, "and the authority never spawned one")
 }

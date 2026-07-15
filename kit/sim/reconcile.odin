@@ -48,6 +48,13 @@ Entry :: struct {
 	id:     knet.Net_Id,
 	entity: rawptr,
 	hist:   ^History,
+	// The tick this entity was BORN (0 = existed from the start). A predicted
+	// spawn (a projectile fired mid-window) has no state before `born`, so the
+	// ledger, the rewind, and the resim must treat ticks < born as "not yet
+	// existing" — otherwise a reconcile landing before the spawn (which happens
+	// for the whole first round trip of the entity's life, the server running a
+	// transit behind) re-flies it from stale head state. See run_tick/note_all.
+	born:   u64,
 }
 
 // Authoritative predict-set state for one entity at the batch's tick —
@@ -65,6 +72,9 @@ Resim_Proc :: proc(user: rawptr, tick: u64)
 // stepping each predicted tick — live frames and replays alike.
 note_all :: proc(entries: []Entry, tick: u64) {
 	for &e in entries {
+		if e.born != 0 && tick < e.born {
+			continue // not born yet — no state to ledger before the spawn tick
+		}
 		history_note(e.hist, tick, e.entity)
 	}
 }

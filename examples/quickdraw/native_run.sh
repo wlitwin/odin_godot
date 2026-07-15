@@ -125,7 +125,30 @@ for port in 4189 4196; do
             exit 1
         fi
 
-        echo "QUICKDRAW_NATIVE_OK proved: at 240ms RTT the rewound duel lands ($HITS_A hits -> kill -> respawn), the live-judged control misses ($HITS_B), and the bounty shop's verb wore boots at tick $WORN — $((WORN - SENT)) ticks after issue, no round trip"
+        # THE LOB — a PREDICTED SPAWN. The deadeye's slow projectile leaves its
+        # muzzle on the client's OWN tick (a local predicted entity, born-gated
+        # and reconciled), and the authority spawns the real one at the SAME sim
+        # tick — no round trip. The authority's flight then rekeys the very
+        # bullet the client predicted (no duplicate, no crash) and lands its arc.
+        MLOG="$LOGDIR/rewound-marshal.log"
+        grep -q "QD_LOB_LOCAL" "$DLOG" || { echo "the deadeye never predicted a lob"; exit 1; }
+        grep -q "QD_LOB_HOST" "$MLOG" || { echo "the authority never spawned a lob bullet"; exit 1; }
+        grep -q "QD_LOB_LAND" "$MLOG" || { echo "the authority's lob never completed its flight"; exit 1; }
+        LOCAL_N=$(grep -c "QD_LOB_LOCAL" "$DLOG" || true)
+        HOST_N=$(grep -c "QD_LOB_HOST" "$MLOG" || true)
+        if ((LOCAL_N < 4)) || ((HOST_N < 4)); then
+            echo "the lob barely fired (predicted $LOCAL_N, authoritative $HOST_N)"; exit 1
+        fi
+        LSENT=$(grep -m1 "QD_LOB_LOCAL" "$DLOG" | sed 's/.*tick=//')
+        LHOST=$(grep -m1 "QD_LOB_HOST" "$MLOG" | sed 's/.*tick=//')
+        if [ -z "$LSENT" ] || [ -z "$LHOST" ]; then echo "lob ticks unreadable"; exit 1; fi
+        LGAP=$((LSENT - LHOST)); LGAP=${LGAP#-}
+        if ((LGAP > 2)); then
+            echo "the predicted lob didn't leave on the client's own tick (local $LSENT, authority $LHOST) — it round-tripped"
+            exit 1
+        fi
+
+        echo "QUICKDRAW_NATIVE_OK proved: at 240ms RTT the rewound duel lands ($HITS_A hits -> kill -> respawn), the live-judged control misses ($HITS_B), the bounty shop's verb wore boots at tick $WORN ($((WORN - SENT)) ticks after issue), and the lob's PREDICTED bullet left the muzzle on the client's own tick $LSENT — the authority spawned its real one at tick $LHOST and rekeyed it, no round trip"
         exit 0
     fi
     echo "QUICKDRAW_NATIVE_FAIL: hits rewound=$HITS_A live=$HITS_B (want rewound>=10, live<=3, gap>6)"

@@ -831,6 +831,18 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 // the wire header needs the entity's net identity. Missing either is a build
 // error HERE, with the fix spelled out — not a nil-descriptor crash at runtime.
 validate_script :: proc(s: ^Script) {
+	// The coop dirty mask AND the sim predict/command masks are each a single
+	// u64, so an entity tops out at 64 replicated fields (predicted ones are a
+	// subset, bounded by the same ceiling). Past 64 the high fields' bits shift
+	// out and SILENTLY stop replicating — caught here at build time, naming the
+	// class, instead of shadow_make's bare runtime assert or a quiet desync.
+	if len(s.replicates) > 64 {
+		error_at(
+			Loc{path = s.path},
+			"%s has %d replicated fields — at most 64 (the delta dirty mask and the sim predict mask are each one u64); group related fields into a sub-struct (a fixed array counts as one field)",
+			s.struct_name, len(s.replicates),
+		)
+	}
 	if len(s.commands) > 0 {
 		if len(s.replicates) == 0 {
 			error_at(
@@ -1443,20 +1455,20 @@ parse_sample :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^
 	s.sample = Sim_Proc_Info{proc_name = proc_name, line = loc.line, input_type = types[1][1:]}
 }
 
-// One @(gd_step) proc — the lane's world pass, run AFTER entity ticks:
-// contact between the pairs this peer has inputs for, respawn queues, wave
-// directors. `@(gd_step = "authority")` runs it on the host alone — the
-// role gate an authority-work pass used to open with, held by the lane.
+// @(gd_step) procs — the lane's world passes, run AFTER entity ticks. Two
+// slots, a class may fill one of each:
+//
+//   @(gd_step)              the EVERYWHERE pass — runs live AND in resims, on
+//                           every peer: pure-sim contact between the pairs this
+//                           peer has inputs for.
+//   @(gd_step="authority")  the AUTHORITY pass — the host alone runs it, once
+//                           per real tick (the authority never resims): respawn
+//                           queues, adjudication sweeps, a match clock. A game
+//                           needing both keeps them SEPARATE instead of folding
+//                           `if lane_is_authority()` into one pass.
+//
 // Shape, receiver first: proc(self: ^Game, tick: u64), no results.
 parse_step :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
-	if s.step.proc_name != "" {
-		error_at(
-			loc,
-			"%s: second @(gd_step) proc %q — %q already steps the world; one world pass per lane",
-			s.struct_name, proc_name, s.step.proc_name,
-		)
-		return
-	}
 	authority := false
 	for part in strings.split(config, ",") {
 		tok := strings.trim_space(part)
@@ -1478,7 +1490,27 @@ parse_step :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^as
 		error_at(loc, "step %s: no results — world-pass facts are state; entity ticks carry payloads", proc_name)
 		return
 	}
-	s.step = Sim_Proc_Info{proc_name = proc_name, line = loc.line, authority = authority}
+	if authority {
+		if s.step_auth.proc_name != "" {
+			error_at(
+				loc,
+				"%s: second @(gd_step=\"authority\") proc %q — %q already runs the authority pass; one per lane, compose inside it",
+				s.struct_name, proc_name, s.step_auth.proc_name,
+			)
+			return
+		}
+		s.step_auth = Sim_Proc_Info{proc_name = proc_name, line = loc.line}
+	} else {
+		if s.step.proc_name != "" {
+			error_at(
+				loc,
+				"%s: second @(gd_step) proc %q — %q already runs the everywhere pass; mark one @(gd_step=\"authority\") if it's host-only adjudication",
+				s.struct_name, proc_name, s.step.proc_name,
+			)
+			return
+		}
+		s.step = Sim_Proc_Info{proc_name = proc_name, line = loc.line}
+	}
 }
 
 // The param type texts AFTER the receiver, one entry per declared name.
@@ -1589,10 +1621,10 @@ resolve_sim :: proc(scripts: []^Script) {
 	}
 	owner: ^Script
 	for s in scripts {
-		if s.sample.proc_name == "" && s.step.proc_name == "" {continue}
+		if s.sample.proc_name == "" && s.step.proc_name == "" && s.step_auth.proc_name == "" {continue}
 		if owner != nil {
 			error_at(
-				Loc{path = s.path, line = max(s.sample.line, s.step.line)},
+				Loc{path = s.path, line = max(s.sample.line, s.step.line, s.step_auth.line)},
 				"%s declares @(gd_sample)/@(gd_step), but %s already does — one lane per package; a second lane is the hand-driven lane_set_sim's job",
 				s.struct_name, owner.struct_name,
 			)
@@ -2278,6 +2310,41 @@ parse_replicate_info :: proc(
 			}
 			continue
 		}
+		// `slack=N`: this predicted float field's own reconcile tolerance (world
+		// units), overriding the lane default — a fast contested object rides loose
+		// drift while precise fields in the same lane stay tight. The numeric literal
+		// is spliced into the descriptor as f32; validated float and predict-only below.
+		if strings.has_prefix(spec, "slack=") {
+			val := strings.trim_space(spec[len("slack="):])
+			if _, ok := strconv.parse_f64(val); !ok {
+				error_at(floc, "%s.%s: `slack=` needs a number — the reconcile tolerance in world units, e.g. slack=0.5", struct_name, field_label)
+				continue
+			}
+			rep.slack = val
+			continue
+		}
+		// `glide=N`: this field's render-error smoothing half-life (seconds), overriding
+		// the lane default — a slow-gliding avatar and a snappy ball can share one lane.
+		if strings.has_prefix(spec, "glide=") {
+			val := strings.trim_space(spec[len("glide="):])
+			if _, ok := strconv.parse_f64(val); !ok {
+				error_at(floc, "%s.%s: `glide=` needs a number — the smoothing half-life in seconds, e.g. glide=0.1", struct_name, field_label)
+				continue
+			}
+			rep.glide = val
+			continue
+		}
+		// `cut=N`: this field's snap threshold (world units) — a reconcile error past it
+		// is a teleport, and the whole entity snaps instead of gliding, overriding the lane.
+		if strings.has_prefix(spec, "cut=") {
+			val := strings.trim_space(spec[len("cut="):])
+			if _, ok := strconv.parse_f64(val); !ok {
+				error_at(floc, "%s.%s: `cut=` needs a number — the snap threshold in world units, e.g. cut=32", struct_name, field_label)
+				continue
+			}
+			rep.cut = val
+			continue
+		}
 		switch spec {
 		case "interp":
 			rep.interp = true
@@ -2316,6 +2383,33 @@ parse_replicate_info :: proc(
 	// generated file byte-identical.
 	if rep.predict && !rep.interp && rep.lerp == "" {
 		rep.lerp = interp_lerp_kind(type_text) // "" for non-floats: exact compare
+	}
+	// `slack=` is a predict-reconcile knob and only bites on float fields — discrete
+	// predicted state always reconciles exactly (a differing byte is a real event),
+	// so slack there would be silently ignored by predict_within. Reject both misuses.
+	if rep.slack != "" {
+		if !rep.predict {
+			error_at(floc, "%s.%s: `slack=` is a kit/sim reconcile knob — it only applies to a gd:\"replicate,predict\" field (add `predict`, or drop slack=)", struct_name, field_label)
+			return {}, false
+		}
+		if rep.lerp != ".F32" && rep.lerp != ".F64" {
+			error_at(floc, "%s.%s: `slack=` needs a float predicted field (f32/f64, float vectors/colors, or fixed arrays of them) — discrete predicted state always reconciles exactly; drop slack= here", struct_name, field_label)
+			return {}, false
+		}
+	}
+	// `glide=`/`cut=` shape the GLIDE of a reconcile correction — render-error
+	// smoothing, which only exists on a predicted field the eye INTERPOLATES, and
+	// only floats carry that error (.Quat/.Custom snap, so they'd silently ignore it).
+	glide_cut := rep.glide != "" ? "glide=" : (rep.cut != "" ? "cut=" : "")
+	if glide_cut != "" {
+		if !rep.predict || !rep.interp {
+			error_at(floc, "%s.%s: `%s` shapes render-error smoothing — it needs a gd:\"replicate,predict,interp\" field; a non-interp predicted field snaps on reconcile, nothing to glide", struct_name, field_label, glide_cut)
+			return {}, false
+		}
+		if rep.lerp != ".F32" && rep.lerp != ".F64" {
+			error_at(floc, "%s.%s: `%s` needs a float predicted interp field (f32/f64, float vectors/colors, or fixed arrays of them) — only those carry a render error", struct_name, field_label, glide_cut)
+			return {}, false
+		}
 	}
 	return rep, true
 }

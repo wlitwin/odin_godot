@@ -109,8 +109,12 @@ The game's own half — the device read and the world pass — is typed and
 attributed the same way. `@(gd_sample)` marks the ONE place that touches
 hardware (never called during a resim); scriptgen pins its input struct to
 the ticks' at build time, so sampling into the wrong struct can't compile.
-`@(gd_step)` is the world pass, AFTER entity ticks; the `"authority"` token
-holds the role gate an authority-work pass used to open with:
+`@(gd_step)` is the world pass, AFTER entity ticks. There are two slots, and
+a class may fill one of each: a bare `@(gd_step)` runs EVERYWHERE (live and in
+every resim, on every peer — pure-sim contact), and `@(gd_step="authority")`
+runs on the HOST alone, once per real tick (the authority never resims). A
+game needing both keeps them SEPARATE instead of folding `if is_host` into one
+pass — the last role gate a world pass used to open with, held by the lane:
 
 ```odin
 @(gd_sample)
@@ -119,14 +123,19 @@ game_sample :: proc(self: ^Game, tick: u64, input: ^Runner_Input) {
 	input.buttons = read_buttons()
 }
 
-@(gd_step = "authority") // omit the token for a pure-sim pass (runs everywhere)
+@(gd_step) // everywhere, live + resim: contact for the pairs this peer simulates
+game_contact :: proc(self: ^Game, tick: u64) {
+	resolve_overlaps(self)
+}
+
+@(gd_step = "authority") // host alone: adjudication, respawns, the match clock
 game_step :: proc(self: ^Game, tick: u64) {
 	run_respawns(self, tick)
 }
 ```
 
 The wiring left to the game, ALL of it — `<class>_lane_init` is generated,
-carrying the input size, the typed procs, and the authority gate:
+carrying the input size, the typed procs, and each pass wired to its slot:
 
 ```odin
 // ready(), beside boot_attach + boot_entities:
@@ -141,9 +150,10 @@ every frame and forwards `Ev_Owner_Changed`.
 
 Entity thunks run every simulated tick — live and replay identically, in
 track order — each fed its owner's input (`nil` coasts: an inputless entity
-type, or a remote player on a client whose truth is already inbound). The
-optional `Step_Proc` runs AFTER entity ticks as the world pass, for
-genuinely WORLD-shaped authority work (respawn queues, wave directors). One
+type, or a remote player on a client whose truth is already inbound). The two
+optional world passes run AFTER entity ticks: the everywhere pass for pure-sim
+cross-entity work (contact), the authority pass for genuinely WORLD-shaped
+authority work (respawn queues, wave directors). One
 input TYPE per lane, by design — the wire ships one input blob per player
 per tick; compose per-entity intent into the one struct. Quantize by
 DECLARING the quantized type — what the struct holds is what crosses the
@@ -158,9 +168,10 @@ if !drives {continue} // a pair this peer doesn't simulate
 ```
 
 For hand-driven setups (tests, generated-code-free games) `lane_init` +
-`lane_set_sim` (rawptr sample/step, `step_authority` flag) + `lane_track` /
-`lane_track_set` + explicit `lane_frame`/`lane_present` calls remain fully
-supported — the generated wiring and the thunks are sugar over exactly that.
+`lane_set_sim` (rawptr sample + the two `Step_Proc`s, everywhere then
+authority) + `lane_track` / `lane_track_set` + explicit
+`lane_frame`/`lane_present` calls remain fully supported — the generated
+wiring and the thunks are sugar over exactly that.
 
 ## The predicted shelf — godot:play/sim
 
@@ -397,6 +408,50 @@ ball_spike_apply :: proc(self: ^Ball, px, py: f32) {
 }
 ```
 
+## Predicted spawns — a fired projectile
+
+A verb mutates an entity that already exists; a **projectile** is a NEW one,
+and it has to leave your muzzle the instant you fire — before the authority's
+real bullet is even on the wire. That's a client-PREDICTED spawn: a local
+entity, flying its own arc, born-gated and reconciled like your avatar, that
+the authority's spawn REKEYS a round trip later (never a second bullet).
+
+The projectile is an ordinary `@(gd_tick)` entity (inputless — it self-
+integrates, like the ball) with an `entity=Bullet:id` scene. The fire is one
+call in the tick's name-paired halves — no role branch, because `_then` is
+always the authority and `_fx` always the owner's client:
+
+```odin
+@(gd_tick) // the flight: pure predicted state, `landed` routes to the splash
+bullet_tick :: proc(self: ^Bullet) -> (landed: bool) { ...self.x += self.vx... }
+
+gunner_tick_then :: proc(g: ^Game, self: ^Gunner, by: knet.Player_Id, lobbed: bool) {
+	if lobbed { lob_bullet(g, self, by) } // AUTHORITY: the real spawn
+}
+gunner_tick_fx :: proc(g: ^Game, self: ^Gunner, lobbed: bool) {
+	if lobbed { lob_bullet(g, self, g.ses.me) } // this CLIENT: the predicted one
+}
+
+lob_bullet :: proc(g: ^Game, gun: ^Gunner, owner: knet.Player_Id) {
+	bp, bid := kboot.boot_fire_spawn(&g.boot, BULLET_TYPE, owner) // routes host/client
+	b := cast(^Bullet)bp
+	b.x, b.y, b.vx, b.vy, b.life = ... // the muzzle and the arc
+	kboot.boot_fire_spawn_send(&g.boot, bid) // host announces; client no-ops
+}
+```
+
+`boot_fire_spawn` routes: the authority gets a real net id
+(`session_spawn_make`), this client a local predicted node under a provisional
+id. Underneath: **born-tick gating** keeps the reconciles that land before the
+spawn (the whole first round trip, the server running a transit behind) from
+re-flying it from stale state; when the authority's `Ev_Spawned` arrives the
+factory **matches** it to the projectile you predicted and rekeys — the same
+node, its flight ledger intact, reconciled from there. A refused fire (or one
+the authority never spawns) is culled and its node freed. Splash adjudicates
+SERVER-SIDE on truth, not a rewind — a slow shot is meant to be dodged.
+`examples/quickdraw`'s lob (right-click) is the worked proof; its native acid
+lands the predicted bullet on the client's own tick, no round trip.
+
 ## Promoting a coop game
 
 Because `predict` is a lane per FIELD, a friendslop game that grows
@@ -443,9 +498,28 @@ guide if you are deciding rather than migrating.
 · `margin` 2 (target input headroom, ticks) · `slots` 128 (ledger depth) ·
 `redundancy` 8 · `rewind_max` hz/4 · `watch_delay` 2×snap_every ·
 `smooth_halflife` 0.063 s · `smooth_cut` 0 (never cut; set it in world
-units for teleport-heavy games). Running tallies for a netgraph:
+units for teleport-heavy games) · `tolerance` 0 (exact reconcile; set it in
+world units so continuous held-input drift under the line rides uncorrected —
+predict-world's anti-churn). Running tallies for a netgraph:
 `lane.stat_reconciles`, `lane.stat_resims` (a resim burst is a latency
 event worth drawing).
+
+**Per-field reconcile + glide knobs.** The lane values are defaults; a single
+float field can override each on its tag, so a fast contested object and a
+precise avatar share ONE lane with different behavior:
+
+- `slack=N` (world units) overrides `tolerance` — the drift this field rides
+  before a reconcile (float-only: discrete predicted state always reconciles
+  exactly, a differing byte is a real event).
+- `glide=N` (seconds) overrides `smooth_halflife` — how slowly a correction on
+  this field glides back (a slower glide reads smoother).
+- `cut=N` (world units) overrides `smooth_cut` — the error past which this
+  field is a teleport and SNAPS. The snap stays entity-coherent: any field over
+  its own cut snaps the whole pose (smoothing a cut looks worse than the cut).
+
+`glide=`/`cut=` are render-error knobs and need a `predict,interp` float field
+(a non-interp predicted field snaps on reconcile, nothing to glide); `slack=`
+needs a `predict` float. scriptgen rejects each on the wrong field, spelled out.
 
 ## Gotchas
 

@@ -31,13 +31,20 @@ pawn_spawned :: proc(game: ^Board, self: ^Pawn, id: knet.Net_Id, owner: knet.Pla
 pawn_freed :: proc(game: ^Board, self: ^Pawn, id: knet.Net_Id) {
 }
 
-// The lane's GAME half — typed device read + authority world pass; scriptgen
+// The lane's GAME half — typed device read + up to TWO world passes; scriptgen
 // emits the rawptr thunks and `board_lane_init` (input size from Pawn_Input,
-// the step's role gate from the attribute token).
+// each pass wired to its slot from the attribute token). Both passes here:
+// the everywhere contact pass and the host-only adjudication pass.
 @(gd_sample)
 board_sample :: proc(self: ^Board, tick: u64, input: ^Pawn_Input) {
 }
 
+// Everywhere: runs live and in every resim, on every peer (pure-sim contact).
+@(gd_step)
+board_contact :: proc(self: ^Board, tick: u64) {
+}
+
+// Authority: the host alone, once per real tick (adjudication, respawns).
 @(gd_step = "authority")
 board_step :: proc(self: ^Board, tick: u64) {
 }

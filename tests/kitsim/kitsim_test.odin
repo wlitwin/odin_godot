@@ -470,3 +470,62 @@ predict_within_eps :: proc(t: ^testing.T) {
 	ksim.predict_capture(bb, &b, &desc)
 	testing.expect(t, !ksim.predict_within(ab, bb, &desc, 100), "discrete fields never earn slack")
 }
+
+// Per-field slack overrides the lane default: with the lane EXACT (eps 0), the
+// field carrying its own slack rides its drift while a tight neighbor in the
+// same descriptor reconciles on any difference — the ball-and-sniper case.
+@(test)
+predict_within_per_field_slack :: proc(t: ^testing.T) {
+	@(static) fields := [?]knet.Field_Desc{
+		{offset = offset_of(Mover, x), size = size_of(f32), flags = {.Predicted, .Interp}, lerp = .F32, slack = 0.5}, // loose
+		{offset = offset_of(Mover, vx), size = size_of(f32), flags = {.Predicted}, lerp = .F32}, // inherits the lane
+	}
+	desc := knet.Entity_Desc{fields = fields[:]}
+	a := Mover{x = 10, vx = 2}
+	ab := make([]u8, ksim.predict_size(&desc))
+	bb := make([]u8, ksim.predict_size(&desc))
+	defer delete(ab)
+	defer delete(bb)
+	ksim.predict_capture(ab, &a, &desc)
+
+	// x drifts 0.3 (< its 0.5 slack), vx exact — the lane is exact, x still rides.
+	b := Mover{x = 10.3, vx = 2}
+	ksim.predict_capture(bb, &b, &desc)
+	testing.expect(t, ksim.predict_within(ab, bb, &desc, 0), "x drift under its own slack rides while the lane is exact")
+
+	// vx drifts a hair — no slack of its own, lane exact: a real event.
+	b = Mover{x = 10, vx = 2.05}
+	ksim.predict_capture(bb, &b, &desc)
+	testing.expect(t, !ksim.predict_within(ab, bb, &desc, 0), "the tight neighbor reconciles on any drift")
+
+	// x past its own slack still reconciles.
+	b = Mover{x = 10.9, vx = 2}
+	ksim.predict_capture(bb, &b, &desc)
+	testing.expect(t, !ksim.predict_within(ab, bb, &desc, 0), "x past its slack reconciles")
+}
+
+// history_within honors per-field slack even at the exact lane default: the
+// cached has_slack flag routes past the one-memcmp fast path into the compare.
+@(test)
+history_within_uses_field_slack :: proc(t: ^testing.T) {
+	@(static) fields := [?]knet.Field_Desc{
+		{offset = offset_of(Mover, x), size = size_of(f32), flags = {.Predicted}, lerp = .F32, slack = 0.5},
+	}
+	desc := knet.Entity_Desc{fields = fields[:]}
+	h := ksim.history_make(&desc, 8)
+	defer ksim.history_destroy(&h)
+	testing.expect(t, h.has_slack, "make caches the field's slack")
+
+	m := Mover{x = 10}
+	ksim.history_note(&h, 5, &m)
+	db := make([]u8, ksim.predict_size(&desc))
+	defer delete(db)
+
+	drift := Mover{x = 10.3}
+	ksim.predict_capture(db, &drift, &desc)
+	testing.expect(t, ksim.history_within(&h, 5, db, 0), "field slack rides at the exact lane default")
+
+	far := Mover{x = 11}
+	ksim.predict_capture(db, &far, &desc)
+	testing.expect(t, !ksim.history_within(&h, 5, db, 0), "past the field slack, a real mismatch")
+}

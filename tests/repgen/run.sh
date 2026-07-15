@@ -57,6 +57,9 @@ for needle in \
 	'lerp = .Custom, blend = pawn_blend_aim' \
 	'wire = .F16' \
 	'wire = .Custom, codec = pawn_charge_codec' \
+	'slack = 0.5' \
+	'glide = 0.1' \
+	'cut = 32' \
 	'pawn_net_desc := knet.Entity_Desc' \
 	'intrinsics.type_is_nearly_simple_compare' \
 ; do
@@ -174,17 +177,19 @@ for needle in \
 	'_board_lane_sample :: proc(user: rawptr, tick: u64, dst: rawptr)' \
 	'board_sample(cast(^Board)user, tick, cast(^Pawn_Input)dst)' \
 	'_board_lane_step :: proc(user: rawptr, tick: u64)' \
+	'board_contact(cast(^Board)user, tick)' \
+	'_board_lane_step_auth :: proc(user: rawptr, tick: u64)' \
 	'board_step(cast(^Board)user, tick)' \
 	'board_lane_init :: proc(self: ^Board, l: ^ksim.Lane, ses: ^ksess.Session, tag := ksim.SIM_TAG, cfg := ksim.Lane_Config{})' \
 	'ksim.lane_init(l, ses, size_of(Pawn_Input), tag, cfg)' \
-	'ksim.lane_set_sim(l, self, _board_lane_sample, _board_lane_step, step_authority = true)' \
+	'ksim.lane_set_sim(l, self, _board_lane_sample, _board_lane_step, _board_lane_step_auth)' \
 ; do
 	if ! grep -qF "$needle" "$BGEN"; then
 		echo "REPGEN_FAIL: generated file is missing lane-wiring artifact: $needle"
 		exit 1
 	fi
 done
-echo "  ok  lane wiring generated (typed sample/step thunks, board_lane_init, authority gate)"
+echo "  ok  lane wiring generated (typed sample + both step slots, board_lane_init)"
 
 # The standard transport forwards (board.odin's kboot.Boot field): generated
 # bodies wired through the boot's own pointers — and hand-written wins, name
@@ -540,6 +545,185 @@ if ! echo "$APL_OUT" | grep -q "doesn't tick"; then
 	exit 1
 fi
 echo "  ok  a _apply half on a non-ticking class rejected at scriptgen time"
+
+# ---- (4a2d): slack= misuse — a reconcile knob, float-and-predict only ----
+# slack on a DISCRETE predicted field would be silently ignored (discrete state
+# reconciles exactly); scriptgen must reject it, and slack on a non-predict field.
+SLK="$TMP/slk"
+mkdir -p "$SLK"
+cat > "$SLK/loosy.odin" <<'EOF'
+//gd:extends Node
+//gd:class Loosy
+package repgen_slk
+
+import gd "godot:godot"
+
+Loosy :: struct {
+	owner: gd.Node,
+	flag:  u8 `gd:"replicate,predict,slack=0.5"`, // discrete: slack is meaningless
+	x:     f32 `gd:"replicate,predict"`,
+}
+
+@(gd_tick)
+loosy_tick :: proc(self: ^Loosy) {
+	self.x += 1
+}
+EOF
+set +e
+SLK_OUT="$(run_scriptgen "$SLK" 2>&1)"
+SLK_RC=$?
+set -e
+if [ "$SLK_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: slack= on a discrete predicted field was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$SLK_OUT" | grep -q "float predicted field"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't explain the slack/float contract:"
+	echo "$SLK_OUT" | tail -3
+	exit 1
+fi
+SLK2="$TMP/slk2"
+mkdir -p "$SLK2"
+cat > "$SLK2/coldy.odin" <<'EOF'
+//gd:extends Node
+//gd:class Coldy
+package repgen_slk2
+
+import gd "godot:godot"
+
+Coldy :: struct {
+	owner: gd.Node,
+	x:     f32 `gd:"replicate,interp,slack=0.5"`, // not predicted: reconcile knob has no lane
+}
+EOF
+set +e
+SLK2_OUT="$(run_scriptgen "$SLK2" 2>&1)"
+SLK2_RC=$?
+set -e
+if [ "$SLK2_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: slack= on a non-predict field was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$SLK2_OUT" | grep -q "reconcile knob"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't explain the slack/predict contract:"
+	echo "$SLK2_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  slack= misuse rejected at scriptgen time (discrete field, non-predict field)"
+
+# ---- (4a2d2): glide= on a non-interp predicted field — render-error needs interp ----
+# The glide/cut knobs shape a reconcile correction's SMOOTHING; a non-interp
+# predicted field snaps on reconcile, so there is no glide to shape — reject it.
+GLD="$TMP/gld"
+mkdir -p "$GLD"
+cat > "$GLD/snappy.odin" <<'EOF'
+//gd:extends Node
+//gd:class Snappy
+package repgen_gld
+
+import gd "godot:godot"
+
+Snappy :: struct {
+	owner: gd.Node,
+	x:     f32 `gd:"replicate,predict,glide=0.1"`, // predicted but not interp: snaps, no glide
+}
+
+@(gd_tick)
+snappy_tick :: proc(self: ^Snappy) {
+	self.x += 1
+}
+EOF
+set +e
+GLD_OUT="$(run_scriptgen "$GLD" 2>&1)"
+GLD_RC=$?
+set -e
+if [ "$GLD_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: glide= on a non-interp predicted field was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$GLD_OUT" | grep -q "render-error smoothing"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't explain the glide/interp contract:"
+	echo "$GLD_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  glide= on a non-interp predicted field rejected at scriptgen time"
+
+# ---- (4a2g): more than 64 replicated fields — the dirty mask is one u64 ----
+# The 65th field's dirty bit would shift out of the mask and silently stop
+# replicating; scriptgen must refuse the build, naming the class.
+BIG="$TMP/big"
+mkdir -p "$BIG"
+{
+	echo '//gd:extends Node'
+	echo '//gd:class Bloaty'
+	echo 'package repgen_big'
+	echo ''
+	echo 'import gd "godot:godot"'
+	echo ''
+	echo 'Bloaty :: struct {'
+	echo '	owner: gd.Node,'
+	for i in $(seq 1 65); do
+		echo "	f$i: u8 \`gd:\"replicate\"\`,"
+	done
+	echo '}'
+} > "$BIG/bloaty.odin"
+set +e
+BIG_OUT="$(run_scriptgen "$BIG" 2>&1)"
+BIG_RC=$?
+set -e
+if [ "$BIG_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: an entity with 65 replicated fields was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$BIG_OUT" | grep -q "at most 64"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't explain the 64-field ceiling:"
+	echo "$BIG_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  more than 64 replicated fields rejected at scriptgen time"
+
+# ---- (4a2e): two @(gd_step) of the same kind — one everywhere + one authority ----
+DUP="$TMP/dup"
+mkdir -p "$DUP"
+cat > "$DUP/twicey.odin" <<'EOF'
+//gd:extends Node
+//gd:class Twicey
+package repgen_dup
+
+import gd "godot:godot"
+
+Twicey :: struct {
+	owner: gd.Node,
+	x:     f32 `gd:"replicate,predict"`,
+}
+
+@(gd_tick)
+twicey_tick :: proc(self: ^Twicey) {
+	self.x += 1
+}
+
+@(gd_step)
+twicey_a :: proc(self: ^Twicey, tick: u64) {
+}
+
+@(gd_step)
+twicey_b :: proc(self: ^Twicey, tick: u64) {
+}
+EOF
+set +e
+DUP_OUT="$(run_scriptgen "$DUP" 2>&1)"
+DUP_RC=$?
+set -e
+if [ "$DUP_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: two @(gd_step) everywhere passes were accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$DUP_OUT" | grep -q "everywhere pass"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't name the duplicate everywhere pass:"
+	echo "$DUP_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  a duplicate everywhere @(gd_step) rejected at scriptgen time"
 
 # ---- (4a3): a block tick with an input param — blocks are INPUTLESS ----
 BTK="$TMP/btk"

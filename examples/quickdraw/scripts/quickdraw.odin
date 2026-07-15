@@ -46,6 +46,7 @@ Quickdraw :: struct {
 	started: bool,
 
 	gunner_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Gunner:1"`,
+	bullet_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Bullet:2"`,
 
 	// The census is GENERATED (gunner_of / my_gunner / gunner_owned_by /
 	// gunner_ids read the kit's own ledgers) — the only bookkeeping left is
@@ -193,6 +194,8 @@ install_controls :: proc "contextless" () {
 	bind("qd_buy", i64('B'))
 	gd.add_action("qd_fire")
 	gd.action_add_mouse_button("qd_fire", i64(gd.Mouse_Button.Left))
+	gd.add_action("qd_lob")
+	gd.action_add_mouse_button("qd_lob", i64(gd.Mouse_Button.Right))
 }
 
 @(gd_sample)
@@ -210,6 +213,7 @@ qd_sample :: proc(self: ^Quickdraw, tick: u64, input: ^Gunner_Input) {
 		if gd.is_action_pressed("qd_down") {input.move[1] += 1}
 		if gd.is_action_pressed("qd_dash") {input.buttons |= BTN_DASH}
 		if gd.is_action_pressed("qd_fire") {input.buttons |= BTN_FIRE}
+		if gd.is_action_pressed("qd_lob") {input.buttons |= BTN_LOB}
 	}
 	if self.me_gun != nil {
 		m := gd.canvas_item_get_global_mouse_position(cast(gd.Canvas_Item)self.owner)
@@ -237,6 +241,17 @@ bot_sample :: proc(g: ^Quickdraw, tick: u64, input: ^Gunner_Input) {
 	case "deadeye":
 		if tick % 90 == 0 {
 			input.buttons |= BTN_FIRE
+		}
+		// ...and lobs the slow projectile on its own cadence — the predicted
+		// spawn leaves its muzzle this instant, the authority's rekeys it later.
+		if tick % 54 == 0 {
+			input.buttons |= BTN_LOB
+		}
+	case "lobber":
+		// Stands its ground and lobs the slow projectile at the nearest gunner
+		// on its own cadence — the predicted-spawn acid's shooter.
+		if tick % 54 == 0 {
+			input.buttons |= BTN_LOB
 		}
 	case:
 		a := f32(tick) * 0.021
@@ -271,19 +286,50 @@ bot_sample :: proc(g: ^Quickdraw, tick: u64, input: ^Gunner_Input) {
 // the authority, the fx on this player's live pass, never a resim, never a
 // double fire. What's left is single-player-looking on both sides.
 
-// AUTHORITY: the shot's consequence — judge it where the shooter's screen
-// aimed, land the damage as delta-lane state.
-gunner_tick_then :: proc(g: ^Quickdraw, self: ^Gunner, by: knet.Player_Id, fired: bool) {
-	if !fired {return}
-	adjudicate_shot(g, self.net_id, self, by, self.aim, ksim.lane_now(&g.lane))
+// AUTHORITY: the shot's consequences. The hitscan shot judges where the
+// shooter's screen aimed (delta-lane damage); the LOB spawns the AUTHORITATIVE
+// bullet — a real net id, announced to every peer — at the same tick the client
+// already predicted its own.
+gunner_tick_then :: proc(g: ^Quickdraw, self: ^Gunner, by: knet.Player_Id, fired: bool, lobbed: bool) {
+	if fired {
+		adjudicate_shot(g, self.net_id, self, by, self.aim, ksim.lane_now(&g.lane))
+	}
+	if lobbed {
+		lob_bullet(g, self, by)
+		gd.print_str(fmt.tprintf("QD_LOB_HOST by=%d tick=%d", u64(by), ksim.lane_now(&g.lane)))
+	}
 }
 
-// THIS PLAYER, live pass only: the muzzle answers the click NOW.
-gunner_tick_fx :: proc(g: ^Quickdraw, self: ^Gunner, fired: bool) {
+// THIS PLAYER, live pass only: the muzzle answers the click NOW, and the lob's
+// bullet leaves the barrel THIS instant — a predicted spawn, before the
+// authority's real one is even in flight on the wire.
+gunner_tick_fx :: proc(g: ^Quickdraw, self: ^Gunner, fired: bool, lobbed: bool) {
 	if fired {
 		gunner_beam(self, self.aim)
 		gd.print_str("QD_FIRE")
 	}
+	if lobbed {
+		lob_bullet(g, self, g.ses.me)
+		gd.print_str(fmt.tprintf("QD_LOB_LOCAL tick=%d", ksim.lane_now(&g.lane)))
+	}
+}
+
+// Spawn the lob's bullet at the muzzle, aimed. One call, no role branch:
+// boot_fire_spawn routes it — the authority (the _then half) gets a real net id
+// it announces; this client (the _fx half) gets a local predicted node, flying
+// now, that the authority's spawn will rekey. Set the flight, then send.
+lob_bullet :: proc(g: ^Quickdraw, gun: ^Gunner, owner: knet.Player_Id) {
+	bp, bid := kboot.boot_fire_spawn(&g.boot, BULLET_TYPE, owner)
+	if bp == nil {return}
+	b := cast(^Bullet)bp
+	dx, dy := math.cos(gun.aim), math.sin(gun.aim)
+	b.x = gun.x + dx * (GUN_R + 4)
+	b.y = gun.y + dy * (GUN_R + 4)
+	b.vx = dx * LOB_SPEED
+	b.vy = dy * LOB_SPEED
+	b.life = LOB_LIFE
+	b.pid = u8(owner)
+	kboot.boot_fire_spawn_send(&g.boot, bid)
 }
 
 // The buy's consequence — AUTHORITY only, at the verb's execution tick: the

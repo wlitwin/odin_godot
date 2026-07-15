@@ -90,11 +90,13 @@ predict_matches :: proc(entity: rawptr, desc: ^knet.Entity_Desc, blob: []u8) -> 
 // History — the tick-indexed ring of predict-set snapshots.
 
 History :: struct {
-	desc:  ^knet.Entity_Desc,
-	size:  int,   // bytes per snapshot (predict_size(desc), cached)
-	slots: int,   // ring capacity in ticks
-	data:  []u8,  // slots × size
-	tick:  []u64, // which tick wrote each slot (0 = never — tick 0 predates any note)
+	desc:      ^knet.Entity_Desc,
+	size:      int,   // bytes per snapshot (predict_size(desc), cached)
+	has_slack: bool,  // any predicted field carries a per-field slack (cached at make —
+	                  // keeps the exact-compare fast path a single memcmp, no field walk)
+	slots:     int,   // ring capacity in ticks
+	data:      []u8,  // slots × size
+	tick:      []u64, // which tick wrote each slot (0 = never — tick 0 predates any note)
 }
 
 // `slots` is the window in TICKS the ledger holds — size it from what reads
@@ -103,12 +105,20 @@ History :: struct {
 history_make :: proc(desc: ^knet.Entity_Desc, slots: int, allocator := context.allocator) -> History {
 	assert(slots > 0)
 	size := predict_size(desc)
+	has_slack := false
+	for f in desc.fields {
+		if .Predicted in f.flags && f.slack > 0 {
+			has_slack = true
+			break
+		}
+	}
 	return History {
-		desc  = desc,
-		size  = size,
-		slots = slots,
-		data  = make([]u8, slots * size, allocator),
-		tick  = make([]u64, slots, allocator),
+		desc      = desc,
+		size      = size,
+		has_slack = has_slack,
+		slots     = slots,
+		data      = make([]u8, slots * size, allocator),
+		tick      = make([]u64, slots, allocator),
 	}
 }
 
@@ -181,6 +191,11 @@ history_matches :: proc(h: ^History, tick: u64, blob: []u8) -> bool {
 // keeps predict-world from resimming on every batch of held-input noise:
 // sub-epsilon drift rides until it accumulates past the line, then one
 // normal reconcile absorbs it.
+// `eps` is the lane default tolerance; a field's own Field_Desc.slack (> 0)
+// overrides it for that field — so a fast contested object rides loose drift
+// while precise fields in the same lane stay tight. slack is meaningful only
+// on float (.F32/.F64) fields; discrete predicted state always compares exact
+// (a differing byte is a real event), whatever the tolerances say.
 predict_within :: proc(a: []u8, b: []u8, desc: ^knet.Entity_Desc, eps: f32) -> bool {
 	off := 0
 	for f in desc.fields {
@@ -188,12 +203,13 @@ predict_within :: proc(a: []u8, b: []u8, desc: ^knet.Entity_Desc, eps: f32) -> b
 			continue
 		}
 		defer off += f.size
+		fe := f.slack > 0 ? f.slack : eps // per-field slack overrides the lane default
 		#partial switch f.lerp {
 		case .F32:
 			for i in 0 ..< f.size / 4 {
 				av := (^f32)(rawptr(&a[off + i * 4]))^
 				bv := (^f32)(rawptr(&b[off + i * 4]))^
-				if abs(av - bv) > eps {
+				if abs(av - bv) > fe {
 					return false
 				}
 			}
@@ -201,7 +217,7 @@ predict_within :: proc(a: []u8, b: []u8, desc: ^knet.Entity_Desc, eps: f32) -> b
 			for i in 0 ..< f.size / 8 {
 				av := (^f64)(rawptr(&a[off + i * 8]))^
 				bv := (^f64)(rawptr(&b[off + i * 8]))^
-				if abs(av - bv) > f64(eps) {
+				if abs(av - bv) > f64(fe) {
 					return false
 				}
 			}
@@ -214,9 +230,11 @@ predict_within :: proc(a: []u8, b: []u8, desc: ^knet.Entity_Desc, eps: f32) -> b
 	return true
 }
 
-// history_matches with the tolerant compare (eps = 0 falls back to exact).
+// history_matches with the tolerant compare. The exact fast path (one memcmp,
+// no field walk) holds only when NOTHING wants slack — neither the lane
+// default nor any per-field override; otherwise the per-field compare runs.
 history_within :: proc(h: ^History, tick: u64, blob: []u8, eps: f32) -> bool {
-	if eps <= 0 {
+	if eps <= 0 && !h.has_slack {
 		return history_matches(h, tick, blob)
 	}
 	stored, ok := history_read(h, tick)

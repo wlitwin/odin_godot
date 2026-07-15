@@ -152,6 +152,21 @@ boot_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 	b := cast(^Boot)user
 	for &k in b.ent_kinds {
 		if k.type != type {continue}
+		// PREDICTED-SPAWN MATCH: a projectile WE fired is already on our screen,
+		// flying under a provisional id — reuse it (rekey our node to the real
+		// one), never a second. The lane already rekeyed its tracking + opened a
+		// received-truth ledger; here we just carry the node ledger across.
+		if b.lane != nil {
+			if entity, from, matched := ksim.lane_spawn_match(b.lane, id, owner, type); matched {
+				if node, ok := b.ent_nodes[from]; ok {
+					b.ent_nodes[id] = node
+					delete_key(&b.ent_nodes, from)
+				}
+				b.ent_types[id] = type
+				delete_key(&b.ent_types, from)
+				return entity, k.set
+			}
+		}
 		scene := (cast(^^gd.Resource)(uintptr(b.ent_game) + k.scene_offset))^
 		assert(
 			cast(rawptr)scene != nil,
@@ -204,6 +219,67 @@ boot_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	if b.lane != nil {
 		ksim.lane_untrack(b.lane, id) // no-op for entities the lane never tracked
 	}
+	if node, ok := b.ent_nodes[id]; ok {
+		gd.node_queue_free(node)
+		delete_key(&b.ent_nodes, id)
+	}
+	delete_key(&b.ent_types, id)
+}
+
+// ---------------------------------------------------------------------------
+// Predicted spawns — a fired projectile (kit/sim spawn.odin). The client makes
+// the node and flies it THIS instant; the authority's real spawn rekeys it
+// (boot_make_entity's match) a round trip later. See docs/kit/sim.md.
+
+// Spawn a projectile the client PREDICTS and the authority OWNS — one call, no
+// role branch. Host: session_spawn_make (a real id, announced by _send). Client:
+// a local predicted node (a provisional id, flying now). Set the returned
+// entity's spawn fields (position, velocity from the muzzle), then
+// boot_fire_spawn_send(b, id). Call it from the firing verb's body.
+boot_fire_spawn :: proc(b: ^Boot, type: ksess.Entity_Type, owner: knet.Player_Id) -> (entity: rawptr, id: knet.Net_Id) {
+	if b.ses != nil && b.ses.is_host {
+		return ksess.session_spawn_make(b.ses, type, owner)
+	}
+	return boot_spawn_predicted(b, type, owner)
+}
+
+// The second half: announce the authority's spawn to every peer. Host only —
+// on a client the predicted spawn stays local until the authority's arrives.
+boot_fire_spawn_send :: proc(b: ^Boot, id: knet.Net_Id) {
+	if b.ses != nil && b.ses.is_host {
+		ksess.session_spawn_send(b.ses, id)
+	}
+}
+
+// Client-side: make the node and track it PREDICTED (provisional id, born this
+// tick). Prefer boot_fire_spawn, which routes host/client so game code stays
+// single-player-shaped. Returns (entity, provisional id).
+boot_spawn_predicted :: proc(b: ^Boot, type: ksess.Entity_Type, owner: knet.Player_Id) -> (entity: rawptr, id: knet.Net_Id) {
+	assert(b.lane != nil, "boot_spawn_predicted needs a sim lane (boot_lane) — a projectile flies on it")
+	for &k in b.ent_kinds {
+		if k.type != type {continue}
+		assert(k.sim_set != nil, "a predicted projectile must @(gd_tick) — it flies itself with no inputs")
+		scene := (cast(^^gd.Resource)(uintptr(b.ent_game) + k.scene_offset))^
+		assert(cast(rawptr)scene != nil, fmt.tprintf("entity %s: its tagged scene field is nil", k.name))
+		node := gd.instantiate(cast(gd.Packed_Scene)scene)
+		entity = k.script_of(node)
+		assert(entity != nil, fmt.tprintf("entity %s: the scene's root does not carry the %s script", k.name, k.name))
+		gd.add_child(b.world, node)
+		id = ksim.lane_spawn_predicted(b.lane, entity, k.sim_set, owner, type)
+		b.ent_nodes[id] = node
+		b.ent_types[id] = type
+		if k.spawned != nil {
+			k.spawned(b.ent_game, entity, id, owner)
+		}
+		return
+	}
+	return nil, 0
+}
+
+// The lane's node-free hook (installed by boot_lane): a culled predicted spawn
+// (a refused fire, or a lost one swept) queue-frees the node the client made.
+boot_free_predicted :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
+	b := cast(^Boot)user
 	if node, ok := b.ent_nodes[id]; ok {
 		gd.node_queue_free(node)
 		delete_key(&b.ent_nodes, id)

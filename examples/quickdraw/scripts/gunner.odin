@@ -42,6 +42,7 @@ Gunner :: struct {
 	aim:     f32 `gd:"replicate,predict"`,
 	dash_cd: u16 `gd:"replicate,predict"`,
 	fire:    psim.Cool,
+	lob:     psim.Cool, // the slow projectile's cadence (predicted, like the trigger)
 
 	// The delta lane, beside it (host-authoritative, never resimmed).
 	hp:       i32 `gd:"replicate"`,
@@ -74,6 +75,7 @@ Gunner_Input :: struct {
 
 BTN_FIRE :: u8(1)
 BTN_DASH :: u8(2)
+BTN_LOB :: u8(4)
 
 // The sim-lane step: pure (predicted fields, input) → predicted fields, plus
 // a returned PAYLOAD — the facts this tick learned. Runs authoritatively on
@@ -84,7 +86,7 @@ BTN_DASH :: u8(2)
 // generated thunk holds every role gate. No clocks, no nodes, no
 // PhysicsServer: walls and crates are util.odin arithmetic.
 @(gd_tick)
-gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) -> (fired: bool) {
+gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) -> (fired: bool, lobbed: bool) {
 	// Reading delta-lane hp here is a KNOWN mispredict source at the death
 	// edge (the client learns you died ~a transit late, predicts a step the
 	// server refused, and reconciles it back — the glide eats the pop). The
@@ -99,7 +101,10 @@ gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) -> (fired: bool) {
 		if self.fire.left > 0 {
 			self.fire.left += 1
 		}
-		return false
+		if self.lob.left > 0 {
+			self.lob.left += 1
+		}
+		return
 	}
 	self.aim = angle_of(input.aim)
 
@@ -108,6 +113,12 @@ gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) -> (fired: bool) {
 	// trips, and a replay re-derives the same shots from the same inputs.
 	if input.buttons & BTN_FIRE != 0 && psim.ready(&self.fire, FIRE_CD) {
 		fired = true
+	}
+	// The LOB: same predicted cadence, but its FACT spawns a slow projectile —
+	// a client-predicted entity that leaves the muzzle this instant and the
+	// authority's real one rekeys a round trip later (quickdraw.odin's halves).
+	if input.buttons & BTN_LOB != 0 && psim.ready(&self.lob, LOB_CD) {
+		lobbed = true
 	}
 
 	// The boots the shop sold you — predicted state read by the predicted

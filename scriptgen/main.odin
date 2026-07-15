@@ -346,6 +346,10 @@ Replicate_Info :: struct {
 	blend:  string, // `interp=NAME`: the author's knet.Blend_Proc, spliced verbatim
 	wire:   string, // knet.Wire_Kind literal (".F16"/".Custom"); "" = raw struct bytes
 	codec:  string, // `wire=NAME`: the author's knet.Wire_Codec, spliced verbatim
+	slack:  string, // `slack=N`: per-field kit/sim reconcile tolerance, the numeric literal
+	                // spliced as f32 ("" = inherit the lane default). predict floats only.
+	glide:  string, // `glide=N`: per-field render-error half-life (seconds). predict+interp floats.
+	cut:    string, // `cut=N`: per-field snap threshold (world units). predict+interp floats.
 }
 
 // One @(gd_command) arg. Command args cross the wire, so the allowed types are
@@ -424,7 +428,6 @@ Sim_Proc_Info :: struct {
 	proc_name:  string,
 	line:       int,
 	input_type: string, // sample only: the `input: ^T` param's T
-	authority:  bool,   // step only: @(gd_step = "authority") — the host alone runs it
 }
 
 // The one @(gd_tick) proc a class may declare — its sim-lane step (kit/sim).
@@ -468,7 +471,8 @@ Script :: struct {
 	tick:        Tick_Info, // proc_name == "" = the class doesn't tick
 	block_ticks: [dynamic]Hoisted_Tick, // embedded blocks' ticks, entity-tick-first order
 	sample:      Sim_Proc_Info, // @(gd_sample): the lane's device read (proc_name == "" = none)
-	step:        Sim_Proc_Info, // @(gd_step): the lane's world pass
+	step:        Sim_Proc_Info, // @(gd_step): the EVERYWHERE world pass (live + resim)
+	step_auth:   Sim_Proc_Info, // @(gd_step="authority"): the host-only world pass
 	lane_input_type: string, // resolved package-wide (resolve_sim): the ONE input struct the lane ships
 	boot_field:  string, // the kboot.Boot field's name ("" = none) — generates the standard transport forwards
 	std_forwards: [dynamic]string, // which standard forwards were synthesized (bodies emitted by generate)

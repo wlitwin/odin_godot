@@ -26,6 +26,14 @@ DASH_CD :: u16(45) // full cooldown, burst included (~0.75s)
 
 FIRE_CD :: u16(18) // ~0.3s between shots
 FIRE_RANGE :: f32(800) // arena-wide; walls and crates are the real limit
+
+// The LOB — the slow predicted-spawn projectile (bullet.odin). Slow enough to
+// read and dodge, which is the whole reason its splash lands on server truth,
+// not a rewind.
+LOB_SPEED :: f32(2.6) // ~156 px/s — a touch faster than a running gunner
+LOB_LIFE :: u16(70) // ~1.2s of flight before it lands (~180 px reach)
+LOB_RADIUS :: f32(26) // splash reach at the landing point
+LOB_CD :: u16(48) // ~0.8s between lobs
 MAX_HP :: i32(3)
 RESPAWN_TICKS :: u64(120) // ~2s on the floor
 

@@ -25,10 +25,12 @@ import knet "godot:kit/net"
 // never existed); everything else presents the sim value as-is. The err blob
 // shares the predict-subset layout, so offsets line up for free.
 
-// err = shown − truth, per float interp component. `cut` > 0: an error any
-// component of which exceeds it is a deliberate discontinuity (a teleport, a
-// kickoff) — zero it and let the snap show; smoothing a cut looks worse than
-// the cut (the puppet rule).
+// err = shown − truth, per float interp component. The cut is the teleport
+// threshold: an error any component of which exceeds it is a deliberate
+// discontinuity (a teleport, a kickoff) — zero the WHOLE error and let the snap
+// show; smoothing a cut looks worse than the cut (the puppet rule). `cut` is
+// the lane default; a field's own Field_Desc.cut (> 0) overrides it — but the
+// snap stays entity-coherent (any field past ITS cut snaps the whole pose).
 predict_error :: proc(err: []u8, shown: []u8, truth: []u8, desc: ^knet.Entity_Desc, cut: f32) {
 	off := 0
 	over := false
@@ -40,12 +42,13 @@ predict_error :: proc(err: []u8, shown: []u8, truth: []u8, desc: ^knet.Entity_De
 		if .Interp not_in f.flags {
 			continue
 		}
+		fc := f.cut > 0 ? f.cut : cut // per-field cut overrides the lane default
 		#partial switch f.lerp {
 		case .F32:
 			for i in 0 ..< f.size / 4 {
 				d := (^f32)(rawptr(&shown[off + i * 4]))^ - (^f32)(rawptr(&truth[off + i * 4]))^
 				(^f32)(rawptr(&err[off + i * 4]))^ = d
-				if cut > 0 && abs(d) > cut {
+				if fc > 0 && abs(d) > fc {
 					over = true
 				}
 			}
@@ -53,7 +56,7 @@ predict_error :: proc(err: []u8, shown: []u8, truth: []u8, desc: ^knet.Entity_De
 			for i in 0 ..< f.size / 8 {
 				d := (^f64)(rawptr(&shown[off + i * 8]))^ - (^f64)(rawptr(&truth[off + i * 8]))^
 				(^f64)(rawptr(&err[off + i * 8]))^ = d
-				if cut > 0 && abs(d) > f64(cut) {
+				if fc > 0 && abs(d) > f64(fc) {
 					over = true
 				}
 			}
@@ -66,8 +69,11 @@ predict_error :: proc(err: []u8, shown: []u8, truth: []u8, desc: ^knet.Entity_De
 	}
 }
 
-// One frame of exponential decay: err *= k (k = 0.5^(dt/half_life)).
-predict_error_decay :: proc(err: []u8, desc: ^knet.Entity_Desc, k: f32) {
+// One frame of exponential decay per field: err *= 0.5^(dt/half_life), where a
+// field's own glide half-life (Field_Desc.glide > 0) overrides `halflife`, the
+// lane default. Per-field k is why a slow-gliding avatar and a snappy ball can
+// share one lane.
+predict_error_decay :: proc(err: []u8, desc: ^knet.Entity_Desc, dt: f64, halflife: f64) {
 	off := 0
 	for f in desc.fields {
 		if .Predicted not_in f.flags {
@@ -77,6 +83,8 @@ predict_error_decay :: proc(err: []u8, desc: ^knet.Entity_Desc, k: f32) {
 		if .Interp not_in f.flags {
 			continue
 		}
+		hl := f.glide > 0 ? f64(f.glide) : halflife
+		k := f32(math.pow(0.5, dt / hl))
 		#partial switch f.lerp {
 		case .F32:
 			for i in 0 ..< f.size / 4 {

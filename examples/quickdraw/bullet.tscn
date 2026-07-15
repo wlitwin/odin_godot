@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/bullet.odin" id="1_bul"]
+
+[node name="Bullet" type="Node2D"]
+script = ExtResource("1_bul")
+
+[node name="Skin" type="Polygon2D" parent="."]
+z_index = 4
+color = Color(0.95, 0.75, 0.2, 1)
+polygon = PackedVector2Array(4, 0, 0, 3, -4, 0, 0, -3)

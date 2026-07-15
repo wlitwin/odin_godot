@@ -362,21 +362,28 @@ run_cmds :: proc(l: ^Lane, t: u64) {
 // the delta-lane ones: they ARE the re-applied speculation.
 @(private = "file")
 cmd_exec_local :: proc(l: ^Lane, c: ^Cmd_Out, tr: ^Tracked, me: knet.Player_Id, re := false) {
-	if n := delta_lane_size(tr.desc); n > 0 {
+	// Capture stable handles up front: the verb may spawn a projectile
+	// (lane_spawn_predicted), which appends to l.tracked and can REALLOCATE it —
+	// `tr` would then dangle. The entity struct, its descriptor, the command
+	// slice, and the History all live outside that array and stay put.
+	entity, dsc, cmds, hist, idx := tr.entity, tr.desc, tr.cmds, tr.hist, c.idx
+	if n := delta_lane_size(dsc); n > 0 {
 		if c.revert == nil {
 			c.revert = make([]u8, n)
 		}
-		delta_lane_capture(c.revert, tr.entity, tr.desc)
+		delta_lane_capture(c.revert, entity, dsc)
 	}
-	pre := make([]u8, tr.hist.size, context.temp_allocator)
-	predict_capture(pre, tr.entity, tr.desc)
+	pre := make([]u8, hist.size, context.temp_allocator)
+	predict_capture(pre, entity, dsc)
 	c.mask = 0
 	delete(c.patch)
 	c.patch = nil
-	c.ok = tr.cmds[c.idx].exec(tr.entity, c.args, l, me)
-	if c.ok && tr.cmds[c.idx].apply == nil {
-		scratch := make([]u8, tr.hist.size, context.temp_allocator)
-		mask, n := cmd_patch_diff(scratch, pre, tr.entity, tr.desc)
+	l.cmd_exec_seq = c.seq // a predicted spawn inside this verb tags itself with the seq
+	c.ok = cmds[idx].exec(entity, c.args, l, me)
+	l.cmd_exec_seq = 0
+	if c.ok && cmds[idx].apply == nil {
+		scratch := make([]u8, hist.size, context.temp_allocator)
+		mask, n := cmd_patch_diff(scratch, pre, entity, dsc)
 		if n > 0 {
 			c.mask = mask
 			c.patch = make([]u8, n)
@@ -386,7 +393,7 @@ cmd_exec_local :: proc(l: ^Lane, c: ^Cmd_Out, tr: ^Tracked, me: knet.Player_Id, 
 	if re {
 		// Off-tick re-execution: predicted fields go back to what the frame
 		// held; the effect lands through the next resim like everything else.
-		predict_restore(tr.entity, tr.desc, pre)
+		predict_restore(entity, dsc, pre)
 	}
 	// A locally-false verb wrote nothing (check-then-mutate is the verb
 	// contract) — the entry stays for the server's word anyway: ITS state
@@ -412,6 +419,10 @@ cmd_settle :: proc(l: ^Lane) {
 		if c.verdict != .Rejected || !c.executed {
 			continue
 		}
+		// A refused fire despawns the projectile it predicted (no-op if it
+		// spawned none) — the verdict is the instant despawn; the sweep is the
+		// backstop for a fire whose spawn simply never arrives.
+		lane_spawn_reject(l, c.seq)
 		tr := cmd_tracked(l, c.id)
 		if tr == nil || tr.hist == nil {
 			c.executed = false

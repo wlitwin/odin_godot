@@ -36,6 +36,17 @@ Field_Desc :: struct {
 	blend:  Blend_Proc, // required iff lerp == .Custom
 	wire:   Wire_Kind, // how the field's bytes are ENCODED in packets (default: raw)
 	codec:  Wire_Codec, // required iff wire == .Custom
+	slack:  f32, // kit/sim reconcile tolerance for THIS predicted float field, world
+	             // units (0 = inherit the lane default, Lane_Config.tolerance). Lets a
+	             // fast contested object ride loose drift while precise fields in the
+	             // same lane stay tight — a differing float within slack doesn't resim.
+	             // Only the predict reconcile reads it; coop-lane fields ignore it.
+	glide:  f32, // kit/sim render-error smoothing half-life for THIS predicted interp
+	             // float field, seconds (0 = inherit Lane_Config.smooth_halflife). A
+	             // slower glide reads smoother; a faster one snaps back sooner.
+	cut:    f32, // kit/sim snap threshold for THIS field, world units (0 = inherit
+	             // Lane_Config.smooth_cut). A reconcile error past it is a teleport —
+	             // the whole entity SNAPS (smoothing a cut looks worse than the cut).
 }
 
 Field_Flag :: enum u8 {
@@ -221,7 +232,7 @@ field_ptr :: proc(entity: rawptr, f: Field_Desc) -> rawptr {
 // (every registered entity passes through here): a malformed Wire_Kind fails
 // loudly at registration instead of corrupting packets later.
 shadow_make :: proc(desc: ^Entity_Desc, allocator := context.allocator) -> []u8 {
-	assert(len(desc.fields) <= MAX_REPLICATED_FIELDS)
+	assert(len(desc.fields) <= MAX_REPLICATED_FIELDS, "entity exceeds 64 replicated fields — the dirty mask (and the sim predict mask) is one u64; group fields into a sub-struct (scriptgen catches this at build time)")
 	for f in desc.fields {
 		switch f.wire {
 		case .Raw:

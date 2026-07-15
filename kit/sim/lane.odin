@@ -43,7 +43,6 @@ package kit_sim
 // predicted fields, lane_input, and per-tick derivables — never wall clocks,
 // node state, or un-ledgered randomness.
 
-import "core:math"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
@@ -144,6 +143,14 @@ Tracked :: struct {
 	err:     []u8, // render-error blob (predict-subset layout), alloc'd on the first correction
 	contested: bool, // predicted here but NOT mine: presentation follows `claim`
 	claim:     f32, // 1 = my sim drives it (present predicted), decaying to 0 (present the watched view)
+	// Predicted-spawn bookkeeping (a client-fired projectile, command.odin's
+	// lane_spawn_predicted). born = the spawn tick, so ticks before it are
+	// gated out of the ledger/rewind/resim (Entry.born). A provisional entity is
+	// unmatched until the authority's spawn arrives and rekeys it.
+	born:        u64,
+	provisional: bool, // spawned locally, not yet matched to an authoritative id
+	spawn_seq:   u32, // the firing command's seq — the match key (FIFO breaks on a rejected burst shot)
+	spawn_type:  ksess.Entity_Type, // what to match against on the authority's spawn
 }
 
 Lane :: struct {
@@ -166,8 +173,8 @@ Lane :: struct {
 
 	user:            rawptr,
 	sample:          Sample_Proc, // nil = this seat plays nobody (dedicated)
-	step:            Step_Proc,
-	step_auth:       bool, // the step is authority work: run it on the host only
+	step:            Step_Proc, // the world pass that runs EVERYWHERE (live + resim): pure-sim contact
+	step_auth:       Step_Proc, // the host-only world pass: adjudication, respawns (the authority never resims)
 
 	tracked:         [dynamic]Tracked,
 	entries:         [dynamic]Entry, // ledgered subset of tracked (host: all; client: mine)
@@ -204,6 +211,15 @@ Lane :: struct {
 	cmd_seq:         u32,
 	cmd_out:         [dynamic]Cmd_Out,
 	cmd_in:          [dynamic]Cmd_In,
+	cmd_exec_seq:    u32, // the command whose exec is running RIGHT NOW (0 = none) —
+	                      // lane_spawn_predicted tags its projectile with it, so a
+	                      // rejected fire despawns exactly the projectile it spawned
+
+	// predicted spawns (spawn.odin): a client's own fired projectiles, tracked
+	// under provisional ids until the authority's spawn arrives and rekeys them
+	spawn_next:      u32, // provisional id counter (client-local, high-bit tagged)
+	spawn_free:      Spawn_Free_Proc, // engine layer frees the node on despawn (nil on the core)
+	spawn_free_user: rawptr,
 }
 
 // Bind to a session (host or client, before or after it starts) — wiring
@@ -277,19 +293,24 @@ lane_destroy :: proc(l: ^Lane) {
 	delete(l.cmd_in)
 }
 
-// The two game procs. `sample` may be nil on a seat that plays nobody (a
-// dedicated server). `step` is the world pass; with lane_track_set entities
-// it becomes optional — entity thunks carry the per-entity simulation, the
-// step keeps only the cross-entity work (and may be nil when there is none).
-// `step_authority` runs the step on the authority only — the role gate an
-// authority-work world pass (respawn queues, adjudication sweeps) used to
-// open with; a PURE-SIM world pass (contact for pairs this peer has inputs
-// for) leaves it false and runs everywhere, live and resim alike.
-lane_set_sim :: proc(l: ^Lane, user: rawptr, sample: Sample_Proc, step: Step_Proc, step_authority := false) {
+// The game procs. `sample` may be nil on a seat that plays nobody (a
+// dedicated server). Up to TWO world passes, either nil, both run after the
+// entity thunks:
+//
+//   `step`      runs EVERYWHERE, live and resim alike — the PURE-SIM pass
+//               (contact for pairs this peer has inputs for). With
+//               lane_track_set entities it's often nil: entity thunks carry
+//               the per-entity simulation, the step keeps only cross-entity work.
+//   `step_auth` runs on the AUTHORITY alone — the role gate an authority-work
+//               pass (respawn queues, adjudication sweeps, a match clock) used
+//               to open with by hand. The host never resims, so it fires once
+//               per real tick. A game needing both keeps them separate instead
+//               of folding `if lane_is_authority()` into one pass.
+lane_set_sim :: proc(l: ^Lane, user: rawptr, sample: Sample_Proc, step: Step_Proc = nil, step_auth: Step_Proc = nil) {
 	l.user = user
 	l.sample = sample
 	l.step = step
-	l.step_auth = step_authority
+	l.step_auth = step_auth
 }
 
 // Put an entity on the sim lane — call where the entity is born on this peer
@@ -544,8 +565,24 @@ lane_frame :: proc(l: ^Lane, dt: f64) -> int {
 @(private = "file")
 run_tick :: proc(l: ^Lane, t: u64) {
 	l.step_tick = t
-	for &tr in l.tracked {
+	// Index-based, re-fetching each iteration: a tick's _fx/_then may SPAWN a
+	// projectile (lane_spawn_predicted / lane_track_set), which appends to
+	// l.tracked and can REALLOCATE it — a `for &tr` pointer would dangle. A
+	// freshly appended entity is born THIS tick, so the born gate below skips it.
+	for i := 0; i < len(l.tracked); i += 1 {
+		tr := &l.tracked[i]
 		if tr.tick == nil || tr.watched {
+			continue
+		}
+		if tr.born != 0 && t <= tr.born {
+			// Not born yet, or the spawn tick itself (which holds the unticked
+			// spawn state — a predicted spawn is created AFTER the thunk pass, in
+			// run_cmds). During a resim that crosses the spawn, reseed from the
+			// ledger so flight restarts from the spawn state, not the stale head
+			// a failed rewind left behind.
+			if l.resimming && t == tr.born && tr.hist != nil {
+				history_restore(tr.hist, tr.born, tr.entity)
+			}
 			continue
 		}
 		in_ptr: rawptr
@@ -560,8 +597,14 @@ run_tick :: proc(l: ^Lane, t: u64) {
 	// ticks integrate, verbs mutate the settled state, the world pass
 	// adjudicates (command.odin).
 	run_cmds(l, t)
-	if l.step != nil && (!l.step_auth || l.ses.is_host) {
+	// The everywhere pass first (contact settles), then the authority pass
+	// reads that settled state to adjudicate. The host is never resimming, so
+	// its authority pass fires exactly once per real tick.
+	if l.step != nil {
 		l.step(l.user, t)
+	}
+	if l.step_auth != nil && l.ses.is_host {
+		l.step_auth(l.user, t)
 	}
 }
 
@@ -641,6 +684,7 @@ client_frame :: proc(l: ^Lane, dt: f64) -> int {
 		return 0
 	}
 	cmd_settle(l) // land verdicts/timeouts on the frame, not in a handler
+	lane_spawn_sweep(l) // reap lost predicted spawns (a fire no authority spawn claimed)
 	n := sim_ticker_advance(&l.ticker, dt)
 	if n > 0 {
 		// Fields may hold last frame's PRESENTED values (sim + decaying
@@ -1010,7 +1054,6 @@ lane_present :: proc(l: ^Lane, dt: f64) {
 	// snapped at ingest, the eye glides here. Restoring from the ledger first
 	// makes a double present harmless (idempotent per frame).
 	if l.smooth_halflife > 0 {
-		k := f32(math.pow(0.5, dt / l.smooth_halflife))
 		for &tr in l.tracked {
 			if tr.watched || tr.hist == nil || tr.err == nil {
 				continue
@@ -1018,7 +1061,9 @@ lane_present :: proc(l: ^Lane, dt: f64) {
 			if !history_restore(tr.hist, l.ticker.tick, tr.entity) {
 				continue
 			}
-			predict_error_decay(tr.err, tr.desc, k)
+			// Per-field half-life: each field decays at its own glide (or the
+			// lane default). The gate above stays a lane-level fast out.
+			predict_error_decay(tr.err, tr.desc, dt, l.smooth_halflife)
 			predict_error_apply(tr.entity, tr.desc, tr.err)
 		}
 	}
