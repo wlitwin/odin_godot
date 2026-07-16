@@ -452,6 +452,49 @@ SERVER-SIDE on truth, not a rewind — a slow shot is meant to be dodged.
 `examples/quickdraw`'s lob (right-click) is the worked proof; its native acid
 lands the predicted bullet on the client's own tick, no round trip.
 
+## Two entity kinds, two inputs
+
+One player can drive two DIFFERENT entity kinds on the same tick — a walker and
+a turret, an avatar and a vehicle, a duelist and a companion drone. Each kind
+declares its own `@(gd_tick)` input struct, and each is an input **class**: the
+client samples one per tick, ships one window per class on the single upstream
+packet, and the host de-jitters each into its own per-player buffer. An entity's
+tick reads only its own class — the two timelines never cross, and a reconcile
+of one leaves the other untouched.
+
+The authoring is just a second `@(gd_sample)`, one per input type:
+
+```odin
+// two ticking kinds, two input structs
+@(gd_tick) gunner_tick :: proc(self: ^Gunner, in: Gunner_Input) { ... }
+@(gd_tick) drone_tick  :: proc(self: ^Drone,  in: Drone_Input)  { ... }
+
+// two device reads on the game root — scriptgen matches each to its class by
+// the struct it writes (one sample per input TYPE; a second on the same type
+// is a build error)
+@(gd_sample) qd_sample    :: proc(self: ^Game, tick: u64, in: ^Gunner_Input) { ... }
+@(gd_sample) drone_sample :: proc(self: ^Game, tick: u64, in: ^Drone_Input)  { ... }
+```
+
+scriptgen assigns each distinct input type a stable wire id (sorted by name; the
+primary is 0), stamps each `Sim_Set` with its class, and grows `<game>_lane_init`
+to register them all — `lane_init` carries the primary, `lane_add_input_class`
+the rest. Nothing else changes: track each entity with its generated `Sim_Set`
+as before, and the right input reaches the right tick everywhere (live, predict,
+resim). A single-input game registers exactly one class and is byte-for-byte the
+old wire.
+
+Underneath: a `Lane` holds one ring per class the seat drives and the host holds
+one buffer per (player, class); the batch's input ack is the MIN newest across a
+player's classes, so the client leads enough for its most-starved input and
+trims every ring by that floor. The one deliberate limit: **one driven entity
+per class per player** — two entities of the *same* kind driven by one player
+would share a window (give them distinct input structs, or compose their intent
+into one). `examples/quickdraw`'s drone (a companion each duelist steers beside
+their gunner) is the worked proof; its native acid predicts the drone on the
+client's own tick and shows it sweeping its own steer while the gunner strafes
+the other way — the two input classes, orthogonal, from one seat.
+
 ## Promoting a coop game
 
 Because `predict` is a lane per FIELD, a friendslop game that grows
@@ -553,14 +596,14 @@ needs a `predict` float. scriptgen rejects each on the wrong field, spelled out.
 ## Status and what's next
 
 The runtime and the authoring surface are complete and proven headless:
-input pipeline, ledgers, snapshots, reconcile, lane driver, lag comp,
-watched interp, render-error smoothing, possession, the
-`@(gd_tick)`/`predict` codegen, tick composition through embedded blocks
-(the `play/sim` shelf above), and two worked example games (quickdraw,
-speedball) with native duel acids — the kitsim tests (including
-loss-and-blackout convergence acids and the glide-vs-snap assertion) plus
-the repgen contract pins hold all of it. Still to come:
-commands-as-tick-inputs for entities that mix lanes.
+input pipeline (single- or multi-class), ledgers, snapshots, reconcile, lane
+driver, lag comp, watched interp, render-error smoothing, possession, predicted
+spawns, the `@(gd_tick)`/`@(gd_sample)`/`predict` codegen, tick composition
+through embedded blocks (the `play/sim` shelf above), and two worked example
+games (quickdraw, speedball) with native duel acids — the kitsim tests
+(including loss-and-blackout convergence acids, the per-class routing
+fingerprint, and the glide-vs-snap assertion) plus the repgen contract pins
+hold all of it.
 
 See also: [net](net.md) (the shared descriptor core), [session](session.md)
 (identity and everything reliable), [play](play.md) (the coop shelf —

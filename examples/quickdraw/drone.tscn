@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/drone.odin" id="1_drn"]
+
+[node name="Drone" type="Node2D"]
+script = ExtResource("1_drn")
+
+[node name="Skin" type="Polygon2D" parent="."]
+z_index = 3
+color = Color(0.6, 0.85, 0.95, 1)
+polygon = PackedVector2Array(5, 0, 0, 5, -5, 0, 0, -5)

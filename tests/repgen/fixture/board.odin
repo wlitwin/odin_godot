@@ -39,6 +39,13 @@ pawn_freed :: proc(game: ^Board, self: ^Pawn, id: knet.Net_Id) {
 board_sample :: proc(self: ^Board, tick: u64, input: ^Pawn_Input) {
 }
 
+// The SECOND input class's device read — one @(gd_sample) per input TYPE. This
+// fills the turret's input; resolve_sim matches it to Turret's class by the
+// struct it writes, and board_lane_init registers it with lane_add_input_class.
+@(gd_sample)
+board_sample_turret :: proc(self: ^Board, tick: u64, input: ^Turret_Input) {
+}
+
 // Everywhere: runs live and in every resim, on every peer (pure-sim contact).
 @(gd_step)
 board_contact :: proc(self: ^Board, tick: u64) {

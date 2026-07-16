@@ -187,6 +187,8 @@ Input_Buffer :: struct {
 	margin_init: bool,
 	fresh_count: u64, // pops that found the exact tick
 	held_count:  u64, // pops that fell back to hold-last (the gap stat)
+	fresh:       bool, // did the LAST pop find its tick (the driver's freshness bit) —
+	                   // per-class now, so it rides the buffer instead of the peer
 }
 
 input_buffer_make :: proc(size: int, slots: int, allocator := context.allocator) -> Input_Buffer {
@@ -286,8 +288,10 @@ input_buffer_pop :: proc(b: ^Input_Buffer, tick: u64) -> (input: []u8, fresh: bo
 		copy(b.held, b.data[i * b.size:(i + 1) * b.size])
 		b.tag = b.tags[i]
 		b.fresh_count += 1
+		b.fresh = true
 		return b.held, true
 	}
 	b.held_count += 1 // b.tag holds the last real rider, like the input itself
+	b.fresh = false
 	return b.held, false
 }

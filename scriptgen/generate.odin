@@ -76,7 +76,7 @@ generate :: proc(s: ^Script) -> string {
 			break
 		}
 	}
-	has_lane_wiring := s.sample.proc_name != "" || s.step.proc_name != ""
+	has_lane_wiring := len(s.input_classes) > 0 || s.step.proc_name != "" || s.step_auth.proc_name != ""
 	if s.tick.proc_name != "" || len(s.block_ticks) > 0 || ticked_entities || has_lane_wiring {
 		w(&b, "import ksim \"godot:kit/sim\"\n")
 	}
@@ -928,12 +928,15 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		}
 
 		in_size := s.tick.input_type != "" ? fmt.tprintf("size_of(%s)", s.tick.input_type) : "0"
+		// The wire class the input rides (resolve_sim assigned it package-wide);
+		// 0 for the primary or an inputless tick, emitted only when it differs.
+		in_class := s.tick.input_type != "" && s.tick.input_class != 0 ? fmt.tprintf(", input_class = %d", s.tick.input_class) : ""
 		contested := s.tick.contested ? ", contested = true" : ""
 		sim_cmds := len(s.commands) > 0 ? fmt.tprintf(", commands = _%s_sim_cmds[:]", snake) : ""
 		fmt.sbprintf(
 			b,
-			"// kit/sim set for %s — ksim.lane_track_set(&lane, id, self, &%s_sim_set, owner)\n%s_sim_set := ksim.Sim_Set{{entity_desc = &%s_net_desc, tick = _%s_tick_step, input_size = %s%s%s}}\n\n",
-			cls, snake, snake, snake, snake, in_size, contested, sim_cmds,
+			"// kit/sim set for %s — ksim.lane_track_set(&lane, id, self, &%s_sim_set, owner)\n%s_sim_set := ksim.Sim_Set{{entity_desc = &%s_net_desc, tick = _%s_tick_step, input_size = %s%s%s%s}}\n\n",
+			cls, snake, snake, snake, snake, in_size, in_class, contested, sim_cmds,
 		)
 	}
 
@@ -979,14 +982,17 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	// @(gd_step="authority") on the host alone. Game wiring is two lines:
 	// `<snake>_lane_init(self, &self.lane, &self.ses, cfg = {...})` beside
 	// boot_attach, then `kboot.boot_lane(&self.boot, &self.lane)`.
-	if s.sample.proc_name != "" || s.step.proc_name != "" || s.step_auth.proc_name != "" {
+	if len(s.input_classes) > 0 || s.step.proc_name != "" || s.step_auth.proc_name != "" {
 		w(b, "// ---- @(gd_sample)/@(gd_step) lane wiring ----\n\n")
-		if s.sample.proc_name != "" {
-			fmt.sbprintf(
-				b,
-				"@(private = \"file\")\n_%s_lane_sample :: proc(user: rawptr, tick: u64, dst: rawptr) {{\n\t%s(cast(^%s)user, tick, cast(^%s)dst)\n}}\n\n",
-				snake, s.sample.proc_name, cls, s.sample.input_type,
-			)
+		// One typed device-read thunk per input class that has a sample.
+		for ic in s.input_classes {
+			if ic.sample != "" {
+				fmt.sbprintf(
+					b,
+					"@(private = \"file\")\n_%s_lane_sample_%d :: proc(user: rawptr, tick: u64, dst: rawptr) {{\n\t%s(cast(^%s)user, tick, cast(^%s)dst)\n}}\n\n",
+					snake, ic.class_id, ic.sample, cls, ic.type_name,
+				)
+			}
 		}
 		if s.step.proc_name != "" {
 			fmt.sbprintf(
@@ -1002,21 +1008,37 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				snake, s.step_auth.proc_name, cls,
 			)
 		}
-		lane_in_size := s.lane_input_type != "" ? fmt.tprintf("size_of(%s)", s.lane_input_type) : "0"
-		sample_ref := s.sample.proc_name != "" ? fmt.tprintf("_%s_lane_sample", snake) : "nil"
 		step_ref := s.step.proc_name != "" ? fmt.tprintf("_%s_lane_step", snake) : "nil"
 		step_auth_ref := s.step_auth.proc_name != "" ? fmt.tprintf("_%s_lane_step_auth", snake) : "nil"
+		// The primary class (id 0) rides lane_init + lane_set_sim; extras
+		// register after. An inputless lane (no classes) passes size 0 / nil.
+		primary_size := "0"
+		primary_sample := "nil"
+		if len(s.input_classes) > 0 {
+			p := s.input_classes[0] // sorted by id: [0] is the primary
+			primary_size = fmt.tprintf("size_of(%s)", p.type_name)
+			if p.sample != "" {
+				primary_sample = fmt.tprintf("_%s_lane_sample_%d", snake, p.class_id)
+			}
+		}
 		fmt.sbprintf(
 			b,
-			"// The lane beside the session: input size, typed sample, and up to two\n"+
-			"// world passes (everywhere + authority) — all from the attributes. cfg\n"+
-			"// tunes; zero = defaults.\n"+
+			"// The lane beside the session: the input classes, each with its typed\n"+
+			"// sample, and up to two world passes (everywhere + authority) — all from\n"+
+			"// the attributes. A single-input game registers one class; a game driving\n"+
+			"// two entity kinds registers both. cfg tunes; zero = defaults.\n"+
 			"%s_lane_init :: proc(self: ^%s, l: ^ksim.Lane, ses: ^ksess.Session, tag := ksim.SIM_TAG, cfg := ksim.Lane_Config{{}}) {{\n"+
 			"\tksim.lane_init(l, ses, %s, tag, cfg)\n"+
-			"\tksim.lane_set_sim(l, self, %s, %s, %s)\n"+
-			"}}\n\n",
-			snake, cls, lane_in_size, sample_ref, step_ref, step_auth_ref,
+			"\tksim.lane_set_sim(l, self, %s, %s, %s)\n",
+			snake, cls, primary_size, primary_sample, step_ref, step_auth_ref,
 		)
+		if len(s.input_classes) > 1 {
+			for ic in s.input_classes[1:] {
+				sample_ref := ic.sample != "" ? fmt.tprintf("_%s_lane_sample_%d", snake, ic.class_id) : "nil"
+				fmt.sbprintf(b, "\tksim.lane_add_input_class(l, %d, size_of(%s), %s)\n", ic.class_id, ic.type_name, sample_ref)
+			}
+		}
+		w(b, "}\n\n")
 	}
 
 	// ---- entity kinds: `entity=Name:id` scene fields -> the kboot table ----

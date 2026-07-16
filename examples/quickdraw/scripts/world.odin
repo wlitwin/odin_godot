@@ -29,6 +29,16 @@ gunner_freed :: proc(game: ^Quickdraw, self: ^Gunner, id: knet.Net_Id) {
 	}
 }
 
+// The drone's census hook — the SECOND input-driven kind. Its one game line is
+// the same lane_track_set the kit runs from the generated kinds row (drone's
+// Sim_Set carries its wire class); here we only mark ownership for the sample.
+drone_spawned :: proc(game: ^Quickdraw, self: ^Drone, id: knet.Net_Id, owner: knet.Player_Id) {
+	self.mine = owner != knet.PLAYER_ID_INVALID && owner == game.ses.me
+}
+
+drone_freed :: proc(game: ^Quickdraw, self: ^Drone, id: knet.Net_Id) {
+}
+
 // Host: the duel fills — one gunner per seated player, corners first.
 spawn_world :: proc(self: ^Quickdraw) {
 	if len(gunner_ids(&self.boot)) > 0 {return}
@@ -54,4 +64,14 @@ spawn_gunner :: proc(self: ^Quickdraw, pid: knet.Player_Id) {
 	g.x = spot[0]
 	g.y = spot[1]
 	ksess.session_spawn_send(&self.ses, gid)
+
+	// ...and a DRONE beside them, owned by the same player: two entities, two
+	// input classes, one seat. It hovers a little above the gunner's spot and
+	// steers on Drone_Input every tick.
+	dp, did := ksess.session_spawn_make(&self.ses, DRONE_TYPE, owner = pid)
+	d := cast(^Drone)dp
+	d.pid = u8(pid)
+	d.x = spot[0]
+	d.y = clamp(spot[1] - 40, ARENA_WALL, ARENA_H - ARENA_WALL)
+	ksess.session_spawn_send(&self.ses, did)
 }

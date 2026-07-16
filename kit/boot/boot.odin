@@ -140,6 +140,7 @@ boot_lane :: proc(b: ^Boot, lane: ^ksim.Lane) {
 	b.lane = lane
 	// A culled predicted spawn (a refused or lost fire) frees its node through here.
 	ksim.lane_set_spawn_free(lane, b, boot_free_predicted)
+	ksim.lane_set_present_ready(lane, b, boot_present_ready)
 }
 
 // The ready() ceremony. Call once, after installing your factory/hooks is

@@ -430,12 +430,24 @@ Sim_Proc_Info :: struct {
 	input_type: string, // sample only: the `input: ^T` param's T
 }
 
+// One input CLASS the lane carries — a distinct @(gd_tick) input struct type,
+// its wire id (assigned package-wide by resolve_sim, sorted by type name; the
+// primary is 0), and the @(gd_sample) that fills it. A single-input game has
+// one of these; a game driving two entity kinds has one per kind.
+Input_Class_Info :: struct {
+	class_id:  int,
+	type_name: string,
+	sample:    string, // the @(gd_sample) proc filling it ("" = none: those entities coast)
+	line:      int,
+}
+
 // The one @(gd_tick) proc a class may declare — its sim-lane step (kit/sim).
 // scriptgen generates the rawptr thunk and the `<snake>_sim_set` the game
 // hands to ksim.lane_track_set.
 Tick_Info :: struct {
 	proc_name:     string,
 	input_type:    string, // the input param's type text, spliced verbatim ("" = inputless)
+	input_class:   int, // resolved package-wide (resolve_sim): the wire class its input rides
 	wants_lane:    bool, // trailing `lane: ^ksim.Lane` param — threaded by the thunk
 	line:          int,
 	contested:     bool, // @(gd_tick="contested"): every peer predicts this entity
@@ -470,10 +482,10 @@ Script :: struct {
 	net_id_type: string, // type text of a `net_id` field ("" = none) — commands require knet.Net_Id
 	tick:        Tick_Info, // proc_name == "" = the class doesn't tick
 	block_ticks: [dynamic]Hoisted_Tick, // embedded blocks' ticks, entity-tick-first order
-	sample:      Sim_Proc_Info, // @(gd_sample): the lane's device read (proc_name == "" = none)
+	samples:     [dynamic]Sim_Proc_Info, // @(gd_sample): the lane's device reads — one per input class
 	step:        Sim_Proc_Info, // @(gd_step): the EVERYWHERE world pass (live + resim)
 	step_auth:   Sim_Proc_Info, // @(gd_step="authority"): the host-only world pass
-	lane_input_type: string, // resolved package-wide (resolve_sim): the ONE input struct the lane ships
+	input_classes: [dynamic]Input_Class_Info, // resolved package-wide (resolve_sim), on the lane OWNER: every input class, sorted by id (0 = primary)
 	boot_field:  string, // the kboot.Boot field's name ("" = none) — generates the standard transport forwards
 	std_forwards: [dynamic]string, // which standard forwards were synthesized (bodies emitted by generate)
 }

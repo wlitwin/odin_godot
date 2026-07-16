@@ -47,6 +47,7 @@ Quickdraw :: struct {
 
 	gunner_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Gunner:1"`,
 	bullet_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Bullet:2"`,
+	drone_scene:  ^gd.Resource `gd:"export,resource=PackedScene,entity=Drone:3"`,
 
 	// The census is GENERATED (gunner_of / my_gunner / gunner_owned_by /
 	// gunner_ids read the kit's own ledgers) — the only bookkeeping left is
@@ -192,6 +193,12 @@ install_controls :: proc "contextless" () {
 	bind("qd_down", i64('S'), i64(gd.Key.Down))
 	bind("qd_dash", i64(gd.Key.Space))
 	bind("qd_buy", i64('B'))
+	// The DRONE's own steer keys — a SECOND input class, distinct from WASD, so
+	// a player flies the companion while their gunner strafes on the same tick.
+	bind("qd_drone_left", i64('J'))
+	bind("qd_drone_right", i64('L'))
+	bind("qd_drone_up", i64('I'))
+	bind("qd_drone_down", i64('K'))
 	gd.add_action("qd_fire")
 	gd.action_add_mouse_button("qd_fire", i64(gd.Mouse_Button.Left))
 	gd.add_action("qd_lob")
@@ -218,6 +225,30 @@ qd_sample :: proc(self: ^Quickdraw, tick: u64, input: ^Gunner_Input) {
 	if self.me_gun != nil {
 		m := gd.canvas_item_get_global_mouse_position(cast(gd.Canvas_Item)self.owner)
 		input.aim = angle_to_wire(math.atan2(f32(m.y) - self.me_gun.y, f32(m.x) - self.me_gun.x))
+	}
+}
+
+// The SECOND @(gd_sample) — one per input CLASS. It fills the drone's steer,
+// the class scriptgen routes to Drone_Input; the gunner's mouse-and-WASD sample
+// above fills Gunner_Input. Two device reads, two windows, one packet.
+@(gd_sample)
+drone_sample :: proc(self: ^Quickdraw, tick: u64, input: ^Drone_Input) {
+	input^ = {}
+	if self.bot != "" {
+		// A deterministic HORIZONTAL sweep. It is ORTHOGONAL to the strafer's
+		// VERTICAL gunner patrol on purpose: the drone's motion is then a
+		// fingerprint of its OWN input class — a pure left-right drift with a
+		// steady y — that the avatar's stick could not have produced. If the
+		// two classes crossed, the drone would track the gunner instead.
+		input.steer[0] = (tick / 96) % 2 == 0 ? 1 : -1
+		return
+	}
+	typing := bool(gd.control_has_focus(cast(gd.Control)self.boot.chat.input, false))
+	if !typing {
+		if gd.is_action_pressed("qd_drone_left") {input.steer[0] -= 1}
+		if gd.is_action_pressed("qd_drone_right") {input.steer[0] += 1}
+		if gd.is_action_pressed("qd_drone_up") {input.steer[1] -= 1}
+		if gd.is_action_pressed("qd_drone_down") {input.steer[1] += 1}
 	}
 }
 
@@ -348,6 +379,13 @@ qd_step :: proc(self: ^Quickdraw, tick: u64) {
 		for id in gunner_ids(&self.boot) {
 			gun, _ := gunner_of(&self.boot, id)
 			gd.print_str(fmt.tprintf("QD_POS tick=%d id=%d x=%.1f y=%.1f hp=%d gear=%d gold=%d", tick, u32(id), gun.x, gun.y, gun.hp, gun.gear, gun.gold))
+		}
+		// The drones' authoritative track — the SECOND input class landing
+		// server-side. Each swept its own steer (horizontal, steady y), never
+		// its owner's gunner input.
+		for id in drone_ids(&self.boot) {
+			d, _ := drone_of(&self.boot, id)
+			gd.print_str(fmt.tprintf("QD_DRONE tick=%d id=%d pid=%d x=%.1f y=%.1f", tick, u32(id), d.pid, d.x, d.y))
 		}
 	}
 }

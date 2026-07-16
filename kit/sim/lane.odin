@@ -23,7 +23,7 @@ package kit_sim
 // both on the .Stream channel (tick-stamped, self-superseding — a lost one
 // is worthless by the time it could be resent):
 //
-//     SIM_INPUT  client → host   [snap ack][render off][input window]
+//     SIM_INPUT  client → host   [snap ack][render off][class count]{[class id][input window]}
 //     SIM_SNAP   host → client   [snapshot batch]
 //
 // EVENTS, NOT CALLBACKS: handlers only file bytes into lane-owned state
@@ -57,6 +57,27 @@ SIM_VERDICT: u8 : 3 // host → client, RELIABLE: that verb's accept/reject
 // Read the device here and nowhere else — a resim never calls this.
 Sample_Proc :: proc(user: rawptr, tick: u64, dst: rawptr)
 
+// One input TYPE the lane carries: its wire class id, its byte size, the
+// sample that fills it (nil on a seat that doesn't play), and the client's
+// ring of already-predicted inputs for it. A single-input game holds exactly
+// one of these; a game driving two entity kinds holds one per kind, each
+// riding its own window on the packet and its own de-jitter buffer per player.
+Input_Class :: struct {
+	id:      u16,
+	size:    int,
+	sample:  Sample_Proc,
+	ring:    Input_Ring, // client only: local inputs already fed to prediction
+	scratch: []u8,       // sample destination (size bytes)
+}
+
+// Echo (predict-world) keys last-known inputs by (player, class): a remote
+// player driving two kinds echoes one held input per kind.
+@(private = "file")
+Echo_Key :: struct {
+	player: knet.Player_Id,
+	class:  u16,
+}
+
 // Advance the sim-lane world one tick: read inputs via lane_input, mutate
 // predicted fields. Deliberately the same shape as Resim_Proc — the live
 // frame and the replay run the identical proc. OPTIONAL once entities carry
@@ -83,6 +104,11 @@ Sim_Set :: struct {
 	entity_desc: ^knet.Entity_Desc,
 	tick:        Tick_Thunk,
 	input_size:  int, // size of the tick proc's input struct (0 = inputless)
+	input_class: u16, // WHICH input the tick reads — its class id on the wire. One
+	                  // per distinct @(gd_tick) input TYPE in the package (scriptgen
+	                  // assigns; the primary is 0). A lane ships one window per class
+	                  // a seat drives, so a player controlling two entity KINDS (a
+	                  // walker + a turret) sends both their inputs each tick.
 	commands:    []Sim_Cmd, // the class's @(gd_command) verbs, tick-scheduled (command.odin)
 	// @(gd_tick="contested"): EVERY peer predicts this entity, owner or not —
 	// the predict-the-contested-object pattern (the ball, the crown, the
@@ -123,9 +149,10 @@ Lane_Config :: struct {
 // Host-side per-player state, created on a player's first input packet.
 @(private = "file")
 Lane_Peer :: struct {
-	buf:   Input_Buffer,
+	bufs:  map[u16]^Input_Buffer, // one de-jitter buffer per input class this player drives
 	acked: u64, // newest snap tick they fully applied — their delta baseline
-	fresh: bool, // did their input for the CURRENT tick actually arrive
+	tag:   u64, // the (ack<<8|off) rider of the input just popped — one packet feeds every
+	            // class, so every buffer's tag agrees; the rewind reads it here
 }
 
 @(private) // command.odin's scheduler walks the track list too
@@ -138,6 +165,7 @@ Tracked :: struct {
 	watched: bool, // client-side remote-owned: truth applies directly, no resim
 	tick:    Tick_Thunk, // nil = the game's Step_Proc moves this entity
 	has_in:  bool, // the thunk wants its owner's input (Sim_Set.input_size > 0)
+	in_class: u16, // which input class drives it (Sim_Set.input_class) — the ring/buffer key
 	cmds:    []Sim_Cmd, // tick-scheduled verbs (nil = the class declares none)
 	set:     ^Sim_Set, // the class's set (lane_track_set) — nil for hand-tracked entities
 	err:     []u8, // render-error blob (predict-subset layout), alloc'd on the first correction
@@ -168,11 +196,16 @@ Lane :: struct {
 	judge_live:      bool,
 	tolerance:       f32,
 	echo_on:         bool,
-	echo:            map[knet.Player_Id][]u8, // last-known input per REMOTE player (predict-world)
+	echo:            map[Echo_Key][]u8, // last-known input per REMOTE (player, class) (predict-world)
 	ticker:          Sim_Ticker,
 
 	user:            rawptr,
-	sample:          Sample_Proc, // nil = this seat plays nobody (dedicated)
+	// One input class per distinct @(gd_tick) input TYPE. Single-input games
+	// hold exactly one (id 0, its sample from lane_set_sim); a game driving two
+	// entity kinds registers the extras with lane_add_input_class. The client
+	// samples and ships a window for every class here that has a sample; the
+	// host de-jitters each into the matching per-player buffer.
+	inputs:          [dynamic]Input_Class,
 	step:            Step_Proc, // the world pass that runs EVERYWHERE (live + resim): pure-sim contact
 	step_auth:       Step_Proc, // the host-only world pass: adjudication, respawns (the authority never resims)
 
@@ -180,7 +213,6 @@ Lane :: struct {
 	entries:         [dynamic]Entry, // ledgered subset of tracked (host: all; client: mine)
 
 	// client
-	ring:            Input_Ring,
 	rx:              Snap_Rx,
 	pending:         [dynamic]u8, // newest unprocessed batch (copied out of the handler)
 	pending_tick:    u64,
@@ -196,7 +228,6 @@ Lane :: struct {
 	// the live pass) — sim mutations must NEVER branch on it, or prediction
 	// and replay diverge by construction.
 	resimming:       bool,
-	scratch:         []u8, // one input's bytes for the sample proc
 
 	// running tallies, game-readable (a resim burst is a netgraph datum)
 	stat_resims:     int,
@@ -220,7 +251,21 @@ Lane :: struct {
 	spawn_next:      u32, // provisional id counter (client-local, high-bit tagged)
 	spawn_free:      Spawn_Free_Proc, // engine layer frees the node on despawn (nil on the core)
 	spawn_free_user: rawptr,
+
+	// A watched entity becomes PRESENTABLE the tick the delayed watch clock
+	// reaches its first ledgered pose — the moment a remote muzzle's projectile
+	// should actually appear (in step with the delayed barrel that fired it),
+	// not the earlier moment its spawn packet merely landed. The engine layer
+	// hides the node until then, so a fresh watched spawn is revealed on cue
+	// instead of sitting frozen at the muzzle through the render delay.
+	present_ready:      Present_Ready_Proc, // nil on the core
+	present_ready_user: rawptr,
 }
+
+// Fired once per watched entity, the tick it first becomes presentable (the
+// watch clock reaches its earliest ledgered tick). The engine layer reveals
+// the node it created hidden.
+Present_Ready_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr)
 
 // Bind to a session (host or client, before or after it starts) — wiring
 // survives session re-init like every pre-start hookup. `input_size` is the
@@ -240,20 +285,73 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 	l.smooth_cut = cfg.smooth_cut
 	l.judge_live = cfg.judge_live
 	l.echo_on = cfg.echo_inputs
-	l.echo = make(map[knet.Player_Id][]u8, allocator)
+	l.echo = make(map[Echo_Key][]u8, allocator)
 	l.tolerance = cfg.tolerance
 	l.ticker = sim_ticker_make(hz)
 	l.tracked = make([dynamic]Tracked, allocator)
 	l.entries = make([dynamic]Entry, allocator)
-	l.ring = input_ring_make(input_size, l.slots, allocator)
+	l.inputs = make([dynamic]Input_Class, allocator)
+	if input_size > 0 {
+		// The primary input class (id 0). lane_set_sim attaches its sample;
+		// extra classes ride lane_add_input_class.
+		lane_class_add(l, 0, input_size, nil, allocator)
+	}
 	l.rx = snap_rx_make(l.slots, allocator)
 	l.pending = make([dynamic]u8, allocator)
 	l.peers = make(map[knet.Player_Id]^Lane_Peer, allocator)
-	l.scratch = make([]u8, input_size, allocator)
 	l.wound = make([dynamic]Wound, allocator)
 	l.cmd_out = make([dynamic]Cmd_Out, allocator)
 	l.cmd_in = make([dynamic]Cmd_In, allocator)
 	ksess.session_app_route(ses, tag, l, lane_handle)
+}
+
+// Register an ADDITIONAL input class beyond lane_init's primary (id 0) — a
+// second entity kind the same player drives, with its own input struct. The
+// generated <class>_lane_init emits one per extra @(gd_tick) input type; a
+// hand-built lane calls it right after lane_init. `id` must be unique and
+// agree with the Sim_Set.input_class the tracked entities of that kind carry.
+lane_add_input_class :: proc(l: ^Lane, id: u16, size: int, sample: Sample_Proc, allocator := context.allocator) {
+	assert(id != 0, "class 0 is lane_init's primary input — pass its size to lane_init")
+	assert(size > 0, "an input class needs a non-zero size (inputless entities take no class)")
+	lane_class_add(l, id, size, sample, allocator)
+}
+
+@(private = "file")
+lane_class_add :: proc(l: ^Lane, id: u16, size: int, sample: Sample_Proc, allocator := context.allocator) {
+	assert(lane_class(l, id) == nil, "input class id registered twice")
+	ic := Input_Class{id = id, size = size, sample = sample}
+	if size > 0 {
+		ic.ring = input_ring_make(size, l.slots, allocator)
+		ic.scratch = make([]u8, size, allocator)
+	}
+	append(&l.inputs, ic)
+}
+
+@(private = "file")
+lane_class :: proc(l: ^Lane, id: u16) -> ^Input_Class {
+	for &ic in l.inputs {
+		if ic.id == id {
+			return &ic
+		}
+	}
+	return nil
+}
+
+// The class whose input struct is `size` bytes — lane_input_of resolves the
+// class from the typed T it was handed. Ambiguous only if two kinds share a
+// size, which the typed accessor can't disambiguate: then call lane_input.
+@(private = "file")
+class_for_size :: proc(l: ^Lane, size: int) -> u16 {
+	id: u16
+	n := 0
+	for &ic in l.inputs {
+		if ic.size == size {
+			id = ic.id
+			n += 1
+		}
+	}
+	assert(n == 1, "lane_input_of: input size ambiguous across classes — use lane_input with an explicit class id")
+	return id
 }
 
 lane_destroy :: proc(l: ^Lane) {
@@ -269,11 +367,21 @@ lane_destroy :: proc(l: ^Lane) {
 	}
 	delete(l.tracked)
 	delete(l.entries)
-	input_ring_destroy(&l.ring)
+	for &ic in l.inputs {
+		if ic.size > 0 {
+			input_ring_destroy(&ic.ring)
+			delete(ic.scratch)
+		}
+	}
+	delete(l.inputs)
 	snap_rx_destroy(&l.rx)
 	delete(l.pending)
 	for _, p in l.peers {
-		input_buffer_destroy(&p.buf)
+		for _, buf in p.bufs {
+			input_buffer_destroy(buf)
+			free(buf)
+		}
+		delete(p.bufs)
 		free(p)
 	}
 	delete(l.peers)
@@ -281,7 +389,6 @@ lane_destroy :: proc(l: ^Lane) {
 		delete(blob)
 	}
 	delete(l.echo)
-	delete(l.scratch)
 	delete(l.wound)
 	for &c in l.cmd_out {
 		cmd_out_free(&c)
@@ -308,9 +415,17 @@ lane_destroy :: proc(l: ^Lane) {
 //               of folding `if lane_is_authority()` into one pass.
 lane_set_sim :: proc(l: ^Lane, user: rawptr, sample: Sample_Proc, step: Step_Proc = nil, step_auth: Step_Proc = nil) {
 	l.user = user
-	l.sample = sample
 	l.step = step
 	l.step_auth = step_auth
+	if sample != nil {
+		// The sample fills the primary class (id 0). A game with extra input
+		// kinds passes their samples through lane_add_input_class.
+		if ic := lane_class(l, 0); ic != nil {
+			ic.sample = sample
+		} else {
+			assert(false, "lane_set_sim: a sample needs an input class — pass input_size > 0 to lane_init")
+		}
+	}
 }
 
 // Put an entity on the sim lane — call where the entity is born on this peer
@@ -346,17 +461,22 @@ lane_track :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, desc: ^knet.Entity
 //
 //     ksim.lane_track_set(&self.lane, id, runner, &runner_sim_set, owner)
 //
-// One input TYPE per lane: every input-driven entity's set must agree with
-// lane_init's input_size (compose per-entity intent into one struct — the
-// wire ships one input blob per player per tick, deliberately).
+// Each input-driven set names its input CLASS (Sim_Set.input_class) — the id
+// its window rides on the wire. That class must be registered (lane_init's
+// primary or a lane_add_input_class extra) and agree on size; a player driving
+// two entity KINDS ships one window per class each tick.
 lane_track_set :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, set: ^Sim_Set, owner: knet.Player_Id, allocator := context.allocator) {
 	assert(set.tick != nil, "lane_track_set: a Sim_Set carries the tick entry point")
-	assert(set.input_size == 0 || set.input_size == l.ring.size,
-		"lane_track_set: one input struct per lane — this set's input size disagrees with lane_init's")
+	if set.input_size > 0 {
+		ic := lane_class(l, set.input_class)
+		assert(ic != nil && ic.size == set.input_size,
+			"lane_track_set: this set's input class is unregistered or its size disagrees — register it with lane_init/lane_add_input_class")
+	}
 	lane_track(l, id, entity, set.entity_desc, owner, allocator)
 	tr := &l.tracked[len(l.tracked) - 1]
 	tr.tick = set.tick
 	tr.has_in = set.input_size > 0
+	tr.in_class = set.input_class
 	tr.cmds = set.commands
 	tr.set = set
 	if set.contested && tr.watched {
@@ -474,31 +594,42 @@ lane_set_owner :: proc(l: ^Lane, id: knet.Net_Id, owner: knet.Player_Id, allocat
 // harmless to skip — an idle buffer holds a few KB until the run ends).
 lane_drop_player :: proc(l: ^Lane, player: knet.Player_Id) {
 	if p, ok := l.peers[player]; ok {
-		input_buffer_destroy(&p.buf)
+		for _, buf in p.bufs {
+			input_buffer_destroy(buf)
+			free(buf)
+		}
+		delete(p.bufs)
 		free(p)
 		delete_key(&l.peers, player)
 	}
 }
 
-// The input driving `player`'s entities for the tick being stepped — valid
-// ONLY inside your Step_Proc (live or resim, same answer). ok=false means no
-// input exists here for that player this tick: a client asking about remote
-// players (predict-self — coast them, their truth is on the way), a held
-// gap on the host (the returned bytes then repeat their last real input).
-lane_input :: proc(l: ^Lane, player: knet.Player_Id) -> (input: []u8, ok: bool) {
+// The input driving `player`'s entities of `class` for the tick being stepped
+// — valid ONLY inside your Step_Proc (live or resim, same answer). ok=false
+// means no input exists here for that player+class this tick: a client asking
+// about remote players (predict-self — coast them, their truth is on the way),
+// a held gap on the host (the returned bytes then repeat their last real
+// input). `class` defaults to 0, the single-input lane's only class.
+lane_input :: proc(l: ^Lane, player: knet.Player_Id, class: u16 = 0) -> (input: []u8, ok: bool) {
 	if player == l.ses.me {
-		return input_read(&l.ring, l.step_tick)
+		if ic := lane_class(l, class); ic != nil && ic.size > 0 {
+			return input_read(&ic.ring, l.step_tick)
+		}
+		return nil, false
 	}
 	if l.ses.is_host {
 		if p, found := l.peers[player]; found {
-			return p.buf.held, p.fresh
+			if buf, has := p.bufs[class]; has {
+				return buf.held, buf.fresh
+			}
 		}
+		return nil, false
 	}
 	if l.echo_on {
-		// Predict-world: a remote player's LAST-KNOWN input (the batch echo)
-		// — held, never fresh; the extrapolation every peer ticks remotes
-		// with, corrected by the next batch's truth.
-		if held, found := l.echo[player]; found {
+		// Predict-world: a remote player's LAST-KNOWN input for this class (the
+		// batch echo) — held, never fresh; the extrapolation every peer ticks
+		// remotes with, corrected by the next batch's truth.
+		if held, found := l.echo[Echo_Key{player, class}]; found {
 			return held, false
 		}
 	}
@@ -512,10 +643,11 @@ lane_input :: proc(l: ^Lane, player: knet.Player_Id) -> (input: []u8, ok: bool) 
 //
 // `drives` means an input EXISTS to drive with — held gaps repeat the last
 // real one, because driving through loss is the point; the raw lane_input's
-// ok is the FRESHNESS bit, for the rare caller that cares. Passing a struct
-// that isn't this lane's input type is an assert, not a silent misread.
+// ok is the FRESHNESS bit, for the rare caller that cares. The class is
+// resolved from T's size (the common case: one class per struct type); a lane
+// with two same-sized input kinds must call lane_input with an explicit id.
 lane_input_of :: proc(l: ^Lane, player: knet.Player_Id, $T: typeid) -> (input: T, drives: bool) {
-	bytes, _ := lane_input(l, player)
+	bytes, _ := lane_input(l, player, class_for_size(l, size_of(T)))
 	if bytes == nil {
 		return {}, false
 	}
@@ -587,7 +719,7 @@ run_tick :: proc(l: ^Lane, t: u64) {
 		}
 		in_ptr: rawptr
 		if tr.has_in {
-			if in_bytes, _ := lane_input(l, tr.owner); in_bytes != nil {
+			if in_bytes, _ := lane_input(l, tr.owner, tr.in_class); in_bytes != nil {
 				in_ptr = raw_data(in_bytes)
 			}
 		}
@@ -608,16 +740,31 @@ run_tick :: proc(l: ^Lane, t: u64) {
 	}
 }
 
+// Sample every input class this seat plays (each with a sample proc), noting
+// the result into that class's ring — the local half of prediction. Runs on
+// both the host (for its own avatar) and the client. A class the seat doesn't
+// actually drive still samples harmlessly (neutral bytes drive nothing), which
+// keeps the wire shape identical on every peer.
+@(private = "file")
+sample_inputs :: proc(l: ^Lane, t: u64) {
+	for &ic in l.inputs {
+		if ic.sample != nil && ic.size > 0 {
+			ic.sample(l.user, t, raw_data(ic.scratch))
+			input_note(&ic.ring, t, raw_data(ic.scratch))
+		}
+	}
+}
+
 @(private = "file")
 host_frame :: proc(l: ^Lane, dt: f64) -> int {
 	n := sim_ticker_advance(&l.ticker, dt)
 	for t := l.ticker.tick - u64(n) + 1; t <= l.ticker.tick; t += 1 {
-		if l.sample != nil {
-			l.sample(l.user, t, raw_data(l.scratch))
-			input_note(&l.ring, t, raw_data(l.scratch))
-		}
+		sample_inputs(l, t)
 		for _, p in l.peers {
-			_, p.fresh = input_buffer_pop(&p.buf, t)
+			for _, buf in p.bufs {
+				input_buffer_pop(buf, t) // sets buf.fresh
+				p.tag = buf.tag // every class shares the packet's rider — last wins, all agree
+			}
 		}
 		run_tick(l, t)
 		note_all(l.entries[:], t)
@@ -640,7 +787,7 @@ snap_broadcast :: proc(l: ^Lane, tick: u64) {
 		acked, input_ack := u64(0), u64(0)
 		if lp, ok := l.peers[p.id]; ok {
 			acked = lp.acked
-			input_ack = lp.buf.newest
+			input_ack = peer_input_ack(lp)
 		}
 		w := ksess.session_app_begin(l.ses, l.tag)
 		knet.write_u8(w, SIM_SNAP)
@@ -652,9 +799,26 @@ snap_broadcast :: proc(l: ^Lane, tick: u64) {
 	}
 }
 
+// The input ack a batch ships is the MIN newest across the player's class
+// buffers — the client leads enough for its most-starved input and trims every
+// ring by this conservative floor. 0 until the player has sent anything.
+@(private = "file")
+peer_input_ack :: proc(p: ^Lane_Peer) -> u64 {
+	m := max(u64)
+	any := false
+	for _, buf in p.bufs {
+		if !any || buf.newest < m {
+			m = buf.newest
+			any = true
+		}
+	}
+	return any ? m : 0
+}
+
 // The predict-world rider: every player's input AS THE SERVER SIMULATED IT
-// this tick (its own from the ring, each peer's from the hold-last buffer),
-// appended after the batch rows — [count u8] count × [player u64][bytes].
+// this tick (its own from the rings, each peer's from the hold-last buffers),
+// appended after the batch rows — [count u8] count × [player u64][class u16]
+// [bytes]. One row per (player, class): a player driving two kinds echoes both.
 // Clients tick remote contested entities from these held inputs, which is
 // what puts every avatar on one predicted timeline.
 @(private = "file")
@@ -662,17 +826,23 @@ echo_write :: proc(l: ^Lane, w: ^knet.Writer, tick: u64) {
 	count_at := len(w.buf)
 	knet.write_u8(w, 0)
 	count := 0
-	if l.sample != nil {
-		if blob, ok := input_read(&l.ring, tick); ok {
-			knet.write_player_id(w, l.ses.me)
-			append(&w.buf, ..blob)
-			count += 1
+	for &ic in l.inputs {
+		if ic.sample != nil && ic.size > 0 {
+			if blob, ok := input_read(&ic.ring, tick); ok {
+				knet.write_player_id(w, l.ses.me)
+				knet.write_u16(w, ic.id)
+				append(&w.buf, ..blob)
+				count += 1
+			}
 		}
 	}
 	for pid, p in l.peers {
-		knet.write_player_id(w, pid)
-		append(&w.buf, ..p.buf.held)
-		count += 1
+		for cid, buf in p.bufs {
+			knet.write_player_id(w, pid)
+			knet.write_u16(w, cid)
+			append(&w.buf, ..buf.held)
+			count += 1
+		}
 	}
 	w.buf[count_at] = u8(count)
 }
@@ -697,14 +867,18 @@ client_frame :: proc(l: ^Lane, dt: f64) -> int {
 		}
 	}
 	for t := l.ticker.tick - u64(n) + 1; t <= l.ticker.tick; t += 1 {
-		if l.sample != nil {
-			l.sample(l.user, t, raw_data(l.scratch))
-			input_note(&l.ring, t, raw_data(l.scratch))
-		}
+		sample_inputs(l, t)
 		run_tick(l, t)
 		note_all(l.entries[:], t)
 	}
-	if n > 0 && l.sample != nil {
+	plays := false
+	for &ic in l.inputs {
+		if ic.sample != nil && ic.size > 0 {
+			plays = true
+			break
+		}
+	}
+	if n > 0 && plays {
 		// Ack FIRST: the receiver tags every input in this packet with it —
 		// the snap ack is the sender's world view, and binding them is what
 		// lets a rewound query judge the view each input was AIMED with. The
@@ -713,11 +887,26 @@ client_frame :: proc(l: ^Lane, dt: f64) -> int {
 		// a bounded claim — the server clamps it inside the window the ack
 		// proves — that lets the rewind BLEND the same bracket the shooter's
 		// screen blended, instead of quantizing to a tick.
+		//
+		// Then one window PER CLASS this seat plays — a class count, then each
+		// class's id and its redundant input window. A single-input game writes
+		// count 1; a player driving two kinds writes both. Every ring trims by
+		// the same min ack (l.input_ack), the conservative floor.
 		w := ksess.session_app_begin(l.ses, l.tag)
 		knet.write_u8(w, SIM_INPUT)
 		snap_ack_write(w, &l.rx)
 		knet.write_u8(w, render_off8(l))
-		input_write(w, &l.ring, l.input_ack, l.redundancy)
+		count_at := len(w.buf)
+		knet.write_u8(w, 0) // class count, patched below
+		cnt := 0
+		for &ic in l.inputs {
+			if ic.sample != nil && ic.size > 0 {
+				knet.write_u16(w, ic.id)
+				input_write(w, &ic.ring, l.input_ack, l.redundancy)
+				cnt += 1
+			}
+		}
+		w.buf[count_at] = u8(cnt)
 		ksess.session_app_flush(l.ses, ksess.HOST_PEER, .Stream)
 	}
 	return n
@@ -748,22 +937,27 @@ client_ingest :: proc(l: ^Lane) {
 	tick, input_ack, _ := snap_rx_apply(&l.rx, &r, &truths)
 	if tick != 0 && l.echo_on {
 		// The predict-world rider follows the rows: last-known inputs for
-		// every player, last-value by batch (older batches already dropped).
+		// every (player, class), last-value by batch (older batches dropped).
+		// The class id gives the byte width — the receiver knows every class.
 		ec := int(knet.read_u8(&r))
 		for _ in 0 ..< ec {
 			pid := knet.read_player_id(&r)
-			if r.err || r.off + l.ring.size > len(r.data) {
+			cid := knet.read_u16(&r)
+			ic := lane_class(l, cid)
+			sz := ic != nil ? ic.size : 0
+			if r.err || sz == 0 || r.off + sz > len(r.data) {
 				break
 			}
-			blob := r.data[r.off:r.off + l.ring.size]
-			r.off += l.ring.size
+			blob := r.data[r.off:r.off + sz]
+			r.off += sz
 			if pid == l.ses.me {
-				continue // my inputs live in my ring
+				continue // my inputs live in my rings
 			}
-			held, ok := l.echo[pid]
+			key := Echo_Key{pid, cid}
+			held, ok := l.echo[key]
 			if !ok {
-				held = make([]u8, l.ring.size)
-				l.echo[pid] = held
+				held = make([]u8, sz)
+				l.echo[key] = held
 			}
 			copy(held, blob)
 		}
@@ -915,7 +1109,7 @@ lane_rewind_view :: proc(l: ^Lane, shooter: knet.Player_Id) -> (lo: u64, alpha: 
 	}
 	tag := u64(0)
 	if p, ok := l.peers[shooter]; ok {
-		tag = p.buf.tag
+		tag = p.tag
 	}
 	ack := tag >> 8
 	if ack == 0 || ack >= t {
@@ -1072,11 +1266,6 @@ lane_present :: proc(l: ^Lane, dt: f64) {
 	if !ok {
 		return // fewer than two batches (or pre-window): ingest's snap stands
 	}
-	alpha := f32(1)
-	if next > prev {
-		alpha = f32((l.watch_clock - f64(prev)) / f64(next - prev))
-		alpha = clamp(alpha, 0, 1)
-	}
 	for &tr in l.tracked {
 		if !tr.watched && !tr.contested {
 			continue
@@ -1104,10 +1293,39 @@ lane_present :: proc(l: ^Lane, dt: f64) {
 		if e == nil {
 			continue
 		}
-		a, aok := history_read(&e.hist, prev)
-		b, bok := history_read(&e.hist, next)
+		// Reveal on cue: the tick the delayed clock reaches this entity's first
+		// ledgered pose is the tick it should APPEAR — a remote muzzle's shot
+		// emerges as the delayed barrel fires it, not a render delay early. The
+		// boot created the node hidden; this uncovers it, exactly once.
+		if !e.revealed && e.first != 0 && l.watch_clock >= f64(e.first) {
+			e.revealed = true
+			if l.present_ready != nil {
+				l.present_ready(l.present_ready_user, tr.id, tr.entity)
+			}
+		}
+		// Clamp the bracket UP to the entity's first ledgered tick. A fresh
+		// watched spawn (a projectile that just left a remote muzzle) has no
+		// truth before `first`, and the delayed watch clock sits a `watch_delay`
+		// behind it — so hold it AT that first pose (the muzzle) until the clock
+		// arrives, then let it fly. Without this it holds the node's stale value
+		// (its scene default) and pops into place a watch_delay late, off the
+		// barrel that fired it. Long-lived entities have `first` far in the past,
+		// so lo/hi are prev/next and this is a no-op for them.
+		lo, hi := prev, next
+		if lo < e.first {
+			lo = e.first
+		}
+		if hi < e.first {
+			hi = e.first
+		}
+		a, aok := history_read(&e.hist, lo)
+		b, bok := history_read(&e.hist, hi)
 		if !aok || !bok {
 			continue // a skipped row at one end: hold ingest's last apply
+		}
+		alpha := f32(0)
+		if hi > lo {
+			alpha = clamp(f32((l.watch_clock - f64(lo)) / f64(hi - lo)), 0, 1)
 		}
 		if tr.contested && tr.claim > 0.001 {
 			// Mid-fade: capture the predicted pose, paint the watched view,
@@ -1154,14 +1372,36 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 		p, ok := l.peers[from]
 		if !ok {
 			p = new(Lane_Peer)
-			p.buf = input_buffer_make(l.ring.size, l.slots)
+			p.bufs = make(map[u16]^Input_Buffer)
 			l.peers[from] = p
 		}
 		acked := snap_ack_read(r)
 		off8 := knet.read_u8(r)
 		// One rider per input: the ack AND the render offset that traveled
 		// with it, packed (ticks fit 56 bits by ~38 million years).
-		input_buffer_apply(&p.buf, r, tag = (acked << 8) | u64(off8))
+		tag := (acked << 8) | u64(off8)
+		// One window per class the sender drives, into the matching per-player
+		// buffer (created on first sight, sized from the class the build
+		// registered). An unknown class can't be length-skipped safely, so it
+		// drops the packet's tail — every peer runs the same build regardless.
+		ccount := int(knet.read_u8(r))
+		if r.err {
+			return
+		}
+		for _ in 0 ..< ccount {
+			cid := knet.read_u16(r)
+			ic := lane_class(l, cid)
+			if r.err || ic == nil || ic.size == 0 {
+				return
+			}
+			buf, has := p.bufs[cid]
+			if !has {
+				buf = new(Input_Buffer)
+				buf^ = input_buffer_make(ic.size, l.slots)
+				p.bufs[cid] = buf
+			}
+			input_buffer_apply(buf, r, tag = tag)
+		}
 		if !r.err && acked > p.acked {
 			p.acked = acked // regressions are stale reordering, not truth
 		}

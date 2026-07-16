@@ -170,26 +170,45 @@ for needle in \
 done
 echo "  ok  entity table generated (TYPE const, kinds row, typed census hooks)"
 
-# @(gd_sample)/@(gd_step) artifacts (board.odin's lane game half): the rawptr
-# thunks holding the casts, and `board_lane_init` carrying the input size and
-# the step's authority gate — the wiring nobody writes.
+# @(gd_sample)/@(gd_step) artifacts (board.odin's lane game half): a rawptr
+# thunk PER input class holding the typed cast, and `board_lane_init` carrying
+# the primary class's size + sample and registering the extra class (the
+# turret) with lane_add_input_class — the wiring nobody writes. Types sort
+# Pawn_Input < Turret_Input, so the pawn is the primary class 0.
 for needle in \
-	'_board_lane_sample :: proc(user: rawptr, tick: u64, dst: rawptr)' \
+	'_board_lane_sample_0 :: proc(user: rawptr, tick: u64, dst: rawptr)' \
 	'board_sample(cast(^Board)user, tick, cast(^Pawn_Input)dst)' \
+	'_board_lane_sample_1 :: proc(user: rawptr, tick: u64, dst: rawptr)' \
+	'board_sample_turret(cast(^Board)user, tick, cast(^Turret_Input)dst)' \
 	'_board_lane_step :: proc(user: rawptr, tick: u64)' \
 	'board_contact(cast(^Board)user, tick)' \
 	'_board_lane_step_auth :: proc(user: rawptr, tick: u64)' \
 	'board_step(cast(^Board)user, tick)' \
 	'board_lane_init :: proc(self: ^Board, l: ^ksim.Lane, ses: ^ksess.Session, tag := ksim.SIM_TAG, cfg := ksim.Lane_Config{})' \
 	'ksim.lane_init(l, ses, size_of(Pawn_Input), tag, cfg)' \
-	'ksim.lane_set_sim(l, self, _board_lane_sample, _board_lane_step, _board_lane_step_auth)' \
+	'ksim.lane_set_sim(l, self, _board_lane_sample_0, _board_lane_step, _board_lane_step_auth)' \
+	'ksim.lane_add_input_class(l, 1, size_of(Turret_Input), _board_lane_sample_1)' \
 ; do
 	if ! grep -qF "$needle" "$BGEN"; then
 		echo "REPGEN_FAIL: generated file is missing lane-wiring artifact: $needle"
 		exit 1
 	fi
 done
-echo "  ok  lane wiring generated (typed sample + both step slots, board_lane_init)"
+echo "  ok  lane wiring generated (per-class typed samples, primary + lane_add_input_class, board_lane_init)"
+
+# The second entity's Sim_Set carries its wire class (input_class = 1); the
+# primary pawn's omits it (class 0). Turret's own gen file holds the set.
+TGEN="$GOOD/turret.gen.odin"
+[ -f "$TGEN" ] || { echo "REPGEN_FAIL: scriptgen produced no turret.gen.odin"; exit 1; }
+if ! grep -qF 'turret_sim_set := ksim.Sim_Set{entity_desc = &turret_net_desc, tick = _turret_tick_step, input_size = size_of(Turret_Input), input_class = 1}' "$TGEN"; then
+	echo "REPGEN_FAIL: turret Sim_Set missing its input_class = 1"
+	exit 1
+fi
+if grep -qF 'input_class' "$GEN"; then
+	echo "REPGEN_FAIL: the primary pawn Sim_Set should omit input_class (class 0)"
+	exit 1
+fi
+echo "  ok  second input class routed (turret input_class = 1, primary pawn omits it)"
 
 # The standard transport forwards (board.odin's kboot.Boot field): generated
 # bodies wired through the boot's own pointers — and hand-written wins, name
@@ -457,14 +476,63 @@ MIS_OUT="$(run_scriptgen "$MIS" 2>&1)"
 MIS_RC=$?
 set -e
 if [ "$MIS_RC" -eq 0 ]; then
-	echo "REPGEN_FAIL: a @(gd_sample) writing the wrong input struct was accepted by scriptgen"
+	echo "REPGEN_FAIL: a @(gd_sample) writing an input struct no tick reads was accepted by scriptgen"
 	exit 1
 fi
-if ! echo "$MIS_OUT" | grep -q "one input struct, both ends"; then
-	echo "REPGEN_FAIL: scriptgen error doesn't name the sample/tick input mismatch:"
+if ! echo "$MIS_OUT" | grep -q "the sample would feed nobody"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't name the orphan-sample mismatch:"
 	echo "$MIS_OUT" | tail -3
 	exit 1
 fi
+
+# Two @(gd_sample) procs writing the SAME input struct — multiple samples are
+# allowed (one per input CLASS), but two filling the same class is the ambiguity
+# the parser rejects by name.
+DUP="$TMP/dupsample"
+mkdir -p "$DUP"
+cat > "$DUP/dally.odin" <<'EOF'
+//gd:extends Node
+//gd:class Dally
+package repgen_dupsample
+
+import gd "godot:godot"
+
+Dally :: struct {
+	owner: gd.Node,
+	x:     f32 `gd:"replicate,predict"`,
+}
+
+Dally_Input :: struct {
+	go: i8,
+}
+
+@(gd_tick)
+dally_tick :: proc(self: ^Dally, input: Dally_Input) {
+	self.x += f32(input.go)
+}
+
+@(gd_sample)
+dally_sample :: proc(self: ^Dally, tick: u64, input: ^Dally_Input) {
+}
+
+@(gd_sample)
+dally_sample_again :: proc(self: ^Dally, tick: u64, input: ^Dally_Input) {
+}
+EOF
+set +e
+DUP_OUT="$(run_scriptgen "$DUP" 2>&1)"
+DUP_RC=$?
+set -e
+if [ "$DUP_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: two @(gd_sample) filling the same input class was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$DUP_OUT" | grep -q "one sample per input TYPE"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't name the duplicate-sample-per-class violation:"
+	echo "$DUP_OUT" | tail -3
+	exit 1
+fi
+
 STK="$TMP/stk"
 mkdir -p "$STK"
 cat > "$STK/refy.odin" <<'EOF'
@@ -501,7 +569,7 @@ if ! echo "$STK_OUT" | grep -q 'expected `authority`'; then
 	echo "$STK_OUT" | tail -3
 	exit 1
 fi
-echo "  ok  lane-wiring violations rejected: sample/tick input mismatch, unknown step token"
+echo "  ok  lane-wiring violations rejected: orphan sample, duplicate sample per class, unknown step token"
 
 # ---- (4a2c): a <verb>_apply on a class that doesn't tick ----
 # The apply half is the resim's property; a coop-loop verb reverts whole.

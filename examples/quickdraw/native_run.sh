@@ -148,7 +148,46 @@ for port in 4189 4196; do
             exit 1
         fi
 
-        echo "QUICKDRAW_NATIVE_OK proved: at 240ms RTT the rewound duel lands ($HITS_A hits -> kill -> respawn), the live-judged control misses ($HITS_B), the bounty shop's verb wore boots at tick $WORN ($((WORN - SENT)) ticks after issue), and the lob's PREDICTED bullet left the muzzle on the client's own tick $LSENT — the authority spawned its real one at tick $LHOST and rekeyed it, no round trip"
+        # THE DRONE — a SECOND INPUT CLASS. Every duelist drives a gunner AND a
+        # drone on the SAME tick from two different input structs; each ships its
+        # own window on the one upstream packet (count=2), the host de-jitters
+        # each into its own buffer, and each entity's tick reads only its own.
+        # The drone is steered on a pure HORIZONTAL sweep, ORTHOGONAL to the
+        # strafer's VERTICAL gunner patrol — so a drone whose x swept wide while
+        # its y never budged is a fingerprint of its OWN input class, a motion
+        # the avatar's stick could not have produced. If the two classes crossed,
+        # the drone would track the gunner instead.
+        grep -q "QD_DRONE_LOCAL" "$DLOG" || { echo "the deadeye never predicted its own drone (the second input class never reached the client)"; exit 1; }
+        grep -q "QD_DRONE " "$MLOG" || { echo "the authority never tracked a drone"; exit 1; }
+        # The horizontal-sweep fingerprint, per drone, on the authority: some
+        # drone's x must span > 80px while its y stays pinned (< 3px) — steer.y
+        # is always 0, so any y drift would mean a crossed input.
+        DRONE_FP=$(awk '
+            /QD_DRONE / {
+                for (i=1;i<=NF;i++) {
+                    if ($i ~ /^id=/)      { id=substr($i,4) }
+                    else if ($i ~ /^x=/)  { x=substr($i,3)+0 }
+                    else if ($i ~ /^y=/)  { y=substr($i,3)+0 }
+                }
+                if (!(id in seen)) { seen[id]=1; xmin[id]=x; xmax[id]=x; ymin[id]=y; ymax[id]=y }
+                if (x<xmin[id]) xmin[id]=x; if (x>xmax[id]) xmax[id]=x
+                if (y<ymin[id]) ymin[id]=y; if (y>ymax[id]) ymax[id]=y
+            }
+            END {
+                for (id in seen) {
+                    dx=xmax[id]-xmin[id]; dy=ymax[id]-ymin[id]
+                    if (dx>80 && dy<3) { print id": dx="dx" dy="dy; found=1 }
+                }
+                exit found?0:1
+            }' "$MLOG")
+        if [ -z "$DRONE_FP" ]; then
+            echo "no drone swept its own input class (want a drone with x-span > 80 and y-span < 3 on the authority):"
+            grep "QD_DRONE " "$MLOG" | tail -6
+            exit 1
+        fi
+        DLOC=$(grep -m1 "QD_DRONE_LOCAL" "$DLOG")
+
+        echo "QUICKDRAW_NATIVE_OK proved: at 240ms RTT the rewound duel lands ($HITS_A hits -> kill -> respawn), the live-judged control misses ($HITS_B), the bounty shop's verb wore boots at tick $WORN ($((WORN - SENT)) ticks after issue), the lob's PREDICTED bullet left the muzzle on the client's own tick $LSENT (authority spawned + rekeyed at $LHOST, no round trip), and the drone's SECOND INPUT CLASS flowed the whole distance — the client predicted its own drone ($DLOC) and on the authority it swept its own steer while its gunner strafed the other way ($DRONE_FP)"
         exit 0
     fi
     echo "QUICKDRAW_NATIVE_FAIL: hits rewound=$HITS_A live=$HITS_B (want rewound>=10, live<=3, gap>6)"

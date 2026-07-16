@@ -191,6 +191,16 @@ boot_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 			// The sim-lane line nobody writes anymore: predicted on its
 			// owner's screen, truth-ledgered on the host, watched elsewhere.
 			ksim.lane_track_set(b.lane, id, entity, k.sim_set, owner)
+			// A watched (remote-owned) sim entity renders on the DELAYED clock,
+			// so it should not appear until that clock reaches its spawn — a
+			// fresh muzzle's shot must emerge as the delayed barrel fires it, not
+			// a render delay early (which reads as a pause at the barrel). Hide
+			// it now; lane_present's present_ready hook reveals it on cue.
+			// Contested objects present their predicted pose immediately, so they
+			// are never hidden; the owner's own predicted entities aren't either.
+			if !ksim.lane_is_authority(b.lane) && owner != ksim.lane_me(b.lane) && !k.sim_set.contested {
+				gd.set_bool(cast(gd.Object)node, "visible", false)
+			}
 		}
 		return entity, k.set
 	}
@@ -285,4 +295,15 @@ boot_free_predicted :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 		delete_key(&b.ent_nodes, id)
 	}
 	delete_key(&b.ent_types, id)
+}
+
+// The lane's reveal hook (installed by boot_lane): a watched entity hidden at
+// spawn becomes presentable — the delayed clock reached its first pose — so
+// uncover it. It is already dressed and positioned; this is the moment it was
+// meant to appear, in step with the delayed barrel that fired it.
+boot_present_ready :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
+	b := cast(^Boot)user
+	if node, ok := b.ent_nodes[id]; ok {
+		gd.set_bool(cast(gd.Object)node, "visible", true)
+	}
 }

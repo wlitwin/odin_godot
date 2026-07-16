@@ -34,6 +34,12 @@ LOB_SPEED :: f32(2.6) // ~156 px/s — a touch faster than a running gunner
 LOB_LIFE :: u16(70) // ~1.2s of flight before it lands (~180 px reach)
 LOB_RADIUS :: f32(26) // splash reach at the landing point
 LOB_CD :: u16(48) // ~0.8s between lobs
+
+// The DRONE — the companion each duelist steers ALONGSIDE the gunner, from its
+// OWN input class (drone.odin). Its speed is deliberately unlike a gunner's, so
+// its motion can never be mistaken for the avatar's stick.
+DRONE_SPEED :: f32(1.6) // ~96 px/s
+
 MAX_HP :: i32(3)
 RESPAWN_TICKS :: u64(120) // ~2s on the floor
 

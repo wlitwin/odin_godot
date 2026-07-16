@@ -267,6 +267,221 @@ mover_tick_thunk :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner:
 	lane_mover_step(cast(^Mover)entity, (cast(^i8)input)^)
 }
 
+// A projectile that spawns mid-run and is owned by someone ELSE (watched on
+// this peer, like the muzzle-fired lob a remote duelist throws): the observer
+// must present it at its spawn pose (the muzzle) and let it fly from there in
+// step with the delayed barrel — NOT hold the node's stale default and pop it
+// into place a watch_delay late, off the barrel that fired it. The shooter's
+// own screen predicts it correctly; this is the OTHER screens' view.
+@(test)
+lane_watched_fresh_spawn_holds_at_muzzle :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	av_set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1}
+	fly_set := ksim.Sim_Set{entity_desc = &desc, tick = proj_fly_thunk, input_size = 0}
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	for b in boxes {
+		ksim.lane_init(&b.lane, &b.s, 1, cfg = cfg)
+		ksim.lane_set_sim(&b.lane, b, lbox_sample, nil)
+	}
+	AV :: knet.Net_Id(20) // an avatar keeps batches (and the watch clock) flowing
+	for b in boxes {
+		m := new(Mover)
+		b.movers[AV] = m
+		b.owners[AV] = 2
+		ksim.lane_track_set(&b.lane, AV, m, &av_set, 2)
+	}
+
+	DT :: 1.0 / 60.0
+	alice.ax = 0
+	for i in 1 ..= 60 { // warm up: batches + watch_clock established
+		for b in boxes {ksim.lane_frame(&b.lane, DT)}
+		ksim.lane_present(&alice.lane, DT)
+		lane_pump(boxes)
+	}
+
+	// MID-RUN spawn: a host-owned flyer at the muzzle x=100, vx=3. On the host
+	// it's real and flying; on alice it's a fresh WATCHED spawn whose node still
+	// holds its default (x=0) — exactly the game's uninitialized bullet node.
+	MUZZLE :: f32(100)
+	FLY :: knet.Net_Id(50)
+	for b in boxes {
+		m := new(Mover)
+		if b.s.is_host {
+			m.x = MUZZLE // the authority sets the muzzle; the observer's node is DEFAULT
+			m.vx = 3
+		}
+		b.movers[FLY] = m
+		b.owners[FLY] = 1
+		ksim.lane_track_set(&b.lane, FLY, m, &fly_set, 1)
+	}
+
+	// The reveal hook must fire ON CUE — the tick the delayed clock reaches the
+	// spawn, which is a render delay AFTER the shot left the host's muzzle (so
+	// the boot hides the node until exactly then). Record the host's downrange
+	// distance at the reveal: it must be well past the muzzle, proving the node
+	// was kept hidden through the hold rather than shown early.
+	reveal_hostx := f32(-1)
+	ksim.lane_set_present_ready(&alice.lane, &reveal_hostx, proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
+		if (cast(^f32)user)^ < 0 {
+			(cast(^f32)user)^ = 0 // marker: fired (host.x filled in by the loop)
+		}
+	})
+
+	// The muzzle-hold signature the fix produces and the bug cannot: at some
+	// frame the observer presents the flyer NEAR THE MUZZLE while the host has
+	// already flown it well downrange. Without the fix the observer sits at the
+	// stale default (0) through the whole hold and only appears once the delayed
+	// clock reaches the spawn — never near the muzzle while the host is ahead.
+	held_at_muzzle := false
+	reveal_frame_hostx := f32(-1)
+	for i in 1 ..= 20 {
+		for b in boxes {ksim.lane_frame(&b.lane, DT)}
+		reveal_hostx = -1 // reset the per-frame fired marker
+		ksim.lane_present(&alice.lane, DT)
+		lane_pump(boxes)
+		ax := alice.movers[FLY].x
+		hx := host.movers[FLY].x
+		if reveal_hostx == 0 && reveal_frame_hostx < 0 {
+			reveal_frame_hostx = hx // the host's downrange distance the tick the reveal fired
+		}
+		// The observer must NEVER present a flown-ahead ghost: once it shows
+		// anything, it is between the muzzle and the host's truth.
+		if ax != 0 {
+			testing.expectf(t, ax >= MUZZLE - 1 && ax <= hx + 0.5,
+				"frame %d: observer presented %v outside [muzzle, truth]=[%v, %v] — a stale or ahead ghost", i, ax, MUZZLE, hx)
+		}
+		if ax >= MUZZLE - 1 && ax <= MUZZLE + 12 && hx > MUZZLE + 18 {
+			held_at_muzzle = true // held at the muzzle while the shot is well downrange
+		}
+	}
+	testing.expect(t, held_at_muzzle,
+		"the observer never held the fresh watched projectile at the muzzle — it popped in a watch_delay late off the barrel")
+	// The reveal fired, and it fired a render delay LATE — the host had already
+	// carried the shot well past the muzzle by the time the node was uncovered.
+	testing.expectf(t, reveal_frame_hostx > MUZZLE + 10,
+		"present_ready fired too early (host at %v, muzzle %v) — the node would appear before the delayed barrel fired it", reveal_frame_hostx, MUZZLE)
+}
+
+// The active-intent window sits AFTER join startup (~5 ticks of neutral held
+// input before alice's stream reaches the host) and ends before the run does,
+// so every active tick is simulated with fresh confirmed input on both peers —
+// the fingerprint is then exact, not a startup-eaten approximation.
+MC_LO :: 40 // first active tick
+MC_FLIP :: 120 // class 1 flips here
+MC_HI :: 180 // last active tick
+
+// The SECOND input class: a 2-byte i16 intent driving its entity by +ax16/tick
+// (deliberately a different width, value, and gain than class 0's i8 ×2, so a
+// crossed input would land the entity somewhere impossible). Intent is a pure
+// function of the TICK it samples for, so predict, resim, and the host's
+// consumption all agree per tick.
+mc_sample0 :: proc(user: rawptr, tick: u64, dst: rawptr) {
+	(cast(^i8)dst)^ = (tick >= MC_LO && tick <= MC_HI) ? 3 : 0
+}
+
+mc_sample1 :: proc(user: rawptr, tick: u64, dst: rawptr) {
+	v: i16 = 0
+	if tick >= MC_LO && tick <= MC_FLIP {
+		v = -5
+	} else if tick > MC_FLIP && tick <= MC_HI {
+		v = 4 // a hard flip mid-run: class 1's entity resims independent of class 0
+	}
+	(cast(^i16)dst)^ = v
+}
+
+mover16_tick_thunk :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner: knet.Player_Id) {
+	if input == nil {
+		return
+	}
+	m := cast(^Mover)entity
+	m.vx = f32((cast(^i16)input)^)
+	m.x += m.vx
+}
+
+// Two input CLASSES on one lane, one player driving BOTH kinds: alice owns an
+// i8-driven mover (class 0) and an i16-driven mover (class 1). Each tick her
+// packet carries two windows; the host de-jitters each into its own buffer and
+// routes it to the matching entity. The proof is a fingerprint — class 1's
+// entity ends where ONLY its own i16 intent (flipped mid-run to force an
+// independent resim) could put it — plus byte-equal convergence on both peers.
+@(test)
+lane_two_input_classes_route_per_entity :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	set0 := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, input_class = 0}
+	set1 := ksim.Sim_Set{entity_desc = &desc, tick = mover16_tick_thunk, input_size = 2, input_class = 1}
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+	testing.expect_value(t, alice.s.me, knet.Player_Id(2))
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	for b in boxes {
+		ksim.lane_init(&b.lane, &b.s, 1, cfg = cfg) // primary class 0 (i8)
+		ksim.lane_add_input_class(&b.lane, 1, 2, mc_sample1) // class 1 (i16)
+		ksim.lane_set_sim(&b.lane, b, mc_sample0, nil) // no world pass: sets drive themselves
+	}
+
+	A :: knet.Net_Id(10) // class 0, alice's
+	B :: knet.Net_Id(11) // class 1, alice's
+	for b in boxes {
+		for id in ([?]knet.Net_Id{A, B}) {
+			m := new(Mover)
+			b.movers[id] = m
+			b.owners[id] = 2
+			ksim.lane_track_set(&b.lane, id, m, id == A ? &set0 : &set1, 2)
+		}
+	}
+
+	DT :: 1.0 / 60.0
+	for i in 1 ..= 240 {
+		for b in boxes {
+			ksim.lane_frame(&b.lane, DT)
+		}
+		lane_pump(boxes)
+	}
+
+	// Byte-equal convergence on BOTH entities across both peers — the resim
+	// churn (predict-ahead + the class-1 flip) settled to one timeline.
+	for id in ([?]knet.Net_Id{A, B}) {
+		ha := host.movers[id]
+		al := alice.movers[id]
+		testing.expectf(t, abs(ha.x - al.x) < 0.001,
+			"entity %d disagrees: host x=%v alice x=%v", id, ha.x, al.x)
+	}
+
+	// The fingerprint: class 1's entity moved ONLY by its i16 intent (−5 over
+	// [40,120], then +4 over [121,180]), never by class 0's i8 ×2. A crossed
+	// input could not land here — class 0's +6/tick would drive B strongly
+	// POSITIVE instead of to its own net-negative spot.
+	want_b := f32(-5) * (MC_FLIP - MC_LO + 1) + f32(4) * (MC_HI - MC_FLIP)
+	testing.expectf(t, abs(host.movers[B].x - want_b) < 0.001,
+		"class-1 entity should sit at its own i16 fingerprint %v, got %v (input crossed classes?)", want_b, host.movers[B].x)
+	// Class 0's entity likewise sits at its i8 ×2 fingerprint over [40,180].
+	want_a := f32(3) * 2 * (MC_HI - MC_LO + 1)
+	testing.expectf(t, abs(host.movers[A].x - want_a) < 0.001,
+		"class-0 entity should sit at its own i8 fingerprint %v, got %v", want_a, host.movers[A].x)
+}
+
 // The surge verb — the full tick-command shape in one proc: rejectable
 // (an empty purse says no), cross-lane (hp is the delta-lane purse), with
 // a predicted effect (x jumps). Check-then-mutate, the verb contract.

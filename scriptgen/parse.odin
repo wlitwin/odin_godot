@@ -3,6 +3,7 @@ package scriptgen
 import "core:fmt"
 import "core:odin/ast"
 import "core:odin/parser"
+import "core:slice"
 import "core:strconv"
 import "core:strings"
 
@@ -1427,20 +1428,13 @@ parse_tick :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^as
 //
 //   proc(self: ^Game, tick: u64, input: ^Game_Input)
 //
-// The generated thunk writes through the pointer; resolve_sim pins T to the
-// package's @(gd_tick) input struct at build time, so sampling into the
-// wrong struct dies here instead of desyncing quietly.
+// The generated thunk writes through the pointer; resolve_sim pins T to a
+// package @(gd_tick) input struct at build time, so sampling into a struct no
+// tick reads dies here instead of desyncing quietly. One sample per input
+// TYPE — a game driving two entity kinds declares two, one per kind.
 parse_sample :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
 	if config != "" {
 		error_at(loc, "sample %s: @(gd_sample) takes no config (got %q)", proc_name, config)
-		return
-	}
-	if s.sample.proc_name != "" {
-		error_at(
-			loc,
-			"%s: second @(gd_sample) proc %q — %q already reads the device; one sample per lane, compose intent inside it",
-			s.struct_name, proc_name, s.sample.proc_name,
-		)
 		return
 	}
 	types := flatten_param_types(src, pt)
@@ -1452,7 +1446,18 @@ parse_sample :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^
 		error_at(loc, "sample %s: no results — a sample WRITES the input struct; facts belong to ticks", proc_name)
 		return
 	}
-	s.sample = Sim_Proc_Info{proc_name = proc_name, line = loc.line, input_type = types[1][1:]}
+	itype := types[1][1:]
+	for existing in s.samples {
+		if existing.input_type == itype {
+			error_at(
+				loc,
+				"%s: a second @(gd_sample) writes %s — %q already fills that input class; one sample per input TYPE",
+				s.struct_name, itype, existing.proc_name,
+			)
+			return
+		}
+	}
+	append(&s.samples, Sim_Proc_Info{proc_name = proc_name, line = loc.line, input_type = itype})
 }
 
 // @(gd_step) procs — the lane's world passes, run AFTER entity ticks. Two
@@ -1598,33 +1603,47 @@ resolve_boot_forwards :: proc(s: ^Script) {
 
 // Resolve the package's lane authoring surface, module-wide:
 //
-//   - ONE input struct per lane — two ticks disagreeing is a build error
-//     here, not a runtime assert in lane_track_set;
-//   - the @(gd_sample)'s pointee IS that struct;
+//   - every distinct @(gd_tick) input struct type is an input CLASS, assigned
+//     a stable wire id (sorted by type name; 0 = primary). A player driving
+//     two entity KINDS ships one input window per class each tick;
+//   - each class's @(gd_sample) is matched to it by the struct it writes;
 //   - @(gd_sample)/@(gd_step) live on ONE class — the game whose gen file
 //     carries `<snake>_lane_init`.
 resolve_sim :: proc(scripts: []^Script) {
-	input_type, input_from := "", ""
+	// The distinct input types across every tick in the package.
+	types: [dynamic]string
+	defer delete(types)
 	for s in scripts {
 		if s.tick.proc_name == "" || s.tick.input_type == "" {continue}
-		if input_type == "" {
-			input_type, input_from = s.tick.input_type, s.struct_name
-			continue
+		seen := false
+		for e in types {
+			if e == s.tick.input_type {seen = true; break}
 		}
-		if s.tick.input_type != input_type {
-			error_at(
-				Loc{path = s.path, line = s.tick.line},
-				"%s ticks with input %s, but %s already ticks with %s — one input TYPE per lane (the wire ships one blob per player per tick); compose both intents into one struct",
-				s.struct_name, s.tick.input_type, input_from, input_type,
-			)
+		if !seen {append(&types, s.tick.input_type)}
+	}
+	slice.sort(types[:]) // stable ids: all peers rebuild together, so self-consistent is enough
+
+	// Annotate each input-driven tick with the wire class its input rides.
+	for s in scripts {
+		if s.tick.proc_name == "" || s.tick.input_type == "" {continue}
+		for ty, i in types {
+			if ty == s.tick.input_type {
+				s.tick.input_class = i
+				break
+			}
 		}
 	}
+
+	// One lane owner per package: the class carrying @(gd_sample)/@(gd_step).
+	// Its gen file gets <snake>_lane_init and every class registration.
 	owner: ^Script
 	for s in scripts {
-		if s.sample.proc_name == "" && s.step.proc_name == "" && s.step_auth.proc_name == "" {continue}
+		if len(s.samples) == 0 && s.step.proc_name == "" && s.step_auth.proc_name == "" {continue}
 		if owner != nil {
+			line := max(s.step.line, s.step_auth.line)
+			if len(s.samples) > 0 {line = max(line, s.samples[0].line)}
 			error_at(
-				Loc{path = s.path, line = max(s.sample.line, s.step.line, s.step_auth.line)},
+				Loc{path = s.path, line = line},
 				"%s declares @(gd_sample)/@(gd_step), but %s already does — one lane per package; a second lane is the hand-driven lane_set_sim's job",
 				s.struct_name, owner.struct_name,
 			)
@@ -1633,19 +1652,34 @@ resolve_sim :: proc(scripts: []^Script) {
 		owner = s
 	}
 	if owner == nil {return}
-	owner.lane_input_type = input_type
-	if owner.sample.proc_name != "" {
-		if input_type == "" {
+
+	// Pair each class with the sample that fills it (matched by input type). A
+	// class with no sample is legal — those entities coast until owned, and the
+	// wire registration takes a nil sample.
+	for t, i in types {
+		info := Input_Class_Info{class_id = i, type_name = t}
+		for sm in owner.samples {
+			if sm.input_type == t {
+				info.sample = sm.proc_name
+				info.line = sm.line
+				break
+			}
+		}
+		append(&owner.input_classes, info)
+	}
+
+	// No orphan samples: a @(gd_sample) writing a struct no @(gd_tick) reads
+	// would feed nobody — the build error the single-input lane always raised.
+	for sm in owner.samples {
+		is_tick_input := false
+		for t in types {
+			if t == sm.input_type {is_tick_input = true; break}
+		}
+		if !is_tick_input {
 			error_at(
-				Loc{path = owner.path, line = owner.sample.line},
-				"%s: @(gd_sample) writes %s, but no @(gd_tick) in the package takes an input — the sample would feed nobody",
-				owner.sample.proc_name, owner.sample.input_type,
-			)
-		} else if owner.sample.input_type != input_type {
-			error_at(
-				Loc{path = owner.path, line = owner.sample.line},
-				"%s samples into %s, but the lane's ticks read %s (%s's tick) — one input struct, both ends",
-				owner.sample.proc_name, owner.sample.input_type, input_type, input_from,
+				Loc{path = owner.path, line = sm.line},
+				"%s: @(gd_sample) writes %s, but no @(gd_tick) in the package takes that input — the sample would feed nobody",
+				sm.proc_name, sm.input_type,
 			)
 		}
 	}

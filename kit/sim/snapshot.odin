@@ -183,8 +183,14 @@ write_subset_delta :: proc(w: ^knet.Writer, now: []u8, base: []u8, desc: ^knet.E
 // decode baseline.
 
 Rx_Entry :: struct {
-	id:   knet.Net_Id,
-	hist: History, // received truth, owned by the Snap_Rx
+	id:    knet.Net_Id,
+	hist:  History, // received truth, owned by the Snap_Rx
+	first: u64, // the first tick this entity was ever ledgered here (0 = none yet) —
+	            // a fresh watched spawn has no truth before it, so the presenter holds
+	            // it at this pose (the muzzle) until the delayed watch clock arrives,
+	            // instead of leaving the node at its stale/default value
+	revealed: bool, // has the present_ready hook fired (the watch clock reached `first`) —
+	                // the engine layer reveals the hidden node exactly once, on cue
 }
 
 // How many recent batch ticks the receiver remembers for bracket lookups
@@ -286,6 +292,9 @@ snap_rx_apply :: proc(rx: ^Snap_Rx, r: ^knet.Reader, truths: ^[dynamic]Truth) ->
 			}
 		}
 		history_note_bytes(&e.hist, tick, scratch)
+		if e.first == 0 {
+			e.first = tick // the earliest pose the presenter can hold this entity at
+		}
 		blob, _ := history_read(&e.hist, tick)
 		append(truths, Truth{id = id, blob = blob})
 		applied += 1

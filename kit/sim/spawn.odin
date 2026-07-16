@@ -54,6 +54,13 @@ lane_set_spawn_free :: proc(l: ^Lane, user: rawptr, free: Spawn_Free_Proc) {
 	l.spawn_free = free
 }
 
+// Install the reveal hook (the boot factory does): the lane calls it once per
+// watched entity, the tick it first becomes presentable.
+lane_set_present_ready :: proc(l: ^Lane, user: rawptr, ready: Present_Ready_Proc) {
+	l.present_ready_user = user
+	l.present_ready = ready
+}
+
 // Is this a provisional (unmatched, client-local) id?
 lane_id_provisional :: proc(id: knet.Net_Id) -> bool {
 	return u32(id) & PROVISIONAL_BIT != 0
@@ -89,7 +96,7 @@ lane_spawn_predicted :: proc(
 	hist^ = history_make(set.entity_desc, l.slots, allocator)
 	append(&l.tracked, Tracked {
 		id = id, entity = entity, desc = set.entity_desc, owner = owner,
-		hist = hist, tick = set.tick, has_in = set.input_size > 0, cmds = set.commands, set = set,
+		hist = hist, tick = set.tick, has_in = set.input_size > 0, in_class = set.input_class, cmds = set.commands, set = set,
 		born = born, provisional = true, spawn_seq = l.cmd_exec_seq, spawn_type = type,
 	})
 	append(&l.entries, Entry{id = id, entity = entity, hist = hist, born = born})
