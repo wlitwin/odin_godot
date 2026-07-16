@@ -374,6 +374,69 @@ lane_watched_fresh_spawn_holds_at_muzzle :: proc(t: ^testing.T) {
 		"present_ready fired too early (host at %v, muzzle %v) — the node would appear before the delayed barrel fired it", reveal_frame_hostx, MUZZLE)
 }
 
+// The reveal-gate's edge: if a possession hands a still-HIDDEN fresh watched
+// entity to me before the delayed clock uncovered it, gaining ownership must
+// reveal it — a predicted entity is shown at once, and the watched present loop
+// that would otherwise fire the reveal no longer runs for it.
+@(test)
+lane_gaining_a_hidden_spawn_reveals_it :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	av_set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1}
+	fly_set := ksim.Sim_Set{entity_desc = &desc, tick = proj_fly_thunk, input_size = 0}
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	for b in boxes {
+		ksim.lane_init(&b.lane, &b.s, 1, cfg = cfg)
+		ksim.lane_set_sim(&b.lane, b, lbox_sample, nil)
+	}
+	AV :: knet.Net_Id(20)
+	for b in boxes {
+		m := new(Mover)
+		b.movers[AV] = m
+		b.owners[AV] = 2
+		ksim.lane_track_set(&b.lane, AV, m, &av_set, 2)
+	}
+	DT :: 1.0 / 60.0
+	alice.ax = 0
+	for i in 1 ..= 60 {
+		for b in boxes {ksim.lane_frame(&b.lane, DT)}
+		ksim.lane_present(&alice.lane, DT)
+		lane_pump(boxes)
+	}
+
+	// Record which ids the reveal hook fires for.
+	revealed_fly := false
+	ksim.lane_set_present_ready(&alice.lane, &revealed_fly, proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
+		if id == 50 {(cast(^bool)user)^ = true}
+	})
+
+	// A host-owned flyer spawns (watched + hidden on alice). Hand it to alice
+	// BEFORE any present could uncover it — the reveal must come from the gain.
+	FLY :: knet.Net_Id(50)
+	for b in boxes {
+		m := new(Mover)
+		if b.s.is_host {m.x = 100; m.vx = 3}
+		b.movers[FLY] = m
+		b.owners[FLY] = 1
+		ksim.lane_track_set(&b.lane, FLY, m, &fly_set, 1)
+	}
+	testing.expect(t, !revealed_fly, "the flyer revealed before it was even owned — the setup is wrong")
+	ksim.lane_set_owner(&alice.lane, FLY, 2) // alice gains it, still hidden
+	testing.expect(t, revealed_fly,
+		"gaining a hidden fresh spawn didn't reveal it — a possession during its first render delay would leave it invisible")
+}
+
 // The active-intent window sits AFTER join startup (~5 ticks of neutral held
 // input before alice's stream reaches the host) and ends before the run does,
 // so every active tick is simulated with fresh confirmed input on both peers —

@@ -561,6 +561,13 @@ lane_set_owner :: proc(l: ^Lane, id: knet.Net_Id, owner: knet.Player_Id, allocat
 		}
 		if gaining && tr.watched {
 			tr.watched = false
+			// Mine now: a predicted entity is shown at once. If the reveal-gate
+			// still had it hidden (a possession handed over during its first
+			// render-delay of life, before the watched present loop uncovered
+			// it), uncover it here — that loop no longer runs for it.
+			if l.present_ready != nil {
+				l.present_ready(l.present_ready_user, id, tr.entity)
+			}
 			tr.hist = new(History, allocator)
 			tr.hist^ = history_make(tr.desc, l.slots, allocator)
 			if e := find_rx_entry(&l.rx, id); e != nil {
