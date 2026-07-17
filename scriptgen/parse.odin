@@ -2335,7 +2335,17 @@ resolve_edges :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
 			continue
 		}
 		at += 1
-		if len(types) - at != 2 || types[at] != r.type_text || types[at + 1] != r.type_text {
+		// Compare BASE type names: an imported block's field type is spelled
+		// bare at the block ("Gun_Mode") and qualified at the game
+		// ("play.Gun_Mode") — both are the same type, and the generated call
+		// site lets the compiler hold the exact match (the thunk derives the
+		// cast with type_of, so no spelling is ever spliced).
+		base_of :: proc(t: string) -> string {
+			b := t
+			if j := strings.last_index(b, "."); j >= 0 {b = b[j + 1:]}
+			return b
+		}
+		if len(types) - at != 2 || types[at] != types[at + 1] || base_of(types[at]) != base_of(r.type_text) {
 			error_at(loc, "%s: expected exactly `old, new: %s` after `self` (the field's declared type) — found %d param(s)%s", name, r.type_text, len(types) - at, len(types) > at ? fmt.tprintf(" starting with %q", types[at]) : "")
 			continue
 		}

@@ -12,17 +12,24 @@ package play
 // — `left` AND `wind` both replicate, so every peer computes the exact growth fraction even when
 // the wind VARIES (an enraged boss winding up in half the time: hardcoding the nominal wind in
 // presentation draws that ring half-grown from the start — replicating the denominator is the
-// point) — and the landing EDGE (telegraph_step, once per peer, the frame it hits zero).
+// point).
+//
+// THE LANDING is the game's edge half on `left`, generated — declare it on the embedding
+// entity and ask telegraph_landed whether THIS change is the eruption (it holds the cancel
+// contract; a late joiner's first sight seeds silently, so no phantom landing exists):
+//
+//   mob_tele_left_edge :: proc(g: ^Game, self: ^Mob, old, new: u16) {
+//       if play.telegraph_landed(&self.tele, old, new) { erupt(g, self) }
+//   }
 //
 // WHAT STAYS YOURS: the GEOMETRY and the PAYLOAD. A ring, a line, a cone — and what the landing
 // does (an AoE, a projectile barrage, a door slamming) — are the game's; the block owns only the
-// clock, its broadcast, and the edges. Root-while-winding (the boss stands still) is your brain's
-// policy around telegraph_active.
+// clock, its broadcast, and the landing test. Root-while-winding (the boss stands still) is your
+// brain's policy around telegraph_active.
 
 Telegraph :: struct {
 	left: u16 `gd:"replicate"`, // ticks until it lands (0 = idle) — every screen's countdown
 	wind: u16 `gd:"replicate"`, // the full wind THIS telegraph started with — frac's denominator
-	seen: Edge(u16),            // per-peer scratch: the landing edge's shadow, never on the wire
 }
 
 // telegraph_start — host: begin a wind-up of `wind` ticks. Every screen sees it grow from zero
@@ -56,17 +63,12 @@ telegraph_frac :: proc "contextless" (t: ^Telegraph) -> f32 {
 	return t.wind > 0 ? 1 - f32(t.left) / f32(t.wind) : 0
 }
 
-// telegraph_step — every peer, every frame: fires ONCE the frame the countdown hits zero — the
-// eruption cue, in lockstep on all screens (the host observes its own tick; each client observes
-// replication; same contract as Machine's step). A cancel goes quiet (wind was zeroed with it),
-// and a late joiner who never saw the wind-up gets no phantom landing.
-telegraph_step :: proc(t: ^Telegraph) -> (landed: bool) {
-	prev, _ := see(&t.seen, t.left)
-	return prev > 0 && t.left == 0 && t.wind > 0
-}
-
-// telegraph_sync — resync pre-pass: re-baseline the landing shadow so a snapshot catch-up
-// doesn't replay a long-landed slam as a fresh eruption.
-telegraph_sync :: proc(t: ^Telegraph) {
-	sync(&t.seen, t.left)
+// telegraph_landed — the landing test for the game's `<entity>_tele_left_edge` half: did THIS
+// net change land the wind-up? Holds the cancel contract — telegraph_cancel zeroes `wind` in
+// the same host mutation, so the delta that drops `left` to 0 arrives with `wind` already 0
+// and stays quiet; a real landing arrives with the wind still stamped. (First sight seeds the
+// edge silently, so a late joiner who never saw the wind-up gets no phantom eruption — that
+// used to be this block's own shadow + sync ritual; the kit's edge halves absorbed it.)
+telegraph_landed :: proc "contextless" (t: ^Telegraph, old_left, new_left: u16) -> bool {
+	return old_left > 0 && new_left == 0 && t.wind > 0
 }

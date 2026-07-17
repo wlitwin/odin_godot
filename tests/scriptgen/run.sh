@@ -300,7 +300,7 @@ grep -q "MOB_CMD_GUN_FIRE :: u16" "$icgen" || fail "imported composed command in
 # ---- fixture 9: the REAL play.Gun library block composes into a consumer ------
 # Embeds godot:play's Gun (state + the gun_fire verb) and asserts the whole block drops in: its
 # @(gd_command) verb hoists onto the entity (imported + qualified, NO owner param), its Gun_Def
-# knob-blob and its Machine(Gun_Mode) mode both compose into the descriptor.
+# knob-blob and its plain Gun_Mode mode field both compose into the descriptor.
 pg="$work/playgun"
 mkdir -p "$pg"
 cat >"$pg/turret.odin" <<'ODIN'
@@ -324,7 +324,7 @@ grep -q 'import play "godot:play"' "$tgen" || fail "play.Gun consumer must impor
 grep -q "return play.gun_fire(&self.weapon, _a0, _a1)" "$tgen" || fail "play.gun_fire must route into &self.weapon (imported, qualified, no owner)"
 grep -q "TURRET_CMD_WEAPON_FIRE :: u16" "$tgen" || fail "play.Gun's verb must hoist as TURRET_CMD_WEAPON_FIRE"
 grep -q "size_of(type_of(Turret{}.weapon.def))" "$tgen" || fail "the Gun_Def knob-blob must replicate through the embed"
-grep -q "offset_of(type_of(Turret{}.weapon.mode), cur)" "$tgen" || fail "Machine(Gun_Mode) mode.cur must compose through the block"
+grep -q "offset_of(type_of(Turret{}.weapon), mode)" "$tgen" || fail "the Gun_Mode mode field must compose through the block"
 
 # ---- fixture 10: METHOD composition — a block's @(gd_method)/@(gd_rpc) hoist ------
 # The engine-facing dual of verb composition: a @(gd_method) (owner-threaded, with a return) and a

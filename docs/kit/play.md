@@ -13,15 +13,27 @@ the wire (see [recipes](../recipes.md) for the full pattern).
 | `play.Gun` | host-written, client-predicted verb | mag + reload + jam behind a `gun_fire` verb, knob-configured (`Gun_Def`) |
 | `play.Ability` | cooldown-gated verb | the slow cast (lob/cone/buff) — the block owns its cooldown |
 | `play.Channel` | owner-streamed progress + plain claim verb | hold-to-progress: revive, capture, cast bar — every screen draws the fill |
-| `play.Health` | host-written state, VERB-FREE | hp + max + the per-peer damage edge (numbers, topples, death cues) |
+| `play.Health` | host-written state, VERB-FREE | hp + max + the damage policy (`hurt`'s killing-blow-once contract) |
 | `play.Telegraph` | host countdown, verb-free | the wind-up that lands — every screen grows the same warning ring |
-| `play.Machine(E)` | replicated FSM state | `cur` replicates through the embed; a local edge shadow presents transitions |
 | `play.Puppet` / `Puppet3` | owner-simulated engine physics | a RigidBody every screen agrees about (below) |
 
+**A block never shadows a replicated field.** Its state diffs like any
+tagged field, so its PRESENTATION is the game's generated
+[`<field>_edge` half](net.md#edges-class_field_edge--presenting-delta-lane-changes)
+on the embedding entity — `mob_health_hp_edge` for the hit/death/revive
+cues, `runner_weapon_mode_edge` for the gun's jam/reload pops,
+`mob_tele_left_edge` (+ `play.telegraph_landed`, which holds the cancel
+contract) for the eruption. First sight and resyncs seed silently, so the
+birth guards and re-baseline rituals the blocks used to carry are gone with
+their shadows. (A replicated FSM is now just a plain enum field plus its
+edge half — the old `play.Machine` dissolved into that.)
+
 Presentation-side (never on the wire): `play.Edge(T)` (fire once on a
-change), `play.Anim` clocks (tiny float eases), `play.Marker` (lazy world
-markers — rings, bars, beacons), `play.Pace` (the re-armed deadline every
-host tick loop re-spells), and `play.Trail` (the authority's
+change of DERIVED or local state — a boolean computed from a replicated
+array, a persistence profile; a replicated field itself takes the generated
+half above), `play.Anim` clocks (tiny float eases), `play.Marker` (lazy
+world markers — rings, bars, beacons), `play.Pace` (the re-armed deadline
+every host tick loop re-spells), and `play.Trail` (the authority's
 where-was-it-a-moment-ago ledger — lag-compensated hitscan reads it).
 
 PREDICTED blocks live on the sibling shelf, `godot:play/sim` (blessed alias

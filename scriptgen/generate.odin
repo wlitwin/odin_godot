@@ -742,11 +742,14 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			leaf := join_snake(r.path)
 			fmt.sbprintf(b, "@(private = \"file\")\n_%s_edge_%s :: proc(entity: rawptr, game: rawptr, old: rawptr) {{\n", snake, leaf)
 			fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
+			// The old-value cast derives its type from the field itself
+			// (type_of) — no spelled type, so an imported block's field needs
+			// no qualifier and no import here.
 			if r.edge_game != "" {
 				fmt.sbprintf(b, "\tassert(game != nil, \"%s needs the game pointer — session_set_factory's user is what edge halves receive\")\n", r.edge_proc)
-				fmt.sbprintf(b, "\t%s(cast(^%s)game, self, (cast(^%s)old)^, self.%s)\n", r.edge_proc, r.edge_game, r.type_text, join_path(r.path))
+				fmt.sbprintf(b, "\t%s(cast(^%s)game, self, (cast(^type_of(self.%s))old)^, self.%s)\n", r.edge_proc, r.edge_game, join_path(r.path), join_path(r.path))
 			} else {
-				fmt.sbprintf(b, "\t%s(self, (cast(^%s)old)^, self.%s)\n", r.edge_proc, r.type_text, join_path(r.path))
+				fmt.sbprintf(b, "\t%s(self, (cast(^type_of(self.%s))old)^, self.%s)\n", r.edge_proc, join_path(r.path), join_path(r.path))
 			}
 			w(b, "}\n\n")
 		}

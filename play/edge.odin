@@ -1,29 +1,32 @@
 package play
 
-// play/edge — fire ONCE on a change instead of every frame.
+// play/edge — fire ONCE on a change instead of every frame — for state the
+// wire CANNOT see.
 //
-// An Edge(T) is a client-local SHADOW of some value (usually a REPLICATED field)
-// so presentation can react the single frame the value moves — a hit flash, a
-// status splash, a telegraph burst — rather than re-running every frame the value
-// merely HOLDS. Hand `see` the current value; it returns the PREVIOUS one and
-// whether it moved, updating the shadow in place. The caller reads prev-vs-cur for
-// the exact transition it cares about (rose, fell to zero, a delta).
+// A REPLICATED field never needs this: declare the generated `<field>_edge`
+// half (kit/net) and the session's per-frame pass hands you the net change,
+// with first sight and resyncs seeding silently — no shadow, no scan, no
+// re-baseline ritual. This primitive is for everything ELSE that moves:
 //
-// WHY THIS IS A play/ PRIMITIVE AND NOT A kit/ ONE: an Edge touches NOTHING on the
-// wire. It is pure local scratch — it lives in an entity's `view` (client render
-// state) or host brain, off the replication boundary by construction. The kit's
-// bar is "on the wire AND two games need it"; an Edge is neither, yet every
-// non-trivial game re-derives it. That is exactly what the opt-in companion layer
-// is for: reusable game-STRUCTURE that can't break kit discipline.
+//   - DERIVED values — a boolean computed from a replicated array
+//     (scrapyard's "is this mob slimed?" off its fx effects), a distance
+//     bucket, a rank; the field diffs but the DERIVATION is yours
+//   - LOCAL state — a persistence profile, a host brain's scratch, render
+//     bookkeeping that never crosses the wire
+//
+// Hand `see` the current value; it returns the PREVIOUS one and whether it
+// moved, updating the shadow in place. The caller reads prev-vs-cur for the
+// exact transition it cares about (rose, fell to zero, a delta).
 //
 //   Rising edge:    p, moved := play.see(&e, v);  moved && v          // just became true / nonzero
 //   Fell to zero:   p, _     := play.see(&e, v);  p > 0 && v == 0     // finished / expired this frame
 //   Delta:          p, moved := play.see(&e, v);  if moved { d := p - v }
 //
-// A snapshot catch-up (a late join, an interest re-entry) lands replicated fields
-// WHOLESALE — that jump is history, not gameplay. Re-baseline the shadow with
-// `sync` in the resync pre-pass so a wound taken out of view doesn't present as a
-// fresh hit.
+// For DERIVED-from-replicated values one discipline carries over from the
+// kit's halves: a snapshot catch-up (late join, interest re-entry) lands the
+// SOURCE fields wholesale, so re-baseline the shadow with `sync` on
+// Ev_Resynced — the derivation jump is history, not gameplay. (Purely local
+// state never needs it.)
 Edge :: struct($T: typeid) {
 	seen: T,
 }

@@ -1,30 +1,38 @@
 package play
 
-// play/health — HIT POINTS as a drop-in block: hp + max replicated through the embed, plus the
-// per-peer damage EDGE every screen presents from (numbers, topples, revive pops).
+// play/health — HIT POINTS as a drop-in block: hp + max replicated through the embed.
 //
 //   Runner :: struct { ... health: play.Health, ... }
 //   Mob    :: struct { ... health: play.Health, ... }   // same block, any entity type
 //
 // THE FIRST VERB-FREE BLOCK. play.Gun/Ability/Channel each compose a command; Health composes
 // NONE — damage is HOST-INTERNAL (a bite, a slug, a splash: consequences of the sim, never a
-// client intent), so there is no client→host seam to generate. What composes is the STATE (every
-// screen's HUD and gates read the same replicated hp/max) and the presentation EDGE
-// (health_step — the once-per-change hook, same peer-symmetric contract as play.Machine's step).
-// A block doesn't need verbs to be worth being a block.
+// client intent), so there is no client→host seam to generate. What composes is the STATE:
+// every screen's HUD and gates read the same replicated hp/max. A block doesn't need verbs to
+// be worth being a block.
+//
+// THE PRESENTATION EDGE IS THE GAME'S HALF, generated: declare the name-paired half on the
+// embedding entity and the session's per-frame pass hands you the net change — a hit
+// (new < old, the delta is the damage number), a death (new == 0), a revive (old == 0) —
+// with first sight and resyncs seeding SILENTLY, so there is no birth guard and no
+// resync re-baseline ritual to write:
+//
+//   mob_health_hp_edge :: proc(g: ^Game, self: ^Mob, old, new: u16) { ... }
+//
+// (This block used to carry its own shadow + health_step/health_sync — the kit's edge halves
+// made that whole mechanism the framework's; a block never shadows a replicated field now.)
 //
 // WHAT STAYS YOURS: the MEANING. Who takes damage, what a death pays out (credit, loot, reaping),
 // what a heal is allowed to do — game logic wrapped AROUND health_hurt/health_kill/health_heal.
 // The fields are public; an odd policy (a revive that sets hp to a stake, a heal-to-base that
 // ignores a raised max) is an honest direct write, host-side.
 //
-// The host writes (plain replicated fields); every peer reads and steps. u16 spans a player's
+// The host writes (plain replicated fields); every peer reads. u16 spans a player's
 // handful to a boss's hundreds.
 
 Health :: struct {
-	hp:   u16 `gd:"replicate"`, // host-authoritative; 0 = dead/downed (what that MEANS is yours)
-	max:  u16 `gd:"replicate"`, // stamped by health_arm; replicated so every screen can draw a bar
-	seen: Edge(u16),            // per-peer scratch — health_step's shadow, never on the wire
+	hp:  u16 `gd:"replicate"`, // host-authoritative; 0 = dead/downed (what that MEANS is yours)
+	max: u16 `gd:"replicate"`, // stamped by health_arm; replicated so every screen can draw a bar
 }
 
 // health_arm — host, at spawn / a max change (a plate part, a boss dialing its pool): stamp the
@@ -64,17 +72,3 @@ health_frac :: proc "contextless" (h: ^Health) -> f32 {
 	return h.max > 0 ? f32(h.hp) / f32(h.max) : 0
 }
 
-// health_step — the presentation edge: call every frame on every peer and branch on (prev, cur)
-// — prev > cur is a hit (the delta is the damage number), cur == 0 a death, prev == 0 && cur > 0
-// a revive. A first sighting (prev == 0 at birth) is a BIRTH, not a hit — the caller's usual
-// `if prev == 0 {continue}` applies, exactly as with a hand-rolled Edge.
-health_step :: proc(h: ^Health) -> (prev, cur: u16, moved: bool) {
-	prev, moved = see(&h.seen, h.hp)
-	return prev, h.hp, moved
-}
-
-// health_sync — resync pre-pass: re-baseline the edge so a snapshot catch-up (late join,
-// interest re-entry) doesn't present a wholesale hp jump as a fresh wound.
-health_sync :: proc(h: ^Health) {
-	sync(&h.seen, h.hp)
-}

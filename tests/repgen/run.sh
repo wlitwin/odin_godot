@@ -238,7 +238,7 @@ echo "  ok  every-screen _fx: event gate, authority broadcast, inline _mine call
 # — the session's per-frame pass does the rest.
 for needle in \
 	'_pawn_edge_hp :: proc(entity: rawptr, game: rawptr, old: rawptr)' \
-	'pawn_hp_edge(self, (cast(^i32)old)^, self.hp)' \
+	'pawn_hp_edge(self, (cast(^type_of(self.hp))old)^, self.hp)' \
 	'{field = 0, fire = _pawn_edge_hp}' \
 	'edges = _pawn_edges[:]' \
 ; do

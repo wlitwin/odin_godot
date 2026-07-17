@@ -22,7 +22,7 @@ package play
 //   * CADENCE — WHEN to pull. Responsive fire is a per-local-player wall-clock feel (the pacer
 //     lesson): the wielder paces and predicts on its own clock, never waiting for replicated
 //     state. So the game issues `..._fire_cmd` when ITS pace says now (a play.Pace, holding for
-//     `g.def.reload_ticks` while `g.mode.cur == .Reloading`). The gun tells you its state; you
+//     `g.def.reload_ticks` while `g.mode == .Reloading`). The gun tells you its state; you
 //     time the trigger.
 //   * EFFECT — WHAT a shot does. A projectile / hitscan / damage touches the game's world, which
 //     the gun can't know. Read `g.fired` at the issue site to draw YOUR muzzle flash, and in the
@@ -52,7 +52,7 @@ Gun_Def :: struct {
 Gun :: struct {
 	def:          Gun_Def `gd:"replicate"`, // the knobs (POD blob; host-assigned at equip)
 	ammo:         u16 `gd:"replicate"`,      // rounds left in the mag
-	mode:         Machine(Gun_Mode),         // Ready / Reloading / Jammed (cur replicated; owns its own state)
+	mode:         Gun_Mode `gd:"replicate"`, // Ready / Reloading / Jammed — host-written, every screen reads
 	reload_cd:    u16 `gd:"replicate"`,      // host countdown to reload done (0 = not reloading)
 	taps:         u8 `gd:"replicate"`,       // clear-taps left on a jam (replicated so the mash reads on every screen)
 	salt:         u32 `gd:"replicate"`,      // jam-seed context the game sets (floor/run/player); 0 is fine
@@ -72,7 +72,7 @@ gun_equip :: proc(g: ^Gun, def: Gun_Def, salt: u32 = 0) {
 	g.spent = 0
 	g.reload_cd = 0
 	g.taps = 0
-	set(&g.mode, Gun_Mode.Ready)
+	g.mode = .Ready
 }
 
 // gun_fire — PULL THE TRIGGER. A composed, PREDICTED command: scriptgen hoists it onto whatever
@@ -87,29 +87,29 @@ gun_equip :: proc(g: ^Gun, def: Gun_Def, salt: u32 = 0) {
 gun_fire :: proc(g: ^Gun, dx, dy: f32) -> bool {
 	g.aim_x, g.aim_y = dx, dy
 	g.fired = false
-	switch g.mode.cur {
+	switch g.mode {
 	case .Reloading:
 	// The pacer holds through a reload; a stray pull that raced it is a no-op (still applied).
 	case .Jammed:
 		// Mash to clear — each pull chips a tap; no round leaves until it's Ready again.
 		if g.taps > 0 {g.taps -= 1}
-		if g.taps == 0 {set(&g.mode, Gun_Mode.Ready)}
+		if g.taps == 0 {g.mode = .Ready}
 	case .Ready:
 		if g.ammo == 0 {
 			// Empty — begin the reload; the host counts it down in gun_tick, the pacer holds.
-			set(&g.mode, Gun_Mode.Reloading)
+			g.mode = .Reloading
 			g.reload_cd = g.def.reload_ticks
 		} else if gun_jams(g) {
 			g.ammo -= 1 // the dud is ejected
 			g.spent += 1
-			set(&g.mode, Gun_Mode.Jammed)
+			g.mode = .Jammed
 			g.taps = g.def.jam_taps
 		} else {
 			g.ammo -= 1
 			g.spent += 1
 			g.fired = true // a live round flew
 			if g.ammo == 0 {
-				set(&g.mode, Gun_Mode.Reloading)
+				g.mode = .Reloading
 				g.reload_cd = g.def.reload_ticks
 			}
 		}
@@ -121,22 +121,23 @@ gun_fire :: proc(g: ^Gun, dx, dy: f32) -> bool {
 // authoritative half of the client's predicted reload gap (they finish within a hair). No-op
 // unless reloading.
 gun_tick :: proc(g: ^Gun) {
-	if g.mode.cur == .Reloading && g.reload_cd > 0 {
+	if g.mode == .Reloading && g.reload_cd > 0 {
 		g.reload_cd -= 1
 		if g.reload_cd == 0 {
 			g.ammo = g.def.mag
-			set(&g.mode, Gun_Mode.Ready)
+			g.mode = .Ready
 		}
 	}
 }
 
-// gun_step — presentation edge: call every frame on every peer and branch on (from, to) to fire
-// enter/exit cues (a JAM burst, a reload click, a Ready pop). The host observes its own `set`,
-// each client observes the replicated `mode.cur`; both drive this, so cues fire on every screen
-// with no coordination — the play.Machine contract, one level up.
-gun_step :: proc(g: ^Gun) -> (from, to: Gun_Mode, moved: bool) {
-	return step(&g.mode)
-}
+// THE MODE'S PRESENTATION is the game's edge half on the embedding entity —
+// branch on (old, new) for enter/exit cues (a JAM burst, a reload click, a
+// Ready pop), fired on every screen by the session's edge pass, no per-frame
+// scan and no coordination:
+//
+//   runner_weapon_mode_edge :: proc(g: ^Game, self: ^Runner, old, new: play.Gun_Mode) {
+//       #partial switch new { case .Jammed: spark(); case .Ready: click() }
+//   }
 
 // gun_jams — the deterministic per-shot jam roll: seeded from the shared salt and the gun's
 // LIFETIME round counter, which never repeats. (It once seeded from the mag position — fine on a
@@ -153,7 +154,7 @@ gun_jams :: proc "contextless" (g: ^Gun) -> bool {
 	return u16(h % 1000) < g.def.jam_per_mille
 }
 
-// Convenience predicates the pacer and HUD read — the gun's state is public (`g.mode.cur`,
+// Convenience predicates the pacer and HUD read — the gun's state is public (`g.mode`,
 // `g.ammo`, `g.def`), but these name the intent at the call site.
-gun_reloading :: proc "contextless" (g: ^Gun) -> bool {return g.mode.cur == .Reloading}
-gun_jammed :: proc "contextless" (g: ^Gun) -> bool {return g.mode.cur == .Jammed}
+gun_reloading :: proc "contextless" (g: ^Gun) -> bool {return g.mode == .Reloading}
+gun_jammed :: proc "contextless" (g: ^Gun) -> bool {return g.mode == .Jammed}
