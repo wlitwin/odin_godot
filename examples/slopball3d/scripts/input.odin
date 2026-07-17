@@ -63,7 +63,7 @@ drive_my_kicker :: proc(self: ^Slopball3, delta: f64) {
 		if bdx * bdx + bdz * bdz <= DRIBBLE_R * DRIBBLE_R && bp.y < 0.6 {
 			has := ksess.session_owner_of(&self.ses, self.ball_id) == self.ses.me ||
 				self.ball.puppet.claimed
-			if !has && self.ball.won == 0 {
+			if !has && self.ball.score.won == 0 {
 				// PREDICTED POSSESSION: my screen sees the touch NOW; seize
 				// the sim on spec. The host's grant confirms in ~a round
 				// trip — or the claim melts away, smoothed.
@@ -80,7 +80,7 @@ drive_my_kicker :: proc(self: ^Slopball3, delta: f64) {
 	// The boot: while MY solver runs the ball and it's in reach, punt it away
 	// from me — all local, all instant (that is the whole point of the seat).
 	// A 3D kick lofts: the arc is what exercises y and the tumble.
-	want_kick := (self.bot == "striker" && self.ball != nil && self.ball.won == 0) ||
+	want_kick := (self.bot == "striker" && self.ball != nil && self.ball.score.won == 0) ||
 		(self.bot == "" && !typing && gd.is_action_just_pressed("slop3_kick"))
 	if want_kick && self.ball != nil && now_s() >= self.kick_cool &&
 	   (ksess.session_owner_of(&self.ses, self.ball_id) == self.ses.me || self.ball.puppet.claimed) {
@@ -116,7 +116,7 @@ bot_steer :: proc(self: ^Slopball3) -> [3]f32 {
 		return normalized_xz({b.x - self.me_kick.pos.x, 0, b.z - self.me_kick.pos.z})
 	}
 	if self.bot != "striker" {return {}}
-	if self.ball.won != 0 {return {}}
+	if self.ball.score.won != 0 {return {}}
 	me := self.me_kick
 	b := self.ball.puppet.pos
 	gx: f32 = kicker3_team(me.pid) == 1 ? PITCH_W : 0

@@ -31,6 +31,7 @@ import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import kui "godot:kit/ui"
+import netgd "godot:kit/netgd"
 import play "godot:play"
 
 MSG_SESSION :: u8(0) // all kit/session traffic under one game byte
@@ -90,9 +91,9 @@ Slopball :: struct {
 	kickoff_at: f64, // until when the ball rests at center
 	goals_to:   int, // first to N takes the match (SLOP_GOALS)
 
-	// Presentation edges + acid.
-	seen_l, seen_r: u8, // score edges: every peer narrates goals from replication
-	seen_won:       u8,
+	// Presentation + acid. (The old seen_l/seen_r/seen_won mirrors are GONE —
+	// the ball_score_edge half below receives the net change directly.)
+	netgraph:       kui.Netgraph, // the "is it healthy?" overlay — coop form + the traffic row
 	auto_peers:     int, // env role: auto-start when this many are seated (0 = lobby UI)
 	bot:            string, // SLOP_BOT: "", "striker", "idle"
 	kick_cool:      f64,
@@ -137,6 +138,8 @@ slopball_ready :: proc(self: ^Slopball) {
 
 	self.goals_to = gd.env_int("SLOP_GOALS", 3)
 	self.bot = gd.env_string("SLOP_BOT", "")
+	self.netgraph = kui.netgraph_make(cast(gd.Node)self.owner)
+	kui.netgraph_show(&self.netgraph, true)
 	install_controls()
 
 	// Headless drivers pick a role from the env (the acid path); humans get
@@ -157,7 +160,18 @@ slopball_ready :: proc(self: ^Slopball) {
 		self.auto_peers = gd.env_int("SLOP_PEERS", 2)
 		slopball_on_serve(self)
 	}
+	// Scripted matches auto-start when the pitch fills — checked wherever the
+	// count can change: here (single mode seats only me) and on each join's
+	// authority consequence (slopball_player_joined_then).
+	slopball_try_start(self)
 	gd.print_str("SB_UI_READY")
+}
+
+slopball_try_start :: proc(self: ^Slopball) {
+	if self.started || self.auto_peers <= 0 {return}
+	if ksess.session_count(&self.ses, connected_only = true, players_only = true) >= self.auto_peers {
+		slopball_on_start(self) // self-gating: non-hosts and re-calls no-op
+	}
 }
 
 slopball_process :: proc(self: ^Slopball, delta: f64) {
@@ -167,68 +181,100 @@ slopball_process :: proc(self: ^Slopball, delta: f64) {
 
 	if self.started {
 		drive_my_kicker(self, delta)
-		if self.ses.is_host {
-			for _ in 0 ..< ticks {
-				slop_host_tick(self)
-			}
-		}
-		score_edges(self)
+		// The authority's fixed steps, role-free at the call site: the
+		// generated slopball_step holds the host gate (clients no-op) and
+		// runs the same-frame edge pass after the loop.
+		slopball_step(self, ticks)
 		ball_report(self)
-	} else if self.ses.is_host && self.auto_peers > 0 &&
-	   ksess.session_count(&self.ses, connected_only = true, players_only = true) >= self.auto_peers {
-		slopball_on_start(self)
 	}
 
-	for ev in events {
-		#partial switch e in ev {
-		case ksess.Ev_Welcomed:
-			gd.print_str(fmt.tprintf("SB_SEATED me=%d", u64(e.me)))
-		case ksess.Ev_Player_Joined:
-			if self.ses.is_host {
-				if p, ok := ksess.session_player(&self.ses, e.id); ok {
-					kcomms.comms_welcome(&self.comms, e.id, e.rejoin, fmt.tprintf("%s takes the pitch", p.name))
-				}
-				// Drop-in: a mid-match joiner gets a kicker on the spot.
-				if self.started && !e.rejoin {
-					spawn_kicker(self, e.id)
-				}
-			}
-		case ksess.Ev_Player_Left:
-			if self.ses.is_host {
-				// The seat outlives the socket, but the SIM must not: a ball
-				// owned by the leaver would freeze mid-air on every screen.
-				if self.ball != nil && ksess.session_owner_of(&self.ses, self.ball_id) == e.id {
-					ksess.session_set_owner(&self.ses, self.ball_id, self.ses.me)
-					gd.print_str("SB_BALL_RECLAIMED")
-				}
-			}
-		case ksess.Ev_Host_Left:
-			kui.lobby_set_status(&self.boot.ui, "The host left — this match is over")
-			gd.print_str("SB_HOST_LEFT")
-		case ksess.Ev_Spawned:
-			if !self.started {
-				self.started = true
-				gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
-				gd.set_bool(cast(gd.Object)self.boot.legend, "visible", true)
-				gd.print_str("SB_STARTED")
-			}
-			if e.id == self.ball_id && self.ball != nil {
-				// First sight of the ball: adopt the current seat (a late
-				// joiner may arrive while a client already simulates).
-				seat_ball(self, ksess.session_owner_of(&self.ses, e.id))
-			}
-			gd.print_str(fmt.tprintf("SB_SPAWN id=%d mine=%v", u32(e.id), e.owner == self.ses.me))
-		case ksess.Ev_Owner_Changed:
-			if e.id == self.ball_id {
-				seat_ball(self, e.owner)
-				gd.print_str(fmt.tprintf("SB_BALL_OWNER player=%d", u64(e.owner)))
-			}
-		case ksess.Ev_Join_Denied:
-			gd.print_str(fmt.tprintf("SB_DENIED reason=%v", e.reason))
-		case ksess.Ev_Join_Failed:
-			gd.print_str("SB_JOIN_FAILED")
+	// The "is it healthy?" overlay: rtt off the replicated ping stat, the
+	// LINK's own truth (ENet loss + rtt variance — clients only), and the
+	// wire's bytes-by-kind row. Coop form: `sim` stays false.
+	ng := kui.Net_Stats{
+		rtt_ms  = kui.net_ping_ms(&self.ses),
+		traffic = netgd.wire_traffic(&self.boot.wire),
+	}
+	if _, jit, loss, has := netgd.wire_link_quality(&self.boot.wire, ksess.HOST_PEER); has {
+		ng.jitter_ms = jit
+		ng.loss_pct = loss
+	}
+	kui.netgraph_refresh(&self.netgraph, ng)
+
+	// The game's event reactions are the name-paired halves below; the
+	// generated slopball_events holds the switch and every role gate.
+	slopball_events(self, events)
+}
+
+// ---- session event halves ---------------------------------------------------
+
+slopball_welcomed :: proc(self: ^Slopball, me: knet.Player_Id) {
+	gd.print_str(fmt.tprintf("SB_SEATED me=%d", u64(me)))
+}
+
+// The join's authority consequence: word the arrival, field a drop-in kicker,
+// start the scripted match when the pitch fills — is_host-free (the generated
+// dispatch holds the gate).
+slopball_player_joined_then :: proc(self: ^Slopball, id: knet.Player_Id, rejoin: bool) {
+	if p, ok := ksess.session_player(&self.ses, id); ok {
+		kcomms.comms_welcome(&self.comms, id, rejoin, fmt.tprintf("%s takes the pitch", p.name))
+	}
+	if self.started && !rejoin {
+		spawn_kicker(self, id)
+	}
+	slopball_try_start(self)
+}
+
+// The seat outlives the socket, but the SIM must not: a ball owned by the
+// leaver would freeze mid-air on every screen. Authority consequence — the
+// host reclaims the seat.
+slopball_player_left_then :: proc(self: ^Slopball, id: knet.Player_Id) {
+	if self.ball != nil && ksess.session_owner_of(&self.ses, self.ball_id) == id {
+		ksess.session_set_owner(&self.ses, self.ball_id, self.ses.me)
+		gd.print_str("SB_BALL_RECLAIMED")
+	}
+}
+
+slopball_host_left :: proc(self: ^Slopball) {
+	kui.lobby_set_status(&self.boot.ui, "The host left — this match is over")
+	gd.print_str("SB_HOST_LEFT")
+}
+
+// The world reached this peer — and the ball's INITIAL dress: adopt the
+// current seat (a late joiner may arrive while a client already simulates)
+// and paint a mid-match score (spawn values seed the edge silently — a
+// baseline, not an edge).
+slopball_entity_spawned :: proc(self: ^Slopball, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
+	_ = type
+	if !self.started {
+		self.started = true
+		gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
+		gd.set_bool(cast(gd.Object)self.boot.legend, "visible", true)
+		gd.print_str("SB_STARTED")
+	}
+	if id == self.ball_id && self.ball != nil {
+		seat_ball(self, ksess.session_owner_of(&self.ses, id))
+		if self.ball.score.l != 0 || self.ball.score.r != 0 {
+			kui.lobby_set_status(&self.boot.ui, fmt.tprintf("%d — %d", self.ball.score.l, self.ball.score.r))
 		}
 	}
+	gd.print_str(fmt.tprintf("SB_SPAWN id=%d mine=%v", u32(id), owner == self.ses.me))
+}
+
+slopball_owner_changed :: proc(self: ^Slopball, id: knet.Net_Id, owner: knet.Player_Id, prev: knet.Player_Id) {
+	_ = prev
+	if id == self.ball_id {
+		seat_ball(self, owner)
+		gd.print_str(fmt.tprintf("SB_BALL_OWNER player=%d", u64(owner)))
+	}
+}
+
+slopball_join_denied :: proc(self: ^Slopball, reason: ksess.Deny_Reason) {
+	gd.print_str(fmt.tprintf("SB_DENIED reason=%v", reason))
+}
+
+slopball_join_failed :: proc(self: ^Slopball) {
+	gd.print_str("SB_JOIN_FAILED")
 }
 
 // seat_ball — the Puppet handoff: whoever the session names, that peer's
@@ -244,27 +290,24 @@ seat_ball :: proc(self: ^Slopball, owner: knet.Player_Id) {
 	play.puppet_seat(&self.ball.puppet, owner == self.ses.me)
 }
 
-// score_edges — every peer narrates goals and the match end from REPLICATED
-// score bytes (the host never sends a "goal!" message; the state IS the news).
-score_edges :: proc(self: ^Slopball) {
-	if self.ball == nil {return}
-	b := self.ball
-	if b.score_l != self.seen_l || b.score_r != self.seen_r {
-		self.seen_l = b.score_l
-		self.seen_r = b.score_r
-		kui.lobby_set_status(&self.boot.ui, fmt.tprintf("%d — %d", b.score_l, b.score_r))
-		gd.print_str(fmt.tprintf("SB_SCORE l=%d r=%d", b.score_l, b.score_r))
+// THE SCOREBOARD EDGE — every peer narrates goals and the match end from
+// REPLICATED score bytes (the host never sends a "goal!" message; the state
+// IS the news). Score is ONE co-located field, so a goal that moves l and won
+// together fires ONCE with the whole old/new — the seen_* mirrors and the
+// per-frame compare are deleted, and first sight (a late joiner's 3—2) seeds
+// silently by design (dressed on slopball_entity_spawned above).
+ball_score_edge :: proc(g: ^Slopball, self: ^Ball, old, new: Score) {
+	if new.l != old.l || new.r != old.r {
+		kui.lobby_set_status(&g.boot.ui, fmt.tprintf("%d — %d", new.l, new.r))
+		gd.print_str(fmt.tprintf("SB_SCORE l=%d r=%d", new.l, new.r))
 	}
-	if b.won != self.seen_won {
-		self.seen_won = b.won
-		if b.won != 0 {
-			side := b.won == 1 ? "LEFT" : "RIGHT"
-			kui.lobby_set_status(&self.boot.ui, fmt.tprintf("%s takes the match %d—%d", side, b.score_l, b.score_r))
-			gd.print_str(fmt.tprintf("SB_MATCH winner=%d", b.won))
-			if !self.done {
-				self.done = true
-				gd.print_str("SLOPBALL_DONE")
-			}
+	if new.won != 0 && old.won == 0 {
+		side := new.won == 1 ? "LEFT" : "RIGHT"
+		kui.lobby_set_status(&g.boot.ui, fmt.tprintf("%s takes the match %d—%d", side, new.l, new.r))
+		gd.print_str(fmt.tprintf("SB_MATCH winner=%d", new.won))
+		if !g.done {
+			g.done = true
+			gd.print_str("SLOPBALL_DONE")
 		}
 	}
 }

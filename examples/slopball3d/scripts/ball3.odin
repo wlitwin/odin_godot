@@ -17,14 +17,20 @@ import gd "godot:godot"
 import knet "godot:kit/net"
 import play "godot:play"
 
+// The scoreboard, CO-LOCATED into one POD struct: the diff atom is the field,
+// so a goal that moves l and won together lands as ONE edge — ball3_score_edge
+// (slopball3d.odin) narrates once, no seen_* mirrors.
+Score :: struct {
+	l, r: u8, // goals by each team (LEFT defends left, scores right)
+	won:  u8, // 0 = playing, 1/2 = that side took the match
+}
+
 Ball3 :: struct {
-	owner:   gd.Rigid_Body3d,
-	look:    gd.Node3d `gd:"onready=Look"`, // the drawn ball — render-error smoothing rides here
-	net_id:  knet.Net_Id,
-	puppet:  play.Puppet3, // pose + both velocities replicate through the embed
-	score_l: u8 `gd:"replicate"`, // host: goals by the LEFT team (defends left, scores right)
-	score_r: u8 `gd:"replicate"`,
-	won:     u8 `gd:"replicate"`, // 0 = playing, 1/2 = that side took the match
+	owner:  gd.Rigid_Body3d,
+	look:   gd.Node3d `gd:"onready=Look"`, // the drawn ball — render-error smoothing rides here
+	net_id: knet.Net_Id,
+	puppet: play.Puppet3, // pose + both velocities replicate through the embed
+	score:  Score `gd:"replicate"`, // host-authoritative deltas on the client-streamed entity
 }
 
 ball3_ready :: proc(self: ^Ball3) {

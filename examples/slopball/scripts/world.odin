@@ -7,6 +7,7 @@ package slopball
 // typed *_spawned/*_freed hooks that keep the by-type maps.
 
 import gd "godot:godot"
+import kboot "godot:kit/boot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
@@ -41,11 +42,10 @@ ball_freed :: proc(game: ^Slopball, self: ^Ball, id: knet.Net_Id) {
 // seated player, spread along their team's half.
 spawn_world :: proc(self: ^Slopball) {
 	if self.ball != nil {return} // the started flag flips on the EVENT; this guard is synchronous
-	bp, bid := ksess.session_spawn_make(&self.ses, BALL_TYPE, owner = self.ses.me)
-	ball := cast(^Ball)bp
+	ball, bid := ball_spawn(&self.boot, owner = self.ses.me) // typed, from the entity tag — no const, no cast
 	ball.puppet.x = PITCH_W / 2
 	ball.puppet.y = PITCH_H / 2
-	ksess.session_spawn_send(&self.ses, bid)
+	kboot.boot_spawn_send(&self.boot, bid)
 	seat_ball(self, self.ses.me)
 	self.kickoff_at = now_s() + KICKOFF_HOLD
 
@@ -63,8 +63,7 @@ spawn_world :: proc(self: ^Slopball) {
 // Host: one avatar for `pid`, placed on its team's side of the center line.
 spawn_kicker :: proc(self: ^Slopball, pid: knet.Player_Id) {
 	if _, has := kicker_owned_by(&self.boot, pid); has {return}
-	kp, kid := ksess.session_spawn_make(&self.ses, KICKER_TYPE, owner = pid)
-	k := cast(^Kicker)kp
+	k, kid := kicker_spawn(&self.boot, owner = pid)
 	k.pid = u8(pid)
 	team := kicker_team(k.pid)
 	rank := (int(pid) - int(team)) / 2 // 0,1,2.. within the team
@@ -73,5 +72,5 @@ spawn_kicker :: proc(self: ^Slopball, pid: knet.Player_Id) {
 	// Fan the team OFF the center lane: a kickoff shot at the goal mouth must
 	// not thread a parked teammate (the acid learned this as an own-goal).
 	k.y = PITCH_H/2 + off[rank % 4]
-	ksess.session_spawn_send(&self.ses, kid)
+	kboot.boot_spawn_send(&self.boot, kid)
 }

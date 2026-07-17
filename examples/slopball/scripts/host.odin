@@ -12,9 +12,13 @@ import play "godot:play"
 import "core:fmt"
 import "core:math"
 
+// The attribute is the whole wiring: generated `slopball_step(self, ticks)`
+// runs this on the AUTHORITY alone off boot_pump's accumulator, then fires
+// the host's fresh edges same-frame — no is_host in the shell.
+@(gd_step = "authority")
 slop_host_tick :: proc(self: ^Slopball) {
 	b := self.ball
-	if b == nil || b.won != 0 {return}
+	if b == nil || b.score.won != 0 {return}
 
 	// Kickoff hold: the ball rests at center under the HOST's seat until the
 	// whistle. session_teleport made every screen snap it there.
@@ -88,10 +92,10 @@ slop_host_tick :: proc(self: ^Slopball) {
 		if b.puppet.x < 6 {scored = 2}
 		if b.puppet.x > PITCH_W - 6 {scored = 1}
 		if scored != 0 {
-			if scored == 1 {b.score_l += 1} else {b.score_r += 1}
-			gd.print_str(fmt.tprintf("SB_GOAL by=%d l=%d r=%d", scored, b.score_l, b.score_r))
-			if int(b.score_l) >= self.goals_to || int(b.score_r) >= self.goals_to {
-				b.won = scored
+			if scored == 1 {b.score.l += 1} else {b.score.r += 1}
+			gd.print_str(fmt.tprintf("SB_GOAL by=%d l=%d r=%d", scored, b.score.l, b.score.r))
+			if int(b.score.l) >= self.goals_to || int(b.score.r) >= self.goals_to {
+				b.score.won = scored
 				return
 			}
 			reset_kickoff(self)
