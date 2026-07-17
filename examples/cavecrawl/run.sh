@@ -19,7 +19,13 @@ PROJ="$ROOT/examples/cavecrawl"
 LOGDIR="$PROJ/.runlogs"
 mkdir -p "$LOGDIR"
 
-bash "$ROOT/build/build_scripts.sh" "$PROJ"
+# A failed build MUST kill the run here — this script has no `set -e` (the
+# acts lean on expected failures), and falling through would acid the STALE
+# dylib and print a false CAVECRAWL_OK.
+if ! bash "$ROOT/build/build_scripts.sh" "$PROJ"; then
+	echo "CAVECRAWL_FAIL: script build failed"
+	exit 1
+fi
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
 
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
