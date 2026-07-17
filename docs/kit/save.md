@@ -53,12 +53,11 @@ CaveLobby :: struct {
 	// ...
 }
 
-cave_backup_blob :: proc(user: rawptr, w: ^knet.Writer) { // session_set_backup_blob's hook
-	self := cast(^CaveLobby)user
-	if self.ses.is_host && self.started {cave_lobby_backup_write(self, w)}
+// the migration half (kboot.boot_migration's table calls it, host only):
+cave_lobby_backup :: proc(self: ^CaveLobby, w: ^knet.Writer) {
+	if self.started {cave_lobby_backup_write(self, w)}
 }
-// resume / takeover:
-r := knet.reader_make(blob)
+// resume from a FILE / the heir's `<game>_took_over(r)` half:
 if !cave_lobby_backup_read(self, &r) { /* stale or truncated — bail */ }
 ```
 

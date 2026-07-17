@@ -103,10 +103,26 @@ The id is EXPLICIT on purpose — it rides saves, rejoins, and migration
 backups, so auto-numbering would scramble worlds across builds; scriptgen
 errors on duplicates, unknown structs, and mis-shaped hooks at build time.
 `boot_node(b, id)` looks up an entity's node (the old `nodes[id]` map);
-`boot_entities_clear(b)` is the back-to-lobby/takeover wipe. The scene is
-read through the field at spawn time, so editor wiring and hot reload keep
+`boot_entities_wipe(b)` is the back-to-lobby/takeover wipe — CENSUS-DRIVEN:
+it fires the `_freed` hooks per live entity (the by-type maps empty through
+the same code that fills them) before freeing the nodes. The scene is read
+through the field at spawn time, so editor wiring and hot reload keep
 working — and `session_set_factory` remains the escape hatch for exotic
 creation.
+
+**The migration dance, danced by nobody.** Declare up to four name-paired
+halves — `<game>_backup(self, w)`, `<game>_took_over(self, r)`,
+`<game>_wiped(self)`, `<game>_migrating(self, step, target, try)` — and
+wire the generated table in ready: `kboot.boot_migration(&self.boot, self,
+<snake>_succ_hooks)`. The kit owns the torch, the takeover/chase fork (run
+off the generated events tail, so words halves see the old world), the
+census-driven wipe, the retry caps, and the window latches;
+`boot_take_over`/`boot_chase` stay public for a manual Resume button, and
+games that raise their own transports call `boot_succ_config` once. Details
+and the arm-by-arm words contract:
+[session.md](session.md#backup-hosting-and-resume). Coop lane only — a sim
+lane's authority restarts, it does not migrate (asserted with a teaching
+message).
 
 **The census, written by nobody.** Every `entity=` tag also generates the
 typed queries the hand-kept `map[Net_Id]^T` + owner + `avatar_of` mirrors
