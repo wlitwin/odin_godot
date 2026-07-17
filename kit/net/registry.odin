@@ -24,6 +24,8 @@ package kit_net
 // along for the owner-stream split the session layer does when it walks with
 // a field-flag filter.
 
+import "core:fmt"
+
 Registry_Entry :: struct {
 	id:     Net_Id,
 	entity: rawptr,
@@ -307,6 +309,12 @@ registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = ni
 		if reconcile {
 			replay_pending(ctx, e)
 		}
+		// Bless: the shadow tracks "state the framework last put here" so the
+		// write guard (registry_write_guard) can tell a local rogue write from
+		// everything legitimate. Captured after the replay on purpose — a
+		// pending's speculation is legal (the guard skips pending entities),
+		// and its retirement re-blesses.
+		shadow_capture(e.entity, e.shadow, e.set.entity_desc)
 		if changed != nil {
 			append(changed, id)
 		}
@@ -615,6 +623,13 @@ registry_client_result :: proc(reg: ^Registry, ctx: ^Command_Ctx, r: ^Reader, me
 	}
 	if res.ok {
 		command_confirm(ctx, res.seq)
+		// Bless: the entity keeps its speculative values (the authority just
+		// said yes) but the pending that licensed them is gone — without the
+		// capture, the write guard would flag the gap until the effect's own
+		// delta arrives.
+		if e, found := reg.entries[res.entity]; found {
+			shadow_capture(e.entity, e.shadow, e.set.entity_desc)
+		}
 		return res
 	}
 	if e, found := reg.entries[res.entity]; found {
@@ -625,6 +640,7 @@ registry_client_result :: proc(reg: ^Registry, ctx: ^Command_Ctx, r: ^Reader, me
 		if has_pending_for(ctx, res.entity) {
 			replay_pending(ctx, e)
 		}
+		shadow_capture(e.entity, e.shadow, e.set.entity_desc) // bless the landed truth
 	} else if p, had := pending_reject(&ctx.pending, res.seq); had {
 		pending_dispose(p)
 	}
@@ -649,6 +665,7 @@ registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks
 		if e, found := reg.entries[p.entity]; found {
 			owned_here := me != PLAYER_ID_INVALID && e.owner == me
 			fields_restore(e.entity, e.set.entity_desc, p.revert, skip_owner = owned_here, skip_predicted = true)
+			shadow_capture(e.entity, e.shadow, e.set.entity_desc) // bless: the revert is framework truth now
 		}
 		if out != nil {
 			append(out, Expired_Command{seq = p.seq, entity = p.entity, cmd = p.cmd})
@@ -656,4 +673,68 @@ registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks
 		pending_dispose(p)
 	}
 	return len(expired)
+}
+
+// ---------------------------------------------------------------------------
+// The delta-lane WRITE GUARD — the canonical co-op bug, made loud.
+//
+// A client assigning to a host-lane replicated field (`self.ball.score.l += 1`)
+// compiles, looks right on its own screen, and never replicates: the host's
+// shadow diff never saw the write, and no correction arrives until the host
+// happens to dirty that field — possibly never. It is invisible in solo and
+// host-seat testing, exactly where co-op games get tested.
+//
+// The guard turns it into a named failure within one net tick. The invariant:
+// on a CLIENT, every entity's shadow holds "the bytes the framework last put
+// here" — committed at every apply/replay/revert/confirm site (the blesses
+// above). Any delta-lane divergence from it on an entity with no in-flight
+// prediction is therefore a local rogue write. Owner-stream fields (yours to
+// write) and predicted fields (the sim lane reconciles them) are excluded by
+// diff_mask itself — the same skip the host's send walk uses.
+//
+// Cost: the same memcmp walk per net tick the host already pays to diff.
+// Stripped (walk and all) under `-disable-assert`, like every kit guardrail.
+
+// Re-commit one entity's shadow: "these bytes are framework-blessed". The
+// sim lane calls this when a tick-scheduled verb's speculation retires
+// (its delta-lane writes stand confirmed outside any ctx pending).
+registry_bless :: proc(reg: ^Registry, id: Net_Id) {
+	if e, ok := &reg.entries[id]; ok {
+		shadow_capture(e.entity, e.shadow, e.set.entity_desc)
+	}
+}
+
+// A higher layer's extra "this entity's divergence is legal right now" — the
+// boot installs one that knows about the sim lane's in-flight verbs.
+Guard_Exempt_Proc :: proc(user: rawptr, id: Net_Id) -> bool
+
+// The walk: on a client, report the first delta-lane field that moved outside
+// the framework since its last bless. Call once per net tick, AFTER packet
+// application; entities with a ctx pending (coop speculation) or an exempt
+// verdict (sim speculation) are skipped whole. Returns found = false when the
+// invariant holds; the session layer turns a finding into the teaching assert
+// (split so tests can pin the detection without dying on it).
+registry_write_guard :: proc(reg: ^Registry, ctx: ^Command_Ctx, exempt: Guard_Exempt_Proc = nil, exempt_user: rawptr = nil) -> (cls, field: string, id: Net_Id, found: bool) {
+	for eid, &e in reg.entries {
+		if has_pending_for(ctx, eid) {
+			continue
+		}
+		if exempt != nil && exempt(exempt_user, eid) {
+			continue
+		}
+		mask := diff_mask(e.entity, e.shadow, e.set.entity_desc)
+		if mask == 0 {
+			continue
+		}
+		field = "?"
+		for f, i in e.set.entity_desc.fields {
+			if mask & (1 << u64(i)) != 0 {
+				field = f.name != "" ? f.name : fmt.tprintf("field #%d", i)
+				break
+			}
+		}
+		cls = e.set.entity_desc.name != "" ? e.set.entity_desc.name : "entity"
+		return cls, field, eid, true
+	}
+	return "", "", NET_ID_INVALID, false
 }

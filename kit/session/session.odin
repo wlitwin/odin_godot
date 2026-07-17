@@ -425,13 +425,26 @@ Session_Config :: struct {
 	backup_interval: f64, // backup-host snapshot refresh cadence
 	max_players:     int, // NEW joins refused past this many connected (0 = unlimited; rejoins always reclaim their seat)
 	change_events:   bool, // emit Ev_Entity_Changed per dirty entity per tick (repaint THAT, not everything). Off by default: at friendslop scale repaint-everything is usually fine
-	fingerprint:     u64, // the build's WIRE CONTRACT hash (scriptgen's generated
-	// NET_FINGERPRINT — descriptors, verbs, entity ids, input classes). 0 = no
-	// check. Nonzero on BOTH ends: the join carries it and a mismatch is denied
+	fingerprint:     u64, // the build's WIRE CONTRACT hash. 0 (the default) =
+	// use the generated NET_FINGERPRINT — scriptgen's guard file registers it
+	// at load (default_net_fingerprint), so the version gate is ON without any
+	// wiring. Set explicitly only to override (a hand-rolled multi-module
+	// contract), or to FINGERPRINT_NONE to disable the gate on purpose.
+	// Nonzero on BOTH ends: the join carries it and a mismatch is denied
 	// with .Version — a skewed build's descriptors would misparse every delta
 	// into garbage fields, the least debuggable failure a playtest can produce.
 	// A nonzero HOST also refuses fingerprint-less clients (pre-check builds).
 }
+
+// The generated guard file's @(init) parks the module's NET_FINGERPRINT here,
+// so a game that never touches Session_Config.fingerprint still gets the
+// version gate — the right thing, by default. (One value per scripts dll; a
+// multi-net-module build overrides via cfg.fingerprint instead.)
+default_net_fingerprint: u64
+
+// Explicit "no version gate" for Session_Config.fingerprint — distinguishable
+// from 0, which means "use the generated default".
+FINGERPRINT_NONE :: u64(0xFFFFFFFFFFFFFFFF)
 
 Session :: struct {
 	is_host:   bool,
@@ -468,6 +481,12 @@ Session :: struct {
 	unsent:        map[knet.Net_Id]u64, // host: spawn_make'd, spawn_send still owed (tick-stamped)
 	factory_user:  rawptr,
 	factory_make:  Make_Entity_Proc,
+
+	// The write guard's extra exemption (session_set_guard_exempt): "this
+	// entity's delta-lane divergence is legal right now". kboot.boot_lane
+	// installs one that knows about the sim lane's in-flight verbs.
+	guard_exempt:      knet.Guard_Exempt_Proc,
+	guard_exempt_user: rawptr,
 	factory_free:  Free_Entity_Proc,
 	game_user:     rawptr, // session_set_game's explicit override (nil = the factory user)
 	cmd_hook_user: rawptr,
@@ -730,6 +749,15 @@ session_present :: proc(s: ^Session, mine: bool, user: rawptr, cb: knet.Later_Pr
 session_set_transport :: proc(s: ^Session, user: rawptr, send: Send_Proc) {
 	s.send = send
 	s.send_user = user
+}
+
+// Install the write guard's extra exemption (see registry_write_guard) —
+// pre-start wiring like the transport/factory installers. kboot.boot_lane
+// installs the sim lane's ("a tick-scheduled verb is in flight on this
+// entity"); games without a lane never need one.
+session_set_guard_exempt :: proc(s: ^Session, user: rawptr, exempt: knet.Guard_Exempt_Proc) {
+	s.guard_exempt = exempt
+	s.guard_exempt_user = user
 }
 
 // ---- stats: declare / mutate (host) / read (anyone) ---------------------------
@@ -1174,6 +1202,7 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 
 	if e, exists := knet.registry_get(&s.reg, id); exists {
 		knet.apply_full(&body, e.entity, e.set.entity_desc)
+		knet.registry_bless(&s.reg, id) // the resync is framework truth (write guard)
 		// A known entity caught up wholesale (interest re-entry, snapshot
 		// over live state). The game hears it as Ev_Resynced, NOT a second
 		// Ev_Spawned — the entity was never gone HERE. The jump is history,
@@ -1196,6 +1225,7 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 	knet.registry_insert(&s.reg, id, entity, set, owner)
 	s.types[id] = type
 	knet.apply_full(&body, entity, set.entity_desc)
+	knet.registry_bless(&s.reg, id) // spawn dress baseline (write guard)
 	append(&s.events, Ev_Spawned{id = id, type = type, owner = owner})
 	// Blob event AFTER Ev_Spawned: by the time the game hears about the blob,
 	// the entity it decorates exists on this peer.
@@ -1214,6 +1244,27 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 		net_tick(s)
 	}
 	sampled = knet.registry_sample_streams(&s.reg, now - s.interp_delay, s.me)
+	// The delta-lane WRITE GUARD (kit/net registry.odin): on a client, a
+	// host-lane field that moved outside the framework since its last bless
+	// is a local rogue write — the canonical silent-divergence bug, named
+	// within one net tick instead of never. Costs the host's own diff walk;
+	// stripped whole (walk and all) under `-disable-assert`.
+	when !ODIN_DISABLE_ASSERT {
+		if ticks > 0 && !s.is_host {
+			if cls, field, id, found := knet.registry_write_guard(&s.reg, &s.ctx, s.guard_exempt, s.guard_exempt_user); found {
+				assert(
+					false,
+					fmt.tprintf(
+						"WRITE GUARD: %s.%s (net id %d) changed on a CLIENT outside the framework — " +
+						"host-lane replicated fields are the authority's to write; a client's local write never replicates (it silently diverges). " +
+						"Route the change through a verb (`<verb>_cmd`) or compute it on the authority (`_then` / an authority step); " +
+						"presentation belongs in halves, not in replicated fields.",
+						cls, field, u32(id),
+					),
+				)
+			}
+		}
+	}
 	// Presentations whose render time has come (session_present) fire here,
 	// AFTER sampling — the rendered world they align with is current.
 	knet.later_drain(&s.later, now)
@@ -2054,8 +2105,12 @@ FP_SALT :: u64(0x9E3779B97F4A7C15) + PROTOCOL_REV // the golden-ratio constant, 
 // trips an LLVM-backend assert in current Odin — a compiler crash, not an error)
 
 @(private = "file")
-wire_fingerprint :: proc(fp: u64) -> u64 {
+wire_fingerprint :: proc(cfg_fp: u64) -> u64 {
+	fp := cfg_fp
 	if fp == 0 {
+		fp = default_net_fingerprint // the generated guard file's @(init) value
+	}
+	if fp == 0 || fp == FINGERPRINT_NONE {
 		return 0 // unchecked stays unchecked — never salted into a phantom value
 	}
 	return fp ~ FP_SALT

@@ -27,10 +27,14 @@ package kit_sim
 //     timeout restores them, and the next reconcile scrubs the predicted
 //     half. The server's verdict rides the reliable channel.
 //
-// V1 rules, enforced both ends: a client may only command entities it OWNS
-// (predicted-self — the shop buys YOUR boots), and one verb may be pending
-// per entity at a time. Both are the shapes a first consumer needs;
-// loosening either is a wire-compatible follow-up.
+// The rules, enforced both ends: a client may command entities it OWNS
+// (predicted-self — the shop buys YOUR boots), plus CONTESTED entities whose
+// verb declares `@(gd_command="any_seat")` — prediction scope and command
+// authority are separate questions, so marking a class contested (which
+// predict-world does to every avatar) never silently opens its verbs to
+// every seat; each verb opts in, and the predicate arbitrates the races.
+// Bursts chain per entity (cmd_settle re-executes survivors in seq order);
+// the per-player pending cap is an untrusted-input bound, not a rule.
 
 import "core:mem"
 import knet "godot:kit/net"
@@ -58,6 +62,12 @@ Sim_Cmd :: struct {
 	id:    u16,
 	exec:  Cmd_Exec,
 	apply: Cmd_Apply, // nil = patch mode (recorded post-bytes replay)
+	// `@(gd_command="any_seat")`: on a CONTESTED class, any seat may issue this
+	// verb (a grab on the ball — the predicate arbitrates same-tick races).
+	// Off by default so contested-for-PREDICTION (predict-world avatars) never
+	// silently widens who may command an entity: without it, verbs stay
+	// owner-only even on contested types.
+	any_seat: bool,
 }
 
 // id → slot in the entity's command slice (-1 = unknown id: reject). Sets are
@@ -221,7 +231,11 @@ cmd_tracked :: proc(l: ^Lane, id: knet.Net_Id) -> ^Tracked {
 // a return value (watch the fields, or the authority's `_then`).
 lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: u16, args: []u8) -> bool {
 	tr := cmd_tracked(l, id)
-	if tr == nil || tr.cmds == nil || sim_cmd_find(tr.cmds, cmd) < 0 {
+	if tr == nil || tr.cmds == nil {
+		return false
+	}
+	slot := sim_cmd_find(tr.cmds, cmd)
+	if slot < 0 {
 		return false
 	}
 	if l.ses.is_host {
@@ -232,12 +246,14 @@ lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: u16, args: []u8) -> bool {
 		append(&l.cmd_in, Cmd_In{tick = l.ticker.tick + 1, from = l.ses.me, id = id, cmd = cmd, args = queued})
 		return true
 	}
-	// Predicted-HERE only: my own entities, and contested ones (on my
-	// prediction ledger by construction — a verb on the ball speculates
-	// exactly like a touch does). Watched entities can't speculate: their
-	// fields belong to the presenter; command them from the authority, or
-	// promote them to contested.
-	if !l.anchored || tr.hist == nil || (tr.owner != l.ses.me && !tr.contested) {
+	// Predicted-HERE only: my own entities, and contested ones whose verb
+	// declares any_seat (on my prediction ledger by construction — a verb on
+	// the ball speculates exactly like a touch does). Watched entities can't
+	// speculate: their fields belong to the presenter; command them from the
+	// authority, or promote them to contested. A contested entity WITHOUT the
+	// verb's any_seat refuses HERE, same answer the host's gate would give —
+	// the dev discovers at the issue site, not as a silent drop.
+	if !l.anchored || tr.hist == nil || (tr.owner != l.ses.me && !(tr.contested && tr.cmds[slot].any_seat)) {
 		return false
 	}
 	pending := 0
@@ -264,6 +280,19 @@ lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: u16, args: []u8) -> bool {
 	return true
 }
 
+// Any tick-scheduled verb still in flight on this entity? The session's
+// write guard exempts such an entity: the verb's speculative delta-lane
+// writes are legal until the entry retires (cmd_retire blesses it then).
+// kboot.boot_lane installs this as the session's guard exemption.
+lane_cmd_inflight :: proc(l: ^Lane, id: knet.Net_Id) -> bool {
+	for c in l.cmd_out {
+		if c.id == id {
+			return true
+		}
+	}
+	return false
+}
+
 // Host: file an arriving SIM_CMD (handler discipline — no game code here).
 @(private)
 cmd_handle :: proc(l: ^Lane, from: knet.Player_Id, r: ^knet.Reader) {
@@ -278,14 +307,21 @@ cmd_handle :: proc(l: ^Lane, from: knet.Player_Id, r: ^knet.Reader) {
 	tr := cmd_tracked(l, id)
 	// An unknown id (version skew, a renamed verb) MISSES the lookup and drops
 	// cleanly — never dispatches to whatever lives at that position.
-	if tr == nil || tr.cmds == nil || sim_cmd_find(tr.cmds, cmd) < 0 {
+	if tr == nil || tr.cmds == nil {
 		return
 	}
-	// The cheat gate: your verbs move YOUR entities — or CONTESTED ones,
-	// where any seat's touch is legitimate and the predicate arbitrates
-	// (two grabs the same tick: arrival order runs them, one wins).
-	contested_type := tr.set != nil && tr.set.contested
-	if tr.owner != from && !contested_type {
+	slot := sim_cmd_find(tr.cmds, cmd)
+	if slot < 0 {
+		return
+	}
+	// The cheat gate: your verbs move YOUR entities — or CONTESTED ones whose
+	// verb declares `@(gd_command="any_seat")`, where any seat's touch is
+	// legitimate and the predicate arbitrates (two grabs the same tick:
+	// arrival order runs them, one wins). Contested alone never widens
+	// command authority: predict-world marks every avatar contested for
+	// PREDICTION, and an opponent must not get its verbs for free.
+	open := tr.set != nil && tr.set.contested && tr.cmds[slot].any_seat
+	if tr.owner != from && !open {
 		return
 	}
 	held := 0
@@ -501,6 +537,11 @@ cmd_retire :: proc(l: ^Lane, auth: u64) {
 		c := &l.cmd_out[i]
 		settled := c.verdict == .Accepted || (c.verdict == .Rejected && !c.executed)
 		if settled && c.tick <= auth {
+			// Bless the entity's session shadow: the entry's speculative
+			// delta-lane writes just stopped being exempt (write guard) — an
+			// accepted verb's stand as framework truth, a rejected one's were
+			// already unwound by cmd_settle.
+			knet.registry_bless(&l.ses.reg, c.id)
 			cmd_out_free(c)
 			ordered_remove(&l.cmd_out, i)
 			continue

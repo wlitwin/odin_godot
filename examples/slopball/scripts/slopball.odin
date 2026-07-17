@@ -114,9 +114,8 @@ slopball_ready :: proc(self: ^Slopball) {
 		// Default the interp window to ~3 keyframes of the chosen rate (50ms
 		// at 60Hz, 25ms at 120) — SLOP_INTERP_MS overrides for A/B feel tests.
 		interp_delay = f64(gd.env_int("SLOP_INTERP_MS", max(3000 / hz, 16))) / 1000.0,
-		// The build's wire contract (generated): a version-skewed join is
-		// refused at the door instead of misparsing deltas into garbage.
-		fingerprint = NET_FINGERPRINT,
+		// The wire-contract version gate needs no wiring: the generated guard
+		// file registers NET_FINGERPRINT as the session default at load.
 	})
 	// The net rate is only honest if the SOLVER steps at it too: a 120Hz
 	// session over 60Hz physics just streams duplicate poses.

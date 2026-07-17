@@ -459,11 +459,16 @@ after entity thunks, before the world pass — and answers with a verdict: a
 rejection unwinds the delta-lane writes on the spot and the next reconcile
 scrubs the predicted ones, the same glide as any mispredict.
 
-You may command entities you OWN — and CONTESTED ones, which live on your
-prediction ledger by construction: a spike on the ball speculates exactly
-like a touch does, any seat may issue it, and two same-tick verbs run in
-execution order with the predicate arbitrating (speedball's spike is the
-worked example). Watched entities can't speculate — command them from the
+You may command entities you OWN — and CONTESTED ones whose verb opts in
+with **`@(gd_command = "any_seat")`**. A contested entity lives on your
+prediction ledger by construction, so an open verb speculates exactly like a
+touch does, and two same-tick verbs run in execution order with the
+predicate arbitrating (a spike on the ball is the shape). The opt-in exists
+because prediction scope is not command scope: predict-world marks every
+AVATAR contested too, and marking yours must never hand your taunt or your
+reload to every opponent — without `any_seat`, verbs stay owner-only on both
+ends (the client refuses at the issue site, the host's cheat gate refuses
+the wire). Watched entities can't speculate — command them from the
 authority, or promote them to contested. Bursts are fine: verbs QUEUE per
 entity, and a rejection unwinds the delta-lane speculation chain in order
 without disturbing the survivors. The wrapper returns whether it SCHEDULED

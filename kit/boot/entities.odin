@@ -187,7 +187,14 @@ boot_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 			// it (dressing belongs on Ev_Spawned, which fires once fields land).
 			k.spawned(b.ent_game, entity, id, owner)
 		}
-		if k.sim_set != nil && b.lane != nil {
+		if k.sim_set != nil {
+			// A ticking entity with no lane would spawn, render, and never
+			// simulate — the silent version of the wiring mistake the sibling
+			// assert (boot_spawn_predicted) already names. Name it here too.
+			assert(
+				b.lane != nil,
+				fmt.tprintf("entity %s ticks (@(gd_tick)) but the boot has no lane — wire `<game>_lane_init` + kboot.boot_lane before entities spawn", k.name),
+			)
 			// The sim-lane line nobody writes anymore: predicted on its
 			// owner's screen, truth-ledgered on the host, watched elsewhere.
 			ksim.lane_track_set(b.lane, id, entity, k.sim_set, owner)
