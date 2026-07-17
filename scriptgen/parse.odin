@@ -980,6 +980,16 @@ scan_then_procs :: proc(idx: ^map[string]Then_Candidate, path, src: string, file
 				}
 			}
 		}
+		if !interesting {
+			// Migration halves (`<game>_backup` …) — same full-suffix pairing.
+			for spec in MIGRATION_HALVES {
+				at := len(name_ident.name) - len(spec.suffix)
+				if at > 0 && name_ident.name[at - 1] == '_' && name_ident.name[at:] == spec.suffix {
+					interesting = true
+					break
+				}
+			}
+		}
 		if !interesting {continue}
 		if pl.type == nil {continue}
 		idx[name_ident.name] = Then_Candidate{
@@ -1149,6 +1159,29 @@ check_unclaimed_pairs :: proc(idx: ^map[string]Then_Candidate, script_snakes: ma
 			break // suffixes never nest within the table — first match decides
 		}
 		if ev_flagged {continue}
+
+		// Migration halves, same teaching: an unclaimed migration-suffix proc
+		// touching a game shell whose prefix is one edit from the game's snake
+		// is a typo'd pairing kboot would never call.
+		mig_flagged := false
+		for spec in MIGRATION_HALVES {
+			at := len(name) - len(spec.suffix)
+			if at <= 0 || name[at - 1] != '_' || name[at:] != spec.suffix {continue}
+			prefix := name[:at - 1]
+			for t in targets {
+				if t.boot_field == "" {continue}
+				if !edit_distance_le1(prefix, to_snake(t.struct_name)) {continue}
+				error_at(
+					loc,
+					"proc %q looks like a migration half, but it doesn't pair — kboot.boot_migration's `%s` half on %s is %q. Pair it, or rename it.",
+					name, spec.suffix, t.struct_name, fmt.tprintf("%s_%s", to_snake(t.struct_name), spec.suffix),
+				)
+				mig_flagged = true
+				break
+			}
+			break // suffixes never nest within the table — first match decides
+		}
+		if mig_flagged {continue}
 
 		switch {
 		case strings.has_suffix(name, "_then"):
@@ -2143,6 +2176,89 @@ check_event_half :: proc(s: ^Script, ev: Session_Ev, name: string, cand: Then_Ca
 			loc,
 			"%s: the shape is %s, no results — the generated dispatch passes ksess.%s's fields through",
 			name, strings.to_string(shape), ev.variant,
+		)
+		return false
+	}
+	return true
+}
+
+// Pair a game shell's MIGRATION halves — kboot.boot_migration's four seams
+// (the blob writer, the heir's read+mend, the non-entity pool wipe, the
+// words). They pair on the SHELL by exact name, like session events; the
+// generated `<snake>_succ_hooks` table carries them and the generated
+// `<snake>_events` tail drains the kit's noted succession, so no fork, no
+// wipe, no chase cap survives in game code.
+resolve_migration :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
+	if s.boot_field == "" {
+		return
+	}
+	snake := to_snake(s.struct_name)
+	slots := [?]^string{&s.succ_backup, &s.succ_took_over, &s.succ_wiped, &s.succ_migrating}
+	for spec, i in MIGRATION_HALVES {
+		name := fmt.tprintf("%s_%s", snake, spec.suffix)
+		if cand, found := idx[name]; found {
+			cand.claimed = true
+			idx[name] = cand
+			if check_migration_half(s, spec, name, cand) {
+				slots[i]^ = strings.clone(name)
+			}
+		}
+		then_name := fmt.tprintf("%s_then", name)
+		if cand, found := idx[then_name]; found {
+			cand.claimed = true
+			idx[then_name] = cand
+			error_at(
+				Loc{path = cand.path, line = cand.line},
+				"%s: migration halves have no `_then` — %s already runs on its fixed role (backup/took_over on the authority, wiped/migrating wherever the dance lands)",
+				then_name, name,
+			)
+		}
+	}
+}
+
+// One migration half's contract: a plain proc, `(self: ^Game, <the seam's
+// params>)` exactly, no results — kboot calls it through the generated table.
+@(private = "file")
+check_migration_half :: proc(s: ^Script, spec: Migration_Half_Spec, name: string, cand: Then_Candidate) -> bool {
+	loc := Loc{path = cand.path, line = cand.line}
+	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
+		error_at(loc, "%s must be a plain proc — kboot.boot_migration's generated table calls it, it is never registered", name)
+		return false
+	}
+	base_of :: proc(t: string) -> string {
+		b := t
+		if j := strings.last_index(b, "."); j >= 0 {b = b[j + 1:]}
+		return b
+	}
+	types := make([dynamic]string, context.temp_allocator)
+	if cand.pt.params != nil {
+		for f in cand.pt.params.list {
+			t := strings.trim_space(node_text(cand.src, f.type))
+			for _ in 0 ..< max(1, len(f.names)) {
+				append(&types, t)
+			}
+		}
+	}
+	ok := len(types) == 1 + len(spec.params) && types[0] == fmt.tprintf("^%s", s.struct_name)
+	if ok {
+		for p, i in spec.params {
+			if base_of(types[1 + i]) != base_of(p.type_) {
+				ok = false
+				break
+			}
+		}
+	}
+	if !ok || cand.pt.results != nil {
+		shape := strings.builder_make(context.temp_allocator)
+		fmt.sbprintf(&shape, "(self: ^%s", s.struct_name)
+		for p in spec.params {
+			fmt.sbprintf(&shape, ", %s: %s", p.name, p.type_)
+		}
+		strings.write_string(&shape, ")")
+		error_at(
+			loc,
+			"%s: the shape is %s, no results — %s",
+			name, strings.to_string(shape), spec.what,
 		)
 		return false
 	}

@@ -123,6 +123,21 @@ Boot :: struct {
 	ent_game:  rawptr,
 	ent_nodes: map[knet.Net_Id]gd.Node,
 	ent_types: map[knet.Net_Id]ksess.Entity_Type,
+
+	// boot_migration's state (succession.odin): the rendezvous ceremony, the
+	// generated hook table, and the latches every migrating game hand-kept
+	// (host_gone/rejoin_tries/kicked_out — absorbed).
+	succ:             netgd.Succession,
+	succ_hooks:       Succ_Hooks,
+	succ_game:        rawptr,
+	succ_armed:       bool,
+	succ_kicked:      bool, // a kicked player never chases the torch
+	succ_tries:       int, // native chase cap (Ev_Succession's refire is the pulse)
+	succ_pending:     knet.Player_Id, // a noted succession, mechanics deferred
+	succ_has_pending: bool,
+	succ_now:         f64, // boot_pump's clock, for the deferred chase
+	succ_name:        string, // boot-owned clones (door callers pass temps)
+	succ_url:         string,
 }
 
 // Install the sim lane (kit/sim), and the boot drives ALL of it: boot_pump
@@ -240,6 +255,8 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 // temp-allocated, so the game's own switch sees everything.
 boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, marks: []kcomms.Ev_Marker, ticks: int) {
 	netgd.wire_pump(&b.wire, now)
+	b.succ_now = now
+	boot_succ_pulse(b, now) // the web chase's knock pump (no-op native / idle)
 	ticks, _ = ksess.session_tick(b.ses, delta, now)
 
 	evs := make([dynamic]ksess.Event, context.temp_allocator)
@@ -248,6 +265,7 @@ boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, mar
 		if !ok {
 			break
 		}
+		boot_succ_event(b, ev) // torch / noted succession / chase-over / kick latch
 		#partial switch e in ev {
 		case ksess.Ev_Owner_Changed:
 			// The lane must always hear ownership moves (predicted↔watched,
@@ -350,6 +368,7 @@ boot_host :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64
 		kui.lobby_set_status(&b.ui, "Could not host (port taken?)")
 		return false
 	}
+	boot_succ_config(b, false, port, "", token, name)
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Hosting on :%d — waiting for friends", port))
 	kui.lobby_refresh(&b.ui, b.ses)
@@ -394,6 +413,7 @@ boot_join :: proc(b: ^Boot, addr: cstring, port: int, token: u64, name: string, 
 		kui.lobby_set_status(&b.ui, "Could not start joining")
 		return false
 	}
+	boot_succ_config(b, false, port, "", token, name)
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, status)
 	kui.chat_show(&b.chat, true)
@@ -410,6 +430,7 @@ boot_host_web :: proc(b: ^Boot, url: cstring, name: string, token: u64 = 0, room
 		kui.lobby_set_status(&b.ui, "Could not reach the relay")
 		return false
 	}
+	boot_succ_config(b, true, 0, url, token, name)
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, "Opening a room…")
 	kui.chat_show(&b.chat, true)
@@ -423,6 +444,7 @@ boot_join_web :: proc(b: ^Boot, url: cstring, room: cstring, token: u64, name: s
 		kui.lobby_set_status(&b.ui, "Could not reach the relay")
 		return false
 	}
+	boot_succ_config(b, true, 0, url, token, name)
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Joining room %s…", room))
 	kui.chat_show(&b.chat, true)

@@ -159,16 +159,19 @@ generate :: proc(s: ^Script) -> string {
 	if s.tick.proc_name != "" || len(s.block_ticks) > 0 || ticked_entities || has_lane_wiring {
 		w(&b, "import ksim \"godot:kit/sim\"\n")
 	}
+	// Any declared migration half pulls kboot (the hooks table + the events-tail
+	// drain) and ksess (the events proc's signature).
+	has_succ := s.succ_backup != "" || s.succ_took_over != "" || s.succ_wiped != "" || s.succ_migrating != ""
 	// entity tables (`entity=Name:id` scene fields) name ksess.Entity_Type and
 	// build kboot.Entity_Kind rows; the lane wiring names ksess.Session; the
 	// standard transport forwards route into netgd/ksess; the boot-routed step
 	// and the session-event dispatch name ksess too.
-	if len(s.entities) > 0 || has_lane_wiring || len(s.std_forwards) > 0 || s.step_boot || len(s.event_halves) > 0 {
+	if len(s.entities) > 0 || has_lane_wiring || len(s.std_forwards) > 0 || s.step_boot || len(s.event_halves) > 0 || has_succ {
 		w(&b, "import ksess \"godot:kit/session\"\n")
 	}
 	// The unified `<verb>_cmd` wrappers take the game's one handle (^kboot.Boot)
 	// on BOTH models, so any class with commands names kboot.
-	if len(s.entities) > 0 || len(s.commands) > 0 {
+	if len(s.entities) > 0 || len(s.commands) > 0 || has_succ {
 		w(&b, "import kboot \"godot:kit/boot\"\n")
 	}
 	if len(s.std_forwards) > 0 {
@@ -182,10 +185,10 @@ generate :: proc(s: ^Script) -> string {
 		imported := make(map[string]bool)
 		imported["godot:godot"] = true
 		imported["godot:kit/net"] = true
-		if len(s.entities) > 0 {
+		if len(s.entities) > 0 || has_succ {
 			imported["godot:kit/session"] = true
 		}
-		if len(s.entities) > 0 || len(s.commands) > 0 {
+		if len(s.entities) > 0 || len(s.commands) > 0 || has_succ {
 			imported["godot:kit/boot"] = true
 		}
 		for c in s.commands {
@@ -1281,18 +1284,22 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	// transport-death signal queues Ev_Succession twice in one batch — the gate
 	// is what makes the second one harmless). Call it with boot_pump's events,
 	// any frame order you like: `<snake>_events(self, events)`.
-	if len(s.event_halves) > 0 {
+	has_succ := s.succ_backup != "" || s.succ_took_over != "" || s.succ_wiped != "" || s.succ_migrating != ""
+	if len(s.event_halves) > 0 || has_succ {
 		fmt.sbprintf(
 			b,
 			"// Dispatch this frame's session events to the class's declared halves\n"+
 			"// (role gates generated: client-only events skip a host — a takeover\n"+
 			"// mid-batch kills the stale re-fire — and `_then` halves fire on the\n"+
 			"// authority alone).\n"+
-			"%s_events :: proc(self: ^%s, events: []ksess.Event) {{\n"+
-			"\tfor ev in events {{\n"+
-			"\t\t#partial switch e in ev {{\n",
+			"%s_events :: proc(self: ^%s, events: []ksess.Event) {{\n",
 			snake, cls,
 		)
+		if len(s.event_halves) == 0 {
+			w(b, "\t_ = events\n")
+		} else {
+			w(b, "\tfor ev in events {\n\t\t#partial switch e in ev {\n")
+		}
 		for h in s.event_halves {
 			ev := SESSION_EVENTS[h.ev]
 			args := strings.builder_make(context.temp_allocator)
@@ -1329,7 +1336,56 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				)
 			}
 		}
-		w(b, "\t\t}\n\t}\n}\n\n")
+		if len(s.event_halves) > 0 {
+			w(b, "\t\t}\n\t}\n")
+		}
+		if has_succ {
+			// The migration drain: boot_pump only NOTED a succession; the
+			// mechanics run here, AFTER the words halves saw the old world.
+			fmt.sbprintf(b, "\tkboot.boot_migrate_pending(&self.%s)\n", s.boot_field)
+		}
+		w(b, "}\n\n")
+	}
+
+	// ---- host migration: the declared halves -> kboot.boot_migration's table ----
+	// The dance itself is the kit's (kit/boot/succession.odin): the torch on
+	// Ev_Backup_Target, the takeover/chase fork, the census-driven wipe, the
+	// chase caps and latches. These thunks are the game's four seams.
+	if has_succ {
+		w(b, "// ---- host migration (the `_backup`/`_took_over`/`_wiped`/`_migrating` halves) ----\n\n")
+		if s.succ_backup != "" {
+			fmt.sbprintf(b, "@(private = \"file\")\n_%s_succ_backup :: proc(game: rawptr, w: ^knet.Writer) {{\n\t%s(cast(^%s)game, w)\n}}\n\n", snake, s.succ_backup, cls)
+		}
+		if s.succ_took_over != "" {
+			fmt.sbprintf(b, "@(private = \"file\")\n_%s_succ_took_over :: proc(game: rawptr, r: ^knet.Reader) {{\n\t%s(cast(^%s)game, r)\n}}\n\n", snake, s.succ_took_over, cls)
+		}
+		if s.succ_wiped != "" {
+			fmt.sbprintf(b, "@(private = \"file\")\n_%s_succ_wiped :: proc(game: rawptr) {{\n\t%s(cast(^%s)game)\n}}\n\n", snake, s.succ_wiped, cls)
+		}
+		if s.succ_migrating != "" {
+			fmt.sbprintf(b, "@(private = \"file\")\n_%s_succ_migrating :: proc(game: rawptr, step: kboot.Migrate_Step, target: string, try: int) {{\n\t%s(cast(^%s)game, step, target, try)\n}}\n\n", snake, s.succ_migrating, cls)
+		}
+		fmt.sbprintf(
+			b,
+			"// The migration hook table — pass to kboot.boot_migration(&self.%s, self,\n"+
+			"// %s_succ_hooks) in ready, after boot_attach. Arms off the SESSION's backup\n"+
+			"// config; the halves only supply bytes and words.\n",
+			s.boot_field, snake,
+		)
+		fmt.sbprintf(b, "%s_succ_hooks := kboot.Succ_Hooks {{\n", snake)
+		if s.succ_backup != "" {
+			fmt.sbprintf(b, "\tbackup = _%s_succ_backup,\n", snake)
+		}
+		if s.succ_took_over != "" {
+			fmt.sbprintf(b, "\ttook_over = _%s_succ_took_over,\n", snake)
+		}
+		if s.succ_wiped != "" {
+			fmt.sbprintf(b, "\twiped = _%s_succ_wiped,\n", snake)
+		}
+		if s.succ_migrating != "" {
+			fmt.sbprintf(b, "\tmigrating = _%s_succ_migrating,\n", snake)
+		}
+		w(b, "}\n\n")
 	}
 
 	// ---- entity kinds: `entity=Name:id` scene fields -> the kboot table ----
