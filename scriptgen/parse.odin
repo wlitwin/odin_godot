@@ -557,14 +557,26 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			}
 		}
 
-		if !has {
-			// No gd tag: this may be a `using`/embedded sub-struct whose fields carry
-			// gd tags. Resolve the field's type (same-package or imported bundle) and
-			// recurse so nested `gd:"replicate"` (and, through `using`, export/onready/
-			// signal) fields are discovered. Non-struct / unresolved / typo'd types
-			// don't resolve and are skipped, exactly as before (nested-replicate-fields).
+		// `gd:"manual"` on an embedded sim block opts its @(gd_tick) OUT of
+		// auto-hoist — the wielder's own tick drives it. It still recurses like
+		// an untagged embed (so its predict fields flatten into the descriptor);
+		// only the auto-call is suppressed, via the `manual` flag threaded below.
+		is_manual := has && strings.trim_space(val) == "manual"
+		if !has || is_manual {
+			// No gd tag (or `manual`): this may be a `using`/embedded sub-struct whose
+			// fields carry gd tags. Resolve the field's type (same-package or imported
+			// bundle) and recurse so nested `gd:"replicate"` (and, through `using`,
+			// export/onready/signal) fields are discovered. Non-struct / unresolved /
+			// typo'd types don't resolve and are skipped (nested-replicate-fields).
 			nested := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
 			if def, subst, ok := resolve_type(nest_ctx, nested); ok {
+				if is_manual && def.tick.proc_name == "" {
+					error_at(
+						floc,
+						"%s.%s: `gd:\"manual\"` only applies to an embedded sim block with an @(gd_tick) — %q has none",
+						s.struct_name, field_label, nested,
+					)
+				}
 				entry_using := .Using in f.flags
 				for nm in f.names {
 					ident, iok := nm.derived.(^ast.Ident)
@@ -573,9 +585,15 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 					// namespaces them under `<field>_` (see recurse_into / walk_members).
 					name_prefix := entry_using ? "" : strings.concatenate({ident.name, "_"})
 					visited := make(map[string]bool)
-					recurse_into(&s, def, path_of(ident.name), &visited, name_prefix, subst)
+					recurse_into(&s, def, path_of(ident.name), &visited, name_prefix, subst, is_manual)
 					delete(visited)
 				}
+			} else if is_manual {
+				error_at(
+					floc,
+					"%s.%s: `gd:\"manual\"` but the type %q didn't resolve to a sim block",
+					s.struct_name, field_label, nested,
+				)
 			}
 			continue
 		}
@@ -623,6 +641,32 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			continue
 		}
 
+		// friendslop toolkit: `gd:"backup"` — HOST-LOCAL state for host migration
+		// AND save/resume (the same bytes ride both, session.odin's split). generate
+		// emits a version-hashed <class>_backup_write/_read codec over these fields,
+		// so a takeover restores the campaign, not a diorama — no hand-matched
+		// write_u8/read_u8 lists to drift. POD (scalars/structs/fixed arrays),
+		// map[POD]POD, and [dynamic]POD are supported; anything else is a build error.
+		if tok0 == "backup" {
+			kind, key, elem, bad := classify_backup(type_text)
+			if bad != "" {
+				error_at(floc, "%s.%s: gd:\"backup\" can't serialize %s", s.struct_name, field_label, bad)
+				continue
+			}
+			for nm in f.names {
+				ident, iok := nm.derived.(^ast.Ident)
+				if !iok || ident == nil {continue}
+				append(&s.backups, Backup_Info{
+					field = ident.name,
+					path  = path_of(ident.name),
+					kind  = kind,
+					key   = key,
+					elem  = elem,
+				})
+			}
+			continue
+		}
+
 		if tok0 != "export" {
 			if strings.has_prefix(tok0, "args=") {
 				error_at(
@@ -638,7 +682,7 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			// that would otherwise silently leave the field un-exported.
 			error_at(
 				floc,
-				"%s.%s: unknown gd tag %q (expected `export`, `replicate`, or `onready=PATH`)",
+				"%s.%s: unknown gd tag %q (expected `export`, `replicate`, `backup`, or `onready=PATH`)",
 				s.struct_name,
 				field_label,
 				tok0,
@@ -919,11 +963,24 @@ scan_then_procs :: proc(idx: ^map[string]Then_Candidate, path, src: string, file
 		if !is_proc {continue}
 		name_ident, _ := vd.names[0].derived.(^ast.Ident)
 		if name_ident == nil {continue}
-		if !strings.has_suffix(name_ident.name, "_then") &&
-		   !strings.has_suffix(name_ident.name, "_fx") &&
-		   !strings.has_suffix(name_ident.name, "_apply") &&
-		   !strings.has_suffix(name_ident.name, "_spawned") &&
-		   !strings.has_suffix(name_ident.name, "_freed") {continue}
+		interesting := strings.has_suffix(name_ident.name, "_then") ||
+			strings.has_suffix(name_ident.name, "_fx") ||
+			strings.has_suffix(name_ident.name, "_apply") ||
+			strings.has_suffix(name_ident.name, "_edge") ||
+			strings.has_suffix(name_ident.name, "_spawned") ||
+			strings.has_suffix(name_ident.name, "_freed")
+		if !interesting {
+			// Session event halves (`<game>_player_joined` …) pair by full
+			// suffix — index any candidate wearing one.
+			for ev in SESSION_EVENTS {
+				at := len(name_ident.name) - len(ev.suffix)
+				if at > 0 && name_ident.name[at - 1] == '_' && name_ident.name[at:] == ev.suffix {
+					interesting = true
+					break
+				}
+			}
+		}
+		if !interesting {continue}
 		if pl.type == nil {continue}
 		idx[name_ident.name] = Then_Candidate{
 			path = path,
@@ -1035,33 +1092,244 @@ resolve_then :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
 	}
 }
 
-// After every script resolved: an unclaimed pairing candidate is very likely
-// a typo'd name — the proc would silently never fire. `_then` always warns
-// (its prefix is a command wrapper name, unguessable here); `_spawned`/
-// `_freed` warn only when the prefix IS a script struct in this module (an
-// innocent `node_freed` helper stays quiet).
-warn_unclaimed_thens :: proc(idx: ^map[string]Then_Candidate, script_snakes: map[string]bool) {
+// After every script resolved: an unclaimed pairing candidate that TOUCHES a
+// script struct (a ^Struct param) is a typo'd or half-deleted pairing — the
+// proc would silently never fire, the exact bug class the pairing exists to
+// kill — so it is an ERROR with the expected names spelled out. The pairing
+// suffixes are RESERVED on procs that touch script structs: pair them or
+// rename them. A suffix-named proc touching no script struct keeps the old
+// behavior (a `_then` warns — its prefix is a wrapper name, unguessable
+// here; the rest stay silent): an innocent helper in a math file is none of
+// our business.
+check_unclaimed_pairs :: proc(idx: ^map[string]Then_Candidate, script_snakes: map[string]bool, by_struct: map[string]^Script) {
 	for name, cand in idx {
 		if cand.claimed {continue}
 		loc := Loc{path = cand.path, line = cand.line}
+
+		// The script structs this proc touches (^Struct params) — the
+		// reserved-suffix gate, and where the fix-hint comes from.
+		targets := make([dynamic]^Script, context.temp_allocator)
+		if cand.pt.params != nil {
+			for f in cand.pt.params.list {
+				t := strings.trim_space(node_text(cand.src, f.type))
+				if !strings.has_prefix(t, "^") {continue}
+				s, ok := by_struct[t[1:]]
+				if !ok {continue}
+				dup := false
+				for x in targets {
+					if x == s {dup = true; break}
+				}
+				if !dup {append(&targets, s)}
+			}
+		}
+
+		// Session event halves first (their suffixes can nest the legacy ones:
+		// `_entity_spawned` ends in `_spawned`): an unclaimed event-suffix proc
+		// touching a GAME SHELL (a class with the kboot.Boot field) whose PREFIX
+		// is one edit from the game's snake is a typo'd pairing — the generated
+		// `<snake>_events` dispatch would never call it. A genuinely different
+		// prefix (`cave_lobby_WAS_kicked`, a query) or a bootless struct is an
+		// innocent name: no near-pairing, nothing to silently miss.
+		ev_flagged := false
+		for ev in SESSION_EVENTS {
+			at := len(name) - len(ev.suffix)
+			if at <= 0 || name[at - 1] != '_' || name[at:] != ev.suffix {continue}
+			prefix := name[:at - 1]
+			for t in targets {
+				if t.boot_field == "" {continue}
+				if !edit_distance_le1(prefix, to_snake(t.struct_name)) {continue}
+				error_at(
+					loc,
+					"proc %q looks like a session event half, but it doesn't pair — the ksess.%s half on %s is %q. Pair it, or rename it.",
+					name, ev.variant, t.struct_name, fmt.tprintf("%s_%s", to_snake(t.struct_name), ev.suffix),
+				)
+				ev_flagged = true
+				break
+			}
+			break // suffixes never nest within the table — first match decides
+		}
+		if ev_flagged {continue}
+
 		switch {
 		case strings.has_suffix(name, "_then"):
-			warn_at(
+			// A typo'd EVENT `_then` (`cave_loby_player_joined_then`) would fall
+			// into the command-wrapper wording below — name the event pairing.
+			ev_then := false
+			base := strings.trim_suffix(name, "_then")
+			for ev in SESSION_EVENTS {
+				at := len(base) - len(ev.suffix)
+				if at <= 0 || base[at - 1] != '_' || base[at:] != ev.suffix {continue}
+				prefix := base[:at - 1]
+				for t in targets {
+					if t.boot_field == "" {continue}
+					if !edit_distance_le1(prefix, to_snake(t.struct_name)) {continue}
+					error_at(
+						loc,
+						"proc %q looks like a session event's authority half, but it doesn't pair — the ksess.%s halves on %s are %q and %q. Pair it, or rename it.",
+						name, ev.variant, t.struct_name,
+						fmt.tprintf("%s_%s", to_snake(t.struct_name), ev.suffix),
+						fmt.tprintf("%s_%s_then", to_snake(t.struct_name), ev.suffix),
+					)
+					ev_then = true
+					break
+				}
+				break
+			}
+			if ev_then {continue}
+			if len(targets) == 0 {
+				warn_at(
+					loc,
+					"proc %q looks like a command consequence, but no @(gd_command) generates a `%s` wrapper — it will never fire",
+					name,
+					strings.trim_suffix(name, "_then"),
+				)
+				continue
+			}
+			error_at(
 				loc,
-				"proc %q looks like a command consequence, but no @(gd_command) generates a `%s` wrapper — it will never fire",
-				name,
-				strings.trim_suffix(name, "_then"),
+				"proc %q ends in `_then` but pairs with no verb or tick — it would silently never fire. %s Pair it, or rename it (`_then` is a reserved pairing suffix on procs touching script structs).",
+				name, hint_then(targets[:]),
+			)
+		case strings.has_suffix(name, "_fx"):
+			if len(targets) == 0 {continue}
+			error_at(
+				loc,
+				"proc %q ends in `_fx` but pairs with no tick — it would silently never fire. %s Pair it, or rename it (`_fx` is a reserved pairing suffix on procs touching script structs).",
+				name, hint_fx(targets[:]),
+			)
+		case strings.has_suffix(name, "_apply"):
+			if len(targets) == 0 {continue}
+			error_at(
+				loc,
+				"proc %q ends in `_apply` but pairs with no verb — it would silently never fire. %s Pair it, or rename it (`_apply` is a reserved pairing suffix on procs touching script structs).",
+				name, hint_apply(targets[:]),
+			)
+		case strings.has_suffix(name, "_edge"):
+			if len(targets) == 0 {continue}
+			error_at(
+				loc,
+				"proc %q ends in `_edge` but pairs with no replicated delta-lane field — it would silently never fire. %s Pair it, or rename it (`_edge` is a reserved pairing suffix on procs touching script structs).",
+				name, hint_edge(targets[:]),
 			)
 		case strings.has_suffix(name, "_spawned"):
-			if script_snakes[strings.trim_suffix(name, "_spawned")] {
-				warn_at(loc, "proc %q looks like an entity spawn hook, but no scene field declares `entity=...` for that struct — it will never fire", name)
-			}
+			check_unclaimed_hook(loc, name, "_spawned", targets[:], script_snakes)
 		case strings.has_suffix(name, "_freed"):
-			if script_snakes[strings.trim_suffix(name, "_freed")] {
-				warn_at(loc, "proc %q looks like an entity free hook, but no scene field declares `entity=...` for that struct — it will never fire", name)
+			check_unclaimed_hook(loc, name, "_freed", targets[:], script_snakes)
+		}
+	}
+}
+
+// The census hooks pair by NAME (`<target_snake>_spawned`/`_freed`) with an
+// entity-tagged struct. Two ways to miss, both errors: the name matches a
+// script that nothing entity-tags (tag the scene export), or a ^Target param
+// says which entity the author meant while the prefix is typo'd (spell the
+// expected name out).
+@(private = "file")
+check_unclaimed_hook :: proc(loc: Loc, name, suffix: string, targets: []^Script, script_snakes: map[string]bool) {
+	kind := suffix == "_spawned" ? "spawn" : "free"
+	if script_snakes[strings.trim_suffix(name, suffix)] {
+		error_at(
+			loc,
+			"proc %q looks like an entity %s hook, but no scene field declares `entity=...` for that struct — it would silently never fire. Tag the scene export (`entity=Name:id`), or rename the proc.",
+			name, kind,
+		)
+		return
+	}
+	for t in targets {
+		for other in targets {
+			for ent in other.entities {
+				if ent.target != t.struct_name {continue}
+				want := fmt.tprintf("%s%s", to_snake(t.struct_name), suffix)
+				if name != want {
+					error_at(
+						loc,
+						"proc %q has a ^%s param and ends in `%s`, but the %s hook pairs by NAME — `%s`. Rename it (or drop the suffix if it isn't the hook).",
+						name, t.struct_name, suffix, kind, want,
+					)
+					return
+				}
 			}
 		}
 	}
+}
+
+// "Gunner pairs: gunner_buy_then, gunner_tick_then." — every _then the
+// targeted classes generate, so the typo'd name has its fix beside it.
+@(private = "file")
+hint_then :: proc(targets: []^Script) -> string {
+	b: strings.Builder
+	strings.builder_init(&b, context.temp_allocator)
+	for t in targets {
+		if strings.builder_len(b) > 0 {strings.write_string(&b, " ")}
+		names := make([dynamic]string, context.temp_allocator)
+		for cmd in t.commands {
+			wrapper := len(cmd.path) > 0 ? fmt.tprintf("%s_%s", to_snake(t.struct_name), cmd.name) : cmd.proc_name
+			append(&names, fmt.tprintf("%s_then", wrapper))
+		}
+		if t.tick.proc_name != "" {
+			append(&names, fmt.tprintf("%s_then", t.tick.proc_name))
+		}
+		if len(names) == 0 {
+			fmt.sbprintf(&b, "%s declares no @(gd_command) verbs and no @(gd_tick), so nothing on it pairs a `_then`.", t.struct_name)
+			continue
+		}
+		fmt.sbprintf(&b, "%s pairs: %s.", t.struct_name, strings.join(names[:], ", ", context.temp_allocator))
+	}
+	return strings.to_string(b)
+}
+
+@(private = "file")
+hint_fx :: proc(targets: []^Script) -> string {
+	b: strings.Builder
+	strings.builder_init(&b, context.temp_allocator)
+	for t in targets {
+		if strings.builder_len(b) > 0 {strings.write_string(&b, " ")}
+		if t.tick.proc_name != "" {
+			fmt.sbprintf(&b, "%s's tick pairs as `%s_fx`.", t.struct_name, t.tick.proc_name)
+		} else {
+			fmt.sbprintf(&b, "%s has no @(gd_tick), so nothing on it pairs an `_fx`.", t.struct_name)
+		}
+	}
+	return strings.to_string(b)
+}
+
+@(private = "file")
+hint_edge :: proc(targets: []^Script) -> string {
+	b: strings.Builder
+	strings.builder_init(&b, context.temp_allocator)
+	for t in targets {
+		if strings.builder_len(b) > 0 {strings.write_string(&b, " ")}
+		names := make([dynamic]string, context.temp_allocator)
+		for r in t.replicates {
+			if r.owner || r.predict {continue} // the delta lane only
+			append(&names, fmt.tprintf("%s_%s_edge", to_snake(t.struct_name), strings.join(r.path, "_", context.temp_allocator)))
+		}
+		if len(names) == 0 {
+			fmt.sbprintf(&b, "%s has no delta-lane replicated fields, so nothing on it edges.", t.struct_name)
+			continue
+		}
+		fmt.sbprintf(&b, "%s's fields pair: %s.", t.struct_name, strings.join(names[:], ", ", context.temp_allocator))
+	}
+	return strings.to_string(b)
+}
+
+@(private = "file")
+hint_apply :: proc(targets: []^Script) -> string {
+	b: strings.Builder
+	strings.builder_init(&b, context.temp_allocator)
+	for t in targets {
+		if strings.builder_len(b) > 0 {strings.write_string(&b, " ")}
+		names := make([dynamic]string, context.temp_allocator)
+		for cmd in t.commands {
+			append(&names, fmt.tprintf("%s_apply", cmd.proc_name))
+		}
+		if len(names) == 0 {
+			fmt.sbprintf(&b, "%s declares no @(gd_command) verbs, so nothing on it pairs an `_apply`.", t.struct_name)
+			continue
+		}
+		fmt.sbprintf(&b, "%s's verbs pair: %s.", t.struct_name, strings.join(names[:], ", ", context.temp_allocator))
+	}
+	return strings.to_string(b)
 }
 
 // ---------------------------------------------------------------------------
@@ -1272,6 +1540,22 @@ build_command_info :: proc(
 		}
 	}
 
+	// The ISSUER param: `by: knet.Player_Id` next (shape-detected like the
+	// wielder — the name AND type together are the declaration) is framework-
+	// filled with the true issuer and never rides the wire, so a predicate can
+	// arbitrate on WHO without trusting a client-claimed argument.
+	if len(pt.params.list) > start && len(pt.params.list[start].names) == 1 {
+		f := pt.params.list[start]
+		if id, iok := f.names[0].derived.(^ast.Ident); iok && id != nil && id.name == "by" {
+			base := strings.trim_space(node_text(src, f.type))
+			if j := strings.last_index(base, "."); j >= 0 {base = base[j + 1:]}
+			if base == "Player_Id" {
+				cmd.wants_by = true
+				start += 1
+			}
+		}
+	}
+
 	for fi in start ..< len(pt.params.list) {
 		field := pt.params.list[fi]
 		atext := strings.trim_space(node_text(src, field.type))
@@ -1298,6 +1582,19 @@ build_command_info :: proc(
 		for nm in field.names {
 			ident, iok := nm.derived.(^ast.Ident)
 			if !iok || ident == nil {continue}
+			// `by` is the RESERVED issuer name — a wire arg wearing it is either a
+			// misplaced/mistyped issuer declaration or a client-claimed identity
+			// (the exact spoofable-side wart the issuer param deletes). A player
+			// the verb TARGETS stays legal under any other name (`who`, `target`).
+			if ident.name == "by" {
+				error_at(
+					loc,
+					"command %s: `by` is the reserved issuer param — declare it as `by: knet.Player_Id` immediately after the receiver and the framework fills it with the true issuer (it never rides the wire); an arg that merely names a player is fine as `who`/`target`",
+					proc_name,
+				)
+				ok = false
+				continue
+			}
 			append(&cmd.args, Command_Arg{name = ident.name, type_text = splice, wire = wire})
 		}
 	}
@@ -1410,11 +1707,17 @@ parse_tick :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^as
 
 	// Results are the tick's PAYLOAD — facts it learned this tick (fired,
 	// dashed, landed), threaded into the name-paired `<proc>_then` (authority
-	// consequence) and `<proc>_fx` (owner's live presentation). They never
-	// cross the wire and they are not verdicts: a tick can't reject.
+	// consequence) and `<proc>_fx` (presentation). They are not verdicts (a
+	// tick can't reject), and they stay in-process unless the _fx declares
+	// `mine` — the every-screen form, whose facts cross the wire (validated
+	// against the wire primitives in resolve_tick_then).
 	if pt.results != nil {
 		for r in pt.results.list {
-			tk.payload_count += max(1, len(r.names))
+			text := strings.trim_space(node_text(src, r.type))
+			for _ in 0 ..< max(1, len(r.names)) {
+				tk.payload_count += 1
+				append(&tk.payload_types, text)
+			}
 		}
 	}
 
@@ -1470,9 +1773,15 @@ parse_sample :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^
 //                           per real tick (the authority never resims): respawn
 //                           queues, adjudication sweeps, a match clock. A game
 //                           needing both keeps them SEPARATE instead of folding
-//                           `if lane_is_authority()` into one pass.
+//                           `if lane_is_authority()` into one pass. In a
+//                           package with NO @(gd_tick) classes this same
+//                           declaration is the COOP game's host tick — routed
+//                           through the boot accumulator (resolve_sim sets
+//                           step_boot; generate emits `<snake>_step`).
 //
-// Shape, receiver first: proc(self: ^Game, tick: u64), no results.
+// Shape, receiver first: proc(self: ^Game[, tick: u64]), no results. The tick
+// param is the LANE's clock — a lane-routed step may take it; the boot-routed
+// coop authority pass (resolve_sim) has no absolute tick and must omit it.
 parse_step :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
 	authority := false
 	for part in strings.split(config, ",") {
@@ -1487,8 +1796,13 @@ parse_step :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^as
 		}
 	}
 	types := flatten_param_types(src, pt)
-	if len(types) != 1 || types[0] != "u64" {
-		error_at(loc, "step %s: the shape is (self: ^%s, tick: u64)", proc_name, s.struct_name)
+	wants_tick := false
+	switch {
+	case len(types) == 0:
+	case len(types) == 1 && types[0] == "u64":
+		wants_tick = true
+	case:
+		error_at(loc, "step %s: the shape is (self: ^%s[, tick: u64])", proc_name, s.struct_name)
 		return
 	}
 	if pt.results != nil {
@@ -1504,7 +1818,7 @@ parse_step :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^as
 			)
 			return
 		}
-		s.step_auth = Sim_Proc_Info{proc_name = proc_name, line = loc.line}
+		s.step_auth = Sim_Proc_Info{proc_name = proc_name, line = loc.line, wants_tick = wants_tick}
 	} else {
 		if s.step.proc_name != "" {
 			error_at(
@@ -1514,7 +1828,7 @@ parse_step :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^as
 			)
 			return
 		}
-		s.step = Sim_Proc_Info{proc_name = proc_name, line = loc.line}
+		s.step = Sim_Proc_Info{proc_name = proc_name, line = loc.line, wants_tick = wants_tick}
 	}
 }
 
@@ -1556,6 +1870,7 @@ resolve_census :: proc(s: ^Script, taken: map[string]bool) {
 		e.gen_owned = !taken[fmt.tprintf("%s_owned_by", tsnake)]
 		e.gen_my = !taken[fmt.tprintf("my_%s", tsnake)]
 		e.gen_ids = !taken[fmt.tprintf("%s_ids", tsnake)]
+		e.gen_spawn = !taken[fmt.tprintf("%s_spawn", tsnake)]
 	}
 }
 
@@ -1634,11 +1949,51 @@ resolve_sim :: proc(scripts: []^Script) {
 		}
 	}
 
+	// A package with no @(gd_tick) classes has no lane — an authority pass
+	// there is the COOP game's fixed step, and it routes through the BOOT
+	// accumulator instead: generate `<snake>_step(self, ticks)` (role gate +
+	// same-frame edge pass inside), not lane wiring. The declaration is the
+	// same either way — promoting a coop game to the sim lane just re-routes it.
+	any_ticks := false
+	for s in scripts {
+		if s.tick.proc_name != "" || len(s.block_ticks) > 0 {
+			any_ticks = true
+			break
+		}
+	}
+
 	// One lane owner per package: the class carrying @(gd_sample)/@(gd_step).
 	// Its gen file gets <snake>_lane_init and every class registration.
 	owner: ^Script
 	for s in scripts {
 		if len(s.samples) == 0 && s.step.proc_name == "" && s.step_auth.proc_name == "" {continue}
+		if !any_ticks && len(s.samples) == 0 && s.step.proc_name == "" {
+			// The boot-routed coop authority step.
+			loc := Loc{path = s.path, line = s.step_auth.line}
+			snake := to_snake(s.struct_name)
+			if s.boot_field == "" {
+				error_at(
+					loc,
+					"%s: @(gd_step=\"authority\") in a package with no @(gd_tick) classes rides the boot loop — %s needs a kboot.Boot field for the generated %s_step to gate on (or add the lane surface)",
+					s.step_auth.proc_name, s.struct_name, snake,
+				)
+			} else if s.step_auth.wants_tick {
+				error_at(
+					loc,
+					"%s: the boot-routed authority step is (self: ^%s) — there is no lane tick in the coop loop; count ticks in your own field (tag it gd:\"backup\" so a takeover resumes the count)",
+					s.step_auth.proc_name, s.struct_name,
+				)
+			} else if s.step_auth.proc_name == fmt.tprintf("%s_step", snake) {
+				error_at(
+					loc,
+					"%s: `%s_step` is the GENERATED wrapper's name (the role-gated per-frame call) — rename the authored pass (e.g. %s_host_tick)",
+					s.step_auth.proc_name, snake, snake,
+				)
+			} else {
+				s.step_boot = true
+			}
+			continue
+		}
 		if owner != nil {
 			line := max(s.step.line, s.step_auth.line)
 			if len(s.samples) > 0 {line = max(line, s.samples[0].line)}
@@ -1683,6 +2038,115 @@ resolve_sim :: proc(scripts: []^Script) {
 			)
 		}
 	}
+}
+
+// Pair a game shell's SESSION EVENT halves — the name-paired replacement for
+// the event-drain switch. For each SESSION_EVENTS row the game may declare:
+//
+//   <game>_<suffix>      :: proc(self: ^Game, <the event's fields>)  // fires wherever the event fires
+//   <game>_<suffix>_then :: proc(self: ^Game, <the event's fields>)  // AUTHORITY only (two-role events)
+//
+// The generated `<snake>_events(self, events)` dispatch holds the switch AND
+// the role gate, so neither survives in game code. Halves live on the game
+// SHELL — the class with the kboot.Boot field, whose session the gate reads;
+// a bootless class resolves nothing here (it has no generated dispatch to
+// call, so a stray half surfaces as an undeclared-name error at the call
+// site, never a silent no-fire).
+resolve_session_events :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
+	if s.boot_field == "" {
+		return
+	}
+	snake := to_snake(s.struct_name)
+	for ev, ei in SESSION_EVENTS {
+		bare_name := fmt.tprintf("%s_%s", snake, ev.suffix)
+		then_name := fmt.tprintf("%s_then", bare_name)
+		half := Event_Half{ev = ei}
+		if cand, found := idx[bare_name]; found {
+			cand.claimed = true
+			idx[bare_name] = cand
+			if check_event_half(s, ev, bare_name, cand) {
+				half.bare = bare_name
+			}
+		}
+		if cand, found := idx[then_name]; found {
+			// Claimed either way — the diagnosis here beats the unclaimed-_then
+			// fallback (which would talk about @(gd_command) wrappers).
+			cand.claimed = true
+			idx[then_name] = cand
+			loc := Loc{path = cand.path, line = cand.line}
+			switch ev.role {
+			case .Client:
+				error_at(
+					loc,
+					"%s: ksess.%s never reaches the authority — there is no `_then` half; react in %s",
+					then_name, ev.variant, bare_name,
+				)
+			case .Host:
+				error_at(
+					loc,
+					"%s: ksess.%s is already authority-only — declare %s (the bare half) instead",
+					then_name, ev.variant, bare_name,
+				)
+			case .Every:
+				if check_event_half(s, ev, then_name, cand) {
+					half.then_proc = then_name
+				}
+			}
+		}
+		if half.bare != "" || half.then_proc != "" {
+			append(&s.event_halves, half)
+		}
+	}
+}
+
+// One event half's contract: a plain proc, `(self: ^Game, <the event's
+// fields>)` exactly, no results — the generated dispatch passes the Ev
+// struct's fields through positionally.
+@(private = "file")
+check_event_half :: proc(s: ^Script, ev: Session_Ev, name: string, cand: Then_Candidate) -> bool {
+	loc := Loc{path = cand.path, line = cand.line}
+	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
+		error_at(loc, "%s must be a plain proc — the generated %s_events dispatch calls it, it is never registered", name, to_snake(s.struct_name))
+		return false
+	}
+	base_of :: proc(t: string) -> string {
+		b := t
+		if j := strings.last_index(b, "."); j >= 0 {b = b[j + 1:]}
+		return b
+	}
+	types := make([dynamic]string, context.temp_allocator)
+	if cand.pt.params != nil {
+		for f in cand.pt.params.list {
+			t := strings.trim_space(node_text(cand.src, f.type))
+			for _ in 0 ..< max(1, len(f.names)) {
+				append(&types, t)
+			}
+		}
+	}
+	ok := len(types) == 1 + len(ev.params) && types[0] == fmt.tprintf("^%s", s.struct_name)
+	if ok {
+		for p, i in ev.params {
+			if base_of(types[1 + i]) != base_of(p.type_) {
+				ok = false
+				break
+			}
+		}
+	}
+	if !ok || cand.pt.results != nil {
+		shape := strings.builder_make(context.temp_allocator)
+		fmt.sbprintf(&shape, "(self: ^%s", s.struct_name)
+		for p in ev.params {
+			fmt.sbprintf(&shape, ", %s: %s", p.name, p.type_)
+		}
+		strings.write_string(&shape, ")")
+		error_at(
+			loc,
+			"%s: the shape is %s, no results — the generated dispatch passes ksess.%s's fields through",
+			name, strings.to_string(shape), ev.variant,
+		)
+		return false
+	}
+	return true
 }
 
 // Pair a SIM-lane verb with its `<verb>_apply` half: the predicted-effect
@@ -1765,13 +2229,45 @@ resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
 	}
 	then_name := fmt.tprintf("%s_then", s.tick.proc_name)
 	fx_name := fmt.tprintf("%s_fx", s.tick.proc_name)
-	if game, ok := claim_tick_half(s, idx, then_name, true); ok {
+	if game, _, ok := claim_tick_half(s, idx, then_name, true); ok {
 		s.tick.then_proc = then_name
 		s.tick.then_game = game
 	}
-	if game, ok := claim_tick_half(s, idx, fx_name, false); ok {
+	if game, mine, ok := claim_tick_half(s, idx, fx_name, false); ok {
 		s.tick.fx_proc = fx_name
 		s.tick.fx_game = game
+		s.tick.fx_mine = mine
+		if mine {
+			// The every-screen form: the fact tuple crosses the wire to
+			// watching screens, so every fact must be a wire primitive, and
+			// at least one must be a bool — the EVENT trigger (the tuple
+			// broadcasts on any tick a bool fact is true).
+			cand := idx[fx_name]
+			loc := Loc{path = cand.path, line = cand.line}
+			bools := 0
+			for ptype in s.tick.payload_types {
+				wire, _, wok := command_wire_type(ptype)
+				if !wok {
+					error_at(
+						loc,
+						"%s declares `mine` — the tick's facts cross the wire to watching screens, and %q is not a wire primitive (fixed-width ints, f32/f64, bool, string, knet.Net_Id, knet.Player_Id)",
+						fx_name, ptype,
+					)
+					continue
+				}
+				if wire == "bool" {
+					bools += 1
+				}
+				append(&s.tick.payload_wires, wire)
+			}
+			if bools == 0 {
+				error_at(
+					loc,
+					"%s declares `mine` but the tick returns no bool fact — a bool is the event trigger: the fact tuple broadcasts on any tick a bool fact is true",
+					fx_name,
+				)
+			}
+		}
 	}
 	if s.tick.payload_count > 0 && s.tick.then_proc == "" && s.tick.fx_proc == "" {
 		warn_at(
@@ -1782,11 +2278,78 @@ resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
 	}
 }
 
+// Pair each replicated field with its `<class>_<path>_edge` half — delta-lane
+// change presentation, where THE PROC IS THE SUBSCRIPTION (no tag): declare it
+// and the field's NET change per frame fires it with (old, new); don't, and
+// the field costs nothing. The diff atom is the FIELD, so fields that must
+// edge together are co-located into one POD struct (one field, one half, one
+// atomic old/new). Delta lane only, held here: predicted state resims and
+// owner-streamed state interpolates — each lane has its own presentation
+// answer, and an edge on either would misfire by construction.
+resolve_edges :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
+	snake := to_snake(s.struct_name)
+	for &r in s.replicates {
+		name := fmt.tprintf("%s_%s_edge", snake, strings.join(r.path, "_", context.temp_allocator))
+		cand, found := idx[name]
+		if !found {continue}
+		cand.claimed = true
+		idx[name] = cand
+		loc := Loc{path = cand.path, line = cand.line}
+
+		field := fmt.tprintf("%s.%s", s.struct_name, strings.join(r.path, ".", context.temp_allocator))
+		if r.predict {
+			error_at(loc, "%s: %s is PREDICTED — the sim rewrites it on every reconcile, so a delta edge would fire on mispredict scrubs; predicted facts ride the mine-form `_fx` (sim.md)", name, field)
+			continue
+		}
+		if r.owner {
+			error_at(loc, "%s: %s is OWNER-STREAMED — it interpolates every frame; dress continuous state from the fields. `_edge` is the delta lane's", name, field)
+			continue
+		}
+		if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") || has_attr(cand.vd, "gd_tick") {
+			error_at(loc, "%s must be a plain proc — the per-frame edge pass calls it, it is never registered", name)
+			continue
+		}
+		if cand.pt.results != nil {
+			error_at(loc, "%s: an edge half presents, it decides nothing — no results (consequences belong to verbs and ticks)", name)
+			continue
+		}
+
+		types := make([dynamic]string, context.temp_allocator)
+		if cand.pt.params != nil {
+			for f in cand.pt.params.list {
+				t := strings.trim_space(node_text(cand.src, f.type))
+				for _ in 0 ..< max(1, len(f.names)) {
+					append(&types, t)
+				}
+			}
+		}
+		self_type := fmt.tprintf("^%s", s.struct_name)
+		at := 0
+		game := ""
+		if len(types) > at && strings.has_prefix(types[at], "^") && types[at] != self_type {
+			game = types[at][1:]
+			at += 1
+		}
+		if !(len(types) > at && types[at] == self_type) {
+			error_at(loc, "%s: expected `self: %s` %s — the shapes are (self, old, new: %s) or (game, self, old, new: %s)", name, self_type, game == "" ? "first" : "after the game param", r.type_text, r.type_text)
+			continue
+		}
+		at += 1
+		if len(types) - at != 2 || types[at] != r.type_text || types[at + 1] != r.type_text {
+			error_at(loc, "%s: expected exactly `old, new: %s` after `self` (the field's declared type) — found %d param(s)%s", name, r.type_text, len(types) - at, len(types) > at ? fmt.tprintf(" starting with %q", types[at]) : "")
+			continue
+		}
+
+		r.edge_proc = name
+		r.edge_game = game
+	}
+}
+
 @(private = "file")
-claim_tick_half :: proc(s: ^Script, idx: ^map[string]Then_Candidate, name: string, wants_by: bool) -> (game: string, ok: bool) {
+claim_tick_half :: proc(s: ^Script, idx: ^map[string]Then_Candidate, name: string, wants_by: bool) -> (game: string, mine: bool, ok: bool) {
 	cand, found := idx[name]
 	if !found {
-		return "", false
+		return "", false, false
 	}
 	cand.claimed = true
 	idx[name] = cand
@@ -1794,15 +2357,23 @@ claim_tick_half :: proc(s: ^Script, idx: ^map[string]Then_Candidate, name: strin
 
 	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") || has_attr(cand.vd, "gd_tick") {
 		error_at(loc, "%s must be a plain proc — the generated tick thunk calls it, it is never registered", name)
-		return "", false
+		return "", false, false
 	}
 
 	types := make([dynamic]string, context.temp_allocator)
+	names := make([dynamic]string, context.temp_allocator)
 	if cand.pt.params != nil {
 		for f in cand.pt.params.list {
 			t := strings.trim_space(node_text(cand.src, f.type))
-			for _ in 0 ..< max(1, len(f.names)) {
+			for ni in 0 ..< max(1, len(f.names)) {
 				append(&types, t)
+				nm := ""
+				if ni < len(f.names) {
+					if ident, iok := f.names[ni].derived.(^ast.Ident); iok && ident != nil {
+						nm = ident.name
+					}
+				}
+				append(&names, nm)
 			}
 		}
 	}
@@ -1820,7 +2391,7 @@ claim_tick_half :: proc(s: ^Script, idx: ^map[string]Then_Candidate, name: strin
 			name, self_type, game == "" ? "first" : "after the game param",
 			wants_by ? ", by" : "", wants_by ? ", by" : "",
 		)
-		return "", false
+		return "", false, false
 	}
 	at += 1
 
@@ -1833,8 +2404,18 @@ claim_tick_half :: proc(s: ^Script, idx: ^map[string]Then_Candidate, name: strin
 		}
 		if !by_ok {
 			error_at(loc, "%s: the param after `self` must be the driving seat (`by: knet.Player_Id`)", name)
-			return "", false
+			return "", false, false
 		}
+		at += 1
+	}
+
+	// The presentation half may declare `mine: bool` right after `self` —
+	// the EVERY-SCREEN form: the live pass fires it inline (mine=true), the
+	// authority broadcasts the fact tuple, and watching screens fire it when
+	// their watch clock reaches the fact's tick (mine=false). Detected by
+	// NAME so an extra bool fact can never silently shift into the slot.
+	if !wants_by && len(types) > at && types[at] == "bool" && names[at] == "mine" {
+		mine = true
 		at += 1
 	}
 
@@ -1842,11 +2423,11 @@ claim_tick_half :: proc(s: ^Script, idx: ^map[string]Then_Candidate, name: strin
 		error_at(
 			loc,
 			"%s: expected the tick's %d payload value(s) after %s — found %d param(s)",
-			name, s.tick.payload_count, wants_by ? "`by`" : "`self`", len(types) - at,
+			name, s.tick.payload_count, wants_by ? "`by`" : (mine ? "`mine`" : "`self`"), len(types) - at,
 		)
-		return "", false
+		return "", false, false
 	}
-	return game, true
+	return game, mine, true
 }
 
 // Build a Method_Info from a @(gd_method)/@(gd_rpc) proc: the GDScript-exposed name (stripped),
@@ -2038,6 +2619,12 @@ join_path :: proc(path: []string) -> string {
 	return strings.join(path, ".")
 }
 
+// The identifier-safe join: {"weapon","ammo"} -> "weapon_ammo" — edge half
+// names and their generated thunks, matching the hoisted-name convention.
+join_snake :: proc(path: []string) -> string {
+	return strings.join(path, "_")
+}
+
 // The entity-level name for a command or method composed from an embedded block: the access path
 // joined with the verb by underscores. {"gun"} + "fire" -> "gun_fire"; {"loadout","primary"} +
 // "fire" -> "loadout_primary_fire". Drives the command index const / decode thunk / issue wrapper
@@ -2161,7 +2748,7 @@ is_signal_field_type :: proc(type_text: string) -> bool {
 //   * signal — registered by the runtime walk; scriptgen generates the typed `*_emit_*`
 //     helper (arity family only — SignalN needs its AST payload node, which the index
 //     doesn't carry, so it registers at runtime without a typed helper).
-recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[string]bool, name_prefix: string, subst: map[string]string) {
+recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[string]bool, name_prefix: string, subst: map[string]string, manual := false) {
 	if visited[def.id] {return} // a type reachable from itself — stop, don't loop
 	visited[def.id] = true
 	defer delete_key(visited, def.id) // allow the same type at independent sibling positions
@@ -2188,7 +2775,12 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 				"%s embeds %s (as %q), but its @(gd_tick) can't compose: %s",
 				s.struct_name, def.id, join_path(path), def.tick.bad,
 			)
-		} else if def.tick.proc_name != "" {
+		} else if def.tick.proc_name != "" && !manual {
+			// `manual` (a `gd:"manual"` tag on the embed) opts OUT of auto-hoist:
+			// the wielder's own tick drives this block's step wherever it wants
+			// (any ordering, conditionally), so scriptgen must NOT also call it.
+			// The predict fields still flatten (the walk below is unchanged) —
+			// only the auto-call is skipped.
 			append(&s.block_ticks, Hoisted_Tick{
 				path        = path,
 				pkg_alias   = alias,
@@ -2251,15 +2843,106 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 					append(&s.replicates, rep)
 				}
 			}
+			// `gd:"backup"` rides nesting too (scrapyard tags host-local fields inside
+			// a `using`-embedded sub-struct): collect it onto the class with its full
+			// access path, exactly like replicate.
+			if len(specs) > 0 && strings.trim_space(specs[0]) == "backup" {
+				kind, key, elem, bad := classify_backup(ftype)
+				if bad != "" {
+					error_at(fld.loc, "%s.%s: gd:\"backup\" can't serialize %s", s.struct_name, join_path(fpath), bad)
+				} else {
+					append(&s.backups, Backup_Info{field = fld.name, path = fpath, kind = kind, key = key, elem = elem})
+				}
+			}
 			// export/onready (and any unknown tag) are the runtime reflection walk's to
-			// register and validate — scriptgen owns only `replicate` through nesting.
+			// register and validate — scriptgen owns only `replicate`/`backup` through nesting.
 			continue
 		}
 		if sub, sub_subst, ok := resolve_type(def, ftype); ok {
 			// `using` keeps the current name prefix; a plain embed extends it by `<field>_`.
 			sub_prefix := fld.is_using ? name_prefix : strings.concatenate({name_prefix, fld.name, "_"})
-			recurse_into(s, sub, fpath, visited, sub_prefix, sub_subst)
+			// A manual embed owns its whole subtree: the wielder drives this
+			// block's tick, which drives its children — so a nested block under
+			// a manual one must not auto-hoist either.
+			recurse_into(s, sub, fpath, visited, sub_prefix, sub_subst, manual)
 		}
+	}
+}
+
+// The verb's STABLE wire id: FNV-1a of the verb name, xor-folded to u16. What
+// the generated constants hold and both command wires ship — reordering (or
+// adding/removing) procs can no longer renumber the protocol; a version-skewed
+// peer's unknown id MISSES the receiver's lookup and rejects cleanly instead
+// of dispatching to whatever now lives at that position. A renamed verb is a
+// new id on purpose: it IS a different verb.
+cmd_wire_id :: proc(name: string) -> u16 {
+	h: u32 = 0x811c9dc5
+	for c in transmute([]u8)name {
+		h = (h ~ u32(c)) * 0x01000193
+	}
+	return u16(h >> 16) ~ u16(h & 0xFFFF)
+}
+
+// Two verbs on one entity hashing to the same u16 — astronomically rare for a
+// handful of names, deterministic, and fatal on the wire, so it's a build
+// error naming both (rename one). Runs per script in main's resolution pass.
+validate_command_ids :: proc(s: ^Script) {
+	for c, i in s.commands {
+		for j in i + 1 ..< len(s.commands) {
+			o := s.commands[j]
+			if cmd_wire_id(c.name) == cmd_wire_id(o.name) {
+				error_at(
+					Loc{path = s.path},
+					"%s: commands %q and %q collide on wire id 0x%x — rename one verb",
+					s.struct_name, c.name, o.name, cmd_wire_id(c.name),
+				)
+			}
+		}
+	}
+}
+
+// Classify a `gd:"backup"` field's type: a whole-POD value (scalar / POD struct
+// / fixed [N]POD array), a map[POD]POD, or a [dynamic]POD. `bad` != "" is a
+// rejection reason (a slice, a string — not self-contained + restorable); the
+// caller reports it. Element PODness itself is enforced by the generated #assert.
+classify_backup :: proc(type_text: string) -> (kind: Backup_Kind, key: string, elem: string, bad: string) {
+	t := strings.trim_space(type_text)
+	switch {
+	case t == "string" || t == "cstring":
+		return .Pod, "", "", "a string (not self-contained bytes) — copy it into a fixed [N]u8 or a [dynamic]u8"
+	case strings.has_prefix(t, "map["):
+		// Split key/value at the `]` that closes `map[`, honoring nested brackets
+		// in the key (e.g. map[[2]int]V).
+		depth := 0
+		for i := 4; i < len(t); i += 1 {
+			switch t[i] {
+			case '[':
+				depth += 1
+			case ']':
+				if depth == 0 {
+					key = strings.trim_space(t[4:i])
+					elem = strings.trim_space(t[i + 1:])
+					if key == "" || elem == "" {
+						return .Map, "", "", "a malformed map type"
+					}
+					return .Map, key, elem, ""
+				}
+				depth -= 1
+			}
+		}
+		return .Map, "", "", "a malformed map type"
+	case strings.has_prefix(t, "[dynamic]"):
+		elem = strings.trim_space(t[len("[dynamic]"):])
+		if elem == "" {
+			return .Dyn, "", "", "a malformed dynamic-array type"
+		}
+		return .Dyn, "", elem, ""
+	case strings.has_prefix(t, "[]"):
+		return .Pod, "", "", "a slice (no owned storage to restore into) — use [dynamic]T or a map"
+	case:
+		// scalar / enum / vector / fixed [N]T array / POD struct — the whole
+		// value's bytes ARE its state (the generated #assert enforces PODness).
+		return .Pod, "", "", ""
 	}
 }
 
@@ -2304,7 +2987,34 @@ parse_replicate_info :: proc(
 			return {}, false
 		}
 	}
-	rep := Replicate_Info{}
+	// The COLLECTIONS stance, held at build time: variable-length state never
+	// replicates as a field. The delta walk's whole contract is flat POD cells
+	// (a shadow memcmp per field, a u64 dirty mask, byte-identical apply) — a
+	// [dynamic]'s bytes are a header whose elements a memcpy would tear, and
+	// element identity breaks byte-diffing anyway (insert-at-front shifts
+	// every byte). The three honest shapes, all with worked examples:
+	//   BOUNDED       -> a fixed array + count/sentinel (cavecrawl's [6]Slot
+	//                    bag — one field, one diff atom; the cap is game
+	//                    design, own it)
+	//   RARE-CHANGE   -> an entity BLOB (session_set_blob — whole-value,
+	//                    reliable, rides every snapshot; the inscription)
+	//   LIVE ELEMENTS -> each element is an ENTITY: the registry IS the
+	//                    diffed dynamic collection (spawn = insert, despawn
+	//                    = remove, per-element fields diff normally; the
+	//                    floor's pickups)
+	if strings.has_prefix(type_text, "[dynamic]") ||
+	   strings.has_prefix(type_text, "[]") ||
+	   strings.has_prefix(type_text, "map[") {
+		error_at(
+			floc,
+			"%s.%s: %q is variable-length — replicated fields are flat POD cells (the delta walk memcmps and memcpys them whole, and byte-diffing has no element identity). Pick the collection's real shape: BOUNDED -> fixed array + count/sentinel (`[6]Slot`); RARE-CHANGE bytes/text -> an entity blob (ksess.session_set_blob); LIVE elements -> spawn each as an ENTITY (the registry is the diffed collection). (gd:\"backup\" still takes [dynamic]/map — that codec restores whole, it never diffs.)",
+			struct_name,
+			field_label,
+			type_text,
+		)
+		return {}, false
+	}
+	rep := Replicate_Info{type_text = type_text}
 	for spec_raw in specs[1:] {
 		spec := strings.trim_space(spec_raw)
 		// `interp=NAME`: custom blend math — NAME is an author proc of type knet.Blend_Proc,

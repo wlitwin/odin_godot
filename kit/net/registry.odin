@@ -40,6 +40,11 @@ Registry_Entry :: struct {
 	            // local hint, NOT replicated — a new authority re-applies it.
 	blob:     []u8, // the entity's opaque payload (registry_set_blob) — nil = never set
 	blob_ver: u32, // bumped per set; receivers use it to drop re-received duplicates
+	// The edge mirror (edge.odin): last-presented bytes of the class's
+	// edge-declared fields. nil for classes without edge halves; seeded on
+	// first sight and on resync — silently, both times.
+	edge_shadow: []u8,
+	edge_seeded: bool,
 }
 
 Registry :: struct {
@@ -55,6 +60,7 @@ registry_destroy :: proc(reg: ^Registry) {
 	for _, &e in reg.entries {
 		delete(e.shadow)
 		delete(e.blob)
+		delete(e.edge_shadow)
 		stream_ring_destroy(&e.stream)
 	}
 	delete(reg.entries)
@@ -84,13 +90,17 @@ registry_insert :: proc(reg: ^Registry, id: Net_Id, entity: rawptr, set: ^Comman
 	if set.net_id_offset > 0 {
 		(cast(^Net_Id)(uintptr(entity) + uintptr(set.net_id_offset)))^ = id
 	}
-	reg.entries[id] = Registry_Entry {
+	entry := Registry_Entry {
 		id     = id,
 		entity = entity,
 		set    = set,
 		shadow = shadow_make(set.entity_desc),
 		owner  = owner,
 	}
+	if n := edge_shadow_size(set); n > 0 {
+		entry.edge_shadow = make([]u8, n)
+	}
+	reg.entries[id] = entry
 	if id >= reg.next_id {
 		reg.next_id = id + 1
 	}
@@ -103,6 +113,7 @@ registry_remove :: proc(reg: ^Registry, id: Net_Id) -> bool {
 	}
 	delete(e.shadow)
 	delete(e.blob)
+	delete(e.edge_shadow)
 	stream_ring_destroy(&e.stream)
 	delete_key(&reg.entries, id)
 	return true
@@ -239,7 +250,10 @@ replay_pending :: proc(ctx: ^Command_Ctx, e: Registry_Entry) {
 		delete(p.revert)
 		p.revert = fields_capture(e.entity, e.set.entity_desc)
 		r := reader_make(p.args)
-		if !(e.set.commands[p.cmd].invoke(e.entity, &r, &env) && !r.err) {
+		// Lookup by the verb's stable id (recorded from our own issue, so a miss
+		// can't really happen — treated as a failed replay if it somehow does).
+		c := command_find(e.set, p.cmd)
+		if c == nil || !(c.invoke(e.entity, &r, &env) && !r.err) {
 			fields_restore(e.entity, e.set.entity_desc, p.revert, skip_predicted = true)
 		}
 	}

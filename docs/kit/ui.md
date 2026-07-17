@@ -144,6 +144,31 @@ kui.abilities_refresh(&self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.s
   Odin-side tracking arrays.
 - Widgets spawn at the anchor origin — position them yourself; layout is the game's call.
 
+## The netgraph — "is it healthy?", drawn
+
+A drop-in text overlay (`netgraph_make` / `netgraph_show` /
+`netgraph_refresh(ng, Net_Stats{...})`) that draws the numbers that move when
+the link goes bad:
+
+```
+net  42ms  jit 6ms  loss 1.2%  ok
+rx 3.2k state 2.1 stream 0.8 app16 0.2 · tx 0.4k cmd 0.3
+sim  lead 4t  resim ▁▁▂▁▇▁▁…  rec 128
+```
+
+Row 1 is the link: rtt off the replicated ping stat (`net_ping_ms`), jitter
+and loss off [ENet's own per-peer statistics](netgd.md#the-wire-gauge--bytes-by-kind-and-the-links-own-truth)
+(`netgd.wire_link_quality` — clients fill it about the host), and a quality
+word that rates loss first, then jitter, then raw rtt. Row 2 is the wire's
+bytes-by-kind (`Net_Stats.traffic = netgd.wire_traffic(&boot.wire)` — an
+opaque pre-formatted string, so this package never imports the transport).
+Row 3 is the sim lane, and the RESIM SPARKLINE is the point: a steady sim
+draws a flat baseline; a lost input or a contested mispredict makes the
+client rewind, and that burst — invisible in a headless log — is exactly
+what you can SEE here. Every field is optional (coop games leave `sim`
+false); quickdraw's fill is the worked example.
+
 Siblings: [session.md](session.md) (roster, stats, `session_tick_hz`) ·
 [comms.md](comms.md) (the chat log) · [combat.md](combat.md) (`Ability_Def`, cooldowns) ·
-[items.md](items.md) (`Slot`, `Table`).
+[items.md](items.md) (`Slot`, `Table`) · [netgd.md](netgd.md) (the shim + gauge the
+netgraph draws).

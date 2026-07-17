@@ -20,14 +20,10 @@ kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{
 	               "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 })
 
-// process():
+// process(): the whole loop, role-free — both procs are generated
 events, marks, ticks := kboot.boot_pump(&self.boot, delta, now_s())
-if self.ses.is_host {
-	for _ in 0 ..< ticks { my_game_tick(self) }
-}
-for ev in events {
-	#partial switch e in ev { /* ONLY game cases — see below */ }
-}
+my_game_step(self, ticks)     // @(gd_step="authority") pass: host gate + edge pass inside (sim.md)
+my_game_events(self, events)  // session-event dispatch over the declared halves (session.md)
 ```
 
 **Everything stays yours.** Every widget is a public field on `Boot`
@@ -52,11 +48,16 @@ frame rate is 120 on one machine and whatever vsync says on another — a
 (scrapyard shipped exactly that: its stage clock ran off frames and the
 120fps unthrottle cut the countdown in half). `boot_pump` returns `ticks` —
 how many fixed net ticks fired this frame — and that is the clock the host's
-simulation and every timer should count:
+simulation and every timer should count. Declare the pass and hand it those
+ticks; the generated proc holds the role gate and the loop:
 
 ```odin
+@(gd_step = "authority")
+my_game_tick :: proc(self: ^MyGame) { /* timers decrement HERE */ }
+
+// process():
 events, _, ticks := kboot.boot_pump(&self.boot, delta, now_s())
-if self.ses.is_host { for _ in 0 ..< ticks { my_game_tick(self) } } // timers decrement HERE
+my_game_step(self, ticks) // generated: host-only fixed steps + the same-frame edge pass
 ```
 
 The eight
@@ -71,8 +72,11 @@ error, not a haunted roster ("" still skips a signal on purpose).
 identically (Welcomed/Joined/Left → lobby+score repaints and the host's Start
 gating at `min_players`; Stats → score repaint; Join_Failed/Host_Left →
 status lines), then returns **every** session event plus the comms markers
-(temp-allocated) so your switch sees the full stream. Your cases run *after*
-boot's, so a game-specific status line simply overwrites the stock one.
+(temp-allocated). The game's own reactions are its
+[declared event halves](session.md#event-halves-game_event--the-switch-generated)
+— hand the stream to the generated `<snake>_events` and each half runs
+*after* boot's stock reaction, so a game-specific status line simply
+overwrites the stock one.
 
 **The factory, written by nobody:** tag each exported entity scene with what
 it bodies and its stable wire id, and pass the GENERATED table to
@@ -131,8 +135,10 @@ method-name lint holds), but their bodies are no longer yours to get wrong.
 
 **Identity from one prefix:** `Options.env = "MY"` makes `boot_port(b, def)`
 / `boot_name(b, def)` / `boot_token(b)` read `MY_PORT`/`MY_NAME`/`MY_TOKEN`
-(token persisted in `user://my_token`), and the latency shim answers
-`MY_LATENCY` without `latency_env` — the per-game env trio, absorbed.
+(token persisted in `user://my_token`), and the whole
+[bad-link shim](netgd.md#wire_set_latency--the-bad-link-shim) answers
+`MY_LATENCY` / `MY_JITTER` / `MY_LOSS` without `latency_env` — the per-game
+env family, absorbed.
 
 **The buttons:** `boot_host(b, port, name)` and
 `boot_join(b, addr, port, token, name)` do transport-up + session-start + the

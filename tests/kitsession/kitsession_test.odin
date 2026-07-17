@@ -25,6 +25,11 @@ Peer_Box :: struct {
 	out:   [dynamic]Envelope,
 	bots:  map[knet.Net_Id]^Bot, // factory-created entities (clients)
 	freed: int, // factory frees observed
+
+	// the `<field>_edge` probe: what the hp edge half saw on this peer
+	edge_fires: int,
+	edge_old:   i32,
+	edge_new:   i32,
 }
 
 box_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
@@ -352,7 +357,19 @@ bot_fields := [?]knet.Field_Desc{
 }
 bot_desc := knet.Entity_Desc{fields = bot_fields[:]}
 bot_cmds := [?]knet.Command_Desc{{name = "hit", predict = true, invoke = bot_cmd_hit}}
-bot_command_set := knet.Command_Set{entity_desc = &bot_desc, commands = bot_cmds[:]}
+
+// The hp edge half, hand-built like generated code would be: cast, deref old,
+// record. Living on the SHARED set means every kitsession scenario (spawns,
+// reconnects, migration, interest) exercises the edge machinery incidentally.
+bot_hp_edge_thunk :: proc(entity: rawptr, game: rawptr, old: rawptr) {
+	b := cast(^Peer_Box)game // the factory user — the same `game` a _then receives
+	b.edge_fires += 1
+	b.edge_old = (cast(^i32)old)^
+	b.edge_new = (cast(^Bot)entity).hp
+}
+
+bot_edges := [?]knet.Edge_Desc{{field = 0, fire = bot_hp_edge_thunk}}
+bot_command_set := knet.Command_Set{entity_desc = &bot_desc, commands = bot_cmds[:], edges = bot_edges[:]}
 
 BOT_TYPE :: ksess.Entity_Type(7)
 UNKNOWN_TYPE :: ksess.Entity_Type(99)
@@ -1791,4 +1808,189 @@ fire_listen_routes_to_other_screens_only :: proc(t: ^testing.T) {
 	now := f64(1000)
 	step(boxes, &now)
 	testing.expect(t, ksess.session_tick_no(&host.s) > before, "the tick clock advances")
+}
+
+// ---------------------------------------------------------------------------
+// The VERSION door: Session_Config.fingerprint rides SES_JOIN, and the host
+// refuses a build whose wire contract disagrees — with a sentence (.Version),
+// not garbage-field deltas. Unchecked (0) opts out on either end.
+
+@(test)
+version_skew_is_denied_at_the_door :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+
+	ksess.session_configure(&host.s, {fingerprint = 0xF00D})
+	ksess.session_host_start(&host.s, "hosty")
+
+	// The same build: welcomed like any other day.
+	ksess.session_configure(&alice.s, {fingerprint = 0xF00D})
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump([]^Peer_Box{&host, &alice})
+	testing.expect(t, alice.s.joined, "a matching fingerprint joins as ever")
+
+	// A skewed build: denied with the reason, join timeout disarmed.
+	ksess.session_configure(&bob.s, {fingerprint = 0xBAD})
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump([]^Peer_Box{&host, &alice, &bob})
+	bev := drain(&bob.s)
+	testing.expect_value(t, len(bev), 1)
+	d, denied := bev[0].(ksess.Ev_Join_Denied)
+	testing.expect(t, denied)
+	testing.expect_value(t, d.reason, ksess.Deny_Reason.Version)
+	testing.expect(t, !bob.s.joined)
+	testing.expect_value(t, bob.s.join_waited, -1)
+
+	// A PRE-FINGERPRINT build (its JOIN ends at the name): the checked host
+	// reads the missing tail as "no fingerprint" and refuses it the same way.
+	carol: Peer_Box
+	box_make(&carol, 300)
+	defer box_destroy(&carol)
+	ksess.session_client_start(&carol.s, u64(0xCA401), "carol")
+	{
+		w := knet.writer_make(64, context.temp_allocator)
+		knet.write_u8(&w, 0) // SES_JOIN — the kind's wire value, pinned
+		knet.write_u64(&w, u64(0xCA401))
+		knet.write_string(&w, "carol")
+		r := knet.reader_make(knet.writer_bytes(&w))
+		ksess.session_handle_packet(&host.s, 300, &r)
+	}
+	pump([]^Peer_Box{&host, &carol})
+	cev := drain(&carol.s)
+	testing.expect_value(t, len(cev), 1)
+	dl, _ := cev[0].(ksess.Ev_Join_Denied)
+	testing.expect_value(t, dl.reason, ksess.Deny_Reason.Version)
+
+	// The roster never grew past the matching build.
+	testing.expect_value(t, ksess.session_count(&host.s), 2)
+}
+
+@(test)
+unchecked_fingerprint_opts_out :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+
+	// Host doesn't check (fingerprint 0): a checked client still seats — the
+	// authority owns the door, and an unchecked authority holds it open.
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_configure(&alice.s, {fingerprint = 0xF00D})
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump([]^Peer_Box{&host, &alice})
+	testing.expect(t, alice.s.joined, "an unchecked host accepts any build")
+}
+
+// ---------------------------------------------------------------------------
+// The `<field>_edge` halves: NET delta-lane change per frame, on every peer —
+// the machinery that replaces hand-rolled seen_* mirrors. Spawn seeds
+// silently, coalesced writes fire once, cancelled pulses never fire, and a
+// resync (the caught-up spawn tuple) re-seeds without firing.
+
+@(test)
+edge_halves_fire_on_net_change :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	hbot := Bot{hp = 10}
+	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
+	ksess.session_start_replicating(&host.s)
+	now := 0.0
+	step(boxes, &now)
+	step(boxes, &now)
+
+	// Spawn values are a baseline, not an edge — on both screens.
+	testing.expect_value(t, host.edge_fires, 0)
+	testing.expect_value(t, alice.edge_fires, 0)
+
+	// Two writes inside one frame: ONE net edge, old 10 -> new 6, host and
+	// client alike (the host's own mutations edge — zero role branches).
+	hbot.hp = 8
+	hbot.hp = 6
+	step(boxes, &now)
+	testing.expect_value(t, host.edge_fires, 1)
+	testing.expect_value(t, host.edge_old, i32(10))
+	testing.expect_value(t, host.edge_new, i32(6))
+	step(boxes, &now) // alice's delta landed last step; her pass has run by now
+	testing.expect_value(t, alice.edge_fires, 1)
+	testing.expect_value(t, alice.edge_old, i32(10))
+	testing.expect_value(t, alice.edge_new, i32(6))
+
+	// A pulse that cancels within the frame is not a change — and it never
+	// even ships (the wire's own shadow agrees).
+	hbot.hp = 1
+	hbot.hp = 6
+	step(boxes, &now)
+	step(boxes, &now)
+	testing.expect_value(t, host.edge_fires, 1)
+	testing.expect_value(t, alice.edge_fires, 1)
+
+	// RESYNC IS SILENT: mutate and re-announce the spawn tuple before any
+	// net tick ships the delta — alice catches up wholesale (Ev_Resynced),
+	// her mirror re-seeds, and her half stays quiet. The HOST's own screen
+	// still edges (its mutation was real gameplay there).
+	drain(&alice.s)
+	hbot.hp = 3
+	ksess.session_spawn_send(&host.s, id)
+	pump(boxes)
+	resynced := false
+	for ev in drain(&alice.s) {
+		if _, is := ev.(ksess.Ev_Resynced); is {resynced = true}
+	}
+	testing.expect(t, resynced, "the redundant tuple lands as a resync")
+	step(boxes, &now)
+	step(boxes, &now)
+	testing.expect_value(t, host.edge_fires, 2) // the host's screen flashed
+	testing.expect_value(t, host.edge_new, i32(3))
+	testing.expect_value(t, alice.edge_fires, 1) // the catch-up presented NOTHING
+}
+
+// session_run_edges: the authority's SAME-FRAME pass — a game tick that
+// mutates after the frame's session_tick calls it and the halves fire NOW,
+// not next frame; the pass is idempotent, so the automatic one that follows
+// re-fires nothing.
+@(test)
+edge_pass_is_idempotent_and_callable :: proc(t: ^testing.T) {
+	host: Peer_Box
+	box_make(&host, 1)
+	defer box_destroy(&host)
+
+	ksess.session_host_start(&host.s, "hosty")
+	hbot := Bot{hp = 10}
+	_ = ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
+	ksess.session_start_replicating(&host.s)
+	ksess.session_run_edges(&host.s) // first sight: seeds silently
+	testing.expect_value(t, host.edge_fires, 0)
+
+	// The "post-pump game tick" mutation: fires the SAME frame via the
+	// explicit pass, before any session_tick has run.
+	hbot.hp = 7
+	ksess.session_run_edges(&host.s)
+	testing.expect_value(t, host.edge_fires, 1)
+	testing.expect_value(t, host.edge_old, i32(10))
+	testing.expect_value(t, host.edge_new, i32(7))
+
+	// Idempotent: the automatic pass (or a second call) re-fires nothing.
+	ksess.session_run_edges(&host.s)
+	now := 0.0
+	step([]^Peer_Box{&host}, &now)
+	testing.expect_value(t, host.edge_fires, 1)
 }

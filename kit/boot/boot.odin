@@ -22,11 +22,10 @@ package kit_boot
 //                     "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 //     })
 //
-//     // process():
+//     // process(): the whole loop, role-free — both procs are generated
 //     events, marks, ticks := kboot.boot_pump(&self.boot, delta, now_s())
-//     for ev in events {
-//         #partial switch e in ev { /* ONLY game cases */ }
-//     }
+//     my_game_step(self, ticks)    // @(gd_step="authority"): host gate + edge pass inside
+//     my_game_events(self, events) // dispatch over the declared session event halves
 //
 // The eight @(gd_method) names stay the game's to declare — Godot signals
 // must land on the game's script class; their bodies are one-liners (see
@@ -209,7 +208,16 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 		latency_env = fmt.ctprintf("%s_LATENCY", opts.env)
 	}
 	if latency_env != "" {
-		netgd.wire_set_latency(&b.wire, gd.env_int(latency_env, 0))
+		// The whole bad-link shim off env: <ENV>_LATENCY (one-way ms) plus
+		// <ENV>_JITTER (extra uniform ms, order-preserving) and <ENV>_LOSS
+		// (percent: streams drop, reliable pays a retransmit delay) — prove
+		// your game FEELS right on a bad link, not just a slow one.
+		jit, loss := 0, 0
+		if opts.env != "" {
+			jit = gd.env_int(fmt.ctprintf("%s_JITTER", opts.env), 0)
+			loss = gd.env_int(fmt.ctprintf("%s_LOSS", opts.env), 0)
+		}
+		netgd.wire_set_latency(&b.wire, gd.env_int(latency_env, 0), jit, loss)
 	}
 
 	if opts.legend != "" {

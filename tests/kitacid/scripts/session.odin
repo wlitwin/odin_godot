@@ -24,6 +24,7 @@ package kitacid_scripts
 
 import gd "godot:godot"
 import rt "godot:runtime"
+import kboot "godot:kit/boot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import netgd "godot:kit/netgd"
@@ -48,6 +49,10 @@ AcidSession :: struct {
 	owner:   gd.Node,
 	orb:     ^Orb,
 	ses:     ksess.Session,
+	// The generated wrapper's handle — a bare Boot whose one live pointer is
+	// set at start (this phase-0 acid predates kit/boot and hand-rolls the
+	// wiring; the wrapper's coop route only reads b.ses.ctx).
+	boot:    kboot.Boot,
 	delayed: [dynamic]Delayed_Packet,
 	latency: f64, // injected one-way receive delay, seconds
 	min_rtt: f64, // proof threshold: measured round trips must exceed this
@@ -124,6 +129,7 @@ acid_session_start_host :: proc(self: ^AcidSession, port: gd.Int) {
 	}
 	self.ses.send = session_send
 	self.ses.send_user = self
+	self.boot.ses = &self.ses
 	ksess.session_host_start(&self.ses, "host")
 	self.ses.backup_every = 40 // refresh the backup snapshot every 2s in-test
 	self.strikes_col = ksess.session_stat_column(&self.ses, "strikes")
@@ -143,6 +149,7 @@ start_client :: proc(self: ^AcidSession, port: int, token: u64, name: string) {
 	}
 	self.ses.send = session_send
 	self.ses.send_user = self
+	self.boot.ses = &self.ses
 	ksess.session_set_factory(&self.ses, self, acid_make_entity, acid_free_entity)
 	ksess.session_client_start(&self.ses, token, name)
 	self.started = true
@@ -411,7 +418,7 @@ route_packet :: proc(self: ^AcidSession, from: int, data: []u8) {
 acid_session_issue_strike :: proc(self: ^AcidSession, cost: gd.Int) {
 	self.issues += 1
 	self.issue_at = now_s()
-	applied := orb_strike_cmd(&self.ses.ctx, self.orb, i32(cost))
+	applied := orb_strike_cmd(&self.boot, self.orb, i32(cost))
 	gd.print_str(
 		fmt.tprintf(
 			"ACID_ISSUE n=%d predicted=%v hp=%d st=%d pending=%d",

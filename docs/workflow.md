@@ -32,7 +32,11 @@ CI, headless builds, or working from the source repo.
 
 1. builds the `scriptgen` preprocessor,
 2. runs it over the scripts dir to emit `*.gen.odin` build artifacts beside your sources (you
-   never edit these; the loader ignores them as attachable scripts),
+   never edit these; the loader ignores them as attachable scripts). One of them,
+   `odin_godot_guard.gen.odin`, is the STALENESS GUARD: a compile-time `#load_hash`
+   assert per authored source, so a build path that skips this step — a bare
+   `odin build` against yesterday's `*.gen.odin` — fails at compile time naming the
+   drifted file instead of silently compiling stale descriptors,
 3. builds the scripts dll (`odin build <scriptsdir> -build-mode:dll` with
    `-custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc
    -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_sample

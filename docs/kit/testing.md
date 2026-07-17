@@ -5,7 +5,8 @@ it as a template: `addons/odin_godot/template/test/` holds a sourceable
 `harness.sh` and a `driver.gd` skeleton.
 
 **The shape.** Launch N *real* headless processes of your *real* main scene
-under injected latency (`netgd`'s shim, via your `*_LATENCY` env). A GDScript
+under an injected bad link (`netgd`'s shim, via your `*_LATENCY` /
+`*_JITTER` / `*_LOSS` env — a slow wire, a wobbly one, a lossy one). A GDScript
 `SceneTree` driver presses the same `@(gd_method)`s your buttons fire — no
 mocks anywhere — and prints an UPPERCASE tag for every fact worth asserting.
 Your `run.sh` sources the harness and asserts over the **logs**:

@@ -29,10 +29,12 @@ package scriptgen
 // ----------------------------------------------------------------------------
 
 import "core:fmt"
+import "core:hash"
 import "core:odin/ast"
 import "core:odin/parser"
 import "core:odin/tokenizer"
 import "core:os"
+import "core:slice"
 import "core:strings"
 
 // ---- Odin type -> Godot Variant mapping --------------------------------------
@@ -334,6 +336,9 @@ Rpc_Info :: struct {
 // consumer's compile, naming the offending field.
 Replicate_Info :: struct {
 	field:  string, // leaf field name (diagnostics/display)
+	type_text: string, // the field's declared type (subst-applied for block fields) —
+	                   // the wire-layout proxy the NET_FINGERPRINT hashes: a changed
+	                   // type is a changed wire even when the name stayed put
 	// Access segments from the entity-struct root to this field, e.g. {"hp"} for a
 	// top-level field, {"move","x"} for a field reached through a `using`/embedded
 	// sub-struct. generate.odin turns this into the offset/size/POD expressions
@@ -350,6 +355,28 @@ Replicate_Info :: struct {
 	                // spliced as f32 ("" = inherit the lane default). predict floats only.
 	glide:  string, // `glide=N`: per-field render-error half-life (seconds). predict+interp floats.
 	cut:    string, // `cut=N`: per-field snap threshold (world units). predict+interp floats.
+	// The field's `<class>_<path>_edge` half (resolve_edges): delta-lane
+	// change presentation — the PROC is the subscription, no tag. "" = none.
+	edge_proc: string,
+	edge_game: string, // its optional leading game param type ("" = self-first)
+}
+
+// A `gd:"backup"` field — HOST-LOCAL state that rides host migration and
+// save/resume. generate.odin emits a version-hashed <class>_backup_write/_read
+// codec over these, so a takeover restores the campaign (not a diorama) with
+// no hand-matched write/read lists to drift out of sync.
+Backup_Kind :: enum {
+	Pod, // a scalar, a POD struct, or a fixed [N]POD array — write_pod whole
+	Map, // map[POD]POD — length-prefixed key/value loop
+	Dyn, // [dynamic]POD — length-prefixed element loop
+}
+
+Backup_Info :: struct {
+	field: string, // leaf name (diagnostics)
+	path:  []string, // access segments from the class root (nesting, like Replicate_Info)
+	kind:  Backup_Kind,
+	key:   string, // Map: the key type text
+	elem:  string, // Map: the value type text; Dyn: the element type text
 }
 
 // One @(gd_command) arg. Command args cross the wire, so the allowed types are
@@ -379,6 +406,12 @@ Command_Info :: struct {
 	// entity's own package: no qualifier, no import).
 	path:      []string,
 	owner:     bool,
+	// The verb declared the ISSUER param — `by: knet.Player_Id` right after the
+	// receiver (after the wielder for a composed block). Framework-filled, never
+	// a wire arg: the predicate learns WHO unforgeably (ctx.me on the issuing
+	// peer, the resolved sender on the host — the same values its `_then` gets),
+	// so "which side am I" can't be a client-claimed argument.
+	wants_by:  bool,
 	pkg_alias: string,
 	pkg_path:  string,
 	// Consequence pairing (`<wrapper>_then`): a verb may return `(bool, payload…)`
@@ -412,7 +445,8 @@ Entity_Tag :: struct {
 	// typed hooks ("" = not declared).
 	spawned: string, // <target_snake>_spawned
 	freed:   string, // <target_snake>_freed
-	has_tick: bool, // the target declares @(gd_tick) — the kinds row carries its Sim_Set
+	has_tick:  bool, // the target declares @(gd_tick) — the kinds row carries its Sim_Set
+	gen_spawn: bool, // emit the typed `<entity>_spawn` helper (hand-written name wins)
 	// Which census accessors to emit (resolve_census): a hand-written proc
 	// of the same name suppresses that one, keeping its meaning.
 	gen_of, gen_owned, gen_my, gen_ids: bool,
@@ -427,6 +461,7 @@ Entity_Tag :: struct {
 Sim_Proc_Info :: struct {
 	proc_name:  string,
 	line:       int,
+	wants_tick: bool, // step only: declared the optional `tick: u64` param
 	input_type: string, // sample only: the `input: ^T` param's T
 }
 
@@ -452,11 +487,18 @@ Tick_Info :: struct {
 	line:          int,
 	contested:     bool, // @(gd_tick="contested"): every peer predicts this entity
 	payload_count: int, // results = FACTS the tick learned (fired, dashed, landed) —
-	                    // threaded to the name-paired halves below, never wire'd
+	                    // threaded to the name-paired halves below
+	payload_types: [dynamic]string, // each fact's declared type text, in result order
 	then_proc:     string, // `<proc>_then`: AUTHORITY-only consequence ("" = none)
 	then_game:     string, // its optional leading game param type ("" = self-first shape)
-	fx_proc:       string, // `<proc>_fx`: owning peer's LIVE-pass presentation ("" = none)
+	fx_proc:       string, // `<proc>_fx`: presentation ("" = none). Without `mine` it fires
+	                       // on the owning peer's LIVE pass only; with it, on EVERY screen.
 	fx_game:       string,
+	fx_mine:       bool, // the _fx declares `mine: bool` after self: every-screen
+	                     // presentation — event ticks broadcast the fact tuple (SIM_FACT),
+	                     // watchers fire on the watch clock, the live pass fires inline
+	payload_wires: [dynamic]string, // wire suffix per fact (filled iff fx_mine — facts
+	                                // cross the wire, so they must be wire primitives)
 }
 
 Script :: struct {
@@ -477,6 +519,7 @@ Script :: struct {
 	connections: [dynamic]Connection_Info,
 	rpcs:        [dynamic]Rpc_Info,
 	replicates:  [dynamic]Replicate_Info,
+	backups:     [dynamic]Backup_Info, // gd:"backup" host-local migration/save state
 	commands:    [dynamic]Command_Info,
 	entities:    [dynamic]Entity_Tag, // entity=Name:id scene fields (the kboot table)
 	net_id_type: string, // type text of a `net_id` field ("" = none) — commands require knet.Net_Id
@@ -485,9 +528,72 @@ Script :: struct {
 	samples:     [dynamic]Sim_Proc_Info, // @(gd_sample): the lane's device reads — one per input class
 	step:        Sim_Proc_Info, // @(gd_step): the EVERYWHERE world pass (live + resim)
 	step_auth:   Sim_Proc_Info, // @(gd_step="authority"): the host-only world pass
+	// The authority pass is BOOT-routed (resolve_sim): a tickless package has no
+	// lane, so `<snake>_step(self, ticks)` is generated instead of lane wiring —
+	// the coop game's fixed step, role-gated, with the same-frame edge pass inside.
+	step_boot:   bool,
 	input_classes: [dynamic]Input_Class_Info, // resolved package-wide (resolve_sim), on the lane OWNER: every input class, sorted by id (0 = primary)
 	boot_field:  string, // the kboot.Boot field's name ("" = none) — generates the standard transport forwards
 	std_forwards: [dynamic]string, // which standard forwards were synthesized (bodies emitted by generate)
+	event_halves: [dynamic]Event_Half, // session-event halves (resolve_session_events) — the generated `<snake>_events` dispatch
+}
+
+// One session event a game shell paired a half with. The BARE half fires
+// wherever the event fires on this peer; the `_then` half fires on the
+// AUTHORITY alone — the generated dispatch holds the role gate, so no
+// event-drain switch (or is_host inside it) survives in game code.
+Event_Half :: struct {
+	ev:        int,    // index into SESSION_EVENTS
+	bare:      string, // "" = undeclared
+	then_proc: string, // "" = undeclared (legal only on .Every events)
+}
+
+Session_Ev_Role :: enum u8 {
+	Every,  // both roles hear it — `_then` narrows to the authority
+	Client, // never reaches the authority — a `_then` could never fire
+	Host,   // already authority-only — a `_then` would be redundant
+}
+
+Session_Ev_Param :: struct {
+	name:  string, // canonical param name (for error hints)
+	type_: string, // the param type as spelled in hints ("knet.Player_Id")
+	field: string, // the Ev struct field the dispatch reads ("e.id")
+}
+
+Session_Ev :: struct {
+	suffix:  string, // half name = <game snake> + "_" + suffix
+	variant: string, // the ksess.Event union variant ("Ev_Player_Joined")
+	role:    Session_Ev_Role,
+	params:  []Session_Ev_Param,
+}
+
+// The session's event surface as pairable halves — kit/session's Event union,
+// one row per variant, roles from the (client)/(host) annotations there. The
+// entity-cluster suffixes carry an `entity_` prefix so they never collide with
+// the census `<entity>_spawned`/`_freed` hooks (which fire BEFORE the spawn
+// tuple's fields apply; these fire after — the initial-dress home).
+SESSION_EVENTS := [?]Session_Ev {
+	{suffix = "welcomed", variant = "Ev_Welcomed", role = .Client, params = {{"me", "knet.Player_Id", "e.me"}}},
+	{suffix = "player_joined", variant = "Ev_Player_Joined", role = .Every, params = {{"id", "knet.Player_Id", "e.id"}, {"rejoin", "bool", "e.rejoin"}}},
+	{suffix = "player_left", variant = "Ev_Player_Left", role = .Every, params = {{"id", "knet.Player_Id", "e.id"}}},
+	{suffix = "host_left", variant = "Ev_Host_Left", role = .Client, params = {}},
+	{suffix = "join_failed", variant = "Ev_Join_Failed", role = .Client, params = {}},
+	{suffix = "join_denied", variant = "Ev_Join_Denied", role = .Client, params = {{"reason", "ksess.Deny_Reason", "e.reason"}}},
+	{suffix = "kicked", variant = "Ev_Kicked", role = .Client, params = {}},
+	{suffix = "backup_target", variant = "Ev_Backup_Target", role = .Host, params = {{"player", "knet.Player_Id", "e.player"}}},
+	{suffix = "succession", variant = "Ev_Succession", role = .Client, params = {{"successor", "knet.Player_Id", "e.successor"}}},
+	{suffix = "backup_received", variant = "Ev_Backup_Received", role = .Client, params = {{"size", "int", "e.size"}}},
+	{suffix = "entity_spawned", variant = "Ev_Spawned", role = .Every, params = {{"id", "knet.Net_Id", "e.id"}, {"type", "ksess.Entity_Type", "e.type"}, {"owner", "knet.Player_Id", "e.owner"}}},
+	{suffix = "entity_resynced", variant = "Ev_Resynced", role = .Client, params = {{"id", "knet.Net_Id", "e.id"}, {"type", "ksess.Entity_Type", "e.type"}, {"owner", "knet.Player_Id", "e.owner"}}},
+	{suffix = "entity_despawned", variant = "Ev_Despawned", role = .Client, params = {{"id", "knet.Net_Id", "e.id"}}},
+	{suffix = "entity_changed", variant = "Ev_Entity_Changed", role = .Client, params = {{"id", "knet.Net_Id", "e.id"}}},
+	{suffix = "owner_changed", variant = "Ev_Owner_Changed", role = .Every, params = {{"id", "knet.Net_Id", "e.id"}, {"owner", "knet.Player_Id", "e.owner"}, {"prev", "knet.Player_Id", "e.prev"}}},
+	{suffix = "stats_updated", variant = "Ev_Stats_Updated", role = .Client, params = {}},
+	{suffix = "state_applied", variant = "Ev_State_Applied", role = .Client, params = {{"entities", "int", "e.entities"}}},
+	{suffix = "blob_changed", variant = "Ev_Blob_Changed", role = .Every, params = {{"id", "knet.Net_Id", "e.id"}, {"size", "int", "e.size"}}},
+	{suffix = "command_executed", variant = "Ev_Command_Executed", role = .Host, params = {{"ok", "bool", "e.ok"}, {"player", "knet.Player_Id", "e.player"}, {"entity", "knet.Net_Id", "e.entity"}, {"cmd", "u16", "e.cmd"}}},
+	{suffix = "command_confirmed", variant = "Ev_Command_Confirmed", role = .Client, params = {{"seq", "knet.Intent_Seq", "e.seq"}}},
+	{suffix = "command_rejected", variant = "Ev_Command_Rejected", role = .Client, params = {{"seq", "knet.Intent_Seq", "e.seq"}, {"entity", "knet.Net_Id", "e.entity"}}},
 }
 
 had_error: bool
@@ -1048,10 +1154,6 @@ main :: proc() {
 		script:   Script,
 		out_path: string,
 	}
-	Helper :: struct {
-		path: string,
-		src:  string,
-	}
 	pending := make([dynamic]Pending)
 	helpers := make([dynamic]Helper)
 	lintable := make([dynamic]Helper) // EVERY package file — scripts and helpers both
@@ -1177,7 +1279,10 @@ main :: proc() {
 	for &pend in pending {
 		resolve_then(&pend.script, &then_idx)
 		resolve_tick_then(&pend.script, &then_idx)
+		resolve_edges(&pend.script, &then_idx)
+		resolve_session_events(&pend.script, &then_idx)
 		resolve_command_applies(&pend.script, &then_idx)
+		validate_command_ids(&pend.script)
 		resolve_entities(&pend.script, by_struct, &seen_entity_ids, &then_idx)
 		resolve_census(&pend.script, proc_names)
 		resolve_boot_forwards(&pend.script)
@@ -1188,7 +1293,7 @@ main :: proc() {
 		for &pend in pending {append(&all, &pend.script)}
 		resolve_sim(all[:])
 	}
-	warn_unclaimed_thens(&then_idx, script_snakes)
+	check_unclaimed_pairs(&then_idx, script_snakes, by_struct)
 	lint_method_claims(method_claims[:], by_struct)
 
 	// Generate, now that every file's contribution is in (validation too — a
@@ -1203,6 +1308,24 @@ main :: proc() {
 		}
 		fmt.printfln("scriptgen: wrote %s", pend.out_path)
 		emitted += 1
+	}
+
+	// Generate the STALENESS GUARD: one compile-time `#load_hash` assert per
+	// authored source, so a build that skipped scriptgen — a bare `odin build`
+	// against stale *.gen.odin — fails AT COMPILE TIME naming the drifted
+	// file, instead of compiling yesterday's descriptors over today's structs.
+	if !had_error && pkg != "" && len(lintable) > 0 {
+		dir := strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\")
+		all_scripts := make([dynamic]^Script, 0, len(pending), context.temp_allocator)
+		for &pend in pending {append(&all_scripts, &pend.script)}
+		fp := net_fingerprint(all_scripts[:], dir)
+		guard_path := strings.concatenate({dir, "/odin_godot_guard.gen.odin"})
+		owned_gen[norm_path(guard_path)] = true
+		if werr := os.write_entire_file(guard_path, transmute([]byte)gen_guard(pkg, lintable[:], fp)); werr != nil {
+			errorf("cannot write %q", guard_path)
+		} else {
+			fmt.printfln("scriptgen: wrote %s (staleness guard + fingerprint)", guard_path)
+		}
 	}
 
 	// Generate the REQUIRED boot shim (the `odin_scripts_boot` export the core calls after
@@ -1457,6 +1580,184 @@ scan_package :: proc(src: string) -> string {
 		return strings.trim_space(rest[:end])
 	}
 	return ""
+}
+
+// One authored package file (path + contents) — scripts and helpers both; the
+// per-dir pass collects them and the staleness guard hashes them.
+Helper :: struct {
+	path: string,
+	src:  string,
+}
+
+@(private = "file")
+fnv1a64 :: proc(s: string) -> u64 {
+	h := u64(0xcbf29ce484222325)
+	for i in 0 ..< len(s) {
+		h ~= u64(s[i])
+		h *= 0x100000001b3
+	}
+	return h
+}
+
+// The package's WIRE CONTRACT, hashed: everything two builds must agree on to
+// parse each other's packets — replicated field order/types/lanes and wire
+// encodings, verbs and their arg shapes, entity type ids, tick input structs
+// FIELD BY FIELD (the input blob memcpys: its layout IS the wire), input
+// classes, broadcast fact tuples, and @(gd_rpc) signatures. Deliberately
+// EXCLUDED (local behavior, not wire): interp/lerp/blend, slack/glide/cut,
+// gd:"backup" (host-local saves), methods/signals/exports, world passes.
+// Field NAMES are hashed too — a rename over-refuses a join (annoying,
+// harmless: rebuild both ends); a type change under-refusing would be the
+// silent-garbage disaster the fingerprint exists to prevent. The session
+// folds its own PROTOCOL_REV in before the wire, so kit upgrades refuse too.
+net_fingerprint :: proc(scripts: []^Script, scripts_dir: string) -> u64 {
+	b: strings.Builder
+	strings.builder_init(&b, context.temp_allocator)
+
+	sorted := make([dynamic]^Script, 0, len(scripts), context.temp_allocator)
+	append(&sorted, ..scripts)
+	slice.sort_by(sorted[:], proc(a, b: ^Script) -> bool {return a.struct_name < b.struct_name})
+
+	inputs := make([dynamic]string, context.temp_allocator) // distinct tick input types
+	for s in sorted {
+		fmt.sbprintf(&b, "class %s\n", s.struct_name)
+
+		ents := make([dynamic]Entity_Tag, 0, len(s.entities), context.temp_allocator)
+		append(&ents, ..s.entities[:])
+		slice.sort_by(ents[:], proc(a, b: Entity_Tag) -> bool {return a.type_id < b.type_id})
+		for e in ents {
+			fmt.sbprintf(&b, "entity %s=%d\n", e.target, e.type_id)
+		}
+
+		// Declaration order is the descriptor order is the mask order: keep it.
+		for r in s.replicates {
+			fmt.sbprintf(
+				&b, "rep %s:%s owner=%v predict=%v wire=%s/%s\n",
+				strings.join(r.path, ".", context.temp_allocator), r.type_text,
+				r.owner, r.predict, r.wire, r.codec,
+			)
+		}
+
+		cmds := make([dynamic]string, context.temp_allocator)
+		for c in s.commands {
+			cb: strings.Builder
+			strings.builder_init(&cb, context.temp_allocator)
+			fmt.sbprintf(&cb, "cmd %s(", c.name)
+			for a, i in c.args {
+				if i > 0 {strings.write_string(&cb, ",")}
+				strings.write_string(&cb, a.wire)
+			}
+			strings.write_string(&cb, ")")
+			append(&cmds, strings.to_string(cb))
+		}
+		slice.sort(cmds[:]) // ids are name-hashed; declaration order is not wire
+		for c in cmds {
+			fmt.sbprintf(&b, "%s\n", c)
+		}
+
+		if s.tick.proc_name != "" {
+			fmt.sbprintf(&b, "tick input=%s class=%d contested=%v", s.tick.input_type, s.tick.input_class, s.tick.contested)
+			if s.tick.fx_mine {
+				strings.write_string(&b, " facts=")
+				for wr, i in s.tick.payload_wires {
+					if i > 0 {strings.write_string(&b, ",")}
+					strings.write_string(&b, wr)
+				}
+			}
+			strings.write_string(&b, "\n")
+			if s.tick.input_type != "" && !slice.contains(inputs[:], s.tick.input_type) {
+				append(&inputs, s.tick.input_type)
+			}
+		}
+
+		rpcs := make([dynamic]string, context.temp_allocator)
+		for r in s.rpcs {
+			rb: strings.Builder
+			strings.builder_init(&rb, context.temp_allocator)
+			fmt.sbprintf(&rb, "rpc %s m=%d t=%d ch=%d(", r.method, r.mode, r.transfer, r.channel)
+			for m in s.methods {
+				if m.gd_name != r.method {continue}
+				for a, i in m.args {
+					if i > 0 {strings.write_string(&rb, ",")}
+					strings.write_string(&rb, a.vi.enum_name)
+				}
+				break
+			}
+			strings.write_string(&rb, ")")
+			append(&rpcs, strings.to_string(rb))
+		}
+		slice.sort(rpcs[:])
+		for r in rpcs {
+			fmt.sbprintf(&b, "%s\n", r)
+		}
+	}
+
+	// The input blobs, field by field — the one wire surface a type NAME can't
+	// stand in for (editing a field inside Gunner_Input changes every packet).
+	slice.sort(inputs[:])
+	index_pkg_dir(scripts_dir) // idempotent; the scripts package indexes like any other
+	if pkg, ok := g_pkgs[scripts_dir]; ok {
+		for name in inputs {
+			if def, has := pkg[name]; has {
+				for f in def.fields {
+					fmt.sbprintf(&b, "in %s.%s:%s\n", name, f.name, f.type_text)
+				}
+			}
+		}
+	}
+	return fnv1a64(strings.to_string(b))
+}
+
+@(private = "file")
+Guard_Entry :: struct {
+	name: string,
+	crc:  u32,
+}
+
+// The generated STALENESS GUARD: `#load_hash` re-hashes each authored source
+// at COMPILE time and compares against the hash scriptgen saw when it
+// generated — so building this package with stale *.gen.odin (any path that
+// skips scriptgen, e.g. a bare `odin build`) fails loudly, naming the file
+// that drifted, instead of compiling yesterday's descriptors and thunks over
+// today's structs. A deleted or renamed source fails the #load_hash itself.
+// Not covered, deliberately: files ADDED after generation (nothing references
+// them yet), and imported block packages (godot:play/…) — the guard is this
+// package's contract with its own sources.
+gen_guard :: proc(pkg: string, files: []Helper, fingerprint: u64) -> string {
+	entries := make([dynamic]Guard_Entry, 0, len(files), context.temp_allocator)
+	for f in files {
+		name := f.path
+		if i := strings.last_index_any(name, "/\\"); i >= 0 {
+			name = name[i + 1:]
+		}
+		append(&entries, Guard_Entry{name = name, crc = hash.crc32(transmute([]u8)f.src)})
+	}
+	// Deterministic output whatever order the directory listed in.
+	slice.sort_by(entries[:], proc(a, b: Guard_Entry) -> bool {return a.name < b.name})
+
+	b: strings.Builder
+	strings.builder_init(&b)
+	w :: strings.write_string
+	fmt.sbprintf(&b, "package %s\n\n", pkg)
+	w(&b, "// GENERATED by scriptgen — do not edit. THE STALENESS GUARD: each assert\n")
+	w(&b, "// re-hashes an authored source at compile time; a mismatch means this\n")
+	w(&b, "// package's *.gen.odin predates the source it claims to mirror — the build\n")
+	w(&b, "// path skipped scriptgen. Build via build_scripts.sh (it re-runs scriptgen),\n")
+	w(&b, "// or re-run scriptgen over this directory by hand.\n\n")
+	w(&b, "// The package's WIRE CONTRACT, hashed — replicated field order/types/lanes,\n")
+	w(&b, "// verbs, entity ids, input structs, fact tuples, rpcs. Hand it to the session\n")
+	w(&b, "// (`ksess.session_configure(&ses, {fingerprint = NET_FINGERPRINT})`) and a\n")
+	w(&b, "// version-skewed build is refused AT THE DOOR (Deny_Reason.Version) instead\n")
+	w(&b, "// of misparsing every delta into garbage fields.\n")
+	fmt.sbprintf(&b, "NET_FINGERPRINT :: u64(0x%016x)\n\n", fingerprint)
+	for e in entries {
+		fmt.sbprintf(
+			&b,
+			"#assert(\n\t#load_hash(%q, \"crc32\") == 0x%08x,\n\t\"%s changed after scriptgen ran — *.gen.odin is STALE; build via build_scripts.sh (it re-runs scriptgen), or re-run scriptgen over this dir\",\n)\n",
+			e.name, e.crc, e.name,
+		)
+	}
+	return strings.to_string(b)
 }
 
 // The generated boot shim: the `@(export) odin_scripts_boot` the core invokes right after

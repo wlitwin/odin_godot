@@ -52,6 +52,13 @@ Lane_Box :: struct {
 	inline_to:       u64,
 	saw_inline:      f32,
 	inline_restored: f32,
+
+	// every-screen fact probe (mine-form _fx): what fired here, and when
+	fx_calls:  int,
+	fx_mine:   bool,
+	fx_x:      f32, // the fact's wire-decoded payload
+	fx_clock:  f64, // lane.watch_clock at the fire (0 on a live-pass fire)
+	fx_newest: u64, // rx.newest at the fire — proves the watcher fired BEHIND the wire
 }
 
 lbox_probe :: proc(user: rawptr) {
@@ -678,7 +685,7 @@ mover_boost_apply :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane) {
 @(test)
 lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	cmds := [?]ksim.Sim_Cmd{{exec = mover_surge_exec}, {exec = mover_dash_exec}}
+	cmds := [?]ksim.Sim_Cmd{{id = 0, exec = mover_surge_exec}, {id = 1, exec = mover_dash_exec}}
 	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds[:]}
 	set_c := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds[:], contested = true}
 	host, alice: Lane_Box
@@ -1587,4 +1594,131 @@ lane_predicted_projectile_rejected :: proc(t: ^testing.T) {
 	settle(boxes, 90)
 	testing.expect(t, !ksim.lane_tracks(&alice.lane, alice.cli_proj_id), "the refused fire culled its projectile")
 	testing.expect(t, host.host_proj == nil, "and the authority never spawned one")
+}
+
+// ---------------------------------------------------------------------------
+// Every-screen facts (the mine-form _fx): the owner's live pass fires
+// mine=true instantly; the authority presents everyone else's facts as its
+// own live pass (mine=false); a WATCHING third peer receives SIM_FACT and
+// fires when its watch clock reaches the fact's tick — beside the delayed
+// avatar that caused it, never on packet arrival.
+
+FACT_AT :: u64(60) // the event tick: alice's mover "fires" here, exactly once
+
+// Mirrors the generated mine-form thunk: tick the entity, and on the event
+// tick encode the fact tuple, broadcast from the authority, and fire the fx
+// locally where this screen's own simulation presented it live.
+fact_tick_thunk :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner: knet.Player_Id) {
+	if input == nil {
+		return
+	}
+	m := cast(^Mover)entity
+	lane_mover_step(m, (cast(^i8)input)^)
+	fired := ksim.lane_now(lane) == FACT_AT && owner == 2 // alice's avatar only
+	if fired {
+		w := knet.writer_make(16, context.temp_allocator)
+		knet.write_bool(&w, true)
+		knet.write_f32(&w, m.x)
+		blob := knet.writer_bytes(&w)
+		if ksim.lane_is_authority(lane) {
+			ksim.lane_fact(lane, entity, blob)
+		}
+		if !lane.resimming {
+			mine := owner == ksim.lane_me(lane)
+			if mine || ksim.lane_is_authority(lane) {
+				box_fact_fx(entity, lane, mine, blob)
+			}
+		}
+	}
+}
+
+// Mirrors the generated fx decode thunk: bytes → typed facts → the author's
+// presentation proc (recorded into the box here).
+box_fact_fx :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {
+	b := cast(^Lane_Box)ksim.lane_game(lane)
+	r := knet.reader_make(args)
+	fired := knet.read_bool(&r)
+	x := knet.read_f32(&r)
+	if r.err || !fired {
+		return
+	}
+	b.fx_calls += 1
+	b.fx_mine = mine
+	b.fx_x = x
+	b.fx_clock = lane.watch_clock
+	b.fx_newest = lane.rx.newest
+}
+
+@(test)
+lane_facts_reach_every_screen_on_time :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	host, alice, bob: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	lbox_make(&bob, 101)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	defer lbox_destroy(&bob)
+	boxes := []^Lane_Box{&host, &alice, &bob}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, 0xB0B, "bob")
+	ksess.session_client_join(&bob.s)
+	lane_pump(boxes)
+	testing.expect_value(t, alice.s.me, knet.Player_Id(2))
+	testing.expect_value(t, bob.s.me, knet.Player_Id(3))
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	fact_set := ksim.Sim_Set{entity_desc = &desc, tick = fact_tick_thunk, input_size = 1, fx = box_fact_fx}
+	pairs := [?]struct {
+		id:    knet.Net_Id,
+		owner: knet.Player_Id,
+	}{{10, 1}, {20, 2}}
+	for b in boxes {
+		ksim.lane_init(&b.lane, &b.s, 1, cfg = cfg)
+		ksim.lane_set_sim(&b.lane, b, lbox_sample, nil)
+		for p in pairs {
+			m := new(Mover)
+			b.movers[p.id] = m
+			b.owners[p.id] = p.owner
+			ksim.lane_track_set(&b.lane, p.id, m, &fact_set, p.owner)
+		}
+	}
+
+	DT :: 1.0 / 60.0
+	for i in 1 ..= 240 {
+		host.ax = 1
+		alice.ax = 1
+		ksim.lane_frame(&host.lane, DT)
+		lane_pump(boxes)
+		ksim.lane_frame(&alice.lane, DT)
+		ksim.lane_present(&alice.lane, DT)
+		ksim.lane_frame(&bob.lane, DT)
+		ksim.lane_present(&bob.lane, DT)
+		lane_pump(boxes)
+	}
+
+	// Alice's own screen: the live pass, mine=true, exactly once — and no
+	// SIM_FACT echo ever re-fires it (the authority excludes the owner).
+	testing.expect_value(t, alice.fx_calls, 1)
+	testing.expect(t, alice.fx_mine, "the owner's fire is mine")
+
+	// The authority's screen: its live pass presents everyone, mine=false.
+	testing.expect_value(t, host.fx_calls, 1)
+	testing.expect(t, !host.fx_mine, "the authority presents a remote fact")
+
+	// Bob watches: SIM_FACT fired once, mine=false, and ON THE WATCH CLOCK —
+	// at the fact's tick in render time, provably behind the wire (batches
+	// newer than the fact had already landed when it presented).
+	testing.expect_value(t, bob.fx_calls, 1)
+	testing.expect(t, !bob.fx_mine, "a watcher's fact is never mine")
+	testing.expect(t, bob.fx_clock >= f64(FACT_AT), "fires once the watch clock reaches the fact")
+	testing.expect(t, bob.fx_clock <= f64(FACT_AT) + 3, "and not meaningfully later")
+	testing.expect(t, f64(bob.fx_newest) > bob.fx_clock, "the fire happened behind the newest batch — delayed, not on arrival")
+
+	// The payload crossed intact: every screen decoded the authoritative x.
+	testing.expect_value(t, host.fx_x, alice.fx_x) // prediction matched truth (no loss)
+	testing.expect_value(t, bob.fx_x, host.fx_x)
 }

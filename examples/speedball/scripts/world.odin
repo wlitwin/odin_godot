@@ -6,20 +6,27 @@ package speedball
 
 import "core:fmt"
 import gd "godot:godot"
+import kboot "godot:kit/boot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
+import psim "godot:play/sim"
 
 // The census hooks, down to the game-shaped lines — the generated queries
 // (kicker_of / kicker_ids / kicker_owned_by, kboot.boot_entity_owner) answer
 // everything the old three maps did.
 kicker_spawned :: proc(game: ^Speedball, self: ^Kicker, id: knet.Net_Id, owner: knet.Player_Id) {
 	// The mover's LAW half — config is never on the wire, so every peer
-	// stamps the same numbers here, before the first tick.
-	self.run.accel = RUN_ACCEL
-	self.run.min_x = PITCH_WALL + KICKER_R
-	self.run.max_x = PITCH_W - PITCH_WALL - KICKER_R
-	self.run.min_y = PITCH_WALL + KICKER_R
-	self.run.max_y = PITCH_H - PITCH_WALL - KICKER_R
+	// stamps the same numbers here, before the first tick. One call names
+	// every field: leave one out and it won't compile (vs a silently-zero
+	// bound that clamps this peer's movement to the origin).
+	psim.mover_arm(
+		&self.run,
+		accel = RUN_ACCEL,
+		min_x = PITCH_WALL + KICKER_R,
+		min_y = PITCH_WALL + KICKER_R,
+		max_x = PITCH_W - PITCH_WALL - KICKER_R,
+		max_y = PITCH_H - PITCH_WALL - KICKER_R,
+	)
 	if owner != knet.PLAYER_ID_INVALID && owner == game.ses.me {
 		self.mine = true
 		game.me_kick = self
@@ -36,13 +43,16 @@ kicker_freed :: proc(game: ^Speedball, self: ^Kicker, id: knet.Net_Id) {
 ball_spawned :: proc(game: ^Speedball, self: ^Ball, id: knet.Net_Id, owner: knet.Player_Id) {
 	// The roller's LAW half — friction, ceiling, restitution, walls: the
 	// same numbers on every peer, stamped before the first tick.
-	self.roll.friction = FRICTION
-	self.roll.max_speed = BALL_MAX
-	self.roll.bounce = WALL_BOUNCE
-	self.roll.min_x = GOAL_LINE_L
-	self.roll.max_x = GOAL_LINE_R
-	self.roll.min_y = PITCH_WALL + BALL_R
-	self.roll.max_y = PITCH_H - PITCH_WALL - BALL_R
+	psim.roller_arm(
+		&self.roll,
+		friction = FRICTION,
+		max_speed = BALL_MAX,
+		bounce = WALL_BOUNCE,
+		min_x = GOAL_LINE_L,
+		min_y = PITCH_WALL + BALL_R,
+		max_x = GOAL_LINE_R,
+		max_y = PITCH_H - PITCH_WALL - BALL_R,
+	)
 	game.ball = self
 }
 
@@ -54,12 +64,11 @@ ball_freed :: proc(game: ^Speedball, self: ^Ball, id: knet.Net_Id) {
 
 spawn_world :: proc(self: ^Speedball) {
 	if self.ball != nil {return}
-	bp, bid := ksess.session_spawn_make(&self.ses, BALL_TYPE)
-	b := cast(^Ball)bp
+	b, bid := ball_spawn(&self.boot) // typed, from the entity tag — no const, no cast
 	b.roll.x = PITCH_W / 2
 	b.roll.y = PITCH_H / 2
 	b.hold = KICKOFF_HOLD
-	ksess.session_spawn_send(&self.ses, bid)
+	kboot.boot_spawn_send(&self.boot, bid)
 
 	for _, p in self.ses.players {
 		if !p.connected {continue}
@@ -72,11 +81,10 @@ spawn_world :: proc(self: ^Speedball) {
 
 spawn_kicker :: proc(self: ^Speedball, pid: knet.Player_Id) {
 	if _, has := kicker_owned_by(&self.boot, pid); has {return}
-	kp, kid := ksess.session_spawn_make(&self.ses, KICKER_TYPE, owner = pid)
-	k := cast(^Kicker)kp
+	k, kid := kicker_spawn(&self.boot, owner = pid)
 	k.pid = u8(pid)
 	spot := SPAWNS[int(pid) % len(SPAWNS)]
 	k.run.x = spot[0]
 	k.run.y = spot[1]
-	ksess.session_spawn_send(&self.ses, kid)
+	kboot.boot_spawn_send(&self.boot, kid)
 }

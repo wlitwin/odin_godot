@@ -11,6 +11,7 @@ package cavecrawl_scripts
 import gd "godot:godot"
 import rt "godot:runtime"
 import kai "godot:kit/ai"
+import kboot "godot:kit/boot"
 import kcombat "godot:kit/combat"
 import kcomms "godot:kit/comms"
 import kinter "godot:kit/interact"
@@ -37,13 +38,12 @@ cave_credit :: proc(self: ^CaveLobby, player: knet.Player_Id, chest: ^Chest, tak
 // creation path clients run (make, set the per-spawn fields, send).
 @(private = "file")
 cave_mint_pickup_at :: proc(self: ^CaveLobby, item: kitems.Item_Id, count: u16, x, y: f32) {
-	ep, id := ksess.session_spawn_make(&self.ses, PICKUP_TYPE)
-	p := cast(^Pickup)ep
+	p, id := pickup_spawn(&self.boot) // typed, from the entity tag — no const, no cast
 	p.x = x
 	p.y = y
 	p.item = item
 	p.count = count
-	ksess.session_spawn_send(&self.ses, id)
+	kboot.boot_spawn_send(&self.boot, id)
 }
 
 // Host: mint the Pickup a drop left behind (the verb's payload says what;
@@ -88,12 +88,11 @@ cave_slay_dweller :: proc(self: ^CaveLobby, id: knet.Net_Id, slayer: knet.Player
 cave_spawn_dweller :: proc(self: ^CaveLobby) {
 	den := self.dens[self.dens_used % len(self.dens)]
 	self.dens_used += 1
-	ep, id := ksess.session_spawn_make(&self.ses, DWELLER_TYPE, owner = self.ses.me)
-	d := cast(^Dweller)ep
+	d, id := dweller_spawn(&self.boot, owner = self.ses.me)
 	d.x = den.x
 	d.y = den.y
 	d.hp = DWELLER_HP
-	ksess.session_spawn_send(&self.ses, id)
+	kboot.boot_spawn_send(&self.boot, id)
 	self.brains[id] = Dweller_Brain{home = den}
 	gd.print_str(fmt.tprintf("CAVE_DEN id=%d at=%.0f,%.0f", u32(id), den.x, den.y))
 }
@@ -173,7 +172,11 @@ cave_spill_bag :: proc(self: ^CaveLobby, sp: ^Spelunker) {
 
 // The host's game tick (once per 20 Hz net tick): decay ability clocks and
 // effects, regen stamina, fly the rocks, deal the damage, credit the
-// ledger, run the respawn clocks. Deltas carry every consequence.
+// ledger, run the respawn clocks. Deltas carry every consequence. The
+// attribute is the whole wiring: generated `cave_lobby_step(self, ticks)`
+// runs it on the AUTHORITY alone off boot_pump's accumulator, then fires
+// the host's fresh edges same-frame — no is_host, no ritual, in game code.
+@(gd_step = "authority")
 cave_host_tick :: proc(self: ^CaveLobby) {
 	self.host_ticks += 1
 	for _, sp in self.spelunkers {

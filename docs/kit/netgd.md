@@ -149,10 +149,10 @@ Every wire packet leads with the game's one message byte (the `kind` passed to
 are not the wire's; the game routes those itself *before* calling `wire_receive`. This is how
 session traffic shares `peer_packet` with any other raw-bytes protocol the game runs.
 
-## wire_set_latency — the acid-test shim
+## wire_set_latency — the bad-link shim
 
 ```odin
-wire_set_latency :: proc(wire: ^Session_Wire, ms: int)
+wire_set_latency :: proc(wire: ^Session_Wire, ms: int, jitter_ms := 0, loss_pct := 0)
 ```
 
 Injects one-way **receive** latency (0 disables): every packet this peer receives is held
@@ -160,12 +160,40 @@ that long before the session sees it — buffered in the wire, delivered by `wir
 delay is app-side, above the transport, so ENet's acks and retransmits still flow at protocol
 level; what you are testing is your *game's* feel under real round trips, not the socket's.
 The toolkit's own acid tests run at 120ms so predictions are proven to bite instantly while
-confirms measurably ride the slow wire. Test your game the same way — cavecrawl exposes it as
-an env knob:
+confirms measurably ride the slow wire.
+
+A slow link is only half the truth — a BAD link wobbles and drops. `jitter_ms` adds a
+uniform extra `[0, jitter)` per packet, with one honest constraint: delivery stays FIFO per
+sender (the shim sits above ENet's already-ordered channels, and handing packets over
+shuffled would break the ordered-reliable contract no real network can break at this
+layer). `loss_pct` is channel-honest the same way: a **stream** batch rolls the dice and
+vanishes (last-value semantics — the next batch supersedes it, which is the real behavior
+of the unreliable channel), while **reliable** traffic must arrive, so its "loss" costs
+what loss really costs a reliable channel: a retransmit's worth of extra delay. kit/boot
+wires all three off env for you:
+
+```sh
+QD_LATENCY=120 QD_JITTER=30 QD_LOSS=3 ./run_two_windows.sh   # <ENV>_LATENCY/_JITTER/_LOSS
+```
+
+## The wire gauge — bytes by kind, and the link's own truth
+
+Every framed byte the wire sends or receives is tallied by session message kind
+(state, stream, cmd, spawn, app — with app split by its tag byte, so the sim
+lane's traffic is named, not lumped), windowed per second. Two reads:
 
 ```odin
-netgd.wire_set_latency(&self.wire, env_int("CAVE_LATENCY", 0)) // the acid rig, now a kit shim
+netgd.wire_traffic(&wire) -> string
+// "rx 3.2k state 2.1 stream 0.8 app16 0.2 · tx 0.4k cmd 0.3"
+netgd.wire_link_quality(&wire, peer) -> (rtt_ms, jitter_ms, loss_pct, ok)
 ```
+
+`wire_traffic` is the [netgraph](ui.md)'s traffic row — fill `Net_Stats.traffic`
+with it and you can watch a chatty field's bytes move as you tune `wire=f16`,
+stream rates, or interest. `wire_link_quality` reads ENet's own per-peer
+statistics (smoothed rtt, rtt variance, packet loss ×`PACKET_LOSS_SCALE`) — the
+transport's view, meaningful on clients about the host (`ksess.HOST_PEER`); a
+host asks per client peer. quickdraw's netgraph fill is the worked example.
 
 ## Kicks: wire_drop is deferred on purpose
 

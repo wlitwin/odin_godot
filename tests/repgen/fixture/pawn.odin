@@ -25,9 +25,15 @@ Pawn :: struct {
 	fuel:   u16 `gd:"replicate,predict"`, // predicted without interp: steps, never lerps
 	pace:   Pace, // TICK-COMPOSITION: the block's step hoists, runs after pawn_tick
 	chill:  psim.Cool, // IMPORTED-shelf tick block: the hoist crosses packages
+	warm:   psim.Cool `gd:"manual"`, // MANUAL: predict field still flattens, but the tick is NOT hoisted (the wielder drives it)
 	state:  u8 `gd:"replicate"`,
 	speed:  f64 `gd:"export,range=0:10"`, // exports and replicates coexist
 	local:  int, // untagged: never replicated
+	// gd:"backup" — host-local migration/save state, all three kinds; the nested
+	// one (pace.beat) proves the walk rides `using`/embeds like replicate does.
+	save_seed: u32 `gd:"backup"`, // Pod: write_pod whole
+	save_seen: map[knet.Net_Id]u16 `gd:"backup"`, // Map[POD]POD: length + key/value loop
+	save_log:  [dynamic]u8 `gd:"backup"`, // [dynamic]POD: length + element loop
 }
 
 // The custom blend `aim` names — a knet.Blend_Proc; the generated descriptor
@@ -59,6 +65,7 @@ pawn_tick :: proc(self: ^Pawn, input: Pawn_Input, lane: ^ksim.Lane) -> (dashed: 
 // wielder's tick writes), hoisted to run after the entity's own step.
 Pace :: struct {
 	heat: u16 `gd:"replicate,predict"`,
+	beat: u32 `gd:"backup"`, // NESTED gd:"backup": collected onto Pawn as self.pace.beat
 }
 
 @(gd_tick)
@@ -111,9 +118,20 @@ pawn_hit_apply :: proc(self: ^Pawn, amount: i32) {
 }
 
 // Host-only command (no predict): string + id args exercise the wider wire types.
+// `who` is a player the verb TARGETS — ordinary wire data, legal under any name
+// but the reserved `by`.
 @(gd_command)
 pawn_mark :: proc(self: ^Pawn, label: string, who: knet.Player_Id) -> bool {
 	self.state = 1
+	return true
+}
+
+// The ISSUER param on a SIM-lane verb: `by` is the seat the lane resolved (me
+// speculating, the ledgered seat on the host), spliced before the wire args.
+@(gd_command)
+pawn_salute :: proc(self: ^Pawn, by: knet.Player_Id, style: u8) -> bool {
+	if style == 0 {return false}
+	self.state = style
 	return true
 }
 
@@ -130,4 +148,12 @@ pawn_loot :: proc(self: ^Pawn, slot: i32) -> (ok: bool, got: u8) {
 
 pawn_loot_then :: proc(self: ^Pawn, by: knet.Player_Id, slot: i32, got: u8) {
 	self.hp += i32(got) // host-side consequence — an ordinary delta carries it
+}
+
+// The hp EDGE half — delta-lane change presentation, proc-as-subscription:
+// the name pairs it to the field, the session's per-frame pass fires it with
+// the net (old, new) — no seen_* mirror, no resync re-seed to forget.
+pawn_hp_edge :: proc(self: ^Pawn, old, new: i32) {
+	_ = old
+	_ = new
 }

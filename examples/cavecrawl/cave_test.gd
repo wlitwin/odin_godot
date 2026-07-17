@@ -397,7 +397,7 @@ func _process(_delta: float) -> bool:
 			# run.sh reaps this process when the story is over.
 			return false
 		if phase == "limbo": # endguest: the game's handler prints CAVE_KICKED_ME
-			if bool(cave.call("kicked")):
+			if bool(cave.call("was_kicked")):
 				print(role.to_upper(), "_DONE")
 				quit(0); return true
 			elif timed_out(now, "never told about the kick"):

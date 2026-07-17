@@ -38,6 +38,22 @@ Roller :: struct {
 	min_x, min_y, max_x, max_y: f32, // the walls
 }
 
+// roller_arm — the LAW half, stamped once per peer at spawn (the census hook
+// runs before the first tick). One call names every config field so a game
+// can't silently leave friction, the ceiling, or a wall at zero — the "same
+// numbers on every peer" desync a contested body punishes hardest (a ball
+// with friction 0 on one screen never slows, and every batch reconciles).
+// Config never rides the wire: the SAME args must reach this on every peer.
+roller_arm :: proc(r: ^Roller, friction, max_speed, bounce: f32, min_x, min_y, max_x, max_y: f32) {
+	r.friction = friction
+	r.max_speed = max_speed
+	r.bounce = bounce
+	r.min_x = min_x
+	r.min_y = min_y
+	r.max_x = max_x
+	r.max_y = max_y
+}
+
 // The block tick: friction, cap, integrate, bounce. Inputless and
 // self-simulating by contract — nobody drives a rolling body, they impulse
 // it and physics does the rest.

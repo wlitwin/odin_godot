@@ -41,6 +41,35 @@ package kit_net
 // the verb applies: client predictions and registry replays re-run the VERB
 // from the same bytes but carry authority=false, so a consequence can never
 // double-fire or fire on spec.
+// Command_Outcome — what a generated `<verb>_cmd` wrapper hands back, ONE meaning
+// per value on every peer, so the call site needs no `is_host` branch (distinct
+// from the internal wire-level Command_Result struct below):
+//
+//   Rejected  — the predicate said no on THIS peer. On the host it is final; on a
+//               predicting client the LOCAL optimistic apply failed and reverted
+//               (nothing stands here — the command was still sent for the host to
+//               judge with fresher state).
+//   Predicted — a client sent it and it is in flight, the host's verdict pending
+//               (it lands as replicated state, or a revert). A predicting command
+//               also applied optimistically; a non-predicting one just sent.
+//   Applied   — the host's authoritative accept. Done.
+//
+// "Did it show on my screen?" is `command_ok(r)` (== `r != .Rejected`); "is it
+// authoritative?" is `r == .Applied`. Replaces the old `bool` whose truth meant
+// authoritative-verdict on the host but tentative-local on a client — the one
+// return in the feature that used to force a role branch to read correctly.
+Command_Outcome :: enum u8 {
+	Rejected,
+	Predicted,
+	Applied,
+}
+
+// It applied on THIS peer (authoritatively on the host, optimistically on a
+// client) — the role-free "should I show local feedback?" check.
+command_ok :: proc(r: Command_Outcome) -> bool {
+	return r != .Rejected
+}
+
 Command_Env :: struct {
 	authority: bool,      // this run is the authoritative one — consequences fire
 	user:      rawptr,    // the game pointer `_then` procs receive (ctx.game_user)
@@ -56,8 +85,27 @@ Command_Proc :: proc(entity: rawptr, r: ^Reader, env: ^Command_Env) -> bool
 
 Command_Desc :: struct {
 	name:    string, // stripped verb ("open") — diagnostics only
+	// The verb's STABLE wire id — what `command_begin` ships and receivers look
+	// up (never an array position: reordering procs must not renumber the wire).
+	// scriptgen stamps an FNV-1a hash of the verb name and refuses same-set
+	// collisions at build time; hand-built sets pick any values unique within
+	// the set (a single command's zero value is fine). An id the receiver
+	// doesn't know (version skew, a renamed verb) MISSES the lookup and rejects
+	// cleanly instead of dispatching to whatever lives at that position.
+	id:      u16,
 	predict: bool,
 	invoke:  Command_Proc,
+}
+
+// The id → descriptor lookup every receive/issue path routes through (sets are
+// a handful of verbs — a scan beats any table). nil = unknown id: reject.
+command_find :: proc(set: ^Command_Set, id: u16) -> ^Command_Desc {
+	for &c in set.commands {
+		if c.id == id {
+			return &c
+		}
+	}
+	return nil
 }
 
 // Per entity TYPE: the command table + the replicated-field descriptor that
@@ -72,6 +120,10 @@ Command_Set :: struct {
 	// 0 is safely "none": in script structs the owner handle occupies offset
 	// 0, so a real net_id field can never live there. scriptgen emits this.
 	net_id_offset: int,
+	// The class's `<field>_edge` halves (edge.odin) — delta-lane change
+	// presentation, fired by the per-frame registry_edges_tick walk. nil =
+	// the class declares none (and pays nothing: no mirror, no diff).
+	edges:         []Edge_Desc,
 }
 
 // Complete outgoing COMMAND message bytes → whoever owns the transport. The
@@ -167,7 +219,10 @@ command_begin :: proc(ctx: ^Command_Ctx, entity: Net_Id, cmd: u16) {
 // and only the host may say no.
 command_issue :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd: u16) -> bool {
 	assert(!ctx.is_authority, "command_issue is the client path — the authority runs the command proc directly")
-	c := &set.commands[cmd]
+	c := command_find(set, cmd)
+	if c == nil {
+		return false // no such verb on this set — a hand-written caller's bug, never a wire input
+	}
 	predicted := false
 	if c.predict {
 		revert := fields_capture(entity, set.entity_desc)
@@ -223,18 +278,20 @@ command_dedup :: proc(ctx: ^Command_Ctx, peer_key: u64, seq: Intent_Seq) -> bool
 	return ok
 }
 
-// Run a received command authoritatively. Unknown command index, truncated
-// args, and proc rejection all return false — and rejection can never leave
-// torn state: declared fields are captured first and restored on any failure.
-// `env` is this run's identity (authority + issuer + game pointer) — the thunk
-// fires the verb's `_then` consequence off it when the proc applies.
+// Run a received command authoritatively. Unknown command id (version skew, a
+// renamed verb — the lookup misses instead of misdispatching), truncated args,
+// and proc rejection all return false — and rejection can never leave torn
+// state: declared fields are captured first and restored on any failure. `env`
+// is this run's identity (authority + issuer + game pointer) — the thunk fires
+// the verb's `_then` consequence off it when the proc applies.
 command_execute :: proc(entity: rawptr, set: ^Command_Set, cmd: u16, r: ^Reader, env: ^Command_Env) -> bool {
-	if int(cmd) >= len(set.commands) {
+	c := command_find(set, cmd)
+	if c == nil {
 		return false
 	}
 	revert := fields_capture(entity, set.entity_desc)
 	defer delete(revert)
-	if set.commands[cmd].invoke(entity, r, env) && !r.err {
+	if c.invoke(entity, r, env) && !r.err {
 		return true
 	}
 	fields_restore(entity, set.entity_desc, revert)

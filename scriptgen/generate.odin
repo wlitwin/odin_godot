@@ -43,6 +43,83 @@ field_offset_expr :: proc(cls: string, path: []string) -> string {
 	return strings.to_string(b)
 }
 
+// gd:"backup" — the host-local migration/save codec (Backup_Info). A
+// version-hashed <class>_backup_write/_read pair over the tagged fields, so a
+// takeover or a resume restores the campaign with no hand-matched write/read
+// lists to drift. POD fields ride whole (knet.write_pod); map[POD]POD and
+// [dynamic]POD get a length-prefixed loop. The version const is an FNV-1a of the
+// field SIGNATURE, so a stale blob from a mismatched build bails on read instead
+// of misreading bytes — the automatic form of the hand-kept version byte.
+emit_backup :: proc(b: ^strings.Builder, s: ^Script) {
+	if len(s.backups) == 0 {return}
+	cls := s.struct_name
+	snake := to_snake(cls)
+	upper := strings.to_upper(snake)
+	w :: strings.write_string
+
+	// FNV-1a over the field signature — a stable compile-time version stamp.
+	ver: u32 = 0x811c9dc5
+	for bk in s.backups {
+		sig := fmt.tprintf("%s|%v|%s|%s;", join_path(bk.path), bk.kind, bk.key, bk.elem)
+		for c in transmute([]u8)sig {
+			ver = (ver ~ u32(c)) * 0x01000193
+		}
+	}
+
+	pod :: proc(x: string) -> string {
+		return fmt.tprintf(
+			"intrinsics.type_is_nearly_simple_compare(%s) && !intrinsics.type_is_pointer(%s) && !intrinsics.type_is_multi_pointer(%s)",
+			x, x, x,
+		)
+	}
+
+	w(b, "// ---- gd:\"backup\": host-local migration + save codec ----\n")
+	for bk in s.backups {
+		switch bk.kind {
+		case .Pod:
+			fmt.sbprintf(b, "#assert(%s, \"%s.%s: gd:\\\"backup\\\" fields must be POD (no strings, slices, maps, or pointers)\")\n", pod(field_type_expr(cls, bk.path)), cls, bk.field)
+		case .Map:
+			fmt.sbprintf(b, "#assert(%s, \"%s.%s: gd:\\\"backup\\\" map key must be POD\")\n", pod(bk.key), cls, bk.field)
+			fmt.sbprintf(b, "#assert(%s, \"%s.%s: gd:\\\"backup\\\" map value must be POD\")\n", pod(bk.elem), cls, bk.field)
+		case .Dyn:
+			fmt.sbprintf(b, "#assert(%s, \"%s.%s: gd:\\\"backup\\\" element must be POD\")\n", pod(bk.elem), cls, bk.field)
+		}
+	}
+	fmt.sbprintf(b, "\n%s_BACKUP_VERSION :: u32(0x%x)\n\n", upper, ver)
+
+	// ---- write ----
+	fmt.sbprintf(b, "%s_backup_write :: proc(self: ^%s, w: ^knet.Writer) {{\n", snake, cls)
+	fmt.sbprintf(b, "\tknet.write_u32(w, %s_BACKUP_VERSION)\n", upper)
+	for bk in s.backups {
+		acc := fmt.tprintf("self.%s", join_path(bk.path))
+		switch bk.kind {
+		case .Pod:
+			fmt.sbprintf(b, "\tknet.write_pod(w, %s)\n", acc)
+		case .Map:
+			fmt.sbprintf(b, "\tknet.write_u32(w, u32(len(%s)))\n\tfor k, v in %s {{knet.write_pod(w, k); knet.write_pod(w, v)}}\n", acc, acc)
+		case .Dyn:
+			fmt.sbprintf(b, "\tknet.write_u32(w, u32(len(%s)))\n\tfor e in %s {{knet.write_pod(w, e)}}\n", acc, acc)
+		}
+	}
+	w(b, "}\n\n")
+
+	// ---- read (false on a version mismatch or a truncated blob) ----
+	fmt.sbprintf(b, "%s_backup_read :: proc(self: ^%s, r: ^knet.Reader) -> bool {{\n", snake, cls)
+	fmt.sbprintf(b, "\tif knet.read_u32(r) != %s_BACKUP_VERSION {{return false}}\n", upper)
+	for bk in s.backups {
+		acc := fmt.tprintf("self.%s", join_path(bk.path))
+		switch bk.kind {
+		case .Pod:
+			fmt.sbprintf(b, "\t%s = knet.read_pod(r, type_of(%s))\n", acc, acc)
+		case .Map:
+			fmt.sbprintf(b, "\t{{\n\t\tn := knet.read_u32(r)\n\t\tif r.err {{return false}}\n\t\tclear(&%s)\n\t\tfor _ in 0 ..< n {{\n\t\t\tk := knet.read_pod(r, %s)\n\t\t\tv := knet.read_pod(r, %s)\n\t\t\tif r.err {{return false}}\n\t\t\t%s[k] = v\n\t\t}}\n\t}}\n", acc, bk.key, bk.elem, acc)
+		case .Dyn:
+			fmt.sbprintf(b, "\t{{\n\t\tn := knet.read_u32(r)\n\t\tif r.err {{return false}}\n\t\tclear(&%s)\n\t\tfor _ in 0 ..< n {{\n\t\t\te := knet.read_pod(r, %s)\n\t\t\tif r.err {{return false}}\n\t\t\tappend(&%s, e)\n\t\t}}\n\t}}\n", acc, bk.elem, acc)
+		}
+	}
+	w(b, "\treturn !r.err\n}\n\n")
+}
+
 // ---- main emitter ------------------------------------------------------------
 
 generate :: proc(s: ^Script) -> string {
@@ -61,10 +138,10 @@ generate :: proc(s: ^Script) -> string {
 	// gd:"replicate" field needs the kit/net descriptor + the POD compile-time check
 	// (commands imply replicates — parse validation enforces it — but keep the
 	// condition independent for robustness).
-	if len(s.replicates) > 0 || len(s.commands) > 0 || len(s.entities) > 0 {
+	if len(s.replicates) > 0 || len(s.commands) > 0 || len(s.entities) > 0 || len(s.backups) > 0 {
 		w(&b, "import knet \"godot:kit/net\"\n")
 	}
-	if len(s.replicates) > 0 {
+	if len(s.replicates) > 0 || len(s.backups) > 0 {
 		w(&b, "import \"base:intrinsics\"\n")
 	}
 	// @(gd_tick) generates the sim-lane thunk + Sim_Set (kit/sim) — and an
@@ -76,17 +153,22 @@ generate :: proc(s: ^Script) -> string {
 			break
 		}
 	}
-	has_lane_wiring := len(s.input_classes) > 0 || s.step.proc_name != "" || s.step_auth.proc_name != ""
+	// A boot-routed authority step (s.step_boot) is NOT lane wiring — the coop
+	// game's fixed step rides `<snake>_step` + the boot accumulator instead.
+	has_lane_wiring := len(s.input_classes) > 0 || s.step.proc_name != "" || (s.step_auth.proc_name != "" && !s.step_boot)
 	if s.tick.proc_name != "" || len(s.block_ticks) > 0 || ticked_entities || has_lane_wiring {
 		w(&b, "import ksim \"godot:kit/sim\"\n")
 	}
 	// entity tables (`entity=Name:id` scene fields) name ksess.Entity_Type and
 	// build kboot.Entity_Kind rows; the lane wiring names ksess.Session; the
-	// standard transport forwards route into netgd/ksess.
-	if len(s.entities) > 0 || has_lane_wiring || len(s.std_forwards) > 0 {
+	// standard transport forwards route into netgd/ksess; the boot-routed step
+	// and the session-event dispatch name ksess too.
+	if len(s.entities) > 0 || has_lane_wiring || len(s.std_forwards) > 0 || s.step_boot || len(s.event_halves) > 0 {
 		w(&b, "import ksess \"godot:kit/session\"\n")
 	}
-	if len(s.entities) > 0 {
+	// The unified `<verb>_cmd` wrappers take the game's one handle (^kboot.Boot)
+	// on BOTH models, so any class with commands names kboot.
+	if len(s.entities) > 0 || len(s.commands) > 0 {
 		w(&b, "import kboot \"godot:kit/boot\"\n")
 	}
 	if len(s.std_forwards) > 0 {
@@ -102,6 +184,8 @@ generate :: proc(s: ^Script) -> string {
 		imported["godot:kit/net"] = true
 		if len(s.entities) > 0 {
 			imported["godot:kit/session"] = true
+		}
+		if len(s.entities) > 0 || len(s.commands) > 0 {
 			imported["godot:kit/boot"] = true
 		}
 		for c in s.commands {
@@ -568,10 +652,12 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	is_sim := s.tick.proc_name != "" || len(s.block_ticks) > 0
 	if len(s.commands) > 0 && !is_sim {
 		w(b, "// ---- @(gd_command) dispatch + typed issue wrappers ----\n\n")
-		w(b, "// Command indices, by declaration order — for the game's command hook\n")
-		w(b, "// dispatch (never hand-sync these; reordering procs reorders them).\n")
-		for c, ci in s.commands {
-			fmt.sbprintf(b, "%s_CMD_%s :: u16(%d)\n", upper, strings.to_upper(c.name), ci)
+		w(b, "// Command wire ids — a stable FNV-1a hash of each verb's name, NOT a\n")
+		w(b, "// position: reordering (or adding/removing) procs never renumbers the\n")
+		w(b, "// wire, and a version-skewed peer's unknown id rejects instead of\n")
+		w(b, "// misdispatching. For the game's command hook dispatch.\n")
+		for c in s.commands {
+			fmt.sbprintf(b, "%s_CMD_%s :: u16(0x%x)\n", upper, strings.to_upper(c.name), cmd_wire_id(c.name))
 		}
 		w(b, "\n")
 		for c in s.commands {
@@ -590,6 +676,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			if c.then_proc == "" && c.payload_count == 0 {
 				fmt.sbprintf(b, "\treturn %s%s(%s", qual, c.proc_name, recv)
 				if c.owner {w(b, ", self")} // the block asked for its wielder — pass the entity
+				if c.wants_by {w(b, ", env.by")} // the declared issuer — ctx.me predicting, the sender on the host
 				for _, i in c.args {
 					fmt.sbprintf(b, ", _a%d", i)
 				}
@@ -606,6 +693,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			fmt.sbprintf(b, " := %s%s(%s", qual, c.proc_name, recv)
 			if c.owner {w(b, ", self")}
+			if c.wants_by {w(b, ", env.by")}
 			for _, i in c.args {
 				fmt.sbprintf(b, ", _a%d", i)
 			}
@@ -633,7 +721,39 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 
 		fmt.sbprintf(b, "@(private = \"file\")\n_%s_commands := [?]knet.Command_Desc {{\n", snake)
 		for c in s.commands {
-			fmt.sbprintf(b, "\t{{name = %q, predict = %v, invoke = _%s_cmd_%s}},\n", c.name, c.predict, snake, c.name)
+			fmt.sbprintf(b, "\t{{name = %q, id = %s_CMD_%s, predict = %v, invoke = _%s_cmd_%s}},\n", c.name, upper, strings.to_upper(c.name), c.predict, snake, c.name)
+		}
+		w(b, "}\n\n")
+	}
+
+	// ---- `<field>_edge` halves: delta-lane change presentation ----
+	// One thunk per declared half (cast, deref old, call the author's proc —
+	// the new value is the field itself at fire time) plus the Edge_Desc
+	// table wired into the command set; the session's per-frame edge pass
+	// (knet.registry_edges_tick) does the rest — mirror, net diff, resync
+	// silence — so no seen_* scratch and no re-seed handling exist to forget.
+	has_edges := false
+	for r in s.replicates {
+		if r.edge_proc != "" {has_edges = true; break}
+	}
+	if has_edges {
+		for r in s.replicates {
+			if r.edge_proc == "" {continue}
+			leaf := join_snake(r.path)
+			fmt.sbprintf(b, "@(private = \"file\")\n_%s_edge_%s :: proc(entity: rawptr, game: rawptr, old: rawptr) {{\n", snake, leaf)
+			fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
+			if r.edge_game != "" {
+				fmt.sbprintf(b, "\tassert(game != nil, \"%s needs the game pointer — session_set_factory's user is what edge halves receive\")\n", r.edge_proc)
+				fmt.sbprintf(b, "\t%s(cast(^%s)game, self, (cast(^%s)old)^, self.%s)\n", r.edge_proc, r.edge_game, r.type_text, join_path(r.path))
+			} else {
+				fmt.sbprintf(b, "\t%s(self, (cast(^%s)old)^, self.%s)\n", r.edge_proc, r.type_text, join_path(r.path))
+			}
+			w(b, "}\n\n")
+		}
+		fmt.sbprintf(b, "@(private = \"file\")\n_%s_edges := [?]knet.Edge_Desc {{\n", snake)
+		for r, i in s.replicates {
+			if r.edge_proc == "" {continue}
+			fmt.sbprintf(b, "\t{{field = %d, fire = _%s_edge_%s}},\n", i, snake, join_snake(r.path))
 		}
 		w(b, "}\n\n")
 	}
@@ -644,35 +764,40 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	if len(s.replicates) > 0 || len(s.commands) > 0 {
 		cmds := len(s.commands) > 0 && !is_sim ? fmt.tprintf(", commands = _%s_commands[:]", snake) : ""
 		net_id := s.net_id_type != "" ? fmt.tprintf(", net_id_offset = int(offset_of(%s, net_id))", cls) : ""
+		edges := has_edges ? fmt.tprintf(", edges = _%s_edges[:]", snake) : ""
 		fmt.sbprintf(
 			b,
-			"// kit/net command set for %s — the command table + the replicated-field descriptor.\n%s_command_set := knet.Command_Set{{entity_desc = &%s_net_desc%s%s}}\n\n",
-			cls, snake, snake, cmds, net_id,
+			"// kit/net command set for %s — the command table + the replicated-field descriptor.\n%s_command_set := knet.Command_Set{{entity_desc = &%s_net_desc%s%s%s}}\n\n",
+			cls, snake, snake, cmds, net_id, edges,
 		)
 	}
 
 	if len(s.commands) > 0 && !is_sim {
-		for c, ci in s.commands {
+		for c in s.commands {
 			// A composed command routes into the block and qualifies the proc; its wrapper is
 			// named per-entity (`runner_gun_fire_cmd`) so two blocks of the same type never collide.
 			recv := len(c.path) > 0 ? fmt.tprintf("&self.%s", join_path(c.path)) : "self"
 			qual := c.pkg_alias != "" ? fmt.tprintf("%s.", c.pkg_alias) : ""
 			wrapper := len(c.path) > 0 ? fmt.tprintf("%s_%s", snake, c.name) : c.proc_name
-			fmt.sbprintf(b, "// Issue `%s` — the SAME call on every peer, zero role branches. Authority:\n", c.name)
+			fmt.sbprintf(b, "// Issue `%s` — the SAME call on every peer AND on both models, zero role\n", c.name)
 			if c.predict {
-				w(b, "// runs the proc directly. Client: predicts optimistically (rejection or a lost\n")
-				w(b, "// result auto-reverts the declared fields) and sends the command to the host.\n")
+				w(b, "// branches. Authority: runs the proc directly. Client: predicts optimistically\n")
+				w(b, "// (rejection or a lost result auto-reverts the declared fields) and sends.\n")
 			} else {
-				w(b, "// runs the proc directly. Client: sends the command to the host (no prediction\n")
+				w(b, "// branches. Authority: runs the proc directly. Client: sends (no prediction\n")
 				w(b, "// declared); the state change arrives through normal replication.\n")
 			}
-			w(b, "// Returns whether the command applied locally (authoritative on the host,\n")
-			w(b, "// optimistic on a predicting client) — the host's result is always authoritative.\n")
-			fmt.sbprintf(b, "%s_cmd :: proc(ctx: ^knet.Command_Ctx, self: ^%s", wrapper, cls)
+			w(b, "// Returns a knet.Command_Outcome — .Applied (host accept), .Predicted (client\n")
+			w(b, "// optimistic + sent), or .Rejected — the SAME meaning on every peer.\n")
+			w(b, "// `knet.command_ok(r)` is the \"applied on my screen?\" check. The boot is the\n")
+			w(b, "// game's one handle: promoting this class to the sim lane re-routes the verb\n")
+			w(b, "// without touching a single issue site.\n")
+			fmt.sbprintf(b, "%s_cmd :: proc(b: ^kboot.Boot, self: ^%s", wrapper, cls)
 			for a in c.args {
 				fmt.sbprintf(b, ", %s: %s", a.name, a.type_text)
 			}
-			w(b, ") -> bool {\n")
+			w(b, ") -> knet.Command_Outcome {\n")
+			w(b, "\tctx := &b.ses.ctx\n")
 			w(b, "\tif ctx.is_authority {\n")
 			w(b, "\t\t_ok")
 			for i in 0 ..< c.payload_count {
@@ -684,6 +809,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			fmt.sbprintf(b, " := %s%s(%s", qual, c.proc_name, recv)
 			if c.owner {w(b, ", self")}
+			if c.wants_by {w(b, ", ctx.me")} // the authority's own issue: the host player IS the issuer
 			for a in c.args {
 				fmt.sbprintf(b, ", %s", a.name)
 			}
@@ -706,13 +832,20 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				}
 				w(b, ")\n\t\t}\n")
 			}
-			fmt.sbprintf(b, "\t\tknet.command_hook_local(ctx, self.net_id, %d, _ok) // same cross-entity path client commands take\n", ci)
-			w(b, "\t\treturn _ok\n\t}\n")
-			fmt.sbprintf(b, "\tknet.command_begin(ctx, self.net_id, %d)\n", ci)
+			fmt.sbprintf(b, "\t\tknet.command_hook_local(ctx, self.net_id, %s_CMD_%s, _ok) // same cross-entity path client commands take\n", upper, strings.to_upper(c.name))
+			w(b, "\t\tif _ok {return .Applied}\n\t\treturn .Rejected\n\t}\n")
+			fmt.sbprintf(b, "\tknet.command_begin(ctx, self.net_id, %s_CMD_%s)\n", upper, strings.to_upper(c.name))
 			for a in c.args {
 				fmt.sbprintf(b, "\tknet.write_%s(&ctx.msg, %s)\n", a.wire, a.name)
 			}
-			fmt.sbprintf(b, "\treturn knet.command_issue(ctx, self, &%s_command_set, %d)\n}}\n\n", snake, ci)
+			if c.predict {
+				// The optimistic apply either held (.Predicted) or reverted (.Rejected).
+				fmt.sbprintf(b, "\tif knet.command_issue(ctx, self, &%s_command_set, %s_CMD_%s) {{return .Predicted}}\n\treturn .Rejected\n}}\n\n", snake, upper, strings.to_upper(c.name))
+			} else {
+				// No local prediction runs, so a client can't locally reject — a
+				// successful send is simply in flight; the host's verdict lands as state.
+				fmt.sbprintf(b, "\t_ = knet.command_issue(ctx, self, &%s_command_set, %s_CMD_%s)\n\treturn .Predicted\n}}\n\n", snake, upper, strings.to_upper(c.name))
+			}
 		}
 	}
 
@@ -798,7 +931,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			w(b, ")\n\t}\n")
 		}
-		if s.tick.fx_proc != "" {
+		if s.tick.fx_proc != "" && !s.tick.fx_mine {
 			w(b, "\tif owner == ksim.lane_me(lane) && !lane.resimming {\n\t\t")
 			if s.tick.fx_game != "" {
 				fmt.sbprintf(b, "%s(cast(^%s)ksim.lane_game(lane), self", s.tick.fx_proc, s.tick.fx_game)
@@ -810,16 +943,74 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			w(b, ")\n\t}\n")
 		}
+		if s.tick.fx_proc != "" && s.tick.fx_mine {
+			// The EVERY-SCREEN form: on an event tick (any bool fact true) the
+			// authority broadcasts the fact tuple (watchers fire it from the
+			// watch clock — lane_fact), and the screens whose live pass just
+			// simulated it fire inline: the owner's (mine=true) and the
+			// authority's own view of everyone else (mine=false, live truth).
+			w(b, "\tif ")
+			first := true
+			for wire, i in s.tick.payload_wires {
+				if wire != "bool" {continue}
+				if !first {w(b, " || ")}
+				fmt.sbprintf(b, "_p%d", i)
+				first = false
+			}
+			w(b, " { // an event tick: the facts present\n")
+			w(b, "\t\tif ksim.lane_is_authority(lane) {\n")
+			w(b, "\t\t\t_fw := knet.writer_make(64, context.temp_allocator)\n")
+			for wire, i in s.tick.payload_wires {
+				fmt.sbprintf(b, "\t\t\tknet.write_%s(&_fw, _p%d)\n", wire, i)
+			}
+			w(b, "\t\t\tksim.lane_fact(lane, entity, knet.writer_bytes(&_fw))\n")
+			w(b, "\t\t}\n")
+			w(b, "\t\tif !lane.resimming {\n")
+			w(b, "\t\t\t_mine := owner == ksim.lane_me(lane)\n")
+			w(b, "\t\t\tif _mine || ksim.lane_is_authority(lane) {\n\t\t\t\t")
+			if s.tick.fx_game != "" {
+				fmt.sbprintf(b, "%s(cast(^%s)ksim.lane_game(lane), self, _mine", s.tick.fx_proc, s.tick.fx_game)
+			} else {
+				fmt.sbprintf(b, "%s(self, _mine", s.tick.fx_proc)
+			}
+			for i in 0 ..< s.tick.payload_count {
+				fmt.sbprintf(b, ", _p%d", i)
+			}
+			w(b, ")\n\t\t\t}\n\t\t}\n\t}\n")
+		}
 		w(b, "}\n\n")
+		if s.tick.fx_proc != "" && s.tick.fx_mine {
+			// The fx DECODE thunk (Sim_Set.fx): SIM_FACT bytes → typed facts →
+			// the presentation half. The lane fires it on WATCHING screens when
+			// the watch clock reaches the fact's tick; the live pass above
+			// called the half directly.
+			fmt.sbprintf(b, "@(private = \"file\")\n_%s_fx :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {{\n", snake)
+			fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
+			w(b, "\tr := knet.reader_make(args)\n")
+			for wire, i in s.tick.payload_wires {
+				fmt.sbprintf(b, "\t_p%d := knet.read_%s(&r)\n", i, wire)
+			}
+			w(b, "\tif r.err {return}\n\t")
+			if s.tick.fx_game != "" {
+				fmt.sbprintf(b, "%s(cast(^%s)ksim.lane_game(lane), self, mine", s.tick.fx_proc, s.tick.fx_game)
+			} else {
+				fmt.sbprintf(b, "%s(self, mine", s.tick.fx_proc)
+			}
+			for i in 0 ..< s.tick.payload_count {
+				fmt.sbprintf(b, ", _p%d", i)
+			}
+			w(b, ")\n}\n\n")
+		}
 		// ---- @(gd_command) on a ticking class: tick-scheduled verbs ----
 		// The verb executes INSIDE the tick pipeline on both ends (kit/sim
 		// command.odin): the client speculates at its next tick and resims
 		// re-apply the captured patch; the authority executes at the stamped
 		// tick and its `_then` fires there — the exec thunk holds that gate.
 		if len(s.commands) > 0 {
-			w(b, "// Command indices, by declaration order.\n")
-			for c, ci in s.commands {
-				fmt.sbprintf(b, "%s_CMD_%s :: u16(%d)\n", upper, strings.to_upper(c.name), ci)
+			w(b, "// Command wire ids — a stable FNV-1a hash of each verb's name, NOT a\n")
+			w(b, "// position: reordering procs never renumbers the wire.\n")
+			for c in s.commands {
+				fmt.sbprintf(b, "%s_CMD_%s :: u16(0x%x)\n", upper, strings.to_upper(c.name), cmd_wire_id(c.name))
 			}
 			w(b, "\n")
 			for c in s.commands {
@@ -844,6 +1035,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				}
 				fmt.sbprintf(b, " := %s%s(%s", qual, c.proc_name, recv)
 				if c.owner {w(b, ", self")}
+				if c.wants_by {w(b, ", by")} // the declared issuer — the lane resolved it (me speculating, the seat on the host)
 				for _, i in c.args {
 					fmt.sbprintf(b, ", _a%d", i)
 				}
@@ -897,32 +1089,36 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			fmt.sbprintf(b, "@(private = \"file\")\n_%s_sim_cmds := [?]ksim.Sim_Cmd {{\n", snake)
 			for c in s.commands {
 				if c.apply_proc != "" {
-					fmt.sbprintf(b, "\t{{exec = _%s_simcmd_%s, apply = _%s_simcmd_%s_apply}},\n", snake, c.name, snake, c.name)
+					fmt.sbprintf(b, "\t{{id = %s_CMD_%s, exec = _%s_simcmd_%s, apply = _%s_simcmd_%s_apply}},\n", upper, strings.to_upper(c.name), snake, c.name, snake, c.name)
 				} else {
-					fmt.sbprintf(b, "\t{{exec = _%s_simcmd_%s}},\n", snake, c.name)
+					fmt.sbprintf(b, "\t{{id = %s_CMD_%s, exec = _%s_simcmd_%s}},\n", upper, strings.to_upper(c.name), snake, c.name)
 				}
 			}
 			w(b, "}\n\n")
-			for c, ci in s.commands {
+			for c in s.commands {
 				wrapper := len(c.path) > 0 ? fmt.tprintf("%s_%s", snake, c.name) : c.proc_name
-				fmt.sbprintf(b, "// Issue `%s` — tick-scheduled on the sim lane: the SAME call on every peer,\n", c.name)
-				w(b, "// zero role branches. Your own entity speculates at your next tick; the\n")
-				w(b, "// authority executes at the stamped tick and answers with a verdict — a\n")
-				w(b, "// rejection unwinds the delta-lane writes and the reconcile scrubs the\n")
-				w(b, "// predicted ones. Returns whether it SCHEDULED; the verdict is state.\n")
-				fmt.sbprintf(b, "%s_cmd :: proc(l: ^ksim.Lane, self: ^%s", wrapper, cls)
+				fmt.sbprintf(b, "// Issue `%s` — tick-scheduled on the sim lane: the SAME call on every peer\n", c.name)
+				w(b, "// AND on both models, zero role branches. Your own entity speculates at your\n")
+				w(b, "// next tick; the authority executes at the stamped tick and answers with a\n")
+				w(b, "// verdict — a rejection unwinds the delta-lane writes and the reconcile\n")
+				w(b, "// scrubs the predicted ones. Returns a knet.Command_Outcome: .Predicted =\n")
+				w(b, "// scheduled and in flight on my screen (even the authority's own issue runs\n")
+				w(b, "// at the stamped tick, never inline — .Applied is a coop-loop word); the\n")
+				w(b, "// verdict is state. `knet.command_ok(r)` reads it, same as any coop verb.\n")
+				fmt.sbprintf(b, "%s_cmd :: proc(b: ^kboot.Boot, self: ^%s", wrapper, cls)
 				for a in c.args {
 					fmt.sbprintf(b, ", %s: %s", a.name, a.type_text)
 				}
-				w(b, ") -> bool {\n")
+				w(b, ") -> knet.Command_Outcome {\n")
+				fmt.sbprintf(b, "\tassert(b.lane != nil, \"%s_cmd rides the sim lane — kboot.boot_lane(&boot, &lane) installs it\")\n", wrapper)
 				if len(c.args) > 0 {
 					w(b, "\t_w := knet.writer_make(64, context.temp_allocator)\n")
 					for a in c.args {
 						fmt.sbprintf(b, "\tknet.write_%s(&_w, %s)\n", a.wire, a.name)
 					}
-					fmt.sbprintf(b, "\treturn ksim.lane_command(l, self.net_id, %d, knet.writer_bytes(&_w))\n}}\n\n", ci)
+					fmt.sbprintf(b, "\tif ksim.lane_command(b.lane, self.net_id, %s_CMD_%s, knet.writer_bytes(&_w)) {{return .Predicted}}\n\treturn .Rejected\n}}\n\n", upper, strings.to_upper(c.name))
 				} else {
-					fmt.sbprintf(b, "\treturn ksim.lane_command(l, self.net_id, %d, nil)\n}}\n\n", ci)
+					fmt.sbprintf(b, "\tif ksim.lane_command(b.lane, self.net_id, %s_CMD_%s, nil) {{return .Predicted}}\n\treturn .Rejected\n}}\n\n", upper, strings.to_upper(c.name))
 				}
 			}
 		}
@@ -933,10 +1129,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		in_class := s.tick.input_type != "" && s.tick.input_class != 0 ? fmt.tprintf(", input_class = %d", s.tick.input_class) : ""
 		contested := s.tick.contested ? ", contested = true" : ""
 		sim_cmds := len(s.commands) > 0 ? fmt.tprintf(", commands = _%s_sim_cmds[:]", snake) : ""
+		fx := s.tick.fx_mine ? fmt.tprintf(", fx = _%s_fx", snake) : ""
 		fmt.sbprintf(
 			b,
-			"// kit/sim set for %s — ksim.lane_track_set(&lane, id, self, &%s_sim_set, owner)\n%s_sim_set := ksim.Sim_Set{{entity_desc = &%s_net_desc, tick = _%s_tick_step, input_size = %s%s%s%s}}\n\n",
-			cls, snake, snake, snake, snake, in_size, in_class, contested, sim_cmds,
+			"// kit/sim set for %s — ksim.lane_track_set(&lane, id, self, &%s_sim_set, owner)\n%s_sim_set := ksim.Sim_Set{{entity_desc = &%s_net_desc, tick = _%s_tick_step, input_size = %s%s%s%s%s}}\n\n",
+			cls, snake, snake, snake, snake, in_size, in_class, contested, sim_cmds, fx,
 		)
 	}
 
@@ -981,8 +1178,10 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	// sample to it) and up to two world passes: @(gd_step) runs everywhere,
 	// @(gd_step="authority") on the host alone. Game wiring is two lines:
 	// `<snake>_lane_init(self, &self.lane, &self.ses, cfg = {...})` beside
-	// boot_attach, then `kboot.boot_lane(&self.boot, &self.lane)`.
-	if len(s.input_classes) > 0 || s.step.proc_name != "" || s.step_auth.proc_name != "" {
+	// boot_attach, then `kboot.boot_lane(&self.boot, &self.lane)`. (A
+	// boot-routed authority step — s.step_boot — is not lane wiring; its
+	// `<snake>_step` is emitted below with the session-event dispatch.)
+	if len(s.input_classes) > 0 || s.step.proc_name != "" || (s.step_auth.proc_name != "" && !s.step_boot) {
 		w(b, "// ---- @(gd_sample)/@(gd_step) lane wiring ----\n\n")
 		// One typed device-read thunk per input class that has a sample.
 		for ic in s.input_classes {
@@ -997,15 +1196,15 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		if s.step.proc_name != "" {
 			fmt.sbprintf(
 				b,
-				"@(private = \"file\")\n_%s_lane_step :: proc(user: rawptr, tick: u64) {{\n\t%s(cast(^%s)user, tick)\n}}\n\n",
-				snake, s.step.proc_name, cls,
+				"@(private = \"file\")\n_%s_lane_step :: proc(user: rawptr, tick: u64) {{\n\t%s(cast(^%s)user%s)\n}}\n\n",
+				snake, s.step.proc_name, cls, s.step.wants_tick ? ", tick" : "",
 			)
 		}
 		if s.step_auth.proc_name != "" {
 			fmt.sbprintf(
 				b,
-				"@(private = \"file\")\n_%s_lane_step_auth :: proc(user: rawptr, tick: u64) {{\n\t%s(cast(^%s)user, tick)\n}}\n\n",
-				snake, s.step_auth.proc_name, cls,
+				"@(private = \"file\")\n_%s_lane_step_auth :: proc(user: rawptr, tick: u64) {{\n\t%s(cast(^%s)user%s)\n}}\n\n",
+				snake, s.step_auth.proc_name, cls, s.step_auth.wants_tick ? ", tick" : "",
 			)
 		}
 		step_ref := s.step.proc_name != "" ? fmt.tprintf("_%s_lane_step", snake) : "nil"
@@ -1039,6 +1238,95 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 		}
 		w(b, "}\n\n")
+	}
+
+	// ---- the BOOT-routed authority step (@(gd_step="authority"), no lane) ----
+	// The coop game's fixed step: role gate, tick loop, and the same-frame edge
+	// pass in ONE generated proc — the call site is role-free (`<snake>_step(self,
+	// ticks)` with boot_pump's ticks, every peer; clients no-op). The edge pass
+	// runs HERE because the authored pass mutates after boot_pump's automatic
+	// one — a half that MOVES something the next tick reads must not land a
+	// frame late (the pass is idempotent: everyone else pays a memcmp).
+	if s.step_boot {
+		fmt.sbprintf(
+			b,
+			"// Run this frame's authority steps — %s, `ticks` times, HOST only —\n"+
+			"// then fire the authority's fresh edges same-frame. Call it right after\n"+
+			"// boot_pump (or wherever your frame wants the world to advance):\n"+
+			"//\n"+
+			"//   events, marks, ticks := kboot.boot_pump(&self.%s, delta, now)\n"+
+			"//   %s_step(self, ticks)\n"+
+			"%s_step :: proc(self: ^%s, ticks: int) {{\n"+
+			"\tif self.%s.ses == nil || !self.%s.ses.is_host {{return}}\n"+
+			"\tfor _ in 0 ..< ticks {{\n"+
+			"\t\t%s(self)\n"+
+			"\t}}\n"+
+			"\tksess.session_run_edges(self.%s.ses)\n"+
+			"}}\n\n",
+			s.step_auth.proc_name, s.boot_field, snake, snake, cls,
+			s.boot_field, s.boot_field, s.step_auth.proc_name, s.boot_field,
+		)
+	}
+
+	// ---- session-event dispatch: the declared halves, switched by nobody ----
+	// One generated proc replaces the game shell's event-drain switch: each
+	// declared `<game>_<event>` half fires wherever the event fires, and each
+	// `_then` half fires on the AUTHORITY alone — the role gates live here,
+	// never in game code. Single-role events get their annotation enforced at
+	// dispatch too: a (client) event queued just BEFORE a takeover flipped
+	// is_host dies at the gate instead of re-running takeover code (the double
+	// transport-death signal queues Ev_Succession twice in one batch — the gate
+	// is what makes the second one harmless). Call it with boot_pump's events,
+	// any frame order you like: `<snake>_events(self, events)`.
+	if len(s.event_halves) > 0 {
+		fmt.sbprintf(
+			b,
+			"// Dispatch this frame's session events to the class's declared halves\n"+
+			"// (role gates generated: client-only events skip a host — a takeover\n"+
+			"// mid-batch kills the stale re-fire — and `_then` halves fire on the\n"+
+			"// authority alone).\n"+
+			"%s_events :: proc(self: ^%s, events: []ksess.Event) {{\n"+
+			"\tfor ev in events {{\n"+
+			"\t\t#partial switch e in ev {{\n",
+			snake, cls,
+		)
+		for h in s.event_halves {
+			ev := SESSION_EVENTS[h.ev]
+			args := strings.builder_make(context.temp_allocator)
+			for p in ev.params {
+				fmt.sbprintf(&args, ", %s", p.field)
+			}
+			fmt.sbprintf(b, "\t\tcase ksess.%s:\n", ev.variant)
+			if len(ev.params) == 0 {
+				w(b, "\t\t\t_ = e\n")
+			}
+			switch ev.role {
+			case .Every:
+				if h.bare != "" {
+					fmt.sbprintf(b, "\t\t\t%s(self%s)\n", h.bare, strings.to_string(args))
+				}
+				if h.then_proc != "" {
+					fmt.sbprintf(
+						b,
+						"\t\t\tif self.%s.ses != nil && self.%s.ses.is_host {{\n\t\t\t\t%s(self%s)\n\t\t\t}}\n",
+						s.boot_field, s.boot_field, h.then_proc, strings.to_string(args),
+					)
+				}
+			case .Client:
+				fmt.sbprintf(
+					b,
+					"\t\t\tif self.%s.ses != nil && !self.%s.ses.is_host {{\n\t\t\t\t%s(self%s)\n\t\t\t}}\n",
+					s.boot_field, s.boot_field, h.bare, strings.to_string(args),
+				)
+			case .Host:
+				fmt.sbprintf(
+					b,
+					"\t\t\tif self.%s.ses != nil && self.%s.ses.is_host {{\n\t\t\t\t%s(self%s)\n\t\t\t}}\n",
+					s.boot_field, s.boot_field, h.bare, strings.to_string(args),
+				)
+			}
+		}
+		w(b, "\t\t}\n\t}\n}\n\n")
 	}
 
 	// ---- entity kinds: `entity=Name:id` scene fields -> the kboot table ----
@@ -1133,8 +1421,42 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 					tsnake, strings.to_upper(tsnake),
 				)
 			}
+			if e.gen_spawn {
+				// The typed spawn — the tag already knows the struct, so the
+				// TYPE const and the rawptr cast stop existing at spawn sites.
+				// Set the returned entity's fields, then boot_spawn_send(b, id).
+				if e.has_tick {
+					fmt.sbprintf(
+						b,
+						"// Typed spawn for %s (ticking: role-routed) — the host mints the real\n"+
+						"// entity, a client a PREDICTED one flying this instant (a fired\n"+
+						"// projectile; the authority's spawn rekeys it). Set the spawn fields,\n"+
+						"// then kboot.boot_spawn_send(b, id).\n"+
+						"%s_spawn :: proc(b: ^kboot.Boot, owner := knet.PLAYER_ID_INVALID) -> (^%s, knet.Net_Id) {{\n"+
+						"\te, id := kboot.boot_fire_spawn(b, %s_TYPE, owner)\n"+
+						"\treturn cast(^%s)e, id\n"+
+						"}}\n\n",
+						e.target, tsnake, e.target, strings.to_upper(tsnake), e.target,
+					)
+				} else {
+					fmt.sbprintf(
+						b,
+						"// Typed spawn for %s — authority code (clients hear the result as\n"+
+						"// Ev_Spawned). Set the spawn fields, then kboot.boot_spawn_send(b, id).\n"+
+						"%s_spawn :: proc(b: ^kboot.Boot, owner := knet.PLAYER_ID_INVALID) -> (^%s, knet.Net_Id) {{\n"+
+						"\tassert(b.ses != nil && b.ses.is_host, \"%s_spawn mints a REAL entity — only the authority spawns\")\n"+
+						"\te, id := ksess.session_spawn_make(b.ses, %s_TYPE, owner)\n"+
+						"\treturn cast(^%s)e, id\n"+
+						"}}\n\n",
+						e.target, tsnake, e.target, tsnake, strings.to_upper(tsnake), e.target,
+					)
+				}
+			}
 		}
 	}
+
+	// gd:"backup" host-local migration/save codec (version-hashed write/read).
+	emit_backup(b, s)
 
 	// lifecycle literal
 	lc_lit := strings.builder_make()

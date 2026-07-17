@@ -105,6 +105,46 @@ Tick shapes: `(self)`, `(self, input)`, `(self, lane)`, `(self, input, lane)`
 — a pointer param is the lane, a value param is the input; both halves also
 accept game-less (self-first) shapes.
 
+**Presentation on every screen — the `mine` param.** The `_fx` above fires on
+the acting player's live pass only. Declare `mine: bool` right after `self`
+(by that name) and the SAME half fires on **every screen**, each at its own
+presentation time for the cause — one proc, the framework holds the timing:
+
+```odin
+runner_tick_fx :: proc(g: ^Game, self: ^Runner, mine: bool, fired: bool) {
+	if fired {
+		muzzle_flash(self)        // every screen
+		if mine {kick_camera(g)}  // flavor, not a role branch
+	}
+}
+```
+
+- **The actor's screen** fires it inline from the live pass (`mine = true`) —
+  instantly, the old form's moment, never a resim.
+- **The authority's screen** presents everyone else's facts as they execute
+  (`mine = false`) — its view of the world is live truth.
+- **Every other screen** receives the fact tuple (a reliable `SIM_FACT`) and
+  fires when its **watch clock** reaches the fact's tick (`mine = false`): the
+  flash lands ON the delayed barrel that fired it, not a render-delay early.
+  This is the replicated-counter-plus-`seen_*` edge every game used to
+  hand-roll, generated — and stricter: two facts coalescing into one batch
+  can't eat a fire, and there is no edge scratch to re-seed on resync.
+  quickdraw's tracer ships on it (its old `shot_seq`/`shot_aim` fields and
+  the hand-detected edge are deleted; the duel acid pins the watcher path).
+
+The wire imposes three contracts, each a build-time error when broken: the
+mine-form fires on **event ticks only** (any tick a bool fact is true — the
+old form is called every tick), its facts must be **wire primitives** (they
+cross to watching screens), and **at least one fact must be a bool** (the
+event trigger). Two edges stay yours: a fact predicted by the owner that the
+server refuses can still ghost-fire locally (the same accepted trade as the
+old form), and a fact's entity must outlive the slowest watch clock — dwell
+the despawn, the same edges-outlive-observers law as everything presented
+late. Keep the old form for continuous owner-only presentation (an engine
+hum, a strain shader) and for effects that must NOT run everywhere — the
+predicted-spawn `_fx` below spawns a client-local projectile, exactly the
+kind of half that stays owner-shaped.
+
 The game's own half — the device read and the world pass — is typed and
 attributed the same way. `@(gd_sample)` marks the ONE place that touches
 hardware (never called during a resim); scriptgen pins its input struct to
@@ -133,6 +173,20 @@ game_step :: proc(self: ^Game, tick: u64) {
 	run_respawns(self, tick)
 }
 ```
+
+(The `tick: u64` param is optional in both slots — a pass that doesn't read
+the clock declares `proc(self: ^Game)`.)
+
+**The same attribute is the COOP game's host tick.** In a package with no
+`@(gd_tick)` classes there is no lane, so `@(gd_step = "authority")` routes
+through the boot accumulator instead: scriptgen generates
+`<snake>_step(self, ticks)` — the role gate, the fixed-step loop, and the
+[same-frame edge pass](net.md#edges-class_field_edge--presenting-delta-lane-changes)
+in one proc the game calls with `boot_pump`'s ticks, role-free
+(cavecrawl's `cave_host_tick` is the worked example; there is no absolute
+tick in the coop loop, so this form is `proc(self)` — count ticks in your
+own `gd:"backup"` field). One declaration, two routings: promoting the game
+to the sim lane re-routes it without touching the attribute.
 
 The wiring left to the game, ALL of it — `<class>_lane_init` is generated,
 carrying the input size, the typed procs, and each pass wired to its slot:
@@ -208,6 +262,30 @@ Kicker :: struct {
   bounce. The game keeps the consequences — speedball's ball detects goals
   off the roller's clamp (a crossing lands exactly ON the line for one
   tick) and predicts its own reset.
+
+**Driving a block yourself — `gd:"manual"`.** Auto-hoist runs a block's tick
+AFTER the wielder's ("intent, then integrate") — the right default, until the
+wielder must act ON the integrated result (a crate pushout after the move) or
+skip the step entirely (a dead avatar that must not count its cooldown down).
+Tag the embed `gd:"manual"` and scriptgen stops auto-calling that block's
+tick; the wielder drives it, wherever and however often it likes:
+
+```odin
+fire: psim.Cool `gd:"manual"`, // I'll tick it myself
+
+@(gd_tick)
+gunner_tick :: proc(self: ^Gunner, in: Gunner_Input) -> (fired: bool) {
+	if self.hp <= 0 {return} // dead: never tick it — the cooldown just freezes
+	if in.buttons & FIRE != 0 && psim.ready(&self.fire, FIRE_CD) {fired = true}
+	psim.cool_tick(&self.fire) // driven here, on the alive path
+}
+```
+
+The predict fields still flatten into the descriptor — `manual` suppresses only
+the auto-CALL, never the wire. It's the escape hatch for bespoke ordering (any
+order, conditional, or not at all); an untagged embed stays auto-hoisted, so the
+"just embed it and it integrates" case is untouched. quickdraw's revolver is the
+worked example: its dead-man freeze is one skipped call, not a prepay hack.
 
 The namespaces police themselves: embed a predict-tagged block from the
 root `godot:play` shelf and scriptgen errors it toward `play/sim`; embed a
@@ -364,8 +442,10 @@ gunner_buy :: proc(self: ^Gunner, item: u8) -> bool {
 	return true
 }
 
-// anywhere with the lane in reach (a key edge, a bot):
-gunner_buy_cmd(&g.lane, g.me_gun, ITEM_BOOTS)
+// anywhere with the boot in reach (a key edge, a bot) — the same handle and
+// the same knet.Command_Outcome as a coop verb, so promoting a class never
+// touches an issue site:
+gunner_buy_cmd(&g.boot, g.me_gun, ITEM_BOOTS)
 ```
 
 The generated wrapper schedules the verb at your next tick and ships it
@@ -388,6 +468,13 @@ authority, or promote them to contested. Bursts are fine: verbs QUEUE per
 entity, and a rejection unwinds the delta-lane speculation chain in order
 without disturbing the survivors. The wrapper returns whether it SCHEDULED
 — the verdict is state (watch the fields, or the authority's `_then`).
+
+When the predicate needs WHO, declare the issuer: `by: knet.Player_Id`
+right after the receiver, and the lane fills it with the seat that issued
+— you speculating, the ledgered seat on the authority, the same value the
+`_then` gets. It never rides the wire, so on a contested entity a verb can
+arbitrate on whose touch it is without a claimable argument (the name is
+reserved: a wire arg called `by` is a build error).
 
 Replays re-apply what a verb WROTE (recorded bytes), not what it meant — so
 prefer absolute mutations (`gear = item`) in the verb itself. When the
@@ -428,21 +515,25 @@ bullet_tick :: proc(self: ^Bullet) -> (landed: bool) { ...self.x += self.vx... }
 gunner_tick_then :: proc(g: ^Game, self: ^Gunner, by: knet.Player_Id, lobbed: bool) {
 	if lobbed { lob_bullet(g, self, by) } // AUTHORITY: the real spawn
 }
-gunner_tick_fx :: proc(g: ^Game, self: ^Gunner, lobbed: bool) {
-	if lobbed { lob_bullet(g, self, g.ses.me) } // this CLIENT: the predicted one
+gunner_tick_fx :: proc(g: ^Game, self: ^Gunner, mine: bool, lobbed: bool) {
+	// A HOSTING player is authority AND owner — the _then above already
+	// spawned their real bullet; only a pure client predicts one.
+	if lobbed && mine && !ksim.lane_is_authority(&g.lane) {
+		lob_bullet(g, self, g.ses.me)
+	}
 }
 
 lob_bullet :: proc(g: ^Game, gun: ^Gunner, owner: knet.Player_Id) {
-	bp, bid := kboot.boot_fire_spawn(&g.boot, BULLET_TYPE, owner) // routes host/client
-	b := cast(^Bullet)bp
+	b, bid := bullet_spawn(&g.boot, owner) // typed, role-routed — no const, no cast
 	b.x, b.y, b.vx, b.vy, b.life = ... // the muzzle and the arc
-	kboot.boot_fire_spawn_send(&g.boot, bid) // host announces; client no-ops
+	kboot.boot_spawn_send(&g.boot, bid) // host announces; client no-ops
 }
 ```
 
-`boot_fire_spawn` routes: the authority gets a real net id
-(`session_spawn_make`), this client a local predicted node under a provisional
-id. Underneath: **born-tick gating** keeps the reconciles that land before the
+The generated `bullet_spawn` (every `entity=` tag gets one) rides
+`kboot.boot_fire_spawn` underneath, which routes: the authority gets a real
+net id (`session_spawn_make`), this client a local predicted node under a
+provisional id. **Born-tick gating** keeps the reconciles that land before the
 spawn (the whole first round trip, the server running a transit behind) from
 re-flying it from stale state; when the authority's `Ev_Spawned` arrives the
 factory **matches** it to the projectile you predicted and rekeys — the same
@@ -527,7 +618,10 @@ game on the two models); the checklist, per contested entity:
    feel questions the seat used to.
 7. **Wire once:** `<game>_lane_init(self, &self.lane, &self.ses, cfg)` +
    `kboot.boot_lane(&self.boot, &self.lane)`, and cross entities off one at
-   a time — a hybrid game is a supported end state, not a transition.
+   a time — a hybrid game is a supported end state, not a transition. What
+   you do NOT touch: issue sites and spawn sites. `<verb>_cmd(&boot, …)`
+   and `<entity>_spawn(&boot, …)` keep their exact shape on both models —
+   the generated bodies re-route.
 
 What you buy: positions are no longer client-trusted (the cheat-resistance
 motive), and lag-compensated hit validation becomes available. What you pay:
@@ -598,12 +692,13 @@ needs a `predict` float. scriptgen rejects each on the wrong field, spelled out.
 The runtime and the authoring surface are complete and proven headless:
 input pipeline (single- or multi-class), ledgers, snapshots, reconcile, lane
 driver, lag comp, watched interp, render-error smoothing, possession, predicted
-spawns, the `@(gd_tick)`/`@(gd_sample)`/`predict` codegen, tick composition
-through embedded blocks (the `play/sim` shelf above), and two worked example
-games (quickdraw, speedball) with native duel acids — the kitsim tests
-(including loss-and-blackout convergence acids, the per-class routing
-fingerprint, and the glide-vs-snap assertion) plus the repgen contract pins
-hold all of it.
+spawns, every-screen tick facts (the mine-form `_fx`: SIM_FACT broadcast,
+watch-clock firing), the `@(gd_tick)`/`@(gd_sample)`/`predict` codegen, tick
+composition through embedded blocks (the `play/sim` shelf above), and two
+worked example games (quickdraw, speedball) with native duel acids — the
+kitsim tests (including loss-and-blackout convergence acids, the per-class
+routing fingerprint, the glide-vs-snap assertion, and the three-peer
+fact-timing pin) plus the repgen contract pins hold all of it.
 
 See also: [net](net.md) (the shared descriptor core), [session](session.md)
 (identity and everything reliable), [play](play.md) (the coop shelf —

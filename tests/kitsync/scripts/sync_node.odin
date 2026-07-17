@@ -25,7 +25,9 @@ package kitsync_scripts
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
+import kboot "godot:kit/boot"
 import knet "godot:kit/net"
+import ksess "godot:kit/session"
 import netgd "godot:kit/netgd"
 import "core:fmt"
 
@@ -37,7 +39,12 @@ SyncNode :: struct {
 	state:  u8 `gd:"replicate"`,
 	locked: u8 `gd:"replicate"`, // server flips this SILENTLY to force a stale prediction
 	shadow: []u8,
-	ctx:    knet.Command_Ctx,
+	// The generated wrapper's handle is the BOOT (its coop route reads
+	// b.ses.ctx) — this raw-layer test drives everything below sessions by
+	// hand, so it carries an otherwise-inert Session for the ctx and a bare
+	// Boot whose one live pointer is set in ready (nothing attached).
+	ses:    ksess.Session,
+	boot:   kboot.Boot,
 	got:    int, // client: verified packets/results so far (driver polls via get_got)
 	cmds:   int, // server: commands executed so far (driver polls via get_cmds)
 }
@@ -49,7 +56,8 @@ MSG_RESULT :: u8(3)
 
 sync_node_ready :: proc(self: ^SyncNode) {
 	self.shadow = knet.shadow_make(&sync_node_net_desc)
-	self.ctx = knet.command_ctx_make()
+	self.ses.ctx = knet.command_ctx_make()
+	self.boot.ses = &self.ses
 	self.net_id = knet.Net_Id(1) // single test entity; the registry layer will assign these
 }
 
@@ -68,7 +76,7 @@ sync_node_start_host :: proc(self: ^SyncNode, port: gd.Int) {
 		gd.print_str("HOST_FAIL")
 		return
 	}
-	self.ctx.is_authority = true
+	self.ses.ctx.is_authority = true
 	// The host receives commands on the same raw-bytes path the client uses.
 	if err := netgd.listen_packets(self.owner, "on_packet"); err != .Ok {
 		gd.print_str(fmt.tprintf("LISTEN_FAIL err=%v", err))
@@ -87,8 +95,8 @@ sync_node_start_client :: proc(self: ^SyncNode, port: gd.Int) {
 		gd.print_str(fmt.tprintf("LISTEN_FAIL err=%v", err))
 		return
 	}
-	self.ctx.send = send_command_bytes
-	self.ctx.send_user = self
+	self.ses.ctx.send = send_command_bytes
+	self.ses.ctx.send_user = self
 	gd.print_str("JOIN_OK")
 }
 
@@ -148,13 +156,13 @@ sync_node_send_delta :: proc(self: ^SyncNode, peer: gd.Int) {
 // that is identical on every peer.
 @(gd_method)
 sync_node_issue_bump :: proc(self: ^SyncNode) {
-	applied := sync_node_bump_cmd(&self.ctx, self, 5)
+	applied := sync_node_bump_cmd(&self.boot, self, 5)
 	gd.print_str(
 		fmt.tprintf(
 			"SYNC_CMD_ISSUED predicted=%v hp=%d pending=%d",
 			applied,
 			self.hp,
-			knet.pending_count(&self.ctx.pending),
+			knet.pending_count(&self.ses.ctx.pending),
 		),
 	)
 }
@@ -181,7 +189,7 @@ sync_node_on_packet :: proc(self: ^SyncNode, id: gd.Int, packet: gd.Packed_Byte_
 		// HOST: dedup → execute (auto-restores on rejection) → result (reject
 		// embeds the authoritative truth snapshot).
 		h := knet.command_read_header(&r)
-		if !knet.command_dedup(&self.ctx, u64(id), h.seq) {
+		if !knet.command_dedup(&self.ses.ctx, u64(id), h.seq) {
 			gd.print_str(fmt.tprintf("SYNC_CMD_DUP seq=%d", u32(h.seq)))
 			return
 		}
@@ -202,15 +210,15 @@ sync_node_on_packet :: proc(self: ^SyncNode, id: gd.Int, packet: gd.Packed_Byte_
 	case MSG_RESULT:
 		res := knet.command_result_read(&r)
 		if res.ok {
-			knet.command_confirm(&self.ctx, res.seq)
-			ok := self.hp == 48 && knet.pending_count(&self.ctx.pending) == 0
-			gd.print_str(fmt.tprintf("SYNC_CMD_CONFIRM ok=%v hp=%d pending=%d", ok, self.hp, knet.pending_count(&self.ctx.pending)))
+			knet.command_confirm(&self.ses.ctx, res.seq)
+			ok := self.hp == 48 && knet.pending_count(&self.ses.ctx.pending) == 0
+			gd.print_str(fmt.tprintf("SYNC_CMD_CONFIRM ok=%v hp=%d pending=%d", ok, self.hp, knet.pending_count(&self.ses.ctx.pending)))
 			if ok {self.got += 1}
 		} else {
 			// res.entity names the entity; this test has exactly one.
-			knet.command_reject(&self.ctx, res, &r, self, &sync_node_command_set)
-			ok := !r.err && self.hp == 48 && self.locked == 1 && knet.pending_count(&self.ctx.pending) == 0
-			gd.print_str(fmt.tprintf("SYNC_CMD_REJECT ok=%v hp=%d locked=%d pending=%d", ok, self.hp, self.locked, knet.pending_count(&self.ctx.pending)))
+			knet.command_reject(&self.ses.ctx, res, &r, self, &sync_node_command_set)
+			ok := !r.err && self.hp == 48 && self.locked == 1 && knet.pending_count(&self.ses.ctx.pending) == 0
+			gd.print_str(fmt.tprintf("SYNC_CMD_REJECT ok=%v hp=%d locked=%d pending=%d", ok, self.hp, self.locked, knet.pending_count(&self.ses.ctx.pending)))
 			if ok {self.got += 1}
 		}
 	case:

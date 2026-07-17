@@ -90,18 +90,23 @@ golf_ready :: proc(self: ^Golf) {
 	kboot.boot_entities(&self.boot, self, golf_entity_kinds[:]) // the generated factory
 }
 
+@(gd_step = "authority") // the host's fixed step — the gate and loop are generated
+golf_host_tick :: proc(self: ^Golf) { run_the_course(self) }
+
 golf_process :: proc(self: ^Golf, delta: f64) {
 	events, _, ticks := kboot.boot_pump(&self.boot, delta, now_s())
-	if self.ses.is_host { for _ in 0 ..< ticks { host_tick(self) } }
-	for ev in events { react(self, ev) }
+	golf_step(self, ticks)     // generated: hosts step, clients no-op
+	golf_events(self, events)  // generated: dispatch to the event halves you declared
 }
 ```
 
 That's a hosted, joinable game: lobby UI, chat, scoreboard, host/join buttons
 (`kboot.boot_host` / `boot_join`), connection lifecycle, and the pump that
-drives it all. The `events` loop is where your game reacts — a player joined,
-an entity spawned, a command was rejected — as plain values you switch on,
-never callbacks into a half-initialized script.
+drives it all. Your game reacts by declaring **event halves** — plain procs
+named for the event (`golf_player_joined`, `golf_entity_spawned`, an
+authority-only `golf_player_joined_then` for consequences) that the generated
+`golf_events` dispatches to — never callbacks into a half-initialized script,
+and never a role branch of your own.
 
 One concept in the join call deserves a sentence now, because it pays off for
 the rest of the series: a player joins with a **token** (`ksave.token` — an

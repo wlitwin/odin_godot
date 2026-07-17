@@ -36,60 +36,21 @@ cave_backup_blob :: proc(user: rawptr, w: ^knet.Writer) {
 	write_game_blob(self, w)
 }
 
+// The campaign bytes are now DECLARED, not hand-serialized: the six gd:"backup"
+// fields on CaveLobby (cavecrawl.odin) generate a version-hashed
+// cave_lobby_backup_write/_read pair — POD scalars ride whole, the two maps get
+// a length-prefixed loop, and there is no second hand-kept read list to drift
+// out of order (the bug this shape exists to kill). These two adapters just
+// bridge the generated codec to the blob call sites (a []u8 in, a Writer out).
 @(private = "file")
 write_game_blob :: proc(self: ^CaveLobby, w: ^knet.Writer) {
-	knet.write_u64(w, u64(self.host_ticks))
-	knet.write_u8(w, u8(self.last_wave))
-	knet.write_u8(w, u8(self.dens_used))
-	knet.write_u8(w, u8(self.director.wave))
-	knet.write_u16(w, self.director.pending)
-	knet.write_u16(w, u16(self.director.alive))
-	knet.write_u64(w, self.director.rest_until)
-	knet.write_bool(w, self.director.done)
-	assert(len(self.brains) <= int(max(u16)))
-	knet.write_u16(w, u16(len(self.brains)))
-	for id, b in self.brains {
-		knet.write_net_id(w, id)
-		knet.write_f32(w, b.home.x)
-		knet.write_f32(w, b.home.y)
-		knet.write_u16(w, b.bite_cd)
-	}
-	knet.write_u16(w, u16(len(self.respawn_at)))
-	for id, at in self.respawn_at {
-		knet.write_net_id(w, id)
-		knet.write_u64(w, u64(at))
-	}
+	cave_lobby_backup_write(self, w)
 }
 
 @(private = "file")
 read_game_blob :: proc(self: ^CaveLobby, blob: []u8) -> bool {
 	r := knet.reader_make(blob)
-	self.host_ticks = int(knet.read_u64(&r))
-	self.last_wave = int(knet.read_u8(&r))
-	self.dens_used = int(knet.read_u8(&r))
-	self.director.wave = int(knet.read_u8(&r))
-	self.director.pending = knet.read_u16(&r)
-	self.director.alive = int(knet.read_u16(&r))
-	self.director.rest_until = knet.read_u64(&r)
-	self.director.done = knet.read_bool(&r)
-	brains := int(knet.read_u16(&r))
-	if r.err {return false}
-	for _ in 0 ..< brains {
-		id := knet.read_net_id(&r)
-		home := [3]f32{knet.read_f32(&r), knet.read_f32(&r), 0}
-		cd := knet.read_u16(&r)
-		if r.err {return false}
-		self.brains[id] = Dweller_Brain{home = home, bite_cd = cd}
-	}
-	respawns := int(knet.read_u16(&r))
-	if r.err {return false}
-	for _ in 0 ..< respawns {
-		id := knet.read_net_id(&r)
-		at := int(knet.read_u64(&r))
-		if r.err {return false}
-		self.respawn_at[id] = at
-	}
-	return true
+	return cave_lobby_backup_read(self, &r)
 }
 
 // Host: write the run to disk — one call, everything phases 0-5 built.

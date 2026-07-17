@@ -7,6 +7,7 @@ package quickdraw
 
 import "core:fmt"
 import gd "godot:godot"
+import kboot "godot:kit/boot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
@@ -55,23 +56,21 @@ spawn_world :: proc(self: ^Quickdraw) {
 
 spawn_gunner :: proc(self: ^Quickdraw, pid: knet.Player_Id) {
 	if _, has := gunner_owned_by(&self.boot, pid); has {return}
-	gp, gid := ksess.session_spawn_make(&self.ses, GUNNER_TYPE, owner = pid)
-	g := cast(^Gunner)gp
+	g, gid := gunner_spawn(&self.boot, owner = pid) // typed, from the entity tag — no const, no cast
 	g.pid = u8(pid)
 	g.hp = MAX_HP
 	g.gold = u8(gd.env_int("QD_GOLD", 0)) // the solo gate's starting purse; duels earn theirs
 	spot := SPAWNS[int(pid) % len(SPAWNS)]
 	g.x = spot[0]
 	g.y = spot[1]
-	ksess.session_spawn_send(&self.ses, gid)
+	kboot.boot_spawn_send(&self.boot, gid)
 
 	// ...and a DRONE beside them, owned by the same player: two entities, two
 	// input classes, one seat. It hovers a little above the gunner's spot and
 	// steers on Drone_Input every tick.
-	dp, did := ksess.session_spawn_make(&self.ses, DRONE_TYPE, owner = pid)
-	d := cast(^Drone)dp
+	d, did := drone_spawn(&self.boot, owner = pid)
 	d.pid = u8(pid)
 	d.x = spot[0]
 	d.y = clamp(spot[1] - 40, ARENA_WALL, ARENA_H - ARENA_WALL)
-	ksess.session_spawn_send(&self.ses, did)
+	kboot.boot_spawn_send(&self.boot, did)
 }

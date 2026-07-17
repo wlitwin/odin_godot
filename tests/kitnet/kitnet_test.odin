@@ -494,9 +494,11 @@ probe_cmd_mark :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) 
 }
 
 probe_commands := [?]knet.Command_Desc {
-	{name = "add", predict = true, invoke = probe_cmd_add},
-	{name = "torn", predict = true, invoke = probe_cmd_torn},
-	{name = "mark", predict = false, invoke = probe_cmd_mark},
+	// Hand-built sets pick their own STABLE wire ids (Command_Desc.id) —
+	// lookup is by id now, never by array position.
+	{name = "add", id = CMD_ADD, predict = true, invoke = probe_cmd_add},
+	{name = "torn", id = CMD_TORN, predict = true, invoke = probe_cmd_torn},
+	{name = "mark", id = CMD_MARK, predict = false, invoke = probe_cmd_mark},
 }
 
 Capture :: struct {

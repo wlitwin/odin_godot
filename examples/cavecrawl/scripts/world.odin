@@ -190,19 +190,17 @@ cave_build_floor :: proc(self: ^CaveLobby, depth: int) {
 	chest_at := marker_pos(self, "ChestSpawn")
 	door_at := marker_pos(self, "DoorSpawn")
 
-	cep, cid := ksess.session_spawn_make(&self.ses, CHEST_TYPE)
-	chest := cast(^Chest)cep
+	chest, cid := chest_spawn(&self.boot) // typed, from the entity tag — no const, no cast
 	chest.x = chest_at.x
 	chest.y = chest_at.y
 	chest.slots[0] = {GEM, u16(def.gems)}
 	chest.slots[1] = {TORCH, u16(def.torches)}
-	ksess.session_spawn_send(&self.ses, cid)
+	kboot.boot_spawn_send(&self.boot, cid)
 
-	dep, did := ksess.session_spawn_make(&self.ses, DOOR_TYPE)
-	door := cast(^Door)dep
+	door, did := door_spawn(&self.boot)
 	door.x = door_at.x
 	door.y = door_at.y
-	ksess.session_spawn_send(&self.ses, did)
+	kboot.boot_spawn_send(&self.boot, did)
 }
 
 // Host, Start pressed: build the world — the depth marker, floor 1, and a
@@ -220,32 +218,29 @@ cave_lobby_on_start :: proc(self: ^CaveLobby) {
 		return
 	}
 
-	lep, lid := ksess.session_spawn_make(&self.ses, LEVEL_TYPE)
-	lv := cast(^Level)lep
+	lv, lid := level_spawn(&self.boot)
 	lv.depth = 1
 	lv.seed = u32(i64(now_s() * 1000)) | 1 // the run's dice, minted once, never zero
-	ksess.session_spawn_send(&self.ses, lid)
+	kboot.boot_spawn_send(&self.boot, lid)
 	cave_inscribe(self) // floor 1's inscription — late joiners get it with the world
 
 	cave_build_floor(self, 1)
 
 	// The relic: one per run, resting near the mouth until someone carries it.
-	rp, rid := ksess.session_spawn_make(&self.ses, RELIC_TYPE)
-	relic := cast(^Relic)rp
+	relic, rid := relic_spawn(&self.boot)
 	relic.x, relic.y = SPAWN_X + 40, SPAWN_Y - 40
-	ksess.session_spawn_send(&self.ses, rid)
+	kboot.boot_spawn_send(&self.boot, rid)
 
 	i := 0
 	for _, p in self.ses.players {
 		if !p.connected {continue}
-		sep, sid := ksess.session_spawn_make(&self.ses, SPELUNKER_TYPE, owner = p.id)
-		sp := cast(^Spelunker)sep
+		sp, sid := spelunker_spawn(&self.boot, owner = p.id)
 		sp.x = SPAWN_X + f32(i) * 60
 		sp.y = SPAWN_Y
 		sp.hp = MAX_HP
 		sp.stamina = MAX_STAMINA
 		i += 1
-		ksess.session_spawn_send(&self.ses, sid)
+		kboot.boot_spawn_send(&self.boot, sid)
 	}
 
 	ksess.session_start_replicating(&self.ses)

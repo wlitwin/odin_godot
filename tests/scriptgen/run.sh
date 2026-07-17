@@ -259,8 +259,8 @@ grep -q "RUNNER_CMD_PRIMARY_RELOAD :: u16" "$vgen" || fail "plain composed comma
 grep -q "return gun_fire(&self.primary, self, _a0)" "$vgen" || fail "decode thunk must route into &self.primary and pass self (owner)"
 grep -q "return gun_reload(&self.secondary)" "$vgen" || fail "plain composed thunk must route into &self.secondary with no owner/args"
 grep -q "runner_secondary_fire_cmd :: proc" "$vgen" || fail "issue wrapper must be named per-entity (runner_secondary_fire_cmd)"
-grep -q '{name = "primary_fire", predict = true' "$vgen" || fail "composed predict flag not carried"
-grep -q '{name = "primary_reload", predict = false' "$vgen" || fail "plain composed command must have predict = false"
+grep -q '{name = "primary_fire", id = RUNNER_CMD_PRIMARY_FIRE, predict = true' "$vgen" || fail "composed predict flag (and stable wire id) not carried"
+grep -q '{name = "primary_reload", id = RUNNER_CMD_PRIMARY_RELOAD, predict = false' "$vgen" || fail "plain composed command must have predict = false"
 grep -q "offset_of(Runner, primary) + offset_of(type_of(Runner{}.primary), ammo)" "$vgen" || fail "the block's replicated state must compose upward beside its verbs"
 
 # ---- fixture 8: VERB composition — IMPORTED block (qualifier + import) --------
@@ -417,7 +417,7 @@ grep -q 'offset_of(type_of(HeroC{}.rev), target).*flags = {.Owner_Stream}' "$cge
 grep -q 'offset_of(type_of(HeroC{}.rev), pct).*flags = {.Owner_Stream}' "$cgen" || fail "rev.pct must be owner-streamed through the embed"
 grep -q "HERO_C_CMD_REV_CLAIM :: u16" "$cgen" || fail "the channel's claim must hoist as HERO_C_CMD_REV_CLAIM"
 grep -q "return play.channel_claim(&self.rev, _a0)" "$cgen" || fail "claim thunk must route into &self.rev with the wire target"
-grep -q '{name = "rev_claim", predict = false' "$cgen" || fail "the claim must be a PLAIN command (no prediction)"
+grep -q '{name = "rev_claim", id = HERO_C_CMD_REV_CLAIM, predict = false' "$cgen" || fail "the claim must be a PLAIN command (no prediction)"
 
 # ---- fixture 13: play.Health — a VERB-FREE block composes state only ----------
 # Health ships no @(gd_command) (damage is host-internal, not client intent): its hp/max must

@@ -36,6 +36,39 @@ their ids, stats, and owned entities back — exactly like any reconnect.
 The envelope is engine-free (bytes in, bytes out — unit-testable without Godot); the file
 helpers are thin FileAccess wrappers so `user://` paths work on every platform, web included.
 
+## Declaring the game blob — `gd:"backup"`
+
+The game blob is the same host-local state host migration ships (see [session](session.md)),
+and you don't hand-serialize it. Tag the fields on your game class `gd:"backup"` and scriptgen
+generates a version-hashed `<class>_backup_write` / `_read` pair over them — so a takeover or a
+resume restores the campaign with no second, hand-kept read list to drift out of order (the
+classic silent-corruption bug this shape exists to kill):
+
+```odin
+CaveLobby :: struct {
+	host_ticks: int                           `gd:"backup"`,
+	director:   kai.Director                  `gd:"backup"`, // a POD struct rides whole
+	brains:     map[knet.Net_Id]Dweller_Brain `gd:"backup"`, // map[POD]POD: length + loop
+	respawn_at: map[knet.Net_Id]int           `gd:"backup"`,
+	// ...
+}
+
+cave_backup_blob :: proc(user: rawptr, w: ^knet.Writer) { // session_set_backup_blob's hook
+	self := cast(^CaveLobby)user
+	if self.ses.is_host && self.started {cave_lobby_backup_write(self, w)}
+}
+// resume / takeover:
+r := knet.reader_make(blob)
+if !cave_lobby_backup_read(self, &r) { /* stale or truncated — bail */ }
+```
+
+Supported: POD scalars, POD structs, POD fixed arrays, `map[POD]POD`, and `[dynamic]POD` (rides
+`using`/embeds like `replicate`). Anything else — a slice, a string, a non-POD element — is a
+build error, spelled out. The version const is a hash of the field set, so a blob from a
+mismatched build fails the read cleanly instead of misreading bytes: the automatic form of the
+version byte you used to keep by hand. `knet.write_pod`/`read_pod` are that same primitive,
+exposed for any fixed-shape state you still serialize by hand.
+
 ## API by task
 
 **Save** — host only:

@@ -105,8 +105,10 @@ cave_lobby_won :: proc(self: ^CaveLobby) -> gd.Bool {
 	return gd.Bool(self.level != nil && self.level.won != 0)
 }
 
+// `was_kicked`, not `kicked`: the bare name is the Ev_Kicked event half now
+// (cavecrawl.odin) — event suffixes are reserved on the game shell.
 @(gd_method)
-cave_lobby_kicked :: proc(self: ^CaveLobby) -> gd.Bool {
+cave_lobby_was_kicked :: proc(self: ^CaveLobby) -> gd.Bool {
 	return gd.Bool(self.kicked_out)
 }
 

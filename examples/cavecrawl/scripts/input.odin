@@ -12,6 +12,7 @@ import kcombat "godot:kit/combat"
 import ksess "godot:kit/session"
 import kcomms "godot:kit/comms"
 import kitems "godot:kit/items"
+import knet "godot:kit/net"
 import kui "godot:kit/ui"
 import "core:fmt"
 
@@ -142,25 +143,25 @@ cave_lobby_interact :: proc(self: ^CaveLobby) {
 		// No "authority inline half" here: the host's own commands fire the
 		// command hook exactly like client commands do. The repaint is
 		// role-free UX: show the predicted/settled bag THIS frame.
-		applied := chest_take_cmd(&self.ses.ctx, chest, slot, me.x, me.y)
+		applied := knet.command_ok(chest_take_cmd(&self.boot, chest, slot, me.x, me.y))
 		kui.inv_refresh(&self.inv, me.bag[:], &self.table)
 		gd.print_str(fmt.tprintf("CAVE_LOOT applied=%v slot=%d", applied, slot))
 	case 2:
 		door := self.doors[self.target_id]
-		applied := door_toggle_cmd(&self.ses.ctx, door, me.x, me.y)
+		applied := knet.command_ok(door_toggle_cmd(&self.boot, door, me.x, me.y))
 		gd.print_str(fmt.tprintf("CAVE_TOGGLE applied=%v open=%v", applied, door.open))
 	case 3:
 		id := self.target_id
 		p := self.pickups[id]
-		applied := pickup_grab_cmd(&self.ses.ctx, p, me.x, me.y)
+		applied := knet.command_ok(pickup_grab_cmd(&self.boot, p, me.x, me.y))
 		kui.inv_refresh(&self.inv, me.bag[:], &self.table)
 		gd.print_str(fmt.tprintf("CAVE_GRAB applied=%v", applied))
 	case 4:
-		applied := relic_grab_cmd(&self.ses.ctx, self.relic, me.x, me.y)
+		applied := knet.command_ok(relic_grab_cmd(&self.boot, self.relic, me.x, me.y))
 		gd.print_str(fmt.tprintf("CAVE_RELIC_GRAB applied=%v", applied))
 	case 5:
 		sp := self.spelunkers[self.target_id]
-		applied := spelunker_revive_cmd(&self.ses.ctx, sp, me.x, me.y)
+		applied := knet.command_ok(spelunker_revive_cmd(&self.boot, sp, me.x, me.y))
 		gd.print_str(fmt.tprintf("CAVE_REVIVE applied=%v", applied))
 	}
 }
@@ -171,7 +172,7 @@ cave_lobby_interact :: proc(self: ^CaveLobby) {
 cave_lobby_drop_relic :: proc(self: ^CaveLobby) {
 	if !self.started || self.relic == nil {return}
 	if ksess.session_owner_of(&self.ses, self.relic_id) != self.ses.me {return}
-	applied := relic_drop_cmd(&self.ses.ctx, self.relic)
+	applied := knet.command_ok(relic_drop_cmd(&self.boot, self.relic))
 	gd.print_str(fmt.tprintf("CAVE_RELIC_DROP applied=%v", applied))
 }
 
@@ -187,7 +188,7 @@ cave_lobby_throw :: proc(self: ^CaveLobby, dx: gd.Float, dy: gd.Float) {
 	// noise the game never needed to make).
 	if me.hp <= 0 || !kcombat.ability_ready(me.cds[:], 0) || me.stamina < ROCK_ABILITY.cost {return}
 	self.issue_at = now_s()
-	applied := spelunker_throw_cmd(&self.ses.ctx, me, f32(dx), f32(dy), me.x, me.y)
+	applied := knet.command_ok(spelunker_throw_cmd(&self.boot, me, f32(dx), f32(dy), me.x, me.y))
 	if applied {
 		// Press fire, SEE rock — my visual flies this frame, no round trip.
 		// (On the host spelunker_throw_then already launched the authoritative
@@ -212,7 +213,7 @@ cave_lobby_heal :: proc(self: ^CaveLobby) {
 	// the authority's verdict (clients don't self-censor), so a key held
 	// at full hp would otherwise flood the host with doomed commands.
 	if me.hp <= 0 || me.hp >= MAX_HP || !kcombat.ability_ready(me.cds[:], 1) || me.stamina < HEAL_ABILITY.cost {return}
-	applied := spelunker_heal_cmd(&self.ses.ctx, self.me_spel)
+	applied := knet.command_ok(spelunker_heal_cmd(&self.boot, self.me_spel))
 	refresh_hud(self)
 	if applied {
 		gd.print_str(fmt.tprintf("CAVE_HEAL applied=true hp=%d stamina=%d", self.me_spel.hp, self.me_spel.stamina))
@@ -230,7 +231,7 @@ cave_lobby_show_score :: proc(self: ^CaveLobby, visible: gd.Bool) {
 @(gd_method)
 cave_lobby_drop :: proc(self: ^CaveLobby, slot: gd.Int) {
 	if !self.started || self.me_spel == nil {return}
-	applied := spelunker_drop_cmd(&self.ses.ctx, self.me_spel, i32(slot))
+	applied := knet.command_ok(spelunker_drop_cmd(&self.boot, self.me_spel, i32(slot)))
 	kui.inv_refresh(&self.inv, self.me_spel.bag[:], &self.table)
 	gd.print_str(fmt.tprintf("CAVE_DROP applied=%v", applied))
 }

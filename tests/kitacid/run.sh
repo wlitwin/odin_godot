@@ -126,15 +126,15 @@ attempt() {
 	grep -q "ACID_SEATED me=" "$wlog" || { echo "  FAIL: owner was never welcomed"; ok=0; }
 	grep -qF "ACID_SPAWN ok=true id=1 mine=true hp=100 st=10" "$wlog" \
 		|| { echo "  FAIL: owner join snapshot (with ownership) not verified"; ok=0; }
-	grep -qF "ACID_ISSUE n=1 predicted=true hp=92 st=6 pending=1" "$wlog" \
+	grep -qF "ACID_ISSUE n=1 predicted=Predicted hp=92 st=6 pending=1" "$wlog" \
 		|| { echo "  FAIL: strike 1 was not predicted instantly"; ok=0; }
 	grep -qF "ACID_CONFIRM n=1 ok=true hp=92 st=6 pending=0 lat_ok=true" "$wlog" \
 		|| { echo "  FAIL: confirm 1 wrong (or beat the injected latency)"; ok=0; }
-	grep -qF "ACID_ISSUE n=2 predicted=true hp=84 st=2 pending=1" "$wlog" \
+	grep -qF "ACID_ISSUE n=2 predicted=Predicted hp=84 st=2 pending=1" "$wlog" \
 		|| { echo "  FAIL: strike 2 was not predicted instantly"; ok=0; }
 	grep -qF "ACID_CONFIRM n=2 ok=true hp=84 st=2 pending=0 lat_ok=true" "$wlog" \
 		|| { echo "  FAIL: confirm 2 wrong (or beat the injected latency)"; ok=0; }
-	grep -qF "ACID_ISSUE n=3 predicted=false hp=84 st=2 pending=0" "$wlog" \
+	grep -qF "ACID_ISSUE n=3 predicted=Rejected hp=84 st=2 pending=0" "$wlog" \
 		|| { echo "  FAIL: empty-stamina strike must locally reject + revert (and still send)"; ok=0; }
 	grep -qF "ACID_REJECT n=3 ok=true hp=84 st=2 pending=0" "$wlog" \
 		|| { echo "  FAIL: host reject + truth did not settle the owner"; ok=0; }

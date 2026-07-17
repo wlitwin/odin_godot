@@ -27,6 +27,7 @@ import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import ksim "godot:kit/sim"
 import kui "godot:kit/ui"
+import netgd "godot:kit/netgd"
 
 MSG_SESSION :: u8(0)
 DEFAULT_PORT :: 4189
@@ -42,6 +43,7 @@ Quickdraw :: struct {
 	comms:   kcomms.Comms,
 	boot:    kboot.Boot,
 	lane:    ksim.Lane,
+	netgraph: kui.Netgraph, // the drop-in net-health overlay (rtt + resim spikes)
 	running: bool,
 	started: bool,
 
@@ -69,6 +71,9 @@ Quickdraw :: struct {
 now_s :: knet.now_s
 
 quickdraw_ready :: proc(self: ^Quickdraw) {
+	// The build's wire contract (generated): a version-skewed join is refused
+	// at the door (Deny_Reason.Version) instead of misparsing deltas.
+	ksess.session_configure(&self.ses, {fingerprint = NET_FINGERPRINT})
 	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
 		title = "Q U I C K D R A W",
 		status = "Host a duel, or join one at localhost",
@@ -96,6 +101,12 @@ quickdraw_ready :: proc(self: ^Quickdraw) {
 	})
 	kboot.boot_lane(&self.boot, &self.lane) // the boot drives the lane from here on
 
+	// The net-health overlay — a kit/ui drop-in, left on. Its resim sparkline
+	// is the visible proof of the promise: flat when the wire is calm, spiking
+	// exactly when a lost input or a mispredict makes the client rewind.
+	self.netgraph = kui.netgraph_make(cast(gd.Node)self.owner)
+	kui.netgraph_show(&self.netgraph, true)
+
 	install_controls()
 	self.bot = gd.env_string("QD_BOT", "")
 
@@ -113,7 +124,18 @@ quickdraw_ready :: proc(self: ^Quickdraw) {
 		self.auto_peers = gd.env_int("QD_PEERS", 2)
 		quickdraw_on_serve(self)
 	}
+	// Scripted matches auto-start when the table fills — checked wherever the
+	// count can change: here (single mode seats only me) and on each join's
+	// authority consequence (quickdraw_player_joined_then).
+	quickdraw_try_start(self)
 	gd.print_str("QD_UI_READY")
+}
+
+quickdraw_try_start :: proc(self: ^Quickdraw) {
+	if self.started || self.auto_peers <= 0 {return}
+	if ksess.session_count(&self.ses, connected_only = true, players_only = true) >= self.auto_peers {
+		quickdraw_on_start(self) // self-gating: non-hosts and re-calls no-op
+	}
 }
 
 quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
@@ -123,10 +145,24 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 	// (predict/simulate, then present) — before this returns.
 	events, _, _ := kboot.boot_pump(&self.boot, delta, now_s())
 
-	if !self.started && self.ses.is_host && self.auto_peers > 0 &&
-	   ksess.session_count(&self.ses, connected_only = true, players_only = true) >= self.auto_peers {
-		quickdraw_on_start(self)
+	// Fill the net-health overlay from the readable tallies: rtt off the
+	// replicated ping stat (host or client), the LINK's own truth (ENet's
+	// loss + rtt variance — clients only; the host has no link to itself),
+	// the wire's bytes-by-kind line, and the lane's resim/reconcile counters.
+	// Coop games leave `sim` false.
+	ng := kui.Net_Stats{
+		rtt_ms  = kui.net_ping_ms(&self.ses),
+		sim     = true,
+		lead    = ksim.lane_lead(&self.lane),
+		resims  = self.lane.stat_resims,
+		recons  = self.lane.stat_reconciles,
+		traffic = netgd.wire_traffic(&self.boot.wire),
 	}
+	if _, jit, loss, has := netgd.wire_link_quality(&self.boot.wire, ksess.HOST_PEER); has {
+		ng.jitter_ms = jit
+		ng.loss_pct = loss
+	}
+	kui.netgraph_refresh(&self.netgraph, ng)
 
 	// THE SHOP DOOR — a tick-scheduled verb, issued like any coop command
 	// (a key edge, or the bots' own hands): your gear flips at your NEXT
@@ -137,7 +173,7 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 	if self.me_gun != nil {
 		buy := gd.is_action_just_pressed("qd_buy") ||
 			(self.bot != "" && self.me_gun.gear == 0 && self.me_gun.gold >= BOOTS_PRICE)
-		if buy && gunner_buy_cmd(&self.lane, self.me_gun, GEAR_BOOTS) {
+		if buy && knet.command_ok(gunner_buy_cmd(&self.boot, self.me_gun, GEAR_BOOTS)) {
 			gd.print_str(fmt.tprintf("QD_BUY_SENT tick=%d", ksim.lane_now(&self.lane)))
 		}
 		if self.me_gun.gear != self.gear_seen {
@@ -146,35 +182,53 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 		}
 	}
 
-	for ev in events {
-		#partial switch e in ev {
-		case ksess.Ev_Welcomed:
-			gd.print_str(fmt.tprintf("QD_SEATED me=%d", u64(e.me)))
-		case ksess.Ev_Player_Joined:
-			if self.ses.is_host {
-				if p, ok := ksess.session_player(&self.ses, e.id); ok {
-					kcomms.comms_welcome(&self.comms, e.id, e.rejoin, fmt.tprintf("%s steps into the dust", p.name))
-				}
-				if self.started && !e.rejoin {
-					spawn_gunner(self, e.id)
-				}
-			}
-		case ksess.Ev_Host_Left:
-			kui.lobby_set_status(&self.boot.ui, "The marshal left — duel's off")
-			gd.print_str("QD_HOST_LEFT")
-		case ksess.Ev_Spawned:
-			if !self.started {
-				self.started = true
-				gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
-				gd.set_bool(cast(gd.Object)self.boot.legend, "visible", true)
-				gd.print_str("QD_STARTED")
-			}
-		case ksess.Ev_Join_Denied:
-			gd.print_str(fmt.tprintf("QD_DENIED reason=%v", e.reason))
-		case ksess.Ev_Join_Failed:
-			gd.print_str("QD_JOIN_FAILED")
-		}
+	// The event reactions are the name-paired halves below; the generated
+	// quickdraw_events holds the switch and every role gate.
+	quickdraw_events(self, events)
+}
+
+// ---- session event halves ---------------------------------------------------
+
+quickdraw_welcomed :: proc(self: ^Quickdraw, me: knet.Player_Id) {
+	gd.print_str(fmt.tprintf("QD_SEATED me=%d", u64(me)))
+}
+
+// The join's authority consequence: word the arrival, field a late joiner,
+// and start the scripted match when the table fills — the whole block the
+// shell used to wrap in is_host, now gate-free (the dispatch holds it).
+quickdraw_player_joined_then :: proc(self: ^Quickdraw, id: knet.Player_Id, rejoin: bool) {
+	if p, ok := ksess.session_player(&self.ses, id); ok {
+		kcomms.comms_welcome(&self.comms, id, rejoin, fmt.tprintf("%s steps into the dust", p.name))
 	}
+	if self.started && !rejoin {
+		spawn_gunner(self, id)
+	}
+	quickdraw_try_start(self)
+}
+
+quickdraw_host_left :: proc(self: ^Quickdraw) {
+	kui.lobby_set_status(&self.boot.ui, "The marshal left — duel's off")
+	gd.print_str("QD_HOST_LEFT")
+}
+
+quickdraw_entity_spawned :: proc(self: ^Quickdraw, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
+	_ = id
+	_ = type
+	_ = owner
+	if !self.started {
+		self.started = true
+		gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
+		gd.set_bool(cast(gd.Object)self.boot.legend, "visible", true)
+		gd.print_str("QD_STARTED")
+	}
+}
+
+quickdraw_join_denied :: proc(self: ^Quickdraw, reason: ksess.Deny_Reason) {
+	gd.print_str(fmt.tprintf("QD_DENIED reason=%v", reason))
+}
+
+quickdraw_join_failed :: proc(self: ^Quickdraw) {
+	gd.print_str("QD_JOIN_FAILED")
 }
 
 // ---- the input sample: the ONE place that touches hardware -------------------
@@ -314,8 +368,9 @@ bot_sample :: proc(g: ^Quickdraw, tick: u64, input: ^Gunner_Input) {
 //
 // gunner_tick returns `fired` — a fact — and the generated thunk routes it,
 // holding every role gate the old world pass hand-wrote: the consequence on
-// the authority, the fx on this player's live pass, never a resim, never a
-// double fire. What's left is single-player-looking on both sides.
+// the authority, the fx on EVERY screen at its own presentation time (the
+// mine-form — never a resim, never a double fire, watchers on the watch
+// clock). What's left is single-player-looking on both sides.
 
 // AUTHORITY: the shot's consequences. The hitscan shot judges where the
 // shooter's screen aimed (delta-lane damage); the LOB spawns the AUTHORITATIVE
@@ -331,28 +386,39 @@ gunner_tick_then :: proc(g: ^Quickdraw, self: ^Gunner, by: knet.Player_Id, fired
 	}
 }
 
-// THIS PLAYER, live pass only: the muzzle answers the click NOW, and the lob's
-// bullet leaves the barrel THIS instant — a predicted spawn, before the
-// authority's real one is even in flight on the wire.
-gunner_tick_fx :: proc(g: ^Quickdraw, self: ^Gunner, fired: bool, lobbed: bool) {
+// EVERY SCREEN (the mine-form): the tracer draws where each screen presents
+// the shot — the shooter's at the muzzle instant (mine, the live pass), the
+// authority's live, and watchers when their watch clock reaches the shot's
+// tick, ON the delayed barrel that fired it (the fact tuple rides a reliable
+// SIM_FACT; the lane holds the timing). This deletes the shot_seq/shot_aim
+// replicated scratch and the hand-rolled seen_shot edge the tracer used to
+// need. The LOB's predicted spawn stays mine-gated: speculation is a CLIENT
+// move (the authority's real bullet comes from the _then above — a hosting
+// player's fire is already authoritative, and speculating it too would
+// double the bullet).
+gunner_tick_fx :: proc(g: ^Quickdraw, self: ^Gunner, mine: bool, fired: bool, lobbed: bool) {
 	if fired {
 		gunner_beam(self, self.aim)
-		gd.print_str("QD_FIRE")
+		if mine {
+			gd.print_str("QD_FIRE")
+		} else {
+			gd.print_str(fmt.tprintf("QD_TRACER pid=%d", self.pid))
+		}
 	}
-	if lobbed {
+	if lobbed && mine && !ksim.lane_is_authority(&g.lane) {
 		lob_bullet(g, self, g.ses.me)
 		gd.print_str(fmt.tprintf("QD_LOB_LOCAL tick=%d", ksim.lane_now(&g.lane)))
 	}
 }
 
-// Spawn the lob's bullet at the muzzle, aimed. One call, no role branch:
-// boot_fire_spawn routes it — the authority (the _then half) gets a real net id
-// it announces; this client (the _fx half) gets a local predicted node, flying
-// now, that the authority's spawn will rekey. Set the flight, then send.
+// Spawn the lob's bullet at the muzzle, aimed. One call, no role branch, no
+// cast: the generated bullet_spawn routes it — the authority (the _then half)
+// gets a real net id it announces; this client (the _fx half) gets a local
+// predicted node, flying now, that the authority's spawn will rekey. Set the
+// flight, then send.
 lob_bullet :: proc(g: ^Quickdraw, gun: ^Gunner, owner: knet.Player_Id) {
-	bp, bid := kboot.boot_fire_spawn(&g.boot, BULLET_TYPE, owner)
-	if bp == nil {return}
-	b := cast(^Bullet)bp
+	b, bid := bullet_spawn(&g.boot, owner)
+	if b == nil {return}
 	dx, dy := math.cos(gun.aim), math.sin(gun.aim)
 	b.x = gun.x + dx * (GUN_R + 4)
 	b.y = gun.y + dy * (GUN_R + 4)
@@ -360,7 +426,7 @@ lob_bullet :: proc(g: ^Quickdraw, gun: ^Gunner, owner: knet.Player_Id) {
 	b.vy = dy * LOB_SPEED
 	b.life = LOB_LIFE
 	b.pid = u8(owner)
-	kboot.boot_fire_spawn_send(&g.boot, bid)
+	kboot.boot_spawn_send(&g.boot, bid)
 }
 
 // The buy's consequence — AUTHORITY only, at the verb's execution tick: the
@@ -412,9 +478,8 @@ adjudicate_shot :: proc(g: ^Quickdraw, shooter_id: knet.Net_Id, gun: ^Gunner, pi
 	}
 	ksim.lane_rewound_end(&g.lane)
 
-	// The tracer + the verdict reach every screen as STATE (the delta lane).
-	gun.shot_seq += 1
-	gun.shot_aim = a
+	// The VERDICT reaches every screen as state (hp, the delta lane); the
+	// tracer already rode the tick's `fired` fact (the mine-form fx above).
 	g.shot_count += 1
 	gd.print_str(fmt.tprintf("QD_SHOT by=%d tick=%d judged=%d", u64(pid), tick, judged))
 

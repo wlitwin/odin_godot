@@ -51,7 +51,6 @@ Speedball :: struct {
 	goals_to: u8,
 
 	// Presentation edges + the acid's probes.
-	seen_l, seen_r, seen_won: u8,
 	auto_peers: int,
 	bot:        string, // SPB_BOT: "" | "striker" | "spiker" | "idle"
 	done:       bool,
@@ -63,6 +62,7 @@ Speedball :: struct {
 now_s :: knet.now_s
 
 speedball_ready :: proc(self: ^Speedball) {
+	ksess.session_configure(&self.ses, {fingerprint = NET_FINGERPRINT}) // refuse skewed builds at the door
 	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
 		title = "S P E E D B A L L",
 		status = "Host a pitch, or join one at localhost — the contested twin",
@@ -101,7 +101,18 @@ speedball_ready :: proc(self: ^Speedball) {
 		self.auto_peers = gd.env_int("SPB_PEERS", 2)
 		speedball_on_serve(self)
 	}
+	// Scripted matches auto-start when the pitch fills — checked wherever the
+	// count can change: here (single mode seats only me) and on each join's
+	// authority consequence (speedball_player_joined_then).
+	speedball_try_start(self)
 	gd.print_str("SPB_UI_READY")
+}
+
+speedball_try_start :: proc(self: ^Speedball) {
+	if self.started || self.auto_peers <= 0 {return}
+	if ksess.session_count(&self.ses, connected_only = true, players_only = true) >= self.auto_peers {
+		speedball_on_start(self) // self-gating: non-hosts and re-calls no-op
+	}
 }
 
 speedball_process :: proc(self: ^Speedball, delta: f64) {
@@ -117,16 +128,16 @@ speedball_process :: proc(self: ^Speedball, delta: f64) {
 		b := self.ball
 		me := self.me_kick
 		want := gd.is_action_just_pressed("spb_spike")
-		if self.bot == "spiker" && !self.spiked && b.hold == 0 && b.won == 0 {
+		if self.bot == "spiker" && !self.spiked && b.hold == 0 && b.score.won == 0 {
 			dx := b.roll.x - me.run.x
 			dy := b.roll.y - me.run.y
 			want = want || dx * dx + dy * dy < SPIKE_REACH * SPIKE_REACH
 		}
-		if want && ball_spike_cmd(&self.lane, b, me.run.x, me.run.y) {
+		if want && knet.command_ok(ball_spike_cmd(&self.boot, b, me.run.x, me.run.y)) {
 			if !self.spiked {
 				self.spiked = true
 				self.spike_from = {b.roll.x, b.roll.y}
-				_ = ball_spike_cmd(&self.lane, b, me.run.x, me.run.y) // the burst's second verb
+				_ = ball_spike_cmd(&self.boot, b, me.run.x, me.run.y) // the burst's second verb
 				gd.print_str(fmt.tprintf("SPB_SPIKE_SENT tick=%d", ksim.lane_now(&self.lane)))
 			}
 		}
@@ -140,64 +151,79 @@ speedball_process :: proc(self: ^Speedball, delta: f64) {
 		}
 	}
 
-	if !self.started && self.ses.is_host && self.auto_peers > 0 &&
-	   ksess.session_count(&self.ses, connected_only = true, players_only = true) >= self.auto_peers {
-		speedball_on_start(self)
-	}
-	if self.started {
-		score_edges(self)
-	}
+	// The event reactions are the name-paired halves below; the generated
+	// speedball_events holds the switch and every role gate.
+	speedball_events(self, events)
+}
 
-	for ev in events {
-		#partial switch e in ev {
-		case ksess.Ev_Welcomed:
-			gd.print_str(fmt.tprintf("SPB_SEATED me=%d", u64(e.me)))
-		case ksess.Ev_Player_Joined:
-			if self.ses.is_host {
-				if p, ok := ksess.session_player(&self.ses, e.id); ok {
-					kcomms.comms_welcome(&self.comms, e.id, e.rejoin, fmt.tprintf("%s takes the pitch", p.name))
-				}
-				if self.started && !e.rejoin {
-					spawn_kicker(self, e.id)
-				}
-			}
-		case ksess.Ev_Host_Left:
-			kui.lobby_set_status(&self.boot.ui, "The host left — this match is over")
-			gd.print_str("SPB_HOST_LEFT")
-		case ksess.Ev_Spawned:
-			if !self.started {
-				self.started = true
-				gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
-				gd.set_bool(cast(gd.Object)self.boot.legend, "visible", true)
-				gd.print_str("SPB_STARTED")
-			}
-		case ksess.Ev_Join_Failed:
-			gd.print_str("SPB_JOIN_FAILED")
-		}
+// ---- session event halves ---------------------------------------------------
+
+speedball_welcomed :: proc(self: ^Speedball, me: knet.Player_Id) {
+	gd.print_str(fmt.tprintf("SPB_SEATED me=%d", u64(me)))
+}
+
+// The join's authority consequence: word the arrival, field a late joiner,
+// start the scripted match when the pitch fills — is_host-free (the
+// generated dispatch holds the gate).
+speedball_player_joined_then :: proc(self: ^Speedball, id: knet.Player_Id, rejoin: bool) {
+	if p, ok := ksess.session_player(&self.ses, id); ok {
+		kcomms.comms_welcome(&self.comms, id, rejoin, fmt.tprintf("%s takes the pitch", p.name))
+	}
+	if self.started && !rejoin {
+		spawn_kicker(self, id)
+	}
+	speedball_try_start(self)
+}
+
+speedball_host_left :: proc(self: ^Speedball) {
+	kui.lobby_set_status(&self.boot.ui, "The host left — this match is over")
+	gd.print_str("SPB_HOST_LEFT")
+}
+
+// The scoreboard's INITIAL dress — a late joiner's 3—2 — rides this half, on
+// the event (fields are set), never in the ball_spawned census hook (it
+// fires before the spawn tuple applies); the edge half stays silent on
+// first sight by design (a baseline, not an edge).
+speedball_entity_spawned :: proc(self: ^Speedball, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
+	_ = id
+	_ = owner
+	if !self.started {
+		self.started = true
+		gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
+		gd.set_bool(cast(gd.Object)self.boot.legend, "visible", true)
+		gd.print_str("SPB_STARTED")
+	}
+	if type == BALL_TYPE && self.ball != nil && (self.ball.score.l != 0 || self.ball.score.r != 0) {
+		kui.lobby_set_status(&self.boot.ui, fmt.tprintf("%d — %d", self.ball.score.l, self.ball.score.r))
 	}
 }
 
-// Every peer narrates goals and the match from REPLICATED bytes — the state
-// IS the news, exactly slopball's discipline, one netcode over.
-score_edges :: proc(self: ^Speedball) {
-	if self.ball == nil {return}
-	b := self.ball
-	if b.score_l != self.seen_l || b.score_r != self.seen_r {
-		self.seen_l = b.score_l
-		self.seen_r = b.score_r
-		kui.lobby_set_status(&self.boot.ui, fmt.tprintf("%d — %d", b.score_l, b.score_r))
-		gd.print_str(fmt.tprintf("SPB_SCORE l=%d r=%d", b.score_l, b.score_r))
+speedball_join_failed :: proc(self: ^Speedball) {
+	gd.print_str("SPB_JOIN_FAILED")
+}
+
+// THE SCOREBOARD EDGE — every peer narrates goals and the match from
+// REPLICATED state, but the seen_* mirrors and the per-frame compare are
+// gone: Score is ONE field (ball.odin's co-location), so this half receives
+// the whole old/new atomically and fires ONCE per net change even when a
+// goal moves l and won together — where per-field halves would have printed
+// the log twice and dinged a horn twice. Wire-fresh on purpose: a scoreboard
+// is timelines row 4 (no spatial cause) — never delay it. The INITIAL dress
+// (a late joiner's 3—2) rides Ev_Spawned above — the event fires with the
+// tuple's fields SET, unlike the census hook: spawn values are a baseline,
+// not an edge.
+ball_score_edge :: proc(g: ^Speedball, self: ^Ball, old, new: Score) {
+	if new.l != old.l || new.r != old.r {
+		kui.lobby_set_status(&g.boot.ui, fmt.tprintf("%d — %d", new.l, new.r))
+		gd.print_str(fmt.tprintf("SPB_SCORE l=%d r=%d", new.l, new.r))
 	}
-	if b.won != self.seen_won {
-		self.seen_won = b.won
-		if b.won != 0 {
-			side := b.won == 1 ? "LEFT" : "RIGHT"
-			kui.lobby_set_status(&self.boot.ui, fmt.tprintf("%s takes the match %d—%d", side, b.score_l, b.score_r))
-			gd.print_str(fmt.tprintf("SPB_MATCH winner=%d", b.won))
-			if !self.done {
-				self.done = true
-				gd.print_str("SPEEDBALL_DONE")
-			}
+	if new.won != old.won && new.won != 0 {
+		side := new.won == 1 ? "LEFT" : "RIGHT"
+		kui.lobby_set_status(&g.boot.ui, fmt.tprintf("%s takes the match %d—%d", side, new.l, new.r))
+		gd.print_str(fmt.tprintf("SPB_MATCH winner=%d", new.won))
+		if !g.done {
+			g.done = true
+			gd.print_str("SPEEDBALL_DONE")
 		}
 	}
 }
@@ -305,7 +331,7 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 	if b == nil {return}
 	// The acid's convergence probe reports through holds and match end.
 	if g.ses.is_host && tick % 60 == 0 {
-		gd.print_str(fmt.tprintf("SPB_POS tick=%d x=%.1f y=%.1f l=%d r=%d", tick, b.roll.x, b.roll.y, b.score_l, b.score_r))
+		gd.print_str(fmt.tprintf("SPB_POS tick=%d x=%.1f y=%.1f l=%d r=%d", tick, b.roll.x, b.roll.y, b.score.l, b.score.r))
 	}
 	if !g.ses.is_host && !g.lane.resimming && tick % 60 == 0 {
 		mx, my := f32(-1), f32(-1)
@@ -316,7 +342,7 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 		gd.print_str(fmt.tprintf("SPB_CVIEW tick=%d bx=%.1f by=%.1f mex=%.1f mey=%.1f resims=%d", tick, b.roll.x, b.roll.y, mx, my, g.lane.stat_resims))
 	}
 
-	if b.won != 0 || b.hold > 0 {return}
+	if b.score.won != 0 || b.hold > 0 {return}
 
 	for id in kicker_ids(&g.boot) {
 		k, _ := kicker_of(&g.boot, id)
@@ -383,12 +409,12 @@ ball_spike_then :: proc(g: ^Speedball, self: ^Ball, by: knet.Player_Id, px, py: 
 ball_tick_then :: proc(g: ^Speedball, self: ^Ball, by: knet.Player_Id, scored: u8) {
 	if scored == 0 {return}
 	if scored == 1 {
-		self.score_l += 1
+		self.score.l += 1
 	} else {
-		self.score_r += 1
+		self.score.r += 1
 	}
-	gd.print_str(fmt.tprintf("SPB_GOAL team=%d l=%d r=%d", scored, self.score_l, self.score_r))
-	if self.score_l >= g.goals_to || self.score_r >= g.goals_to {
-		self.won = scored
+	gd.print_str(fmt.tprintf("SPB_GOAL team=%d l=%d r=%d", scored, self.score.l, self.score.r))
+	if self.score.l >= g.goals_to || self.score.r >= g.goals_to {
+		self.score.won = scored
 	}
 }

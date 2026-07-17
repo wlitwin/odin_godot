@@ -50,8 +50,26 @@ Cmd_Exec :: proc(entity: rawptr, args: []u8, lane: ^Lane, by: knet.Player_Id) ->
 Cmd_Apply :: proc(entity: rawptr, args: []u8, lane: ^Lane)
 
 Sim_Cmd :: struct {
+	// The verb's STABLE wire id — what lane_command ships and every deref looks
+	// up (never an array position: reordering procs must not renumber the wire).
+	// scriptgen stamps an FNV-1a hash of the verb name and refuses same-set
+	// collisions at build time; hand-built sets pick any values unique within
+	// the set (a single command's zero value is fine).
+	id:    u16,
 	exec:  Cmd_Exec,
 	apply: Cmd_Apply, // nil = patch mode (recorded post-bytes replay)
+}
+
+// id → slot in the entity's command slice (-1 = unknown id: reject). Sets are
+// a handful of verbs — a scan beats any table.
+@(private)
+sim_cmd_find :: proc(cmds: []Sim_Cmd, id: u16) -> int {
+	for c, i in cmds {
+		if c.id == id {
+			return i
+		}
+	}
+	return -1
 }
 
 // How long a command may sit unanswered before the client treats silence as
@@ -74,7 +92,7 @@ Cmd_Out :: struct {
 	seq:      u32,
 	tick:     u64, // local execution tick
 	id:       knet.Net_Id,
-	idx:      u16, // index into the entity's Sim_Set.commands
+	cmd:      u16, // the verb's stable wire id (Sim_Cmd.id — resolved by lookup, never a position)
 	args:     []u8, // owned
 	executed: bool,
 	ok:       bool, // the LOCAL predicate's verdict (apply-mode resims gate on it)
@@ -91,7 +109,7 @@ Cmd_In :: struct {
 	from: knet.Player_Id,
 	seq:  u32,
 	id:   knet.Net_Id,
-	idx:  u16,
+	cmd:  u16, // the verb's stable wire id (Sim_Cmd.id)
 	args: []u8, // owned
 }
 
@@ -195,15 +213,15 @@ cmd_tracked :: proc(l: ^Lane, id: knet.Net_Id) -> ^Tracked {
 	return nil
 }
 
-// Issue verb `idx` of entity `id` with encoded `args` — the generated
-// `<verb>_cmd` wrapper's target; games never call this raw. Schedules the
-// execution at the next local tick (host and client alike — live and
-// replay must agree on WHEN), ships it tick-stamped on the reliable
+// Issue verb `cmd` (its stable wire id) of entity `id` with encoded `args` —
+// the generated `<verb>_cmd` wrapper's target; games never call this raw.
+// Schedules the execution at the next local tick (host and client alike —
+// live and replay must agree on WHEN), ships it tick-stamped on the reliable
 // channel, and returns whether it was scheduled: the VERDICT is state, not
 // a return value (watch the fields, or the authority's `_then`).
-lane_command :: proc(l: ^Lane, id: knet.Net_Id, idx: u16, args: []u8) -> bool {
+lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: u16, args: []u8) -> bool {
 	tr := cmd_tracked(l, id)
-	if tr == nil || tr.cmds == nil || int(idx) >= len(tr.cmds) {
+	if tr == nil || tr.cmds == nil || sim_cmd_find(tr.cmds, cmd) < 0 {
 		return false
 	}
 	if l.ses.is_host {
@@ -211,7 +229,7 @@ lane_command :: proc(l: ^Lane, id: knet.Net_Id, idx: u16, args: []u8) -> bool {
 		// speculation — its execution IS the truth.
 		queued := make([]u8, len(args))
 		copy(queued, args)
-		append(&l.cmd_in, Cmd_In{tick = l.ticker.tick + 1, from = l.ses.me, id = id, idx = idx, args = queued})
+		append(&l.cmd_in, Cmd_In{tick = l.ticker.tick + 1, from = l.ses.me, id = id, cmd = cmd, args = queued})
 		return true
 	}
 	// Predicted-HERE only: my own entities, and contested ones (on my
@@ -234,13 +252,13 @@ lane_command :: proc(l: ^Lane, id: knet.Net_Id, idx: u16, args: []u8) -> bool {
 	owned := make([]u8, len(args))
 	copy(owned, args)
 	l.cmd_seq += 1
-	append(&l.cmd_out, Cmd_Out{seq = l.cmd_seq, tick = l.ticker.tick + 1, id = id, idx = idx, args = owned})
+	append(&l.cmd_out, Cmd_Out{seq = l.cmd_seq, tick = l.ticker.tick + 1, id = id, cmd = cmd, args = owned})
 	w := ksess.session_app_begin(l.ses, l.tag)
 	knet.write_u8(w, SIM_CMD)
 	knet.write_u32(w, l.cmd_seq)
 	knet.write_u64(w, l.ticker.tick + 1)
 	knet.write_u32(w, u32(id))
-	knet.write_u16(w, idx)
+	knet.write_u16(w, cmd)
 	knet.write_bytes(w, args)
 	ksess.session_app_flush(l.ses, ksess.HOST_PEER) // reliable: verbs are one-shots
 	return true
@@ -252,13 +270,15 @@ cmd_handle :: proc(l: ^Lane, from: knet.Player_Id, r: ^knet.Reader) {
 	seq := knet.read_u32(r)
 	tick := knet.read_u64(r)
 	id := knet.Net_Id(knet.read_u32(r))
-	idx := knet.read_u16(r)
+	cmd := knet.read_u16(r)
 	args := knet.read_bytes(r)
 	if r.err {
 		return
 	}
 	tr := cmd_tracked(l, id)
-	if tr == nil || tr.cmds == nil || int(idx) >= len(tr.cmds) {
+	// An unknown id (version skew, a renamed verb) MISSES the lookup and drops
+	// cleanly — never dispatches to whatever lives at that position.
+	if tr == nil || tr.cmds == nil || sim_cmd_find(tr.cmds, cmd) < 0 {
 		return
 	}
 	// The cheat gate: your verbs move YOUR entities — or CONTESTED ones,
@@ -282,7 +302,7 @@ cmd_handle :: proc(l: ^Lane, from: knet.Player_Id, r: ^knet.Reader) {
 	// Late arrivals (a lag spike outran the lead) execute at the next tick —
 	// history is never rewritten; the client's reconcile absorbs the slip.
 	at := max(tick, l.ticker.tick + 1)
-	append(&l.cmd_in, Cmd_In{tick = at, from = from, seq = seq, id = id, idx = idx, args = queued})
+	append(&l.cmd_in, Cmd_In{tick = at, from = from, seq = seq, id = id, cmd = cmd, args = queued})
 }
 
 // Client: the authority answered (handler discipline — file it; the revert
@@ -313,8 +333,14 @@ run_cmds :: proc(l: ^Lane, t: u64) {
 				i += 1
 				continue
 			}
-			if tr := cmd_tracked(l, c.id); tr != nil && tr.cmds != nil && int(c.idx) < len(tr.cmds) {
-				ok := tr.cmds[c.idx].exec(tr.entity, c.args, l, c.from)
+			if tr := cmd_tracked(l, c.id); tr != nil && tr.cmds != nil {
+				slot := sim_cmd_find(tr.cmds, c.cmd)
+				if slot < 0 {
+					delete(c.args)
+					ordered_remove(&l.cmd_in, i)
+					continue // untracked verb id since filing (can't happen same-build)
+				}
+				ok := tr.cmds[slot].exec(tr.entity, c.args, l, c.from)
 				if c.from != l.ses.me {
 					if p, seated := ksess.session_player(l.ses, c.from); seated && p.peer != ksess.NO_PEER {
 						w := ksess.session_app_begin(l.ses, l.tag)
@@ -345,7 +371,11 @@ run_cmds :: proc(l: ^Lane, t: u64) {
 			c.executed = true
 			cmd_exec_local(l, &c, tr, l.ses.me)
 		} else if l.resimming && c.executed && c.verdict != .Rejected {
-			if ap := tr.cmds[c.idx].apply; ap != nil {
+			slot := sim_cmd_find(tr.cmds, c.cmd)
+			if slot < 0 {
+				continue
+			}
+			if ap := tr.cmds[slot].apply; ap != nil {
 				if c.ok {
 					ap(tr.entity, c.args, l) // exact: re-run with corrected pre-state
 				}
@@ -366,7 +396,12 @@ cmd_exec_local :: proc(l: ^Lane, c: ^Cmd_Out, tr: ^Tracked, me: knet.Player_Id, 
 	// (lane_spawn_predicted), which appends to l.tracked and can REALLOCATE it —
 	// `tr` would then dangle. The entity struct, its descriptor, the command
 	// slice, and the History all live outside that array and stay put.
-	entity, dsc, cmds, hist, idx := tr.entity, tr.desc, tr.cmds, tr.hist, c.idx
+	entity, dsc, cmds, hist := tr.entity, tr.desc, tr.cmds, tr.hist
+	idx := sim_cmd_find(cmds, c.cmd) // the verb's slot, resolved from its stable id
+	if idx < 0 {
+		c.ok = false // unknown verb id — same-build issue makes this unreachable
+		return
+	}
 	if n := delta_lane_size(dsc); n > 0 {
 		if c.revert == nil {
 			c.revert = make([]u8, n)

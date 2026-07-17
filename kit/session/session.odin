@@ -93,6 +93,9 @@ Deny_Reason :: enum u8 {
 	Full, // at max_players (Session_Config)
 	Locked, // the host closed the door (session_set_locked)
 	Banned, // a kicked-with-ban token came back
+	Version, // the builds disagree — Session_Config.fingerprint mismatch: a
+	// version-skewed peer's descriptors would misparse every delta into
+	// garbage fields, so the door refuses it with a sentence instead
 }
 
 Ev_Join_Denied :: struct {
@@ -277,7 +280,10 @@ SES_STATE :: u8(5) // host -> all     registry delta batch, per net tick
 SES_CMD :: u8(6) // client -> host  command header + args
 @(private)
 SES_RESULT :: u8(7) // host -> issuer  confirm / reject+truth
-@(private)
+// EXPORTED, unlike its siblings: the transport layer reads this kind off the
+// wire — it is the ONE kind a loss shim may drop (unreliable, last-value
+// semantics: the next batch supersedes; everything else is ordered-reliable
+// and must arrive). kit/netgd's gauge and shim are the consumers.
 SES_STREAM :: u8(8) // owner -> all    owner-stream batch (Channel.Stream)
 @(private)
 SES_PING :: u8(9) // any -> any      [local_send f64]
@@ -293,7 +299,9 @@ SES_WORLD :: u8(13) // host -> one    [count u16] x the SES_SPAWN tuple (join sn
 SES_STATS :: u8(14) // host -> all    [cols u8] x [name] + [players u16] x ([id][cols x i64])
 @(private)
 SES_BACKUP :: u8(15) // host -> ONE   the full re-hostable session snapshot (opaque to the client)
-@(private)
+// EXPORTED, unlike its siblings: kit/netgd's byte gauge splits this kind by
+// its tag byte (the sim lane, comms, and game messages each wear one), so
+// the netgraph can name what the app bucket actually carries.
 SES_APP :: u8(16) // any -> any      [tag u8][payload] — routed to the registered app handler
 @(private)
 SES_DENIED :: u8(17) // host -> joiner  [reason u8] — the join was refused (full/locked/banned)
@@ -417,6 +425,12 @@ Session_Config :: struct {
 	backup_interval: f64, // backup-host snapshot refresh cadence
 	max_players:     int, // NEW joins refused past this many connected (0 = unlimited; rejoins always reclaim their seat)
 	change_events:   bool, // emit Ev_Entity_Changed per dirty entity per tick (repaint THAT, not everything). Off by default: at friendslop scale repaint-everything is usually fine
+	fingerprint:     u64, // the build's WIRE CONTRACT hash (scriptgen's generated
+	// NET_FINGERPRINT — descriptors, verbs, entity ids, input classes). 0 = no
+	// check. Nonzero on BOTH ends: the join carries it and a mismatch is denied
+	// with .Version — a skewed build's descriptors would misparse every delta
+	// into garbage fields, the least debuggable failure a playtest can produce.
+	// A nonzero HOST also refuses fingerprint-less clients (pre-check builds).
 }
 
 Session :: struct {
@@ -1162,8 +1176,10 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 		knet.apply_full(&body, e.entity, e.set.entity_desc)
 		// A known entity caught up wholesale (interest re-entry, snapshot
 		// over live state). The game hears it as Ev_Resynced, NOT a second
-		// Ev_Spawned — the entity was never gone HERE; edge scratch must
-		// re-seed, not re-dress. Blob event after, same order as birth.
+		// Ev_Spawned — the entity was never gone HERE. The jump is history,
+		// not gameplay: the edge mirrors re-seed SILENTLY (no `<field>_edge`
+		// fires), and any hand-rolled seen_* scratch re-seeds off this event.
+		knet.registry_edges_commit(&s.reg, id)
 		append(&s.events, Ev_Resynced{id = id, type = type, owner = owner})
 		if knet.registry_apply_blob(&s.reg, id, blob_ver, blob) {
 			append(&s.events, Ev_Blob_Changed{id = id, size = blob_n})
@@ -1201,7 +1217,27 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 	// Presentations whose render time has come (session_present) fire here,
 	// AFTER sampling — the rendered world they align with is current.
 	knet.later_drain(&s.later, now)
+	// The `<field>_edge` halves: NET delta-lane changes since last frame —
+	// this frame's applies, reverts, and the host's own mutations alike (one
+	// pass, zero role branches). Runs on the game's stack like everything
+	// else in this proc; the game pointer is the `_then` contract's.
+	session_run_edges(s)
 	return
+}
+
+// Run the `<field>_edge` pass NOW — diff every edge-declaring entity against
+// its mirror, fire the halves for what changed, commit. session_tick already
+// runs it once per frame, and the pass is IDEMPOTENT (diff-then-commit), so
+// extra calls cost a memcmp and fire nothing new. The one caller that needs
+// it: an AUTHORITY whose game tick mutates delta-lane state AFTER the frame's
+// session_tick (the classic `for ticks {my_game_tick}` loop) — call this
+// right after that loop and the host's own edges fire the SAME frame its
+// mutations happened, exactly like the hand-rolled polls they replaced (one
+// frame matters when the half moves something the next tick's world reads —
+// cavecrawl's respawn walk-out was the worked lesson: a frame of un-teleported
+// full-hp host at point-blank range is one more rock through a friend).
+session_run_edges :: proc(s: ^Session) {
+	_ = knet.registry_edges_tick(&s.reg, s.game_user != nil ? s.game_user : s.factory_user)
 }
 
 @(private = "file")
@@ -1862,6 +1898,23 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 	if r.err {
 		return
 	}
+	fp := knet.read_u64(r)
+	if r.err {
+		// A pre-fingerprint build's JOIN ends at the name — read that as "no
+		// fingerprint" and let the gate below give it a sentence (only this
+		// trailing read can newly err: a torn packet returned above).
+		fp = 0
+		r.err = false
+	}
+
+	// The FIRST gate: the builds must speak the same wire. A version-skewed
+	// peer's descriptors would misparse every delta into garbage fields — no
+	// other gate matters if this one fails, and the reconnect promise cannot
+	// survive a wire the two ends disagree on.
+	if want := wire_fingerprint(s.cfg.fingerprint); want != 0 && fp != want {
+		deny_join(s, peer, .Version)
+		return
+	}
 
 	// The gates, in order of severity. A RETURNING identity passes lock and
 	// capacity — its seat is its own (that is the whole reconnect promise);
@@ -1986,7 +2039,26 @@ session_client_join :: proc(s: ^Session) {
 	knet.write_u8(&w, SES_JOIN)
 	knet.write_u64(&w, s.token)
 	knet.write_string(&w, s.name)
+	knet.write_u64(&w, wire_fingerprint(s.cfg.fingerprint))
 	s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
+}
+
+// The kit's own wire revision, folded into every nonzero fingerprint before it
+// rides SES_JOIN — a kit upgrade that changes the wire then refuses skewed
+// peers even when the game's declarations didn't move. Bump on wire changes.
+PROTOCOL_REV :: u64(3) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: the wire frame byte carries the stream-channel bit (netgd)
+
+@(private = "file")
+FP_SALT :: u64(0x9E3779B97F4A7C15) + PROTOCOL_REV // the golden-ratio constant, rev-shifted
+// (added, not multiplied: a typed compile-time u64 multiply that overflows
+// trips an LLVM-backend assert in current Odin — a compiler crash, not an error)
+
+@(private = "file")
+wire_fingerprint :: proc(fp: u64) -> u64 {
+	if fp == 0 {
+		return 0 // unchecked stays unchecked — never salted into a phantom value
+	}
+	return fp ~ FP_SALT
 }
 
 // Graceful goodbye (the host also handles the plain transport disconnect —

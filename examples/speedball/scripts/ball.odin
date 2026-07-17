@@ -38,18 +38,29 @@ Ball :: struct {
 	roll: psim.Roller,
 	hold: u16 `gd:"replicate,predict"`, // kickoff freeze, itself predicted
 
-	// The delta lane beside it — the authority's ledger of consequence.
-	score_l: u8 `gd:"replicate"`,
-	score_r: u8 `gd:"replicate"`,
-	won:     u8 `gd:"replicate"`, // 0 = playing; 1/2 = that team took the match
+	// The delta lane beside it — the authority's ledger of consequence, as
+	// ONE field: the scoreboard is one VALUE (l, r, and the match verdict
+	// move together on a goal), so co-locating it makes it dirty as one,
+	// ship as one, and EDGE as one — ball_score_edge (speedball.odin) gets
+	// the whole old/new atomically and fires ONCE even when a goal moves
+	// two members. The co-location idiom: fields that edge together are one
+	// struct; the diff atom is the field.
+	score: Score `gd:"replicate"`,
 
 	// Local scratch.
 	placed: bool,
 }
 
+// The scoreboard — one value, edged and shipped atomically through the
+// single tagged field above.
+Score :: struct {
+	l, r: u8,
+	won:  u8, // 0 = playing; 1/2 = that team took the match
+}
+
 @(gd_tick = "contested")
 ball_tick :: proc(self: ^Ball) -> (scored: u8) {
-	if self.won != 0 || self.hold > 0 {
+	if self.score.won != 0 || self.hold > 0 {
 		// Frozen: zero the intent and the roller integrates a no-op.
 		self.roll.vx = 0
 		self.roll.vy = 0
@@ -95,7 +106,7 @@ ball_tick :: proc(self: ^Ball) -> (scored: u8) {
 // bursts inside one RTT ride the pending chain.
 @(gd_command)
 ball_spike :: proc(self: ^Ball, px, py: f32) -> bool {
-	if self.won != 0 || self.hold > 0 {return false}
+	if self.score.won != 0 || self.hold > 0 {return false}
 	dx := self.roll.x - px
 	dy := self.roll.y - py
 	if dx * dx + dy * dy > SPIKE_REACH * SPIKE_REACH {return false}

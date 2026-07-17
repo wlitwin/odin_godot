@@ -68,18 +68,20 @@ regenerate it. See [session](session.md).
 
 In `process()`, one call pumps the wire, ticks the session, reacts to the
 five events every game handles identically (lobby/scoreboard repaints, the
-join-failed status line), and RE-YIELDS every event for your own switch:
+join-failed status line), and RE-YIELDS every event; two generated procs
+route the rest — your host tick (declared with `@(gd_step = "authority")`)
+and your [event halves](session.md#event-halves-game_event--the-switch-generated)
+(`my_game_player_joined`, `my_game_entity_spawned`, …):
 
 ```odin
 events, _, ticks := kboot.boot_pump(&self.boot, delta, now_s())
-if self.ses.is_host { for _ in 0 ..< ticks { my_game_tick(self) } }
-for ev in events {
-	#partial switch e in ev { /* ONLY game cases: spawns, state, rejections... */ }
-}
+my_game_step(self, ticks)    // hosts run the declared tick; clients no-op
+my_game_events(self, events) // dispatch to whichever halves you declared
 ```
 
-Events, not callbacks: nothing calls into your half-initialized script. (The
-raw layer underneath — `wire_attach`/`wire_pump`, `session_tick`/
+Events, not callbacks — and no role branches: nothing calls into your
+half-initialized script, and the generated dispatch holds every `is_host`.
+(The raw layer underneath — `wire_attach`/`wire_pump`, `session_tick`/
 `session_poll` — stays public for games that want the ritual their own way:
 [netgd](netgd.md), [session](session.md).)
 
@@ -120,14 +122,13 @@ chest_spawned :: proc(game: ^CaveLobby, self: ^Chest, id: knet.Net_Id, owner: kn
 }
 ```
 
-The host spawns with the two-phase pair, so world-building code exists
-exactly once (`CHEST_TYPE` is generated from the tag):
+The host spawns TYPED — the tag generates a `chest_spawn` helper, so
+world-building code exists exactly once and no cast ever appears:
 
 ```odin
-ep, id := ksess.session_spawn_make(&self.ses, CHEST_TYPE)
-chest := cast(^Chest)ep
+chest, id := chest_spawn(&self.boot)
 chest.x, chest.y = 300, 180
-ksess.session_spawn_send(&self.ses, id)
+kboot.boot_spawn_send(&self.boot, id)
 ```
 
 Fields you change on the host after this ride the per-tick delta walk to

@@ -31,17 +31,81 @@ import gd "godot:godot"
 import "godot:gdext"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
+import "core:fmt"
+import "core:strings"
 
 // One session's transport binding. Lives in the game's script struct (no
-// package globals); `latency` is the built-in acid-test shim — see
-// wire_set_latency.
+// package globals); `latency`/`jitter`/`loss` are the built-in acid-test
+// shim — see wire_set_latency. `gauge` tallies every framed byte by session
+// message kind — see wire_traffic.
 Session_Wire :: struct {
 	node:     gd.Node,
 	ses:      ^ksess.Session,
 	kind:     u8, // the game's one message byte for session traffic
 	latency:  f64, // injected one-way receive delay, seconds (0 = off)
+	jitter:   f64, // extra per-packet delay, uniform [0, jitter) seconds
+	loss:     f64, // simulated loss fraction [0,1) — streams drop, reliable pays a retransmit delay
+	rng:      u64, // the shim's xorshift state (seeded on first use)
+	last_due: map[ksess.Peer_Id]f64, // per-peer monotone due clamp: jitter varies delay, never reorders
 	delayed:  [dynamic]Wire_Delayed,
 	dropping: [dynamic]Wire_Drop, // sockets scheduled to close (kicks)
+	gauge:    Wire_Gauge,
+}
+
+// ---- the wire gauge: bytes by message kind, windowed per second -----------
+//
+// Every framed byte this wire sends or receives, tallied by the session
+// message kind riding it (SES_STATE, SES_STREAM, SES_APP, ...), with SES_APP
+// split by its tag byte (the sim lane, comms, and game messages each wear
+// one). Rates roll once per second in wire_pump; read them raw, or let
+// wire_traffic format the netgraph line. Cost: a few adds per packet.
+
+WIRE_KINDS :: 24 // headroom over the SES_* ids (0..21 today)
+
+Wire_Gauge :: struct {
+	in_acc, out_acc:           [WIRE_KINDS]int, // current window, bytes (frame byte included)
+	in_rate, out_rate:         [WIRE_KINDS]int, // last completed window, bytes/second
+	app_in_acc, app_out_acc:   map[u8]int, // SES_APP, split by tag
+	app_in_rate, app_out_rate: map[u8]int,
+	window:                    f64, // when the current window opened (0 = not yet)
+}
+
+@(private = "file")
+gauge_count :: proc(g: ^Wire_Gauge, out: bool, ses_kind: u8, app_tag: u8, size: int) {
+	k := int(ses_kind)
+	if k >= WIRE_KINDS {k = WIRE_KINDS - 1}
+	if out {
+		g.out_acc[k] += size
+		if ses_kind == ksess.SES_APP {g.app_out_acc[app_tag] += size}
+	} else {
+		g.in_acc[k] += size
+		if ses_kind == ksess.SES_APP {g.app_in_acc[app_tag] += size}
+	}
+}
+
+@(private = "file")
+gauge_roll :: proc(g: ^Wire_Gauge, now: f64) {
+	if g.window == 0 {
+		g.window = now
+		return
+	}
+	dt := now - g.window
+	if dt < 1.0 {
+		return
+	}
+	for k in 0 ..< WIRE_KINDS {
+		g.in_rate[k] = int(f64(g.in_acc[k]) / dt)
+		g.out_rate[k] = int(f64(g.out_acc[k]) / dt)
+		g.in_acc[k] = 0
+		g.out_acc[k] = 0
+	}
+	clear(&g.app_in_rate)
+	for tag, bytes in g.app_in_acc {g.app_in_rate[tag] = int(f64(bytes) / dt)}
+	clear(&g.app_in_acc)
+	clear(&g.app_out_rate)
+	for tag, bytes in g.app_out_acc {g.app_out_rate[tag] = int(f64(bytes) / dt)}
+	clear(&g.app_out_acc)
+	g.window = now
 }
 
 Wire_Delayed :: struct {
@@ -78,12 +142,25 @@ when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 	}
 }
 
+// The frame byte's high bit marks a STREAM-channel packet — the sender is
+// the only one who knows the channel, and the receive-side shim needs it to
+// be honest (streams drop under loss and never queue behind reliable
+// traffic; reliable must arrive, in order). Godot's peer_packet signal
+// erases the channel, so the frame carries it. Wire-format change:
+// ksess.PROTOCOL_REV covers it (a skewed peer is refused at the door).
+@(private = "file")
+WIRE_STREAM_BIT :: u8(0x80)
+
 @(private = "file")
 wire_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
 	wire := cast(^Session_Wire)user
+	if len(bytes) > 0 {
+		tag := len(bytes) > 1 ? bytes[1] : 0
+		gauge_count(&wire.gauge, true, bytes[0], tag, len(bytes) + 1)
+	}
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
-	knet.write_u8(&w, wire.kind)
+	knet.write_u8(&w, channel == .Stream ? wire.kind | WIRE_STREAM_BIT : wire.kind)
 	append(&w.buf, ..bytes)
 	if channel == .Stream {
 		_ = send_stream(wire.node, int(to_peer), knet.writer_bytes(&w))
@@ -138,17 +215,66 @@ wire_listen :: proc "contextless" (
 wire_receive :: proc(wire: ^Session_Wire, id: gd.Int, packet: gd.Packed_Byte_Array) {
 	packet := packet
 	view := pba_view(&packet)
-	if len(view) == 0 || view[0] != wire.kind {
+	if len(view) == 0 || view[0] & ~WIRE_STREAM_BIT != wire.kind {
 		return
 	}
-	if wire.latency > 0 {
+	streamed := view[0] & WIRE_STREAM_BIT != 0 // the sender's channel, carried on the frame
+	ses_kind := len(view) > 1 ? view[1] : 0
+	app_tag := len(view) > 2 ? view[2] : 0
+	gauge_count(&wire.gauge, false, ses_kind, app_tag, len(view)) // dropped-below counts too: it crossed the wire
+	if wire.latency > 0 || wire.jitter > 0 || wire.loss > 0 {
+		delay := wire.latency + wire.jitter * wire_rand01(wire)
+		if wire.loss > 0 && wire_rand01(wire) < wire.loss {
+			// Channel-honest loss: an unreliable-channel packet (owner streams,
+			// the sim lane's input windows and snapshots) simply VANISHES —
+			// redundancy and last-value semantics absorb it, which is the real
+			// behavior. Reliable traffic MUST arrive (the whole stack assumes
+			// ordered-reliable delivery), so its "loss" is what loss really
+			// costs that channel: a retransmit's worth of extra delay.
+			if streamed {
+				return
+			}
+			delay += 2 * wire.latency
+		}
+		from := ksess.Peer_Id(id)
+		due := knet.now_s() + delay
+		// Jitter varies delay but the RELIABLE channel never reorders: its
+		// packets stay FIFO per sender (the shim sits above ENet, whose
+		// ordered channel already sequenced them — handing them over shuffled
+		// would break contracts no real network can break at this layer).
+		// STREAM packets skip the clamp both ways: they neither queue behind
+		// a delayed reliable packet (real streams bypass that queue) nor hold
+		// reliable traffic back — and if jitter lands two of them out of
+		// order, the stamps and acks above already shrug that off, exactly as
+		// they do on a real link.
+		if !streamed {
+			if prev, seen := wire.last_due[from]; seen && due < prev {
+				due = prev
+			}
+			wire.last_due[from] = due
+		}
 		data := make([]u8, len(view) - 1)
 		copy(data, view[1:])
-		append(&wire.delayed, Wire_Delayed{due = knet.now_s() + wire.latency, from = ksess.Peer_Id(id), data = data})
+		append(&wire.delayed, Wire_Delayed{due = due, from = from, data = data})
 		return
 	}
 	r := knet.reader_make(view[1:])
 	ksess.session_handle_packet(wire.ses, ksess.Peer_Id(id), &r)
+}
+
+// The shim's own dice — xorshift64*, seeded from the clock on first use. A
+// shim wants believable variety, not statistics; this is plenty.
+@(private = "file")
+wire_rand01 :: proc(wire: ^Session_Wire) -> f64 {
+	if wire.rng == 0 {
+		wire.rng = u64(knet.now_s() * 1e6) | 1
+	}
+	x := wire.rng
+	x ~= x << 13
+	x ~= x >> 7
+	x ~= x << 17
+	wire.rng = x
+	return f64(x >> 11) / f64(1 << 53)
 }
 
 // Per-frame: deliver latency-shimmed packets whose time has come, and close
@@ -156,9 +282,17 @@ wire_receive :: proc(wire: ^Session_Wire, id: gd.Int, packet: gd.Packed_Byte_Arr
 // no-op — still call it; the shim is how you acid-test YOUR game's feel
 // under real round trips: netgd.wire_set_latency(&wire, 120).)
 wire_pump :: proc(wire: ^Session_Wire, now: f64) {
-	for len(wire.delayed) > 0 && wire.delayed[0].due <= now {
-		pkt := wire.delayed[0]
-		ordered_remove(&wire.delayed, 0)
+	gauge_roll(&wire.gauge, now)
+	// Deliver in ARRIVAL order, not due order: with jitter the dues aren't
+	// globally sorted, but each sender's are monotone (the receive clamp), so
+	// an in-order scan keeps every peer's packets FIFO.
+	for i := 0; i < len(wire.delayed); {
+		if wire.delayed[i].due > now {
+			i += 1
+			continue
+		}
+		pkt := wire.delayed[i]
+		ordered_remove(&wire.delayed, i)
 		r := knet.reader_make(pkt.data)
 		ksess.session_handle_packet(wire.ses, pkt.from, &r)
 		delete(pkt.data)
@@ -184,13 +318,97 @@ wire_drop :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id, after := 0.75) {
 	append(&wire.dropping, Wire_Drop{due = knet.now_s() + after, peer = peer})
 }
 
-// Inject one-way receive latency (milliseconds; 0 disables). Every packet
-// this peer RECEIVES is held that long before the session sees it — the
-// toolkit's own acid tests run at 120ms so predictions are proven to bite
-// instantly while confirms measurably ride the slow wire. Test your game
-// the same way.
-wire_set_latency :: proc(wire: ^Session_Wire, ms: int) {
+// Inject one-way receive latency (milliseconds; 0 disables), plus optional
+// JITTER (extra uniform [0, jitter_ms) per packet — delays vary, order is
+// preserved) and LOSS (percent: stream batches drop outright — last-value
+// semantics absorb it — while reliable traffic pays a retransmit's worth of
+// extra delay, because this layer may never break ordered-reliable
+// delivery). The toolkit's own acid tests run at 120ms so predictions are
+// proven to bite instantly while confirms measurably ride the slow wire;
+// jitter and loss are how you prove your game FEELS right on a bad link,
+// not just a slow one. Test your game the same way — kit/boot reads
+// <ENV>_LATENCY / <ENV>_JITTER / <ENV>_LOSS for you.
+wire_set_latency :: proc(wire: ^Session_Wire, ms: int, jitter_ms := 0, loss_pct := 0) {
 	wire.latency = f64(ms) / 1000.0
+	wire.jitter = f64(jitter_ms) / 1000.0
+	wire.loss = clamp(f64(loss_pct) / 100.0, 0, 0.95)
+}
+
+// Short display names per SES kind, for wire_traffic (indexes match the
+// SES_* ids; unknown/overflow reads "other").
+@(private = "file")
+WIRE_KIND_NAMES := [WIRE_KINDS]string {
+	"join", "welcome", "upsert", "left", "bye", "state", "cmd", "result",
+	"stream", "ping", "pong", "spawn", "despawn", "world", "stats", "backup",
+	"app", "denied", "kicked", "setowner", "successor", "blob", "other", "other",
+}
+
+// The netgraph's traffic line: total in/out bytes per second with the top
+// contributors named — `rx 3.2k state 2.1 stream 0.8 · tx 0.4k cmd 0.3`.
+// SES_APP splits by tag (`app16 1.2` = the sim lane's tag riding it). Rates
+// are the last completed one-second window; "" until the first window rolls.
+wire_traffic :: proc(wire: ^Session_Wire, allocator := context.temp_allocator) -> string {
+	g := &wire.gauge
+	total_in, total_out := 0, 0
+	for k in 0 ..< WIRE_KINDS {
+		total_in += g.in_rate[k]
+		total_out += g.out_rate[k]
+	}
+	if total_in == 0 && total_out == 0 {
+		return ""
+	}
+	b := strings.builder_make(allocator)
+	dir :: proc(b: ^strings.Builder, label: string, total: int, rates: [WIRE_KINDS]int, app: map[u8]int) {
+		fmt.sbprintf(b, "%s %.1fk", label, f64(total) / 1024.0)
+		// The top three kinds carry the story; the rest is noise.
+		shown := 0
+		used: [WIRE_KINDS]bool
+		for shown < 3 {
+			best, best_k := 0, -1
+			for k in 0 ..< WIRE_KINDS {
+				if !used[k] && rates[k] > best {
+					best, best_k = rates[k], k
+				}
+			}
+			if best_k < 0 || best == 0 {break}
+			used[best_k] = true
+			shown += 1
+			if best_k == int(ksess.SES_APP) && len(app) > 0 {
+				// Name the heaviest tag instead of the opaque bucket.
+				bt, bb := u8(0), 0
+				for tag, bytes in app {
+					if bytes > bb {bt, bb = tag, bytes}
+				}
+				fmt.sbprintf(b, " app%d %.1f", bt, f64(best) / 1024.0)
+			} else {
+				fmt.sbprintf(b, " %s %.1f", WIRE_KIND_NAMES[best_k], f64(best) / 1024.0)
+			}
+		}
+	}
+	dir(&b, "rx", total_in, g.in_rate, g.app_in_rate)
+	strings.write_string(&b, " · ")
+	dir(&b, "tx", total_out, g.out_rate, g.app_out_rate)
+	return strings.to_string(b)
+}
+
+// The LINK's own truth, off ENet's per-peer statistics: smoothed round trip,
+// its variance (the honest jitter), and packet loss percent — the transport's
+// view, independent of anything the session measures. ok=false off-ENet, on
+// an unknown peer, or asked about yourself (a host has no link to itself; ask
+// per client peer there, or just fill the graph on clients).
+wire_link_quality :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id) -> (rtt_ms, jitter_ms, loss_pct: f64, ok: bool) {
+	mp := gd.node_get_multiplayer(wire.node)
+	if cast(rawptr)mp == nil {return}
+	p := gd.multiplayer_api_get_multiplayer_peer(mp)
+	if cast(rawptr)p == nil {return}
+	if !bool(gd.object_is_class(cast(gd.Object)p, gd.gstr("ENetMultiplayerPeer"))) {return}
+	pkt := gd.e_net_multiplayer_peer_get_peer(cast(gd.E_Net_Multiplayer_Peer)p, gd.Int(peer))
+	if cast(rawptr)pkt == nil {return}
+	rtt_ms = gd.e_net_packet_peer_get_statistic(pkt, .Peer_Round_Trip_Time)
+	jitter_ms = gd.e_net_packet_peer_get_statistic(pkt, .Peer_Round_Trip_Time_Variance)
+	// ENet scales loss by PACKET_LOSS_SCALE (65536 = 100%).
+	loss_pct = gd.e_net_packet_peer_get_statistic(pkt, .Peer_Packet_Loss) / 65536.0 * 100.0
+	return rtt_ms, jitter_ms, loss_pct, true
 }
 
 // A connected peer's remote address as the HOST sees it — the rendezvous

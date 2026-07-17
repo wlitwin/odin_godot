@@ -19,6 +19,7 @@ import kcombat "godot:kit/combat"
 import kitems "godot:kit/items"
 import kinter "godot:kit/interact"
 import knet "godot:kit/net"
+import ksess "godot:kit/session"
 
 Spelunker :: struct {
 	owner:     gd.Node2d,
@@ -34,7 +35,6 @@ Spelunker :: struct {
 	cds:       [2]u16 `gd:"replicate"`, // ability cooldowns, host-decayed
 	fx:        [2]kcombat.Effect `gd:"replicate"`, // status effects, host-decayed
 	php:       kcombat.Predicted_Hp, // scratch: impacts SEEN here, pre-truth
-	was_dead:  bool, // scratch: death-edge detector for the pyre burst
 }
 
 // The hp wire codec: an i32 whose whole gameplay range is 0..MAX_HP has no
@@ -117,12 +117,37 @@ spelunker_process :: proc(self: ^Spelunker, delta: f64) {
 	gd.node2d_set_position(self.owner, {self.x, self.y})
 	// Everyone can see who's dead — the corpse glyph replicates with hp.
 	gd.set_string(cast(gd.Object)self.glyph, "text", self.hp > 0 ? "\xE2\x9B\x8F" : "\xF0\x9F\x92\x80") // ⛏ / 💀
-	// Death edge, on EVERY screen (hp replicates): the corpse persists, so
-	// it carries its own pyre — authored in spelunker.tscn, fired here.
-	if self.hp <= 0 && !self.was_dead {
-		self.was_dead = true
+}
+
+// THE HP EDGE — death and return, one half for every screen, no was_dead
+// mirrors. The DOWNWARD crossing fires the pyre everywhere (the corpse
+// persists and carries its own particles) and stops the owner's feet; the
+// UPWARD crossing is owner business — position is owner-streamed, only I can
+// move me — and the value tells a bled-out respawn (full hp: a fresh body at
+// the spawn point) from a revive where I fell. A late joiner seeing an OLD
+// corpse gets the glyph, not a fresh pyre burst: spawn values seed silently —
+// the exact "old wounds present as fresh hits" bug the mirrors used to have.
+// (The host's own restores edge SAME-frame because cavecrawl.odin calls
+// session_run_edges right after its host-tick loop — the walk-out must move
+// the body before the next exchange, the acid's crossfire lesson.)
+spelunker_hp_edge :: proc(g: ^CaveLobby, self: ^Spelunker, old, new: i32) {
+	if new <= 0 && old > 0 {
 		gd.cpu_particles2d_restart(self.pyre, false)
-	} else if self.hp > 0 {
-		self.was_dead = false
+		if self == g.me_spel {
+			g.walking = false
+			gd.print_str("CAVE_DIED")
+		}
+	}
+	if new > 0 && old <= 0 && self == g.me_spel {
+		if new >= MAX_HP {
+			// BLED OUT and back: a fresh body at the spawn point.
+			self.x = SPAWN_X
+			self.y = SPAWN_Y
+			ksess.session_teleport(&g.ses, self.net_id) // out of the grave in one step, on every screen
+			gd.print_str("CAVE_RESPAWNED")
+		} else {
+			// REVIVED where I fell — a friend got there before the clock.
+			gd.print_str("CAVE_REVIVED")
+		}
 	}
 }

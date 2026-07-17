@@ -43,6 +43,21 @@ Mover :: struct {
 	min_x, min_y, max_x, max_y: f32, // position clamp
 }
 
+// mover_arm — the LAW half, stamped once per peer at spawn (the census hook
+// runs before the first tick). play.gun_equip / health_arm's twin for the
+// sim shelf: one call names every config field, so a game can't silently
+// leave a bound at zero (the classic "same numbers on every peer" desync —
+// an omitted max_y clamps movement to the origin on the peer that forgot it).
+// Config never rides the wire, so the SAME args must reach this on every peer
+// — feed it constants, or values derived identically everywhere (arena size).
+mover_arm :: proc(m: ^Mover, accel: f32, min_x, min_y, max_x, max_y: f32) {
+	m.accel = accel
+	m.min_x = min_x
+	m.min_y = min_y
+	m.max_x = max_x
+	m.max_y = max_y
+}
+
 // The block tick: approach the intent, integrate, clamp. Inputless by
 // contract — the input already became tx/ty in the wielder's tick.
 @(gd_tick)

@@ -9,11 +9,13 @@ package quickdraw
 //        server simulates it from inputs (gunner_tick below), your own screen
 //        predicts it a few ticks ahead, everyone else's interpolates it. The
 //        tick proc is single-player-looking; the netcode writes itself.
-//   hp/pid/shot_seq/shot_aim  gd:"replicate"       the DISCRETE state — the
+//   hp/pid/gold            gd:"replicate"          the DISCRETE state — the
 //        coop kit's host-authoritative delta lane, unchanged, in the same
 //        struct. Damage is adjudicated host-side and arrives as ordinary
-//        deltas; tracers are drawn from the shot_seq EDGE on every screen
-//        (state, not events — the byte outlives the tick).
+//        deltas; the TRACER rides the tick's `fired` fact instead — the
+//        mine-form gunner_tick_fx fires on every screen, each at its own
+//        presentation time (yours at the muzzle instant, watchers when the
+//        watch clock reaches the shot — ON the delayed barrel that fired it).
 //
 // The node half (gunner_process) dresses from the fields every frame, one
 // line for everybody: after lane_present the fields hold presentation truth —
@@ -31,25 +33,24 @@ Gunner :: struct {
 	net_id: knet.Net_Id,
 
 	// The sim lane (server-simulated, client-predicted, reconciled). The
-	// TRIGGER lives here too: the cadence is a psim.Cool, its countdown
-	// predicted through the embed, so your revolver answers the click
-	// instantly and replays exactly. (Movement stays hand-rolled: the crate
-	// pushout runs mid-pipeline — after the clamp, before the shot's
-	// adjudication — where a block tick, which runs after this whole proc,
-	// can't reach.)
+	// TRIGGER lives here too: the cadence is a psim.Cool tagged `gd:"manual"`,
+	// so gunner_tick drives its countdown itself (a dead gunner simply skips
+	// the call) — still predicted through the embed, so your revolver answers
+	// the click instantly and replays exactly. Movement stays hand-rolled: with
+	// `manual` a block COULD now run mid-pipeline, but the dash is a locked-
+	// velocity impulse, not psim.Mover's momentum intent — bespoke movement is
+	// the honest fit here, a design choice, not a shelf limitation.
 	x, y:    f32 `gd:"replicate,predict,interp"`,
 	vx, vy:  f32 `gd:"replicate,predict"`,
 	aim:     f32 `gd:"replicate,predict"`,
 	dash_cd: u16 `gd:"replicate,predict"`,
-	fire:    psim.Cool,
-	lob:     psim.Cool, // the slow projectile's cadence (predicted, like the trigger)
+	fire:    psim.Cool `gd:"manual"`, // driven below — so a dead gunner freezes it by not ticking it
+	lob:     psim.Cool `gd:"manual"`, // the slow projectile's cadence (predicted, like the trigger)
 
 	// The delta lane, beside it (host-authoritative, never resimmed).
-	hp:       i32 `gd:"replicate"`,
-	pid:      u8 `gd:"replicate"`,
-	shot_seq: u8 `gd:"replicate"`, // bumps per adjudicated shot — the tracer edge
-	shot_aim: f32 `gd:"replicate"`,
-	gold:     u8 `gd:"replicate"`, // kill bounty — the shop's purse
+	hp:   i32 `gd:"replicate"`,
+	pid:  u8 `gd:"replicate"`,
+	gold: u8 `gd:"replicate"`, // kill bounty — the shop's purse
 
 	// The shop's effect: PREDICTED, so your boots answer the buy at your
 	// next tick, not a round trip later. The buy itself is the verb below.
@@ -58,10 +59,19 @@ Gunner :: struct {
 	// Local scratch — never on the wire.
 	mine:      bool, // set by the census hook: my avatar
 	painted:   bool,
-	seen_shot: u8, // tracer edge (remote shots)
-	seen_hp:   i32, // hurt-flash edge
 	flash_ttl: f64,
 	beam_ttl:  f64,
+}
+
+// The hurt flash — the hp EDGE half. The session's per-frame pass hands every
+// screen the NET change (the host's own adjudications included, zero role
+// branches): no seen_* mirror to keep, no resync re-seed to forget, and a
+// same-frame hit+heal that cancels never flashes. The decay and the dead tint
+// stay continuous dressing in gunner_process below.
+gunner_hp_edge :: proc(self: ^Gunner, old, new: i32) {
+	if new < old {
+		self.flash_ttl = 0.25
+	}
 }
 
 // Sampled once per predicted tick (quickdraw.odin's qd_sample); discovered by
@@ -95,15 +105,9 @@ gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) -> (fired: bool, lobbed:
 	if self.hp <= 0 {
 		self.vx = 0
 		self.vy = 0
-		// Dead men hold the hammer: the Cool block's decrement still runs
-		// after this return, so prepay it — the cooldown freezes with the
-		// body, exactly as the hand-rolled early return froze it.
-		if self.fire.left > 0 {
-			self.fire.left += 1
-		}
-		if self.lob.left > 0 {
-			self.lob.left += 1
-		}
+		// Dead men hold the hammer: the cadences are `gd:"manual"`, so a dead
+		// gunner just never reaches the cool_tick calls below — the cooldown
+		// freezes with the body, no prepay arithmetic to cancel an auto-decrement.
 		return
 	}
 	self.aim = angle_of(input.aim)
@@ -149,6 +153,13 @@ gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) -> (fired: bool, lobbed:
 	for c in CRATES {
 		crate_pushout(&self.x, &self.y, c)
 	}
+
+	// Drive the cadences — manual, so THIS is the decrement the auto-hoist used
+	// to run after the tick. A `ready()` above re-armed to the interval this
+	// same tick, so the next shot still lands exactly `interval` ticks later;
+	// and the dead branch above returned before reaching here, freezing them.
+	psim.cool_tick(&self.fire)
+	psim.cool_tick(&self.lob)
 	return
 }
 
@@ -156,7 +167,7 @@ gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) -> (fired: bool, lobbed:
 // bit can't be: an ARGUMENT (which item), a VERDICT (an empty purse says
 // no), a cross-lane read (gold, delta lane), and a predicted effect (gear —
 // your boots answer at your next tick, ~15 ticks before the server's word
-// returns at 240ms RTT). The generated `gunner_buy_cmd(&lane, gun, item)`
+// returns at 240ms RTT). The generated `gunner_buy_cmd(&boot, gun, item)`
 // schedules it; a rejection unwinds the gold and the reconcile scrubs the
 // gear, the same glide as any mispredict.
 GEAR_BOOTS :: u8(1)
@@ -171,8 +182,9 @@ gunner_buy :: proc(self: ^Gunner, item: u8) -> bool {
 	return true
 }
 
-// The muzzle answer: shooter-local, instant, presentation-only (quickdraw.odin
-// calls it off the live input edge; remote screens draw off the shot_seq edge).
+// The tracer, one proc for every screen: the mine-form gunner_tick_fx
+// (quickdraw.odin) calls it — the shooter at the muzzle instant, watchers at
+// the watch clock, so the beam leaves the barrel each screen is drawing.
 gunner_beam :: proc(self: ^Gunner, a: f32) {
 	length := shot_wall_limit(self.x, self.y, a)
 	gd.node2d_set_rotation(cast(gd.Node2d)self.beam, gd.Float(a))
@@ -185,8 +197,6 @@ gunner_process :: proc(self: ^Gunner, delta: f64) {
 	if !self.painted && self.pid != 0 {
 		self.painted = true
 		gd.polygon2d_set_color(self.skin, peer_color(int(self.pid)))
-		self.seen_hp = self.hp
-		self.seen_shot = self.shot_seq
 	}
 
 	// ONE line places everybody: after lane_present the fields are what this
@@ -194,14 +204,6 @@ gunner_process :: proc(self: ^Gunner, delta: f64) {
 	gd.node2d_set_position(cast(gd.Node2d)self.owner, {self.x, self.y})
 	gd.node2d_set_rotation(cast(gd.Node2d)self.gun, gd.Float(self.aim))
 
-	// Remote shots: the tracer rides the shot_seq EDGE (mine already flashed
-	// at the muzzle, live — skip the echo).
-	if self.shot_seq != self.seen_shot {
-		self.seen_shot = self.shot_seq
-		if !self.mine {
-			gunner_beam(self, self.shot_aim)
-		}
-	}
 	if self.beam_ttl > 0 {
 		self.beam_ttl -= delta
 		if self.beam_ttl <= 0 {
@@ -209,13 +211,8 @@ gunner_process :: proc(self: ^Gunner, delta: f64) {
 		}
 	}
 
-	// Hurt flash + the dead fade, from hp deltas — every screen, no messages.
-	if self.hp != self.seen_hp {
-		if self.hp < self.seen_hp {
-			self.flash_ttl = 0.25
-		}
-		self.seen_hp = self.hp
-	}
+	// The hurt flash (poked by gunner_hp_edge above) and the dead fade —
+	// every screen, no messages, no hand-rolled hp mirror.
 	if self.flash_ttl > 0 {
 		self.flash_ttl -= delta
 		gd.polygon2d_set_color(self.skin, {1, 0.25, 0.2, 1})

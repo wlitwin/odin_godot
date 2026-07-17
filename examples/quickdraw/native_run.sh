@@ -77,6 +77,16 @@ run_phase() {
     grep -q "QD_STARTED" "$dlog" || { echo "[$label] deadeye never saw the world"; return 1; }
     grep -q "QD_FIRE" "$dlog" || { echo "[$label] deadeye never pulled the trigger"; return 1; }
     grep -q "QD_SHOT by=3" "$mlog" || { echo "[$label] the marshal never adjudicated a deadeye shot"; return 1; }
+    # THE EVERY-SCREEN TRACER (the mine-form _fx): the strafer WATCHES the
+    # deadeye — its screen must draw the deadeye's beam, delivered as a
+    # SIM_FACT and fired when its watch clock reaches the shot's tick (the
+    # beam on the delayed barrel). The deadeye's own log must NOT carry a
+    # tracer for its own shots (the owner fired mine=true, live; the
+    # authority excludes it from the broadcast).
+    grep -q "QD_TRACER pid=3" "$slog" || { echo "[$label] the strafer never saw the deadeye's tracer (every-screen fx)"; return 1; }
+    if grep -q "QD_TRACER pid=3" "$dlog"; then
+        echo "[$label] the deadeye's own tracer echoed back (owner exclusion broken)"; return 1
+    fi
     if grep -qE "SCRIPT ERROR|signal 11" "$mlog" "$slog" "$dlog"; then
         echo "[$label] runtime errors in the logs"; return 1
     fi

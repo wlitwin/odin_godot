@@ -11,6 +11,7 @@ package kit_net
 // field. A malformed/truncated packet can never read out of bounds or panic —
 // remote input is untrusted by default.
 
+import "base:intrinsics"
 import "core:mem"
 
 Writer :: struct {
@@ -179,4 +180,22 @@ read_bytes :: proc(r: ^Reader) -> []u8 {
 	b := r.data[r.off:r.off + n]
 	r.off += n
 	return b
+}
+
+// ---------------------------------------------------------------------------
+// write_pod / read_pod — a whole POD value as its raw little-endian bytes. The
+// primitive under generated `gd:"backup"` codecs, and the house idiom for any
+// fixed-shape state not worth a hand-written field list (backup/save blobs).
+// T must be SELF-CONTAINED — no pointers, slices, maps, or strings — so its
+// bytes ARE its value; the `where` guard rejects a non-POD T at the call site.
+// Every target is little-endian, so this is a copy, symmetric with the scalar
+// codecs above (a fixed [N]T or a nested POD struct rides in one call).
+write_pod :: proc(w: ^Writer, v: $T) where intrinsics.type_is_nearly_simple_compare(T) {
+	v := v
+	write_raw(w, &v, size_of(T))
+}
+
+read_pod :: proc(r: ^Reader, $T: typeid) -> (v: T) where intrinsics.type_is_nearly_simple_compare(T) {
+	_ = read_raw(r, &v, size_of(T))
+	return
 }

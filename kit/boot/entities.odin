@@ -245,7 +245,8 @@ boot_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 // role branch. Host: session_spawn_make (a real id, announced by _send). Client:
 // a local predicted node (a provisional id, flying now). Set the returned
 // entity's spawn fields (position, velocity from the muzzle), then
-// boot_fire_spawn_send(b, id). Call it from the firing verb's body.
+// boot_spawn_send(b, id). The generated typed `<entity>_spawn` helpers route
+// through here for ticking entities — prefer those; this is the raw door.
 boot_fire_spawn :: proc(b: ^Boot, type: ksess.Entity_Type, owner: knet.Player_Id) -> (entity: rawptr, id: knet.Net_Id) {
 	if b.ses != nil && b.ses.is_host {
 		return ksess.session_spawn_make(b.ses, type, owner)
@@ -253,9 +254,12 @@ boot_fire_spawn :: proc(b: ^Boot, type: ksess.Entity_Type, owner: knet.Player_Id
 	return boot_spawn_predicted(b, type, owner)
 }
 
-// The second half: announce the authority's spawn to every peer. Host only —
-// on a client the predicted spawn stays local until the authority's arrives.
-boot_fire_spawn_send :: proc(b: ^Boot, id: knet.Net_Id) {
+// The second half — and the ONE announce for both models: the host sends the
+// real spawn; a client's predicted spawn stays local until the authority's
+// arrives and rekeys it. Pairs with the generated typed `<entity>_spawn`
+// helpers exactly like it pairs with boot_fire_spawn (it absorbed the old
+// boot_fire_spawn_send: same body, wider duty).
+boot_spawn_send :: proc(b: ^Boot, id: knet.Net_Id) {
 	if b.ses != nil && b.ses.is_host {
 		ksess.session_spawn_send(b.ses, id)
 	}

@@ -16,8 +16,10 @@
 #   (4) An unknown replicate option is a scriptgen-time error.
 #   (5) Command contract violations are scriptgen-time errors: no net_id field /
 #       no replicated fields, platform-width int args, non-bool-first returns,
-#       and mispaired `<verb>_then` consequences (the shape is validated at
-#       build time — a consequence can never silently not fire).
+#       mispaired `<verb>_then` consequences (the shape is validated at build
+#       time — a consequence can never silently not fire), and wire args wearing
+#       the reserved issuer name `by` (the framework fills the declared
+#       `by: knet.Player_Id`; a client-claimed one is the spoofable-side wart).
 #
 # Prints REPGEN_OK. Run inside the Nix dev shell, e.g.:
 #   nix develop --command bash -c 'bash tests/repgen/run.sh'
@@ -52,6 +54,7 @@ for needle in \
 	'offset_of(Pawn, px)' \
 	'offset_of(Pawn, fuel)' \
 	'offset_of(Pawn, chill) + offset_of(type_of(Pawn{}.chill), left)' \
+	'offset_of(Pawn, warm) + offset_of(type_of(Pawn{}.warm), left)' \
 	'lerp = .F32' \
 	'lerp = .Quat' \
 	'lerp = .Custom, blend = pawn_blend_aim' \
@@ -84,18 +87,20 @@ for needle in \
 	'_pawn_simcmd_hit :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool' \
 	'_a0 := knet.read_i32(&r)' \
 	'if r.err {return false}' \
-	'{exec = _pawn_simcmd_mark}' \
+	'{id = PAWN_CMD_MARK, exec = _pawn_simcmd_mark}' \
 	'pawn_command_set := knet.Command_Set{entity_desc = &pawn_net_desc' \
-	'pawn_hit_cmd :: proc(l: ^ksim.Lane, self: ^Pawn, amount: i32) -> bool' \
-	'pawn_mark_cmd :: proc(l: ^ksim.Lane, self: ^Pawn, label: string, who: knet.Player_Id) -> bool' \
+	'pawn_hit_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, amount: i32) -> knet.Command_Outcome' \
+	'pawn_mark_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, label: string, who: knet.Player_Id) -> knet.Command_Outcome' \
+	'_ok := pawn_salute(self, by, _a0)' \
+	'pawn_salute_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, style: u8) -> knet.Command_Outcome' \
 	'knet.write_player_id(&_w, who)' \
-	'ksim.lane_command(l, self.net_id, 0, knet.writer_bytes(&_w))' \
+	'if ksim.lane_command(b.lane, self.net_id, PAWN_CMD_HIT, knet.writer_bytes(&_w)) {return .Predicted}' \
 	'_ok, _p0 := pawn_loot(self, _a0)' \
 	'if _ok && ksim.lane_is_authority(lane) {' \
 	'pawn_loot_then(self, by, _a0, _p0)' \
 	'if _ok {pawn_hit_apply(self, _a0)}' \
 	'_pawn_simcmd_hit_apply :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane)' \
-	'{exec = _pawn_simcmd_hit, apply = _pawn_simcmd_hit_apply}' \
+	'{id = PAWN_CMD_HIT, exec = _pawn_simcmd_hit, apply = _pawn_simcmd_hit_apply}' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
 		echo "REPGEN_FAIL: generated file is missing sim-command artifact: $needle"
@@ -115,6 +120,35 @@ if grep -qF '_pawn_m_hit' "$GEN"; then
 	exit 1
 fi
 echo "  ok  sim-command thunks, table, lane wrappers generated; knet loop skipped"
+
+# A coop @(gd_command) on a NON-ticking class (chest.odin): its wrapper returns a
+# knet.Command_Outcome — .Applied (host accept) / .Predicted (client in-flight) /
+# .Rejected (predicate said no) — the SAME meaning on every peer, replacing the
+# old role-ambiguous bool. (Pawn/Turret tick, so theirs are sim-scheduled bools.)
+CGEN="$GOOD/chest.gen.odin"
+[ -f "$CGEN" ] || { echo "REPGEN_FAIL: scriptgen produced no chest.gen.odin"; exit 1; }
+for needle in \
+	'chest_open_cmd :: proc(b: ^kboot.Boot, self: ^Chest, amount: i32) -> knet.Command_Outcome' \
+	'ctx := &b.ses.ctx' \
+	'if _ok {return .Applied}' \
+	'if knet.command_issue(ctx, self, &chest_command_set, CHEST_CMD_OPEN) {return .Predicted}' \
+	'return .Rejected' \
+	'chest_seal_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Command_Outcome' \
+	'_ = knet.command_issue(ctx, self, &chest_command_set, CHEST_CMD_SEAL)' \
+	'CHEST_CMD_OPEN :: u16(0x' \
+	'id = CHEST_CMD_OPEN, predict = true' \
+	'_ok := chest_claim(self, env.by)' \
+	'chest_claim_then(self, env.by)' \
+	'chest_claim_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Command_Outcome' \
+	'_ok := chest_claim(self, ctx.me)' \
+	'chest_claim_then(self, ctx.me)' \
+; do
+	if ! grep -qF "$needle" "$CGEN"; then
+		echo "REPGEN_FAIL: coop command wrapper missing Command_Outcome artifact: $needle"
+		exit 1
+	fi
+done
+echo "  ok  coop @(gd_command) wrapper returns knet.Command_Outcome; issuer param framework-filled (env.by in the thunk, ctx.me on the host's own issue, absent from the wrapper signature)"
 
 # @(gd_tick) artifacts: the ksim import, the input POD assert, the rawptr
 # thunk (nil input coasts; the author call stays typed), and the Sim_Set the
@@ -143,7 +177,105 @@ if grep -qF '_pawn_m_tick' "$GEN"; then
 	echo "REPGEN_FAIL: the @(gd_tick) proc leaked into the method trampolines"
 	exit 1
 fi
-echo "  ok  tick thunk + sim set generated (POD-asserted input, coast-on-nil, imported-shelf block hoisted)"
+# `gd:"manual"` (the `warm` block): the two-state hybrid. Its predict field
+# STILL flattens into the descriptor (asserted above), but its tick is NOT
+# auto-hoisted — the wielder drives it. So the auto `chill` call is present
+# (asserted above) while the manual `warm` call must be ABSENT.
+if grep -qF 'play_sim.cool_tick(&self.warm)' "$GEN"; then
+	echo "REPGEN_FAIL: a gd:\"manual\" block's tick was auto-hoisted (should be wielder-driven)"
+	exit 1
+fi
+echo "  ok  tick thunk + sim set generated (POD-asserted input, coast-on-nil, imported-shelf block hoisted; gd:\"manual\" flattens but does NOT hoist)"
+
+# The EVERY-SCREEN _fx (scout.odin): `mine: bool` after `self` flips the fx
+# from owner-live-only to every screen — the thunk gates on the bool facts
+# (the event trigger), the authority broadcasts the tuple (lane_fact), the
+# live pass fires inline with _mine computed (owner=true, authority's view of
+# everyone else=false), and the decode thunk + `fx =` wiring hand watchers
+# the same half at watch-clock time. Pawn's old-form fx (asserted above) must
+# keep its owner-live shape untouched.
+SCOUT_GEN="$GOOD/scout.gen.odin"
+[ -f "$SCOUT_GEN" ] || { echo "REPGEN_FAIL: scriptgen produced no scout.gen.odin"; exit 1; }
+for needle in \
+	'_p0, _p1 := scout_tick(self)' \
+	'if _p0 { // an event tick: the facts present' \
+	'if ksim.lane_is_authority(lane) {' \
+	'knet.write_bool(&_fw, _p0)' \
+	'knet.write_f32(&_fw, _p1)' \
+	'ksim.lane_fact(lane, entity, knet.writer_bytes(&_fw))' \
+	'if !lane.resimming {' \
+	'_mine := owner == ksim.lane_me(lane)' \
+	'if _mine || ksim.lane_is_authority(lane) {' \
+	'scout_tick_fx(self, _mine, _p0, _p1)' \
+	'_scout_fx :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8)' \
+	'_p0 := knet.read_bool(&r)' \
+	'_p1 := knet.read_f32(&r)' \
+	'if r.err {return}' \
+	'scout_tick_fx(self, mine, _p0, _p1)' \
+	'scout_sim_set := ksim.Sim_Set{entity_desc = &scout_net_desc, tick = _scout_tick_step, input_size = 0, fx = _scout_fx}' \
+; do
+	if ! grep -qF "$needle" "$SCOUT_GEN"; then
+		echo "REPGEN_FAIL: generated file is missing every-screen fx artifact: $needle"
+		exit 1
+	fi
+done
+# The old owner-live gate must NOT wrap the mine-form call…
+if grep -qF 'if owner == ksim.lane_me(lane) && !lane.resimming {' "$SCOUT_GEN"; then
+	echo "REPGEN_FAIL: the mine-form fx still emits the owner-live-only gate"
+	exit 1
+fi
+# …and the old-form fx (pawn) must NOT grow any fact machinery.
+for stale in 'lane_fact' '_pawn_fx' 'fx = _pawn_fx'; do
+	if grep -qF "$stale" "$GEN"; then
+		echo "REPGEN_FAIL: the old-form fx sprouted every-screen machinery: $stale"
+		exit 1
+	fi
+done
+echo "  ok  every-screen _fx: event gate, authority broadcast, inline _mine call, decode thunk, Sim_Set fx wiring (old form untouched)"
+
+# The `<field>_edge` half (pawn_hp_edge): the thunk casts and derefs old, the
+# Edge_Desc table indexes the descriptor FIELD, and the command set carries it
+# — the session's per-frame pass does the rest.
+for needle in \
+	'_pawn_edge_hp :: proc(entity: rawptr, game: rawptr, old: rawptr)' \
+	'pawn_hp_edge(self, (cast(^i32)old)^, self.hp)' \
+	'{field = 0, fire = _pawn_edge_hp}' \
+	'edges = _pawn_edges[:]' \
+; do
+	if ! grep -qF "$needle" "$GEN"; then
+		echo "REPGEN_FAIL: generated file is missing edge artifact: $needle"
+		exit 1
+	fi
+done
+echo "  ok  edge half generated (thunk, field-indexed Edge_Desc, command-set wiring)"
+
+# gd:"backup" — the host-local migration/save codec. All three kinds (POD scalar,
+# map[POD]POD, [dynamic]POD) plus a NESTED field (pace.beat, proving the walk
+# rides embeds like replicate) ride ONE version-hashed write/read pair, each POD
+# #asserted. The declared replacement for hand-matched write_u8/read_u8 blob
+# lists that silently corrupt a takeover when they drift (session.md's split).
+for needle in \
+	'PAWN_BACKUP_VERSION :: u32(0x' \
+	'pawn_backup_write :: proc(self: ^Pawn, w: ^knet.Writer)' \
+	'knet.write_u32(w, PAWN_BACKUP_VERSION)' \
+	'knet.write_pod(w, self.pace.beat)' \
+	'knet.write_pod(w, self.save_seed)' \
+	'for k, v in self.save_seen {knet.write_pod(w, k); knet.write_pod(w, v)}' \
+	'for e in self.save_log {knet.write_pod(w, e)}' \
+	'pawn_backup_read :: proc(self: ^Pawn, r: ^knet.Reader) -> bool' \
+	'if knet.read_u32(r) != PAWN_BACKUP_VERSION {return false}' \
+	'self.save_seed = knet.read_pod(r, type_of(self.save_seed))' \
+	'k := knet.read_pod(r, knet.Net_Id)' \
+	'append(&self.save_log, e)' \
+	'return !r.err' \
+	'gd:\"backup\" fields must be POD' \
+; do
+	if ! grep -qF "$needle" "$GEN"; then
+		echo "REPGEN_FAIL: generated file is missing backup-codec artifact: $needle"
+		exit 1
+	fi
+done
+echo "  ok  gd:\"backup\" codec generated (POD scalar / map / dynamic + nested, version-hashed write+read)"
 
 # Entity-table artifacts (board.odin's `entity=Pawn:7` scene tag): the TYPE
 # const, the kboot.Entity_Kind row reading the scene THROUGH the field
@@ -162,6 +294,10 @@ for needle in \
 	'pawn_owned_by :: proc(b: ^kboot.Boot, owner: knet.Player_Id) -> (^Pawn, bool)' \
 	'my_pawn :: proc(b: ^kboot.Boot) -> (^Pawn, bool)' \
 	'pawn_ids :: proc(b: ^kboot.Boot, allocator := context.temp_allocator) -> []knet.Net_Id' \
+	'pawn_spawn :: proc(b: ^kboot.Boot, owner := knet.PLAYER_ID_INVALID) -> (^Pawn, knet.Net_Id)' \
+	'kboot.boot_fire_spawn(b, PAWN_TYPE, owner)' \
+	'chest_spawn :: proc(b: ^kboot.Boot, owner := knet.PLAYER_ID_INVALID) -> (^Chest, knet.Net_Id)' \
+	'ksess.session_spawn_make(b.ses, CHEST_TYPE, owner)' \
 ; do
 	if ! grep -qF "$needle" "$BGEN"; then
 		echo "REPGEN_FAIL: generated file is missing entity artifact: $needle"
@@ -236,6 +372,98 @@ echo "  ok  standard transport forwards generated; hand-written wins name by nam
 	${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"}
 echo "  ok  generated package compiles (odin check)"
 
+# ---- the STALENESS GUARD: a source edited after scriptgen fails the compile ----
+# odin_godot_guard.gen.odin carries one compile-time #load_hash assert per
+# authored source; a bare `odin build` against stale *.gen.odin must fail
+# NAMING the drifted file, and a scriptgen re-run must clear it.
+GUARD="$GOOD/odin_godot_guard.gen.odin"
+[ -f "$GUARD" ] || { echo "REPGEN_FAIL: scriptgen produced no staleness guard"; exit 1; }
+for needle in \
+	'#load_hash("pawn.odin", "crc32")' \
+	'#load_hash("chest.odin", "crc32")' \
+	'#load_hash("scout.odin", "crc32")' \
+	'NET_FINGERPRINT :: u64(0x' \
+; do
+	if ! grep -qF "$needle" "$GUARD"; then
+		echo "REPGEN_FAIL: staleness guard is missing: $needle"
+		exit 1
+	fi
+done
+FP_BEFORE=$(grep 'NET_FINGERPRINT ::' "$GUARD")
+if grep -qF '.gen.odin"' "$GUARD"; then
+	echo "REPGEN_FAIL: the staleness guard hashes generated files (circular)"
+	exit 1
+fi
+printf '\n// drifted after generation\n' >> "$GOOD/pawn.odin"
+set +e
+STALE_OUT="$("$ODIN" check "$GOOD" -collection:godot="$ROOT" -no-entry-point \
+	${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} 2>&1)"
+STALE_RC=$?
+set -e
+if [ "$STALE_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a stale gen (edited pawn.odin, no scriptgen re-run) compiled clean"
+	exit 1
+fi
+if ! echo "$STALE_OUT" | grep -q "pawn.odin changed after scriptgen ran"; then
+	echo "REPGEN_FAIL: the stale-build failure doesn't name the drifted file:"
+	echo "$STALE_OUT" | tail -3
+	exit 1
+fi
+run_scriptgen "$GOOD"
+"$ODIN" check "$GOOD" -collection:godot="$ROOT" -no-entry-point \
+	${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"}
+echo "  ok  staleness guard: drifted source fails the compile by name; scriptgen re-run clears it"
+
+# ---- NET_FINGERPRINT: the wire contract, hashed — comment-blind, type-aware ----
+# The drift above was a COMMENT: the wire didn't change, so the fingerprint
+# must not move (a comment edit refusing joins would be over-refusal). A
+# replicated field's TYPE changing (i32 -> i64: a different wire) must move
+# it — that under-refusal is the silent-garbage disaster the check prevents.
+FP_AFTER=$(grep 'NET_FINGERPRINT ::' "$GUARD")
+if [ "$FP_BEFORE" != "$FP_AFTER" ]; then
+	echo "REPGEN_FAIL: a comment edit moved the fingerprint (over-refusal): $FP_BEFORE vs $FP_AFTER"
+	exit 1
+fi
+FPW="$TMP/fpw"
+mkdir -p "$FPW"
+cp "$ROOT/tests/repgen/fixture/"*.odin "$FPW/"
+# state, not hp: hp carries an _edge half whose (old, new) types would then
+# mismatch — a different (also-correct) failure that would mask this one.
+sed -i.bak 's/state:  u8 `gd:"replicate"`,/state:  u16 `gd:"replicate"`,/' "$FPW/pawn.odin" && rm -f "$FPW/pawn.odin.bak"
+run_scriptgen "$FPW"
+FP_TYPED=$(grep 'NET_FINGERPRINT ::' "$FPW/odin_godot_guard.gen.odin")
+if [ "$FP_BEFORE" = "$FP_TYPED" ]; then
+	echo "REPGEN_FAIL: a replicated field's type change did NOT move the fingerprint"
+	exit 1
+fi
+FPI="$TMP/fpi"
+mkdir -p "$FPI"
+cp "$ROOT/tests/repgen/fixture/"*.odin "$FPI/"
+sed -i.bak 's/buttons: u8,/buttons: u16,/' "$FPI/pawn.odin" && rm -f "$FPI/pawn.odin.bak"
+run_scriptgen "$FPI"
+FP_INPUT=$(grep 'NET_FINGERPRINT ::' "$FPI/odin_godot_guard.gen.odin")
+if [ "$FP_BEFORE" = "$FP_INPUT" ]; then
+	echo "REPGEN_FAIL: an input-struct field change did NOT move the fingerprint (the blob memcpys — its layout IS the wire)"
+	exit 1
+fi
+# Declaring the ISSUER param must NOT move it: `by` is framework-filled, never
+# wire bytes — a peer that added `by` to a predicate still interoperates.
+FPB="$TMP/fpb"
+mkdir -p "$FPB"
+cp "$ROOT/tests/repgen/fixture/"*.odin "$FPB/"
+sed -i.bak 's/chest_open :: proc(self: ^Chest, amount: i32)/chest_open :: proc(self: ^Chest, by: knet.Player_Id, amount: i32)/' "$FPB/chest.odin" && rm -f "$FPB/chest.odin.bak"
+run_scriptgen "$FPB"
+if ! grep -qF 'return chest_open(self, env.by, _a0)' "$FPB/chest.gen.odin"; then
+	echo "REPGEN_FAIL: the added issuer param didn't reach the thunk (sed no-op, or the splice order broke)"
+	exit 1
+fi
+FP_BY=$(grep 'NET_FINGERPRINT ::' "$FPB/odin_godot_guard.gen.odin")
+if [ "$FP_BEFORE" != "$FP_BY" ]; then
+	echo "REPGEN_FAIL: declaring the issuer param moved the fingerprint (by never rides the wire): $FP_BEFORE vs $FP_BY"
+	exit 1
+fi
+echo "  ok  NET_FINGERPRINT: stable across comments and issuer-param declarations, moves on replicated-type and input-struct changes"
+
 # ---- (3a): engine handle/heap types are a SCRIPTGEN-time error ----
 ENG="$TMP/eng"
 mkdir -p "$ENG"
@@ -268,7 +496,48 @@ if ! echo "$ENG_OUT" | grep -q "cannot be a replicated field"; then
 fi
 echo "  ok  engine handle/heap type rejected at scriptgen time (gd.String)"
 
-# ---- (3b): a non-POD type scriptgen can't judge fails the CONSUMER compile ----
+# ---- (3b): the COLLECTIONS stance — variable-length replicate fields are a
+# scriptgen-time error that TEACHES the three-way fork (bounded -> fixed
+# array; rare-change -> entity blob; live elements -> entities).
+COLL="$TMP/collections"
+mkdir -p "$COLL"
+cat > "$COLL/hoard.odin" <<'EOF'
+//gd:extends Node
+//gd:class Hoard
+package repgen_collections
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Hoard :: struct {
+	owner: gd.Node,
+	loot:  [dynamic]u16 `gd:"replicate"`, // the [dynamic] ask the stance answers
+	view:  []u8 `gd:"replicate"`, // a slice is the same answer
+	tally: map[knet.Net_Id]u16 `gd:"replicate"`, // and a map
+}
+
+hoard_ready :: proc(self: ^Hoard) {}
+EOF
+set +e
+COLL_OUT="$(run_scriptgen "$COLL" 2>&1)"
+COLL_RC=$?
+set -e
+if [ "$COLL_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a variable-length replicate field was accepted by scriptgen"
+	exit 1
+fi
+for want in "Hoard.loot" "Hoard.view" "Hoard.tally" "the registry is the diffed collection"; do
+	if ! echo "$COLL_OUT" | grep -qF "$want"; then
+		echo "REPGEN_FAIL: the collections-stance error is missing: $want"
+		echo "$COLL_OUT" | tail -4
+		exit 1
+	fi
+done
+echo "  ok  collections stance held at scriptgen time: [dynamic]/slice/map rejected with the three-way fork spelled out"
+
+# ---- (3b2): a DEEP non-POD type scriptgen can't judge fails the CONSUMER
+# compile — the syntactic gate above can't see inside a named struct, so the
+# generated #assert stays the backstop, naming the field.
 BAD="$TMP/bad"
 mkdir -p "$BAD"
 cat > "$BAD/chatty.odin" <<'EOF'
@@ -278,20 +547,24 @@ package repgen_bad
 
 import gd "godot:godot"
 
+Notes :: struct {
+	text: string, // heap-backed, hidden behind a named struct
+}
+
 Chatty :: struct {
 	owner: gd.Node,
-	data:  []u8 `gd:"replicate"`, // slice: not a Variant type, so only the #assert can catch it
+	data:  Notes `gd:"replicate"`, // scriptgen sees "Notes"; only the #assert can judge it
 }
 
 chatty_ready :: proc(self: ^Chatty) {}
 EOF
-run_scriptgen "$BAD" # scriptgen succeeds — the type check is the consumer compiler's
+run_scriptgen "$BAD" # scriptgen succeeds — the deep type check is the consumer compiler's
 set +e
 CHECK_OUT="$("$ODIN" check "$BAD" -collection:godot="$ROOT" -no-entry-point 2>&1)"
 CHECK_RC=$?
 set -e
 if [ "$CHECK_RC" -eq 0 ]; then
-	echo "REPGEN_FAIL: a replicated slice field COMPILED — the POD assert is not enforcing"
+	echo "REPGEN_FAIL: a replicated string-bearing struct COMPILED — the POD assert is not enforcing"
 	exit 1
 fi
 if ! echo "$CHECK_OUT" | grep -q "Chatty.data"; then
@@ -299,7 +572,7 @@ if ! echo "$CHECK_OUT" | grep -q "Chatty.data"; then
 	echo "$CHECK_OUT" | tail -5
 	exit 1
 fi
-echo "  ok  non-POD replicate field fails the build, naming Chatty.data"
+echo "  ok  deep non-POD replicate field fails the build, naming Chatty.data"
 
 # ---- (4): unknown option is a scriptgen-time error ----
 OPT="$TMP/opt"
@@ -364,6 +637,320 @@ if ! echo "$LANES_OUT" | grep -q "mutually exclusive"; then
 	exit 1
 fi
 echo "  ok  owner+predict lane conflict rejected at scriptgen time"
+
+# ---- (4a1b): gd:"backup" on a non-restorable type (a slice) is refused ----
+BADBK="$TMP/badbackup"
+mkdir -p "$BADBK"
+cat > "$BADBK/leaky.odin" <<'EOF'
+//gd:extends Node
+//gd:class Leaky
+package repgen_badbackup
+
+import gd "godot:godot"
+
+Leaky :: struct {
+	owner: gd.Node,
+	log:   []u8 `gd:"backup"`, // a slice: no owned storage to restore into — refused
+}
+
+leaky_ready :: proc(self: ^Leaky) {}
+EOF
+set +e
+BADBK_OUT="$(run_scriptgen "$BADBK" 2>&1)"
+BADBK_RC=$?
+set -e
+if [ "$BADBK_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: gd:\"backup\" on a slice was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$BADBK_OUT" | grep -q "slice"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't explain the backup slice rejection:"
+	echo "$BADBK_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  gd:\"backup\" on a slice rejected at scriptgen time"
+
+# ---- (4a1c): two verbs colliding on one wire id (FNV-1a-16) are refused ----
+# "aapy" and "aaym" genuinely collide at 0xe032 — astronomically rare in real
+# sets, deterministic at build time, fatal on the wire, so it's a named error.
+COLL="$TMP/cmdcollide"
+mkdir -p "$COLL"
+cat > "$COLL/vault.odin" <<'EOF'
+//gd:extends Node
+//gd:class Vault
+package repgen_cmdcollide
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Vault :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	n:      i32 `gd:"replicate"`,
+}
+
+@(gd_command)
+vault_aapy :: proc(self: ^Vault) -> bool {
+	self.n += 1
+	return true
+}
+
+@(gd_command)
+vault_aaym :: proc(self: ^Vault) -> bool {
+	self.n -= 1
+	return true
+}
+
+vault_ready :: proc(self: ^Vault) {}
+EOF
+set +e
+COLL_OUT="$(run_scriptgen "$COLL" 2>&1)"
+COLL_RC=$?
+set -e
+if [ "$COLL_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: colliding command wire ids were accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$COLL_OUT" | grep -q "collide"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't explain the wire-id collision:"
+	echo "$COLL_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  colliding command wire ids rejected at scriptgen time"
+
+# ---- (4a1d): a wire arg wearing the reserved issuer name `by` is refused ----
+# Misplaced (not right after the receiver) or mistyped, either way it would be
+# a client-claimed identity — the spoofable-`side` wart the issuer param
+# deletes. A player the verb TARGETS stays legal as `who`/`target` (pawn_mark).
+BYR="$TMP/byreserved"
+mkdir -p "$BYR"
+cat > "$BYR/spoof.odin" <<'EOF'
+//gd:extends Node
+//gd:class Spoof
+package repgen_byr
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Spoof :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	n:      i32 `gd:"replicate"`,
+}
+
+@(gd_command)
+spoof_late :: proc(self: ^Spoof, amount: i32, by: knet.Player_Id) -> bool { // issuer NOT after the receiver
+	self.n = amount
+	return true
+}
+
+@(gd_command)
+spoof_typed :: proc(self: ^Spoof, by: u64) -> bool { // reserved name, wrong type
+	self.n = i32(by)
+	return true
+}
+EOF
+set +e
+BYR_OUT="$(run_scriptgen "$BYR" 2>&1)"
+BYR_RC=$?
+set -e
+if [ "$BYR_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a wire arg named \`by\` was accepted by scriptgen (client-claimed identity)"
+	exit 1
+fi
+if ! echo "$BYR_OUT" | grep -q 'spoof_late.*reserved issuer param' || \
+   ! echo "$BYR_OUT" | grep -q 'spoof_typed.*reserved issuer param'; then
+	echo "REPGEN_FAIL: scriptgen didn't flag BOTH \`by\` misuses (misplaced + mistyped):"
+	echo "$BYR_OUT" | tail -4
+	exit 1
+fi
+echo "  ok  reserved issuer name: a wire arg named \`by\` rejected (misplaced and mistyped)"
+
+# ---- (4a1e): the COOP game shell — boot-routed authority step + event halves ----
+# A tickless package's @(gd_step="authority") rides the boot accumulator:
+# generated `<snake>_step` holds the role gate + the same-frame edge pass (the
+# crossfire lesson, encoded). Session event halves pair by name; the generated
+# `<snake>_events` dispatch holds the switch AND every role gate (authority
+# `_then`, the client-only gate that kills a stale post-takeover re-fire).
+SHELL_FIX="$TMP/coopshell"
+mkdir -p "$SHELL_FIX"
+cat > "$SHELL_FIX/camp.odin" <<'EOF'
+//gd:extends Node
+//gd:class Camp
+package repgen_coopshell
+
+import gd "godot:godot"
+import kboot "godot:kit/boot"
+import kcomms "godot:kit/comms"
+import knet "godot:kit/net"
+import ksess "godot:kit/session"
+
+Camp :: struct {
+	owner: gd.Node,
+	boot:  kboot.Boot,
+	ses:   ksess.Session,
+	comms: kcomms.Comms,
+	fires: i32,
+}
+
+@(gd_step = "authority")
+camp_host_tick :: proc(self: ^Camp) {
+	self.fires += 1
+}
+
+camp_player_joined :: proc(self: ^Camp, id: knet.Player_Id, rejoin: bool) {
+	_ = id; _ = rejoin
+}
+
+camp_player_joined_then :: proc(self: ^Camp, id: knet.Player_Id, rejoin: bool) {
+	_ = id; _ = rejoin
+}
+
+camp_kicked :: proc(self: ^Camp) {
+}
+
+camp_entity_spawned :: proc(self: ^Camp, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
+	_ = id; _ = type; _ = owner
+}
+
+// NEGATIVE CONTROL: shares the `_kicked` tail but is a genuinely different
+// name (a query, cavecrawl's real case) — must stay silent, not reserved.
+camp_was_kicked :: proc(self: ^Camp) -> bool {
+	return false
+}
+
+camp_ready :: proc(self: ^Camp) {}
+EOF
+run_scriptgen "$SHELL_FIX"
+SHELL_GEN="$SHELL_FIX/camp.gen.odin"
+for needle in \
+	'camp_step :: proc(self: ^Camp, ticks: int)' \
+	'if self.boot.ses == nil || !self.boot.ses.is_host {return}' \
+	'camp_host_tick(self)' \
+	'ksess.session_run_edges(self.boot.ses)' \
+	'camp_events :: proc(self: ^Camp, events: []ksess.Event)' \
+	'camp_player_joined(self, e.id, e.rejoin)' \
+	'camp_player_joined_then(self, e.id, e.rejoin)' \
+	'if self.boot.ses != nil && !self.boot.ses.is_host {' \
+	'camp_entity_spawned(self, e.id, e.type, e.owner)' \
+; do
+	if ! grep -qF "$needle" "$SHELL_GEN"; then
+		echo "REPGEN_FAIL: coop-shell gen is missing: $needle"
+		exit 1
+	fi
+done
+# ...and it must NOT sprout lane wiring: the step is boot-routed.
+for stale in 'lane_init' 'import ksim'; do
+	if grep -qF "$stale" "$SHELL_GEN"; then
+		echo "REPGEN_FAIL: a boot-routed authority step emitted lane wiring: $stale"
+		exit 1
+	fi
+done
+"$ODIN" check "$SHELL_FIX" -collection:godot="$ROOT" -no-entry-point \
+	${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"}
+echo "  ok  coop shell generated: boot-routed authority step (role gate + edge pass), event dispatch (authority _then, client-only gate); compiles"
+
+# The contract violations, each with its fix spelled out: a lane-tick param on
+# the boot-routed step, `_then` on a client-only and on a host-only event, a
+# one-edit-typo'd half prefix, and a wrong-shaped half.
+SHELL_BAD="$TMP/coopshellbad"
+mkdir -p "$SHELL_BAD"
+cat > "$SHELL_BAD/camp.odin" <<'EOF'
+//gd:extends Node
+//gd:class Camp
+package repgen_coopshellbad
+
+import gd "godot:godot"
+import kboot "godot:kit/boot"
+import kcomms "godot:kit/comms"
+import knet "godot:kit/net"
+import ksess "godot:kit/session"
+
+Camp :: struct {
+	owner: gd.Node,
+	boot:  kboot.Boot,
+	ses:   ksess.Session,
+	comms: kcomms.Comms,
+	fires: i32,
+}
+
+@(gd_step = "authority")
+camp_host_tick :: proc(self: ^Camp, tick: u64) { // boot-routed: no lane tick exists
+	self.fires = i32(tick)
+}
+
+camp_kicked_then :: proc(self: ^Camp) { // client-only event: no authority half
+}
+
+camp_backup_target_then :: proc(self: ^Camp, player: knet.Player_Id) { // already authority-only
+	_ = player
+}
+
+cmp_player_joined :: proc(self: ^Camp, id: knet.Player_Id, rejoin: bool) { // one-edit prefix typo
+	_ = id; _ = rejoin
+}
+
+camp_owner_changed :: proc(self: ^Camp, id: knet.Net_Id) { // wrong shape (missing owner, prev)
+	_ = id
+}
+
+camp_ready :: proc(self: ^Camp) {}
+EOF
+set +e
+SHELL_OUT="$(run_scriptgen "$SHELL_BAD" 2>&1)"
+SHELL_RC=$?
+set -e
+if [ "$SHELL_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: the coop-shell contract violations were accepted by scriptgen"
+	exit 1
+fi
+for want in \
+	"no lane tick in the coop loop" \
+	"never reaches the authority" \
+	"already authority-only" \
+	"looks like a session event half" \
+	"the shape is (self: ^Camp, id: knet.Net_Id, owner: knet.Player_Id, prev: knet.Player_Id)" \
+; do
+	if ! echo "$SHELL_OUT" | grep -qF "$want"; then
+		echo "REPGEN_FAIL: coop-shell violations missing the error: $want"
+		echo "$SHELL_OUT" | tail -6
+		exit 1
+	fi
+done
+# A tickless authority step on a BOOTLESS class has nothing to gate on.
+STEPB="$TMP/stepboot"
+mkdir -p "$STEPB"
+cat > "$STEPB/drift.odin" <<'EOF'
+//gd:extends Node
+//gd:class Drift
+package repgen_stepboot
+
+import gd "godot:godot"
+
+Drift :: struct {
+	owner: gd.Node,
+	n:     i32,
+}
+
+@(gd_step = "authority")
+drift_host_tick :: proc(self: ^Drift) {
+	self.n += 1
+}
+EOF
+set +e
+STEPB_OUT="$(run_scriptgen "$STEPB" 2>&1)"
+STEPB_RC=$?
+set -e
+if [ "$STEPB_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a bootless coop authority step was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$STEPB_OUT" | grep -q "needs a kboot.Boot field"; then
+	echo "REPGEN_FAIL: the bootless-step error doesn't name the missing field:"
+	echo "$STEPB_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  coop-shell violations rejected: lane-tick param, _then on client-only/host-only events, typo'd prefix, wrong shape, bootless step"
 
 # ---- (4a2): @(gd_tick) contract violations — mispaired _then / no predict fields ----
 TIK="$TMP/tik"
@@ -436,6 +1023,307 @@ if ! echo "$NOP_OUT" | grep -q 'replicate,predict'; then
 	exit 1
 fi
 echo "  ok  tick contract violations rejected: mispaired _then, no predict fields"
+
+# ---- (4a2c): the mine-form _fx contract — facts cross the wire ----
+# A non-wire fact type behind `mine` must be a scriptgen error (watchers
+# decode the tuple from bytes), and a mine-form fx on a tick with no bool
+# fact has no event trigger — also an error, spelled out.
+FXW="$TMP/fxw"
+mkdir -p "$FXW"
+cat > "$FXW/blip.odin" <<'EOF'
+//gd:extends Node
+//gd:class Blip
+package repgen_fxw
+
+import gd "godot:godot"
+
+Blip :: struct {
+	owner: gd.Node,
+	x:     f32 `gd:"replicate,predict"`,
+}
+
+@(gd_tick)
+blip_tick :: proc(self: ^Blip) -> (hit: bool, spot: [2]f32) {
+	self.x += 1
+	return true, {self.x, 0}
+}
+
+blip_tick_fx :: proc(self: ^Blip, mine: bool, hit: bool, spot: [2]f32) {
+	_ = mine; _ = hit; _ = spot
+}
+EOF
+set +e
+FXW_OUT="$(run_scriptgen "$FXW" 2>&1)"
+FXW_RC=$?
+set -e
+if [ "$FXW_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a mine-form fx with a non-wire fact type was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$FXW_OUT" | grep -q "wire primitive"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't explain the non-wire fact:"
+	echo "$FXW_OUT" | tail -3
+	exit 1
+fi
+FXB="$TMP/fxb"
+mkdir -p "$FXB"
+cat > "$FXB/hum.odin" <<'EOF'
+//gd:extends Node
+//gd:class Hum
+package repgen_fxb
+
+import gd "godot:godot"
+
+Hum :: struct {
+	owner: gd.Node,
+	x:     f32 `gd:"replicate,predict"`,
+}
+
+@(gd_tick)
+hum_tick :: proc(self: ^Hum) -> (level: f32) {
+	self.x += 1
+	return self.x
+}
+
+hum_tick_fx :: proc(self: ^Hum, mine: bool, level: f32) {
+	_ = mine; _ = level
+}
+EOF
+set +e
+FXB_OUT="$(run_scriptgen "$FXB" 2>&1)"
+FXB_RC=$?
+set -e
+if [ "$FXB_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a mine-form fx with no bool fact was accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$FXB_OUT" | grep -q "event trigger"; then
+	echo "REPGEN_FAIL: scriptgen error doesn't explain the missing event trigger:"
+	echo "$FXB_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  mine-form fx contract violations rejected: non-wire fact, no bool trigger"
+
+# ---- (4a2c2): `_edge` lane contract — the delta lane only ----
+# An edge on a PREDICTED field would fire on every mispredict scrub; on an
+# OWNER-STREAMED field it would fire every interpolated frame. Both rejected,
+# each pointing at that lane's real presentation tool.
+EDG="$TMP/edg"
+mkdir -p "$EDG"
+cat > "$EDG/comet.odin" <<'EOF'
+//gd:extends Node
+//gd:class Comet
+package repgen_edg
+
+import gd "godot:godot"
+
+Comet :: struct {
+	owner: gd.Node,
+	x:     f32 `gd:"replicate,predict"`,
+	tail:  f32 `gd:"replicate,owner"`,
+}
+
+@(gd_tick)
+comet_tick :: proc(self: ^Comet) {
+	self.x += 1
+}
+
+comet_x_edge :: proc(self: ^Comet, old, new: f32) { // predicted: resims scrub it
+	_ = old; _ = new
+}
+
+comet_tail_edge :: proc(self: ^Comet, old, new: f32) { // owner stream: it interpolates
+	_ = old; _ = new
+}
+EOF
+set +e
+EDG_OUT="$(run_scriptgen "$EDG" 2>&1)"
+EDG_RC=$?
+set -e
+if [ "$EDG_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: edges on predict/owner fields were accepted by scriptgen"
+	exit 1
+fi
+if ! echo "$EDG_OUT" | grep -q "mine-form"; then
+	echo "REPGEN_FAIL: the predicted-field edge error doesn't point at the mine-form fx:"
+	echo "$EDG_OUT" | tail -3
+	exit 1
+fi
+if ! echo "$EDG_OUT" | grep -q "OWNER-STREAMED"; then
+	echo "REPGEN_FAIL: the owner-field edge error doesn't explain the stream lane:"
+	echo "$EDG_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  edge lane contract: predict and owner fields rejected, each pointing at its lane's tool"
+
+# ---- (4a2d): RESERVED PAIRING SUFFIXES — an unclaimed half is an ERROR ----
+# A typo'd pairing name used to be a proc that silently never fired (_fx and
+# _apply didn't even warn). Now: a suffix-named proc TOUCHING a script struct
+# must pair or the build fails, with the expected name spelled out. A helper
+# touching no script struct keeps the old behavior (warn for _then).
+UNC="$TMP/unc"
+mkdir -p "$UNC"
+cat > "$UNC/wisp.odin" <<'EOF'
+//gd:extends Node
+//gd:class Wisp
+package repgen_unc
+
+import gd "godot:godot"
+
+Wisp :: struct {
+	owner: gd.Node,
+	x:     f32 `gd:"replicate,predict"`,
+}
+
+@(gd_tick)
+wisp_tick :: proc(self: ^Wisp) -> (blinked: bool) {
+	self.x += 1
+	return true
+}
+
+wisp_tikc_fx :: proc(self: ^Wisp, mine: bool, blinked: bool) { // typo'd tick prefix
+	_ = mine; _ = blinked
+}
+EOF
+set +e
+UNC_OUT="$(run_scriptgen "$UNC" 2>&1)"
+UNC_RC=$?
+set -e
+if [ "$UNC_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a typo'd unclaimed _fx was accepted (it would silently never fire)"
+	exit 1
+fi
+if ! echo "$UNC_OUT" | grep -q 'wisp_tick_fx'; then
+	echo "REPGEN_FAIL: the unclaimed-_fx error doesn't spell the expected name:"
+	echo "$UNC_OUT" | tail -3
+	exit 1
+fi
+UNT="$TMP/unt"
+mkdir -p "$UNT"
+cat > "$UNT/gate.odin" <<'EOF'
+//gd:extends Node
+//gd:class Gate
+package repgen_unt
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Gate :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	open:   u8 `gd:"replicate"`,
+}
+
+@(gd_command)
+gate_toggle :: proc(self: ^Gate) -> bool {
+	self.open = 1 - self.open
+	return true
+}
+
+gate_togle_then :: proc(self: ^Gate, by: knet.Player_Id) { // typo'd verb
+	_ = by
+}
+
+gate_opn_edge :: proc(self: ^Gate, old, new: u8) { // typo'd field
+	_ = old; _ = new
+}
+EOF
+set +e
+UNT_OUT="$(run_scriptgen "$UNT" 2>&1)"
+UNT_RC=$?
+set -e
+if [ "$UNT_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a typo'd unclaimed _then was accepted (it would silently never fire)"
+	exit 1
+fi
+if ! echo "$UNT_OUT" | grep -q 'gate_toggle_then'; then
+	echo "REPGEN_FAIL: the unclaimed-_then error doesn't list the class's pairings:"
+	echo "$UNT_OUT" | tail -3
+	exit 1
+fi
+if ! echo "$UNT_OUT" | grep -q 'gate_open_edge'; then
+	echo "REPGEN_FAIL: the unclaimed-_edge error doesn't spell the expected field pairing:"
+	echo "$UNT_OUT" | tail -3
+	exit 1
+fi
+UNH="$TMP/unh"
+mkdir -p "$UNH"
+cat > "$UNH/den.odin" <<'EOF'
+//gd:extends Node
+//gd:class Den
+package repgen_unh
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Den :: struct {
+	owner:     gd.Node,
+	mob_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Mob:1"`,
+}
+EOF
+cat > "$UNH/mob.odin" <<'EOF'
+//gd:extends Node2D
+//gd:class Mob
+package repgen_unh
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Mob :: struct {
+	owner: gd.Node2d,
+	hp:    i32 `gd:"replicate"`,
+}
+
+mbo_spawned :: proc(game: ^Den, self: ^Mob, id: knet.Net_Id, owner: knet.Player_Id) { // typo'd prefix
+}
+EOF
+set +e
+UNH_OUT="$(run_scriptgen "$UNH" 2>&1)"
+UNH_RC=$?
+set -e
+if [ "$UNH_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: a typo'd unclaimed _spawned hook was accepted (it would silently never fire)"
+	exit 1
+fi
+if ! echo "$UNH_OUT" | grep -q 'mob_spawned'; then
+	echo "REPGEN_FAIL: the unclaimed-hook error doesn't spell the expected name:"
+	echo "$UNH_OUT" | tail -3
+	exit 1
+fi
+# The negative control: a `_then` helper touching NO script struct stays a
+# WARNING — the build passes, the note prints.
+UNW="$TMP/unw"
+mkdir -p "$UNW"
+cat > "$UNW/plain.odin" <<'EOF'
+//gd:extends Node
+//gd:class Plain
+package repgen_unw
+
+import gd "godot:godot"
+
+Plain :: struct {
+	owner: gd.Node,
+	hp:    i32 `gd:"replicate"`,
+}
+
+load_then :: proc(data: []u8) { // innocent helper: no script struct touched
+	_ = data
+}
+EOF
+set +e
+UNW_OUT="$(run_scriptgen "$UNW" 2>&1)"
+UNW_RC=$?
+set -e
+if [ "$UNW_RC" -ne 0 ]; then
+	echo "REPGEN_FAIL: an innocent _then helper (no script-struct param) failed the build"
+	exit 1
+fi
+if ! echo "$UNW_OUT" | grep -q "will never fire"; then
+	echo "REPGEN_FAIL: the innocent _then helper lost its warning:"
+	echo "$UNW_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  reserved pairing suffixes: typo'd _fx/_then/_spawned error with the fix named; script-free helpers keep the warning"
 
 # ---- (4a2b): @(gd_sample)/@(gd_step) contract violations ----
 # A sample writing a struct the lane's ticks don't read is the silent-desync

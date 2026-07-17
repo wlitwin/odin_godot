@@ -77,8 +77,30 @@ Session_Config :: struct {
 	join_timeout:    f64, // client_start -> Ev_Join_Failed horizon
 	backup_interval: f64, // backup-host snapshot refresh cadence
 	max_players:     int, // NEW joins refused past this many connected (0 = unlimited; rejoins always reclaim their seat)
+	fingerprint:     u64, // the build's wire-contract hash (0 = no check) — see below
 }
 ```
+
+**The version door.** Two builds whose replicated declarations disagree don't
+get an error — they get GARBAGE: the descriptors are positional, so a skewed
+peer misparses every delta into the wrong fields, the least debuggable
+failure a playtest can produce. `fingerprint` closes that door: scriptgen
+hashes the package's whole wire contract (replicated field order/types/lanes,
+verbs, entity ids, input structs field-by-field, fact tuples, rpcs) into the
+generated `NET_FINGERPRINT`; hand it to the config —
+
+```odin
+ksess.session_configure(&self.ses, {fingerprint = NET_FINGERPRINT})
+```
+
+— and the join carries it: a mismatch is refused as `Ev_Join_Denied{.Version}`
+("your build and the host's disagree"), and a checked host also refuses
+fingerprint-less clients (pre-check builds). Comment edits and formatting
+never move the hash; a renamed field does (over-refusal — rebuild both ends —
+is harmless; a type change slipping through would be the disaster). The
+session folds its own `PROTOCOL_REV` in, so a kit upgrade that changes the
+wire refuses skewed peers even when the game's declarations didn't move.
+Zero on either end opts out (hand-built descriptors, tests).
 
 The cross-entity half of a command — a command proc may only mutate its target
 (that's what the predict/revert/reject-truth machinery protects) — lives in the verb's
@@ -149,13 +171,64 @@ for {
 }
 ```
 
+### Event halves (`<game>_<event>`) — the switch, generated
+
+A [kit/boot](boot.md) game never writes that switch. Each event pairs by
+name with a plain proc on the game shell (the class with the `kboot.Boot`
+field), and scriptgen generates `<snake>_events(self, events)` — the
+dispatch — from whatever you declared. Undeclared events are skipped; that
+IS the `#partial`:
+
+```odin
+cave_lobby_player_joined :: proc(self: ^CaveLobby, id: knet.Player_Id, rejoin: bool) {
+	// every peer: repaint, log
+}
+
+// The AUTHORITY consequence — comms lines, fielding a late joiner. The
+// generated dispatch holds the is_host gate; the half never checks a role.
+cave_lobby_player_joined_then :: proc(self: ^CaveLobby, id: knet.Player_Id, rejoin: bool) { ... }
+
+// in process(): the two generated calls, role-free at the call site
+events, marks, ticks := kboot.boot_pump(&self.boot, delta, now_s())
+cave_lobby_step(self, ticks)      // the coop authority step, if declared (sim.md)
+cave_lobby_events(self, events)
+```
+
+The half names are the event names (`_welcomed`, `_player_joined`,
+`_player_left`, `_host_left`, `_join_failed`, `_join_denied`, `_kicked`,
+`_backup_target`, `_succession`, `_backup_received`, `_owner_changed`,
+`_blob_changed`, `_stats_updated`, `_state_applied`, `_command_executed`,
+`_command_confirmed`, `_command_rejected`) — except the entity cluster,
+which wears an `entity_` prefix (`_entity_spawned`, `_entity_resynced`,
+`_entity_despawned`, `_entity_changed`) so it can never be mistaken for the
+[census hooks](boot.md): the census `<entity>_spawned` fires BEFORE the
+spawn tuple's fields apply (wiring), `<game>_entity_spawned` fires after
+(the initial-dress home). Each half's params are the event's fields,
+positionally; a mispaired shape or a one-edit-typo'd name is a build error
+with the fix spelled out, never a proc that silently doesn't fire.
+
+**Role gates are generated, both kinds.** A two-role event (`player_joined`,
+`player_left`, `entity_spawned`, `owner_changed`, `blob_changed`) may
+declare a `_then` half — authority only, the event's consequence. A
+single-role event gets its annotation ENFORCED at dispatch: a `(client)`
+event queued just before a mid-batch takeover flipped `is_host` dies at the
+generated gate instead of re-running takeover code (a host death often
+lands as TWO transport signals, so `Ev_Succession` can queue twice in one
+batch — the gate is why the game's succession half needs no `is_host` and
+cavecrawl's carries none). A `_then` on a client-only event ("the authority
+never hears Ev_Kicked") or a host-only one ("Ev_Backup_Target is already
+authority-only") is a build error.
+
 The event union: `Ev_Welcomed`, `Ev_Player_Joined` (with `rejoin`), `Ev_Player_Left`,
 `Ev_Host_Left` (alone it ends the run; with [succession](#backup-hosting-and-resume)
 armed, `Ev_Succession` fires beside it and the run survives), `Ev_Join_Failed`,
-`Ev_Join_Denied` (`.Full` / `.Locked` / `.Banned` — each a different sentence to the
-player), `Ev_Kicked`, `Ev_Spawned`, `Ev_Resynced` (a KNOWN entity's fields caught up
-wholesale — interest re-entry, a snapshot over live state; re-seed `seen_*` edge scratch
-here or the missed changes present as fresh events), `Ev_Despawned`, `Ev_Owner_Changed`,
+`Ev_Join_Denied` (`.Full` / `.Locked` / `.Banned` / `.Version` — each a different
+sentence to the player), `Ev_Kicked`, `Ev_Spawned`, `Ev_Resynced` (a KNOWN entity's fields caught up
+wholesale — interest re-entry, a snapshot over live state; generated
+[`<field>_edge` halves](net.md#edges-class_field_edge--presenting-delta-lane-changes)
+re-seed themselves silently, so this event is only for hand-rolled edge
+scratch, which re-seeds here or presents the missed changes as fresh events),
+`Ev_Despawned`, `Ev_Owner_Changed`,
 `Ev_Blob_Changed`, `Ev_Stats_Updated`, `Ev_Backup_Received`, `Ev_State_Applied`,
 `Ev_Entity_Changed` (opt-in), `Ev_Command_Executed` (host),
 `Ev_Command_Confirmed` / `Ev_Command_Rejected` (client; timeouts surface as rejections
@@ -173,18 +246,26 @@ session_teleport :: proc(s: ^Session, id: knet.Net_Id)
 session_owner_of :: proc(s: ^Session, id: knet.Net_Id) -> knet.Player_Id
 ```
 
-Prefer the `session_spawn_make` / `session_spawn_send` pair — two-phase because the spawn
-announcement carries a field snapshot: make, set your per-spawn fields, then send.
-`session_spawn` remains for games that build entities by hand. From cavecrawl:
+Spawning is two-phase because the announcement carries a field snapshot:
+make, set your per-spawn fields, then send. A [kit/boot](boot.md) game
+spawns TYPED — every `entity=Name:id` tag generates a `<entity>_spawn`
+helper (the tag already knows the struct, so the `TYPE` const and the
+rawptr cast stop existing at spawn sites), paired with the one role-safe
+announce `kboot.boot_spawn_send`. From cavecrawl:
 
 ```odin
-sep, sid := ksess.session_spawn_make(&self.ses, SPEL_TYPE, owner = p.id)
-sp := cast(^Spelunker)sep
+sp, sid := spelunker_spawn(&self.boot, owner = p.id)
 sp.x = SPAWN_X + f32(i) * 60
 sp.y = SPAWN_Y
 sp.hp = MAX_HP
-ksess.session_spawn_send(&self.ses, sid)
+kboot.boot_spawn_send(&self.boot, sid)
 ```
+
+(For a TICKING entity the same helper routes through `boot_fire_spawn`: the
+host mints the real entity, a client a predicted one — sim.md's fired
+projectile.) The raw `session_spawn_make`/`session_spawn_send` pair stays
+public underneath, and `session_spawn` remains for games that build
+entities by hand.
 
 `session_start_replicating` is the host's "the world is set up — go live": it commits
 shadows, ships the full world to every already-seated client, and from then on the
@@ -213,7 +294,10 @@ session_set_blob :: proc(s: ^Session, id: knet.Net_Id, data: []u8)
 session_blob :: proc(s: ^Session, id: knet.Net_Id) -> []u8
 ```
 
-The variable-length escape hatch: one opaque, **author-dirtied** payload per
+The variable-length escape hatch — the RARE-CHANGE arm of
+[net.md's collections stance](net.md#collections--the-dynamic-stance)
+(bounded state takes a fixed array; a live collection of things takes
+entities): one opaque, **author-dirtied** payload per
 entity. Deliberately not a field — no diffing (you say when it changed, which
 deletes the "how do you memcmp a pointer-bearing value" problem), no
 interpolation, no prediction interplay. The host sets it; it ships reliably to
@@ -312,10 +396,11 @@ Mechanics worth knowing:
   same reconcile path a rejoin uses): fields and blob catch up at once. The
   catch-up announces itself as `Ev_Resynced` (not a second `Ev_Spawned` — the
   entity was never gone on this peer). The jump is history, not gameplay:
-  re-seed any `seen_*` edge scratch in that case (`seen_hp = hp`), or wounds
-  taken while out of interest present as fresh hits on re-entry.
-  `hysteresis` widens the exit edge (enter at `radius`, leave at
-  `radius + hysteresis`) so border-dancers don't thrash this.
+  generated `<field>_edge` halves re-seed silently by construction; any
+  hand-rolled `seen_*` scratch re-seeds off the event, or wounds taken while
+  out of interest present as fresh hits on re-entry. `hysteresis` widens the
+  exit edge (enter at `radius`, leave at `radius + hysteresis`) so
+  border-dancers don't thrash this.
 - **Streams route via the host.** Owners send their batches to the host
   instead of the transport's blind relay (the packets passed through that
   machine anyway — no extra hop), and the host forwards per-recipient at
@@ -369,6 +454,11 @@ Backup_Blob_Proc :: proc(user: rawptr, w: ^knet.Writer)
 session_set_backup_blob :: proc(s: ^Session, user: rawptr, write: Backup_Blob_Proc)
 session_backup_parts :: proc(s: ^Session, allocator := context.temp_allocator) -> (game_blob: []u8, snapshot: []u8, ok: bool)
 ```
+
+Don't hand-serialize those bytes: tag the host-local fields `gd:"backup"` and scriptgen
+generates the version-hashed write/read pair (POD, `map[POD]POD`, `[dynamic]POD`) — see
+[save](save.md#declaring-the-game-blob--gdbackup). The proc above is what you wire the
+generated writer into.
 
 **The takeover recipe** (live in cavecrawl's `cave_lobby_on_takeover`): on `Ev_Host_Left`,
 the peer holding a backup splits it with `session_backup_parts` (it returns copies — the
@@ -462,13 +552,26 @@ Trade :: struct {
 	state:      u8 `gd:"replicate"`, // OPEN / DONE / FAILED — an edge every screen words
 }
 
+// WHICH seat is acting is never an argument — it's derived from the ISSUER.
+// The verbs below declare `by: knet.Player_Id` right after the receiver, so
+// the framework fills it with the true issuer (it never rides the wire): a
+// hostile peer cannot edit or confirm the OTHER side of the table, and a
+// spectator's command finds no seat and rejects.
+trade_seat :: proc(self: ^Trade, by: knet.Player_Id) -> (side: u8, seated: bool) {
+	if u64(by) == self.a {return 0, true}
+	if u64(by) == self.b {return 1, true}
+	return 0, false
+}
+
 // THE DUPE-GUARD, single-target and therefore race-proof: ANY offer edit
 // clears BOTH confirms in the same verb, so the switch-the-item-at-the-last-
 // second scam is structurally dead — a confirm racing an edit lands on
 // cleared state and the commit below refuses.
 @(gd_command = "predict")
-trade_offer :: proc(self: ^Trade, side: u8, slot: u8, item: u16, count: u16) -> bool {
+trade_offer :: proc(self: ^Trade, by: knet.Player_Id, slot: u8, item: u16, count: u16) -> bool {
 	if self.state != TRADE_OPEN {return false}
+	side, seated := trade_seat(self, by)
+	if !seated {return false}
 	(side == 0 ? &self.offer_a[slot] : &self.offer_b[slot])^ = {kitems.Item_Id(item), count}
 	self.confirm_a = false
 	self.confirm_b = false
@@ -476,8 +579,10 @@ trade_offer :: proc(self: ^Trade, side: u8, slot: u8, item: u16, count: u16) -> 
 }
 
 @(gd_command = "predict")
-trade_confirm :: proc(self: ^Trade, side: u8) -> (ok: bool, sealed: bool) {
+trade_confirm :: proc(self: ^Trade, by: knet.Player_Id) -> (ok: bool, sealed: bool) {
 	if self.state != TRADE_OPEN {return false, false}
+	side, seated := trade_seat(self, by)
+	if !seated {return false, false}
 	if side == 0 {self.confirm_a = true} else {self.confirm_b = true}
 	return true, self.confirm_a && self.confirm_b // the second confirm seals it
 }
@@ -489,7 +594,7 @@ trade_confirm :: proc(self: ^Trade, side: u8) -> (ok: bool, sealed: bool) {
 // outcomes are ordinary host mutations: deltas carry the verdict and the
 // items to every screen at once, and phantom items are impossible — nothing
 // was predicted into anyone's bag.
-trade_confirm_then :: proc(game: ^MyGame, self: ^Trade, by: knet.Player_Id, side: u8, sealed: bool) {
+trade_confirm_then :: proc(game: ^MyGame, self: ^Trade, by: knet.Player_Id, sealed: bool) {
 	if !sealed {return}
 	if game_move_offers(game, self) { // validate both bags, then swap
 		self.state = TRADE_DONE

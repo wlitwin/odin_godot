@@ -62,6 +62,36 @@ authority only, right after the verb applies. Then:
   fresh baseline. A replay whose precondition no longer holds is dropped locally; the
   host's in-flight result has the final word either way.
 
+**The wrapper — one surface on both models.** `<verb>_cmd(b: ^kboot.Boot,
+self, args…) -> knet.Command_Outcome` — the boot is the game's one handle, and
+the generated body holds the routing: a coop class's verb rides the session's
+command loop, a ticking class's rides the sim lane (tick-scheduled), and
+promoting an entity between models leaves every issue site byte-identical.
+The return has the SAME meaning on every peer, so the call site needs no
+`is_host` branch: `.Applied` (the host accepted — authoritative; coop only —
+a sim verb executes at its stamped tick, never inline, so even the
+authority's own issue reports `.Predicted`), `.Predicted` (in flight on my
+screen — optimistically applied if it predicts, otherwise just sent), or
+`.Rejected` (the predicate said no on this peer: final on the host, a
+reverted local apply on a client). "Did it show on my screen?" is
+`knet.command_ok(r)` (`r != .Rejected`); "is it authoritative?" is
+`r == .Applied`. It replaced a plain `bool` whose truth meant
+authoritative-verdict on the host but tentative-local on a client — the one
+return in the feature that used to force a role branch to read correctly.
+(A game not using kit/boot issues through the raw layer below.)
+
+**Command ids are stable name hashes, not positions.** The generated
+`<CLASS>_CMD_<VERB>` constants (and both command wires, coop and sim) carry an
+FNV-1a hash of the verb's name — so reordering, adding, or removing procs never
+renumbers the protocol, and a version-skewed peer's unknown id MISSES the
+receiver's lookup and rejects cleanly instead of silently dispatching to
+whatever now lives at that position (the rolling-update landmine this kills).
+A renamed verb is a new id on purpose: it IS a different verb, and stale
+clients get the correct refusal. Same-set collisions are a build error naming
+both verbs (rename one — astronomically rare with a handful of names).
+Hand-built `Command_Desc`/`Sim_Cmd` sets pick their own ids, unique within the
+set (a single command's zero value is fine).
+
 **The tick paces the wire, not the sim.** The fixed net tick (default 20 Hz) is when
 deltas are diffed and streams are sent; gameplay runs at frame rate. Remote entities render
 `interp_delay` in the past (~2–3 send intervals) so there is almost always a bracketing
@@ -148,6 +178,23 @@ to record `last_take` in an untagged field for the hook to read; now the verb
 *returns* what it took. Payload types are unconstrained — the generated call
 site lets the compiler hold the `_then` signature to them.
 
+**The verb can see the issuer too.** When the *predicate* needs WHO — a trade
+window arbitrating which seat is confirming, a first-come claim recording its
+claimant — declare `by: knet.Player_Id` right after the receiver (after the
+wielder param in a composed block) and the framework fills it: `ctx.me` on the
+issuing peer's optimistic run, the resolved sender on the host — the same
+values the `_then` gets. It never rides the wire, so it can't be forged: the
+client-claimed `side: u8` a hostile peer flips to confirm the *other* side of
+a trade has no place to exist (the worked rewrite is the
+[trade recipe](session.md#recipes-over-existing-pieces)). The name is
+reserved — a wire arg called `by` is a build error; a player the verb merely
+*targets* stays ordinary wire data under any other name (`who`, `target`).
+
+```odin
+@(gd_command = "predict")
+trade_confirm :: proc(self: ^Trade, by: knet.Player_Id) -> (ok: bool, sealed: bool)
+```
+
 **The guarantees.** A consequence fires exactly once per applied command — on
 the host's own issues too (the wrapper's authority branch), and never on a
 client's optimistic run, a registry replay, a rejection, or a deduped
@@ -166,8 +213,12 @@ switch ever appears. A composed verb's payload is the block's *offer*
 
 **Build-time contract.** A mispaired consequence is a scriptgen error, not a
 proc that silently never fires: the shape (`[game,] self, by, wire args…,
-payload…`) is validated against the verb, an unclaimed `*_then` proc warns,
-and a direct verb whose payload nobody consumes warns too. When something
+payload…`) is validated against the verb, and the pairing suffixes
+(`_then`/`_fx`/`_apply`/`_edge`/`_spawned`/`_freed`) are RESERVED on procs that touch
+a script struct — an unclaimed one (a typo'd verb, a half-deleted pairing) is
+an error with the expected names spelled out: pair it or rename it. A
+suffix-named helper touching no script struct stays a warning at most, and a
+direct verb whose payload nobody consumes warns too. When something
 needs to react to commands *generically* (metrics, receipts, replays), the
 untyped [command hook](session.md#command-hooks-the-generic-layer-under-_then)
 remains underneath — `_then` is generated dispatch over the same authority path.
@@ -220,7 +271,7 @@ Runner :: struct {
 The entity's generated command is named by the **field path**, so two blocks of the same type
 never collide (`weapon: Gun` + `sidearm: Gun` → `runner_weapon_fire` + `runner_sidearm_fire`,
 distinct wire indices). Issue it exactly like a direct command —
-`runner_weapon_fire_cmd(ctx, self, dx, dy)` — the owner is passed for you, so only the wire args
+`runner_weapon_fire_cmd(&boot, self, dx, dy)` — the owner is passed for you, so only the wire args
 appear in the wrapper. Prediction reverts and reject-truth snapshots cover the block's replicated
 state for free (it's already in the entity's descriptor), and the block's cross-entity effects
 (spawning a projectile, applying damage) live in the game's `runner_weapon_fire_then`
@@ -293,8 +344,99 @@ only needs to name an entry, not carry it). Two rules keep codecs honest:
 unstable round trip makes confirmed predictions micro-snap), and dirtiness is
 still diffed on struct bytes — a change smaller than the wire precision still
 sends, so pick a precision at least as fine as gameplay cares about.
-Variable-length state doesn't belong in fields at all: use an entity blob
-(kit/session) or an explicit message.
+
+## Collections — the `[dynamic]` stance
+
+A `[dynamic]T`, slice, or map tagged `gd:"replicate"` is a **build error**, by
+decision, not omission. The delta walk's whole contract is flat POD cells — a
+shadow memcmp per field, one bit in a u64 mask, a byte-identical apply on
+every peer. A dynamic's bytes are a header whose elements a memcpy would
+tear, and the deeper problem survives any encoding: **byte-diffing has no
+element identity** — insert one element at the front and every byte after it
+"changed", so the diff ships the world for a one-item edit. Rather than grow
+a worse diff, the toolkit holds that a variable-length ask is always one of
+three real shapes, and each already has first-class machinery:
+
+- **Bounded** → a fixed array + count/sentinel: `bag: [6]kitems.Slot` with
+  `ITEM_NONE` empties (cavecrawl). One field, one diff atom, edges and
+  struct co-location work, prediction reverts are trivial. The cap is game
+  design — a friendslop game should own "six slots", not defer it.
+- **Rare-change, genuinely unbounded** (text, authored bytes) → an
+  [entity blob](session.md#entity-blobs): author-dirtied, whole-value,
+  reliable, and it rides every snapshot, so late joiners, backups, and saves
+  get it free (cavecrawl's floor inscription).
+- **A live collection of THINGS** → each element is an **entity**. This is
+  the one people reach past: the registry already IS a diffed dynamic
+  collection — spawn is insert, despawn is remove, per-element state diffs
+  field-by-field, interest management culls it, and late joiners get exactly
+  the live set. Cavecrawl's floor pickups are the worked example: not
+  `pickups: [dynamic]Pickup` on the level, but a Pickup entity per item on
+  the ground, each with its own `x/y/item/count` (and its own typed
+  `pickup_spawn`).
+
+The build error spells this fork out at the field. (`gd:"backup"` still
+accepts `[dynamic]`/map — the backup codec restores whole values on one
+peer; it never diffs across the wire.)
+
+## Edges (`<class>_<field>_edge`) — presenting delta-lane changes
+
+Deltas carry values; one-shot reactions (the hurt flash, the goal horn, the
+floor fanfare) need the TRANSITION. Declare a plain proc named for the field —
+**the proc is the subscription**, no tag — and the session's per-frame pass
+hands it the net change:
+
+```odin
+// ([game,] self, old, new: <the field's declared type>) — no results
+gunner_hp_edge :: proc(self: ^Gunner, old, new: i32) {
+	if new < old {self.flash_ttl = 0.25}
+}
+```
+
+This replaces the hand-rolled `seen_*` mirror, the per-frame compare, AND the
+re-seed-on-resync ritual beside them. The semantics, deliberate:
+
+- **Net change per frame, never per apply.** A predicting client legitimately
+  writes a delta-lane field several times in one frame (optimistic apply,
+  reject-truth, the replay reconcile) — the half fires once on what actually
+  changed since last frame, or not at all when the churn cancels.
+- **The diff atom is the FIELD** — and a tagged POD struct or fixed array is
+  one field. Fields that must edge *together* are co-located into one struct
+  and receive one half with the whole old/new value, atomically (speedball's
+  `score: Score` — l, r, and won as one value, one half, one fire per goal).
+  The grouping knob is the data model, not a framework mode.
+- **First sight seeds, resync re-seeds — silently.** Spawn values are a
+  baseline, not an edge; a wholesale catch-up (interest re-entry, a snapshot
+  over live state) is history, not gameplay. Initial dress (a late joiner's
+  3—2 scoreboard) rides `Ev_Spawned` — the event fires with the tuple's
+  fields SET; the census `_spawned` hook fires before they apply and is
+  bookkeeping only (the trap cavecrawl's floor-1 procgen acid caught live).
+- **The host's own mutations edge the same way** — the hurt flash needs no
+  `is_host`, ever. (A host-side pulse within one net tick still never reaches
+  clients: edges don't repeal "deltas carry state" — hold state a tick.)
+  One timing note for authorities: the automatic pass runs inside
+  `session_tick`, so a game tick that mutates AFTER the frame's pump would
+  edge a frame late. That frame only matters when the half MOVES something
+  the next tick's world reads — cavecrawl's respawn walk-out was the worked
+  lesson (one frame of un-teleported host at point-blank range is one more
+  rock through a friend). A coop game that declares its host pass with
+  [`@(gd_step = "authority")`](sim.md#discrete-verbs-on-the-lane) never
+  sees this: the generated `<snake>_step(self, ticks)` runs the loop and
+  the same-frame edge pass together. Hand-driven loops keep the manual fix
+  — the pass is idempotent (diff-then-commit), so it is one call after the
+  loop: `ksess.session_run_edges(&ses)`.
+- **Timing**: the half fires wire-fresh — correct for row 4 of the
+  [two-timelines table](#the-two-timelines-presenting-consequences)
+  (scoreboards, hp, inventories: never delay these). A row-2 consequence (a
+  lid on the render clock) calls `session_present` inside the body.
+- **Edges say "it changed"; facts say "it happened N times."** Two hits
+  coalescing into one net tick were always one delta — they are one edge.
+  When multiplicity or arguments matter, that is a FACT: the sim lane's
+  mine-form `_fx`, or a verb's consequence.
+
+Delta lane only, held at build time: an `_edge` on a `predict` field errors
+toward the mine-form `_fx` (resims would scrub it), on an `owner` field
+toward dress-from-fields (it interpolates every frame). `play/edge` remains
+for NON-replicated local state, where this machinery can't see.
 
 ## Registering entities
 
@@ -357,7 +499,7 @@ registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks
 ```
 
 You rarely call these by hand — the generated `<proc>_cmd` wrapper is the whole author
-surface (`chest_take_cmd(ctx, chest, slot, px, py)`), and [kit/session](session.md)
+surface (`chest_take_cmd(&boot, chest, slot, px, py)`), and [kit/session](session.md)
 installs the send hook and drives the host/client/expiry paths. Guarantees the loop owns:
 `false` really means "no mutation" (declared fields are captured before the run and
 restored on any rejection, on both peers — a command can never leave torn replicated
@@ -447,7 +589,7 @@ tool — when something looks mistimed, find its row:
 | **My own simulation** (I claimed it, I struck it) | now | `session_present(mine = true)` — or just do it |
 | **A remote moving cause** (a streamed avatar/ball reaching a thing) | at the render clock | `session_present(mine = false)` |
 | **A per-peer local visual** (each screen flies its own projectile) | at *my* visual's moment | fx hooks ([kit/fx](fx.md) `On_Hit_Proc`) |
-| **No spatial cause** (scoreboards, inventories, objectives) | wire-fresh | nothing — *never* delay these |
+| **No spatial cause** (scoreboards, inventories, objectives) | wire-fresh | a [`<field>_edge` half](#edges-class_field_edge--presenting-delta-lane-changes) — *never* delay these |
 | **A global transition** (the won byte, the hole index) | after a dwell | edge-outlives-observers: hold state ≥ `interp_delay` |
 
 The bins are per-CONSEQUENCE, not per-entity: one looted chest updates the
@@ -466,8 +608,9 @@ presentation is almost always the better spend.
 - **Deltas carry STATE, not events.** The walk memcmps entity-vs-shadow once per net tick;
   a replicated byte pulsed `1 → 0` *within* one tick equals its shadow when the diff runs
   and never ships. Put edge-triggered state on bytes that outlive a tick (cavecrawl's
-  `level.won` stays 1 until the next run; peers react to the *edge* locally), or use an
-  explicit reliable message.
+  `level.won` stays 1 until the next run), or use an explicit reliable message. The
+  REACTION side is a [`<field>_edge` half](#edges-class_field_edge--presenting-delta-lane-changes) —
+  the pulse caveat is about what the wire carries, not how you observe it.
 - **Owner-streamed fields are never written by network input on the owner's peer.**
   `registry_apply_streams` skips entities owned by `me`; reject-truth, prediction reverts,
   and expiry all pass `skip_owner` for them; `diff_mask` keeps them out of deltas entirely.
@@ -480,8 +623,11 @@ presentation is almost always the better spend.
   peer hasn't seen spawn (an unknown id abandons the batch — field sizes come from the
   descriptor the peer doesn't have). The session guarantees both by putting results, state
   batches, and spawn/despawn on the same reliable ordered channel.
-- **POD only, 64 fields max.** The generated code `#assert`s the POD rule at compile time;
-  group past-64 field counts into sub-structs (a fixed array is one field).
+- **POD only, 64 fields max.** Syntactic collections (`[dynamic]`, slices, maps) are a
+  scriptgen error with [the three-way stance](#collections--the-dynamic-stance) spelled
+  out; deeper non-POD (a struct hiding a string) fails the generated `#assert` at the
+  consumer compile, naming the field. Group past-64 field counts into sub-structs (a
+  fixed array is one field).
 - **`Intent_Seq` wraparound is not handled**, by design: u32 gives ~4 billion commands per
   peer per session.
 

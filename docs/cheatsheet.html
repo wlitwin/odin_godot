@@ -237,7 +237,7 @@ Runner :: struct {
 <tr><td class="k">session_set_transport(&s,user,send) · session_set_factory(&s,user,make,free) · session_set_command_hook(&s,user,hook) · session_set_type_hook(&s,TYPE,user,hook) · session_set_backup_blob(&s,user,write)</td><td>ready() wiring; survives re-init. Type hook wins over catch-all (cmd ids collide across types — every type's first cmd is 0)</td></tr>
 <tr><td class="k">session_host_start(&s,name,token=0,dedicated=false) · session_client_start(&s,token,name) · session_client_join(&s) · session_client_leave(&s) · session_host_resume(&s,me,name,backup)→bool</td><td>join when transport up (on_net_up); dedicated seat = server-not-player (roster flags it, succession never arms)</td></tr>
 <tr><td class="k">session_tick(&s,dt,now)→(ticks,sampled) · session_poll(&s)→(Event,ok) · session_handle_packet(&s,from_peer,&r) · session_peer_disconnected(&s,peer)</td><td>the frame drive; drain poll until !ok. Events not callbacks (factory make is the one sync call)</td></tr>
-<tr><td class="k">session_spawn_make(&s,type,owner=INVALID)→(entity,id) … set fields … session_spawn_send(&s,id)</td><td>two-phase spawn through the SAME factory every peer runs; Ev_Spawned fires at send with fields set</td></tr>
+<tr><td class="k">&lt;entity&gt;_spawn(&b,owner=INVALID)→(^T,id) … set fields … kboot.boot_spawn_send(&b,id)</td><td>TYPED two-phase spawn generated from the entity= tag (ticking entities route predicted on clients); raw pair session_spawn_make/_send underneath; Ev_Spawned fires at send with fields set</td></tr>
 <tr><td class="k">session_despawn · session_teleport(id) · session_set_owner(&s,id,owner) · session_owner_of(id) · session_start_replicating(&s)</td><td>teleport = stream discontinuity (else remotes slide); set_owner = carry/mount/possess (Ev_Owner_Changed, remotes snap); start_replicating = host go-live</td></tr>
 <tr><td class="k">session_set_blob(&s,id,data) · session_blob(&s,id)→[]u8 (view)</td><td>per-entity opaque variable-length payload; author-dirtied, reliable, rides EVERY snapshot (late join/backup/save free); Ev_Blob_Changed everywhere</td></tr>
 <tr><td class="k">session_set_stream_hz(&s,id,hz)→actual · session_set_stream_tier(&s,id,tier)</td><td>bandwidth lever; keep 1/hz &lt; interp_delay</td></tr>
@@ -256,7 +256,7 @@ Runner :: struct {
 <tr><td class="k">wire_attach(&w,node,&ses,MSG_KIND) · wire_listen(&w,"on_packet","on_peer_left","on_net_up","on_net_down") · wire_receive · wire_pump(&w,now)</td><td>attach once (survives *_start); listen after in-tree; pump per frame. Channels: 1 reliable (commands/state), 2 stream (unreliable-ordered)</td></tr>
 <tr><td class="k">begin_host(&w,port,name,max=32,token=0,dedicated=false)→bool · begin_join(&w,addr,port,token,name)→bool</td><td>native ENet two-button; false = port taken / dial fail</td></tr>
 <tr><td class="k">begin_host_web(&w,url,name,token=0,room="")→bool · begin_join_web(&w,url,room,token,name)→bool · web_poll(&w) every frame · web_close(&w)</td><td>WebRTC twins; relay assigns code async — read gd.webrtc_room_code; room param = succession reservation</td></tr>
-<tr><td class="k">wire_set_latency(&w,ms) · wire_drop(&w,peer,after=.75) · peer_address(node,peer)→(string,ok) · drop_peer · pba_view(&pba)→[]u8 · send_reliable/send_stream/listen_packets</td><td>acid latency shim · deferred kick close (flush first) · zero-copy packet view (clone to keep)</td></tr>
+<tr><td class="k">wire_set_latency(&w,ms,jitter_ms=0,loss_pct=0) · wire_traffic(&w)→string · wire_link_quality(&w,peer)→(rtt,jit,loss,ok) · wire_drop(&w,peer,after=.75) · peer_address(node,peer)→(string,ok) · pba_view(&pba)→[]u8</td><td>bad-link shim (jitter order-preserving; loss drops streams, delays reliable) · bytes-by-kind line · ENet link truth · deferred kick close · zero-copy view</td></tr>
 </table>
 
 <h3>kit/boot (kboot)</h3>
@@ -324,10 +324,10 @@ case CRATE_TYPE:
     c := rt.script_of(node, Crate)
     self.crates[id] = c
     return c, &crate_command_set
-// host spawn:
-e, id := ksess.session_spawn_make(&s.ses, CRATE_TYPE, owner=pid)
-(cast(^Crate)e).x = 100
-ksess.session_spawn_send(&s.ses, id)     // dress on Ev_Spawned</pre>
+// host spawn (typed, generated from the tag — no const, no cast):
+c, id := crate_spawn(&s.boot, owner=pid)
+c.x = 100
+kboot.boot_spawn_send(&s.boot, id)       // dress on Ev_Spawned</pre>
 <h3>Predicted verb + cross-entity hook</h3>
 <pre>@(gd_command = "predict")
 crate_loot :: proc(c: ^Crate) -> bool {          // gate BEFORE issuing too
@@ -335,7 +335,7 @@ crate_loot :: proc(c: ^Crate) -> bool {          // gate BEFORE issuing too
     c.slots[0] = {}
     return true
 }
-// issue (any peer):  crate_loot_cmd(&self.ses.ctx, crate)
+// issue (any peer, both models):  crate_loot_cmd(&self.boot, crate)
 // cross-entity effect (host, in the type hook, fires for host's own too):
 hook :: proc(user, player, entity, cmd, ok) { if ok && cmd == CRATE_CMD_LOOT { /* into looter's bag */ } }</pre>
 <h3>Bullets — projectiles are never entities</h3>
