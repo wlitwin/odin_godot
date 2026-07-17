@@ -556,4 +556,54 @@ ODIN
 if "$SGEN" "$as" -godot:"$ROOT" >"$as/out.log" 2>&1; then fail "any_seat on a coop class must FAIL the build"; fi
 grep -q "sim-lane declaration" "$as/out.log" || fail "the any_seat misuse must say it is a sim-lane declaration"
 
+# ---- fixture: generated acid probes — per entity kind, count/my/field
+# @(gd_method)s the test driver reads replicated state through; a
+# hand-written proc wearing a probe's name suppresses it (census-style). ----
+pr="$work/probes"
+mkdir -p "$pr"
+cat >"$pr/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class PrGame
+package pr
+import gd "godot:godot"
+import knet "godot:kit/net"
+import kboot "godot:kit/boot"
+
+PrGame :: struct {
+	owner:      gd.Node,
+	boot:       kboot.Boot,
+	mob_scene:  ^gd.Resource `gd:"export,resource=PackedScene,entity=Mob:1"`,
+}
+
+// The suppression: a hand-written probe wearing the generated name wins.
+@(gd_method)
+probe_mob_hp :: proc(self: ^PrGame, id: gd.Int) -> gd.Int { return 42 }
+ODIN
+cat >"$pr/mob.odin" <<'ODIN'
+//gd:extends Node2D
+//gd:class Mob
+package pr
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Mob_Pose :: struct { x, y: f32 `gd:"replicate,interp"` }
+
+Mob :: struct {
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id,
+	hp:     i32 `gd:"replicate"`,
+	angry:  bool `gd:"replicate"`,
+	pose:   Mob_Pose,
+	tag:    [4]u8 `gd:"replicate"`, // compound: no generated probe
+}
+ODIN
+"$SGEN" "$pr" -godot:"$ROOT" >"$pr/out.log" 2>&1 || fail "the probes fixture must generate"
+gen="$pr/game.gen.odin"
+grep -q "_pr_game_probe_mob_count" "$gen" || fail "probe_mob_count must generate"
+grep -q "_pr_game_probe_my_mob" "$gen" || fail "probe_my_mob must generate"
+grep -q "_pr_game_probe_mob_angry" "$gen" || fail "bool fields get a 1/0 probe"
+grep -q "_pr_game_probe_mob_pose_x" "$gen" || fail "nested scalar fields probe under their path"
+grep -q "_pr_game_probe_mob_hp :: proc" "$gen" && fail "a hand-written probe name must suppress the generated one"
+grep -q "_pr_game_probe_mob_tag" "$gen" && fail "compound fields must not probe"
+
 echo "SCRIPTGEN_OK"

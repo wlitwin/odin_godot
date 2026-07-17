@@ -1,5 +1,11 @@
 # Build a multiplayer game in a day
 
+> This is the guided TOUR — it explains the whole surface in reading order,
+> against cavecrawl as the finished artifact, and its snippets are excerpts,
+> not a follow-along. For the copy-paste-run path (empty folder → two windows
+> in ten minutes, every line compiled), do the **[quickstart](quickstart.md)**
+> first; terms of art live in the [glossary](glossary.md).
+
 The friendslop toolkit exists for one shape of game: **you and your friends,
 one of you hosts, things go wrong together.** This tutorial builds that game —
 a small co-op cave crawler — the same way `examples/cavecrawl` was built,

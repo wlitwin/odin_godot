@@ -27,8 +27,11 @@ two):
 
 Everything the session gives you — identity, roster, reconnect, spawns,
 blobs, stats, chat, the command loop for discrete verbs — keeps working
-unchanged. Only the contested fast state (movement, projectiles) opts into
-the sim lane, per field. `owner` and `predict` on one field is a build
+unchanged; this page assumes you know that surface (the
+[quickstart](quickstart.md) is the fast route in, the
+[sim quickstart](quickstart-sim.md) the fast route HERE — a coop hello
+promoted in four diffs). Only the contested fast state (movement,
+projectiles) opts into the sim lane, per field. `owner` and `predict` on one field is a build
 error: a field has one writer.
 
 **The tick IS the simulation.** Unlike the coop model (gameplay at frame

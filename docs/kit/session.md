@@ -352,6 +352,44 @@ acid once caught a resource gate passing on 254 milliseconds of latency). On any
 peer that didn't register the column, resolve BY NAME with `session_stat_find`
 (cheap — do it per read).
 
+### Player profiles (the lobby's state, typed)
+
+Stats are the *host's* ledger about players; the **profile** is each player's
+own word about themselves — picks, loadout, ready lamp, declared cosmetics.
+One POD struct per seat, one writer per row (its player), host-relayed to
+every screen. This is the machinery every lobby used to rebuild on stat
+columns and hand-serialized app messages:
+
+```odin
+Pick :: struct { look, iron: u8, ready: bool }
+
+// ready(), before *_start — both ends install the same type:
+ksess.session_profile_install(&self.ses, Pick)
+
+// MY row: write freely, read instantly — the local echo IS the row
+// (a click that lagged its own screen by the relay cadence read as broken):
+ksess.session_profile_mine(&self.ses, Pick).look += 1
+
+// anyone's row, in session_roster order (stable slots on every screen):
+for p in ksess.session_roster(&self.ses) {
+    pick, _ := ksess.session_profile_of(&self.ses, p.id, Pick)
+    draw_row(p, pick)
+}
+```
+
+There is no declare call to remember: the session diffs your row once per
+net tick and ships the change; the host relays the table at the stats
+cadence, sends the lot to late joiners behind their welcome, and every peer
+already holds every row when a takeover makes one of them the host.
+`Ev_Profile_Changed{player}` fires wherever a *view* of a row changed (never
+for your own local writes). **The muster recipe**: draw rows from
+`session_roster` + `session_profile_of`; gate the host's START on every
+row's `ready`; on `Ev_Profile_Changed` against a live run, a newly-ready
+row IS the drop-in trigger — spawn them (the spawn waits for the pick, so
+there is no spawn/declare race to lose). Rows are the declarer's word (the
+friendslop trust model) — host-*minted* truth (banked currency, dealt
+inventory) belongs in replicated entity fields, not here.
+
 ## Command hooks (the generic layer under _then)
 
 Per-verb consequences belong in [`<verb>_then` procs](net.md#consequences-verb_then) —

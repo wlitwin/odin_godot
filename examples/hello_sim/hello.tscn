@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/hello.odin" id="1_hello"]
+[ext_resource type="PackedScene" path="res://player.tscn" id="2_player"]
+
+[node name="HelloNet" type="Node2D"]
+script = ExtResource("1_hello")
+player_scene = ExtResource("2_player")
+
+[node name="Floor" type="Polygon2D" parent="."]
+z_index = -10
+color = Color(0.12, 0.13, 0.16, 1)
+polygon = PackedVector2Array(0, 0, 640, 0, 640, 360, 0, 360)

@@ -202,6 +202,7 @@ Event :: union {
 	Ev_Command_Executed,
 	Ev_Command_Confirmed,
 	Ev_Command_Rejected,
+	Ev_Profile_Changed,
 }
 
 // ---- the stat registry ---------------------------------------------------------
@@ -313,6 +314,9 @@ SES_SETOWNER :: u8(19) // host -> all   [id][owner] — ownership transfer (carr
 SES_SUCCESSOR :: u8(20) // host -> all  [player][info] — who carries the torch if I die, and how to find them
 @(private)
 SES_BLOB :: u8(21) // host -> all  [id][ver u32][len u32][bytes] — an entity blob changed
+
+SES_DECLARE :: u8(22) // client -> host  [size u16][row bytes] — my profile row (profile.odin)
+SES_PROFILES :: u8(23) // host -> all    [size u16][players u16] x ([id][row]) — the profile table
 
 // ---- app messages: the extension point for sibling kit packages ---------------
 //
@@ -487,6 +491,10 @@ Session :: struct {
 	// installs one that knows about the sim lane's in-flight verbs.
 	guard_exempt:      knet.Guard_Exempt_Proc,
 	guard_exempt_user: rawptr,
+
+	// The per-player PROFILE table (profile.odin): one POD row per seat,
+	// owner-authored, host-relayed. size survives re-init (pre-start wiring).
+	prof: Profile_Table,
 	factory_free:  Free_Entity_Proc,
 	game_user:     rawptr, // session_set_game's explicit override (nil = the factory user)
 	cmd_hook_user: rawptr,
@@ -666,6 +674,7 @@ session_destroy :: proc(s: ^Session) {
 		delete(n)
 	}
 	delete(s.stat_names)
+	prof_destroy(&s.prof)
 	delete(s.stats)
 	delete(s.backup)
 	delete(s.succ_info)
@@ -1412,6 +1421,12 @@ net_tick :: proc(s: ^Session) {
 			s.stats_dirty = false
 			send_stats(s)
 		}
+		// The profile relay (profile.odin): a landed declare goes out at the
+		// same lobby-alive cadence stats do.
+		if s.prof.dirty {
+			s.prof.dirty = false
+			prof_send(s)
+		}
 		// Backup hosting: keep the ELDEST connected client holding a fresh
 		// re-hostable snapshot — refreshed on the interval, and immediately
 		// when the target changes (first client seats, old target leaves).
@@ -1434,6 +1449,10 @@ net_tick :: proc(s: ^Session) {
 			}
 		}
 	}
+
+	// The profile auto-declare (profile.odin), every role: my row's changes
+	// ship themselves — there is no "remember to declare" call to forget.
+	prof_tick(s)
 
 	// Loud auto-revert: a silent host must read as "no" — and the rejection
 	// carries the REAL seq/entity so UI keyed on either matches the timeout
@@ -2066,6 +2085,7 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 		send_world(s, peer)
 	}
 	send_stats(s, peer)
+	prof_send(s, peer) // the profile table rides behind the welcome too
 	send_successor(s, peer)
 
 	append(&s.events, Ev_Player_Joined{id = id, rejoin = rejoin})
@@ -2327,6 +2347,22 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) 
 		copy(s.backup, blob)
 		s.backup_at = s.now
 		append(&s.events, Ev_Backup_Received{size = len(blob)})
+	case SES_DECLARE:
+		// A player's profile row (profile.odin) — host only, seated only
+		// (the same trust gate as commands: a peer that never JOINed is nobody).
+		if !s.is_host {
+			return
+		}
+		from, seated := s.by_peer[from_peer]
+		if !seated {
+			return
+		}
+		prof_handle_declare(s, from, r)
+	case SES_PROFILES:
+		if s.is_host || !s.joined {
+			return
+		}
+		prof_handle_table(s, r)
 	case SES_STATS:
 		if s.is_host || !s.joined {
 			return

@@ -1459,6 +1459,60 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		}
 	}
 
+	// Generated acid probes — the driver's window into replicated state
+	// (resolve_probes): probe_<kind>_<field>(id) with 0 = mine, plus
+	// probe_<kind>_count() / probe_my_<kind>(). Registered @(gd_method)s, so
+	// driver.gd reads what this peer SEES with no hand-written queries file;
+	// a hand-written proc wearing a probe's name suppressed it upstream.
+	if len(s.probes) > 0 {
+		w(b, "// ---- generated acid probes (the test driver's replicated-state window) ----\n\n")
+		for p in s.probes {
+			upper_t := strings.to_upper(p.tsnake)
+			switch p.form {
+			case .Count:
+				fmt.sbprintf(
+					b,
+					"@(private = \"file\")\n_%s_%s :: proc(self: ^%s) -> gd.Int {{\n\treturn gd.Int(len(kboot.boot_entity_ids(&self.%s, %s_TYPE)))\n}}\n\n",
+					snake, p.name, cls, s.boot_field, upper_t,
+				)
+			case .My:
+				fmt.sbprintf(
+					b,
+					"@(private = \"file\")\n_%s_%s :: proc(self: ^%s) -> gd.Int {{\n\tif self.%s.ses == nil {{return 0}}\n\t_, id, ok := kboot.boot_owned_entity(&self.%s, %s_TYPE, self.%s.ses.me)\n\treturn ok ? gd.Int(id) : 0\n}}\n\n",
+					snake, p.name, cls, s.boot_field, s.boot_field, upper_t, s.boot_field,
+				)
+			case .Field:
+				ret := p.float ? "gd.Float" : "gd.Int"
+				value := fmt.tprintf("%s(e.%s)", ret, p.access)
+				if p.boolish {
+					value = fmt.tprintf("e.%s ? gd.Int(1) : gd.Int(0)", p.access)
+				}
+				fmt.sbprintf(
+					b,
+					"@(private = \"file\")\n_%s_%s :: proc(self: ^%s, id: gd.Int) -> %s {{\n"+
+					"\tif self.%s.ses == nil {{return 0}}\n"+
+					"\tnid := knet.Net_Id(id)\n"+
+					"\tif id == 0 {{\n"+
+					"\t\t_, mid, mok := kboot.boot_owned_entity(&self.%s, %s_TYPE, self.%s.ses.me)\n"+
+					"\t\tif !mok {{return 0}}\n"+
+					"\t\tnid = mid\n"+
+					"\t}}\n"+
+					"\traw, ok := kboot.boot_entity(&self.%s, nid, %s_TYPE)\n"+
+					"\tif !ok {{return 0}}\n"+
+					"\te := cast(^%s)raw\n"+
+					"\treturn %s\n"+
+					"}}\n\n",
+					snake, p.name, cls, ret,
+					s.boot_field,
+					s.boot_field, upper_t, s.boot_field,
+					s.boot_field, upper_t,
+					p.target,
+					value,
+				)
+			}
+		}
+	}
+
 	// gd:"backup" host-local migration/save codec (version-hashed write/read).
 	emit_backup(b, s)
 

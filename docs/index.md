@@ -48,6 +48,9 @@ use → ship.**
 
 ## Build multiplayer: the friendslop toolkit — and the server-authority companion
 
+- **[Multiplayer quickstart](kit/quickstart.md)** — zero to TWO WINDOWS in two small
+  files (`examples/hello_net` is its living copy); the [sim twin](kit/quickstart-sim.md)
+  then promotes the same game to server authority. Start multiplayer here.
 - **[kit/ overview](kit/index.md)** — reusable multiplayer game systems (`godot:kit/*`):
   host-authoritative sessions with reconnect identity, declarative replication with
   client prediction, chat, items, combat, NPCs, save/resume, moderation, ENet + Steam

@@ -1938,6 +1938,86 @@ default_fingerprint_gates_without_wiring :: proc(t: ^testing.T) {
 }
 
 @(test)
+profiles_declare_echo_and_catchup :: proc(t: ^testing.T) {
+	// The typed per-player PROFILE (profile.odin): my row echoes locally this
+	// instant, the auto-declare ships it, the host relays the table, and a
+	// late joiner catches the lot behind her welcome — the lobby machinery
+	// every game rebuilt on stat columns, as one POD struct per seat.
+	Pick :: struct {
+		look:  u8,
+		ready: bool,
+	}
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+
+	ksess.session_profile_install(&host.s, Pick)
+	ksess.session_profile_install(&alice.s, Pick)
+	ksess.session_profile_install(&bob.s, Pick)
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+	drain(&host.s); drain(&alice.s); drain(&bob.s)
+	now := 100.0
+
+	// LOCAL ECHO: my write reads back this instant — no round trip, no cadence.
+	mine := ksess.session_profile_mine(&alice.s, Pick)
+	mine.look = 3
+	mine.ready = true
+	got, gok := ksess.session_profile_of(&alice.s, alice.s.me, Pick)
+	testing.expect(t, gok, "my row exists the moment I write it")
+	testing.expect_value(t, got.look, u8(3))
+
+	// The auto-declare ships on the next net tick; the relay rides the
+	// low-rate (stats-cadence) block — give it half a second of ticks.
+	for _ in 0 ..< 12 {step(boxes, &now)}
+	hv, hok := ksess.session_profile_of(&host.s, alice.s.me, Pick)
+	testing.expect(t, hok, "the declare landed on the host")
+	testing.expect_value(t, hv.look, u8(3))
+	testing.expect(t, hv.ready, "the whole row rode one declare")
+	heard := false
+	for ev in drain(&host.s) {
+		if pc, k := ev.(ksess.Ev_Profile_Changed); k && pc.player == alice.s.me {
+			heard = true
+		}
+	}
+	testing.expect(t, heard, "the host heard the view change")
+	bv, bok := ksess.session_profile_of(&bob.s, alice.s.me, Pick)
+	testing.expect(t, bok, "the relay reached the third screen")
+	testing.expect_value(t, bv.look, u8(3))
+
+	// The HOST's own row rides the same lane (its word IS the relay).
+	ksess.session_profile_mine(&host.s, Pick).look = 7
+	for _ in 0 ..< 12 {step(boxes, &now)}
+	av, aok := ksess.session_profile_of(&alice.s, host.s.me, Pick)
+	testing.expect(t, aok, "the host's row reached the clients")
+	testing.expect_value(t, av.look, u8(7))
+
+	// LATE JOINER: the whole table rides behind her welcome, no cadence wait.
+	carol: Peer_Box
+	box_make(&carol, 300)
+	defer box_destroy(&carol)
+	ksess.session_profile_install(&carol.s, Pick)
+	ksess.session_client_start(&carol.s, u64(0xCA401), "carol")
+	ksess.session_client_join(&carol.s)
+	all := []^Peer_Box{&host, &alice, &bob, &carol}
+	pump(all)
+	cv, cok := ksess.session_profile_of(&carol.s, alice.s.me, Pick)
+	testing.expect(t, cok, "the joiner caught the table behind her welcome")
+	testing.expect_value(t, cv.look, u8(3))
+	testing.expect(t, cv.ready)
+}
+
+@(test)
 write_guard_names_a_client_rogue_write :: proc(t: ^testing.T) {
 	// THE canonical co-op bug: a client assigns to a host-lane field —
 	// compiles, looks right locally, never replicates. The shadow-as-bless

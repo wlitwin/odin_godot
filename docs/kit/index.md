@@ -6,8 +6,22 @@ players, host-authoritative, drop-in join, reconnect, save/resume, ENet or
 Steam. Built and proven by `examples/cavecrawl`, which grows with every
 package and doubles as the reference implementation.
 
-**Start with the [tutorial](build-a-game-in-a-day.md)** — it builds the whole
-game in order and links each page below at the moment you need it.
+**Want to feel it in five minutes?** Run `examples/slopball` in two windows
+(`bash build/build_scripts.sh examples/slopball`, then `$GODOT --path
+examples/slopball` twice — Host in one, Join in the other). **Then build
+your own:** the **[quickstart](quickstart.md)** goes zero-to-two-windows in
+two small files (`examples/hello_net` is its living copy), and the
+**[sim quickstart](quickstart-sim.md)** promotes that game to server
+authority for competitive shapes. From there the
+[tutorial](build-a-game-in-a-day.md) tours the whole surface in cavecrawl,
+linking each page below at the moment you need it — and the
+[glossary](glossary.md) is one paragraph per term of art (halves, census,
+dress, acid...).
+
+Platform note: macOS is verified end-to-end by the suite; Windows ships
+prebuilt cores with limited runtime verification so far, Linux is
+build-verified only ([status](../../README.md#platform-status)) — co-op
+means your friends' machines, so check before you promise a LAN party.
 
 ## The promises
 

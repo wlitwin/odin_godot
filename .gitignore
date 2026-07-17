@@ -72,6 +72,7 @@ examples/*/.coopsignal.log
 # JetBrains (Rider) per-user project config
 .idea/
 examples/cavecrawl/.runlogs/
+**/.runlogs/
 tests/kitnav/.runlogs/
 examples/slopball/.sloplogs/
 examples/slopball3d/.sloplogs/

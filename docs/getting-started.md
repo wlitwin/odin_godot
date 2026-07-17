@@ -199,6 +199,8 @@ $GODOT --headless --path /path/to/your/project --quit-after 30   # smoke test
 
 ## Next steps
 
+- **Building multiplayer?** → the [co-op quickstart](kit/quickstart.md): zero to two
+  windows moving a player, two small files.
 - **[Authoring Guide](authoring-guide.md)** — exports of every type, signals, methods,
   resources, cross-script calls, autoloads, the full `gd.*` helper catalog.
 - **[Workflow](workflow.md)** — the edit→reload loop, editor squiggles/autocomplete, and

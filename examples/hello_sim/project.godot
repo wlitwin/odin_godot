@@ -1,0 +1,18 @@
+; Engine configuration file.
+
+config_version=5
+
+[application]
+
+config/name="Hello, Server Authority"
+run/main_scene="res://hello.tscn"
+config/features=PackedStringArray("4.6")
+
+[display]
+
+window/size/viewport_width=640
+window/size/viewport_height=360
+
+[editor]
+
+script/search_in_file_extensions=PackedStringArray("gd", "gdshader", "odin")

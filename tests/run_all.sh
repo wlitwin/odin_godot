@@ -192,6 +192,14 @@ TESTS=(
     # bullet immediacy (the firer's bullet exists the same tick, NO host round-trip) + broadcast,
     # a peer-authoritative kill agreed by both peers, despawn replication, XP to the firer.
     "arenanative|ARENA_NATIVE_OK|examples/coop_arena/coop_native_run.sh"
+    # THE QUICKSTART, kept honest: hello_net (docs/kit/quickstart.md's living copy) in two
+    # headless windows under 120ms — the guest watches the host's walk arrive through the
+    # wire, read entirely through GENERATED probes on the acid harness (its smallest consumer).
+    "hellonet|HELLO_NET_OK|examples/hello_net/run.sh"
+    # THE SIM QUICKSTART: hello_net promoted per the checklist (retag/tick/sample/two wires).
+    # Pins the promotion's two receipts under 120ms each way: the guest's OWN square moves
+    # within half a second of the press (prediction), the host's walk arrives watched.
+    "hellosim|HELLO_SIM_OK|examples/hello_sim/run.sh"
     # ENGINE-PHYSICS soccer, SOLO: a real RigidBody2D ball (play.Puppet) + a move_and_slide
     # striker run the whole loop headless — kick, goal off the replicated pose, match edge.
     # The repo's only exercise of the 2D physics SOLVER under --headless.

@@ -1922,6 +1922,98 @@ resolve_census :: proc(s: ^Script, taken: map[string]bool) {
 	}
 }
 
+// Which probe return a replicated field's declared type maps to. Scalars
+// only: compound fields (structs, arrays) are hand-written probes — a
+// formatted view is game-shaped, not mechanical.
+@(private = "file")
+probe_scalar :: proc(type_text: string) -> (float, boolish, ok: bool) {
+	t := type_text
+	if i := strings.last_index(t, "."); i >= 0 {t = t[i + 1:]}
+	switch t {
+	case "f16", "f32", "f64", "Float":
+		return true, false, true
+	case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "Int":
+		return false, false, true
+	case "bool", "b8", "b16", "b32", "b64":
+		return false, true, true
+	}
+	return false, false, false
+}
+
+// The generated acid probes — the mechanical half of every game's hand-written
+// queries.odin, synthesized as real @(gd_method)s so the test driver reads
+// what this peer SEES with no game code. Per `entity=` kind: count, my-id,
+// and one per replicated scalar field. Needs the boot (the census resolves
+// through it); a hand-written proc wearing a probe's name wins, name by name.
+resolve_probes :: proc(s: ^Script, by_struct: map[string]^Script, taken: map[string]bool) {
+	if s.boot_field == "" || len(s.entities) == 0 {
+		return
+	}
+	vi_int, iok := map_variant("gd.Int")
+	vi_float, fok := map_variant("gd.Float")
+	if !iok || !fok {
+		return // unreachable: both are core Variant types
+	}
+	add :: proc(s: ^Script, taken: map[string]bool, p: Probe_Info, args: ..Arg) -> bool {
+		if taken[p.name] {
+			return false // hand-written wins
+		}
+		for m in s.methods {
+			if m.gd_name == p.name {
+				return false
+			}
+		}
+		m := Method_Info {
+			proc_name = fmt.tprintf("_%s_%s", to_snake(s.struct_name), p.name),
+			gd_name   = p.name,
+			ret       = p.form == .Field && p.float ? _probe_vi_float : _probe_vi_int,
+		}
+		for a in args {
+			append(&m.args, a)
+		}
+		append(&s.methods, m)
+		append(&s.probes, p)
+		return true
+	}
+	_probe_vi_int = vi_int
+	_probe_vi_float = vi_float
+	id_arg := Arg{name = "id", type_text = "gd.Int", vi = vi_int}
+	for e in s.entities {
+		tsnake := to_snake(e.target)
+		add(s, taken, Probe_Info{form = .Count, name = fmt.tprintf("probe_%s_count", tsnake), tsnake = tsnake, target = e.target})
+		add(s, taken, Probe_Info{form = .My, name = fmt.tprintf("probe_my_%s", tsnake), tsnake = tsnake, target = e.target})
+		tgt, known := by_struct[e.target]
+		if !known {
+			continue
+		}
+		for r in tgt.replicates {
+			float, boolish, ok := probe_scalar(r.type_text)
+			if !ok {
+				continue
+			}
+			add(
+				s, taken,
+				Probe_Info{
+					form = .Field,
+					name = fmt.tprintf("probe_%s_%s", tsnake, strings.join(r.path, "_", context.temp_allocator)),
+					tsnake = tsnake,
+					target = e.target,
+					access = strings.join(r.path, ".", context.temp_allocator),
+					float = float,
+					boolish = boolish,
+				},
+				id_arg,
+			)
+		}
+	}
+}
+
+// resolve_probes' return-type scratch (Odin nested procs don't capture).
+@(private = "file")
+_probe_vi_int: Variant_Info
+@(private = "file")
+_probe_vi_float: Variant_Info
+
 // The four standard transport forwards, written by nobody: a kboot.Boot
 // field on the script struct declares them. Every session game wrote the
 // same four one-liners (packet → wire_receive, peer_left/net_down →

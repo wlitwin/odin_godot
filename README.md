@@ -92,7 +92,9 @@ nix develop --command bash tests/run_all.sh
 
 New here? Start with **[Getting Started](docs/getting-started.md)** — it installs the
 toolchain, wires the extension into a Godot project, and walks you through your first Odin
-script from empty file to a moving node.
+script from empty file to a moving node. Here for multiplayer? The
+**[quickstart](docs/kit/quickstart.md)** goes zero-to-two-windows in two small files, and
+its **[sim twin](docs/kit/quickstart-sim.md)** promotes the same game to server authority.
 
 ## Documentation
 

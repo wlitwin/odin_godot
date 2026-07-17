@@ -439,6 +439,28 @@ Command_Info :: struct {
 // editor-wired export; the tag names the entity struct it bodies and its
 // STABLE wire id (explicit on purpose — auto-numbering would silently
 // renumber saves/rejoins/backups on any edit).
+// One generated acid probe — the mechanical half of every game's hand-written
+// queries.odin: a @(gd_method) window the test driver (driver.gd) reads
+// replicated state through. Per `entity=` kind: a count, a my-id, and one
+// per replicated SCALAR field (compound fields stay hand-written — a derived
+// view is game-shaped). A hand-written proc wearing the name wins, like the
+// census.
+Probe_Form :: enum {
+	Field, // probe_<kind>_<field>(id) — 0 = my entity of that kind
+	Count, // probe_<kind>_count()
+	My,    // probe_my_<kind>() — my entity's net id, 0 = none
+}
+
+Probe_Info :: struct {
+	form:    Probe_Form,
+	name:    string, // the gd-visible name ("probe_kicker_hp")
+	tsnake:  string, // entity kind, snaked ("kicker")
+	target:  string, // the entity struct ("Kicker")
+	access:  string, // Field only: the access path on the entity ("score.l")
+	float:   bool,   // Field only: gd.Float return (f32/f64); else gd.Int
+	boolish: bool,   // Field only: bool field — returns 1/0
+}
+
 Entity_Tag :: struct {
 	field:   string, // the scene field (offset_of target on the game struct)
 	target:  string, // the entity struct the scene bodies ("Mob")
@@ -538,6 +560,7 @@ Script :: struct {
 	input_classes: [dynamic]Input_Class_Info, // resolved package-wide (resolve_sim), on the lane OWNER: every input class, sorted by id (0 = primary)
 	boot_field:  string, // the kboot.Boot field's name ("" = none) — generates the standard transport forwards
 	std_forwards: [dynamic]string, // which standard forwards were synthesized (bodies emitted by generate)
+	probes:       [dynamic]Probe_Info, // generated acid probes (resolve_probes; bodies emitted by generate)
 	event_halves: [dynamic]Event_Half, // session-event halves (resolve_session_events) — the generated `<snake>_events` dispatch
 }
 
@@ -1291,6 +1314,7 @@ main :: proc() {
 		validate_command_ids(&pend.script)
 		resolve_entities(&pend.script, by_struct, &seen_entity_ids, &then_idx)
 		resolve_census(&pend.script, proc_names)
+		resolve_probes(&pend.script, by_struct, proc_names)
 		resolve_boot_forwards(&pend.script)
 	}
 	{
