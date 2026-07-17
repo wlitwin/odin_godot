@@ -605,6 +605,21 @@ presentation is almost always the better spend.
 
 ## Gotchas
 
+- **A client writing a host-lane field is caught, loudly.** The canonical
+  co-op bug — `self.score += 1` on a client compiles, looks right locally,
+  and never replicates — used to diverge silently until the host next
+  dirtied the field. Now every client re-purposes its shadow as "the bytes
+  the framework last put here" and diffs against it once per net tick (the
+  same memcmp walk the host pays to send): a delta-lane field that moved
+  outside the framework asserts, naming the class, the field, and the fix
+  (route it through a verb, or compute it on the authority). Coop
+  speculation and the sim lane's in-flight verbs are exempt while pending —
+  legal optimistic writes never trip it. Two build-time cousins guard the
+  same doctrine: a direct call of a `@(gd_command)` proc is a scriptgen
+  error pointing at the `<verb>_cmd` wrapper, and a gd-shaped tag under a
+  typo'd namespace (`gs:"replicate"`) is named instead of silently ignored.
+  The whole runtime walk strips under `-disable-assert`, like every kit
+  guardrail.
 - **Deltas carry STATE, not events.** The walk memcmps entity-vs-shadow once per net tick;
   a replicated byte pulsed `1 → 0` *within* one tick equals its shadow when the diff runs
   and never ships. Put edge-triggered state on bytes that outlive a tick (cavecrawl's

@@ -218,9 +218,8 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	kitems.items_register(&self.table, TORCH, "torch", 5)
 	kcombat.fire_listen(&self.fires, &self.ses, TAG_FIRE, self, cave_on_fire)
 
-	// The build's wire contract (generated into the guard file): a version-
-	// skewed join is refused at the door instead of misparsing deltas.
-	ksess.session_configure(&self.ses, {fingerprint = NET_FINGERPRINT})
+	// (The wire-contract version gate is on by default — the generated guard
+	// file registers NET_FINGERPRINT as the session default at load.)
 	// The stock stack — lobby, chat+comms, scoreboard, stage/world, wire,
 	// legend — is kit/boot's. Everything below is what makes this CAVECRAWL.
 	kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{

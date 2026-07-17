@@ -687,7 +687,15 @@ lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 	desc := mover_desc()
 	cmds := [?]ksim.Sim_Cmd{{id = 0, exec = mover_surge_exec}, {id = 1, exec = mover_dash_exec}}
 	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds[:]}
-	set_c := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds[:], contested = true}
+	// The contested table opts its verbs in (`any_seat`) — contested widens
+	// PREDICTION to every seat, never command authority; id 2 stays closed to
+	// pin the split.
+	cmds_c := [?]ksim.Sim_Cmd{
+		{id = 0, exec = mover_surge_exec, any_seat = true},
+		{id = 1, exec = mover_dash_exec, any_seat = true},
+		{id = 2, exec = mover_surge_exec},
+	}
+	set_c := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds_c[:], contested = true}
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
 	lbox_make(&alice, 100)
@@ -729,6 +737,11 @@ lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 
 	// Not contested, not mine: the gate holds.
 	testing.expect(t, !ksim.lane_command(&alice.lane, 10, 0, nil), "a host-owned entity refuses a client's verb")
+
+	// Contested but the verb never opted in: prediction scope is not command
+	// scope — predict-world marks avatars contested, and their verbs must not
+	// open to every seat for free.
+	testing.expect(t, !ksim.lane_command(&alice.lane, 30, 2, nil), "a contested entity's closed verb still refuses a non-owner")
 
 	// CONTESTED: any seat's verb speculates on its own predicted timeline.
 	host.movers[30].hp = 1

@@ -31,6 +31,9 @@ import "core:mem"
 Field_Desc :: struct {
 	offset: uintptr,
 	size:   int,
+	name:   string, // diagnostics only ("score.l") — generated descs fill it so
+	                // guard violations can name the field; hand-built descs may
+	                // leave it "" (reports fall back to the field ordinal)
 	flags:  Field_Flags,
 	lerp:   Lerp_Kind, // how stream sampling blends this field (meaningful with .Interp)
 	blend:  Blend_Proc, // required iff lerp == .Custom
@@ -132,6 +135,7 @@ Blend_Proc :: proc(dst, a, b: rawptr, alpha: f32)
 // field). Generated code produces one of these per class; tests build them by hand.
 Entity_Desc :: struct {
 	fields: []Field_Desc,
+	name:   string, // diagnostics only ("Ball") — same contract as Field_Desc.name
 }
 
 MAX_REPLICATED_FIELDS :: 64

@@ -77,30 +77,31 @@ Session_Config :: struct {
 	join_timeout:    f64, // client_start -> Ev_Join_Failed horizon
 	backup_interval: f64, // backup-host snapshot refresh cadence
 	max_players:     int, // NEW joins refused past this many connected (0 = unlimited; rejoins always reclaim their seat)
-	fingerprint:     u64, // the build's wire-contract hash (0 = no check) — see below
+	fingerprint:     u64, // wire-contract hash override (0 = the generated default) — see below
 }
 ```
 
-**The version door.** Two builds whose replicated declarations disagree don't
-get an error — they get GARBAGE: the descriptors are positional, so a skewed
-peer misparses every delta into the wrong fields, the least debuggable
-failure a playtest can produce. `fingerprint` closes that door: scriptgen
-hashes the package's whole wire contract (replicated field order/types/lanes,
-verbs, entity ids, input structs field-by-field, fact tuples, rpcs) into the
-generated `NET_FINGERPRINT`; hand it to the config —
+**The version door — on by default.** Two builds whose replicated
+declarations disagree don't get an error — they get GARBAGE: the descriptors
+are positional, so a skewed peer misparses every delta into the wrong fields,
+the least debuggable failure a playtest can produce. scriptgen closes that
+door without any wiring: it hashes the package's whole wire contract
+(replicated field order/types/lanes, verbs, entity ids, input structs
+field-by-field, fact tuples, rpcs) into the generated `NET_FINGERPRINT`, and
+the guard file registers it as the session default at load. The join carries
+it: a mismatch is refused as `Ev_Join_Denied{.Version}` ("your build and the
+host's disagree"), and a checked host also refuses fingerprint-less clients
+(pre-check builds). Comment edits and formatting never move the hash; a
+renamed field does (over-refusal — rebuild both ends — is harmless; a type
+change slipping through would be the disaster). The session folds its own
+`PROTOCOL_REV` in, so a kit upgrade that changes the wire refuses skewed
+peers even when the game's declarations didn't move.
 
-```odin
-ksess.session_configure(&self.ses, {fingerprint = NET_FINGERPRINT})
-```
-
-— and the join carries it: a mismatch is refused as `Ev_Join_Denied{.Version}`
-("your build and the host's disagree"), and a checked host also refuses
-fingerprint-less clients (pre-check builds). Comment edits and formatting
-never move the hash; a renamed field does (over-refusal — rebuild both ends —
-is harmless; a type change slipping through would be the disaster). The
-session folds its own `PROTOCOL_REV` in, so a kit upgrade that changes the
-wire refuses skewed peers even when the game's declarations didn't move.
-Zero on either end opts out (hand-built descriptors, tests).
+`Session_Config.fingerprint` is the override: leave it 0 (the default) to use
+the generated value, set it for a hand-rolled multi-module contract, or set
+`ksess.FINGERPRINT_NONE` to disable the gate on purpose (hand-built
+descriptors, tests — a session with no generated fingerprint at all is simply
+unchecked, as before).
 
 The cross-entity half of a command — a command proc may only mutate its target
 (that's what the predict/revert/reject-truth machinery protects) — lives in the verb's

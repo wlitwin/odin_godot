@@ -73,7 +73,6 @@ now_s :: knet.now_s
 quickdraw_ready :: proc(self: ^Quickdraw) {
 	// The build's wire contract (generated): a version-skewed join is refused
 	// at the door (Deny_Reason.Version) instead of misparsing deltas.
-	ksess.session_configure(&self.ses, {fingerprint = NET_FINGERPRINT})
 	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
 		title = "Q U I C K D R A W",
 		status = "Host a duel, or join one at localhost",

@@ -299,3 +299,75 @@ lint_method_claims :: proc(claims: []Method_Claim, by_struct: map[string]^Script
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// The raw-verb lint. A @(gd_command) proc is the framework's to run: the
+// generated `<verb>_cmd` wrapper is the ONLY door that predicts, ships,
+// validates, dedups, and fires the `_then`. The raw proc is one suffix away
+// and callable from anywhere — on the host it MOSTLY works (mutates and
+// replicates, but skips `_then` and the command hook), on a client it is the
+// silent local-only write. Both compile. Named here at build time instead.
+
+Cmd_Call :: struct {
+	callee: string, // final identifier ("chest_take" — package qualifier stripped)
+	path:   string,
+	line:   int,
+}
+
+@(private = "file")
+Cmd_Call_State :: struct {
+	calls: ^[dynamic]Cmd_Call,
+	path:  string,
+	src:   string,
+}
+
+// Collect every call's final identifier from one parsed file (validated
+// against the module's command procs once those are fully resolved).
+scan_command_calls :: proc(calls: ^[dynamic]Cmd_Call, path, src: string, file: ^ast.File) {
+	st := Cmd_Call_State {
+		calls = calls,
+		path  = path,
+		src   = src,
+	}
+	for decl in file.decls {
+		vd, ok := decl.derived.(^ast.Value_Decl)
+		if !ok || len(vd.values) != 1 {continue}
+		pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
+		if !is_proc || pl.body == nil {continue}
+		context.user_ptr = &st
+		ast.inspect(pl.body, cmd_call_visit)
+		context.user_ptr = nil
+	}
+}
+
+@(private = "file")
+cmd_call_visit :: proc(node: ^ast.Node) -> bool {
+	if node == nil {return false}
+	st := cast(^Cmd_Call_State)context.user_ptr
+	call, ok := node.derived.(^ast.Call_Expr)
+	if !ok {return true}
+	callee := node_text(st.src, call.expr)
+	if i := strings.last_index(callee, "."); i >= 0 {callee = callee[i + 1:]}
+	if callee == "" {return true}
+	append(st.calls, Cmd_Call{callee = callee, path = st.path, line = call.pos.line})
+	return true
+}
+
+// Validate once every script's command set is complete (composed verbs
+// hoist from imported blocks, so pass 2 must have run).
+lint_command_calls :: proc(calls: []Cmd_Call, scripts: []^Script) {
+	for c in calls {
+		for s in scripts {
+			for &cmd in s.commands {
+				if c.callee != cmd.proc_name {continue}
+				wrapper := len(cmd.path) > 0 ? strings.concatenate({to_snake(s.struct_name), "_", cmd.name}) : cmd.proc_name
+				error_at(
+					Loc{path = c.path, line = c.line},
+					"%s is a @(gd_command) verb — a direct call skips the framework (no `_then`, no dedup or validation on the host; a silent local-only write on a client). Issue it through the generated wrapper: `%s_cmd(&boot, self, ...)`",
+					cmd.proc_name, wrapper,
+				)
+				break
+			}
+		}
+	}
+}

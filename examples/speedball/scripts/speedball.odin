@@ -62,7 +62,8 @@ Speedball :: struct {
 now_s :: knet.now_s
 
 speedball_ready :: proc(self: ^Speedball) {
-	ksess.session_configure(&self.ses, {fingerprint = NET_FINGERPRINT}) // refuse skewed builds at the door
+	// (The wire-contract version gate is on by default — the generated guard
+	// file registers NET_FINGERPRINT as the session default at load.)
 	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
 		title = "S P E E D B A L L",
 		status = "Host a pitch, or join one at localhost — the contested twin",

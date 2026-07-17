@@ -623,15 +623,15 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			cut := len(r.cut) > 0 ? fmt.tprintf(", cut = %s", r.cut) : ""
 			fmt.sbprintf(
 				b,
-				"\t{{offset = %s, size = size_of(%s), flags = %s%s%s%s%s%s}},\n",
-				field_offset_expr(cls, r.path), field_type_expr(cls, r.path), flags, lerp, wire, slack, glide, cut,
+				"\t{{offset = %s, size = size_of(%s), name = %q, flags = %s%s%s%s%s%s}},\n",
+				field_offset_expr(cls, r.path), field_type_expr(cls, r.path), join_path(r.path), flags, lerp, wire, slack, glide, cut,
 			)
 		}
 		w(b, "}\n\n")
 		fmt.sbprintf(
 			b,
-			"// kit/net replication descriptor for %s — consumed by the toolkit session layer.\n%s_net_desc := knet.Entity_Desc{{fields = _%s_net_fields[:]}}\n\n",
-			cls, snake, snake,
+			"// kit/net replication descriptor for %s — consumed by the toolkit session layer.\n%s_net_desc := knet.Entity_Desc{{fields = _%s_net_fields[:], name = %q}}\n\n",
+			cls, snake, snake, cls,
 		)
 	}
 
@@ -1094,10 +1094,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			fmt.sbprintf(b, "@(private = \"file\")\n_%s_sim_cmds := [?]ksim.Sim_Cmd {{\n", snake)
 			for c in s.commands {
+				aseat := c.any_seat ? ", any_seat = true" : ""
 				if c.apply_proc != "" {
-					fmt.sbprintf(b, "\t{{id = %s_CMD_%s, exec = _%s_simcmd_%s, apply = _%s_simcmd_%s_apply}},\n", upper, strings.to_upper(c.name), snake, c.name, snake, c.name)
+					fmt.sbprintf(b, "\t{{id = %s_CMD_%s, exec = _%s_simcmd_%s, apply = _%s_simcmd_%s_apply%s}},\n", upper, strings.to_upper(c.name), snake, c.name, snake, c.name, aseat)
 				} else {
-					fmt.sbprintf(b, "\t{{id = %s_CMD_%s, exec = _%s_simcmd_%s}},\n", upper, strings.to_upper(c.name), snake, c.name)
+					fmt.sbprintf(b, "\t{{id = %s_CMD_%s, exec = _%s_simcmd_%s%s}},\n", upper, strings.to_upper(c.name), snake, c.name, aseat)
 				}
 			}
 			w(b, "}\n\n")

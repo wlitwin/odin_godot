@@ -103,8 +103,12 @@ ball_tick :: proc(self: ^Ball) -> (scored: u8) {
 // execution order), and RELATIVE — so the impulse lives in the _apply half,
 // which resims re-run with the ledgered args against corrected state. The
 // position args are the issuer's own screen's (the door_toggle pattern);
-// bursts inside one RTT ride the pending chain.
-@(gd_command)
+// bursts inside one RTT ride the pending chain. `any_seat` is the open-verb
+// DECLARATION: contested widens prediction to every seat, never command
+// authority — without it this spike would be the ball owner's alone
+// (predict-world marks avatars contested too, and their verbs must not
+// open to opponents for free).
+@(gd_command = "any_seat")
 ball_spike :: proc(self: ^Ball, px, py: f32) -> bool {
 	if self.score.won != 0 || self.hold > 0 {return false}
 	dx := self.roll.x - px

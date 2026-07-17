@@ -598,4 +598,82 @@ ODIN
 if "$SGEN" "$sn" -godot:"$ROOT" >"$sn/out.log" 2>&1; then fail "a near-miss migration prefix must FAIL the build"; fi
 grep -q "looks like a migration half" "$sn/out.log" || fail "the near-miss error must name the pairing"
 
+# ---- fixture: the silent-footgun lints (raw-verb call, tag namespace typo,
+# any_seat off the sim lane) — each compiles fine as Odin and used to
+# misbehave silently; each is a named build error now. -----------------------
+fg="$work/footguns"
+mkdir -p "$fg"
+cat >"$fg/chest.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Chest
+package fg
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Chest :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	gold:   i32 `gd:"replicate"`,
+}
+
+@(gd_command = "predict")
+chest_take :: proc(self: ^Chest, n: i32) -> bool {
+	if self.gold < n {return false}
+	self.gold -= n
+	return true
+}
+ODIN
+cat >"$fg/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class FgGame
+package fg
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+FgGame :: struct {
+	owner: gd.Node,
+	hp:    i32 `gs:"replicate"`, // the NAMESPACE typo: not a gd tag at all
+}
+
+fg_game_ready :: proc(self: ^FgGame) {}
+ODIN
+cat >"$fg/loot.odin" <<'ODIN'
+package fg
+
+// The raw-verb call: bypasses the wrapper — no _then, no validation.
+loot_all :: proc(c: ^Chest) {
+	chest_take(c, 5)
+}
+ODIN
+out="$("$SGEN" "$fg" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "the footgun fixture must fail the build"
+echo "$out" | grep -q "direct call skips the framework" || fail "raw-verb call must error pointing at the _cmd wrapper"
+echo "$out" | grep -q 'namespace "gs" is not' || fail "the gs: namespace typo must be named"
+
+# any_seat on a class that doesn't tick: a sim-lane declaration misused.
+as="$work/anyseat"
+mkdir -p "$as"
+cat >"$as/door.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Door
+package as
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Door :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	open:   u8 `gd:"replicate"`,
+}
+
+@(gd_command = "any_seat")
+door_toggle :: proc(self: ^Door) -> bool {
+	self.open = 1 - self.open
+	return true
+}
+ODIN
+if "$SGEN" "$as" -godot:"$ROOT" >"$as/out.log" 2>&1; then fail "any_seat on a coop class must FAIL the build"; fi
+grep -q "sim-lane declaration" "$as/out.log" || fail "the any_seat misuse must say it is a sim-lane declaration"
+
 echo "SCRIPTGEN_OK"

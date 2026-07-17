@@ -1890,6 +1890,111 @@ unchecked_fingerprint_opts_out :: proc(t: ^testing.T) {
 	testing.expect(t, alice.s.joined, "an unchecked host accepts any build")
 }
 
+@(test)
+default_fingerprint_gates_without_wiring :: proc(t: ^testing.T) {
+	// The generated guard file registers NET_FINGERPRINT as the session
+	// default at load — games wire nothing and the version door is closed.
+	// Pin the fallthrough: cfg 0 means "use the default", an explicit value
+	// still overrides, and FINGERPRINT_NONE opts out on purpose.
+	ksess.default_net_fingerprint = 0xF00D
+	defer ksess.default_net_fingerprint = 0
+
+	host, alice, bob, carol: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	box_make(&carol, 300)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	defer box_destroy(&carol)
+
+	ksess.session_host_start(&host.s, "hosty") // cfg 0: gates on the default
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice") // cfg 0: same build
+	ksess.session_client_join(&alice.s)
+	pump([]^Peer_Box{&host, &alice})
+	testing.expect(t, alice.s.joined, "two default-fingerprint builds seat with zero wiring")
+
+	ksess.session_configure(&bob.s, {fingerprint = 0xBAD}) // an override still overrides
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump([]^Peer_Box{&host, &bob})
+	bev := drain(&bob.s)
+	testing.expect_value(t, len(bev), 1)
+	d, denied := bev[0].(ksess.Ev_Join_Denied)
+	testing.expect(t, denied)
+	testing.expect_value(t, d.reason, ksess.Deny_Reason.Version)
+
+	// FINGERPRINT_NONE: the client OPTS OUT — and the checked host refuses a
+	// fingerprint-less build the same way it always has.
+	ksess.session_configure(&carol.s, {fingerprint = ksess.FINGERPRINT_NONE})
+	ksess.session_client_start(&carol.s, u64(0xCA401), "carol")
+	ksess.session_client_join(&carol.s)
+	pump([]^Peer_Box{&host, &carol})
+	cev := drain(&carol.s)
+	testing.expect_value(t, len(cev), 1)
+	dc, _ := cev[0].(ksess.Ev_Join_Denied)
+	testing.expect_value(t, dc.reason, ksess.Deny_Reason.Version)
+}
+
+@(test)
+write_guard_names_a_client_rogue_write :: proc(t: ^testing.T) {
+	// THE canonical co-op bug: a client assigns to a host-lane field —
+	// compiles, looks right locally, never replicates. The shadow-as-bless
+	// invariant turns it into a named finding within one net tick; legal
+	// writes (host deltas, coop speculation while pending, owner streams)
+	// stay silent. The walk is called directly here — the session turns a
+	// finding into the teaching assert, and a pin shouldn't die on it.
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	hbot := Bot{hp = 10, x = 1}
+	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set, owner = alice.s.me)
+	ksess.session_start_replicating(&host.s)
+	pump(boxes)
+	abot := alice.bots[id]
+	testing.expect(t, abot != nil, "the factory must have made alice's bot")
+	now := 100.0
+
+	// Clean after a legit host delta.
+	hbot.hp = 8
+	step(boxes, &now)
+	_, _, _, dirty := knet.registry_write_guard(&alice.s.reg, &alice.s.ctx)
+	testing.expect(t, !dirty, "a host delta blesses the shadow — nothing to flag")
+
+	// Coop speculation is exempt while pending, blessed once it settles.
+	knet.command_begin(&alice.s.ctx, id, 0)
+	knet.write_i32(&alice.s.ctx.msg, 3)
+	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, 0))
+	_, _, _, dirty = knet.registry_write_guard(&alice.s.reg, &alice.s.ctx)
+	testing.expect(t, !dirty, "an in-flight prediction is legal divergence")
+	pump(boxes) // the confirm lands and blesses the speculative bytes
+	_, _, _, dirty = knet.registry_write_guard(&alice.s.reg, &alice.s.ctx)
+	testing.expect(t, !dirty, "a confirmed prediction blesses on retire")
+
+	// The rogue write: found, naming entity and field.
+	abot.hp += 5
+	_, field, fid, found := knet.registry_write_guard(&alice.s.reg, &alice.s.ctx)
+	testing.expect(t, found, "a client-side host-lane write is a finding")
+	testing.expect_value(t, fid, id)
+	testing.expect_value(t, field, "field #0") // hand-built desc carries no names
+
+	// Owner-stream fields on the OWNER are never the guard's business.
+	abot.hp -= 5 // undo the rogue write
+	abot.x = 42  // alice owns the stream
+	_, _, _, dirty = knet.registry_write_guard(&alice.s.reg, &alice.s.ctx)
+	testing.expect(t, !dirty, "owner-stream fields are the owner's to write")
+}
+
 // ---------------------------------------------------------------------------
 // The `<field>_edge` halves: NET delta-lane change per frame, on every peer —
 // the machinery that replaces hand-rolled seen_* mirrors. Spawn seeds

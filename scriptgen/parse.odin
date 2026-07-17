@@ -529,6 +529,32 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 					field_label,
 					raw,
 				)
+			} else if ci := strings.index(raw, ":\""); ci > 0 {
+				// A gd-shaped declaration under the WRONG NAMESPACE (`gs:"replicate"`)
+				// contains no "gd:" at all and would silently not replicate/export.
+				// Flag a namespace one edit from `gd`, and any namespace whose first
+				// payload token is unmistakably ours.
+				ns := raw[:ci]
+				payload := raw[ci + 2:]
+				if qi := strings.index(payload, "\""); qi >= 0 {payload = payload[:qi]}
+				tok := payload
+				if comma := strings.index(tok, ","); comma >= 0 {tok = tok[:comma]}
+				tok = strings.trim_space(tok)
+				gd_shaped :=
+					tok == "export" || tok == "replicate" || tok == "backup" ||
+					strings.has_prefix(tok, "onready=") || strings.has_prefix(tok, "args=") ||
+					strings.has_prefix(tok, "entity=")
+				if edit_distance_le1(ns, "gd") || gd_shaped {
+					error_at(
+						floc,
+						"%s.%s: tag namespace %q is not `gd` — %q would silently not apply; write `gd:\"%s\"`",
+						s.struct_name,
+						field_label,
+						ns,
+						payload,
+						payload,
+					)
+				}
 			}
 		}
 
@@ -904,6 +930,26 @@ validate_script :: proc(s: ^Script) {
 				"%s declares @(gd_command) procs but no `net_id: knet.Net_Id` field — commands name their entity over the wire; add the field (the session/registry layer assigns it)",
 				s.struct_name,
 			)
+		}
+		// `any_seat` widens a verb's COMMAND scope to every seat — only
+		// meaningful on a contested sim class, and silently dead anywhere
+		// else, which is exactly the class of quiet flag this build step
+		// exists to refuse.
+		for c in s.commands {
+			if !c.any_seat {continue}
+			if s.tick.proc_name == "" && len(s.block_ticks) == 0 {
+				error_at(
+					Loc{path = s.path},
+					"command %s: `any_seat` is a sim-lane declaration — %s does not tick, and coop verbs are host-validated and issuable by any seat already; drop it",
+					c.proc_name, s.struct_name,
+				)
+			} else if !s.tick.contested {
+				error_at(
+					Loc{path = s.path, line = s.tick.line},
+					"command %s: `any_seat` opens the verb to every seat on a CONTESTED class only — mark %s's tick @(gd_tick=\"contested\") (predict-the-contested-object), or drop any_seat (verbs stay owner-only)",
+					c.proc_name, s.struct_name,
+				)
+			}
 		}
 	}
 	if s.tick.proc_name != "" || len(s.block_ticks) > 0 {
@@ -1556,8 +1602,10 @@ build_command_info :: proc(
 		case "":
 		case "predict":
 			cmd.predict = true
+		case "any_seat":
+			cmd.any_seat = true
 		case:
-			error_at(loc, "command %s: unknown config token %q (expected `predict`)", proc_name, tok)
+			error_at(loc, "command %s: unknown config token %q (expected `predict` or `any_seat`)", proc_name, tok)
 			ok = false
 		}
 	}
