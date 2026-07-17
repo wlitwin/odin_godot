@@ -50,6 +50,8 @@ Succ_Hooks :: struct {
 // acted; the half narrates). The frozen world stays on screen for the human
 // arms: the kit never tears down a scene it cannot rebuild.
 Migrate_Step :: enum u8 {
+	Taking_Over, // heir: the torch named ME — the takeover starts now (worded ONCE,
+	// even when a double death-signal queues the succession twice in one batch)
 	Chasing, // native: the rendezvous is being dialed (target = "addr:port")
 	Knocking, // web: a knock went out at the reserved room (target = the code)
 	No_Torch, // no usable successor info — the human flow is all there is
@@ -96,13 +98,20 @@ boot_succ_event :: proc(b: ^Boot, ev: ksess.Event) {
 		if b.ses.is_host {
 			_, _ = netgd.succession_torch(&b.succ, &b.wire, e.player)
 		}
+	case ksess.Ev_Host_Left:
+		b.succ_host_gone = true
 	case ksess.Ev_Succession:
 		if !b.ses.is_host { // a takeover queued a stale twin behind itself — dead here too
+			b.succ_host_gone = true // a succession IMPLIES the loss (batch order is not ours)
 			b.succ_pending = e.successor
 			b.succ_has_pending = true
 		}
 	case ksess.Ev_Welcomed:
+		// Seated = the host exists BY DEFINITION — the window closes HERE
+		// (dead-socket signals landing mid-rejoin must not re-open it
+		// against the live host — the cavecrawl lesson, now the kit's).
 		netgd.succession_done(&b.succ)
+		b.succ_host_gone = false
 		b.succ_tries = 0
 	case ksess.Ev_Kicked:
 		b.succ_kicked = true
@@ -136,6 +145,10 @@ boot_migrate_pending :: proc(b: ^Boot) {
 		return
 	}
 	if successor == b.ses.me {
+		// The bearer's word rides the DRAIN, not the raw event: a double
+		// death-signal queues Ev_Succession twice in one batch, and the bare
+		// words half hears both — this arm fires exactly once.
+		boot_succ_word(b, .Taking_Over, "", 0)
 		_ = boot_take_over(b)
 	} else {
 		boot_chase(b)
@@ -147,6 +160,9 @@ boot_migrate_pending :: proc(b: ^Boot) {
 // sequence the auto path does. False = worded through `_migrating` already
 // (no backup / raise refused / corrupt snapshot); the frozen world stays.
 boot_take_over :: proc(b: ^Boot) -> bool {
+	if !b.succ_armed || b.ses == nil || b.ses.is_host || !b.succ_host_gone {
+		return false // no window: hosts don't take over, and neither does a live seat
+	}
 	blob, snapshot, ok := ksess.session_backup_parts(b.ses)
 	if !ok {
 		boot_succ_word(b, .No_Backup, "", 0)
@@ -162,6 +178,7 @@ boot_take_over :: proc(b: ^Boot) -> bool {
 		boot_succ_word(b, .Resume_Corrupt, "", 0)
 		return false
 	}
+	b.succ_host_gone = false // the crown sits — the window is over
 	if b.succ_hooks.took_over != nil {
 		r := knet.reader_make(blob)
 		b.succ_hooks.took_over(b.succ_game, &r)
@@ -174,6 +191,9 @@ boot_take_over :: proc(b: ^Boot) -> bool {
 // manual rejoin button. Ev_Succession re-fires on every failed native
 // reconnect; the tries cap turns that pulse into a bounded chase.
 boot_chase :: proc(b: ^Boot) {
+	if !b.succ_armed || b.ses == nil || b.ses.is_host || !b.succ_host_gone {
+		return
+	}
 	if b.succ.web && netgd.succession_chasing(&b.succ) != "" {
 		return // the pump owns a live chase — a stale refire
 	}
@@ -258,5 +278,6 @@ boot_succ_config :: proc(b: ^Boot, web: bool, port: int, url: cstring, token: u6
 		b.succ.signal_url = b.succ_url
 	}
 	b.succ_kicked = false
+	b.succ_host_gone = false
 	b.succ_tries = 0
 }

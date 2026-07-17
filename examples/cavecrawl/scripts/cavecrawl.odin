@@ -193,9 +193,8 @@ CaveLobby :: struct {
 	hud_hp:     kui.Health_Bar,
 	hud_ab:     kui.Ability_Bar,
 	chat_sent:  bool, // the Enter that submitted a line must not also re-open chat
-	host_gone:  bool, // Ev_Host_Left seen — the takeover/rejoin window is open
+	host_gone:  bool, // the driver's poll mirror (the KIT holds the mechanics latch now)
 	succ_seen:  int, // Ev_Succession count (latched; drivers poll it — host_gone flips back within a frame)
-	rejoin_tries: int, // auto-rejoin attempts chasing the successor (capped)
 	issue_at:   f64, // when my last command left (confirm latency proof)
 
 }
@@ -217,7 +216,6 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	// table. World hookups install now; entities exist only after Start.
 	kitems.items_register(&self.table, GEM, "gem", 99)
 	kitems.items_register(&self.table, TORCH, "torch", 5)
-	ksess.session_set_backup_blob(&self.ses, self, cave_backup_blob)
 	kcombat.fire_listen(&self.fires, &self.ses, TAG_FIRE, self, cave_on_fire)
 
 	// The build's wire contract (generated into the guard file): a version-
@@ -239,6 +237,11 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	// *_spawned/*_freed hooks in world.odin keep the census. `self` is also
 	// what every `<verb>_then` consequence receives as its game param.
 	kboot.boot_entities(&self.boot, self, cave_lobby_entity_kinds[:])
+	// The migration dance, danced by the kit: the torch, the takeover/chase
+	// fork, the census-driven wipe, the caps. The game's four seams ride the
+	// generated table (backup/took_over/wiped/migrating halves, save.odin +
+	// net.odin) — words and bytes, never mechanics.
+	kboot.boot_migration(&self.boot, self, cave_lobby_succ_hooks)
 
 	self.prompt = kui.prompt_make(self.owner)
 	self.inv = kui.inv_make(self.owner, 6)
@@ -338,7 +341,6 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 // it against the LIVE host, blocking every "are we back?" gate forever.
 cave_lobby_welcomed :: proc(self: ^CaveLobby, me: knet.Player_Id) {
 	self.host_gone = false
-	self.rejoin_tries = 0 // seated: the chase (if any) is over
 	gd.print_str(fmt.tprintf("CAVE_SEATED me=%d", u64(me)))
 }
 
@@ -380,50 +382,23 @@ cave_lobby_host_left :: proc(self: ^CaveLobby) {
 	}
 }
 
-// LIVE MIGRATION, the host's half: the session named WHO carries the torch;
-// the transport knows WHERE they are. Convention: the successor re-binds the
-// same port everyone already uses.
+// LIVE MIGRATION, the host's half: WORDS ONLY now — the session named WHO,
+// and the KIT's ceremony (boot_migration) computed WHERE and broadcast it
+// before this half fired. The receipt reads the torch back.
 cave_lobby_backup_target :: proc(self: ^CaveLobby, player: knet.Player_Id) {
-	if p, ok := ksess.session_player(&self.ses, player); ok {
-		addr, aok := netgd.peer_address(self.owner, p.peer)
-		if !aok {
-			addr = "127.0.0.1"
-		}
-		w := knet.writer_make()
-		defer knet.writer_destroy(&w)
-		knet.write_string(&w, addr)
-		knet.write_u16(&w, u16(port()))
-		ksess.session_set_successor_info(&self.ses, knet.writer_bytes(&w))
-		gd.print_str(fmt.tprintf("CAVE_TORCH_NAMED player=%d addr=%s", u64(player), addr))
-	}
+	_, info := ksess.session_successor(&self.ses)
+	gd.print_str(fmt.tprintf("CAVE_TORCH_NAMED player=%d addr=%s", u64(player), string(info)))
 }
 
-// LIVE MIGRATION, everyone else's half: hands-free. The torch bearer takes
-// over; the rest chase them (the event re-fires on every failed reconnect —
-// the natural retry pulse). The old `!is_host` guard is GONE: the generated
-// dispatch drops client-only events on a host, so the stale re-fire a double
-// death-signal queues behind a same-batch takeover dies at the gate.
+// LIVE MIGRATION, everyone else's half: WORDS ONLY — the kit runs the
+// takeover on the bearer and the capped chase on everyone else AFTER this
+// half returns (the generated events tail drains it), so these words still
+// see the old world. The bearer's own word rides cave_lobby_migrating's
+// .Taking_Over arm (the kit dedupes the double death-signal); the chase
+// receipts live there too.
 cave_lobby_succession :: proc(self: ^CaveLobby, successor: knet.Player_Id) {
+	_ = successor
 	self.succ_seen += 1
-	if self.kicked_out {
-		return
-	}
-	if successor == self.ses.me {
-		gd.print_str("CAVE_TORCH_MINE")
-		cave_lobby_on_takeover(self)
-	} else if self.rejoin_tries < 12 {
-		self.rejoin_tries += 1
-		_, info := ksess.session_successor(&self.ses)
-		ir := knet.reader_make(info)
-		addr := knet.read_string(&ir)
-		sport := int(knet.read_u16(&ir))
-		if !ir.err {
-			gd.print_str(fmt.tprintf("CAVE_CHASE_TORCH try=%d", self.rejoin_tries))
-			cave_rejoin_to(self, addr, sport)
-		}
-	} else {
-		kui.lobby_set_status(&self.boot.ui, "The torch went out — this run is over")
-	}
 }
 
 // We are the designated backup host from this moment on.

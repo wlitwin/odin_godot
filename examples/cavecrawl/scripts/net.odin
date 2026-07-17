@@ -11,6 +11,7 @@ package cavecrawl_scripts
 
 import gd "godot:godot"
 import "godot:gdext"
+import kboot "godot:kit/boot"
 import kcombat "godot:kit/combat"
 import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
@@ -75,9 +76,35 @@ cave_lobby_on_rejoin :: proc(self: ^CaveLobby) {
 	cave_rejoin_to(self, "127.0.0.1", port())
 }
 
+// The dance's words — the kit already acted (the dial, the caps, the heir
+// arms); each arm narrates. The acid pins the chase receipts here.
+cave_lobby_migrating :: proc(self: ^CaveLobby, step: kboot.Migrate_Step, target: string, try: int) {
+	_ = target
+	switch step {
+	case .Taking_Over:
+		gd.print_str("CAVE_TORCH_MINE")
+	case .Chasing:
+		gd.print_str(fmt.tprintf("CAVE_CHASE_TORCH try=%d", try))
+		kui.lobby_set_status(&self.boot.ui, "Rejoining the cave...")
+		gd.print_str("CAVE_REJOINING")
+	case .Knocking: // no web build of the cave (yet)
+	case .No_Torch, .Gave_Up:
+		kui.lobby_set_status(&self.boot.ui, "The torch went out — this run is over")
+	case .Chase_Failed:
+		kui.lobby_set_status(&self.boot.ui, "Could not start rejoining")
+	case .No_Backup:
+		kui.lobby_set_status(&self.boot.ui, "No backup to carry")
+		gd.print_str("CAVE_TAKEOVER_FAIL no-backup")
+	case .Raise_Failed:
+		gd.print_str("CAVE_HOST_FAIL")
+	case .Resume_Corrupt:
+		gd.print_str("CAVE_TAKEOVER_FAIL snapshot")
+	}
+}
+
 cave_rejoin_to :: proc(self: ^CaveLobby, addr: string, to_port: int) {
 	if !self.running || self.ses.is_host || !self.host_gone {return}
-	cave_wipe_local(self)
+	kboot.boot_entities_wipe(&self.boot) // census-driven: _freed hooks + the wiped half
 	gd.multiplayer_clear_peer(self.owner)
 	if !gd.join(self.owner, fmt.ctprintf("%s", addr), to_port) {
 		kui.lobby_set_status(&self.boot.ui, "Could not start rejoining")
@@ -112,6 +139,9 @@ cave_lobby_on_host :: proc(self: ^CaveLobby) {
 // session cannot tell the transports apart, which is the whole point.
 begin_hosting :: proc(self: ^CaveLobby) {
 	ksess.session_host_start(&self.ses, my_name(self))
+	// The ceremony's shape (cavecrawl raises its own transports — Steam is
+	// why — so the boot doors never saw this run's port/token/name).
+	kboot.boot_succ_config(&self.boot, false, port(), "", my_token(), my_name(self))
 	self.cols = kcombat.combat_columns(&self.ses) // the ledger, on the scoreboard
 	self.slain_col = ksess.session_stat_column(&self.ses, "slain") // the game's own column
 	self.running = true
@@ -139,6 +169,7 @@ cave_lobby_on_join :: proc(self: ^CaveLobby) {
 
 begin_joining :: proc(self: ^CaveLobby) {
 	ksess.session_client_start(&self.ses, my_token(), my_name(self))
+	kboot.boot_succ_config(&self.boot, false, port(), "", my_token(), my_name(self))
 	self.running = true
 	kui.lobby_show_menu(&self.boot.ui, false, false)
 	kui.lobby_set_status(&self.boot.ui, "Joining the cave...")

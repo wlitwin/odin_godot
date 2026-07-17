@@ -132,6 +132,7 @@ Boot :: struct {
 	succ_game:        rawptr,
 	succ_armed:       bool,
 	succ_kicked:      bool, // a kicked player never chases the torch
+	succ_host_gone:   bool, // the takeover/rejoin window (Ev_Host_Left opens, a seat closes)
 	succ_tries:       int, // native chase cap (Ev_Succession's refire is the pulse)
 	succ_pending:     knet.Player_Id, // a noted succession, mechanics deferred
 	succ_has_pending: bool,
