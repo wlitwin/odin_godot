@@ -23,10 +23,16 @@ set -uo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PROJ="$ROOT/examples/speedball"
 LOGDIR="$PROJ/.spblogs"
-mkdir -p "$LOGDIR"
 
-bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null
+bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null || { echo "SPEEDBALL_NATIVE_FAIL (build)"; exit 1; }
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+
+# The launch/ready/reap plumbing is the kit harness; every receipt below
+# stays the acid's own.
+FSLP_PROJ="$PROJ"
+FSLP_LOGS="$LOGDIR"
+source "$ROOT/build/template/test/harness.sh"
+
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
 
 launch() { # launch <role> <bot> <name> <token> <log> <port>
@@ -34,6 +40,7 @@ launch() { # launch <role> <bot> <name> <token> <log> <port>
     SPB_ROLE="$role" SPB_BOT="$bot" SPB_NAME="$name" SPB_TOKEN="$token" \
     SPB_PORT="$port" SPB_PEERS=2 SPB_GOALS=1 SPB_LATENCY=120 \
         "$GODOT" --headless --path "$PROJ" >"$log" 2>&1 &
+    echo $! >>"$FSLP_PIDS"
     echo $!
 }
 
@@ -41,24 +48,13 @@ for port in 4190 4197; do
     mlog="$LOGDIR/marshal.log"; slog="$LOGDIR/striker.log"; wlog="$LOGDIR/watcher.log"
     : >"$mlog"; : >"$slog"; : >"$wlog"
 
+    : >"$FSLP_PIDS"
     mp=$(launch serve none marshal 9201 "$mlog" "$port")
-    i=0
-    while ((i<60)); do
-        grep -q "SPB_SERVING" "$mlog" && break
-        grep -q "SPB_HOST_FAIL" "$mlog" && break
-        kill -0 "$mp" 2>/dev/null || break
-        sleep 0.1; ((i++))
-    done
-    if grep -q "SPB_HOST_FAIL" "$mlog"; then
-        kill "$mp" 2>/dev/null; wait "$mp" 2>/dev/null; continue
+    if ! fslp_ready "$mlog" "SPB_SERVING" 8 "$mp"; then
+        fslp_reap; continue
     fi
     sp=$(launch join striker striker 9202 "$slog" "$port")
-    i=0
-    while ((i<150)); do
-        grep -q "SPB_SEATED me=2" "$slog" && break
-        kill -0 "$sp" 2>/dev/null || break
-        sleep 0.1; ((i++))
-    done
+    fslp_ready "$slog" "SPB_SEATED me=2" 15 "$sp" || true
     wp=$(launch join spiker watcher 9203 "$wlog" "$port")
 
     # One goal ends it; give the duel of one a generous minute.
@@ -68,8 +64,7 @@ for port in 4190 4197; do
         sleep 0.1; ((i++))
     done
     sleep 2 # a beat of REST so the post-goal probes show the ball at its predicted center
-    kill "$mp" "$sp" "$wp" 2>/dev/null
-    wait "$mp" "$sp" "$wp" 2>/dev/null
+    fslp_reap
 
     ok=1
     grep -q "SPB_SERVING" "$mlog" || { echo "marshal never served"; ok=0; }

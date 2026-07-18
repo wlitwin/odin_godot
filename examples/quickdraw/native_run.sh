@@ -25,10 +25,16 @@ set -uo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PROJ="$ROOT/examples/quickdraw"
 LOGDIR="$PROJ/.qdlogs"
-mkdir -p "$LOGDIR"
 
-bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null
+bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null || { echo "QUICKDRAW_NATIVE_FAIL (build)"; exit 1; }
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+
+# The launch/ready/reap plumbing is the kit harness; the phase structure and
+# every receipt below stay the acid's own.
+FSLP_PROJ="$PROJ"
+FSLP_LOGS="$LOGDIR"
+source "$ROOT/build/template/test/harness.sh"
+
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
 
 launch() { # launch <role> <bot> <name> <token> <log> <port> <norewind>
@@ -36,6 +42,7 @@ launch() { # launch <role> <bot> <name> <token> <log> <port> <norewind>
     QD_ROLE="$role" QD_BOT="$bot" QD_NAME="$name" QD_TOKEN="$token" \
     QD_PORT="$port" QD_PEERS=2 QD_LATENCY=120 QD_NOREWIND="$norewind" \
         "$GODOT" --headless --path "$PROJ" >"$log" 2>&1 &
+    echo $! >>"$FSLP_PIDS"
     echo $!
 }
 
@@ -46,30 +53,19 @@ run_phase() {
     : >"$mlog"; : >"$slog"; : >"$dlog"
     PHASE_HITS=99
 
-    local mp sp dp i
+    local mp sp dp
+    : >"$FSLP_PIDS"
     mp=$(launch serve none marshal 9101 "$mlog" "$port" "$norewind")
-    i=0
-    while ((i<60)); do
-        grep -q "QD_SERVING" "$mlog" && break
-        grep -q "QD_HOST_FAIL" "$mlog" && { kill "$mp" 2>/dev/null; wait "$mp" 2>/dev/null; return 2; }
-        kill -0 "$mp" 2>/dev/null || break
-        sleep 0.1; ((i++))
-    done
+    fslp_ready "$mlog" "QD_SERVING" 8 "$mp" || { fslp_reap; return 2; }
     sp=$(launch join strafer strafer 9102 "$slog" "$port" 0)
-    i=0
-    while ((i<150)); do
-        grep -q "QD_SEATED me=2" "$slog" && break
-        kill -0 "$sp" 2>/dev/null || break
-        sleep 0.1; ((i++))
-    done
+    fslp_ready "$slog" "QD_SEATED me=2" 15 "$sp" || { fslp_reap; return 1; }
     dp=$(launch join deadeye deadeye 9103 "$dlog" "$port" 0)
 
     # 60s of dueling is ~40 deadeye shots — enough statistics that a loaded
     # machine's low tail stays clear of the thresholds (35s flaked: observed
     # 6..12 hits against a >=8 bar, clean HEAD included).
     sleep 60
-    kill "$mp" "$sp" "$dp" 2>/dev/null
-    wait "$mp" "$sp" "$dp" 2>/dev/null
+    fslp_reap
 
     for want in "QD_SERVING" "QD_WORLD_UP"; do
         grep -q "$want" "$mlog" || { echo "[$label] missing on marshal: $want"; return 1; }

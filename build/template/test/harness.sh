@@ -47,8 +47,14 @@
 
 FSLP_OK=1        # the current act's verdict accumulator (expect* clear it)
 FSLP_RUN_OK=1    # the whole run's verdict (a spent act clears it)
-FSLP_PIDS=()     # every live pid this act launched (fslp_reap's default set)
 mkdir -p "$FSLP_LOGS"
+# The pid LEDGER is a FILE, not a shell array, for one hard-won reason:
+# launchers run inside command substitution (`hp=$(fslp_launch ...)`) — a
+# subshell — so an array append there mutates a COPY and the parent reaps
+# nothing (24 leaked headless instances taught this). A custom launcher
+# joins the ledger with:  echo $! >> "$FSLP_PIDS"
+FSLP_PIDS="$FSLP_LOGS/.pids"
+: >"$FSLP_PIDS"
 
 # Build the scripts through the ADDON (the downloader's path) and run the
 # one-time --import pass headless runs need to discover the extension.
@@ -59,14 +65,14 @@ fslp_build() {
 }
 
 # fslp_launch NAME LOG [ENV=VAL]... — one headless peer; echoes its pid (and
-# records it for fslp_reap).
+# files it in the ledger for fslp_reap).
 fslp_launch() {
 	local name="$1" log="$2"; shift 2
 	mkdir -p "$(dirname "$log")"
 	env "$@" ROLE="${ROLE:-$name}" \
 		"$GODOT" --headless --path "$FSLP_PROJ" --script "$FSLP_DRIVER" \
 		>"$log" 2>&1 &
-	FSLP_PIDS+=($!)
+	echo $! >>"$FSLP_PIDS"
 	echo $!
 }
 
@@ -110,17 +116,19 @@ fslp_wait_all() {
 # IS the test (host-migration acts kill the host mid-sentence on purpose).
 fslp_reap() {
 	local pids=("$@")
-	((${#pids[@]})) || pids=("${FSLP_PIDS[@]}")
+	if ((${#pids[@]} == 0)) && [ -s "$FSLP_PIDS" ]; then
+		while read -r p; do pids+=("$p"); done <"$FSLP_PIDS"
+	fi
 	((${#pids[@]})) || return 0
 	kill "${pids[@]}" 2>/dev/null
-	local deadline=$((SECONDS + 5)) live=1
+	local deadline=$((SECONDS + 8)) live=1
 	while ((live && SECONDS < deadline)); do
 		live=0
 		for p in "${pids[@]}"; do kill -0 "$p" 2>/dev/null && live=1; done
 		((live)) && sleep 0.2
 	done
 	((live)) && kill -9 "${pids[@]}" 2>/dev/null
-	FSLP_PIDS=()
+	: >"$FSLP_PIDS"
 	return 0
 }
 
@@ -139,7 +147,7 @@ fslp_act() {
 		port=$((FSLP_PORT_BASE + FSLP_ACT_NO * 16 + try))
 		echo "==> act $name (try $try, port $port)"
 		FSLP_OK=1
-		FSLP_PIDS=()
+		: >"$FSLP_PIDS"
 		if "$fn" "$port" && ((FSLP_OK)); then
 			echo "  PASS: $name"
 			return 0

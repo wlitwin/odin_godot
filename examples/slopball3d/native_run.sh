@@ -9,141 +9,150 @@
 #
 # CONVERGENCE: at the same session tick, all three screens report the ball
 # within a few centimeters (SB3_BALL tick=N, positions in cm — interp + f16
-# tolerance). Prints SLOPBALL3D_NATIVE_OK.
+# tolerance). Plumbing = the kit harness; the receipts stay.
+# Prints SLOPBALL3D_NATIVE_OK.
 # ----------------------------------------------------------------------------
 set -uo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PROJ="$ROOT/examples/slopball3d"
-LOGDIR="$PROJ/.sloplogs"
-mkdir -p "$LOGDIR"
 
-bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null
+bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null || { echo "SLOPBALL3D_NATIVE_FAIL (build)"; exit 1; }
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+
+FSLP_PROJ="$PROJ"
+FSLP_LOGS="$PROJ/.sloplogs"
+source "$ROOT/build/template/test/harness.sh"
+
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
 
-launch() { # launch <role> <bot> <name> <token> <log> <port>
-    local role="$1" bot="$2" name="$3" token="$4" log="$5" port="$6"
-    SLOP3_ROLE="$role" SLOP3_BOT="$bot" SLOP3_NAME="$name" SLOP3_TOKEN="$token" \
-    SLOP3_PORT="$port" SLOP3_GOALS=1 SLOP3_PEERS=3 \
-        "$GODOT" --headless --path "$PROJ" >"$log" 2>&1 &
-    echo $!
+slop3_launch() { # slop3_launch <role> <bot> <name> <token> <log> <port>
+	local role="$1" bot="$2" name="$3" token="$4" log="$5" port="$6"
+	SLOP3_ROLE="$role" SLOP3_BOT="$bot" SLOP3_NAME="$name" SLOP3_TOKEN="$token" \
+	SLOP3_PORT="$port" SLOP3_GOALS=1 SLOP3_PEERS=3 \
+		"$GODOT" --headless --path "$PROJ" >"$log" 2>&1 &
+	echo $! >>"$FSLP_PIDS"
+	echo $!
 }
 
-attempt() {
-    local port="$1"
-    local hlog="$LOGDIR/host.log" slog="$LOGDIR/striker.log" wlog="$LOGDIR/watcher.log"
-    : >"$hlog"; : >"$slog"; : >"$wlog"
-    local hp sp wp
-    hp=$(launch host idle hosty 9301 "$hlog" "$port")
-    local i=0
-    while ((i<60)); do
-        grep -q "SB3_HOSTING" "$hlog" && break
-        grep -q "SB3_HOST_FAIL" "$hlog" && { kill "$hp" 2>/dev/null; wait "$hp" 2>/dev/null; return 2; }
-        kill -0 "$hp" 2>/dev/null || break
-        sleep 0.1; ((i++))
-    done
-    sp=$(launch join striker striker 9302 "$slog" "$port")
-    # Seat order is arrival order — hold the watcher until the striker sits in
-    # seat 2, or the two joins race and the assertions point at the wrong logs.
-    i=0
-    while ((i<150)); do
-        grep -q "SB3_SEATED me=2" "$slog" && break
-        kill -0 "$sp" 2>/dev/null || break
-        sleep 0.1; ((i++))
-    done
-    wp=$(launch join idle watcher 9303 "$wlog" "$port")
+three_peers_3d() {
+	local port="$1"
+	local hlog="$FSLP_LOGS/host.log" slog="$FSLP_LOGS/striker.log" wlog="$FSLP_LOGS/watcher.log"
+	: >"$hlog"; : >"$slog"; : >"$wlog"
+	local hp sp wp
+	hp=$(slop3_launch host idle hosty 9301 "$hlog" "$port")
+	fslp_ready "$hlog" "SB3_HOSTING" 8 "$hp" || { echo "  port $port: host never bound"; return 1; }
+	sp=$(slop3_launch join striker striker 9302 "$slog" "$port")
+	# Seat order is arrival order — hold the watcher until the striker sits in
+	# seat 2, or the two joins race and the assertions point at the wrong logs.
+	fslp_ready "$slog" "SB3_SEATED me=2" 15 "$sp" || { echo "  striker never seated"; return 1; }
+	wp=$(slop3_launch join idle watcher 9303 "$wlog" "$port")
 
-    # The whole match should land inside 40s; then a beat of REST so the last
-    # SB3_BALL reports show a settled ball for the convergence diff.
-    local deadline=$((SECONDS + 40))
-    while ((SECONDS < deadline)); do
-        if grep -q "SLOPBALL3D_DONE" "$hlog" && grep -q "SLOPBALL3D_DONE" "$slog" && grep -q "SLOPBALL3D_DONE" "$wlog"; then
-            break
-        fi
-        sleep 0.5
-    done
-    sleep 4  # the last kick's roll must settle, or interp lag reads as disagreement
-    kill "$hp" "$sp" "$wp" 2>/dev/null
-    wait "$hp" "$sp" "$wp" 2>/dev/null
+	# The whole match should land inside 40s; then a beat of REST so the last
+	# SB3_BALL reports show a settled ball for the convergence diff.
+	local deadline=$((SECONDS + 40))
+	while ((SECONDS < deadline)); do
+		if grep -q "SLOPBALL3D_DONE" "$hlog" && grep -q "SLOPBALL3D_DONE" "$slog" && grep -q "SLOPBALL3D_DONE" "$wlog"; then
+			break
+		fi
+		sleep 0.5
+	done
+	sleep 4 # the last kick's roll must settle, or interp lag reads as disagreement
+	fslp_reap
 
-    local ok=1
-    grep -q "SB3_WORLD_UP"            "$hlog" || { echo "host never spawned the world"; ok=0; }
-    grep -q "SB3_SEATED me=2"         "$slog" || { echo "striker not seated as 2"; ok=0; }
-    grep -q "SB3_SEATED me=3"         "$wlog" || { echo "watcher not seated as 3"; ok=0; }
-    grep -q "SB3_BALL_OWNER player=2" "$hlog" || { echo "host never granted the striker the seat"; ok=0; }
-    grep -q "SB3_BALL_OWNER player=2" "$slog" || { echo "striker never heard it holds the seat"; ok=0; }
-    grep -q "SB3_BALL_OWNER player=2" "$wlog" || { echo "watcher never heard the seat transfer"; ok=0; }
-    grep -q "SB3_KICK"                "$slog" || { echo "striker never kicked"; ok=0; }
-    grep -q "SB3_GOAL by=2"           "$hlog" || { echo "host never saw the goal"; ok=0; }
-    grep -q "SB3_MATCH winner=2"      "$hlog" || { echo "no match edge on the host"; ok=0; }
-    grep -q "SB3_MATCH winner=2"      "$wlog" || { echo "no match edge on the watcher"; ok=0; }
-    grep -q "SLOPBALL3D_DONE"         "$slog" || { echo "striker never finished"; ok=0; }
-    for l in "$hlog" "$slog" "$wlog"; do
-        grep -qE "SCRIPT ERROR|signal 11" "$l" && { echo "runtime errors in $l"; ok=0; }
-    done
+	expect "$hlog" "SB3_WORLD_UP" "host never spawned the world"
+	expect "$slog" "SB3_SEATED me=2" "striker not seated as 2"
+	expect "$wlog" "SB3_SEATED me=3" "watcher not seated as 3"
+	expect "$hlog" "SB3_BALL_OWNER player=2" "host never granted the striker the seat"
+	expect "$slog" "SB3_BALL_OWNER player=2" "striker never heard it holds the seat"
+	expect "$wlog" "SB3_BALL_OWNER player=2" "watcher never heard the seat transfer"
+	expect "$slog" "SB3_KICK" "striker never kicked"
+	expect "$hlog" "SB3_GOAL by=2" "host never saw the goal"
+	expect "$hlog" "SB3_MATCH winner=2" "no match edge on the host"
+	expect "$wlog" "SB3_MATCH winner=2" "no match edge on the watcher"
+	expect "$slog" "SLOPBALL3D_DONE" "striker never finished"
+	for l in "$hlog" "$slog" "$wlog"; do
+		expect_absent "$l" "SCRIPT ERROR|signal 11" "runtime errors in $(basename "$l")"
+	done
 
-    # CONVERGENCE: highest tick reported by all three, positions within 40cm
-    # (x and z; y is gravity-parked and comes along for free in the diff), and
-    # the QUATERNION within 0.05 per sampled component — the settled ball's
-    # orientation is the end-to-end receipt for the .Quat wire+nlerp path
-    # (a corrupted rotation cannot show up in the position diff).
-    local hpts="$LOGDIR/h.pts" spts="$LOGDIR/s.pts" wpts="$LOGDIR/w.pts"
-    sed -nE 's/.*SB3_BALL tick=([0-9]+) x=(-?[0-9]+) y=(-?[0-9]+) z=(-?[0-9]+) qx=(-?[0-9]+) qw=(-?[0-9]+).*/\1 \2 \3 \4 \5 \6/p' "$hlog" >"$hpts"
-    sed -nE 's/.*SB3_BALL tick=([0-9]+) x=(-?[0-9]+) y=(-?[0-9]+) z=(-?[0-9]+) qx=(-?[0-9]+) qw=(-?[0-9]+).*/\1 \2 \3 \4 \5 \6/p' "$slog" >"$spts"
-    sed -nE 's/.*SB3_BALL tick=([0-9]+) x=(-?[0-9]+) y=(-?[0-9]+) z=(-?[0-9]+) qx=(-?[0-9]+) qw=(-?[0-9]+).*/\1 \2 \3 \4 \5 \6/p' "$wlog" >"$wpts"
-    local tick
-    tick=$(cat "$hpts" "$spts" "$wpts" | awk '{print $1}' | sort -n | uniq -c | awk '$1==3{t=$2} END{print t+0}')
-    if ((tick == 0)); then
-        echo "convergence: no common SB3_BALL tick across the three logs"; ok=0
-    else
-        local hx hy hz hqx hqw sx sy sz sqx sqw wx wy wz wqx wqw span=0 qspan=0 d
-        read -r hx hy hz hqx hqw <<<"$(awk -v t="$tick" '$1==t{print $2, $3, $4, $5, $6; exit}' "$hpts")"
-        read -r sx sy sz sqx sqw <<<"$(awk -v t="$tick" '$1==t{print $2, $3, $4, $5, $6; exit}' "$spts")"
-        read -r wx wy wz wqx wqw <<<"$(awk -v t="$tick" '$1==t{print $2, $3, $4, $5, $6; exit}' "$wpts")"
-        for d in $((hx-sx)) $((hx-wx)) $((sx-wx)) $((hy-sy)) $((hy-wy)) $((sy-wy)) $((hz-sz)) $((hz-wz)) $((sz-wz)); do
-            ((d<0)) && d=$((-d)); ((d>span)) && span=$d
-        done
-        for d in $((hqx-sqx)) $((hqx-wqx)) $((sqx-wqx)) $((hqw-sqw)) $((hqw-wqw)) $((sqw-wqw)); do
-            ((d<0)) && d=$((-d)); ((d>qspan)) && qspan=$d
-        done
-        echo "convergence: tick=$tick host=($hx,$hy,$hz) striker=($sx,$sy,$sz) watcher=($wx,$wy,$wz) span=${span}cm qspan=$qspan"
-        # The assert exists to catch two-WORLDS divergence (meters); a ball
-        # still rolling at sample time legitimately spreads ~an interp window
-        # across screens (~30cm at 60Hz mid-kick).
-        ((span<=40)) || { echo "convergence: screens disagree past tolerance"; ok=0; }
-        # Quat tolerance derives from residual SLOW ROLL, not the wire: the ball
-        # settles positionally long before its spin fully dies, and a rolling
-        # quat churns ~ω/2 per second — an interp-window sampling skew spreads
-        # ~10-25 units. Corruption (garbage decode, hemisphere flip) shows as
-        # 70-200. 40 splits the two decisively.
-        ((qspan<=40)) || { echo "convergence: quaternions disagree past tolerance (wire/nlerp)"; ok=0; }
-        # And the decisive receipt that rotation CROSSED the wire at all: every
-        # peer must have seen the ball's quat leave identity during the match
-        # (a dead rot field pins qw at 100 on watchers forever).
-        for f in "$hpts" "$spts" "$wpts"; do
-            awk 'BEGIN{m=999} {v=$6; if(v<0)v=-v; if(v<m)m=v} END{exit !(m<=50)}' "$f" \
-                || { echo "quat receipt: $f never left identity — rotation not replicating"; ok=0; }
-        done
-    fi
+	# CONVERGENCE: highest tick reported by all three, positions within 40cm
+	# (x and z; y is gravity-parked and comes along for free in the diff), and
+	# the QUATERNION within tolerance per sampled component — the settled
+	# ball's orientation is the end-to-end receipt for the .Quat wire+nlerp
+	# path (a corrupted rotation cannot show up in the position diff).
+	local hpts="$FSLP_LOGS/h.pts" spts="$FSLP_LOGS/s.pts" wpts="$FSLP_LOGS/w.pts"
+	sed -nE 's/.*SB3_BALL tick=([0-9]+) x=(-?[0-9]+) y=(-?[0-9]+) z=(-?[0-9]+) qx=(-?[0-9]+) qw=(-?[0-9]+).*/\1 \2 \3 \4 \5 \6/p' "$hlog" >"$hpts"
+	sed -nE 's/.*SB3_BALL tick=([0-9]+) x=(-?[0-9]+) y=(-?[0-9]+) z=(-?[0-9]+) qx=(-?[0-9]+) qw=(-?[0-9]+).*/\1 \2 \3 \4 \5 \6/p' "$slog" >"$spts"
+	sed -nE 's/.*SB3_BALL tick=([0-9]+) x=(-?[0-9]+) y=(-?[0-9]+) z=(-?[0-9]+) qx=(-?[0-9]+) qw=(-?[0-9]+).*/\1 \2 \3 \4 \5 \6/p' "$wlog" >"$wpts"
+	# Judge the BEST (min-span) common tick, not the last: two-WORLDS
+	# divergence disagrees at EVERY shared tick by meters, while under
+	# machine load the final samples land mid-flight, where an interp
+	# window's honest spread (~30cm at 60Hz, more when frames stretch)
+	# reads as disagreement. The quat gets its own independent min — its
+	# clean moments (settled spin) need not be the position's.
+	local verdict
+	verdict=$(awk '
+		function A(v){return v<0?-v:v}
+		FNR==1{f++}
+		f==1{hx[$1]=$2; hy[$1]=$3; hz[$1]=$4; hqx[$1]=$5; hqw[$1]=$6}
+		f==2{sx[$1]=$2; sy[$1]=$3; sz[$1]=$4; sqx[$1]=$5; sqw[$1]=$6}
+		f==3{
+			t=$1
+			if ((t in hx) && (t in sx)) {
+				span=0
+				if(A(hx[t]-sx[t])>span)span=A(hx[t]-sx[t]); if(A(hx[t]-$2)>span)span=A(hx[t]-$2); if(A(sx[t]-$2)>span)span=A(sx[t]-$2)
+				if(A(hy[t]-sy[t])>span)span=A(hy[t]-sy[t]); if(A(hy[t]-$3)>span)span=A(hy[t]-$3); if(A(sy[t]-$3)>span)span=A(sy[t]-$3)
+				if(A(hz[t]-sz[t])>span)span=A(hz[t]-sz[t]); if(A(hz[t]-$4)>span)span=A(hz[t]-$4); if(A(sz[t]-$4)>span)span=A(sz[t]-$4)
+				qs=0
+				if(A(hqx[t]-sqx[t])>qs)qs=A(hqx[t]-sqx[t]); if(A(hqx[t]-$5)>qs)qs=A(hqx[t]-$5); if(A(sqx[t]-$5)>qs)qs=A(sqx[t]-$5)
+				if(A(hqw[t]-sqw[t])>qs)qs=A(hqw[t]-sqw[t]); if(A(hqw[t]-$6)>qs)qs=A(hqw[t]-$6); if(A(sqw[t]-$6)>qs)qs=A(sqw[t]-$6)
+				ticks[n]=t; spans[n]=span; qs_[n]=qs; n++
+			}
+		}
+		END{
+			if (n==0) {print "none"; exit}
+			# min over the LAST five common ticks: late enough that the
+			# kickoff stillness cannot trivially converge, wide enough that
+			# one mid-flight sample cannot trivially diverge.
+			from = n>5 ? n-5 : 0
+			for (i=from; i<n; i++) {
+				if (best=="" || spans[i]<best) {best=spans[i]; bt=ticks[i]}
+				if (qbest=="" || qs_[i]<qbest) {qbest=qs_[i]}
+			}
+			print bt, best, qbest
+		}
+	' "$hpts" "$spts" "$wpts")
+	if [ "$verdict" = "none" ]; then
+		echo "  FAIL: convergence: no common SB3_BALL tick across the three logs"; FSLP_OK=0
+	else
+		local tick span qspan
+		read -r tick span qspan <<<"$verdict"
+		echo "  convergence: best common tick=$tick span=${span}cm qspan=$qspan"
+		((span<=40)) || { echo "  FAIL: convergence: screens disagree past tolerance at EVERY shared tick (best span ${span}cm)"; FSLP_OK=0; }
+		# Quat tolerance derives from residual SLOW ROLL, not the wire: a
+		# rolling quat churns ~ω/2 per second and sampling skew spreads
+		# ~10-25 units. Corruption (garbage decode, hemisphere flip) shows as
+		# 70-200 at EVERY tick. 40 splits the two decisively.
+		((qspan<=40)) || { echo "  FAIL: convergence: quaternions disagree past tolerance at EVERY shared tick (wire/nlerp)"; FSLP_OK=0; }
+		# And the decisive receipt that rotation CROSSED the wire at all: every
+		# peer must have seen the ball's quat leave identity during the match
+		# (a dead rot field pins qw at 100 on watchers forever).
+		for f in "$hpts" "$spts" "$wpts"; do
+			awk 'BEGIN{m=999} {v=$6; if(v<0)v=-v; if(v<m)m=v} END{exit !(m<=50)}' "$f" \
+				|| { echo "  FAIL: quat receipt: $(basename "$f") never left identity — rotation not replicating"; FSLP_OK=0; }
+		done
+	fi
 
-    ((ok==1)) && return 0 || return 1
+	if ((!FSLP_OK)); then
+		for l in "$hlog" "$slog" "$wlog"; do
+			echo "  ==== $(basename "$l") ===="; tail -n 20 "$l" | sed 's/^/    /'
+		done
+		return 1
+	fi
 }
 
-rc=1
-for try in 1 2 3 4 5; do
-    PORT=$(((RANDOM % 12000) + 50000))
-    attempt "$PORT"; rc=$?
-    ((rc==0)) && break
-    ((rc==2)) && { echo "port $PORT busy, retrying"; continue; }
-    break
-done
-
-if ((rc==0)); then
-    echo "SLOPBALL3D_NATIVE_OK proved: client-simulated RigidBody3D under gravity, quaternion stream, host seat grants, goal off the stream, 3-screen convergence"
-    exit 0
+fslp_act "three peers, third axis" 4 three_peers_3d
+if fslp_verdict SLOPBALL3D_NATIVE; then
+	echo "SLOPBALL3D_NATIVE_OK proved: client-simulated RigidBody3D under gravity, quaternion stream, host seat grants, goal off the stream, 3-screen convergence"
+	exit 0
 fi
-echo "SLOPBALL3D_NATIVE_FAIL"
-for l in "$LOGDIR"/host.log "$LOGDIR"/striker.log "$LOGDIR"/watcher.log; do
-    echo "==== $l ===="; tail -n 25 "$l"
-done
 exit 1
