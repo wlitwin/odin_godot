@@ -72,6 +72,8 @@ sim_ticker_advance :: proc(t: ^Sim_Ticker, frame_dt: f64) -> int {
 // number — a wobbling link needs more headroom than a slow steady one), and
 // `slack` ticks of de-jitter buffer on the server side. Ceil'd: arriving a
 // fraction early is a buffer, arriving a fraction late is a held input.
+// The lane's ANCHOR seeds from this (slack = its margin) the moment the
+// first snapshot lands; lead_control trims from there.
 lead_target :: proc(clock: ^knet.Clock_Sync, dt: f64, jitter_mult := 2.0, slack_ticks := 1) -> int {
 	seconds := clock.rtt / 2 + clock.jitter * jitter_mult
 	ticks := int((seconds + dt - 1e-9) / dt) // ceil in tick units

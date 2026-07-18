@@ -334,7 +334,7 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 	if g.ses.is_host && tick % 60 == 0 {
 		gd.print_str(fmt.tprintf("SPB_POS tick=%d x=%.1f y=%.1f l=%d r=%d", tick, b.roll.x, b.roll.y, b.score.l, b.score.r))
 	}
-	if !g.ses.is_host && !g.lane.resimming && tick % 60 == 0 {
+	if !g.ses.is_host && ksim.lane_live(&g.lane) && tick % 60 == 0 {
 		mx, my := f32(-1), f32(-1)
 		if g.me_kick != nil {
 			mx = g.me_kick.run.x
@@ -391,7 +391,10 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 			}
 			b.roll.vx += aim.x * KICK_POWER
 			b.roll.vy += aim.y * KICK_POWER
-			if k.mine && !g.lane.resimming {
+			// (mine && live) is the _fx gate written inline — the kick moves
+			// ANOTHER entity (the ball) from this tick, so it can't ride the
+			// tick's own fact channel; lane_live keeps the lane's internals out.
+			if k.mine && ksim.lane_live(&g.lane) {
 				gd.print_str(fmt.tprintf("SPB_KICK tick=%d bvx=%.1f bvy=%.1f", tick, b.roll.vx, b.roll.vy))
 			}
 		}

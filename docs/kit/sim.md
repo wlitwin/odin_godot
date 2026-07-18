@@ -135,6 +135,13 @@ runner_tick_fx :: proc(g: ^Game, self: ^Runner, mine: bool, fired: bool) {
   quickdraw's tracer ships on it (its old `shot_seq`/`shot_aim` fields and
   the hand-detected edge are deleted; the duel acid pins the watcher path).
 
+**Presentation that can't ride a fact** — a cross-entity effect inside a
+tick body (a kick that moves the BALL from the kicker's tick), or anything
+inline in a world pass (`@(gd_step)`) — gates on `ksim.lane_live(&lane)`:
+"the live pass, not a resim replay". Never read `lane.resimming` raw; the
+`_fx` halves carry this gate for you, `lane_live` is the inline spelling
+(speedball's kick receipt is the worked example).
+
 The wire imposes three contracts, each a build-time error when broken: the
 mine-form fires on **event ticks only** (any tick a bool fact is true — the
 old form is called every tick), its facts must be **wire primitives** (they

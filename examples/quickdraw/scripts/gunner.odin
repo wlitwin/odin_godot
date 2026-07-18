@@ -42,7 +42,10 @@ Gunner :: struct {
 	// the honest fit here, a design choice, not a shelf limitation.
 	x, y:    f32 `gd:"replicate,predict,interp"`,
 	vx, vy:  f32 `gd:"replicate,predict"`,
-	aim:     f32 `gd:"replicate,predict"`,
+	// interp=angle: watched gunners' aim GLIDES the short arc across ±π —
+	// bare predict used to snap it per tick (the "stepped aim" that existed
+	// only because a raw f32 lerp sweeps the long way around the circle).
+	aim:     f32 `gd:"replicate,predict,interp=angle"`,
 	dash_cd: u16 `gd:"replicate,predict"`,
 	fire:    psim.Cool `gd:"manual"`, // driven below — so a dead gunner freezes it by not ticking it
 	lob:     psim.Cool `gd:"manual"`, // the slow projectile's cadence (predicted, like the trigger)

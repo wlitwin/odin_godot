@@ -766,6 +766,16 @@ lane_lead :: proc(l: ^Lane) -> int {
 	return int(l.ticker.tick) - int(l.input_ack)
 }
 
+// lane_live — is this the LIVE pass, whose side effects should fire ONCE
+// (prints, sounds, particles), as opposed to a resim replay of history? The
+// gate every game hand-wrote as `!lane.resimming` inside tick and step
+// bodies. Entity-tick facts get it FREE through their `_fx` halves (the
+// generated thunk holds this gate); inline presentation in a tick body or a
+// world pass (@(gd_step)) reads it here — never the raw field.
+lane_live :: proc(l: ^Lane) -> bool {
+	return !l.resimming
+}
+
 // ---------------------------------------------------------------------------
 // The frame drive.
 
@@ -1068,16 +1078,25 @@ client_ingest :: proc(l: ^Lane) {
 	l.input_ack = input_ack
 
 	if !l.anchored {
-		// First contact: adopt the truth outright and start predicting a
-		// margin ahead of the tick the server just showed us — the lead
-		// controller trims from there.
+		// First contact: adopt the truth outright and start predicting AHEAD
+		// of it — the transit the input must cover (rtt/2 + jitter allowance,
+		// from the session's clock sync) plus `margin` ticks of server-side
+		// headroom. The old anchor used margin alone, so a distant client's
+		// first seconds ran short and the controller grew the lead one nudge
+		// at a time — inputs arriving late exactly while first impressions
+		// form. A cold clock (no pong yet) reads rtt 0 and the margin stands;
+		// the controller trims whatever the seed overshoots.
 		for tr in truths {
 			apply_truth(l, tr)
 			if e := find_lane_entry(l, tr.id); e != nil {
 				history_note_bytes(e.hist, tick, tr.blob)
 			}
 		}
-		l.ticker.tick = tick + u64(l.margin) + 1
+		lead := l.margin
+		if clock := ksess.session_clock(l.ses, ksess.HOST_PEER); clock.rtt > 0 {
+			lead = max(lead, lead_target(&clock, l.ticker.dt, slack_ticks = l.margin))
+		}
+		l.ticker.tick = tick + u64(lead) + 1
 		l.anchored = true
 		return
 	}
