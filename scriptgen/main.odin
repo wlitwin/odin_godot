@@ -562,6 +562,14 @@ Script :: struct {
 	std_forwards: [dynamic]string, // which standard forwards were synthesized (bodies emitted by generate)
 	probes:       [dynamic]Probe_Info, // generated acid probes (resolve_probes; bodies emitted by generate)
 	event_halves: [dynamic]Event_Half, // session-event halves (resolve_session_events) — the generated `<snake>_events` dispatch
+
+	// Migration halves (resolve_migration): the host-migration dance's four
+	// name-paired seams — kboot.boot_migration's generated hook table. "" =
+	// undeclared; any declared = the table + the events-tail drain are emitted.
+	succ_backup:    string, // `<snake>_backup(self, w)` — host: the campaign blob
+	succ_took_over: string, // `<snake>_took_over(self, r)` — heir: read blob + mend
+	succ_wiped:     string, // `<snake>_wiped(self)` — non-entity pools, post-wipe
+	succ_migrating: string, // `<snake>_migrating(self, step, target, try)` — the words
 }
 
 // One session event a game shell paired a half with. The BARE half fires
@@ -620,6 +628,22 @@ SESSION_EVENTS := [?]Session_Ev {
 	{suffix = "command_executed", variant = "Ev_Command_Executed", role = .Host, params = {{"ok", "bool", "e.ok"}, {"player", "knet.Player_Id", "e.player"}, {"entity", "knet.Net_Id", "e.entity"}, {"cmd", "u16", "e.cmd"}}},
 	{suffix = "command_confirmed", variant = "Ev_Command_Confirmed", role = .Client, params = {{"seq", "knet.Intent_Seq", "e.seq"}}},
 	{suffix = "command_rejected", variant = "Ev_Command_Rejected", role = .Client, params = {{"seq", "knet.Intent_Seq", "e.seq"}, {"entity", "knet.Net_Id", "e.entity"}}},
+}
+
+// The host-migration halves — kboot.boot_migration's seams, pairable like
+// session events (on the SHELL, by exact name). Session_Ev_Param reused for
+// the shape hints; `field` is unused (the kit calls these, not a dispatch).
+Migration_Half_Spec :: struct {
+	suffix: string,
+	params: []Session_Ev_Param,
+	what:   string, // one line of role, for the shape error
+}
+
+MIGRATION_HALVES := [?]Migration_Half_Spec {
+	{suffix = "backup", params = {{"w", "^knet.Writer", ""}}, what = "the HOST writes the campaign blob it rides on every backup refresh"},
+	{suffix = "took_over", params = {{"r", "^knet.Reader", ""}}, what = "the HEIR reads the blob back and mends, after the kit resumed the run"},
+	{suffix = "wiped", params = {}, what = "the non-entity pools clear, after the kit's census-driven wipe"},
+	{suffix = "migrating", params = {{"step", "kboot.Migrate_Step", ""}, {"target", "string", ""}, {"try", "int", ""}}, what = "the dance's words — one call per arm, mechanics already ran"},
 }
 
 had_error: bool
@@ -1310,6 +1334,7 @@ main :: proc() {
 		resolve_tick_then(&pend.script, &then_idx)
 		resolve_edges(&pend.script, &then_idx)
 		resolve_session_events(&pend.script, &then_idx)
+		resolve_migration(&pend.script, &then_idx)
 		resolve_command_applies(&pend.script, &then_idx)
 		validate_command_ids(&pend.script)
 		resolve_entities(&pend.script, by_struct, &seen_entity_ids, &then_idx)

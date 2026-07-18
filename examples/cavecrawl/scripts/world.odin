@@ -260,26 +260,17 @@ cave_inscribe :: proc(self: ^CaveLobby) {
 	ksess.session_set_blob(&self.ses, self.level.net_id, transmute([]u8)text)
 }
 
-// Drop every LOCAL copy of the world — nodes and maps — without touching
-// the session. The two callers rebuild through the factory right after: a
-// takeover (the backup snapshot respawns everything) and a rejoin (the new
-// host's SES_WORLD does). The registry's own teardown is session_init's.
-cave_wipe_local :: proc(self: ^CaveLobby) {
-	kboot.boot_entities_clear(&self.boot) // the driver's node ledger
-	clear(&self.spelunkers)
-	clear(&self.chests)
-	clear(&self.doors)
-	clear(&self.pickups)
-	clear(&self.dwellers)
-	clear(&self.avatar_of)
-	clear(&self.brains)
+// The non-entity pools, after the kit's CENSUS-DRIVEN wipe: the `_freed`
+// hooks above emptied every entity map (and nilled level/relic) through the
+// same code that fills them; this half clears what never was an entity. The
+// rebuild comes through the factory right after — a takeover's backup
+// snapshot or a rejoin's SES_WORLD.
+cave_lobby_wiped :: proc(self: ^CaveLobby) {
+	clear(&self.avatar_of) // spelunker_freed keeps no owner mirror
 	clear(&self.respawn_at)
 	clear(&self.flying)
 	kfx.tracers_clear(&self.tracers)
 	self.me_spel = nil
-	self.level = nil
-	self.relic = nil
-	self.relic_id = 0
 	self.director = {}
 	self.dens_used = 0
 	self.last_wave = 0

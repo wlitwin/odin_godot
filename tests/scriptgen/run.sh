@@ -478,6 +478,126 @@ ODIN
 if "$SGEN" "$mt" -godot:"$ROOT" >"$mt/out.log" 2>&1; then fail "a ^Game @(gd_method) in Panel's home file must FAIL the build"; fi
 grep -q "binds to NOTHING" "$mt/out.log" || fail "the method-trap error must name the fix (move to a headerless file)"
 
+# ---- fixture 15: HOST MIGRATION halves -> kboot.boot_migration's table ---------
+# The four seams pair on the shell by exact name: thunks + the Succ_Hooks table
+# are generated, and the events dispatch grows the boot_migrate_pending tail
+# (mechanics AFTER the words halves). Wrong shape, `_then`, and a prefix typo
+# are all teaching errors, never silent no-fires.
+sc="$work/succession"
+mkdir -p "$sc"
+cat >"$sc/depot.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Depot
+package succ
+import gd "godot:godot"
+import kboot "godot:kit/boot"
+import knet "godot:kit/net"
+
+Depot :: struct {
+	owner: gd.Node,
+	boot:  kboot.Boot,
+}
+
+depot_backup :: proc(self: ^Depot, w: ^knet.Writer) {}
+depot_took_over :: proc(self: ^Depot, r: ^knet.Reader) {}
+depot_wiped :: proc(self: ^Depot) {}
+depot_migrating :: proc(self: ^Depot, step: kboot.Migrate_Step, target: string, try: int) {}
+depot_welcomed :: proc(self: ^Depot, me: knet.Player_Id) {}
+ODIN
+if ! "$SGEN" "$sc" -godot:"$ROOT" >/dev/null 2>&1; then fail "migration halves must resolve, not error"; fi
+sgen="$sc/depot.gen.odin"
+grep -q "_depot_succ_backup :: proc(game: rawptr, w: ^knet.Writer)" "$sgen" || fail "backup thunk not generated"
+grep -q "depot_succ_hooks := kboot.Succ_Hooks" "$sgen" || fail "the Succ_Hooks table not generated"
+grep -q "took_over = _depot_succ_took_over" "$sgen" || fail "took_over not wired into the table"
+grep -q "migrating = _depot_succ_migrating" "$sgen" || fail "migrating not wired into the table"
+grep -q "kboot.boot_migrate_pending(&self.boot)" "$sgen" || fail "the events tail must drain the kit's noted succession"
+grep -q "depot_events :: proc" "$sgen" || fail "declaring migration must emit the events proc (the drain rides it)"
+
+# a migration-only shell (no event halves) still gets the events proc + drain
+so="$work/succonly"
+mkdir -p "$so"
+cat >"$so/vault.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Vault
+package succonly
+import gd "godot:godot"
+import kboot "godot:kit/boot"
+import knet "godot:kit/net"
+
+Vault :: struct {
+	owner: gd.Node,
+	boot:  kboot.Boot,
+}
+
+vault_backup :: proc(self: ^Vault, w: ^knet.Writer) {}
+ODIN
+if ! "$SGEN" "$so" -godot:"$ROOT" >/dev/null 2>&1; then fail "a migration-only shell must resolve"; fi
+ogen="$so/vault.gen.odin"
+grep -q "vault_events :: proc" "$ogen" || fail "migration alone must still emit the events proc"
+grep -q "kboot.boot_migrate_pending(&self.boot)" "$ogen" || fail "migration-only events proc must carry the drain"
+
+# wrong shape = a teaching error naming the expected signature
+sb="$work/succbad"
+mkdir -p "$sb"
+cat >"$sb/depot.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Depot
+package succbad
+import gd "godot:godot"
+import kboot "godot:kit/boot"
+
+Depot :: struct {
+	owner: gd.Node,
+	boot:  kboot.Boot,
+}
+
+depot_backup :: proc(self: ^Depot, blob: []u8) {}
+ODIN
+if "$SGEN" "$sb" -godot:"$ROOT" >"$sb/out.log" 2>&1; then fail "a wrong-shape migration half must FAIL the build"; fi
+grep -q "knet.Writer" "$sb/out.log" || fail "the shape error must spell the expected ^knet.Writer param"
+
+# `_then` on a migration half = a teaching error (fixed roles, no authority narrowing)
+st="$work/succthen"
+mkdir -p "$st"
+cat >"$st/depot.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Depot
+package succthen
+import gd "godot:godot"
+import kboot "godot:kit/boot"
+import knet "godot:kit/net"
+
+Depot :: struct {
+	owner: gd.Node,
+	boot:  kboot.Boot,
+}
+
+depot_took_over_then :: proc(self: ^Depot, r: ^knet.Reader) {}
+ODIN
+if "$SGEN" "$st" -godot:"$ROOT" >"$st/out.log" 2>&1; then fail "a migration _then must FAIL the build"; fi
+grep -q "migration halves have no" "$st/out.log" || fail "the _then error must teach the fixed-role rule"
+
+# a one-edit prefix typo = the near-miss teaching, never a silent no-fire
+sn="$work/succnear"
+mkdir -p "$sn"
+cat >"$sn/depot.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Depot
+package succnear
+import gd "godot:godot"
+import kboot "godot:kit/boot"
+import knet "godot:kit/net"
+
+Depot :: struct {
+	owner: gd.Node,
+	boot:  kboot.Boot,
+}
+
+depo_backup :: proc(self: ^Depot, w: ^knet.Writer) {}
+ODIN
+if "$SGEN" "$sn" -godot:"$ROOT" >"$sn/out.log" 2>&1; then fail "a near-miss migration prefix must FAIL the build"; fi
+grep -q "looks like a migration half" "$sn/out.log" || fail "the near-miss error must name the pairing"
+
 # ---- fixture: the silent-footgun lints (raw-verb call, tag namespace typo,
 # any_seat off the sim lane) — each compiles fine as Odin and used to
 # misbehave silently; each is a named build error now. -----------------------

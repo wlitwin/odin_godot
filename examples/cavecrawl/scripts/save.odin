@@ -7,6 +7,7 @@ package cavecrawl_scripts
 // dwellers.
 
 import gd "godot:godot"
+import kboot "godot:kit/boot"
 import kcombat "godot:kit/combat"
 import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
@@ -27,12 +28,12 @@ save_path :: proc() -> cstring {
 	return "user://cave_save.fslp"
 }
 
-// The session's backup-blob hook: every backup that ships to the designated
-// holder carries the same campaign bytes a save file does — a takeover
-// resumes the RUN, not a diorama of it.
-cave_backup_blob :: proc(user: rawptr, w: ^knet.Writer) {
-	self := cast(^CaveLobby)user
-	if !self.ses.is_host || !self.started {return}
+// The backup half (kboot.boot_migration's generated table calls it, host
+// only): every backup that ships to the designated holder carries the same
+// campaign bytes a save file does — a takeover resumes the RUN, not a
+// diorama of it.
+cave_lobby_backup :: proc(self: ^CaveLobby, w: ^knet.Writer) {
+	if !self.started {return}
 	write_game_blob(self, w)
 }
 
@@ -130,33 +131,21 @@ cave_lobby_on_resume :: proc(self: ^CaveLobby) {
 
 
 // HOST MIGRATION, the stepping-stone shape: the designated backup holder
-// becomes the new host of the run they were just playing — same process,
-// same port, same identity. The dead run's local copies go first (the
-// factory rebuilds everything from the backup snapshot); friends rejoin
-// with their tokens and reclaim themselves, exactly like any reconnect
-// (see on_rejoin). No election, no live handoff: the friendslop version is
-// "the person holding the backup presses the button".
+// becomes the new host of the run they were just playing. The MECHANICS —
+// wipe, raise, resume, the window gates — are the kit's (boot_take_over
+// runs them for the button exactly as the auto path does); this button is
+// the manual door the driver presses.
 @(gd_method)
 cave_lobby_on_takeover :: proc(self: ^CaveLobby) {
-	if self.ses.is_host || !self.host_gone {return}
-	game_blob, snap, held := ksess.session_backup_parts(&self.ses) // copies — survive the re-init
-	if !held {
-		kui.lobby_set_status(&self.boot.ui, "No backup to carry")
-		gd.print_str("CAVE_TAKEOVER_FAIL no-backup")
-		return
-	}
-	me := self.ses.me
-	cave_wipe_local(self) // stale nodes and maps of the dead run
-	gd.multiplayer_clear_peer(self.owner)
-	if !gd.host(self.owner, port()) {
-		gd.print_str("CAVE_HOST_FAIL")
-		return
-	}
-	if !ksess.session_host_resume(&self.ses, me, my_name(self), snap) {
-		gd.print_str("CAVE_TAKEOVER_FAIL snapshot")
-		return
-	}
-	if !read_game_blob(self, game_blob) {
+	_ = kboot.boot_take_over(&self.boot)
+}
+
+// The heir's half, fired AFTER the kit resumed the run as ours: read the
+// campaign blob back, re-find the columns (idempotent by name — never
+// re-declare), and word the crown. The failure arms word through
+// cave_lobby_migrating.
+cave_lobby_took_over :: proc(self: ^CaveLobby, r: ^knet.Reader) {
+	if !cave_lobby_backup_read(self, r) {
 		gd.print_str("CAVE_TAKEOVER_FAIL blob")
 		return
 	}

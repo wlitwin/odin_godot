@@ -1606,8 +1606,14 @@ session_set_successor_info :: proc(s: ^Session, info: []u8) {
 	send_successor(s, BROADCAST_PEER)
 }
 
-// Client: who carries the torch, and the host-provided rendezvous blob.
+// Who carries the torch, and the rendezvous blob. Answers on BOTH roles:
+// a client reads what the wire delivered; the HOST reads what it authored
+// (it wrote the torch — an empty answer to its own question was a wart the
+// backup_target words halves fell into).
 session_successor :: proc(s: ^Session) -> (knet.Player_Id, []u8) {
+	if s.is_host {
+		return s.backup_target, s.succ_info
+	}
 	return s.successor, s.successor_info
 }
 

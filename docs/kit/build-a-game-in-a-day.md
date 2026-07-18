@@ -291,20 +291,17 @@ cavecrawl's `spelunker_revive`.
 
 ## 9c. When the host's cat unplugs the router (30 minutes)
 
-The backup snapshots that ship every few seconds (phase 1 machinery) plus
-`session_set_backup_blob` (your campaign bytes ride along) make the death of
-the host survivable: the holder splits the payload with
-`session_backup_parts`, wipes its local world, rebinds as a server, and
-`session_host_resume`s under its own identity. Everyone else rejoins with
-their tokens and reclaims themselves.
-
-Make it HANDS-FREE with succession: on `Ev_Backup_Target` the host names the
-holder and how to reach them (`netgd.peer_address` +
-`session_set_successor_info`); on host loss every client gets
-`Ev_Succession` — the bearer auto-takes-over, the rest auto-chase (the event
-re-fires on each failed reconnect, so retry is free). Cavecrawl's
-`on_takeover`/`cave_rejoin_to` pair is the whole recipe, and acid act 4
-kills the host with `kill -9` to prove nobody has to press anything.
+The backup snapshots that ship every few seconds (phase 1 machinery) make
+the death of the host survivable — and the dance is `kboot.boot_migration`:
+declare four halves (`<game>_backup` writes your campaign bytes onto every
+backup, `<game>_took_over` reads them back on the heir and mends,
+`<game>_wiped` clears the never-entity pools after the kit's census-driven
+wipe, `<game>_migrating` words each arm) and make one `ready` call with the
+generated table. The kit torches on `Ev_Backup_Target`, runs the
+takeover/chase fork hands-free off the events tail, caps the retries, and
+holds the window latches. Cavecrawl is the worked example, and its acid
+act 4 kills the host with `kill -9` to prove nobody has to press anything —
+see [session.md](session.md#backup-hosting-and-resume) for the recipe.
 
 ## 9d. Worlds from dice: shared-seed procgen (30 minutes)
 

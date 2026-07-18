@@ -499,34 +499,50 @@ generates the version-hashed write/read pair (POD, `map[POD]POD`, `[dynamic]POD`
 [save](save.md#declaring-the-game-blob--gdbackup). The proc above is what you wire the
 generated writer into.
 
-**The takeover recipe** (live in cavecrawl's `cave_lobby_on_takeover`): on `Ev_Host_Left`,
-the peer holding a backup splits it with `session_backup_parts` (it returns copies — the
-resume's re-init frees the stored payload), wipes its LOCAL world copies (nodes and game
-maps — the factory is about to rebuild them), rebinds its transport as a server, calls
-`session_host_resume` with its own id, and parses the game blob back. Friends rejoin the
-same address with their tokens and reclaim themselves.
+**The whole dance is `kboot.boot_migration` now** — the game declares four name-paired
+halves and one `ready` call; the kit owns the torch, the fork, the wipe, the caps:
 
-**Live migration** makes that hands-free — the missing piece is that everyone must know
-WHO carries the torch and WHERE to find them *before* the host dies:
+```odin
+my_game_backup    :: proc(self: ^G, w: ^knet.Writer)  // host: the campaign blob (wire the
+                                                      // generated gd:"backup" writer in)
+my_game_took_over :: proc(self: ^G, r: ^knet.Reader)  // heir: read it back, mend, word it
+my_game_wiped     :: proc(self: ^G)                   // every peer: the never-entity pools
+my_game_migrating :: proc(self: ^G, step: kboot.Migrate_Step, target: string, try: int)
+
+// ready(), after boot_attach:
+kboot.boot_migration(&self.boot, self, my_game_succ_hooks)  // the generated table
+```
+
+On `Ev_Backup_Target` the kit computes and broadcasts the rendezvous
+([`netgd.Succession`](netgd.md#succession-the-rendezvous-ceremony-written-once):
+`addr:port` on native, a reserved room code on web — minted once per run). On
+`Ev_Succession` the kit NOTES the fork and runs it off the generated `<snake>_events`
+TAIL — so your bare words halves still see the old world — then: the bearer wipes
+(census-driven — the entity table's `_freed` hooks empty the by-type maps through the
+same code that fills them, then `_wiped` clears the pools), raises the promised
+transport, `session_host_resume`s, and hands `_took_over` the blob; everyone else chases
+under the kit's caps (the event's refire-on-failed-reconnect is the retry pulse; web
+knocks ride `boot_pump`). Every arm that needs words — the chase dial, the knock, no
+torch, gave up, the heir's failures — fires `_migrating` once; `.Taking_Over` is the
+bearer's own word, deduped against the double death-signal a `kill -9` queues.
+`kboot.boot_take_over`/`boot_chase` stay public for a manual Resume button (window-gated:
+they refuse on a live seat). Games that raise their own transports (Steam) call
+`kboot.boot_succ_config` once so the ceremony knows the run's shape. Cavecrawl's acid
+act 4 kills the host with `kill -9` and the run survives with nobody pressing anything.
+
+The raw layer stays underneath for exotic transports:
 
 ```odin
 Ev_Backup_Target :: struct { player: knet.Player_Id } // (host) holder changed — name them
 session_set_successor_info :: proc(s: ^Session, info: []u8)
 session_successor :: proc(s: ^Session) -> (knet.Player_Id, []u8)
 Ev_Succession :: struct { successor: knet.Player_Id } // (client) host gone, torch named
+session_backup_parts :: proc(...) -> (game_blob, snapshot: []u8, ok: bool) // copies
 ```
 
-The session names WHO (the backup holder); the TRANSPORT knows where — the info blob is
-opaque to the session (address:port for ENet via `netgd.peer_address`, a lobby id for
-Steam, a room code for WebRTC). For ENet and WebRTC the whole rendezvous ceremony —
-minting the reserved room, wording the torch, raising the heir, the knock-on-a-timer
-chase — is [`netgd.Succession`](netgd.md#succession-the-rendezvous-ceremony-written-once),
-written once. It broadcasts immediately and to every later joiner. On
-host loss, `Ev_Succession` fires beside `Ev_Host_Left` on every client: the bearer runs
-the takeover recipe, everyone else rejoins the info — and because the event RE-FIRES on
-every failed reconnect, chasing a successor that hasn't bound yet retries for free (cap
-your attempts). Cavecrawl's acid act 4 kills the host with `kill -9` and the run survives
-with nobody pressing anything.
+The session names WHO; the info blob is opaque to it (a Steam lobby id fits where an
+`addr:port` does). Migration is coop-lane only: `boot_migration` refuses a sim lane
+(the lane's authority cannot migrate without a rebuild — a dead sim server restarts).
 
 ## Ownership transfer
 
