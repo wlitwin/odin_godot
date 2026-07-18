@@ -726,4 +726,82 @@ grep -q "_pr_game_probe_mob_pose_x" "$gen" || fail "nested scalar fields probe u
 grep -q "_pr_game_probe_mob_hp :: proc" "$gen" && fail "a hand-written probe name must suppress the generated one"
 grep -q "_pr_game_probe_mob_tag" "$gen" && fail "compound fields must not probe"
 
+# ---- fixture: the profile declaration form (gd:"profile=T") -----------------
+# The tag on the Session field IS session_profile_install: the install lands
+# in the generated ready thunk, the row's field-by-field shape folds into
+# NET_FINGERPRINT (same-size layout drift must MOVE the hash — that drift
+# used to scramble rows past the version door), and the misuses are loud.
+pf="$work/profile"
+mkdir -p "$pf"
+cat >"$pf/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class PfGame
+package pf
+import gd "godot:godot"
+import ksess "godot:kit/session"
+
+Loadout :: struct { look: u8, iron: u8, ready: bool }
+
+PfGame :: struct {
+	owner: gd.Node,
+	ses:   ksess.Session `gd:"profile=Loadout"`,
+}
+
+pf_game_ready :: proc(self: ^PfGame) {}
+ODIN
+"$SGEN" "$pf" -godot:"$ROOT" >"$pf/out.log" 2>&1 || fail "the profile fixture must generate"
+grep -q 'session_profile_install(&(cast(^PfGame)self_raw).ses, Loadout)' "$pf/game.gen.odin" \
+	|| fail "the ready thunk must install the declared profile row"
+grep -q "_register_net_fingerprint" "$pf/odin_godot_guard.gen.odin" \
+	|| fail "a profile declaration alone is a kit wire surface (fingerprint default must register)"
+fp1=$(grep -oE "NET_FINGERPRINT :: u64\(0x[0-9a-f]+\)" "$pf/odin_godot_guard.gen.odin")
+# Swap two same-size fields: the struct's SIZE is unchanged, only the layout —
+# exactly the drift the raw install could never catch.
+cat >"$pf/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class PfGame
+package pf
+import gd "godot:godot"
+import ksess "godot:kit/session"
+
+Loadout :: struct { iron: u8, look: u8, ready: bool }
+
+PfGame :: struct {
+	owner: gd.Node,
+	ses:   ksess.Session `gd:"profile=Loadout"`,
+}
+
+pf_game_ready :: proc(self: ^PfGame) {}
+ODIN
+"$SGEN" "$pf" -godot:"$ROOT" >"$pf/out2.log" 2>&1 || fail "the reordered profile fixture must generate"
+fp2=$(grep -oE "NET_FINGERPRINT :: u64\(0x[0-9a-f]+\)" "$pf/odin_godot_guard.gen.odin")
+[[ -n "$fp1" && -n "$fp2" && "$fp1" != "$fp2" ]] \
+	|| fail "same-size profile layout drift must move NET_FINGERPRINT (got $fp1 then $fp2)"
+
+# The misuses, all three loud in one run: the tag off the Session field, a row
+# type that resolves to nothing, and a class with no ready to wire.
+pe="$work/proferr"
+mkdir -p "$pe"
+cat >"$pe/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class PeGame
+package pe
+import gd "godot:godot"
+import ksess "godot:kit/session"
+
+Loadout :: struct { look: u8 }
+
+PeGame :: struct {
+	owner: gd.Node,
+	bad:   i32 `gd:"profile=Loadout"`,
+	ses:   ksess.Session `gd:"profile=Nope"`,
+}
+ODIN
+"$SGEN" "$pe" -godot:"$ROOT" >"$pe/out.log" 2>&1
+rc=$?
+[[ $rc -ne 0 ]] || fail "the profile-misuse fixture must fail the build"
+grep -q "belongs on the ksess.Session field" "$pe/out.log" || fail "a profile tag off the Session field must say where it goes"
+grep -q 'no struct "Nope"' "$pe/out.log" || fail "an unresolvable row type must be named"
+grep -q "needs a \`pe_game_ready\`" "$pe/out.log" || fail "a profile without a ready must ask for one"
+
 echo "SCRIPTGEN_OK"

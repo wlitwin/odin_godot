@@ -265,9 +265,11 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 		return
 	}
 
-	// `gd:"replicate,…"` is the kit/net toolkit's tag — consumed entirely by
-	// scriptgen (Entity_Desc tables); nothing to reflect at runtime.
-	if tok0 == "replicate" {
+	// The kit toolkit's tags — consumed entirely by scriptgen (descriptor
+	// tables, backup codecs, the profile install, sim-block wiring); nothing
+	// to reflect at runtime. `backup` spent a while missing from this skip
+	// and every backup field logged a bogus "unknown gd tag" at boot.
+	if tok0 == "replicate" || tok0 == "backup" || tok0 == "manual" || strings.has_prefix(tok0, "profile=") {
 		return
 	}
 

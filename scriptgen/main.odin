@@ -570,6 +570,11 @@ Script :: struct {
 	succ_took_over: string, // `<snake>_took_over(self, r)` — heir: read blob + mend
 	succ_wiped:     string, // `<snake>_wiped(self)` — non-entity pools, post-wipe
 	succ_migrating: string, // `<snake>_migrating(self, step, target, try)` — the words
+
+	// `gd:"profile=Type"` on the ksess.Session field: the session-profile
+	// row type — folded into NET_FINGERPRINT, installed in the ready thunk.
+	profile_type: string, // the row struct's name ("" = none declared)
+	profile_ses:  string, // the Session field the install targets
 }
 
 // One session event a game shell paired a half with. The BARE half fires
@@ -1342,6 +1347,7 @@ main :: proc() {
 		resolve_census(&pend.script, proc_names)
 		resolve_probes(&pend.script, by_struct, proc_names)
 		resolve_boot_forwards(&pend.script)
+		resolve_profile(&pend.script, scripts_dir)
 	}
 	{
 		// The lane's module-wide contracts: one input struct, one wired class.
@@ -1388,7 +1394,7 @@ main :: proc() {
 		// plain exports) skip it: no kit import, no session to gate.
 		kit_wire := false
 		for s in all_scripts {
-			if len(s.replicates) > 0 || len(s.commands) > 0 || len(s.entities) > 0 || s.tick.proc_name != "" {
+			if len(s.replicates) > 0 || len(s.commands) > 0 || len(s.entities) > 0 || s.tick.proc_name != "" || s.profile_type != "" {
 				kit_wire = true
 				break
 			}
@@ -1684,6 +1690,36 @@ fnv1a64 :: proc(s: string) -> u64 {
 // harmless: rebuild both ends); a type change under-refusing would be the
 // silent-garbage disaster the fingerprint exists to prevent. The session
 // folds its own PROTOCOL_REV in before the wire, so kit upgrades refuse too.
+// `gd:"profile=Type"`'s module contract: the row type must exist beside the
+// game (the fingerprint hashes its fields; a name that resolves to nothing
+// would silently hash to nothing), and the class needs a ready — the
+// generated install lives in the ready thunk.
+resolve_profile :: proc(s: ^Script, scripts_dir: string) {
+	if s.profile_type == "" {
+		return
+	}
+	has_ready := false
+	for lc in s.lifecycles {
+		if lc.keyword == "ready" {has_ready = true; break}
+	}
+	if !has_ready {
+		errorf(
+			"%s: gd:\"profile=%s\" needs a `%s_ready` — the generated session_profile_install is wired into the ready thunk",
+			s.struct_name, s.profile_type, to_snake(s.struct_name),
+		)
+	}
+	dir := strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\")
+	index_pkg_dir(dir)
+	if pkg, ok := g_pkgs[dir]; ok {
+		if _, has := pkg[s.profile_type]; !has {
+			errorf(
+				"%s: gd:\"profile=%s\" — no struct %q in this package (the row type lives beside the game; it is POD, ≤ ksess.PROFILE_MAX_SIZE)",
+				s.struct_name, s.profile_type, s.profile_type,
+			)
+		}
+	}
+}
+
 net_fingerprint :: proc(scripts: []^Script, scripts_dir: string) -> u64 {
 	b: strings.Builder
 	strings.builder_init(&b, context.temp_allocator)
@@ -1775,6 +1811,23 @@ net_fingerprint :: proc(scripts: []^Script, scripts_dir: string) -> u64 {
 			if def, has := pkg[name]; has {
 				for f in def.fields {
 					fmt.sbprintf(&b, "in %s.%s:%s\n", name, f.name, f.type_text)
+				}
+			}
+		}
+		// The profile row (gd:"profile=T"), same reasoning: the row IS the
+		// wire bytes, so its field-by-field shape gates the join — same-size
+		// layout drift used to scramble rows PAST the version door.
+		profs := make([dynamic]string, context.temp_allocator)
+		for s in sorted {
+			if s.profile_type != "" && !slice.contains(profs[:], s.profile_type) {
+				append(&profs, s.profile_type)
+			}
+		}
+		slice.sort(profs[:])
+		for name in profs {
+			if def, has := pkg[name]; has {
+				for f in def.fields {
+					fmt.sbprintf(&b, "profile %s.%s:%s\n", name, f.name, f.type_text)
 				}
 			}
 		}

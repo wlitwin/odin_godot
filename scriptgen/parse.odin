@@ -693,6 +693,34 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			continue
 		}
 
+		// friendslop toolkit: `gd:"profile=Type"` on the class's ksess.Session
+		// field — the DECLARATION form of session_profile_install: the named
+		// POD struct is this game's per-player profile row. scriptgen folds
+		// the row's field-by-field shape into NET_FINGERPRINT (a drifted
+		// profile refuses the join like any other wire skew — the raw install
+		// call left it outside the version door: same-size drift scrambled
+		// rows silently) and installs it inside the generated ready thunk,
+		// before the game's ready can *_start.
+		if strings.has_prefix(tok0, "profile=") {
+			pt := strings.trim_space(tok0[len("profile="):])
+			switch {
+			case pt == "":
+				error_at(floc, "%s.%s: `profile=` names the row struct, e.g. gd:\"profile=Loadout\"", s.struct_name, field_label)
+			case !strings.has_suffix(type_text, ".Session") && type_text != "Session":
+				error_at(floc, "%s.%s: `profile=` belongs on the ksess.Session field (got %q) — the row installs into that session", s.struct_name, field_label, type_text)
+			case s.profile_type != "":
+				error_at(floc, "%s.%s: a second profile declaration (%q; already %q) — one row type per session", s.struct_name, field_label, pt, s.profile_type)
+			case len(f.names) != 1:
+				error_at(floc, "%s.%s: one session field per profile declaration", s.struct_name, field_label)
+			case:
+				s.profile_type = pt
+				if ident, iok := f.names[0].derived.(^ast.Ident); iok && ident != nil {
+					s.profile_ses = ident.name
+				}
+			}
+			continue
+		}
+
 		if tok0 != "export" {
 			if strings.has_prefix(tok0, "args=") {
 				error_at(

@@ -166,7 +166,7 @@ generate :: proc(s: ^Script) -> string {
 	// build kboot.Entity_Kind rows; the lane wiring names ksess.Session; the
 	// standard transport forwards route into netgd/ksess; the boot-routed step
 	// and the session-event dispatch name ksess too.
-	if len(s.entities) > 0 || has_lane_wiring || len(s.std_forwards) > 0 || s.step_boot || len(s.event_halves) > 0 || has_succ {
+	if len(s.entities) > 0 || has_lane_wiring || len(s.std_forwards) > 0 || s.step_boot || len(s.event_halves) > 0 || has_succ || s.profile_type != "" {
 		w(&b, "import ksess \"godot:kit/session\"\n")
 	}
 	// The unified `<verb>_cmd` wrappers take the game's one handle (^kboot.Boot)
@@ -259,6 +259,13 @@ generate :: proc(s: ^Script) -> string {
 		} else {
 			fmt.sbprintf(&b, "@(private = \"file\")\n%s :: proc \"c\" (self_raw: rawptr) {{\n", fname)
 			w(&b, "\tcontext = rt.script_context()\n")
+			if lc.keyword == "ready" && s.profile_type != "" {
+				// gd:"profile=T" — the declaration form of session_profile_install:
+				// wired BEFORE the game's ready so a ready that *_starts (role
+				// launches do) already has the row type installed. The install's
+				// own #asserts hold the POD/size contract against the named type.
+				fmt.sbprintf(&b, "\tksess.session_profile_install(&(cast(^%s)self_raw).%s, %s) // gd:\"profile\"\n", cls, s.profile_ses, s.profile_type)
+			}
 			fmt.sbprintf(&b, "\t%s(cast(^%s)self_raw)\n}}\n\n", lc.proc_name, cls)
 		}
 	}

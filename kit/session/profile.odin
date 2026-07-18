@@ -7,7 +7,12 @@ package kit_session
 //
 //   Pick :: struct { look, iron: u8, ready: bool }
 //
-//   // ready(), before *_start (pre-start wiring, like the transport):
+//   // THE DECLARATION (scriptgen games): tag the Session field — the install
+//   // generates into the ready thunk and the row's shape folds into the wire
+//   // fingerprint, so a drifted Pick refuses the join at the version door:
+//   ses: ksess.Session `gd:"profile=Pick"`
+//
+//   // (raw kit consumers install by hand — ready(), before *_start:)
 //   ksess.session_profile_install(&self.ses, Pick)
 //
 //   // MY row — write freely, read instantly (the local echo is the row):
@@ -64,10 +69,14 @@ Profile_Table :: struct {
 	dirty:  bool, // host: relay goes out on the next low-rate tick
 }
 
-// Install the profile type — pre-start wiring, both ends, same T. A build
-// whose T differs in SIZE degrades to dropped rows (never a torn one);
-// folding the profile type into the generated wire fingerprint arrives with
-// the scriptgen declaration form.
+// Install the profile type — pre-start wiring, both ends, same T. Scriptgen
+// games declare it instead (`ses: ksess.Session \`gd:"profile=T"\`` — the
+// install generates into the ready thunk AND the row's field-by-field shape
+// folds into NET_FINGERPRINT, so profile drift refuses the join). A raw
+// consumer calling this directly keeps the runtime guard only: a T that
+// differs in SIZE degrades to dropped rows (never a torn one) — but a
+// SAME-SIZE layout drift misreads rows silently; the declaration form is
+// how that gets caught.
 session_profile_install :: proc(s: ^Session, $T: typeid) {
 	#assert(size_of(T) <= PROFILE_MAX_SIZE, "a profile row is a loadout, not an inventory dump — shrink it or blob it")
 	#assert(intrinsics.type_is_nearly_simple_compare(T) && !intrinsics.type_is_pointer(T), "profile rows are POD — no strings, slices, maps, or pointers (the row IS the wire bytes)")

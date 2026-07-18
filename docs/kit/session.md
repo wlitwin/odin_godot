@@ -363,8 +363,11 @@ columns and hand-serialized app messages:
 ```odin
 Pick :: struct { look, iron: u8, ready: bool }
 
-// ready(), before *_start — both ends install the same type:
-ksess.session_profile_install(&self.ses, Pick)
+// THE DECLARATION — tag the Session field; the install generates into the
+// ready thunk, and Pick's field-by-field shape folds into the wire
+// fingerprint (a build whose Pick drifted — even at the SAME size — is
+// refused at the join door, not scrambled silently):
+ses: ksess.Session `gd:"profile=Pick"`
 
 // MY row: write freely, read instantly — the local echo IS the row
 // (a click that lagged its own screen by the relay cadence read as broken):
@@ -380,7 +383,10 @@ for p in ksess.session_roster(&self.ses) {
 There is no declare call to remember: the session diffs your row once per
 net tick and ships the change; the host relays the table at the stats
 cadence, sends the lot to late joiners behind their welcome, and every peer
-already holds every row when a takeover makes one of them the host.
+already holds every row when a takeover makes one of them the host. (A raw
+kit consumer without scriptgen installs by hand —
+`ksess.session_profile_install(&ses, Pick)` in ready, before `*_start` —
+and forfeits the fingerprint gate on the row's shape.)
 `Ev_Profile_Changed{player}` fires wherever a *view* of a row changed (never
 for your own local writes) — and it pairs like every session event: a
 `<game>_profile_changed(self, player)` half fires where views change, and
