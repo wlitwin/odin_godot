@@ -1040,6 +1040,69 @@ registry_delta_replays_pending_prediction :: proc(t: ^testing.T) {
 	testing.expect_value(t, host.hp, i32(18))
 }
 
+// A TORN batch must not outlive itself: the unwind has already run when the
+// tear is noticed, so the replay and the shadow bless must run anyway. The
+// old code broke between the halves — the prediction visibly vanished (the
+// entity sat at its unwound baseline) and the pendings kept stale reverts
+// for the next reconcile to re-restore.
+@(test)
+registry_truncated_delta_still_replays :: proc(t: ^testing.T) {
+	pdesc := probe_desc()
+	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+
+	sreg := knet.registry_make()
+	defer knet.registry_destroy(&sreg)
+	host := Probe{hp = 10}
+	id := knet.registry_spawn(&sreg, &host, &pset)
+
+	creg := knet.registry_make()
+	defer knet.registry_destroy(&creg)
+	client := Probe{hp = 10}
+	knet.registry_insert(&creg, id, &client, &pset)
+	knet.registry_commit_shadows(&sreg)
+
+	cap := Capture{}
+	defer capture_destroy(&cap)
+	cctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&cctx)
+	cctx.send = capture_send
+	cctx.send_user = &cap
+	hctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&hctx)
+	hctx.is_authority = true
+
+	// Two predicted adds in flight: +5 then +3 — the client shows 18.
+	knet.command_begin(&cctx, id, CMD_ADD)
+	knet.write_i32(&cctx.msg, 5)
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	knet.command_begin(&cctx, id, CMD_ADD)
+	knet.write_i32(&cctx.msg, 3)
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	testing.expect_value(t, client.hp, i32(18))
+
+	// The host's own tick moves hp to 12; the delta arrives TRUNCATED inside
+	// the field bytes. Nothing applies (per-field bounds check), but the
+	// predictions must still stand replayed on the unwound baseline.
+	host.hp = 12
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	testing.expect_value(t, knet.registry_write_deltas(&w, &sreg), 1)
+	full := knet.writer_bytes(&w)
+	torn := knet.reader_make(full[:len(full) - 2])
+	testing.expect_value(t, knet.registry_apply_deltas(&torn, &creg, &cctx), 0)
+	testing.expect(t, torn.err)
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 2)
+	testing.expect_value(t, client.hp, i32(18)) // 10 baseline + replayed +5 +3
+
+	// No cascade: the same delta arriving WHOLE (reliable retransmit) then
+	// reconciles cleanly — authoritative 12 under the replayed predictions.
+	whole := knet.reader_make(full)
+	testing.expect_value(t, knet.registry_apply_deltas(&whole, &creg, &cctx), 1)
+	testing.expect(t, !whole.err)
+	testing.expect_value(t, client.hp, i32(20)) // 12 + 5 + 3
+	testing.expect_value(t, knet.pending_count(&cctx.pending), 2)
+}
+
 @(test)
 registry_delta_untouched_fields_do_not_double_apply :: proc(t: ^testing.T) {
 	pdesc := probe_desc()

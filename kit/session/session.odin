@@ -1509,11 +1509,16 @@ net_tick :: proc(s: ^Session) {
 	}
 }
 
-// Transport-level "everyone but me" (engine semantics: netgd relays peer 0 to
-// all other peers, server-relayed for clients). World traffic uses this — only
-// the HOST knows other players' transport peers, but any peer may own streamed
+// Transport-level "everyone but me". World traffic uses this — only the HOST
+// knows other players' transport peers, but any peer may own streamed
 // entities. Roster messages stay host-targeted (they need per-peer exclusion).
-BROADCAST_PEER :: Peer_Id(0)
+//
+// DELIBERATELY NOT 0: zero is NO_PEER, a disconnected seat's peer — and for
+// years the two aliased, so a departed player's peer accidentally handed to
+// send() became a broadcast instead of a bug. The transport translates: netgd
+// maps this sentinel to the engine's broadcast id (0) at the boundary and
+// DROPS a NO_PEER send as the upstream mistake it is.
+BROADCAST_PEER :: Peer_Id(-1)
 
 @(private) // interest.odin composes per-peer sends beside this
 broadcast :: proc(s: ^Session, bytes: []u8, channel: Channel) {
@@ -1567,6 +1572,7 @@ backup_target :: proc(s: ^Session) -> knet.Player_Id {
 // Layout: [next_player u64]
 //         [cols u8] x [name string]
 //         [players u16] x ([id u64][name string][token_hash u64][cols x i64])
+//         [locked bool][denied u16] x ([token_hash u64][id u64])
 //         [next_net_id u32]
 //         [entities u16] x the SES_SPAWN tuple
 session_snapshot :: proc(s: ^Session, w: ^knet.Writer) {
@@ -1592,6 +1598,16 @@ session_snapshot :: proc(s: ^Session, w: ^knet.Writer) {
 		for i in 0 ..< len(s.stat_names) {
 			knet.write_i64(w, row[i])
 		}
+	}
+	// The DOOR travels with the roster: a ban outlives the host that issued
+	// it and a locked room stays locked through a takeover — otherwise the
+	// kicked-with-ban player just waits for the migration and walks back in.
+	knet.write_bool(w, s.locked)
+	assert(len(s.denied) <= int(max(u16)))
+	knet.write_u16(w, u16(len(s.denied)))
+	for h, id in s.denied {
+		knet.write_u64(w, h)
+		knet.write_player_id(w, id)
 	}
 	knet.write_u32(w, u32(s.reg.next_id))
 	assert(knet.registry_count(&s.reg) <= int(max(u16)))
@@ -1755,13 +1771,24 @@ session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backu
 		s.players[id] = Player {
 			id        = id,
 			name      = strings.clone(mine ? name : pname),
-			peer      = mine ? HOST_PEER : 0,
+			peer      = mine ? HOST_PEER : NO_PEER,
 			connected = mine,
 		}
 		if hash != 0 {
 			s.tokens[hash] = id
 		}
 		s.stats[id] = row
+	}
+	// The door: bans + the lock survive the takeover (written by
+	// session_snapshot right after the roster).
+	s.locked = knet.read_bool(&r)
+	nden := int(knet.read_u16(&r))
+	if r.err {
+		return false
+	}
+	for _ in 0 ..< nden {
+		h := knet.read_u64(&r)
+		s.denied[h] = knet.read_player_id(&r)
 	}
 	next_net := knet.Net_Id(knet.read_u32(&r))
 	entities := int(knet.read_u16(&r))
@@ -2190,7 +2217,7 @@ session_client_join :: proc(s: ^Session) {
 // The kit's own wire revision, folded into every nonzero fingerprint before it
 // rides SES_JOIN — a kit upgrade that changes the wire then refuses skewed
 // peers even when the game's declarations didn't move. Bump on wire changes.
-PROTOCOL_REV :: u64(4) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: the wire frame byte carries the stream-channel bit (netgd) · 4: SIM_FACT carries a fact kind (declared world-pass facts)
+PROTOCOL_REV :: u64(5) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: the wire frame byte carries the stream-channel bit (netgd) · 4: SIM_FACT carries a fact kind (declared world-pass facts) · 5: the re-hostable snapshot carries the door (locked + denied)
 
 @(private = "file")
 FP_SALT :: u64(0x9E3779B97F4A7C15) + PROTOCOL_REV // the golden-ratio constant, rev-shifted
@@ -2352,7 +2379,7 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		}
 		if p, had := s.players[id]; had {
 			p.connected = false
-			p.peer = 0
+			p.peer = NO_PEER
 			s.players[id] = p
 			append(&s.events, Ev_Player_Left{id = id})
 		}

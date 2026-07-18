@@ -72,7 +72,7 @@ box_destroy :: proc(b: ^Peer_Box) {
 }
 
 // Deliver every queued message (including ones queued by handling) until the
-// network is quiet. `to == BROADCAST_PEER (0)` reaches everyone but the sender,
+// network is quiet. `to == BROADCAST_PEER` reaches everyone but the sender,
 // matching the transport's relay semantics.
 pump :: proc(boxes: []^Peer_Box) {
 	for progress := true; progress; {
@@ -1139,6 +1139,65 @@ kick_with_ban_shuts_the_door :: proc(t: ^testing.T) {
 	testing.expect(t, !again)
 	_, self_kick := ksess.session_kick(&host.s, 1)
 	testing.expect(t, !self_kick)
+}
+
+// The DOOR survives a takeover: bans and the lock ride the re-hostable
+// snapshot. Without them, a kicked-with-ban player just waited for the host
+// to die and walked back into the resumed run.
+@(test)
+ban_and_lock_survive_resume :: proc(t: ^testing.T) {
+	host, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &bob}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+
+	_, kicked := ksess.session_kick(&host.s, 2, ban = true)
+	testing.expect(t, kicked)
+	pump(boxes)
+	ksess.session_set_locked(&host.s, true)
+
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	ksess.session_snapshot(&host.s, &w)
+
+	host2: Peer_Box
+	box_make(&host2, 1)
+	defer box_destroy(&host2)
+	testing.expect(t, ksess.session_host_resume(&host2.s, 1, "hosty", knet.writer_bytes(&w)))
+	testing.expect(t, host2.s.locked, "the lock rode the snapshot")
+
+	// The banned token bounces off the RESUMED host.
+	bob2: Peer_Box
+	box_make(&bob2, 300)
+	defer box_destroy(&bob2)
+	ksess.session_client_start(&bob2.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob2.s)
+	pump([]^Peer_Box{&host2, &bob2})
+	dev := drain(&bob2.s)
+	testing.expect_value(t, len(dev), 1)
+	d, denied := dev[0].(ksess.Ev_Join_Denied)
+	testing.expect(t, denied)
+	testing.expect_value(t, d.reason, ksess.Deny_Reason.Banned)
+
+	// A stranger hits the surviving lock (bans check first; the lock is next).
+	carol: Peer_Box
+	box_make(&carol, 400)
+	defer box_destroy(&carol)
+	ksess.session_client_start(&carol.s, u64(0xCA401), "carol")
+	ksess.session_client_join(&carol.s)
+	pump([]^Peer_Box{&host2, &carol})
+	cev := drain(&carol.s)
+	testing.expect_value(t, len(cev), 1)
+	c, cden := cev[0].(ksess.Ev_Join_Denied)
+	testing.expect(t, cden)
+	testing.expect_value(t, c.reason, ksess.Deny_Reason.Locked)
 }
 
 @(test)

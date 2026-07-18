@@ -151,8 +151,27 @@ when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 @(private = "file")
 WIRE_STREAM_BIT :: u8(0x80)
 
+// Kit peer → engine peer, the sentinel boundary: kit's BROADCAST_PEER (-1)
+// becomes the engine's broadcast id (0). NEVER cast a ksess.Peer_Id to int
+// yourself — a raw -1 reaches the engine as "all except peer 1", which
+// silently excludes the SERVER from every broadcast. Hand-rolled Send_Procs
+// (the raw-layer path) route through this; ok=false means NO_PEER — a
+// disconnected seat's peer reached the transport, drop the send (the old
+// 0-aliasing turned exactly that mistake into an accidental broadcast).
+wire_engine_peer :: proc(to_peer: ksess.Peer_Id) -> (engine_peer: int, ok: bool) {
+	if to_peer == ksess.NO_PEER {
+		return 0, false
+	}
+	return to_peer == ksess.BROADCAST_PEER ? 0 : int(to_peer), true
+}
+
 @(private = "file")
 wire_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
+	assert(to_peer != ksess.NO_PEER, "send to NO_PEER — a disconnected seat's peer reached the transport (check p.connected before sending)")
+	engine_peer, peer_ok := wire_engine_peer(to_peer)
+	if !peer_ok {
+		return
+	}
 	wire := cast(^Session_Wire)user
 	if len(bytes) > 0 {
 		tag := len(bytes) > 1 ? bytes[1] : 0
@@ -163,9 +182,9 @@ wire_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ks
 	knet.write_u8(&w, channel == .Stream ? wire.kind | WIRE_STREAM_BIT : wire.kind)
 	append(&w.buf, ..bytes)
 	if channel == .Stream {
-		_ = send_stream(wire.node, int(to_peer), knet.writer_bytes(&w))
+		_ = send_stream(wire.node, engine_peer, knet.writer_bytes(&w))
 	} else {
-		_ = send_reliable(wire.node, int(to_peer), knet.writer_bytes(&w))
+		_ = send_reliable(wire.node, engine_peer, knet.writer_bytes(&w))
 	}
 }
 

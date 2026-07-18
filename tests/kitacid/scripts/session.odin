@@ -96,11 +96,18 @@ session_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel:
 	defer knet.writer_destroy(&w)
 	knet.write_u8(&w, MSG_SESSION)
 	append(&w.buf, ..bytes)
+	// The raw path pays the transport's dues itself: BROADCAST_PEER (-1)
+	// must become the engine's broadcast id — a bare int cast reaches the
+	// engine as "all except peer 1" and silently excludes the server.
+	engine_peer, peer_ok := netgd.wire_engine_peer(to_peer)
+	if !peer_ok {
+		return
+	}
 	err: gd.Error
 	if channel == .Stream {
-		err = netgd.send_stream(self.owner, int(to_peer), knet.writer_bytes(&w))
+		err = netgd.send_stream(self.owner, engine_peer, knet.writer_bytes(&w))
 	} else {
-		err = netgd.send_reliable(self.owner, int(to_peer), knet.writer_bytes(&w))
+		err = netgd.send_reliable(self.owner, engine_peer, knet.writer_bytes(&w))
 	}
 	if err != .Ok {
 		gd.print_str(fmt.tprintf("ACID_ERR session send err=%v", err))

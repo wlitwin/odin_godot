@@ -349,8 +349,12 @@ write_delta :: proc(w: ^Writer, entity: rawptr, shadow: []u8, desc: ^Entity_Desc
 // Apply a delta produced by write_delta. Returns the mask so higher layers can
 // fire per-field change notifications (transition observers). On a truncated
 // packet the reader's sticky error is set and the entity is left partially
-// updated — the caller must check r.err and discard the whole packet's effects
-// (packets are applied into a staging copy at the session layer when that matters).
+// updated — the per-field bounds check contains the tear to this entity's
+// later fields; there is NO staging copy anywhere. The containment that
+// matters lives in registry_apply_deltas: even on the error path it still
+// replays pendings and blesses shadows, so a bad packet's damage is torn
+// fields from a TRUSTED host, never a corrupted reconcile baseline. The
+// session counts the drop (session_malformed).
 apply_delta :: proc(r: ^Reader, entity: rawptr, desc: ^Entity_Desc) -> u64 {
 	mask := read_mask(r, mask_bytes(desc))
 	for f, i in desc.fields {

@@ -308,9 +308,14 @@ registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = ni
 			unwind_pending(ctx, e)
 		}
 		_ = apply_delta(r, e.entity, e.set.entity_desc)
-		if r.err {
-			break
-		}
+		// A truncated batch stops mid-entity (apply_delta's per-field bounds
+		// checks contain the tear to one entity's later fields) — but the
+		// UNWIND above already ran, so the replay and the bless below MUST
+		// still run even on the error path: skipping them left pendings
+		// holding stale reverts (the next reconcile re-restored dead bytes)
+		// and unblessed framework writes (a write-guard false positive). The
+		// damage from a bad packet must never outlive the packet.
+		bad := r.err
 		if reconcile {
 			replay_pending(ctx, e)
 		}
@@ -320,6 +325,9 @@ registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = ni
 		// pending's speculation is legal (the guard skips pending entities),
 		// and its retirement re-blesses.
 		shadow_capture(e.entity, e.shadow, e.set.entity_desc)
+		if bad {
+			break // the count reports FULLY applied entities; this one tore
+		}
 		if changed != nil {
 			append(changed, id)
 		}
