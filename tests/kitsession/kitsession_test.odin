@@ -14,6 +14,19 @@ import kcombat "godot:kit/combat"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
+// The default wire fingerprint, set ONCE at load — exactly the shape the
+// generated guard file's @(init) gives a real game, and the only shape that
+// is safe: tests run in PARALLEL threads over package globals, so a test
+// that mutated this mid-run would race every concurrently-joining session
+// into a .Version denial (three seat-count tests once failed exactly that
+// way). Every fingerprint-less session in this binary now gates on 0xF00D
+// (both ends match, so nothing changes for them); opting OUT is
+// FINGERPRINT_NONE, the production story.
+@(init)
+_test_default_fingerprint :: proc "contextless" () {
+	ksess.default_net_fingerprint = 0xF00D
+}
+
 Envelope :: struct {
 	to:   ksess.Peer_Id,
 	data: []u8,
@@ -1880,10 +1893,13 @@ unchecked_fingerprint_opts_out :: proc(t: ^testing.T) {
 	defer box_destroy(&host)
 	defer box_destroy(&alice)
 
-	// Host doesn't check (fingerprint 0): a checked client still seats — the
-	// authority owns the door, and an unchecked authority holds it open.
+	// Host opts OUT on purpose (FINGERPRINT_NONE — with a generated default
+	// registered, 0 means "use it", so the deliberate no-gate needs the
+	// sentinel): a checked client still seats — the authority owns the door,
+	// and an unchecked authority holds it open.
+	ksess.session_configure(&host.s, {fingerprint = ksess.FINGERPRINT_NONE})
 	ksess.session_host_start(&host.s, "hosty")
-	ksess.session_configure(&alice.s, {fingerprint = 0xF00D})
+	ksess.session_configure(&alice.s, {fingerprint = 0xBEEF})
 	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
 	ksess.session_client_join(&alice.s)
 	pump([]^Peer_Box{&host, &alice})
@@ -1894,11 +1910,9 @@ unchecked_fingerprint_opts_out :: proc(t: ^testing.T) {
 default_fingerprint_gates_without_wiring :: proc(t: ^testing.T) {
 	// The generated guard file registers NET_FINGERPRINT as the session
 	// default at load — games wire nothing and the version door is closed.
-	// Pin the fallthrough: cfg 0 means "use the default", an explicit value
-	// still overrides, and FINGERPRINT_NONE opts out on purpose.
-	ksess.default_net_fingerprint = 0xF00D
-	defer ksess.default_net_fingerprint = 0
-
+	// Pin the fallthrough: cfg 0 means "use the default" (the package @(init)
+	// above set 0xF00D, load-time like production), an explicit value still
+	// overrides, and FINGERPRINT_NONE opts out on purpose.
 	host, alice, bob, carol: Peer_Box
 	box_make(&host, 1)
 	box_make(&alice, 100)

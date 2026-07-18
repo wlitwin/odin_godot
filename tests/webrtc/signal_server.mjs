@@ -13,12 +13,15 @@
 // Wire protocol (raw WebSocket, JSON text frames; production server path is `/rtc`):
 //   client -> server:
 //     {"type":"create"}                                  // make a room, become host (id 1)
-//     {"type":"join","room":"<CODE>"}                    // join a room
-//     {"type":"signal","to":<peerId>,"data":<opaque>}    // relay SDP/ICE to a peer
+//     {"type":"create","native":true,"udp":<port>}       // NATIVE (ENet) room: code + endpoint broker
+//     {"type":"join","room":"<CODE>"}                    // join a room (native rooms too; add "udp" for the punch)
+//     {"type":"signal","to":<peerId>,"data":<opaque>}    // relay SDP/ICE to a peer (WebRTC rooms)
 //     {"type":"leave"}
 //   server -> client:
 //     {"type":"created","room":"<CODE>","id":1}
 //     {"type":"joined","room":"<CODE>","id":<n>}
+//     {"type":"native","room":"<CODE>","id":<n>,"host":{"ip":..,"port":..}}  // joiner: point ENet here
+//     {"type":"native_peer","id":<n>,"ip":..,"udp":..}   // native host: a joiner's endpoint (punch it)
 //     {"type":"peer","id":<peerId>}                      // host: one per joiner; joiner: the host
 //     {"type":"signal","from":<peerId>,"data":<opaque>}
 //     {"type":"peer_left","id":<peerId>}
@@ -76,9 +79,10 @@ function leave(sock) {
   console.log(`signal: id=${sock._id} left room ${code}`);
 }
 
-wss.on("connection", (sock) => {
+wss.on("connection", (sock, req) => {
   sock._room = null;
   sock._id = 0;
+  sock._addr = req?.socket?.remoteAddress ?? "127.0.0.1";
 
   sock.on("message", (data, isBinary) => {
     const text = isBinary ? data.toString("utf8") : data.toString();
@@ -103,10 +107,19 @@ wss.on("connection", (sock) => {
         let code = (typeof msg.room === "string" && /^[A-Za-z0-9]{4,8}$/.test(msg.room))
           ? msg.room.toUpperCase() : null;
         if (!code || rooms.has(code)) code = newCode();
-        rooms.set(code, { peers: new Map([[1, sock]]), nextId: 2 });
+        // NATIVE mode: the room brokers an ENet rendezvous instead of SDP —
+        // the host declares its UDP port; the relay pairs it with the host's
+        // OBSERVED address so a joiner learns where to point ENet. Codes share
+        // one namespace with WebRTC rooms.
+        const native = msg.native === true && Number.isInteger(msg.udp);
+        rooms.set(code, {
+          peers: new Map([[1, sock]]), nextId: 2,
+          native, udp: native ? msg.udp : 0,
+          hostIp: sock._addr,
+        });
         sock._room = code; sock._id = 1;
-        send(sock, { type: "created", room: code, id: 1, ice: ICE });
-        console.log(`signal: host created room ${code} (id=1)`);
+        send(sock, { type: "created", room: code, id: 1, ice: ICE, native });
+        console.log(`signal: host created ${native ? "native " : ""}room ${code} (id=1)`);
         break;
       }
 
@@ -118,6 +131,17 @@ wss.on("connection", (sock) => {
         const id = r.nextId++;
         sock._room = code; sock._id = id;
         r.peers.set(id, sock);
+        if (r.native) {
+          // ENet rendezvous: hand the joiner the host's endpoint, and the host
+          // the joiner's observed address + claimed UDP port (for the punch).
+          // IPv6-mapped IPv4 ("::ffff:1.2.3.4") is unwrapped for ENet.
+          const unmap = (a) => a && a.startsWith("::ffff:") ? a.slice(7) : a;
+          const jip = unmap(sock._addr);
+          send(sock, { type: "native", room: code, id, host: { ip: unmap(r.hostIp), port: r.udp } });
+          send(r.peers.get(1), { type: "native_peer", id, ip: jip, udp: Number.isInteger(msg.udp) ? msg.udp : 0 });
+          console.log(`signal: native joiner id=${id} -> room ${code} (host ${unmap(r.hostIp)}:${r.udp})`);
+          break;
+        }
         send(sock, { type: "joined", room: code, id, ice: ICE });
         // Introduce the joiner and the host to each other — and ONLY to each other: in the
         // star, joiners never handshake among themselves. The host then creates the offer.

@@ -518,3 +518,25 @@ web_poll :: proc(wire: ^Session_Wire) {
 web_close :: proc(wire: ^Session_Wire) {
 	gd.webrtc_close(wire.node)
 }
+
+// wire_punch — fire a few tiny UDP packets from this wire's own bound ENet
+// socket at a joiner's observed endpoint (kit/netgd code.odin's rendezvous):
+// garbage to ENet, gold to the NAT — the joiner's inbound connect then meets
+// a warm outbound mapping. ENet-transport hosts only (the code door is an
+// ENet feature; begin_host installed the peer this reaches).
+wire_punch :: proc(wire: ^Session_Wire, ip: cstring, port: int) {
+	mp := gd.node_get_multiplayer(wire.node)
+	if cast(rawptr)mp == nil {return}
+	peer := gd.multiplayer_api_get_multiplayer_peer(mp)
+	if cast(rawptr)peer == nil {return}
+	host := gd.e_net_multiplayer_peer_get_host(cast(gd.E_Net_Multiplayer_Peer)peer)
+	if cast(rawptr)host == nil {return}
+	addr := gd.new_string_cstring(ip)
+	defer gd.free_string(addr)
+	pkt := gd.new_packed_byte_array()
+	defer gd.free_packed_byte_array(pkt)
+	gd.packed_byte_array_push_back(&pkt, 0)
+	for _ in 0 ..< 3 {
+		gd.e_net_connection_socket_send(host, addr, gd.Int(port), pkt)
+	}
+}

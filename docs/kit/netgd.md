@@ -108,6 +108,41 @@ code path on both transports; the branch ends the moment the multiplayer peer in
 [kit/boot](boot.md) wraps both flavors with the stock lobby ceremony: `boot_host` /
 `boot_join` and their `boot_host_web` / `boot_join_web` twins.
 
+### Join codes for NATIVE ENet (code.odin)
+
+"Send your friend a four-letter code" without Steam and without reading out
+an IP: the same relay the browser build already talks to (native room mode —
+`tests/webrtc/signal_server.mjs` is the reference; the production relay
+speaks it at `/rtc`) becomes a phonebook for plain ENet. The host registers
+its bound port under a minted code; a joiner trades the code for the host's
+observed endpoint; the join proceeds exactly as `begin_join` always did.
+
+```odin
+// host, AFTER begin_host(port) succeeded:
+netgd.code_host_open(&rdv, RELAY_URL, port)
+// joiner, INSTEAD of an address:
+netgd.code_join_open(&rdv, RELAY_URL, "KWXP")
+
+// both, every frame, until it resolves:
+switch netgd.code_poll(&rdv, &wire) {
+case .Ready:
+    if rdv.is_host {show(netgd.code_room(&rdv))} // the code to share
+    else {ip, port := netgd.code_endpoint(&rdv); begin_join(&wire, ip, port, token, name)}
+case .Failed: // rdv.err: .No_Room (typo / host gone), .Full, .Closed — say WHY,
+              // then point at the doors that always work (browser, Steam)
+}
+```
+
+`examples/hello_net` is the worked consumer (its `run.sh`'s join-by-code act
+proves the full loop against a local relay). **NAT honesty:** this covers
+the same-LAN pair, the port-forwarded or public host, and the common
+port-preserving home NAT (the relay hands the host each joiner's observed
+endpoint and `wire_punch` warms the mapping with a few UDP packets).
+Symmetric NATs it does NOT cover — there is no TURN for raw ENet; when the
+connect times out, say so and offer the browser build (WebRTC + TURN) and
+Steam, which always work. That trade — a copyable code for most, two spare
+doors for the rest — is the stance.
+
 ## The disconnect signals are NOT optional plumbing
 
 - Unwired `peer_disconnected`: an alt-F4'd client haunts the roster forever, and the host
