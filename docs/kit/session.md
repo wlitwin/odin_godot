@@ -382,11 +382,13 @@ net tick and ships the change; the host relays the table at the stats
 cadence, sends the lot to late joiners behind their welcome, and every peer
 already holds every row when a takeover makes one of them the host.
 `Ev_Profile_Changed{player}` fires wherever a *view* of a row changed (never
-for your own local writes). **The muster recipe**: draw rows from
-`session_roster` + `session_profile_of`; gate the host's START on every
-row's `ready`; on `Ev_Profile_Changed` against a live run, a newly-ready
-row IS the drop-in trigger — spawn them (the spawn waits for the pick, so
-there is no spawn/declare race to lose). Rows are the declarer's word (the
+for your own local writes) — and it pairs like every session event: a
+`<game>_profile_changed(self, player)` half fires where views change, and
+`<game>_profile_changed_then` is the authority's consequence slot. **The
+muster recipe**: draw rows from `session_roster` + `session_profile_of`;
+gate the host's START on every row's `ready`; in `_profile_changed_then`
+against a live run, a newly-ready row IS the drop-in trigger — spawn them
+(the spawn waits for the pick, so there is no spawn/declare race to lose). Rows are the declarer's word (the
 friendslop trust model) — host-*minted* truth (banked currency, dealt
 inventory) belongs in replicated entity fields, not here.
 

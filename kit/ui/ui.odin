@@ -27,6 +27,7 @@ import gd "godot:godot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import "core:fmt"
+import "core:strings"
 
 // Set a node's "text" property from an Odin string. The package's PUBLIC API
 // speaks string, not cstring — callers use fmt.tprintf and never think about
@@ -65,6 +66,8 @@ Lobby :: struct {
 	host_btn:  gd.Button,
 	join_btn:  gd.Button,
 	start_btn: gd.Button, // hidden until the game shows it (host, enough players)
+	code_edit: gd.Line_Edit, // the join-code field — hidden until lobby_show_code
+	code_on:   bool, // the game turned the code field on (menu toggles honor it)
 	rows:      [dynamic]gd.Label, // reused across refreshes
 }
 
@@ -104,6 +107,11 @@ lobby_make :: proc(parent: gd.Node, title: string) -> Lobby {
 	gd.set_string(cast(gd.Object)l.host_btn, "text", "Host")
 	gd.add_child(cast(gd.Node)l.panel, cast(gd.Node)l.host_btn)
 
+	l.code_edit = gd.new_line_edit()
+	gd.set_string(cast(gd.Object)l.code_edit, "placeholder_text", "join code")
+	gd.add_child(cast(gd.Node)l.panel, cast(gd.Node)l.code_edit)
+	gd.set_bool(cast(gd.Object)l.code_edit, "visible", false)
+
 	l.join_btn = gd.new_button()
 	gd.set_string(cast(gd.Object)l.join_btn, "text", "Join")
 	gd.add_child(cast(gd.Node)l.panel, cast(gd.Node)l.join_btn)
@@ -141,6 +149,13 @@ lobby_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene, title: string) -> L
 	l.host_btn = cast(gd.Button)adopt_child(node, "Host", "lobby")
 	l.join_btn = cast(gd.Button)adopt_child(node, "Join", "lobby")
 	l.start_btn = cast(gd.Button)adopt_child(node, "Start", "lobby")
+	// OPTIONAL contract node — a "Code" LineEdit for join-code games. Quiet
+	// when absent: most lobbies never show one (lobby_show_code turns it on).
+	{
+		pat := gd.new_string_cstring("Code")
+		defer gd.free_string(pat)
+		l.code_edit = cast(gd.Line_Edit)gd.node_find_child(node, pat, true, false)
+	}
 	set_text(cast(gd.Object)l.title, title)
 	if cast(rawptr)l.start_btn != nil {
 		gd.set_bool(cast(gd.Object)l.start_btn, "visible", false)
@@ -164,6 +179,30 @@ lobby_show_menu :: proc(l: ^Lobby, menu: bool, start: bool) {
 	gd.set_bool(cast(gd.Object)l.host_btn, "visible", menu)
 	gd.set_bool(cast(gd.Object)l.join_btn, "visible", menu)
 	gd.set_bool(cast(gd.Object)l.start_btn, "visible", start)
+	if cast(rawptr)l.code_edit != nil {
+		gd.set_bool(cast(gd.Object)l.code_edit, "visible", menu && l.code_on)
+	}
+}
+
+// Reveal the join-code field (above the Join button in the stock build; the
+// adopted contract's optional "Code" node). Games with a relay show it once
+// in ready(); Join then reads lobby_code — empty means join by address.
+lobby_show_code :: proc(l: ^Lobby, show: bool) {
+	l.code_on = show
+	if cast(rawptr)l.code_edit != nil {
+		gd.set_bool(cast(gd.Object)l.code_edit, "visible", show)
+	}
+}
+
+// What the human typed in the code field, trimmed and uppercased (the relay
+// mints uppercase codes) — "" when blank or the lobby has no field.
+// Temp-allocated.
+lobby_code :: proc(l: ^Lobby) -> string {
+	if cast(rawptr)l.code_edit == nil {
+		return ""
+	}
+	raw := gd.get_string(cast(gd.Object)l.code_edit, "text", context.temp_allocator)
+	return strings.to_upper(strings.trim_space(raw), context.temp_allocator)
 }
 
 // Repaint the player list from the session: sorted by Player_Id (join order —

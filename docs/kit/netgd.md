@@ -117,6 +117,21 @@ speaks it at `/rtc`) becomes a phonebook for plain ENet. The host registers
 its bound port under a minted code; a joiner trades the code for the host's
 observed endpoint; the join proceeds exactly as `begin_join` always did.
 
+**A kit game uses the boot doors** — same shape as every other door, and
+`boot_pump` runs the whole rendezvous (the host's minted code lands in the
+lobby status and `boot_room_code`; a joiner's resolved endpoint walks through
+`boot_join` on its own; a bad code restores the menu with the reason):
+
+```odin
+// host — instead of boot_host (also: kui.lobby_show_code reveals the stock
+// lobby's code field, and kui.lobby_code reads what the human typed):
+kboot.boot_host_coded(&self.boot, RELAY_URL, port, name)
+// joiner — a CODE instead of an address; no port, no IP:
+kboot.boot_join_code(&self.boot, RELAY_URL, "KWXP", token, name)
+```
+
+Games below the boot (or with their own lobby flow) drive `code.odin` raw:
+
 ```odin
 // host, AFTER begin_host(port) succeeded:
 netgd.code_host_open(&rdv, RELAY_URL, port)
@@ -133,8 +148,9 @@ case .Failed: // rdv.err: .No_Room (typo / host gone), .Full, .Closed — say WH
 }
 ```
 
-`examples/hello_net` is the worked consumer (its `run.sh`'s join-by-code act
-proves the full loop against a local relay). **NAT honesty:** this covers
+`examples/hello_net` is the worked consumer of the boot doors (its `run.sh`
+join-by-code act proves the full loop against a local relay; with
+`HELLO_RELAY` set, its lobby grows the code field). **NAT honesty:** this covers
 the same-LAN pair, the port-forwarded or public host, and the common
 port-preserving home NAT (the relay hands the host each joiner's observed
 endpoint and `wire_punch` warms the mapping with a few UDP packets).

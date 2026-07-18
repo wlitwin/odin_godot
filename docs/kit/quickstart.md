@@ -219,6 +219,10 @@ and the [testing guide](testing.md) is how you grow your own.
   slopball is the worked example.
 - **Save/resume, reconnect, host migration, Steam**: already on — see
   [session.md](session.md) for what the stock stack gave you.
+- **Join codes** ("send your friend `KWXP`" instead of an IP): swap
+  `boot_host` for `boot_host_coded` and join with `boot_join_code` — the
+  living `hello.odin` carries the optional relay branch;
+  [netgd.md](netgd.md#join-codes-for-native-enet-codeodin) has the stance.
 - **Competitive play** (server authority, prediction, lag comp): the sim
   lane — [quickstart-sim.md](quickstart-sim.md) promotes THIS game, then
   [sim.md](sim.md).

@@ -623,6 +623,7 @@ SESSION_EVENTS := [?]Session_Ev {
 	{suffix = "entity_changed", variant = "Ev_Entity_Changed", role = .Client, params = {{"id", "knet.Net_Id", "e.id"}}},
 	{suffix = "owner_changed", variant = "Ev_Owner_Changed", role = .Every, params = {{"id", "knet.Net_Id", "e.id"}, {"owner", "knet.Player_Id", "e.owner"}, {"prev", "knet.Player_Id", "e.prev"}}},
 	{suffix = "stats_updated", variant = "Ev_Stats_Updated", role = .Client, params = {}},
+	{suffix = "profile_changed", variant = "Ev_Profile_Changed", role = .Every, params = {{"player", "knet.Player_Id", "e.player"}}},
 	{suffix = "state_applied", variant = "Ev_State_Applied", role = .Client, params = {{"entities", "int", "e.entities"}}},
 	{suffix = "blob_changed", variant = "Ev_Blob_Changed", role = .Every, params = {{"id", "knet.Net_Id", "e.id"}, {"size", "int", "e.size"}}},
 	{suffix = "command_executed", variant = "Ev_Command_Executed", role = .Host, params = {{"ok", "bool", "e.ok"}, {"player", "knet.Player_Id", "e.player"}, {"entity", "knet.Net_Id", "e.entity"}, {"cmd", "u16", "e.cmd"}}},

@@ -139,6 +139,15 @@ Boot :: struct {
 	succ_now:         f64, // boot_pump's clock, for the deferred chase
 	succ_name:        string, // boot-owned clones (door callers pass temps)
 	succ_url:         string,
+
+	// boot_host_coded/boot_join_code's state (the join-code rendezvous,
+	// netgd/code.odin): pumped inside boot_pump — a host's minted code lands
+	// in the lobby status (and boot_room_code), a joiner's resolved endpoint
+	// walks through boot_join automatically.
+	rdv:       netgd.Code_Rendezvous,
+	rdv_seen:  netgd.Code_State, // last state surfaced (status edges once)
+	rdv_token: u64, // joiner's identity, held until the phonebook answers
+	rdv_name:  string, // boot-owned clone (door callers pass temps)
 }
 
 // Install the sim lane (kit/sim), and the boot drives ALL of it: boot_pump
@@ -263,6 +272,12 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 // gating) — and RE-YIELDS every session event plus the comms markers, both
 // temp-allocated, so the game's own switch sees everything.
 boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, marks: []kcomms.Ev_Marker, ticks: int) {
+	boot_code_pulse(b) // the join-code phonebook (no-op unless a coded door opened)
+	if !b.ses.ran {
+		// No session yet — a joiner-by-code waiting on the relay. The pulse
+		// above is the whole frame; its boot_join starts everything else.
+		return
+	}
 	netgd.wire_pump(&b.wire, now)
 	b.succ_now = now
 	boot_succ_pulse(b, now) // the web chase's knock pump (no-op native / idle)
@@ -458,6 +473,99 @@ boot_join_web :: proc(b: ^Boot, url: cstring, room: cstring, token: u64, name: s
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Joining room %s…", room))
 	kui.chat_show(&b.chat, true)
 	return true
+}
+
+// The Host button, JOIN-CODE flavor: a native ENet host (boot_host, ceremony
+// included) that ALSO registers the port with the signaling relay for a
+// copyable room code — the same relay the browser build uses (the production
+// one serves /rtc; tests/webrtc/signal_server.mjs speaks it locally). The
+// code arrives async (one relay round trip): boot_pump lands it in the lobby
+// status, boot_room_code reads it any time. A dead relay demotes to plain
+// hosting — the session stands either way; false means the PORT was taken.
+// A non-empty `room` RESERVES that code when free (succession pre-arranges).
+boot_host_coded :: proc(b: ^Boot, url: cstring, port: int, name: string, max_peers := 32, token: u64 = 0, room := "") -> bool {
+	if !boot_host(b, port, name, max_peers, token) {
+		return false
+	}
+	b.rdv_seen = .Idle
+	if !netgd.code_host_open(&b.rdv, url, port, room) {
+		kui.lobby_set_status(&b.ui, "Hosting — but the relay is unreachable (no code)")
+		return true
+	}
+	kui.lobby_set_status(&b.ui, fmt.tprintf("Hosting on :%d — minting a join code…", port))
+	return true
+}
+
+// The Join button, JOIN-CODE flavor: trade a friend's code for the host's
+// endpoint, then it's a normal ENet join — boot_pump polls the relay and
+// walks through boot_join the moment the phonebook answers (keep calling it;
+// there is no session to pump until then, and it knows). A bad code resolves
+// later in the lobby status (no such room / full / relay gone) with the menu
+// restored; an unreachable host after that as Ev_Join_Failed. false = the
+// relay socket refused outright.
+boot_join_code :: proc(b: ^Boot, url: cstring, code: string, token: u64, name: string) -> bool {
+	if !netgd.code_join_open(&b.rdv, url, code) {
+		kui.lobby_set_status(&b.ui, "Could not reach the relay")
+		return false
+	}
+	b.rdv_seen = .Idle
+	b.rdv_token = token
+	if b.rdv_name != "" {
+		delete(b.rdv_name)
+	}
+	b.rdv_name = strings.clone(name)
+	kui.lobby_show_menu(&b.ui, false, false)
+	kui.lobby_set_status(&b.ui, fmt.tprintf("Looking up %s…", code))
+	kui.chat_show(&b.chat, true)
+	return true
+}
+
+// The minted join code — "" until the relay answers (the lobby status shows
+// it too; this is for games that paint it somewhere of their own).
+boot_room_code :: proc(b: ^Boot) -> string {
+	return b.rdv.is_host ? netgd.code_room(&b.rdv) : ""
+}
+
+// The rendezvous pump: surface state edges in the lobby, complete a joiner's
+// door. A host's socket stays open past .Ready — the relay brokers every
+// later join through it (and each joiner's NAT punch rides the same poll).
+@(private = "file")
+boot_code_pulse :: proc(b: ^Boot) {
+	if !b.rdv.active {
+		return
+	}
+	st := netgd.code_poll(&b.rdv, &b.wire)
+	if st == b.rdv_seen {
+		return
+	}
+	b.rdv_seen = st
+	#partial switch st {
+	case .Ready:
+		if b.rdv.is_host {
+			kui.lobby_set_status(&b.ui, fmt.tprintf("Join code %s — waiting for friends", netgd.code_room(&b.rdv)))
+		} else {
+			// The phonebook answered: a normal ENet join from here on.
+			ip, port := netgd.code_endpoint(&b.rdv)
+			boot_join(b, ip, port, b.rdv_token, b.rdv_name, fmt.tprintf("Code %s accepted — joining...", netgd.code_room(&b.rdv)))
+			netgd.code_close(&b.rdv)
+		}
+	case .Failed:
+		if b.rdv.is_host {
+			// The host stands regardless — friends can still join by address.
+			kui.lobby_set_status(&b.ui, "Hosting — but the relay dropped (no code)")
+		} else {
+			why := "the relay dropped before answering"
+			#partial switch b.rdv.err {
+			case .No_Room:
+				why = "no room wears that code"
+			case .Full:
+				why = "that room is full"
+			}
+			kui.lobby_set_status(&b.ui, fmt.tprintf("Join code failed — %s", why))
+			kui.lobby_show_menu(&b.ui, true, false) // back to the doors
+		}
+		netgd.code_close(&b.rdv)
+	}
 }
 
 // Chat's text_submitted, one call (see kui.chat_submit for the trap it fixes).

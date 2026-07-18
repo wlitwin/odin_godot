@@ -73,7 +73,9 @@ join_by_code() {
 	fslp_wait_all 45 "$hp" "$gp"
 	kill "$sigpid" 2>/dev/null
 
-	expect "$glog" "HELLO_RESOLVED 127.0.0.1:$port" "the code did not resolve to the host's endpoint"
+	# (The guest gets NO address env — seating at all proves the relay
+	# resolved the code to the host's real endpoint.)
+	expect "$glog" "HELLO_CODE_JOIN code=$code" "the guest never opened the code door"
 	expect "$glog" "HELLO_SEATED me=2" "the code-joiner was never seated"
 	expect "$glog" "HELLO_SAW_WALK d=([6-9][0-9]|[0-9]{3,})" "the walk never crossed the code-brokered wire"
 	expect "$hlog" "HOST_DONE" "coded host did not finish"

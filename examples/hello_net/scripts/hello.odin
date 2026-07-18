@@ -24,7 +24,6 @@ import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import kui "godot:kit/ui"
-import netgd "godot:kit/netgd"
 
 DEFAULT_PORT :: 4242
 SPEED :: f32(160)
@@ -46,8 +45,9 @@ HelloNet :: struct {
 
 	// JOIN CODES (optional): with HELLO_RELAY set, hosting registers the ENet
 	// port under a minted code and a friend joins with the CODE instead of an
-	// address — the relay is a phonebook, the game stays plain ENet.
-	rdv: netgd.Code_Rendezvous,
+	// address — the relay is a phonebook, the game stays plain ENet. The boot
+	// doors (boot_host_coded / boot_join_code) run the whole rendezvous.
+	minted: bool, // the code receipt printed once
 }
 
 now_s :: knet.now_s
@@ -66,6 +66,12 @@ hello_net_ready :: proc(self: ^HelloNet) {
 	// The factory, written by nobody — the entity tag above IS the table.
 	kboot.boot_entities(&self.boot, self, hello_net_entity_kinds[:])
 
+	// With a relay configured, the lobby grows its join-code field — a human
+	// types a friend's code and presses Join (see on_join).
+	if gd.env_string("HELLO_RELAY", "") != "" {
+		kui.lobby_show_code(&self.boot.ui, true)
+	}
+
 	// Headless acids pick a role from the env; humans click the lobby.
 	switch gd.env_string("HELLO_ROLE", "") {
 	case "host":
@@ -73,43 +79,31 @@ hello_net_ready :: proc(self: ^HelloNet) {
 	case "join":
 		hello_net_on_join(self)
 	case "code":
-		// Join by CODE: ask the relay where the host lives, then it's a
-		// normal ENet join (hello_net_process completes it at .Ready).
+		// Join by CODE: the door asks the relay where the host lives, then
+		// it's a normal ENet join — boot_pump completes it when the
+		// phonebook answers.
 		relay := gd.env_string("HELLO_RELAY", "")
 		code := gd.env_string("HELLO_CODE", "")
 		if relay != "" && code != "" {
-			netgd.code_join_open(&self.rdv, fmt.ctprintf("%s", relay), code)
+			gd.print_str(fmt.tprintf("HELLO_CODE_JOIN code=%s", code))
+			if kboot.boot_join_code(&self.boot, fmt.ctprintf("%s", relay), code, kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player")) {
+				self.running = true
+			}
 		}
 	}
 }
 
 hello_net_process :: proc(self: ^HelloNet, delta: f64) {
-	// The code rendezvous resolves outside `running` — a joiner-by-code has
-	// no transport until the phonebook answers.
-	if self.rdv.active {
-		switch netgd.code_poll(&self.rdv, &self.boot.wire) {
-		case .Ready:
-			if self.rdv.is_host {
-				kui.lobby_set_status(&self.boot.ui, fmt.tprintf("room %s — share the code", netgd.code_room(&self.rdv)))
-				gd.print_str(fmt.tprintf("HELLO_CODE room=%s", netgd.code_room(&self.rdv)))
-				self.rdv.active = false // minted; the relay's job here is done
-			} else if !self.running {
-				ip, port := netgd.code_endpoint(&self.rdv)
-				gd.print_str(fmt.tprintf("HELLO_RESOLVED %s:%d", ip, port))
-				if kboot.boot_join(&self.boot, ip, port, kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player"), status = "Code accepted — joining...") {
-					self.running = true
-				}
-				netgd.code_close(&self.rdv)
-			}
-		case .Failed:
-			kui.lobby_set_status(&self.boot.ui, fmt.tprintf("code failed (%v) — try the browser build, or an address", self.rdv.err))
-			gd.print_str(fmt.tprintf("HELLO_CODE_FAIL err=%v", self.rdv.err))
-			self.rdv.active = false
-		case .Idle, .Opening, .Waiting:
-		}
-	}
 	if !self.running {return}
 	events, _, _ := kboot.boot_pump(&self.boot, delta, now_s())
+	// The minted code is a FACT to poll, not a callback: show it when it lands
+	// (the stock lobby status already carries it; this is the headless receipt).
+	if !self.minted {
+		if room := kboot.boot_room_code(&self.boot); room != "" {
+			self.minted = true
+			gd.print_str(fmt.tprintf("HELLO_CODE room=%s", room))
+		}
+	}
 	if self.me != nil {
 		// Drive MY square. The x/y writes are all it takes: they are
 		// owner-streamed fields, so every other screen glides this body.
@@ -132,19 +126,30 @@ hello_net_process :: proc(self: ^HelloNet, delta: f64) {
 hello_net_on_host :: proc(self: ^HelloNet) {
 	if self.running {return}
 	port := kboot.boot_port(&self.boot, DEFAULT_PORT)
-	if !kboot.boot_host(&self.boot, port, kboot.boot_name(&self.boot, "player")) {return}
-	self.running = true
-	// With a relay configured, register the bound port under a join code —
-	// the status line shows it once minted (HELLO_CODE in headless logs).
+	// With a relay configured, host WITH a join code — the coded door is
+	// boot_host plus "register the port under a code the status line shows".
+	ok: bool
 	if relay := gd.env_string("HELLO_RELAY", ""); relay != "" {
-		netgd.code_host_open(&self.rdv, fmt.ctprintf("%s", relay), port)
+		ok = kboot.boot_host_coded(&self.boot, fmt.ctprintf("%s", relay), port, kboot.boot_name(&self.boot, "player"))
+	} else {
+		ok = kboot.boot_host(&self.boot, port, kboot.boot_name(&self.boot, "player"))
 	}
+	if !ok {return}
+	self.running = true
 	hello_net_on_start(self) // a lone host starts at once; joiners drop in
 }
 
 @(gd_method)
 hello_net_on_join :: proc(self: ^HelloNet) {
 	if self.running {return}
+	// A code in the lobby's field joins THROUGH it; empty joins by address.
+	if code := kui.lobby_code(&self.boot.ui); code != "" {
+		relay := gd.env_string("HELLO_RELAY", "")
+		if relay != "" && kboot.boot_join_code(&self.boot, fmt.ctprintf("%s", relay), code, kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player")) {
+			self.running = true
+		}
+		return
+	}
 	if !kboot.boot_join(&self.boot, "127.0.0.1", kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player")) {return}
 	self.running = true
 }
