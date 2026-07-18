@@ -32,6 +32,7 @@ package kit_sim
 // spawns past the FIFO is the documented edge (stamp the spawn with the fire
 // seq to make it exact); it self-heals at the next snapshot regardless.
 
+import "core:mem"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
@@ -83,8 +84,9 @@ lane_spawn_predicted :: proc(
 	set: ^Sim_Set,
 	owner: knet.Player_Id,
 	type: ksess.Entity_Type,
-	allocator := context.allocator,
+	allocator := mem.Allocator{},
 ) -> knet.Net_Id {
+	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	if l.ses.is_host {
 		return 0 // the authority spawns for real; prediction is the client's job
 	}
@@ -124,8 +126,9 @@ lane_spawn_match :: proc(
 	auth_id: knet.Net_Id,
 	owner: knet.Player_Id,
 	type: ksess.Entity_Type,
-	allocator := context.allocator,
+	allocator := mem.Allocator{},
 ) -> (entity: rawptr, from: knet.Net_Id, ok: bool) {
+	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	// Oldest unmatched of this (owner, type) — lowest provisional id, FIFO with
 	// the authority's in-order spawns.
 	best := -1

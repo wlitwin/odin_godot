@@ -251,30 +251,8 @@ history_within :: proc(h: ^History, tick: u64, blob: []u8, eps: f32) -> bool {
 	return predict_within(stored, blob, h.desc, eps)
 }
 
-// ---------------------------------------------------------------------------
-// Rewind — the lag-compensation scope, as a paired begin/end.
-//
-// A server validating a shot judges it where the SHOOTER saw the target: the
-// target's predict set is wound back to the rewind tick for the duration of
-// the hit test, then the live state returns. The rewind tick is derived
-// SERVER-SIDE (shooter's tick − lead − interp delay, clamped to the ledger
-// window) — never trusted from a client stamp; that policy lives in the
-// session glue, this pair is the mechanism.
-//
-//   live, ok := ksim.history_rewind_begin(&e.hist, rewind_tick, e.entity)
-//   if ok { hit := trace(...); ksim.history_rewind_end(&e.hist, e.entity, live) }
-//   // !ok: the ledger no longer holds that tick — test live, by choice.
-
-history_rewind_begin :: proc(h: ^History, tick: u64, entity: rawptr, allocator := context.temp_allocator) -> (live: []u8, ok: bool) {
-	if _, held := history_read(h, tick); !held {
-		return nil, false
-	}
-	live = make([]u8, h.size, allocator)
-	predict_capture(live, entity, h.desc)
-	history_restore(h, tick, entity)
-	return live, true
-}
-
-history_rewind_end :: proc(h: ^History, entity: rawptr, live: []u8) {
-	predict_restore(entity, h.desc, live)
-}
+// Lag-compensation rewind lives in lane.odin (lane_rewound_begin/end): it
+// winds EVERY watched entity to the bracket pair and alpha the shooter's
+// screen actually drew — the single-tick per-entity begin/end pair that once
+// sat here predated the blend and survived only in tests, a stale rung a
+// game could mistake for the real mechanism.

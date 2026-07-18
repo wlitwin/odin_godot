@@ -17,10 +17,10 @@ package kit_sim
 // owner streams, applied to intent.
 //
 // De-jitter is a BUFFER DEPTH, not a delay line: the server consumes exactly
-// one input per player per tick (input_buffer_pop) and tracks how much
-// headroom arrivals have over consumption (margin). The session glue ships
-// margin back to the client, whose lead controller (tick.odin) nudges its
-// timescale so inputs arrive just-in-time — the adaptive half of the loop.
+// one input per player per tick (input_buffer_pop). The lead-control loop
+// closes over the batch header's input-ack echo — the client measures how
+// far its inputs ran ahead of the server's sim and bends its clock
+// (lane.odin's ingest + tick.odin's lead_control); nothing extra is shipped.
 
 import knet "godot:kit/net"
 
@@ -177,14 +177,6 @@ Input_Buffer :: struct {
 	newest:     u64, // newest tick ever received — the ack the client trims by
 	popped:     u64, // last tick consumed (0 = none): older arrivals are stale
 	held:       []u8, // the hold-last copy a gap tick repeats (zeroed = neutral input until the first pop)
-	// margin: EWMA of how many ticks of headroom arrivals have over
-	// consumption (newest − next-consumed, sampled per packet). The number the
-	// session ships back for the client's lead controller: positive and small
-	// is healthy, negative means inputs are arriving after their tick already
-	// simulated (the client must lead more), large means wasted latency (the
-	// client can lead less).
-	margin:      f64,
-	margin_init: bool,
 	fresh_count: u64, // pops that found the exact tick
 	held_count:  u64, // pops that fell back to hold-last (the gap stat)
 	fresh:       bool, // did the LAST pop find its tick (the driver's freshness bit) —
@@ -259,17 +251,6 @@ input_buffer_apply :: proc(b: ^Input_Buffer, r: ^knet.Reader, tag: u64 = 0) -> i
 		b.tick[i] = t
 		b.tags[i] = tag
 		fresh += 1
-	}
-	// One headroom sample per packet, against the next tick to be consumed.
-	if b.newest > 0 {
-		sample := f64(i64(b.newest) - i64(b.popped + 1))
-		if !b.margin_init {
-			b.margin = sample
-			b.margin_init = true
-		} else {
-			ALPHA :: 0.1 // knet.Clock_Sync's gentle EWMA, same reasoning
-			b.margin += (sample - b.margin) * ALPHA
-		}
 	}
 	return fresh
 }

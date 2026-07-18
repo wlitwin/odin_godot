@@ -262,8 +262,14 @@ snap_rx_apply :: proc(rx: ^Snap_Rx, r: ^knet.Reader, truths: ^[dynamic]Truth) ->
 		flags := knet.read_u8(r)
 		n := int(knet.read_u16(r))
 		if r.err || r.off + n > len(r.data) {
+			// Truncated mid-batch: drop it all, the next one supersedes. Rows
+			// ALREADY noted into the rx ledger this loop stay there, harmlessly:
+			// this tick is never acked (the server never names it as a baseline)
+			// and never enters the applied ring (the presenter never brackets
+			// it), and a ring lap re-stamps the slot before any read could
+			// alias it — phantom truth with no reader.
 			r.err = true
-			return 0, 0, 0 // truncated mid-batch: drop it all, the next one supersedes
+			return 0, 0, 0
 		}
 		payload := r.data[r.off:r.off + n]
 		r.off += n
@@ -346,7 +352,7 @@ snap_ack_read :: proc(r: ^knet.Reader) -> u64 {
 	return knet.read_u64(r)
 }
 
-@(private = "file")
+@(private) // lane.odin's presenter and fact paths resolve rx entries too
 find_rx :: proc(rx: ^Snap_Rx, id: knet.Net_Id) -> ^Rx_Entry {
 	for &e in rx.entries {
 		if e.id == id {

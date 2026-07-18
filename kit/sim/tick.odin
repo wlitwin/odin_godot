@@ -20,10 +20,11 @@ package kit_sim
 //     multi-second stall resumes from NOW instead of replaying the gap:
 //     past MAX_CATCHUP_TICKS the backlog drops and the session re-anchors.
 //
-// The control loop closes over the wire: the server's Input_Buffer measures
-// margin (input headroom over consumption), the session ships it back, and
-// lead_control turns the error into a timescale. knet.Clock_Sync provides
-// the cold-start estimate before the first margin arrives.
+// The control loop closes over the batch header's input-ack echo: the client
+// measures how far its inputs ran ahead of the server's sim (input_ack −
+// batch tick, lane.odin's ingest) and lead_control turns the error into a
+// timescale. knet.Clock_Sync provides the cold-start estimate before the
+// first batch lands.
 
 import knet "godot:kit/net"
 

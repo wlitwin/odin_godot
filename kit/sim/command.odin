@@ -232,6 +232,7 @@ cmd_tracked :: proc(l: ^Lane, id: knet.Net_Id) -> ^Tracked {
 // channel, and returns whether it was scheduled: the VERDICT is state, not
 // a return value (watch the fields, or the authority's `_then`).
 lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: u16, args: []u8) -> bool {
+	context.allocator = l.allocator // the owned arg copies free under lane roots later
 	tr := cmd_tracked(l, id)
 	if tr == nil || tr.cmds == nil {
 		return false

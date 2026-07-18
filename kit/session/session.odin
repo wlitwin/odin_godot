@@ -317,6 +317,7 @@ SES_BLOB :: u8(21) // host -> all  [id][ver u32][len u32][bytes] — an entity b
 
 SES_DECLARE :: u8(22) // client -> host  [size u16][row bytes] — my profile row (profile.odin)
 SES_PROFILES :: u8(23) // host -> all    [size u16][players u16] x ([id][row]) — the profile table
+SES_AOI :: u8(24) // host -> all    [aoi bool] — stream routing changed MID-RUN (session_set_interest after clients joined; the welcome covers everyone later)
 
 // ---- app messages: the extension point for sibling kit packages ---------------
 //
@@ -561,7 +562,7 @@ Session :: struct {
 	interest_user: rawptr,
 	locator:       Locator_Proc,
 	focus:         map[knet.Player_Id][2]f32, // host: each peer's eyes
-	interest:      map[u64]bool, // host: (player, entity) pairs currently near
+	interest:      map[Interest_Key]bool, // host: (player, entity) pairs currently near
 	aoi_client:    bool, // client: the welcome said streams route via the host
 }
 
@@ -2003,7 +2004,7 @@ session_peer_disconnected :: proc(s: ^Session, peer: Peer_Id) {
 	if !s.is_host {
 		if peer == HOST_PEER {
 			append(&s.events, Ev_Host_Left{})
-			if s.successor != knet.PLAYER_ID_INVALID && s.successor != 0 {
+			if s.successor != knet.PLAYER_ID_INVALID {
 				// LIVE MIGRATION: everyone already knows who carries the
 				// torch. Fires again on every failed reconnect — the retry
 				// pulse for peers chasing a successor that isn't up yet.
@@ -2031,6 +2032,11 @@ mark_left :: proc(s: ^Session, id: knet.Player_Id) {
 	p.connected = false
 	p.peer = NO_PEER
 	s.players[id] = p
+	// Their exactly-once window goes with them: a returning player gets a
+	// fresh Command_Ctx client-side anyway (new process or re-init), so the
+	// old window only mis-drops their first post-rejoin commands as "stale"
+	// — and an unpruned map otherwise grows with every seat ever used.
+	delete_key(&s.ctx.dedup, u64(id))
 	append(&s.events, Ev_Player_Left{id = id})
 }
 
@@ -2217,7 +2223,7 @@ session_client_join :: proc(s: ^Session) {
 // The kit's own wire revision, folded into every nonzero fingerprint before it
 // rides SES_JOIN — a kit upgrade that changes the wire then refuses skewed
 // peers even when the game's declarations didn't move. Bump on wire changes.
-PROTOCOL_REV :: u64(5) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: the wire frame byte carries the stream-channel bit (netgd) · 4: SIM_FACT carries a fact kind (declared world-pass facts) · 5: the re-hostable snapshot carries the door (locked + denied)
+PROTOCOL_REV :: u64(6) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: the wire frame byte carries the stream-channel bit (netgd) · 4: SIM_FACT carries a fact kind (declared world-pass facts) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream routing mid-run
 
 @(private = "file")
 FP_SALT :: u64(0x9E3779B97F4A7C15) + PROTOCOL_REV // the golden-ratio constant, rev-shifted
@@ -2332,6 +2338,13 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		if s.is_host {
 			session_peer_disconnected(s, from_peer)
 		}
+	case SES_AOI:
+		// Stream routing flipped mid-run (the welcome told joiners; this
+		// tells everyone who was already seated).
+		if s.is_host || !s.joined {
+			return
+		}
+		s.aoi_client = knet.read_bool(r)
 	case SES_WELCOME:
 		if !s.is_host {
 			client_handle_welcome(s, r)
@@ -2556,7 +2569,7 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
 		knet.write_u8(&w, SES_RESULT)
-		responded, ok, h := knet.registry_host_command(&s.reg, &s.ctx, u64(pid), r, &w)
+		responded, ok, h := knet.registry_host_command(&s.reg, &s.ctx, pid, r, &w)
 		if !responded {
 			return
 		}

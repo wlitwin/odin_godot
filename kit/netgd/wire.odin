@@ -60,7 +60,7 @@ Session_Wire :: struct {
 // one). Rates roll once per second in wire_pump; read them raw, or let
 // wire_traffic format the netgraph line. Cost: a few adds per packet.
 
-WIRE_KINDS :: 24 // headroom over the SES_* ids (0..21 today)
+WIRE_KINDS :: 26 // SES_* ids (0..24 today) + one dedicated overflow bucket ("other") — a future kind lands THERE, never aliased onto a real kind's row
 
 Wire_Gauge :: struct {
 	in_acc, out_acc:           [WIRE_KINDS]int, // current window, bytes (frame byte included)
@@ -359,7 +359,8 @@ wire_set_latency :: proc(wire: ^Session_Wire, ms: int, jitter_ms := 0, loss_pct 
 WIRE_KIND_NAMES := [WIRE_KINDS]string {
 	"join", "welcome", "upsert", "left", "bye", "state", "cmd", "result",
 	"stream", "ping", "pong", "spawn", "despawn", "world", "stats", "backup",
-	"app", "denied", "kicked", "setowner", "successor", "blob", "other", "other",
+	"app", "denied", "kicked", "setowner", "successor", "blob", "declare",
+	"profiles", "aoi", "other",
 }
 
 // The netgraph's traffic line: total in/out bytes per second with the top

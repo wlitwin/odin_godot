@@ -30,11 +30,13 @@ package kit_net
 //   intent.odin  — intent ids, per-peer dedup windows, the pending-prediction
 //                  table with timeout → automatic revert.
 //   tick.odin    — the fixed net tick (decoupled from frame rate) + clock sync.
-//   interp.odin  — timestamped sample ring + delayed interpolated sampling for
-//                  remote entities (masks jitter and single drops).
+//   interp.odin  — a typed convenience ring (Interp_Buffer($T)) for hand-driven
+//                  interpolation. The REAL remote-entity path is stream.odin's
+//                  Stream_Ring (warp serials, handoff seeding, per-kind blends);
+//                  this one is the small generic sibling for game-side values.
 //
-// The generated side (scriptgen's gd:"replicate" / @(gd_command), later in phase 0)
-// produces Entity_Desc tables and calls into this core; nothing here depends on
+// The generated side (scriptgen's gd:"replicate" / @(gd_command)) produces
+// Entity_Desc tables and calls into this core; nothing here depends on
 // codegen, so everything is testable with hand-built descriptors first.
 
 // Stable identity of a replicated entity across the session. Allocated by the host

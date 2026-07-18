@@ -14,6 +14,11 @@ package kit_net
 import "base:intrinsics"
 import "core:mem"
 
+// The whole codec is native-byte memcpy on the promise that every target is
+// little-endian. Promises rot; this one is pinned — a big-endian port fails
+// HERE, at compile time, instead of decoding every field as garbage.
+#assert(ODIN_ENDIAN == .Little)
+
 Writer :: struct {
 	buf: [dynamic]u8,
 }
@@ -35,6 +40,14 @@ writer_reset :: proc(w: ^Writer) {
 
 writer_bytes :: proc(w: ^Writer) -> []u8 {
 	return w.buf[:]
+}
+
+// Overwrite a u16 at `at` (an offset a caller noted with len(w.buf) before
+// writing a count it didn't know yet) — the write-then-patch idiom for
+// [count][entries...] framing, LE like everything else on the wire.
+writer_patch_u16 :: proc(w: ^Writer, at: int, v: u16) {
+	w.buf[at] = u8(v)
+	w.buf[at + 1] = u8(v >> 8)
 }
 
 @(private = "file")

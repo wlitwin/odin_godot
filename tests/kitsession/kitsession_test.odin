@@ -1697,6 +1697,33 @@ interest_filters_deltas_and_resyncs_on_entry :: proc(t: ^testing.T) {
 	testing.expect_value(t, alice.bots[idf].hp, i32(22)) // exit edge holds her in
 }
 
+// Flipping interest ON mid-run must re-declare stream routing to clients
+// seated BEFORE the flip — their welcome said broadcast, and without SES_AOI
+// they kept broadcasting owner streams unfiltered forever.
+@(test)
+aoi_flip_mid_run_rewires_streams :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	testing.expect(t, !alice.s.aoi_client, "no interest at join: streams broadcast")
+
+	ksess.session_set_interest(&host.s, 300, 50, nil, bot_locate)
+	pump(boxes)
+	testing.expect(t, alice.s.aoi_client, "the mid-run flip re-declared routing")
+
+	ksess.session_set_interest(&host.s, 0, 0, nil, nil)
+	pump(boxes)
+	testing.expect(t, !alice.s.aoi_client, "and the flip back re-declares again")
+}
+
 @(test)
 interest_streams_route_via_host_and_filter :: proc(t: ^testing.T) {
 	host, alice, bob: Peer_Box

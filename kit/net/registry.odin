@@ -164,8 +164,7 @@ registry_write_deltas :: proc(w: ^Writer, reg: ^Registry, changed: ^[dynamic]Net
 		count += 1
 	}
 	assert(count <= int(max(u16)))
-	w.buf[count_at] = u8(count)
-	w.buf[count_at + 1] = u8(count >> 8)
+	writer_patch_u16(w, count_at, u16(count))
 	return count
 }
 
@@ -231,12 +230,12 @@ registry_collect_deltas :: proc(scratch: ^Writer, reg: ^Registry, segs: ^[dynami
 // index check silently disabled reconcile for every generated command (the
 // confirm-2 acid signature — a delta stomping an in-flight prediction).
 @(private = "file")
-pending_reconciles :: proc(p: Pending, e: Registry_Entry) -> bool {
+pending_reconciles :: proc(p: Pending, e: ^Registry_Entry) -> bool {
 	return p.entity == e.id && p.args != nil
 }
 
 @(private = "file")
-unwind_pending :: proc(ctx: ^Command_Ctx, e: Registry_Entry) {
+unwind_pending :: proc(ctx: ^Command_Ctx, e: ^Registry_Entry) {
 	#reverse for &p in ctx.pending.entries {
 		if pending_reconciles(p, e) {
 			// Client-only path: predicted fields belong to the sim lane.
@@ -246,7 +245,7 @@ unwind_pending :: proc(ctx: ^Command_Ctx, e: Registry_Entry) {
 }
 
 @(private = "file")
-replay_pending :: proc(ctx: ^Command_Ctx, e: Registry_Entry) {
+replay_pending :: proc(ctx: ^Command_Ctx, e: ^Registry_Entry) {
 	// Replays are re-predictions, never authoritative: the env keeps each
 	// re-run's `_then` consequence quiet, exactly like the original prediction.
 	env := Command_Env{authority = false, user = ctx.game_user, by = ctx.me}
@@ -298,7 +297,10 @@ registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = ni
 		if r.err {
 			break
 		}
-		e, ok := reg.entries[id]
+		// Pointer lookup on purpose: a Registry_Entry is ~500 bytes with its
+		// inline Stream_Ring — the by-value copy was the exact mutate-the-
+		// copy-and-forget footgun registry_get's fix comment names.
+		e, ok := &reg.entries[id]
 		if !ok {
 			r.err = true // can't size the unknown entity's fields — abandon the rest
 			break
@@ -348,7 +350,14 @@ registry_write_fulls :: proc(w: ^Writer, reg: ^Registry) -> int {
 	return len(reg.entries)
 }
 
-registry_apply_fulls :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = nil) -> int {
+// `me` names the RECEIVER: entities this peer owns keep their .Owner_Stream
+// fields (the batch's copy is a lagged echo of state this peer is the
+// authority for). Join seeding omits it on purpose — a fresh process has no
+// local owner state worth protecting, and the snapshot IS the seed. Shadows
+// are blessed inline, symmetric with registry_apply_deltas; the separate
+// registry_commit_shadows stays for the resume path (which applies spawn
+// tuples, not this batch).
+registry_apply_fulls :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = nil, me := PLAYER_ID_INVALID) -> int {
 	count := int(read_u16(r))
 	applied := 0
 	for _ in 0 ..< count {
@@ -356,12 +365,13 @@ registry_apply_fulls :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = nil
 		if r.err {
 			break
 		}
-		e, ok := reg.entries[id]
+		e, ok := &reg.entries[id]
 		if !ok {
 			r.err = true
 			break
 		}
-		apply_full(r, e.entity, e.set.entity_desc)
+		owned_here := me != PLAYER_ID_INVALID && e.owner == me
+		apply_full(r, e.entity, e.set.entity_desc, skip_owner = owned_here)
 		if r.err {
 			break
 		}
@@ -370,6 +380,7 @@ registry_apply_fulls :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = nil
 		if has_pending_for(ctx, id) {
 			replay_pending(ctx, e)
 		}
+		shadow_capture(e.entity, e.shadow, e.set.entity_desc)
 		applied += 1
 	}
 	return applied
@@ -538,8 +549,7 @@ registry_write_streams :: proc(w: ^Writer, reg: ^Registry, me: Player_Id, sender
 		count += 1
 	}
 	assert(count <= int(max(u16)))
-	w.buf[count_at] = u8(count)
-	w.buf[count_at + 1] = u8(count >> 8)
+	writer_patch_u16(w, count_at, u16(count))
 	return count
 }
 
@@ -608,19 +618,20 @@ registry_sample_streams :: proc(reg: ^Registry, t: f64, me: Player_Id) -> int {
 // can tell its game WHAT ran (the session's command hook rides on it).
 // Unknown entities produce NO result (the client's pending expiry is the
 // safety net — we can't write truth for an entity we don't have).
-registry_host_command :: proc(reg: ^Registry, ctx: ^Command_Ctx, peer_key: u64, r: ^Reader, out: ^Writer) -> (responded: bool, ok: bool, h: Command_Header) {
+registry_host_command :: proc(reg: ^Registry, ctx: ^Command_Ctx, by: Player_Id, r: ^Reader, out: ^Writer) -> (responded: bool, ok: bool, h: Command_Header) {
 	h = command_read_header(r)
-	if r.err || !command_dedup(ctx, peer_key, h.seq) {
+	if r.err || !command_dedup(ctx, u64(by), h.seq) {
 		return false, false, h
 	}
-	e, found := reg.entries[h.entity]
+	e, found := &reg.entries[h.entity]
 	if !found {
 		return false, false, h
 	}
 	// THE authoritative run: the verb's `_then` consequence fires inside the
-	// thunk. peer_key doubles as the issuer — the session keys dedup by
-	// Player_Id, so the id and the key are the same value on this path.
-	env := Command_Env{authority = true, user = ctx.game_user, by = Player_Id(peer_key)}
+	// thunk. `by` is the ISSUER'S Player_Id — it keys the dedup window AND
+	// rides the env (the old param said "peer_key: any stable per-sender key",
+	// which stopped being true the day env.by was born from it).
+	env := Command_Env{authority = true, user = ctx.game_user, by = by}
 	ok = command_execute(e.entity, e.set, h.cmd, r, &env)
 	command_result_write(out, h, ok, e.entity, e.set)
 	return true, ok, h
@@ -640,12 +651,12 @@ registry_client_result :: proc(reg: ^Registry, ctx: ^Command_Ctx, r: ^Reader, me
 		// said yes) but the pending that licensed them is gone — without the
 		// capture, the write guard would flag the gap until the effect's own
 		// delta arrives.
-		if e, found := reg.entries[res.entity]; found {
+		if e, found := &reg.entries[res.entity]; found {
 			shadow_capture(e.entity, e.shadow, e.set.entity_desc)
 		}
 		return res
 	}
-	if e, found := reg.entries[res.entity]; found {
+	if e, found := &reg.entries[res.entity]; found {
 		owned_here := me != PLAYER_ID_INVALID && e.owner == me
 		command_reject(ctx, res, r, e.entity, e.set, owned_here)
 		// The reject's truth snapshot (a full) stomped the entity — replay any
@@ -675,7 +686,7 @@ registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks
 	expired := make([dynamic]Pending, context.temp_allocator)
 	pending_expire(&ctx.pending, ctx.now_tick, max_age_ticks, &expired)
 	for p in expired {
-		if e, found := reg.entries[p.entity]; found {
+		if e, found := &reg.entries[p.entity]; found {
 			owned_here := me != PLAYER_ID_INVALID && e.owner == me
 			fields_restore(e.entity, e.set.entity_desc, p.revert, skip_owner = owned_here, skip_predicted = true)
 			shadow_capture(e.entity, e.shadow, e.set.entity_desc) // bless: the revert is framework truth now

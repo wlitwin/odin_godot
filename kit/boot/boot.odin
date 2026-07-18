@@ -356,7 +356,16 @@ boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, mar
 			kui.score_refresh(&b.score, b.ses)
 			kui.lobby_set_status(&b.ui, "Seated — waiting for the host to start")
 			b.phase = .Lobby // a fresh seat; the world (or its resync) moves it on
-		case ksess.Ev_Player_Joined, ksess.Ev_Player_Left:
+		case ksess.Ev_Player_Joined:
+			roster_changed(b)
+		case ksess.Ev_Player_Left:
+			// The lane hears departures like it hears ownership moves — same
+			// no-game-ever-forgets rule: without the drop, the host pops the
+			// departed seat's input buffers every tick forever and their
+			// entities coast on held inputs.
+			if b.lane != nil {
+				ksim.lane_drop_player(b.lane, e.id)
+			}
 			roster_changed(b)
 		case ksess.Ev_Stats_Updated:
 			kui.score_refresh(&b.score, b.ses)

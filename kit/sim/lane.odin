@@ -44,6 +44,7 @@ package kit_sim
 // node state, or un-ledgered randomness.
 
 import "core:fmt"
+import "core:mem"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
@@ -211,6 +212,9 @@ Lane :: struct {
 	rewind_max:      int,
 	watch_delay:     int,
 	watch_clock:     f64, // watched-entity render position, in fractional ticks
+	presented:       bool, // the game has called lane_present at least once — until
+	                       // then ingest keeps painting watched truth directly (a
+	                       // hand-driven client that never presents must never freeze)
 	smooth_halflife: f64,
 	smooth_cut:      f32,
 	judge_live:      bool,
@@ -220,6 +224,12 @@ Lane :: struct {
 	ticker:          Sim_Ticker,
 
 	user:            rawptr,
+	// The allocator lane_init was given. EVERY lane entry point installs it
+	// as context.allocator, so a handler-side alloc and its frame-side free
+	// can never ride different allocators — the param used to cover only the
+	// init-time containers, a half-promise a custom-allocator lane paid for
+	// in mismatched frees.
+	allocator:       mem.Allocator,
 	// One input class per distinct @(gd_tick) input TYPE. Single-input games
 	// hold exactly one (id 0, its sample from lane_set_sim); a game driving two
 	// entity kinds registers the extras with lane_add_input_class. The client
@@ -363,11 +373,15 @@ lane_owner_of :: proc(l: ^Lane, entity: rawptr) -> knet.Player_Id {
 @(private = "file")
 FACT_QUEUE_CAP :: 256
 
-// Bind to a session (host or client, before or after it starts) — wiring
-// survives session re-init like every pre-start hookup. `input_size` is the
-// game's input struct size, identical on every peer by construction (the
-// same compiled struct).
+// Bind to a session (host or client, before or after it starts). The app
+// ROUTE survives session re-init like every pre-start hookup — but lane
+// STATE does not reset with the session: a lane that must follow a fresh
+// authority (new ticks, new anchor) takes lane_destroy → lane_init, the
+// reset story. `input_size` is the game's input struct size, identical on
+// every peer by construction (the same compiled struct).
 lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG, cfg := Lane_Config{}, allocator := context.allocator) {
+	assert(l.ses == nil, "lane_init on a live lane — lane_destroy first (re-init without teardown leaks every container and keeps a stale anchor)")
+	l.allocator = allocator
 	l.ses = ses
 	l.tag = tag
 	hz := cfg.hz > 0 ? cfg.hz : DEFAULT_SIM_HZ
@@ -420,14 +434,18 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 // generated <class>_lane_init emits one per extra @(gd_tick) input type; a
 // hand-built lane calls it right after lane_init. `id` must be unique and
 // agree with the Sim_Set.input_class the tracked entities of that kind carry.
-lane_add_input_class :: proc(l: ^Lane, id: u16, size: int, sample: Sample_Proc, allocator := context.allocator) {
+lane_add_input_class :: proc(l: ^Lane, id: u16, size: int, sample: Sample_Proc, allocator := mem.Allocator{}) {
 	assert(id != 0, "class 0 is lane_init's primary input — pass its size to lane_init")
 	assert(size > 0, "an input class needs a non-zero size (inputless entities take no class)")
 	lane_class_add(l, id, size, sample, allocator)
 }
 
 @(private = "file")
-lane_class_add :: proc(l: ^Lane, id: u16, size: int, sample: Sample_Proc, allocator := context.allocator) {
+lane_class_add :: proc(l: ^Lane, id: u16, size: int, sample: Sample_Proc, allocator := mem.Allocator{}) {
+	// Zero allocator (the default at every layer) = the LANE'S — these
+	// containers free in lane_destroy under l.allocator, and an ambient
+	// default here silently mismatched them for custom-allocator lanes.
+	allocator := allocator.procedure != nil ? allocator : l.allocator
 	assert(lane_class(l, id) == nil, "input class id registered twice")
 	ic := Input_Class{id = id, size = size, sample = sample}
 	if size > 0 {
@@ -465,6 +483,9 @@ class_for_size :: proc(l: ^Lane, size: int) -> u16 {
 }
 
 lane_destroy :: proc(l: ^Lane) {
+	if l.allocator.procedure != nil {
+		context.allocator = l.allocator // free under what allocated (a zero lane keeps ambient)
+	}
 	if l.ses != nil {
 		ksess.session_app_route(l.ses, l.tag, nil, nil)
 	}
@@ -512,6 +533,11 @@ lane_destroy :: proc(l: ^Lane) {
 		delete(f.args)
 	}
 	delete(l.facts)
+	// A destroyed lane is a ZERO lane: destroy → lane_init is the reset
+	// story (a re-keyed authority, back-to-lobby). Without the wipe, stale
+	// anchor/rx state would drop every batch from a fresh-tick authority
+	// forever, and a double init would silently leak the first containers.
+	l^ = {}
 }
 
 // The game procs. `sample` may be nil on a seat that plays nobody (a
@@ -548,7 +574,8 @@ lane_set_sim :: proc(l: ^Lane, user: rawptr, sample: Sample_Proc, step: Step_Pro
 // everyone; a client ledgers predictions for its OWN entities and merely
 // watches the rest (their truth applies straight from batches — phase-3
 // smoothing will make that pretty).
-lane_track :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, desc: ^knet.Entity_Desc, owner: knet.Player_Id, allocator := context.allocator) {
+lane_track :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, desc: ^knet.Entity_Desc, owner: knet.Player_Id, allocator := mem.Allocator{}) {
+	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	assert(!l.rewound, "lane_track inside a rewound block — the restore holds pointers into the track list; lane_rewound_end first")
 	assert(predict_size(desc) > 0, "lane_track: entity predicts nothing — tag fields gd:\"replicate,predict\"")
 	if l.ses.is_host {
@@ -580,7 +607,8 @@ lane_track :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, desc: ^knet.Entity
 // its window rides on the wire. That class must be registered (lane_init's
 // primary or a lane_add_input_class extra) and agree on size; a player driving
 // two entity KINDS ships one window per class each tick.
-lane_track_set :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, set: ^Sim_Set, owner: knet.Player_Id, allocator := context.allocator) {
+lane_track_set :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, set: ^Sim_Set, owner: knet.Player_Id, allocator := mem.Allocator{}) {
+	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	assert(set.tick != nil, "lane_track_set: a Sim_Set carries the tick entry point")
 	if set.input_size > 0 {
 		ic := lane_class(l, set.input_class)
@@ -706,7 +734,8 @@ lane_untrack :: proc(l: ^Lane, id: knet.Net_Id) -> bool {
 // received truth (predictions begin next tick — a one-lead-deep resim later
 // corrects the seam); losing it drops the ledger and the entity becomes
 // watched, presented from batches like everyone else's.
-lane_set_owner :: proc(l: ^Lane, id: knet.Net_Id, owner: knet.Player_Id, allocator := context.allocator) -> bool {
+lane_set_owner :: proc(l: ^Lane, id: knet.Net_Id, owner: knet.Player_Id, allocator := mem.Allocator{}) -> bool {
+	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	for &tr, i in l.tracked {
 		if tr.id != id {
 			continue
@@ -733,7 +762,7 @@ lane_set_owner :: proc(l: ^Lane, id: knet.Net_Id, owner: knet.Player_Id, allocat
 			}
 			tr.hist = new(History, allocator)
 			tr.hist^ = history_make(tr.desc, l.slots, allocator)
-			if e := find_rx_entry(&l.rx, id); e != nil {
+			if e := find_rx(&l.rx, id); e != nil {
 				if blob, ok := history_read(&e.hist, l.rx.newest); ok {
 					predict_restore(tr.entity, tr.desc, blob)
 					history_note_bytes(tr.hist, l.ticker.tick, blob) // the seam's baseline
@@ -760,8 +789,10 @@ lane_set_owner :: proc(l: ^Lane, id: knet.Net_Id, owner: knet.Player_Id, allocat
 	return false
 }
 
-// A departed player's input state (call it from your Ev_Player_Left handler;
-// harmless to skip — an idle buffer holds a few KB until the run ends).
+// A departed player's input state. kboot's event drain forwards
+// Ev_Player_Left here (the same no-game-ever-forgets rule as ownership
+// moves); hand-driven sessions call it from their own handler — skipping it
+// leaks a few KB per departed seat and keeps popping their buffers per tick.
 lane_drop_player :: proc(l: ^Lane, player: knet.Player_Id) {
 	if p, ok := l.peers[player]; ok {
 		for _, buf in p.bufs {
@@ -876,6 +907,7 @@ lane_live :: proc(l: ^Lane) -> bool {
 // many sim ticks ran. A client returns 0 until the first batch anchors it to
 // the server's timeline.
 lane_frame :: proc(l: ^Lane, dt: f64) -> int {
+	context.allocator = l.allocator // lane work rides the lane's allocator (see the field)
 	if l.ses.is_host {
 		return host_frame(l, dt)
 	}
@@ -957,9 +989,18 @@ host_frame :: proc(l: ^Lane, dt: f64) -> int {
 	for t := l.ticker.tick - u64(n) + 1; t <= l.ticker.tick; t += 1 {
 		sample_inputs(l, t)
 		for _, p in l.peers {
+			// One packet feeds every class, so the riders USUALLY agree — but
+			// a held gap on one class retains its stale rider while another
+			// advances, and "last wins" in map order let iteration order pick
+			// this seat's rewind depth. Take the newest deterministically:
+			// the tag is (ack<<8)|off, so the plain max is the freshest ack.
+			best := u64(0)
 			for _, buf in p.bufs {
 				input_buffer_pop(buf, t) // sets buf.fresh
-				p.tag = buf.tag // every class shares the packet's rider — last wins, all agree
+				best = max(best, buf.tag)
+			}
+			if best != 0 {
+				p.tag = best
 			}
 		}
 		run_tick(l, t)
@@ -1197,7 +1238,12 @@ client_ingest :: proc(l: ^Lane) {
 		return
 	}
 
-	watched_fallback := l.rx.applied_count < 2 // pre-bracket: ingest paints watched directly
+	// Pre-bracket (fewer than two applied batches) OR a game that has never
+	// called lane_present: ingest paints watched truth directly. The latch
+	// keeps the render_off8 promise honest — before it, a hand-driven client
+	// that skipped lane_present froze every watched entity at the second
+	// batch forever, because nobody else would ever paint them again.
+	watched_fallback := l.rx.applied_count < 2 || !l.presented
 	l.stat_reconciles += 1
 	// What the screen last showed, per predicted entity — the continuity a
 	// correction must glide from. Fields hold last present's visual (or the
@@ -1441,6 +1487,8 @@ lane_rewound_end :: proc(l: ^Lane) {
 // freshness is the whole point of prediction.
 
 lane_present :: proc(l: ^Lane, dt: f64) {
+	context.allocator = l.allocator // same rule as lane_frame
+	l.presented = true // the presenter owns watched fields from here (see watched_fallback)
 	if l.ses.is_host || !l.anchored || l.rx.applied_count == 0 {
 		return
 	}
@@ -1502,7 +1550,7 @@ lane_present :: proc(l: ^Lane, dt: f64) {
 				continue
 			}
 		}
-		e := find_rx_entry(&l.rx, tr.id)
+		e := find_rx(&l.rx, tr.id)
 		if e == nil {
 			continue
 		}
@@ -1603,15 +1651,6 @@ fire_facts :: proc(l: ^Lane) {
 	}
 }
 
-@(private = "file")
-find_rx_entry :: proc(rx: ^Snap_Rx, id: knet.Net_Id) -> ^Rx_Entry {
-	for &e in rx.entries {
-		if e.id == id {
-			return &e
-		}
-	}
-	return nil
-}
 
 // ---------------------------------------------------------------------------
 // The receive side: bytes into lane state, game code never re-entered here.
@@ -1619,6 +1658,7 @@ find_rx_entry :: proc(rx: ^Snap_Rx, id: knet.Net_Id) -> ^Rx_Entry {
 @(private = "file")
 lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id, r: ^knet.Reader) {
 	l := cast(^Lane)user
+	context.allocator = l.allocator // handler-side allocs must free under the same allocator later
 	kind := knet.read_u8(r)
 	if r.err {
 		return

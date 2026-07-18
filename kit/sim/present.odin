@@ -183,29 +183,9 @@ predict_blend :: proc(entity: rawptr, desc: ^knet.Entity_Desc, a: []u8, b: []u8,
 				df[i] = knet.angle_lerp(af[i], bf[i], alpha) // shortest arc across ±π
 			}
 		case .Quat:
-			// nlerp with hemisphere flip: a raw componentwise lerp collapses
-			// through zero when q and -q meet (same rule as stream sampling).
-			aq := (^[4]f32)(ap)^
-			bq := (^[4]f32)(bp)^
-			dot := aq[0] * bq[0] + aq[1] * bq[1] + aq[2] * bq[2] + aq[3] * bq[3]
-			if dot < 0 {
-				for i in 0 ..< 4 {
-					bq[i] = -bq[i]
-				}
-			}
-			out: [4]f32
-			len_sq: f32
-			for i in 0 ..< 4 {
-				out[i] = aq[i] + (bq[i] - aq[i]) * alpha
-				len_sq += out[i] * out[i]
-			}
-			if len_sq > 1e-12 {
-				inv := 1.0 / math.sqrt(len_sq)
-				for i in 0 ..< 4 {
-					out[i] *= inv
-				}
-			}
-			(^[4]f32)(dst)^ = out
+			// The stream path's nlerp, verbatim — hemisphere flip and the
+			// antipode hold live in ONE place (knet), never a drifted twin.
+			knet.quat_nlerp(([^]f32)(dst), ([^]f32)(ap), ([^]f32)(bp), alpha)
 		case .Custom:
 			f.blend(dst, ap, bp, alpha)
 		}

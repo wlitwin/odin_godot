@@ -269,8 +269,10 @@ command_read_header :: proc(r: ^Reader) -> Command_Header {
 
 // Exactly-once gate: false = duplicate/stale (drop silently — the reliable
 // channel means the original result was delivered; nothing to resend).
-// peer_key is any stable per-sender key (transport peer id now, Player_Id once
-// the session layer owns identity).
+// peer_key is the sender's Player_Id as u64 — registry_host_command derives
+// env.by (the issuer a `_then` consequence sees) from the SAME value, so any
+// other key would mis-attribute every consequence. The session already keys
+// this path by Player_Id; hand-driven callers must too.
 command_dedup :: proc(ctx: ^Command_Ctx, peer_key: u64, seq: Intent_Seq) -> bool {
 	win := ctx.dedup[peer_key] // zero value for a new peer IS the fresh window
 	ok := dedup_accept(&win, seq)

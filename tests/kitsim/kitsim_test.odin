@@ -122,30 +122,6 @@ history_ledger_contract :: proc(t: ^testing.T) {
 	testing.expect_value(t, m.x, 50) // and leaves the entity alone
 }
 
-@(test)
-history_rewind_pair :: proc(t: ^testing.T) {
-	desc := mover_desc()
-	h := ksim.history_make(&desc, 8)
-	defer ksim.history_destroy(&h)
-
-	m := Mover{x = 10, vx = 2, hp = 77}
-	ksim.history_note(&h, 5, &m)
-	m.x = 100
-	m.vx = 9
-
-	live, ok := ksim.history_rewind_begin(&h, 5, &m)
-	testing.expect(t, ok, "tick 5 held")
-	testing.expect_value(t, m.x, 10) // the hit test sees the past
-	testing.expect_value(t, m.vx, 2)
-	testing.expect_value(t, m.hp, 77) // non-predicted state never rewinds
-	ksim.history_rewind_end(&h, &m, live)
-	testing.expect_value(t, m.x, 100) // the present returns
-	testing.expect_value(t, m.vx, 9)
-
-	_, ok = ksim.history_rewind_begin(&h, 3, &m)
-	testing.expect(t, !ok, "a tick the ledger lost refuses to rewind — test live, by choice")
-}
-
 // ---- input pipeline -------------------------------------------------------------
 
 @(test)
@@ -250,26 +226,6 @@ input_malformed_is_safe :: proc(t: ^testing.T) {
 	defer ksim.input_buffer_destroy(&buf2)
 	testing.expect_value(t, ksim.input_buffer_apply(&buf2, &r), 0)
 	testing.expect(t, r.err, "truncation sets the sticky error")
-}
-
-@(test)
-input_margin_tracks_headroom :: proc(t: ^testing.T) {
-	ring := ksim.input_ring_make(1, 16)
-	defer ksim.input_ring_destroy(&ring)
-	buf := ksim.input_buffer_make(1, 16)
-	defer ksim.input_buffer_destroy(&buf)
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-
-	for tick in u64(1) ..= 3 {
-		ax := i8(1)
-		ksim.input_note(&ring, tick, &ax)
-	}
-	ksim.input_write(&w, &ring, acked = 0)
-	r := knet.reader_make(knet.writer_bytes(&w))
-	ksim.input_buffer_apply(&buf, &r)
-	// Nothing consumed yet: newest=3 vs next-consumed=1 → 2 ticks of headroom.
-	testing.expect_value(t, buf.margin, 2)
 }
 
 // ---- ticker + lead ---------------------------------------------------------------

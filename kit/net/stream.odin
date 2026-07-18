@@ -267,7 +267,8 @@ stream_blend :: proc(entity: rawptr, desc: ^Entity_Desc, lo, hi: []u8, alpha: f3
 // across hemispheres collapses through zero and garbles the rotation). nlerp
 // isn't constant-velocity like slerp, but between stream samples ~50ms apart
 // the difference is invisible — and it's branchless-cheap on the render path.
-@(private = "file")
+// PUBLIC like angle_lerp: the sim lane's presenter blends .Quat predicted
+// fields with the same rule (one implementation, not a drifted twin).
 quat_nlerp :: proc(dst, a, b: [^]f32, alpha: f32) {
 	dot := a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
 	sign: f32 = dot < 0 ? -1 : 1

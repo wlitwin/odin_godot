@@ -37,13 +37,23 @@ Locator_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y: f3
 
 // Host: turn interest management on (radius <= 0 turns it off). `hysteresis`
 // widens the EXIT edge so an entity at the border doesn't flicker in and out
-// (enter at `radius`, leave at `radius + hysteresis`). Call any time; joins
-// mid-run are fine (the welcome tells clients how to route streams).
+// (enter at `radius`, leave at `radius + hysteresis`). Call any time: joiners
+// learn the stream routing from their welcome, and a MID-RUN flip re-declares
+// it to everyone already connected (SES_AOI) — without that, clients seated
+// before the flip kept broadcasting their owner streams unfiltered forever.
 session_set_interest :: proc(s: ^Session, radius: f32, hysteresis: f32, user: rawptr, locator: Locator_Proc) {
+	was := interest_on(s)
 	s.interest_r = radius
 	s.interest_hys = hysteresis
 	s.interest_user = user
 	s.locator = locator
+	if s.ran && s.is_host && s.send != nil && interest_on(s) != was {
+		w := knet.writer_make()
+		defer knet.writer_destroy(&w)
+		knet.write_u8(&w, SES_AOI)
+		knet.write_bool(&w, interest_on(s))
+		broadcast(s, knet.writer_bytes(&w), .Reliable)
+	}
 }
 
 // Host: where `player` is looking from — almost always their avatar, fed
@@ -58,9 +68,17 @@ interest_on :: proc(s: ^Session) -> bool {
 	return s.is_host && s.interest_r > 0 && s.locator != nil
 }
 
+// A struct key, not a packed u64: `u64(player) << 32 | u64(id)` silently
+// truncated Player_Id to 32 bits — safe only while ids stay small, which is
+// exactly the kind of invariant nobody re-checks when it breaks.
+Interest_Key :: struct {
+	player: knet.Player_Id,
+	id:     knet.Net_Id,
+}
+
 @(private = "file")
-ikey :: proc(player: knet.Player_Id, id: knet.Net_Id) -> u64 {
-	return u64(player) << 32 | u64(id)
+ikey :: proc(player: knet.Player_Id, id: knet.Net_Id) -> Interest_Key {
+	return Interest_Key{player, id}
 }
 
 @(private = "file")
