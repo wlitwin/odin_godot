@@ -333,7 +333,8 @@ cmd_handle :: proc(l: ^Lane, from: knet.Player_Id, r: ^knet.Reader) {
 		}
 	}
 	if held >= CMD_HOST_CAP {
-		return // untrusted-input cap; an honest client never queues this deep
+		l.stat_cmd_capped += 1 // untrusted-input cap; an honest client never queues this deep — counted, never silent
+		return
 	}
 	queued := make([]u8, len(args))
 	copy(queued, args)

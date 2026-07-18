@@ -224,10 +224,15 @@ registry_collect_deltas :: proc(scratch: ^Writer, reg: ^Registry, segs: ^[dynami
 // ordered channel (one more reason for that channel plan).
 
 // A pending takes part in reconcile iff it can replay: unwind and replay must
-// use the SAME predicate or the pair corrupts state.
+// use the SAME predicate or the pair corrupts state. "Can replay" is having
+// recorded wire args — the verb itself is resolved by STABLE id at replay
+// time (command_find; a miss restores and drops). Never compare p.cmd against
+// the set's length: ids are FNV hashes, not array positions, and that stale
+// index check silently disabled reconcile for every generated command (the
+// confirm-2 acid signature — a delta stomping an in-flight prediction).
 @(private = "file")
 pending_reconciles :: proc(p: Pending, e: Registry_Entry) -> bool {
-	return p.entity == e.id && p.args != nil && int(p.cmd) < len(e.set.commands)
+	return p.entity == e.id && p.args != nil
 }
 
 @(private = "file")
@@ -693,7 +698,10 @@ registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks
 // diff_mask itself — the same skip the host's send walk uses.
 //
 // Cost: the same memcmp walk per net tick the host already pays to diff.
-// Stripped (walk and all) under `-disable-assert`, like every kit guardrail.
+// The walk runs in EVERY build — the session turns a finding into the
+// teaching assert in dev and into a counted log-once (session_guard_hits)
+// under `-disable-assert`: a shipped build re-opening the divergence class
+// this guard exists to kill would cost more than the walk does.
 
 // Re-commit one entity's shadow: "these bytes are framework-blessed". The
 // sim lane calls this when a tick-scheduled verb's speculation retires

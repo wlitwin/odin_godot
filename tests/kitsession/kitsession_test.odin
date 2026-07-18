@@ -369,7 +369,8 @@ bot_fields := [?]knet.Field_Desc{
 	{offset = offset_of(Bot, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32},
 }
 bot_desc := knet.Entity_Desc{fields = bot_fields[:]}
-bot_cmds := [?]knet.Command_Desc{{name = "hit", predict = true, invoke = bot_cmd_hit}}
+BOT_HIT :: u16(0x6232) // hash-sized like a generated id — the suite rides the production shape
+bot_cmds := [?]knet.Command_Desc{{name = "hit", id = BOT_HIT, predict = true, invoke = bot_cmd_hit}}
 
 // The hp edge half, hand-built like generated code would be: cast, deref old,
 // record. Living on the SHARED set means every kitsession scenario (spawns,
@@ -459,9 +460,9 @@ world_over_the_session :: proc(t: ^testing.T) {
 
 	// PREDICTED COMMAND, CONFIRM: alice hits for 3 — instant locally, host
 	// executes, confirm event drains the pending.
-	knet.command_begin(&alice.s.ctx, id, 0)
+	knet.command_begin(&alice.s.ctx, id, BOT_HIT)
 	knet.write_i32(&alice.s.ctx.msg, 3)
-	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, 0))
+	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, BOT_HIT))
 	testing.expect_value(t, abot.hp, i32(5))
 	pump(boxes)
 	testing.expect_value(t, hbot.hp, i32(5))
@@ -487,9 +488,9 @@ world_over_the_session :: proc(t: ^testing.T) {
 	// PREDICTED COMMAND, REJECT: hitting for 5 would kill (hp 5) — alice's
 	// stale-free prediction also rejects locally, the host's reject + truth
 	// still settles it (and the event names the entity).
-	knet.command_begin(&alice.s.ctx, id, 0)
+	knet.command_begin(&alice.s.ctx, id, BOT_HIT)
 	knet.write_i32(&alice.s.ctx.msg, 5)
-	testing.expect(t, !knet.command_issue(&alice.s.ctx, abot, &bot_command_set, 0))
+	testing.expect(t, !knet.command_issue(&alice.s.ctx, abot, &bot_command_set, BOT_HIT))
 	testing.expect_value(t, abot.hp, i32(5)) // local revert
 	pump(boxes)
 	testing.expect_value(t, hbot.hp, i32(5)) // host rejected too
@@ -951,9 +952,10 @@ dedicated_server_seat :: proc(t: ^testing.T) {
 	ap, aok := ksess.session_player(&alice.s, alice.s.me)
 	testing.expect(t, aok && !ap.dedicated, "a joiner is a person")
 
-	// Player gates skip it: three seats on the wire, two players in the game.
-	testing.expect_value(t, ksess.session_count(&host.s, connected_only = true), 3)
-	testing.expect_value(t, ksess.session_count(&host.s, connected_only = true, players_only = true), 2)
+	// Player gates skip it: three seats on the wire, two players in the game
+	// (the wire's view now spells players_only=false; the bare call IS the gate).
+	testing.expect_value(t, ksess.session_count(&host.s, connected_only = true, players_only = false), 3)
+	testing.expect_value(t, ksess.session_count(&host.s), 2)
 
 	// SUCCESSION NEVER ARMS: replicate and run well past the first backup
 	// window — no torch-bearer is named, no blob ships to anyone. (A dead
@@ -1025,7 +1027,7 @@ resume_run_from_backup :: proc(t: ^testing.T) {
 
 	// The roster survived: 3 players, only alice connected; identity table
 	// intact for everyone who ever JOINed (the dead host has no token — v1).
-	testing.expect_value(t, ksess.session_count(&host2.s), 3)
+	testing.expect_value(t, ksess.session_count(&host2.s, connected_only = false, players_only = false), 3)
 	testing.expect_value(t, ksess.session_count(&host2.s, connected_only = true), 1)
 	me, _ := ksess.session_player(&host2.s, old_me)
 	testing.expect(t, me.connected && me.peer == ksess.HOST_PEER)
@@ -1691,12 +1693,12 @@ interest_streams_route_via_host_and_filter :: proc(t: ^testing.T) {
 // ---- per-type hook routing -------------------------------------------------------
 
 Hook_Log :: struct {
-	calls: [dynamic]u64, // (entity << 8 | cmd) per firing — order preserved
+	calls: [dynamic]u64, // (entity << 16 | cmd) per firing — order preserved; cmd is a full hash-sized u16
 }
 
 log_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
 	l := cast(^Hook_Log)user
-	if ok {append(&l.calls, u64(entity) << 8 | u64(cmd))}
+	if ok {append(&l.calls, u64(entity) << 16 | u64(cmd))}
 }
 
 @(test)
@@ -1730,12 +1732,12 @@ type_hooks_route_and_catch_all_falls_back :: proc(t: ^testing.T) {
 	// A CLIENT's command on the routed type fires the TYPE hook, not the
 	// catch-all — the wrong-classification bug is structurally impossible.
 	abot := alice.bots[id]
-	knet.command_begin(&alice.s.ctx, id, 0)
+	knet.command_begin(&alice.s.ctx, id, BOT_HIT)
 	knet.write_i32(&alice.s.ctx.msg, 3)
-	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, 0))
+	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, BOT_HIT))
 	step(boxes, &now)
 	testing.expect_value(t, len(typed.calls), 1)
-	testing.expect_value(t, typed.calls[0], u64(id) << 8)
+	testing.expect_value(t, typed.calls[0], u64(id) << 16 | u64(BOT_HIT))
 	testing.expect_value(t, len(general.calls), 0)
 
 	// The HOST's own local issue routes identically (one dispatcher).
@@ -1745,16 +1747,16 @@ type_hooks_route_and_catch_all_falls_back :: proc(t: ^testing.T) {
 	r := knet.reader_make([]u8{3, 0, 0, 0})
 	env := knet.Command_Env{authority = true, by = host.s.me}
 	_ = bot_cmd_hit(host.s.reg.entries[id].entity, &r, &env)
-	knet.command_hook_local(&host.s.ctx, id, 0, true)
+	knet.command_hook_local(&host.s.ctx, id, BOT_HIT, true)
 	testing.expect_value(t, len(typed.calls), 2)
 
 	// An UNROUTED type falls back to the catch-all.
 	if e, ok := host.s.reg.entries[sid]; ok {
 		_ = e
-		knet.command_hook_local(&host.s.ctx, sid, 0, true)
+		knet.command_hook_local(&host.s.ctx, sid, BOT_HIT, true)
 	}
 	testing.expect_value(t, len(general.calls), 1)
-	testing.expect_value(t, general.calls[0], u64(sid) << 8)
+	testing.expect_value(t, general.calls[0], u64(sid) << 16 | u64(BOT_HIT))
 }
 
 // ---- kcombat fire routing over SES_APP -------------------------------------------
@@ -2121,9 +2123,9 @@ write_guard_names_a_client_rogue_write :: proc(t: ^testing.T) {
 	testing.expect(t, !dirty, "a host delta blesses the shadow — nothing to flag")
 
 	// Coop speculation is exempt while pending, blessed once it settles.
-	knet.command_begin(&alice.s.ctx, id, 0)
+	knet.command_begin(&alice.s.ctx, id, BOT_HIT)
 	knet.write_i32(&alice.s.ctx.msg, 3)
-	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, 0))
+	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, BOT_HIT))
 	_, _, _, dirty = knet.registry_write_guard(&alice.s.reg, &alice.s.ctx)
 	testing.expect(t, !dirty, "an in-flight prediction is legal divergence")
 	pump(boxes) // the confirm lands and blesses the speculative bytes

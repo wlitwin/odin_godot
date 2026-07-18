@@ -43,6 +43,7 @@ package kit_sim
 // predicted fields, lane_input, and per-tick derivables — never wall clocks,
 // node state, or un-ledgered randomness.
 
+import "core:fmt"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
@@ -253,6 +254,8 @@ Lane :: struct {
 	stat_reconciles: int,
 	stat_facts_dropped: int, // world facts refused by a full queue — a moving count means the game presents too rarely (or FACT_QUEUE_CAP is honestly too small)
 	stat_render_sat:    int, // render_off8 hit the wire's 31.5-tick ceiling — the authority now rewinds LESS than this screen's true delay (lag comp judges shallow)
+	stat_input_drops:   int, // host: input windows dropped for an unknown class id — zero in a same-build session; a moving count is version skew or garbage on the port
+	stat_cmd_capped:    int, // host: verbs refused by the per-player CMD_HOST_CAP — an honest client never queues this deep; a moving count names the peer flooding you
 
 	// active inline rewind (lane_rewound_begin/end) — live captures to restore
 	wound:           [dynamic]Wound,
@@ -374,12 +377,25 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 	l.redundancy = cfg.redundancy > 0 ? cfg.redundancy : INPUT_REDUNDANCY
 	l.rewind_max = cfg.rewind_max > 0 ? cfg.rewind_max : max(hz / 4, 1)
 	l.watch_delay = cfg.watch_delay > 0 ? cfg.watch_delay : 2 * l.snap_every
+	// The render offset rides the wire in EIGHTHS of a tick in one byte
+	// (render_off8): 31 ticks is the most a screen can DECLARE. A config past
+	// it would make every rewind judge shallow — refuse while a dev is
+	// looking, clamp where asserts are stripped (stat_render_sat still counts
+	// the saturation there).
+	assert(l.watch_delay <= 31, "Lane_Config.watch_delay exceeds the 31-tick render-offset wire ceiling (render_off8)")
+	l.watch_delay = min(l.watch_delay, 31)
 	l.smooth_halflife = cfg.smooth_halflife > 0 ? cfg.smooth_halflife : 0.063
 	l.smooth_cut = cfg.smooth_cut
 	l.judge_live = cfg.judge_live
 	l.echo_on = cfg.echo_inputs
 	l.echo = make(map[Echo_Key][]u8, allocator)
 	l.tolerance = cfg.tolerance
+	if l.echo_on && l.tolerance == 0 {
+		// Predict-world without slack: every held-input drift mismatches the
+		// exact compare and buys a full resim — nearly every batch. Legal but
+		// never what anyone means; one line at init beats a silent CPU tax.
+		fmt.println("kit/sim: echo_inputs with tolerance=0 resims on nearly every batch — set Lane_Config.tolerance (world units of acceptable held-input drift)")
+	}
 	l.ticker = sim_ticker_make(hz)
 	l.tracked = make([dynamic]Tracked, allocator)
 	l.entries = make([dynamic]Entry, allocator)
@@ -1635,8 +1651,12 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 		}
 		for _ in 0 ..< ccount {
 			cid := knet.read_u16(r)
+			if r.err {
+				return // truncation — the session's malformed counter owns it
+			}
 			ic := lane_class(l, cid)
-			if r.err || ic == nil || ic.size == 0 {
+			if ic == nil || ic.size == 0 {
+				l.stat_input_drops += 1 // the tail can't be length-skipped; counted, never silent
 				return
 			}
 			buf, has := p.bufs[cid]

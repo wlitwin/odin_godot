@@ -419,6 +419,12 @@ DEFAULT_JOIN_TIMEOUT :: 15.0 // seconds
 // How often the designated backup host's snapshot refreshes.
 DEFAULT_BACKUP_INTERVAL :: 5.0 // seconds
 
+// NEW joins refused past this many present people (Deny_Reason.Full). This is
+// a 2-8 friendslop framework: an unbounded lobby is a CHOICE a game states
+// (max_players < 0), never an accident of the zero value — the old 0=unlimited
+// default meant every game that never thought about it shipped uncapped.
+DEFAULT_MAX_PLAYERS :: 8
+
 // Every tunable the session bakes a time constant from, set ONCE before
 // *_start via session_configure (like all pre-start wiring, it survives
 // re-init). Zero-valued fields mean the defaults above — a zero config is the
@@ -430,7 +436,7 @@ Session_Config :: struct {
 	command_timeout: f64, // prediction auto-revert horizon
 	join_timeout:    f64, // client_start -> Ev_Join_Failed horizon
 	backup_interval: f64, // backup-host snapshot refresh cadence
-	max_players:     int, // NEW joins refused past this many connected (0 = unlimited; rejoins always reclaim their seat)
+	max_players:     int, // NEW joins refused past this many present people (0 = DEFAULT_MAX_PLAYERS, 8; negative = unlimited on purpose; rejoins always reclaim their seat)
 	change_events:   bool, // emit Ev_Entity_Changed per dirty entity per tick (repaint THAT, not everything). Off by default: at friendslop scale repaint-everything is usually fine
 	fingerprint:     u64, // the build's WIRE CONTRACT hash. 0 (the default) =
 	// use the generated NET_FINGERPRINT — scriptgen's guard file registers it
@@ -478,6 +484,11 @@ Session :: struct {
 	clocks:       map[Peer_Id]knet.Clock_Sync, // per transport peer, fed by ping/pong
 	pongs:        int, // pong samples applied (games gate "clock is warm" on this)
 	malformed:    u64, // session packets dropped mid-parse (truncation, corruption, a foreign build past the fingerprint) — counted, never silent; netgraph's `drop` reads it
+	// The write guard's RELEASE voice (see session_tick): where -disable-assert
+	// strips the teaching assert, rogue client writes count here and log ONCE
+	// instead of going dark. Stays zero in dev builds — the assert fires first.
+	guard_hits:   u64,
+	guard_logged: bool,
 	now:          f64, // the game's monotonic seconds, updated each session_tick
 	replicating:  bool, // host: the world is LIVE (deltas flow; joiners get SES_WORLD)
 	ran:          bool, // session_init completed at least once — gates the re-entrant teardown
@@ -609,6 +620,8 @@ session_init :: proc(s: ^Session) {
 		s.stats_dirty = false
 		s.pongs = 0
 		s.malformed = 0
+		s.guard_hits = 0
+		s.guard_logged = false
 		s.next_player = {}
 		s.backup_tick = 0
 		s.backup_target = {}
@@ -1274,11 +1287,15 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 	// The delta-lane WRITE GUARD (kit/net registry.odin): on a client, a
 	// host-lane field that moved outside the framework since its last bless
 	// is a local rogue write — the canonical silent-divergence bug, named
-	// within one net tick instead of never. Costs the host's own diff walk;
-	// stripped whole (walk and all) under `-disable-assert`.
-	when !ODIN_DISABLE_ASSERT {
-		if ticks > 0 && !s.is_host {
-			if cls, field, id, found := knet.registry_write_guard(&s.reg, &s.ctx, s.guard_exempt, s.guard_exempt_user); found {
+	// within one net tick instead of never. Costs the host's own diff walk.
+	// Dev builds HALT on it (the teaching assert); a `-disable-assert` build
+	// keeps the walk and the name but not the halt — it counts (guard_hits,
+	// session_guard_hits) and says the first one ONCE, because a shipped
+	// build re-opening the exact divergence class this guard was built to
+	// kill is worse than the walk it saves.
+	if ticks > 0 && !s.is_host {
+		if cls, field, id, found := knet.registry_write_guard(&s.reg, &s.ctx, s.guard_exempt, s.guard_exempt_user); found {
+			when !ODIN_DISABLE_ASSERT {
 				assert(
 					false,
 					fmt.tprintf(
@@ -1289,6 +1306,15 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 						cls, field, u32(id),
 					),
 				)
+			} else {
+				s.guard_hits += 1
+				if !s.guard_logged {
+					s.guard_logged = true
+					fmt.printfln(
+						"kit/session WRITE GUARD: %s.%s (net id %d) changed on a client outside the framework — logged once; session_guard_hits counts from here",
+						cls, field, u32(id),
+					)
+				}
 			}
 		}
 	}
@@ -1839,10 +1865,15 @@ session_owner_of :: proc(s: ^Session, id: knet.Net_Id) -> knet.Player_Id {
 	return knet.PLAYER_ID_INVALID
 }
 
-// `players_only` skips dedicated seats — the count for anything gating on
-// PEOPLE (min-players, "everyone ready", max_players): a server is not a
-// player, however real its seat is to the wire.
-session_count :: proc(s: ^Session, connected_only := false, players_only := false) -> int {
+// The bare call counts PRESENT PEOPLE — connected, non-dedicated — because
+// that is what every gate that says "players" means (min-players, ready
+// checks, max_players). The old bare call counted ghosts: departed seats
+// (kept for reconnect) and the server's own infrastructure seat, and every
+// real caller was overriding both flags to say otherwise. Opt DOWN for the
+// other censuses: connected_only=false includes departed rows (roster size —
+// what a save/resume receipt reports), players_only=false counts a dedicated
+// seat (the wire's view).
+session_count :: proc(s: ^Session, connected_only := true, players_only := true) -> int {
 	if !connected_only && !players_only {
 		return len(s.players)
 	}
@@ -2053,8 +2084,11 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 			deny_join(s, peer, .Locked)
 			return
 		}
-		// max_players caps PEOPLE — a dedicated server's own seat never eats one.
-		if s.cfg.max_players > 0 && session_count(s, connected_only = true, players_only = true) >= s.cfg.max_players {
+		// max_players caps PEOPLE — a dedicated server's own seat never eats
+		// one. Zero config = DEFAULT_MAX_PLAYERS; going unbounded is spelled
+		// max_players = -1, a declaration, not a forgotten field.
+		limit := s.cfg.max_players == 0 ? DEFAULT_MAX_PLAYERS : s.cfg.max_players
+		if limit > 0 && session_count(s, connected_only = true, players_only = true) >= limit {
 			deny_join(s, peer, .Full)
 			return
 		}
@@ -2243,6 +2277,14 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) 
 // How many session packets this peer dropped mid-parse. A moving count on a
 // live link means truncation, corruption, or a mismatched build the
 // fingerprint door didn't get to refuse — surface it (netgraph does).
+// Rogue client writes the guard found in a RELEASE build (dev builds assert
+// instead, so this stays zero there). Nonzero in the field means some client
+// code writes host-lane replicated state locally — silent divergence until
+// the next authoritative delta stomps it; surface it beside malformed drops.
+session_guard_hits :: proc(s: ^Session) -> u64 {
+	return s.guard_hits
+}
+
 session_malformed :: proc(s: ^Session) -> u64 {
 	return s.malformed
 }

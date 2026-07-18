@@ -162,7 +162,8 @@ the_save_saga :: proc(t: ^testing.T) {
 
 	testing.expect(t, ksave.save_restore(&host2.s, "hosty", &r, h))
 	testing.expect_value(t, host2.s.me, knet.Player_Id(1))
-	testing.expect_value(t, ksess.session_count(&host2.s), 2) // alice is back, disconnected
+	// Roster rows, disconnected included — alice is back as a SEAT, not yet present.
+	testing.expect_value(t, ksess.session_count(&host2.s, connected_only = false, players_only = false), 2)
 	ap, has_alice := ksess.session_player(&host2.s, 2)
 	testing.expect(t, has_alice && !ap.connected)
 

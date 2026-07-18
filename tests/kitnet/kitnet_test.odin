@@ -467,9 +467,13 @@ interp_bracketing_and_clamps :: proc(t: ^testing.T) {
 // "Client" and "host" are two Probe copies wired through a capture callback —
 // the full intent→command→result loop without a socket.
 
-CMD_ADD :: u16(0) // predicted; rejects when state == 9 ("locked")
-CMD_TORN :: u16(1) // hostile: mutates BEFORE rejecting — restore must undo it
-CMD_MARK :: u16(2) // non-predicted host-only action
+// Wire ids are FNV-SIZED on purpose: scriptgen stamps hash ids (0x9a65…), so
+// index-like 0/1/2 here would exercise a shape production never runs — the
+// stale `p.cmd < len(commands)` reconcile gate survived exactly that way,
+// green in tests while dead in every generated game (the confirm-2 flake).
+CMD_ADD :: u16(0x9a65) // predicted; rejects when state == 9 ("locked")
+CMD_TORN :: u16(0xed76) // hostile: mutates BEFORE rejecting — restore must undo it
+CMD_MARK :: u16(0x2da5) // non-predicted host-only action
 
 probe_cmd_add :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
 	p := cast(^Probe)entity
@@ -733,8 +737,9 @@ probe_cmd_loot :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) 
 
 @(test)
 command_then_fires_on_authority_only :: proc(t: ^testing.T) {
+	LOOT :: u16(0xc57) // hash-sized like a generated id, unique within the set
 	desc := probe_desc()
-	cmds := [?]knet.Command_Desc{{name = "loot", predict = true, invoke = probe_cmd_loot}}
+	cmds := [?]knet.Command_Desc{{name = "loot", id = LOOT, predict = true, invoke = probe_cmd_loot}}
 	set := knet.Command_Set{entity_desc = &desc, commands = cmds[:]}
 
 	log := Then_Log{}
@@ -752,9 +757,9 @@ command_then_fires_on_authority_only :: proc(t: ^testing.T) {
 	defer knet.command_ctx_destroy(&hctx)
 	hctx.game_user = &log
 
-	knet.command_begin(&cctx, knet.Net_Id(1), 0)
+	knet.command_begin(&cctx, knet.Net_Id(1), LOOT)
 	knet.write_i32(&cctx.msg, 5)
-	testing.expect(t, knet.command_issue(&cctx, &client, &set, 0), "prediction applies")
+	testing.expect(t, knet.command_issue(&cctx, &client, &set, LOOT), "prediction applies")
 	testing.expect_value(t, client.hp, i32(15))
 	testing.expect_value(t, log.fires, 0) // on spec: the consequence stays quiet
 

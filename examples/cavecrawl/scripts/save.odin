@@ -118,7 +118,9 @@ cave_lobby_on_resume :: proc(self: ^CaveLobby) {
 		fmt.tprintf(
 			"CAVE_RESUMED me=%d players=%d entities=%d reg=%d dwellers=%d gems=%d door=%v",
 			u64(self.ses.me),
-			ksess.session_count(&self.ses),
+			// ROSTER size, disconnected rows included — after a resume everyone
+			// starts disconnected; the receipt counts seats, not presence.
+			ksess.session_count(&self.ses, connected_only = false, players_only = false),
 			len(self.boot.ent_nodes),
 			knet.registry_count(&self.ses.reg),
 			len(self.dwellers),
@@ -161,7 +163,9 @@ cave_lobby_took_over :: proc(self: ^CaveLobby, r: ^knet.Reader) {
 		fmt.tprintf(
 			"CAVE_TAKEOVER me=%d players=%d entities=%d dwellers=%d",
 			u64(self.ses.me),
-			ksess.session_count(&self.ses),
+			// Roster rows, like CAVE_RESUMED — the takeover moment still counts
+			// seats mid-reconnect, not who has knocked yet.
+			ksess.session_count(&self.ses, connected_only = false, players_only = false),
 			knet.registry_count(&self.ses.reg),
 			len(self.dwellers),
 		),

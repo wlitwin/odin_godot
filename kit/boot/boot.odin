@@ -123,6 +123,14 @@ Options :: struct {
 // A shipping build that prefers tear-free rendering sets Options.keep_vsync.
 @(private = "file")
 unthrottle_desktop :: proc() {
+	// DEV BUILDS ONLY. A shipped build must neither tear by default nor cap a
+	// 240 Hz display at 120 — the playtest unthrottle keys on the BUILD, not
+	// on whichever display server the player happens to run. -disable-assert
+	// is the release line every kit guardrail already draws; past it the
+	// engine's vsync default stands and keep_vsync is moot.
+	when ODIN_DISABLE_ASSERT {
+		return
+	}
 	ds := gd.singleton_display_server()
 	name := gd.display_server_get_name(ds)
 	buf: [64]u8
