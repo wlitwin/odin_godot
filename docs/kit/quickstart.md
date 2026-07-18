@@ -101,7 +101,6 @@ hello_net_ready :: proc(self: ^HelloNet) {
 		legend = "Arrows move · Enter chat",
 		env = "HELLO",
 		min_players = 1,
-		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
 	kboot.boot_entities(&self.boot, self, hello_net_entity_kinds[:])
 	switch gd.env_string("HELLO_ROLE", "") {

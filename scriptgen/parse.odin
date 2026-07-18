@@ -3317,7 +3317,20 @@ parse_replicate_info :: proc(
 		if strings.has_prefix(spec, "interp=") {
 			name := strings.trim_space(spec[len("interp="):])
 			if name == "" {
-				error_at(floc, "%s.%s: `interp=` needs a blend proc name (a knet.Blend_Proc in this package)", struct_name, field_label)
+				error_at(floc, "%s.%s: `interp=` needs `angle` or a blend proc name (a knet.Blend_Proc in this package)", struct_name, field_label)
+				continue
+			}
+			// `interp=angle` is RESERVED: f32 radians blend the shortest arc
+			// (a raw lerp from +3.1 to -3.1 sweeps the long way around) — the
+			// built-in nobody should hand-write. Any other name is an author
+			// Blend_Proc, spliced verbatim.
+			if name == "angle" {
+				if interp_lerp_kind(type_text) != ".F32" {
+					error_at(floc, "%s.%s: `interp=angle` wants f32 radians (f32, or fixed arrays of f32) — %q isn't", struct_name, field_label, type_text)
+					continue
+				}
+				rep.interp = true
+				rep.lerp = ".Angle"
 				continue
 			}
 			rep.interp = true
@@ -3392,7 +3405,7 @@ parse_replicate_info :: proc(
 			rep.predict = true
 		case "":
 		case:
-			error_at(floc, "%s.%s: unknown replicate option %q (expected `interp`, `interp=BLEND_PROC`, `owner`, `predict`, `wire=f16`, or `wire=CODEC`)", struct_name, field_label, spec)
+			error_at(floc, "%s.%s: unknown replicate option %q (expected `interp`, `interp=angle`, `interp=BLEND_PROC`, `owner`, `predict`, `wire=f16`, or `wire=CODEC`)", struct_name, field_label, spec)
 		}
 	}
 	// A field has ONE authority lane: `owner` streams from its owning peer,

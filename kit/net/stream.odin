@@ -247,6 +247,13 @@ stream_blend :: proc(entity: rawptr, desc: ^Entity_Desc, lo, hi: []u8, alpha: f3
 		case .Quat:
 			assert(f.size == 16, ".Quat blends exactly 4 x f32 (xyzw)")
 			quat_nlerp(([^]f32)(dst), ([^]f32)(&lo[off]), ([^]f32)(&hi[off]), alpha)
+		case .Angle:
+			df := ([^]f32)(dst)
+			lf := ([^]f32)(&lo[off])
+			hf := ([^]f32)(&hi[off])
+			for i in 0 ..< f.size / 4 {
+				df[i] = angle_lerp(lf[i], hf[i], alpha) // shortest arc, never the long way around
+			}
 		case .Custom:
 			assert(f.blend != nil, "lerp = .Custom needs Field_Desc.blend")
 			f.blend(rawptr(dst), rawptr(&lo[off]), rawptr(&hi[off]), alpha)

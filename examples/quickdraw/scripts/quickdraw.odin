@@ -151,10 +151,12 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 	// Coop games leave `sim` false.
 	ng := kui.Net_Stats{
 		rtt_ms  = kui.net_ping_ms(&self.ses),
+		drops   = ksess.session_malformed(&self.ses),
 		sim     = true,
 		lead    = ksim.lane_lead(&self.lane),
 		resims  = self.lane.stat_resims,
 		recons  = self.lane.stat_reconciles,
+		fact_drops = self.lane.stat_facts_dropped,
 		traffic = netgd.wire_traffic(&self.boot.wire),
 	}
 	if _, jit, loss, has := netgd.wire_link_quality(&self.boot.wire, ksess.HOST_PEER); has {

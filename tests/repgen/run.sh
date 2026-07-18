@@ -1849,7 +1849,7 @@ if ! echo "$LRP_OUT" | grep -q "can only snap between samples"; then
 	echo "$LRP_OUT" | tail -4
 	exit 1
 fi
-if ! echo "$LRP_OUT" | grep -q "needs a blend proc name"; then
+if ! echo "$LRP_OUT" | grep -q "needs .angle. or a blend proc name"; then
 	echo "REPGEN_FAIL: missing the empty interp= error:"
 	echo "$LRP_OUT" | tail -4
 	exit 1

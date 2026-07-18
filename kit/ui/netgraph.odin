@@ -31,10 +31,12 @@ Net_Stats :: struct {
 	rtt_ms:    f64, // round trip; net_ping_ms(s) is the easy fill
 	jitter_ms: f64, // connection-quality wobble; netgd.wire_link_quality fills it on clients (ENet's rtt variance); 0 = unknown, quality falls back to rtt
 	loss_pct:  f64, // packet loss percent — wire_link_quality again; drawn (and rated) when > 0
+	drops:     u64, // malformed session packets dropped — ksess.session_malformed(s); drawn when > 0 (a moving count = corruption or a build the fingerprint door never saw)
 	sim:       bool, // draw the sim row? (false on the coop model)
 	lead:      int, // ksim.lane_lead(l) — the client's working lead in ticks
 	resims:    int, // lane.stat_resims — running tally; the widget sparks its per-frame delta
 	recons:    int, // lane.stat_reconciles — running tally
+	fact_drops: int, // lane.stat_facts_dropped — world facts refused by a full queue; drawn when > 0
 	// The bytes-by-kind line, pre-formatted by netgd.wire_traffic(&boot.wire)
 	// — the widget renders it opaquely ("" = skip the row), so kit/ui never
 	// imports the transport.
@@ -103,6 +105,9 @@ netgraph_refresh :: proc(ng: ^Netgraph, stats: Net_Stats) {
 	if stats.loss_pct > 0 {
 		fmt.sbprintf(&b, "  loss %.1f%%", stats.loss_pct)
 	}
+	if stats.drops > 0 {
+		fmt.sbprintf(&b, "  drop %d", stats.drops)
+	}
 	fmt.sbprintf(&b, "  %s", net_quality(stats))
 
 	if stats.traffic != "" {
@@ -117,6 +122,9 @@ netgraph_refresh :: proc(ng: ^Netgraph, stats: Net_Stats) {
 			strings.write_string(&b, SPARK_ROWS[ng.spark[(ng.head + i) % SPARK_N]])
 		}
 		fmt.sbprintf(&b, "  rec %d", stats.recons)
+		if stats.fact_drops > 0 {
+			fmt.sbprintf(&b, "  fdrop %d", stats.fact_drops)
+		}
 	}
 
 	gd.set_string(cast(gd.Object)ng.label, "text", fmt.ctprintf("%s", strings.to_string(b)))

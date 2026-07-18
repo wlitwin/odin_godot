@@ -1,5 +1,7 @@
 package kit_net
 
+import "core:math"
+
 // delta — descriptor-driven dirty tracking and delta serialization.
 //
 // A replicated entity declares its fields (in generated code: the gd:"replicate"
@@ -73,7 +75,28 @@ Lerp_Kind :: enum u8 {
 	F64,    // as F32 but f64 elements
 	Quat,   // 4 x f32 quaternion: nlerp with hemisphere flip + renormalize (a raw
 	        // componentwise lerp collapses through zero when q and -q meet)
-	Custom, // author-supplied Blend_Proc (special math: wrapped angles, color spaces, …)
+	Angle,  // f32 RADIANS (componentwise like F32): shortest-arc lerp — a raw
+	        // lerp from +3.1 to -3.1 sweeps the long way around the circle.
+	        // Declared `gd:"replicate,interp=angle"`; wrapped into (-π, π].
+	Custom, // author-supplied Blend_Proc (special math: color spaces, splines, …)
+}
+
+// The shortest signed step from `a` to `b` around the circle, in (-π, π] —
+// the .Angle blend's core, public because glide/error math needs the same
+// wrap anywhere an angle difference is taken.
+angle_arc :: proc "contextless" (a, b: f32) -> f32 {
+	d := math.mod(b - a, math.TAU)
+	switch {
+	case d > math.PI:
+		d -= math.TAU
+	case d <= -math.PI:
+		d += math.TAU
+	}
+	return d
+}
+
+angle_lerp :: proc "contextless" (a, b, alpha: f32) -> f32 {
+	return a + angle_arc(a, b) * alpha
 }
 
 // How a field's bytes are ENCODED inside packets. The struct-side representation
@@ -118,14 +141,11 @@ Wire_Codec :: struct {
 // sample) and `b` (later sample) into the ENTITY field at `dst`. All three point
 // at exactly Field_Desc.size bytes. Authors declare one via the tag:
 //
-//     heading: f32 `gd:"replicate,owner,interp=blend_heading"`
+//     tint: [3]f32 `gd:"replicate,owner,interp=blend_oklab"`
 //
-//     blend_heading :: proc(dst, a, b: rawptr, alpha: f32) {
-//         av := (^f32)(a)^
-//         bv := (^f32)(b)^
-//         (^f32)(dst)^ = av + shortest_arc(av, bv) * alpha
-//     }
+//     blend_oklab :: proc(dst, a, b: rawptr, alpha: f32) { ... }
 //
+// (Wrapped HEADINGS are built in — `interp=angle` — don't hand-write those.)
 // scriptgen splices the proc name into the generated descriptor, so a missing
 // or wrongly-typed blend proc fails the consumer compile with the field's line.
 Blend_Proc :: proc(dst, a, b: rawptr, alpha: f32)

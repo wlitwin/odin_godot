@@ -83,8 +83,10 @@ sim_cmd_find :: proc(cmds: []Sim_Cmd, id: u16) -> int {
 }
 
 // How long a command may sit unanswered before the client treats silence as
-// rejection and restores its revert buffer, in ledger slots (ticks).
-CMD_EXPIRE_SLOTS :: 128
+// rejection and restores its revert buffer: the LANE'S ring depth (l.slots)
+// — past that horizon the entry can't reconcile anyway. (This was a fixed
+// 128 regardless of cfg.slots: a deeper ring expired commands it could
+// still have settled; a shallower one held reverts it could no longer use.)
 
 // The most scheduled-but-unexecuted commands the host will hold per player
 // — an untrusted-input cap, far above any honest burst.
@@ -484,7 +486,7 @@ cmd_exec_local :: proc(l: ^Lane, c: ^Cmd_Out, tr: ^Tracked, me: knet.Player_Id, 
 cmd_settle :: proc(l: ^Lane) {
 	for i := 0; i < len(l.cmd_out); i += 1 {
 		c := &l.cmd_out[i]
-		if c.verdict == .Pending && c.executed && l.ticker.tick > c.tick + CMD_EXPIRE_SLOTS {
+		if c.verdict == .Pending && c.executed && l.ticker.tick > c.tick + u64(l.slots) {
 			c.verdict = .Rejected // silence past the horizon = a lost seat or a dead host
 		}
 		if c.verdict != .Rejected || !c.executed {

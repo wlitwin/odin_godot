@@ -213,6 +213,13 @@ predict_within :: proc(a: []u8, b: []u8, desc: ^knet.Entity_Desc, eps: f32) -> b
 					return false
 				}
 			}
+		case .Angle:
+			for i in 0 ..< f.size / 4 {
+				// wrapped compare: 3.14 vs -3.14 is a sliver, not a mismatch
+				if abs(knet.angle_arc((^f32)(rawptr(&a[off + i * 4]))^, (^f32)(rawptr(&b[off + i * 4]))^)) > fe {
+					return false
+				}
+			}
 		case .F64:
 			for i in 0 ..< f.size / 8 {
 				av := (^f64)(rawptr(&a[off + i * 8]))^

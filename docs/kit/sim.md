@@ -409,6 +409,15 @@ between. `lane_rewound(l, shooter, user, query)` is the same judgment as a
 callback, for the places a proc value reads better (tests, table-driven
 weapons).
 
+**Scope, precisely:** the rewind winds back the PREDICT-SET fields of every
+tracked entity except the shooter's own — nothing else. Delta-lane fields
+(hp, scores, gear), untracked entities, and any game-side maps read LIVE
+inside the block. That is usually what you want (quickdraw judges a rewound
+pose but applies damage to live hp — a dead man's past body shouldn't eat a
+new bullet), but it means a predicate like "was the target shielded when
+the shooter saw them" must keep its shield in the predict set, or it reads
+today's shield against yesterday's pose.
+
 The rewind view is **fact-anchored and interpolated**: every input arrives
 in a packet that also carries the sender's snapshot ack and its render
 offset, and the buffer tags each input with both — so when the server
@@ -677,9 +686,15 @@ needs a `predict` float. scriptgen rejects each on the wrong field, spelled out.
   which on a ticking class are tick-scheduled and replayed by construction
   (see "Discrete verbs on the lane").
 - **Engine physics can't re-step.** Predicted movement must be query-based
-  kinematics (ray/shape casts are stateless and re-runnable); a rigid body
-  can be sim-lane state only if you own its integration in the step proc.
-  This is the same line every Godot rollback system draws.
+  kinematics; a rigid body can be sim-lane state only if you own its
+  integration in the step proc. This is the same line every Godot rollback
+  system draws. And be precise about what a cast may TOUCH: an engine
+  ray/shape cast is re-runnable only against STATIC geometry (walls, the
+  arena), because a replay queries the physics server's CURRENT node poses
+  — a cast that can hit another entity's collider reads the latest frame,
+  not the replayed tick, and mispredicts every time bodies move. Entity-vs-
+  entity tests belong in Odin against the tracked structs' own fields (the
+  examples' overlap checks are all field math for exactly this reason).
 - **Reading delta-lane fields in a tick is legal — and a mispredict source
   at their change edges.** A replay sees the field's CURRENT value, not the
   value it held at the replayed tick, and a client learns the change a

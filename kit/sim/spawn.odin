@@ -39,9 +39,9 @@ import ksess "godot:kit/session"
 // authority's ids increment from 1 and never reach here (2^31 entities).
 PROVISIONAL_BIT :: u32(0x8000_0000)
 
-// How long an unmatched provisional rides before it is swept as a lost fire,
-// in ticks. Comfortably past a bad round trip — a real spawn matches long first.
-SPAWN_EXPIRE_SLOTS :: 128
+// How long an unmatched provisional rides before it is swept as a lost fire:
+// the lane's ring depth (l.slots) — comfortably past a bad round trip, and
+// honest when cfg.slots resizes the lane's whole memory (it was a fixed 128).
 
 // A node-free hook: when the lane despawns a provisional (reject or sweep) the
 // engine layer must free the node it made for it, keyed by the provisional id.
@@ -166,7 +166,7 @@ lane_spawn_reject :: proc(l: ^Lane, seq: u32) -> rawptr {
 lane_spawn_sweep :: proc(l: ^Lane, out: ^[dynamic]rawptr = nil) {
 	for i := 0; i < len(l.tracked); {
 		tr := l.tracked[i]
-		if tr.provisional && l.ticker.tick > tr.born + SPAWN_EXPIRE_SLOTS {
+		if tr.provisional && l.ticker.tick > tr.born + u64(l.slots) {
 			if out != nil {
 				append(out, tr.entity)
 			}

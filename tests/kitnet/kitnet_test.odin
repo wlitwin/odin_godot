@@ -1870,3 +1870,16 @@ reject_truth_spares_the_sim_lane :: proc(t: ^testing.T) {
 	testing.expect_value(t, live.hp, 99) // truth landed on the delta lane...
 	testing.expect_value(t, live.px, 42) // ...and the sim lane was spared
 }
+
+// ---- .Angle: the shortest arc, never the long way around --------------------
+
+@(test)
+angle_lerp_crosses_pi_the_short_way :: proc(t: ^testing.T) {
+	// +3.1 to -3.1 is a 0.083-radian sliver across ±π, not a 6.2-radian spin.
+	mid := knet.angle_lerp(3.1, -3.1, 0.5)
+	testing.expect(t, abs(abs(mid) - 3.14159265) < 0.01, "the midpoint must sit ON the ±π seam")
+	// The arc itself is small and positive-bound.
+	testing.expect(t, abs(knet.angle_arc(3.1, -3.1)) < 0.1, "the ±π crossing is a sliver")
+	// And a plain non-wrapping pair still lerps linearly.
+	testing.expect_value(t, knet.angle_lerp(0.0, 1.0, 0.25), 0.25)
+}

@@ -152,9 +152,12 @@ Command_Set :: struct {
 
 At most `MAX_REPLICATED_FIELDS :: 64` fields per entity (the dirty mask is one u64; a
 fixed array counts as one field). `Lerp_Kind` covers `.Snap`, `.F32`, `.F64`, `.Quat`
-(nlerp with hemisphere flip), and `.Custom` with an author-supplied
+(nlerp with hemisphere flip), `.Angle` — f32 **radians** blending the shortest
+arc, declared `` heading: f32 `gd:"replicate,owner,interp=angle"` `` (a raw
+lerp from `+3.1` to `-3.1` sweeps the long way around; every hand-rolled
+heading blend was this) — and `.Custom` with an author-supplied
 `Blend_Proc :: proc(dst, a, b: rawptr, alpha: f32)` — declared via
-`` heading: f32 `gd:"replicate,owner,interp=blend_heading"` ``.
+`` tint: [3]f32 `gd:"replicate,owner,interp=blend_oklab"` ``.
 
 ## Consequences (`<verb>_then`)
 

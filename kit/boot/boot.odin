@@ -44,10 +44,45 @@ import "core:fmt"
 import "core:strings"
 
 // The eight signal landing pads, in one fixed order: host/join/start button
-// presses, chat submit, then the four transport forwards.
+// presses, chat submit, then the four transport forwards. A zero Methods
+// (the field simply not passed) resolves to STANDARD_METHODS — every game
+// wrote these same eight strings; now only a game that DEVIATES writes any
+// (scriptgen validates the defaulted names too, so a missing on_host is
+// still a build error, not a dead button). "" in an explicit list skips
+// that one signal on purpose.
 Methods :: struct {
 	host, join, start, chat:                cstring,
 	packet, peer_left, net_up, net_down: cstring,
+}
+
+STANDARD_METHODS :: Methods {
+	host      = "on_host",
+	join      = "on_join",
+	start     = "on_start",
+	chat      = "on_chat",
+	packet    = "on_packet",
+	peer_left = "on_peer_left",
+	net_up    = "on_net_up",
+	net_down  = "on_net_down",
+}
+
+// Where the boot stands, coarse and honest — the two booleans every game
+// declared and threaded by hand (`running`, `started`), without the hand.
+//   .Menu       — no transport; the Host/Join doors are showing
+//   .Connecting — a join door opened, no seat yet (includes a code resolving)
+//   .Lobby      — seated (hosting counts), the world not yet on this screen
+//   .Playing    — the world reached this peer (first spawn/state/resync)
+// A failed or denied join and a kick fall back to .Menu; a host loss stays
+// put (succession may re-seat — the welcome moves it, not the loss).
+Boot_Phase :: enum u8 {
+	Menu,
+	Connecting,
+	Lobby,
+	Playing,
+}
+
+boot_phase :: proc(b: ^Boot) -> Boot_Phase {
+	return b.phase
 }
 
 Options :: struct {
@@ -72,7 +107,7 @@ Options :: struct {
 	lobby_scene: gd.Packed_Scene,
 	chat_scene:  gd.Packed_Scene,
 	score_scene: gd.Packed_Scene,
-	methods:     Methods,
+	methods:     Methods, // zero = STANDARD_METHODS (on_host/on_join/…) — pass only to deviate
 }
 
 // TWO WINDOWS, ONE LAPTOP — every friendslop game gets playtested this way,
@@ -140,6 +175,11 @@ Boot :: struct {
 	succ_name:        string, // boot-owned clones (door callers pass temps)
 	succ_url:         string,
 
+	// The boot's lifecycle phase — the `running`/`started` latch pair every
+	// game hand-kept, tracked once: doors advance it, boot_pump's event
+	// drain moves it on seats and world arrival. Read boot_phase(b).
+	phase: Boot_Phase,
+
 	// boot_host_coded/boot_join_code's state (the join-code rendezvous,
 	// netgd/code.odin): pumped inside boot_pump — a host's minted code lands
 	// in the lobby status (and boot_room_code), a joiner's resolved endpoint
@@ -178,6 +218,10 @@ boot_lane :: proc(b: ^Boot, lane: ^ksim.Lane) {
 // The ready() ceremony. Call once, after installing your factory/hooks is
 // fine either side — this wires UI + comms + transport, nothing session-run.
 boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms.Comms, opts: Options) {
+	opts := opts
+	if opts.methods == (Methods{}) {
+		opts.methods = STANDARD_METHODS // the eight names every game wrote anyway
+	}
 	b.ses = ses
 	b.comms = comms
 	b.min_players = opts.min_players > 0 ? opts.min_players : 2
@@ -303,14 +347,27 @@ boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, mar
 			kui.lobby_refresh(&b.ui, b.ses)
 			kui.score_refresh(&b.score, b.ses)
 			kui.lobby_set_status(&b.ui, "Seated — waiting for the host to start")
+			b.phase = .Lobby // a fresh seat; the world (or its resync) moves it on
 		case ksess.Ev_Player_Joined, ksess.Ev_Player_Left:
 			roster_changed(b)
 		case ksess.Ev_Stats_Updated:
 			kui.score_refresh(&b.score, b.ses)
+		case ksess.Ev_Spawned, ksess.Ev_Resynced, ksess.Ev_State_Applied:
+			// The world is on this screen (every role: a host's own first
+			// spawn lands here too) — the `started` latch, kept once.
+			if b.phase == .Lobby {
+				b.phase = .Playing
+			}
 		case ksess.Ev_Join_Failed:
 			kui.lobby_set_status(&b.ui, "Could not reach the host")
+			b.phase = .Menu
+		case ksess.Ev_Join_Denied:
+			b.phase = .Menu
+		case ksess.Ev_Kicked:
+			b.phase = .Menu
 		case ksess.Ev_Host_Left:
 			kui.lobby_set_status(&b.ui, "The host left — round over")
+			// (phase stays — succession may re-seat; the welcome moves it.)
 		}
 		append(&evs, ev)
 	}
@@ -385,14 +442,22 @@ boot_token :: proc(b: ^Boot) -> u64 {
 
 // The Host button, ceremony included: transport up, session started, menu
 // hidden, status set, chat shown. false = port taken (status already says
-// so). `token` is the host's own reconnect identity (session_host_start) —
-// pass it so a dead host can reclaim its seat from a resumed run.
+// so). `token` is the host's own reconnect identity (session_host_start);
+// the 0 default resolves to boot_token — the machine's persisted identity —
+// so a dead host reclaims its seat from a resumed run WITHOUT the game
+// remembering to pass one (token 0 shipped in every reference game and
+// silently forfeited exactly that).
 boot_host :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64 = 0) -> bool {
+	token := token
+	if token == 0 {
+		token = boot_token(b)
+	}
 	if !netgd.begin_host(&b.wire, port, name, max_peers, token) {
 		kui.lobby_set_status(&b.ui, "Could not host (port taken?)")
 		return false
 	}
 	boot_succ_config(b, false, port, "", token, name)
+	b.phase = .Lobby // hosting seats you outright; the first spawn moves it on
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Hosting on :%d — waiting for friends", port))
 	kui.lobby_refresh(&b.ui, b.ses)
@@ -409,10 +474,15 @@ boot_host :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64
 // (see examples/slopball's `serve` role). Native only: a browser tab makes a
 // poor always-on box. false = the port was taken.
 boot_serve :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64 = 0) -> bool {
+	token := token
+	if token == 0 {
+		token = boot_token(b) // stable server identity — a restart is a resume
+	}
 	if !netgd.begin_host(&b.wire, port, name, max_peers, token, dedicated = true) {
 		kui.lobby_set_status(&b.ui, "Could not host (port taken?)")
 		return false
 	}
+	b.phase = .Lobby
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Serving on :%d", port))
 	kui.chat_show(&b.chat, true)
@@ -438,6 +508,7 @@ boot_join :: proc(b: ^Boot, addr: cstring, port: int, token: u64, name: string, 
 		return false
 	}
 	boot_succ_config(b, false, port, "", token, name)
+	b.phase = .Connecting // Ev_Welcomed seats it; Ev_Join_Failed sends it home
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, status)
 	kui.chat_show(&b.chat, true)
@@ -450,11 +521,16 @@ boot_join :: proc(b: ^Boot, addr: cstring, port: int, token: u64, name: string, 
 // code (host migration pre-arranges tomorrow's room; the relay honors a free
 // valid code, else assigns). false = the relay socket refused.
 boot_host_web :: proc(b: ^Boot, url: cstring, name: string, token: u64 = 0, room: cstring = "") -> bool {
+	token := token
+	if token == 0 {
+		token = boot_token(b) // same reclaim default as boot_host
+	}
 	if !netgd.begin_host_web(&b.wire, url, name, token, room) {
 		kui.lobby_set_status(&b.ui, "Could not reach the relay")
 		return false
 	}
 	boot_succ_config(b, true, 0, url, token, name)
+	b.phase = .Lobby
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, "Opening a room…")
 	kui.chat_show(&b.chat, true)
@@ -469,6 +545,7 @@ boot_join_web :: proc(b: ^Boot, url: cstring, room: cstring, token: u64, name: s
 		return false
 	}
 	boot_succ_config(b, true, 0, url, token, name)
+	b.phase = .Connecting
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Joining room %s…", room))
 	kui.chat_show(&b.chat, true)
@@ -514,6 +591,7 @@ boot_join_code :: proc(b: ^Boot, url: cstring, code: string, token: u64, name: s
 		delete(b.rdv_name)
 	}
 	b.rdv_name = strings.clone(name)
+	b.phase = .Connecting // the phonebook first, then the join proper
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Looking up %s…", code))
 	kui.chat_show(&b.chat, true)
@@ -563,6 +641,7 @@ boot_code_pulse :: proc(b: ^Boot) {
 			}
 			kui.lobby_set_status(&b.ui, fmt.tprintf("Join code failed — %s", why))
 			kui.lobby_show_menu(&b.ui, true, false) // back to the doors
+			b.phase = .Menu
 		}
 		netgd.code_close(&b.rdv)
 	}

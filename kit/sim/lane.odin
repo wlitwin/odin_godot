@@ -243,6 +243,8 @@ Lane :: struct {
 	// running tallies, game-readable (a resim burst is a netgraph datum)
 	stat_resims:     int,
 	stat_reconciles: int,
+	stat_facts_dropped: int, // world facts refused by a full queue — a moving count means the game presents too rarely (or FACT_QUEUE_CAP is honestly too small)
+	stat_render_sat:    int, // render_off8 hit the wire's 31.5-tick ceiling — the authority now rewinds LESS than this screen's true delay (lag comp judges shallow)
 
 	// active inline rewind (lane_rewound_begin/end) — live captures to restore
 	wound:           [dynamic]Wound,
@@ -1009,6 +1011,13 @@ render_off8 :: proc(l: ^Lane) -> u8 {
 	if l.watch_clock > 0 && f64(l.rx.acked) > l.watch_clock {
 		off = f64(l.rx.acked) - l.watch_clock
 	}
+	if off > 31.5 {
+		// The wire ceiling (u8 in 1/8 ticks): a screen running further behind
+		// than this REPORTS the ceiling, so the authority's lag comp rewinds
+		// less than the shooter's true delay and shots judge shallow. Counted
+		// — a moving tally is a stall/overload symptom, not a tuning knob.
+		l.stat_render_sat += 1
+	}
 	off = clamp(off, 0, min(f64(2 * l.watch_delay + 4), 31.5))
 	return u8(off * 8)
 }
@@ -1556,7 +1565,11 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 		tick := knet.read_u64(r)
 		id := knet.Net_Id(knet.read_u32(r))
 		blob := knet.read_bytes(r)
-		if r.err || len(l.facts) >= FACT_QUEUE_CAP {
+		if r.err {
+			return
+		}
+		if len(l.facts) >= FACT_QUEUE_CAP {
+			l.stat_facts_dropped += 1 // counted, never silent — netgraph's sim row shows it
 			return
 		}
 		args := make([]u8, len(blob))

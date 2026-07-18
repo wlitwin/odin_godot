@@ -401,9 +401,12 @@ session_app_send_to :: proc(s: ^Session, player: knet.Player_Id, tag: u8, bytes:
 	session_app_send(s, p.peer, tag, bytes)
 }
 
-// Remote entities render this far in the past (~3 net ticks at 20 Hz): almost
-// always a bracketing sample pair, smooth through jitter and single drops.
-DEFAULT_INTERP_DELAY :: 0.15
+// Remote entities render this many NET TICKS in the past: almost always a
+// bracketing sample pair, smooth through jitter and single drops. The default
+// DERIVES from the configured rate (3 ticks = the old fixed 0.15s at the
+// 20 Hz default) — a 60 Hz game used to inherit 9 ticks of needless latency,
+// a 10 Hz game only 1.5 ticks of buffer (not even a stable pair).
+DEFAULT_INTERP_TICKS :: 3.0
 
 // Predictions whose result never arrives revert after this long.
 DEFAULT_COMMAND_TIMEOUT :: 3.0 // seconds — far beyond any sane RTT
@@ -474,6 +477,7 @@ Session :: struct {
 	ticker:       knet.Ticker,
 	clocks:       map[Peer_Id]knet.Clock_Sync, // per transport peer, fed by ping/pong
 	pongs:        int, // pong samples applied (games gate "clock is warm" on this)
+	malformed:    u64, // session packets dropped mid-parse (truncation, corruption, a foreign build past the fingerprint) — counted, never silent; netgraph's `drop` reads it
 	now:          f64, // the game's monotonic seconds, updated each session_tick
 	replicating:  bool, // host: the world is LIVE (deltas flow; joiners get SES_WORLD)
 	ran:          bool, // session_init completed at least once — gates the re-entrant teardown
@@ -604,6 +608,7 @@ session_init :: proc(s: ^Session) {
 		s.replicating = false
 		s.stats_dirty = false
 		s.pongs = 0
+		s.malformed = 0
 		s.next_player = {}
 		s.backup_tick = 0
 		s.backup_target = {}
@@ -613,7 +618,7 @@ session_init :: proc(s: ^Session) {
 	// seconds and baked to tick counts HERE, against the configured rate.
 	s.tick_hz = s.cfg.tick_hz > 0 ? s.cfg.tick_hz : knet.DEFAULT_TICK_HZ
 	hz := f64(s.tick_hz)
-	s.interp_delay = s.cfg.interp_delay > 0 ? s.cfg.interp_delay : DEFAULT_INTERP_DELAY
+	s.interp_delay = s.cfg.interp_delay > 0 ? s.cfg.interp_delay : DEFAULT_INTERP_TICKS / hz
 	s.pending_max_age = u64((s.cfg.command_timeout > 0 ? s.cfg.command_timeout : DEFAULT_COMMAND_TIMEOUT) * hz)
 	s.join_timeout = int((s.cfg.join_timeout > 0 ? s.cfg.join_timeout : DEFAULT_JOIN_TIMEOUT) * hz)
 	s.backup_every = u64((s.cfg.backup_interval > 0 ? s.cfg.backup_interval : DEFAULT_BACKUP_INTERVAL) * hz)
@@ -2198,6 +2203,24 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 // `from_peer` is the transport sender (hosts route by it; clients only ever
 // hear from the host — except streams, which any owning peer may broadcast).
 session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
+	handle_packet_inner(s, from_peer, r)
+	if r.err {
+		// A packet died mid-parse — every inner bail leaves r.err set, so the
+		// drop is COUNTED here no matter which of the ~30 read sites refused
+		// it. (Role-gate returns leave r.err clear: discipline, not damage.)
+		s.malformed += 1
+	}
+}
+
+// How many session packets this peer dropped mid-parse. A moving count on a
+// live link means truncation, corruption, or a mismatched build the
+// fingerprint door didn't get to refuse — surface it (netgraph does).
+session_malformed :: proc(s: ^Session) -> u64 {
+	return s.malformed
+}
+
+@(private = "file")
+handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 	kind := knet.read_u8(r)
 	if r.err {
 		return

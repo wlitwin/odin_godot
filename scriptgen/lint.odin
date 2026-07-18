@@ -258,7 +258,11 @@ claim_visit :: proc(node: ^ast.Node) -> bool {
 			claim_add(st, arg, callee)
 		}
 	case "boot_attach":
-		// Find the Options literal's `methods = {...}` field, wherever it sits.
+		// Find the Options literal's `methods = {...}` field, wherever it
+		// sits. An Options literal WITHOUT one rides the kit's standard
+		// eight (kboot.STANDARD_METHODS) — claim those, so a game leaning
+		// on the default and missing an on_host still fails at build time.
+		found_methods := false
 		for arg in call.args {
 			cl, is_cl := arg.derived.(^ast.Comp_Lit)
 			if !is_cl {continue}
@@ -266,12 +270,20 @@ claim_visit :: proc(node: ^ast.Node) -> bool {
 				fv, is_fv := elem.derived.(^ast.Field_Value)
 				if !is_fv {continue}
 				if node_text(st.src, fv.field) != "methods" {continue}
+				found_methods = true
 				mcl, is_m := fv.value.derived.(^ast.Comp_Lit)
 				if !is_m {continue}
 				for me in mcl.elems {
 					claim_add(st, me, "boot_attach methods")
 				}
 			}
+			if !found_methods {
+				std := [8]string{"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"}
+				for name in std {
+					append(st.claims, Method_Claim{struct_name = st.struct_name, method = name, call = "boot_attach defaulted methods", path = st.path, line = cl.pos.line})
+				}
+			}
+			break // the Options literal is the one Comp_Lit argument
 		}
 	}
 	return true
@@ -291,11 +303,19 @@ lint_method_claims :: proc(claims: []Method_Claim, by_struct: map[string]^Script
 			}
 		}
 		if !found {
-			error_at(
-				Loc{path = c.path, line = c.line},
-				"%s: %q names no @(gd_method) of %s — the signal will never connect (declare `@(gd_method) %s_%s :: proc(self: ^%s, ...)`, or pass \"\" to skip on purpose)",
-				c.call, c.method, c.struct_name, to_snake(c.struct_name), c.method, c.struct_name,
-			)
+			if c.call == "boot_attach defaulted methods" {
+				error_at(
+					Loc{path = c.path, line = c.line},
+					"boot_attach defaults Options.methods to the standard eight, and %q names no @(gd_method) of %s — declare `@(gd_method) %s_%s :: proc(self: ^%s, ...)`, or pass Options.methods yourself (\"\" skips a slot on purpose)",
+					c.method, c.struct_name, to_snake(c.struct_name), c.method, c.struct_name,
+				)
+			} else {
+				error_at(
+					Loc{path = c.path, line = c.line},
+					"%s: %q names no @(gd_method) of %s — the signal will never connect (declare `@(gd_method) %s_%s :: proc(self: ^%s, ...)`, or pass \"\" to skip on purpose)",
+					c.call, c.method, c.struct_name, to_snake(c.struct_name), c.method, c.struct_name,
+				)
+			}
 		}
 	}
 }

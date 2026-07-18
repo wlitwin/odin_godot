@@ -52,6 +52,16 @@ predict_error :: proc(err: []u8, shown: []u8, truth: []u8, desc: ^knet.Entity_De
 					over = true
 				}
 			}
+		case .Angle:
+			for i in 0 ..< f.size / 4 {
+				// The error is the SHORT arc — a glide across ±π must not
+				// spin the long way any more than the blend does.
+				d := knet.angle_arc((^f32)(rawptr(&truth[off + i * 4]))^, (^f32)(rawptr(&shown[off + i * 4]))^)
+				(^f32)(rawptr(&err[off + i * 4]))^ = d
+				if fc > 0 && abs(d) > fc {
+					over = true
+				}
+			}
 		case .F64:
 			for i in 0 ..< f.size / 8 {
 				d := (^f64)(rawptr(&shown[off + i * 8]))^ - (^f64)(rawptr(&truth[off + i * 8]))^
@@ -86,7 +96,7 @@ predict_error_decay :: proc(err: []u8, desc: ^knet.Entity_Desc, dt: f64, halflif
 		hl := f.glide > 0 ? f64(f.glide) : halflife
 		k := f32(math.pow(0.5, dt / hl))
 		#partial switch f.lerp {
-		case .F32:
+		case .F32, .Angle: // an angle error is already the short arc — plain decay
 			for i in 0 ..< f.size / 4 {
 				(^f32)(rawptr(&err[off + i * 4]))^ *= k
 			}
@@ -115,6 +125,12 @@ predict_error_apply :: proc(entity: rawptr, desc: ^knet.Entity_Desc, err: []u8) 
 		case .F32:
 			for i in 0 ..< f.size / 4 {
 				(^f32)(rawptr(base + uintptr(i * 4)))^ += (^f32)(rawptr(&err[off + i * 4]))^
+			}
+		case .Angle:
+			for i in 0 ..< f.size / 4 {
+				p := (^f32)(rawptr(base + uintptr(i * 4)))
+				// add the gliding error, then keep the shown value in (-π, π]
+				p^ = knet.angle_arc(0, p^ + (^f32)(rawptr(&err[off + i * 4]))^)
 			}
 		case .F64:
 			for i in 0 ..< f.size / 8 {
@@ -158,6 +174,13 @@ predict_blend :: proc(entity: rawptr, desc: ^knet.Entity_Desc, a: []u8, b: []u8,
 			bd := ([^]f64)(bp)
 			for i in 0 ..< f.size / 8 {
 				dd[i] = ad[i] + (bd[i] - ad[i]) * f64(alpha)
+			}
+		case .Angle:
+			df := ([^]f32)(dst)
+			af := ([^]f32)(ap)
+			bf := ([^]f32)(bp)
+			for i in 0 ..< f.size / 4 {
+				df[i] = knet.angle_lerp(af[i], bf[i], alpha) // shortest arc across ±π
 			}
 		case .Quat:
 			// nlerp with hemisphere flip: a raw componentwise lerp collapses
