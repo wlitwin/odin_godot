@@ -522,6 +522,13 @@ cmd_settle :: proc(l: ^Lane) {
 		c.mask = 0
 		c.ok = false
 		for o in later {
+			// A survivor's re-exec may SPAWN (lane_spawn_predicted appends to
+			// l.tracked and can REALLOCATE it) — a ^Tracked held across the
+			// loop would dangle for the next survivor. Re-resolve each pass.
+			tr = cmd_tracked(l, c.id)
+			if tr == nil {
+				break
+			}
 			cmd_exec_local(l, o, tr, l.ses.me, re = true)
 		}
 	}

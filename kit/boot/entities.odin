@@ -277,6 +277,13 @@ boot_spawn_send :: proc(b: ^Boot, id: knet.Net_Id) {
 // single-player-shaped. Returns (entity, provisional id).
 boot_spawn_predicted :: proc(b: ^Boot, type: ksess.Entity_Type, owner: knet.Player_Id) -> (entity: rawptr, id: knet.Net_Id) {
 	assert(b.lane != nil, "boot_spawn_predicted needs a sim lane (boot_lane) — a projectile flies on it")
+	if e0, id0, exists := ksim.lane_spawn_of_exec(b.lane); exists {
+		// A reject-chain re-execution (cmd_settle re-runs surviving verb
+		// bodies): this fire's projectile already exists — still provisional,
+		// or already rekeyed by the authority's spawn. Hand it back; a second
+		// node would be a ghost the FIFO match can never pair.
+		return e0, id0
+	}
 	for &k in b.ent_kinds {
 		if k.type != type {continue}
 		assert(k.sim_set != nil, "a predicted projectile must @(gd_tick) — it flies itself with no inputs")

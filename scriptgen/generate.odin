@@ -932,7 +932,10 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		// owning peer's live pass only — a replay re-runs the tick, never
 		// the presentation, and never double-fires a consequence.
 		if s.tick.then_proc != "" {
-			w(b, "\tif ksim.lane_is_authority(lane) {\n\t\t")
+			// in_auth marks the authority-only context for lane_fact's
+			// provenance-aware owner skip: a fact door announced from a `_then`
+			// must INCLUDE the anchor's owner — their screen never ran this half.
+			w(b, "\tif ksim.lane_is_authority(lane) {\n\t\tlane.in_auth = true\n\t\t")
 			if s.tick.then_game != "" {
 				fmt.sbprintf(b, "assert(ksim.lane_game(lane) != nil, \"%s needs the game pointer — lane_set_sim's user is what tick consequences receive\")\n\t\t", s.tick.then_proc)
 				fmt.sbprintf(b, "%s(cast(^%s)ksim.lane_game(lane), self, owner", s.tick.then_proc, s.tick.then_game)
@@ -942,7 +945,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			for i in 0 ..< s.tick.payload_count {
 				fmt.sbprintf(b, ", _p%d", i)
 			}
-			w(b, ")\n\t}\n")
+			w(b, ")\n\t\tlane.in_auth = false\n\t}\n")
 		}
 		if s.tick.fx_proc != "" && !s.tick.fx_mine {
 			w(b, "\tif owner == ksim.lane_me(lane) && !lane.resimming {\n\t\t")
@@ -1063,7 +1066,9 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 					w(b, ")}\n")
 				}
 				if c.then_proc != "" {
-					w(b, "\tif _ok && ksim.lane_is_authority(lane) {\n")
+					// in_auth: a fact door announced from this authority-only
+					// half must include the anchor's owner in the broadcast.
+					w(b, "\tif _ok && ksim.lane_is_authority(lane) {\n\t\tlane.in_auth = true\n")
 					if c.then_game != "" {
 						fmt.sbprintf(b, "\t\tassert(ksim.lane_game(lane) != nil, \"%s needs the game pointer — lane_set_sim's user is what consequences receive\")\n", c.then_proc)
 						fmt.sbprintf(b, "\t\t%s(cast(^%s)ksim.lane_game(lane), self, by", c.then_proc, c.then_game)
@@ -1076,7 +1081,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 					for i in 0 ..< c.payload_count {
 						fmt.sbprintf(b, ", _p%d", i)
 					}
-					w(b, ")\n\t}\n")
+					w(b, ")\n\t\tlane.in_auth = false\n\t}\n")
 				}
 				w(b, "\treturn _ok\n}\n\n")
 				if c.apply_proc != "" {
@@ -1251,7 +1256,95 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				fmt.sbprintf(b, "\tksim.lane_add_input_class(l, %d, size_of(%s), %s)\n", ic.class_id, ic.type_name, sample_ref)
 			}
 		}
+		if len(s.facts) > 0 {
+			fmt.sbprintf(b, "\tksim.lane_set_facts(l, _%s_fact_table[:])\n", snake)
+		}
 		w(b, "}\n\n")
+
+		// ---- @(gd_fact): the world-pass fact doors, written by nobody ----
+		// The author wrote `<event>_fx` (the presentation half); each door here
+		// is the bare `<event>` name the sim calls where it DISCOVERS the event.
+		// Every gate lives in the door, so the call site is role-free.
+		if len(s.facts) > 0 {
+			w(b, "// ---- @(gd_fact) world-pass facts: the announce doors ----\n")
+			w(b, "// Stable wire ids — an FNV-1a hash of each event's name, never a position:\n")
+			w(b, "// reordering declarations can't renumber the wire.\n")
+			for f in s.facts {
+				fmt.sbprintf(b, "FACT_%s :: u16(0x%x)\n", strings.to_upper(f.name), cmd_wire_id(f.name))
+			}
+			w(b, "\n")
+			for f in s.facts {
+				fmt.sbprintf(b, "// Announce %q — call it where the sim discovers the event (the world\n", f.name)
+				w(b, "// pass, or an authority-only half). The door holds every gate: the\n")
+				w(b, "// authority broadcasts to watching screens (they fire on the watch\n")
+				w(b, "// clock, beside the delayed avatar), the causer's live pass fires now\n")
+				w(b, "// (mine=true), a resim replay never re-fires, and screens with no part\n")
+				w(b, "// in it stay silent.\n")
+				fmt.sbprintf(b, "%s :: proc(l: ^ksim.Lane", f.name)
+				if f.anchor != "" {
+					fmt.sbprintf(b, ", %s: ^%s", f.anchor_param, f.anchor)
+				}
+				for a, i in f.arg_names {
+					fmt.sbprintf(b, ", %s: %s", a, f.arg_types[i])
+				}
+				w(b, ") {\n")
+				w(b, "\tif ksim.lane_is_authority(l) {\n")
+				w(b, "\t\t_fw := knet.writer_make(64, context.temp_allocator)\n")
+				for a, i in f.arg_names {
+					fmt.sbprintf(b, "\t\tknet.write_%s(&_fw, %s)\n", f.arg_wires[i], a)
+				}
+				anchor_ref := f.anchor != "" ? f.anchor_param : "nil"
+				fmt.sbprintf(b, "\t\tksim.lane_fact(l, %s, knet.writer_bytes(&_fw), FACT_%s)\n", anchor_ref, strings.to_upper(f.name))
+				w(b, "\t}\n")
+				if f.anchor != "" {
+					w(b, "\tif ksim.lane_live(l) {\n")
+					fmt.sbprintf(b, "\t\t_owner := ksim.lane_owner_of(l, %s)\n", f.anchor_param)
+					w(b, "\t\t_mine := _owner != knet.PLAYER_ID_INVALID && _owner == ksim.lane_me(l)\n")
+					w(b, "\t\tif _mine || ksim.lane_is_authority(l) {\n")
+					fmt.sbprintf(b, "\t\t\t%s(cast(^%s)ksim.lane_game(l), %s, _mine", f.fx_proc, cls, f.anchor_param)
+					for a in f.arg_names {
+						fmt.sbprintf(b, ", %s", a)
+					}
+					w(b, ")\n\t\t}\n\t}\n")
+				} else {
+					// Anchorless: the WORLD caused it — the authority's own live
+					// simulation is the causer (mine=true on its screen alone);
+					// every client presents from the broadcast, on the watch clock.
+					w(b, "\tif ksim.lane_is_authority(l) && ksim.lane_live(l) {\n")
+					fmt.sbprintf(b, "\t\t%s(cast(^%s)ksim.lane_game(l), true", f.fx_proc, cls)
+					for a in f.arg_names {
+						fmt.sbprintf(b, ", %s", a)
+					}
+					w(b, ")\n\t}\n")
+				}
+				w(b, "}\n\n")
+				// The decode thunk (the lane's fact table): SIM_FACT bytes →
+				// typed args → the half, fired when the watch clock arrives.
+				fmt.sbprintf(b, "@(private = \"file\")\n_%s_fact_%s :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {{\n", snake, f.name)
+				if len(f.arg_names) > 0 {
+					w(b, "\tr := knet.reader_make(args)\n")
+					for wr, i in f.arg_wires {
+						fmt.sbprintf(b, "\t_a%d := knet.read_%s(&r)\n", i, wr)
+					}
+					w(b, "\tif r.err {return}\n")
+				}
+				if f.anchor != "" {
+					fmt.sbprintf(b, "\t%s(cast(^%s)ksim.lane_game(lane), cast(^%s)entity, mine", f.fx_proc, cls, f.anchor)
+				} else {
+					w(b, "\t_ = entity\n")
+					fmt.sbprintf(b, "\t%s(cast(^%s)ksim.lane_game(lane), mine", f.fx_proc, cls)
+				}
+				for _, i in f.arg_names {
+					fmt.sbprintf(b, ", _a%d", i)
+				}
+				w(b, ")\n}\n\n")
+			}
+			fmt.sbprintf(b, "@(private = \"file\")\n_%s_fact_table := [?]ksim.Fact_Desc{{\n", snake)
+			for f in s.facts {
+				fmt.sbprintf(b, "\t{{id = FACT_%s, fx = _%s_fact_%s}},\n", strings.to_upper(f.name), snake, f.name)
+			}
+			w(b, "}\n\n")
+		}
 	}
 
 	// ---- the BOOT-routed authority step (@(gd_step="authority"), no lane) ----

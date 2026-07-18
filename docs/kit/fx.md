@@ -5,6 +5,12 @@ Code-driven juice: one-shot particle bursts, hit-flash tweens, and the projectil
 summon these. An entity that keeps its own emitter (a carried torch, a pyre) authors it in
 its scene instead — kit/fx is for FX with no authored home.
 
+**Lane compatibility: presentation is lane-agnostic; the triggers differ.** Bursts,
+flashes, and tweens fire from wherever presentation legally runs — coop `_edge` halves
+and announces, or sim `_fx` halves and [declared facts](sim.md). The TRACER pool and
+`fire_announce` are the COOP projectile answer specifically; a sim game's projectiles
+are predicted *entities* (sim.md says why), which carry their own visuals.
+
 ```odin
 import kfx "godot:kit/fx"
 ```

@@ -106,3 +106,25 @@ Already shipped on the coop model and outgrowing it? The choice is not
 all-or-nothing: sim.md's **"Promoting a coop game"** checklist migrates one
 contested entity at a time (slopball → speedball is the worked diff), and a
 hybrid is a supported end state.
+
+## What follows a promotion — the gameplay modules
+
+"Two netcodes, one surface" is exact at the session layer (identity, chat,
+transfers, saves, the boot ride along untouched). The GAMEPLAY shelves were
+grown on the coop model, and each doc now opens with its lane stance; the
+map:
+
+| Module | Stance |
+|---|---|
+| comms, xfer, save, ui | **Lane-agnostic** — session-level, use as-is |
+| interact | Pure geometry, sim-safe; the prompt pattern is coop-shaped |
+| items | Slot math sim-safe; inventories ride the delta lane (hybrid per-field) |
+| combat | **Coop wire** — sim games use predict fields, verbs, and declared facts instead; math ports |
+| ai | Coop NPC shape; brains move to the authority pass, math ports |
+| fx | Presentation ports; the tracer pool is coop's projectile answer (sim projectiles are entities) |
+| nav | **Never in a resimulating pass** — coop host brains and the sim authority pass only |
+
+The open question (deliberately unresolved, not silently assumed): whether
+`Inventory($N)`/`Cooldowns` embed-bundles can sit under a sim snapshot
+descriptor. Until a game forces it, a hybrid keeps those fields on the
+delta lane.

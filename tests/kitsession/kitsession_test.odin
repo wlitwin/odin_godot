@@ -2032,6 +2032,61 @@ profiles_declare_echo_and_catchup :: proc(t: ^testing.T) {
 }
 
 @(test)
+profile_table_scopes_to_the_run :: proc(t: ^testing.T) {
+	// The rehost/re-declare hole: profile rows are RUN state. A back-to-lobby
+	// rehost must not relay the dead run's rows under recycled seats, and a
+	// client whose row is UNCHANGED since the last run must still re-declare
+	// to a NEW host — the declare shadow dies with the run (and again at
+	// every join), or the diff eats the declare and the row stays invisible
+	// all session. host_resume is the one keeper (the heir swaps its table
+	// around the re-init); a rejoin re-declares anyway, so even a
+	// fresh-session resume repopulates.
+	Pick :: struct {
+		look:  u8,
+		ready: bool,
+	}
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_profile_install(&host.s, Pick)
+	ksess.session_profile_install(&alice.s, Pick)
+
+	// Run one: alice declares.
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	now := 100.0
+	ksess.session_profile_mine(&alice.s, Pick).look = 3
+	for _ in 0 ..< 12 {step(boxes, &now)}
+	hv, hok := ksess.session_profile_of(&host.s, alice.s.me, Pick)
+	testing.expect(t, hok, "run one: the declare landed")
+	testing.expect_value(t, hv.look, u8(3))
+	old_seat := alice.s.me
+
+	// Back to lobby, RE-HOST: the dead run's rows are gone — a fresh player
+	// seated on the recycled id inherits nothing.
+	ksess.session_host_start(&host.s, "hosty")
+	_, stale := ksess.session_profile_of(&host.s, old_seat, Pick)
+	testing.expect(t, !stale, "a rehost relays no dead run's rows")
+
+	// Alice rejoins and writes the SAME row bytes as last run — unchanged
+	// state must still reach the new host (a surviving shadow would eat it).
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	ksess.session_profile_mine(&alice.s, Pick).look = 3
+	for _ in 0 ..< 12 {step(boxes, &now)}
+	hv2, hok2 := ksess.session_profile_of(&host.s, alice.s.me, Pick)
+	testing.expect(t, hok2, "an unchanged row re-declares to a NEW host")
+	testing.expect_value(t, hv2.look, u8(3))
+}
+
+@(test)
 write_guard_names_a_client_rogue_write :: proc(t: ^testing.T) {
 	// THE canonical co-op bug: a client assigns to a host-lane field —
 	// compiles, looks right locally, never replicates. The shadow-as-bless

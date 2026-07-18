@@ -4,6 +4,15 @@ Reach for `kit/nav` when a brain needs to walk around walls instead of through t
 engine already owns the hard parts (nav meshes, region merging, funnel pathfinding);
 kit/nav makes the two calls a game actually needs ergonomic, in both dimensions.
 
+**Lane compatibility: NEVER inside a resimulating pass.** These calls query the
+NavigationServer — live engine state that does not rewind. Inside `@(gd_tick)` or the
+everywhere `@(gd_step)` a resim replay would query TODAY's mesh state for YESTERDAY's
+ticks and diverge from the prediction it is rebuilding — the same law as
+[engine casts](sim.md) but worse, because paths steer entities. Legal homes: coop host
+brains (the host never resims) and the sim lane's `@(gd_step="authority")` pass (the
+authority never resims). Path FOLLOWING from a stored polyline is pure math and
+sim-safe anywhere; it's the *query* that must stay on a never-resimming pass.
+
 ## Mental model
 
 Two calls:

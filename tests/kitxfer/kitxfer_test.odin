@@ -207,3 +207,62 @@ album_welcomes_the_late_joiner :: proc(t: ^testing.T) {
 	_, _, dup := kxfer.album_poll(&alice.album)
 	testing.expect(t, !dup, "the catch-up was addressed, not broadcast")
 }
+
+@(test)
+xfer_fast_supersede_keeps_done_bytes :: proc(t: ^testing.T) {
+	// The dangling-Ev_Done hole: payload A's last chunk and payload B's first
+	// land in ONE pump window (the ordered channel + a re-put) — the seq-0
+	// restart used to free A's buffer with its Ev_Done still queued, and the
+	// consumer copied from freed memory. Now the buffer RETIRES: alive until
+	// its event drains, freed by the next pump.
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	hx, ax: kxfer.Xfer
+	kxfer.xfer_init(&hx, &host.s, 7)
+	kxfer.xfer_init(&ax, &alice.s, 7)
+	defer kxfer.xfer_destroy(&hx)
+	defer kxfer.xfer_destroy(&ax)
+
+	a := payload(0xAA, 64)
+	b := payload(0xBB, 64)
+	defer delete(a)
+	defer delete(b)
+	kxfer.xfer_send(&hx, 3, a)
+	kxfer.xfer_pump(&hx) // A ships whole (one chunk)...
+	kxfer.xfer_send(&hx, 3, b)
+	kxfer.xfer_pump(&hx) // ...and B's restarting chunk rides the same window
+	pump(boxes)          // both land before alice ever polls — the hole's window
+
+	saw_a, saw_b := false, false
+	for {
+		ev, ok := kxfer.xfer_poll(&ax)
+		if !ok {break}
+		if d, is_done := ev.(kxfer.Ev_Done); is_done {
+			if !saw_a {
+				saw_a = true
+				testing.expect_value(t, len(d.bytes), len(a))
+				same := true
+				for bt, i in d.bytes {
+					if bt != a[i] {same = false; break}
+				}
+				testing.expect(t, same, "the superseded payload's bytes survive until its event drains")
+			} else {
+				saw_b = true
+				testing.expect_value(t, len(d.bytes), len(b))
+			}
+		}
+	}
+	testing.expect(t, saw_a && saw_b, "both payloads completed")
+	kxfer.xfer_pump(&ax) // the drain grace expires: the retiree frees
+	testing.expect_value(t, len(ax.retired), 0)
+}

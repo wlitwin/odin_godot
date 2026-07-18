@@ -57,6 +57,14 @@ Lane_Box :: struct {
 	fx_calls:  int,
 	fx_mine:   bool,
 	fx_x:      f32, // the fact's wire-decoded payload
+
+	// declared world-pass fact probe (@(gd_fact) doors): one recorder slot
+	// per kind under test — calls, the mine bit, the watch clock at fire,
+	// and whether the thunk saw a nil entity (the anchorless form)
+	df_calls: [4]int,
+	df_mine:  [4]bool,
+	df_clock: [4]f64,
+	df_nil:   [4]bool,
 	fx_clock:  f64, // lane.watch_clock at the fire (0 on a live-pass fire)
 	fx_newest: u64, // rx.newest at the fire — proves the watcher fired BEHIND the wire
 }
@@ -1610,6 +1618,135 @@ lane_predicted_projectile_rejected :: proc(t: ^testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// The reject-chain pair: an early rejection makes cmd_settle unwind and
+// RE-EXECUTE the surviving verbs. A survivor that spawned must hand back the
+// projectile it already minted — lane_spawn_of_exec, the boot door's check —
+// never a second provisional (a ghost the FIFO match can't pair); and the
+// settle re-resolves its ^Tracked per survivor, because a spawn's append can
+// reallocate the track list under it.
+
+// The rejectable gate: predicated on delta-lane hp (the authority's purse
+// says no), spawns nothing.
+chain_gate_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool {
+	m := cast(^Mover)entity
+	if m.hp <= 0 {
+		return false
+	}
+	m.hp -= 1
+	return true
+}
+
+// The surviving fire: spawns — through the boot door's contract (reuse the
+// exec's existing spawn on a re-execution, never mint a ghost).
+chain_fire_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool {
+	b := cast(^Lane_Box)ksim.lane_game(lane)
+	shooter := cast(^Mover)entity
+	if ksim.lane_is_authority(lane) {
+		p := new(Mover)
+		p.x = shooter.x
+		p.vx = 3
+		b.proj_ids += 1
+		id := knet.Net_Id(600 + b.proj_ids)
+		b.movers[id] = p
+		ksim.lane_track_set(&b.lane, id, p, b.proj_set, by)
+		b.host_proj = p
+		b.host_proj_id = id
+		return true
+	}
+	if e0, id0, exists := ksim.lane_spawn_of_exec(lane); exists {
+		b.cli_proj = cast(^Mover)e0
+		b.cli_proj_id = id0
+		return true
+	}
+	p := new(Mover)
+	p.x = shooter.x
+	p.vx = 3
+	id := ksim.lane_spawn_predicted(&b.lane, p, b.proj_set, by, PROJ_TYPE)
+	b.movers[id] = p
+	b.cli_proj = p
+	b.cli_proj_id = id
+	return true
+}
+
+@(test)
+lane_reject_chain_keeps_one_projectile :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	proj_set := ksim.Sim_Set{entity_desc = &desc, tick = proj_fly_thunk, input_size = 0}
+	cmds := [?]ksim.Sim_Cmd{{id = 1, exec = chain_gate_exec}, {id = 2, exec = chain_fire_exec}}
+	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds[:]}
+
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	host.proj_set = &proj_set
+	alice.proj_set = &proj_set
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
+	ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
+
+	SHOOTER :: knet.Net_Id(20)
+	for b in boxes {
+		s := new(Mover)
+		s.x = 100
+		b.movers[SHOOTER] = s
+		b.owners[SHOOTER] = 2
+		ksim.lane_track_set(&b.lane, SHOOTER, s, &set, 2)
+	}
+
+	DT :: 1.0 / 60.0
+	settle :: proc(boxes: []^Lane_Box, frames: int) {
+		for _ in 0 ..< frames {
+			ksim.lane_frame(&boxes[0].lane, DT)
+			lane_pump(boxes)
+			ksim.lane_frame(&boxes[1].lane, DT)
+			ksim.lane_present(&boxes[1].lane, DT)
+			lane_pump(boxes)
+		}
+	}
+	settle(boxes, 60)
+
+	// Divergent purse: alice's screen says the gate is legal; the authority
+	// refuses it. The fire behind it survives either way — the verb burst.
+	alice.movers[SHOOTER].hp = 1
+	host.movers[SHOOTER].hp = 0
+	testing.expect(t, ksim.lane_command(&alice.lane, SHOOTER, 1, nil), "the gate schedules")
+	testing.expect(t, ksim.lane_command(&alice.lane, SHOOTER, 2, nil), "the fire schedules behind it")
+	ksim.lane_frame(&alice.lane, DT) // both speculate; the fire spawns ONE provisional
+	testing.expect(t, alice.cli_proj != nil, "the shot left her screen this tick")
+	first_id := alice.cli_proj_id
+
+	prov_count :: proc(l: ^ksim.Lane) -> int {
+		n := 0
+		for tr in l.tracked {
+			if tr.provisional {
+				n += 1
+			}
+		}
+		return n
+	}
+	testing.expect_value(t, prov_count(&alice.lane), 1)
+
+	// The reject lands; cmd_settle unwinds the gate and RE-EXECUTES the fire.
+	settle(boxes, 90)
+	testing.expect_value(t, prov_count(&alice.lane), 1) // reused, never a ghost
+	testing.expect(t, ksim.lane_tracks(&alice.lane, first_id), "the original projectile still flies")
+	testing.expect_value(t, alice.cli_proj_id, first_id) // the re-exec handed back the same spawn
+	// Truth healed the purse: the refused gate never spent on the authority.
+	testing.expect_value(t, host.movers[SHOOTER].hp, i32(0))
+}
+
+// ---------------------------------------------------------------------------
 // Every-screen facts (the mine-form _fx): the owner's live pass fires
 // mine=true instantly; the authority presents everyone else's facts as its
 // own live pass (mine=false); a WATCHING third peer receives SIM_FACT and
@@ -1734,4 +1871,198 @@ lane_facts_reach_every_screen_on_time :: proc(t: ^testing.T) {
 	// The payload crossed intact: every screen decoded the authoritative x.
 	testing.expect_value(t, host.fx_x, alice.fx_x) // prediction matched truth (no loss)
 	testing.expect_value(t, bob.fx_x, host.fx_x)
+}
+
+// ---------------------------------------------------------------------------
+// Declared world-pass facts (@(gd_fact) doors): the same every-screen laws as
+// tick facts, minted from the WORLD passes. Four laws pinned:
+//   (1) everywhere-pass anchored fact — the anchor owner's live pass fires
+//       mine=true once (broadcast skips them: no echo double-fire), the
+//       authority fires live mine=false, a watcher fires at the watch clock,
+//       and a screen with no part stays silent at announce time;
+//   (2) PROVENANCE — the same door called from an AUTHORITY-ONLY context
+//       (in_auth) INCLUDES the anchor's owner in the broadcast: their screen
+//       never ran the announcing code, so the wire copy is their only fire;
+//   (3) anchorless world fact — the authority's live pass is the causer
+//       (mine=true there), every client presents at the watch clock with a
+//       nil entity;
+//   (4) despawn-drop — an anchored fact whose anchor untracks before the
+//       watch clock arrives is dropped, never fired against a dead entity.
+
+DF_BUMP :: u16(0x1001) // slot 0: everywhere-pass anchored
+DF_ADJU :: u16(0x1002) // slot 1: authority-context anchored (provenance)
+DF_HORN :: u16(0x1003) // slot 2: anchorless
+DF_LATE :: u16(0x1004) // slot 3: despawn-drop (must never fire)
+
+DF_BUMP_AT :: u64(60)
+DF_ADJU_AT :: u64(120)
+DF_HORN_AT :: u64(150)
+DF_LATE_AT :: u64(180)
+
+df_record :: proc(slot: int, entity: rawptr, lane: ^ksim.Lane, mine: bool) {
+	b := cast(^Lane_Box)ksim.lane_game(lane)
+	b.df_calls[slot] += 1
+	b.df_mine[slot] = mine
+	b.df_clock[slot] = lane.watch_clock
+	b.df_nil[slot] = entity == nil
+}
+
+df_fx_bump :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(0, entity, lane, mine)}
+df_fx_adju :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(1, entity, lane, mine)}
+df_fx_horn :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(2, entity, lane, mine)}
+df_fx_late :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(3, entity, lane, mine)}
+
+df_table := [?]ksim.Fact_Desc{
+	{id = DF_BUMP, fx = df_fx_bump},
+	{id = DF_ADJU, fx = df_fx_adju},
+	{id = DF_HORN, fx = df_fx_horn},
+	{id = DF_LATE, fx = df_fx_late},
+}
+
+// Mirrors the generated ANCHORED door: authority broadcasts, the live pass
+// fires where this screen's own simulation caused it.
+df_door :: proc(l: ^ksim.Lane, entity: rawptr, kind: u16, slot: int) {
+	if ksim.lane_is_authority(l) {
+		ksim.lane_fact(l, entity, {}, kind)
+	}
+	if ksim.lane_live(l) {
+		owner := ksim.lane_owner_of(l, entity)
+		mine := owner != knet.PLAYER_ID_INVALID && owner == ksim.lane_me(l)
+		if mine || ksim.lane_is_authority(l) {
+			df_record(slot, entity, l, mine)
+		}
+	}
+}
+
+// Mirrors the generated ANCHORLESS door: the world (the authority's own
+// simulation) is the causer.
+df_door_horn :: proc(l: ^ksim.Lane) {
+	if ksim.lane_is_authority(l) {
+		ksim.lane_fact(l, nil, {}, DF_HORN)
+		if ksim.lane_live(l) {
+			df_record(2, nil, l, true)
+		}
+	}
+}
+
+// The EVERYWHERE pass: every peer announces the bump at its tick — the door's
+// gates sort the screens (that is the whole point of the channel).
+df_step :: proc(user: rawptr, tick: u64) {
+	b := cast(^Lane_Box)user
+	if tick == DF_BUMP_AT {
+		m := b.movers[20] // alice's avatar — she caused it
+		df_door(&b.lane, m, DF_BUMP, 0)
+	}
+}
+
+// The AUTHORITY pass: adjudication facts — the lane marks in_auth around this
+// pass, so the broadcast must INCLUDE alice (she never ran this code).
+df_step_auth :: proc(user: rawptr, tick: u64) {
+	b := cast(^Lane_Box)user
+	switch tick {
+	case DF_ADJU_AT:
+		df_door(&b.lane, b.movers[20], DF_ADJU, 1)
+	case DF_HORN_AT:
+		df_door_horn(&b.lane)
+	case DF_LATE_AT:
+		df_door(&b.lane, b.movers[20], DF_LATE, 3)
+	}
+}
+
+@(test)
+lane_declared_facts_world_pass :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	host, alice, bob: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	lbox_make(&bob, 101)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	defer lbox_destroy(&bob)
+	boxes := []^Lane_Box{&host, &alice, &bob}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, 0xB0B, "bob")
+	ksess.session_client_join(&bob.s)
+	lane_pump(boxes)
+	testing.expect_value(t, alice.s.me, knet.Player_Id(2))
+	testing.expect_value(t, bob.s.me, knet.Player_Id(3))
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1}
+	pairs := [?]struct {
+		id:    knet.Net_Id,
+		owner: knet.Player_Id,
+	}{{10, 1}, {20, 2}}
+	for b in boxes {
+		ksim.lane_init(&b.lane, &b.s, 1, cfg = cfg)
+		ksim.lane_set_sim(&b.lane, b, lbox_sample, df_step, df_step_auth)
+		ksim.lane_set_facts(&b.lane, df_table[:])
+		for p in pairs {
+			m := new(Mover)
+			b.movers[p.id] = m
+			b.owners[p.id] = p.owner
+			ksim.lane_track_set(&b.lane, p.id, m, &set, p.owner)
+		}
+	}
+
+	DT :: 1.0 / 60.0
+	for i in 1 ..= 300 {
+		host.ax = 1
+		alice.ax = 1
+		ksim.lane_frame(&host.lane, DT)
+		lane_pump(boxes)
+		ksim.lane_frame(&alice.lane, DT)
+		ksim.lane_present(&alice.lane, DT)
+		ksim.lane_frame(&bob.lane, DT)
+		ksim.lane_present(&bob.lane, DT)
+		lane_pump(boxes)
+		if i == int(DF_LATE_AT) + 1 {
+			// The despawn races the render delay: bob loses the anchor before
+			// his watch clock reaches the fact — the filed fact must drop.
+			ksim.lane_untrack(&bob.lane, 20)
+		}
+	}
+
+	// (1) The everywhere-pass bump: alice (the causer) fired mine, live, once
+	// — the broadcast skipped her, so no echo double-fire; the authority
+	// presented it live (mine=false); bob presented it ON the watch clock.
+	testing.expect_value(t, alice.df_calls[0], 1)
+	testing.expect(t, alice.df_mine[0], "the causer's bump is mine")
+	testing.expect_value(t, host.df_calls[0], 1)
+	testing.expect(t, !host.df_mine[0], "the authority presents a remote bump")
+	testing.expect_value(t, bob.df_calls[0], 1)
+	testing.expect(t, !bob.df_mine[0], "a watcher's bump is never mine")
+	testing.expect(t, bob.df_clock[0] >= f64(DF_BUMP_AT), "bob fires once the watch clock reaches the bump")
+	testing.expect(t, bob.df_clock[0] <= f64(DF_BUMP_AT) + 3, "and not meaningfully later")
+
+	// (2) PROVENANCE: the adjudication fact was minted in the authority pass —
+	// alice never ran that code, so the broadcast included her; her only fire
+	// is the wire copy, at her watch clock, mine=false. (The tick-fact skip
+	// here would have orphaned it on exactly the screen it is most about.)
+	testing.expect_value(t, host.df_calls[1], 1)
+	testing.expect(t, !host.df_mine[1], "the authority's adjudication is not mine (alice's avatar)")
+	testing.expect_value(t, alice.df_calls[1], 1)
+	testing.expect(t, !alice.df_mine[1], "alice presents the authority's word, not a prediction")
+	testing.expect(t, alice.df_clock[1] >= f64(DF_ADJU_AT), "on her watch clock")
+	testing.expect_value(t, bob.df_calls[1], 1)
+
+	// (3) The anchorless horn: the authority's own live pass is the causer;
+	// both clients present at the watch clock with a nil entity.
+	testing.expect_value(t, host.df_calls[2], 1)
+	testing.expect(t, host.df_mine[2], "the world's horn is the authority's own simulation")
+	testing.expect_value(t, alice.df_calls[2], 1)
+	testing.expect(t, !alice.df_mine[2], "a client presents the world's horn")
+	testing.expect(t, alice.df_nil[2], "anchorless: the thunk sees a nil entity")
+	testing.expect_value(t, bob.df_calls[2], 1)
+	testing.expect(t, bob.df_clock[2] >= f64(DF_HORN_AT), "on the watch clock")
+
+	// (4) Despawn-drop: bob lost the anchor before his watch clock arrived —
+	// the filed fact dropped instead of firing against a dead entity. The
+	// authority (live) and alice (still tracking) both presented it.
+	testing.expect_value(t, host.df_calls[3], 1)
+	testing.expect_value(t, alice.df_calls[3], 1)
+	testing.expect_value(t, bob.df_calls[3], 0)
 }

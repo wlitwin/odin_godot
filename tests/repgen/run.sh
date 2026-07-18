@@ -332,6 +332,253 @@ for needle in \
 done
 echo "  ok  lane wiring generated (per-class typed samples, primary + lane_add_input_class, board_lane_init)"
 
+# @(gd_fact) artifacts (the declared world-pass facts): a stable FNV id const
+# per event, the announce DOOR under the bare event name holding every gate
+# (authority broadcast via lane_fact with the kind; anchored = owner-derived
+# `mine` on the live pass; anchorless = the authority's live pass alone), the
+# decode thunk per event, the package fact table, and its install inside
+# board_lane_init. The doors compile with the package (the odin check above).
+for needle in \
+	'FACT_PAWN_BUMPED :: u16(0x' \
+	'FACT_BOARD_HORN :: u16(0x' \
+	'pawn_bumped :: proc(l: ^ksim.Lane, p: ^Pawn, force: f32)' \
+	'board_horn :: proc(l: ^ksim.Lane, side: u8)' \
+	'ksim.lane_fact(l, p, knet.writer_bytes(&_fw), FACT_PAWN_BUMPED)' \
+	'ksim.lane_fact(l, nil, knet.writer_bytes(&_fw), FACT_BOARD_HORN)' \
+	'_owner := ksim.lane_owner_of(l, p)' \
+	'_mine := _owner != knet.PLAYER_ID_INVALID && _owner == ksim.lane_me(l)' \
+	'if ksim.lane_is_authority(l) && ksim.lane_live(l) {' \
+	'_board_fact_pawn_bumped :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8)' \
+	'pawn_bumped_fx(cast(^Board)ksim.lane_game(lane), cast(^Pawn)entity, mine, _a0)' \
+	'_board_fact_table := [?]ksim.Fact_Desc{' \
+	'ksim.lane_set_facts(l, _board_fact_table[:])' \
+; do
+	if ! grep -qF "$needle" "$BGEN"; then
+		echo "REPGEN_FAIL: generated file is missing fact artifact: $needle"
+		exit 1
+	fi
+done
+# The tick-fact skip law, inverted for provenance: both authority-only `_then`
+# wraps mark in_auth so a door announced there INCLUDES the anchor's owner.
+if ! grep -qF 'lane.in_auth = true' "$GEN"; then
+	echo "REPGEN_FAIL: the tick _then wrap is missing the in_auth provenance mark"
+	exit 1
+fi
+echo "  ok  fact doors generated (FNV ids, gates, decode thunks, table installed in lane_init)"
+
+# ---- @(gd_fact) contract violations are scriptgen-time errors ----
+# Five misuses in one lane-carrying package, plus the no-lane package: each
+# must surface as a teaching error, never a half that silently can't fire.
+FBAD="$TMP/factbad"
+mkdir -p "$FBAD"
+cat > "$FBAD/fgame.odin" <<'EOF'
+//gd:extends Node
+//gd:class FGame
+package repgen_factbad
+
+import gd "godot:godot"
+
+FGame :: struct {
+	owner: gd.Node,
+}
+
+F_In :: struct {
+	ax: i8,
+}
+
+@(gd_sample)
+fgame_sample :: proc(self: ^FGame, tick: u64, input: ^F_In) {
+}
+
+@(gd_fact)
+f_bad_name :: proc(g: ^FGame, mine: bool, v: f32) { // not `_fx`-named
+}
+
+@(gd_fact)
+f_nomine_fx :: proc(g: ^FGame, v: f32) { // the mine-form marker missing
+}
+
+@(gd_fact)
+f_struct_fx :: proc(g: ^FGame, mine: bool, v: F_In) { // not a wire primitive
+}
+
+@(gd_fact)
+f_verdict_fx :: proc(g: ^FGame, mine: bool) -> bool { // a fact decides nothing
+	return false
+}
+
+@(gd_fact)
+f_taken_fx :: proc(g: ^FGame, mine: bool) { // the door's name is claimed below
+}
+
+f_taken :: proc() {
+}
+EOF
+cat > "$FBAD/fpawn.odin" <<'EOF'
+//gd:extends Node2D
+//gd:class FPawn
+package repgen_factbad
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+FPawn :: struct {
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id,
+	x:      f32 `gd:"replicate,predict"`,
+}
+
+@(gd_tick)
+fpawn_tick :: proc(self: ^FPawn, input: F_In) {
+}
+EOF
+set +e
+FBAD_OUT="$(run_scriptgen "$FBAD" 2>&1)"
+FBAD_RC=$?
+set -e
+if [ "$FBAD_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: the @(gd_fact) misuse package was accepted by scriptgen"
+	exit 1
+fi
+for want in \
+	"a declared fact IS a presentation half" \
+	"the every-screen law" \
+	"not a wire primitive" \
+	"a fact presents, it decides nothing" \
+	"GENERATED announce door's name" \
+; do
+	if ! echo "$FBAD_OUT" | grep -qF "$want"; then
+		echo "REPGEN_FAIL: fact misuse error missing: $want"
+		echo "$FBAD_OUT" | tail -20
+		exit 1
+	fi
+done
+
+FNOLANE="$TMP/factnolane"
+mkdir -p "$FNOLANE"
+cat > "$FNOLANE/ngame.odin" <<'EOF'
+//gd:extends Node
+//gd:class NGame
+package repgen_factnolane
+
+import gd "godot:godot"
+
+NGame :: struct {
+	owner: gd.Node,
+}
+
+@(gd_fact)
+n_horn_fx :: proc(g: ^NGame, mine: bool) {
+}
+EOF
+set +e
+FNOLANE_OUT="$(run_scriptgen "$FNOLANE" 2>&1)"
+FNOLANE_RC=$?
+set -e
+if [ "$FNOLANE_RC" -eq 0 ] || ! echo "$FNOLANE_OUT" | grep -qF "this package has no lane"; then
+	echo "REPGEN_FAIL: a @(gd_fact) in a laneless package must error (facts ride the watch clock)"
+	echo "$FNOLANE_OUT" | tail -10
+	exit 1
+fi
+echo "  ok  fact misuses rejected: bad name, no mine, non-wire arg, results, taken door, laneless package"
+
+# ---- the silent paths, closed: each of these compiled and silently never
+# ---- worked before — now each is a build error naming the fix ----
+SP="$TMP/silent"
+mkdir -p "$SP"
+cat > "$SP/silent.odin" <<'EOF'
+//gd:extends Node
+//gd:class Silent
+package repgen_silent
+
+import gd "godot:godot"
+import ksess "godot:kit/session"
+
+Row :: struct {
+	look: u8,
+}
+
+Embedded_Misprofile :: struct {
+	ses: ksess.Session `gd:"profile=Row"`, // NESTED profile= — silently never installed
+}
+
+Silent :: struct {
+	owner:      gd.Node,
+	using gone: Ghost_Bundle, // a `using` embed that resolves to nothing
+	sub:        Embedded_Misprofile,
+}
+
+Helper :: struct {
+	n: int,
+}
+
+// A method on a receiver that is neither a script class nor an embedded
+// block — it used to register nowhere, silently.
+@(gd_method)
+helper_poke :: proc(h: ^Helper) {
+}
+
+// gd_connect without gd_method — it used to compile and never connect.
+@(gd_connect = "pressed")
+silent_click :: proc(self: ^Silent) {
+}
+EOF
+set +e
+SP_OUT="$(run_scriptgen "$SP" 2>&1)"
+SP_RC=$?
+set -e
+if [ "$SP_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: the silent-path package was accepted by scriptgen"
+	exit 1
+fi
+for want in \
+	"silently never connect" \
+	"registers NOWHERE" \
+	"silently never installs" \
+	"doesn't resolve to a struct in this package" \
+; do
+	if ! echo "$SP_OUT" | grep -qF "$want"; then
+		echo "REPGEN_FAIL: silent-path error missing: $want"
+		echo "$SP_OUT" | tail -20
+		exit 1
+	fi
+done
+
+# The unresolved-embed trap's import half: a struct behind a RELATIVE import
+# (scriptgen can't see inside it) must refuse, not silently drop its tags.
+SB="$TMP/silentgear"
+mkdir -p "$SB/gear"
+cat > "$SB/gear/gear.odin" <<'EOF'
+package silent_gear
+
+Gear :: struct {
+	ammo: i32 `gd:"replicate"`,
+}
+EOF
+cat > "$SB/robot.odin" <<'EOF'
+//gd:extends Node
+//gd:class SilentRobot
+package repgen_silentgear
+
+import gd "godot:godot"
+import sg "gear"
+
+SilentRobot :: struct {
+	owner: gd.Node,
+	gun:   sg.Gear, // the gun that never replicated — now a loud refusal
+}
+EOF
+set +e
+SB_OUT="$(run_scriptgen "$SB" 2>&1)"
+SB_RC=$?
+set -e
+if [ "$SB_RC" -eq 0 ] || ! echo "$SB_OUT" | grep -qF "cannot see inside"; then
+	echo "REPGEN_FAIL: a relative-import embed must refuse loudly (the gun that never replicated)"
+	echo "$SB_OUT" | tail -10
+	exit 1
+fi
+echo "  ok  silent paths closed: bare gd_connect, orphan receiver, nested profile=, unresolved using, relative-import embed"
+
 # The second entity's Sim_Set carries its wire class (input_class = 1); the
 # primary pawn's omits it (class 0). Turret's own gen file holds the set.
 TGEN="$GOOD/turret.gen.odin"

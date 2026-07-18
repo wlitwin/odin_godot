@@ -10,6 +10,11 @@
 #     post-impulse velocity — the touch resolved locally, that tick, at
 #     240ms RTT. That is the pattern: the contested object lives on every
 #     peer's predicted timeline.
+#   - the kick is a DECLARED WORLD-PASS FACT (@(gd_fact) ball_kicked_fx; the
+#     step announces through the generated ball_kicked door): the WATCHER,
+#     who never simulated the striker's press, presents SPB_KICK_SEEN from
+#     the authority's broadcast on its watch clock — and the striker's own
+#     screen NEVER double-fires (the broadcast skips the causer).
 #   - the GOAL detects inside the ball's own tick and the reset predicts
 #     (every screen snaps the ball home the moment ITS sim crosses the
 #     line); the SCORE is authority-only (ball_tick_then), landing on the
@@ -71,7 +76,16 @@ for port in 4190 4197; do
     grep -q "SPB_WORLD_UP" "$mlog" || { echo "world never spawned"; ok=0; }
     # The pattern's proof: the striker's OWN screen kicked its OWN predicted
     # ball — locally, at 240ms RTT (the print carries post-impulse velocity).
-    grep -q "SPB_KICK" "$slog" || { echo "the striker never touched its predicted ball"; ok=0; }
+    grep -q "SPB_KICK tick=" "$slog" || { echo "the striker never touched its predicted ball"; ok=0; }
+    # The world-pass fact channel: the WATCHER presents the striker's kick
+    # from the authority's SIM_FACT on its watch clock (it never simulated
+    # the press), the marshal's live truth fires too, and the striker —
+    # skipped by the broadcast — never double-fires its own kick.
+    grep -q "SPB_KICK_SEEN" "$wlog" || { echo "the watcher never presented the striker's kick (fact channel)"; ok=0; }
+    grep -q "SPB_KICK_SEEN" "$mlog" || { echo "the marshal never presented the kick (authority live fire)"; ok=0; }
+    if grep -q "SPB_KICK_SEEN" "$slog"; then
+        echo "the striker double-fired its own kick (broadcast echo not skipped)"; ok=0
+    fi
     # The striker seats as pid 2 → team RIGHT → it scores into the LEFT goal.
     grep -q "SPB_GOAL team=2" "$mlog" || { echo "the authority never scored the goal"; ok=0; }
     for log in "$mlog" "$slog" "$wlog"; do

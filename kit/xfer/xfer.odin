@@ -50,7 +50,13 @@ Ev_Started :: struct {
 Ev_Done :: struct {
 	from:  knet.Player_Id,
 	id:    u8,
-	bytes: []u8, // owned by the xfer — valid until (from,id) restarts or destroy
+	// Owned by the xfer. Valid through the frame you polled the event —
+	// copy to keep. (A fast supersede — the next payload's first chunk
+	// landing in the same pump window as this one's last — RETIRES the
+	// buffer; it stays alive until its event drains, then frees on the
+	// next pump. Holding bytes across frames was never survivable: the
+	// old contract freed them on restart with the event still queued.)
+	bytes: []u8,
 }
 
 Event :: union {
@@ -75,11 +81,15 @@ Asm :: struct {
 }
 
 Xfer :: struct {
-	ses:    ^ksess.Session,
-	tag:    u8,
-	outbox: [dynamic]Out,
-	inbox:  map[u32]Asm, // key: sender<<8 | id
-	events: [dynamic]Event,
+	ses:     ^ksess.Session,
+	tag:     u8,
+	outbox:  [dynamic]Out,
+	inbox:   map[u32]Asm, // key: sender<<8 | id
+	events:  [dynamic]Event,
+	// Superseded DONE buffers whose Ev_Done still sits in `events` (a fast
+	// restart landed before the consumer polled): kept alive until the event
+	// drains, freed by the next pump — never yanked from under a queued event.
+	retired: [dynamic][dynamic]u8,
 }
 
 // ---- wire (inside the session's SES_APP framing) ---------------------------
@@ -113,6 +123,10 @@ xfer_destroy :: proc(x: ^Xfer) {
 	}
 	delete(x.inbox)
 	delete(x.events)
+	for buf in x.retired {
+		delete(buf)
+	}
+	delete(x.retired)
 	x^ = {}
 }
 
@@ -135,9 +149,36 @@ xfer_send :: proc(x: ^Xfer, id: u8, bytes: []u8) -> bool {
 	return true
 }
 
+// A queued Ev_Done for (from,id)? The retire path asks before freeing a
+// superseded buffer from under it.
+@(private = "file")
+done_queued :: proc(x: ^Xfer, from: knet.Player_Id, id: u8) -> bool {
+	for ev in x.events {
+		if d, ok := ev.(Ev_Done); ok && d.from == from && d.id == id {
+			return true
+		}
+	}
+	return false
+}
+
 // Ship up to `budget` chunks. Call once per NET TICK — the pacing is the
 // point (one giant reliable packet stalls everything queued behind it).
 xfer_pump :: proc(x: ^Xfer, budget := PUMP_CHUNKS) {
+	// Free retired buffers whose Ev_Done has drained — the one-frame grace a
+	// polled consumer gets to copy (see Ev_Done's ownership note).
+	for i := len(x.retired) - 1; i >= 0; i -= 1 {
+		referenced := false
+		for ev in x.events {
+			if d, ok := ev.(Ev_Done); ok && raw_data(d.bytes) == raw_data(x.retired[i][:]) {
+				referenced = true
+				break
+			}
+		}
+		if !referenced {
+			delete(x.retired[i])
+			unordered_remove(&x.retired, i)
+		}
+	}
 	if x.ses == nil || len(x.outbox) == 0 {
 		return
 	}
@@ -193,7 +234,15 @@ ingest :: proc(x: ^Xfer, from: knet.Player_Id, id: u8, seq, chunks: int, total: 
 	asm_, has := &x.inbox[k]
 	if seq == 0 {
 		if has {
-			delete(asm_.buf)
+			if asm_.done && done_queued(x, from, id) {
+				// The fast supersede: this payload's Ev_Done is still queued
+				// (the consumer never polled between the last chunk and this
+				// restart) — freeing now would hand it dangling bytes. Retire
+				// the buffer; the pump frees it once the event drains.
+				append(&x.retired, asm_.buf)
+			} else {
+				delete(asm_.buf)
+			}
 		}
 		x.inbox[k] = Asm{total = total, chunks = chunks, buf = make([dynamic]u8, 0, total)}
 		asm_ = &x.inbox[k]

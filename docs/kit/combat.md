@@ -5,6 +5,15 @@ costs, buffs/debuffs on a clock, or projectiles that must feel instant on the sh
 screen while only the host deals damage. It also auto-publishes damage/kill/death tallies
 into the [session](session.md) stat registry.
 
+**Lane compatibility: COOP.** The wire halves here — `Predicted_Hp` keyed to delta
+confirmation, host-validated hits, `fire_announce`/tracers — are the coop lane's model in
+mechanism and vocabulary. A [sim-lane](sim.md) game expresses the same ideas natively
+instead: hp as a `predict` field, hits as verbs judged under [lag comp](sim.md), fired
+shots as predicted spawns or declared facts (sim.md says why tracers are superseded by
+projectile *entities* there). The pure math (range/cone checks, damage arithmetic) is
+sim-safe anywhere. Whether the `Cooldowns`/ability bundles can ride a sim snapshot
+descriptor is an OPEN question — unverified today; don't assume it.
+
 ## Mental model
 
 Combat state is **plain replicated fields on your entity** — `hp: i32`, `cds: [4]u16`,

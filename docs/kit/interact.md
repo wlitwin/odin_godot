@@ -4,6 +4,11 @@ Reach for `kit/interact` when a player should get a *use* prompt near chests, do
 pickups, and the host must validate the use from the same geometry. It is deliberately
 thin: three procs and one struct, no engine types, no dispatch.
 
+**Lane compatibility: lane-agnostic math, coop-shaped pattern.** The three procs are pure
+geometry — legal anywhere, including inside a sim tick. The prompt-then-validate PATTERN
+around them is written for coop verbs; a sim game runs the same geometry inside its own
+verbs and the authority pass.
+
 ## Mental model
 
 Interaction is two questions:

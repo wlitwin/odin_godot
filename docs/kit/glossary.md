@@ -28,6 +28,14 @@ proc whose body is the predicate-and-mutation, issued through its generated
 `<verb>_cmd` wrapper. Predicted where legal, validated on the authority,
 reverted on rejection; consequences ride the `_then` half.
 
+**fact** — a sim-lane event that *presents* on every screen at that screen's
+right time: the causer's live pass instantly (`mine=true`), the authority
+live, watchers when their watch clock reaches the fact's tick, a resim never.
+An entity tick's facts are its return values (the mine-form `_fx` half);
+a cross-entity event discovered in a world pass or an authority half is a
+*declared* fact — `@(gd_fact)` on the `<event>_fx` half, announced through
+the generated bare-name door ([sim.md](sim.md)).
+
 **census** — the framework's own ledger of live entities, queried back
 instead of hand-mirrored: generated `<entity>_of(id)` / `my_<entity>()` /
 `<entity>_owned_by(player)` / `<entity>_ids()` per `entity=` tag. The

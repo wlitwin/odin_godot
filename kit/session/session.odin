@@ -613,6 +613,19 @@ session_init :: proc(s: ^Session) {
 		s.backup_tick = 0
 		s.backup_target = {}
 		s.backup_at = 0
+		// The profile table is RUN state: a rehost must not relay a dead run's
+		// rows under recycled Player_Ids, and a surviving declare shadow would
+		// keep an unchanged client's row invisible to a NEW host (prof_tick
+		// diffs against it). `size` survives — the install is pre-start wiring
+		// like the factory. The ONE keeper is session_host_resume: the heir's
+		// table IS the resumed lobby, and it swaps its rows around this init.
+		for _, row in s.prof.rows {
+			delete(row)
+		}
+		clear(&s.prof.rows)
+		delete(s.prof.shadow)
+		s.prof.shadow = nil
+		s.prof.dirty = false
 	}
 	// Resolve the config (zero fields = defaults). Durations are configured in
 	// seconds and baked to tick counts HERE, against the configured rate.
@@ -1667,7 +1680,17 @@ send_backup :: proc(s: ^Session, peer: Peer_Id) {
 // Returns false on a corrupt blob (destroy the session and start clean).
 session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backup: []u8) -> bool {
 	assert(s.factory_make != nil, "resume recreates entities through the factory — install it first")
+	// The heir carries every player's profile row into the resumed run (each
+	// peer holds the whole table — that's what makes succession free). Swap
+	// the table out of session_init's run-teardown reach and put it back;
+	// dirty re-relays it at the next stats cadence so nobody waits on a
+	// re-declare that would never come.
+	kept_prof := s.prof
+	s.prof = Profile_Table{size = kept_prof.size}
 	session_init(s)
+	prof_destroy(&s.prof)
+	s.prof = kept_prof
+	s.prof.dirty = true
 	s.is_host = true
 	s.ctx.is_authority = true
 	s.me = me
@@ -2116,6 +2139,11 @@ session_client_start :: proc(s: ^Session, token: u64, name: string) {
 
 // Transport is connected: ask the host to seat us.
 session_client_join :: proc(s: ^Session) {
+	// This host has never seen my row (a fresh host, or a rejoin to a new
+	// one): drop the declare shadow so the first prof_tick after seating
+	// re-ships it. The row itself stays — it is my echo, not run state here.
+	delete(s.prof.shadow)
+	s.prof.shadow = nil
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_u8(&w, SES_JOIN)
@@ -2128,7 +2156,7 @@ session_client_join :: proc(s: ^Session) {
 // The kit's own wire revision, folded into every nonzero fingerprint before it
 // rides SES_JOIN — a kit upgrade that changes the wire then refuses skewed
 // peers even when the game's declarations didn't move. Bump on wire changes.
-PROTOCOL_REV :: u64(3) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: the wire frame byte carries the stream-channel bit (netgd)
+PROTOCOL_REV :: u64(4) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: the wire frame byte carries the stream-channel bit (netgd) · 4: SIM_FACT carries a fact kind (declared world-pass facts)
 
 @(private = "file")
 FP_SALT :: u64(0x9E3779B97F4A7C15) + PROTOCOL_REV // the golden-ratio constant, rev-shifted

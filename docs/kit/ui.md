@@ -5,6 +5,12 @@ can summon them. Lobby, chat box, scoreboard, and the HUD set (interact prompt, 
 grid/hotbar, health bar, ability bar). Styling is deliberately stock Godot theme —
 friendslop lobbies are for friends, and games that care can theme the returned nodes.
 
+**Lane compatibility: lane-agnostic.** Widgets read session-level state (roster, stats,
+chat) and whatever values the game hands them — both lanes use them as-is (the netgraph
+overlay draws coop and sim rows alike). The HUD set's *feeders* in the examples are
+coop-shaped (e.g. the ability bar reads kit/combat cooldowns); a sim game feeds the same
+widgets from its own fields.
+
 ```odin
 import kui "godot:kit/ui"
 ```

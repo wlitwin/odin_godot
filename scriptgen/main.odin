@@ -526,6 +526,26 @@ Tick_Info :: struct {
 	                                // cross the wire, so they must be wire primitives)
 }
 
+// One declared world-pass fact — `@(gd_fact)` on a `<event>_fx` presentation
+// half. scriptgen generates the announce DOOR under the bare event name: the
+// step (or an authority half) calls `<event>(l, anchor?, args…)` and the door
+// holds every gate — the authority broadcasts (SIM_FACT, watchers fire on the
+// watch clock), the causer's live pass fires now (mine=true), a resim replay
+// never re-fires, and screens with no part stay silent. Resolved package-wide
+// onto the lane OWNER (resolve_facts): facts ride the lane's watch clock.
+Fact_Info :: struct {
+	name:         string, // the bare event name — the generated door (fx name minus `_fx`)
+	fx_proc:      string, // the author's half: `<name>_fx`
+	game:         string, // the leading game param's struct name (the lane owner)
+	anchor:       string, // the anchor param's struct name ("" = anchorless world fact)
+	anchor_param: string, // the author's name for the anchor param (the door mirrors it)
+	arg_names:    [dynamic]string, // wire args after `mine`, author-named
+	arg_types:    [dynamic]string, // declared type text per arg (spliced into the door)
+	arg_wires:    [dynamic]string, // wire suffix per arg
+	line:         int,
+	path:         string,
+}
+
 Script :: struct {
 	path:        string, // source file path (diagnostics)
 	godot_alias: string, // the file's `godot:godot` import alias ("" = not imported)
@@ -558,6 +578,7 @@ Script :: struct {
 	// the coop game's fixed step, role-gated, with the same-frame edge pass inside.
 	step_boot:   bool,
 	input_classes: [dynamic]Input_Class_Info, // resolved package-wide (resolve_sim), on the lane OWNER: every input class, sorted by id (0 = primary)
+	facts:        [dynamic]Fact_Info, // declared world-pass facts (resolve_facts), on the lane OWNER — doors + decode thunks + the fact table ride its gen file
 	boot_field:  string, // the kboot.Boot field's name ("" = none) — generates the standard transport forwards
 	std_forwards: [dynamic]string, // which standard forwards were synthesized (bodies emitted by generate)
 	probes:       [dynamic]Probe_Info, // generated acid probes (resolve_probes; bodies emitted by generate)
@@ -1311,6 +1332,8 @@ main :: proc() {
 	defer delete(cmd_calls)
 	proc_names := make(map[string]bool)
 	defer delete(proc_names)
+	fact_decls := make([dynamic]Fact_Candidate)
+	defer delete(fact_decls)
 	for l in lintable {
 		file := ast.File {
 			fullpath = l.path,
@@ -1324,6 +1347,8 @@ main :: proc() {
 		scan_method_claims(&method_claims, l.path, l.src, &file, script_structs)
 		scan_command_calls(&cmd_calls, l.path, l.src, &file)
 		scan_proc_names(&proc_names, &file)
+		scan_fact_procs(&fact_decls, l.path, l.src, &file)
+		lint_attributed_receivers(l.path, l.src, &file, script_structs)
 	}
 	by_struct := make(map[string]^Script)
 	defer delete(by_struct)
@@ -1354,6 +1379,10 @@ main :: proc() {
 		all := make([dynamic]^Script, context.temp_allocator)
 		for &pend in pending {append(&all, &pend.script)}
 		resolve_sim(all[:])
+		// Declared world-pass facts land on the lane owner resolve_sim just
+		// settled — and claim their `_fx` idx entries before the unclaimed
+		// sweep below reads them.
+		resolve_facts(all[:], fact_decls[:], &then_idx, by_struct, proc_names)
 	}
 	check_unclaimed_pairs(&then_idx, script_snakes, by_struct)
 	lint_method_claims(method_claims[:], by_struct)
@@ -1763,6 +1792,25 @@ net_fingerprint :: proc(scripts: []^Script, scripts_dir: string) -> u64 {
 		slice.sort(cmds[:]) // ids are name-hashed; declaration order is not wire
 		for c in cmds {
 			fmt.sbprintf(&b, "%s\n", c)
+		}
+
+		// Declared world-pass facts: their ids ride SIM_FACT and their tuples
+		// cross the wire — a drifted fact set is a drifted protocol.
+		fcts := make([dynamic]string, context.temp_allocator)
+		for f in s.facts {
+			fb: strings.Builder
+			strings.builder_init(&fb, context.temp_allocator)
+			fmt.sbprintf(&fb, "fact %s(", f.name)
+			for wr, i in f.arg_wires {
+				if i > 0 {strings.write_string(&fb, ",")}
+				strings.write_string(&fb, wr)
+			}
+			fmt.sbprintf(&fb, ") anchor=%s", f.anchor)
+			append(&fcts, strings.to_string(fb))
+		}
+		slice.sort(fcts[:]) // ids are name-hashed; declaration order is not wire
+		for f in fcts {
+			fmt.sbprintf(&b, "%s\n", f)
 		}
 
 		if s.tick.proc_name != "" {

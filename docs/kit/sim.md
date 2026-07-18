@@ -135,12 +135,49 @@ runner_tick_fx :: proc(g: ^Game, self: ^Runner, mine: bool, fired: bool) {
   quickdraw's tracer ships on it (its old `shot_seq`/`shot_aim` fields and
   the hand-detected edge are deleted; the duel acid pins the watcher path).
 
-**Presentation that can't ride a fact** — a cross-entity effect inside a
-tick body (a kick that moves the BALL from the kicker's tick), or anything
-inline in a world pass (`@(gd_step)`) — gates on `ksim.lane_live(&lane)`:
-"the live pass, not a resim replay". Never read `lane.resimming` raw; the
-`_fx` halves carry this gate for you, `lane_live` is the inline spelling
-(speedball's kick receipt is the worked example).
+**Presentation born OUTSIDE an entity's tick — declared world-pass facts
+(`@(gd_fact)`).** A cross-entity event is discovered where no single entity's
+tick can return it: the world pass sees the foot meet the ball, an authority
+half adjudicates a theft. Declare the presentation half and the event is a
+first-class fact — the same laws and timing as tick facts, with no hand gate:
+
+```odin
+// The half you write — mine-form, anchored on the causer:
+@(gd_fact)
+ball_kicked_fx :: proc(g: ^Game, k: ^Kicker, mine: bool, bvx, bvy: f32) {
+	kick_sound(bvx, bvy)            // every screen, at its right time
+	if mine {kick_camera(g)}        // flavor, not a role branch
+}
+
+// The door scriptgen generates — call it where the sim DISCOVERS the event:
+if kicked {
+	ball_kicked(&g.lane, k, b.roll.vx, b.roll.vy)
+}
+```
+
+The door holds every gate, for every audience: the **causer's** live pass
+fires instantly (`mine = true` — the anchor param's tracked owner is the
+causer), the **authority** broadcasts a reliable `SIM_FACT` and fires live,
+a **watcher** fires when its watch clock reaches the fact's tick (beside the
+delayed avatar that caused it), a **resim** replay never re-fires, and a
+screen with no part in it stays silent at the announce and presents from the
+wire. Omit the anchor param and it is a WORLD fact — the authority's own
+simulation is the causer (`mine = true` on its screen alone); every client
+presents on the watch clock, with no entity. Announce from wherever the sim
+discovers the event — the everywhere pass, the authority pass, or a `_then`
+half; provenance is handled: a fact minted in an authority-only context
+reaches the causer's screen over the wire (they never ran that code), while
+the everywhere-pass form skips them (their own live pass already fired — an
+echo would double the flash). The wire contracts match tick facts: args are
+wire primitives, the anchor must outlive the slowest watch clock (a despawn
+drops late facts — dwell it), and a predicted announce the server never
+confirms can ghost-fire locally, the accepted trade. speedball's kick is the
+worked example — its acid pins the watcher presenting on the watch clock and
+the causer never double-firing.
+
+For the rare inline probe that shouldn't be a fact at all (a debug print in
+a tick body), gate on `ksim.lane_live(&lane)` — "the live pass, not a resim
+replay"; never read `lane.resimming` raw.
 
 The wire imposes three contracts, each a build-time error when broken: the
 mine-form fires on **event ticks only** (any tick a bool fact is true — the
@@ -723,12 +760,14 @@ The runtime and the authoring surface are complete and proven headless:
 input pipeline (single- or multi-class), ledgers, snapshots, reconcile, lane
 driver, lag comp, watched interp, render-error smoothing, possession, predicted
 spawns, every-screen tick facts (the mine-form `_fx`: SIM_FACT broadcast,
-watch-clock firing), the `@(gd_tick)`/`@(gd_sample)`/`predict` codegen, tick
-composition through embedded blocks (the `play/sim` shelf above), and two
-worked example games (quickdraw, speedball) with native duel acids — the
-kitsim tests (including loss-and-blackout convergence acids, the per-class
-routing fingerprint, the glide-vs-snap assertion, and the three-peer
-fact-timing pin) plus the repgen contract pins hold all of it.
+watch-clock firing), declared world-pass facts (`@(gd_fact)` + the generated
+announce doors, provenance-aware), the `@(gd_tick)`/`@(gd_sample)`/`predict`
+codegen, tick composition through embedded blocks (the `play/sim` shelf
+above), and two worked example games (quickdraw, speedball) with native duel
+acids — the kitsim tests (including loss-and-blackout convergence acids, the
+per-class routing fingerprint, the glide-vs-snap assertion, the three-peer
+fact-timing pin, and the four-law declared-fact pin) plus the repgen contract
+pins hold all of it.
 
 See also: [net](net.md) (the shared descriptor core), [session](session.md)
 (identity and everything reliable), [play](play.md) (the coop shelf —

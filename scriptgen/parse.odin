@@ -614,12 +614,15 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 					recurse_into(&s, def, path_of(ident.name), &visited, name_prefix, subst, is_manual)
 					delete(visited)
 				}
-			} else if is_manual {
-				error_at(
-					floc,
-					"%s.%s: `gd:\"manual\"` but the type %q didn't resolve to a sim block",
-					s.struct_name, field_label, nested,
-				)
+			} else {
+				if is_manual {
+					error_at(
+						floc,
+						"%s.%s: `gd:\"manual\"` but the type %q didn't resolve to a sim block",
+						s.struct_name, field_label, nested,
+					)
+				}
+				unresolved_embed_check(floc, s.struct_name, field_label, nested, .Using in f.flags, nest_ctx.imports)
 			}
 			continue
 		}
@@ -901,6 +904,16 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 					s.struct_name,
 					proc_name,
 					kw,
+				)
+			}
+			// A bare @(gd_connect) compiles and silently never connects — the
+			// auto-wire targets a REGISTERED method. The docs state the rule;
+			// this enforces it.
+			if _, has_conn := attr_value(vd, "gd_connect"); has_conn {
+				error_at(
+					Loc{path, name_ident.pos.line},
+					"%s: proc %q wears @(gd_connect) without @(gd_method) — the connection targets a registered method, so bare it would silently never connect. Add @(gd_method).",
+					s.struct_name, proc_name,
 				)
 			}
 		}
@@ -1301,8 +1314,8 @@ check_unclaimed_pairs :: proc(idx: ^map[string]Then_Candidate, script_snakes: ma
 			if len(targets) == 0 {continue}
 			error_at(
 				loc,
-				"proc %q ends in `_fx` but pairs with no tick — it would silently never fire. %s Pair it, or rename it (`_fx` is a reserved pairing suffix on procs touching script structs).",
-				name, hint_fx(targets[:]),
+				"proc %q ends in `_fx` but pairs with no tick — it would silently never fire. %s Pair it, declare it `@(gd_fact)` (a world-pass fact's half — the generated `%s` door announces it), or rename it (`_fx` is a reserved pairing suffix on procs touching script structs).",
+				name, hint_fx(targets[:]), strings.trim_suffix(name, "_fx"),
 			)
 		case strings.has_suffix(name, "_apply"):
 			if len(targets) == 0 {continue}
@@ -2241,6 +2254,253 @@ resolve_sim :: proc(scripts: []^Script) {
 	}
 }
 
+// A `@(gd_fact)` declaration found in the package scan — a world-pass fact's
+// presentation half, held until resolve_facts (the lane owner isn't known
+// before resolve_sim settles it). Collected by ATTRIBUTE, not suffix, so a
+// misnamed declaration surfaces as a build error instead of a proc that
+// silently never fires.
+Fact_Candidate :: struct {
+	path: string,
+	line: int,
+	src:  string,
+	name: string,
+	pt:   ^ast.Proc_Type,
+	vd:   ^ast.Value_Decl,
+}
+
+scan_fact_procs :: proc(out: ^[dynamic]Fact_Candidate, path, src: string, file: ^ast.File) {
+	for decl in file.decls {
+		vd, ok := decl.derived.(^ast.Value_Decl)
+		if !ok {continue}
+		if len(vd.names) != 1 || len(vd.values) != 1 {continue}
+		pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
+		if !is_proc {continue}
+		name_ident, _ := vd.names[0].derived.(^ast.Ident)
+		if name_ident == nil {continue}
+		if !has_attr(vd, "gd_fact") {continue}
+		if pl.type == nil {continue}
+		append(out, Fact_Candidate{
+			path = path, line = name_ident.pos.line, src = src,
+			name = name_ident.name, pt = pl.type, vd = vd,
+		})
+	}
+}
+
+// Resolve every `@(gd_fact)` declaration — the world-pass fact channel. The
+// author writes ONE presentation half, `<event>_fx(game, anchor?, mine,
+// args…)`; scriptgen generates the announce DOOR under the bare `<event>`
+// name, and the door holds every gate the tick facts already get: the
+// authority broadcasts (watchers fire on the watch clock, beside the delayed
+// avatar), the causer's live pass fires now (mine=true), a resim replay never
+// re-fires, screens with no part stay silent. An ANCHORED fact names an
+// entity param after the game — the watch-clock anchor, the mine derivation
+// (its tracked owner), and the despawn-drop all key on it. No anchor = a
+// WORLD fact: the authority alone causes it (mine=true on its screen), every
+// client presents it on the watch clock.
+resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, idx: ^map[string]Then_Candidate, by_struct: map[string]^Script, taken: map[string]bool) {
+	if len(decls) == 0 {return}
+
+	// The lane owner resolve_sim settled: the class carrying @(gd_sample) or a
+	// lane-routed @(gd_step). Facts ride its lane's watch clock.
+	owner: ^Script
+	for s in scripts {
+		if len(s.samples) > 0 || s.step.proc_name != "" || (s.step_auth.proc_name != "" && !s.step_boot) {
+			owner = s
+			break
+		}
+	}
+
+	RESERVED :: [?]string{"_then", "_fx", "_apply", "_edge", "_spawned", "_freed", "_cmd", "_spawn", "_step", "_events"}
+
+	for cand in decls {
+		loc := Loc{path = cand.path, line = cand.line}
+
+		if v, _ := attr_value(cand.vd, "gd_fact"); v != "" {
+			error_at(loc, "%s: @(gd_fact) takes no config — the shape declares everything (an entity param after the game = anchored; none = a world fact)", cand.name)
+			continue
+		}
+		if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") ||
+		   has_attr(cand.vd, "gd_tick") || has_attr(cand.vd, "gd_step") || has_attr(cand.vd, "gd_sample") {
+			error_at(loc, "%s: @(gd_fact) is a plain presentation half — it never registers, ticks, or decides; drop the other attribute", cand.name)
+			continue
+		}
+		if !strings.has_suffix(cand.name, "_fx") {
+			error_at(
+				loc,
+				"%s: a declared fact IS a presentation half — name it `%s_fx`; the step announces through the generated bare `%s` door",
+				cand.name, cand.name, cand.name,
+			)
+			continue
+		}
+		door := strings.trim_suffix(cand.name, "_fx")
+		if owner == nil {
+			error_at(
+				loc,
+				"%s: @(gd_fact) rides the sim lane's watch clock, and this package has no lane (no @(gd_sample)/@(gd_step)) — coop presentation is `_edge` halves and session events (net.md)",
+				cand.name,
+			)
+			continue
+		}
+
+		// The door is a generated proc under the bare event name — refuse the
+		// names that can't be it.
+		tick_clash := false
+		for s in scripts {
+			if s.tick.proc_name != "" && door == s.tick.proc_name {
+				error_at(
+					loc,
+					"%s: that is %s's tick `_fx` — an entity tick's facts already broadcast through its own channel (return them from the tick); @(gd_fact) is for WORLD-PASS facts",
+					cand.name, s.struct_name,
+				)
+				tick_clash = true
+				break
+			}
+		}
+		if tick_clash {continue}
+		reserved_clash := false
+		for suf in RESERVED {
+			if strings.has_suffix(door, suf) {
+				error_at(
+					loc,
+					"%s: the event name %q ends in the reserved suffix %q — the generated door would collide with that pairing family; rename the event",
+					cand.name, door, suf,
+				)
+				reserved_clash = true
+				break
+			}
+		}
+		if reserved_clash {continue}
+		if taken[door] {
+			error_at(
+				loc,
+				"%s: `%s` is the GENERATED announce door's name and a proc already claims it — rename the hand-written `%s` (the door is the one path, so every announce holds the gates)",
+				cand.name, door, door,
+			)
+			continue
+		}
+		if cmd_wire_id(door) == 0 {
+			error_at(loc, "%s: the event name hashes to the reserved fact kind 0 — rename the event", cand.name)
+			continue
+		}
+
+		// Shape: (game: ^<Owner>[, anchor: ^<Entity>], mine: bool, wire args…),
+		// no results. Flatten params with their names.
+		if cand.pt.results != nil {
+			error_at(loc, "%s: a fact presents, it decides nothing — no results (consequences belong to verbs and ticks)", cand.name)
+			continue
+		}
+		types := make([dynamic]string, context.temp_allocator)
+		names := make([dynamic]string, context.temp_allocator)
+		if cand.pt.params != nil {
+			for f in cand.pt.params.list {
+				t := strings.trim_space(node_text(cand.src, f.type))
+				for ni in 0 ..< max(1, len(f.names)) {
+					append(&types, t)
+					nm := ""
+					if ni < len(f.names) {
+						if ident, iok := f.names[ni].derived.(^ast.Ident); iok && ident != nil {
+							nm = ident.name
+						}
+					}
+					append(&names, nm)
+				}
+			}
+		}
+		game_type := fmt.tprintf("^%s", owner.struct_name)
+		if !(len(types) > 0 && types[0] == game_type) {
+			error_at(
+				loc,
+				"%s: the first param is the game — `g: %s` (the lane owner; the door threads it via lane_game). Shapes: (game, mine, args…) for a world fact, (game, anchor, mine, args…) anchored",
+				cand.name, game_type,
+			)
+			continue
+		}
+		at := 1
+		anchor := ""
+		anchor_param := ""
+		if len(types) > at && strings.has_prefix(types[at], "^") {
+			target := types[at][1:]
+			if target == owner.struct_name {
+				error_at(loc, "%s: the game is not an anchor — a world fact just omits the param (every client presents on the watch clock)", cand.name)
+				continue
+			}
+			if _, is_script := by_struct[target]; !is_script {
+				error_at(
+					loc,
+					"%s: anchor `%s` is not a script class in this package — the anchor is the lane-tracked entity the fact presents beside (its owner derives `mine`; its despawn drops late facts)",
+					cand.name, types[at],
+				)
+				continue
+			}
+			anchor = target
+			anchor_param = names[at] != "" ? names[at] : "anchor"
+			at += 1
+		}
+		if !(len(types) > at && types[at] == "bool" && names[at] == "mine") {
+			error_at(
+				loc,
+				"%s: `mine: bool` comes %s — the every-screen law: mine=true on the screen whose live simulation caused it, false on watchers (fired when their watch clock reaches the fact's tick)",
+				cand.name, anchor == "" ? "after the game param" : "after the anchor",
+			)
+			continue
+		}
+		at += 1
+
+		info := Fact_Info{
+			name = door, fx_proc = cand.name, game = owner.struct_name,
+			anchor = anchor, anchor_param = anchor_param,
+			line = cand.line, path = cand.path,
+		}
+		args_ok := true
+		for i in at ..< len(types) {
+			wire, _, wok := command_wire_type(types[i])
+			if !wok {
+				error_at(
+					loc,
+					"%s: the fact tuple crosses the wire to watching screens, and %q is not a wire primitive (fixed-width ints, f32/f64, bool, string, knet.Net_Id, knet.Player_Id)",
+					cand.name, types[i],
+				)
+				args_ok = false
+				break
+			}
+			if names[i] == "l" || anchor_param == "l" {
+				error_at(loc, "%s: `l` is the generated door's lane param — rename yours", cand.name)
+				args_ok = false
+				break
+			}
+			append(&info.arg_names, names[i] != "" ? names[i] : fmt.tprintf("a%d", i - at))
+			append(&info.arg_types, types[i])
+			append(&info.arg_wires, wire)
+		}
+		if !args_ok {continue}
+
+		// One event, one door: a second declaration of the same name (any
+		// file) or a u16 hash collision is fatal on the wire — name both.
+		dup := false
+		for f in owner.facts {
+			if f.name == door {
+				error_at(loc, "%s: fact %q is already declared at %s:%d — one door per event", cand.name, door, f.path, f.line)
+				dup = true
+				break
+			}
+			if cmd_wire_id(f.name) == cmd_wire_id(door) {
+				error_at(loc, "facts %q and %q collide on wire id 0x%x — rename one event", f.name, door, cmd_wire_id(door))
+				dup = true
+				break
+			}
+		}
+		if dup {continue}
+
+		// Claim the `_fx` idx entry so the unclaimed-suffix sweep stays quiet.
+		if c2, found := idx[cand.name]; found {
+			c2.claimed = true
+			idx[cand.name] = c2
+		}
+
+		append(&owner.facts, info)
+	}
+}
+
 // Pair a game shell's SESSION EVENT halves — the name-paired replacement for
 // the event-drain switch. For each SESSION_EVENTS row the game may declare:
 //
@@ -3047,6 +3307,17 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 	visited[def.id] = true
 	defer delete_key(visited, def.id) // allow the same type at independent sibling positions
 
+	{
+		// Record the embedded-block name (def.id is "<dir>|<name>"): method-
+		// family attributes on these receivers are legal (they hoist) —
+		// lint_attributed_receivers exempts them.
+		id := def.id
+		if j := strings.last_index(id, "|"); j >= 0 {
+			id = id[j + 1:]
+		}
+		g_embedded_blocks[id] = true
+	}
+
 	shelf_lint(s, def, path) // shelf blocks must sit on the lane their shelf names
 
 	// verb-/method-composition (the dual of the nested-replicate collection below): hoist this
@@ -3148,6 +3419,17 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 					append(&s.backups, Backup_Info{field = fld.name, path = fpath, kind = kind, key = key, elem = elem})
 				}
 			}
+			// `gd:"profile=T"` is a TOP-LEVEL declaration on the game class's own
+			// Session field — nested inside an embed it would silently never
+			// install (neither the generated ready thunk nor the fingerprint
+			// fold walks nested Sessions).
+			if len(specs) > 0 && strings.has_prefix(strings.trim_space(specs[0]), "profile=") {
+				error_at(
+					fld.loc,
+					"%s.%s: `profile=` declares on the class's OWN ksess.Session field — nested in an embed it silently never installs; move the declaration to the top level",
+					s.struct_name, join_path(fpath),
+				)
+			}
 			// export/onready (and any unknown tag) are the runtime reflection walk's to
 			// register and validate — scriptgen owns only `replicate`/`backup` through nesting.
 			continue
@@ -3159,7 +3441,122 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 			// block's tick, which drives its children — so a nested block under
 			// a manual one must not auto-hoist either.
 			recurse_into(s, sub, fpath, visited, sub_prefix, sub_subst, manual)
+		} else {
+			unresolved_embed_check(fld.loc, s.struct_name, join_path(fpath), ftype, fld.is_using, def.imports)
 		}
+	}
+}
+
+// The unresolved-embed trap (the recorded "gun that never replicated"): a
+// field type the resolver can't see inside may CARRY kit tags — and skipping
+// it as plain data makes replicate/backup/verbs vanish with no error. Same-
+// package structs and godot: collection bundles resolve; this refuses the
+// shapes that LOOK like tag-carrying embeds and provably can't be seen into:
+// a relative/foreign-import qualified struct, a godot: bundle with no
+// collection root, and a `using` embed that resolves to nothing. Engine
+// (gd.) and stdlib (core:/base:/vendor:) types stay silent skips — they
+// can't carry gd tags — and unqualified non-`using` misses stay silent too
+// (a plain enum/union field is data, and a typo'd type is the compiler's
+// error already).
+// Struct names recurse_into embedded as blocks anywhere in the package —
+// method-family attributes on THESE receivers are legal (composed blocks
+// hoist @(gd_method)/@(gd_command) onto their wielder). Filled during parse,
+// read by lint_attributed_receivers in pass 3.
+g_embedded_blocks: map[string]bool
+
+// A proc wearing a method-family attribute binds by its FIRST param
+// (`self: ^<ScriptClass>`, or an embedded block's type — those hoist). Any
+// other receiver binds to NOTHING: the method compiles and silently never
+// registers — the reserved-suffix trap's attribute twin. Loud, per file.
+lint_attributed_receivers :: proc(path, src: string, file: ^ast.File, script_structs: map[string]bool) {
+	for decl in file.decls {
+		vd, ok := decl.derived.(^ast.Value_Decl)
+		if !ok {continue}
+		if len(vd.names) != 1 || len(vd.values) != 1 {continue}
+		pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
+		if !is_proc {continue}
+		name_ident, _ := vd.names[0].derived.(^ast.Ident)
+		if name_ident == nil {continue}
+		attr := ""
+		switch {
+		case has_attr(vd, "gd_method"):
+			attr = "gd_method"
+		case has_attr(vd, "gd_rpc"):
+			attr = "gd_rpc"
+		case has_attr(vd, "gd_connect"):
+			attr = "gd_connect"
+		}
+		if attr == "" {continue}
+		recv := ""
+		if pl.type != nil && pl.type.params != nil && len(pl.type.params.list) > 0 {
+			recv = strings.trim_space(node_text(src, pl.type.params.list[0].type))
+		}
+		target := strings.has_prefix(recv, "^") ? recv[1:] : ""
+		if j := strings.last_index(target, "."); j >= 0 {
+			target = target[j + 1:]
+		}
+		if j := strings.index_byte(target, '('); j >= 0 {
+			target = strings.trim_space(target[:j]) // a generic block receiver: ^Machine($S)
+		}
+		if target != "" && (script_structs[target] || g_embedded_blocks[target]) {
+			continue
+		}
+		error_at(
+			Loc{path = path, line = name_ident.pos.line},
+			"proc %q wears @(%s) but its first param is %s — methods bind by receiver (`self: ^<ScriptClass>`, or an embedded block's type), so this one registers NOWHERE and silently never runs. Fix the receiver, or drop the attribute.",
+			name_ident.name, attr, recv == "" ? "missing" : fmt.tprintf("%q", recv),
+		)
+	}
+}
+
+unresolved_embed_check :: proc(loc: Loc, class_name, field_label, type_text: string, is_using: bool, imports: map[string]string) {
+	t := strings.trim_space(type_text)
+	if len(t) == 0 || t[0] == '^' || strings.contains(t, "[") || strings.contains(t, "(") || strings.contains(t, "map[") {
+		return // decorated types are never tag-carrying embeds
+	}
+	alias := ""
+	name := t
+	if dot := strings.index_byte(t, '.'); dot >= 0 {
+		alias = t[:dot]
+		name = t[dot + 1:]
+	}
+	if len(name) == 0 || !(name[0] >= 'A' && name[0] <= 'Z') {
+		return // primitives and lowercase names: plain data by convention
+	}
+	if alias == "gd" || alias == "godot" {
+		return // engine types are opaque on purpose
+	}
+	if alias != "" {
+		imp, has := imports[alias]
+		if !has {
+			return // an alias the file never imported — the compiler's error, not ours
+		}
+		if strings.has_prefix(imp, "core:") || strings.has_prefix(imp, "base:") || strings.has_prefix(imp, "vendor:") {
+			return // stdlib can't carry gd tags
+		}
+		if strings.has_prefix(imp, "godot:") {
+			if g_godot_root == "" {
+				error_at(
+					loc,
+					"%s.%s: %q rides import %q, but the godot: collection root is unknown (pass -godot:<root> or set ODIN_GODOT_ROOT) — the resolver can't see inside it, and gd:\"…\" tags on its fields would SILENTLY never register",
+					class_name, field_label, t, imp,
+				)
+			}
+			return // an indexed bundle whose name isn't a struct there: an enum/union — plain data
+		}
+		error_at(
+			loc,
+			"%s.%s: %q comes from import %q, which scriptgen cannot see inside — gd:\"…\" tags on its fields would SILENTLY never register (replicate, backup, and composed verbs all vanish). Move the struct into this package or a godot: collection bundle; plain data from elsewhere is fine by value under a non-struct type or behind ^.",
+			class_name, field_label, t, imp,
+		)
+		return
+	}
+	if is_using {
+		error_at(
+			loc,
+			"%s.%s: `using` embeds %q, but it doesn't resolve to a struct in this package — if it carries gd:\"…\" tags they would silently never register. Check the spelling, or drop `using` for plain data.",
+			class_name, field_label, t,
+		)
 	}
 }
 

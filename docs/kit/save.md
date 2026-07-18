@@ -6,6 +6,13 @@ host every few seconds is already a complete re-hostable world, and `session_hos
 already rebuilds one. **Saving a run and surviving a dead host are the SAME contract** —
 kit/save just points it at a file and wraps it in a versioned envelope.
 
+**Lane compatibility: lane-agnostic (session-level).** The envelope wraps the session
+snapshot — delta-lane and `gd:"backup"` state. Sim-lane RUNTIME state (ledgers, inputs
+in flight) is deliberately not saved: a resumed sim restarts its lane fresh from the
+saved authoritative fields, which is the correct semantics for a server-authority run
+(the sim lane also refuses host *migration* — [sim.md](sim.md) argues why; resuming
+from disk restarts the authority, which is fine).
+
 ```odin
 import ksave "godot:kit/save"
 ```

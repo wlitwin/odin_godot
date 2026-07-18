@@ -4,6 +4,13 @@ Reach for `kit/items` when entities carry things: bags, chests, pickups, loot. I
 a 4-byte `Slot`, a definition `Table` (names, stack sizes), and deterministic operations —
 add, take, put, transfer — that are safe inside predicted commands.
 
+**Lane compatibility: COOP wire, sim-safe math.** Inventories replicate as delta-lane
+fields mutated through coop verbs — that pairing is this module's model. The `Slot` ops
+themselves are pure and deterministic (safe inside any predicted command, either lane),
+but whether an `Inventory($N)` bundle can sit under a sim snapshot descriptor is an OPEN
+question — unverified today; a sim game keeps its purse on the delta lane (the hybrid
+composes per-field) until that's proven.
+
 ## Mental model
 
 An inventory is a **plain fixed-size array of 4-byte Slot values living inside a replicated

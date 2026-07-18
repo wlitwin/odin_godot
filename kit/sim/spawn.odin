@@ -89,6 +89,17 @@ lane_spawn_predicted :: proc(
 		return 0 // the authority spawns for real; prediction is the client's job
 	}
 	assert(set != nil && set.tick != nil, "a predicted spawn needs a ticking Sim_Set (the projectile flies itself)")
+	assert(!l.rewound, "lane_spawn_predicted inside a rewound block — spawning reallocates the track list the restore points into")
+	{
+		// A reject-chain RE-EXECUTION (cmd_settle re-runs surviving verb
+		// bodies) reaches here with this fire's projectile already tracked —
+		// still provisional, or already rekeyed by the authority's spawn. A
+		// second one is a ghost the FIFO match can never pair: the caller must
+		// hand back the existing spawn instead (lane_spawn_of_exec — the
+		// boot's spawn door does).
+		_, _, exists := lane_spawn_of_exec(l)
+		assert(!exists, "this fire already has its projectile (a reject-chain re-execution) — reuse it via lane_spawn_of_exec instead of spawning a ghost (boot_spawn_predicted does)")
+	}
 	l.spawn_next += 1
 	id := knet.Net_Id(PROVISIONAL_BIT | l.spawn_next)
 	born := l.step_tick // spawned inside the tick pipeline: this is the fire tick
@@ -145,6 +156,25 @@ lane_spawn_match :: proc(
 	// projectile from here (its predicted-flight ledger, tr.hist, is untouched).
 	snap_rx_add(&l.rx, auth_id, tr.desc, allocator)
 	return tr.entity, prov, true
+}
+
+// The spawn already minted by the command executing RIGHT NOW, if any —
+// still provisional, or already rekeyed to the authority's id (spawn_seq
+// survives the rekey). Meaningful only inside a verb exec (l.cmd_exec_seq
+// is set). The reject-chain's settle (cmd_settle) re-runs surviving verb
+// bodies whose projectile still flies: a caller about to spawn asks here
+// first and reuses the existing one — minting a second would be a ghost the
+// FIFO match can never pair (and the ghost would coast until the sweep).
+lane_spawn_of_exec :: proc(l: ^Lane) -> (entity: rawptr, id: knet.Net_Id, ok: bool) {
+	if l.cmd_exec_seq == 0 || l.ses.is_host {
+		return nil, 0, false
+	}
+	for &tr in l.tracked {
+		if tr.spawn_seq == l.cmd_exec_seq {
+			return tr.entity, tr.id, true
+		}
+	}
+	return nil, 0, false
 }
 
 // The fire the server refused: despawn the provisional it spawned (keyed by the

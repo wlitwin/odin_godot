@@ -3,6 +3,13 @@
 Reach for `kit/ai` when the host needs NPCs that perceive, chase, flee, patrol — and a
 director that paces enemy waves. It supplies the *verbs*; you write the brain.
 
+**Lane compatibility: COOP model, sim-safe math.** The patterns here assume the coop
+NPC shape — host-brained, owner-streamed poses. On the [sim lane](sim.md) an NPC is a
+server-ticked entity with `predict` fields, its brain in the AUTHORITY pass. The
+perception/steering math is pure and safe in either; the wave director is
+authority-side logic and ports as-is. See [nav](nav.md) for the one genuinely
+dangerous crossing.
+
 ## Mental model
 
 **Patterns, not a framework**: kit/ai has no Brain type, no behavior tree, no update loop.

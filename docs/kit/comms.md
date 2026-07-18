@@ -5,6 +5,10 @@ system lines ("alice joined the cave"). It rides the [session](session.md)'s SES
 extension point on the reliable channel, so a game wires **zero** extra networking for chat —
 no packet type, no kind byte, no route of its own.
 
+**Lane compatibility: lane-agnostic.** Chat is session-level — it works identically
+beside the coop lane, the sim lane, or both (quickdraw and speedball could wire it
+tomorrow; nothing here touches ticks or prediction).
+
 ```odin
 import kcomms "godot:kit/comms"
 ```

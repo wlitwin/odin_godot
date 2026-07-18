@@ -60,5 +60,21 @@ board_contact :: proc(self: ^Board, tick: u64) {
 board_step :: proc(self: ^Board, tick: u64) {
 }
 
+// Declared WORLD-PASS facts (@(gd_fact)): the author writes the presentation
+// half (`<event>_fx`, mine-form); scriptgen generates the announce door under
+// the bare event name, holding every gate. ANCHORED on the pawn — its tracked
+// owner derives `mine`, watchers fire on the watch clock, its despawn drops
+// late facts:
+@(gd_fact)
+pawn_bumped_fx :: proc(g: ^Board, p: ^Pawn, mine: bool, force: f32) {
+}
+
+// ...and ANCHORLESS — a world fact: the authority's own simulation is the
+// causer (mine=true on its screen alone); every client presents at the watch
+// clock with no entity.
+@(gd_fact)
+board_horn_fx :: proc(g: ^Board, mine: bool, side: u8) {
+}
+
 board_ready :: proc(self: ^Board) {
 }

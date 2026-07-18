@@ -7,6 +7,11 @@ level file — that must not stall the reliable channel behind one giant packet,
 and must fit the web transport at all (WebRTC data channels cap a message around
 16KB).
 
+**Lane compatibility: lane-agnostic.** Transfers ride the session's app channel;
+neither lane's tick machinery is involved. (Just never *consume* a payload inside a
+sim tick — arrival timing is wall-clock, not sim-deterministic; land it in frame code
+and let facts or fields carry the consequences.)
+
 The shape is [kit/comms](comms.md)' shape, sized up: everything routes through
 the host. A client sends paced 8KB `XF_CHUNK` frames to the host; the host
 assembles its own copy AND relays each frame to everyone as `XF_CAST`, stamped

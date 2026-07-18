@@ -391,15 +391,30 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 			}
 			b.roll.vx += aim.x * KICK_POWER
 			b.roll.vy += aim.y * KICK_POWER
-			// (mine && live) is the _fx gate written inline — the kick moves
-			// ANOTHER entity (the ball) from this tick, so it can't ride the
-			// tick's own fact channel; lane_live keeps the lane's internals out.
-			if k.mine && ksim.lane_live(&g.lane) {
-				gd.print_str(fmt.tprintf("SPB_KICK tick=%d bvx=%.1f bvy=%.1f", tick, b.roll.vx, b.roll.vy))
-			}
+			// The kick moves ANOTHER entity (the ball), so it can't ride the
+			// kicker's own tick channel — it is a WORLD-PASS fact. The door
+			// holds every gate: this call is role-free.
+			ball_kicked(&g.lane, k, b.roll.vx, b.roll.vy)
 		}
 	}
 
+}
+
+// ---- the kick's presentation: a declared world-pass fact ------------------------
+
+// @(gd_fact) — the step discovers the kick (foot meets ball, cross-entity)
+// and announces it through the generated `ball_kicked` door; this half fires
+// on EVERY screen at its right time: the striker's live pass immediately
+// (mine=true — the touch resolved locally, that tick), the authority live,
+// and watchers when their watch clock reaches the kick's tick, beside the
+// delayed avatar that kicked. A resim replay never re-fires it.
+@(gd_fact)
+ball_kicked_fx :: proc(g: ^Speedball, k: ^Kicker, mine: bool, bvx, bvy: f32) {
+	if mine {
+		gd.print_str(fmt.tprintf("SPB_KICK tick=%d bvx=%.1f bvy=%.1f", ksim.lane_now(&g.lane), bvx, bvy))
+	} else {
+		gd.print_str(fmt.tprintf("SPB_KICK_SEEN bvx=%.1f bvy=%.1f", bvx, bvy))
+	}
 }
 
 // ---- the goal's consequence: authority only, name-paired ------------------------

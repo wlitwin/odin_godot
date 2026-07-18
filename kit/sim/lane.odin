@@ -52,7 +52,15 @@ SIM_INPUT: u8 : 0 // client → host, inside the tag
 SIM_SNAP: u8 : 1 // host → client
 SIM_CMD: u8 : 2 // client → host, RELIABLE: a tick-stamped verb (command.odin)
 SIM_VERDICT: u8 : 3 // host → client, RELIABLE: that verb's accept/reject
-SIM_FACT: u8 : 4 // host → client, RELIABLE: an event tick's facts, watch-clock presented
+// host → client, RELIABLE: an event tick's facts, watch-clock presented.
+// WIRE FORMAT (the one place it is written down — the generated encoders in
+// every *.gen.odin and the receive case below are matched pairs, and the
+// kitsim fact tests drive the full encode→decode path so a drift fails
+// loudly):  [SIM_FACT u8][tick u64][anchor Net_Id u32; 0 = anchorless]
+//           [kind u16; 0 = the anchor set's tick fx, else a Fact_Desc id]
+//           [args: length-prefixed bytes — the fact tuple, wire-primitive
+//            encoded in DECLARATION ORDER]
+SIM_FACT: u8 : 4
 
 // Fill the LOCAL player's input for `tick` into dst (input_size bytes).
 // Read the device here and nowhere else — a resim never calls this.
@@ -264,6 +272,21 @@ Lane :: struct {
 	// fx thunk when the watch clock reaches the fact's tick (lane_present).
 	facts:           [dynamic]Fact_In,
 
+	// declared world-pass facts (@(gd_fact)): the package's fact table, id →
+	// decode thunk, installed by the generated <snake>_lane_init. Kind 0 is
+	// reserved for entity-tick facts (routed through the anchor's Sim_Set.fx).
+	fact_set:        []Fact_Desc,
+
+	// True while an AUTHORITY-ONLY context is running: the step_auth pass
+	// (run_tick sets it) and every generated `_then` half (the tick and verb
+	// thunks set it around the authority-gated call). lane_fact reads it for
+	// the broadcast's owner skip: an everywhere-pass fact skips the anchor's
+	// owner (their own live pass just presented it), but an authority-only
+	// context's fact must INCLUDE them — their screen never ran the code that
+	// announced it, and skipping them would orphan the fact on exactly the
+	// screen it is most about.
+	in_auth:         bool,
+
 	// predicted spawns (spawn.odin): a client's own fired projectiles, tracked
 	// under provisional ids until the authority's spawn arrives and rekeys them
 	spawn_next:      u32, // provisional id counter (client-local, high-bit tagged)
@@ -289,8 +312,47 @@ Present_Ready_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr)
 @(private = "file")
 Fact_In :: struct {
 	tick: u64,
-	id:   knet.Net_Id,
+	id:   knet.Net_Id, // the anchor (NET_ID_INVALID = an anchorless world fact)
+	kind: u16, // 0 = entity-tick fact (the anchor set's fx); else a Fact_Desc id
 	args: []u8, // owned — the fact tuple, wire-encoded
+}
+
+// One declared world-pass fact (@(gd_fact)): its stable wire id (an FNV-1a
+// hash of the event name — the command-id law: reordering declarations never
+// renumbers the wire) and its decode thunk. scriptgen emits the package's
+// table; the generated lane_init installs it.
+Fact_Desc :: struct {
+	id: u16,       // never 0 — kind 0 on the wire means "the anchor set's tick fx"
+	fx: Fx_Thunk,  // entity = the anchor (nil for an anchorless world fact)
+}
+
+// Install the package's declared-fact table — generated wiring, alongside
+// lane_set_sim. Hand-built lanes (tests) may pass their own.
+lane_set_facts :: proc(l: ^Lane, table: []Fact_Desc) {
+	l.fact_set = table
+}
+
+@(private = "file")
+fact_fx :: proc(l: ^Lane, kind: u16) -> Fx_Thunk {
+	for d in l.fact_set {
+		if d.id == kind {
+			return d.fx
+		}
+	}
+	return nil
+}
+
+// The tracked owner of an entity — the seat driving it (PLAYER_ID_INVALID for
+// contested/world entities and anything untracked). The generated fact doors
+// derive `mine` from it; games may read it wherever the census hook's stamp
+// isn't at hand.
+lane_owner_of :: proc(l: ^Lane, entity: rawptr) -> knet.Player_Id {
+	for &tr in l.tracked {
+		if tr.entity == entity {
+			return tr.owner
+		}
+	}
+	return knet.PLAYER_ID_INVALID
 }
 
 // The most unfired facts a client holds — an untrusted-input bound far above
@@ -471,6 +533,7 @@ lane_set_sim :: proc(l: ^Lane, user: rawptr, sample: Sample_Proc, step: Step_Pro
 // watches the rest (their truth applies straight from batches — phase-3
 // smoothing will make that pretty).
 lane_track :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, desc: ^knet.Entity_Desc, owner: knet.Player_Id, allocator := context.allocator) {
+	assert(!l.rewound, "lane_track inside a rewound block — the restore holds pointers into the track list; lane_rewound_end first")
 	assert(predict_size(desc) > 0, "lane_track: entity predicts nothing — tag fields gd:\"replicate,predict\"")
 	if l.ses.is_host {
 		hist := new(History, allocator)
@@ -546,41 +609,55 @@ lane_claim :: proc(l: ^Lane, id: knet.Net_Id) {
 	}
 }
 
-// Broadcast an event tick's FACTS to every screen that didn't simulate them
-// live — the generated mine-form `_fx` thunk calls this on the authority when
-// any bool fact fires. Reliable (facts are one-shots, like verdicts), to every
-// connected client EXCEPT the entity's owner: their own live pass already
-// presented it (mine=true), and re-firing the echo would double the flash.
-// Receivers file it and fire the set's fx thunk when their watch clock
-// reaches `l.step_tick` — beside the delayed avatar that caused it.
-lane_fact :: proc(l: ^Lane, entity: rawptr, args: []u8) {
+// Broadcast a fact to every screen that didn't simulate it live — the
+// generated thunks (an entity tick's mine-form `_fx`, a declared @(gd_fact)
+// door) call this on the authority. Reliable (facts are one-shots, like
+// verdicts). Receivers file it and fire the matching fx thunk when their
+// watch clock reaches `l.step_tick` — beside the delayed avatar that caused
+// it. `kind` 0 = an entity-tick fact (routed to the anchor set's fx); a
+// declared fact ships its Fact_Desc id. `entity` nil = an anchorless world
+// fact (kind facts only) — no owner, everyone watches.
+//
+// The owner skip is PROVENANCE-AWARE: a fact from the everywhere pass skips
+// the anchor's owner (their own live pass just presented it, mine=true, and
+// the echo would double the flash) — but a fact minted in the AUTHORITY pass
+// (l.in_auth) includes them, because their everywhere pass never ran the
+// code that announced it.
+lane_fact :: proc(l: ^Lane, entity: rawptr, args: []u8, kind: u16 = 0) {
 	assert(l.ses.is_host, "facts broadcast from the authority — the generated thunk holds this gate")
 	id := knet.NET_ID_INVALID
 	owner := knet.PLAYER_ID_INVALID
-	for &tr in l.tracked {
-		if tr.entity == entity {
-			id = tr.id
-			owner = tr.owner
-			break
+	if entity != nil {
+		for &tr in l.tracked {
+			if tr.entity == entity {
+				id = tr.id
+				owner = tr.owner
+				break
+			}
 		}
+		if id == knet.NET_ID_INVALID {
+			return // untracked (mid-despawn): nobody left to tell
+		}
+	} else {
+		assert(kind != 0, "an entity-tick fact always has its entity — nil anchors belong to declared @(gd_fact) doors")
 	}
-	if id == knet.NET_ID_INVALID {
-		return // untracked (mid-despawn): nobody left to tell
-	}
+	skip := l.in_auth ? knet.PLAYER_ID_INVALID : owner
 	for p in ksess.session_roster(l.ses) {
-		if !p.connected || p.id == l.ses.me || p.id == owner {
+		if !p.connected || p.id == l.ses.me || (skip != knet.PLAYER_ID_INVALID && p.id == skip) {
 			continue
 		}
 		w := ksess.session_app_begin(l.ses, l.tag)
 		knet.write_u8(w, SIM_FACT)
 		knet.write_u64(w, l.step_tick)
 		knet.write_u32(w, u32(id))
+		knet.write_u16(w, kind)
 		knet.write_bytes(w, args)
 		ksess.session_app_flush(l.ses, p.peer) // reliable: facts are one-shots
 	}
 }
 
 lane_untrack :: proc(l: ^Lane, id: knet.Net_Id) -> bool {
+	assert(!l.rewound, "lane_untrack inside a rewound block — the restore holds pointers into the track list; lane_rewound_end first")
 	if !l.ses.is_host {
 		snap_rx_remove(&l.rx, id)
 	}
@@ -831,12 +908,15 @@ run_tick :: proc(l: ^Lane, t: u64) {
 	run_cmds(l, t)
 	// The everywhere pass first (contact settles), then the authority pass
 	// reads that settled state to adjudicate. The host is never resimming, so
-	// its authority pass fires exactly once per real tick.
+	// its authority pass fires exactly once per real tick. The in_auth flag
+	// marks the pass for lane_fact's provenance-aware owner skip.
 	if l.step != nil {
 		l.step(l.user, t)
 	}
 	if l.step_auth != nil && l.ses.is_host {
+		l.in_auth = true
 		l.step_auth(l.user, t)
+		l.in_auth = false
 	}
 }
 
@@ -1463,9 +1543,11 @@ lane_present :: proc(l: ^Lane, dt: f64) {
 }
 
 // Land every filed fact whose tick the watch clock has reached: fire the
-// entity's fx thunk with mine=false. An entity untracked since filing (a
-// despawn racing the render delay) drops its facts — the edge-outlives-
-// observers law is the game's to honor (dwell the despawn, sim.md).
+// matching fx thunk with mine=false — kind 0 routes to the anchor set's
+// tick fx, a declared kind to the package fact table. An entity untracked
+// since filing (a despawn racing the render delay) drops its facts — the
+// edge-outlives-observers law is the game's to honor (dwell the despawn,
+// sim.md). An ANCHORLESS fact (id 0) has nothing to outlive and always fires.
 @(private = "file")
 fire_facts :: proc(l: ^Lane) {
 	if l.watch_clock == 0 {
@@ -1481,14 +1563,20 @@ fire_facts :: proc(l: ^Lane) {
 		// track/untrack, but a dangling &tr across a call is not a bet.
 		fx: Fx_Thunk
 		entity: rawptr
-		for &tr in l.tracked {
-			if tr.id == f.id {
-				if tr.set != nil {
-					fx = tr.set.fx
+		anchored := f.id != knet.NET_ID_INVALID
+		if anchored {
+			for &tr in l.tracked {
+				if tr.id == f.id {
+					if f.kind == 0 && tr.set != nil {
+						fx = tr.set.fx
+					}
+					entity = tr.entity
+					break
 				}
-				entity = tr.entity
-				break
 			}
+		}
+		if f.kind != 0 && (!anchored || entity != nil) {
+			fx = fact_fx(l, f.kind)
 		}
 		args := f.args
 		ordered_remove(&l.facts, i)
@@ -1583,6 +1671,7 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 		}
 		tick := knet.read_u64(r)
 		id := knet.Net_Id(knet.read_u32(r))
+		kind := knet.read_u16(r)
 		blob := knet.read_bytes(r)
 		if r.err {
 			return
@@ -1593,7 +1682,7 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 		}
 		args := make([]u8, len(blob))
 		copy(args, blob)
-		append(&l.facts, Fact_In{tick = tick, id = id, args = args})
+		append(&l.facts, Fact_In{tick = tick, id = id, kind = kind, args = args})
 	case SIM_SNAP:
 		// Client only, and only the authority's word counts.
 		if l.ses.is_host || from_peer != ksess.HOST_PEER {
