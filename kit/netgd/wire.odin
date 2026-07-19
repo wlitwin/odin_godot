@@ -490,11 +490,12 @@ begin_host :: proc(wire: ^Session_Wire, port: int, name: string, max_peers := 32
 
 // Join `addr:port` as `token`/`name`. false = the transport refused outright;
 // an unreachable host surfaces later as Ev_Join_Failed (the join timeout).
-begin_join :: proc(wire: ^Session_Wire, addr: cstring, port: int, token: u64, name: string) -> bool {
+// `spectate` joins to WATCH (a receive-only seat — see ksess.Player.spectator).
+begin_join :: proc(wire: ^Session_Wire, addr: cstring, port: int, token: u64, name: string, spectate := false) -> bool {
 	if !gd.join(wire.node, addr, port) {
 		return false
 	}
-	ksess.session_client_start(wire.ses, token, name)
+	ksess.session_client_start(wire.ses, token, name, spectate)
 	return true
 }
 

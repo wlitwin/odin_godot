@@ -307,6 +307,11 @@ cmd_handle :: proc(l: ^Lane, from: knet.Player_Id, r: ^knet.Reader) {
 	if r.err {
 		return
 	}
+	// A watching seat issues nothing — the session's command gate already
+	// drops its coop verbs; this is the sim lane's same door.
+	if p, seated := ksess.session_player(l.ses, from); seated && p.spectator {
+		return
+	}
 	tr := cmd_tracked(l, id)
 	// An unknown id (version skew, a renamed verb) MISSES the lookup and drops
 	// cleanly — never dispatches to whatever lives at that position.

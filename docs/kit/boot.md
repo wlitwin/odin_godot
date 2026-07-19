@@ -183,7 +183,13 @@ separately if you want the ritual your way — e.g. cavecrawl's Steam paths).
 `boot_serve(b, port, name)` is the **dedicated-server door**: same transport,
 but the authority holds an infrastructure seat (no avatar, no roster row,
 uncounted by player gates, succession never arms — see
-[session.md](session.md)). Nobody presses Start on a server, so auto-start
+[session.md](session.md)). `boot_spectate(b, addr, port, token, name)` is the
+**watching door** — the dedicated pattern pointed the other way: a seat that
+sees everything and is nobody (bypasses a full room, counts toward nothing,
+receive-only past the join; [session.md's spectator
+paragraph](session.md) has the contract, and the game's spawn loops give it
+the same `!p.spectator` skip they give `dedicated`).
+Nobody presses Start on a server, so auto-start
 your world once `session_count(players_only = true)` reaches your threshold
 (`examples/slopball`'s `serve` role is the model).
 `boot_chat(b, text, &sent)` is the whole `text_submitted` handler, focus

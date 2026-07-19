@@ -33,7 +33,10 @@ package kit_session
 
 import knet "godot:kit/net"
 
-Locator_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y: f32, always: bool)
+// `z` completes the position for 3D worlds; a 2D game returns 0 and the
+// math collapses to the plane (the focus default matches — 2D callers of
+// session_set_focus never spell it).
+Locator_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y, z: f32, always: bool)
 
 // Host: turn interest management on (radius <= 0 turns it off). `hysteresis`
 // widens the EXIT edge so an entity at the border doesn't flicker in and out
@@ -59,8 +62,9 @@ session_set_interest :: proc(s: ^Session, radius: f32, hysteresis: f32, user: ra
 // Host: where `player` is looking from — almost always their avatar, fed
 // every host frame. A player with no focus yet receives EVERYTHING (safe
 // default: filtering starts when the game starts saying where they are).
-session_set_focus :: proc(s: ^Session, player: knet.Player_Id, x, y: f32) {
-	s.focus[player] = {x, y}
+// `z` defaults away for 2D games.
+session_set_focus :: proc(s: ^Session, player: knet.Player_Id, x, y: f32, z: f32 = 0) {
+	s.focus[player] = {x, y, z}
 }
 
 @(private)
@@ -82,9 +86,9 @@ ikey :: proc(player: knet.Player_Id, id: knet.Net_Id) -> Interest_Key {
 }
 
 @(private = "file")
-d2 :: proc(ax, ay, bx, by: f32) -> f32 {
-	dx, dy := bx - ax, by - ay
-	return dx * dx + dy * dy
+d2 :: proc(a: [3]f32, bx, by, bz: f32) -> f32 {
+	dx, dy, dz := bx - a.x, by - a.y, bz - a.z
+	return dx * dx + dy * dy + dz * dz
 }
 
 // Host, once per net tick before the delta send: refresh every peer's
@@ -105,11 +109,11 @@ interest_tick :: proc(s: ^Session) {
 			if !live {
 				continue
 			}
-			x, y, always := s.locator(s.interest_user, id, e.entity)
+			x, y, z, always := s.locator(s.interest_user, id, e.entity)
 			key := ikey(pid, id)
 			in_set := s.interest[key]
 			lim := in_set ? s.interest_r + s.interest_hys : s.interest_r
-			near := always || d2(focus.x, focus.y, x, y) <= lim * lim
+			near := always || d2(focus, x, y, z) <= lim * lim
 			if near && !in_set {
 				s.interest[key] = true
 				// The re-entry resync: everything this peer missed while the

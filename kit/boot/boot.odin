@@ -532,6 +532,25 @@ boot_join :: proc(b: ^Boot, addr: cstring, port: int, token: u64, name: string, 
 	return true
 }
 
+// The WATCHING door: join a run to see it, not to play it. The seat is
+// receive-only past the join (the host refuses its commands, streams, and
+// inputs), bypasses max_players (a full room can be watched), never holds
+// the torch, and games field it no avatar (its rows read spectator on every
+// roster — the spawn loops' `!p.spectator` guard is the game's half). It
+// still chases the torch on a migration — as a spectator of the resumed run.
+boot_spectate :: proc(b: ^Boot, addr: cstring, port: int, token: u64, name: string, status := "Watching...") -> bool {
+	if !netgd.begin_join(&b.wire, addr, port, token, name, spectate = true) {
+		kui.lobby_set_status(&b.ui, "Could not start joining")
+		return false
+	}
+	boot_succ_config(b, false, port, "", token, name)
+	b.phase = .Connecting
+	kui.lobby_show_menu(&b.ui, false, false)
+	kui.lobby_set_status(&b.ui, status)
+	kui.chat_show(&b.chat, true)
+	return true
+}
+
 // The Host button, WebRTC flavor: room opened on the relay, session started,
 // menu hidden, status set (the CODE arrives async — netgd.web_poll it and
 // read gd.webrtc_room_code), chat shown. A non-empty `room` RESERVES that

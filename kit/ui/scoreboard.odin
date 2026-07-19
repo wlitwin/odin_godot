@@ -122,7 +122,7 @@ score_refresh :: proc(sb: ^Score, s: ^ksess.Session) {
 	}
 	roster := ksess.session_roster(s)
 	for p in roster {
-		if p.dedicated {continue} // the server keeps no score
+		if p.dedicated || p.spectator {continue} // the server keeps no score; watchers keep none either
 		cell(sb, &next, fmt.ctprintf("%s", p.name), false)
 		for name in names {
 			if score_hidden(sb, name) {continue}

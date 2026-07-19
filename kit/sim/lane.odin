@@ -1672,8 +1672,12 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 	switch kind {
 	case SIM_INPUT:
 		// Host only; the session already resolved the seat (unseated peers
-		// never reach a handler with a valid `from`).
+		// never reach a handler with a valid `from`). A watching seat drives
+		// nobody — its windows are refused before a buffer ever exists.
 		if !l.ses.is_host || from == knet.PLAYER_ID_INVALID {
+			return
+		}
+		if sp, seated := ksess.session_player(l.ses, from); seated && sp.spectator {
 			return
 		}
 		p, ok := l.peers[from]

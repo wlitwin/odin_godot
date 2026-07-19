@@ -232,7 +232,9 @@ lobby_refresh :: proc(l: ^Lobby, s: ^ksess.Session) {
 		crown := p.id == host ? "\xF0\x9F\x91\x91 " : "" // the host wears it
 		you := p.id == s.me ? "  (you)" : ""
 		suffix := ""
-		if !p.connected {
+		if p.spectator {
+			suffix = "  (watching)" // a seat in the room, not in the game
+		} else if !p.connected {
 			suffix = "  (away)"
 		} else if ping := ksess.session_stat(s, p.id, ksess.STAT_PING); ping > 0 {
 			suffix = fmt.tprintf("  %dms", ping)

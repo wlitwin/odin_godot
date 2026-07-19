@@ -61,6 +61,12 @@ Player :: struct {
 	name:      string, // owned by the session
 	peer:      Peer_Id, // transport seat; NO_PEER while disconnected
 	connected: bool,
+	// A WATCHING seat: sees the whole world, owns nothing, counts toward
+	// nothing. Player gates skip it (session_count's players_only), it can
+	// never hold the torch (backup_target), and the host drops its commands
+	// and streams outright — a spectator's wire is receive-only past the
+	// join. It bypasses max_players on purpose: a full room can be watched.
+	spectator: bool,
 	dedicated: bool, // an INFRASTRUCTURE seat (a dedicated server), not a person:
 	// fields no avatar, hidden from rosters/scoreboards, uncounted by player
 	// gates. Only the authority can hold one (session_host_start's flag).
@@ -552,6 +558,7 @@ Session :: struct {
 
 	// client bookkeeping
 	token:       u64, // our reconnect secret (the game persists it across runs)
+	spectate:    bool, // client: this seat joins to WATCH (session_client_start's flag; rides SES_JOIN)
 	name:        string, // owned; the name we asked for
 	joined:      bool, // WELCOME received
 	join_waited: int, // ticks since client_start without a WELCOME (-1 = not waiting)
@@ -561,7 +568,7 @@ Session :: struct {
 	interest_hys:  f32,
 	interest_user: rawptr,
 	locator:       Locator_Proc,
-	focus:         map[knet.Player_Id][2]f32, // host: each peer's eyes
+	focus:         map[knet.Player_Id][3]f32, // host: each peer's eyes (z = 0 for 2D games)
 	interest:      map[Interest_Key]bool, // host: (player, entity) pairs currently near
 	aoi_client:    bool, // client: the welcome said streams route via the host
 }
@@ -1557,8 +1564,8 @@ session_world_time :: proc(s: ^Session) -> f64 {
 backup_target :: proc(s: ^Session) -> knet.Player_Id {
 	best := knet.PLAYER_ID_INVALID
 	for _, p in s.players {
-		if !p.connected || p.id == s.me {
-			continue
+		if !p.connected || p.id == s.me || p.spectator {
+			continue // a watcher can never hold the torch
 		}
 		if best == knet.PLAYER_ID_INVALID || p.id < best {
 			best = p.id
@@ -1912,7 +1919,7 @@ session_count :: proc(s: ^Session, connected_only := true, players_only := true)
 	n := 0
 	for _, p in s.players {
 		if connected_only && !p.connected {continue}
-		if players_only && p.dedicated {continue}
+		if players_only && (p.dedicated || p.spectator) {continue}
 		n += 1
 	}
 	return n
@@ -2078,6 +2085,11 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 		fp = 0
 		r.err = false
 	}
+	spectate := knet.read_bool(r)
+	if r.err {
+		spectate = false // a pre-spectator build's JOIN ends at the fingerprint
+		r.err = false
+	}
 
 	// The FIRST gate: the builds must speak the same wire. A version-skewed
 	// peer's descriptors would misparse every delta into garbage fields — no
@@ -2122,10 +2134,12 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 			return
 		}
 		// max_players caps PEOPLE — a dedicated server's own seat never eats
-		// one. Zero config = DEFAULT_MAX_PLAYERS; going unbounded is spelled
-		// max_players = -1, a declaration, not a forgotten field.
+		// one, and a SPECTATOR bypasses the cap outright (a full room can be
+		// watched; the seat plays nobody). Zero config = DEFAULT_MAX_PLAYERS;
+		// going unbounded is spelled max_players = -1, a declaration, not a
+		// forgotten field.
 		limit := s.cfg.max_players == 0 ? DEFAULT_MAX_PLAYERS : s.cfg.max_players
-		if limit > 0 && session_count(s, connected_only = true, players_only = true) >= limit {
+		if !spectate && limit > 0 && session_count(s, connected_only = true, players_only = true) >= limit {
 			deny_join(s, peer, .Full)
 			return
 		}
@@ -2140,6 +2154,7 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 		p.name = strings.clone(name)
 		p.peer = peer
 		p.connected = true
+		p.spectator = spectate // the seat re-declares its intent each join
 		s.players[id] = p
 	} else {
 		id = s.next_player
@@ -2150,6 +2165,7 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 			name      = strings.clone(name),
 			peer      = peer,
 			connected = true,
+			spectator = spectate,
 		}
 	}
 	s.by_peer[peer] = id
@@ -2167,6 +2183,7 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 		knet.write_string(&w, p.name)
 		knet.write_bool(&w, p.connected)
 		knet.write_bool(&w, p.dedicated) // the server seat announces itself
+		knet.write_bool(&w, p.spectator) // ...and the watching seats do too
 	}
 	knet.write_bool(&w, s.interest_r > 0 && s.locator != nil) // stream routing (interest.odin)
 	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
@@ -2179,6 +2196,7 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 	knet.write_string(&up, name)
 	knet.write_bool(&up, true)
 	knet.write_bool(&up, rejoin)
+	knet.write_bool(&up, spectate)
 	host_broadcast(s, knet.writer_bytes(&up), except = id)
 
 	// DROP-IN JOIN: a live world follows the welcome on the same ordered
@@ -2200,10 +2218,16 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 
 // Remember who we are; the JOIN goes out when the game confirms the transport
 // is up (session_client_join). `token` is the persistent reconnect secret.
-session_client_start :: proc(s: ^Session, token: u64, name: string) {
+// `spectate` joins to WATCH: the seat sees everything and is nobody — no
+// avatar to field, no vote in player gates, no torch, and the host refuses
+// its commands and streams. It bypasses max_players (a full room can be
+// watched). Promotion to a playing seat is deliberately NOT a flag flip —
+// leave and rejoin as a player.
+session_client_start :: proc(s: ^Session, token: u64, name: string, spectate := false) {
 	session_init(s)
 	s.is_host = false
 	s.token = token
+	s.spectate = spectate
 	s.name = strings.clone(name)
 	s.join_waited = 0 // the join-timeout clock arms; Ev_Join_Failed if no WELCOME
 }
@@ -2221,13 +2245,14 @@ session_client_join :: proc(s: ^Session) {
 	knet.write_u64(&w, s.token)
 	knet.write_string(&w, s.name)
 	knet.write_u64(&w, wire_fingerprint(s.cfg.fingerprint))
+	knet.write_bool(&w, s.spectate) // trailing like the fingerprint: older joins just end sooner
 	s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
 }
 
 // The kit's own wire revision, folded into every nonzero fingerprint before it
 // rides SES_JOIN — a kit upgrade that changes the wire then refuses skewed
 // peers even when the game's declarations didn't move. Bump on wire changes.
-PROTOCOL_REV :: u64(6) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: the wire frame byte carries the stream-channel bit (netgd) · 4: SIM_FACT carries a fact kind (declared world-pass facts) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream routing mid-run
+PROTOCOL_REV :: u64(7) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: the wire frame byte carries the stream-channel bit (netgd) · 4: SIM_FACT carries a fact kind (declared world-pass facts) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream routing mid-run · 7: spectator seats (SES_JOIN intent + roster rows carry the flag)
 
 @(private = "file")
 FP_SALT :: u64(0x9E3779B97F4A7C15) + PROTOCOL_REV // the golden-ratio constant, rev-shifted
@@ -2256,7 +2281,7 @@ session_client_leave :: proc(s: ^Session) {
 }
 
 @(private = "file")
-roster_upsert :: proc(s: ^Session, id: knet.Player_Id, name: string, connected: bool, peer := NO_PEER, dedicated := false) {
+roster_upsert :: proc(s: ^Session, id: knet.Player_Id, name: string, connected: bool, peer := NO_PEER, dedicated := false, spectator := false) {
 	if old, had := s.players[id]; had {
 		delete(old.name)
 	}
@@ -2266,6 +2291,7 @@ roster_upsert :: proc(s: ^Session, id: knet.Player_Id, name: string, connected: 
 		peer      = peer,
 		connected = connected,
 		dedicated = dedicated,
+		spectator = spectator,
 	}
 }
 
@@ -2281,10 +2307,11 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 		name := knet.read_string(r)
 		connected := knet.read_bool(r)
 		dedicated := knet.read_bool(r)
+		spectator := knet.read_bool(r)
 		if r.err {
 			return // partial roster is fine: entries already applied are valid
 		}
-		roster_upsert(s, id, name, connected, dedicated = dedicated)
+		roster_upsert(s, id, name, connected, dedicated = dedicated, spectator = spectator)
 	}
 	s.me = me
 	s.ctx.me = me
@@ -2381,10 +2408,11 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		name := knet.read_string(r)
 		connected := knet.read_bool(r)
 		rejoin := knet.read_bool(r)
+		spectator := knet.read_bool(r)
 		if r.err {
 			return
 		}
-		roster_upsert(s, id, name, connected)
+		roster_upsert(s, id, name, connected, spectator = spectator)
 		append(&s.events, Ev_Player_Joined{id = id, rejoin = rejoin})
 	case SES_LEFT:
 		if s.is_host {
@@ -2570,6 +2598,9 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		if !seated {
 			return
 		}
+		if p, has := s.players[pid]; has && p.spectator {
+			return // a watching seat issues nothing — receive-only past the join
+		}
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
 		knet.write_u8(&w, SES_RESULT)
@@ -2600,6 +2631,16 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 	case SES_STREAM:
 		if !s.joined {
 			return
+		}
+		if s.is_host {
+			// A watching seat streams nothing (it owns nothing to stream) —
+			// the host refuses at the door. Clients keep the friends-not-
+			// forensics trust model for peer broadcasts, as ever.
+			if pid, seated := s.by_peer[from_peer]; seated {
+				if p, has := s.players[pid]; has && p.spectator {
+					return
+				}
+			}
 		}
 		raw := r.data[r.off:] // the batch, pre-parse (the host may forward it)
 		_ = knet.registry_stream_time(r) // sender stamp (clock-mapped timelines later)

@@ -348,6 +348,16 @@ with `ban` the token bounces off future joins with `.Banned` for the rest of the
 are run-scoped but ride the [backup snapshot](#backup-hosting-and-resume), so a takeover
 doesn't launder them; persist them yourself if forever matters).
 
+**Spectators.** `session_client_start(..., spectate = true)` joins to WATCH: the seat
+receives the whole world — spawns, deltas, streams, stats, chat — and is nobody. It
+bypasses `max_players` (a full room can be watched), `session_count()` doesn't count it,
+player gates and the torch skip it, and the host refuses its commands, streams, and sim
+inputs outright — receive-only past the join. Every roster reads `Player.spectator`
+(the lobby marks the row "(watching)", the scoreboard skips it); the game's half is the
+same `!p.spectator` guard its spawn loops already give `dedicated`. Promotion is
+deliberately NOT a flag flip — a watcher who wants in leaves and rejoins as a player,
+through the same doors and gates as anyone.
+
 Stats are generic named i64 counters on the *player* record — host-accumulated, replicated
 to everyone as a full snapshot at ~2 Hz when dirty, and they survive disconnects like
 everything else identity-shaped. Column 0 is always "ping", fed by the session itself:
@@ -446,11 +456,13 @@ for entities near its **focus**. Off by default.
 // host, once — before start or mid-run alike; the locator lends the session
 // eyes (it can't read your fields):
 ksess.session_set_interest(&self.ses, 800, 120, self, my_locator)
-my_locator :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y: f32, always: bool) {
-	// return each entity's position; `always = true` for placeless entities
-	// (the world/level entity, global timers) — relevant to everyone, forever.
+my_locator :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y, z: f32, always: bool) {
+	// return each entity's position (z = 0 for a 2D world — the math collapses
+	// to the plane); `always = true` for placeless entities (the world/level
+	// entity, global timers) — relevant to everyone, forever.
 }
-// host, every frame: where each player is looking from (their avatar):
+// host, every frame: where each player is looking from (their avatar);
+// `z` defaults away for 2D games:
 ksess.session_set_focus(&self.ses, pid, avatar.x, avatar.y)
 ```
 

@@ -9,7 +9,9 @@ package kit_session_test
 // path — JOIN/WELCOME/UPSERT/LEFT bytes included — is exercised exactly as it
 // runs over the real transport, minus the socket.
 
+import "core:fmt"
 import "core:testing"
+import "core:time"
 import kcombat "godot:kit/combat"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
@@ -35,6 +37,7 @@ Envelope :: struct {
 Peer_Box :: struct {
 	peer:  ksess.Peer_Id,
 	s:     ksess.Session,
+	sent:  int, // bytes this box handed the transport (the scale test's receipt)
 	out:   [dynamic]Envelope,
 	bots:  map[knet.Net_Id]^Bot, // factory-created entities (clients)
 	freed: int, // factory frees observed
@@ -47,6 +50,7 @@ Peer_Box :: struct {
 
 box_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
 	b := cast(^Peer_Box)user
+	b.sent += len(bytes)
 	cloned := make([]u8, len(bytes))
 	copy(cloned, bytes)
 	append(&b.out, Envelope{to = to_peer, data = cloned})
@@ -1626,9 +1630,9 @@ present_now_for_mine_render_delayed_for_theirs :: proc(t: ^testing.T) {
 // only reaches peers whose FOCUS is near. The locator lends the session eyes
 // (Bot.x doubles as the position).
 
-bot_locate :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y: f32, always: bool) {
+bot_locate :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y, z: f32, always: bool) {
 	b := cast(^Bot)entity
-	return b.x, 0, false
+	return b.x, 0, 0, false
 }
 
 @(test)
@@ -2337,4 +2341,171 @@ edge_pass_is_idempotent_and_callable :: proc(t: ^testing.T) {
 	now := 0.0
 	step([]^Peer_Box{&host}, &now)
 	testing.expect_value(t, host.edge_fires, 1)
+}
+
+// ---- THE SCALE PROOF, unit tier -------------------------------------------------
+//
+// 32 in-process sessions through the box transport — a join storm, a
+// replicated world under interest, and steady-state worst-case delta fanout,
+// at 4x the framework's stated table size. This proves the session MACHINERY
+// at scale (no engine processes, no load sensitivity — the real-process tier
+// lives in the harness, gated, for a quiet box); the timings and byte counts
+// print as receipts and never assert — machines differ, the trend is the pin.
+@(test)
+scale_32_seats :: proc(t: ^testing.T) {
+	N :: 32 // host + 31 clients
+	boxes_store: [N]Peer_Box
+	boxes: [N]^Peer_Box
+	for i in 0 ..< N {
+		boxes[i] = &boxes_store[i]
+		box_make(boxes[i], ksess.Peer_Id(i + 1))
+	}
+	defer for b in boxes {box_destroy(b)}
+
+	// An unbounded lobby is a DECLARATION now — this test is the declaring
+	// consumer (the default caps at 8 and would deny seat 9's join).
+	ksess.session_configure(&boxes[0].s, {max_players = -1})
+	ksess.session_host_start(&boxes[0].s, "hosty")
+
+	join_start := time.tick_now()
+	for i in 1 ..< N {
+		ksess.session_client_start(&boxes[i].s, u64(0x5CA1E000 + i), fmt.tprintf("p%d", i))
+		ksess.session_client_join(&boxes[i].s)
+	}
+	pump(boxes[:])
+	join_ms := time.duration_milliseconds(time.tick_since(join_start))
+
+	// Everyone seated, on every roster — the bare count is present people.
+	for b in boxes {
+		testing.expect_value(t, ksess.session_count(&b.s), N)
+	}
+
+	// One bot per seat, spread along x; interest filters freshness around a
+	// 150-unit focus but EXISTENCE is global — all 32 exist on all 32 screens.
+	ksess.session_set_interest(&boxes[0].s, 150, 30, nil, bot_locate)
+	ids: [N]knet.Net_Id
+	for i in 0 ..< N {
+		bot := new(Bot)
+		bot.hp = 10
+		bot.x = f32(i * 100)
+		ids[i] = ksess.session_spawn(&boxes[0].s, BOT_TYPE, bot, &bot_command_set)
+		boxes[0].bots[ids[i]] = bot
+	}
+	ksess.session_start_replicating(&boxes[0].s)
+	for i in 1 ..< N {
+		ksess.session_set_focus(&boxes[0].s, boxes[i].s.me, f32(i * 100), 0)
+	}
+	world_start := time.tick_now()
+	pump(boxes[:])
+	world_ms := time.duration_milliseconds(time.tick_since(world_start))
+	for b in boxes {
+		testing.expect_value(t, len(b.bots), N) // existence global, everywhere
+	}
+
+	// Steady state, worst case: every bot dirty every tick, 20 ticks — the
+	// full delta fanout under per-peer interest collection.
+	base_sent := boxes[0].sent
+	now := f64(1000)
+	steady_start := time.tick_now()
+	TICKS :: 20
+	for tick in 0 ..< TICKS {
+		for id in ids {
+			boxes[0].bots[id].hp += 1
+		}
+		step(boxes[:], &now)
+	}
+	steady := time.tick_since(steady_start)
+	host_bytes := boxes[0].sent - base_sent
+
+	// The world stayed coherent under the storm: spot-check a near pair on a
+	// far client (interest still delivered ITS bot's freshness) and zero
+	// malformed drops anywhere.
+	for b in boxes {
+		testing.expect_value(t, ksess.session_malformed(&b.s), u64(0))
+	}
+	testing.expect_value(t, boxes[N - 1].bots[ids[N - 1]].hp, i32(10 + TICKS))
+
+	fmt.printf(
+		"SCALE32 join_ms=%.1f world_ms=%.1f steady_ms=%.2f per_tick_us=%.0f host_tx_bytes=%d per_tick_per_peer_bytes=%d\n",
+		join_ms, world_ms,
+		time.duration_milliseconds(steady),
+		time.duration_microseconds(steady) / TICKS,
+		host_bytes,
+		host_bytes / (TICKS * (N - 1)),
+	)
+}
+
+// The WATCHING seat, end to end: joins a full room, counts toward nothing,
+// sees the whole world, can never hold the torch, and the host refuses its
+// verbs — receive-only past the join, marked spectator on every roster.
+@(test)
+spectator_watches_and_is_nobody :: proc(t: ^testing.T) {
+	host, watcher, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&watcher, 100)
+	box_make(&alice, 200)
+	box_make(&bob, 300)
+	defer box_destroy(&host)
+	defer box_destroy(&watcher)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &watcher, &alice, &bob}
+
+	ksess.session_configure(&host.s, {max_players = 2}) // host + one player fill it
+	ksess.session_host_start(&host.s, "hosty")
+
+	// The watcher seats FIRST (lowest client id — the torch test below needs
+	// it to be the tempting-but-wrong heir) and never eats a player slot.
+	ksess.session_client_start(&watcher.s, u64(0xCA3E7A), "cam", spectate = true)
+	ksess.session_client_join(&watcher.s)
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	testing.expect(t, watcher.s.joined, "the watcher seated")
+	testing.expect(t, alice.s.joined, "the watcher's seat cost alice nothing")
+
+	// A THIRD person is a player and the room is genuinely full for players.
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+	dev := drain(&bob.s)
+	testing.expect_value(t, len(dev), 1)
+	d, denied := dev[0].(ksess.Ev_Join_Denied)
+	testing.expect(t, denied)
+	testing.expect_value(t, d.reason, ksess.Deny_Reason.Full)
+
+	// Counts: present PEOPLE is 2 everywhere; the roster holds 3 seats.
+	testing.expect_value(t, ksess.session_count(&host.s), 2)
+	testing.expect_value(t, ksess.session_count(&host.s, connected_only = false, players_only = false), 3)
+	wp, has := ksess.session_player(&alice.s, watcher.s.me)
+	testing.expect(t, has && wp.spectator, "every roster reads the watching flag")
+
+	// The whole world reaches the watcher — existence and freshness alike.
+	abot := new(Bot)
+	abot.hp = 10
+	id := ksess.session_spawn(&host.s, BOT_TYPE, abot, &bot_command_set)
+	host.bots[id] = abot
+	ksess.session_start_replicating(&host.s)
+	pump(boxes)
+	testing.expect(t, watcher.bots[id] != nil, "the watcher got the world")
+	now := f64(1000)
+	abot.hp = 42
+	step(boxes, &now)
+	testing.expect_value(t, watcher.bots[id].hp, i32(42))
+
+	// The watcher's verb dies at the host's door: the authoritative copy
+	// never moves (the local optimistic run is its own delusion, reverted by
+	// the expiry like any lost command).
+	knet.command_begin(&watcher.s.ctx, id, BOT_HIT)
+	knet.write_i32(&watcher.s.ctx.msg, 3)
+	_ = knet.command_issue(&watcher.s.ctx, watcher.bots[id], &bot_command_set, BOT_HIT)
+	pump(boxes)
+	testing.expect_value(t, abot.hp, i32(42))
+
+	// The torch skips the watcher: past the backup cadence the designated
+	// heir is ALICE (id 3), never the lower-seated watching seat (id 2).
+	for _ in 0 ..< 110 {
+		step(boxes, &now)
+	}
+	testing.expect_value(t, host.s.backup_target, alice.s.me)
 }

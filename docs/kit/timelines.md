@@ -24,6 +24,16 @@ scale, headless (the kitsim acids run two-to-three peers over an in-memory
 wire). Predict-world's speedball is 1v1 too — larger sim seats, on every
 row of that half, are untested, not impossible.
 
+The session MACHINERY has numbers past the table size: the 32-seat unit
+proof (kitsession's `scale_32_seats` — real sessions over an in-memory
+wire, no engine) seats a 31-client join storm in ~4ms, broadcasts a
+32-entity world in ~5ms, and pays ~0.7ms per 20 Hz net tick for the
+worst case — every entity dirty every tick, per-peer interest collection
+— at ~40 bytes/tick/peer with interest filtering the freshness down to
+each seat's neighborhood. That is the machinery, measured; what 32 REAL
+processes do to a frame budget is the engine-tier proof, which wants a
+quiet box and is not claimed here.
+
 And the fifth, deliberately not shipped: **deterministic lockstep** (the
 fighting-game answer — GGPO-style). One timeline by CONSENSUS: every peer
 simulates every tick from everyone's inputs, rolling back on late arrivals.
