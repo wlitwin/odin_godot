@@ -388,7 +388,10 @@ agen="$ab/caster.gen.odin"
 grep -q "CASTER_CMD_LOB_CAST :: u16" "$agen" || fail "first ability's cast must hoist as CASTER_CMD_LOB_CAST"
 grep -q "CASTER_CMD_CONE_CAST :: u16" "$agen" || fail "second ability instance must get its own path-prefixed cast (CONE_CAST)"
 grep -q "return play.ability_cast(&self.lob, _a0, _a1)" "$agen" || fail "cast thunk must route into &self.lob (imported, qualified, no owner)"
-grep -q "size_of(type_of(Caster{}.lob.def))" "$agen" || fail "the Ability_Def cooldown knob must replicate through the embed"
+# The knob is FLAT since play went canonical-shelf: play.Ability_Def is gone
+# (the def table is kcombat's; a string name can never ride a replicated
+# blob), and the block replicates a bare cooldown beside its countdown.
+grep -q "offset_of(type_of(Caster{}.lob), cooldown)" "$agen" || fail "the flat cooldown knob must replicate through the embed"
 grep -q "offset_of(type_of(Caster{}.lob), cd)" "$agen" || fail "the cooldown cd must compose through the block"
 
 # ---- fixture 12: play.Channel — owner-streamed block state + a composed claim ----

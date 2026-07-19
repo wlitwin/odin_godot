@@ -30,14 +30,35 @@ import "core:math"
 
 // ---- health ------------------------------------------------------------------
 
-// Apply damage: clamps at zero, reports the killing blow exactly once
-// (hitting a corpse is a no-op — no double kills, no negative hp).
-hit :: proc "contextless" (hp: ^i32, amount: i32) -> (died: bool) {
-	if hp^ <= 0 || amount <= 0 {
-		return false
+// The scalar damage core — THE one implementation of the corpse-guarded
+// clamp, generic over the game's hp integer (play.Health's u16, a raw i32
+// field, a boss's whatever). `dealt` is what actually landed (0 on a corpse
+// or a no-op amount — hit credit reads it); `died` reports the killing blow
+// exactly once. hit() below and play.health_hurt both delegate here — the
+// same one-gate rule as cast_gate: the two layers can never drift on what a
+// death is.
+hurt :: proc "contextless" (hp: ^$T, dmg: T) -> (dealt: T, died: bool) {
+	if hp^ <= 0 || dmg <= 0 {
+		return 0, false
 	}
-	hp^ = max(0, hp^ - amount)
-	return hp^ == 0
+	dealt = min(dmg, hp^)
+	hp^ -= dealt
+	return dealt, hp^ == 0
+}
+
+// The scalar heal: restore `amount`, clamped to `maximum`. Reviving a corpse
+// is a heal from 0 — whether that is ALLOWED is policy, gated by the caller.
+heal :: proc "contextless" (hp: ^$T, maximum: T, amount: T) {
+	hp^ = min(hp^ + amount, maximum)
+}
+
+// Apply damage to a raw hp field: clamps at zero, reports the killing blow
+// exactly once (hitting a corpse is a no-op — no double kills, no negative
+// hp). The died-only convenience over `hurt` for games that keep bare i32
+// hp; block games get the same rules through play.Health.
+hit :: proc "contextless" (hp: ^i32, amount: i32) -> (died: bool) {
+	_, died = hurt(hp, amount)
+	return died
 }
 
 // ---- abilities: integer costs + tick cooldowns -------------------------------

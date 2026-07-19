@@ -25,6 +25,28 @@ hit_clamps_and_kills_once :: proc(t: ^testing.T) {
 	testing.expect_value(t, hp, i32(5))
 }
 
+// The scalar core under hit AND play.health_hurt — pinned at the u16
+// instantiation the block uses, so the one-implementation rule is a test,
+// not a comment.
+@(test)
+hurt_deals_credit_and_heal_clamps :: proc(t: ^testing.T) {
+	hp := u16(10)
+	dealt, died := kcombat.hurt(&hp, 7)
+	testing.expect_value(t, dealt, u16(7))
+	testing.expect(t, !died)
+	dealt, died = kcombat.hurt(&hp, 99)
+	testing.expect_value(t, dealt, u16(3)) // only what was there lands — hit credit is honest
+	testing.expect(t, died, "the killing blow reports")
+	dealt, died = kcombat.hurt(&hp, 5)
+	testing.expect_value(t, dealt, u16(0)) // corpses take nothing
+	testing.expect(t, !died, "and don't die twice")
+
+	kcombat.heal(&hp, u16(10), u16(4)) // a revive is a heal from 0 — policy gates it, not the math
+	testing.expect_value(t, hp, u16(4))
+	kcombat.heal(&hp, u16(10), u16(99))
+	testing.expect_value(t, hp, u16(10)) // clamped to max
+}
+
 ROCK :: kcombat.Ability_Def{name = "rock", cooldown = 20, cost = 3}
 
 @(test)

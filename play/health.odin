@@ -29,6 +29,15 @@ package play
 //
 // The host writes (plain replicated fields); every peer reads. u16 spans a player's
 // handful to a boss's hundreds.
+//
+// THE LAYERING (play is policy, kit is mechanism): the damage clamp and the heal clamp
+// delegate to kcombat.hurt/heal — the same scalar core kcombat.hit wraps for raw-field
+// games, so a block game and a bare-i32 game can never disagree on what a death is. The
+// SEEN-before-confirmed overlay (dip the displayed hp at visual contact, reconcile when
+// the wire agrees) is kit mechanism too: kcombat.Predicted_Hp — pair it with this block
+// in the game's presentation half, never inside the replicated fields.
+
+import kcombat "godot:kit/combat"
 
 Health :: struct {
 	hp:  u16 `gd:"replicate"`, // host-authoritative; 0 = dead/downed (what that MEANS is yours)
@@ -46,10 +55,7 @@ health_arm :: proc(h: ^Health, max: u16) {
 // — 0 on a corpse) and whether THIS hit was the killing one (false on a corpse: a death edge
 // fires once).
 health_hurt :: proc(h: ^Health, dmg: u16) -> (dealt: u16, died: bool) {
-	if h.hp == 0 {return 0, false}
-	dealt = min(dmg, h.hp)
-	h.hp -= dealt
-	return dealt, h.hp == 0
+	return kcombat.hurt(&h.hp, dmg)
 }
 
 // health_kill — host: drop to 0 outright (a self-destruct, a detonate combo, a dev cheat).
@@ -60,7 +66,7 @@ health_kill :: proc(h: ^Health) {
 // health_heal — host: restore `amount`, clamped to max. Reviving a corpse is a heal from 0 —
 // gate "may this target be healed" yourself (that's policy).
 health_heal :: proc(h: ^Health, amount: u16) {
-	h.hp = min(h.hp + amount, h.max)
+	kcombat.heal(&h.hp, h.max, amount)
 }
 
 // health_dead / health_frac — the two reads every gate and bar wants, named. `hp`/`max` are

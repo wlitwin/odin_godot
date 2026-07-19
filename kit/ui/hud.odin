@@ -93,6 +93,9 @@ hp_make :: proc(parent: gd.Node) -> Health_Bar {
 
 // Text blocks over stock theme: "hp ▓▓▓▓▓▓▓░░░ 70/100". Zero art to install,
 // and a test can read the exact fill back out of the tree.
+// A play.Health block feeds this directly: `kui.hp_refresh(&hb,
+// i32(r.health.hp), i32(r.health.max))` — the widget speaks plain ints on
+// purpose, so no layer owns it.
 hp_refresh :: proc(hb: ^Health_Bar, current, max_hp: i32) {
 	filled := 0
 	if max_hp > 0 {
@@ -137,6 +140,16 @@ abilities_destroy :: proc(bar: ^Ability_Bar) {
 // NET TICKS — pass `session_tick_hz(&ses)` so the seconds shown are true at
 // any configured rate (the default only matches a session left at knet's
 // 20 Hz; a 60 Hz game that omits it shows cooldowns 3× too long).
+//
+// BOTH ability models feed this one widget — kcombat.Ability_Def is the def
+// vocabulary at every layer since play went canonical-shelf. A slot-array
+// game passes its Cooldowns bundle (`c.cds[:]`); a play-block game gathers
+// its blocks' countdowns into a local array beside the same def rows:
+//
+//     kui.abilities_refresh(&bar, defs, []u16{r.slime.cd, r.ignite.cd}, gold, hz)
+//
+// (kit/ui can never import play — the arrow points play → kit — and it
+// never needs to: the shared def table IS the flip.)
 abilities_refresh :: proc(bar: ^Ability_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_rate := knet.DEFAULT_TICK_HZ) {
 	for cell, i in bar.cells {
 		if i >= len(defs) {

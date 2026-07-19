@@ -35,6 +35,8 @@ package play
 // (or hand-write the composed verb — name-wins — when the pay must sit inside the predicted gate).
 // The block replicates only what both peers must agree on: the cooldown knob and the countdown.
 // The GATE and the DECAY delegate to kcombat (cast_gate/cd_decay) — one implementation, two layers.
+// The stock ability bar reads the same rows: gather the blocks' countdowns beside them —
+// `kui.abilities_refresh(&bar, defs, []u16{r.slime.cd, r.ignite.cd}, gold, hz)`.
 
 import kcombat "godot:kit/combat"
 
