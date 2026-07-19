@@ -344,13 +344,19 @@ command_confirm :: proc(ctx: ^Command_Ctx, seq: Intent_Seq) -> bool {
 // lagged echo of state this peer is authoritative for, and restoring it
 // yanks a moving owner backwards on every rejection.
 command_reject :: proc(ctx: ^Command_Ctx, res: Command_Result, r: ^Reader, entity: rawptr, set: ^Command_Set, owned_here := false) {
-	// skip_predicted unconditionally: this proc only runs on CLIENTS, where
-	// .Predicted fields belong to the sim lane's reconcile — a reject-truth
-	// may only land on the delta-lane fields the command could touch.
+	// .Predicted is skipped unconditionally: this proc only runs on CLIENTS,
+	// where .Predicted fields belong to the sim lane's reconcile — a
+	// reject-truth may only land on the delta-lane fields the command could
+	// touch. .Owner joins the skip when this peer owns the entity (its streamed
+	// fields are authoritative here, not in the host's lagged truth).
+	skip := Subset_Skips{.Predicted}
+	if owned_here {
+		skip += {.Owner}
+	}
 	p, had := pending_reject(&ctx.pending, res.seq)
-	apply_full(r, entity, set.entity_desc, skip_owner = owned_here, skip_predicted = true)
+	apply_full(r, entity, set.entity_desc, skip)
 	if r.err && had {
-		fields_restore(entity, set.entity_desc, p.revert, skip_owner = owned_here, skip_predicted = true)
+		fields_restore(entity, set.entity_desc, p.revert, skip)
 	}
 	if had {
 		pending_dispose(p)

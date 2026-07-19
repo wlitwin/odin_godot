@@ -27,44 +27,19 @@ import knet "godot:kit/net"
 
 // Byte size of one predict-set snapshot. 0 = this entity type predicts nothing.
 predict_size :: proc(desc: ^knet.Entity_Desc) -> int {
-	n := 0
-	for f in desc.fields {
-		if .Predicted in f.flags {
-			n += f.size
-		}
-	}
-	return n
-}
-
-@(private = "file")
-field_ptr :: proc(entity: rawptr, f: knet.Field_Desc) -> rawptr {
-	return rawptr(uintptr(entity) + f.offset)
+	return knet.subset_view(desc, .Predicted).struct_bytes
 }
 
 // Entity → blob (caller sizes dst with predict_size).
 predict_capture :: proc(dst: []u8, entity: rawptr, desc: ^knet.Entity_Desc) {
-	off := 0
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
-		mem.copy(&dst[off], field_ptr(entity, f), f.size)
-		off += f.size
-	}
+	knet.subset_capture(knet.subset_view(desc, .Predicted), entity, dst)
 }
 
 // Blob → entity. The restore half of a reconcile: authoritative truth (or a
 // stored prediction) lands on exactly the predicted fields, nothing else —
 // delta-lane and owner-stream fields are never touched from here.
 predict_restore :: proc(entity: rawptr, desc: ^knet.Entity_Desc, src: []u8) {
-	off := 0
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
-		mem.copy(field_ptr(entity, f), &src[off], f.size)
-		off += f.size
-	}
+	knet.subset_restore(knet.subset_view(desc, .Predicted), entity, src)
 }
 
 // Does the entity's live predict set equal `blob`? The clean-skip test: equal
@@ -72,18 +47,7 @@ predict_restore :: proc(entity: rawptr, desc: ^knet.Entity_Desc, src: []u8) {
 // same memcmp discipline as the delta walk (POD fields, nothing follows
 // pointers).
 predict_matches :: proc(entity: rawptr, desc: ^knet.Entity_Desc, blob: []u8) -> bool {
-	off := 0
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
-		ep := ([^]u8)(field_ptr(entity, f))
-		if mem.compare(ep[:f.size], blob[off:off + f.size]) != 0 {
-			return false
-		}
-		off += f.size
-	}
-	return true
+	return knet.subset_equal(knet.subset_view(desc, .Predicted), entity, blob)
 }
 
 // ---------------------------------------------------------------------------

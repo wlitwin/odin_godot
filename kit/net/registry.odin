@@ -259,7 +259,7 @@ unwind_pending :: proc(ctx: ^Command_Ctx, e: ^Registry_Entry) {
 	#reverse for &p in ctx.pending.entries {
 		if pending_reconciles(p, e) {
 			// Client-only path: predicted fields belong to the sim lane.
-			fields_restore(e.entity, e.set.entity_desc, p.revert, skip_predicted = true)
+			fields_restore(e.entity, e.set.entity_desc, p.revert, {.Predicted})
 		}
 	}
 }
@@ -280,7 +280,7 @@ replay_pending :: proc(ctx: ^Command_Ctx, e: ^Registry_Entry) {
 		// can't really happen — treated as a failed replay if it somehow does).
 		c := command_find(e.set, p.cmd)
 		if c == nil || !(c.invoke(e.entity, &r, &env) && !r.err) {
-			fields_restore(e.entity, e.set.entity_desc, p.revert, skip_predicted = true)
+			fields_restore(e.entity, e.set.entity_desc, p.revert, {.Predicted})
 		}
 	}
 }
@@ -391,7 +391,11 @@ registry_apply_fulls :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = nil
 			break
 		}
 		owned_here := me != PLAYER_ID_INVALID && e.owner == me
-		apply_full(r, e.entity, e.set.entity_desc, skip_owner = owned_here)
+		skip: Subset_Skips
+		if owned_here {
+			skip = {.Owner}
+		}
+		apply_full(r, e.entity, e.set.entity_desc, skip)
 		if r.err {
 			break
 		}
@@ -735,7 +739,11 @@ registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks
 	for p in expired {
 		if e, found := &reg.entries[p.entity]; found {
 			owned_here := me != PLAYER_ID_INVALID && e.owner == me
-			fields_restore(e.entity, e.set.entity_desc, p.revert, skip_owner = owned_here, skip_predicted = true)
+			skip := Subset_Skips{.Predicted}
+			if owned_here {
+				skip += {.Owner}
+			}
+			fields_restore(e.entity, e.set.entity_desc, p.revert, skip)
 			shadow_capture(e.entity, e.shadow, e.set.entity_desc) // bless: the revert is framework truth now
 		}
 		if out != nil {

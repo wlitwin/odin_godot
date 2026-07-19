@@ -162,11 +162,7 @@ MAX_REPLICATED_FIELDS :: 64
 
 // Total shadow byte size for a descriptor (struct-layout — capture/restore/diff).
 desc_data_size :: proc(desc: ^Entity_Desc) -> int {
-	n := 0
-	for f in desc.fields {
-		n += f.size
-	}
-	return n
+	return subset_view(desc, .Full).struct_bytes
 }
 
 // One field's size ON THE WIRE (== .size unless a Wire_Kind re-encodes it).
@@ -184,11 +180,7 @@ field_wire_size :: proc(f: Field_Desc) -> int {
 
 // Total full-snapshot byte size on the wire (spawn tuples, joins, backups).
 desc_wire_size :: proc(desc: ^Entity_Desc) -> int {
-	n := 0
-	for f in desc.fields {
-		n += field_wire_size(f)
-	}
-	return n
+	return subset_view(desc, .Full).wire_bytes
 }
 
 // Whether any field re-encodes on the wire (lets hot paths skip decode shims).
@@ -303,11 +295,7 @@ diff_mask :: proc(entity: rawptr, shadow: []u8, desc: ^Entity_Desc) -> (mask: u6
 
 // Copy the entity's replicated fields into the shadow (the "committed as sent" state).
 shadow_capture :: proc(entity: rawptr, shadow: []u8, desc: ^Entity_Desc) {
-	off := 0
-	for f in desc.fields {
-		mem.copy(&shadow[off], field_ptr(entity, f), f.size)
-		off += f.size
-	}
+	subset_capture(subset_view(desc, .Full), entity, shadow)
 }
 
 @(private = "file")
@@ -374,28 +362,34 @@ apply_delta :: proc(r: ^Reader, entity: rawptr, desc: ^Entity_Desc) -> u64 {
 // Full-state write/apply: every field, no mask — join snapshots, backup-host
 // shipping, save/load all reuse this exact layout.
 write_full :: proc(w: ^Writer, entity: rawptr, desc: ^Entity_Desc) {
-	for f in desc.fields {
-		field_encode(w, field_ptr(entity, f), f)
-	}
+	subset_write_entity(w, subset_view(desc, .Full), entity)
 }
 
-// `skip_owner` is set when the RECEIVING peer owns this entity: for
-// .Owner_Stream fields the owner IS the authority, so a host "truth"
-// snapshot of them is only a lagged echo — writing it back teleports the
-// owner (visibly, on every rejected cast while moving). `skip_predicted`
-// is the same argument for the THIRD lane: on a client, .Predicted fields
-// are the sim lane's property (kit/sim reconciles them against tick-stamped
-// truth) — a command reject-truth stomping them would fight the resim with
-// an unstamped, un-ledgered write. Join/backup seeding passes neither flag.
-// The bytes are still consumed; the fields are left alone.
-apply_full :: proc(r: ^Reader, entity: rawptr, desc: ^Entity_Desc, skip_owner := false, skip_predicted := false) {
-	for f in desc.fields {
-		n := field_wire_size(f)
+@(private = "file")
+subset_skipped :: proc "contextless" (flags: Field_Flags, skip: Subset_Skips) -> bool {
+	return (.Owner in skip && .Owner_Stream in flags) || (.Predicted in skip && .Predicted in flags)
+}
+
+// `skip` names lanes to leave untouched (only .Owner and .Predicted are
+// meaningful). .Owner is set when the RECEIVING peer owns this entity: for
+// .Owner_Stream fields the owner IS the authority, so a host "truth" snapshot
+// of them is only a lagged echo — writing it back teleports the owner
+// (visibly, on every rejected cast while moving). .Predicted is the same
+// argument for the THIRD lane: on a client, .Predicted fields are the sim
+// lane's property (kit/sim reconciles them against tick-stamped truth) — a
+// command reject-truth stomping them would fight the resim with an unstamped,
+// un-ledgered write. Join/backup seeding passes an empty skip. The bytes are
+// still consumed; the fields are left alone.
+apply_full :: proc(r: ^Reader, entity: rawptr, desc: ^Entity_Desc, skip: Subset_Skips = {}) {
+	v := subset_view(desc, .Full)
+	for e in v.entries {
+		f := v.fields[e.field]
+		n := int(e.wire_size)
 		if r.err || r.off + n > len(r.data) {
 			r.err = true
 			return
 		}
-		if !(skip_owner && .Owner_Stream in f.flags) && !(skip_predicted && .Predicted in f.flags) {
+		if !subset_skipped(f.flags, skip) {
 			field_decode(field_ptr(entity, f), ([^]u8)(&r.data[r.off]), f)
 		}
 		r.off += n
@@ -406,23 +400,24 @@ apply_full :: proc(r: ^Reader, entity: rawptr, desc: ^Entity_Desc, skip_owner :=
 // This pair IS the automatic revert behind predicted commands: capture before the
 // optimistic run, restore on rejection/timeout, discard on confirmation.
 fields_capture :: proc(entity: rawptr, desc: ^Entity_Desc, allocator := context.allocator) -> []u8 {
-	buf := make([]u8, desc_data_size(desc), allocator)
-	shadow_capture(entity, buf, desc)
+	v := subset_view(desc, .Full)
+	buf := make([]u8, v.struct_bytes, allocator)
+	subset_capture(v, entity, buf)
 	return buf
 }
 
-// `skip_owner` mirrors apply_full: an OWNER restoring a prediction revert
-// must not restore its own streamed fields — the capture is a stale copy of
-// state it kept writing while the command was in flight. `skip_predicted`
+// `skip` mirrors apply_full: .Owner means an OWNER restoring a prediction
+// revert must not restore its own streamed fields — the capture is a stale
+// copy of state it kept writing while the command was in flight. .Predicted
 // likewise: on a client the sim lane kept simulating those fields while the
 // command flew, and a revert would rewind them outside the reconcile.
-fields_restore :: proc(entity: rawptr, desc: ^Entity_Desc, snapshot: []u8, skip_owner := false, skip_predicted := false) {
-	assert(len(snapshot) == desc_data_size(desc))
-	off := 0
-	for f in desc.fields {
-		if !(skip_owner && .Owner_Stream in f.flags) && !(skip_predicted && .Predicted in f.flags) {
-			mem.copy(field_ptr(entity, f), &snapshot[off], f.size)
+fields_restore :: proc(entity: rawptr, desc: ^Entity_Desc, snapshot: []u8, skip: Subset_Skips = {}) {
+	v := subset_view(desc, .Full)
+	assert(len(snapshot) == v.struct_bytes)
+	for e in v.entries {
+		f := v.fields[e.field]
+		if !subset_skipped(f.flags, skip) {
+			mem.copy(field_ptr(entity, f), &snapshot[e.struct_off], f.size)
 		}
-		off += f.size
 	}
 }

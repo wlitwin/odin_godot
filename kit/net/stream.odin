@@ -29,40 +29,20 @@ import "core:math"
 // desc order, tightly packed) — the shape ring blobs hold and blending reads.
 // 0 = this entity type streams nothing.
 stream_data_size :: proc(desc: ^Entity_Desc) -> int {
-	n := 0
-	for f in desc.fields {
-		if .Owner_Stream in f.flags {
-			n += f.size
-		}
-	}
-	return n
+	return subset_view(desc, .Owner).struct_bytes
 }
 
 // Byte size of one stream snapshot ON THE WIRE (Wire_Kind encodings applied).
 // Packets carry this; the receiver decodes to struct layout at the packet edge
 // (stream_decode) so rings, warps, and blending never see wire bytes.
 stream_wire_size :: proc(desc: ^Entity_Desc) -> int {
-	n := 0
-	for f in desc.fields {
-		if .Owner_Stream in f.flags {
-			n += field_wire_size(f)
-		}
-	}
-	return n
+	return subset_view(desc, .Owner).wire_bytes
 }
 
 // Decode one wire-encoded stream snapshot into a struct-layout blob (the caller
 // sizes `dst` with stream_data_size). The packet-edge half of Wire_Kind.
 stream_decode :: proc(dst: []u8, wire: []u8, desc: ^Entity_Desc) {
-	doff, woff := 0, 0
-	for f in desc.fields {
-		if .Owner_Stream not_in f.flags {
-			continue
-		}
-		field_decode(&dst[doff], ([^]u8)(&wire[woff]), f)
-		doff += f.size
-		woff += field_wire_size(f)
-	}
+	_ = subset_decode_full(subset_view(desc, .Owner), dst, wire)
 }
 
 @(private = "file")
@@ -72,12 +52,7 @@ stream_field_ptr :: proc(entity: rawptr, f: Field_Desc) -> [^]u8 {
 
 // Owner side: append the streamed fields' current values, wire-encoded.
 stream_write :: proc(w: ^Writer, entity: rawptr, desc: ^Entity_Desc) {
-	for f in desc.fields {
-		if .Owner_Stream not_in f.flags {
-			continue
-		}
-		field_encode(w, stream_field_ptr(entity, f), f)
-	}
+	subset_write_entity(w, subset_view(desc, .Owner), entity)
 }
 
 // ---------------------------------------------------------------------------
@@ -122,22 +97,14 @@ stream_ring_reset :: proc(ring: ^Stream_Ring) {
 // this peer's freshest truth at the seam; interpolation spans seed -> first
 // real sample and motion flows straight through.
 stream_ring_seed :: proc(ring: ^Stream_Ring, t: f64, entity: rawptr, desc: ^Entity_Desc, allocator := context.allocator) {
-	n := stream_data_size(desc)
-	if n == 0 {
+	v := subset_view(desc, .Owner)
+	if v.struct_bytes == 0 {
 		return
 	}
 	if ring.blobs[0] == nil {
-		ring.blobs[0] = make([]u8, n, allocator)
+		ring.blobs[0] = make([]u8, v.struct_bytes, allocator)
 	}
-	off := 0
-	for f in desc.fields {
-		if .Owner_Stream not_in f.flags {
-			continue
-		}
-		src := stream_field_ptr(entity, f)
-		copy(ring.blobs[0][off:off + f.size], src[:f.size])
-		off += f.size
-	}
+	subset_capture(v, entity, ring.blobs[0])
 	ring.head = 0
 	ring.count = 1
 	ring.times[0] = t
@@ -225,11 +192,10 @@ stream_ring_push :: proc(ring: ^Stream_Ring, t: f64, data: []u8, warp: u8 = 0, a
 // Blend the streamed fields of `lo`/`hi` at `alpha` straight into the entity.
 @(private = "file")
 stream_blend :: proc(entity: rawptr, desc: ^Entity_Desc, lo, hi: []u8, alpha: f32) {
-	off := 0
-	for f in desc.fields {
-		if .Owner_Stream not_in f.flags {
-			continue
-		}
+	v := subset_view(desc, .Owner)
+	for e in v.entries {
+		f := v.fields[e.field]
+		off := int(e.struct_off)
 		dst := stream_field_ptr(entity, f)
 		lerp := f.lerp if .Interp in f.flags else Lerp_Kind.Snap
 		switch lerp {
@@ -263,7 +229,6 @@ stream_blend :: proc(entity: rawptr, desc: ^Entity_Desc, lo, hi: []u8, alpha: f3
 			assert(f.blend != nil, "lerp = .Custom needs Field_Desc.blend")
 			f.blend(rawptr(dst), rawptr(&lo[off]), rawptr(&hi[off]), alpha)
 		}
-		off += f.size
 	}
 }
 

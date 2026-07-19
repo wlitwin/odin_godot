@@ -1600,7 +1600,7 @@ truth_and_revert_spare_owner_fields_on_the_owner :: proc(t: ^testing.T) {
 	// The owner, meanwhile, is HERE.
 	me := Mover{hp = 65, x = 300, y = 250, face = 2}
 	r := knet.reader_make(knet.writer_bytes(&w))
-	knet.apply_full(&r, &me, &desc, skip_owner = true)
+	knet.apply_full(&r, &me, &desc, {.Owner})
 	testing.expect_value(t, me.hp, i32(40)) // host state: truth applies
 	testing.expect_value(t, me.x, f32(300)) // owner state: MINE, untouched
 	testing.expect_value(t, me.y, f32(250))
@@ -1612,7 +1612,7 @@ truth_and_revert_spare_owner_fields_on_the_owner :: proc(t: ^testing.T) {
 	snap := knet.fields_capture(&me, &desc, context.temp_allocator)
 	me.hp = 1
 	me.x = 999 // kept moving
-	knet.fields_restore(&me, &desc, snap, skip_owner = true)
+	knet.fields_restore(&me, &desc, snap, {.Owner})
 	testing.expect_value(t, me.hp, i32(40)) // reverted
 	testing.expect_value(t, me.x, f32(999)) // mine, untouched
 }
@@ -1899,4 +1899,135 @@ angle_lerp_crosses_pi_the_short_way :: proc(t: ^testing.T) {
 	testing.expect(t, abs(knet.angle_arc(3.1, -3.1)) < 0.1, "the ±π crossing is a sliver")
 	// And a plain non-wrapping pair still lerps linearly.
 	testing.expect_value(t, knet.angle_lerp(0.0, 1.0, 0.25), 0.25)
+}
+
+// ---- subset views ------------------------------------------------------------
+//
+// The one desc walk, precomputed: the view's offsets/sizes must agree with the
+// hand walks it will replace (cross-checked here against the live originals),
+// its cache must key on the FIELDS BACKING (wrappers are by-value in tests),
+// and the masked codec must hold the sim lane's exact wire discipline.
+
+Trio :: struct {
+	score: i32, // delta lane, raw
+	px:    f32, // owner + interp, F16 on the wire
+	py:    f32, // owner, raw
+	vx:    f32, // predicted, F16 on the wire
+	vy:    f32, // predicted, raw
+	local: int, // unreplicated
+}
+
+trio_desc :: proc() -> knet.Entity_Desc {
+	@(static) fields := [?]knet.Field_Desc{
+		{offset = offset_of(Trio, score), size = size_of(i32)},
+		{offset = offset_of(Trio, px), size = size_of(f32), flags = {.Owner_Stream, .Interp}, wire = .F16},
+		{offset = offset_of(Trio, py), size = size_of(f32), flags = {.Owner_Stream}},
+		{offset = offset_of(Trio, vx), size = size_of(f32), flags = {.Predicted}, wire = .F16},
+		{offset = offset_of(Trio, vy), size = size_of(f32), flags = {.Predicted}},
+	}
+	return knet.Entity_Desc{fields = fields[:]}
+}
+
+@(test)
+subset_view_offsets_sizes_and_cache :: proc(t: ^testing.T) {
+	desc := trio_desc()
+
+	full := knet.subset_view(&desc, .Full)
+	owner := knet.subset_view(&desc, .Owner)
+	pred := knet.subset_view(&desc, .Predicted)
+	dl := knet.subset_view(&desc, .Delta)
+
+	// Sizes agree with the live hand walks this view replaces.
+	testing.expect_value(t, full.struct_bytes, knet.desc_data_size(&desc))
+	testing.expect_value(t, full.wire_bytes, knet.desc_wire_size(&desc))
+	testing.expect_value(t, owner.struct_bytes, knet.stream_data_size(&desc))
+	testing.expect_value(t, owner.wire_bytes, knet.stream_wire_size(&desc))
+	testing.expect_value(t, pred.struct_bytes, 8)
+	testing.expect_value(t, pred.wire_bytes, 6) // F16 vx (2) + raw vy (4)
+	testing.expect_value(t, dl.struct_bytes, 4)
+	testing.expect_value(t, dl.wire_bytes, 4)
+
+	// Membership + hand-computed offsets (struct AND wire diverge under F16).
+	testing.expect_value(t, len(full.entries), 5)
+	testing.expect_value(t, len(owner.entries), 2)
+	testing.expect_value(t, len(pred.entries), 2)
+	testing.expect_value(t, len(dl.entries), 1)
+	testing.expect_value(t, owner.entries[0].field, u16(1)) // px
+	testing.expect_value(t, owner.entries[1].field, u16(2)) // py
+	testing.expect_value(t, owner.entries[1].struct_off, u32(4))
+	testing.expect_value(t, owner.entries[1].wire_off, u32(2)) // past px's F16
+	testing.expect_value(t, pred.entries[1].struct_off, u32(4))
+	testing.expect_value(t, pred.entries[1].wire_off, u32(2))
+	testing.expect_value(t, dl.entries[0].field, u16(0))
+	testing.expect_value(t, pred.mask_bytes, 1)
+	testing.expect(t, pred.has_wire)
+	testing.expect(t, !dl.has_wire)
+
+	// The cache keys on the FIELDS BACKING: a second by-value wrapper over the
+	// same @(static) array yields the SAME view pointer.
+	desc2 := trio_desc()
+	testing.expect(t, knet.subset_view(&desc2, .Owner) == owner, "cache keys on the fields backing, not the wrapper")
+
+	// Capture -> restore round trip + equality, owner lane.
+	src := Trio{px = 1.5, py = 2.5, score = 9}
+	blob := make([]u8, owner.struct_bytes)
+	defer delete(blob)
+	knet.subset_capture(owner, &src, blob)
+	dst := Trio{}
+	knet.subset_restore(owner, &dst, blob)
+	testing.expect_value(t, dst.px, f32(1.5))
+	testing.expect_value(t, dst.py, f32(2.5))
+	testing.expect_value(t, dst.score, i32(0)) // other lanes untouched
+	testing.expect(t, knet.subset_equal(owner, &dst, blob))
+	dst.py = 99
+	testing.expect(t, !knet.subset_equal(owner, &dst, blob))
+}
+
+@(test)
+subset_delta_codec_roundtrip :: proc(t: ^testing.T) {
+	desc := trio_desc()
+	pred := knet.subset_view(&desc, .Predicted)
+
+	base := make([]u8, pred.struct_bytes)
+	defer delete(base)
+	now := make([]u8, pred.struct_bytes)
+	defer delete(now)
+	src := Trio{vx = 100.5, vy = 0}
+	knet.subset_capture(pred, &src, now)
+
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	mask := knet.subset_delta_write(&w, pred, now, base)
+	testing.expect_value(t, mask, u64(0b01)) // vx dirty (ordinal 0), vy clean
+	// GOLDEN: 1 mask byte + one F16 field — the phase-2 coop conversion must
+	// change this test deliberately, never silently.
+	testing.expect_value(t, len(knet.writer_bytes(&w)), 3)
+	testing.expect_value(t, knet.writer_bytes(&w)[0], u8(0b01))
+
+	out := make([]u8, pred.struct_bytes)
+	defer delete(out)
+	testing.expect(t, knet.subset_delta_apply(pred, out, knet.writer_bytes(&w)))
+	got := Trio{}
+	knet.subset_restore(pred, &got, out)
+	testing.expect(t, abs(got.vx - 100.5) < 0.5, "vx survived the half-float trip")
+	testing.expect_value(t, got.vy, f32(0))
+
+	// Malformed payloads refuse whole: truncated field, trailing garbage.
+	bytes := knet.writer_bytes(&w)
+	testing.expect(t, !knet.subset_delta_apply(pred, out, bytes[:2]), "truncated field refused")
+	longer := make([]u8, len(bytes) + 1)
+	defer delete(longer)
+	copy(longer, bytes)
+	testing.expect(t, !knet.subset_delta_apply(pred, out, longer), "trailing garbage refused")
+	testing.expect(t, !knet.subset_delta_apply(pred, out, nil), "short mask refused")
+
+	// Full-row encode/decode with the length gate.
+	w2 := knet.writer_make()
+	defer knet.writer_destroy(&w2)
+	knet.subset_write_blob(&w2, pred, now)
+	testing.expect_value(t, len(knet.writer_bytes(&w2)), pred.wire_bytes)
+	out2 := make([]u8, pred.struct_bytes)
+	defer delete(out2)
+	testing.expect(t, knet.subset_decode_full(pred, out2, knet.writer_bytes(&w2)))
+	testing.expect(t, !knet.subset_decode_full(pred, out2, knet.writer_bytes(&w2)[:3]), "short full row refused")
 }

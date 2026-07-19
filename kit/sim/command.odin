@@ -131,36 +131,15 @@ Cmd_In :: struct {
 // jurisdiction, and therefore what a rejection must put back.
 
 delta_lane_size :: proc(desc: ^knet.Entity_Desc) -> int {
-	n := 0
-	for f in desc.fields {
-		if .Predicted in f.flags || .Owner_Stream in f.flags {
-			continue
-		}
-		n += f.size
-	}
-	return n
+	return knet.subset_view(desc, .Delta).struct_bytes
 }
 
 delta_lane_capture :: proc(dst: []u8, entity: rawptr, desc: ^knet.Entity_Desc) {
-	off := 0
-	for f in desc.fields {
-		if .Predicted in f.flags || .Owner_Stream in f.flags {
-			continue
-		}
-		mem.copy(&dst[off], rawptr(uintptr(entity) + f.offset), f.size)
-		off += f.size
-	}
+	knet.subset_capture(knet.subset_view(desc, .Delta), entity, dst)
 }
 
 delta_lane_restore :: proc(entity: rawptr, desc: ^knet.Entity_Desc, src: []u8) {
-	off := 0
-	for f in desc.fields {
-		if .Predicted in f.flags || .Owner_Stream in f.flags {
-			continue
-		}
-		mem.copy(rawptr(uintptr(entity) + f.offset), &src[off], f.size)
-		off += f.size
-	}
+	knet.subset_restore(knet.subset_view(desc, .Delta), entity, src)
 }
 
 // ---------------------------------------------------------------------------
@@ -174,34 +153,29 @@ delta_lane_restore :: proc(entity: rawptr, desc: ^knet.Entity_Desc, src: []u8) {
 // the exec). Returns the mask and the packed changed bytes' length; `dst`
 // is caller-sized to predict_size.
 cmd_patch_diff :: proc(dst: []u8, pre: []u8, entity: rawptr, desc: ^knet.Entity_Desc) -> (mask: u64, n: int) {
-	off, ord := 0, u32(0)
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
+	v := knet.subset_view(desc, .Predicted)
+	for e, ord in v.entries {
+		f := v.fields[e.field]
+		off := int(e.struct_off)
 		ep := ([^]u8)(rawptr(uintptr(entity) + f.offset))
 		if mem.compare(ep[:f.size], pre[off:off + f.size]) != 0 {
-			mask |= u64(1) << ord
+			mask |= u64(1) << u32(ord)
 			copy(dst[n:], ep[:f.size])
 			n += f.size
 		}
-		off += f.size
-		ord += 1
 	}
 	return mask, n
 }
 
 cmd_patch_apply :: proc(entity: rawptr, desc: ^knet.Entity_Desc, mask: u64, patch: []u8) {
-	n, ord := 0, u32(0)
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
-		if mask & (u64(1) << ord) != 0 {
+	v := knet.subset_view(desc, .Predicted)
+	n := 0
+	for e, ord in v.entries {
+		f := v.fields[e.field]
+		if mask & (u64(1) << u32(ord)) != 0 {
 			mem.copy(rawptr(uintptr(entity) + f.offset), raw_data(patch[n:]), f.size)
 			n += f.size
 		}
-		ord += 1
 	}
 }
 

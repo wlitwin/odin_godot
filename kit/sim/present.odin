@@ -37,13 +37,11 @@ import knet "godot:kit/net"
 // the lane default; a field's own Field_Desc.cut (> 0) overrides it — but the
 // snap stays entity-coherent (any field past ITS cut snaps the whole pose).
 predict_error :: proc(err: []u8, shown: []u8, truth: []u8, desc: ^knet.Entity_Desc, cut: f32) {
-	off := 0
+	v := knet.subset_view(desc, .Predicted)
 	over := false
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
-		defer off += f.size
+	for e in v.entries {
+		f := v.fields[e.field]
+		off := int(e.struct_off)
 		if .Interp not_in f.flags {
 			continue
 		}
@@ -89,12 +87,10 @@ predict_error :: proc(err: []u8, shown: []u8, truth: []u8, desc: ^knet.Entity_De
 // lane default. Per-field k is why a slow-gliding avatar and a snappy ball can
 // share one lane.
 predict_error_decay :: proc(err: []u8, desc: ^knet.Entity_Desc, dt: f64, halflife: f64) {
-	off := 0
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
-		defer off += f.size
+	v := knet.subset_view(desc, .Predicted)
+	for e in v.entries {
+		f := v.fields[e.field]
+		off := int(e.struct_off)
 		if .Interp not_in f.flags {
 			continue
 		}
@@ -116,12 +112,10 @@ predict_error_decay :: proc(err: []u8, desc: ^knet.Entity_Desc, dt: f64, halflif
 // Present: add the decayed error onto the entity's float interp fields (the
 // caller restores the sim state first, so this is shown = truth + err).
 predict_error_apply :: proc(entity: rawptr, desc: ^knet.Entity_Desc, err: []u8) {
-	off := 0
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
-		defer off += f.size
+	v := knet.subset_view(desc, .Predicted)
+	for e in v.entries {
+		f := v.fields[e.field]
+		off := int(e.struct_off)
 		if .Interp not_in f.flags {
 			continue
 		}
@@ -148,17 +142,15 @@ predict_error_apply :: proc(entity: rawptr, desc: ^knet.Entity_Desc, err: []u8) 
 // Write the interpolation of two predict-set blobs (struct layout, the shape
 // History holds) into the entity's predicted fields. alpha 0 = a, 1 = b.
 predict_blend :: proc(entity: rawptr, desc: ^knet.Entity_Desc, a: []u8, b: []u8, alpha: f32) {
-	off := 0
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
+	v := knet.subset_view(desc, .Predicted)
+	for e in v.entries {
+		f := v.fields[e.field]
+		off := int(e.struct_off)
 		dst := rawptr(uintptr(entity) + f.offset)
 		if .Interp not_in f.flags {
 			// Discrete: hold the earlier sample until the later one's time
 			// truly arrives — the same step rule the stream ring applies.
 			copy(([^]u8)(dst)[:f.size], a[off:off + f.size])
-			off += f.size
 			continue
 		}
 		ap := rawptr(&a[off])
@@ -194,6 +186,5 @@ predict_blend :: proc(entity: rawptr, desc: ^knet.Entity_Desc, a: []u8, b: []u8,
 		case .Custom:
 			f.blend(dst, ap, bp, alpha)
 		}
-		off += f.size
 	}
 }

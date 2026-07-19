@@ -50,7 +50,6 @@ package kit_sim
 // per-client (the baseline is per-client) — the input ring's trim signal
 // costs eight bytes in a message that was going to that client anyway.
 
-import "core:mem"
 import knet "godot:kit/net"
 
 SNAP_FULL: u8 : 1 << 0 // row flag: payload is the whole subset, no baseline needed
@@ -59,24 +58,7 @@ SNAP_FULL: u8 : 1 << 0 // row flag: payload is the whole subset, no baseline nee
 // applied) — what a full row's payload occupies. The stream_wire_size of
 // this lane.
 predict_wire_size :: proc(desc: ^knet.Entity_Desc) -> int {
-	n := 0
-	for f in desc.fields {
-		if .Predicted in f.flags {
-			n += knet.field_wire_size(f)
-		}
-	}
-	return n
-}
-
-@(private = "file")
-subset_mask_bytes :: proc(desc: ^knet.Entity_Desc) -> int {
-	n := 0
-	for f in desc.fields {
-		if .Predicted in f.flags {
-			n += 1
-		}
-	}
-	return (n + 7) / 8
+	return knet.subset_view(desc, .Predicted).wire_bytes
 }
 
 // ---------------------------------------------------------------------------
@@ -105,12 +87,13 @@ snap_write :: proc(w: ^knet.Writer, entries: []Entry, tick: u64, baseline: u64, 
 		assert(have_now, "snap_write ships ledgered ticks: note_all before snapping")
 		base, have_base := history_read(e.hist, baseline)
 
+		pred := knet.subset_view(desc, .Predicted)
 		knet.write_net_id(w, e.id)
 		if !have_base {
 			// New entity or lapped baseline: the full row that needs nothing.
 			knet.write_u8(w, SNAP_FULL)
-			knet.write_u16(w, u16(predict_wire_size(desc)))
-			write_subset_full(w, now, desc)
+			knet.write_u16(w, u16(pred.wire_bytes))
+			knet.subset_write_blob(w, pred, now)
 			count += 1
 			continue
 		}
@@ -118,7 +101,7 @@ snap_write :: proc(w: ^knet.Writer, entries: []Entry, tick: u64, baseline: u64, 
 		len_at := len(w.buf)
 		knet.write_u16(w, 0) // patched below
 		payload_from := len(w.buf)
-		write_subset_delta(w, now, base, desc)
+		knet.subset_delta_write(w, pred, now, base)
 		payload := len(w.buf) - payload_from
 		assert(payload <= int(max(u16)))
 		knet.writer_patch_u16(w, len_at, u16(payload))
@@ -127,55 +110,6 @@ snap_write :: proc(w: ^knet.Writer, entries: []Entry, tick: u64, baseline: u64, 
 	assert(count <= int(max(u16)))
 	knet.writer_patch_u16(w, count_at, u16(count))
 	return count
-}
-
-// The whole subset, wire-encoded from a struct-layout ledger blob.
-@(private = "file")
-write_subset_full :: proc(w: ^knet.Writer, blob: []u8, desc: ^knet.Entity_Desc) {
-	off := 0
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
-		knet.field_encode(w, &blob[off], f)
-		off += f.size
-	}
-}
-
-// Mask + dirty fields, diffed blob-vs-baseline on struct bytes (the same
-// rule as the delta walk: dirtiness is judged in memory, encoding happens
-// at the wire edge).
-@(private = "file")
-write_subset_delta :: proc(w: ^knet.Writer, now: []u8, base: []u8, desc: ^knet.Entity_Desc) {
-	mask: u64
-	off := 0
-	ord := 0
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
-		if mem.compare(now[off:off + f.size], base[off:off + f.size]) != 0 {
-			mask |= 1 << u64(ord)
-		}
-		off += f.size
-		ord += 1
-	}
-	nbytes := subset_mask_bytes(desc)
-	for i in 0 ..< nbytes {
-		knet.write_u8(w, u8(mask >> (u64(i) * 8)))
-	}
-	off = 0
-	ord = 0
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
-		if mask & (1 << u64(ord)) != 0 {
-			knet.field_encode(w, &now[off], f)
-		}
-		off += f.size
-		ord += 1
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -281,9 +215,10 @@ snap_rx_apply :: proc(rx: ^Snap_Rx, r: ^knet.Reader, truths: ^[dynamic]Truth) ->
 			skipped += 1 // spawn still in flight on the reliable lane
 			continue
 		}
+		pred := knet.subset_view(e.hist.desc, .Predicted)
 		scratch := make([]u8, e.hist.size, context.temp_allocator)
 		if flags & SNAP_FULL != 0 {
-			if !decode_subset_full(scratch, payload, e.hist.desc) {
+			if !knet.subset_decode_full(pred, scratch, payload) {
 				skipped += 1
 				continue
 			}
@@ -294,7 +229,7 @@ snap_rx_apply :: proc(rx: ^Snap_Rx, r: ^knet.Reader, truths: ^[dynamic]Truth) ->
 				continue
 			}
 			copy(scratch, base)
-			if !decode_subset_delta(scratch, payload, e.hist.desc) {
+			if !knet.subset_delta_apply(pred, scratch, payload) {
 				skipped += 1
 				continue
 			}
@@ -362,53 +297,4 @@ find_rx :: proc(rx: ^Snap_Rx, id: knet.Net_Id) -> ^Rx_Entry {
 		}
 	}
 	return nil
-}
-
-// false = payload malformed for this descriptor (wrong length) — the row is
-// skipped, the batch survives. A well-formed payload decodes exactly.
-@(private = "file")
-decode_subset_full :: proc(dst: []u8, payload: []u8, desc: ^knet.Entity_Desc) -> bool {
-	if len(payload) != predict_wire_size(desc) {
-		return false
-	}
-	doff, woff := 0, 0
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
-		knet.field_decode(&dst[doff], ([^]u8)(&payload[woff]), f)
-		doff += f.size
-		woff += knet.field_wire_size(f)
-	}
-	return true
-}
-
-@(private = "file")
-decode_subset_delta :: proc(dst: []u8, payload: []u8, desc: ^knet.Entity_Desc) -> bool {
-	nbytes := subset_mask_bytes(desc)
-	if len(payload) < nbytes {
-		return false
-	}
-	mask: u64
-	for i in 0 ..< nbytes {
-		mask |= u64(payload[i]) << (u64(i) * 8)
-	}
-	doff, woff := 0, nbytes
-	ord := 0
-	for f in desc.fields {
-		if .Predicted not_in f.flags {
-			continue
-		}
-		if mask & (1 << u64(ord)) != 0 {
-			n := knet.field_wire_size(f)
-			if woff + n > len(payload) {
-				return false
-			}
-			knet.field_decode(&dst[doff], ([^]u8)(&payload[woff]), f)
-			woff += n
-		}
-		doff += f.size
-		ord += 1
-	}
-	return woff == len(payload) // trailing garbage is malformed, not ignored
 }
