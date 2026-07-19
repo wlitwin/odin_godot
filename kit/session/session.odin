@@ -1853,7 +1853,7 @@ session_client_join :: proc(s: ^Session) {
 // The kit's own wire revision, folded into every nonzero fingerprint before it
 // rides SES_JOIN — a kit upgrade that changes the wire then refuses skewed
 // peers even when the game's declarations didn't move. Bump on wire changes.
-PROTOCOL_REV :: u64(7) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: the wire frame byte carries the stream-channel bit (netgd) · 4: SIM_FACT carries a fact kind (declared world-pass facts) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream routing mid-run · 7: spectator seats (SES_JOIN intent + roster rows carry the flag)
+PROTOCOL_REV :: u64(8) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: the wire frame byte carries the stream-channel bit (netgd) · 4: SIM_FACT carries a fact kind (declared world-pass facts) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream routing mid-run · 7: spectator seats (SES_JOIN intent + roster rows carry the flag) · 8: the succession torch is a typed rendezvous record, [kind u8][payload] (netgd)
 
 @(private = "file")
 FP_SALT :: u64(0x9E3779B97F4A7C15) + PROTOCOL_REV // the golden-ratio constant, rev-shifted

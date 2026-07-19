@@ -20,16 +20,52 @@ package kit_net
 //     per peer; a predicted transition and its authoritative echo share an intent
 //     id so confirmation MATCHES the already-played effect instead of replaying it.
 //
-// WHAT LIVES WHERE:
+// ONE PACKAGE, TWO LAYERS. What lives here is really two things fused under one
+// name, and the fusion is DELIBERATE:
+//
+//   1. a shared REPLICATION SUBSTRATE — the wire, the field descriptors, the
+//      codecs and blend math, the tick and clock. BOTH lanes consume it: the
+//      coop lane below AND kit/sim (the server-authority resim lane, which is
+//      its own package). The substrate has no name of its own.
+//   2. the COOP LANE proper — the command + owned-streams model described above.
+//      The substrate serves it but does not depend on it.
+//
+// A package split (substrate → its own package) was weighed and DEFERRED: the
+// substrate stays nameless until a THIRD consumer earns the split. Two consumers
+// is a shared header, not a library. This is why Field_Desc carries sim-only
+// tuning fields (slack/glide/cut, whose comments open "kit/sim …") and why a
+// couple of substrate symbols still sit in coop-lane files (below): the seam is
+// named, not drawn. sim.md calls this the substrate LAYER of kit/net; net.md
+// calls kit/net the coop replication core — both are this same package, this
+// same fusion, seen from the two lanes that share it.
+//
+// SUBSTRATE — consumed by BOTH lanes (coop and kit/sim):
 //   wire.odin    — bounds-checked little-endian Writer/Reader (the byte format).
 //   delta.odin   — descriptor-driven dirty tracking: per-entity shadow copies,
 //                  memcmp field masks, delta write/apply, full snapshot/restore.
+//                  Also the field codecs (Wire_Kind) and interp blend math
+//                  (Lerp_Kind, angle_arc/angle_lerp) both lanes encode/blend by.
 //                  Replicated fields are POD-ONLY by design (ints/floats/bools/
 //                  enums/fixed arrays) — strings & dynamic data travel as explicit
 //                  reliable messages, never as replicated fields.
-//   intent.odin  — intent ids, per-peer dedup windows, the pending-prediction
-//                  table with timeout → automatic revert.
-//   tick.odin    — the fixed net tick (decoupled from frame rate) + clock sync.
+//   tick.odin    — the fixed net tick (decoupled from frame rate) + clock sync
+//                  (Clock_Sync feeds both lanes' interpolation timelines).
+//   net.odin     — the shared identity types (Net_Id, Player_Id) and the id-space
+//                  contract (PROVISIONAL_BIT), owned beside the values they carve.
+//
+// COOP LANE — this model's own machinery (kit/sim does NOT consume these):
+//   registry.odin — Net_Id → entity bookkeeping + the per-tick delta walk.
+//   stream.odin   — owner-authoritative field streaming with delayed interp sampling.
+//   intent.odin   — intent ids, per-peer dedup windows, the pending-prediction
+//                   table with timeout → automatic revert.
+//   command.odin  — the intent→command→result runtime loop.
+//   edge.odin     — delta-lane change presentation (the <class>_<field>_edge halves).
+//   later.odin    — the render-timeline delay queue (present on the eye's clock).
+//
+// The line isn't perfectly clean: kit/sim borrows quat_nlerp and the INTERP_CAP
+// ring depth out of stream.odin (sharing the one nlerp/interp math rather than
+// twinning it) and registry_bless out of registry.odin — small shared surfaces
+// that are exactly the untidiness a future split would tidy. Named, not fixed.
 //
 // The generated side (scriptgen's gd:"replicate" / @(gd_command)) produces
 // Entity_Desc tables and calls into this core; nothing here depends on

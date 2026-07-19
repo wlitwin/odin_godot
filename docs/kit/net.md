@@ -9,6 +9,26 @@ for wire read/write in [app messages](session.md#app-messages), custom interpola
 procs, `Clock_Sync`, `now_s`, and hand-built descriptors in tests. The engine-facing
 transport lives in [kit/netgd](netgd.md).
 
+**One package, two layers.** `kit/net` is really two things fused under one name, and the
+fusion is deliberate: a shared **replication substrate** (the wire format, the field
+descriptors and codecs, the interpolation blend math, the tick and clock) is consumed by
+BOTH the coop lane described on this page AND [kit/sim](sim.md), the server-authority resim
+lane that lives in its own package — and the **coop lane** proper (the command +
+owned-streams model) is layered on top of it. A split of the substrate into a package of its
+own was weighed and deferred: two consumers is a shared header, not a library, so the
+substrate stays nameless until a third consumer earns the split (which is why `Field_Desc`
+carries sim-only tuning fields like `slack`/`glide`/`cut` with no seam to hang them on).
+[kit/sim](sim.md) calls this same package the substrate *layer* of kit/net; this page calls
+the whole of it the coop replication core — one package, two lanes sharing it, seen from
+either side.
+
+One vocabulary note, because *present* means three different things in the kit:
+`session_present` queues ONE consequence for the render clock (see [the two
+timelines](#the-two-timelines-presenting-consequences)), `lane_present` is
+[kit/sim](sim.md)'s per-frame presentation pump for watched/reconciled entities, and
+`kit/sim/present.odin` is the blend/error math that pump drives — three code paths, one
+word; don't conflate them.
+
 ## The mental model
 
 **Two authorities, disjoint by construction.** This is a command + owned-streams hybrid,

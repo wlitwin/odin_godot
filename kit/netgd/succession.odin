@@ -1,44 +1,32 @@
 package kit_netgd
 
-// succession — the TRANSPORT half of surviving a dead host, extracted from
-// the game that shipped it (scrapyard's succession.odin was ~400 lines; most
-// of it was this ceremony, none of it game-shaped). The session already does
-// the session half: backups ride to the eldest client, the torch names the
-// bearer, session_host_resume raises the heir, tokens reclaim seats. What a
-// game still had to hand-roll was the RENDEZVOUS — how survivors FIND the
-// heir on each transport flavor:
+// succession — the TRANSPORT half of surviving a dead host: how survivors
+// FIND the heir. The session does the session half (backups ride to the
+// eldest client, the torch names the bearer, session_host_resume raises the
+// heir, tokens reclaim seats); kit/boot owns the ORCHESTRATION (the state
+// machine, the retry policy, the deferred mechanics — boot/succession.odin).
+// What lives HERE is stateless per-transport mechanics:
 //
-//   native  the host broadcasts "addr:port" — the bearer's address as the
-//           host saw it, and the port the bearer WILL bind (derived from
-//           their seat, so it never collides with the dead host's).
-//   web     the relay honors reservations on create, so the host MINTS
-//           tomorrow's room code today and rides it in the torch
-//           ("web:<CODE>"); the heir hosts UNDER the reserved code and every
-//           survivor knocks on it — on a timer, because the heir needs a
-//           breath to open the room and a browser cannot block.
+//   - the RENDEZVOUS record: a typed torch ([kind u8][payload]) instead of a
+//     sniffed string — one encoder, one decoder, extensible per transport
+//     (a Steam lobby id is a future kind, not a format renegotiation).
+//   - the torch verbs: compute + broadcast the rendezvous (host), raise the
+//     promised transport (heir), dial it ONCE (survivor — the retry loop is
+//     boot's).
 //
-// The game keeps what is genuinely its own: wiping its census before a
-// raise/chase, restoring its campaign blob, and wording the notes. The shape:
+// The kinds shipped today:
 //
-//   // ready() — configure once (web/native is a build fact, IS_WEB-style):
-//   self.succ = netgd.Succession{web = IS_WEB, signal_url = SIGNAL_URL,
-//                                base_port = PORT, token = my_token(), name = my_name()}
-//   // Ev_Backup_Target (host): broadcast the rendezvous
-//   info, _ := netgd.succession_torch(&self.succ, &self.boot.wire, e.player)
-//   // Ev_Succession: the two exits from a dead host
-//   if e.successor == self.ses.me {
-//       census_clear(self)                                  // yours
-//       if netgd.succession_raise(&self.succ, &self.boot.wire) {
-//           ksess.session_host_resume(...)                  // yours: resume + blob + fixups
-//       }
-//   } else {
-//       census_clear(self)                                  // yours
-//       switch netgd.succession_chase(&self.succ, &self.boot.wire, now) { ... } // word it
-//   }
-//   // process(), every frame (no-op unless a web chase is live):
-//   switch netgd.succession_pulse(&self.succ, &self.boot.wire, now) { ... }     // word it
-//   // Ev_Welcomed: the chase caught its seat
-//   netgd.succession_done(&self.succ)
+//   .Native_Addr   [addr string][port u16] — the bearer's address as the host
+//                  observed it, and the port the bearer WILL bind (derived
+//                  from their seat, so it never collides with the dead
+//                  host's). ENet-only: a transport with no peer-address story
+//                  cannot light this torch (the torch says so, once).
+//   .Web_Room      [code string] — the relay honors reservations on create,
+//                  so the host MINTS tomorrow's room code today and rides it
+//                  in the torch; the heir hosts UNDER the reserved code and
+//                  every survivor knocks on it — on boot's timer, because the
+//                  heir needs a breath to open the room and a browser cannot
+//                  block.
 //
 // Same-subnet truth: over raw ENet the address the host observed may not be
 // reachable across NAT (room codes and Steam lobbies don't have this problem —
@@ -47,45 +35,86 @@ package kit_netgd
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import "core:fmt"
-import "core:strconv"
 import "core:strings"
-
-// The web torch's sentinel: "web:<CODE>" (a bare "web" is an old torch with
-// no reservation — the human get-the-code-and-rejoin flow is all there is).
-SUCC_WEB_INFO :: "web"
 
 // Wordable over voice, like the relay's own codes.
 @(private = "file")
 SUCC_CODE_ALPHABET :: "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
+// The chase policy constants — the state machine that applies them lives in
+// kit/boot, but the numbers are transport truths (how long a relay room takes
+// to open, how patient a knock should be), so they stay here.
 SUCC_CHASE_TRIES :: 12 // ~30s of knocking before the human flow takes over
 SUCC_CHASE_GAP :: 2.5
 SUCC_CHASE_HEADSTART :: 1.5 // the heir's breath before the first knock
 
-Succession :: struct {
-	// configure once, before any torch (all copied, never freed by the kit):
-	web:        bool,   // web room-code rendezvous vs native addr:port
-	signal_url: string, // web: the relay url ("" on native)
-	base_port:  int,    // native: the run's host port (the heir binds a seat-derived sibling)
-	token:      u64,    // my reconnect identity (the chase rejoins with it)
-	name:       string, // my display name (chase + heir host)
-
-	// the ceremony's state:
-	code:           string, // host: the minted reservation, once per run ("" = not yet)
-	chase_code:     string, // chaser: the room being knocked on ("" = idle)
-	warned_no_addr: bool, // the torch said "this transport can't" once already
-	chase_tries: int,
-	chase_next:  f64,
+// Which rendezvous flavor a torch carries. A new transport adds a kind and
+// two switch arms (encode/dial) — never a string format negotiation.
+Rendezvous_Kind :: enum u8 {
+	None        = 0, // no torch / an unparseable one — the human flow is all there is
+	Native_Addr = 1, // [addr string][port u16]
+	Web_Room    = 2, // [code string]
+	// A Steam lobby id ([id u64]) is the reserved next kind — it arrives with
+	// the Transport-record refactor, which gives raise/dial their per-peer
+	// transport handles.
 }
 
-// What a chase call/pulse did — the game words each arm (notes, logs).
-Chase_Step :: enum {
-	Idle,    // nothing to do (native pulse, no live chase)
-	Dialing, // native: the rendezvous is being dialed right now
-	Knocking, // web: the knock pump armed (chase) or knocked (pulse)
-	No_Info, // the torch named nobody / carried no reservation — human flow only
-	Failed,  // the dial itself refused (ENet create / relay socket) — human flow
-	Gave_Up, // web: out of tries — human flow from here
+// A decoded torch. String fields are VIEWS into the torch bytes — copy them
+// out before anything restarts the session (a raise or dial frees
+// successor_info under the slice; the boot driver clones to temp first).
+Rendezvous :: struct {
+	kind: Rendezvous_Kind,
+	addr: string, // .Native_Addr
+	port: int, // .Native_Addr
+	code: string, // .Web_Room
+}
+
+Succession :: struct {
+	// configure once, before any torch (all copied, never freed by the kit;
+	// kboot.boot_succ_config fills it for door games):
+	kind:       Rendezvous_Kind, // the flavor THIS run's torch will carry
+	signal_url: string, // .Web_Room: the relay url
+	base_port:  int, // .Native_Addr: the run's host port (the heir binds a seat-derived sibling)
+	token:      u64, // my reconnect identity (the chase rejoins with it)
+	name:       string, // my display name (chase + heir host)
+
+	// host-side ceremony state:
+	code:            string, // host: the minted web reservation, once per run ("" = not yet)
+	warned_no_torch: bool, // the torch said "this transport can't" once already
+}
+
+succession_destroy :: proc(sc: ^Succession) {
+	delete(sc.code)
+	sc.code = ""
+}
+
+// Parse a torch. kind == .None (ok=false) covers both "no torch yet" and a
+// foreign/corrupt one — the callers treat those identically (human flow).
+succession_decode :: proc(info: []u8) -> (rv: Rendezvous, ok: bool) {
+	if len(info) == 0 {
+		return {}, false
+	}
+	r := knet.reader_make(info)
+	kind := Rendezvous_Kind(knet.read_u8(&r))
+	switch kind {
+	case .Native_Addr:
+		rv.addr = knet.read_string(&r)
+		rv.port = int(knet.read_u16(&r))
+		if r.err || rv.addr == "" || rv.port == 0 {
+			return {}, false
+		}
+	case .Web_Room:
+		rv.code = knet.read_string(&r)
+		if r.err || rv.code == "" {
+			return {}, false
+		}
+	case .None:
+		return {}, false
+	case:
+		return {}, false // a kind from the future: this build can't chase it
+	}
+	rv.kind = kind
+	return rv, true
 }
 
 // Is there a usable torch to chase? A PEEK — nothing moves, so the game can
@@ -93,55 +122,56 @@ Chase_Step :: enum {
 // anything for a real chase.
 succession_named :: proc(sc: ^Succession, wire: ^Session_Wire) -> bool {
 	_, info := ksess.session_successor(wire.ses)
-	if sc.web {
-		code, _ := succ_web_code(string(info))
-		return code != ""
-	}
-	_, _, ok := succ_rendezvous(string(info))
+	_, ok := succession_decode(info)
 	return ok
-}
-
-succession_destroy :: proc(sc: ^Succession) {
-	delete(sc.code)
-	sc.code = ""
-	succession_done(sc)
 }
 
 // HOST, on Ev_Backup_Target: compute the rendezvous and broadcast it (the
 // session re-broadcasts to every later joiner). Web mints ONE reservation per
-// run — stable across torch re-broadcasts. Returns the info for the game's
-// log; false = no rendezvous could be named (unseated target, no address).
+// run — stable across torch re-broadcasts. Returns a human-readable info
+// string for the game's log; false = no rendezvous could be named (unseated
+// target, no address, a kind this transport can't light).
 succession_torch :: proc(sc: ^Succession, wire: ^Session_Wire, target: knet.Player_Id) -> (info: string, ok: bool) {
-	if sc.web {
+	w := knet.writer_make(32, context.temp_allocator)
+	switch sc.kind {
+	case .Web_Room:
 		if sc.code == "" {
 			sc.code = succ_mint_code(sc.token)
 		}
-		info = fmt.tprintf("%s:%s", SUCC_WEB_INFO, sc.code)
-		ksess.session_set_successor_info(wire.ses, transmute([]u8)info)
-		return info, true
-	}
-	p, has := wire.ses.players[target]
-	if !has {return "", false}
-	addr, aok := peer_address(wire.node, p.peer)
-	if !aok {
-		// A transport with no peer-address story (anything but ENet — Steam,
-		// custom peers) can never light the native torch: migration stays
-		// ARMED but silently absent. Say it once instead of losing the world
-		// to a dead host months later. (A Steam lobby id is the easy
-		// rendezvous the per-transport refactor will carry; until then, the
-		// web room-code arm is the workaround.)
-		if !sc.warned_no_addr {
-			sc.warned_no_addr = true
-			fmt.println("kit/netgd: succession torch UNLIT — this transport exposes no peer address (ENet-only today), so host migration cannot happen on it; use the web rendezvous (boot_succ_config web=true + relay) until per-transport rendezvous ships")
+		knet.write_u8(&w, u8(Rendezvous_Kind.Web_Room))
+		knet.write_string(&w, sc.code)
+		info = fmt.tprintf("room %s", sc.code)
+	case .Native_Addr:
+		p, has := wire.ses.players[target]
+		if !has {return "", false}
+		addr, aok := peer_address(wire.node, p.peer)
+		if !aok {
+			// A transport with no peer-address story (anything but ENet —
+			// Steam, custom peers) can never light the native torch:
+			// migration stays ARMED but silently absent. Say it once instead
+			// of losing the world to a dead host months later. (A Steam lobby
+			// id is the easy rendezvous the Transport-record refactor will
+			// carry; until then, the web room-code arm is the workaround.)
+			if !sc.warned_no_torch {
+				sc.warned_no_torch = true
+				fmt.println("kit/netgd: succession torch UNLIT — this transport exposes no peer address (ENet-only today), so host migration cannot happen on it; use the web rendezvous (kind = .Web_Room + relay) until per-transport rendezvous ships")
+			}
+			return "", false
 		}
+		port := succ_port(sc.base_port, target)
+		knet.write_u8(&w, u8(Rendezvous_Kind.Native_Addr))
+		knet.write_string(&w, addr)
+		assert(port <= int(max(u16)))
+		knet.write_u16(&w, u16(port))
+		info = fmt.tprintf("%s:%d", addr, port)
+	case .None:
 		return "", false
 	}
-	info = fmt.tprintf("%s:%d", addr, succ_port(sc.base_port, target))
-	ksess.session_set_successor_info(wire.ses, transmute([]u8)info)
+	ksess.session_set_successor_info(wire.ses, knet.writer_bytes(&w))
 	return info, true
 }
 
-// THE HEIR, from Ev_Succession naming me: raise the transport the torch
+// THE HEIR, from a succession naming me: raise the transport the torch
 // promised — web hosts UNDER the reserved room (the crew is knocking on that
 // exact code right now), native binds the seat-derived port. False = the
 // crown could not be raised (port taken / relay refused). The caller wipes
@@ -149,85 +179,42 @@ succession_torch :: proc(sc: ^Succession, wire: ^Session_Wire, target: knet.Play
 // transport. (On web, begin_host_web host-starts the session and the resume
 // re-inits over it — the same order the native arm runs through begin_host.)
 succession_raise :: proc(sc: ^Succession, wire: ^Session_Wire) -> bool {
-	if sc.web {
+	// Raise per the TORCH's kind, not the config's — what the survivors hold
+	// is what they will chase.
+	_, sinfo := ksess.session_successor(wire.ses)
+	rv, ok := succession_decode(sinfo)
+	if !ok {
+		return false
+	}
+	switch rv.kind {
+	case .Web_Room:
 		// Copy the reservation OUT before touching the transport — raising
 		// re-inits the session, which frees successor_info under the slice.
-		_, sinfo := ksess.session_successor(wire.ses)
-		code, _ := succ_web_code(string(sinfo))
-		room := fmt.ctprintf("%s", code)
+		room := fmt.ctprintf("%s", rv.code)
 		web_close(wire)
 		return begin_host_web(wire, fmt.ctprintf("%s", sc.signal_url), sc.name, room = room)
+	case .Native_Addr:
+		return begin_host(wire, succ_port(sc.base_port, wire.ses.me), sc.name, 32)
+	case .None:
 	}
-	return begin_host(wire, succ_port(sc.base_port, wire.ses.me), sc.name, 32)
+	return false
 }
 
-// A SURVIVOR, from Ev_Succession naming someone else: go find them. Native
-// dials the rendezvous now (`.Dialing`); web arms the knock pump
-// (`.Knocking` — drive it with succession_pulse every frame). `.No_Info` is
-// the human flow: word it and let the player rejoin by hand. The caller
-// wipes its census before calling. Re-fires are safe: a live web chase
-// ignores them (the pump owns the hunt).
-succession_chase :: proc(sc: ^Succession, wire: ^Session_Wire, now: f64) -> Chase_Step {
-	if sc.web {
-		if sc.chase_code != "" {return .Knocking} // a stale refire — the pump owns it
-		_, sinfo := ksess.session_successor(wire.ses)
-		code, _ := succ_web_code(string(sinfo))
-		if code == "" {
-			web_close(wire)
-			return .No_Info
-		}
-		// Copy the code OUT of the session's buffer (every knock restarts the
-		// session, which frees it) and give the heir a breath before knocking.
-		sc.chase_code = strings.clone(code)
-		sc.chase_tries = 0
-		sc.chase_next = now + SUCC_CHASE_HEADSTART
-		web_close(wire)
-		return .Knocking
+// A SURVIVOR: one dial at a decoded torch — no retry, no timer, no state.
+// The chase POLICY (tries, gaps, the heir's headstart, when to give up) is
+// kit/boot's state machine; this is only the transport verb it repeats.
+// Web folds any previous knock's socket first (the relay allows one at a
+// time); false = the dial itself refused (ENet create / relay socket).
+succession_dial :: proc(sc: ^Succession, wire: ^Session_Wire, rv: Rendezvous) -> bool {
+	switch rv.kind {
+	case .Web_Room:
+		web_close(wire) // fold the previous knock (idempotent on a cold wire)
+		return begin_join_web(wire, fmt.ctprintf("%s", sc.signal_url), fmt.ctprintf("%s", rv.code), sc.token, sc.name)
+	case .Native_Addr:
+		return begin_join(wire, fmt.ctprintf("%s", rv.addr), rv.port, sc.token, sc.name)
+	case .None:
 	}
-	_, info := ksess.session_successor(wire.ses)
-	addr, chase_port, ok := succ_rendezvous(string(info))
-	if !ok {return .No_Info}
-	if !begin_join(wire, fmt.ctprintf("%s", addr), chase_port, sc.token, sc.name) {
-		return .Failed
-	}
-	return .Dialing
-}
-
-// Every frame (a no-op unless a web chase is live): the knock pump. The heir
-// needs a moment to open the reserved room and a browser cannot block, so
-// each retry folds the failed attempt and dials fresh. `.Knocking` = a knock
-// went out (word the attempt if you like); `.Gave_Up` = out of tries — the
-// human flow takes over. A seat arriving (Ev_Welcomed) must call
-// succession_done to end the hunt.
-succession_pulse :: proc(sc: ^Succession, wire: ^Session_Wire, now: f64) -> Chase_Step {
-	if !sc.web || sc.chase_code == "" {return .Idle}
-	if now < sc.chase_next {return .Idle}
-	if sc.chase_tries >= SUCC_CHASE_TRIES {
-		succession_done(sc)
-		return .Gave_Up
-	}
-	if sc.chase_tries > 0 {
-		web_close(wire) // fold the failed knock before the next
-	}
-	sc.chase_tries += 1
-	sc.chase_next = now + SUCC_CHASE_GAP
-	if !begin_join_web(wire, fmt.ctprintf("%s", sc.signal_url), fmt.ctprintf("%s", sc.chase_code), sc.token, sc.name) {
-		return .Idle // the relay socket refused; the timer knocks again
-	}
-	return .Knocking
-}
-
-// The chase ended — a seat (Ev_Welcomed), a give-up — stop knocking.
-succession_done :: proc(sc: ^Succession) {
-	if sc.chase_code != "" {
-		delete(sc.chase_code)
-		sc.chase_code = ""
-	}
-}
-
-// The room being chased ("" = no live chase) — for the game's notes.
-succession_chasing :: proc(sc: ^Succession) -> string {
-	return sc.chase_code
+	return false
 }
 
 // Mint the reservation — any entropy works (it's a host-local pick the torch
@@ -245,29 +232,9 @@ succ_mint_code :: proc(token: u64) -> string {
 	return strings.clone(string(buf[:]))
 }
 
-// Parse the web torch: "web" alone is an old bare sentinel (no reservation).
-@(private = "file")
-succ_web_code :: proc(info: string) -> (code: string, is_web: bool) {
-	if !strings.has_prefix(info, SUCC_WEB_INFO) {return "", false}
-	if len(info) > len(SUCC_WEB_INFO) && info[len(SUCC_WEB_INFO)] == ':' {
-		return info[len(SUCC_WEB_INFO) + 1:], true
-	}
-	return "", true
-}
-
 // The heir listens on a port derived from their seat — the HOST writes it
-// into the rendezvous (peers parse the torch, never re-derive).
+// into the rendezvous (peers decode the torch, never re-derive).
 @(private = "file")
 succ_port :: proc(base: int, p: knet.Player_Id) -> int {
 	return base + 1 + int(u64(p) % 512)
-}
-
-// Parse a native torch ("addr:port").
-@(private = "file")
-succ_rendezvous :: proc(info: string) -> (addr: string, p: int, ok: bool) {
-	i := strings.last_index_byte(info, ':')
-	if i <= 0 {return}
-	p, _ = strconv.parse_int(info[i + 1:]) // 0 on garbage, same as ever
-	if p == 0 {return}
-	return info[:i], p, true
 }

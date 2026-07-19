@@ -175,8 +175,10 @@ Boot :: struct {
 	succ_game:        rawptr,
 	succ_armed:       bool,
 	succ_kicked:      bool, // a kicked player never chases the torch
-	succ_host_gone:   bool, // the takeover/rejoin window (Ev_Host_Left opens, a seat closes)
-	succ_tries:       int, // native chase cap (Ev_Succession's refire is the pulse)
+	succ_phase:       Succ_Phase, // THE window record — one owner (was: latches here + chase state in netgd)
+	succ_tries:       int, // THE chase counter, both flavors (was: a native counter here and a web twin in netgd)
+	succ_next:        f64, // web: when the next knock may go (heir headstart, then the retry gap)
+	succ_room:        string, // web: the room being knocked on (owned; "" = no live web chase)
 	succ_pending:     knet.Player_Id, // a noted succession, mechanics deferred
 	succ_has_pending: bool,
 	succ_now:         f64, // boot_pump's clock, for the deferred chase
@@ -481,7 +483,7 @@ boot_host :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64
 		kui.lobby_set_status(&b.ui, "Could not host (port taken?)")
 		return false
 	}
-	boot_succ_config(b, false, port, "", token, name)
+	boot_succ_config(b, .Native_Addr, port, "", token, name)
 	b.phase = .Lobby // hosting seats you outright; the first spawn moves it on
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Hosting on :%d — waiting for friends", port))
@@ -532,7 +534,7 @@ boot_join :: proc(b: ^Boot, addr: cstring, port: int, token: u64, name: string, 
 		kui.lobby_set_status(&b.ui, "Could not start joining")
 		return false
 	}
-	boot_succ_config(b, false, port, "", token, name)
+	boot_succ_config(b, .Native_Addr, port, "", token, name)
 	b.phase = .Connecting // Ev_Welcomed seats it; Ev_Join_Failed sends it home
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, status)
@@ -551,7 +553,7 @@ boot_spectate :: proc(b: ^Boot, addr: cstring, port: int, token: u64, name: stri
 		kui.lobby_set_status(&b.ui, "Could not start joining")
 		return false
 	}
-	boot_succ_config(b, false, port, "", token, name)
+	boot_succ_config(b, .Native_Addr, port, "", token, name)
 	b.phase = .Connecting
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, status)
@@ -573,7 +575,7 @@ boot_host_web :: proc(b: ^Boot, url: cstring, name: string, token: u64 = 0, room
 		kui.lobby_set_status(&b.ui, "Could not reach the relay")
 		return false
 	}
-	boot_succ_config(b, true, 0, url, token, name)
+	boot_succ_config(b, .Web_Room, 0, url, token, name)
 	b.phase = .Lobby
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, "Opening a room…")
@@ -588,7 +590,7 @@ boot_join_web :: proc(b: ^Boot, url: cstring, room: cstring, token: u64, name: s
 		kui.lobby_set_status(&b.ui, "Could not reach the relay")
 		return false
 	}
-	boot_succ_config(b, true, 0, url, token, name)
+	boot_succ_config(b, .Web_Room, 0, url, token, name)
 	b.phase = .Connecting
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Joining room %s…", room))

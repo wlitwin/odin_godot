@@ -186,24 +186,30 @@ empty string stays a deliberate skip.
 ## Succession: the rendezvous ceremony, written once
 
 The session names WHO carries the torch ([session](session.md#backup-hosting-and-resume));
-`netgd.Succession` owns HOW the survivors find them — extracted from the game
-that shipped it (most of scrapyard's 400-line succession file was this):
+`netgd.Succession` owns HOW the survivors find them; `kboot`'s state machine
+owns WHEN (the window, the retry policy, the deferred mechanics —
+`boot_migration` wires the whole dance and most games never touch this layer
+directly). The torch is a typed record — `[kind u8][payload]`, encoded and
+decoded only here (`succession_decode`) — so a new transport adds a
+`Rendezvous_Kind` and two switch arms, never a string-format negotiation:
 
-- **native** — the torch carries "addr:port": the bearer's address as the host
-  saw it, plus the seat-derived port the bearer will bind.
-- **web** — the relay honors reservations on create, so the host MINTS
-  tomorrow's room code today ("web:CODE" in the torch); the heir hosts UNDER
-  it and survivors knock on a timer (a browser cannot block, and the heir
-  needs a breath to open the room).
+- **`.Native_Addr`** — `[addr][port]`: the bearer's address as the host saw
+  it, plus the seat-derived port the bearer will bind. ENet-only: a transport
+  with no peer-address story can't light this torch (the torch warns once
+  instead of silently shipping no migration).
+- **`.Web_Room`** — `[code]`: the relay honors reservations on create, so the
+  host MINTS tomorrow's room code today; the heir hosts UNDER it and
+  survivors knock on boot's timer (a browser cannot block, and the heir
+  needs a breath to open the room). A Steam lobby id is the reserved next
+  kind (the Transport-record refactor).
 
-Configure once (`Succession{web, signal_url, base_port, token, name}`), then:
-`succession_torch` on `Ev_Backup_Target` (host), `succession_raise` /
-`succession_chase` from `Ev_Succession` (the heir / everyone else — wipe your
-census first; `succession_named` peeks so a no-successor torch leaves the
-world standing), `succession_pulse` every frame (the web knock pump — word
-its `.Knocking`/`.Gave_Up` steps), and `succession_done` on `Ev_Welcomed`.
-The game keeps its campaign blob, its census wipe, and its words — see
-scrapyard's `succession.odin` for the worked consumer.
+Configure once (`Succession{kind, signal_url, base_port, token, name}` —
+`boot_succ_config` does it for door games), then the verbs are stateless:
+`succession_torch` on `Ev_Backup_Target` (host), `succession_raise` (heir),
+`succession_dial` (one attempt at a decoded rendezvous — `kboot`'s machine
+owns tries, gaps, and give-up; `succession_named` peeks so a no-successor
+torch leaves the world standing). The game keeps its campaign blob, its
+census wipe, and its words, as `boot_migration` halves.
 
 ## wire_receive and the kind byte
 

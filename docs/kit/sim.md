@@ -788,6 +788,7 @@ per-class routing fingerprint, the glide-vs-snap assertion, the three-peer
 fact-timing pin, and the four-law declared-fact pin) plus the repgen contract
 pins hold all of it.
 
-See also: [net](net.md) (the shared descriptor core), [session](session.md)
+See also: [net](net.md) (whose shared substrate layer — wire, descriptors, blend
+math, tick — this lane is built on), [session](session.md)
 (identity and everything reliable), [play](play.md) (the coop shelf —
 Puppet is that model's physics answer, `play/sim` is this one's).

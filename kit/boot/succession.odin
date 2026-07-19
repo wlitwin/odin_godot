@@ -37,6 +37,23 @@ import ksess "godot:kit/session"
 import "core:fmt"
 import "core:strings"
 
+// THE STATE MACHINE — one owner for the window that used to be latches here
+// (host_gone) plus live-chase state in netgd (chase_code/tries/next). Boot
+// holds the whole record now; netgd is stateless per-transport verbs.
+//
+//   Idle ──Ev_Host_Left/Ev_Succession──▶ Host_Gone ──chase arms──▶ Chasing
+//     ▲                                      │  ▲                     │
+//     └────────── Ev_Welcomed ◀──────────────┘  └───── give-up ◀──────┘
+//
+// A takeover collapses Host_Gone → Idle directly (the crown sits). The
+// kicked latch is orthogonal — a permanent no that outlives phases until the
+// next door re-arms the config.
+Succ_Phase :: enum u8 {
+	Idle, // no window: host alive (or we ARE the host)
+	Host_Gone, // the takeover/rejoin window is open; no mechanics running
+	Chasing, // a chase is live (native: dials ride Ev_Succession refires; web: the knock pump owns it)
+}
+
 // The generated thunk table — pure data, like Entity_Kind (state lives on
 // Boot; generated code carries no globals worth forking across script dlls).
 Succ_Hooks :: struct {
@@ -99,10 +116,14 @@ boot_succ_event :: proc(b: ^Boot, ev: ksess.Event) {
 			_, _ = netgd.succession_torch(&b.succ, &b.wire, e.player)
 		}
 	case ksess.Ev_Host_Left:
-		b.succ_host_gone = true
+		if b.succ_phase == .Idle {
+			b.succ_phase = .Host_Gone // never demotes a live chase
+		}
 	case ksess.Ev_Succession:
 		if !b.ses.is_host { // a takeover queued a stale twin behind itself — dead here too
-			b.succ_host_gone = true // a succession IMPLIES the loss (batch order is not ours)
+			if b.succ_phase == .Idle {
+				b.succ_phase = .Host_Gone // a succession IMPLIES the loss (batch order is not ours)
+			}
 			b.succ_pending = e.successor
 			b.succ_has_pending = true
 		}
@@ -110,27 +131,51 @@ boot_succ_event :: proc(b: ^Boot, ev: ksess.Event) {
 		// Seated = the host exists BY DEFINITION — the window closes HERE
 		// (dead-socket signals landing mid-rejoin must not re-open it
 		// against the live host — the cavecrawl lesson, now the kit's).
-		netgd.succession_done(&b.succ)
-		b.succ_host_gone = false
-		b.succ_tries = 0
+		boot_succ_end(b)
 	case ksess.Ev_Kicked:
 		b.succ_kicked = true
 	}
 }
 
-// The web knock pump, one pulse per frame (no-op native / idle). Reads the
-// room BEFORE pulsing — a give-up clears it under the words.
+// The window closes (a seat arrived, a takeover crowned, a give-up ended the
+// hunt): back to Idle, counter zeroed, any live web room released.
+@(private = "file")
+boot_succ_end :: proc(b: ^Boot) {
+	b.succ_phase = .Idle
+	b.succ_tries = 0
+	if b.succ_room != "" {
+		delete(b.succ_room)
+		b.succ_room = ""
+	}
+}
+
+// The web knock pump, one pulse per frame (no-op native / idle). The retry
+// POLICY lives here now — netgd only dials; the machine decides when. The
+// heir needs a moment to open the reserved room and a browser cannot block,
+// so each knock folds the failed socket and dials fresh on the gap timer.
 boot_succ_pulse :: proc(b: ^Boot, now: f64) {
-	if !b.succ_armed {
+	if !b.succ_armed || b.succ_phase != .Chasing || b.succ_room == "" {
 		return
 	}
-	room := netgd.succession_chasing(&b.succ)
-	#partial switch netgd.succession_pulse(&b.succ, &b.wire, now) {
-	case .Knocking:
-		boot_succ_word(b, .Knocking, room, b.succ.chase_tries)
-	case .Gave_Up:
-		boot_succ_word(b, .Gave_Up, room, b.succ.chase_tries)
+	if now < b.succ_next {
+		return
 	}
+	if b.succ_tries >= netgd.SUCC_CHASE_TRIES {
+		room := strings.clone(b.succ_room, context.temp_allocator)
+		tries := b.succ_tries
+		netgd.web_close(&b.wire) // release the half-open knock with the hunt
+		boot_succ_end(b)
+		b.succ_phase = .Host_Gone // the window stays open for the human flow
+		boot_succ_word(b, .Gave_Up, room, tries)
+		return
+	}
+	b.succ_tries += 1
+	b.succ_next = now + netgd.SUCC_CHASE_GAP
+	rv := netgd.Rendezvous{kind = .Web_Room, code = b.succ_room}
+	if netgd.succession_dial(&b.succ, &b.wire, rv) {
+		boot_succ_word(b, .Knocking, b.succ_room, b.succ_tries)
+	}
+	// A refused relay socket just waits for the next gap — the timer knocks again.
 }
 
 // The deferred mechanics — the generated `<snake>_events` calls this after
@@ -160,7 +205,7 @@ boot_migrate_pending :: proc(b: ^Boot) {
 // sequence the auto path does. False = worded through `_migrating` already
 // (no backup / raise refused / corrupt snapshot); the frozen world stays.
 boot_take_over :: proc(b: ^Boot) -> bool {
-	if !b.succ_armed || b.ses == nil || b.ses.is_host || !b.succ_host_gone {
+	if !b.succ_armed || b.ses == nil || b.ses.is_host || b.succ_phase == .Idle {
 		return false // no window: hosts don't take over, and neither does a live seat
 	}
 	blob, snapshot, ok := ksess.session_backup_parts(b.ses)
@@ -178,7 +223,7 @@ boot_take_over :: proc(b: ^Boot) -> bool {
 		boot_succ_word(b, .Resume_Corrupt, "", 0)
 		return false
 	}
-	b.succ_host_gone = false // the crown sits — the window is over
+	boot_succ_end(b) // the crown sits — the window is over
 	if b.succ_hooks.took_over != nil {
 		r := knet.reader_make(blob)
 		b.succ_hooks.took_over(b.succ_game, &r)
@@ -186,43 +231,55 @@ boot_take_over :: proc(b: ^Boot) -> bool {
 	return true
 }
 
-// A SURVIVOR: peek the torch (no torch = no wipe — the frozen world stays
+// A SURVIVOR: decode the torch (no torch = no wipe — the frozen world stays
 // worded, not torn down), then wipe and go find the heir. Public — the
 // manual rejoin button. Ev_Succession re-fires on every failed native
-// reconnect; the tries cap turns that pulse into a bounded chase.
+// reconnect; the ONE tries counter turns that pulse into a bounded chase
+// (web knocks count against the same counter, via the pump).
 boot_chase :: proc(b: ^Boot) {
-	if !b.succ_armed || b.ses == nil || b.ses.is_host || !b.succ_host_gone {
+	if !b.succ_armed || b.ses == nil || b.ses.is_host || b.succ_phase == .Idle {
 		return
 	}
-	if b.succ.web && netgd.succession_chasing(&b.succ) != "" {
-		return // the pump owns a live chase — a stale refire
+	if b.succ_room != "" {
+		return // the pump owns a live web chase — a stale refire
 	}
-	if !netgd.succession_named(&b.succ, &b.wire) {
+	// Decode + COPY the torch out before anything restarts the session —
+	// the record's strings view successor_info, which a dial frees (temp:
+	// the words half fires this frame; the room clone below is owned).
+	_, sinfo := ksess.session_successor(b.ses)
+	rv, named := netgd.succession_decode(sinfo)
+	if !named {
 		boot_succ_word(b, .No_Torch, "", 0)
 		return
 	}
-	if !b.succ.web {
+	switch rv.kind {
+	case .Native_Addr:
 		if b.succ_tries >= netgd.SUCC_CHASE_TRIES {
 			boot_succ_word(b, .Gave_Up, "", b.succ_tries)
 			return
 		}
 		b.succ_tries += 1
-	}
-	// Copy the torch OUT before anything restarts the session — words must
-	// never point into the grave (temp: the half fires this frame).
-	_, sinfo := ksess.session_successor(b.ses)
-	target := strings.clone(string(sinfo), context.temp_allocator)
-	boot_entities_wipe(b)
-	switch netgd.succession_chase(&b.succ, &b.wire, b.succ_now) {
-	case .Dialing:
-		boot_succ_word(b, .Chasing, target, b.succ_tries)
-	case .Knocking:
-		boot_succ_word(b, .Knocking, netgd.succession_chasing(&b.succ), b.succ.chase_tries)
-	case .No_Info:
+		b.succ_phase = .Chasing
+		target := fmt.tprintf("%s:%d", rv.addr, rv.port)
+		rv.addr = strings.clone(rv.addr, context.temp_allocator)
+		boot_entities_wipe(b)
+		if netgd.succession_dial(&b.succ, &b.wire, rv) {
+			boot_succ_word(b, .Chasing, target, b.succ_tries)
+		} else {
+			boot_succ_word(b, .Chase_Failed, target, b.succ_tries)
+		}
+	case .Web_Room:
+		// Arm the knock pump: own the room (every knock restarts the session,
+		// which frees the torch under the view) and give the heir a breath.
+		b.succ_room = strings.clone(rv.code)
+		b.succ_tries = 0
+		b.succ_next = b.succ_now + netgd.SUCC_CHASE_HEADSTART
+		b.succ_phase = .Chasing
+		boot_entities_wipe(b)
+		netgd.web_close(&b.wire) // fold the dead run's socket; the pump dials fresh
+		boot_succ_word(b, .Knocking, b.succ_room, 0)
+	case .None:
 		boot_succ_word(b, .No_Torch, "", 0)
-	case .Failed:
-		boot_succ_word(b, .Chase_Failed, target, b.succ_tries)
-	case .Idle, .Gave_Up:
 	}
 }
 
@@ -259,10 +316,12 @@ boot_succ_word :: proc(b: ^Boot, step: Migrate_Step, target: string, try: int) {
 }
 
 // Succession config capture — the transport doors call this so the ceremony
-// knows the run's shape without a line of game config. The name is cloned:
-// door callers pass temps.
-boot_succ_config :: proc(b: ^Boot, web: bool, port: int, url: cstring, token: u64, name: string) {
-	b.succ.web = web
+// knows the run's shape without a line of game config. The rendezvous KIND
+// names the flavor this run's torch will carry (.Native_Addr for ENet doors,
+// .Web_Room for relay doors; a Steam lobby kind arrives with the
+// Transport-record refactor). The name is cloned: door callers pass temps.
+boot_succ_config :: proc(b: ^Boot, kind: netgd.Rendezvous_Kind, port: int, url: cstring, token: u64, name: string) {
+	b.succ.kind = kind
 	b.succ.base_port = port
 	b.succ.token = token
 	if b.succ_name != "" {
@@ -270,7 +329,7 @@ boot_succ_config :: proc(b: ^Boot, web: bool, port: int, url: cstring, token: u6
 	}
 	b.succ_name = strings.clone(name)
 	b.succ.name = b.succ_name
-	if web {
+	if kind == .Web_Room {
 		if b.succ_url != "" {
 			delete(b.succ_url)
 		}
@@ -278,6 +337,5 @@ boot_succ_config :: proc(b: ^Boot, web: bool, port: int, url: cstring, token: u6
 		b.succ.signal_url = b.succ_url
 	}
 	b.succ_kicked = false
-	b.succ_host_gone = false
-	b.succ_tries = 0
+	boot_succ_end(b)
 }

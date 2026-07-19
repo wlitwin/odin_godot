@@ -6,11 +6,14 @@ package kit_fx
 // carried torch, a pyre) authors it in its scene instead.
 //
 // 2D ONLY, stated plainly: bursts are Cpu_Particles2d, floats are
-// Control-positioned Labels, shake moves a Node2d — a 3D game gets nothing
-// from this package (including screen shake) and authors its own juice.
-// The (x, y) args are honest about that; the toolkit's [3]f32 position
+// Control-positioned Labels, and the SHIPPED appliers move a Node2d — a 3D
+// game gets no ready-made juice here and authors its own. The exception is
+// the shake TRAUMA MODEL, whose pure core (shake_offset) is dimension-free:
+// a 3D game advances it and applies the (ox, oy) offset to its own Camera3d
+// in two lines, rather than getting no screen shake at all. The (x, y)
+// applier args stay honest about the 2D stance; the toolkit's [3]f32 position
 // convention resumes where the math is dimension-agnostic (combat/interact/
-// ai), which this package deliberately is not.
+// ai), which this package's appliers deliberately are not.
 //
 // Two lifetimes, two shapes:
 //   * flash — fire-and-forget: paint the node a color NOW, let a Tween walk
@@ -181,17 +184,34 @@ shake_add :: proc(s: ^Shake, amount: f32) {
 SHAKE_DECAY :: f32(1.6) // trauma/s — a full slam settles in ~0.6s
 SHAKE_MAX :: f32(7) // px at trauma 1
 
-shake_frame :: proc(s: ^Shake, delta: f64, nodes: ..gd.Node) {
+// The PURE core — advance the trauma model one frame and return this frame's
+// (ox, oy) pixel offset. Dimension-free, deterministic, allocation-free: a 3D
+// game calls this and applies the result to its own Camera3d, while shake_frame
+// below is the 2D convenience that nudges Node2ds with it. Idle (no trauma)
+// returns (0, 0) without advancing, so a settled shake stays home.
+shake_offset :: proc(s: ^Shake, delta: f64) -> (ox, oy: f32) {
 	if s.trauma <= 0 {
-		return
+		return 0, 0
 	}
 	s.trauma = max(s.trauma - SHAKE_DECAY * f32(delta), 0)
 	s.t += f32(delta)
 	amp := s.trauma * s.trauma * SHAKE_MAX
 	// Two incommensurate sines beat like noise — deterministic, allocation-free.
-	ox := amp * math.sin(s.t * 91.7)
-	oy := amp * math.sin(s.t * 113.3 + 1.7)
+	ox = amp * math.sin(s.t * 91.7)
+	oy = amp * math.sin(s.t * 113.3 + 1.7)
 	if s.trauma == 0 {ox, oy = 0, 0} // settle EXACTLY home on the last frame
+	return
+}
+
+// The 2D applier: advance the model via shake_offset and nudge every node to
+// this frame's offset (the boot stage/world Node2Ds — both move together and
+// every child rides along). A thin convenience over the pure core; idle is a
+// no-op (the last settle frame already put them home).
+shake_frame :: proc(s: ^Shake, delta: f64, nodes: ..gd.Node) {
+	if s.trauma <= 0 {
+		return
+	}
+	ox, oy := shake_offset(s, delta)
 	for n in nodes {
 		gd.node2d_set_position(cast(gd.Node2d)n, {ox, oy})
 	}

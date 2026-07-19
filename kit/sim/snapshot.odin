@@ -3,6 +3,12 @@ package kit_sim
 // snapshot — the authority's wire: tick-stamped predict-set batches, delta-
 // compressed against the last state the client CONFIRMED holding.
 //
+// Despite the name, most of what follows is the sim lane's ack-baselined DELTA
+// codec (mask + dirty fields, diffed against an acked baseline); the full-row
+// SNAPSHOT is only the fallback case — the row a client gets when no baseline
+// is shared yet (a fresh spawn, a lapped ledger). "snapshot" names the batch's
+// job, not the shape most rows take.
+//
 // The loop this file closes (the sim lane's whole conversation):
 //
 //   client → server   [input window]           (input.odin)  [snap ack u64]

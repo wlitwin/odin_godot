@@ -1,9 +1,13 @@
 package kit_combat
 
 // kit/combat — health, abilities, status effects, projectiles (toolkit
-// phase 4). Everything here is DETERMINISTIC, ALLOCATION-FREE and engine-
-// free, because it runs inside predicted commands and host ticks: the
-// casting client and the host execute the same gates from the same bytes.
+// phase 4). The MATH SHELF — targeting, cooldowns, hurt/heal, leash, the
+// projectile pool — is DETERMINISTIC, ALLOCATION-FREE and engine-free,
+// because it runs inside predicted commands and host ticks: the casting
+// client and the host execute the same gates from the same bytes. The Fire
+// wire half (announce/route) and the Predicted_Hp overlay are the exceptions
+// — session-coupled presentation conveniences that live beside the math they
+// serve, not part of that pure core.
 //
 // THE SHAPES:
 //

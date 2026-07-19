@@ -141,7 +141,7 @@ begin_hosting :: proc(self: ^CaveLobby) {
 	ksess.session_host_start(&self.ses, my_name(self))
 	// The ceremony's shape (cavecrawl raises its own transports — Steam is
 	// why — so the boot doors never saw this run's port/token/name).
-	kboot.boot_succ_config(&self.boot, false, port(), "", my_token(), my_name(self))
+	kboot.boot_succ_config(&self.boot, .Native_Addr, port(), "", my_token(), my_name(self))
 	self.cols = kcombat.combat_columns(&self.ses) // the ledger, on the scoreboard
 	self.slain_col = ksess.session_stat_column(&self.ses, "slain") // the game's own column
 	self.running = true
@@ -169,7 +169,7 @@ cave_lobby_on_join :: proc(self: ^CaveLobby) {
 
 begin_joining :: proc(self: ^CaveLobby) {
 	ksess.session_client_start(&self.ses, my_token(), my_name(self))
-	kboot.boot_succ_config(&self.boot, false, port(), "", my_token(), my_name(self))
+	kboot.boot_succ_config(&self.boot, .Native_Addr, port(), "", my_token(), my_name(self))
 	self.running = true
 	kui.lobby_show_menu(&self.boot.ui, false, false)
 	kui.lobby_set_status(&self.boot.ui, "Joining the cave...")

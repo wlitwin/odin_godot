@@ -2,6 +2,11 @@ package kit_sim
 
 // present — blending predict-set snapshots for the eye.
 //
+// This file is the blend/error MATH only — the per-frame PRESENTER that calls
+// it lives in lane.odin as lane_present (the pump that picks the bracket pair,
+// the alpha, and the render clock). A reader looking for "the present code
+// path" wants lane_present; this file is the primitives it drives.
+//
 // A watched entity (someone else's avatar on a client) holds ledgered truth
 // at snapshot ticks; drawing it straight from the newest batch steps at the
 // snap rate. predict_blend is the smoothing primitive: interpolate two
