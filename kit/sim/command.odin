@@ -276,7 +276,7 @@ lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: u16, args: []u8) -> bool {
 	knet.write_u8(w, SIM_CMD)
 	knet.write_u32(w, l.cmd_seq)
 	knet.write_u64(w, l.ticker.tick + 1)
-	knet.write_u32(w, u32(id))
+	knet.write_net_id(w, id)
 	knet.write_u16(w, cmd)
 	knet.write_bytes(w, args)
 	ksess.session_app_flush(l.ses, ksess.HOST_PEER) // reliable: verbs are one-shots
@@ -301,7 +301,7 @@ lane_cmd_inflight :: proc(l: ^Lane, id: knet.Net_Id) -> bool {
 cmd_handle :: proc(l: ^Lane, from: knet.Player_Id, r: ^knet.Reader) {
 	seq := knet.read_u32(r)
 	tick := knet.read_u64(r)
-	id := knet.Net_Id(knet.read_u32(r))
+	id := knet.read_net_id(r)
 	cmd := knet.read_u16(r)
 	args := knet.read_bytes(r)
 	if r.err {

@@ -778,6 +778,37 @@ This is a recipe, not tooling, on purpose: the predicates and signatures are gam
 a generic "owner event" message would just be an unvalidated command, strictly worse than
 the command loop that already exists.
 
+## Adding a session subsystem (the touchpoint checklist)
+
+The session's subsystems — interest (`interest.odin`), profiles (`profile.odin`), stats
+(`stats.odin`), backup/succession (`backup.odin`) — all integrate through the same ~8
+touchpoints. They were folklore until a written-for-teardown interest proc sat uncalled for
+a release because nothing listed the leave-side step. The checklist, so the next subsystem
+can't drop one:
+
+1. **Wire kind(s)** — claim the next `SES_*` id(s) in session.odin's single table; netgd's
+   netgraph name table follows it.
+2. **Packet case(s)** — one `case` per kind in the packet switch: role/seat gate first
+   (gate returns leave `r.err` CLEAR — they're not malformed), then call your
+   `<sub>_recv` proc; sticky `r.err` rides back into the malformed counter.
+3. **A net_tick slot** — if you send on a cadence, add one call in `session_net_tick`'s
+   spine (stats/profile ride the ~2 Hz lobby-alive cadence; pick yours deliberately).
+4. **Welcome parade** — what does a LATE JOINER need to hear? `host_handle_join` sends
+   world, stats, profiles, and the standing torch; a subsystem with standing state joins
+   that parade or late joiners live without it.
+5. **State scoping** — run state goes in `Session_Run` (wiped wholesale every re-init —
+   a field there can never leak into a rehost); pre-start wiring goes in
+   `Session_Wiring` (untouched by re-init). Owned containers add ONE line to
+   `run_destroy`. If some state must survive a `host_resume` specifically, that's a
+   `keep_*` flag on `session_init` (profiles are the worked example).
+6. **Departure sweep** — what happens to your per-player state when a player leaves?
+   `mark_left` is the one funnel (dedup windows, interest pairs prune there).
+7. **Event union** — new game-facing events join `Event`, and scriptgen's
+   `SESSION_EVENTS` table if games should get generated halves.
+8. **Fingerprint** — if your wire shape depends on game declarations (profile rows do),
+   fold it into the build fingerprint so version skew is refused at the door, not
+   debugged in the field.
+
 ## Gotchas
 
 - **`Session_Config` durations are seconds, resolved at `*_start`.** `session_init` bakes

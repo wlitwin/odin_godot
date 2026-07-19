@@ -9,7 +9,6 @@ package kit_ui
 import gd "godot:godot"
 import kcombat "godot:kit/combat"
 import kitems "godot:kit/items"
-import knet "godot:kit/net"
 import "core:fmt"
 import "core:strings"
 
@@ -150,7 +149,10 @@ abilities_destroy :: proc(bar: ^Ability_Bar) {
 //
 // (kit/ui can never import play — the arrow points play → kit — and it
 // never needs to: the shared def table IS the flip.)
-abilities_refresh :: proc(bar: ^Ability_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_rate := knet.DEFAULT_TICK_HZ) {
+// tick_hz is REQUIRED (pass ksess.session_tick_hz(&ses), or the lane's rate on
+// a sim game): a defaulted 20 here once showed a 60 Hz game's cooldowns 3×
+// too long — seconds-rendering procs never guess the tick rate.
+abilities_refresh :: proc(bar: ^Ability_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_hz: int) {
 	for cell, i in bar.cells {
 		if i >= len(defs) {
 			gd.set_string(cast(gd.Object)cell, "text", "")
@@ -159,7 +161,7 @@ abilities_refresh :: proc(bar: ^Ability_Bar, defs: []kcombat.Ability_Def, cds: [
 		text: cstring
 		switch {
 		case i < len(cds) && cds[i] > 0:
-			text = fmt.ctprintf("[%s %.1fs]", defs[i].name, f32(cds[i]) / f32(tick_rate))
+			text = fmt.ctprintf("[%s %.1fs]", defs[i].name, f32(cds[i]) / f32(tick_hz))
 		case resource < defs[i].cost:
 			text = fmt.ctprintf("[%s $]", defs[i].name)
 		case:

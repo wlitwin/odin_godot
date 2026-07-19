@@ -115,13 +115,11 @@ snap_write :: proc(w: ^knet.Writer, entries: []Entry, tick: u64, baseline: u64, 
 		write_subset_delta(w, now, base, desc)
 		payload := len(w.buf) - payload_from
 		assert(payload <= int(max(u16)))
-		w.buf[len_at] = u8(payload)
-		w.buf[len_at + 1] = u8(payload >> 8)
+		knet.writer_patch_u16(w, len_at, u16(payload))
 		count += 1
 	}
 	assert(count <= int(max(u16)))
-	w.buf[count_at] = u8(count)
-	w.buf[count_at + 1] = u8(count >> 8)
+	knet.writer_patch_u16(w, count_at, u16(count))
 	return count
 }
 
@@ -196,8 +194,8 @@ Rx_Entry :: struct {
 // How many recent batch ticks the receiver remembers for bracket lookups
 // (lane_present interpolates watched entities between two of them). At the
 // default 20 Hz snap rate this is ~800ms of history — the stream ring's
-// INTERP_CAP reasoning.
-SNAP_APPLIED_CAP :: 16
+// depth, by the stream ring's reasoning.
+SNAP_APPLIED_CAP :: knet.INTERP_CAP
 
 Snap_Rx :: struct {
 	entries: [dynamic]Rx_Entry,
@@ -261,18 +259,16 @@ snap_rx_apply :: proc(rx: ^Snap_Rx, r: ^knet.Reader, truths: ^[dynamic]Truth) ->
 		id := knet.read_net_id(r)
 		flags := knet.read_u8(r)
 		n := int(knet.read_u16(r))
-		if r.err || r.off + n > len(r.data) {
+		payload := knet.reader_view(r, n)
+		if r.err {
 			// Truncated mid-batch: drop it all, the next one supersedes. Rows
 			// ALREADY noted into the rx ledger this loop stay there, harmlessly:
 			// this tick is never acked (the server never names it as a baseline)
 			// and never enters the applied ring (the presenter never brackets
 			// it), and a ring lap re-stamps the slot before any read could
 			// alias it — phantom truth with no reader.
-			r.err = true
 			return 0, 0, 0
 		}
-		payload := r.data[r.off:r.off + n]
-		r.off += n
 
 		e := find_rx(rx, id)
 		if e == nil {

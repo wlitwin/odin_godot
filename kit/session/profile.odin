@@ -80,7 +80,11 @@ Profile_Table :: struct {
 session_profile_install :: proc(s: ^Session, $T: typeid) {
 	#assert(size_of(T) <= PROFILE_MAX_SIZE, "a profile row is a loadout, not an inventory dump — shrink it or blob it")
 	#assert(intrinsics.type_is_nearly_simple_compare(T) && !intrinsics.type_is_pointer(T), "profile rows are POD — no strings, slices, maps, or pointers (the row IS the wire bytes)")
-	assert(s.prof.size == 0 || s.prof.size == size_of(T), "session_profile_install called twice with different types")
+	assert(s.prof_size == 0 || s.prof_size == size_of(T), "session_profile_install called twice with different types")
+	// prof_size is the WIRING half (survives re-init; session_init re-seeds
+	// the table from it after each run wipe); prof.size is the live copy the
+	// table's own procs read.
+	s.prof_size = size_of(T)
 	s.prof.size = size_of(T)
 }
 

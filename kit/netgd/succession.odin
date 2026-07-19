@@ -71,8 +71,9 @@ Succession :: struct {
 	name:       string, // my display name (chase + heir host)
 
 	// the ceremony's state:
-	code:        string, // host: the minted reservation, once per run ("" = not yet)
-	chase_code:  string, // chaser: the room being knocked on ("" = idle)
+	code:           string, // host: the minted reservation, once per run ("" = not yet)
+	chase_code:     string, // chaser: the room being knocked on ("" = idle)
+	warned_no_addr: bool, // the torch said "this transport can't" once already
 	chase_tries: int,
 	chase_next:  f64,
 }
@@ -122,7 +123,19 @@ succession_torch :: proc(sc: ^Succession, wire: ^Session_Wire, target: knet.Play
 	p, has := wire.ses.players[target]
 	if !has {return "", false}
 	addr, aok := peer_address(wire.node, p.peer)
-	if !aok {return "", false}
+	if !aok {
+		// A transport with no peer-address story (anything but ENet — Steam,
+		// custom peers) can never light the native torch: migration stays
+		// ARMED but silently absent. Say it once instead of losing the world
+		// to a dead host months later. (A Steam lobby id is the easy
+		// rendezvous the per-transport refactor will carry; until then, the
+		// web room-code arm is the workaround.)
+		if !sc.warned_no_addr {
+			sc.warned_no_addr = true
+			fmt.println("kit/netgd: succession torch UNLIT — this transport exposes no peer address (ENet-only today), so host migration cannot happen on it; use the web rendezvous (boot_succ_config web=true + relay) until per-transport rendezvous ships")
+		}
+		return "", false
+	}
 	info = fmt.tprintf("%s:%d", addr, succ_port(sc.base_port, target))
 	ksess.session_set_successor_info(wire.ses, transmute([]u8)info)
 	return info, true

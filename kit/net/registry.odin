@@ -69,12 +69,28 @@ registry_destroy :: proc(reg: ^Registry) {
 	reg.entries = nil
 }
 
+// Allocate the next authority id WITHOUT inserting — for a composer that must
+// name the id before the entity exists (kit/session stamps it into the spawn
+// tuple, then inserts). The allocation rule lives here either way.
+registry_alloc_id :: proc(reg: ^Registry) -> Net_Id {
+	id := reg.next_id
+	reg.next_id += 1
+	return id
+}
+
+// Raise the allocator floor without inserting — a resumed authority (host
+// migration) adopts the dead host's high-water mark so it keeps allocating
+// without collisions. The per-id insert chase below does this incrementally;
+// this is the bulk form a snapshot restore needs.
+registry_reserve_ids :: proc(reg: ^Registry, floor: Net_Id) {
+	reg.next_id = max(reg.next_id, floor)
+}
+
 // Authority-side registration: allocates the id. The fresh shadow is zeroed,
 // so the entity's first delta walk marks every non-zero field dirty — exactly
 // the initial send a newly spawned entity needs.
 registry_spawn :: proc(reg: ^Registry, entity: rawptr, set: ^Command_Set, owner := PLAYER_ID_INVALID) -> Net_Id {
-	id := reg.next_id
-	reg.next_id += 1
+	id := registry_alloc_id(reg)
 	registry_insert(reg, id, entity, set, owner)
 	return id
 }
@@ -84,6 +100,7 @@ registry_spawn :: proc(reg: ^Registry, entity: rawptr, set: ^Command_Set, owner 
 // (host migration) can keep allocating without collisions.
 registry_insert :: proc(reg: ^Registry, id: Net_Id, entity: rawptr, set: ^Command_Set, owner := PLAYER_ID_INVALID) {
 	assert(id != NET_ID_INVALID)
+	assert(u32(id) & PROVISIONAL_BIT == 0, "provisional (high-bit) ids are lane-local and never enter the registry")
 	// Comma-ok, NOT a bare missing-key index: indexing a map by an absent key
 	// of a large value type faults in the current compiler (see the stats-map
 	// note in kit/session) — and absent is this assert's NORMAL path.
@@ -168,8 +185,11 @@ registry_write_deltas :: proc(w: ^Writer, reg: ^Registry, changed: ^[dynamic]Net
 	return count
 }
 
-// A dirty entity's delta segment inside a scratch writer — recorded as a
-// RANGE (the buffer relocates as it grows; slice it after the walk).
+// One entity's segment inside a scratch buffer — recorded as a RANGE (a
+// writer's buffer relocates as it grows; slice after the walk). Shared by the
+// delta collect below and the stream-batch collect: both exist so a composer
+// (kit/session's interest routing) can re-batch per recipient by copying
+// ranges verbatim, without either side re-learning the byte layout.
 Delta_Seg :: struct {
 	id:       Net_Id,
 	from, to: int,
@@ -558,6 +578,35 @@ registry_stream_time :: proc(r: ^Reader) -> f64 {
 	return read_f64(r)
 }
 
+// The read-side sibling of registry_write_streams: split a raw stream batch
+// (everything after the transport's tag byte) into per-entity segments
+// WITHOUT decoding them — for a relay that composes per-recipient batches
+// (kit/session's interest routing), symmetric with registry_collect_deltas.
+// Each segment's range covers [id][warp][len][bytes] whole, copyable
+// verbatim. ok=false = torn batch, forward nothing (the next tick
+// supersedes). The stream batch layout is written by registry_write_streams
+// and parsed by apply_streams and HERE — never outside this file.
+registry_collect_stream_segs :: proc(raw: []u8, segs: ^[dynamic]Delta_Seg) -> (sender_now: f64, ok: bool) {
+	r := reader_make(raw)
+	sender_now = read_f64(&r)
+	count := int(read_u16(&r))
+	if r.err {
+		return 0, false
+	}
+	for _ in 0 ..< count {
+		start := r.off
+		id := read_net_id(&r)
+		_ = read_u8(&r) // warp
+		n := int(read_u16(&r))
+		_ = reader_view(&r, n)
+		if r.err {
+			return 0, false
+		}
+		append(segs, Delta_Seg{id = id, from = start, to = r.off})
+	}
+	return sender_now, true
+}
+
 // Buffer a received stream batch into the target entities' rings, stamped with
 // `stamp` (the caller's timeline — see the header comment). Entities that are
 // unknown, owned by `me` (never accept a stream for state this peer is
@@ -570,12 +619,10 @@ registry_apply_streams :: proc(r: ^Reader, reg: ^Registry, me: Player_Id, stamp:
 		id := read_net_id(r)
 		warp := read_u8(r)
 		n := int(read_u16(r))
-		if r.err || r.off + n > len(r.data) {
-			r.err = true
+		blob := reader_view(r, n)
+		if r.err {
 			break
 		}
-		blob := r.data[r.off:r.off + n]
-		r.off += n
 		e, ok := &reg.entries[id]
 		if !ok || e.owner == me || n != stream_wire_size(e.set.entity_desc) {
 			continue

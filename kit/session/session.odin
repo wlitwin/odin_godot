@@ -211,31 +211,8 @@ Event :: union {
 	Ev_Profile_Changed,
 }
 
-// ---- the stat registry ---------------------------------------------------------
-//
-// Generic named counters on the player record: kills, deaths, damage, score —
-// whatever the game declares. HOST-accumulated (gameplay mutates them on the
-// authority only) and replicated to everyone as a full snapshot at a low rate
-// when dirty (~2 Hz: display data, not simulation data). Stats live on the
-// PLAYER, so they survive disconnects and come back with a reclaimed identity
-// like everything else. Column 0 is always "ping": the host pings its clients
-// and feeds each player's measured RTT (ms) in automatically.
-
-// A column HANDLE, 1-based on purpose: the zero value is INVALID and every
-// read/write asserts on it. Why: `session_stat_column` registers on the HOST
-// (typically in a Start handler) — a Stat_Col stored there is zero-value on
-// every client, and when 0 meant "column 0" a client's read silently returned
-// the auto-fed PING (homestead's acid caught a resource gate passing on 254
-// milliseconds of latency). Now the same mistake is a loud assert pointing at
-// `session_stat_find` — resolve BY NAME on peers that didn't register.
-Stat_Col :: distinct u8
-
-MAX_STAT_COLS :: 16
-
-STAT_COL_INVALID :: Stat_Col(0) // the zero value: never a real column
-
-// Always declared, always fed by the session itself.
-STAT_PING :: Stat_Col(1)
+// ---- the stat registry: stats.odin -------------------------------------------
+// ---- backup hosting + succession: backup.odin --------------------------------
 
 // ---- entity factories --------------------------------------------------------
 //
@@ -466,7 +443,60 @@ default_net_fingerprint: u64
 // from 0, which means "use the generated default".
 FINGERPRINT_NONE :: u64(0xFFFFFFFFFFFFFFFF)
 
-Session :: struct {
+// Everything a game wires BEFORE *_start, surviving every re-init: transport,
+// factory, hooks, routes, config, tuning. The scope RULE, enforced by shape:
+// a field here is never touched by the run teardown; a field in Session_Run
+// dies wholesale at every re-init. New fields must pick a struct — there is
+// no third place to leak from (the profile-table leak was a field parked in
+// the wrong scope with a hand-maintained teardown list to forget it in).
+Session_Wiring :: struct {
+	send:      Send_Proc,
+	send_user: rawptr,
+	cfg:       Session_Config, // resolved into Session_Run at *_start
+
+	// entity factory + command hooks
+	factory_user:  rawptr,
+	factory_make:  Make_Entity_Proc,
+	factory_free:  Free_Entity_Proc,
+	game_user:     rawptr, // session_set_game's explicit override (nil = the factory user)
+	cmd_hook_user: rawptr,
+	cmd_hook:      Command_Hook, // host: the cross-entity half of commands (the catch-all)
+	type_hooks:    map[Entity_Type]Type_Hook_Entry, // host: per-type routing (wins over the catch-all)
+
+	// The write guard's extra exemption (session_set_guard_exempt): "this
+	// entity's delta-lane divergence is legal right now". kboot.boot_lane
+	// installs one that knows about the sim lane's in-flight verbs.
+	guard_exempt:      knet.Guard_Exempt_Proc,
+	guard_exempt_user: rawptr,
+
+	// pre-start wiring: the game's blob writer rides every backup
+	backup_blob_user: rawptr,
+	backup_blob:      Backup_Blob_Proc,
+
+	// app-message routes (kit/comms and friends)
+	app:   [MAX_APP_TAGS]App_Route,
+	app_w: knet.Writer, // scratch for session_app_begin/flush (reused per message)
+
+	// interest management (interest.odin) — off until session_set_interest
+	interest_r:    f32,
+	interest_hys:  f32,
+	interest_user: rawptr,
+	locator:       Locator_Proc,
+
+	// The profile table's WIRING half (profile.odin): the installed row size.
+	// The rows themselves are run state — session_init re-seeds prof.size
+	// from this after the wipe.
+	prof_size: int,
+
+	// our reconnect secret (the game persists it across runs; every *_start
+	// reassigns it, and a resumed host relies on it surviving the re-init)
+	token: u64,
+}
+
+// Everything one RUN creates. Reset is wholesale — run_destroy frees the owned
+// containers, then `s.run = {}` zeroes every field at once, so a new field
+// can never leak stale state across a rehost by being missed in a list.
+Session_Run :: struct {
 	is_host:   bool,
 	dedicated: bool, // this authority is a DEDICATED SERVER: its seat is
 	// infrastructure (see Player.dedicated) and succession never arms — a
@@ -475,14 +505,13 @@ Session :: struct {
 	me:        knet.Player_Id,
 	players:   map[knet.Player_Id]Player,
 	events:    [dynamic]Event,
-	send:      Send_Proc,
-	send_user: rawptr,
-	cfg:       Session_Config, // survives re-init; resolved fields below
 
 	// resolved from cfg at *_start (read these, not cfg, mid-run)
 	tick_hz:         int,
 	pending_max_age: u64, // ticks
 	join_timeout:    int, // ticks
+	interp_delay:    f64,
+	backup_every:    u64, // net ticks between backup refreshes (default 100 = 5s)
 
 	// the replicated world (kit/net): the session drives the per-tick walks
 	reg:          knet.Registry,
@@ -498,30 +527,19 @@ Session :: struct {
 	guard_logged: bool,
 	now:          f64, // the game's monotonic seconds, updated each session_tick
 	replicating:  bool, // host: the world is LIVE (deltas flow; joiners get SES_WORLD)
-	ran:          bool, // session_init completed at least once — gates the re-entrant teardown
-	interp_delay: f64,
 	later:        knet.Later, // session_present's queue — drained every session_tick
 
-	// entity types + client-side factories
-	types:         map[knet.Net_Id]Entity_Type, // host: for (re-)announcing spawns
-	unsent:        map[knet.Net_Id]u64, // host: spawn_make'd, spawn_send still owed (tick-stamped)
-	factory_user:  rawptr,
-	factory_make:  Make_Entity_Proc,
-
-	// The write guard's extra exemption (session_set_guard_exempt): "this
-	// entity's delta-lane divergence is legal right now". kboot.boot_lane
-	// installs one that knows about the sim lane's in-flight verbs.
-	guard_exempt:      knet.Guard_Exempt_Proc,
-	guard_exempt_user: rawptr,
+	// entity types
+	types:  map[knet.Net_Id]Entity_Type, // host: for (re-)announcing spawns
+	unsent: map[knet.Net_Id]u64, // host: spawn_make'd, spawn_send still owed (tick-stamped)
 
 	// The per-player PROFILE table (profile.odin): one POD row per seat,
-	// owner-authored, host-relayed. size survives re-init (pre-start wiring).
+	// owner-authored, host-relayed. Run state — a rehost must not relay a
+	// dead run's rows under recycled Player_Ids, and a surviving declare
+	// shadow would keep an unchanged client's row invisible to a NEW host.
+	// The ONE keeper is session_host_resume (keep_profiles): the heir's
+	// table IS the resumed lobby.
 	prof: Profile_Table,
-	factory_free:  Free_Entity_Proc,
-	game_user:     rawptr, // session_set_game's explicit override (nil = the factory user)
-	cmd_hook_user: rawptr,
-	cmd_hook:      Command_Hook, // host: the cross-entity half of commands (the catch-all)
-	type_hooks:    map[Entity_Type]Type_Hook_Entry, // host: per-type routing (wins over the catch-all)
 
 	// the stat registry (host accumulates; everyone reads)
 	stat_names:  [dynamic]string, // owned; index = column
@@ -530,13 +548,10 @@ Session :: struct {
 
 	// backup hosting (migration-readiness): the host periodically ships a
 	// complete re-hostable snapshot to the ELDEST connected client
-	backup_every:     u64, // net ticks between refreshes (default 100 = 5s)
-	backup_tick:      u64, // host: when the last one shipped
-	backup_target:    knet.Player_Id, // host: who holds it
-	backup:           []u8, // client: the latest payload (opaque; owned; split via session_backup_parts)
-	backup_at:        f64, // client: when it arrived (session now)
-	backup_blob_user: rawptr, // pre-start wiring: the game's blob writer rides every backup
-	backup_blob:      Backup_Blob_Proc,
+	backup_tick:   u64, // host: when the last one shipped
+	backup_target: knet.Player_Id, // host: who holds it
+	backup:        []u8, // client: the latest payload (opaque; owned; split via session_backup_parts)
+	backup_at:     f64, // client: when it arrived (session now)
 
 	// SUCCESSION (live migration): the host names the backup holder and how
 	// to reach them BEFORE dying; every peer holds the answer when the
@@ -544,10 +559,6 @@ Session :: struct {
 	succ_info:      []u8, // host: the game's transport rendezvous blob (owned)
 	successor:      knet.Player_Id, // client: who carries the torch
 	successor_info: []u8, // client: how to find them (owned; see session_successor)
-
-	// app-message routes (kit/comms and friends; survive re-init)
-	app:   [MAX_APP_TAGS]App_Route,
-	app_w: knet.Writer, // scratch for session_app_begin/flush (reused per message)
 
 	// host bookkeeping
 	next_player: knet.Player_Id,
@@ -557,97 +568,93 @@ Session :: struct {
 	locked:      bool, // host: new joins refused (rejoins still reclaim their seat)
 
 	// client bookkeeping
-	token:       u64, // our reconnect secret (the game persists it across runs)
 	spectate:    bool, // client: this seat joins to WATCH (session_client_start's flag; rides SES_JOIN)
 	name:        string, // owned; the name we asked for
 	joined:      bool, // WELCOME received
-	join_waited: int, // ticks since client_start without a WELCOME (-1 = not waiting)
+	join_waited: int, // ticks since client_start without a WELCOME (-1 = not waiting; session_init disarms)
 
-	// interest management (interest.odin) — off until session_set_interest
-	interest_r:    f32,
-	interest_hys:  f32,
-	interest_user: rawptr,
-	locator:       Locator_Proc,
-	focus:         map[knet.Player_Id][3]f32, // host: each peer's eyes (z = 0 for 2D games)
-	interest:      map[Interest_Key]bool, // host: (player, entity) pairs currently near
-	aoi_client:    bool, // client: the welcome said streams route via the host
+	// interest run state (interest.odin)
+	focus:      map[knet.Player_Id][3]f32, // host: each peer's eyes (z = 0 for 2D games)
+	interest:   map[Interest_Key]bool, // host: (player, entity) pairs currently near
+	aoi_client: bool, // client: the welcome said streams route via the host
 }
 
+Session :: struct {
+	using wiring: Session_Wiring,
+	using run:    Session_Run,
+	ran:          bool, // session_init completed at least once — gates the re-entrant teardown
+}
+
+// Free every owned container one run creates — the ONE list a new run-scoped
+// container field must join (a missed line leaks memory; it can never leak
+// stale STATE — `s.run = {}` wipes every field wholesale, listed or not).
+// Shared by session_init's re-entrant teardown and session_destroy.
 @(private = "file")
-session_init :: proc(s: ^Session) {
+run_destroy :: proc(run: ^Session_Run) {
+	knet.registry_destroy(&run.reg)
+	knet.command_ctx_destroy(&run.ctx)
+	for _, p in run.players {
+		delete(p.name)
+	}
+	delete(run.players)
+	delete(run.events)
+	delete(run.tokens)
+	delete(run.by_peer)
+	delete(run.denied)
+	delete(run.clocks)
+	delete(run.types)
+	delete(run.unsent)
+	for n in run.stat_names {
+		delete(n)
+	}
+	delete(run.stat_names)
+	delete(run.stats)
+	delete(run.focus)
+	delete(run.interest)
+	delete(run.backup)
+	delete(run.succ_info)
+	delete(run.successor_info)
+	delete(run.name)
+	prof_destroy(&run.prof)
+	knet.later_destroy(&run.later)
+}
+
+@(private) // backup.odin's session_host_resume re-inits through here too
+session_init :: proc(s: ^Session, keep_profiles := false) {
 	// RE-ENTRANT: host_start / client_start / host_resume may run on a
 	// session that already ran (back to lobby -> rehost, host after a failed
-	// join). Tear down the previous RUN's state — otherwise the old
-	// registry/ctx maps leak and stat_names grows a duplicate "ping" column
-	// that ships to every client — while preserving everything a game wires
-	// BEFORE start: transport, factory, hooks, app routes, interp tuning.
-	// Pending presentations are dropped even on a FIRST start: session_present
-	// can legally run before any *_start (a lobby flourish), and those queued
-	// against a zero clock must not fire into the new run.
+	// join). The previous RUN dies wholesale — run_destroy frees, `s.run = {}`
+	// zeroes — while everything a game wires BEFORE start (Session_Wiring:
+	// transport, factory, hooks, app routes, tuning) is untouchable by
+	// construction. Pending presentations are dropped even on a FIRST start:
+	// session_present can legally run before any *_start (a lobby flourish),
+	// and those queued against a zero clock must not fire into the new run.
 	knet.later_clear(&s.later)
-	// `ran` (not stat_names) gates the teardown: a FAILED host_resume leaves
-	// stat_names empty but the roster/tokens/registry partially populated —
-	// judging by a side effect would skip the teardown exactly then, leaking
-	// the dead run's players into the next one.
+	// `ran` (not a side effect like stat_names) gates the teardown: a FAILED
+	// host_resume leaves stat_names empty but the roster/tokens/registry
+	// partially populated — judging by a side effect would skip the teardown
+	// exactly then, leaking the dead run's players into the next one.
 	if s.ran {
-		knet.registry_destroy(&s.reg)
-		knet.command_ctx_destroy(&s.ctx)
-		for _, p in s.players {
-			delete(p.name)
+		// keep_profiles is session_host_resume's flag: the heir's table IS
+		// the resumed lobby (every peer holds the whole table — that's what
+		// makes succession free). Lift it out of the wipe, put it back
+		// dirty, so it re-relays at the next stats cadence instead of
+		// waiting on re-declares that would never come.
+		kept: Profile_Table
+		if keep_profiles {
+			kept = s.prof
+			s.prof = {}
 		}
-		clear(&s.players)
-		clear(&s.events)
-		clear(&s.tokens)
-		clear(&s.by_peer)
-		clear(&s.denied)
-		s.locked = false
-		clear(&s.clocks)
-		clear(&s.types)
-		clear(&s.unsent)
-		for n in s.stat_names {
-			delete(n)
+		run_destroy(&s.run)
+		s.run = {}
+		if keep_profiles {
+			s.prof = kept
+			s.prof.dirty = true
 		}
-		clear(&s.stat_names)
-		clear(&s.stats)
-		clear(&s.focus)
-		clear(&s.interest)
-		s.aoi_client = false
-		delete(s.backup)
-		s.backup = nil
-		delete(s.succ_info)
-		s.succ_info = nil
-		delete(s.successor_info)
-		s.successor_info = nil
-		s.successor = {}
-		delete(s.name)
-		s.name = ""
-		s.is_host = false
-		s.dedicated = false
-		s.joined = false
-		s.replicating = false
-		s.stats_dirty = false
-		s.pongs = 0
-		s.malformed = 0
-		s.guard_hits = 0
-		s.guard_logged = false
-		s.next_player = {}
-		s.backup_tick = 0
-		s.backup_target = {}
-		s.backup_at = 0
-		// The profile table is RUN state: a rehost must not relay a dead run's
-		// rows under recycled Player_Ids, and a surviving declare shadow would
-		// keep an unchanged client's row invisible to a NEW host (prof_tick
-		// diffs against it). `size` survives — the install is pre-start wiring
-		// like the factory. The ONE keeper is session_host_resume: the heir's
-		// table IS the resumed lobby, and it swaps its rows around this init.
-		for _, row in s.prof.rows {
-			delete(row)
-		}
-		clear(&s.prof.rows)
-		delete(s.prof.shadow)
-		s.prof.shadow = nil
-		s.prof.dirty = false
 	}
+	// Non-zero ground state the wholesale wipe can't express:
+	s.join_waited = -1 // the join-timeout clock is DISARMED (0 would be armed-at-tick-0)
+	s.prof.size = s.prof_size // re-seed the wiring half of the profile table
 	// Resolve the config (zero fields = defaults). Durations are configured in
 	// seconds and baked to tick counts HERE, against the configured rate.
 	s.tick_hz = s.cfg.tick_hz > 0 ? s.cfg.tick_hz : knet.DEFAULT_TICK_HZ
@@ -692,33 +699,10 @@ token_hash :: proc(token: u64) -> u64 {
 }
 
 session_destroy :: proc(s: ^Session) {
-	for _, p in s.players {
-		delete(p.name)
-	}
-	delete(s.players)
-	delete(s.events)
-	delete(s.tokens)
-	delete(s.focus)
-	delete(s.interest)
+	run_destroy(&s.run)
+	// The wiring's own two containers (everything else there is procs,
+	// pointers, and plain values):
 	delete(s.type_hooks)
-	delete(s.by_peer)
-	delete(s.denied)
-	delete(s.name)
-	knet.registry_destroy(&s.reg)
-	knet.command_ctx_destroy(&s.ctx)
-	delete(s.clocks)
-	delete(s.types)
-	delete(s.unsent)
-	for n in s.stat_names {
-		delete(n)
-	}
-	delete(s.stat_names)
-	prof_destroy(&s.prof)
-	delete(s.stats)
-	delete(s.backup)
-	delete(s.succ_info)
-	delete(s.successor_info)
-	knet.later_destroy(&s.later)
 	knet.writer_destroy(&s.app_w)
 	s^ = {}
 }
@@ -806,79 +790,6 @@ session_set_transport :: proc(s: ^Session, user: rawptr, send: Send_Proc) {
 session_set_guard_exempt :: proc(s: ^Session, user: rawptr, exempt: knet.Guard_Exempt_Proc) {
 	s.guard_exempt = exempt
 	s.guard_exempt_user = user
-}
-
-// ---- stats: declare / mutate (host) / read (anyone) ---------------------------
-
-// Host: declare (or find) a named column. Idempotent by name — safe to call
-// from ready() on every run. Clients get columns from the wire.
-session_stat_column :: proc(s: ^Session, name: string) -> Stat_Col {
-	assert(s.is_host, "the authority declares stat columns; clients receive them")
-	if col, ok := session_stat_find(s, name); ok {
-		return col
-	}
-	assert(len(s.stat_names) < MAX_STAT_COLS, "too many stat columns")
-	append(&s.stat_names, strings.clone(name))
-	s.stats_dirty = true
-	return Stat_Col(len(s.stat_names)) // 1-based handle (index + 1)
-}
-
-// Look a column up by name — how clients resolve what the scoreboard shows.
-session_stat_find :: proc(s: ^Session, name: string) -> (Stat_Col, bool) {
-	for n, i in s.stat_names {
-		if n == name {
-			return Stat_Col(i + 1), true
-		}
-	}
-	return STAT_COL_INVALID, false
-}
-
-// Handle -> row index, with THE trap turned into a message: a zero-value
-// Stat_Col is a column that was registered on another peer (or never).
-@(private = "file")
-stat_idx :: proc(col: Stat_Col) -> int {
-	assert(
-		col != STAT_COL_INVALID,
-		"zero-value Stat_Col — session_stat_column registers on the HOST; on a peer that didn't register, resolve by name with session_stat_find (cheap — do it per read)",
-	)
-	return int(col) - 1
-}
-
-session_stat_names :: proc(s: ^Session) -> []string {
-	return s.stat_names[:]
-}
-
-// NOTE: all row reads use the comma-ok form — a plain missing-key index of a
-// map with a large value type faults in the current compiler (found by the
-// acid test's crash reporter; a missing player must read as an all-zero row).
-session_stat_set :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col, value: i64) {
-	assert(s.is_host, "stats are host-accumulated")
-	idx := stat_idx(col)
-	row, _ := s.stats[player]
-	if row[idx] == value {
-		return
-	}
-	row[idx] = value
-	s.stats[player] = row
-	s.stats_dirty = true
-}
-
-session_stat_add :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col, delta: i64) {
-	assert(s.is_host, "stats are host-accumulated")
-	idx := stat_idx(col)
-	row, _ := s.stats[player]
-	row[idx] += delta
-	s.stats[player] = row
-	s.stats_dirty = true
-}
-
-session_stat :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col) -> i64 {
-	idx := stat_idx(col)
-	row, ok := s.stats[player]
-	if !ok {
-		return 0
-	}
-	return row[idx]
 }
 
 // Install the client-side entity factory (do it before joining). The factory's
@@ -1001,8 +912,7 @@ session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet
 session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_ID_INVALID) -> (entity: rawptr, id: knet.Net_Id) {
 	assert(s.is_host, "only the authority spawns; clients create via the factory")
 	assert(s.factory_make != nil, "session_spawn_make needs session_set_factory")
-	id = s.reg.next_id
-	s.reg.next_id += 1
+	id = knet.registry_alloc_id(&s.reg)
 	set: ^knet.Command_Set
 	entity, set = s.factory_make(s.factory_user, type, id, owner)
 	assert(entity != nil, "the factory returned nil for a host-side spawn")
@@ -1151,7 +1061,7 @@ session_blob :: proc(s: ^Session, id: knet.Net_Id) -> []u8 {
 session_despawn :: proc(s: ^Session, id: knet.Net_Id) {
 	assert(s.is_host)
 	entity: rawptr
-	if e, ok := s.reg.entries[id]; ok {
+	if e, ok := knet.registry_get(&s.reg, id); ok {
 		entity = e.entity
 	}
 	if !knet.registry_remove(&s.reg, id) {
@@ -1224,7 +1134,7 @@ send_world :: proc(s: ^Session, peer: Peer_Id) {
 // Client: one incoming spawn tuple — factory-create (or reconcile onto an
 // entity we already have: a same-session rejoin re-receives the world), apply
 // the snapshot, event. Unknown types skip by length.
-@(private = "file")
+@(private) // backup.odin's session_host_resume replays these too
 apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 	type := Entity_Type(knet.read_u16(r))
 	id := knet.read_net_id(r)
@@ -1483,27 +1393,8 @@ net_tick :: proc(s: ^Session) {
 			s.prof.dirty = false
 			prof_send(s)
 		}
-		// Backup hosting: keep the ELDEST connected client holding a fresh
-		// re-hostable snapshot — refreshed on the interval, and immediately
-		// when the target changes (first client seats, old target leaves).
-		// Never on a DEDICATED server: migration is the peer model's answer
-		// to a host who is also a player leaving; a server just restarts.
-		if s.replicating && !s.dedicated {
-			target := backup_target(s)
-			if target != knet.PLAYER_ID_INVALID &&
-			   (target != s.backup_target || t - s.backup_tick >= s.backup_every) {
-				if target != s.backup_target {
-					// The torch-bearer changed: tell the game (it computes
-					// the rendezvous info) — the successor broadcast follows
-					// from session_set_successor_info.
-					append(&s.events, Ev_Backup_Target{player = target})
-				}
-				s.backup_target = target
-				s.backup_tick = t
-				p, _ := s.players[target]
-				send_backup(s, p.peer)
-			}
-		}
+		// Backup hosting (backup.odin): target election + snapshot refresh.
+		backup_slot(s, t)
 	}
 
 	// The profile auto-declare (profile.odin), every role: my row's changes
@@ -1558,301 +1449,6 @@ session_world_time :: proc(s: ^Session) -> f64 {
 	return knet.clock_remote_now(&c, s.now)
 }
 
-// The eldest connected client (lowest Player_Id) — deterministic, stable
-// across everything except that player leaving.
-@(private = "file")
-backup_target :: proc(s: ^Session) -> knet.Player_Id {
-	best := knet.PLAYER_ID_INVALID
-	for _, p in s.players {
-		if !p.connected || p.id == s.me || p.spectator {
-			continue // a watcher can never hold the torch
-		}
-		if best == knet.PLAYER_ID_INVALID || p.id < best {
-			best = p.id
-		}
-	}
-	return best
-}
-
-// The re-hostable snapshot: everything needed to BECOME the host of this
-// run — identity table (hashed tokens), roster names, allocation cursors,
-// the stat registry, and every entity as a spawn tuple. session_host_resume
-// parses it. Two consumers: the backup-host wire (below) and kit/save, which
-// wraps it in a versioned file envelope — saving a run and surviving a dead
-// host are the SAME contract.
-//
-// Layout: [next_player u64]
-//         [cols u8] x [name string]
-//         [players u16] x ([id u64][name string][token_hash u64][cols x i64])
-//         [locked bool][denied u16] x ([token_hash u64][id u64])
-//         [next_net_id u32]
-//         [entities u16] x the SES_SPAWN tuple
-session_snapshot :: proc(s: ^Session, w: ^knet.Writer) {
-	assert(s.is_host, "the authority owns the truth being snapshotted")
-	knet.write_u64(w, u64(s.next_player))
-	knet.write_u8(w, u8(len(s.stat_names)))
-	for n in s.stat_names {
-		knet.write_string(w, n)
-	}
-	assert(len(s.players) <= int(max(u16)))
-	knet.write_u16(w, u16(len(s.players)))
-	for _, p in s.players {
-		knet.write_player_id(w, p.id)
-		knet.write_string(w, p.name)
-		hash := u64(0)
-		for h, id in s.tokens {
-			if id == p.id {
-				hash = h
-			}
-		}
-		knet.write_u64(w, hash) // 0 for the host itself (hosts never JOINed)
-		row, _ := s.stats[p.id]
-		for i in 0 ..< len(s.stat_names) {
-			knet.write_i64(w, row[i])
-		}
-	}
-	// The DOOR travels with the roster: a ban outlives the host that issued
-	// it and a locked room stays locked through a takeover — otherwise the
-	// kicked-with-ban player just waits for the migration and walks back in.
-	knet.write_bool(w, s.locked)
-	assert(len(s.denied) <= int(max(u16)))
-	knet.write_u16(w, u16(len(s.denied)))
-	for h, id in s.denied {
-		knet.write_u64(w, h)
-		knet.write_player_id(w, id)
-	}
-	knet.write_u32(w, u32(s.reg.next_id))
-	assert(knet.registry_count(&s.reg) <= int(max(u16)))
-	knet.write_u16(w, u16(knet.registry_count(&s.reg)))
-	for id in s.types {
-		write_spawn_tuple(s, w, id)
-	}
-}
-
-// Host-side state the SESSION cannot know about — wave directors, AI
-// clocks, quest flags — written into every backup so a would-be new host
-// resumes the CAMPAIGN, not just the roster and entities (the same split
-// kit/save's envelope makes; write the same bytes in both).
-Backup_Blob_Proc :: proc(user: rawptr, w: ^knet.Writer)
-
-// Install the game-blob writer for backups (pre-start wiring; survives
-// *_start like the rest). Without one, backups carry an empty blob and a
-// takeover restores the world but not the campaign around it.
-session_set_backup_blob :: proc(s: ^Session, user: rawptr, write: Backup_Blob_Proc) {
-	s.backup_blob_user = user
-	s.backup_blob = write
-}
-
-// Split a received backup payload into the game's blob and the re-hostable
-// session snapshot (what session_host_resume eats). ok=false when no backup
-// has arrived (we were never the designated holder) or it is malformed.
-// Returns COPIES (temp-allocated by default) on purpose: the resume you are
-// about to run RE-INITS the session, which frees the stored payload —
-// slices into it would dangle exactly when you need them.
-session_backup_parts :: proc(s: ^Session, allocator := context.temp_allocator) -> (game_blob: []u8, snapshot: []u8, ok: bool) {
-	if len(s.backup) < 4 {
-		return nil, nil, false
-	}
-	r := knet.reader_make(s.backup)
-	n := int(knet.read_u32(&r))
-	if r.err || n < 0 || r.off + n > len(s.backup) { // <0: 32-bit wrap on hostile lengths
-		return nil, nil, false
-	}
-	game_blob = make([]u8, n, allocator)
-	copy(game_blob, s.backup[r.off:r.off + n])
-	snapshot = make([]u8, len(s.backup) - r.off - n, allocator)
-	copy(snapshot, s.backup[r.off + n:])
-	return game_blob, snapshot, true
-}
-
-// Host: how peers find the successor if you die — an opaque transport blob
-// (address:port for ENet, a lobby id for Steam, a room code for WebRTC).
-// Call from Ev_Backup_Target (the session names WHO; the transport layer
-// knows WHERE); broadcast immediately and to every later joiner. With no
-// info set, host loss stays v1-shaped: Ev_Host_Left, run over, no auto arc.
-session_set_successor_info :: proc(s: ^Session, info: []u8) {
-	assert(s.is_host)
-	delete(s.succ_info)
-	s.succ_info = make([]u8, len(info))
-	copy(s.succ_info, info)
-	send_successor(s, BROADCAST_PEER)
-}
-
-// Who carries the torch, and the rendezvous blob. Answers on BOTH roles:
-// a client reads what the wire delivered; the HOST reads what it authored
-// (it wrote the torch — an empty answer to its own question was a wart the
-// backup_target words halves fell into).
-session_successor :: proc(s: ^Session) -> (knet.Player_Id, []u8) {
-	if s.is_host {
-		return s.backup_target, s.succ_info
-	}
-	return s.successor, s.successor_info
-}
-
-@(private = "file")
-send_successor :: proc(s: ^Session, to: Peer_Id) {
-	if len(s.succ_info) == 0 {
-		return
-	}
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	knet.write_u8(&w, SES_SUCCESSOR)
-	knet.write_player_id(&w, s.backup_target)
-	knet.write_bytes(&w, s.succ_info)
-	if to == BROADCAST_PEER {
-		broadcast(s, knet.writer_bytes(&w), .Reliable)
-	} else {
-		s.send(s.send_user, to, knet.writer_bytes(&w), .Reliable)
-	}
-}
-
-@(private = "file")
-send_backup :: proc(s: ^Session, peer: Peer_Id) {
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	knet.write_u8(&w, SES_BACKUP)
-	// [blob_len u32][game blob][session snapshot] — parts split it back out.
-	blob := knet.writer_make()
-	defer knet.writer_destroy(&blob)
-	if s.backup_blob != nil {
-		s.backup_blob(s.backup_blob_user, &blob)
-	}
-	knet.write_u32(&w, u32(len(knet.writer_bytes(&blob))))
-	append(&w.buf, ..knet.writer_bytes(&blob))
-	session_snapshot(s, &w)
-	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
-}
-
-// Become the host of a run someone else was hosting, from a backup blob this
-// session (or a previous run's session) received as the designated backup.
-// Call on a FRESH session with the factory already installed; `me` is the
-// caller's own Player_Id from the dead run. Every other player comes back
-// disconnected — they rejoin with their tokens and reclaim ids, stats, and
-// owned entities exactly like any reconnect. That includes the dead HOST,
-// if it started with a token (session_host_start's `token` param); without
-// one it returns as a NEW player.
-// Returns false on a corrupt blob (destroy the session and start clean).
-session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backup: []u8) -> bool {
-	assert(s.factory_make != nil, "resume recreates entities through the factory — install it first")
-	// The heir carries every player's profile row into the resumed run (each
-	// peer holds the whole table — that's what makes succession free). Swap
-	// the table out of session_init's run-teardown reach and put it back;
-	// dirty re-relays it at the next stats cadence so nobody waits on a
-	// re-declare that would never come.
-	kept_prof := s.prof
-	s.prof = Profile_Table{size = kept_prof.size}
-	session_init(s)
-	prof_destroy(&s.prof)
-	s.prof = kept_prof
-	s.prof.dirty = true
-	s.is_host = true
-	s.ctx.is_authority = true
-	s.me = me
-	s.ctx.me = me
-	s.joined = true
-
-	r := knet.reader_make(backup)
-	s.next_player = knet.Player_Id(knet.read_u64(&r))
-	cols := int(knet.read_u8(&r))
-	if r.err || cols == 0 || cols > MAX_STAT_COLS { // 0: even a fresh run has "ping"
-		return false
-	}
-	for n in s.stat_names { // replace the init-time default schema wholesale
-		delete(n)
-	}
-	clear(&s.stat_names)
-	for _ in 0 ..< cols {
-		append(&s.stat_names, strings.clone(knet.read_string(&r)))
-	}
-	players := int(knet.read_u16(&r))
-	if r.err {
-		return false
-	}
-	for _ in 0 ..< players {
-		id := knet.read_player_id(&r)
-		pname := knet.read_string(&r)
-		hash := knet.read_u64(&r)
-		row: [MAX_STAT_COLS]i64
-		for i in 0 ..< cols {
-			row[i] = knet.read_i64(&r)
-		}
-		if r.err {
-			return false
-		}
-		mine := id == me
-		s.players[id] = Player {
-			id        = id,
-			name      = strings.clone(mine ? name : pname),
-			peer      = mine ? HOST_PEER : NO_PEER,
-			connected = mine,
-		}
-		if hash != 0 {
-			s.tokens[hash] = id
-		}
-		s.stats[id] = row
-	}
-	// The door: bans + the lock survive the takeover (written by
-	// session_snapshot right after the roster).
-	s.locked = knet.read_bool(&r)
-	nden := int(knet.read_u16(&r))
-	if r.err {
-		return false
-	}
-	for _ in 0 ..< nden {
-		h := knet.read_u64(&r)
-		s.denied[h] = knet.read_player_id(&r)
-	}
-	next_net := knet.Net_Id(knet.read_u32(&r))
-	entities := int(knet.read_u16(&r))
-	if r.err {
-		return false
-	}
-	for _ in 0 ..< entities {
-		apply_spawn_tuple(s, &r)
-		if r.err {
-			return false
-		}
-	}
-	s.reg.next_id = max(s.reg.next_id, next_net)
-	knet.registry_commit_shadows(&s.reg)
-	s.replicating = true // the world is live: rejoiners get SES_WORLD + stats
-	s.stats_dirty = true
-	return true
-}
-
-// Full stat snapshot: schema + every player's row. Small (16 cols x 8 players
-// ≈ 1KB) and rare (~2 Hz when dirty) — no delta machinery to get wrong.
-@(private = "file")
-send_stats :: proc(s: ^Session, to_peer := BROADCAST_PEER) {
-	w := knet.writer_make()
-	defer knet.writer_destroy(&w)
-	knet.write_u8(&w, SES_STATS)
-	knet.write_u8(&w, u8(len(s.stat_names)))
-	for n in s.stat_names {
-		knet.write_string(&w, n)
-	}
-	assert(len(s.players) <= int(max(u16)))
-	knet.write_u16(&w, u16(len(s.players)))
-	for _, p in s.players {
-		knet.write_player_id(&w, p.id)
-		row, _ := s.stats[p.id]
-		for i in 0 ..< len(s.stat_names) {
-			knet.write_i64(&w, row[i])
-		}
-	}
-	if to_peer == BROADCAST_PEER {
-		broadcast(s, knet.writer_bytes(&w), .Reliable)
-		// The host is a reader of the scoreboard too, and it never hears its
-		// own broadcast — without this, a game that repaints only on
-		// Ev_Stats_Updated ships a board that is permanently empty on the
-		// host's screen (both games independently discovered the workaround
-		// of refreshing at show time; now the event fires everywhere).
-		append(&s.events, Ev_Stats_Updated{})
-	} else {
-		s.send(s.send_user, to_peer, knet.writer_bytes(&w), .Reliable)
-	}
-}
-
 // Drain one queued event (call until ok=false each frame).
 session_poll :: proc(s: ^Session) -> (ev: Event, ok: bool) {
 	if len(s.events) == 0 {
@@ -1898,7 +1494,7 @@ session_roster :: proc(s: ^Session, allocator := context.temp_allocator) -> []Pl
 // Which player owns an entity (PLAYER_ID_INVALID = the host/world) — saves
 // games keeping their own reverse maps.
 session_owner_of :: proc(s: ^Session, id: knet.Net_Id) -> knet.Player_Id {
-	if e, ok := s.reg.entries[id]; ok {
+	if e, ok := knet.registry_get(&s.reg, id); ok {
 		return e.owner
 	}
 	return knet.PLAYER_ID_INVALID
@@ -2048,6 +1644,11 @@ mark_left :: proc(s: ^Session, id: knet.Player_Id) {
 	// old window only mis-drops their first post-rejoin commands as "stale"
 	// — and an unpruned map otherwise grows with every seat ever used.
 	delete_key(&s.ctx.dedup, u64(id))
+	// Their interest footprint too — the focus row and every (player, entity)
+	// near-pair. A rejoin re-declares focus and re-earns its pairs on the next
+	// interest tick (the welcome world already re-seeds everything visible);
+	// left in place they only keep the locator scanning for absent eyes.
+	interest_forget_player(s, id)
 	append(&s.events, Ev_Player_Left{id = id})
 }
 
@@ -2453,15 +2054,7 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		if s.is_host || !s.joined {
 			return
 		}
-		succ := knet.read_player_id(r)
-		info := knet.read_bytes(r)
-		if r.err {
-			return
-		}
-		s.successor = succ
-		delete(s.successor_info)
-		s.successor_info = make([]u8, len(info))
-		copy(s.successor_info, info)
+		successor_recv(s, r)
 	case SES_SETOWNER:
 		if s.is_host || !s.joined {
 			return
@@ -2510,14 +2103,7 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		if s.is_host || !s.joined {
 			return
 		}
-		// We are the designated backup host: keep the blob, opaque, replacing
-		// any older one. Parsing happens only if we ever resume.
-		blob := r.data[r.off:]
-		delete(s.backup)
-		s.backup = make([]u8, len(blob))
-		copy(s.backup, blob)
-		s.backup_at = s.now
-		append(&s.events, Ev_Backup_Received{size = len(blob)})
+		backup_recv(s, r)
 	case SES_DECLARE:
 		// A player's profile row (profile.odin) — host only, seated only
 		// (the same trust gate as commands: a peer that never JOINed is nobody).
@@ -2538,38 +2124,7 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		if s.is_host || !s.joined {
 			return
 		}
-		cols := int(knet.read_u8(r))
-		if r.err || cols > MAX_STAT_COLS {
-			return
-		}
-		// Schema first (the host may declare columns mid-run): rebuild ours.
-		names: [MAX_STAT_COLS]string
-		for i in 0 ..< cols {
-			names[i] = knet.read_string(r)
-		}
-		players := int(knet.read_u16(r))
-		if r.err {
-			return
-		}
-		for n in s.stat_names {
-			delete(n)
-		}
-		clear(&s.stat_names)
-		for i in 0 ..< cols {
-			append(&s.stat_names, strings.clone(names[i]))
-		}
-		for _ in 0 ..< players {
-			id := knet.read_player_id(r)
-			row: [MAX_STAT_COLS]i64
-			for i in 0 ..< cols {
-				row[i] = knet.read_i64(r)
-			}
-			if r.err {
-				return
-			}
-			s.stats[id] = row
-		}
-		append(&s.events, Ev_Stats_Updated{})
+		stats_recv(s, r)
 	case SES_STATE:
 		if s.is_host || !s.joined {
 			return

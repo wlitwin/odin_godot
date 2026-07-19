@@ -65,7 +65,7 @@ hit :: proc "contextless" (hp: ^i32, amount: i32) -> (died: bool) {
 
 Ability_Def :: struct {
 	name:     string, // for ability bars / logs; kit/combat never allocates it
-	cooldown: u16, // net ticks
+	cooldown: u16, // ticks of whichever loop calls cd_decay (net ticks on coop, sim ticks on a lane)
 	cost:     i32, // spent from whatever resource the game passes in
 }
 

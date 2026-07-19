@@ -38,7 +38,9 @@ import ksess "godot:kit/session"
 
 // The high bit of a Net_Id marks a client-local provisional spawn — the
 // authority's ids increment from 1 and never reach here (2^31 entities).
-PROVISIONAL_BIT :: u32(0x8000_0000)
+// The bit is knet's: it carves Net_Id's value space, so the constant and the
+// registry-side refusal live beside the type (kit/net/net.odin).
+PROVISIONAL_BIT :: knet.PROVISIONAL_BIT
 
 // How long an unmatched provisional rides before it is swept as a lost fire:
 // the lane's ring depth (l.slots) — comfortably past a bad round trip, and

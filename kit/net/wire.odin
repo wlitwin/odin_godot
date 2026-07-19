@@ -206,6 +206,21 @@ reader_remaining :: proc(r: ^Reader) -> []u8 {
 	return r.data[r.off:]
 }
 
+// A bounds-checked n-byte view into the payload, zero-copy, advancing the
+// reader — the [len][bytes] tail every batch row ships. Owns the sticky-error
+// check once: every hand-rolled version of this must independently remember
+// the `r.err ||` half, and one forgot before this existed. nil on truncation
+// (r.err set), like every other read past the end.
+reader_view :: proc(r: ^Reader, n: int) -> []u8 {
+	if r.err || n < 0 || r.off + n > len(r.data) {
+		r.err = true
+		return nil
+	}
+	view := r.data[r.off:r.off + n]
+	r.off += n
+	return view
+}
+
 // ---------------------------------------------------------------------------
 // write_pod / read_pod — a whole POD value as its raw little-endian bytes. The
 // primitive under generated `gd:"backup"` codecs, and the house idiom for any

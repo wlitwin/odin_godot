@@ -851,6 +851,48 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 		first := pt.params.list[0]
 		if node_text(src, first.type) != self_type {continue}
 
+		// PRIMARY-attribute exclusivity, checked before the dispatch chain
+		// below: that chain takes the FIRST matching attribute and stops, so
+		// a second primary would be silently inert — @(gd_tick) riding a
+		// @(gd_command) parsed as just a command, its tick never scheduled.
+		// The paired halves already refuse double claims (one owner per
+		// name); primaries follow the same rule.
+		kit_primaries := [?]string{"gd_command", "gd_tick", "gd_sample", "gd_step"}
+		worn_count := 0
+		worn: [2]string
+		for a in kit_primaries {
+			if has_attr(vd, a) {
+				if worn_count < 2 {worn[worn_count] = a}
+				worn_count += 1
+			}
+		}
+		if worn_count > 1 {
+			error_at(
+				Loc{path, name_ident.pos.line},
+				"%s: proc %q wears @(%s) AND @(%s) — primaries are mutually exclusive (the first wins, the second silently never fires); split the proc or drop one",
+				s.struct_name, proc_name, worn[0], worn[1],
+			)
+		}
+		if worn_count == 1 {
+			if has_attr(vd, "gd_method") || has_attr(vd, "gd_rpc") || has_attr(vd, "gd_connect") {
+				error_at(
+					Loc{path, name_ident.pos.line},
+					"%s: proc %q wears @(%s) plus a Godot-method attribute — kit verbs/ticks never join the method tables (the method half would silently never register); use two procs",
+					s.struct_name, proc_name, worn[0],
+				)
+			}
+			// The primary would also outrank a lifecycle NAME (the dispatch
+			// continues before names are read) — the hook would silently
+			// never run as one.
+			if kw, is_lc := lifecycle_keyword(strip_struct_prefix(proc_name, s.struct_name)); is_lc {
+				error_at(
+					Loc{path, name_ident.pos.line},
+					"%s: proc %q is named like the `%s` lifecycle hook but wears @(%s) — the attribute wins and the hook would silently never run; rename the proc or split it",
+					s.struct_name, proc_name, kw, worn[0],
+				)
+			}
+		}
+
 		// `@(gd_command[="predict"])` — a friendslop-toolkit command (kit/net command
 		// loop). NOT a Godot-callable method: it is issued from Odin code via the
 		// generated `<proc>_cmd` wrapper, so it never joins the method tables. Checked
@@ -890,6 +932,17 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 		stripped := strip_struct_prefix(proc_name, s.struct_name)
 
 		if kw, is_lc := lifecycle_keyword(stripped); is_lc {
+			// Lifecycle hooks are matched by NAME and never join the method
+			// tables — @(gd_connect) riding one would silently never connect
+			// (the auto-wire targets a REGISTERED method). Refuse here; the
+			// same check below only sees procs that fall past this branch.
+			if _, has_conn := attr_value(vd, "gd_connect"); has_conn {
+				error_at(
+					Loc{path, name_ident.pos.line},
+					"%s: proc %q is the `%s` lifecycle hook — @(gd_connect) on it silently never connects (the auto-wire targets a registered method); move the connection to a separate @(gd_method) proc",
+					s.struct_name, proc_name, kw,
+				)
+			}
 			has_delta := count_params(pt) >= 2
 			append(&s.lifecycles, Lifecycle_Info{keyword = kw, proc_name = proc_name, has_delta = has_delta})
 			continue
@@ -3429,6 +3482,21 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 					"%s.%s: `profile=` declares on the class's OWN ksess.Session field — nested in an embed it silently never installs; move the declaration to the top level",
 					s.struct_name, join_path(fpath),
 				)
+			}
+			// `entity=` (a spec riding the export tag) is a WIRE declaration —
+			// factory row, stable type id, fingerprint input — and the entity
+			// scan walks only the class's own fields: nested in an embed the
+			// EXPORT registers fine while the factory row silently never
+			// exists, so the entity never spawns over the wire (the recorded
+			// gun-that-never-replicated class through a different door).
+			for spec in specs {
+				if strings.has_prefix(strings.trim_space(spec), "entity=") {
+					error_at(
+						fld.loc,
+						"%s.%s: `entity=` declares on the class's OWN scene field — nested in an embed the export registers but the factory/type row silently never exists; move the field to the top level",
+						s.struct_name, join_path(fpath),
+					)
+				}
 			}
 			// export/onready (and any unknown tag) are the runtime reflection walk's to
 			// register and validate — scriptgen owns only `replicate`/`backup` through nesting.

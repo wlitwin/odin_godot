@@ -182,27 +182,13 @@ interest_send_state :: proc(s: ^Session, changed: ^[dynamic]knet.Net_Id) -> int 
 // outgoing batch and to forward a client owner's batch (exclude the origin).
 @(private)
 interest_route_streams :: proc(s: ^Session, raw: []u8, exclude: Peer_Id) {
-	r := knet.reader_make(raw)
-	sender_now := knet.read_f64(&r)
-	count := int(knet.read_u16(&r))
-	if r.err {
-		return
-	}
-	Seg :: struct {
-		id:       knet.Net_Id,
-		from, to: int,
-	}
-	segs := make([dynamic]Seg, 0, count, context.temp_allocator)
-	for _ in 0 ..< count {
-		start := r.off
-		id := knet.read_net_id(&r)
-		_ = knet.read_u8(&r) // warp
-		n := int(knet.read_u16(&r))
-		if r.err || n < 0 || r.off + n > len(raw) {
-			return // torn batch: forward nothing (the next tick supersedes)
-		}
-		r.off += n
-		append(&segs, Seg{id = id, from = start, to = r.off})
+	// The registry owns the batch layout end to end — this routing only ever
+	// sees opaque per-entity ranges to copy, so a wire change there can never
+	// silently mis-split here.
+	segs := make([dynamic]knet.Delta_Seg, 0, 16, context.temp_allocator)
+	sender_now, ok := knet.registry_collect_stream_segs(raw, &segs)
+	if !ok {
+		return // torn batch: forward nothing (the next tick supersedes)
 	}
 	for pid, p in s.players {
 		if !p.connected || pid == s.me || p.peer == exclude {
@@ -224,8 +210,8 @@ interest_route_streams :: proc(s: ^Session, raw: []u8, exclude: Peer_Id) {
 		if n == 0 {
 			continue
 		}
-		w.buf[count_at] = u8(n)
-		w.buf[count_at + 1] = u8(n >> 8)
+		assert(n <= int(max(u16)))
+		knet.writer_patch_u16(&w, count_at, u16(n))
 		s.send(s.send_user, p.peer, knet.writer_bytes(&w), .Stream)
 	}
 }

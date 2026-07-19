@@ -52,7 +52,7 @@ Replay :: struct {
 
 Album :: struct {
 	x:       Xfer,
-	blobs:   map[u32][]u8, // key_of(player, id) -> the latest bytes, owned
+	blobs:   map[Xfer_Key][]u8, // (player, id) -> the latest bytes, owned
 	fresh:   [dynamic]Fresh,
 	replays: [dynamic]Replay,
 }
@@ -142,12 +142,10 @@ album_welcome :: proc(a: ^Album, player: knet.Player_Id) {
 		return
 	}
 	for k, bytes in a.blobs {
-		from := knet.Player_Id(k >> 8)
-		id := u8(k & 0xFF)
-		if from == player {
+		if k.from == player {
 			continue
 		}
-		queue_replay(a, p.peer, from, id, bytes)
+		queue_replay(a, p.peer, k.from, k.id, bytes)
 	}
 }
 

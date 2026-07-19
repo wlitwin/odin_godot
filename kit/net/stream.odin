@@ -83,6 +83,11 @@ stream_write :: proc(w: ^Writer, entity: rawptr, desc: ^Entity_Desc) {
 // ---------------------------------------------------------------------------
 // Receiver side: a fixed ring of timestamped snapshots per remote-owned entity.
 
+// Samples kept per ring — at the 20Hz default that's 800ms of history, wide
+// enough that the delayed sample point (~2 send intervals back) almost always
+// finds a bracketing pair even through jitter and a dropped packet or two.
+INTERP_CAP :: 16
+
 Stream_Ring :: struct {
 	times: [INTERP_CAP]f64,
 	blobs: [INTERP_CAP][]u8, // each stream_data_size bytes, allocated on first use
@@ -157,8 +162,8 @@ stream_ring_flush_newest :: proc(ring: ^Stream_Ring, entity: rawptr, desc: ^Enti
 }
 
 // Push one snapshot (copied). Stale arrivals — at or before the newest sample's
-// stamp — are dropped, mirroring interp_push (the unreliable-ORDERED channel
-// already discards reordered packets; this is the belt to those suspenders).
+// stamp — are dropped (the unreliable-ORDERED channel already discards
+// reordered packets; this is the belt to those suspenders).
 //
 // A NEWER WARP COUNTER FLUSHES THE RING: a warp is the owner declaring a CUT
 // (teleport, respawn, level change), and the buffered pre-warp samples are a
@@ -293,8 +298,8 @@ quat_nlerp :: proc(dst, a, b: [^]f32, alpha: f32) {
 
 // Sample the ring's timeline at `t` and write the result into the entity's
 // streamed fields. ok=false only on an empty ring (entity keeps its last/spawn
-// values). Same clamp discipline as interp_sample: before the oldest sample →
-// oldest; past the newest → newest, held (never extrapolate).
+// values). The clamp discipline: before the oldest sample → oldest; past the
+// newest → newest, held (never extrapolate).
 stream_ring_sample :: proc(ring: ^Stream_Ring, t: f64, entity: rawptr, desc: ^Entity_Desc) -> bool {
 	if ring.count == 0 {
 		return false

@@ -30,10 +30,6 @@ package kit_net
 //   intent.odin  — intent ids, per-peer dedup windows, the pending-prediction
 //                  table with timeout → automatic revert.
 //   tick.odin    — the fixed net tick (decoupled from frame rate) + clock sync.
-//   interp.odin  — a typed convenience ring (Interp_Buffer($T)) for hand-driven
-//                  interpolation. The REAL remote-entity path is stream.odin's
-//                  Stream_Ring (warp serials, handoff seeding, per-kind blends);
-//                  this one is the small generic sibling for game-side values.
 //
 // The generated side (scriptgen's gd:"replicate" / @(gd_command)) produces
 // Entity_Desc tables and calls into this core; nothing here depends on
@@ -45,6 +41,14 @@ Net_Id :: distinct u32
 
 NET_ID_INVALID :: Net_Id(0)
 
+// The high bit of the id space is RESERVED for kit/sim's client-local
+// provisional spawns. Authority ids increment from 1 and never reach it;
+// registry_insert refuses ids carrying the bit, so a leaked provisional can
+// neither enter replication nor drag next_id past 2^31 via the insert chase.
+// The constant lives HERE, beside the type whose value space it carves, so
+// the contract has one owner; kit/sim aliases it.
+PROVISIONAL_BIT :: u32(0x8000_0000)
+
 // Transport-INDEPENDENT player identity: survives reconnects and (post-v1) host
 // migration. Assigned at first join, reclaimed on reconnect; never derived from a
 // connection/peer handle.
@@ -52,8 +56,8 @@ Player_Id :: distinct u64
 
 PLAYER_ID_INVALID :: Player_Id(0)
 
-// Who owns (is authoritative for) a replicated entity's streamed state.
-Ownership :: struct {
-	owner: Player_Id, // PLAYER_ID_INVALID + host_owned=true => the world/host
-	host_owned: bool,
-}
+// House rule, kit-wide: a composite map key is a STRUCT, never a packed
+// integer. `u64(player) << 32 | id` silently truncated a u64 Player_Id twice
+// (the session's interest pairs, xfer's assembly inbox) before the rule was
+// written down — struct keys make the mistake unrepresentable.
+

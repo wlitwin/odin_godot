@@ -84,7 +84,7 @@ Xfer :: struct {
 	ses:     ^ksess.Session,
 	tag:     u8,
 	outbox:  [dynamic]Out,
-	inbox:   map[u32]Asm, // key: sender<<8 | id
+	inbox:   map[Xfer_Key]Asm, // keyed by (sender, id)
 	events:  [dynamic]Event,
 	// Superseded DONE buffers whose Ev_Done still sits in `events` (a fast
 	// restart landed before the consumer polled): kept alive until the event
@@ -99,9 +99,17 @@ XF_CHUNK :: u8(0) // client -> host  [id u8][seq u16][chunks u16][total u32][byt
 @(private)
 XF_CAST :: u8(1) // host -> all      [from player_id][id][seq][chunks][total][bytes]
 
+// A struct key, never a packed int: `u32(from) << 8 | id` kept only 24 bits of
+// the u64 Player_Id — two players colliding mod 2^24 would cross-assemble each
+// other's transfers. Same rule as the session's Interest_Key.
+Xfer_Key :: struct {
+	from: knet.Player_Id,
+	id:   u8,
+}
+
 @(private)
-key_of :: proc "contextless" (from: knet.Player_Id, id: u8) -> u32 {
-	return u32(from) << 8 | u32(id)
+key_of :: proc "contextless" (from: knet.Player_Id, id: u8) -> Xfer_Key {
+	return Xfer_Key{from, id}
 }
 
 xfer_init :: proc(x: ^Xfer, ses: ^ksess.Session, tag := XFER_TAG) {

@@ -699,7 +699,7 @@ lane_fact :: proc(l: ^Lane, entity: rawptr, args: []u8, kind: u16 = 0) {
 		w := ksess.session_app_begin(l.ses, l.tag)
 		knet.write_u8(w, SIM_FACT)
 		knet.write_u64(w, l.step_tick)
-		knet.write_u32(w, u32(id))
+		knet.write_net_id(w, id)
 		knet.write_u16(w, kind)
 		knet.write_bytes(w, args)
 		ksess.session_app_flush(l.ses, p.peer) // reliable: facts are one-shots
@@ -1195,11 +1195,13 @@ client_ingest :: proc(l: ^Lane) {
 			cid := knet.read_u16(&r)
 			ic := lane_class(l, cid)
 			sz := ic != nil ? ic.size : 0
-			if r.err || sz == 0 || r.off + sz > len(r.data) {
+			if r.err || sz == 0 {
 				break
 			}
-			blob := r.data[r.off:r.off + sz]
-			r.off += sz
+			blob := knet.reader_view(&r, sz)
+			if r.err {
+				break
+			}
 			if pid == l.ses.me {
 				continue // my inputs live in my rings
 			}
@@ -1740,7 +1742,7 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 			return
 		}
 		tick := knet.read_u64(r)
-		id := knet.Net_Id(knet.read_u32(r))
+		id := knet.read_net_id(r)
 		kind := knet.read_u16(r)
 		blob := knet.read_bytes(r)
 		if r.err {

@@ -42,16 +42,6 @@ write_blob :: proc(w: ^knet.Writer, blob: []u8) {
 	append(&w.buf, ..blob)
 }
 
-@(private = "file")
-read_blob :: proc(r: ^knet.Reader, n: int) -> []u8 {
-	if r.err || r.off + n > len(r.data) {
-		r.err = true
-		return nil
-	}
-	blob := r.data[r.off:r.off + n]
-	r.off += n
-	return blob
-}
 
 // ---------------------------------------------------------------------------
 // Client side: the ring of inputs already fed to prediction.
@@ -223,7 +213,7 @@ input_buffer_apply :: proc(b: ^Input_Buffer, r: ^knet.Reader, tag: u64 = 0) -> i
 	fresh := 0
 	for k in 0 ..< count {
 		t := first + u64(k)
-		blob := read_blob(r, size)
+		blob := knet.reader_view(r, size)
 		if r.err {
 			return fresh
 		}

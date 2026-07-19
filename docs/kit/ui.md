@@ -103,16 +103,17 @@ hp_make :: proc(parent: gd.Node) -> Health_Bar
 hp_refresh :: proc(hb: ^Health_Bar, current, max_hp: i32)
 
 abilities_make :: proc(parent: gd.Node, capacity: int) -> Ability_Bar
-abilities_refresh :: proc(bar: ^Ability_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_rate := knet.DEFAULT_TICK_HZ)
+abilities_refresh :: proc(bar: ^Ability_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_hz: int)
 abilities_destroy :: proc(bar: ^Ability_Bar)
 ```
 
 All text blocks over stock theme: the health bar renders `hp ▓▓▓▓▓▓▓░░░ 70/100` (zero art to
 install, and a test can read the exact fill back out of the tree); abilities render `[rock]`
-ready, `[rock 1.2s]` cooling, `[rock $]` ready-but-unaffordable. Cooldowns count NET TICKS —
-pass `session_tick_hz(&ses)` so the seconds shown are true at any configured rate (the
-default only matches a session left at knet's 20 Hz; a 60 Hz game that omits it shows
-cooldowns 3× too long). BOTH ability models feed the one widget — `kcombat.Ability_Def` is
+ready, `[rock 1.2s]` cooling, `[rock $]` ready-but-unaffordable. Cooldowns count TICKS of
+whichever loop decays them — `tick_hz` is required, so pass `session_tick_hz(&ses)` (or the
+lane's rate on a sim game) and the seconds shown are true at any configured rate. (It used
+to default to 20 Hz; a 60 Hz game that omitted it showed cooldowns 3× too long — the
+footgun is deleted, not documented.) BOTH ability models feed the one widget — `kcombat.Ability_Def` is
 the def vocabulary at every layer: a slot-array game passes its `Cooldowns` bundle
 (`c.cds[:]`); a play-block game gathers its blocks' countdowns into a local array beside the
 same def rows (`[]u16{r.slime.cd, r.ignite.cd}`). With `selected`, the inventory row doubles

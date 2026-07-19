@@ -424,43 +424,6 @@ ping_pong_feeds_clock :: proc(t: ^testing.T) {
 	testing.expect_value(t, c.offset, before)
 }
 
-// ---- interp ----------------------------------------------------------------
-
-@(private = "file")
-lerp_f32 :: proc(a, b: f32, alpha: f32) -> f32 {
-	return a + (b - a) * alpha
-}
-
-@(test)
-interp_bracketing_and_clamps :: proc(t: ^testing.T) {
-	b := knet.Interp_Buffer(f32){}
-	_, ok := knet.interp_sample(&b, 1.0, lerp_f32)
-	testing.expect(t, !ok, "empty buffer samples nothing")
-
-	knet.interp_push(&b, 1.0, 10)
-	knet.interp_push(&b, 2.0, 20)
-	knet.interp_push(&b, 3.0, 40)
-
-	v, _ := knet.interp_sample(&b, 1.5, lerp_f32)
-	testing.expect_value(t, v, f32(15))
-	v, _ = knet.interp_sample(&b, 2.5, lerp_f32)
-	testing.expect_value(t, v, f32(30))
-	v, _ = knet.interp_sample(&b, 0.5, lerp_f32) // before oldest: clamp
-	testing.expect_value(t, v, f32(10))
-	v, _ = knet.interp_sample(&b, 9.0, lerp_f32) // past newest: clamp-and-hold
-	testing.expect_value(t, v, f32(40))
-
-	// Out-of-order (stale) push is dropped.
-	knet.interp_push(&b, 2.5, 999)
-	v, _ = knet.interp_sample(&b, 2.75, lerp_f32)
-	testing.expect_value(t, v, f32(35)) // still the 2.0→3.0 segment
-
-	// A dropped packet = a wider gap; the lerp simply spans it.
-	knet.interp_push(&b, 5.0, 80) // 4.0 never arrived
-	v, _ = knet.interp_sample(&b, 4.0, lerp_f32)
-	testing.expect_value(t, v, f32(60))
-}
-
 // ---- command loop ------------------------------------------------------------
 //
 // Hand-built thunks + Command_Set stand in for what @(gd_command) generates.
@@ -1268,20 +1231,6 @@ registry_expire_reverts_lost_predictions :: proc(t: ^testing.T) {
 	testing.expect_value(t, knet.registry_expire_pending(&creg, &cctx, 50), 2)
 	testing.expect_value(t, alive.hp, i32(10))
 	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
-}
-
-@(test)
-interp_ring_wraps :: proc(t: ^testing.T) {
-	b := knet.Interp_Buffer(f32){}
-	for i in 0 ..< 40 { // > INTERP_CAP: oldest evicted
-		knet.interp_push(&b, f64(i), f32(i * 10))
-	}
-	testing.expect_value(t, b.count, knet.INTERP_CAP)
-	v, ok := knet.interp_sample(&b, 38.5, lerp_f32)
-	testing.expect(t, ok)
-	testing.expect_value(t, v, f32(385))
-	v, _ = knet.interp_sample(&b, 0, lerp_f32) // evicted history clamps to oldest kept
-	testing.expect_value(t, v, f32((40 - knet.INTERP_CAP) * 10))
 }
 
 // ---- owner streams -----------------------------------------------------------
