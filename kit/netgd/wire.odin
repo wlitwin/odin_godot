@@ -64,7 +64,29 @@ Session_Wire :: struct {
 // one). Rates roll once per second in wire_pump; read them raw, or let
 // wire_traffic format the netgraph line. Cost: a few adds per packet.
 
-WIRE_KINDS :: 26 // SES_* ids (0..24 today) + one dedicated overflow bucket ("other") — a future kind lands THERE, never aliased onto a real kind's row
+// This package's wire revision — the FRAME formats only (the leading kind
+// byte's stream-channel bit, the succession torch record). Registered into
+// the session's fingerprint salt at load; a frame change bumps THIS
+// constant, in the same commit.
+WIRE_REV :: u64(3) // 1: the framed wire · 2: the frame byte carries the stream-channel bit · 3: the succession torch is a typed rendezvous record
+
+@(init, private = "file")
+wire_load_init :: proc "contextless" () {
+	ksess.session_register_wire_rev(WIRE_REV, 24)
+	// The gauge labels come from the session's own table — id and name live
+	// beside each other there; this copy exists because the constants are
+	// rightly package-private. "other" is the overflow bucket, ours alone.
+	for s, i in ksess.SES_KIND_NAMES {
+		WIRE_KIND_NAMES[i] = s
+	}
+	WIRE_KIND_NAMES[WIRE_KINDS - 1] = "other"
+}
+
+// The gauge's table size DERIVES from the session's kind count (the one
+// number a new SES_* bumps, beside its constant) + one dedicated overflow
+// bucket ("other") — a kind from a future build lands THERE, never aliased
+// onto a real kind's row.
+WIRE_KINDS :: ksess.SES_KIND_COUNT + 1
 
 Wire_Gauge :: struct {
 	in_acc, out_acc:           [WIRE_KINDS]int, // current window, bytes (frame byte included)
@@ -406,12 +428,9 @@ wire_set_latency :: proc(wire: ^Session_Wire, ms: int, jitter_ms := 0, loss_pct 
 // Short display names per SES kind, for wire_traffic (indexes match the
 // SES_* ids; unknown/overflow reads "other").
 @(private = "file")
-WIRE_KIND_NAMES := [WIRE_KINDS]string {
-	"join", "welcome", "upsert", "left", "bye", "state", "cmd", "result",
-	"stream", "ping", "pong", "spawn", "despawn", "world", "stats", "backup",
-	"app", "denied", "kicked", "setowner", "successor", "blob", "declare",
-	"profiles", "aoi", "other",
-}
+// Filled at load from the session's own SES_KIND_NAMES (id and label live in
+// one file over there) + our overflow bucket — see wire_load_init.
+WIRE_KIND_NAMES: [WIRE_KINDS]string
 
 // The netgraph's traffic line: total in/out bytes per second with the top
 // contributors named — `rx 3.2k state 2.1 stream 0.8 · tx 0.4k cmd 0.3`.

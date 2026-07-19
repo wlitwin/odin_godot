@@ -52,6 +52,17 @@ _ :: fmt // native-only use (the tolerance warning) — the freestanding build c
 
 SIM_TAG :: u8(3) // default SES_APP tag (comms holds 0, xfer holds 2)
 
+// This package's wire revision — the lane's formats ONLY (input windows,
+// snap batches, verbs, facts). Registered into the session's fingerprint
+// salt at load (the session sits below and cannot import upward); a lane
+// wire change bumps THIS constant, in the same commit.
+WIRE_REV :: u64(2) // 1: the lane's first wire · 2: SIM_FACT carries a fact kind
+
+@(init, private = "file")
+register_wire_rev :: proc "contextless" () {
+	ksess.session_register_wire_rev(WIRE_REV, 16)
+}
+
 SIM_INPUT: u8 : 0 // client → host, inside the tag
 SIM_SNAP: u8 : 1 // host → client
 SIM_CMD: u8 : 2 // client → host, RELIABLE: a tick-stamped verb (command.odin)

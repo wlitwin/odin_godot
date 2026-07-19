@@ -194,6 +194,9 @@ your world once `session_count(players_only = true)` reaches your threshold
 (`examples/slopball`'s `serve` role is the model).
 `boot_chat(b, text, &sent)` is the whole `text_submitted` handler, focus
 release included ([kui.chat_submit](ui.md)).
+`boot_net_stats(b)` returns the shared coop [`kui.Net_Stats`](ui.md#the-netgraph--is-it-healthy-drawn)
+fill (rtt, link jitter/loss, malformed drops, bytes-by-kind); a sim-lane game
+lays its `sim`/lead/resim rows on the result before `netgraph_refresh`.
 
 Identity pairs with [`ksave.token`](save.md): the env-or-file-or-per-instance
 ladder in one call, with the same-machine seat-stealing footgun documented as

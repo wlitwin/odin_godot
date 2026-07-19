@@ -54,21 +54,17 @@ predict_matches :: proc(entity: rawptr, desc: ^knet.Entity_Desc, blob: []u8) -> 
 // History — the tick-indexed ring of predict-set snapshots.
 
 History :: struct {
-	desc:      ^knet.Entity_Desc,
-	size:      int,   // bytes per snapshot (predict_size(desc), cached)
-	has_slack: bool,  // any predicted field carries a per-field slack (cached at make —
-	                  // keeps the exact-compare fast path a single memcmp, no field walk)
-	slots:     int,   // ring capacity in ticks
-	data:      []u8,  // slots × size
-	tick:      []u64, // which tick wrote each slot (0 = never — tick 0 predates any note)
+	desc:            ^knet.Entity_Desc,
+	has_slack:       bool, // any predicted field carries a per-field slack (cached at make —
+	                       // keeps the exact-compare fast path a single memcmp, no field walk)
+	using ring:      Tick_Ring, // the tick-indexed store (slot .size = predict_size(desc), cached);
+	                            // promoted so callers read hist.size / .slots as before
 }
 
 // `slots` is the window in TICKS the ledger holds — size it from what reads
 // it: a client ring must cover its maximum lead (input RTT worth of ticks), a
 // server lag-comp ring covers the rewind bound (~250ms of ticks).
 history_make :: proc(desc: ^knet.Entity_Desc, slots: int, allocator := context.allocator) -> History {
-	assert(slots > 0)
-	size := predict_size(desc)
 	has_slack := false
 	for f in desc.fields {
 		if .Predicted in f.flags && f.slack > 0 {
@@ -78,52 +74,32 @@ history_make :: proc(desc: ^knet.Entity_Desc, slots: int, allocator := context.a
 	}
 	return History {
 		desc      = desc,
-		size      = size,
 		has_slack = has_slack,
-		slots     = slots,
-		data      = make([]u8, slots * size, allocator),
-		tick      = make([]u64, slots, allocator),
+		ring      = tick_ring_make(predict_size(desc), slots, allocator),
 	}
 }
 
 history_destroy :: proc(h: ^History) {
-	delete(h.data)
-	delete(h.tick)
-	h.data = nil
-	h.tick = nil
-}
-
-@(private = "file")
-slot_of :: proc(h: ^History, tick: u64) -> int {
-	return int(tick % u64(h.slots))
+	tick_ring_destroy(&h.ring)
 }
 
 // Note the entity's live predict set as the state AT `tick` — the owner of
 // the truth (server) or of the prediction (client), once per simulated tick.
 history_note :: proc(h: ^History, tick: u64, entity: rawptr) {
-	i := slot_of(h, tick)
-	predict_capture(h.data[i * h.size:(i + 1) * h.size], entity, h.desc)
-	h.tick[i] = tick
+	predict_capture(tick_ring_dst(&h.ring, tick), entity, h.desc)
 }
 
 // Note an already-captured blob as the state AT `tick` — how arriving
 // authoritative truth replaces a wrong prediction in the ledger, so later
 // rewinds and compares read truth, not the superseded guess.
 history_note_bytes :: proc(h: ^History, tick: u64, blob: []u8) {
-	assert(len(blob) == h.size)
-	i := slot_of(h, tick)
-	copy(h.data[i * h.size:(i + 1) * h.size], blob)
-	h.tick[i] = tick
+	tick_ring_note(&h.ring, tick, blob)
 }
 
 // The snapshot AT `tick`, if the ledger still holds it (a view into the ring —
-// valid until that slot is re-noted). ok=false for never-written or lapped.
+// valid until that slot is re-noted). ok=false per THE LEDGER CONTRACT (ring.odin).
 history_read :: proc(h: ^History, tick: u64) -> (blob: []u8, ok: bool) {
-	i := slot_of(h, tick)
-	if h.tick[i] != tick || tick == 0 {
-		return nil, false
-	}
-	return h.data[i * h.size:(i + 1) * h.size], true
+	return tick_ring_read(&h.ring, tick)
 }
 
 // Restore the entity's predict set to its state AT `tick`. false = the ledger

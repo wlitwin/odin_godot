@@ -693,6 +693,30 @@ boot_code_pulse :: proc(b: ^Boot) {
 	}
 }
 
+// The COOP netgraph fill — the shared Net_Stats core both example games built
+// identically each frame: rtt off the replicated ping stat, the link's own
+// jitter/loss (netgd.wire_link_quality — clients read it about the host; the
+// host has no link to itself, so those stay 0 = "quiet"), the malformed-packet
+// drop count, and the wire's opaque bytes-by-kind line. A coop game passes the
+// result straight to kui.netgraph_refresh; a sim-lane game fills the `sim`/
+// lead/resim/recon rows on the returned value first (see quickdraw).
+//
+// The traffic string is temp-allocated (netgd.wire_traffic's default), so it
+// only lives to the end of the frame — refresh the graph the same frame you
+// call this (every caller does).
+boot_net_stats :: proc(b: ^Boot) -> kui.Net_Stats {
+	ng := kui.Net_Stats {
+		rtt_ms  = kui.net_ping_ms(b.ses),
+		drops   = ksess.session_malformed(b.ses),
+		traffic = netgd.wire_traffic(&b.wire),
+	}
+	if _, jit, loss, has := netgd.wire_link_quality(&b.wire, ksess.HOST_PEER); has {
+		ng.jitter_ms = jit
+		ng.loss_pct = loss
+	}
+	return ng
+}
+
 // Chat's text_submitted, one call (see kui.chat_submit for the trap it fixes).
 boot_chat :: proc(b: ^Boot, text: gd.String, sent: ^bool = nil) {
 	kui.chat_submit(&b.chat, b.comms, text, sent)

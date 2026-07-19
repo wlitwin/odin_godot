@@ -121,6 +121,8 @@ chat_refresh :: proc(ch: ^Chat, c: ^kcomms.Comms) {
 chat_submit :: proc(ch: ^Chat, c: ^kcomms.Comms, text: gd.String, sent: ^bool = nil) {
 	text := text
 	buf: [512]u8
+	// gdext direct: the ergonomics layer has no gd.String→odin-string extractor
+	// yet (gd.get_string reads an Object property, not a signal's String value).
 	n := gdext.string_to_utf8_chars(cast(gdext.StringPtr)&text, cast(cstring)&buf[0], len(buf) - 1)
 	if n > 0 {
 		kcomms.comms_say(c, string(buf[:min(int(n), len(buf) - 1)]))

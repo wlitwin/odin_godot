@@ -47,34 +47,22 @@ write_blob :: proc(w: ^knet.Writer, blob: []u8) {
 // Client side: the ring of inputs already fed to prediction.
 
 Input_Ring :: struct {
-	size:  int,   // bytes per input
-	slots: int,
-	data:  []u8,  // slots × size
-	tick:  []u64, // which tick wrote each slot (0 = never)
-	head:  u64,   // newest tick noted (0 = none yet)
-	tail:  u64,   // oldest tick still held — the first note anchors it (a
-	              // client joins mid-timeline, so tick 1 usually never existed
-	              // here), lapping advances it
+	ring: Tick_Ring, // the tick-indexed store (ring.odin)
+	head: u64,       // newest tick noted (0 = none yet)
+	tail: u64,       // oldest tick still held — the first note anchors it (a
+	                 // client joins mid-timeline, so tick 1 usually never existed
+	                 // here), lapping advances it
 }
 
 // `slots` must cover the resim window (the client's maximum lead) — a replay
 // that reaches for a lapped input has already lost the tick it would explain.
 input_ring_make :: proc(size: int, slots: int, allocator := context.allocator) -> Input_Ring {
 	assert(size > 0 && size <= MAX_INPUT_SIZE)
-	assert(slots > 0)
-	return Input_Ring {
-		size  = size,
-		slots = slots,
-		data  = make([]u8, slots * size, allocator),
-		tick  = make([]u64, slots, allocator),
-	}
+	return Input_Ring{ring = tick_ring_make(size, slots, allocator)}
 }
 
 input_ring_destroy :: proc(r: ^Input_Ring) {
-	delete(r.data)
-	delete(r.tick)
-	r.data = nil
-	r.tick = nil
+	tick_ring_destroy(&r.ring)
 }
 
 // Note the input SAMPLED FOR `tick`, right before predicting that tick — the
@@ -82,30 +70,20 @@ input_ring_destroy :: proc(r: ^Input_Ring) {
 // order (the sim loop owns the counter); noting backwards is a caller bug.
 input_note :: proc(r: ^Input_Ring, tick: u64, input: rawptr) {
 	assert(tick > r.head, "inputs are noted in tick order")
-	i := int(tick % u64(r.slots))
-	sp := ([^]u8)(input)
-	copy(r.data[i * r.size:(i + 1) * r.size], sp[:r.size])
-	r.tick[i] = tick
+	tick_ring_note(&r.ring, tick, ([^]u8)(input)[:r.ring.size])
 	if r.head == 0 {
 		r.tail = tick
 	}
 	r.head = tick
-	if r.head - r.tail >= u64(r.slots) {
-		r.tail = r.head - u64(r.slots) + 1
+	if r.head - r.tail >= u64(r.ring.slots) {
+		r.tail = r.head - u64(r.ring.slots) + 1
 	}
 }
 
 // The input noted for `tick` (a view — valid until that slot laps). ok=false
-// for never-noted or lapped, the ledger contract.
+// for never-noted or lapped — THE LEDGER CONTRACT (ring.odin).
 input_read :: proc(r: ^Input_Ring, tick: u64) -> (input: []u8, ok: bool) {
-	if tick == 0 {
-		return nil, false
-	}
-	i := int(tick % u64(r.slots))
-	if r.tick[i] != tick {
-		return nil, false
-	}
-	return r.data[i * r.size:(i + 1) * r.size], true
+	return tick_ring_read(&r.ring, tick)
 }
 
 // Append one input packet: the unacked window, newest-tick-inclusive.
@@ -127,7 +105,7 @@ input_write :: proc(w: ^knet.Writer, r: ^Input_Ring, acked: u64, redundancy := I
 	first := r.head + 1 // the empty window, self-describing
 	count := 0
 	if r.head > 0 {
-		red := min(redundancy, r.slots)
+		red := min(redundancy, r.ring.slots)
 		for t := r.head; count < red && t > acked; t -= 1 {
 			if _, ok := input_read(r, t); !ok {
 				break // a hole (jump / lap): the window ends here
@@ -144,7 +122,7 @@ input_write :: proc(w: ^knet.Writer, r: ^Input_Ring, acked: u64, redundancy := I
 	}
 	knet.write_u64(w, first)
 	knet.write_u8(w, u8(count))
-	knet.write_u16(w, u16(r.size))
+	knet.write_u16(w, u16(r.ring.size))
 	for t := first; t < first + u64(count); t += 1 {
 		blob, _ := input_read(r, t)
 		write_blob(w, blob)
@@ -156,17 +134,14 @@ input_write :: proc(w: ^knet.Writer, r: ^Input_Ring, acked: u64, redundancy := I
 // Server side: one Input_Buffer per player.
 
 Input_Buffer :: struct {
-	size:       int,
-	slots:      int,
-	data:       []u8,
-	tick:       []u64,
-	tags:       []u64, // per-tick rider: the value `apply` was given for the packet
-	                   // that delivered the tick (the sim lane rides the snap ack here —
-	                   // it binds each input to the WORLD VIEW its sender aimed with)
-	tag:        u64, // the last popped tick's rider, held-last across gaps like the input
-	newest:     u64, // newest tick ever received — the ack the client trims by
-	popped:     u64, // last tick consumed (0 = none): older arrivals are stale
-	held:       []u8, // the hold-last copy a gap tick repeats (zeroed = neutral input until the first pop)
+	ring:        Tick_Ring, // the tick-indexed store (ring.odin)
+	tags:        []u64, // per-tick rider, one per ring slot: the value `apply` was given for
+	                    // the packet that delivered the tick (the sim lane rides the snap ack
+	                    // here — it binds each input to the WORLD VIEW its sender aimed with)
+	tag:         u64, // the last popped tick's rider, held-last across gaps like the input
+	newest:      u64, // newest tick ever received — the ack the client trims by
+	popped:      u64, // last tick consumed (0 = none): older arrivals are stale
+	held:        []u8, // the hold-last copy a gap tick repeats (zeroed = neutral input until the first pop)
 	fresh_count: u64, // pops that found the exact tick
 	held_count:  u64, // pops that fell back to hold-last (the gap stat)
 	fresh:       bool, // did the LAST pop find its tick (the driver's freshness bit) —
@@ -175,24 +150,17 @@ Input_Buffer :: struct {
 
 input_buffer_make :: proc(size: int, slots: int, allocator := context.allocator) -> Input_Buffer {
 	assert(size > 0 && size <= MAX_INPUT_SIZE)
-	assert(slots > 0)
 	return Input_Buffer {
-		size  = size,
-		slots = slots,
-		data  = make([]u8, slots * size, allocator),
-		tick  = make([]u64, slots, allocator),
-		tags  = make([]u64, slots, allocator),
-		held  = make([]u8, size, allocator),
+		ring = tick_ring_make(size, slots, allocator),
+		tags = make([]u64, slots, allocator),
+		held = make([]u8, size, allocator),
 	}
 }
 
 input_buffer_destroy :: proc(b: ^Input_Buffer) {
-	delete(b.data)
-	delete(b.tick)
+	tick_ring_destroy(&b.ring)
 	delete(b.tags)
 	delete(b.held)
-	b.data = nil
-	b.tick = nil
 	b.tags = nil
 	b.held = nil
 }
@@ -206,7 +174,7 @@ input_buffer_apply :: proc(b: ^Input_Buffer, r: ^knet.Reader, tag: u64 = 0) -> i
 	first := knet.read_u64(r)
 	count := int(knet.read_u8(r))
 	size := int(knet.read_u16(r))
-	if r.err || count > MAX_INPUT_REDUNDANCY || size != b.size {
+	if r.err || count > MAX_INPUT_REDUNDANCY || size != b.ring.size {
 		r.err = true
 		return 0
 	}
@@ -230,15 +198,16 @@ input_buffer_apply :: proc(b: ^Input_Buffer, r: ^knet.Reader, tag: u64 = 0) -> i
 		if t <= b.popped {
 			continue // stale: its tick already simulated (hold-last covered it)
 		}
-		i := int(t % u64(b.slots))
-		if b.tick[i] == t {
+		// The buffer's own arrival guards read the stored stamp directly, then
+		// note over the core (which restamps the same slot); tags rides beside.
+		i := tick_ring_slot(&b.ring, t)
+		if b.ring.tick[i] == t {
 			continue // duplicate re-delivery
 		}
-		if b.tick[i] > t {
+		if b.ring.tick[i] > t {
 			continue // slot holds a NEWER tick — never lap backwards
 		}
-		copy(b.data[i * b.size:(i + 1) * b.size], blob)
-		b.tick[i] = t
+		tick_ring_note(&b.ring, t, blob)
 		b.tags[i] = tag
 		fresh += 1
 	}
@@ -254,10 +223,9 @@ input_buffer_apply :: proc(b: ^Input_Buffer, r: ^knet.Reader, tag: u64 = 0) -> i
 input_buffer_pop :: proc(b: ^Input_Buffer, tick: u64) -> (input: []u8, fresh: bool) {
 	assert(tick > b.popped, "pops advance one tick at a time, forward only")
 	b.popped = tick
-	i := int(tick % u64(b.slots))
-	if b.tick[i] == tick {
-		copy(b.held, b.data[i * b.size:(i + 1) * b.size])
-		b.tag = b.tags[i]
+	if blob, ok := tick_ring_read(&b.ring, tick); ok {
+		copy(b.held, blob)
+		b.tag = b.tags[tick_ring_slot(&b.ring, tick)]
 		b.fresh_count += 1
 		b.fresh = true
 		return b.held, true

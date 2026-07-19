@@ -31,7 +31,6 @@ import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import kui "godot:kit/ui"
-import netgd "godot:kit/netgd"
 import play "godot:play"
 
 MSG_SESSION :: u8(0) // all kit/session traffic under one game byte
@@ -187,18 +186,10 @@ slopball_process :: proc(self: ^Slopball, delta: f64) {
 		ball_report(self)
 	}
 
-	// The "is it healthy?" overlay: rtt off the replicated ping stat, the
-	// LINK's own truth (ENet loss + rtt variance — clients only), and the
-	// wire's bytes-by-kind row. Coop form: `sim` stays false.
-	ng := kui.Net_Stats{
-		rtt_ms  = kui.net_ping_ms(&self.ses),
-		traffic = netgd.wire_traffic(&self.boot.wire),
-	}
-	if _, jit, loss, has := netgd.wire_link_quality(&self.boot.wire, ksess.HOST_PEER); has {
-		ng.jitter_ms = jit
-		ng.loss_pct = loss
-	}
-	kui.netgraph_refresh(&self.netgraph, ng)
+	// The "is it healthy?" overlay: the shared coop fill (rtt, the link's own
+	// jitter/loss, malformed drops, the wire's bytes-by-kind row). `sim` stays
+	// false — this game has no lane.
+	kui.netgraph_refresh(&self.netgraph, kboot.boot_net_stats(&self.boot))
 
 	// The game's event reactions are the name-paired halves below; the
 	// generated slopball_events holds the switch and every role gate.

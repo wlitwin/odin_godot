@@ -27,7 +27,6 @@ import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import ksim "godot:kit/sim"
 import kui "godot:kit/ui"
-import netgd "godot:kit/netgd"
 
 MSG_SESSION :: u8(0)
 DEFAULT_PORT :: 4189
@@ -144,25 +143,15 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 	// (predict/simulate, then present) — before this returns.
 	events, _, _ := kboot.boot_pump(&self.boot, delta, now_s())
 
-	// Fill the net-health overlay from the readable tallies: rtt off the
-	// replicated ping stat (host or client), the LINK's own truth (ENet's
-	// loss + rtt variance — clients only; the host has no link to itself),
-	// the wire's bytes-by-kind line, and the lane's resim/reconcile counters.
-	// Coop games leave `sim` false.
-	ng := kui.Net_Stats{
-		rtt_ms  = kui.net_ping_ms(&self.ses),
-		drops   = ksess.session_malformed(&self.ses),
-		sim     = true,
-		lead    = ksim.lane_lead(&self.lane),
-		resims  = self.lane.stat_resims,
-		recons  = self.lane.stat_reconciles,
-		fact_drops = self.lane.stat_facts_dropped,
-		traffic = netgd.wire_traffic(&self.boot.wire),
-	}
-	if _, jit, loss, has := netgd.wire_link_quality(&self.boot.wire, ksess.HOST_PEER); has {
-		ng.jitter_ms = jit
-		ng.loss_pct = loss
-	}
+	// Fill the net-health overlay: the shared coop core (rtt, link jitter/loss,
+	// malformed drops, bytes-by-kind) from boot, then this game's own sim rows —
+	// lead + the lane's resim/reconcile/fact-drop counters — laid on top.
+	ng := kboot.boot_net_stats(&self.boot)
+	ng.sim = true
+	ng.lead = ksim.lane_lead(&self.lane)
+	ng.resims = self.lane.stat_resims
+	ng.recons = self.lane.stat_reconciles
+	ng.fact_drops = self.lane.stat_facts_dropped
 	kui.netgraph_refresh(&self.netgraph, ng)
 
 	// THE SHOP DOOR — a tick-scheduled verb, issued like any coop command

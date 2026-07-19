@@ -226,7 +226,10 @@ Row 3 is the sim lane, and the RESIM SPARKLINE is the point: a steady sim
 draws a flat baseline; a lost input or a contested mispredict makes the
 client rewind, and that burst — invisible in a headless log — is exactly
 what you can SEE here. Every field is optional (coop games leave `sim`
-false); quickdraw's fill is the worked example.
+false); quickdraw's fill is the worked example. Booted games skip the
+hand-fill entirely: [`kboot.boot_net_stats(&boot)`](boot.md) returns the coop
+core (rtt, link jitter/loss, malformed drops, traffic) — a sim game lays its
+lane rows on the result.
 
 Siblings: [session.md](session.md) (roster, stats, `session_tick_hz`) ·
 [comms.md](comms.md) (the chat log) · [combat.md](combat.md) (`Ability_Def`, cooldowns) ·

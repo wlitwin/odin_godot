@@ -302,6 +302,44 @@ SES_DECLARE :: u8(22) // client -> host  [size u16][row bytes] — my profile ro
 SES_PROFILES :: u8(23) // host -> all    [size u16][players u16] x ([id][row]) — the profile table
 SES_AOI :: u8(24) // host -> all    [aoi bool] — stream routing changed MID-RUN (session_set_interest after clients joined; the welcome covers everyone later)
 
+// One past the highest SES_* id — the ONE number a new wire kind bumps,
+// right here beside its constant. netgd's per-kind gauge derives its table
+// size from this, so a new kind can never alias onto another row's tally.
+SES_KIND_COUNT :: 25
+
+// The kinds' display names, indexed by the constants above — id and label
+// live in ONE file, a screen apart (netgd's gauge copies these rows at load;
+// its old hand-mirrored twin had already drifted by count once). A new kind
+// adds its constant, bumps SES_KIND_COUNT, and names itself here; a missing
+// name renders "" in the traffic line — visible, never another row's label.
+SES_KIND_NAMES := [SES_KIND_COUNT]string {
+	int(SES_JOIN)      = "join",
+	int(SES_WELCOME)   = "welcome",
+	int(SES_UPSERT)    = "upsert",
+	int(SES_LEFT)      = "left",
+	int(SES_BYE)       = "bye",
+	int(SES_STATE)     = "state",
+	int(SES_CMD)       = "cmd",
+	int(SES_RESULT)    = "result",
+	int(SES_STREAM)    = "stream",
+	int(SES_PING)      = "ping",
+	int(SES_PONG)      = "pong",
+	int(SES_SPAWN)     = "spawn",
+	int(SES_DESPAWN)   = "despawn",
+	int(SES_WORLD)     = "world",
+	int(SES_STATS)     = "stats",
+	int(SES_BACKUP)    = "backup",
+	int(SES_APP)       = "app",
+	int(SES_DENIED)    = "denied",
+	int(SES_KICKED)    = "kicked",
+	int(SES_SETOWNER)  = "setowner",
+	int(SES_SUCCESSOR) = "successor",
+	int(SES_BLOB)      = "blob",
+	int(SES_DECLARE)   = "declare",
+	int(SES_PROFILES)  = "profiles",
+	int(SES_AOI)       = "aoi",
+}
+
 // ---- app messages: the extension point for sibling kit packages ---------------
 //
 // SES_APP lets packages built ON TOP of the session (kit/comms is the first)
@@ -1850,15 +1888,35 @@ session_client_join :: proc(s: ^Session) {
 	s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
 }
 
-// The kit's own wire revision, folded into every nonzero fingerprint before it
-// rides SES_JOIN — a kit upgrade that changes the wire then refuses skewed
-// peers even when the game's declarations didn't move. Bump on wire changes.
-PROTOCOL_REV :: u64(8) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: the wire frame byte carries the stream-channel bit (netgd) · 4: SIM_FACT carries a fact kind (declared world-pass facts) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream routing mid-run · 7: spectator seats (SES_JOIN intent + roster rows carry the flag) · 8: the succession torch is a typed rendezvous record, [kind u8][payload] (netgd)
+// The SESSION's own wire revision — this package's messages and codecs ONLY.
+// Every wire-bearing package now owns its rev beside the wire it describes
+// (knet.WIRE_REV, ksim's, netgd's) and all of them fold into the fingerprint
+// below, so a wire change and its rev bump land in the SAME package, the
+// same commit. (This log used to register the whole kit's changes: its rev 3
+// and 8 were netgd's, rev 4 was kit/sim's — a convention that held only by
+// engineers remembering a constant in a package they weren't editing.)
+PROTOCOL_REV :: u64(8) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: (moved: netgd rev 2) · 4: (moved: kit/sim rev 2) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream routing mid-run · 7: spectator seats (SES_JOIN intent + roster rows carry the flag) · 8: (moved: netgd rev 3)
+
+// Wire revisions of the packages ABOVE the session (kit/sim's lane wire,
+// netgd's frame) — the session cannot import upward, so they register at
+// load via @(init), the same inversion the generated fingerprint rides
+// (default_net_fingerprint). Shift allocation: session bits 0..7, knet 8..15
+// (read directly — it's below), kit/sim 16..23, netgd 24..31. Pre-main, so
+// no runtime mutation of package globals is ever involved.
+@(private = "file")
+registered_wire_revs: u64
+
+session_register_wire_rev :: proc "contextless" (rev: u64, shift: uint) {
+	registered_wire_revs |= rev << shift
+}
 
 @(private = "file")
-FP_SALT :: u64(0x9E3779B97F4A7C15) + PROTOCOL_REV // the golden-ratio constant, rev-shifted
-// (added, not multiplied: a typed compile-time u64 multiply that overflows
-// trips an LLVM-backend assert in current Odin — a compiler crash, not an error)
+fp_salt :: proc() -> u64 {
+	// The golden-ratio constant, rev-shifted. (Added, not multiplied: a typed
+	// compile-time u64 multiply that overflows trips an LLVM-backend assert
+	// in current Odin — a compiler crash, not an error.)
+	return u64(0x9E3779B97F4A7C15) + PROTOCOL_REV + (knet.WIRE_REV << 8) + registered_wire_revs
+}
 
 @(private = "file")
 wire_fingerprint :: proc(cfg_fp: u64) -> u64 {
@@ -1869,7 +1927,7 @@ wire_fingerprint :: proc(cfg_fp: u64) -> u64 {
 	if fp == 0 || fp == FINGERPRINT_NONE {
 		return 0 // unchecked stays unchecked — never salted into a phantom value
 	}
-	return fp ~ FP_SALT
+	return fp ~ fp_salt()
 }
 
 // Graceful goodbye (the host also handles the plain transport disconnect —

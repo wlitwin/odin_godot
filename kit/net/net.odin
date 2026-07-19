@@ -71,6 +71,14 @@ package kit_net
 // Entity_Desc tables and calls into this core; nothing here depends on
 // codegen, so everything is testable with hand-built descriptors first.
 
+// This package's wire revision — the substrate + coop-lane formats ONLY
+// (field codecs, delta masks, stream batches, the command loop). Folded into
+// the session's fingerprint salt beside every other package's rev, so a wire
+// change here bumps a constant HERE, in the same commit. The coop delta
+// mask's move to subset-ordinal bits (the phase-2 codec unification) will be
+// rev 2.
+WIRE_REV :: u64(1) // 1: the fingerprint-era wire as committed
+
 // Stable identity of a replicated entity across the session. Allocated by the host
 // (authority) — never reused within a session. 0 is the invalid id.
 Net_Id :: distinct u32
