@@ -231,12 +231,6 @@ field_decode :: proc(dst: rawptr, wire: [^]u8, f: Field_Desc) {
 	}
 }
 
-// Width of the wire dirty mask: only as many bytes as the field count needs.
-@(private = "file")
-mask_bytes :: proc(desc: ^Entity_Desc) -> int {
-	return (len(desc.fields) + 7) / 8
-}
-
 @(private = "file")
 field_ptr :: proc(entity: rawptr, f: Field_Desc) -> rawptr {
 	return rawptr(uintptr(entity) + f.offset)
@@ -262,7 +256,10 @@ shadow_make :: proc(desc: ^Entity_Desc, allocator := context.allocator) -> []u8 
 			       "wire = .Custom needs a complete Field_Desc.codec (size, encode, decode)")
 		}
 	}
-	return make([]u8, desc_data_size(desc), allocator)
+	// Delta-packed: the shadow is the DELTA LANE's baseline and nothing
+	// else's — owner-streamed and predicted fields carry their own baselines
+	// (the stream ring, the predict ledger) and never had a row here.
+	return make([]u8, subset_view(desc, .Delta).struct_bytes, allocator)
 }
 
 // Compare entity vs shadow, bit i set = field i differs. Does NOT modify the shadow.
@@ -279,23 +276,26 @@ shadow_make :: proc(desc: ^Entity_Desc, allocator := context.allocator) -> []u8 
 // a reliable delta landing on one would stomp a client's prediction outside
 // the reconcile (no tick stamp, no history note, no replay). Same rule, third
 // lane: the tag decides the wire, and the wires can never fight over a field.
+// Mask bit i = the i-th DELTA-LANE member (subset ordinal — the same
+// convention the sim lane's snap codec has always used; one mask law for
+// every masked subset on the wire since knet.WIRE_REV 2). The shadow is
+// delta-packed: it exists ONLY as this lane's baseline.
 diff_mask :: proc(entity: rawptr, shadow: []u8, desc: ^Entity_Desc) -> (mask: u64) {
-	off := 0
-	for f, i in desc.fields {
-		if .Owner_Stream not_in f.flags && .Predicted not_in f.flags {
-			ep := ([^]u8)(field_ptr(entity, f))
-			if mem.compare(ep[:f.size], shadow[off:off + f.size]) != 0 {
-				mask |= 1 << u64(i)
-			}
+	v := subset_view(desc, .Delta)
+	for e, ord in v.entries {
+		ep := ([^]u8)(field_ptr(entity, v.fields[e.field]))
+		if mem.compare(ep[:e.size], shadow[e.struct_off:e.struct_off + e.size]) != 0 {
+			mask |= 1 << u64(ord)
 		}
-		off += f.size
 	}
 	return
 }
 
-// Copy the entity's replicated fields into the shadow (the "committed as sent" state).
+// Copy the entity's DELTA-LANE fields into the shadow (the "committed as
+// sent" state). Owner-streamed and predicted fields never had a shadow row:
+// their lanes carry their own baselines (the ring, the ledger).
 shadow_capture :: proc(entity: rawptr, shadow: []u8, desc: ^Entity_Desc) {
-	subset_capture(subset_view(desc, .Full), entity, shadow)
+	subset_capture(subset_view(desc, .Delta), entity, shadow)
 }
 
 @(private = "file")
@@ -315,21 +315,22 @@ read_mask :: proc(r: ^Reader, nbytes: int) -> (mask: u64) {
 
 // Diff, serialize dirty fields, and commit the shadow. Returns the mask (0 = wrote
 // nothing — the caller skips this entity entirely, so idle entities cost one memcmp
-// pass and zero bytes).
+// pass and zero bytes). Entity-direct and zero-alloc on purpose: the per-tick
+// send path stages nothing (the sim lane's blob-ledgered sibling is
+// subset_delta_write — same view, same mask law, different baseline story).
 write_delta :: proc(w: ^Writer, entity: rawptr, shadow: []u8, desc: ^Entity_Desc) -> u64 {
 	mask := diff_mask(entity, shadow, desc)
 	if mask == 0 {
 		return 0
 	}
-	write_mask(w, mask, mask_bytes(desc))
-	off := 0
-	for f, i in desc.fields {
-		if mask & (1 << u64(i)) != 0 {
-			ep := field_ptr(entity, f)
-			field_encode(w, ep, f)
-			mem.copy(&shadow[off], ep, f.size) // commit shadow: STRUCT bytes, never wire bytes
+	v := subset_view(desc, .Delta)
+	write_mask(w, mask, v.mask_bytes)
+	for e, ord in v.entries {
+		if mask & (1 << u64(ord)) != 0 {
+			ep := field_ptr(entity, v.fields[e.field])
+			field_encode(w, ep, v.fields[e.field])
+			mem.copy(&shadow[e.struct_off], ep, int(e.size)) // commit shadow: STRUCT bytes, never wire bytes
 		}
-		off += f.size
 	}
 	return mask
 }
@@ -344,15 +345,16 @@ write_delta :: proc(w: ^Writer, entity: rawptr, shadow: []u8, desc: ^Entity_Desc
 // fields from a TRUSTED host, never a corrupted reconcile baseline. The
 // session counts the drop (session_malformed).
 apply_delta :: proc(r: ^Reader, entity: rawptr, desc: ^Entity_Desc) -> u64 {
-	mask := read_mask(r, mask_bytes(desc))
-	for f, i in desc.fields {
-		if mask & (1 << u64(i)) != 0 {
-			n := field_wire_size(f)
+	v := subset_view(desc, .Delta)
+	mask := read_mask(r, v.mask_bytes)
+	for e, ord in v.entries {
+		if mask & (1 << u64(ord)) != 0 {
+			n := int(e.wire_size)
 			if r.err || r.off + n > len(r.data) {
 				r.err = true
 				return mask
 			}
-			field_decode(field_ptr(entity, f), ([^]u8)(&r.data[r.off]), f)
+			field_decode(field_ptr(entity, v.fields[e.field]), ([^]u8)(&r.data[r.off]), v.fields[e.field])
 			r.off += n
 		}
 	}

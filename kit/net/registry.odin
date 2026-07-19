@@ -155,8 +155,9 @@ registry_count :: proc(reg: ^Registry) -> int {
 // The per-net-tick walk: one batched message for all dirty entities.
 //
 // Batch layout: [count u16] then count × ([net_id u32][mask][dirty fields]).
-// The mask width is per-entity (derived from its descriptor), so heterogeneous
-// entity types mix freely in one batch.
+// The mask width is per-entity — ceil(delta-lane members / 8), bit = subset
+// ordinal (knet.WIRE_REV 2) — so heterogeneous entity types mix freely in
+// one batch.
 
 // Walk every entry, appending deltas for the dirty ones and committing their
 // shadows. Returns how many entities were written; on 0 the writer only gained
@@ -809,9 +810,11 @@ registry_write_guard :: proc(reg: ^Registry, ctx: ^Command_Ctx, exempt: Guard_Ex
 			continue
 		}
 		field = "?"
-		for f, i in e.set.entity_desc.fields {
-			if mask & (1 << u64(i)) != 0 {
-				field = f.name != "" ? f.name : fmt.tprintf("field #%d", i)
+		v := subset_view(e.set.entity_desc, .Delta)
+		for e2, ord in v.entries {
+			if mask & (1 << u64(ord)) != 0 {
+				f := v.fields[e2.field]
+				field = f.name != "" ? f.name : fmt.tprintf("field #%d", e2.field)
 				break
 			}
 		}

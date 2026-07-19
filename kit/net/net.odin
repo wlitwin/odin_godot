@@ -77,7 +77,7 @@ package kit_net
 // change here bumps a constant HERE, in the same commit. The coop delta
 // mask's move to subset-ordinal bits (the phase-2 codec unification) will be
 // rev 2.
-WIRE_REV :: u64(1) // 1: the fingerprint-era wire as committed
+WIRE_REV :: u64(2) // 1: the fingerprint-era wire as committed · 2: delta masks are subset-ordinal (delta-lane members only — one mask law with the sim codec; masks narrowed, bits renumbered on mixed-lane entities)
 
 // Stable identity of a replicated entity across the session. Allocated by the host
 // (authority) — never reused within a session. 0 is the invalid id.

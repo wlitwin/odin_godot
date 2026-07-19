@@ -2031,3 +2031,43 @@ subset_delta_codec_roundtrip :: proc(t: ^testing.T) {
 	testing.expect(t, knet.subset_decode_full(pred, out2, knet.writer_bytes(&w2)))
 	testing.expect(t, !knet.subset_decode_full(pred, out2, knet.writer_bytes(&w2)[:3]), "short full row refused")
 }
+
+// The ordinal-mask law, WITNESSED: a delta-lane field that sits AFTER a
+// flagged field gets ordinal bit 0, not its desc-index bit (pre-WIRE_REV-2
+// this mask was 0b10 and one byte wider on >8-field descs). If this pin
+// breaks, the coop delta wire moved — bump knet.WIRE_REV in the same commit.
+Flipped :: struct {
+	px:    f32, // owner — desc index 0
+	score: i32, // delta lane — desc index 1, delta ORDINAL 0
+}
+
+@(test)
+delta_mask_is_subset_ordinal :: proc(t: ^testing.T) {
+	@(static) fields := [?]knet.Field_Desc{
+		{offset = offset_of(Flipped, px), size = size_of(f32), flags = {.Owner_Stream}},
+		{offset = offset_of(Flipped, score), size = size_of(i32)},
+	}
+	desc := knet.Entity_Desc{fields = fields[:]}
+
+	shadow := knet.shadow_make(&desc)
+	defer delete(shadow)
+	testing.expect_value(t, len(shadow), 4) // delta-packed: score only
+
+	src := Flipped{px = 9.5, score = 7}
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+	mask := knet.write_delta(&w, &src, shadow, &desc)
+	testing.expect_value(t, mask, u64(0b01)) // ordinal 0 = score (NOT desc bit 1)
+	testing.expect_value(t, len(knet.writer_bytes(&w)), 1 + 4) // 1 mask byte + i32
+
+	dst := Flipped{}
+	r := knet.reader_make(knet.writer_bytes(&w))
+	applied := knet.apply_delta(&r, &dst, &desc)
+	testing.expect(t, !r.err)
+	testing.expect_value(t, applied, u64(0b01))
+	testing.expect_value(t, dst.score, i32(7))
+	testing.expect_value(t, dst.px, f32(0)) // the owner lane never rides a delta
+
+	// Committed: idle on the next diff.
+	testing.expect_value(t, knet.diff_mask(&src, shadow, &desc), u64(0))
+}

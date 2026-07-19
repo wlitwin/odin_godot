@@ -49,9 +49,11 @@ Fields flagged `.Owner_Stream` are excluded from the delta diff at the mask leve
 (`diff_mask` skips them), so streams and deltas can never fight over a field: full
 snapshots seed the initial values, streams own them from then on.
 
-**The shadow-delta walk.** Each registered entity owns a shadow copy of its replicated
-fields. Every net tick the registry memcmps entity-vs-shadow, writes `[net_id][mask][dirty
-fields]` for just the dirty entities into one batched message, and commits the shadows.
+**The shadow-delta walk.** Each registered entity owns a shadow copy of its DELTA-LANE
+fields (owner-streamed and predicted fields carry their own baselines — the ring, the
+ledger). Every net tick the registry memcmps entity-vs-shadow, writes `[net_id][mask][dirty
+fields]` for just the dirty entities into one batched message, and commits the shadows —
+the mask's bits are delta-subset ordinals, the same mask law the sim codec speaks.
 Receivers apply the mask + fields straight into the entity struct. Idle entities cost one
 memcmp pass and zero bytes. Replicated fields are POD only (ints/floats/bools/enums/fixed
 arrays) — raw bytes are compared and copied, nothing follows pointers. Strings and dynamic

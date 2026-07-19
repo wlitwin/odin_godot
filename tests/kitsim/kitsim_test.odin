@@ -86,8 +86,11 @@ predicted_fields_skip_delta_walk :: proc(t: ^testing.T) {
 	m.aim = 9 // owner stream: excluded from the diff
 	testing.expect_value(t, knet.diff_mask(&m, shadow, &desc), 0)
 
-	m.hp = 99 // delta lane: field index 2
-	testing.expect_value(t, knet.diff_mask(&m, shadow, &desc), u64(1) << 2)
+	// delta lane: field INDEX 2, but the mask speaks subset ORDINALS since
+	// knet.WIRE_REV 2 — hp is the desc's only delta-lane member, so bit 0
+	// (this pin held `1 << 2` under the old full-desc-index convention).
+	m.hp = 99
+	testing.expect_value(t, knet.diff_mask(&m, shadow, &desc), u64(1) << 0)
 }
 
 // ---- history ------------------------------------------------------------------
