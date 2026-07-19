@@ -48,6 +48,8 @@ import "core:mem"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
+_ :: fmt // native-only use (the tolerance warning) — the freestanding build compiles it out
+
 SIM_TAG :: u8(3) // default SES_APP tag (comms holds 0, xfer holds 2)
 
 SIM_INPUT: u8 : 0 // client → host, inside the tag
@@ -408,7 +410,11 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 		// Predict-world without slack: every held-input drift mismatches the
 		// exact compare and buys a full resim — nearly every batch. Legal but
 		// never what anyone means; one line at init beats a silent CPU tax.
-		fmt.println("kit/sim: echo_inputs with tolerance=0 resims on nearly every batch — set Lane_Config.tolerance (world units of acceptable held-input drift)")
+		// (Native only: the wasm fmt has no stdio — println doesn't exist
+		// there, and this line broke the whole web build once.)
+		when ODIN_OS != .Freestanding {
+			fmt.println("kit/sim: echo_inputs with tolerance=0 resims on nearly every batch — set Lane_Config.tolerance (world units of acceptable held-input drift)")
+		}
 	}
 	l.ticker = sim_ticker_make(hz)
 	l.tracked = make([dynamic]Tracked, allocator)

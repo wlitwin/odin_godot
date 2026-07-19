@@ -1311,10 +1311,14 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 				s.guard_hits += 1
 				if !s.guard_logged {
 					s.guard_logged = true
-					fmt.printfln(
-						"kit/session WRITE GUARD: %s.%s (net id %d) changed on a client outside the framework — logged once; session_guard_hits counts from here",
-						cls, field, u32(id),
-					)
+					// Native only: the wasm fmt has no stdio — the counter
+					// still counts there, the once-line just stays quiet.
+					when ODIN_OS != .Freestanding {
+						fmt.printfln(
+							"kit/session WRITE GUARD: %s.%s (net id %d) changed on a client outside the framework — logged once; session_guard_hits counts from here",
+							cls, field, u32(id),
+						)
+					}
 				}
 			}
 		}
