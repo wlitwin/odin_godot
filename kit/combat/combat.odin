@@ -48,25 +48,41 @@ Ability_Def :: struct {
 	cost:     i32, // spent from whatever resource the game passes in
 }
 
-// The whole cast gate, shared by prediction and authority: ready + affordable
-// -> pay and start the cooldown. Call from inside the ability's command proc.
-// A cost-free ability may pass no resource at all (both games' first free
-// casts invented dummy locals for this).
+// The single-slot cast gate — THE one implementation of "ready + affordable
+// -> pay and start", shared by prediction and authority. ability_try's
+// slice+slot form and play.Ability's block form both delegate here (the
+// play → kit arrow: the gate lives ONCE, so the two layers can never drift
+// on what "ready" means again).
+cast_gate :: proc "contextless" (cd: ^u16, cooldown: u16, cost: i32 = 0, resource: ^i32 = nil) -> bool {
+	if cd^ != 0 {
+		return false
+	}
+	if cost > 0 {
+		if resource == nil || resource^ < cost {
+			return false
+		}
+		resource^ -= cost
+	}
+	cd^ = cooldown
+	return true
+}
+
+// One cooldown's per-net-tick decay toward ready — the scalar under
+// abilities_tick and play.ability_tick. No-op when ready.
+cd_decay :: proc "contextless" (cd: ^u16) {
+	if cd^ > 0 {
+		cd^ -= 1
+	}
+}
+
+// The whole cast gate over a slot array. Call from inside the ability's
+// command proc. A cost-free ability may pass no resource at all (both
+// games' first free casts invented dummy locals for this).
 ability_try :: proc "contextless" (cds: []u16, slot: int, def: Ability_Def, resource: ^i32 = nil) -> bool {
 	if slot < 0 || slot >= len(cds) {
 		return false
 	}
-	if cds[slot] != 0 {
-		return false
-	}
-	if def.cost > 0 {
-		if resource == nil || resource^ < def.cost {
-			return false
-		}
-		resource^ -= def.cost
-	}
-	cds[slot] = def.cooldown
-	return true
+	return cast_gate(&cds[slot], def.cooldown, def.cost, resource)
 }
 
 ability_ready :: proc "contextless" (cds: []u16, slot: int) -> bool {
@@ -76,9 +92,7 @@ ability_ready :: proc "contextless" (cds: []u16, slot: int) -> bool {
 // The authority's per-net-tick decay (clients receive it as deltas).
 abilities_tick :: proc "contextless" (cds: []u16) {
 	for &c in cds {
-		if c > 0 {
-			c -= 1
-		}
+		cd_decay(&c)
 	}
 }
 

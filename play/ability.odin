@@ -27,23 +27,28 @@ package play
 // WHAT STAYS YOURS: the EFFECT. The lob's splash, the cone's burns, the buff's stat change touch
 // the game's world, so they live in your command hook (keyed by this command's index, gated on
 // `ok`), reading the aim the block stashed. The gun's two-seam rule, minus the cadence seam.
+//
+// THE LAYERING (play is policy, kit is mechanism — the canonical-shelf rule): the def TYPE is
+// kcombat.Ability_Def — name and cost live at TABLE level, where a string can (the POD discipline
+// bars it from any replicated blob) and where cost belongs: a wire verb can't carry your resource
+// pointer, so cost is gated where you issue and in the authority's hook, against the same def row
+// (or hand-write the composed verb — name-wins — when the pay must sit inside the predicted gate).
+// The block replicates only what both peers must agree on: the cooldown knob and the countdown.
+// The GATE and the DECAY delegate to kcombat (cast_gate/cd_decay) — one implementation, two layers.
 
-// Knobs. Host-assigned at arm and replicated so both peers gate identically and the HUD reads the
-// same countdown. Just the cooldown for now — a resource COST is a game gate (check it before you
-// issue, the same way you check the caster is alive), not the block's business.
-Ability_Def :: struct {
-	cooldown: u16, // NET ticks between casts
-}
+import kcombat "godot:kit/combat"
 
 Ability :: struct {
-	def:          Ability_Def `gd:"replicate"`, // the knob (POD blob; host-assigned at arm)
-	cd:           u16 `gd:"replicate"`,          // ticks until ready (0 = ready); host-decayed, client-predicted
-	aim_x, aim_y: f32,                           // scratch: the last cast's aim/target, for the game's effect hook
+	cooldown:     u16 `gd:"replicate"`, // the knob (host-assigned at arm, from the kcombat def row)
+	cd:           u16 `gd:"replicate"`, // ticks until ready (0 = ready); host-decayed, client-predicted
+	aim_x, aim_y: f32,                  // scratch: the last cast's aim/target, for the game's effect hook
 }
 
-// ability_arm — host-only, at spawn or a loadout change: stamp the cooldown and start ready.
-ability_arm :: proc(a: ^Ability, def: Ability_Def) {
-	a.def = def
+// ability_arm — host-only, at spawn or a loadout change: stamp the cooldown from the game's def
+// row and start ready. The row's name feeds ability bars, its cost feeds the game's issue gate —
+// neither rides the block.
+ability_arm :: proc(a: ^Ability, def: kcombat.Ability_Def) {
+	a.cooldown = def.cooldown
 	a.cd = 0
 }
 
@@ -55,9 +60,10 @@ ability_arm :: proc(a: ^Ability, def: Ability_Def) {
 // command hook (`ok`) to run the effect from `aim`. `dx,dy` is the aim/target, stashed for the hook.
 @(gd_command = "predict")
 ability_cast :: proc(a: ^Ability, dx, dy: f32) -> bool {
-	if a.cd > 0 {return false} // on cooldown — a rejection, revert the optimistic state
+	if !kcombat.cast_gate(&a.cd, a.cooldown) {
+		return false // on cooldown — a rejection, revert the optimistic state
+	}
 	a.aim_x, a.aim_y = dx, dy
-	a.cd = a.def.cooldown
 	return true
 }
 
@@ -65,7 +71,7 @@ ability_cast :: proc(a: ^Ability, dx, dy: f32) -> bool {
 // on the host; the client watches the replicated countdown (the ability is slow enough that it
 // needn't predict the decay). No-op when ready.
 ability_tick :: proc(a: ^Ability) {
-	if a.cd > 0 {a.cd -= 1}
+	kcombat.cd_decay(&a.cd)
 }
 
 // ability_ready reports whether the ability can cast this instant — for the HUD and any local

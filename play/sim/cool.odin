@@ -25,6 +25,14 @@ package play_sim
 // Twin-noun rule of thumb: pacing something only the host cares about, on a
 // wall clock or the host tick? play.Pace. Gating something the player FEELS,
 // that must answer locally and replay exactly? psim.Cool.
+//
+// THE THIRD SIBLING: play.Ability is the coop-lane cast block (its gate
+// delegates to kcombat.cast_gate — the one implementation). Cool stays a
+// separate mechanism ON PURPOSE, the same justified-twins pattern as
+// net/command vs sim/command: a resim decrements this countdown in replays,
+// which the coop gate's optimistic-revert model cannot express. Arm it from
+// the same kcombat.Ability_Def row a coop game would use (def.cooldown in
+// ticks) so the def table stays the one vocabulary across lanes.
 
 Cool :: struct {
 	left: u16 `gd:"replicate,predict"`, // ticks until due — the predicted countdown
