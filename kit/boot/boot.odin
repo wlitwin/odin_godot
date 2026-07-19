@@ -30,6 +30,15 @@ package kit_boot
 // The eight @(gd_method) names stay the game's to declare — Godot signals
 // must land on the game's script class; their bodies are one-liners (see
 // either example game's net.odin).
+//
+// LIFECYCLE — boot_attach builds a boot-owned stack; boot_detach tears it all
+// down for a back-to-menu → re-host in one live process (the ONE flow that
+// crosses attach without freeing the game's node). THE OWNERSHIP RULE, one
+// line for every layer here: boot lives as long as its node; below boot, X
+// destroys what X inits; node trees belong to the scene. boot created the
+// container nodes (ui_layer/stage/world), so boot_detach queue-frees THOSE and
+// their subtrees ride down; the kui *_destroy calls free only their tracking
+// arrays; wire_detach frees the wire's own containers. See boot_detach.
 
 import gd "godot:godot"
 import "godot:gdext"
@@ -326,6 +335,76 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 		gd.set_string(cast(gd.Object)b.legend, "text", fmt.ctprintf("%s", opts.legend))
 		gd.set_bool(cast(gd.Object)b.legend, "visible", false)
 	}
+}
+
+// THE teardown verb — boot_attach's symmetric twin, for the ONE flow that
+// keeps the process alive across it: back to menu, then re-host/re-join in the
+// same run. boot_attach's whole stack is boot-owned, and without this it LEAKED
+// on every return (the widget tracking arrays, the wire's gauge + shim
+// containers, the entity ledgers, the succession clones) and DOUBLED on every
+// re-host (a second ui_layer/stage/world forest piled onto the first, Godot
+// auto-renaming the collisions). boot_detach frees exactly what boot_attach and
+// the doors allocated, queue-frees the container nodes boot itself created (see
+// THE OWNERSHIP RULE below), and zeroes the Boot back to pre-attach — a fresh
+// boot_attach then rebuilds everything. Idempotent: safe on an already-detached
+// (zeroed) Boot, every free below no-ops on a nil container.
+//
+// NOT wired to any scene-exit hook, on purpose — it is the GAME's explicit verb
+// for "undo the attach and keep running". A game returning to its menu calls
+// it; the engine tearing the whole node down (scene change, quit) frees the
+// same nodes anyway — boot lives as long as its node — and the Odin memory dies
+// with the process, so there is nothing to hook. Call it when you mean to keep
+// the process, nowhere else.
+//
+// THE OWNERSHIP RULE: boot lives as long as its node; below boot, X destroys
+// what X inits; node trees belong to the scene. boot CREATED the container
+// nodes (ui_layer / stage / world), so boot_detach queue-frees THOSE — and the
+// widgets, the legend, and the world's entities parented under them ride the
+// subtree down with one free each. The kui *_destroy calls free only their
+// Odin-side tracking arrays (the nodes are the container's, i.e. boot's);
+// wire_detach frees the wire's own containers. Nothing is freed twice: no layer
+// frees a node another layer created (queue-freeing world AND an entity node
+// under it is the one overlap, and Godot's deletion queue validates each id, so
+// the parent-then-child pair is safe by construction).
+boot_detach :: proc(b: ^Boot) {
+	// Widgets: drop the Odin tracking arrays. The NODES ride ui_layer, freed
+	// with its subtree below — these calls never touch the tree (their own
+	// contract, stated on each *_destroy).
+	kui.lobby_destroy(&b.ui)
+	kui.chat_destroy(&b.chat)
+	kui.score_destroy(&b.score)
+	// The transport binding's owned containers (gauge windows, shim queues) and
+	// a live web relay session, if one is up.
+	netgd.wire_detach(&b.wire)
+	// The join-code rendezvous socket, if one is open (no-op when idle).
+	netgd.code_close(&b.rdv)
+	// The succession ceremony's one owned clone (the minted web reservation).
+	netgd.succession_destroy(&b.succ)
+	// The entity ledgers: the documented back-to-lobby wipe queue-frees the
+	// nodes + clears the maps, then release the maps' backing before the zero
+	// (clear keeps the allocation; a bare b^ = {} would orphan it).
+	boot_entities_clear(b)
+	delete(b.ent_nodes)
+	delete(b.ent_types)
+	// The boot-owned string clones the doors minted (callers passed temps;
+	// boot_succ_end may have pre-freed succ_room — delete("") is a no-op).
+	delete(b.succ_name)
+	delete(b.succ_url)
+	delete(b.succ_room)
+	delete(b.rdv_name)
+	// The container nodes boot created — one free each carries the whole subtree
+	// (ui_layer: lobby/chat/score/legend; world: every live entity).
+	if cast(rawptr)b.ui_layer != nil {
+		gd.node_queue_free(b.ui_layer)
+	}
+	if cast(rawptr)b.stage != nil {
+		gd.node_queue_free(b.stage)
+	}
+	if cast(rawptr)b.world != nil {
+		gd.node_queue_free(b.world)
+	}
+	b^ = {} // back to pre-attach — the ses/comms/lane pointers included (a fresh
+	// boot_attach re-supplies them); env / ent_kinds were the game's, never ours.
 }
 
 // The frame preamble + the boilerplate half of the event drain. Pumps the

@@ -42,7 +42,7 @@ Brawler :: struct {
 }
 
 BRAWLER_TYPE :: ksess.Entity_Type(1)
-CMD_THROW :: u16(0) // args: [dx f32][dy f32]
+CMD_THROW :: 0 // args: [dx f32][dy f32] — untyped: used as both the hook's raw u16 cmd and a knet.Cmd_Id at issue
 
 // The whole cast, zero role branches: gate, pay, remember the aim.
 brawler_cmd_throw :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {

@@ -83,6 +83,15 @@ Command_Env :: struct {
 // ones must).
 Command_Proc :: proc(entity: rawptr, r: ^Reader, env: ^Command_Env) -> bool
 
+// A coop verb's wire id. THE ID LAW is stated once, on Command_Desc.id below —
+// scriptgen's cmd_wire_id implements it. Distinct from ksim.Cmd_Id: a coop
+// command id and a sim command id are raw u16s that flow through near-identical
+// issue shapes (command_issue vs ksim.lane_command), so a game holding both
+// could hand one namespace's id to the other's proc and the compiler would
+// shrug. The distinct types make that swap a build error instead. The wire
+// bytes are unchanged — the encoders still write u16(id).
+Cmd_Id :: distinct u16
+
 Command_Desc :: struct {
 	name:    string, // stripped verb ("open") — diagnostics only
 	// The verb's STABLE wire id — what `command_begin` ships and receivers look
@@ -91,17 +100,22 @@ Command_Desc :: struct {
 	// collisions at build time; hand-built sets pick any values unique within
 	// the set (a single command's zero value is fine). An id the receiver
 	// doesn't know (version skew, a renamed verb) MISSES the lookup and rejects
-	// cleanly instead of dispatching to whatever lives at that position.
-	id:      u16,
+	// cleanly instead of dispatching to whatever lives at that position. THIS is
+	// the canonical id law — ksim.Sim_Cmd.id mirrors it and points back here.
+	id:      Cmd_Id,
 	predict: bool,
 	invoke:  Command_Proc,
 }
 
 // The id → descriptor lookup every receive/issue path routes through (sets are
-// a handful of verbs — a scan beats any table). nil = unknown id: reject.
+// a handful of verbs — a scan beats any table). nil = unknown id: reject. Takes
+// a raw u16, not a Cmd_Id: this is the RECEIVE/reconcile side, fed by ids read
+// off the wire (Command_Header.cmd) and from the pending ledger (Pending.cmd) —
+// both raw u16. The issue side converts its Cmd_Id in (the wire id is the same
+// value either way).
 command_find :: proc(set: ^Command_Set, id: u16) -> ^Command_Desc {
 	for &c in set.commands {
-		if c.id == id {
+		if u16(c.id) == id {
 			return &c
 		}
 	}
@@ -139,7 +153,7 @@ Command_Send_Proc :: proc(user: rawptr, bytes: []u8)
 // command executes — for commands arriving from clients AND for the host's
 // own local issues (the generated wrappers call command_hook_local), so games
 // never write an "authority inline half" beside each issue site.
-Command_Hook :: proc(user: rawptr, player: Player_Id, entity: Net_Id, cmd: u16, ok: bool)
+Command_Hook :: proc(user: rawptr, player: Player_Id, entity: Net_Id, cmd: u16, ok: bool) // cmd: raw wire id — the hook rides into the session's game-facing dispatch/events
 
 Command_Ctx :: struct {
 	is_authority: bool,
@@ -171,9 +185,9 @@ Command_Ctx :: struct {
 // generated wrappers' authority branch calls this so the host's own issues
 // take the same cross-entity path client commands do. No-op without a hook
 // (and clients never reach it: only the authority branch calls).
-command_hook_local :: proc(ctx: ^Command_Ctx, entity: Net_Id, cmd: u16, ok: bool) {
+command_hook_local :: proc(ctx: ^Command_Ctx, entity: Net_Id, cmd: Cmd_Id, ok: bool) {
 	if ctx.hook != nil {
-		ctx.hook(ctx.hook_user, ctx.me, entity, cmd, ok)
+		ctx.hook(ctx.hook_user, ctx.me, entity, u16(cmd), ok) // the hook carries the raw wire id
 	}
 }
 
@@ -198,12 +212,12 @@ command_ctx_destroy :: proc(ctx: ^Command_Ctx) {
 // Start a command message: header (entity, command index, fresh intent seq),
 // then the caller writes the args. Reuses ctx.msg — one command in flight at a
 // time between begin and issue.
-command_begin :: proc(ctx: ^Command_Ctx, entity: Net_Id, cmd: u16) {
+command_begin :: proc(ctx: ^Command_Ctx, entity: Net_Id, cmd: Cmd_Id) {
 	seq := ctx.pending.next_seq
 	ctx.pending.next_seq += 1
 	writer_reset(&ctx.msg)
 	write_net_id(&ctx.msg, entity)
-	write_u16(&ctx.msg, cmd)
+	write_u16(&ctx.msg, u16(cmd)) // wire bytes unchanged: the id crosses as a plain u16
 	write_u32(&ctx.msg, u32(seq))
 	ctx._entity = entity
 	ctx._seq = seq
@@ -217,9 +231,9 @@ command_begin :: proc(ctx: ^Command_Ctx, entity: Net_Id, cmd: u16) {
 // authoritative either way). A locally-rejected prediction is restored
 // immediately but the command is STILL sent — the client's copy may be stale
 // and only the host may say no.
-command_issue :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd: u16) -> bool {
+command_issue :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd: Cmd_Id) -> bool {
 	assert(!ctx.is_authority, "command_issue is the client path — the authority runs the command proc directly")
-	c := command_find(set, cmd)
+	c := command_find(set, u16(cmd))
 	if c == nil {
 		return false // no such verb on this set — a hand-written caller's bug, never a wire input
 	}
@@ -236,7 +250,7 @@ command_issue :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd:
 			// SAME proc from these bytes on top of it (registry replay).
 			args := make([]u8, len(ctx.msg.buf) - ctx._args_start)
 			copy(args, ctx.msg.buf[ctx._args_start:])
-			pending_record(&ctx.pending, ctx._seq, ctx._entity, cmd, args, revert, ctx.now_tick)
+			pending_record(&ctx.pending, ctx._seq, ctx._entity, u16(cmd), args, revert, ctx.now_tick)
 			predicted = true
 		} else {
 			fields_restore(entity, set.entity_desc, revert)

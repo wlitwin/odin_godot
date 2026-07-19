@@ -201,7 +201,17 @@ kui.abilities_refresh(&self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.s
   `chat_refresh` on `Ev_Line`, `score_refresh` on `Ev_Stats_Updated`. The exception is the
   owner's own HUD (live cooldown text, and hosts get no state events).
 - **`*_destroy` does not free nodes.** The tree belongs to the scene; destroy only drops the
-  Odin-side tracking arrays.
+  Odin-side tracking arrays (`lobby`/`chat`/`score`/`inv`/`abilities` — the widgets that keep
+  a `[dynamic]` of reused rows). [`kboot.boot_detach`](boot.md) is their caller: it destroys
+  the widget arrays, then queue-frees the container node they lived under (the nodes ride that
+  subtree down). Freeing the game's node instead frees the same nodes — the arrays then leak
+  briefly and die with the process, which is why detach is the supported keep-running path.
+- **`prompt`/`health` have no `*_destroy` — deliberately.** Their whole state is one Label
+  node (no `[dynamic]`, no map), so zero-value teardown is already correct: the node frees with
+  its parent and the struct holds nothing else. An empty destroy proc would only be ceremony.
+  The `netgraph` is the same shape (a Label + a fixed sparkline array); `netgraph_destroy`
+  exists for call-site symmetry but only zeroes — a game that builds its own netgraph owns it,
+  boot does not (`boot_net_stats` fills a value the game feeds to its own overlay).
 - Widgets spawn at the anchor origin — position them yourself; layout is the game's call.
 
 ## The netgraph — "is it healthy?", drawn

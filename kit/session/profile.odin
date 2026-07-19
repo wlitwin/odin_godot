@@ -105,6 +105,7 @@ prof_row :: proc(s: ^Session, pid: knet.Player_Id, make_missing: bool) -> []u8 {
 // against the last declare once per net tick and ships the change itself.
 session_profile_mine :: proc(s: ^Session, $T: typeid) -> ^T {
 	assert(s.prof.size == size_of(T), "session_profile_mine before session_profile_install (or with a different T)")
+	context.allocator = ses_allocator(s) // a first read MAKES my row (prof_row) — owned run state, freed in prof_destroy
 	return cast(^T)raw_data(prof_row(s, s.me, true))
 }
 

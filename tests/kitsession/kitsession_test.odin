@@ -373,7 +373,7 @@ bot_fields := [?]knet.Field_Desc{
 	{offset = offset_of(Bot, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32},
 }
 bot_desc := knet.Entity_Desc{fields = bot_fields[:]}
-BOT_HIT :: u16(0x6232) // hash-sized like a generated id — the suite rides the production shape
+BOT_HIT :: knet.Cmd_Id(0x6232) // hash-sized like a generated id — the suite rides the production shape
 bot_cmds := [?]knet.Command_Desc{{name = "hit", id = BOT_HIT, predict = true, invoke = bot_cmd_hit}}
 
 // The hp edge half, hand-built like generated code would be: cast, deref old,
@@ -1827,7 +1827,7 @@ type_hooks_route_and_catch_all_falls_back :: proc(t: ^testing.T) {
 	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, BOT_HIT))
 	step(boxes, &now)
 	testing.expect_value(t, len(typed.calls), 1)
-	testing.expect_value(t, typed.calls[0], u64(id) << 16 | u64(BOT_HIT))
+	testing.expect_value(t, typed.calls[0], u64(id) << 16 | u64(u16(BOT_HIT)))
 	testing.expect_value(t, len(general.calls), 0)
 
 	// The HOST's own local issue routes identically (one dispatcher).
@@ -1846,7 +1846,7 @@ type_hooks_route_and_catch_all_falls_back :: proc(t: ^testing.T) {
 		knet.command_hook_local(&host.s.ctx, sid, BOT_HIT, true)
 	}
 	testing.expect_value(t, len(general.calls), 1)
-	testing.expect_value(t, general.calls[0], u64(sid) << 16 | u64(BOT_HIT))
+	testing.expect_value(t, general.calls[0], u64(sid) << 16 | u64(u16(BOT_HIT)))
 }
 
 // ---- kcombat fire routing over SES_APP -------------------------------------------

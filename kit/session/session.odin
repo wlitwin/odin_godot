@@ -31,6 +31,7 @@ package kit_session
 
 import knet "godot:kit/net"
 import "core:fmt"
+import "core:mem"
 import "core:strings"
 
 // Which wire the message rides — maps to kit/netgd's channel plan.
@@ -488,6 +489,22 @@ FINGERPRINT_NONE :: u64(0xFFFFFFFFFFFFFFFF)
 // no third place to leak from (the profile-table leak was a field parked in
 // the wrong scope with a hand-maintained teardown list to forget it in).
 Session_Wiring :: struct {
+	// The allocator every ROOT reinstalls as context.allocator — the session's
+	// tier of the kit's three-allocator rule (docs/kit/session.md, "The
+	// allocator tiers"). kit/net's `_make` procs take an allocator EXPLICITLY;
+	// kit/sim's Lane and this Session STORE one and rebind it at every entry;
+	// comms/xfer/items/ui stay ambient. Zero (the default) adopts the caller's
+	// context.allocator at the FIRST *_start — resolved in session_init and
+	// kept across re-inits (Session_Wiring survives the run wipe), exactly as
+	// the Lane adopts context.allocator at lane_init. Set it before *_start for
+	// a custom allocator. Why STORED and not ambient: roster name clones,
+	// profile rows, stat names, backup blobs, and the registry's per-entity
+	// shadows are allocated from a dozen entry points but ALL freed in
+	// run_destroy/session_destroy — a fully-ambient session was correct only
+	// while context.allocator was IDENTICAL at init, at every packet, and at
+	// destroy, the precise assumption kit/sim's Lane fix had to abandon (a
+	// handler-side alloc and its teardown free rode different allocators).
+	allocator: mem.Allocator,
 	send:      Send_Proc,
 	send_user: rawptr,
 	cfg:       Session_Config, // resolved into Session_Run at *_start
@@ -623,6 +640,19 @@ Session :: struct {
 	ran:          bool, // session_init completed at least once — gates the re-entrant teardown
 }
 
+// The session's stored allocator, or the caller's ambient when it is not yet
+// resolved (a root reached before the first *_start — session_present's
+// pre-start lobby flourish). Every allocating/freeing ROOT opens with
+// `context.allocator = ses_allocator(s)` so a container filled from one entry
+// point (a packet handler, a tick) and freed from another (run_destroy) can
+// never ride two allocators — the stored-and-rebound tier kit/sim's Lane
+// proved. Installing context.allocator is frame-local, so this CANNOT be a
+// proc that sets it for the caller; it returns the value each root installs.
+@(private)
+ses_allocator :: proc(s: ^Session) -> mem.Allocator {
+	return s.allocator.procedure != nil ? s.allocator : context.allocator
+}
+
 // Free every owned container one run creates — the ONE list a new run-scoped
 // container field must join (a missed line leaks memory; it can never leak
 // stale STATE — `s.run = {}` wipes every field wholesale, listed or not).
@@ -667,6 +697,17 @@ session_init :: proc(s: ^Session, keep_profiles := false) {
 	// construction. Pending presentations are dropped even on a FIRST start:
 	// session_present can legally run before any *_start (a lobby flourish),
 	// and those queued against a zero clock must not fire into the new run.
+	//
+	// Tier C→B: resolve and install the session's allocator FIRST, so the
+	// re-entrant teardown below frees the dead run under the allocator that
+	// built it, and every container this init creates (registry, ctx,
+	// stat_names, the app writer) rides it too. Zero adopts the caller's
+	// ambient ONCE, at the first *_start; a rehost keeps the resolved value
+	// (Session_Wiring survives the wipe). See Session_Wiring.allocator.
+	if s.allocator.procedure == nil {
+		s.allocator = context.allocator
+	}
+	context.allocator = s.allocator
 	knet.later_clear(&s.later)
 	// `ran` (not a side effect like stat_names) gates the teardown: a FAILED
 	// host_resume leaves stat_names empty but the roster/tokens/registry
@@ -737,6 +778,7 @@ token_hash :: proc(token: u64) -> u64 {
 }
 
 session_destroy :: proc(s: ^Session) {
+	context.allocator = ses_allocator(s) // free every run + wiring container under what built it
 	run_destroy(&s.run)
 	// The wiring's own two containers (everything else there is procs,
 	// pointers, and plain values):
@@ -805,6 +847,7 @@ session_interp_delay :: proc(s: ^Session) -> f64 {
 // drains inside session_tick; a *_start/resume drops whatever was pending
 // (those effects were about the old run's world).
 session_present :: proc(s: ^Session, mine: bool, user: rawptr, cb: knet.Later_Proc, id := knet.NET_ID_INVALID, a := u64(0), extra := 0.0) {
+	context.allocator = ses_allocator(s) // the later queue is the session's (guarded: a pre-start present rides ambient, dropped at init)
 	if mine && extra == 0 {
 		cb(user, id, a)
 		return
@@ -928,6 +971,7 @@ ctx_send_command :: proc(user: rawptr, bytes: []u8) {
 // games that build entities by hand.)
 session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet.Command_Set, owner := knet.PLAYER_ID_INVALID) -> knet.Net_Id {
 	assert(s.is_host, "only the authority spawns; clients create via the factory")
+	context.allocator = ses_allocator(s) // the registry's per-entity shadows free in run_destroy — allocate them there too (a spawn from a lane tick runs under l.allocator otherwise)
 	id := knet.registry_spawn(&s.reg, entity, set, owner)
 	s.types[id] = type
 	if s.replicating {
@@ -950,6 +994,7 @@ session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet
 session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_ID_INVALID) -> (entity: rawptr, id: knet.Net_Id) {
 	assert(s.is_host, "only the authority spawns; clients create via the factory")
 	assert(s.factory_make != nil, "session_spawn_make needs session_set_factory")
+	context.allocator = ses_allocator(s) // registry_insert's shadow/edge_shadow ride the stored allocator (see session_spawn)
 	id = knet.registry_alloc_id(&s.reg)
 	set: ^knet.Command_Set
 	entity, set = s.factory_make(s.factory_user, type, id, owner)
@@ -968,6 +1013,7 @@ session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_
 // they stand NOW) to every seated peer.
 session_spawn_send :: proc(s: ^Session, id: knet.Net_Id) {
 	assert(s.is_host)
+	context.allocator = ses_allocator(s) // the spawn pair's second half rebinds like the first
 	delete_key(&s.unsent, id) // the owed send arrived
 	if s.replicating {
 		w := knet.writer_make()
@@ -1039,6 +1085,7 @@ session_set_stream_tier :: proc(s: ^Session, id: knet.Net_Id, tier: u8) {
 // event, role-free. Ordered with spawns and deltas on the reliable channel.
 session_set_owner :: proc(s: ^Session, id: knet.Net_Id, owner: knet.Player_Id) {
 	assert(s.is_host, "the authority hands things over; clients ask via commands")
+	context.allocator = ses_allocator(s) // registry_set_owner reseeds the stream ring under the stored allocator
 	prev := session_owner_of(s, id)
 	if prev == owner {
 		return
@@ -1067,6 +1114,7 @@ session_set_owner :: proc(s: ^Session, id: knet.Net_Id, owner: knet.Player_Id) {
 // a NEW observer must be able to see.
 session_set_blob :: proc(s: ^Session, id: knet.Net_Id, data: []u8) {
 	assert(s.is_host, "blobs are host truth; clients ask via commands or app messages")
+	context.allocator = ses_allocator(s) // the blob copy frees in registry_remove/destroy under the stored allocator — make it there
 	if !knet.registry_set_blob(&s.reg, id, data) {
 		return
 	}
@@ -1098,6 +1146,7 @@ session_blob :: proc(s: ^Session, id: knet.Net_Id) -> []u8 {
 // missing entity).
 session_despawn :: proc(s: ^Session, id: knet.Net_Id) {
 	assert(s.is_host)
+	context.allocator = ses_allocator(s) // registry_remove frees the entry's shadow/blob/edge/ring — under the allocator that made them (see session_spawn)
 	entity: rawptr
 	if e, ok := knet.registry_get(&s.reg, id); ok {
 		entity = e.entity
@@ -1127,6 +1176,7 @@ session_despawn :: proc(s: ^Session, id: knet.Net_Id) {
 // its WELCOME: drop-in mid-game join is the same code path as being early.
 session_start_replicating :: proc(s: ^Session) {
 	assert(s.is_host)
+	context.allocator = ses_allocator(s) // commit_shadows may allocate a missing entity's shadow — on the stored allocator
 	knet.registry_commit_shadows(&s.reg)
 	s.replicating = true
 	for _, p in s.players {
@@ -1234,6 +1284,7 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 // (any base — it stamps stream rings and clock pings). Returns how many net
 // ticks fired and how many remote entities were stream-sampled this frame.
 session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: int) {
+	context.allocator = ses_allocator(s) // net_tick, prof/stats/backup, the registry walks, later_drain, edges — all one allocator
 	s.now = now
 	ticks = knet.ticker_advance(&s.ticker, dt)
 	for _ in 0 ..< ticks {
@@ -1301,6 +1352,7 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 // cavecrawl's respawn walk-out was the worked lesson: a frame of un-teleported
 // full-hp host at point-blank range is one more rock through a friend).
 session_run_edges :: proc(s: ^Session) {
+	context.allocator = ses_allocator(s) // a standalone edge pass rebinds like session_tick (the halves are game code on the session's stack)
 	_ = knet.registry_edges_tick(&s.reg, s.game_user != nil ? s.game_user : s.factory_user)
 }
 
@@ -1575,7 +1627,8 @@ session_count :: proc(s: ^Session, connected_only := true, players_only := true)
 // server restarts, it does not migrate. The friends-host-for-friends model
 // is untouched; this is the always-on/public-hosting escape hatch.
 session_host_start :: proc(s: ^Session, name: string, token: u64 = 0, dedicated := false) {
-	session_init(s)
+	session_init(s) // resolves + stores s.allocator (first start adopts the ambient)
+	context.allocator = ses_allocator(s) // the host's own roster name clone rides it too
 	s.is_host = true
 	s.dedicated = dedicated
 	s.ctx.is_authority = true
@@ -1863,7 +1916,8 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 // watched). Promotion to a playing seat is deliberately NOT a flag flip —
 // leave and rejoin as a player.
 session_client_start :: proc(s: ^Session, token: u64, name: string, spectate := false) {
-	session_init(s)
+	session_init(s) // resolves + stores s.allocator (first start adopts the ambient)
+	context.allocator = ses_allocator(s) // the requested-name clone below rides it
 	s.is_host = false
 	s.token = token
 	s.spectate = spectate
@@ -1873,6 +1927,7 @@ session_client_start :: proc(s: ^Session, token: u64, name: string, spectate := 
 
 // Transport is connected: ask the host to seat us.
 session_client_join :: proc(s: ^Session) {
+	context.allocator = ses_allocator(s) // the shadow being dropped was made under the stored allocator (prof_tick)
 	// This host has never seen my row (a fresh host, or a rejoin to a new
 	// one): drop the declare shadow so the first prof_tick after seating
 	// re-ships it. The row itself stays — it is my echo, not run state here.
@@ -1988,6 +2043,7 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 // `from_peer` is the transport sender (hosts route by it; clients only ever
 // hear from the host — except streams, which any owning peer may broadcast).
 session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
+	context.allocator = ses_allocator(s) // every receive-path clone/make/free (names, rows, stat names, backup blobs, registry slices) rides the stored allocator
 	handle_packet_inner(s, from_peer, r)
 	if r.err {
 		// A packet died mid-parse — every inner bail leaves r.err set, so the

@@ -33,6 +33,31 @@ and `world` are Node2D containers, so screen shake ([kfx.Shake](fx.md)) can
 nudge them both as one; a 3D game sets `Options.spatial = true` to get Node3D
 containers instead (see `examples/slopball3d`).
 
+**Teardown — `boot_detach(b)`, and THE OWNERSHIP RULE.** `boot_attach` builds
+a boot-owned stack; `boot_detach` is its symmetric twin, for the one flow that
+crosses `attach` without freeing the game's node: **back to menu, then re-host
+or re-join in the same live process.** Without it every return leaked (the
+widget tracking arrays, the wire's gauge + shim containers, the entity ledgers,
+the succession clones) and every re-host *doubled* the node forest (a second
+`ui_layer`/`stage`/`world` piled onto the first). `boot_detach` frees exactly
+what `boot_attach` and the doors allocated and zeroes the `Boot` back to
+pre-attach — a fresh `boot_attach` rebuilds everything. It is **the game's
+explicit verb, wired to no scene-exit hook**: a game returning to its menu
+calls it; the engine tearing the whole node down frees the same nodes anyway
+(boot lives as long as its node) and the Odin memory dies with the process, so
+there is nothing to hook. It is idempotent — safe on an already-detached
+(zeroed) `Boot`.
+
+The rule it embodies, one line for every layer: **boot lives as long as its
+node; below boot, X destroys what X inits; node trees belong to the scene.**
+boot *created* the container nodes (`ui_layer`/`stage`/`world`), so
+`boot_detach` queue-frees THOSE — and the widgets, the legend, and the world's
+entities parented under them ride the subtree down with one free each. The
+[kui `*_destroy`](ui.md) calls free only their Odin-side tracking arrays (the
+nodes belong to the container, i.e. boot); `netgd.wire_detach` frees the wire's
+own gauge + shim containers. Nothing is freed twice — no layer frees a node
+another layer created.
+
 **Your look, the kit's behavior:** `Options.lobby_scene` / `chat_scene` /
 `score_scene` (nil = the stock builds) hand boot game-authored scenes to
 ADOPT — the kit resolves the nodes it drives by name and pours the stock

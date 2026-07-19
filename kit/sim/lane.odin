@@ -286,7 +286,7 @@ Lane :: struct {
 
 	// tick-scheduled verbs (command.odin): the client's issued ledger and
 	// the host's arrival queue
-	cmd_seq:         u32,
+	cmd_seq:         Cmd_Seq, // the client's issued-command counter (command.odin)
 	cmd_out:         [dynamic]Cmd_Out,
 	cmd_in:          [dynamic]Cmd_In,
 	cmd_exec_seq:    u32, // the command whose exec is running RIGHT NOW (0 = none) —

@@ -129,6 +129,29 @@ netgd.wire_attach(&self.wire, self.owner, &self.ses, MSG_SESSION)
 netgd.wire_listen(&self.wire, "on_packet", "on_peer_left", "on_net_up", "on_net_down")
 ```
 
+### The allocator tiers
+
+The kit allocates in three tiers, and the session sits in the middle one.
+**Explicit param** — kit/net's `*_make` procs (`writer_make`, `registry_make`, …)
+take an `allocator` argument; the caller names where every byte lives.
+**Stored and rebound** — kit/sim's `Lane` and this `Session` each keep ONE
+allocator (`Session_Wiring.allocator`, adopted from `context.allocator` at the
+first `*_start` and held across every re-init) and reinstall it as
+`context.allocator` at the top of EVERY root: the starts, resume, destroy,
+`session_tick`, the packet entry, `session_present`, the spawn/blob/owner/despawn
+mutators, and the subsystem writers (`session_stat_column`, `session_profile_mine`,
+`session_set_successor_info`). That is why a roster name cloned in a packet handler
+and freed in `run_destroy`, or a registry shadow made on spawn and freed on despawn,
+can never ride two allocators — a real cross-allocator free the moment a game hosts
+under a custom allocator (an arena, a tracking allocator) whose ambient differs from
+the session's between calls. Set `s.allocator` before `*_start` for a custom one;
+leave it zero and the session adopts whatever `context.allocator` was in force when it
+started. **Ambient** — comms, xfer, album, items, and the UI widgets keep no allocator
+of their own and allocate straight from `context.allocator`; a game driving them under
+a custom allocator must keep `context.allocator` STABLE across each subsystem's init,
+use, and destroy (the exact assumption the session and Lane were promoted out of),
+because their frees inherit whatever ambient is in force at teardown.
+
 ## Start, drive, drain
 
 ([kit/boot](boot.md) drives this whole section for you — `boot_host`/

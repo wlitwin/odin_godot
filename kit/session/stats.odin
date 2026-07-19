@@ -40,6 +40,7 @@ STAT_PING :: Stat_Col(1)
 // from ready() on every run. Clients get columns from the wire.
 session_stat_column :: proc(s: ^Session, name: string) -> Stat_Col {
 	assert(s.is_host, "the authority declares stat columns; clients receive them")
+	context.allocator = ses_allocator(s) // the cloned column name is owned run state, freed in run_destroy
 	if col, ok := session_stat_find(s, name); ok {
 		return col
 	}

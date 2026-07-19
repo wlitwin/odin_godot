@@ -253,9 +253,9 @@ Runner :: struct {
 ODIN
 if ! "$SGEN" "$vc" -godot:"$ROOT" >/dev/null 2>&1; then fail "verb-composition (same-package) must resolve, not error"; fi
 vgen="$vc/runner.gen.odin"
-grep -q "RUNNER_CMD_PRIMARY_FIRE :: u16" "$vgen" || fail "composed command index const RUNNER_CMD_PRIMARY_FIRE missing"
-grep -q "RUNNER_CMD_SECONDARY_FIRE :: u16" "$vgen" || fail "second instance must get its own path-prefixed index (SECONDARY_FIRE)"
-grep -q "RUNNER_CMD_PRIMARY_RELOAD :: u16" "$vgen" || fail "plain composed command RUNNER_CMD_PRIMARY_RELOAD missing"
+grep -q "RUNNER_CMD_PRIMARY_FIRE :: knet.Cmd_Id" "$vgen" || fail "composed command index const RUNNER_CMD_PRIMARY_FIRE missing"
+grep -q "RUNNER_CMD_SECONDARY_FIRE :: knet.Cmd_Id" "$vgen" || fail "second instance must get its own path-prefixed index (SECONDARY_FIRE)"
+grep -q "RUNNER_CMD_PRIMARY_RELOAD :: knet.Cmd_Id" "$vgen" || fail "plain composed command RUNNER_CMD_PRIMARY_RELOAD missing"
 grep -q "return gun_fire(&self.primary, self, _a0)" "$vgen" || fail "decode thunk must route into &self.primary and pass self (owner)"
 grep -q "return gun_reload(&self.secondary)" "$vgen" || fail "plain composed thunk must route into &self.secondary with no owner/args"
 grep -q "runner_secondary_fire_cmd :: proc" "$vgen" || fail "issue wrapper must be named per-entity (runner_secondary_fire_cmd)"
@@ -295,7 +295,7 @@ if ! "$SGEN" "$ic" -godot:"$coll" >/dev/null 2>&1; then fail "verb-composition (
 icgen="$ic/mob.gen.odin"
 grep -q 'import play "godot:play"' "$icgen" || fail "imported block's package must be imported into the generated file"
 grep -q "return play.gun_fire(&self.gun, self, _a0)" "$icgen" || fail "imported composed thunk must qualify (play.) and route + thread owner"
-grep -q "MOB_CMD_GUN_FIRE :: u16" "$icgen" || fail "imported composed command index MOB_CMD_GUN_FIRE missing"
+grep -q "MOB_CMD_GUN_FIRE :: knet.Cmd_Id" "$icgen" || fail "imported composed command index MOB_CMD_GUN_FIRE missing"
 
 # ---- fixture 9: the REAL play.Gun library block composes into a consumer ------
 # Embeds godot:play's Gun (state + the gun_fire verb) and asserts the whole block drops in: its
@@ -322,7 +322,7 @@ if ! "$SGEN" "$pg" -godot:"$ROOT" >/dev/null 2>&1; then fail "the real play.Gun 
 tgen="$pg/turret.gen.odin"
 grep -q 'import play "godot:play"' "$tgen" || fail "play.Gun consumer must import godot:play"
 grep -q "return play.gun_fire(&self.weapon, _a0, _a1)" "$tgen" || fail "play.gun_fire must route into &self.weapon (imported, qualified, no owner)"
-grep -q "TURRET_CMD_WEAPON_FIRE :: u16" "$tgen" || fail "play.Gun's verb must hoist as TURRET_CMD_WEAPON_FIRE"
+grep -q "TURRET_CMD_WEAPON_FIRE :: knet.Cmd_Id" "$tgen" || fail "play.Gun's verb must hoist as TURRET_CMD_WEAPON_FIRE"
 grep -q "size_of(type_of(Turret{}.weapon.def))" "$tgen" || fail "the Gun_Def knob-blob must replicate through the embed"
 grep -q "offset_of(type_of(Turret{}.weapon), mode)" "$tgen" || fail "the Gun_Mode mode field must compose through the block"
 
@@ -385,8 +385,8 @@ Caster :: struct {
 ODIN
 if ! "$SGEN" "$ab" -godot:"$ROOT" >/dev/null 2>&1; then fail "play.Ability must compose into a consumer, not error"; fi
 agen="$ab/caster.gen.odin"
-grep -q "CASTER_CMD_LOB_CAST :: u16" "$agen" || fail "first ability's cast must hoist as CASTER_CMD_LOB_CAST"
-grep -q "CASTER_CMD_CONE_CAST :: u16" "$agen" || fail "second ability instance must get its own path-prefixed cast (CONE_CAST)"
+grep -q "CASTER_CMD_LOB_CAST :: knet.Cmd_Id" "$agen" || fail "first ability's cast must hoist as CASTER_CMD_LOB_CAST"
+grep -q "CASTER_CMD_CONE_CAST :: knet.Cmd_Id" "$agen" || fail "second ability instance must get its own path-prefixed cast (CONE_CAST)"
 grep -q "return play.ability_cast(&self.lob, _a0, _a1)" "$agen" || fail "cast thunk must route into &self.lob (imported, qualified, no owner)"
 # The knob is FLAT since play went canonical-shelf: play.Ability_Def is gone
 # (the def table is kcombat's; a string name can never ride a replicated
@@ -418,7 +418,7 @@ if ! "$SGEN" "$ch" -godot:"$ROOT" >/dev/null 2>&1; then fail "play.Channel must 
 cgen="$ch/hero.gen.odin"
 grep -q 'offset_of(type_of(HeroC{}.rev), target).*flags = {.Owner_Stream}' "$cgen" || fail "the channel's owner flag must carry through the embed (rev.target)"
 grep -q 'offset_of(type_of(HeroC{}.rev), pct).*flags = {.Owner_Stream}' "$cgen" || fail "rev.pct must be owner-streamed through the embed"
-grep -q "HERO_C_CMD_REV_CLAIM :: u16" "$cgen" || fail "the channel's claim must hoist as HERO_C_CMD_REV_CLAIM"
+grep -q "HERO_C_CMD_REV_CLAIM :: knet.Cmd_Id" "$cgen" || fail "the channel's claim must hoist as HERO_C_CMD_REV_CLAIM"
 grep -q "return play.channel_claim(&self.rev, _a0)" "$cgen" || fail "claim thunk must route into &self.rev with the wire target"
 grep -q '{name = "rev_claim", id = HERO_C_CMD_REV_CLAIM, predict = false' "$cgen" || fail "the claim must be a PLAIN command (no prediction)"
 

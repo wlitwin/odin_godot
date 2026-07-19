@@ -665,9 +665,10 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		w(b, "// Command wire ids — a stable FNV-1a hash of each verb's name, NOT a\n")
 		w(b, "// position: reordering (or adding/removing) procs never renumbers the\n")
 		w(b, "// wire, and a version-skewed peer's unknown id rejects instead of\n")
-		w(b, "// misdispatching. For the game's command hook dispatch.\n")
+		w(b, "// misdispatching. Typed knet.Cmd_Id so a coop id can't be handed to a\n")
+		w(b, "// sim verb's proc (it still crosses the wire as a plain u16).\n")
 		for c in s.commands {
-			fmt.sbprintf(b, "%s_CMD_%s :: u16(0x%x)\n", upper, strings.to_upper(c.name), cmd_wire_id(c.name))
+			fmt.sbprintf(b, "%s_CMD_%s :: knet.Cmd_Id(0x%x)\n", upper, strings.to_upper(c.name), cmd_wire_id(c.name))
 		}
 		w(b, "\n")
 		for c in s.commands {
@@ -1024,9 +1025,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		// tick and its `_then` fires there — the exec thunk holds that gate.
 		if len(s.commands) > 0 {
 			w(b, "// Command wire ids — a stable FNV-1a hash of each verb's name, NOT a\n")
-			w(b, "// position: reordering procs never renumbers the wire.\n")
+			w(b, "// position: reordering procs never renumbers the wire. Typed ksim.Cmd_Id\n")
+			w(b, "// so a sim verb id can't be handed to a coop command (still a plain u16\n")
+			w(b, "// on the wire).\n")
 			for c in s.commands {
-				fmt.sbprintf(b, "%s_CMD_%s :: u16(0x%x)\n", upper, strings.to_upper(c.name), cmd_wire_id(c.name))
+				fmt.sbprintf(b, "%s_CMD_%s :: ksim.Cmd_Id(0x%x)\n", upper, strings.to_upper(c.name), cmd_wire_id(c.name))
 			}
 			w(b, "\n")
 			for c in s.commands {
@@ -1108,9 +1111,9 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			for c in s.commands {
 				aseat := c.any_seat ? ", any_seat = true" : ""
 				if c.apply_proc != "" {
-					fmt.sbprintf(b, "\t{{id = %s_CMD_%s, exec = _%s_simcmd_%s, apply = _%s_simcmd_%s_apply%s}},\n", upper, strings.to_upper(c.name), snake, c.name, snake, c.name, aseat)
+					fmt.sbprintf(b, "\t{{name = %q, id = %s_CMD_%s, exec = _%s_simcmd_%s, apply = _%s_simcmd_%s_apply%s}},\n", c.name, upper, strings.to_upper(c.name), snake, c.name, snake, c.name, aseat)
 				} else {
-					fmt.sbprintf(b, "\t{{id = %s_CMD_%s, exec = _%s_simcmd_%s%s}},\n", upper, strings.to_upper(c.name), snake, c.name, aseat)
+					fmt.sbprintf(b, "\t{{name = %q, id = %s_CMD_%s, exec = _%s_simcmd_%s%s}},\n", c.name, upper, strings.to_upper(c.name), snake, c.name, aseat)
 				}
 			}
 			w(b, "}\n\n")

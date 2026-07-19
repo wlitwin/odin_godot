@@ -168,6 +168,41 @@ when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 	}
 }
 
+// The teardown twin of wire_attach — for the ONE flow that keeps a process
+// alive across a transport's whole life: a game returning to menu, then
+// re-hosting/re-joining in the same run (kboot.boot_detach's wire slice). It
+// frees everything the wire OWNS: the gauge's per-tag windows, the bad-link
+// shim's per-peer state and its still-queued receive copies, and the pending-
+// kick queue; then closes a live WebRTC relay session so a fresh begin_*_web
+// can bind clean (web_close no-ops on native — nothing is installed for this
+// node). Safe on a half-attached OR already-zeroed wire: deleting nil
+// containers is a no-op and the node guard skips the socket close. It does NOT
+// unregister the session's transport — the session pointer is the game's, and
+// a re-host re-runs wire_attach (which re-registers) — it just returns the
+// wire to its zero value.
+wire_detach :: proc(wire: ^Session_Wire) {
+	// The bad-link shim's still-queued receives each own a copied byte slice.
+	for d in wire.delayed {
+		delete(d.data)
+	}
+	delete(wire.delayed)
+	delete(wire.dropping)
+	delete(wire.lossy)
+	delete(wire.last_due)
+	// The gauge's SES_APP-by-tag windows (the fixed [WIRE_KINDS] arrays are
+	// inline — nothing to free there).
+	delete(wire.gauge.app_in_acc)
+	delete(wire.gauge.app_out_acc)
+	delete(wire.gauge.app_in_rate)
+	delete(wire.gauge.app_out_rate)
+	// A live web relay session, if any — no-op on native / no-web (webrtc_close
+	// finds no session installed for this node and returns).
+	if cast(rawptr)wire.node != nil {
+		web_close(wire)
+	}
+	wire^ = {}
+}
+
 // The frame byte's high bit marks a STREAM-channel packet — the sender is
 // the only one who knows the channel, and the receive-side shim needs it to
 // be honest (streams drop under loss and never queue behind reliable

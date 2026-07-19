@@ -163,6 +163,7 @@ session_backup_parts :: proc(s: ^Session, allocator := context.temp_allocator) -
 // info set, host loss stays v1-shaped: Ev_Host_Left, run over, no auto arc.
 session_set_successor_info :: proc(s: ^Session, info: []u8) {
 	assert(s.is_host)
+	context.allocator = ses_allocator(s) // succ_info is owned run state, freed in run_destroy — copy it under the stored allocator
 	delete(s.succ_info)
 	s.succ_info = make([]u8, len(info))
 	copy(s.succ_info, info)
@@ -256,7 +257,8 @@ session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backu
 	assert(s.factory_make != nil, "resume recreates entities through the factory — install it first")
 	// The heir carries every player's profile row into the resumed run —
 	// keep_profiles=true lifts the table over the run wipe (see session_init).
-	session_init(s, true)
+	session_init(s, true) // resolves + stores s.allocator (a fresh session's first start)
+	context.allocator = ses_allocator(s) // the resumed roster's name/stat clones below ride the stored allocator
 	s.is_host = true
 	s.ctx.is_authority = true
 	s.me = me

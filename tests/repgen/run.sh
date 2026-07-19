@@ -87,7 +87,7 @@ for needle in \
 	'_pawn_simcmd_hit :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool' \
 	'_a0 := knet.read_i32(&r)' \
 	'if r.err {return false}' \
-	'{id = PAWN_CMD_MARK, exec = _pawn_simcmd_mark}' \
+	'{name = "mark", id = PAWN_CMD_MARK, exec = _pawn_simcmd_mark}' \
 	'pawn_command_set := knet.Command_Set{entity_desc = &pawn_net_desc' \
 	'pawn_hit_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, amount: i32) -> knet.Command_Outcome' \
 	'pawn_mark_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, label: string, who: knet.Player_Id) -> knet.Command_Outcome' \
@@ -100,7 +100,7 @@ for needle in \
 	'pawn_loot_then(self, by, _a0, _p0)' \
 	'if _ok {pawn_hit_apply(self, _a0)}' \
 	'_pawn_simcmd_hit_apply :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane)' \
-	'{id = PAWN_CMD_HIT, exec = _pawn_simcmd_hit, apply = _pawn_simcmd_hit_apply}' \
+	'{name = "hit", id = PAWN_CMD_HIT, exec = _pawn_simcmd_hit, apply = _pawn_simcmd_hit_apply}' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
 		echo "REPGEN_FAIL: generated file is missing sim-command artifact: $needle"
@@ -135,7 +135,7 @@ for needle in \
 	'return .Rejected' \
 	'chest_seal_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Command_Outcome' \
 	'_ = knet.command_issue(ctx, self, &chest_command_set, CHEST_CMD_SEAL)' \
-	'CHEST_CMD_OPEN :: u16(0x' \
+	'CHEST_CMD_OPEN :: knet.Cmd_Id(0x' \
 	'id = CHEST_CMD_OPEN, predict = true' \
 	'_ok := chest_claim(self, env.by)' \
 	'chest_claim_then(self, env.by)' \

@@ -64,10 +64,11 @@ Pickup :: struct {
 	last_grab: kitems.Slot, // scratch for the grab hook
 }
 
-CHEST_TAKE :: u16(0) // args: [slot u8][count u16][px f32][py f32]
-DOOR_TOGGLE :: u16(0) // args: [px f32][py f32]
-SPEL_DROP :: u16(0) // args: [slot u8]
-PICKUP_GRAB :: u16(0) // args: [px f32][py f32]
+// Untyped: each is used as both the loot_hook's raw u16 cmd and a knet.Cmd_Id at issue.
+CHEST_TAKE :: 0 // args: [slot u8][count u16][px f32][py f32]
+DOOR_TOGGLE :: 0 // args: [px f32][py f32]
+SPEL_DROP :: 0 // args: [slot u8]
+PICKUP_GRAB :: 0 // args: [px f32][py f32]
 
 // The whole loot rule, written once, zero role branches: the predicting
 // client and the host run this same proc from byte-identical args.

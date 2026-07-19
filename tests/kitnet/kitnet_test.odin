@@ -434,9 +434,9 @@ ping_pong_feeds_clock :: proc(t: ^testing.T) {
 // index-like 0/1/2 here would exercise a shape production never runs — the
 // stale `p.cmd < len(commands)` reconcile gate survived exactly that way,
 // green in tests while dead in every generated game (the confirm-2 flake).
-CMD_ADD :: u16(0x9a65) // predicted; rejects when state == 9 ("locked")
-CMD_TORN :: u16(0xed76) // hostile: mutates BEFORE rejecting — restore must undo it
-CMD_MARK :: u16(0x2da5) // non-predicted host-only action
+CMD_ADD :: knet.Cmd_Id(0x9a65) // predicted; rejects when state == 9 ("locked")
+CMD_TORN :: knet.Cmd_Id(0xed76) // hostile: mutates BEFORE rejecting — restore must undo it
+CMD_MARK :: knet.Cmd_Id(0x2da5) // non-predicted host-only action
 
 probe_cmd_add :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
 	p := cast(^Probe)entity
@@ -616,7 +616,7 @@ command_execute_restores_torn_state :: proc(t: ^testing.T) {
 	defer knet.writer_destroy(&w)
 	r := knet.reader_make(knet.writer_bytes(&w)) // no args
 	env := knet.Command_Env{authority = true}
-	testing.expect(t, !knet.command_execute(&host, &set, CMD_TORN, &r, &env))
+	testing.expect(t, !knet.command_execute(&host, &set, u16(CMD_TORN), &r, &env)) // receive path: the raw wire id
 	testing.expect_value(t, host.hp, i32(42))
 	testing.expect_value(t, host.x, f32(1))
 
@@ -700,7 +700,7 @@ probe_cmd_loot :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) 
 
 @(test)
 command_then_fires_on_authority_only :: proc(t: ^testing.T) {
-	LOOT :: u16(0xc57) // hash-sized like a generated id, unique within the set
+	LOOT :: knet.Cmd_Id(0xc57) // hash-sized like a generated id, unique within the set
 	desc := probe_desc()
 	cmds := [?]knet.Command_Desc{{name = "loot", id = LOOT, predict = true, invoke = probe_cmd_loot}}
 	set := knet.Command_Set{entity_desc = &desc, commands = cmds[:]}
@@ -751,7 +751,7 @@ command_malformed_input_rejects :: proc(t: ^testing.T) {
 	knet.write_u16(&w, 0xFF) // 2 bytes where read_i32 wants 4
 	r := knet.reader_make(knet.writer_bytes(&w))
 	env := knet.Command_Env{authority = true}
-	testing.expect(t, !knet.command_execute(&host, &set, CMD_ADD, &r, &env))
+	testing.expect(t, !knet.command_execute(&host, &set, u16(CMD_ADD), &r, &env)) // receive path: the raw wire id
 	testing.expect_value(t, host.hp, i32(10))
 
 	// Unknown command index from a hostile/mismatched peer: rejected, no panic.
@@ -1176,7 +1176,7 @@ registry_command_routing :: proc(t: ^testing.T) {
 	responded, ok, h := knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7),&rr, &result)
 	testing.expect(t, responded && ok)
 	testing.expect_value(t, host.hp, i32(15))
-	testing.expect(t, h.entity == hid && h.cmd == CMD_ADD, "the header comes back for command hooks")
+	testing.expect(t, h.entity == hid && h.cmd == u16(CMD_ADD), "the header comes back for command hooks")
 	res_r := knet.reader_make(knet.writer_bytes(&result))
 	res := knet.registry_client_result(&creg, &cctx, &res_r)
 	testing.expect(t, res.ok)
