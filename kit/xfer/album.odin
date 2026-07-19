@@ -130,6 +130,10 @@ album_poll :: proc(a: ^Album) -> (from: knet.Player_Id, id: u8, ok: bool) {
 // everyone else.) No-op off the host.
 album_welcome :: proc(a: ^Album, player: knet.Player_Id) {
 	ses := a.x.ses
+	// Same teaching assert as comms_welcome — the identical join-time role
+	// on the identical trigger; a silent no-op here taught the wrong lesson
+	// its sibling refuses loudly.
+	assert(ses == nil || ses.is_host, "album_welcome is the HOST's half — call it from your _player_joined_then")
 	if ses == nil || !ses.is_host || player == ses.me {
 		return
 	}
@@ -187,23 +191,10 @@ replay_pump :: proc(a: ^Album, budget: int) {
 	left := budget
 	for left > 0 && len(a.replays) > 0 {
 		r := &a.replays[0]
-		chunks := (len(r.data) + CHUNK - 1) / CHUNK
-		lo := r.seq * CHUNK
-		hi := min(lo + CHUNK, len(r.data))
-		w := ksess.session_app_begin(ses, a.x.tag)
-		knet.write_u8(w, XF_CAST)
-		knet.write_player_id(w, r.from)
-		knet.write_u8(w, r.id)
-		knet.write_u16(w, u16(r.seq))
-		knet.write_u16(w, u16(chunks))
-		knet.write_u32(w, u32(len(r.data)))
-		knet.write_bytes(w, r.data[lo:hi])
-		ksess.session_app_flush(ses, r.to)
-		r.seq += 1
-		left -= 1
-		if r.seq >= chunks {
+		if chunk_send(ses, a.x.tag, XF_CAST, r.from, r.id, &r.seq, r.data, r.to) {
 			delete(r.data)
 			ordered_remove(&a.replays, 0)
 		}
+		left -= 1
 	}
 }

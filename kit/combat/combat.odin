@@ -153,10 +153,14 @@ effects_tick :: proc "contextless" (fx: []Effect) {
 		if e.kind == EFFECT_NONE {
 			continue
 		}
-		e.left -= 1
-		if e.left == 0 {
+		// <= catches a hand-written {kind != 0, left = 0} row — effects_add
+		// can't produce it, but a game assigning rows directly can, and the
+		// bare decrement underflowed it to a 65535-tick immortal effect.
+		if e.left <= 1 {
 			e = {}
+			continue
 		}
+		e.left -= 1
 	}
 }
 
@@ -198,6 +202,13 @@ leash :: proc "contextless" (claimed, anchor: [3]f32, r: f32) -> [3]f32 {
 	return anchor + d * (r / n)
 }
 
+// DELIBERATELY kcombat's own vocabulary: kinteract.Candidate and kai.Target
+// carry the same (id, pos) shape under their own names, and each package
+// keeps a private dist_sq — the three math modules stay import-free of each
+// other so a game can take any subset. The cost is a field-copy at the seams
+// of a game that wires all three; the rule is INDEPENDENCE OVER SHARING for
+// the math cores (kit/fx breaks it toward kcombat on purpose: tracers are
+// the visual half of the Fire pattern, not a math module).
 Target :: struct {
 	id:     u32,
 	pos:    [3]f32,
@@ -284,34 +295,59 @@ fire_read :: proc(r: ^knet.Reader) -> (f: Fire, ok: bool) {
 	return f, !r.err
 }
 
+// The fire lane's default SES_APP tag, beside its siblings (comms 0, xfer 2,
+// sim 3) — cavecrawl picked 1 by convention and every game since copied it.
+FIRE_TAG :: u8(1)
+
 // The two halves of the announcement, PACKAGED — the second consumer game
 // reproduced cavecrawl's ~25 lines of tag plumbing and guard logic verbatim,
-// which is the extraction bar. The host announces a confirmed cast:
-fire_announce :: proc(s: ^ksess.Session, tag: u8, f: Fire) {
+// which is the extraction bar. The HOST announces a confirmed cast — the
+// assert is the sender half of the trust gate (the receiver drop below is
+// the security boundary; this is the teaching moment: a client calling it
+// broadcast frames every receiver silently discarded).
+fire_announce :: proc(s: ^ksess.Session, f: Fire, tag: u8 = FIRE_TAG) {
+	assert(s.is_host, "fire_announce is the AUTHORITY's half — clients see fires through fire_poll, they never author them")
 	w := ksess.session_app_begin(s, tag)
 	fire_write(w, f)
 	ksess.session_app_flush(s, ksess.BROADCAST_PEER)
 }
 
-Fire_Proc :: proc(user: rawptr, f: Fire)
-
-// The listener's registration record. Owned by the GAME (a struct field, one
-// per session) — kit/combat keeps no globals, so parallel sessions in one
-// process (the test rig, dedicated hosts) never collide.
+// The listener's registration record + queue. Owned by the GAME (a struct
+// field, one per session) — kit/combat keeps no globals, so parallel
+// sessions in one process (the test rig, dedicated hosts) never collide.
 Fire_Route :: struct {
-	ses:     ^ksess.Session,
-	user:    rawptr,
-	on_fire: Fire_Proc,
+	ses:   ^ksess.Session,
+	fires: [dynamic]Fire,
 }
 
 // ...and every peer listens. The guards each game used to hand-roll live
 // here now: only the HOST authors fires (a spoofed peer announcement is
 // dropped), the host itself skips (its screen drew at launch), and your own
-// echo skips (your screen drew at cast time). What reaches `on_fire` is
+// echo skips (your screen drew at cast time). What lands in the queue is
 // exactly "someone else's rock — draw it".
-fire_listen :: proc(fr: ^Fire_Route, s: ^ksess.Session, tag: u8, user: rawptr, on_fire: Fire_Proc) {
-	fr^ = Fire_Route{ses = s, user = user, on_fire = on_fire}
+//
+// EVENTS, NOT CALLBACKS — the handler only FILES; the game drains with
+// fire_poll each frame, on its own stack (the discipline comms/xfer/the
+// lane all follow; the old on_fire callback ran game code mid-session-pump,
+// the one reentrancy hole in the subsystem).
+fire_listen :: proc(fr: ^Fire_Route, s: ^ksess.Session, tag: u8 = FIRE_TAG) {
+	fr^ = Fire_Route{ses = s}
 	ksess.session_app_route(s, tag, fr, fire_handle)
+}
+
+// Drain one announced fire (call until ok=false each frame, then draw).
+fire_poll :: proc(fr: ^Fire_Route) -> (f: Fire, ok: bool) {
+	if len(fr.fires) == 0 {
+		return {}, false
+	}
+	f = fr.fires[0]
+	ordered_remove(&fr.fires, 0)
+	return f, true
+}
+
+fire_route_destroy :: proc(fr: ^Fire_Route) {
+	delete(fr.fires)
+	fr^ = {}
 }
 
 @(private = "file")
@@ -320,7 +356,7 @@ fire_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 	if fr.ses.is_host || from_peer != ksess.HOST_PEER {return}
 	f, ok := fire_read(r)
 	if !ok || f.shooter == fr.ses.me {return}
-	fr.on_fire(fr.user, f)
+	append(&fr.fires, f)
 }
 
 // ---- predicted hp: the impact you SAW, before the wire agrees ---------------------

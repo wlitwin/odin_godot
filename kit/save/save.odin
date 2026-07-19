@@ -73,7 +73,7 @@ save_read_header :: proc(r: ^knet.Reader) -> (h: Header, ok: bool) {
 // on a FRESH session with the factory installed (entities recreate through
 // it); returns false on a corrupt snapshot.
 save_restore :: proc(s: ^ksess.Session, name: string, r: ^knet.Reader, h: Header) -> bool {
-	return ksess.session_host_resume(s, h.saved_by, name, r.data[r.off:])
+	return ksess.session_host_resume(s, h.saved_by, name, knet.reader_remaining(r))
 }
 
 // Why a resume refused — each case is a different sentence to the player.
@@ -117,7 +117,9 @@ resume :: proc(s: ^ksess.Session, name: string, path: cstring, game_version: u16
 // ---- file helpers (FileAccess: user:// works everywhere, web included) ---------
 
 write_file :: proc(path: cstring, bytes: []u8) -> bool {
-	f := gd.file_access_open(gd.new_string_cstring(path), .Write)
+	gpath := gd.new_string_cstring(path) // caller-owned engine String (Ergonomics rule)
+	defer gd.free_string(gpath)
+	f := gd.file_access_open(gpath, .Write)
 	if cast(rawptr)f == nil {
 		return false
 	}
@@ -134,12 +136,15 @@ write_file :: proc(path: cstring, bytes: []u8) -> bool {
 }
 
 file_exists :: proc(path: cstring) -> bool {
-	return bool(gd.file_access_file_exists(gd.new_string_cstring(path)))
+	gpath := gd.new_string_cstring(path)
+	defer gd.free_string(gpath)
+	return bool(gd.file_access_file_exists(gpath))
 }
 
 // The whole file; the caller owns the slice. ok=false when absent/unreadable.
 read_file :: proc(path: cstring, allocator := context.allocator) -> (bytes: []u8, ok: bool) {
 	gpath := gd.new_string_cstring(path)
+	defer gd.free_string(gpath)
 	if !gd.file_access_file_exists(gpath) {
 		return nil, false
 	}
@@ -149,6 +154,7 @@ read_file :: proc(path: cstring, allocator := context.allocator) -> (bytes: []u8
 	}
 	n := int(gd.file_access_get_length(f))
 	pba := gd.file_access_get_buffer(f, gd.Int(n))
+	defer gd.free_packed_byte_array(pba) // engine-owned buffer, copied out below
 	gd.file_access_close(f)
 	view := netgd.pba_view(&pba)
 	bytes = make([]u8, len(view), allocator)

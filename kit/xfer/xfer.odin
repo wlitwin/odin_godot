@@ -161,6 +161,32 @@ done_queued :: proc(x: ^Xfer, from: knet.Player_Id, id: u8) -> bool {
 	return false
 }
 
+// One chunk of `data` framed and flushed — the pacing atom shared by
+// xfer_pump (own outbox) and the album's replay_pump (addressed catch-up);
+// the two loops were line-for-line twins before it. XF_CAST carries the
+// author's id; XF_CHUNK is a client's own upload (the host stamps the id
+// when it rebroadcasts). Returns true when the payload completed — the
+// caller retires it.
+@(private)
+chunk_send :: proc(ses: ^ksess.Session, tag: u8, kind: u8, from: knet.Player_Id, id: u8, seq: ^int, data: []u8, to: ksess.Peer_Id) -> (done: bool) {
+	chunks := (len(data) + CHUNK - 1) / CHUNK
+	lo := seq^ * CHUNK
+	hi := min(lo + CHUNK, len(data))
+	w := ksess.session_app_begin(ses, tag)
+	knet.write_u8(w, kind)
+	if kind == XF_CAST {
+		knet.write_player_id(w, from)
+	}
+	knet.write_u8(w, id)
+	knet.write_u16(w, u16(seq^))
+	knet.write_u16(w, u16(chunks))
+	knet.write_u32(w, u32(len(data)))
+	knet.write_bytes(w, data[lo:hi])
+	ksess.session_app_flush(ses, to)
+	seq^ += 1
+	return seq^ >= chunks
+}
+
 // Ship up to `budget` chunks. Call once per NET TICK — the pacing is the
 // point (one giant reliable packet stalls everything queued behind it).
 xfer_pump :: proc(x: ^Xfer, budget := PUMP_CHUNKS) {
@@ -185,28 +211,13 @@ xfer_pump :: proc(x: ^Xfer, budget := PUMP_CHUNKS) {
 	left := budget
 	for left > 0 && len(x.outbox) > 0 {
 		out := &x.outbox[0]
-		chunks := (len(out.data) + CHUNK - 1) / CHUNK
-		lo := out.seq * CHUNK
-		hi := min(lo + CHUNK, len(out.data))
-		w := ksess.session_app_begin(x.ses, x.tag)
-		if x.ses.is_host {
-			knet.write_u8(w, XF_CAST)
-			knet.write_player_id(w, x.ses.me)
-		} else {
-			knet.write_u8(w, XF_CHUNK)
-		}
-		knet.write_u8(w, out.id)
-		knet.write_u16(w, u16(out.seq))
-		knet.write_u16(w, u16(chunks))
-		knet.write_u32(w, u32(len(out.data)))
-		knet.write_bytes(w, out.data[lo:hi])
-		ksess.session_app_flush(x.ses, x.ses.is_host ? ksess.BROADCAST_PEER : ksess.HOST_PEER)
-		out.seq += 1
-		left -= 1
-		if out.seq >= chunks {
+		kind := x.ses.is_host ? XF_CAST : XF_CHUNK
+		to := x.ses.is_host ? ksess.BROADCAST_PEER : ksess.HOST_PEER
+		if chunk_send(x.ses, x.tag, kind, x.ses.me, out.id, &out.seq, out.data, to) {
 			delete(out.data)
 			ordered_remove(&x.outbox, 0)
 		}
+		left -= 1
 	}
 }
 

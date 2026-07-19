@@ -124,10 +124,14 @@ score_refresh :: proc(sb: ^Score, s: ^ksess.Session) {
 	for p in roster {
 		if p.dedicated {continue} // the server keeps no score
 		cell(sb, &next, fmt.ctprintf("%s", p.name), false)
-		for name, col in names {
+		for name in names {
 			if score_hidden(sb, name) {continue}
-			// Stat_Col handles are 1-based (0 = the unregistered-column trap).
-			cell(sb, &next, fmt.ctprintf("%d", ksess.session_stat(s, p.id, ksess.Stat_Col(col + 1))), true)
+			// Resolve by NAME, never by position: the registry owns the
+			// index↔handle mapping (the hardcoded col+1 here would silently
+			// mislabel every column if that convention ever moved).
+			if col, has := ksess.session_stat_find(s, name); has {
+				cell(sb, &next, fmt.ctprintf("%d", ksess.session_stat(s, p.id, col)), true)
+			}
 		}
 	}
 	for i in next ..< len(sb.cells) {

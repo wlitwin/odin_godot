@@ -5,6 +5,13 @@ package kit_fx
 // any script can summon these — an entity that keeps its own emitter (a
 // carried torch, a pyre) authors it in its scene instead.
 //
+// 2D ONLY, stated plainly: bursts are Cpu_Particles2d, floats are
+// Control-positioned Labels, shake moves a Node2d — a 3D game gets nothing
+// from this package (including screen shake) and authors its own juice.
+// The (x, y) args are honest about that; the toolkit's [3]f32 position
+// convention resumes where the math is dimension-agnostic (combat/interact/
+// ai), which this package deliberately is not.
+//
 // Two lifetimes, two shapes:
 //   * flash — fire-and-forget: paint the node a color NOW, let a Tween walk
 //     it back to white. The tween is owned by the node; if the node dies
@@ -61,8 +68,10 @@ burst_at :: proc(fx: ^Bursts, parent: gd.Node, x, y: f32, color: gd.Color) {
 	append(&fx.live, Burst{node = p, left = BURST_TTL})
 }
 
-// Reap spent burst emitters (call once per frame from process).
-frame :: proc(fx: ^Bursts, delta: f64) {
+// Reap spent burst emitters (call once per frame from process). Named like
+// its pool siblings floats_frame/shake_frame/tracers_frame — the bare
+// `frame` this file shipped with was the one outlier in its own convention.
+bursts_frame :: proc(fx: ^Bursts, delta: f64) {
 	for i := 0; i < len(fx.live); {
 		b := &fx.live[i]
 		b.left -= f32(delta)
@@ -84,7 +93,15 @@ flash :: proc(node: gd.Node, color: gd.Color) {
 	tw := gd.node_create_tween(node)
 	white := gd.Color{1, 1, 1, 1}
 	v := gd.variant_from_color(&white)
-	_ = gd.tween_tween_property(tw, cast(gd.Object)node, gd.new_node_path_string(gd.new_string_cstring("modulate")), v, 0.3)
+	defer gd.variant_destroy(&v)
+	// Caller-owned engine values, released after the call that consumes them
+	// (tracer_add's discipline) — the inline chain leaked a String and a
+	// NodePath per flash, ~forever on a hit-heavy screen.
+	s := gd.new_string_cstring("modulate")
+	defer gd.free_string(s)
+	np := gd.new_node_path_string(s)
+	defer gd.free_node_path(np)
+	_ = gd.tween_tween_property(tw, cast(gd.Object)node, np, v, 0.3)
 }
 
 // ---- floating text ---------------------------------------------------------------

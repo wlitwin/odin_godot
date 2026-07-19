@@ -9,6 +9,7 @@ package kit_ui
 import gd "godot:godot"
 import kcombat "godot:kit/combat"
 import kitems "godot:kit/items"
+import knet "godot:kit/net"
 import "core:fmt"
 import "core:strings"
 
@@ -132,9 +133,11 @@ abilities_destroy :: proc(bar: ^Ability_Bar) {
 }
 
 // Repaint from the defs and the replicated cooldown array: "[rock]" ready,
-// "[rock 1.2s]" cooling, "[rock $]" ready-but-unaffordable. `tick_rate` is
-// the session's net tick rate (20 Hz) — cooldowns count ticks.
-abilities_refresh :: proc(bar: ^Ability_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_rate := 20) {
+// "[rock 1.2s]" cooling, "[rock $]" ready-but-unaffordable. Cooldowns count
+// NET TICKS — pass `session_tick_hz(&ses)` so the seconds shown are true at
+// any configured rate (the default only matches a session left at knet's
+// 20 Hz; a 60 Hz game that omits it shows cooldowns 3× too long).
+abilities_refresh :: proc(bar: ^Ability_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_rate := knet.DEFAULT_TICK_HZ) {
 	for cell, i in bar.cells {
 		if i >= len(defs) {
 			gd.set_string(cast(gd.Object)cell, "text", "")

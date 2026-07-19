@@ -56,6 +56,7 @@ Netgraph :: struct {
 // Levels 0..8 as the eighth-blocks ▁▂▃▄▅▆▇█ (U+2581..U+2588); index 0 is the
 // flat baseline a quiet sim holds.
 @(private = "file")
+@(rodata)
 SPARK_ROWS := [9]string {
 	"\xE2\x96\x81", "\xE2\x96\x81", "\xE2\x96\x82", "\xE2\x96\x83", "\xE2\x96\x84",
 	"\xE2\x96\x85", "\xE2\x96\x86", "\xE2\x96\x87", "\xE2\x96\x88",

@@ -53,13 +53,12 @@ cave_launch_rock :: proc(self: ^CaveLobby, shooter: knet.Player_Id, origin: [2]f
 	if shooter != self.ses.me {
 		add_visual_rock(self, f) // the host's screen (its own casts drew at cast time)
 	}
-	kcombat.fire_announce(&self.ses, TAG_FIRE, f)
+	kcombat.fire_announce(&self.ses, f, TAG_FIRE)
 }
 
 // Every peer: somebody ELSE's rock (kcombat.fire_listen already dropped the
 // host's own copy, my echo, and anything a non-host tried to author).
-cave_on_fire :: proc(user: rawptr, f: kcombat.Fire) {
-	self := cast(^CaveLobby)user
+cave_on_fire :: proc(self: ^CaveLobby, f: kcombat.Fire) {
 	add_visual_rock(self, f)
 }
 

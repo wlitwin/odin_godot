@@ -195,6 +195,17 @@ read_bytes :: proc(r: ^Reader) -> []u8 {
 	return b
 }
 
+// The undecoded tail, zero-copy — for handing a reader's remainder to
+// another parser whole (kit/save hands the envelope's tail to
+// session_host_resume). An accessor so no consumer reaches into data/off
+// directly; nil once exhausted or errored.
+reader_remaining :: proc(r: ^Reader) -> []u8 {
+	if r.err || r.off >= len(r.data) {
+		return nil
+	}
+	return r.data[r.off:]
+}
+
 // ---------------------------------------------------------------------------
 // write_pod / read_pod — a whole POD value as its raw little-endian bytes. The
 // primitive under generated `gd:"backup"` codecs, and the house idiom for any

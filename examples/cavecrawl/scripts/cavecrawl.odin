@@ -216,7 +216,7 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	// table. World hookups install now; entities exist only after Start.
 	kitems.items_register(&self.table, GEM, "gem", 99)
 	kitems.items_register(&self.table, TORCH, "torch", 5)
-	kcombat.fire_listen(&self.fires, &self.ses, TAG_FIRE, self, cave_on_fire)
+	kcombat.fire_listen(&self.fires, &self.ses, TAG_FIRE)
 
 	// (The wire-contract version gate is on by default — the generated guard
 	// file registers NET_FINGERPRINT as the session default at load.)
@@ -300,7 +300,14 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 			self.relic.x = self.me_spel.x + 10
 			self.relic.y = self.me_spel.y - 12
 		}
-		kfx.frame(&self.fx, delta) // reap spent particle bursts
+		kfx.bursts_frame(&self.fx, delta) // reap spent particle bursts
+		// Announced fires, drained on MY stack (events-not-callbacks — the
+		// old on_fire callback ran mid-session-pump).
+		for {
+			f, has := kcombat.fire_poll(&self.fires)
+			if !has {break}
+			cave_on_fire(self, f)
+		}
 		// The authority's fixed steps + the same-frame edge pass, role-free
 		// at the call site: the generated cave_lobby_step holds the host
 		// gate (clients no-op) and runs session_run_edges after the loop —

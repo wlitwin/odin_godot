@@ -1847,17 +1847,6 @@ type_hooks_route_and_catch_all_falls_back :: proc(t: ^testing.T) {
 
 // ---- kcombat fire routing over SES_APP -------------------------------------------
 
-Fire_Log :: struct {
-	count: int,
-	last:  kcombat.Fire,
-}
-
-log_fire :: proc(user: rawptr, f: kcombat.Fire) {
-	l := cast(^Fire_Log)user
-	l.count += 1
-	l.last = f
-}
-
 @(test)
 fire_listen_routes_to_other_screens_only :: proc(t: ^testing.T) {
 	host, alice, bob: Peer_Box
@@ -1870,11 +1859,13 @@ fire_listen_routes_to_other_screens_only :: proc(t: ^testing.T) {
 	boxes := []^Peer_Box{&host, &alice, &bob}
 
 	TAG :: u8(7)
-	hlog, alog, blog: Fire_Log
 	hroute, aroute, broute: kcombat.Fire_Route
-	kcombat.fire_listen(&hroute, &host.s, TAG, &hlog, log_fire)
-	kcombat.fire_listen(&aroute, &alice.s, TAG, &alog, log_fire)
-	kcombat.fire_listen(&broute, &bob.s, TAG, &blog, log_fire)
+	defer kcombat.fire_route_destroy(&hroute)
+	defer kcombat.fire_route_destroy(&aroute)
+	defer kcombat.fire_route_destroy(&broute)
+	kcombat.fire_listen(&hroute, &host.s, TAG)
+	kcombat.fire_listen(&aroute, &alice.s, TAG)
+	kcombat.fire_listen(&broute, &bob.s, TAG)
 
 	ksess.session_host_start(&host.s, "hosty")
 	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
@@ -1883,26 +1874,37 @@ fire_listen_routes_to_other_screens_only :: proc(t: ^testing.T) {
 	ksess.session_client_join(&bob.s)
 	pump(boxes)
 
-	// The host confirms alice's cast and announces it: BOB draws it (one
-	// call, payload intact); ALICE skips her own echo (she drew at cast
-	// time); the HOST skips (its screen drew at launch).
+	// The host confirms alice's cast and announces it: BOB polls it out
+	// (payload intact); ALICE skips her own echo (she drew at cast time);
+	// the HOST skips (its screen drew at launch). Nothing fires mid-pump —
+	// the queue holds until each game's own drain.
 	f := kcombat.Fire{shooter = 2, origin = {10, 20, 0}, vel = {3, 0, 0}, ttl = 30, kind = 1}
-	kcombat.fire_announce(&host.s, TAG, f)
+	kcombat.fire_announce(&host.s, f, TAG)
 	pump(boxes)
-	testing.expect_value(t, blog.count, 1)
-	testing.expect_value(t, blog.last.shooter, knet.Player_Id(2))
-	testing.expect_value(t, blog.last.ttl, u16(30))
-	testing.expect_value(t, blog.last.origin.x, f32(10))
-	testing.expect_value(t, alog.count, 0)
-	testing.expect_value(t, hlog.count, 0)
+	bf, drew := kcombat.fire_poll(&broute)
+	testing.expect(t, drew, "bob draws the announced fire")
+	testing.expect_value(t, bf.shooter, knet.Player_Id(2))
+	testing.expect_value(t, bf.ttl, u16(30))
+	testing.expect_value(t, bf.origin.x, f32(10))
+	_, extra := kcombat.fire_poll(&broute)
+	testing.expect(t, !extra, "one announcement, one fire")
+	_, aecho := kcombat.fire_poll(&aroute)
+	testing.expect(t, !aecho, "alice skips her own echo")
+	_, hecho := kcombat.fire_poll(&hroute)
+	testing.expect(t, !hecho, "the host's screen drew at launch")
 
-	// A CLIENT trying to author a fire reaches no other screen: the host's
-	// own listener drops everything (is_host), and clients only honor
-	// announcements arriving FROM the host seat.
-	kcombat.fire_announce(&alice.s, TAG, f)
+	// A CLIENT trying to author a fire reaches no other screen. The
+	// announce wrapper asserts against the attempt now, so the spoof takes
+	// the RAW path a real cheater would — hand-framed bytes on the tag —
+	// and the receiver guard (the security boundary) drops it everywhere.
+	w := ksess.session_app_begin(&alice.s, TAG)
+	kcombat.fire_write(w, f)
+	ksess.session_app_flush(&alice.s, ksess.BROADCAST_PEER)
 	pump(boxes)
-	testing.expect_value(t, blog.count, 1) // unchanged
-	testing.expect_value(t, hlog.count, 0)
+	_, spoofed := kcombat.fire_poll(&broute)
+	testing.expect(t, !spoofed, "a client's announcement is dropped by every receiver")
+	_, hspoof := kcombat.fire_poll(&hroute)
+	testing.expect(t, !hspoof)
 
 	// The session's tick clock is the ticker's own count, exposed.
 	before := ksess.session_tick_no(&host.s)
