@@ -45,7 +45,11 @@ Session_Wire :: struct {
 	latency:  f64, // injected one-way receive delay, seconds (0 = off)
 	jitter:   f64, // extra per-packet delay, uniform [0, jitter) seconds
 	loss:     f64, // simulated loss fraction [0,1) — streams drop, reliable pays a retransmit delay
+	burst:    f64, // mean lost-run length in packets (<=1 = independent losses; >1 = Gilbert-Elliott clustering at the same AVERAGE loss — real WiFi loses in bursts, and bursts are crueler than the coin flip)
+	bandwidth: int, // downlink cap in bytes/s (0 = infinite): ONE shared pipe for all senders; sustained overflow QUEUES behind it, so delay grows under load — bufferbloat, the failure real narrow links actually have
 	rng:      u64, // the shim's xorshift state (seeded on first use)
+	pipe_free: f64, // when the modeled downlink finishes its current queue
+	lossy:    map[ksess.Peer_Id]bool, // Gilbert-Elliott per-sender state (true = inside a loss burst)
 	last_due: map[ksess.Peer_Id]f64, // per-peer monotone due clamp: jitter varies delay, never reorders
 	delayed:  [dynamic]Wire_Delayed,
 	dropping: [dynamic]Wire_Drop, // sockets scheduled to close (kicks)
@@ -241,21 +245,56 @@ wire_receive :: proc(wire: ^Session_Wire, id: gd.Int, packet: gd.Packed_Byte_Arr
 	ses_kind := len(view) > 1 ? view[1] : 0
 	app_tag := len(view) > 2 ? view[2] : 0
 	gauge_count(&wire.gauge, false, ses_kind, app_tag, len(view)) // dropped-below counts too: it crossed the wire
-	if wire.latency > 0 || wire.jitter > 0 || wire.loss > 0 {
+	if wire.latency > 0 || wire.jitter > 0 || wire.loss > 0 || wire.bandwidth > 0 {
+		from := ksess.Peer_Id(id)
 		delay := wire.latency + wire.jitter * wire_rand01(wire)
-		if wire.loss > 0 && wire_rand01(wire) < wire.loss {
+		// The narrow pipe: ONE downlink shared by every sender. A packet
+		// transmits at the cap; sustained overflow queues behind the pipe and
+		// the queue IS the delay — bufferbloat, what a real constrained link
+		// does long before it drops anything.
+		if wire.bandwidth > 0 {
+			now := knet.now_s()
+			start := max(now, wire.pipe_free)
+			wire.pipe_free = start + f64(len(view)) / f64(wire.bandwidth)
+			delay += wire.pipe_free - now
+		}
+		lost := false
+		if wire.loss > 0 {
+			if wire.burst > 1 {
+				// Gilbert-Elliott: two states per SENDER — long clean runs, then
+				// a burst that eats ~`burst` consecutive packets, at the same
+				// average rate the uniform roll would give. Transition math:
+				// leave the bad state with p=1/burst (mean run = burst packets),
+				// enter it so the stationary bad share equals `loss`.
+				bad := wire.lossy[from]
+				if bad {
+					lost = true
+					if wire_rand01(wire) < 1.0 / wire.burst {
+						bad = false
+					}
+				} else if wire_rand01(wire) < (wire.loss / (1.0 - wire.loss)) / wire.burst {
+					bad = true
+					lost = true
+				}
+				wire.lossy[from] = bad
+			} else {
+				lost = wire_rand01(wire) < wire.loss
+			}
+		}
+		if lost {
 			// Channel-honest loss: an unreliable-channel packet (owner streams,
 			// the sim lane's input windows and snapshots) simply VANISHES —
 			// redundancy and last-value semantics absorb it, which is the real
 			// behavior. Reliable traffic MUST arrive (the whole stack assumes
 			// ordered-reliable delivery), so its "loss" is what loss really
-			// costs that channel: a retransmit's worth of extra delay.
+			// costs that channel: a retransmit's worth of extra delay — and a
+			// BURST on reliable stacks those delays through the FIFO clamp,
+			// which is the convoy a real burst builds.
 			if streamed {
 				return
 			}
 			delay += 2 * wire.latency
 		}
-		from := ksess.Peer_Id(id)
 		due := knet.now_s() + delay
 		// Jitter varies delay but the RELIABLE channel never reorders: its
 		// packets stay FIFO per sender (the shim sits above ENet, whose
@@ -347,10 +386,21 @@ wire_drop :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id, after := 0.75) {
 // jitter and loss are how you prove your game FEELS right on a bad link,
 // not just a slow one. Test your game the same way — kit/boot reads
 // <ENV>_LATENCY / <ENV>_JITTER / <ENV>_LOSS for you.
-wire_set_latency :: proc(wire: ^Session_Wire, ms: int, jitter_ms := 0, loss_pct := 0) {
+// `burst` clusters the loss: the mean lost-RUN length in packets, at the same
+// average rate — 1 (the default) keeps independent per-packet losses; 4 means
+// losses arrive as ~4-packet bursts with long clean stretches between, the
+// shape real WiFi and cellular actually produce. Bursts are crueler than the
+// coin flip at the same percentage: a redundant-input window survives
+// scattered drops and dies whole inside one burst — test against them.
+// `bandwidth_bps` caps the modeled downlink in BYTES/s (0 = infinite), one
+// shared pipe for all senders; past it, packets queue and delay GROWS
+// (bufferbloat), which is what a narrow link really does before it drops.
+wire_set_latency :: proc(wire: ^Session_Wire, ms: int, jitter_ms := 0, loss_pct := 0, burst := 1, bandwidth_bps := 0) {
 	wire.latency = f64(ms) / 1000.0
 	wire.jitter = f64(jitter_ms) / 1000.0
 	wire.loss = clamp(f64(loss_pct) / 100.0, 0, 0.95)
+	wire.burst = f64(max(burst, 1))
+	wire.bandwidth = max(bandwidth_bps, 0)
 }
 
 // Short display names per SES kind, for wire_traffic (indexes match the

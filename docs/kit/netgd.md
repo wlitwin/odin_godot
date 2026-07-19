@@ -215,7 +215,7 @@ session traffic shares `peer_packet` with any other raw-bytes protocol the game 
 ## wire_set_latency — the bad-link shim
 
 ```odin
-wire_set_latency :: proc(wire: ^Session_Wire, ms: int, jitter_ms := 0, loss_pct := 0)
+wire_set_latency :: proc(wire: ^Session_Wire, ms: int, jitter_ms := 0, loss_pct := 0, burst := 1, bandwidth_bps := 0)
 ```
 
 Injects one-way **receive** latency (0 disables): every packet this peer receives is held
@@ -232,11 +232,27 @@ shuffled would break the ordered-reliable contract no real network can break at 
 layer). `loss_pct` is channel-honest the same way: a **stream** batch rolls the dice and
 vanishes (last-value semantics — the next batch supersedes it, which is the real behavior
 of the unreliable channel), while **reliable** traffic must arrive, so its "loss" costs
-what loss really costs a reliable channel: a retransmit's worth of extra delay. kit/boot
-wires all three off env for you:
+what loss really costs a reliable channel: a retransmit's worth of extra delay.
+
+Two more knobs make the shim honest about links that are CRUEL, not just bad. `burst` is
+the mean lost-run length in packets: at 1 (the default) losses are independent coin flips;
+past it they arrive Gilbert-Elliott style — long clean stretches, then a burst that eats
+`~burst` consecutive packets, at the *same average rate*. The distinction has teeth: a
+redundant input window shrugs off scattered drops and dies whole inside one burst, and a
+reliable-channel burst stacks retransmit delays into a convoy — which is exactly what real
+WiFi and cellular do to netcode that only ever met the coin flip. `bandwidth_bps` caps the
+modeled downlink (bytes/s, one pipe shared by every sender): sustained overflow doesn't
+drop, it QUEUES, and the delay grows — bufferbloat, the failure narrow links actually have
+long before loss shows up. Up/down asymmetry needs no knob: each end shims its own
+*receive*, so a bad uplink is the OTHER window's numbers (the acids already run each
+process with its own env). Not modeled: per-peer mixing on one receiver — one flaky friend
+among good ones shares your whole shimmed downlink.
+
+kit/boot wires all five off env for you:
 
 ```sh
-QD_LATENCY=120 QD_JITTER=30 QD_LOSS=3 ./run_two_windows.sh   # <ENV>_LATENCY/_JITTER/_LOSS
+QD_LATENCY=120 QD_JITTER=30 QD_LOSS=3 ./run_two_windows.sh        # the classic trio
+QD_LOSS=3 QD_BURST=4 QD_BANDWIDTH=16000 ./run_two_windows.sh      # cruel: bursty loss on a 16KB/s pipe
 ```
 
 ## The wire gauge — bytes by kind, and the link's own truth

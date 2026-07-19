@@ -294,15 +294,23 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 	}
 	if latency_env != "" {
 		// The whole bad-link shim off env: <ENV>_LATENCY (one-way ms) plus
-		// <ENV>_JITTER (extra uniform ms, order-preserving) and <ENV>_LOSS
-		// (percent: streams drop, reliable pays a retransmit delay) — prove
-		// your game FEELS right on a bad link, not just a slow one.
-		jit, loss := 0, 0
+		// <ENV>_JITTER (extra uniform ms, order-preserving), <ENV>_LOSS
+		// (percent: streams drop, reliable pays a retransmit delay),
+		// <ENV>_BURST (mean lost-run length in packets — losses CLUSTER like
+		// real WiFi instead of coin-flipping), and <ENV>_BANDWIDTH (downlink
+		// bytes/s — overflow queues and delay grows, bufferbloat-shaped).
+		// Prove your game FEELS right on a bad link, not just a slow one —
+		// and on a CRUEL one, not just a statistically tidy one. Up/down
+		// asymmetry is per-process: each end shims its own receive, so give
+		// the two windows different values.
+		jit, loss, burst, bw := 0, 0, 1, 0
 		if opts.env != "" {
 			jit = gd.env_int(fmt.ctprintf("%s_JITTER", opts.env), 0)
 			loss = gd.env_int(fmt.ctprintf("%s_LOSS", opts.env), 0)
+			burst = gd.env_int(fmt.ctprintf("%s_BURST", opts.env), 1)
+			bw = gd.env_int(fmt.ctprintf("%s_BANDWIDTH", opts.env), 0)
 		}
-		netgd.wire_set_latency(&b.wire, gd.env_int(latency_env, 0), jit, loss)
+		netgd.wire_set_latency(&b.wire, gd.env_int(latency_env, 0), jit, loss, burst, bw)
 	}
 
 	if opts.legend != "" {

@@ -425,6 +425,36 @@ against a live run, a newly-ready row IS the drop-in trigger — spawn them
 friendslop trust model) — host-*minted* truth (banked currency, dealt
 inventory) belongs in replicated entity fields, not here.
 
+## The trust model — friends, not forensics
+
+Said once, plainly, because it is load-bearing everywhere: **the session trusts
+its seats the way you trust people you invited.** ENet is plaintext UDP — anyone
+on the path can read the wire (WebRTC and Steam encrypt for free, which is the
+honest transport answer for anything public). Owner streams are the owner's word:
+the host never validates that a stream batch names only entities its sender owns.
+Nothing rate-limits a seated peer's reliable traffic — the untrusted-*input*
+bounds all exist (command caps, input-window ceilings, the xfer payload cap,
+every length-checked decode), but they bound malformed and oversized, not
+malicious-and-well-formed. The fingerprint gate refuses *version skew*, not
+intent; the write guard catches *your own* bugs, not an attacker.
+
+What IS defended, today, by default: every decode is bounds-checked and every
+parse failure counted (`session_malformed`); commands are exactly-once,
+owner-gated, and dedup-windowed; sim inputs are validated and capped both ends;
+spectator seats are receive-only at four separate doors; the version door turns
+the worst failure mode into a sentence. That is the friendslop threat model
+covered in full: accidents, bugs, and version skew — not adversaries.
+
+A game outgrowing invited-friends play (public lobbies, strangers, stakes)
+wants the **hardening tier**, which is a named set, not a mystery: ride the
+encrypting transports; host-side stream *ownership* validation (the registry
+knows every owner — the check is an opt-in compare per named entity, the same
+door the spectator gate already shows in miniature); per-peer byte/message
+budgets on the reliable channel with a kick policy; and the state-hash probe
+for desync forensics. None of it is built yet, deliberately — friendslop
+defaults should not pay adversarial costs — and none of it is a redesign:
+every piece slots into doors that already exist.
+
 ## Command hooks (the generic layer under _then)
 
 Per-verb consequences belong in [`<verb>_then` procs](net.md#consequences-verb_then) —
