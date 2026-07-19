@@ -71,10 +71,19 @@ flows (bans, capacity, the version fingerprint).
 chat, transport wire, entity factory, and (promoted games) the sim lane.
 `boot_attach` builds it; `boot_pump` drives it once per frame.
 
-**block** — a reusable slice of gameplay shipped by the kit as a struct you
-embed plus procs that operate on it (`play.Puppet`, `play.Health`,
-`kcombat.Cooldowns`, `kitems.Inventory`). Blocks declare their own
-replicated fields and verbs; embedding one composes them into your entity.
+**block** — a `play`-layer primitive a game composes by embedding: a struct
+carrying its own replicated fields and name-paired generated hooks, with
+defaults that encode a stance (`play.Gun`, `play.Health`, `psim.Roller`).
+A block delegates its work down to kit *mechanisms* — play → kit is the only
+arrow, never the reverse — so the layers cannot drift on what "ready" or "a
+death" means ([play.md](play.md)).
+
+**mechanism** — a `kit`-layer proc, wire format, or descriptor table that a
+block or game calls (`kcombat.cast_gate`, `kcombat.hurt`): contextless, no
+opinions about game feel, no replicated state of its own. The litmus for the
+split: a block *holds* replicated state and generates hooks; a mechanism is
+what it calls — [combat.md](combat.md#health-and-abilities) holds the
+two-layer rule.
 
 **acid** — an acceptance test that runs the *real* game, multi-process,
 headless, under an injected bad link, and asserts over printed receipts

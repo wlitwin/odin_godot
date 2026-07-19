@@ -30,7 +30,7 @@ package kit_sim
 //   * tick procs touch predicted fields + ctx queries only — no clocks, no
 //     node state, no un-ledgered randomness (ksim RNG seeds by (tick, id));
 //   * presentation NEVER runs during resim — the sim state snaps, the render
-//     error smooths out over frames (the puppet layer's job, phase 3).
+//     error smooths out over frames (predict_error + the glide in lane_present).
 //
 // Entities without a truth row in this batch (interest filtering, partial
 // snapshots) rewind to their OWN ledgered prediction at T — the replay must
@@ -58,7 +58,7 @@ Entry :: struct {
 }
 
 // Authoritative predict-set state for one entity at the batch's tick —
-// struct-layout bytes (the wire decode happens at the packet edge, phase 2).
+// struct-layout bytes (the wire decode happens at the packet edge, snapshot.odin).
 Truth :: struct {
 	id:   knet.Net_Id,
 	blob: []u8,
@@ -83,7 +83,7 @@ note_all :: proc(entries: []Entry, tick: u64) {
 // `head_tick` is the client's predicted head (the ticker's tick). Returns
 // how many ticks were resimmed (0 = every truth matched, or nothing to do).
 // `mismatched` (optional) collects the ids whose predictions were wrong —
-// diagnostics and the phase-3 smoothing hook ride on it.
+// diagnostics and the render-error seeding (the lane's client_ingest) ride on it.
 reconcile :: proc(
 	entries: []Entry,
 	truths: []Truth,

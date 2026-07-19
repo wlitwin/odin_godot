@@ -407,6 +407,22 @@ re-seed-on-resync ritual beside them. The semantics, deliberate:
   and receive one half with the whole old/new value, atomically (speedball's
   `score: Score` — l, r, and won as one value, one half, one fire per goal).
   The grouping knob is the data model, not a framework mode.
+- **An EVENT must be bytes — equal values are indistinguishable from no
+  event.** The coalescing above means a 1→0→1 pulse inside one frame nets to
+  nothing, and "reset to level 1 *from* level 1" changes no bytes at all — an
+  edge cannot fire on a non-change at any cleverness setting, by design. When
+  you catch yourself wanting one to, the field is under-modeled: give the
+  event bytes. The house form is a **generation counter co-located in the
+  diff atom** — `stage: struct { level: u8, run: u16 }`, reset bumps `run` —
+  so same-level resets and within-frame round trips both land as real
+  transitions (`old.run != new.run` is the cleanup branch), and a late
+  joiner's silent seed correctly replays *zero* of them (they see `run = 5`
+  as a baseline, exactly right — no retained-event machinery needed). It is
+  the same move the kit itself makes everywhere state alone can't carry an
+  occurrence: warp serials, spawn seqs, dedup windows. When the occurrence
+  carries payload or must fire exactly-once under resim, it has outgrown
+  edges — that's a `_then` consequence, a session event, a
+  [Fire announcement](combat.md), or a sim-lane fact.
 - **First sight seeds, resync re-seeds — silently.** Spawn values are a
   baseline, not an edge; a wholesale catch-up (interest re-entry, a snapshot
   over live state) is history, not gameplay. Initial dress (a late joiner's

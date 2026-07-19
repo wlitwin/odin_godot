@@ -572,8 +572,8 @@ lane_set_sim :: proc(l: ^Lane, user: rawptr, sample: Sample_Proc, step: Step_Pro
 // (the factory / Ev_Spawned handler), with the owner from the spawn. The one
 // role decision the lane makes lives here: the authority ledgers truth for
 // everyone; a client ledgers predictions for its OWN entities and merely
-// watches the rest (their truth applies straight from batches — phase-3
-// smoothing will make that pretty).
+// watches the rest (their truth lands from batches; lane_present draws them
+// on the delayed watch clock, blending bracketing batches per field).
 lane_track :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, desc: ^knet.Entity_Desc, owner: knet.Player_Id, allocator := mem.Allocator{}) {
 	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	assert(!l.rewound, "lane_track inside a rewound block — the restore holds pointers into the track list; lane_rewound_end first")

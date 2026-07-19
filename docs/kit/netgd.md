@@ -26,6 +26,15 @@ The transfer-mode aliases (`RELIABLE`, `UNRELIABLE_ORDERED`) and the raw send pr
 (`send_to`, `send_reliable`, `send_stream`) exist so call sites read as intent, but with a
 `Session_Wire` attached you rarely call them yourself — the session's `Send_Proc` does.
 
+If you DO hand-roll a `Send_Proc` (the raw-layer path), translate the peer through
+`wire_engine_peer(to_peer) -> (engine_peer, ok)` — never cast a `ksess.Peer_Id` to an
+engine int. The sentinels don't line up: kit's `BROADCAST_PEER` is `Peer_Id(-1)` (it used
+to alias `NO_PEER`'s 0, so a disconnected seat's peer handed to send became an accidental
+broadcast), and the engine reads a raw -1 as "all except peer 1" — the server silently
+misses every broadcast. `wire_engine_peer` maps broadcast to the engine's 0 and returns
+`ok = false` for `NO_PEER`: a disconnected seat's peer reached the transport — drop the
+send.
+
 ## Session_Wire: the four one-line forwards
 
 `Session_Wire` is the session's transport binding — the ~50 lines every game used to write
@@ -91,18 +100,21 @@ netgd.begin_host(&wire, port, name, max_peers = 32, token = 0) -> bool  // false
 netgd.begin_join(&wire, addr, port, token, name) -> bool
 
 // browser (WebRTC room codes) — the relay ASSIGNS the code after the host connects
-netgd.begin_host_web(&wire, url, name, token = 0) -> bool   // false = relay socket refused
+netgd.begin_host_web(&wire, url, name, token = 0, room = "") -> bool  // false = relay socket refused
 netgd.begin_join_web(&wire, url, room, token, name) -> bool
 netgd.web_poll(&wire)   // every frame: pumps the signaling handshake
 netgd.web_close(&wire)  // full teardown — retry a failed join, or a successor raising a new room
 ```
 
 `token` is the host's own reconnect identity (see [session](session.md) — it makes a dead
-host reclaimable after a migration). The web pair differs from ENet in one structural way:
-the room code **does not exist yet** when `begin_host_web` returns — the relay assigns it
-async. Pump `web_poll` each frame and read it back with `gd.webrtc_room_code(node)` when it
-lands; `gd.webrtc_session_state` / `gd.webrtc_error_reason` narrate the handshake for your
-lobby. Everything ABOVE these calls — session, muster, commands, replication — is the same
+host reclaimable after a migration). `room` asks the relay to honor a RESERVED code
+instead of minting a fresh one — succession rides it: the dying run's host mints
+tomorrow's code today, and the heir raises the promised room under it while the crew
+knocks on exactly that code (empty = mint, the ordinary host). The web pair differs from
+ENet in one structural way: the room code **does not exist yet** when `begin_host_web`
+returns — the relay assigns it async. Pump `web_poll` each frame and read it back with
+`gd.webrtc_room_code(node)` when it lands; `gd.webrtc_session_state` /
+`gd.webrtc_error_reason` narrate the handshake for your lobby. Everything ABOVE these calls — session, muster, commands, replication — is the same
 code path on both transports; the branch ends the moment the multiplayer peer installs.
 
 [kit/boot](boot.md) wraps both flavors with the stock lobby ceremony: `boot_host` /
@@ -289,3 +301,23 @@ SceneMultiplayer's signals fire identically over any `MultiplayerPeer`. The WebR
 above are the browser story; hosting over Steam instead is covered in
 [steamgd.md](steamgd.md) — the `Session_Wire` and the four forwards are byte-for-byte the
 same in every case.
+
+**Cross-play.** A session never MIXES transports: every peer of one session rides the
+same `MultiplayerPeer` flavor — ENet, WebRTC, or Steam — because there is one multiplayer
+peer under the SceneMultiplayer and every seat is a peer on it. "Swappable" means the
+host picks the door for the whole run, not that peers pick doors per seat: a Steam owner
+hosting for a non-Steam friend hosts on ENet or WebRTC, and the Steam friends walk
+through that door like everyone else. The honest stance on the neighbors:
+
+- **LAN discovery** — not shipped. A broadcast ping is easy to hand-roll (UDP broadcast
+  the port, `begin_join` what answers); the join-code door already covers the same-LAN
+  pair without it.
+- **Server browser** — not shipped, and not a weekend: a browser needs a directory
+  service — the join-code relay grown up into registration, listing, and liveness. The
+  code door is the friendslop-sized piece of that.
+- **Splitscreen** — one process, one seat. The session has one identity per process;
+  two players on one couch sharing a screen is a game-side input/camera problem the
+  toolkit doesn't model.
+- **Consoles** — untested, and no platform transports exist here. The engine-free core
+  would port; the door glue (a platform's session/invite API as a `MultiplayerPeer`)
+  is the real work, and nobody has done it.

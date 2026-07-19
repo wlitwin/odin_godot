@@ -49,14 +49,16 @@ ITEM_NONE :: Item_Id(0)
 Item_Def :: struct {
 	name:      string, // owned by the table
 	max_stack: u16, // 1 = unstackable
+	shape:     Shape, // grid footprint (packing below); zero = 1x1
 }
 
 Table :: struct {
 	defs: map[Item_Id]Item_Def,
 }
 
-// Declare (or redeclare — safe in ready() every run) an item kind.
-items_register :: proc(t: ^Table, id: Item_Id, name: string, max_stack: u16 = 1)
+// Declare (or redeclare — safe in ready() every run) an item kind. `shape`
+// only matters to packed grids; slot inventories ignore it.
+items_register :: proc(t: ^Table, id: Item_Id, name: string, max_stack: u16 = 1, shape := Shape{})
 
 items_def :: proc(t: ^Table, id: Item_Id) -> (Item_Def, bool)
 
@@ -105,6 +107,14 @@ put :: proc(t: ^Table, slots: []Slot, idx: int, item: Item_Id, count: u16) -> (a
 // Anything that doesn't fit goes straight back where it came from — the pair
 // of inventories is never left torn. Returns how many moved.
 transfer :: proc(t: ^Table, from: []Slot, from_idx: int, to: []Slot, count: u16) -> (moved: u16)
+
+// The `slots: [N]Slot gd:"replicate"` field, packaged: embed it (`using inv:
+// kitems.Inventory(8)`) and the array replicates like a flat field, while
+// inv_add/inv_remove/inv_count/inv_take/inv_put/inv_transfer forward to
+// `slots[:]` — growing ops still take the Table, drain/read ops stay command-safe.
+Inventory :: struct($N: int) {
+	slots: [N]Slot `gd:"replicate"`,
+}
 ```
 
 ## THE RULE: which ops take the Table

@@ -16,7 +16,7 @@ package kit_sim
 //            authoritative ticks (reconcile.odin) — equal means skip resim
 //   server   a ring of authoritative truth, the lag-compensation ledger
 //            (rewind a hit test to what the shooter rendered) and the delta
-//            baseline store for snapshot compression (phase 2)
+//            baseline store for snapshot compression (snapshot.odin)
 //   both     history is DERIVED state; it must never replicate.
 
 import "core:mem"

@@ -47,7 +47,7 @@ In `ready()`:
 kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{
 	title    = "MY GAME",
 	status   = "Host a cave, or join one at localhost",
-	msg_kind = MSG_SESSION,
+	msg_kind = MSG_SESSION, // MSG_SESSION :: u8(0) — all kit/session traffic under one game byte
 	env      = "MY", // MY_PORT/_NAME/_TOKEN identity + the MY_LATENCY shim
 	methods  = {"on_host", "on_join", "on_start", "on_chat",
 	            "on_packet", "on_peer_left", "on_net_up", "on_net_down"},

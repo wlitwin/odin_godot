@@ -16,6 +16,14 @@ FOUR answers, each proven by a worked game. Pick by what your game contests.
 | **Contested object** (kit/sim, claim) | mine NOW, others past, the OBJECT claim-weighted | the server | round-trip waits on YOUR touches | the claim discipline (below) | the lane's claim machinery + kitsim |
 | **Predict-world** (kit/sim, echo) | EVERYTHING at my predicted now | the server | mixed-timeline artifacts, wholesale | constant small corrections on remotes; resim per batch | speedball |
 
+Budgets, per row, honestly: the coop model's proven scale is 2–8 players
+(the session's default seat cap — the friendslop shape). Predict-self's
+worked example is duel-scale — quickdraw is a 1v1 — though `boot_serve`
+accepts up to 32 peers by default. Contested-object is proven at the same
+scale, headless (the kitsim acids run two-to-three peers over an in-memory
+wire). Predict-world's speedball is 1v1 too — larger sim seats, on every
+row of that half, are untested, not impossible.
+
 And the fifth, deliberately not shipped: **deterministic lockstep** (the
 fighting-game answer — GGPO-style). One timeline by CONSENSUS: every peer
 simulates every tick from everyone's inputs, rolling back on late arrivals.

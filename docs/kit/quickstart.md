@@ -1,8 +1,8 @@
 # Hello, multiplayer — zero to two windows
 
 This page gets you from an empty folder to **two windows moving squares on
-both screens** in about ten minutes. Every line below is a real file in
-`examples/hello_net/` — copy the folder outright, or type along. (Want to
+both screens** in about ten minutes. Every line below is real, shipped code
+from `examples/hello_net/` — copy the folder outright, or type along. (Want to
 *feel* it before reading anything? `examples/slopball` in two windows is the
 five-minute version: `bash build/build_scripts.sh examples/slopball`, then
 run `$GODOT --path examples/slopball` twice, Host in one, Join in the other.)
@@ -40,6 +40,7 @@ Player :: struct {
 }
 
 player_process :: proc(self: ^Player, delta: f64) {
+	_ = delta
 	if !self.tinted && self.pid != 0 {
 		self.tinted = true
 		hues := [4]gd.Color{{0.9, 0.5, 0.2, 1}, {0.3, 0.7, 0.9, 1}, {0.5, 0.9, 0.4, 1}, {0.9, 0.4, 0.7, 1}}
@@ -49,6 +50,7 @@ player_process :: proc(self: ^Player, delta: f64) {
 }
 
 player_spawned :: proc(game: ^HelloNet, self: ^Player, id: knet.Net_Id, owner: knet.Player_Id) {
+	_ = id
 	if owner == game.ses.me {
 		self.mine = true
 		game.me = self
@@ -56,6 +58,7 @@ player_spawned :: proc(game: ^HelloNet, self: ^Player, id: knet.Net_Id, owner: k
 }
 
 player_freed :: proc(game: ^HelloNet, self: ^Player, id: knet.Net_Id) {
+	_ = id
 	if self == game.me {game.me = nil}
 }
 ```
@@ -171,12 +174,20 @@ hello_net_player_joined_then :: proc(self: ^HelloNet, id: knet.Player_Id, rejoin
 }
 
 hello_net_entity_spawned :: proc(self: ^HelloNet, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
+	_ = type; _ = id; _ = owner
 	if !self.started {
 		self.started = true
 		gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
+		gd.print_str("HELLO_STARTED")
 	}
 }
 ```
+
+(One omission, flagged: the living `hello.odin` also carries the optional
+**join-code doors** — with a relay configured, `on_host` mints a shareable
+code via `boot_host_coded` and `on_join` takes a typed one via
+`boot_join_code`. This page shows the address-only forms; the join-codes
+bullet at the bottom points at the stance.)
 
 ## The scenes
 
@@ -203,9 +214,10 @@ owner-stream + interpolation you declared with `gd:"replicate,interp,owner"`
 Then make the wire honest: `HELLO_LATENCY=120 $GODOT --path
 examples/hello_net` injects 120ms each way (every kit game gets the
 `<ENV>_LATENCY/_JITTER/_LOSS` shim from `Options.env`). The remote square
-lags visibly; yours never does. `examples/hello_net/run.sh` is this exact
-scenario as a headless acid — two processes, generated probes, one verdict —
-and the [testing guide](testing.md) is how you grow your own.
+lags visibly; yours never does. `examples/hello_net/run.sh` runs this exact
+scenario as its first act — two processes, generated probes, one verdict —
+then a second act joins by code through the relay; the
+[testing guide](testing.md) is how you grow your own.
 
 ## Where each thing you'll want next lives
 

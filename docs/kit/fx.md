@@ -11,6 +11,12 @@ and announces, or sim `_fx` halves and [declared facts](sim.md). The TRACER pool
 `fire_announce` are the COOP projectile answer specifically; a sim game's projectiles
 are predicted *entities* (sim.md says why), which carry their own visuals.
 
+**2D only, stated plainly.** Bursts are `Cpu_Particles2d`, floats are Control-positioned
+Labels, shake moves a `Node2d` — a 3D game gets nothing from this package (including
+screen shake) and authors its own juice. The `(x, y)` args are honest about that; the
+toolkit's `[3]f32` position convention resumes where the math is dimension-agnostic
+(combat/interact/ai), which this package deliberately is not.
+
 ```odin
 import kfx "godot:kit/fx"
 ```
@@ -25,7 +31,7 @@ Two lifetimes, two shapes:
 - **burst_at** — a one-shot spark burst parented to the WORLD (not the victim), so it
   outlives despawns: a slain enemy's node is gone next frame, its ashes are not. Spent
   emitters carry a TTL (`BURST_TTL :: f32(0.8)` seconds) in a `Bursts` pool the game owns;
-  call `frame()` once per frame to reap them.
+  call `bursts_frame()` once per frame to reap them.
 
 And **tracers**: a `kcombat.Fire` describes the authoritative cast (px/*tick* velocity, tick
 ttl); a tracer is that cast on THIS screen — a plain glyph Label flying on the FRAME clock
@@ -38,7 +44,7 @@ the GAME owns what a hit means (the callbacks).
 
 ```odin
 burst_at :: proc(fx: ^Bursts, parent: gd.Node, x, y: f32, color: gd.Color)
-frame :: proc(fx: ^Bursts, delta: f64)          // reap spent emitters, once per frame
+bursts_frame :: proc(fx: ^Bursts, delta: f64)   // reap spent emitters, once per frame
 bursts_destroy :: proc(fx: ^Bursts)             // frees the tracking list; nodes belong to the scene
 flash :: proc(node: gd.Node, color: gd.Color)   // nil-safe — a victim's node may already be gone
 burst_node :: proc(parent: gd.Node, x, y: f32, color: gd.Color) -> gd.Cpu_Particles2d
@@ -135,7 +141,7 @@ rock_impact :: proc(user: rawptr, hit: kfx.Tracer_Hit) {
 - **The library is silent — games narrate their own log lines.** kit/fx prints nothing;
   cavecrawl keeps thin wrappers (`fx_burst_at`, `fx_flash` in its `fx.odin`) purely so its
   acid tests' `CAVE_FX` lines survive. If your tests grep logs, wrap likewise.
-- **Call the reapers.** `kfx.frame(&fx, delta)` and `kfx.tracers_frame(...)` once per frame,
+- **Call the reapers.** `kfx.bursts_frame(&fx, delta)` and `kfx.tracers_frame(...)` once per frame,
   or bursts linger and rocks fly forever. Fly visuals FIRST in process, before the host's
   ticks, so a seen impact is noted before the authority deals damage in the same frame.
 - **Level change ≠ destroy.** `tracers_clear` frees the in-flight nodes and keeps the pool;

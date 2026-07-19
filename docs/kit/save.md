@@ -25,8 +25,10 @@ The file layout:
 [magic u32][format u16][game_version u16][saved_by u64][game blob][session snapshot]
 ```
 
-- `format` is the **toolkit's** layout version (`FORMAT :: u16(1)`) — a mismatched save
-  refuses to parse instead of reading garbage.
+- `format` is the **toolkit's** layout version (`FORMAT :: u16(3)`, bumped with the
+  session snapshot layout — 2: entity blobs + wire codecs · 3: the door — `locked` +
+  `denied` — rides the roster) — a mismatched save refuses to parse instead of reading
+  garbage: a file from an older toolkit comes back `Bad_Envelope`, cleanly, by version.
 - `game_version` is the **game's** own stamp — pass what you like, check what you get;
   content changes are the game's problem to detect.
 - `saved_by` fixes the who-am-I question on restore: the host that saved resumes under its

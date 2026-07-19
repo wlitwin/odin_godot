@@ -5,13 +5,16 @@ writes its own square's position. For a competitive game that's the wrong
 trust model — the server must own positions, and this page promotes the
 hello game to exactly that in **four small diffs**, following the
 [promotion checklist](sim.md#promoting-a-coop-game). The result is
-`examples/hello_sim/`, byte-identical to `examples/hello_net/` outside these
-diffs. You get: clients that can't lie about where they are, your own square
-still moving the *instant* a key goes down (client prediction), and remote
-squares rendering smoothly a breath in the past (the watched clock).
+`examples/hello_sim/`, which is `examples/hello_net/` outside these diffs —
+plus the dedicated `serve` door (below), minus the optional join-code doors
+the living hello_net has since grown. You get: clients that can't lie about
+where they are, your own square still moving the *instant* a key goes down
+(client prediction), and remote squares rendering smoothly a breath in the
+past (the watched clock).
 
 Prerequisite: the co-op quickstart — the session half (lobby, doors, spawns,
-drop-in) carries over *unchanged*, and this page only explains what moves.
+drop-in) carries over *unchanged* (the join-code doors aside), and this page
+only explains what moves.
 
 ## Diff 1 — the retag (the whole wire migration)
 
@@ -101,9 +104,14 @@ A competitive game's trusted machine has three shapes, all the same code:
 - **Single** — the host with nobody joined; the same build is your practice
   range.
 
-What the kit deliberately does not do: matchmaking services, server fleets,
-or NAT traversal for raw ENet — you hand players an address (or ship the
-browser build / Steam, where rooms and invites exist). See
+What the kit deliberately does not do: matchmaking services or server
+fleets. NAT it now half-solves: the
+[join-code relay](netgd.md#join-codes-for-native-enet-codeodin) hands the
+host each joiner's observed endpoint and the host punches a few UDP packets
+at it, so a plain-ENet join crosses LAN, port-forwarded, and the common
+port-preserving home NATs on a four-letter code. Symmetric NATs stay an
+honest failure — there is no TURN for raw ENet — so say why and offer the
+doors that always work: the browser build (WebRTC + TURN) and Steam. See
 [timelines](timelines.md) for choosing models and [sim.md](sim.md) for
 everything the lane can do — lag-compensated hitscan, contested objects,
 predicted spawns, verbs on the tick timeline.

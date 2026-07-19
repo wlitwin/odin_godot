@@ -45,10 +45,12 @@ package kit_sim
 //                   adaptive lead controller fed by knet.Clock_Sync
 //   reconcile.odin  the compare → restore → resim driver
 //
-// What this package deliberately does NOT do (yet): wire formats for snapshot
-// batches, session integration, scriptgen surfaces (gd:"input", @(gd_tick),
-// the predict tag), lag-comp query scoping, render-error smoothing. Those are
-// the later phases; this file set is the substrate they all stand on.
+// The later phases shipped on top of that substrate and live beside it:
+// snapshot-batch wire formats (snapshot.odin), session integration — the
+// lane driver riding SES_APP (lane.odin), the scriptgen surfaces
+// (@(gd_tick), @(gd_sample), the predict tag, the generated
+// <class>_lane_init), lag-comp query scoping (lane_rewound_begin/end), and
+// render-error smoothing (present.odin).
 //
 // The design is recorded in the project knowledge doc
 // server-authority-resim-companion (p: odin_godot).

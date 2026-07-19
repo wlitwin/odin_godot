@@ -5,13 +5,15 @@ use → ship.**
 
 ## Start here
 
-- **[The onboarding series](onboarding/index.md)** — six posts for Godot developers coming
-  from GDScript/C#: why compiled scripts, the struct mental model, and the multiplayer
-  shift (state-not-messages, verbs-not-RPCs, the two timelines). Read this first if the
-  toolkit's way of structuring a game is new to you — it's the *why* behind everything below.
 - **[Getting Started](getting-started.md)** — install the Nix toolchain, build the extension,
   add it to a Godot project, and write + attach your first `.odin` script (a Node that moves
-  on `_process`). A real, copy-pasteable hello-world.
+  on `_process`). A real, copy-pasteable hello-world — and for multiplayer, the
+  [quickstart](kit/quickstart.md) is the next stop.
+- **[The onboarding series](onboarding/index.md)** — six posts for Godot developers coming
+  from GDScript/C#: why compiled scripts, the struct mental model, and the multiplayer
+  shift (state-not-messages, verbs-not-RPCs, the two timelines). It's the *why* behind
+  everything below — read it alongside your first build, or whenever the toolkit's way of
+  structuring a game feels alien.
 
 ## Reference
 

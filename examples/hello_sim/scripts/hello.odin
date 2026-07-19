@@ -5,8 +5,9 @@ package hello_sim
 // ----------------------------------------------------------------------------
 // HELLO, SERVER AUTHORITY — hello_net promoted to the sim lane, following
 // docs/kit/sim.md's promotion checklist. The session half (lobby, doors,
-// spawns, drop-in, chat) is BYTE-IDENTICAL to hello_net; the whole promotion
-// is: the retag in player.odin, the @(gd_tick), the @(gd_sample) below, and
+// spawns, drop-in, chat) matches hello_net minus the optional join-code
+// doors it has since grown, plus the `serve` door; the whole promotion is:
+// the retag in player.odin, the @(gd_tick), the @(gd_sample) below, and
 // TWO wiring lines in ready(). Clients are no longer trusted with positions;
 // their own square still moves the instant a key goes down (prediction), and
 // remote squares render watched (interpolated, a breath in the past).
@@ -52,7 +53,8 @@ hello_sim_ready :: proc(self: ^HelloSim) {
 		legend = "Arrows move · Enter chat",
 		env = "HELLO",
 		min_players = 1,
-		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
+		// methods omitted = kboot.STANDARD_METHODS — the eight names above
+		// were the list every game wrote anyway
 	})
 	kboot.boot_entities(&self.boot, self, hello_sim_entity_kinds[:])
 

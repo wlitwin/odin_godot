@@ -254,9 +254,12 @@ track order — each fed its owner's input (`nil` coasts: an inputless entity
 type, or a remote player on a client whose truth is already inbound). The two
 optional world passes run AFTER entity ticks: the everywhere pass for pure-sim
 cross-entity work (contact), the authority pass for genuinely WORLD-shaped
-authority work (respawn queues, wave directors). One
-input TYPE per lane, by design — the wire ships one input blob per player
-per tick; compose per-entity intent into the one struct. Quantize by
+authority work (respawn queues, wave directors). One input **class** per
+distinct `@(gd_tick)` input TYPE — `lane_init` registers the primary
+(class 0), `lane_add_input_class` each extra — and the wire ships one window
+per class per packet ("Two entity kinds, two inputs" below). Two driven
+entities of the SAME kind still share a window; compose that intent into the
+one struct. Quantize by
 DECLARING the quantized type — what the struct holds is what crosses the
 wire (quickdraw's aim is a `u16` turn fraction, ~0.005° resolution, with a
 two-line codec pair at the sample/tick boundary; there is no per-field wire
@@ -272,7 +275,16 @@ For hand-driven setups (tests, generated-code-free games) `lane_init` +
 `lane_set_sim` (rawptr sample + the two `Step_Proc`s, everywhere then
 authority) + `lane_track` / `lane_track_set` + explicit
 `lane_frame`/`lane_present` calls remain fully supported — the generated
-wiring and the thunks are sugar over exactly that.
+wiring and the thunks are sugar over exactly that. `lane_present` is
+genuinely optional there: until the first call, the `presented` latch keeps
+ingest painting watched truth directly (a hand-driven client that never
+presents never freezes its watched entities); after it, watched fields
+belong to the presenter.
+
+One lifecycle rule either way: lane STATE does not reset with a session
+re-init — the app route survives, the anchor and ledgers don't follow a
+fresh authority. The reset story is `lane_destroy` → `lane_init` (destroy
+zeroes the lane); `lane_init` on a live lane asserts.
 
 ## The predicted shelf — godot:play/sim
 
@@ -698,9 +710,16 @@ guide if you are deciding rather than migrating.
 `smooth_halflife` 0.063 s · `smooth_cut` 0 (never cut; set it in world
 units for teleport-heavy games) · `tolerance` 0 (exact reconcile; set it in
 world units so continuous held-input drift under the line rides uncorrected —
-predict-world's anti-churn). Running tallies for a netgraph:
+predict-world's anti-churn). Two guards at `lane_init`: `watch_delay`
+refuses values above 31 (the render offset rides the wire in eighths of a
+tick, in one byte), and `echo_inputs` with `tolerance` 0 warns once — that
+pairing resims on nearly every batch; set the tolerance in world units.
+Running tallies for a netgraph:
 `lane.stat_reconciles`, `lane.stat_resims` (a resim burst is a latency
-event worth drawing).
+event worth drawing), and the host-side skew/abuse pair —
+`stat_input_drops` (input windows dropped for an unknown class id: the
+version-skew shape) and `stat_cmd_capped` (verbs refused by the per-player
+cap: names the peer flooding you).
 
 **Per-field reconcile + glide knobs.** The lane values are defaults; a single
 float field can override each on its tag, so a fast contested object and a

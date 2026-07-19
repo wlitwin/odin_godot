@@ -3,9 +3,11 @@
 Every shipped example and real game on this framework lives and dies by the
 same test shape, so the addon ships it as a product, not a pattern:
 `addons/odin_godot/template/test/` holds a sourceable `harness.sh` and a
-`driver.gd` skeleton, and scriptgen **generates the probes** the driver reads
-the world through. The reference consumer is `examples/cavecrawl/run.sh` — a
-four-act acid (the story, save/resume, match flow + moderation, host
+`driver.gd` skeleton (a repo clone has the same files at
+`build/template/test/` — every example's `run.sh` sources
+`build/template/test/harness.sh`), and scriptgen **generates the probes**
+the driver reads the world through. The reference consumer is
+`examples/cavecrawl/run.sh` — a four-act acid (the story, save/resume, match flow + moderation, host
 migration under `kill -9`) whose plumbing is entirely the harness.
 
 **The shape.** Launch N *real* headless processes of your *real* main scene

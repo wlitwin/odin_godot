@@ -76,10 +76,18 @@ Session_Config :: struct {
 	command_timeout: f64, // prediction auto-revert horizon
 	join_timeout:    f64, // client_start -> Ev_Join_Failed horizon
 	backup_interval: f64, // backup-host snapshot refresh cadence
-	max_players:     int, // NEW joins refused past this many connected (0 = unlimited; rejoins always reclaim their seat)
+	max_players:     int, // NEW joins refused past this many present people (0 = DEFAULT_MAX_PLAYERS, 8; rejoins always reclaim their seat)
+	change_events:   bool, // emit Ev_Entity_Changed per dirty entity per tick (repaint THAT, not everything)
 	fingerprint:     u64, // wire-contract hash override (0 = the generated default) — see below
 }
 ```
+
+`max_players` caps at 8 out of the box — this is a 2-8 friendslop framework, and the old
+0=unlimited default meant every game that never thought about it shipped uncapped. An
+unbounded lobby is a CHOICE a game states (`max_players = -1`), never an accident of the
+zero value. `change_events` stays off by default because at friendslop scale
+repaint-everything is usually fine; turn it on when you want to repaint exactly the
+entities a state batch touched.
 
 **The version door — on by default.** Two builds whose replicated
 declarations disagree don't get an error — they get GARBAGE: the descriptors
@@ -145,7 +153,7 @@ The host is a full player too (name, id, stats) — it just never JOINs over the
 authority a SERVER, not a player. Its seat is flagged `Player.dedicated` on
 every roster (the welcome carries it, so clients know too): games skip it when
 spawning avatars (`if p.dedicated {continue}`), the kit lobby/scoreboard hide
-it, `session_count(players_only = true)` doesn't count it, `max_players` caps
+it, `session_count()` doesn't count it, `max_players` caps
 humans only — and **succession never arms** (a dead server restarts; migration
 is the peer model's answer to a *player*-host leaving). The friendslop
 friends-host-for-friends model is untouched; this is the always-on/public
@@ -320,16 +328,25 @@ version, so the event never double-fires.
 session_player :: proc(s: ^Session, id: knet.Player_Id) -> (Player, bool)
 session_roster :: proc(s: ^Session, allocator := context.temp_allocator) -> []Player
 session_host :: proc(s: ^Session) -> knet.Player_Id
-session_count :: proc(s: ^Session, connected_only := false) -> int
+session_count :: proc(s: ^Session, connected_only := true, players_only := true) -> int
 session_set_locked :: proc(s: ^Session, locked: bool)
 session_kick :: proc(s: ^Session, player: knet.Player_Id, ban := false) -> (was: Peer_Id, ok: bool)
 ```
+
+`session_count`'s bare call counts PRESENT PEOPLE — connected, non-dedicated — because
+that is what every gate that says "players" means (min-players, ready checks,
+`max_players`). The old bare call counted ghosts: departed seats kept for reconnect, plus
+the server's own infrastructure seat, and every real caller was overriding both flags to
+say otherwise. Opt DOWN for the other censuses: `connected_only = false` includes departed
+rows (roster size — what a save/resume receipt reports), `players_only = false` counts a
+dedicated seat (the wire's view).
 
 `session_set_locked` is the standard move once a run starts, if drop-in isn't wanted: new
 joins are refused with `.Locked`, players already in the roster still reconnect freely.
 `session_kick` tells the target it was deliberate (`Ev_Kicked`, not a mystery host-crash);
 with `ban` the token bounces off future joins with `.Banned` for the rest of the run (bans
-are run-scoped; persist them yourself if forever matters).
+are run-scoped but ride the [backup snapshot](#backup-hosting-and-resume), so a takeover
+doesn't launder them; persist them yourself if forever matters).
 
 Stats are generic named i64 counters on the *player* record — host-accumulated, replicated
 to everyone as a full snapshot at ~2 Hz when dirty, and they survive disconnects like
@@ -426,7 +443,8 @@ per-tick STATE traffic: a peer only receives deltas and owner-stream samples
 for entities near its **focus**. Off by default.
 
 ```odin
-// host, once — the locator lends the session eyes (it can't read your fields):
+// host, once — before start or mid-run alike; the locator lends the session
+// eyes (it can't read your fields):
 ksess.session_set_interest(&self.ses, 800, 120, self, my_locator)
 my_locator :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y: f32, always: bool) {
 	// return each entity's position; `always = true` for placeless entities
@@ -458,6 +476,11 @@ Mechanics worth knowing:
 - **A peer with no focus yet receives everything** — filtering starts when
   you start saying where they are. Commands, stats, chat, and everything
   reliable-and-rare stay unfiltered.
+- **A mid-run flip takes.** Joiners learn the stream routing from their
+  welcome, and flipping interest on after clients seated re-declares it to
+  everyone already connected (`SES_AOI`) — without the re-declare, clients
+  seated before the flip kept broadcasting their owner streams unfiltered
+  forever. Turn it on whenever the world grows into needing it.
 
 ## App messages
 
@@ -470,17 +493,29 @@ get dropped); on a client `from` is `PLAYER_ID_INVALID` and the handler checks
 
 ```odin
 session_app_begin :: proc(s: ^Session, tag: u8) -> ^knet.Writer
-session_app_flush :: proc(s: ^Session, to_peer: Peer_Id)
-session_app_send :: proc(s: ^Session, to_peer: Peer_Id, tag: u8, bytes: []u8)
+session_app_flush :: proc(s: ^Session, to_peer: Peer_Id, channel: Channel = .Reliable)
+session_app_send :: proc(s: ^Session, to_peer: Peer_Id, tag: u8, bytes: []u8, channel: Channel = .Reliable)
 session_app_send_to :: proc(s: ^Session, player: knet.Player_Id, tag: u8, bytes: []u8)
 ```
+
+`channel` defaults to reliable — the right lane for anything event-shaped or that a
+consumer must not miss. Pass `.Stream` ONLY for tick-stamped, self-superseding payloads
+where the next send makes a lost one worthless ([kit/sim](sim.md)'s inputs and snapshot
+batches ride `SES_APP` on exactly this lane): the receive side routes both channels
+identically, but nothing re-delivers a dropped `.Stream` message and nothing orders it
+against the reliable lane.
 
 ## Backup hosting and resume
 
 The host periodically ships a complete re-hostable snapshot — identity table (hashed
 tokens), roster, allocation cursors, stats, every entity as a spawn tuple — to the eldest
-connected client (`Ev_Backup_Received`). Saving a run and surviving a dead host are the
-same contract: [kit/save](save.md) wraps `session_snapshot` in a versioned file envelope.
+connected client (`Ev_Backup_Received`). The DOOR travels with the roster: `locked` and
+the `denied` ban list ride the snapshot, so a ban outlives the host that issued it and a
+locked room stays locked through a takeover — otherwise the kicked-with-ban player just
+waits for the migration and walks back in. What a takeover still loses is bounded: up to
+`backup_interval` of world state — whatever moved since the last refresh. Saving a run
+and surviving a dead host are the same contract: [kit/save](save.md) wraps
+`session_snapshot` in a versioned file envelope.
 
 ```odin
 session_snapshot :: proc(s: ^Session, w: ^knet.Writer)
@@ -723,6 +758,14 @@ the command loop that already exists.
   replicated byte the host pulses within one net tick never ships. Cavecrawl's match flow
   keeps `level.won` at 1 for the whole end screen and every peer reacts to the edge
   locally.
+- **The write guard survives release builds — counting, not halting.** A client's local
+  write to a host-lane replicated field is the canonical silent-divergence bug (see
+  [kit/net's gotchas](net.md#gotchas)); dev builds assert on it with the class, field,
+  and fix named. A `-disable-assert` build keeps the walk, logs the first offender ONCE,
+  and counts from there — `session_guard_hits(s)` is the tally, worth surfacing beside
+  `session_malformed(s)`'s dropped-packet count (the netgraph draws the latter). Nonzero
+  in the field means some client code writes host-lane state locally: silent divergence
+  until the next authoritative delta stomps it.
 - **The factory's `make` is the one synchronous call into the game** — keep it to
   instantiate-and-return; game reactions belong on `Ev_Spawned`, which fires right after
   (on the host too, via `session_spawn_make`).

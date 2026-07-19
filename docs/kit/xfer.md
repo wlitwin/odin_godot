@@ -26,9 +26,11 @@ kxfer.xfer_init(&self.xfer, &self.ses, MY_TAG) // once — PICK YOUR TAG: the
                                                // game already claimed it
 kxfer.xfer_send(&self.xfer, PAYLOAD_ID, bytes) // anyone; ≤512KB; copies
 kxfer.xfer_pump(&self.xfer)                    // once per NET TICK — the pacing
-                                               // is the point (2 chunks/tick ≈
-                                               // 960KB/s at 60Hz, gameplay
-                                               // traffic never queues behind it)
+                                               // is the point (2 x 8KB chunks/tick
+                                               // ≈ 320KB/s at the default 20Hz;
+                                               // the cap scales with tick_hz, and
+                                               // gameplay traffic never queues
+                                               // behind a spray)
 for {                                          // every frame
     ev, ok := kxfer.xfer_poll(&self.xfer)
     if !ok { break }
@@ -41,7 +43,10 @@ for {                                          // every frame
 Payloads key by `(sender, id byte)`; re-sending an id supersedes the queued copy
 and restarts every receiver's assembly (the reliable channel is ordered per
 sender, so a sequence gap means RESTART, never loss). Hostile totals past
-`MAX_PAYLOAD` (512KB) or lying chunk counts drop the whole assembly.
+`MAX_PAYLOAD` (512KB) or lying chunk counts drop the whole assembly. A sender
+never receives its own `Ev_Done` — deliberate: your screen shouldn't wait on
+your own upload coming back around, and the [album](#the-album--kept-payloads-late-joiners-included)'s
+own-copy shelf exists for exactly that.
 
 Proven in scrapyard's spray wall (acid act 12): drop a PNG at
 `user://spray.png`, it ships to every friend at start, and `G` stamps your tag

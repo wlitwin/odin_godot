@@ -33,14 +33,24 @@ and `world` are Node2D containers, so screen shake ([kfx.Shake](fx.md)) can
 nudge them both as one; a 3D game sets `Options.spatial = true` to get Node3D
 containers instead (see `examples/slopball3d`).
 
+**Your look, the kit's behavior:** `Options.lobby_scene` / `chat_scene` /
+`score_scene` (nil = the stock builds) hand boot game-authored scenes to
+ADOPT — the kit resolves the nodes it drives by name and pours the stock
+behavior in; everything else in a scene is the game's own chrome. The node
+names each widget requires live in
+[ui.md's adopt contract](ui.md#full-replacement-the-adopt-contract).
+
 **Boot unthrottles desktop windows by default** (vsync off + a 120fps cap):
 every friendslop game gets playtested as two windows on one laptop, and with
 vsync on, the OS pacing an occluded window's present makes the background
 instance *simulate* slow, not just draw slow — the whole main loop blocks on
 the compositor, and every timeline-synced screen stutters for it. Headless and
-web runs are left untouched. A shipping build that prefers tear-free rendering
-opts out with `Options.keep_vsync = true` (and may set its own vsync/fps
-policy after `boot_attach`).
+web runs are left untouched — and so is every RELEASE build: the unthrottle is
+DEV BUILDS ONLY, keyed on the build (`-disable-assert`, the release line every
+kit guardrail already draws), so a shipped game never tears by default nor
+caps a 240 Hz display at 120. `Options.keep_vsync = true` remains the
+dev-side opt-out (and a game may set its own vsync/fps policy after
+`boot_attach`).
 
 **Count game time in NET TICKS, never frames.** The unthrottle above means
 frame rate is 120 on one machine and whatever vsync says on another — a
@@ -77,6 +87,16 @@ status lines), then returns **every** session event plus the comms markers
 — hand the stream to the generated `<snake>_events` and each half runs
 *after* boot's stock reaction, so a game-specific status line simply
 overwrites the stock one.
+
+**Where the boot stands:** `boot_phase(b)` returns the coarse lifecycle —
+the `running`/`started` latch pair every game hand-kept, tracked once.
+`Boot_Phase` is `.Menu` (no transport; the Host/Join doors showing),
+`.Connecting` (a join door opened, no seat yet — a code resolving included),
+`.Lobby` (seated; hosting counts), `.Playing` (the world reached this screen
+— first spawn/state/resync). The doors advance it and `boot_pump`'s event
+drain moves it: a failed or denied join and a kick fall back to `.Menu`,
+while a host loss deliberately stays put — succession may re-seat, so the
+welcome moves it, not the loss.
 
 **The factory, written by nobody:** tag each exported entity scene with what
 it bodies and its stable wire id, and pass the GENERATED table to

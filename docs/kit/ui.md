@@ -38,6 +38,8 @@ lobby_make :: proc(parent: gd.Node, title: string) -> Lobby
 lobby_destroy :: proc(l: ^Lobby)
 lobby_set_status :: proc(l: ^Lobby, text: string)
 lobby_show_menu :: proc(l: ^Lobby, menu: bool, start: bool)
+lobby_show_code :: proc(l: ^Lobby, show: bool)   // reveal the join-code field
+lobby_code :: proc(l: ^Lobby) -> string          // what the human typed — trimmed, UPPERCASED, temp-allocated
 lobby_refresh :: proc(l: ^Lobby, s: ^ksess.Session)
 ```
 
@@ -45,7 +47,9 @@ lobby_refresh :: proc(l: ^Lobby, s: ^ksess.Session)
 `start_btn` starts hidden until the host likes the roster (`lobby_show_menu`).
 `lobby_refresh` repaints the roster from the [session](session.md): sorted by `Player_Id`
 (join order — stable), the host crowned, yourself marked `(you)`, departed players dimmed to
-`(away)`, and the stat registry's auto-fed ping when measured.
+`(away)`, and the stat registry's auto-fed ping when measured. Games with a relay call
+`lobby_show_code` once in `ready()` (the field sits above Join; the menu toggles honor it);
+Join then reads `lobby_code` — `""` means join by address.
 
 **Chat box** — a bounded scrollback of [kit/comms](comms.md) lines plus a `Line_Edit`
 (`CHAT_SHOW :: 8` rows painted; the comms log keeps more):
@@ -56,10 +60,15 @@ chat_destroy :: proc(ch: ^Chat)
 chat_show :: proc(ch: ^Chat, visible: bool)
 chat_clear_input :: proc(ch: ^Chat)
 chat_refresh :: proc(ch: ^Chat, c: ^kcomms.Comms)
+chat_submit :: proc(ch: ^Chat, c: ^kcomms.Comms, text: gd.String, sent: ^bool = nil)
 ```
 
 Paints `name: text` for speech, `* text` for system lines. The game connects
-`chat.input`'s `text_submitted` and calls `comms_say` + `chat_clear_input` from it.
+`chat.input`'s `text_submitted` and calls `chat_submit` from it — the whole handler:
+extract (clamped), say, clear, and PUT THE KEYS BACK ON THE WHEEL. The focus release is
+the part that gets forgotten — without it a keyboard player's WASD stays trapped in the
+chat box after every message; `sent` (the game's latch) stops the submitting Enter from
+immediately re-opening chat when the game binds Enter to "talk".
 
 **Scoreboard** — players × whatever stat columns the game registered (ping auto-fed,
 damage/kills/deaths from [kit/combat](combat.md), the game's own counters), straight from the
@@ -69,10 +78,15 @@ session's stat registry. kit/ui renders what the registry holds; it declares not
 score_make :: proc(parent: gd.Node) -> Score
 score_destroy :: proc(sb: ^Score)
 score_show :: proc(sb: ^Score, visible: bool)          // classically: while Tab is held
+score_hide :: proc(sb: ^Score, name: string)           // hide a column by name
 score_refresh :: proc(sb: ^Score, s: ^ksess.Session)
 ```
 
-Departed players stay listed — their tallies survive disconnects by design.
+Departed players stay listed — their tallies survive disconnects by design. Some stat
+columns are PLUMBING, not score — a loadout choice replicated through the registry
+(scrapyard's look/iron, the muster's ready bit) has no business on the board;
+`score_hide` keeps it off (once, after the columns are declared; unknown names are a
+harmless no-op).
 
 **HUD** — prompt, inventory/hotbar, health, abilities:
 
@@ -89,14 +103,53 @@ hp_make :: proc(parent: gd.Node) -> Health_Bar
 hp_refresh :: proc(hb: ^Health_Bar, current, max_hp: i32)
 
 abilities_make :: proc(parent: gd.Node, capacity: int) -> Ability_Bar
-abilities_refresh :: proc(bar: ^Ability_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_rate := 20)
+abilities_refresh :: proc(bar: ^Ability_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_rate := knet.DEFAULT_TICK_HZ)
 abilities_destroy :: proc(bar: ^Ability_Bar)
 ```
 
 All text blocks over stock theme: the health bar renders `hp ▓▓▓▓▓▓▓░░░ 70/100` (zero art to
 install, and a test can read the exact fill back out of the tree); abilities render `[rock]`
-ready, `[rock 1.2s]` cooling, `[rock $]` ready-but-unaffordable — cooldowns count ticks, so
-pass the session's tick rate. With `selected`, the inventory row doubles as a hotbar.
+ready, `[rock 1.2s]` cooling, `[rock $]` ready-but-unaffordable. Cooldowns count NET TICKS —
+pass `session_tick_hz(&ses)` so the seconds shown are true at any configured rate (the
+default only matches a session left at knet's 20 Hz; a 60 Hz game that omits it shows
+cooldowns 3× too long). BOTH ability models feed the one widget — `kcombat.Ability_Def` is
+the def vocabulary at every layer: a slot-array game passes its `Cooldowns` bundle
+(`c.cds[:]`); a play-block game gathers its blocks' countdowns into a local array beside the
+same def rows (`[]u16{r.slime.cd, r.ignite.cd}`). With `selected`, the inventory row doubles
+as a hotbar.
+
+## Full replacement: the adopt contract
+
+The kit provides the implementation, never the final look. A game that wants its own
+lobby/chat/scoreboard authors a scene in the editor and hands it to boot
+(`Options.lobby_scene` / `chat_scene` / `score_scene` — [boot.md](boot.md)); the kit
+ADOPTS it: instances the scene, resolves the nodes it drives **by NAME, at any depth**
+(nest your chrome however you like), and pours the stock behavior into them. Everything
+else in the scene is the game's own — the kit never touches what it didn't name. A
+missing contract node is reported LOUDLY (once, at boot, greppable) and degrades to a
+dead widget, not a crash.
+
+```odin
+lobby_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene, title: string) -> Lobby
+chat_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene) -> Chat
+score_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene) -> Score
+```
+
+The contracts, by node name:
+
+- **Lobby** — `Title` (Label) · `Status` (Label) · `Players` (any container — rows land
+  here) · `Host` (Button) · `Join` (Button) · `Start` (Button; ships hidden), plus an
+  OPTIONAL `Code` (LineEdit) for join-code games — quiet when absent (`lobby_show_code`
+  turns it on).
+- **Chat** — `Lines` (any container — the scrollback rows land here) · `Input` (LineEdit).
+- **Scoreboard** — `Grid` (GridContainer — the kit sets its column count and pours the
+  cells).
+
+The scene owns its OWN layout (anchors under the boot layer bind to the viewport) — none
+of the stock builders' sizing hacks apply, and the scoreboard's hand-centering is skipped.
+Row/cell Labels are kit-created — theme them from the scene root. Extra nodes — a Single
+Player key, an address field, the plate — are the game's to wire after `boot_attach`,
+through the widget's `root`.
 
 ## Worked excerpt (cavecrawl)
 

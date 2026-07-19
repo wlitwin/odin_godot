@@ -27,8 +27,16 @@ sim deals damage — peer-owned visuals, host-validated hits.
 ## Health and abilities
 
 ```odin
-// Apply damage: clamps at zero, reports the killing blow exactly once
-// (hitting a corpse is a no-op — no double kills, no negative hp).
+// The scalar damage core — THE one corpse-guarded clamp, generic over the
+// game's hp integer. `dealt` is what actually landed (0 on a corpse — hit
+// credit reads it); `died` reports the killing blow exactly once.
+hurt :: proc "contextless" (hp: ^$T, dmg: T) -> (dealt: T, died: bool)
+// Restore `amount`, clamped to `maximum`. Reviving a corpse is a heal from 0
+// — whether that is ALLOWED is policy, gated by the caller.
+heal :: proc "contextless" (hp: ^$T, maximum: T, amount: T)
+// The died-only i32 convenience over `hurt`: clamps at zero, no double kills,
+// no negative hp. hit and play.Health both delegate to the same `hurt` — one
+// death definition for raw fields and blocks alike.
 hit :: proc "contextless" (hp: ^i32, amount: i32) -> (died: bool)
 
 Ability_Def :: struct {
@@ -42,6 +50,13 @@ ability_try :: proc "contextless" (cds: []u16, slot: int, def: Ability_Def, reso
 ability_ready :: proc "contextless" (cds: []u16, slot: int) -> bool
 // The authority's per-net-tick decay (clients receive it as deltas).
 abilities_tick :: proc "contextless" (cds: []u16)
+
+// The `cds: [N]u16 gd:"replicate"` field, packaged: embed it (`using cd:
+// kcombat.Cooldowns(3)`) and the array replicates like a flat field, while
+// cd_try/cd_ready/cd_tick forward to `cds[:]` so you never spell the slice.
+Cooldowns :: struct($N: int) {
+	cds: [N]u16 `gd:"replicate"`,
+}
 ```
 
 Defs are code constants (cavecrawl's `ROCK_ABILITY` has `cooldown = 20` — one second at
@@ -61,20 +76,37 @@ The verb that issues it pre-gates with `ability_ready` (`input.odin`) — a refu
 prediction still rides the wire, so a key held at full hp would flood the host with doomed
 commands. [kit/ui](ui.md)'s ability bar renders the same `cds` and defs.
 
-> **Which layer to use — these helpers, or the `play` blocks?** `godot:play` ships
-> higher-level blocks built on the same machinery, and for the common cases they are the
-> default: **`play.Health`** instead of a raw hp field + `hit` (you get max, the damage
-> edge, and frac for free), and **`play.Ability`** instead of a `Cooldowns` slot + a
-> hand-written command (the cast command is *generated* onto the embedding entity, the
-> cooldown knob replicates, and the applied-vs-rejected semantics are already right). Reach
-> for the low-level pair here when you're outside the blocks' shape: `ability_try` when a
-> cast **spends a resource** (stamina, mana — `play.Ability` deliberately owns no resource;
-> that's a game gate), `Cooldowns(N)`'s slot array when slots are **dynamic** (castable
-> inventory items indexed at runtime, where named block fields can't), and `hit` when hp
-> lives somewhere a block can't (a transient, an off-entity pool). The examples split along
-> history: cavecrawl/homestead show the low-level way (they predate the blocks and double as
-> a view of the layer underneath); scrapyard shows the block way. New games: start with the
-> blocks. See [kit/net — composing verbs from embedded blocks](net.md#composing-verbs-from-embedded-blocks).
+> **Which layer to use — these helpers, or the `play` blocks?** This is one instance of
+> the toolkit's TWO-LAYER rule, so here is the rule itself. **`kit` is mechanism and
+> vocabulary**: contextless procs, wire formats, replication machinery, descriptor tables
+> — no opinions about game feel, no replicated fields of its own. The litmus: *is this
+> something a block calls?* **`play` is policy and composition**: blocks — structs games
+> embed, carrying `gd:"replicate"` fields and name-paired generated hooks, with defaults
+> that encode a stance. The litmus: *does it hold replicated state or generate hooks?*
+> **The arrow points one way, play → kit, never the reverse** — a block delegates its
+> mechanism down (`play.Ability`'s gate IS `kcombat.cast_gate`, `play.Health`'s clamp IS
+> `kcombat.hurt`), so the two layers cannot drift on what "ready" or "a death" means.
+> Across kit's own math cores the opposite rule holds — independence over sharing
+> (combat/interact/ai each keep their own vocabulary, so a game can take any subset);
+> sharing is the rule *up* the stack, independence *across* it.
+>
+> In practice: for the common cases the blocks are the default — **`play.Health`** instead
+> of a raw hp field + `hit` (max, the damage edge, and frac for free), **`play.Ability`**
+> instead of a `Cooldowns` slot + a hand-written command (the cast command is *generated*
+> onto the embedding entity, the cooldown knob replicates, and the applied-vs-rejected
+> semantics are already right). The def type is `kcombat.Ability_Def` at every layer —
+> name and cost live in the game's declared table (a string can never ride a replicated
+> blob, and a wire verb can't carry your resource pointer), which is also what feeds
+> [kit/ui](ui.md)'s ability bar for block and slot-array games alike. Reach for the
+> low-level forms when you're outside the blocks' shape: `ability_try` when a cast
+> **spends a resource** at the gate (cost is a game gate — check it where you issue, and
+> in the authority's hook, against the same def row), `Cooldowns(N)`'s slot array when
+> slots are **dynamic** (castable inventory items indexed at runtime, where named block
+> fields can't), and `hit`/`hurt` when hp lives somewhere a block can't (a transient, an
+> off-entity pool). The examples split along history: cavecrawl/homestead show the
+> low-level way (they predate the blocks and double as a view of the layer underneath);
+> scrapyard shows the block way. New games: start with the blocks. See
+> [kit/net — composing verbs from embedded blocks](net.md#composing-verbs-from-embedded-blocks).
 
 ## Status effects
 
@@ -90,7 +122,9 @@ Effect :: struct {
 // Apply an effect: an existing one of the same kind REFRESHES (strongest
 // power, longest clock); otherwise the first empty slot. False = all busy.
 effects_add :: proc "contextless" (fx: []Effect, kind: u8, power: i8, ticks: u16) -> bool
-// The authority's per-net-tick decay; expired slots zero back to empty.
+// The authority's per-net-tick decay; a row clears on its LAST tick, expired
+// slots zero back to empty. Underflow-guarded: a hand-written {kind, left = 0}
+// row clears instead of wrapping into a 65535-tick immortal effect.
 effects_tick :: proc "contextless" (fx: []Effect)
 effect_of :: proc "contextless" (fx: []Effect, kind: u8) -> (Effect, bool)
 ```
@@ -156,19 +190,41 @@ fire_write :: proc(w: ^knet.Writer, f: Fire)
 fire_read :: proc(r: ^knet.Reader) -> (f: Fire, ok: bool)
 ```
 
-The plumbing is packaged — pick an app tag (0 is kit/comms), give the listener a home
-(a struct field; no package globals, so parallel sessions never collide), and the
-guards every game hand-rolled are the kit's problem now:
+The plumbing is packaged — the fire lane defaults to `FIRE_TAG :: 1`, beside its tag
+siblings (comms 0, xfer 2, sim 3); give the listener a home (a struct field; no package
+globals, so parallel sessions never collide), and the guards every game hand-rolled are
+the kit's problem now:
+
+```odin
+fire_announce :: proc(s: ^ksess.Session, f: Fire, tag: u8 = FIRE_TAG)   // HOST-ONLY (asserts)
+fire_listen :: proc(fr: ^Fire_Route, s: ^ksess.Session, tag: u8 = FIRE_TAG)
+fire_poll :: proc(fr: ^Fire_Route) -> (f: Fire, ok: bool)
+fire_route_destroy :: proc(fr: ^Fire_Route)
+```
+
+`fire_announce` is the AUTHORITY's half — it asserts on a client (the receiver drop
+below stays the security boundary; the assert is the teaching moment: a client calling
+it would broadcast frames every receiver silently discarded). The listener is EVENTS,
+NOT CALLBACKS: the handler only *files*, and the game drains with `fire_poll` each frame
+on its own stack — the old `on_fire` callback ran game code mid-session-pump, the one
+reentrancy hole in the subsystem. What lands in the queue is exactly "someone else's
+rock — draw it" (the host's own copy, your own echo, and non-host authors are all
+dropped):
 
 ```odin
 // host, when the command hook confirms a cast:
-kcombat.fire_announce(&self.ses, TAG_FIRE, f)
+kcombat.fire_announce(&self.ses, f)
 
-// ready(), every peer — on_fire receives ONLY other screens' casts (the
-// host's own copy, your own echo, and non-host authors are all dropped):
+// ready(), every peer:
 fires: kcombat.Fire_Route   // a field on your game struct
-kcombat.fire_listen(&self.fires, &self.ses, TAG_FIRE, self, on_fire)
-on_fire :: proc(user: rawptr, f: kcombat.Fire) { /* draw their rock */ }
+kcombat.fire_listen(&self.fires, &self.ses)
+
+// every frame, drain and draw (fire_route_destroy on exit):
+for {
+	f, ok := kcombat.fire_poll(&self.fires)
+	if !ok {break}
+	// draw their rock
+}
 ```
 
 Raw `fire_write`/`fire_read` stay public for games that need a different envelope.
