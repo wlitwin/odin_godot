@@ -4386,26 +4386,11 @@ parse_replicate_info :: proc(
 	if rep.predict && !rep.interp && rep.lerp == "" {
 		rep.lerp = interp_lerp_kind(type_text) // "" for non-floats: exact compare
 	}
-	// A PREDICTED quaternion that asks to INTERP would silently SNAP its reconcile
-	// correction: the sim lane's render-error glide (present.odin's predict_error/
-	// decay/apply) has arms for f32/f64/angle and none for .Quat, so the eye jumps
-	// to each correction instead of easing to it — with no sign anywhere. Refused
-	// with the same loudness the non-float `interp` reject uses, rather than left
-	// to under-deliver invisibly. The rotation still glides on the OTHER lanes —
-	// `owner`/`replicate` blend quats hemisphere-safe (predict_blend / stream_blend
-	// call knet.quat_nlerp) — so stream the rotation from its owner, or predict it
-	// as angles/floats. Full predicted-quat glide (the error as a rotation delta,
-	// decayed toward identity via nlerp, re-applied as shown = err ⊗ truth) is a
-	// real feature left unbuilt until a game needs it: this is where it slots in,
-	// and knet would grow quat multiply/conjugate beside quat_nlerp for it.
-	if rep.predict && rep.interp && rep.lerp == ".Quat" {
-		error_at(
-			floc,
-			"%s.%s: a predicted quaternion can't glide its reconcile correction — the sim lane's render-error smoothing handles floats and angles only, so `interp` here would silently SNAP to each correction. Stream the rotation on the `owner` lane instead (its quat interp glides), or predict it as angles/floats.",
-			struct_name, field_label,
-		)
-		return {}, false
-	}
+	// A PREDICTED quaternion that asks to `interp` GLIDES its reconcile
+	// correction like any other interp field — present.odin's predict_error/
+	// decay/apply grew a .Quat arm (the error is a rotation delta, eased toward
+	// identity, re-applied as shown = err ⊗ truth). No special-casing here: the
+	// lerp classifier already returned .Quat, and the descriptor carries it.
 	// WHAT SURVIVED THE MATRIX: the two FLOAT-NESS rules, which are per-lane
 	// checks about the field's TYPE, not cross-token implications about other
 	// tokens — the lane can't make an i32 carry a continuous reconcile error.

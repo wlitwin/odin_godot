@@ -1750,13 +1750,12 @@ out="$("$SGEN" "$seam" -godot:"$ROOT" 2>&1)"
 [[ $? -ne 0 ]] || fail "a TOP-LEVEL export of an unsupported type must still error — the seam is asymmetric by design"
 echo "$out" | grep -q "unsupported type" || fail "top-level unsupported export must say so — got: $out"
 
-# ---- fixture 20: a predicted quat that asks to INTERP is refused, not snapped ---
-# The sim lane's render-error glide (present.odin predict_error/decay/apply) has
-# no .Quat arm, so `gd:"predict,interp"` on a quaternion would silently SNAP each
-# reconcile correction instead of easing to it. scriptgen refuses it with the
-# alternatives, rather than let it under-deliver invisibly. The rotation still
-# glides on the OTHER lanes (owner/replicate blend quats via knet.quat_nlerp), so
-# those forms must still be ACCEPTED — this fixture pins the line between them.
+# ---- fixture 20: a predicted quat GLIDES its correction, on every lane --------
+# present.odin's render-error glide grew a .Quat arm (error as a rotation delta,
+# eased toward identity, re-applied), so `gd:"predict,interp"` on a quaternion is
+# now a first-class predicted rotation — no longer refused. All four lane/interp
+# combinations that carry a quaternion must build; the unit glide behaviour is
+# pinned in kitsim (predicted_quat_glides_its_correction).
 qpin="$work/quatpin"
 mkdir -p "$qpin"
 quat_lane() {
@@ -1775,9 +1774,7 @@ QuatPin :: struct {
 ODIN
 	"$SGEN" "$qpin" -godot:"$ROOT" >/dev/null 2>&1
 }
-quat_lane 'predict,interp' && fail "gd:\"predict,interp\" on a quat must be refused (it would silently snap the reconcile glide)"
-out="$("$SGEN" "$qpin" -godot:"$ROOT" 2>&1)"
-echo "$out" | grep -q "can't glide its reconcile correction" || fail "the predicted-quat refusal must explain the snap — got: $out"
+quat_lane 'predict,interp' || fail "gd:\"predict,interp\" on a quat must be ACCEPTED — the sim lane glides predicted rotations now"
 quat_lane 'predict' || fail "gd:\"predict\" (no interp) on a quat must be ACCEPTED — a non-interp predicted field snaps by design"
 quat_lane 'owner,interp' || fail "gd:\"owner,interp\" on a quat must be ACCEPTED — owner-streamed quats glide (quat_nlerp)"
 quat_lane 'replicate,interp' || fail "gd:\"replicate,interp\" on a quat must be ACCEPTED — delta-lane quats glide (quat_nlerp)"

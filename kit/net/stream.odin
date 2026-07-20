@@ -261,6 +261,54 @@ quat_nlerp :: proc(dst, a, b: [^]f32, alpha: f32) {
 	}
 }
 
+// ---- quaternion algebra for the sim lane's predicted-rotation glide ----------
+//
+// Components are [x, y, z, w] with w the real part (index 3) — the layout of
+// Odin's quaternion128 / gd.Quaternion, and the one quat_nlerp above already
+// blends. These four are the minimum the predicted-quat render-error glide needs
+// (present.odin): the correction a client must ease across is a ROTATION, not a
+// componentwise difference, so it is composed and decayed as one. dst may alias
+// an input — each reads its operands into locals before writing.
+
+// The Hamilton product a ⊗ b (apply b, then a).
+quat_mul :: proc(dst, a, b: [^]f32) {
+	ax, ay, az, aw := a[0], a[1], a[2], a[3]
+	bx, by, bz, bw := b[0], b[1], b[2], b[3]
+	dst[0] = aw * bx + ax * bw + ay * bz - az * by
+	dst[1] = aw * by - ax * bz + ay * bw + az * bx
+	dst[2] = aw * bz + ax * by - ay * bx + az * bw
+	dst[3] = aw * bw - ax * bx - ay * by - az * bz
+}
+
+// The conjugate (= inverse for a unit quat): the rotation undone.
+quat_conj :: proc(dst, q: [^]f32) {
+	dst[0] = -q[0]
+	dst[1] = -q[1]
+	dst[2] = -q[2]
+	dst[3] = q[3]
+}
+
+// Renormalize in place — a product of two unit quats drifts by rounding, and
+// the glide multiplies every frame. A degenerate (zero-length) quat is left as
+// the identity, which is how a snapped/zeroed error reads as "no correction".
+quat_normalize :: proc(q: [^]f32) {
+	len2 := q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]
+	if len2 > 1e-12 {
+		inv := 1.0 / math.sqrt(len2)
+		q[0] *= inv;q[1] *= inv;q[2] *= inv;q[3] *= inv
+	} else {
+		q[0] = 0;q[1] = 0;q[2] = 0;q[3] = 1
+	}
+}
+
+// The rotation magnitude in radians (the SHORT arc: q and -q are one rotation,
+// so |w|). Used to decide when a predicted-rotation correction is a snap.
+quat_angle :: proc(q: [^]f32) -> f32 {
+	w := abs(q[3])
+	if w > 1 {w = 1}
+	return 2 * math.acos(w)
+}
+
 // Sample the ring's timeline at `t` and write the result into the entity's
 // streamed fields. ok=false only on an empty ring (entity keeps its last/spawn
 // values). The clamp discipline: before the oldest sample → oldest; past the
