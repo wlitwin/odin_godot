@@ -1569,4 +1569,88 @@ for y in h2_mob_of h2_mob_spawn probe_h2_mob_count on_packet; do
 	echo "$out" | grep -q "yielded: $y" || fail "$y must still yield to the hand-written proc"
 done
 
+# ---- fixture 9: ONE dispatch — a nested tag is checked like a top-level one --
+# The two field walks (parse_script's own-fields loop, recurse_into's embedded
+# one) used to be separate hand-written token chains, and `export`/`onready=`
+# were deferred to the runtime UNVALIDATED in the nested one. So the spelling
+# and bare/value arity gates were top-level only: `gd:"export,rnage=0:100"` one
+# comma deep sailed past the build and died at boot, while the identical typo on
+# the class's own field was a hard error. Both walks now funnel through
+# walk_tagged_field with a Field_Ctx, and these are the three that used to slip.
+#
+# TEETH: every one of these was accepted SILENTLY (exit 0) before the merge.
+nested_tag_must_fail() {
+	local tag="$1" want="$2"
+	local nd="$work/nested_$3"
+	mkdir -p "$nd"
+	cat >"$nd/f.odin" <<ODIN
+//gd:extends Node
+//gd:class NestedTag
+package nested_$3
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Aim :: struct {
+	sens: f32 \`gd:"$tag"\`,
+}
+NestedTag :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 \`gd:"replicate"\`,
+	aim:    Aim,
+}
+@(gd_command="predict")
+nestedtag_hit :: proc(self: ^NestedTag, n: i32) -> bool { self.hp -= n; return true }
+ODIN
+	local out rc
+	out="$("$SGEN" "$nd" -godot:"$ROOT" 2>&1)"
+	rc=$?
+	[[ $rc -ne 0 ]] || fail "nested gd:\"$tag\" must fail the build (it was silently accepted before the walks merged)"
+	echo "$out" | grep -q "$want" || fail "nested gd:\"$tag\" errored, but not with $want — got: $out"
+	# The diagnostic must name the full ACCESS PATH, not the leaf: the whole
+	# point is that you can find the tag inside the block it lives in.
+	echo "$out" | grep -q "NestedTag.aim.sens" || fail "nested tag error must name the path NestedTag.aim.sens — got: $out"
+}
+nested_tag_must_fail 'export,rnage=0:100' 'did you mean `range`' spell
+nested_tag_must_fail 'export,multiline=true' 'takes no value' arity
+nested_tag_must_fail 'onready=' 'needs a node path' onready
+
+# ---- fixture 10: `entity=` LEADS the tag — for EVERY kind, not just export ---
+# The trailing-`entity=` refusal used to live inside the export arm, so the rule
+# stopped applying the moment another token led: `gd:"backup,entity=M:1"` went
+# to an arm that never looks past specs[0] and was accepted SILENTLY (verified
+# against the pre-merge binary) — an entity id that folds into NET_FINGERPRINT
+# and mints a factory row, written down and read by nothing. The check now runs
+# once for all kinds, before the dispatch.
+ent="$work/entlead"
+mkdir -p "$ent"
+entity_trailing_must_fail() {
+	cat >"$ent/f.odin" <<ODIN
+//gd:extends Node
+//gd:class EntLead
+package entlead
+import gd "godot:godot"
+import knet "godot:kit/net"
+import kboot "godot:kit/boot"
+
+Blk :: struct { $2 }
+EntLead :: struct {
+	owner:  gd.Node,
+	boot:   kboot.Boot,
+	net_id: knet.Net_Id,
+	$1
+	blk:    Blk,
+}
+ODIN
+	local out rc
+	out="$("$SGEN" "$ent" -godot:"$ROOT" 2>&1)"
+	rc=$?
+	[[ $rc -ne 0 ]] || fail "$3: a trailing \`entity=\` must fail the build whatever token leads"
+	echo "$out" | grep -q "$4" || fail "$3: wrong diagnostic — got: $out"
+}
+entity_trailing_must_fail 'hp: i32 `gd:"backup,entity=M:1"`,' 'x: i32,' \
+	'top-level backup' 'is a WIRE declaration'
+entity_trailing_must_fail 'x: i32,' 'h: i32 `gd:"backup,entity=M:1"`,' \
+	'nested backup' "declares on the class's OWN scene field"
+
 echo "SCRIPTGEN_OK"
