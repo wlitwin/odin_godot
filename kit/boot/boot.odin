@@ -526,6 +526,20 @@ boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, mar
 	// _process dresses nodes from the fields.
 	if b.lane != nil {
 		ksim.lane_frame(b.lane, delta)
+		// The authority's SIM ticks just mutated delta-lane state, and
+		// session_tick's own edge pass is already behind us — so without this
+		// line a sim game's `<field>_edge` halves see this frame's mutations
+		// only NEXT frame. Coop games never had the bug: their tick loop lives
+		// in the generated <snake>_step, which fires the pass right after it,
+		// for exactly this reason. Lane-routed ticks had no equivalent, so the
+		// two lanes disagreed about when an edge means "now".
+		//
+		// Before lane_present on purpose: present blends WATCHED fields toward
+		// their delayed view, and an edge is a statement about the authority's
+		// truth, not about smoothing. The pass is idempotent (diff, fire,
+		// commit), so a client — or a host whose ticks changed nothing — pays
+		// one memcmp.
+		ksess.session_run_edges(b.ses)
 		ksim.lane_present(b.lane, delta)
 	}
 	return evs[:], mks[:], ticks

@@ -1328,9 +1328,18 @@ client_ingest :: proc(l: ^Lane) {
 	if input_ack == 0 {
 		l.ticker.tick += 3 // nothing acked yet: probe forward briskly
 		lead_control(&l.ticker, 0)
-	} else if err > 8 && ack_advanced {
-		l.ticker.tick += u64(err)
+	} else if err > LEAD_DEEP_TICKS && ack_advanced {
+		l.ticker.tick += u64(err) // deep DEFICIT: jump the head, the gap holds last
 		lead_control(&l.ticker, 0)
+	} else if err < -LEAD_DEEP_TICKS && ack_advanced {
+		// Deep SURPLUS: we are needlessly far ahead and every tick of it is
+		// input latency the player pays for nothing. This cannot jump — the
+		// head only moves forward (tick.odin's LEAD_DEEP_TICKS says why) — so
+		// it bends HARD instead, and hands back to the fine bend at the same
+		// threshold its mirror does. Gated on ack_advanced for the same reason
+		// the deficit rung is: a frozen ack drives `observed` down, never up,
+		// so a surplus measured against a dead upstream is not a surplus.
+		lead_control(&l.ticker, err, SCALE_NUDGE_DEEP)
 	} else {
 		lead_control(&l.ticker, err)
 	}

@@ -13,7 +13,11 @@ package kit_sim
 //     bursting whole ticks to adjust would pop every predicted entity, so
 //     the clock BENDS instead: the accumulator consumes frame time scaled by
 //     ±SCALE_NUDGE_MAX (2% — beneath perception, ~1.2 ticks/s of correction
-//     at 60 Hz), and the lead converges over a second or two.
+//     at 60 Hz), and the lead converges over a second or two. Past
+//     LEAD_DEEP_TICKS of error the fine bend is no longer an answer, and a
+//     ladder takes over: forward, a JUMP (the head may skip); backward, a
+//     coarse bend (the head may not rewind). Both rungs are in lane.odin's
+//     ingest, where the error is measured.
 //   * A CATCH-UP CAP in ticks-behind, not ticks-per-frame. A stalled client
 //     (window drag, tab switch) must fast-forward back to server pace —
 //     that is resimulation-shaped work the reconcile already bounds — but a
@@ -30,6 +34,29 @@ import knet "godot:kit/net"
 
 // The clock never bends more than this — corrections stay beneath perception.
 SCALE_NUDGE_MAX :: 0.02
+
+// The DEEP rung's bend, for an error too big to breathe away. 8% at 60 Hz
+// sheds ~4.8 ticks/s, so a deep surplus is gone in a second or two instead of
+// a quarter-minute — slow-motion you could notice if you went looking, which
+// beats the alternative by a wide margin (see LEAD_DEEP_TICKS).
+SCALE_NUDGE_DEEP :: 0.08
+
+// Where "bend it out" stops being an answer. Both deep rungs share this
+// threshold so they hand off to the fine bend at the same place and cannot
+// fight each other.
+//
+// THE ASYMMETRY IS REAL, and only one side of it was ever paid for. A deep
+// DEFICIT (we are behind) jumps the head FORWARD — skipped ticks are never
+// simulated or ledgered, the server holds-last through the gap. A deep SURPLUS
+// (we are needlessly far ahead, inputs pooling on the server) cannot be jumped
+// the other way: those ticks are already simulated and their inputs already
+// sent under those numbers, so rewinding the head would re-issue a tick the
+// server has answered and corrupt a ledger indexed by tick. The only honest
+// way to shed lead is to run SLOW — which is what the bend does, and at 2% it
+// takes ~17 seconds to shed 20 ticks while the player carries every one of
+// those 333ms as latency they did not need to have. Hence a coarser bend
+// rather than no rung at all.
+LEAD_DEEP_TICKS :: 8.0
 
 // A frame owing more ticks than this drops its backlog (sim_ticker_advance
 // returns at most this many). At 60 Hz: half a second of stall fast-forwards;

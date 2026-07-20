@@ -279,6 +279,24 @@ lead_targets_and_control :: proc(t: ^testing.T) {
 	testing.expect_value(t, tk.scale, 1.0 + ksim.SCALE_NUDGE_MAX / 2)
 	ksim.lead_control(&tk, 0)   // converged: the clock runs true
 	testing.expect_value(t, tk.scale, 1.0)
+
+	// THE DEEP RUNGS ARE A LADDER, and the surplus side used to be missing one.
+	// A deep deficit jumps the head (ingest's arm — the head may skip forward,
+	// the server holds last through the gap). A deep surplus CANNOT jump: those
+	// ticks are simulated and their inputs already sent under those numbers, so
+	// the only honest shed is running slow — and at the fine 2% that is ~17
+	// seconds to drop 20 ticks, every one of them latency the player pays for
+	// nothing. The coarse bend is what makes the two sides comparable.
+	ksim.lead_control(&tk, -20, ksim.SCALE_NUDGE_DEEP)
+	testing.expect_value(t, tk.scale, 1.0 - ksim.SCALE_NUDGE_DEEP)
+	testing.expect(
+		t,
+		ksim.SCALE_NUDGE_DEEP > ksim.SCALE_NUDGE_MAX,
+		"the deep rung must shed faster than the bend it takes over from, or it is not a rung",
+	)
+	// It hands back to the fine bend at the SAME threshold its mirror does —
+	// share the number or the two rungs fight over the handoff.
+	testing.expect_value(t, ksim.LEAD_DEEP_TICKS, 8.0)
 }
 
 // ---- reconcile --------------------------------------------------------------------
