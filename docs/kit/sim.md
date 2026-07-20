@@ -139,6 +139,17 @@ runner_tick_fx :: proc(g: ^Game, self: ^Runner, mine: bool, fired: bool) {
   quickdraw's tracer ships on it (its old `shot_seq`/`shot_aim` fields and
   the hand-detected edge are deleted; the duel acid pins the watcher path).
 
+The `mine = true` skip **assumes the actor's own live pass fired the same fact
+from the same input** — true unless the actor's input for that tick was lost:
+the authority then held their last input, its everywhere pass fired the fact
+from the extrapolation, and the actor — running its own fresh input — may not
+have. Skipped, they miss that one-shot. It stays a skip (including them whenever
+their input was held would double-flash the common case where both sides fired
+it), and facts are cosmetic one-shots the "friends, not forensics" stance lets
+loss drop. If the actor **must** see a fact regardless of loss, fire it from an
+**authority** world pass (`@(gd_step="authority")`) instead of the entity tick —
+an authority-minted fact includes the owner by construction.
+
 **Presentation born OUTSIDE an entity's tick — declared world-pass facts
 (`@(gd_fact)`).** A cross-entity event is discovered where no single entity's
 tick can return it: the world pass sees the foot meet the ball, an authority

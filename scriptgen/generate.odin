@@ -1247,16 +1247,21 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			"// The lane beside the session: the input classes, each with its typed\n"+
 			"// sample, and up to two world passes (everywhere + authority) — all from\n"+
 			"// the attributes. A single-input game registers one class; a game driving\n"+
-			"// two entity kinds registers both. cfg tunes; zero = defaults.\n"+
+			"// two entity kinds registers both. cfg tunes; zero = defaults. Each class\n"+
+			"// stamps its input TYPE so lane_input_of resolves by type, not size.\n"+
 			"%s_lane_init :: proc(self: ^%s, l: ^ksim.Lane, ses: ^ksess.Session, tag := ksim.SIM_TAG, cfg := ksim.Lane_Config{{}}) {{\n"+
 			"\tksim.lane_init(l, ses, %s, tag, cfg)\n"+
 			"\tksim.lane_set_sim(l, self, %s, %s, %s)\n",
 			snake, cls, primary_size, primary_sample, step_ref, step_auth_ref,
 		)
+		if len(s.input_classes) > 0 && s.input_classes[0].type_name != "" {
+			fmt.sbprintf(b, "\tksim.lane_class_set_type(l, 0, typeid_of(%s))\n", s.input_classes[0].type_name)
+		}
 		if len(s.input_classes) > 1 {
 			for ic in s.input_classes[1:] {
 				sample_ref := ic.sample != "" ? fmt.tprintf("_%s_lane_sample_%d", snake, ic.class_id) : "nil"
 				fmt.sbprintf(b, "\tksim.lane_add_input_class(l, %d, size_of(%s), %s)\n", ic.class_id, ic.type_name, sample_ref)
+				fmt.sbprintf(b, "\tksim.lane_class_set_type(l, %d, typeid_of(%s))\n", ic.class_id, ic.type_name)
 			}
 		}
 		if len(s.facts) > 0 {
