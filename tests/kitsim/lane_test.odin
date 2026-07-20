@@ -1111,6 +1111,73 @@ predict_error_blob_math :: proc(t: ^testing.T) {
 	testing.expect_value(t, (^f32)(rawptr(&err[0]))^, 0)
 }
 
+// A PREDICTED quaternion glides its reconcile correction — the rotational twin
+// of predict_error_blob_math. The error is a ROTATION (shown ⊗ conj(truth)),
+// eased toward identity and re-applied, so the drawn orientation starts at the
+// old pose (no jump) and converges to truth. TEETH: without the .Quat arms in
+// present.odin the drawn pose would snap to truth on the first present.
+QBox :: struct {
+	rot: [4]f32, // [x, y, z, w] — quaternion128 layout
+}
+
+quat_desc :: proc() -> knet.Entity_Desc {
+	@(static) fields := [?]knet.Field_Desc{
+		{offset = offset_of(QBox, rot), size = 16, flags = {.Predicted, .Interp}, lerp = .Quat},
+	}
+	return knet.Entity_Desc{fields = fields[:]}
+}
+
+@(test)
+predicted_quat_glides_its_correction :: proc(t: ^testing.T) {
+	desc := quat_desc()
+	HALF_PI :: f32(1.5707963) // 90° about Z: sin/cos(π/4) = 0.70710678
+	S :: f32(0.70710678)
+	// truth = identity, shown = 90° about Z. err must be that 90° rotation.
+	truth := []u8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	shown := []u8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	err := make([]u8, 16);defer delete(err)
+	(^f32)(rawptr(&truth[12]))^ = 1 // identity w
+	(^f32)(rawptr(&shown[8]))^ = S // z
+	(^f32)(rawptr(&shown[12]))^ = S // w
+
+	// The error is the full 90° turn from truth to shown.
+	ksim.predict_error(err, shown, truth, &desc, 0)
+	testing.expectf(t, abs(knet.quat_angle(([^]f32)(&err[0])) - HALF_PI) < 0.01,
+		"quat error should be the 90° turn, got %v rad", knet.quat_angle(([^]f32)(&err[0])))
+
+	// Applied with NO decay onto the truth pose: the drawn orientation is the OLD
+	// shown pose, not truth — a glide starts where the eye already was (no jump).
+	// This is the line that would fail if .Quat snapped.
+	q := QBox{rot = {0, 0, 0, 1}} // truth restored, as the presenter does each frame
+	ksim.predict_error_apply(&q, &desc, err)
+	testing.expectf(t, abs(knet.quat_angle(([^]f32)(&q.rot[0])) - HALF_PI) < 0.01,
+		"first present must draw the OLD pose (90° off truth), not snap to truth — got %v rad", knet.quat_angle(([^]f32)(&q.rot[0])))
+
+	// One half-life of decay eases the error strictly toward truth (0 < a < 90°).
+	ksim.predict_error_decay(err, &desc, 1.0, 1.0) // dt == half-life
+	a1 := knet.quat_angle(([^]f32)(&err[0]))
+	testing.expectf(t, a1 > 0.05 && a1 < HALF_PI - 0.05,
+		"one half-life should ease the rotation error partway (0<a<90°), got %v rad", a1)
+	q = QBox{rot = {0, 0, 0, 1}}
+	ksim.predict_error_apply(&q, &desc, err)
+	testing.expectf(t, abs(knet.quat_angle(([^]f32)(&q.rot[0])) - a1) < 0.01,
+		"the drawn pose eases with the error, got %v want %v", knet.quat_angle(([^]f32)(&q.rot[0])), a1)
+
+	// Several more half-lives: the error all but vanishes — the pose has glided
+	// home to truth.
+	for _ in 0 ..< 6 {ksim.predict_error_decay(err, &desc, 1.0, 1.0)}
+	testing.expectf(t, knet.quat_angle(([^]f32)(&err[0])) < 0.05,
+		"the rotation error should decay to ~0 (glided home), got %v rad", knet.quat_angle(([^]f32)(&err[0])))
+
+	// The SNAP path: a cut below the turn zeroes the error — the pose stays at
+	// truth (a snapped quat error reads as identity, not garbage).
+	ksim.predict_error(err, shown, truth, &desc, 0.7854) // cut 45° < the 90° turn
+	q = QBox{rot = {0, 0, 0, 1}}
+	ksim.predict_error_apply(&q, &desc, err)
+	testing.expectf(t, knet.quat_angle(([^]f32)(&q.rot[0])) < 0.001,
+		"past the cut the pose snaps to truth (error zeroed → identity), got %v rad", knet.quat_angle(([^]f32)(&q.rot[0])))
+}
+
 // Per-field glide + cut: with the lane default in play, one field decays at its
 // OWN half-life and snaps at its OWN threshold, while its neighbor uses the
 // lane's — a slow avatar and a snappy ball in one lane. The cut stays entity-

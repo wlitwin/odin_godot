@@ -73,6 +73,22 @@ predict_error :: proc(err: []u8, shown: []u8, truth: []u8, desc: ^knet.Entity_De
 					over = true
 				}
 			}
+		case .Quat:
+			// A rotation's error is a ROTATION, not a componentwise difference:
+			// err = shown ⊗ conj(truth), the turn that carries truth to shown.
+			// decay eases it toward identity, apply re-applies it — so the drawn
+			// orientation glides to each correction the way a position does. cut
+			// (radians here) snaps past a big jump, as the scalar arms do.
+			for i in 0 ..< f.size / 16 {
+				bo := off + i * 16
+				ct: [4]f32
+				knet.quat_conj(raw_data(ct[:]), ([^]f32)(&truth[bo]))
+				knet.quat_mul(([^]f32)(&err[bo]), ([^]f32)(&shown[bo]), raw_data(ct[:]))
+				knet.quat_normalize(([^]f32)(&err[bo]))
+				if fc > 0 && knet.quat_angle(([^]f32)(&err[bo])) > fc {
+					over = true
+				}
+			}
 		}
 	}
 	if over {
@@ -105,6 +121,15 @@ predict_error_decay :: proc(err: []u8, desc: ^knet.Entity_Desc, dt: f64, halflif
 			for i in 0 ..< f.size / 8 {
 				(^f64)(rawptr(&err[off + i * 8]))^ *= f64(k)
 			}
+		case .Quat:
+			// The rotational twin of `err *= k`: nlerp from identity to the
+			// current error by k shrinks its angle by k each frame, easing the
+			// rotation error toward "no correction" (identity, not zero).
+			ident := [4]f32{0, 0, 0, 1}
+			for i in 0 ..< f.size / 16 {
+				bo := off + i * 16
+				knet.quat_nlerp(([^]f32)(&err[bo]), raw_data(ident[:]), ([^]f32)(&err[bo]), k)
+			}
 		}
 	}
 }
@@ -134,6 +159,22 @@ predict_error_apply :: proc(entity: rawptr, desc: ^knet.Entity_Desc, err: []u8) 
 		case .F64:
 			for i in 0 ..< f.size / 8 {
 				(^f64)(rawptr(base + uintptr(i * 8)))^ += (^f64)(rawptr(&err[off + i * 8]))^
+			}
+		case .Quat:
+			// shown = err ⊗ truth (the entity field holds truth here). A zeroed
+			// error — the over-snap path, which can't know to write identity —
+			// reads as "no correction", so leave truth untouched.
+			for i in 0 ..< f.size / 16 {
+				bo := off + i * 16
+				e := ([^]f32)(&err[bo])
+				if e[0] == 0 && e[1] == 0 && e[2] == 0 && e[3] == 0 {
+					continue
+				}
+				p := ([^]f32)(rawptr(base + uintptr(i * 16)))
+				out: [4]f32
+				knet.quat_mul(raw_data(out[:]), e, p)
+				knet.quat_normalize(raw_data(out[:]))
+				p[0] = out[0];p[1] = out[1];p[2] = out[2];p[3] = out[3]
 			}
 		}
 	}

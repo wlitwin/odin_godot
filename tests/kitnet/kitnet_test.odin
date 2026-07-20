@@ -2071,3 +2071,40 @@ delta_mask_is_subset_ordinal :: proc(t: ^testing.T) {
 	// Committed: idle on the next diff.
 	testing.expect_value(t, knet.diff_mask(&src, shadow, &desc), u64(0))
 }
+
+// The quaternion algebra the sim lane's predicted-rotation glide is built on
+// (quat_mul / quat_conj / quat_normalize / quat_angle), tested directly since
+// they are public knet API now. Components are [x, y, z, w], w the real part.
+@(test)
+quat_algebra :: proc(t: ^testing.T) {
+	S :: f32(0.70710678) // sin/cos(45°)
+	near :: proc(a, b: f32) -> bool {return abs(a - b) < 1e-4}
+
+	// 90° about Z, and its conjugate = its inverse: q ⊗ conj(q) = identity.
+	q := [4]f32{0, 0, S, S}
+	c: [4]f32
+	knet.quat_conj(raw_data(c[:]), raw_data(q[:]))
+	testing.expect(t, near(c[0], 0) && near(c[1], 0) && near(c[2], -S) && near(c[3], S), "conj negates the vector part only")
+	id: [4]f32
+	knet.quat_mul(raw_data(id[:]), raw_data(q[:]), raw_data(c[:]))
+	testing.expect(t, near(id[0], 0) && near(id[1], 0) && near(id[2], 0) && near(id[3], 1), "q ⊗ conj(q) is identity")
+
+	// Composing two 45°-about-Z turns makes one 90° turn.
+	h := [4]f32{0, 0, f32(0.38268343), f32(0.92387953)} // 45° about Z
+	comp: [4]f32
+	knet.quat_mul(raw_data(comp[:]), raw_data(h[:]), raw_data(h[:]))
+	testing.expectf(t, near(knet.quat_angle(raw_data(comp[:])), 1.5707963), "45° ⊗ 45° = 90°, got %v rad", knet.quat_angle(raw_data(comp[:])))
+
+	// quat_angle is the short arc: q and -q are one rotation.
+	neg := [4]f32{0, 0, -S, -S}
+	testing.expect(t, near(knet.quat_angle(raw_data(neg[:])), knet.quat_angle(raw_data(q[:]))), "quat_angle(q) == quat_angle(-q)")
+
+	// quat_normalize rescales to unit; a zero quat becomes identity (the
+	// "no correction" the glide's snap path relies on).
+	big := [4]f32{0, 0, 2, 2}
+	knet.quat_normalize(raw_data(big[:]))
+	testing.expect(t, near(big[2] * big[2] + big[3] * big[3], 1), "normalize gives a unit quat")
+	zero := [4]f32{0, 0, 0, 0}
+	knet.quat_normalize(raw_data(zero[:]))
+	testing.expect(t, near(zero[3], 1), "a degenerate quat normalizes to identity")
+}
