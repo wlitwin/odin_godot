@@ -103,25 +103,55 @@ class's registered methods at build time**: a typo'd forward is a build
 error, not a haunted roster ("" still skips a signal on purpose).
 
 **`boot_pump` handles the boilerplate and re-yields everything.** It runs
-`wire_pump` + `session_tick`, reacts to the five events every game reacts to
-identically (Welcomed/Joined/Left → lobby+score repaints and the host's Start
-gating at `min_players`; Stats → score repaint; Join_Failed/Host_Left →
-status lines), then returns **every** session event plus the comms markers
-(temp-allocated). The game's own reactions are its
+`wire_pump` + `session_tick`, then walks every drained session event through
+the kit's own forwarding table (`kit/boot/forward.odin`), then returns
+**every** session event plus the comms markers (temp-allocated). The game's
+own reactions are its
 [declared event halves](session.md#event-halves-game_event--the-switch-generated)
 — hand the stream to the generated `<snake>_events` and each half runs
 *after* boot's stock reaction, so a game-specific status line simply
 overwrites the stock one.
 
+**The kit's forwards are complete by construction.** `forward.odin` holds ONE
+switch over `ksess.Event`, and it is not `#partial`: every variant is named,
+and the ones with no kit-side consequence are named with an empty case and
+the one word that says why (`FACTORY`, `SIM WIRE`, `GAME-FACING`…). Adding a
+session event is therefore a *compile error* in `kit/boot` until somebody has
+decided what the kit owes it. This replaced three hand-written partial
+switches — the lane's `lane_set_owner`, the lane's `lane_drop_player`, and
+the succession machine — where a new event with a lane or migration
+consequence compiled perfectly clean with its forward simply missing. What
+the table pays for today: roster/score repaints and the host's Start gating
+at `min_players`, `lane_set_owner`/`lane_drop_player` (so no game ever forgets
+them), the succession dance's five arms, the phase's world latch, and the
+status line + **restored Host/Join doors** on every way a seat can end
+(failed, denied with the host's reason, kicked).
+
 **Where the boot stands:** `boot_phase(b)` returns the coarse lifecycle —
-the `running`/`started` latch pair every game hand-kept, tracked once.
-`Boot_Phase` is `.Menu` (no transport; the Host/Join doors showing),
-`.Connecting` (a join door opened, no seat yet — a code resolving included),
-`.Lobby` (seated; hosting counts), `.Playing` (the world reached this screen
-— first spawn/state/resync). The doors advance it and `boot_pump`'s event
-drain moves it: a failed or denied join and a kick fall back to `.Menu`,
-while a host loss deliberately stays put — succession may re-seat, so the
-welcome moves it, not the loss.
+the `running`/`started` latch pair every game hand-kept, answered once.
+`Boot_Phase` is `.Menu` (no seat and none coming; the Host/Join doors
+showing), `.Connecting` (a join in flight — a code at the phonebook and a
+survivor's succession chase both count), `.Lobby` (seated; hosting counts),
+`.Playing` (the world reached this screen — first spawn/state/resync).
+
+It is **derived, not tracked**. Every coarse answer is read off the session
+(`ran` / `joined` / `join_waited`) plus boot's own rendezvous, so a game that
+started its run the RAW way — `netgd`/`ksess` by hand, `boot_pump` for
+everything after — gets a truthful phase without having touched a door. The
+one fact nothing below boot knows, *the world reached this screen*, is the
+single latch left, and `boot_pump` is its only writer: raised in the drain on
+the first spawn/state/resync, dropped at the top of any frame that finds no
+seat (`boot_open_host` drops it too, for the one re-seat with no unseated
+frame — menu → Host again in a live process). Consequences: a failed or
+denied join and a kick fall back to `.Menu` because the session disarms its
+own join clock; a BARE host loss stays put, because the seat outlives the
+socket and succession may re-seat it; a survivor's chase reads `.Connecting`,
+because the dial genuinely restarts the session as a client.
+
+`boot_phase` is a LEVEL. A swap that must happen exactly once (hide the
+lobby, print a receipt) wants the rising EDGE, and no bool is needed for it:
+`boot_pump` is the only place the phase rises, so read the phase before the
+pump and compare after — see `examples/hello_net`'s `process`.
 
 **The factory, written by nobody:** tag each exported entity scene with what
 it bodies and its stable wire id, and pass the GENERATED table to
@@ -204,7 +234,23 @@ env family, absorbed.
 **The buttons:** `boot_host(b, port, name)` and
 `boot_join(b, addr, port, token, name)` do transport-up + session-start + the
 menu/status/chat ritual (via `netgd.begin_host/begin_join`, which exist
-separately if you want the ritual your way — e.g. cavecrawl's Steam paths).
+separately if you want the ritual your way).
+
+Under both is **one door per direction**, parameterized by transport:
+
+```odin
+boot_open_host(b, t: ^netgd.Transport, at: netgd.Endpoint, name, token = 0, dedicated = false) -> bool
+boot_open_join(b, t: ^netgd.Transport, at: netgd.Endpoint, name, token, spectate = false, status = "Joining...") -> bool
+```
+
+Every named door on this page is those two plus a status line. The ritual —
+reconnect identity, [succession](netgd.md#swapping-transports) config (the
+torch flavor comes from the transport's own record, so a door is never told
+twice), phase, menu, chat, roster — is written once, and a new transport
+inherits all of it by filling a `netgd.Transport`. Steam is the proof: it had
+no boot door at all, so it forgot every part of the ritual; it now has both
+doors for the price of one record (`ksteam.TRANSPORT` —
+[steamgd.md](steamgd.md)).
 `boot_serve(b, port, name)` is the **dedicated-server door**: same transport,
 but the authority holds an infrastructure seat (no avatar, no roster row,
 uncounted by player gates, succession never arms — see

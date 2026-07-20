@@ -7,11 +7,18 @@ package kit_xfer
 // stall the reliable channel behind one giant packet, and must fit the web
 // transport at all (WebRTC data channels cap a message around 16KB).
 //
-// THE SHAPE (kit/comms' shape, sized up): everything routes through the host.
-// A client sends paced XF_CHUNK frames to the host; the host assembles its own
-// copy AND relays each frame to everyone as XF_CAST, stamped with the sender —
-// so every peer receives every payload exactly once, over any transport, and a
-// spoofed "cast" from a non-host peer drops on the floor.
+// THE SHAPE: everything routes through the host. A client sends paced frames
+// to the host; the host assembles its own copy AND relays each frame to
+// everyone, stamped with the sender — so every peer receives every payload
+// exactly once, over any transport, and a spoofed cast from a non-host peer
+// drops on the floor.
+//
+// That used to read "kit/comms' shape, sized up", and it was: the same state
+// machine, typed out twice. It is `ksess.Host_Relay` now — stamp, spoof-drop,
+// echo policy, addressed replay — and what is left here is a payload codec
+// (chunking, assembly, supersede) over a queue. xfer runs the relay with
+// `echo = false`: you already hold the bytes you sent, so your own upload
+// coming back around is dropped, on both roles, by the same rule.
 //
 //     kxfer.xfer_init(&self.xfer, &self.ses)            // once, by the session
 //     kxfer.xfer_send(&self.xfer, SPRAY_ID, png_bytes)  // anyone, once
@@ -82,22 +89,24 @@ Asm :: struct {
 
 Xfer :: struct {
 	ses:     ^ksess.Session,
-	tag:     u8,
+	relay:   ksess.Host_Relay,
 	outbox:  [dynamic]Out,
 	inbox:   map[Xfer_Key]Asm, // keyed by (sender, id)
-	events:  [dynamic]Event,
+	events:  ksess.App_Queue(Event),
 	// Superseded DONE buffers whose Ev_Done still sits in `events` (a fast
 	// restart landed before the consumer polled): kept alive until the event
 	// drains, freed by the next pump — never yanked from under a queued event.
 	retired: [dynamic][dynamic]u8,
 }
 
-// ---- wire (inside the session's SES_APP framing) ---------------------------
-
-@(private)
-XF_CHUNK :: u8(0) // client -> host  [id u8][seq u16][chunks u16][total u32][bytes]
-@(private)
-XF_CAST :: u8(1) // host -> all      [from player_id][id][seq][chunks][total][bytes]
+// ---- wire (the payload inside the relay's envelope) ------------------------
+//
+// ONE frame shape, not two: the relay's [RELAY_UP|RELAY_CAST][author] envelope
+// carries the direction and the sender, so the old chunk/cast pair — the same
+// frame twice, once unstamped and once with a Player_Id glued on the front —
+// is a single layout on both arms.
+//
+//     [id u8][seq u16][chunks u16][total u32][bytes]
 
 // A struct key, never a packed int: `u32(from) << 8 | id` kept only 24 bits of
 // the u64 Player_Id — two players colliding mod 2^24 would cross-assemble each
@@ -114,14 +123,13 @@ key_of :: proc "contextless" (from: knet.Player_Id, id: u8) -> Xfer_Key {
 
 xfer_init :: proc(x: ^Xfer, ses: ^ksess.Session, tag := XFER_TAG) {
 	x.ses = ses
-	x.tag = tag
-	ksess.session_app_route(ses, tag, x, xfer_handle)
+	// echo = false: nothing I send comes back to me — my own upload's cast is
+	// dropped on arrival, and the host's own broadcast never lands locally.
+	ksess.relay_route(&x.relay, ses, tag, x, xfer_deliver, echo = false)
 }
 
 xfer_destroy :: proc(x: ^Xfer) {
-	if x.ses != nil {
-		ksess.session_app_route(x.ses, x.tag, nil, nil)
-	}
+	ksess.relay_unroute(&x.relay)
 	for out in x.outbox {
 		delete(out.data)
 	}
@@ -130,7 +138,7 @@ xfer_destroy :: proc(x: ^Xfer) {
 		delete(asm_.buf)
 	}
 	delete(x.inbox)
-	delete(x.events)
+	ksess.appq_destroy(&x.events)
 	for buf in x.retired {
 		delete(buf)
 	}
@@ -161,7 +169,7 @@ xfer_send :: proc(x: ^Xfer, id: u8, bytes: []u8) -> bool {
 // superseded buffer from under it.
 @(private = "file")
 done_queued :: proc(x: ^Xfer, from: knet.Player_Id, id: u8) -> bool {
-	for ev in x.events {
+	for ev in ksess.appq_items(&x.events) {
 		if d, ok := ev.(Ev_Done); ok && d.from == from && d.id == id {
 			return true
 		}
@@ -170,27 +178,22 @@ done_queued :: proc(x: ^Xfer, from: knet.Player_Id, id: u8) -> bool {
 }
 
 // One chunk of `data` framed and flushed — the pacing atom shared by
-// xfer_pump (own outbox) and the album's replay_pump (addressed catch-up);
-// the two loops were line-for-line twins before it. XF_CAST carries the
-// author's id; XF_CHUNK is a client's own upload (the host stamps the id
-// when it rebroadcasts). Returns true when the payload completed — the
-// caller retires it.
+// xfer_pump (my own outbox, over my role's arm of the relay) and the album's
+// replay_pump (host, addressed, under the original author); the two loops were
+// line-for-line twins before it. The caller opens the frame — relay_begin for
+// mine, relay_begin_as for a replay — and this writes the payload. Returns
+// true when the payload completed, so the caller retires it.
 @(private)
-chunk_send :: proc(ses: ^ksess.Session, tag: u8, kind: u8, from: knet.Player_Id, id: u8, seq: ^int, data: []u8, to: ksess.Peer_Id) -> (done: bool) {
+chunk_send :: proc(w: ^knet.Writer, hr: ^ksess.Host_Relay, id: u8, seq: ^int, data: []u8, to: ksess.Peer_Id) -> (done: bool) {
 	chunks := (len(data) + CHUNK - 1) / CHUNK
 	lo := seq^ * CHUNK
 	hi := min(lo + CHUNK, len(data))
-	w := ksess.session_app_begin(ses, tag)
-	knet.write_u8(w, kind)
-	if kind == XF_CAST {
-		knet.write_player_id(w, from)
-	}
 	knet.write_u8(w, id)
 	knet.write_u16(w, u16(seq^))
 	knet.write_u16(w, u16(chunks))
 	knet.write_u32(w, u32(len(data)))
 	knet.write_bytes(w, data[lo:hi])
-	ksess.session_app_flush(ses, to)
+	ksess.relay_flush(hr, to)
 	seq^ += 1
 	return seq^ >= chunks
 }
@@ -202,7 +205,7 @@ xfer_pump :: proc(x: ^Xfer, budget := PUMP_CHUNKS) {
 	// polled consumer gets to copy (see Ev_Done's ownership note).
 	for i := len(x.retired) - 1; i >= 0; i -= 1 {
 		referenced := false
-		for ev in x.events {
+		for ev in ksess.appq_items(&x.events) {
 			if d, ok := ev.(Ev_Done); ok && raw_data(d.bytes) == raw_data(x.retired[i][:]) {
 				referenced = true
 				break
@@ -219,9 +222,9 @@ xfer_pump :: proc(x: ^Xfer, budget := PUMP_CHUNKS) {
 	left := budget
 	for left > 0 && len(x.outbox) > 0 {
 		out := &x.outbox[0]
-		kind := x.ses.is_host ? XF_CAST : XF_CHUNK
-		to := x.ses.is_host ? ksess.BROADCAST_PEER : ksess.HOST_PEER
-		if chunk_send(x.ses, x.tag, kind, x.ses.me, out.id, &out.seq, out.data, to) {
+		// No role branch: relay_begin frames a host's stamped cast and a
+		// client's upload from the same call, and relay_flush picks the peer.
+		if chunk_send(ksess.relay_begin(&x.relay), &x.relay, out.id, &out.seq, out.data, ksess.BROADCAST_PEER) {
 			delete(out.data)
 			ordered_remove(&x.outbox, 0)
 		}
@@ -231,12 +234,7 @@ xfer_pump :: proc(x: ^Xfer, budget := PUMP_CHUNKS) {
 
 // Drain one queued event (call until ok=false each frame).
 xfer_poll :: proc(x: ^Xfer) -> (ev: Event, ok: bool) {
-	if len(x.events) == 0 {
-		return nil, false
-	}
-	ev = x.events[0]
-	ordered_remove(&x.events, 0)
-	return ev, true
+	return ksess.appq_poll(&x.events)
 }
 
 // ---- internals --------------------------------------------------------------
@@ -265,7 +263,7 @@ ingest :: proc(x: ^Xfer, from: knet.Player_Id, id: u8, seq, chunks: int, total: 
 		}
 		x.inbox[k] = Asm{total = total, chunks = chunks, buf = make([dynamic]u8, 0, total)}
 		asm_ = &x.inbox[k]
-		append(&x.events, Ev_Started{from = from, id = id, total = total})
+		ksess.appq_push(&x.events, Event(Ev_Started{from = from, id = id, total = total}))
 	} else if !has || asm_.done || seq != asm_.seq + 1 || total != asm_.total {
 		return // a straggler from a superseded send, or nothing to grow
 	}
@@ -283,57 +281,25 @@ ingest :: proc(x: ^Xfer, from: knet.Player_Id, id: u8, seq, chunks: int, total: 
 			return
 		}
 		asm_.done = true
-		append(&x.events, Ev_Done{from = from, id = id, bytes = asm_.buf[:]})
+		ksess.appq_push(&x.events, Event(Ev_Done{from = from, id = id, bytes = asm_.buf[:]}))
 	}
 }
 
+// The whole receive half, both roles, one parse. The relay did the rest: it
+// forwarded the client's frame to everyone stamped with `author` BEFORE
+// handing it here (the host's own copy grows after the hop, never before it),
+// it dropped the spoofed casts, and with echo = false it dropped my own upload
+// coming back around.
 @(private = "file")
-xfer_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id, r: ^knet.Reader) {
+xfer_deliver :: proc(user: rawptr, author: knet.Player_Id, r: ^knet.Reader) {
 	x := cast(^Xfer)user
-	kind := knet.read_u8(r)
+	id := knet.read_u8(r)
+	seq := int(knet.read_u16(r))
+	chunks := int(knet.read_u16(r))
+	total := int(knet.read_u32(r))
+	piece := knet.read_bytes(r)
 	if r.err {
 		return
 	}
-	switch kind {
-	case XF_CHUNK:
-		// Client -> host only; the session vouched for `from`.
-		if !x.ses.is_host {
-			return
-		}
-		id := knet.read_u8(r)
-		seq := int(knet.read_u16(r))
-		chunks := int(knet.read_u16(r))
-		total := int(knet.read_u32(r))
-		piece := knet.read_bytes(r)
-		if r.err {
-			return
-		}
-		// Relay THIS frame to everyone (the sender skips its own echo), then
-		// keep the host's own copy growing.
-		w := ksess.session_app_begin(x.ses, x.tag)
-		knet.write_u8(w, XF_CAST)
-		knet.write_player_id(w, from)
-		knet.write_u8(w, id)
-		knet.write_u16(w, u16(seq))
-		knet.write_u16(w, u16(chunks))
-		knet.write_u32(w, u32(total))
-		knet.write_bytes(w, piece)
-		ksess.session_app_flush(x.ses, ksess.BROADCAST_PEER)
-		ingest(x, from, id, seq, chunks, total, piece)
-	case XF_CAST:
-		// Only the host casts; a peer casting directly is spoofing.
-		if x.ses.is_host || from_peer != ksess.HOST_PEER {
-			return
-		}
-		cast_from := knet.read_player_id(r)
-		id := knet.read_u8(r)
-		seq := int(knet.read_u16(r))
-		chunks := int(knet.read_u16(r))
-		total := int(knet.read_u32(r))
-		piece := knet.read_bytes(r)
-		if r.err || cast_from == x.ses.me {
-			return // malformed, or my own upload coming back around
-		}
-		ingest(x, cast_from, id, seq, chunks, total, piece)
-	}
+	ingest(x, author, id, seq, chunks, total, piece)
 }

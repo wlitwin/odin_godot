@@ -93,6 +93,20 @@ on the game's own stack in the pump — never in a callback into half-initialize
 script state, which is the whole reason `session_poll` exists instead of a
 delegate.
 
+One refinement the list above compresses, spelled out in
+[session.md's three tiers](session.md#three-tiers-of-entry-into-your-code) because
+kit/session has the most entry points of any package: the synchronous half is
+really *two* kinds. A **pull callback** is the kit asking a question it cannot
+answer — the factory's `make`, the interest locator, the backup blob writer, sim's
+`Sample_Proc`/`Step_Proc`; you answer and return. An **atomic authority hook** runs
+inside an operation whose state does not survive it — the command hooks and
+`_then`, an app handler holding a live `^knet.Reader` into the receive buffer; you
+act, on the authority, and you do not re-enter. Everything remaining is tier three,
+and the derivation is mechanical: *if the same meaning survives being queued and
+drained next frame, it must be queued.* That is why `ksess.App_Queue` exists as a
+type — the file-and-drain discipline every `SES_APP` rider follows was a convention
+each package re-earned, until it wasn't.
+
 **Four verbs name a lifetime.** A type's constructor tells you who owns its
 memory, so nobody has to guess whether to free it:
 
@@ -116,7 +130,12 @@ runtime surprises.
 **A type's whole API is one grep.** The proc prefix IS the type's snake-cased
 name — `registry_*` for `Registry`, `lane_*` for `Lane`, `chat_*` for `Chat` —
 with no exceptions, so `grep registry_` is the complete surface of `Registry` and
-nothing hides under a cleverer name.
+nothing hides under a cleverer name. It is enforced retroactively, and the TYPE
+is usually what moves: kit/ui's last two holdouts, `Health_Bar` and `Ability_Bar`
+wearing `hp_*` and `abilities_*` procs, became `Hp_Bar` and `Abilities_Bar`
+rather than stretching every call site into `health_bar_refresh` — the call site
+is what the rule is for, and a widget named for the noun games already say (`hp`,
+beside `Inv` and `Score`) is the one that reads.
 
 ## Beyond the basics
 

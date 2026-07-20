@@ -120,6 +120,11 @@ code path on both transports; the branch ends the moment the multiplayer peer in
 [kit/boot](boot.md) wraps both flavors with the stock lobby ceremony: `boot_host` /
 `boot_join` and their `boot_host_web` / `boot_join_web` twins.
 
+All four `begin_*` calls are **sugar** over one mechanism — `transport_host` / `transport_join`
+with the flavor picked for you. They are the shortest way to spell the common case and the
+names games already say; reach for the generic pair when the transport is a *variable* (a
+settings menu, a fallback chain, kit/boot's doors). See [Swapping transports](#swapping-transports).
+
 ### Join codes for NATIVE ENet (code.odin)
 
 "Send your friend a four-letter code" without Steam and without reading out
@@ -316,13 +321,62 @@ i.e. inside the receiving method call. Feed it to `knet.reader_make`; clone anyt
 keep. For raw-bytes listening without a `Session_Wire`, `listen_packets(node, method)`
 connects `peer_packet` to a single `@(gd_method)` on the same node's script.
 
+The helper itself lives one layer down now as `gd.packed_byte_array_view` — it is engine-type
+ergonomics, not networking, and kit/save was importing the whole of kit/netgd for it just to
+read a file off disk. `netgd.pba_view` stays as the alias, because every packet handler in the
+tree opens with it and that line should stay short.
+
 ## Swapping transports
 
 Nothing on this page mentions ENet specifics because the wire never sees the transport:
-SceneMultiplayer's signals fire identically over any `MultiplayerPeer`. The WebRTC doors
-above are the browser story; hosting over Steam instead is covered in
-[steamgd.md](steamgd.md) — the `Session_Wire` and the four forwards are byte-for-byte the
-same in every case.
+SceneMultiplayer's signals fire identically over any `MultiplayerPeer`. That is the DATA
+plane, and it was always abstract. The CONTROL plane — open, pump, close, who-is-that-peer —
+is the half that used to grow a parallel door-set per transport, each one answering a
+slightly different set of questions and forgetting a different part of the ritual. So the
+questions are a record now (`transport.odin`):
+
+```odin
+Transport :: struct {
+    name:       string,           // "enet" / "webrtc" / "steam"
+    rendezvous: Rendezvous_Kind,  // the torch flavor `address` feeds (.None = cannot migrate)
+    open_host:  proc(wire, at: Endpoint, name: string, token: u64, dedicated: bool) -> bool,
+    open_join:  proc(wire, at: Endpoint, name: string, token: u64, spectate: bool) -> bool,
+    pump:       proc(wire),       // nil = the engine polls it
+    close:      proc(wire),       // nil = nothing outlives the peer
+    link:       proc(wire, peer) -> (rtt_ms, jitter_ms, loss_pct: f64, ok: bool),
+    address:    proc(wire, peer, allocator) -> (string, bool),
+}
+
+Endpoint :: struct {   // WHERE a run lives, in the flavor its transport understands
+    addr: cstring,     // native: the host's address (join) · web: the relay url
+    port: int,         // native: the port to bind or dial
+    room: cstring,     // web: the room code — reserved on host, knocked on join
+    peer_id: u64,      // steam: the host's steam id (join)
+    max_peers: int,    // host: seat cap (0 = the transport's default)
+}
+```
+
+`open_host` / `open_join` are **required**; the rest are optional, and a nil slot is a
+DECLARED degradation with a documented consequence rather than a surprise:
+
+| slot | nil means | what the user sees |
+|---|---|---|
+| `pump` | the engine polls it (ENet, Steam) | nothing — one nil check per frame |
+| `close` | nothing outlives the peer | a re-host binds clean anyway |
+| `link` | no per-peer statistics story | the netgraph blanks its link row instead of showing a confident zero |
+| `address` | no rendezvous handle for a peer | **host migration is off**, and `succession_torch` says so once, naming the transport |
+
+`transport_host` / `transport_join` open a wire and the wire REMEMBERS its transport — that
+one fact is what lets every later verb stop asking. `transport_service` (the per-frame pump,
+driven for you by `boot_pump`), `transport_close`, `wire_link_quality`, and the succession
+torch all dispatch through it. A wire opened the RAW way (`gd.host` by hand, then
+`wire_attach`) never named one and reads as ENet — safe, because every ENet verb
+class-checks the installed peer and answers `ok = false` when it is something else.
+
+Shipped records: `netgd.ENET`, `netgd.WEBRTC`, and `ksteam.TRANSPORT`
+([steamgd.md](steamgd.md)). A fourth transport fills one record and inherits every door,
+the lobby ceremony, the control-plane pump, and the succession config — `Session_Wire` and
+the four forwards are byte-for-byte the same in every case.
 
 **Cross-play.** A session never MIXES transports: every peer of one session rides the
 same `MultiplayerPeer` flavor — ENet, WebRTC, or Steam — because there is one multiplayer

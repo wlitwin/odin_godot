@@ -807,4 +807,224 @@ grep -q "belongs on the ksess.Session field" "$pe/out.log" || fail "a profile ta
 grep -q 'no struct "Nope"' "$pe/out.log" || fail "an unresolvable row type must be named"
 grep -q "needs a \`pe_game_ready\`" "$pe/out.log" || fail "a profile without a ready must ask for one"
 
+# ---- fixture: the two validation tiers, made one ---------------------------
+# `gd:"export,rnage=0:100"` used to sail past scriptgen (the export-spec loop
+# had no default arm) and die at BOOT as a record_error on a field that had
+# silently lost its hint, while the identical typo behind any OTHER first token
+# failed the build. Same tag, two latencies. The spec NAMES now come from
+# godot:decl's EXPORT_SPECS; the runtime still owns what each one MEANS.
+es="$work/exportspec"
+mkdir -p "$es"
+cat >"$es/thing.odin" <<'ODIN'
+//gd:extends Node
+//gd:class EsThing
+package es
+import gd "godot:godot"
+
+EsThing :: struct {
+	owner: gd.Node,
+	hp:    i32 `gd:"export,rnage=0:100"`,
+	mp:    i32 `gd:"export,wibble=3"`,
+}
+ODIN
+out="$("$SGEN" "$es" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "a misspelled export spec must fail the BUILD, not wait for boot"
+echo "$out" | grep -q 'unknown export spec "rnage" — did you mean `range`' \
+	|| fail "a one-edit typo must name the spec it meant"
+echo "$out" | grep -q 'unknown export spec "wibble" — the set is:' \
+	|| fail "a spec with no near match must list the whole set"
+echo "$out" | grep -q "global_dir, resource, array, dict" \
+	|| fail "the listed set must be the EXPORT_SPECS projection, not a hand-kept excerpt"
+# Every real spec still passes — the gate refuses typos, not the language.
+cat >"$es/thing.odin" <<'ODIN'
+//gd:extends Node
+//gd:class EsThing
+package es
+import gd "godot:godot"
+
+EsThing :: struct {
+	owner: gd.Node,
+	hp:    i32 `gd:"export,range=0:100,group=Combat,default=10"`,
+	note:  gd.String `gd:"export,multiline,subgroup=Text"`,
+	path:  gd.String `gd:"export,file=*.png"`,
+}
+ODIN
+"$SGEN" "$es" -godot:"$ROOT" >/dev/null 2>&1 || fail "the real export specs must still build"
+
+# THE EXPORT-SPEC PROJECTION. decl/decl.odin's EXPORT_SPECS is the name set
+# scriptgen refuses against; runtime/register_class.odin is the CONSUMER that
+# gives each name meaning (walk_field's meta switch, parse_hint_spec's hint
+# switch). A spec the runtime grew and the schema didn't would be refused at
+# build time in every game — so the two are asserted equal here, the same way
+# ATTRS is asserted against build/common.sh below.
+schema_specs="$(awk '/^EXPORT_SPECS :: \[\]Export_Spec \{/{f=1;next} f&&/^\}/{f=0} f&&match($0,/\{"[a-z_]+"/){print substr($0, RSTART+2, RLENGTH-3)}' "$ROOT/decl/decl.odin" | sort -u)"
+[[ -n "$schema_specs" ]] || fail "could not read EXPORT_SPECS out of decl/decl.odin"
+rt_specs="$( { awk '/^\t\tswitch sname \{/{f=1;next} f&&/^\t\tcase:/{f=0} f&&match($0,/^\t\tcase "[a-z_]+":/){print substr($0, RSTART+8, RLENGTH-10)}' "$ROOT/runtime/register_class.odin"
+              awk '/^\tswitch name \{/{f=1;next} f&&/^\t\}/{f=0} f&&match($0,/^\tcase "[a-z_]+":/){print substr($0, RSTART+7, RLENGTH-9)}' "$ROOT/runtime/register_class.odin"; } | sort -u)"
+[[ -n "$rt_specs" ]] || fail "could not read the export-spec switches out of runtime/register_class.odin"
+if [[ "$schema_specs" != "$rt_specs" ]]; then
+    fail "decl.EXPORT_SPECS has drifted from register_class.odin: schema=[$(echo $schema_specs)] runtime=[$(echo $rt_specs)]"
+fi
+
+# ---- fixture: //gd:extends is cross-checked against the owner handle --------
+# The two spellings of one fact used to be free to disagree. The dangerous
+# direction is a handle NARROWER than the base — it registers a plain Node and
+# then reaches through the handle with gd.node2d_* calls into an object that
+# never was one. The WIDER direction stays legal (most of examples/ declares
+# `//gd:extends CharacterBody2D` on an `owner: gd.Node2d`).
+xt="$work/extends"
+mkdir -p "$xt"
+cat >"$xt/bad.odin" <<'ODIN'
+//gd:extends Node
+//gd:class XtBad
+package xt
+import gd "godot:godot"
+
+XtBad :: struct {
+	owner: gd.Node2d,
+}
+ODIN
+out="$("$SGEN" "$xt" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "a handle NARROWER than //gd:extends must fail the build"
+echo "$out" | grep -q '`//gd:extends Node` but `owner: gd.Node2d` is a Node2D handle' \
+	|| fail "the extends mismatch must name BOTH the comment and the field type"
+echo "$out" | grep -q "Write \`//gd:extends Node2D\`" || fail "the refusal must name the fix"
+# The widening direction, and the ancestor chains that reach through the
+# hand-written roots (Ref_Counted :: ^Object) — all must stay silent.
+rm "$xt/bad.odin"
+cat >"$xt/ok.odin" <<'ODIN'
+//gd:extends CharacterBody2D
+//gd:class XtOk
+package xt
+import gd "godot:godot"
+
+XtOk :: struct {
+	owner: gd.Node2d,
+}
+ODIN
+cat >"$xt/ok2.odin" <<'ODIN'
+//gd:extends RefCounted
+//gd:class XtOk2
+package xt
+import gd "godot:godot"
+
+XtOk2 :: struct {
+	owner: gd.Object,
+}
+ODIN
+# No marker at all: the base is DERIVED from the handle rather than defaulting
+# to "Node" — one declaration, not two.
+cat >"$xt/derived.odin" <<'ODIN'
+//gd:class XtDerived
+package xt
+import gd "godot:godot"
+
+XtDerived :: struct {
+	owner: gd.Area2d,
+}
+ODIN
+"$SGEN" "$xt" -godot:"$ROOT" >/dev/null 2>&1 || fail "a WIDER owner handle (and an ancestor chain through Object) must stay silent"
+grep -q 'base = "Area2D"' "$xt/derived.gen.odin" || fail "a marker-less script must derive its base from the owner handle"
+
+# ---- fixture: the .Boot match is a package, not a suffix -------------------
+# `strings.has_suffix(ftype, ".Boot")` was the loosest match in the language:
+# ANY package's Boot declared the game shell and got the four transport
+# forwards generated onto a class that owns no session.
+bt="$work/boot"
+mkdir -p "$bt/mine"
+cat >"$bt/mine/mine.odin" <<'ODIN'
+package mine
+Boot :: struct { anything: i32 }
+ODIN
+cat >"$bt/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class BtGame
+package bt
+import gd "godot:godot"
+import mine "./mine"
+
+BtGame :: struct {
+	owner: gd.Node,
+	boot:  ^mine.Boot,
+}
+ODIN
+"$SGEN" "$bt" -godot:"$ROOT" >/dev/null 2>&1 || fail "a foreign .Boot field must not break the build"
+grep -q "_bt_game_std_on_packet" "$bt/game.gen.odin" \
+	&& fail "a NON-kit/boot .Boot field must not declare the game shell"
+
+# ---- fixture: two declarations, one generated engine method name -----------
+# The composed formula (<path>_<verb>) and the direct one
+# (strip_struct_prefix(<proc>, <Class>)) are different formulas over different
+# inputs, and they could meet: one entry silently never bound.
+mn="$work/methodname"
+mkdir -p "$mn"
+cat >"$mn/mob.odin" <<'ODIN'
+//gd:extends Node
+//gd:class MnMob
+package mn
+import gd "godot:godot"
+
+Gun :: struct { ammo: i32 }
+@(gd_method)
+gun_fire :: proc(self: ^Gun) {}
+
+MnMob :: struct {
+	owner: gd.Node,
+	gun:   Gun,
+}
+
+// Composes to the same engine name as the block's hoisted `gun_fire`.
+@(gd_method)
+mn_mob_gun_fire :: proc(self: ^MnMob) {}
+ODIN
+out="$("$SGEN" "$mn" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "two declarations generating one engine method name must fail the build"
+echo "$out" | grep -q 'two declarations generate the engine method "gun_fire"' \
+	|| fail "the collision must name the generated method"
+
+# ---- fixture: the yields are announced -------------------------------------
+# Name shadowing is THE manual-override pattern; a SILENT yield is
+# indistinguishable from a typo in the override's own name.
+yl="$work/yield"
+mkdir -p "$yl"
+cat >"$yl/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class YlGame
+package yl
+import gd "godot:godot"
+import kboot "godot:kit/boot"
+
+YlGame :: struct {
+	owner: gd.Node,
+	boot:  kboot.Boot,
+}
+
+// Takes the generated forward over by name.
+@(gd_method)
+on_net_down :: proc(self: ^YlGame) {}
+ODIN
+out="$("$SGEN" "$yl" -godot:"$ROOT" 2>&1)"
+echo "$out" | grep -q "scriptgen: yielded: on_net_down" \
+	|| fail "a hand-written proc taking a generated name over must be reported"
+
+# ---------------------------------------------------------------------------
+# THE ALLOWLIST PROJECTION. Odin refuses an unknown custom attribute outright,
+# so every @(gd_*) name the language knows must reach the compiler as
+# -custom-attribute:<name> on EVERY build of game scripts. The schema
+# (decl/decl.odin's ATTRS) is the source; build/common.sh and
+# build_scripts.ps1 are projections of it that nothing could previously check.
+# Drift here used to surface as a compile error in someone else's project.
+schema_attrs="$(grep -o '{"gd_[a-z_]*"' "$ROOT/decl/decl.odin" | tr -d '{"' | sort -u)"
+[[ -n "$schema_attrs" ]] || fail "could not read the attribute schema out of decl/decl.odin"
+for src in "build/common.sh" "build/build_scripts.ps1"; do
+    [[ -f "$ROOT/$src" ]] || continue
+    have="$(grep -o 'custom-attribute:gd_[a-z_]*' "$ROOT/$src" | sed 's/.*://' | sort -u)"
+    if [[ "$have" != "$schema_attrs" ]]; then
+        fail "$src's attribute allowlist has drifted from decl.ATTRS: schema=[$(echo $schema_attrs)] build=[$(echo $have)]"
+    fi
+done
+
 echo "SCRIPTGEN_OK"

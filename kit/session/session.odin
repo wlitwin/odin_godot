@@ -1950,7 +1950,7 @@ session_client_join :: proc(s: ^Session) {
 // same commit. (This log used to register the whole kit's changes: its rev 3
 // and 8 were netgd's, rev 4 was kit/sim's — a convention that held only by
 // engineers remembering a constant in a package they weren't editing.)
-PROTOCOL_REV :: u64(8) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: (moved: netgd rev 2) · 4: (moved: kit/sim rev 2) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream routing mid-run · 7: spectator seats (SES_JOIN intent + roster rows carry the flag) · 8: (moved: netgd rev 3)
+PROTOCOL_REV :: u64(9) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: (moved: netgd rev 2) · 4: (moved: kit/sim rev 2) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream routing mid-run · 7: spectator seats (SES_JOIN intent + roster rows carry the flag) · 8: (moved: netgd rev 3) · 9: SES_APP riders carry the host-relay envelope ([RELAY_UP|RELAY_CAST][author]) — relay.odin
 
 // Wire revisions of the packages ABOVE the session (kit/sim's lane wire,
 // netgd's frame) — the session cannot import upward, so they register at

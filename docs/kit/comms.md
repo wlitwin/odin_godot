@@ -20,6 +20,15 @@ sees the same lines in the same order (**the host's order**), on any transport. 
 line comes back with the broadcast rather than echoing locally: authoritative order beats a
 few milliseconds, and what you see IS what everyone sees.
 
+That shape is not written here. It is
+[`ksess.Host_Relay`](session.md#the-host-relay-host_relay--the-send-half-written-once) —
+stamp, spoof-drop, echo policy, addressed replay — which kit/comms and [kit/xfer](xfer.md)
+had hand-rolled twice before it existed; comms runs it with `echo = true`, which is that
+"comes back with the broadcast" sentence, as a flag. What is left in this package is a
+payload codec (two message kinds) over a bounded log and the shared rider queue. It shows in
+the calls: `comms_say` writes the same bytes on the host and on a client, and the relay picks
+the arm — there is no `is_host` at a send door anywhere in the package.
+
 Two shapes come out the other end:
 
 - **Lines** land in a bounded log (`LOG_MAX :: 64` lines, older evict) that a UI repaints

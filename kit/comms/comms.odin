@@ -12,6 +12,13 @@ package kit_comms
 // milliseconds, and it means what you see IS what everyone sees. Markers ride
 // the same way but are transient events, not log lines.
 //
+// That shape is not written here anymore — it is `ksess.Host_Relay` (stamp,
+// spoof-drop, echo policy, addressed replay), which kit/comms and kit/xfer had
+// hand-rolled twice. What is left in this file is a PAYLOAD CODEC over a
+// queue: two message kinds and a bounded log. Note what vanished with it —
+// every `if c.ses.is_host` at a send door: comms_say writes the same bytes on
+// both roles and the relay picks the arm.
+//
 // It rides the session's SES_APP extension point — zero extra game wiring:
 //
 //     kcomms.comms_init(&self.comms, &self.ses)      // once, next to the session
@@ -65,39 +72,39 @@ Event :: union {
 
 Comms :: struct {
 	ses:    ^ksess.Session,
-	tag:    u8,
+	relay:  ksess.Host_Relay,
 	log:    [dynamic]Line,
-	events: [dynamic]Event,
+	events: ksess.App_Queue(Event),
 }
 
-// ---- wire (inside the session's SES_APP framing) ------------------------------
+// ---- wire (the payload inside the relay's envelope) ---------------------------
+//
+// Two kinds, not four: the relay's [RELAY_UP|RELAY_CAST][author] envelope
+// carries the direction and the speaker, so the old say/line and mark/marked
+// pairs — the same message twice, once unstamped and once stamped — collapse
+// into one each.
 
 @(private)
-CO_SAY :: u8(0) // client -> host  [text string]
+CO_SAY :: u8(0) // [text string]
 @(private)
-CO_MARK :: u8(1) // client -> host  [kind u8][x f32][y f32][z f32]
-@(private)
-CO_LINE :: u8(2) // host -> all     [player u64][text string] (player 0 = system)
-@(private)
-CO_MARKED :: u8(3) // host -> all   [player u64][kind u8][x][y][z]
+CO_MARK :: u8(1) // [kind u8][x f32][y f32][z f32]
 
 // Bind to a session (host or client, before or after it starts). The comms
 // must outlive the session's traffic — destroy it before the session.
 comms_init :: proc(c: ^Comms, ses: ^ksess.Session, tag := COMMS_TAG) {
 	c.ses = ses
-	c.tag = tag
-	ksess.session_app_route(ses, tag, c, comms_handle)
+	// echo = true: your own line lands in YOUR log the same way it lands in
+	// everyone else's — through the host's broadcast, in the host's order.
+	ksess.relay_route(&c.relay, ses, tag, c, comms_deliver, echo = true)
 }
 
 comms_destroy :: proc(c: ^Comms) {
-	if c.ses != nil {
-		ksess.session_app_route(c.ses, c.tag, nil, nil)
-	}
+	ksess.relay_unroute(&c.relay)
 	for line in c.log {
 		delete(line.text)
 	}
 	delete(c.log)
-	delete(c.events)
+	ksess.appq_destroy(&c.events)
 	c^ = {}
 }
 
@@ -115,43 +122,39 @@ clip :: proc(text: string, max_bytes: int) -> string {
 	return text[:n]
 }
 
-// Say something. On the host it lands (and broadcasts) immediately; on a
-// client it comes back with the host's broadcast, in everyone's shared order.
+// Say something. Role-free at the call site AND in here: the host's own line
+// broadcasts and lands locally, a client's goes up and comes back with the
+// broadcast — one set of bytes, the relay picks the arm.
 comms_say :: proc(c: ^Comms, text: string) {
 	said := clip(text, MAX_SAY)
 	if said == "" {
 		return
 	}
-	if c.ses.is_host {
-		host_line(c, c.ses.me, said)
-		return
-	}
-	w := ksess.session_app_begin(c.ses, c.tag)
+	w := ksess.relay_begin(&c.relay)
 	knet.write_u8(w, CO_SAY)
 	knet.write_string(w, said)
-	ksess.session_app_flush(c.ses, ksess.HOST_PEER)
+	ksess.relay_flush(&c.relay)
 }
 
 // A system line: host-authored flavor text with no speaker ("bob joined the
 // cave", "the door opened"). The GAME words these — comms just ships them.
 comms_system :: proc(c: ^Comms, text: string) {
 	assert(c.ses.is_host, "system lines come from the authority")
-	host_line(c, SYSTEM_LINE, clip(text, MAX_SAY))
+	w := ksess.relay_begin_as(&c.relay, SYSTEM_LINE)
+	knet.write_u8(w, CO_SAY)
+	knet.write_string(w, clip(text, MAX_SAY))
+	ksess.relay_flush(&c.relay)
 }
 
 // Drop a positional marker everyone sees (poll Ev_Marker to visualize it).
 comms_ping :: proc(c: ^Comms, kind: u8, pos: [3]f32) {
-	if c.ses.is_host {
-		host_marker(c, c.ses.me, kind, pos)
-		return
-	}
-	w := ksess.session_app_begin(c.ses, c.tag)
+	w := ksess.relay_begin(&c.relay)
 	knet.write_u8(w, CO_MARK)
 	knet.write_u8(w, kind)
 	knet.write_f32(w, pos.x)
 	knet.write_f32(w, pos.y)
 	knet.write_f32(w, pos.z)
-	ksess.session_app_flush(c.ses, ksess.HOST_PEER)
+	ksess.relay_flush(&c.relay)
 }
 
 // The whole drop-in ritual, in the one order that works: replay the log to
@@ -179,20 +182,19 @@ comms_catchup :: proc(c: ^Comms, player: knet.Player_Id) {
 		return
 	}
 	for line in c.log {
-		w := ksess.session_app_begin(c.ses, c.tag)
-		write_line(w, line.player, line.text)
-		ksess.session_app_flush(c.ses, p.peer)
+		// Each line re-cast under its ORIGINAL speaker, addressed to the one
+		// joiner: an addressed cast never echoes, so replaying history can't
+		// re-file it into the host's own log.
+		w := ksess.relay_begin_as(&c.relay, line.player)
+		knet.write_u8(w, CO_SAY)
+		knet.write_string(w, line.text)
+		ksess.relay_flush(&c.relay, p.peer)
 	}
 }
 
 // Drain one queued event (call until ok=false each frame).
 comms_poll :: proc(c: ^Comms) -> (ev: Event, ok: bool) {
-	if len(c.events) == 0 {
-		return nil, false
-	}
-	ev = c.events[0]
-	ordered_remove(&c.events, 0)
-	return ev, true
+	return ksess.appq_poll(&c.events)
 }
 
 // The log, oldest first — what a chat box repaints from.
@@ -215,36 +217,6 @@ comms_line_name :: proc(c: ^Comms, line: Line) -> string {
 // ---- internals -----------------------------------------------------------------
 
 @(private = "file")
-write_line :: proc(w: ^knet.Writer, player: knet.Player_Id, text: string) {
-	knet.write_u8(w, CO_LINE)
-	knet.write_player_id(w, player)
-	knet.write_string(w, text)
-}
-
-// Host: land a line locally and broadcast it — the one place lines are minted,
-// so the host's log order IS the shared order.
-@(private = "file")
-host_line :: proc(c: ^Comms, player: knet.Player_Id, text: string) {
-	deliver_line(c, player, text)
-	w := ksess.session_app_begin(c.ses, c.tag)
-	write_line(w, player, text)
-	ksess.session_app_flush(c.ses, ksess.BROADCAST_PEER)
-}
-
-@(private = "file")
-host_marker :: proc(c: ^Comms, player: knet.Player_Id, kind: u8, pos: [3]f32) {
-	append(&c.events, Ev_Marker{player = player, kind = kind, pos = pos})
-	w := ksess.session_app_begin(c.ses, c.tag)
-	knet.write_u8(w, CO_MARKED)
-	knet.write_player_id(w, player)
-	knet.write_u8(w, kind)
-	knet.write_f32(w, pos.x)
-	knet.write_f32(w, pos.y)
-	knet.write_f32(w, pos.z)
-	ksess.session_app_flush(c.ses, ksess.BROADCAST_PEER)
-}
-
-@(private = "file")
 deliver_line :: proc(c: ^Comms, player: knet.Player_Id, text: string) {
 	if len(c.log) >= LOG_MAX {
 		delete(c.log[0].text)
@@ -252,55 +224,33 @@ deliver_line :: proc(c: ^Comms, player: knet.Player_Id, text: string) {
 	}
 	owned := strings.clone(text)
 	append(&c.log, Line{player = player, text = owned})
-	append(&c.events, Ev_Line{player = player, text = owned})
+	ksess.appq_push(&c.events, Event(Ev_Line{player = player, text = owned}))
 }
 
+// The whole receive half, both roles, one switch: the relay already resolved
+// `author` (the host's stamp on a client's word, or the host's own name), and
+// already dropped the spoofs. This proc only FILES — the game drains with
+// comms_poll on its own stack.
 @(private = "file")
-comms_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id, r: ^knet.Reader) {
+comms_deliver :: proc(user: rawptr, author: knet.Player_Id, r: ^knet.Reader) {
 	c := cast(^Comms)user
 	kind := knet.read_u8(r)
 	if r.err {
 		return
 	}
-	if c.ses.is_host {
-		// The session already vouched for `from` (seated player).
-		switch kind {
-		case CO_SAY:
-			said := clip(knet.read_string(r), MAX_SAY) // clip again: trust boundary
-			if r.err || said == "" {
-				return
-			}
-			host_line(c, from, said)
-		case CO_MARK:
-			kind_byte := knet.read_u8(r)
-			pos := [3]f32{knet.read_f32(r), knet.read_f32(r), knet.read_f32(r)}
-			if r.err {
-				return
-			}
-			host_marker(c, from, kind_byte, pos)
-		}
-		return
-	}
-	// Client: only the host mints lines and markers — a peer broadcasting
-	// these directly (transport relay allows it) is spoofing; drop it.
-	if from_peer != ksess.HOST_PEER {
-		return
-	}
 	switch kind {
-	case CO_LINE:
-		player := knet.read_player_id(r)
-		text := knet.read_string(r)
-		if r.err {
+	case CO_SAY:
+		said := clip(knet.read_string(r), MAX_SAY) // clip again: trust boundary
+		if r.err || said == "" {
 			return
 		}
-		deliver_line(c, player, text)
-	case CO_MARKED:
-		player := knet.read_player_id(r)
+		deliver_line(c, author, said)
+	case CO_MARK:
 		kind_byte := knet.read_u8(r)
 		pos := [3]f32{knet.read_f32(r), knet.read_f32(r), knet.read_f32(r)}
 		if r.err {
 			return
 		}
-		append(&c.events, Ev_Marker{player = player, kind = kind_byte, pos = pos})
+		ksess.appq_push(&c.events, Event(Ev_Marker{player = author, kind = kind_byte, pos = pos}))
 	}
 }

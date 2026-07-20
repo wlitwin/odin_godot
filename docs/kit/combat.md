@@ -205,9 +205,11 @@ fire_route_destroy :: proc(fr: ^Fire_Route)
 `fire_announce` is the AUTHORITY's half — it asserts on a client (the receiver drop
 below stays the security boundary; the assert is the teaching moment: a client calling
 it would broadcast frames every receiver silently discarded). The listener is EVENTS,
-NOT CALLBACKS: the handler only *files*, and the game drains with `fire_poll` each frame
-on its own stack — the old `on_fire` callback ran game code mid-session-pump, the one
-reentrancy hole in the subsystem. What lands in the queue is exactly "someone else's
+NOT CALLBACKS: the handler only *files* (into
+[`ksess.App_Queue`](session.md#the-riders-queue-appq--the-receive-half), the same queue comms, xfer and the
+album hold — the discipline is a type now, not a habit each package re-earns), and the game
+drains with `fire_poll` each frame on its own stack — the old `on_fire` callback ran game
+code mid-session-pump, the one reentrancy hole in the subsystem. What lands in the queue is exactly "someone else's
 rock — draw it" (the host's own copy, your own echo, and non-host authors are all
 dropped):
 

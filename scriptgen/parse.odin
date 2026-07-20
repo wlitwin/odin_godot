@@ -6,6 +6,7 @@ import "core:odin/parser"
 import "core:slice"
 import "core:strconv"
 import "core:strings"
+import decl "godot:decl"
 
 // Render a type/expr node back to its source text by slicing the original buffer.
 // Robust for arbitrary types (`f32`, `gd.Int`, `^gd.Node2d`, ...).
@@ -131,6 +132,25 @@ nearest_lifecycle :: proc(name: string) -> (string, bool) {
 	return "", false
 }
 
+// one_typo_apart — edit_distance_le1 WIDENED by one adjacent transposition, for
+// suggesting the word an author meant. `rnage` for `range` is a transposition,
+// not an insert/delete/substitute, and it is the single most common way a short
+// keyword gets mistyped — the export-spec refusal that couldn't name `range`
+// for `rnage` would have been the least useful possible version of itself.
+// Kept separate from edit_distance_le1 because that one also gates the
+// lifecycle-typo WARNING, where a wider net means more false noise on procs the
+// author never meant as lifecycles.
+one_typo_apart :: proc(a, b: string) -> bool {
+	if edit_distance_le1(a, b) {return true}
+	if len(a) != len(b) {return false}
+	for i in 0 ..< len(a) - 1 {
+		if a[i] == b[i] {continue}
+		// The first disagreement must be the swapped pair, and the rest equal.
+		return a[i] == b[i + 1] && a[i + 1] == b[i] && a[i + 2:] == b[i + 2:]
+	}
+	return false
+}
+
 // edit_distance_le1 — true iff `a` becomes `b` with at most one insertion, deletion, or
 // substitution. (A tiny single-edit check; not a full Levenshtein.)
 edit_distance_le1 :: proc(a, b: string) -> bool {
@@ -186,6 +206,7 @@ scan_markers :: proc(src: string, s: ^Script, pkg_line: int) {
 		if rest, ok := marker_arg(body, "extends"); ok {
 			s.marked = true
 			s.base = strings.trim_space(rest)
+			s.base_line = ln
 			if s.base == "" {error_at(loc, "//gd:extends needs a base class name")}
 		} else if rest, ok := marker_arg(body, "class"); ok {
 			s.marked = true
@@ -469,6 +490,50 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		s.class_name = s.struct_name
 	}
 
+	// ---- the base class, and the pair that used to be allowed to disagree ----
+	//
+	// `//gd:extends Node2D` and `owner: gd.Node2d` state the same fact twice, and
+	// until now nothing compared them. The dangerous half is a handle NARROWER
+	// than the base: `//gd:extends Node` with `owner: gd.Node2d` registers a plain
+	// Node and then reaches through that handle with `gd.node2d_*` calls, which is
+	// a crash at the engine boundary with nothing pointing back at the tag. The
+	// WIDER half is legal and idiomatic (`//gd:extends CharacterBody2D` with
+	// `owner: gd.Node2d` is how most of examples/ is written — the script only
+	// calls Node2D methods), so the rule is ancestry, not equality.
+	//
+	// With no marker the base is DERIVED from the handle instead of defaulting to
+	// "Node": one declaration, not two. The "Node" fallback survives for a handle
+	// the engine class index can't place (no -godot: root, a non-ClassDB type),
+	// which is exactly the pre-existing behaviour for those files.
+	{
+		owner_handle := ""
+		if struct_type.fields != nil && len(struct_type.fields.list) > 0 {
+			ot := normalize_godot_qualifier(node_text(src, struct_type.fields.list[0].type), s.godot_alias)
+			ot = strings.trim_left(ot, "^")
+			if strings.has_prefix(ot, "gd.") {owner_handle = ot[3:]}
+		}
+		if owner_handle != "" {
+			if s.base_line == 0 {
+				if g := godot_class_name(owner_handle); g != "" {
+					s.base = g
+				}
+			} else if covers, known := class_handle_covers(owner_handle, s.base); known && !covers {
+				derived := godot_class_name(owner_handle)
+				if derived == "" {derived = owner_handle}
+				error_at(
+					Loc{s.path, s.base_line},
+					"%s: `//gd:extends %s` but `owner: gd.%s` is a %s handle — the handle must be the base or one of its ancestors, or every gd.%s_* call reaches through it into an object that isn't one. Write `//gd:extends %s` (the class this really is), widen the owner field to %s's own handle or one of ITS bases, or drop the marker and let the field declare the base",
+					s.struct_name, s.base, owner_handle, derived,
+					// The binding-proc prefix is the handle name lowercased — the same
+					// spelling godot/<snake>.gen.odin is filed under. (to_snake would
+					// double the underscores already in `Character_Body2d`.)
+					strings.to_lower(owner_handle, context.temp_allocator),
+					derived, s.base,
+				)
+			}
+		}
+	}
+
 	// The resolution context for nested `using`/embedded fields: this file's package dir
 	// (bare types) and its explicit-alias imports (imported bundles). See lookup_struct.
 	nest_ctx := Struct_Def {
@@ -503,9 +568,19 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		// scriptgen generates the four standard transport forwards for the
 		// class (on_packet/on_peer_left/on_net_up/on_net_down), unless the
 		// game defines its own (hand-written wins, name by name).
+		//
+		// The qualifier must RESOLVE to godot:kit/boot. This was a bare
+		// `has_suffix(ftype, ".Boot")` — the loosest match in the language:
+		// any package's `Boot` (a game's own `startup.Boot`, a vendored
+		// library's) silently declared the game shell, and the four transport
+		// forwards were generated onto a class that owns no session. The alias
+		// is free (`kboot`, `boot`, anything) because the IMPORT PATH is what
+		// is checked, not the spelling.
 		{
 			ftype := strings.trim_space(node_text(src, f.type))
-			if ftype == "kboot.Boot" || strings.has_suffix(ftype, ".Boot") {
+			if dot := strings.index_byte(ftype, '.'); dot > 0 &&
+			   ftype[dot + 1:] == "Boot" &&
+			   nest_ctx.imports[ftype[:dot]] == "godot:kit/boot" {
 				for nm in f.names {
 					if ident, iok := nm.derived.(^ast.Ident); iok && ident != nil {
 						s.boot_field = ident.name
@@ -540,10 +615,10 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 				tok := payload
 				if comma := strings.index(tok, ","); comma >= 0 {tok = tok[:comma]}
 				tok = strings.trim_space(tok)
-				gd_shaped :=
-					tok == "export" || tok == "replicate" || tok == "backup" ||
-					strings.has_prefix(tok, "onready=") || strings.has_prefix(tok, "args=") ||
-					strings.has_prefix(tok, "entity=")
+				// The vocabulary's own answer (godot:decl). This sniff used to
+				// carry a third copy of the token list, so a token added to the
+				// language quietly stopped being recognized here.
+				gd_shaped := decl.field_token_shaped(tok)
 				if edit_distance_le1(ns, "gd") || gd_shaped {
 					error_at(
 						floc,
@@ -735,14 +810,17 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 				continue
 			}
 			// The field HAS a `gd:"..."` tag (tag_gd_value succeeded) but its first token is
-			// neither `export` nor `onready=` — almost certainly a misspelling (`exprot`)
-			// that would otherwise silently leave the field un-exported.
+			// none the vocabulary knows — almost certainly a misspelling (`exprot`)
+			// that would otherwise silently leave the field un-exported. The "expected"
+			// half is godot:decl's projection: this list was hand-kept and had already
+			// fallen two tokens behind the language (`manual`, `profile=T`).
 			error_at(
 				floc,
-				"%s.%s: unknown gd tag %q (expected `export`, `replicate`, `backup`, or `onready=PATH`)",
+				"%s.%s: unknown gd tag %q (expected %s)",
 				s.struct_name,
 				field_label,
 				tok0,
+				decl.field_expected(context.temp_allocator),
 			)
 			continue
 		}
@@ -758,6 +836,16 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		// consumes: the `get=`/`set=` accessor proc names (wrapper emission), the
 		// field's Variant type (wrapper marshalling + the ctor set), and the
 		// `entity=Name:id` declaration (the kboot entity table).
+		//
+		// The default arm below is NOT codegen: it is the SPELLING gate this loop
+		// spent its whole life without. Every other first token's spec loop refuses
+		// what it doesn't know, so `gd:"replicate,slcak=0.5"` failed the build —
+		// but a typo behind `export` fell straight through here, reached the runtime
+		// as an unknown hint, and surfaced as a boot-time record_error on a field
+		// that had silently lost its hint. Two tiers, same tag, no way to tell which
+		// one you were about to hit. The name set is godot:decl's EXPORT_SPECS —
+		// the runtime stays the consumer that knows what each spec MEANS (a value's
+		// type, a hint's Variant requirement); this only asks whether it EXISTS.
 		getter := ""
 		setter := ""
 		entity_val := ""
@@ -780,6 +868,29 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 				entity_val = value
 			case "resource":
 				resource_val = value
+			case:
+				if _, known := decl.export_spec(name); !known {
+					nearest := ""
+					for es in decl.EXPORT_SPECS {
+						if one_typo_apart(name, es.name) {
+							nearest = es.name
+							break
+						}
+					}
+					if nearest != "" {
+						error_at(
+							floc,
+							"%s.%s: unknown export spec %q — did you mean `%s`? (a spec scriptgen doesn't know reaches the engine as nothing: the field registers, the hint silently doesn't)",
+							s.struct_name, field_label, name, nearest,
+						)
+					} else {
+						error_at(
+							floc,
+							"%s.%s: unknown export spec %q — the set is: %s (drop it, or fix the spelling)",
+							s.struct_name, field_label, name, decl.export_specs_list(context.temp_allocator),
+						)
+					}
+				}
 			}
 		}
 
@@ -1560,6 +1671,15 @@ type_base :: proc(t: string) -> string {
 // maps every script struct name to its parsed Script; `seen_ids` accumulates
 // wire-id claims across the whole module (ids collide across FILES too).
 resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^map[int]string, idx: ^map[string]Then_Candidate) {
+	// Every generated name on the entity side is keyed by the TARGET struct
+	// (`<t>_spawn`, `<t>_of`, `<t>_owned_by`, `my_<t>`, `<t>_ids`, and the
+	// `<t>_spawned`/`<t>_freed` hooks it pairs). Two scene fields naming the
+	// same struct is therefore not a second entity — it is the same five procs
+	// generated twice, which surfaced as an Odin redeclaration error pointing at
+	// generated code the author never wrote. The wire-id check below can't catch
+	// it: the two declarations carry DIFFERENT ids, which is precisely why it
+	// looked legal.
+	seen_targets := make(map[string]int, context.temp_allocator)
 	for &e in s.entities {
 		loc := Loc{path = s.path, line = e.line}
 		target, known := by_struct[e.target]
@@ -1579,6 +1699,16 @@ resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^m
 			error_at(loc, "entity %s: wire id %d is already claimed by %s — ids are the entity's wire identity and must be unique", e.target, e.type_id, prev)
 			continue
 		}
+		// After the id check, which is the more specific fact when both are true.
+		if prev, dup := seen_targets[e.target]; dup {
+			error_at(
+				loc,
+				"entity %s: %s is already declared at line %d — the generated census is named after the STRUCT (`%s_spawn`, `%s_of`, …), so a second scene for it would generate those procs twice; one entity= per struct",
+				e.target, e.target, prev, to_snake(e.target), to_snake(e.target),
+			)
+			continue
+		}
+		seen_targets[e.target] = e.line
 		seen_ids[e.type_id] = fmt.aprintf("%s (%s:%d)", e.target, s.path, e.line)
 		e.has_tick = target.tick.proc_name != "" || len(target.block_ticks) > 0 // the kinds row carries the Sim_Set
 
@@ -2037,15 +2167,21 @@ scan_proc_names :: proc(taken: ^map[string]bool, file: ^ast.File) {
 // The typed census accessors yield to the game, name by name: an existing
 // `runner_of` (scrapyard predates the generation with a player-keyed one)
 // keeps its meaning; the other three still generate. Sets the per-tag flags
-// generate() honors.
+// generate() honors. Every yield is ANNOUNCED (note_yield) — a silent one is
+// indistinguishable from a typo in the override's name.
 resolve_census :: proc(s: ^Script, taken: map[string]bool) {
+	yield :: proc(taken: map[string]bool, name: string) -> bool {
+		if !taken[name] {return true}
+		note_yield("census accessor", name)
+		return false
+	}
 	for &e in s.entities {
 		tsnake := to_snake(e.target)
-		e.gen_of = !taken[fmt.tprintf("%s_of", tsnake)]
-		e.gen_owned = !taken[fmt.tprintf("%s_owned_by", tsnake)]
-		e.gen_my = !taken[fmt.tprintf("my_%s", tsnake)]
-		e.gen_ids = !taken[fmt.tprintf("%s_ids", tsnake)]
-		e.gen_spawn = !taken[fmt.tprintf("%s_spawn", tsnake)]
+		e.gen_of = yield(taken, fmt.tprintf("%s_of", tsnake))
+		e.gen_owned = yield(taken, fmt.tprintf("%s_owned_by", tsnake))
+		e.gen_my = yield(taken, fmt.tprintf("my_%s", tsnake))
+		e.gen_ids = yield(taken, fmt.tprintf("%s_ids", tsnake))
+		e.gen_spawn = yield(taken, fmt.tprintf("%s_spawn", tsnake))
 	}
 }
 
@@ -2083,10 +2219,12 @@ resolve_probes :: proc(s: ^Script, by_struct: map[string]^Script, taken: map[str
 	}
 	add :: proc(s: ^Script, taken: map[string]bool, p: Probe_Info, args: ..Arg) -> bool {
 		if taken[p.name] {
-			return false // hand-written wins
+			note_yield("acid probe", p.name) // hand-written wins
+			return false
 		}
 		for m in s.methods {
 			if m.gd_name == p.name {
+				note_yield("acid probe", p.name)
 				return false
 			}
 		}
@@ -2163,7 +2301,8 @@ resolve_boot_forwards :: proc(s: ^Script) {
 	add :: proc(s: ^Script, snake, name: string, args: ..Arg) {
 		for m in s.methods {
 			if m.gd_name == name {
-				return // hand-written wins
+				note_yield("standard transport forward", name) // hand-written wins
+				return
 			}
 		}
 		m := Method_Info {
@@ -2424,9 +2563,22 @@ resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, idx: ^map[str
 		}
 		if reserved_clash {continue}
 		if taken[door] {
+			// THE ONE EXCEPTION to name-shadowing. Everywhere else in this
+			// language a hand-written proc of the generated name simply wins
+			// (census accessors, acid probes, the transport forwards — see
+			// note_yield). A fact door refuses, because it is not a convenience
+			// that can be re-implemented: the generated body is FOUR gates the
+			// caller has no way to reproduce from game code — it broadcasts the
+			// tuple through ksim.lane_fact only on the authority, fires the `_fx`
+			// half on the causer's LIVE pass with mine=true, fires it on every
+			// watching screen when that screen's watch clock reaches the fact's
+			// tick with mine=false, and stays silent through resim replays so a
+			// reconcile can't re-announce. A shadowing proc would compile, look
+			// right, and quietly present the event once, locally, on whoever
+			// happened to call it. So it is named, not yielded to.
 			error_at(
 				loc,
-				"%s: `%s` is the GENERATED announce door's name and a proc already claims it — rename the hand-written `%s` (the door is the one path, so every announce holds the gates)",
+				"%s: `%s` is the GENERATED announce door's name and a proc already claims it — rename the hand-written `%s`. Unlike the census/probe/forward names (a same-named proc there simply wins), the door can't be yielded: its body holds the authority-broadcast, the mine=true live fire, the watch-clock fire on watching screens, and the resim silence — gates no hand-written proc can reproduce",
 				cand.name, door, door,
 			)
 			continue
@@ -3628,18 +3780,10 @@ unresolved_embed_check :: proc(loc: Loc, class_name, field_label, type_text: str
 	}
 }
 
-// The verb's STABLE wire id: FNV-1a of the verb name, xor-folded to u16. What
-// the generated constants hold and both command wires ship — reordering (or
-// adding/removing) procs can no longer renumber the protocol; a version-skewed
-// peer's unknown id MISSES the receiver's lookup and rejects cleanly instead
-// of dispatching to whatever now lives at that position. A renamed verb is a
-// new id on purpose: it IS a different verb.
+// The verb's STABLE wire id — the shared hash law's u16 namespace (godot:decl
+// states it once, for the three places that used to inline the arithmetic).
 cmd_wire_id :: proc(name: string) -> u16 {
-	h: u32 = 0x811c9dc5
-	for c in transmute([]u8)name {
-		h = (h ~ u32(c)) * 0x01000193
-	}
-	return u16(h >> 16) ~ u16(h & 0xFFFF)
+	return decl.wire_id16(name)
 }
 
 // Two verbs on one entity hashing to the same u16 — astronomically rare for a
@@ -3656,6 +3800,31 @@ validate_command_ids :: proc(s: ^Script) {
 					s.struct_name, c.name, o.name, cmd_wire_id(c.name),
 				)
 			}
+		}
+	}
+}
+
+// Two declarations landing on ONE engine method name. The composed formula
+// (`<path>_<verb>`, compose_member_name) and the direct one
+// (strip_struct_prefix(<proc>, <Class>)) are different formulas over different
+// inputs, and nothing stopped them meeting: a direct `mob_gun_fire` on class
+// Mob and a `gun: Gun` embed whose block declares `fire` both resolve to the
+// engine name "gun_fire". Two entries went into the method table under one
+// name, the engine bound whichever it saw last, and the other proc was simply
+// never callable — silently, with no build diagnostic anywhere. (The command
+// side is already covered: two verbs sharing a name hash identically and
+// validate_command_ids names both.) The generated conveniences can't trip this
+// — probes and forwards yield before they append.
+validate_method_names :: proc(s: ^Script) {
+	for m, i in s.methods {
+		for j in i + 1 ..< len(s.methods) {
+			o := s.methods[j]
+			if m.gd_name != o.gd_name {continue}
+			error_at(
+				Loc{path = s.path},
+				"%s: two declarations generate the engine method %q (%s and %s) — one of them silently never binds; rename the proc, or rename the embedded field whose path composes into it",
+				s.struct_name, m.gd_name, m.proc_name, o.proc_name,
+			)
 		}
 	}
 }

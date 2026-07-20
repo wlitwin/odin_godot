@@ -31,12 +31,19 @@ package kit_save
 import gd "godot:godot"
 import "godot:gdext"
 import knet "godot:kit/net"
-import netgd "godot:kit/netgd"
 import ksess "godot:kit/session"
 import "core:mem"
 
 MAGIC :: u32(0x46534C50) // "FSLP"
-FORMAT :: u16(3) // bumped with the session snapshot layout (2: entity blobs + wire codecs · 3: the door — locked + denied — rides the roster)
+// HAND-BUMPED, and the one place in the kit that still should be — see
+// save.md's "what crosses time, what crosses the wire". Bytes crossing TIME
+// take the generated FNV field hash (gd:"backup" blobs, write_pod); bytes
+// crossing THE WIRE take a rev at the join door (ksess.PROTOCOL_REV,
+// knet.WIRE_REV, each wire package's own). FORMAT is neither: it versions the
+// ENVELOPE — magic, stamps, two length-prefixed ranges — which has no field
+// set to hash and must be readable by a reader that has agreed to nothing yet.
+// The changelog below IS the contract; bump it with the snapshot layout.
+FORMAT :: u16(3) // 2: entity blobs + wire codecs · 3: the door — locked + denied — rides the roster
 
 Header :: struct {
 	game_version: u16,
@@ -156,7 +163,7 @@ read_file :: proc(path: cstring, allocator := context.allocator) -> (bytes: []u8
 	pba := gd.file_access_get_buffer(f, gd.Int(n))
 	defer gd.free_packed_byte_array(pba) // engine-owned buffer, copied out below
 	gd.file_access_close(f)
-	view := netgd.pba_view(&pba)
+	view := gd.packed_byte_array_view(&pba)
 	bytes = make([]u8, len(view), allocator)
 	copy(bytes, view)
 	return bytes, true

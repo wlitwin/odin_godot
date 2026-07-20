@@ -33,8 +33,10 @@ HelloNet :: struct {
 	ses:     ksess.Session, // identity, roster, replication — the session
 	comms:   kcomms.Comms,  // chat + system lines (the stock lobby uses it)
 	boot:    kboot.Boot,    // the stock stack: lobby UI, transport, factory
-	running: bool,          // transport up (hosting or joining)
-	started: bool,          // the world reached this peer
+	// (no `running`/`started` pair: kboot.boot_phase answers both, derived from
+	// the session — see hello_net_process. The bools drifted, too: `running`
+	// never went back to false after a failed join, so the Host button stayed
+	// dead for the rest of the run.)
 
 	// THE declaration: this exported scene bodies a replicated entity. The
 	// tag mints the wire id, the factory, typed player_spawn(), the census
@@ -87,15 +89,20 @@ hello_net_ready :: proc(self: ^HelloNet) {
 		code := gd.env_string("HELLO_CODE", "")
 		if relay != "" && code != "" {
 			gd.print_str(fmt.tprintf("HELLO_CODE_JOIN code=%s", code))
-			if kboot.boot_join_code(&self.boot, fmt.ctprintf("%s", relay), code, kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player")) {
-				self.running = true
-			}
+			kboot.boot_join_code(&self.boot, fmt.ctprintf("%s", relay), code, kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player"))
 		}
 	}
 }
 
 hello_net_process :: proc(self: ^HelloNet, delta: f64) {
-	if !self.running {return}
+	// THE LIFECYCLE, read not kept. `.Menu` is "no seat and none coming" — the
+	// old `running` bool, except this one is derived from the session, so it
+	// goes back to false when a join fails instead of latching forever. Read
+	// BEFORE the pump on purpose: boot_pump is the only place the phase RISES,
+	// so `was` versus the phase after it is the rising edge the `started` bool
+	// existed to detect (see the swap at the bottom).
+	was := kboot.boot_phase(&self.boot)
+	if was == .Menu {return}
 	events, _, _ := kboot.boot_pump(&self.boot, delta, now_s())
 	// The minted code is a FACT to poll, not a callback: show it when it lands
 	// (the stock lobby status already carries it; this is the headless receipt).
@@ -119,13 +126,20 @@ hello_net_process :: proc(self: ^HelloNet, delta: f64) {
 	// Reactions live in the name-paired halves below; the generated
 	// hello_net_events holds the switch and every role gate.
 	hello_net_events(self, events)
+
+	// The world ARRIVED this frame — the once-only receipt. boot_phase is a
+	// LEVEL and the halves below fire per spawn, so the edge is computed here,
+	// from two reads of the level, and needs no bool on this struct.
+	if was != .Playing && kboot.boot_phase(&self.boot) == .Playing {
+		gd.print_str("HELLO_STARTED")
+	}
 }
 
 // ---- the doors (wired to the stock lobby's buttons by name) ----------------
 
 @(gd_method)
 hello_net_on_host :: proc(self: ^HelloNet) {
-	if self.running {return}
+	if kboot.boot_phase(&self.boot) != .Menu {return} // a door is only a door from the menu
 	port := kboot.boot_port(&self.boot, DEFAULT_PORT)
 	// With a relay configured, host WITH a join code — the coded door is
 	// boot_host plus "register the port under a code the status line shows".
@@ -136,28 +150,28 @@ hello_net_on_host :: proc(self: ^HelloNet) {
 		ok = kboot.boot_host(&self.boot, port, kboot.boot_name(&self.boot, "player"))
 	}
 	if !ok {return}
-	self.running = true
 	hello_net_on_start(self) // a lone host starts at once; joiners drop in
 }
 
 @(gd_method)
 hello_net_on_join :: proc(self: ^HelloNet) {
-	if self.running {return}
+	if kboot.boot_phase(&self.boot) != .Menu {return}
 	// A code in the lobby's field joins THROUGH it; empty joins by address.
 	if code := kui.lobby_code(&self.boot.ui); code != "" {
-		relay := gd.env_string("HELLO_RELAY", "")
-		if relay != "" && kboot.boot_join_code(&self.boot, fmt.ctprintf("%s", relay), code, kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player")) {
-			self.running = true
+		if relay := gd.env_string("HELLO_RELAY", ""); relay != "" {
+			kboot.boot_join_code(&self.boot, fmt.ctprintf("%s", relay), code, kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player"))
 		}
 		return
 	}
-	if !kboot.boot_join(&self.boot, "127.0.0.1", kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player")) {return}
-	self.running = true
+	kboot.boot_join(&self.boot, "127.0.0.1", kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player"))
 }
 
 @(gd_method)
 hello_net_on_start :: proc(self: ^HelloNet) {
-	if !self.ses.is_host || self.started {return}
+	// .Playing is "the world already reached this screen" — the old `started`
+	// bool, minus the frame of lag it carried (it flipped on the drained event,
+	// this flips in the same drain).
+	if !self.ses.is_host || kboot.boot_phase(&self.boot) == .Playing {return}
 	for _, p in self.ses.players {
 		if p.connected {spawn_player(self, p.id)}
 	}
@@ -166,7 +180,7 @@ hello_net_on_start :: proc(self: ^HelloNet) {
 
 @(gd_method)
 hello_net_on_chat :: proc(self: ^HelloNet, text: gd.String) {
-	if self.running {kboot.boot_chat(&self.boot, text)}
+	if kboot.boot_phase(&self.boot) != .Menu {kboot.boot_chat(&self.boot, text)}
 }
 
 // Host: one square per seat, fanned so nobody spawns inside anybody.
@@ -187,17 +201,16 @@ hello_net_welcomed :: proc(self: ^HelloNet, me: knet.Player_Id) {
 
 // The join's authority consequence: field a drop-in square for the arrival.
 hello_net_player_joined_then :: proc(self: ^HelloNet, id: knet.Player_Id, rejoin: bool) {
-	if self.started && !rejoin {
+	if kboot.boot_phase(&self.boot) == .Playing && !rejoin {
 		spawn_player(self, id)
 	}
 }
 
-// The world reached this peer: swap the lobby for the game, every role.
+// The world reached this peer: the lobby gives way to the game. A LEVEL applied
+// per spawn, not a latch — `started` used to be one bool doing double duty
+// (level AND rising edge), and the edge is the only half that needed keeping:
+// it rides boot_phase in process(), where the receipt prints exactly once.
 hello_net_entity_spawned :: proc(self: ^HelloNet, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
 	_ = type; _ = id; _ = owner
-	if !self.started {
-		self.started = true
-		gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
-		gd.print_str("HELLO_STARTED")
-	}
+	gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
 }

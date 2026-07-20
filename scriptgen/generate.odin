@@ -2,6 +2,7 @@ package scriptgen
 
 import "core:fmt"
 import "core:strings"
+import decl "godot:decl"
 
 // Maps a Variant enum member like ".Int" to the bare token used to build cached
 // constructor variable names (`_to_Int`, `_from_Int`).
@@ -57,13 +58,12 @@ emit_backup :: proc(b: ^strings.Builder, s: ^Script) {
 	upper := strings.to_upper(snake)
 	w :: strings.write_string
 
-	// FNV-1a over the field signature — a stable compile-time version stamp.
-	ver: u32 = 0x811c9dc5
+	// FNV-1a over the field signature — a stable compile-time version stamp
+	// (the shared hash law's 32-bit namespace; see godot:decl).
+	ver := decl.FNV32_OFFSET
 	for bk in s.backups {
 		sig := fmt.tprintf("%s|%v|%s|%s;", join_path(bk.path), bk.kind, bk.key, bk.elem)
-		for c in transmute([]u8)sig {
-			ver = (ver ~ u32(c)) * 0x01000193
-		}
+		ver = decl.fnv1a32_acc(ver, sig)
 	}
 
 	pod :: proc(x: string) -> string {

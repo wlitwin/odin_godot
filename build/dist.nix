@@ -78,8 +78,11 @@ stdenvNoCC.mkDerivation ({
     # (the sequencer) and events (the pure-Odin observer) are documented script-facing
     # collections — a consumer following the authoring docs imports them. `play` is the
     # OPT-IN companion layer (edge/pace/fsm — higher-level game-structure helpers built ON
-    # kit's replication model; a game imports it only if it wants them).
-    cp -r core godot gdext libgd runtime flow flowgd events kit play $A/
+    # kit's replication model; a game imports it only if it wants them). `decl` is the
+    # declaration schema — the gd: tag vocabulary and the id-hash law — and it is NOT
+    # optional: `runtime` and `scriptgen` both import it, so a bundle without it fails to
+    # compile at the consumer's first build.
+    cp -r core godot gdext libgd runtime decl flow flowgd events kit play $A/
     cp -r scriptgen $A/scriptgen
     # Only the CONSUMER-facing build scripts — not the repo's dev/test builders
     # (build_phase*.sh) or the nix package def (dist.nix), which a consumer never runs.
@@ -158,7 +161,7 @@ stdenvNoCC.mkDerivation ({
     # destabilizes the editor. A `.gdignore` makes Godot skip a dir (odin's path-based
     # collection resolution is unaffected). The addon root stays scannable so Godot still
     # discovers odin_godot.gdextension.
-    for d in core godot gdext libgd runtime scriptgen template build docs; do
+    for d in core godot gdext libgd runtime decl scriptgen template build docs; do
       touch "$A/$d/.gdignore"
     done
     # The raw engine inputs are gitignored (regenerated from the pinned Godot) and are NOT

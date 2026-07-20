@@ -36,6 +36,7 @@ import "core:odin/tokenizer"
 import "core:os"
 import "core:slice"
 import "core:strings"
+import decl "godot:decl"
 
 // ---- Odin type -> Godot Variant mapping --------------------------------------
 
@@ -553,6 +554,7 @@ Script :: struct {
 	struct_name: string,
 	class_name:  string,
 	base:        string,
+	base_line:   int, // 1-based line of the `//gd:extends` marker (0 = none written; base was DERIVED from the owner handle)
 	doc:         string, // `///` doc comment above the script struct (class description)
 	marked:      bool, // saw at least one valid `//gd:` marker (intent signal for diagnostics)
 	tool:        bool,
@@ -719,6 +721,31 @@ warn_at :: proc(loc: Loc, format: string, args: ..any) {
 	diag_prefix("warning", loc)
 	fmt.eprintf(format, ..args)
 	fmt.eprintln()
+}
+
+// ---- yields: the manual-override pattern, said out loud ----------------------
+//
+// NAME SHADOWING is THE way to take a generated thing over by hand: write a proc
+// with the generated name and it wins. Census accessors, acid probes and the
+// four standard transport forwards all work that way — and all three did it in
+// COMPLETE SILENCE, so a typo'd override (`runner_of` where the entity is
+// `Runner_Bot`) read as "the generation just didn't happen" and a deliberate one
+// left no evidence it had taken effect. These go to stdout beside the
+// `scriptgen: wrote …` lines because a yield is part of what the run PRODUCED,
+// not a complaint about it.
+//
+// (The `@(gd_fact)` announce door is the one exception, and it refuses instead of
+// yielding — see resolve_facts, where the reason is written down.)
+@(private = "file")
+g_yielded: map[string]bool
+
+// `what` names the family ("census accessor", "acid probe", ...). Once per run
+// per name: the census resolves per script, so a shared module-wide name would
+// otherwise print once per file that reaches it.
+note_yield :: proc(what, name: string) {
+	if g_yielded[name] {return}
+	g_yielded[strings.clone(name)] = true // callers pass tprintf'd names; the set outlives the temp frame
+	fmt.printfln("scriptgen: yielded: %s (%s — the hand-written proc of that name wins)", name, what)
 }
 
 // ---- struct index + cross-package resolver (nested-replicate-fields) ----------
@@ -1373,6 +1400,10 @@ main :: proc() {
 		resolve_probes(&pend.script, by_struct, proc_names)
 		resolve_boot_forwards(&pend.script)
 		resolve_profile(&pend.script, scripts_dir)
+		// Last: the probes and forwards above APPEND methods (after yielding to
+		// any hand-written name), so the generated-name collision check has to
+		// see the finished table.
+		validate_method_names(&pend.script)
 	}
 	{
 		// The lane's module-wide contracts: one input struct, one wired class.
@@ -1700,12 +1731,7 @@ Helper :: struct {
 
 @(private = "file")
 fnv1a64 :: proc(s: string) -> u64 {
-	h := u64(0xcbf29ce484222325)
-	for i in 0 ..< len(s) {
-		h ~= u64(s[i])
-		h *= 0x100000001b3
-	}
-	return h
+	return decl.fnv1a64(s) // the shared hash law — godot:decl states the namespaces
 }
 
 // The package's WIRE CONTRACT, hashed: everything two builds must agree on to

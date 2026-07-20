@@ -160,8 +160,10 @@ A few rules this demonstrates (full details in the [Authoring Guide](authoring-g
 - **Prefix proc names with the struct name** (`mover_ready`, `mover_process`) — all scripts
   share one package, so the prefix avoids collisions and is stripped to derive the
   GDScript-facing name.
-- The `//gd:` comment markers declare the class. `//gd:extends` is authoritative for the base
-  class; the `owner` field type is just the handle you use in code.
+- The `//gd:` comment markers declare the class. `//gd:extends` names the base class and the
+  `owner` field is the handle you use in code — the two are cross-checked (the handle must be
+  the base or an ancestor of it), and `//gd:extends` may be omitted entirely, in which case the
+  base is derived from the handle.
 
 You do **not** write the registration boilerplate — `build/build_scripts.sh` runs `scriptgen`,
 which emits a sibling `mover.gen.odin` (a build artifact you never edit) next to your source.

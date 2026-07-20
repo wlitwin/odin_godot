@@ -2,7 +2,7 @@
 
 The toolkit's stock widgets, built programmatically — no scene assets to install; any script
 can summon them. Lobby, chat box, scoreboard, and the HUD set (interact prompt, inventory
-grid/hotbar, health bar, ability bar). Styling is deliberately stock Godot theme —
+grid/hotbar, hp bar, abilities bar). Styling is deliberately stock Godot theme —
 friendslop lobbies are for friends, and games that care can theme the returned nodes.
 
 **Lane compatibility: lane-agnostic.** Widgets read session-level state (roster, stats,
@@ -88,7 +88,7 @@ columns are PLUMBING, not score — a loadout choice replicated through the regi
 `score_hide` keeps it off (once, after the columns are declared; unknown names are a
 harmless no-op).
 
-**HUD** — prompt, inventory/hotbar, health, abilities:
+**HUD** — prompt, inventory/hotbar, hp, abilities:
 
 ```odin
 prompt_make :: proc(parent: gd.Node) -> Prompt
@@ -99,15 +99,15 @@ inv_show :: proc(inv: ^Inv, visible: bool)
 inv_refresh :: proc(inv: ^Inv, slots: []kitems.Slot, table: ^kitems.Table, selected := -1)
 inv_destroy :: proc(inv: ^Inv)
 
-hp_make :: proc(parent: gd.Node) -> Health_Bar
-hp_refresh :: proc(hb: ^Health_Bar, current, max_hp: i32)
+hp_make :: proc(parent: gd.Node) -> Hp_Bar
+hp_refresh :: proc(hb: ^Hp_Bar, current, max_hp: i32)
 
-abilities_make :: proc(parent: gd.Node, capacity: int) -> Ability_Bar
-abilities_refresh :: proc(bar: ^Ability_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_hz: int)
-abilities_destroy :: proc(bar: ^Ability_Bar)
+abilities_make :: proc(parent: gd.Node, capacity: int) -> Abilities_Bar
+abilities_refresh :: proc(bar: ^Abilities_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_hz: int)
+abilities_destroy :: proc(bar: ^Abilities_Bar)
 ```
 
-All text blocks over stock theme: the health bar renders `hp ▓▓▓▓▓▓▓░░░ 70/100` (zero art to
+All text blocks over stock theme: the hp bar renders `hp ▓▓▓▓▓▓▓░░░ 70/100` (zero art to
 install, and a test can read the exact fill back out of the tree); abilities render `[rock]`
 ready, `[rock 1.2s]` cooling, `[rock $]` ready-but-unaffordable. Cooldowns count TICKS of
 whichever loop decays them — `tick_hz` is required, so pass `session_tick_hz(&ses)` (or the
@@ -206,7 +206,7 @@ kui.abilities_refresh(&self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.s
   the widget arrays, then queue-frees the container node they lived under (the nodes ride that
   subtree down). Freeing the game's node instead frees the same nodes — the arrays then leak
   briefly and die with the process, which is why detach is the supported keep-running path.
-- **`prompt`/`health` have no `*_destroy` — deliberately.** Their whole state is one Label
+- **`prompt`/`hp` have no `*_destroy` — deliberately.** Their whole state is one Label
   node (no `[dynamic]`, no map), so zero-value teardown is already correct: the node frees with
   its parent and the struct holds nothing else. An empty destroy proc would only be ceremony.
   The `netgraph` is the same shape (a Label + a fixed sparkline array); `netgraph_destroy`

@@ -25,7 +25,7 @@ is a build artifact that lives beside the source; the loader deliberately **igno
 ## Anatomy of a script
 
 ```odin
-//gd:extends Node          // base Godot class (authoritative). Defaults to Node.
+//gd:extends Node          // base Godot class. Optional — derived from `owner` when omitted.
 //gd:class Ping            // optional class-name override (defaults to struct name)
 //gd:tool                  // optional: registers as a @tool script
 package my_scripts
@@ -74,7 +74,7 @@ ping_emit_ping :: proc(self: ^Ping, value: int) {
 
 | Marker | Meaning |
 | --- | --- |
-| `//gd:extends <Class>` | The Godot base class. Authoritative; defaults to `Node`. |
+| `//gd:extends <Class>` | The Godot base class. **Optional** — omitted, it is derived from the `owner` field's type. |
 | `//gd:class <Name>` | Class name override. Defaults to the struct name. |
 | `//gd:tool` | Registers the class as a `@tool` script (`is_tool() == true`) — runs in the editor. |
 | `//gd:icon res://path.svg` | Custom class icon (Scene dock, Create Node/Resource dialog). |
@@ -82,6 +82,61 @@ ping_emit_ping :: proc(self: ^Ping, value: int) {
 These are the marker comments the engine's resource loader reads to bind the
 authored `res://scripts/<x>.odin` resource (the same file you compile) to its
 compiled class, so the convention is uniform.
+
+`//gd:extends` and the `owner` field state the same fact twice, so scriptgen
+cross-checks them: **the owner handle must be the declared base or one of its
+ancestors.**
+
+```odin
+//gd:extends CharacterBody2D
+Player :: struct { owner: gd.Node2d }   // fine — a wider handle; the script only calls Node2D methods
+
+//gd:extends Node
+Player :: struct { owner: gd.Node2d }   // build error — a NARROWER handle
+```
+
+The narrow direction is the bug: every class handle is a `rawptr` alias, so Odin
+has no opinion, the class registers as a plain `Node`, and then every
+`gd.node2d_*` call in the script reaches through that handle into an object that
+never was a Node2D — a crash at the engine boundary with nothing pointing back
+at the comment that lied. The error names both spellings and both fixes.
+
+Leave the marker off and the base is **derived** from the handle instead, which
+is the version with only one place to be wrong:
+
+```odin
+//gd:class Coin
+package scripts
+Coin :: struct { owner: gd.Area2d }     // registers as Area2D
+```
+
+(The old `Node` default survives only where the handle can't be placed — no
+`-godot:` root, or a type that isn't a ClassDB class. The check degrades to
+silence in exactly those cases rather than inventing errors about a class list
+it cannot see.)
+
+### The tag vocabulary
+
+Every `` `gd:"…"` `` tag opens with ONE token that selects what the field is. The whole
+set, and who consumes each (the table below is the human projection of
+`decl/decl.odin`'s `FIELD_TOKENS` — the schema both scriptgen and the runtime's
+reflection registrar read, so this page, the parser, the boot-time "unknown gd tag"
+error, and the skip list cannot drift apart):
+
+| First token | What it declares | Consumed by | In the wire fingerprint |
+| --- | --- | --- | --- |
+| `export` | an editor-visible property | the runtime registrar | no |
+| `onready=PATH` | an auto-wired node reference | the runtime registrar | no |
+| `replicate` | a networked field ([kit/net](kit/net.md) descriptors) | scriptgen | yes |
+| `backup` | a field the session backup carries | scriptgen | yes |
+| `manual` | "I call the generated thing myself" | scriptgen | no |
+| `profile=T` | the per-player profile row type | scriptgen | yes |
+
+Two more ride BEHIND a first token as specs: `entity=Name:id` (a spawnable type and its
+stable id, on an exported `PackedScene` field) and `args=a,b` (a signal payload's
+parameter names). "In the wire fingerprint" means the declaration's shape folds into
+`NET_FINGERPRINT`, so two builds that disagree about it are refused at the join door
+rather than misparsing each other's packets.
 
 ### Exports
 
@@ -208,9 +263,38 @@ Player :: struct {
 }
 ```
 
-Only scalar Variant types support `default=` today (numbers, bool, and `String`); a
-`default=` on a math-struct/handle field is a clear `scriptgen` error rather than a silent
-drop. (Set those in `_ready` or from the scene instead.)
+Only scalar Variant types support `default=` today (numbers, bool, and `String`). A
+`default=` on a math-struct/handle field is reported at **boot**, by the reflection
+registrar, in the editor's output — not by `scriptgen` (see "Which tier catches what"
+below). It is loud, but it is late. (Set those in `_ready` or from the scene instead.)
+
+### Which tier catches what
+
+Two different things read a `` `gd:"export,…"` `` tag, and knowing which one is about to
+speak saves a confusing afternoon:
+
+| Tier | When | What it checks | How a failure looks |
+| --- | --- | --- | --- |
+| `scriptgen` | build | the tag's VOCABULARY — the first token, and every spec NAME behind it | `scriptgen: error: player.odin:7: …`, the build stops |
+| the reflection registrar | boot / class registration | what each spec MEANS — a value's type, a hint's arity, the Variant a hint requires | an error in Godot's output, the field registers with that spec dropped |
+
+The split is deliberate: only the runtime knows a field's real Variant width, so only the
+runtime can say `array=` needs a `gd.Array` or that `default=Hero` won't fit a `Vector2`.
+But *spelling* needs none of that, so **a misspelled spec is a build error**:
+
+```odin
+hp: i32 `gd:"export,rnage=0:100"`
+// scriptgen: error: Player.hp: unknown export spec "rnage" — did you mean `range`?
+```
+
+This used to be the language's sharpest inconsistency. `gd:"replicate,slcak=0.5"` failed
+the build, because that spec loop refused what it didn't know; `gd:"export,rnage=0:100"`
+sailed straight through scriptgen — the export-spec loop had no default arm — and surfaced
+at boot as an error on a field that had silently lost its hint. Same tag, same class of
+typo, two latencies and two audiences. The recognized spec set is
+[`decl/decl.odin`](../decl/decl.odin)'s `EXPORT_SPECS`, and `tests/scriptgen` asserts it
+against the registrar's own switches, so the two tiers can't drift into disagreeing about
+which names exist.
 
 ### Getter / setter properties
 
@@ -386,6 +470,119 @@ enemy_on_body :: proc(self: ^Enemy, body: gd.Node2d) {
 only the owner's *own* signal to the owner's *own* method — to wire a different emitter or
 target, use `gd.connect_to` from `_ready` instead. (`@(gd_connect)` requires the
 `-custom-attribute:gd_connect` build flag, which `build/build_scripts.sh` passes for you.)
+
+## Reserved shapes
+
+Several toolkit declarations are recognized by the SHAPE of a proc rather than by anything
+you write in the attribute — a parameter's name, its position, or its type. That is
+deliberate (the declaration reads as ordinary Odin), but it means a rename can silently
+change what a proc IS. This table is the whole set.
+
+| Shape | Where it is legal | What it means | Rename it and… |
+| --- | --- | --- | --- |
+| first param `self: ^<Class>` | every bound proc | THE receiver — it is how scriptgen knows the proc belongs to this class at all | the proc is not bound; nothing generates, no diagnostic |
+| a pointer param **immediately after the receiver** | `@(gd_command)` / `@(gd_method)` on an *embedded block* | the WIELDER — scriptgen fills it with `self`, so the block can touch the entity that carries it. Never a wire arg (a pointer can't cross the wire) | a pointer there on a *direct* command is a build error ("un-wire-able arg") |
+| `by: knet.Player_Id` (after the receiver/wielder) | `@(gd_command)` | the ISSUER, framework-filled with the true sender — the whole point is that a predicate can arbitrate on WHO without trusting a client-claimed argument | `by` under any other name is an ordinary wire arg, i.e. client-controlled. The name **and** the type together are the declaration; a wire arg *named* `by` is refused outright |
+| `mine: bool` | `@(gd_fact)` halves, and a tick's `_fx` half | the every-screen law: `true` on the screen whose live simulation caused the event, `false` on watchers replaying it off their watch clock | position and name are both checked; the error names the slot |
+| `tick: u64` | `@(gd_sample)` (required, second), `@(gd_step)` (optional, second) | the lane's tick number | on a sample, a build error; on a step, the param is simply not passed |
+| `l: ^ksim.Lane` | reserved *against* you — a generated fact door already names its lane param `l` | — | an author arg named `l` is refused, because the door's own binding would shadow it |
+| a `kit/boot` `Boot` field on the script struct | the game shell | declares the four standard transport forwards (`on_packet` / `on_peer_left` / `on_net_up` / `on_net_down`) | see the note below |
+
+**The `Boot` match, and how tight it is.** The shell used to be declared by *any* field
+whose type name ended in `.Boot` — the loosest match in the language: a game's own
+`startup.Boot`, a vendored library's, anything. It now requires the type's qualifier to
+resolve to an import of `godot:kit/boot`. The **alias is free** (`kboot`, `boot`, whatever
+you import it as) because the import PATH is what is checked, not the spelling; only a
+`Boot` from a different package stops declaring the shell. That is as tight as it goes
+without demanding an explicit tag on the field — which would be a breaking change to every
+existing game, for a case that now cannot fire by accident.
+
+## Manual overrides — name shadowing is the pattern
+
+Wherever scriptgen generates a proc *for your convenience*, **a hand-written proc of that
+name wins.** That is the one override mechanism; there is no opt-out tag, no config
+token, no magic path.
+
+| Generated | Yields to a hand-written… |
+| --- | --- |
+| census accessors — `<entity>_of`, `<entity>_owned_by`, `my_<entity>`, `<entity>_ids`, `<entity>_spawn` | proc of that name |
+| acid probes — `probe_<entity>_count`, `probe_my_<entity>`, `probe_<entity>_<field>` | proc (or `@(gd_method)`) of that name |
+| the four standard transport forwards | `@(gd_method)` of that name |
+
+Every yield is **printed**, once per run:
+
+```
+scriptgen: yielded: runner_of (census accessor — the hand-written proc of that name wins)
+```
+
+which is the line that tells you an intended override took effect — and, when you *didn't*
+intend one, that something in your package is already wearing a generated name. A silent
+yield is indistinguishable from "the generation just didn't happen", which is exactly how a
+typo'd override (`runner_of` where the entity is `Runner_Bot`) used to read.
+
+**The one exception: `@(gd_fact)` announce doors refuse.** Write a proc with a declared
+fact's door name and it is a build error, not a yield. The reason is that the door is not a
+convenience you could re-implement: its generated body holds four gates you have no way to
+reproduce from game code — it broadcasts the tuple only on the authority, fires the `_fx`
+half on the causer's *live* pass with `mine=true`, fires it on every watching screen when
+that screen's watch clock reaches the fact's tick with `mine=false`, and stays silent
+through resim replays so a reconcile can't re-announce. A shadowing proc would compile,
+look right, and quietly present the event once, locally, to whoever called it. The error
+says so and asks you to rename yours.
+
+**`gd:"manual"` means "I call the generated thing myself."** It is the *other* half of the
+same idea: not "replace this generated proc", but "stop calling it for me — I own the call
+site." Today it applies to an embedded sim block's `@(gd_tick)` (see
+[kit/sim](kit/sim.md)): the block's state still flattens into the descriptor and its verbs
+still hoist, only the auto-call is suppressed so your own tick can drive it with whatever
+ordering or condition you want. Read it as a general token, not a sim-specific one — a
+`manual` on something with nothing generated to call is a build error naming what it
+expected to find.
+
+## Generated names
+
+Three naming formulas produce identifiers you are expected to *call*, and one produces a
+name you are expected to *write*. They are not interchangeable, and two of them are one
+letter apart.
+
+**Command wrappers — two formulas.** A verb declared directly on the entity keeps its own
+proc name; a verb hoisted out of an embedded block is renamed after the PATH it was reached
+through, so two blocks of the same type on one entity never collide:
+
+| Declaration | Generated wrapper |
+| --- | --- |
+| `@(gd_command) gunner_buy :: proc(self: ^Gunner, …)` | `gunner_buy_cmd` — i.e. `<proc>_cmd` |
+| `@(gd_command) gun_fire :: proc(self: ^Gun, …)`, embedded as `primary: Gun` on `Gunner` | `gunner_primary_fire_cmd` — i.e. `<class>_<path>_<verb>_cmd` |
+
+The composed form's path is the FIELD path, joined with `_`, so a block three levels down
+still lands on the entity that owns the net id. Both formulas can reach the same name, and
+when they do it is a build error naming both declarations rather than a silently
+unreachable verb.
+
+**Wire-id constants — prefixed and unprefixed.** Command ids are class-prefixed
+(`GUNNER_CMD_BUY`, `GUNNER_CMD_PRIMARY_FIRE`); world-pass fact ids are not (`FACT_ROUND_OVER`),
+and neither is `NET_FINGERPRINT`. That is not an oversight: commands are per-entity, so
+several classes in one package legitimately declare a verb of the same name, and the class
+prefix is what keeps their constants apart. Facts and the fingerprint are **module-wide** —
+there is exactly one door per event name across the whole package (a second is a build
+error, as is a u16 hash collision between two events), and exactly one fingerprint. A class
+prefix on those would suggest a per-class namespace that doesn't exist.
+
+**`<entity>_spawn` vs `<entity>_spawned` — the homophone trap.** These are one letter apart
+and point in opposite directions:
+
+| Name | Who writes it | Who calls it | What it does |
+| --- | --- | --- | --- |
+| `mob_spawn` | **generated** | **you** | the typed factory — you call it to bring a Mob into the world |
+| `mob_spawned` | **you** | **the framework** | the hook — it calls you once the Mob exists, on every peer |
+
+So `mob_spawn(…)` inside `mob_spawned(…)` is an infinite spawn loop, and a `mob_spawn` you
+wrote by hand silently takes over the factory (it is a census name — it yields, and prints
+`yielded: mob_spawn`). If a spawn seems to do nothing, check that line first. The same
+`-ed` shape marks the other framework-called hook, `<entity>_freed`.
+
+All of these are keyed by the entity's TARGET STRUCT, which is why two `entity=` tags may
+not name the same struct — that would generate the whole census twice.
 
 ## Multiplayer RPCs (`@(gd_rpc)`)
 

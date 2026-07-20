@@ -101,40 +101,70 @@ boot_succ_blob :: proc(user: rawptr, w: ^knet.Writer) {
 	b.succ_hooks.backup(b.succ_game, w)
 }
 
-// boot_pump's slice of the dance (called from the event drain): the torch is
-// immediate (nothing to wipe), the succession is only NOTED (mechanics wait
-// for boot_migrate_pending so the game's words halves see the old world),
-// the welcome ends any chase, the kick latches (a kicked player never
-// chases a session that showed them the door).
-boot_succ_event :: proc(b: ^Boot, ev: ksess.Event) {
+// ---- the dance's arms of the kit-side event table ---------------------------
+//
+// These were one `#partial switch` here, a second in boot_pump, and a third
+// beside it — three partial enumerations of the same union, each complete only
+// by luck. The switch now lives once, in forward.odin, where it is EXHAUSTIVE;
+// these are the bodies it names. Each carries the armed guard itself, so the
+// table reads as one line per event and a game that never called
+// boot_migration still has no dance to run.
+
+// The host designated a new backup holder — light the torch NOW (there is
+// nothing to wipe), so survivors already hold the answer when the lights go out.
+@(private)
+boot_succ_torch :: proc(b: ^Boot, holder: knet.Player_Id) {
+	if !b.succ_armed || !b.ses.is_host {
+		return
+	}
+	_, _ = netgd.succession_torch(&b.succ, &b.wire, holder)
+}
+
+// The host is gone: open the takeover/rejoin window. Never demotes a live chase.
+@(private)
+boot_succ_lost :: proc(b: ^Boot) {
 	if !b.succ_armed {
 		return
 	}
-	#partial switch e in ev {
-	case ksess.Ev_Backup_Target:
-		if b.ses.is_host {
-			_, _ = netgd.succession_torch(&b.succ, &b.wire, e.player)
-		}
-	case ksess.Ev_Host_Left:
-		if b.succ_phase == .Idle {
-			b.succ_phase = .Host_Gone // never demotes a live chase
-		}
-	case ksess.Ev_Succession:
-		if !b.ses.is_host { // a takeover queued a stale twin behind itself — dead here too
-			if b.succ_phase == .Idle {
-				b.succ_phase = .Host_Gone // a succession IMPLIES the loss (batch order is not ours)
-			}
-			b.succ_pending = e.successor
-			b.succ_has_pending = true
-		}
-	case ksess.Ev_Welcomed:
-		// Seated = the host exists BY DEFINITION — the window closes HERE
-		// (dead-socket signals landing mid-rejoin must not re-open it
-		// against the live host — the cavecrawl lesson, now the kit's).
-		boot_succ_end(b)
-	case ksess.Ev_Kicked:
-		b.succ_kicked = true
+	if b.succ_phase == .Idle {
+		b.succ_phase = .Host_Gone
 	}
+}
+
+// A succession is only NOTED here — the mechanics wait for
+// boot_migrate_pending, which the generated `<snake>_events` calls AFTER the
+// game's words halves, so `<game>_succession` words a world that still exists.
+@(private)
+boot_succ_noted :: proc(b: ^Boot, successor: knet.Player_Id) {
+	if !b.succ_armed || b.ses.is_host {
+		return // a takeover queued a stale twin behind itself — dead here too
+	}
+	if b.succ_phase == .Idle {
+		b.succ_phase = .Host_Gone // a succession IMPLIES the loss (batch order is not ours)
+	}
+	b.succ_pending = successor
+	b.succ_has_pending = true
+}
+
+// Seated = the host exists BY DEFINITION — the window closes HERE (dead-socket
+// signals landing mid-rejoin must not re-open it against the live host: the
+// cavecrawl lesson, now the kit's).
+@(private)
+boot_succ_seated :: proc(b: ^Boot) {
+	if !b.succ_armed {
+		return
+	}
+	boot_succ_end(b)
+}
+
+// A kicked player never chases a session that showed them the door — a
+// permanent no that outlives the phases until the next door re-arms the config.
+@(private)
+boot_succ_shown_door :: proc(b: ^Boot) {
+	if !b.succ_armed {
+		return
+	}
+	b.succ_kicked = true
 }
 
 // The window closes (a seat arrived, a takeover crowned, a give-up ended the

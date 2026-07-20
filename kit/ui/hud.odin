@@ -74,16 +74,19 @@ inv_show :: proc(inv: ^Inv, visible: bool) {
 	gd.set_bool(cast(gd.Object)inv.root, "visible", visible)
 }
 
-// ---- health bar ---------------------------------------------------------------
+// ---- hp bar ---------------------------------------------------------------
 
 HP_CELLS :: 10
 
-Health_Bar :: struct {
+// Hp_Bar, not Health_Bar: the prefix is the type's snake name, so `hp_*` is
+// this widget's WHOLE API in one grep. It was the long way round for a while
+// (Health_Bar with hp_* procs), which is exactly the split the rule forbids.
+Hp_Bar :: struct {
 	label: gd.Label,
 }
 
-hp_make :: proc(parent: gd.Node) -> Health_Bar {
-	hb: Health_Bar
+hp_make :: proc(parent: gd.Node) -> Hp_Bar {
+	hb: Hp_Bar
 	hb.label = gd.new_label()
 	gd.node_set_name(cast(gd.Node)hb.label, gd.new_string_name_cstring("Health", true))
 	gd.add_child(parent, cast(gd.Node)hb.label)
@@ -95,7 +98,7 @@ hp_make :: proc(parent: gd.Node) -> Health_Bar {
 // A play.Health block feeds this directly: `kui.hp_refresh(&hb,
 // i32(r.health.hp), i32(r.health.max))` — the widget speaks plain ints on
 // purpose, so no layer owns it.
-hp_refresh :: proc(hb: ^Health_Bar, current, max_hp: i32) {
+hp_refresh :: proc(hb: ^Hp_Bar, current, max_hp: i32) {
 	filled := 0
 	if max_hp > 0 {
 		filled = clamp(int((current * HP_CELLS + max_hp - 1) / max_hp), 0, HP_CELLS)
@@ -109,15 +112,19 @@ hp_refresh :: proc(hb: ^Health_Bar, current, max_hp: i32) {
 	gd.set_string(cast(gd.Object)hb.label, "text", fmt.ctprintf("%s", strings.to_string(b)))
 }
 
-// ---- ability bar ----------------------------------------------------------------
+// ---- abilities bar ----------------------------------------------------------------
 
-Ability_Bar :: struct {
+// Abilities_Bar (plural) tracks the `abilities_*` verbs the same way Hp_Bar
+// tracks `hp_*` — and the plural is honest: one bar repaints EVERY slot, it is
+// never a per-ability widget. kcombat.Ability_Def stays singular; that one IS
+// one ability.
+Abilities_Bar :: struct {
 	root:  gd.Control, // HBox
 	cells: [dynamic]gd.Label,
 }
 
-abilities_make :: proc(parent: gd.Node, capacity: int) -> Ability_Bar {
-	bar: Ability_Bar
+abilities_make :: proc(parent: gd.Node, capacity: int) -> Abilities_Bar {
+	bar: Abilities_Bar
 	bar.root = cast(gd.Control)gd.new_h_box_container()
 	gd.node_set_name(cast(gd.Node)bar.root, gd.new_string_name_cstring("Abilities", true))
 	gd.add_child(parent, cast(gd.Node)bar.root)
@@ -129,7 +136,7 @@ abilities_make :: proc(parent: gd.Node, capacity: int) -> Ability_Bar {
 	return bar
 }
 
-abilities_destroy :: proc(bar: ^Ability_Bar) {
+abilities_destroy :: proc(bar: ^Abilities_Bar) {
 	delete(bar.cells)
 	bar^ = {}
 }
@@ -152,7 +159,7 @@ abilities_destroy :: proc(bar: ^Ability_Bar) {
 // tick_hz is REQUIRED (pass ksess.session_tick_hz(&ses), or the lane's rate on
 // a sim game): a defaulted 20 here once showed a 60 Hz game's cooldowns 3×
 // too long — seconds-rendering procs never guess the tick rate.
-abilities_refresh :: proc(bar: ^Ability_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_hz: int) {
+abilities_refresh :: proc(bar: ^Abilities_Bar, defs: []kcombat.Ability_Def, cds: []u16, resource: i32, tick_hz: int) {
 	for cell, i in bar.cells {
 		if i >= len(defs) {
 			gd.set_string(cast(gd.Object)cell, "text", "")

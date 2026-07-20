@@ -77,12 +77,14 @@ STANDARD_METHODS :: Methods {
 
 // Where the boot stands, coarse and honest — the two booleans every game
 // declared and threaded by hand (`running`, `started`), without the hand.
-//   .Menu       — no transport; the Host/Join doors are showing
-//   .Connecting — a join door opened, no seat yet (includes a code resolving)
+//   .Menu       — no seat and none coming; the Host/Join doors are showing
+//   .Connecting — a join is in flight, no seat yet (a join code at the
+//                 phonebook counts, and so does a survivor's chase: the dial
+//                 restarts the session as a client, which IS connecting)
 //   .Lobby      — seated (hosting counts), the world not yet on this screen
 //   .Playing    — the world reached this peer (first spawn/state/resync)
-// A failed or denied join and a kick fall back to .Menu; a host loss stays
-// put (succession may re-seat — the welcome moves it, not the loss).
+// A failed or denied join and a kick fall back to .Menu; a BARE host loss
+// stays put — the seat survives the socket, and succession may re-seat it.
 Boot_Phase :: enum u8 {
 	Menu,
 	Connecting,
@@ -90,8 +92,47 @@ Boot_Phase :: enum u8 {
 	Playing,
 }
 
+// WHERE THE BOOT STANDS — derived, not tracked.
+//
+// This was a stored `phase` field once, advanced only by boot's own doors and
+// boot_pump's drain. Which meant the documented RAW path — netgd/ksess started
+// by hand, boot_pump for everything after — left it frozen at .Menu forever: a
+// SECOND lifecycle record, disagreeing with the session's own, sitting there
+// with zero consumers and waiting for the first kit feature to branch on it and
+// misbehave for every game that had not come through a door. (Three records was
+// the real count: the games' `running`/`started` bools, boot's phase, and the
+// session's ran/joined/is_host/replicating.)
+//
+// So every coarse answer is READ OFF the session, which knows regardless of who
+// started it, and the ONE fact nothing below boot knows — the world REACHED
+// this screen — is the single latch left (see Boot.world_seen). A raw-path game
+// gets a truthful phase for free; the doors write no lifecycle state at all.
 boot_phase :: proc(b: ^Boot) -> Boot_Phase {
-	return b.phase
+	s := b.ses
+	if s == nil || !s.ran {
+		// Pre-attach, post-detach, or nothing started yet. The one exception is
+		// boot's OWN errand: a join code at the phonebook has no session to
+		// report — the relay answers first, and boot_join proper runs after.
+		return dialing_code(b) ? .Connecting : .Menu
+	}
+	if s.joined {
+		// Seated. Hosting seats you outright (session_host_start), so this arm
+		// is role-free — and the host's own first spawn raises the latch too.
+		return b.world_seen ? .Playing : .Lobby
+	}
+	// Unseated, with the session's join clock ARMED, is a join in flight. A
+	// refusal, a denial, and a kick all DISARM it (join_waited = -1), which is
+	// exactly the fall-back-to-menu the doors used to hand-write — and a
+	// never-started run reads -1 too, so the clock alone is the whole test.
+	if !s.is_host && s.join_waited >= 0 {
+		return .Connecting
+	}
+	return dialing_code(b) ? .Connecting : .Menu
+}
+
+@(private = "file")
+dialing_code :: proc(b: ^Boot) -> bool {
+	return b.rdv.active && !b.rdv.is_host
 }
 
 Options :: struct {
@@ -174,6 +215,17 @@ Boot :: struct {
 	ent_kinds: []Entity_Kind,
 	ent_game:  rawptr,
 	ent_nodes: map[knet.Net_Id]gd.Node,
+	// It LOOKS like a copy of the session's `types` map, and it is not — twice
+	// over, both load-bearing. (1) LIFETIME: both despawn paths delete the
+	// session's row BEFORE calling the factory free (session_despawn and the
+	// SES_DESPAWN handler, in that order), so at the moment boot_free_entity
+	// must resolve the kind to fire the game's `_freed` half, the session has
+	// already forgotten it. (2) SCOPE: a PREDICTED spawn (kit/sim, a fired
+	// projectile flying under a provisional id) has no session registry entry
+	// at all until the authority's spawn rekeys it — this ledger is the only
+	// place that id is a known kind. Deriving it would mean reordering
+	// kit/session's despawn contract and finding a second home for provisional
+	// ids; keeping it costs one map entry per live entity.
 	ent_types: map[knet.Net_Id]ksess.Entity_Type,
 
 	// boot_migration's state (succession.odin): the rendezvous ceremony, the
@@ -194,10 +246,14 @@ Boot :: struct {
 	succ_name:        string, // boot-owned clones (door callers pass temps)
 	succ_url:         string,
 
-	// The boot's lifecycle phase — the `running`/`started` latch pair every
-	// game hand-kept, tracked once: doors advance it, boot_pump's event
-	// drain moves it on seats and world arrival. Read boot_phase(b).
-	phase: Boot_Phase,
+	// THE ONE fact below boot cannot answer: the world REACHED this screen.
+	// Everything else boot_phase reports is read off the session (see there);
+	// this is the residue, and it has exactly ONE owner — boot_pump, which
+	// raises it in the drain when the first spawn/state/resync lands and drops
+	// it at the top of any frame that finds no seat. boot_open_host drops it
+	// too, for the one re-seat that never has an unseated frame (menu → host
+	// again inside a live process). Read boot_phase(b), never this.
+	world_seen: bool,
 
 	// boot_host_coded/boot_join_code's state (the join-code rendezvous,
 	// netgd/code.odin): pumped inside boot_pump — a host's minted code lands
@@ -408,16 +464,28 @@ boot_detach :: proc(b: ^Boot) {
 }
 
 // The frame preamble + the boilerplate half of the event drain. Pumps the
-// wire, ticks the session, reacts to the five events every game reacts to
-// identically (status lines, roster/score/chat repaints, the host's Start
-// gating) — and RE-YIELDS every session event plus the comms markers, both
-// temp-allocated, so the game's own switch sees everything.
+// wire, ticks the session, walks every drained event through the KIT's own
+// forwarding table (forward.odin — one exhaustive switch, so no consequence
+// the kit owes can go missing) — and RE-YIELDS every session event plus the
+// comms markers, both temp-allocated, so the game's own switch sees everything.
 boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, marks: []kcomms.Ev_Marker, ticks: int) {
 	boot_code_pulse(b) // the join-code phonebook (no-op unless a coded door opened)
+	// The transport's own control plane, before anything asks whether a session
+	// exists — on WebRTC this IS the handshake that brings one up. One nil
+	// check on every other transport. (Web games used to hand-call web_poll
+	// from process() and nothing said so; a boot-door browser game that missed
+	// the line simply never connected.)
+	netgd.transport_service(&b.wire)
 	if !b.ses.ran {
 		// No session yet — a joiner-by-code waiting on the relay. The pulse
 		// above is the whole frame; its boot_join starts everything else.
 		return
+	}
+	// The world cannot be on a screen that holds no seat, so the phase's one
+	// latch resets itself as the run turns over — dropped HERE, ahead of the
+	// pump that may deliver the welcome re-seating us this very frame.
+	if !b.ses.joined {
+		b.world_seen = false
 	}
 	netgd.wire_pump(&b.wire, now)
 	b.succ_now = now
@@ -430,51 +498,7 @@ boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, mar
 		if !ok {
 			break
 		}
-		boot_succ_event(b, ev) // torch / noted succession / chase-over / kick latch
-		#partial switch e in ev {
-		case ksess.Ev_Owner_Changed:
-			// The lane must always hear ownership moves (predicted↔watched,
-			// whose inputs drive it, whom rewinds spare) — forwarded here so
-			// no game ever forgets the line.
-			if b.lane != nil {
-				ksim.lane_set_owner(b.lane, e.id, e.owner)
-			}
-		case ksess.Ev_Welcomed:
-			// The roster RODE the welcome — paint it now, not at the next change.
-			kui.lobby_refresh(&b.ui, b.ses)
-			kui.score_refresh(&b.score, b.ses)
-			kui.lobby_set_status(&b.ui, "Seated — waiting for the host to start")
-			b.phase = .Lobby // a fresh seat; the world (or its resync) moves it on
-		case ksess.Ev_Player_Joined:
-			roster_changed(b)
-		case ksess.Ev_Player_Left:
-			// The lane hears departures like it hears ownership moves — same
-			// no-game-ever-forgets rule: without the drop, the host pops the
-			// departed seat's input buffers every tick forever and their
-			// entities coast on held inputs.
-			if b.lane != nil {
-				ksim.lane_drop_player(b.lane, e.id)
-			}
-			roster_changed(b)
-		case ksess.Ev_Stats_Updated:
-			kui.score_refresh(&b.score, b.ses)
-		case ksess.Ev_Spawned, ksess.Ev_Resynced, ksess.Ev_State_Applied:
-			// The world is on this screen (every role: a host's own first
-			// spawn lands here too) — the `started` latch, kept once.
-			if b.phase == .Lobby {
-				b.phase = .Playing
-			}
-		case ksess.Ev_Join_Failed:
-			kui.lobby_set_status(&b.ui, "Could not reach the host")
-			b.phase = .Menu
-		case ksess.Ev_Join_Denied:
-			b.phase = .Menu
-		case ksess.Ev_Kicked:
-			b.phase = .Menu
-		case ksess.Ev_Host_Left:
-			kui.lobby_set_status(&b.ui, "The host left — round over")
-			// (phase stays — succession may re-seat; the welcome moves it.)
-		}
+		boot_forward(b, ev) // THE kit-side table — one full switch, forward.odin
 		append(&evs, ev)
 	}
 
@@ -507,7 +531,7 @@ boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, mar
 	return evs[:], mks[:], ticks
 }
 
-@(private = "file")
+@(private) // forward.odin's table paints through this on both roster edges
 roster_changed :: proc(b: ^Boot) {
 	kui.lobby_refresh(&b.ui, b.ses)
 	kui.score_refresh(&b.score, b.ses)
@@ -546,28 +570,97 @@ boot_token :: proc(b: ^Boot) -> u64 {
 	})
 }
 
-// The Host button, ceremony included: transport up, session started, menu
-// hidden, status set, chat shown. false = port taken (status already says
-// so). `token` is the host's own reconnect identity (session_host_start);
-// the 0 default resolves to boot_token — the machine's persisted identity —
-// so a dead host reclaims its seat from a resumed run WITHOUT the game
-// remembering to pass one (token 0 shipped in every reference game and
-// silently forfeited exactly that).
-boot_host :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64 = 0) -> bool {
+// ---- the two doors, once per direction -------------------------------------
+//
+// THE HOST DOOR and THE JOIN DOOR, parameterized by transport. Every named
+// door below (boot_host, boot_join, the web pair, the code pair, the Steam
+// pair a game writes for itself) is these two plus a status line: the ritual
+// — reconnect identity, succession config, phase, menu, chat, roster — is
+// written ONCE here and a new transport inherits all of it by filling a
+// netgd.Transport record. That is the whole point of the record: before it,
+// each transport grew its own door-set and each door-set forgot a different
+// part of the ritual (Steam had no door at all, so it forgot every part).
+
+// The generic HOST door. false = the transport refused; the session was NOT
+// started and the caller words the failure (each transport fails for its own
+// reason — a taken port, an unreachable relay, a lobby that never came up).
+// `token` is the host's own reconnect identity (session_host_start); the 0
+// default resolves to boot_token — the machine's persisted identity — so a
+// dead host reclaims its seat from a resumed run WITHOUT the game remembering
+// to pass one (token 0 shipped in every reference game and silently forfeited
+// exactly that).
+boot_open_host :: proc(
+	b: ^Boot,
+	t: ^netgd.Transport,
+	at: netgd.Endpoint,
+	name: string,
+	token: u64 = 0,
+	dedicated := false,
+) -> bool {
 	token := token
 	if token == 0 {
 		token = boot_token(b)
 	}
-	if !netgd.begin_host(&b.wire, port, name, max_peers, token) {
+	if !netgd.transport_host(&b.wire, t, at, name, token, dedicated) {
+		return false
+	}
+	// The torch flavor comes from the TRANSPORT (it is the one that knows how
+	// it addresses a peer) — a door never has to be told twice, and a
+	// transport that cannot migrate says .None once, in its own record.
+	// Dedicated servers arm nothing: a dead server restarts, it does not
+	// migrate.
+	if !dedicated {
+		boot_succ_config(b, t.rendezvous, at.port, at.addr, token, name)
+	}
+	// The ONE lifecycle write left in either door, and the only one boot_pump
+	// cannot make for itself: hosting seats you the instant session_host_start
+	// returns, so a re-host inside a live process (menu → Host again, no
+	// boot_detach between) never spends a frame unseated — and without this the
+	// dead run's world would still read as "on this screen".
+	b.world_seen = false
+	kui.lobby_show_menu(&b.ui, false, false)
+	kui.lobby_refresh(&b.ui, b.ses)
+	kui.chat_show(&b.chat, true)
+	return true
+}
+
+// The generic JOIN door. false = the transport refused outright; an
+// unreachable host resolves later as Ev_Join_Failed. `spectate` takes a
+// receive-only seat (see boot_spectate for what that means).
+// (Argument order matches boot_open_host and the Transport record: NAME then
+// TOKEN, everywhere in this door pair. The older named doors kept the
+// begin_join order they always had — `token, name` — so their call sites did
+// not move; the new pair is the one that gets to be consistent.)
+boot_open_join :: proc(
+	b: ^Boot,
+	t: ^netgd.Transport,
+	at: netgd.Endpoint,
+	name: string,
+	token: u64,
+	spectate := false,
+	status := "Joining...",
+) -> bool {
+	if !netgd.transport_join(&b.wire, t, at, name, token, spectate) {
+		return false
+	}
+	boot_succ_config(b, t.rendezvous, at.port, at.addr, token, name)
+	// No phase to write: session_client_start armed the join clock, which IS
+	// .Connecting — and disarms itself into .Menu on a refusal, a denial, or a
+	// kick. See boot_phase.
+	kui.lobby_show_menu(&b.ui, false, false)
+	kui.lobby_set_status(&b.ui, status)
+	kui.chat_show(&b.chat, true)
+	return true
+}
+
+// The Host button, ceremony included: transport up, session started, menu
+// hidden, status set, chat shown. false = port taken (status already says so).
+boot_host :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64 = 0) -> bool {
+	if !boot_open_host(b, &netgd.ENET, {port = port, max_peers = max_peers}, name, token) {
 		kui.lobby_set_status(&b.ui, "Could not host (port taken?)")
 		return false
 	}
-	boot_succ_config(b, .Native_Addr, port, "", token, name)
-	b.phase = .Lobby // hosting seats you outright; the first spawn moves it on
-	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Hosting on :%d — waiting for friends", port))
-	kui.lobby_refresh(&b.ui, b.ses)
-	kui.chat_show(&b.chat, true)
 	return true
 }
 
@@ -580,18 +673,13 @@ boot_host :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64
 // (see examples/slopball's `serve` role). Native only: a browser tab makes a
 // poor always-on box. false = the port was taken.
 boot_serve :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u64 = 0) -> bool {
-	token := token
-	if token == 0 {
-		token = boot_token(b) // stable server identity — a restart is a resume
-	}
-	if !netgd.begin_host(&b.wire, port, name, max_peers, token, dedicated = true) {
+	// token 0 → boot_token inside the door: a stable server identity, so a
+	// restart is a resume.
+	if !boot_open_host(b, &netgd.ENET, {port = port, max_peers = max_peers}, name, token, dedicated = true) {
 		kui.lobby_set_status(&b.ui, "Could not host (port taken?)")
 		return false
 	}
-	b.phase = .Lobby
-	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Serving on :%d", port))
-	kui.chat_show(&b.chat, true)
 	return true
 }
 
@@ -609,15 +697,10 @@ boot_kick :: proc(b: ^Boot, player: knet.Player_Id, ban := false) -> bool {
 
 // The Join button. An unreachable host resolves later as Ev_Join_Failed.
 boot_join :: proc(b: ^Boot, addr: cstring, port: int, token: u64, name: string, status := "Joining...") -> bool {
-	if !netgd.begin_join(&b.wire, addr, port, token, name) {
+	if !boot_open_join(b, &netgd.ENET, {addr = addr, port = port}, name, token, status = status) {
 		kui.lobby_set_status(&b.ui, "Could not start joining")
 		return false
 	}
-	boot_succ_config(b, .Native_Addr, port, "", token, name)
-	b.phase = .Connecting // Ev_Welcomed seats it; Ev_Join_Failed sends it home
-	kui.lobby_show_menu(&b.ui, false, false)
-	kui.lobby_set_status(&b.ui, status)
-	kui.chat_show(&b.chat, true)
 	return true
 }
 
@@ -628,52 +711,35 @@ boot_join :: proc(b: ^Boot, addr: cstring, port: int, token: u64, name: string, 
 // roster — the spawn loops' `!p.spectator` guard is the game's half). It
 // still chases the torch on a migration — as a spectator of the resumed run.
 boot_spectate :: proc(b: ^Boot, addr: cstring, port: int, token: u64, name: string, status := "Watching...") -> bool {
-	if !netgd.begin_join(&b.wire, addr, port, token, name, spectate = true) {
+	if !boot_open_join(b, &netgd.ENET, {addr = addr, port = port}, name, token, spectate = true, status = status) {
 		kui.lobby_set_status(&b.ui, "Could not start joining")
 		return false
 	}
-	boot_succ_config(b, .Native_Addr, port, "", token, name)
-	b.phase = .Connecting
-	kui.lobby_show_menu(&b.ui, false, false)
-	kui.lobby_set_status(&b.ui, status)
-	kui.chat_show(&b.chat, true)
 	return true
 }
 
 // The Host button, WebRTC flavor: room opened on the relay, session started,
-// menu hidden, status set (the CODE arrives async — netgd.web_poll it and
-// read gd.webrtc_room_code), chat shown. A non-empty `room` RESERVES that
+// menu hidden, status set (the CODE arrives async — boot_pump services the
+// handshake, then read gd.webrtc_room_code), chat shown. A non-empty `room` RESERVES that
 // code (host migration pre-arranges tomorrow's room; the relay honors a free
 // valid code, else assigns). false = the relay socket refused.
 boot_host_web :: proc(b: ^Boot, url: cstring, name: string, token: u64 = 0, room: cstring = "") -> bool {
-	token := token
-	if token == 0 {
-		token = boot_token(b) // same reclaim default as boot_host
-	}
-	if !netgd.begin_host_web(&b.wire, url, name, token, room) {
+	if !boot_open_host(b, &netgd.WEBRTC, {addr = url, room = room}, name, token) {
 		kui.lobby_set_status(&b.ui, "Could not reach the relay")
 		return false
 	}
-	boot_succ_config(b, .Web_Room, 0, url, token, name)
-	b.phase = .Lobby
-	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, "Opening a room…")
-	kui.chat_show(&b.chat, true)
 	return true
 }
 
 // The Join button, WebRTC flavor. A dead room resolves later through
 // gd.webrtc_session_state/.Failed (the relay answers no_room / full).
 boot_join_web :: proc(b: ^Boot, url: cstring, room: cstring, token: u64, name: string) -> bool {
-	if !netgd.begin_join_web(&b.wire, url, room, token, name) {
+	status := fmt.tprintf("Joining room %s…", room)
+	if !boot_open_join(b, &netgd.WEBRTC, {addr = url, room = room}, name, token, status = status) {
 		kui.lobby_set_status(&b.ui, "Could not reach the relay")
 		return false
 	}
-	boot_succ_config(b, .Web_Room, 0, url, token, name)
-	b.phase = .Connecting
-	kui.lobby_show_menu(&b.ui, false, false)
-	kui.lobby_set_status(&b.ui, fmt.tprintf("Joining room %s…", room))
-	kui.chat_show(&b.chat, true)
 	return true
 }
 
@@ -716,7 +782,8 @@ boot_join_code :: proc(b: ^Boot, url: cstring, code: string, token: u64, name: s
 		delete(b.rdv_name)
 	}
 	b.rdv_name = strings.clone(name)
-	b.phase = .Connecting // the phonebook first, then the join proper
+	// A live joiner-side rendezvous IS .Connecting (boot_phase reads it): the
+	// phonebook first, then the join proper, and code_close ends both.
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Looking up %s…", code))
 	kui.chat_show(&b.chat, true)
@@ -766,7 +833,8 @@ boot_code_pulse :: proc(b: ^Boot) {
 			}
 			kui.lobby_set_status(&b.ui, fmt.tprintf("Join code failed — %s", why))
 			kui.lobby_show_menu(&b.ui, true, false) // back to the doors
-			b.phase = .Menu
+			// (no phase write: code_close below ends the rendezvous, and with
+			// no session started that IS .Menu — see boot_phase.)
 		}
 		netgd.code_close(&b.rdv)
 	}

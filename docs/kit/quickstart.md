@@ -89,8 +89,6 @@ HelloNet :: struct {
 	ses:     ksess.Session,
 	comms:   kcomms.Comms,
 	boot:    kboot.Boot,
-	running: bool,
-	started: bool,
 	player_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Player:1"`,
 	me: ^Player,
 }
@@ -113,7 +111,8 @@ hello_net_ready :: proc(self: ^HelloNet) {
 }
 
 hello_net_process :: proc(self: ^HelloNet, delta: f64) {
-	if !self.running {return}
+	was := kboot.boot_phase(&self.boot) // read BEFORE the pump: the rising edge
+	if was == .Menu {return}
 	events, _, _ := kboot.boot_pump(&self.boot, delta, now_s())
 	if self.me != nil {
 		dx, dy: f32
@@ -125,26 +124,27 @@ hello_net_process :: proc(self: ^HelloNet, delta: f64) {
 		self.me.y = clamp(self.me.y + dy * SPEED * f32(delta), 8, 352)
 	}
 	hello_net_events(self, events)
+	if was != .Playing && kboot.boot_phase(&self.boot) == .Playing {
+		gd.print_str("HELLO_STARTED") // the world arrived — once
+	}
 }
 
 @(gd_method)
 hello_net_on_host :: proc(self: ^HelloNet) {
-	if self.running {return}
+	if kboot.boot_phase(&self.boot) != .Menu {return}
 	if !kboot.boot_host(&self.boot, kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_name(&self.boot, "player")) {return}
-	self.running = true
 	hello_net_on_start(self)
 }
 
 @(gd_method)
 hello_net_on_join :: proc(self: ^HelloNet) {
-	if self.running {return}
-	if !kboot.boot_join(&self.boot, "127.0.0.1", kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player")) {return}
-	self.running = true
+	if kboot.boot_phase(&self.boot) != .Menu {return}
+	kboot.boot_join(&self.boot, "127.0.0.1", kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player"))
 }
 
 @(gd_method)
 hello_net_on_start :: proc(self: ^HelloNet) {
-	if !self.ses.is_host || self.started {return}
+	if !self.ses.is_host || kboot.boot_phase(&self.boot) == .Playing {return}
 	for _, p in self.ses.players {
 		if p.connected {spawn_player(self, p.id)}
 	}
@@ -153,7 +153,7 @@ hello_net_on_start :: proc(self: ^HelloNet) {
 
 @(gd_method)
 hello_net_on_chat :: proc(self: ^HelloNet, text: gd.String) {
-	if self.running {kboot.boot_chat(&self.boot, text)}
+	if kboot.boot_phase(&self.boot) != .Menu {kboot.boot_chat(&self.boot, text)}
 }
 
 spawn_player :: proc(self: ^HelloNet, pid: knet.Player_Id) {
@@ -170,18 +170,22 @@ hello_net_welcomed :: proc(self: ^HelloNet, me: knet.Player_Id) {
 }
 
 hello_net_player_joined_then :: proc(self: ^HelloNet, id: knet.Player_Id, rejoin: bool) {
-	if self.started && !rejoin {spawn_player(self, id)}
+	if kboot.boot_phase(&self.boot) == .Playing && !rejoin {spawn_player(self, id)}
 }
 
 hello_net_entity_spawned :: proc(self: ^HelloNet, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
 	_ = type; _ = id; _ = owner
-	if !self.started {
-		self.started = true
-		gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
-		gd.print_str("HELLO_STARTED")
-	}
+	gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false) // a level, applied
 }
 ```
+
+**No lifecycle bools.** The `running`/`started` pair this file used to carry
+is [`boot_phase`](boot.md#the-frame-loop-boot_pump) now, and `boot_phase` is
+*derived* from the session — so it is right even for a game that never
+touched a boot door. `boot_phase` is a LEVEL, though, and a swap that must
+happen exactly once needs the rising EDGE: read the phase before
+`boot_pump` (the only place it rises) and compare after, as `process` does
+above. That two-read idiom replaces the bool; nothing is stored.
 
 (One omission, flagged: the living `hello.odin` also carries the optional
 **join-code doors** — with a relay configured, `on_host` mints a shareable

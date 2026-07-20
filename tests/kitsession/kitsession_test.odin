@@ -2509,3 +2509,170 @@ spectator_watches_and_is_nobody :: proc(t: ^testing.T) {
 	}
 	testing.expect_value(t, host.s.backup_target, alice.s.me)
 }
+
+// ---- the host relay + the rider queue (relay.odin / appq.odin) --------------------
+//
+// The shape kit/comms and kit/xfer hand-rolled twice, tested once, on its own:
+// the stamp a client cannot forge, the spoof drop, both arms of the echo flag,
+// and the addressed cast that must NOT come back around.
+
+Relay_Note :: struct {
+	author: knet.Player_Id,
+	n:      u32,
+}
+
+Relay_Probe :: struct {
+	relay: ksess.Host_Relay,
+	got:   ksess.App_Queue(Relay_Note),
+}
+
+relay_probe_deliver :: proc(user: rawptr, author: knet.Player_Id, r: ^knet.Reader) {
+	p := cast(^Relay_Probe)user
+	n := knet.read_u32(r)
+	if r.err {
+		return
+	}
+	ksess.appq_push(&p.got, Relay_Note{author = author, n = n})
+}
+
+// A second deliver proc so the echoing and non-echoing probes are distinct
+// subsystems in relay_route's eyes (which is how tag collisions stay loud).
+relay_probe_deliver_quiet :: proc(user: rawptr, author: knet.Player_Id, r: ^knet.Reader) {
+	relay_probe_deliver(user, author, r)
+}
+
+relay_probe_say :: proc(p: ^Relay_Probe, n: u32) {
+	w := ksess.relay_begin(&p.relay)
+	knet.write_u32(w, n)
+	ksess.relay_flush(&p.relay)
+}
+
+relay_probe_destroy :: proc(p: ^Relay_Probe) {
+	ksess.relay_unroute(&p.relay)
+	ksess.appq_destroy(&p.got)
+}
+
+// Drain the probe: what landed, in order.
+relay_probe_drain :: proc(p: ^Relay_Probe, allocator := context.temp_allocator) -> []Relay_Note {
+	out := make([dynamic]Relay_Note, allocator)
+	for {
+		note, ok := ksess.appq_poll(&p.got)
+		if !ok {
+			break
+		}
+		append(&out, note)
+	}
+	return out[:]
+}
+
+@(test)
+host_relay_stamps_spoof_drops_and_echoes :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+
+	LOUD :: u8(5) // echo = true  (kit/comms' policy)
+	QUIET :: u8(6) // echo = false (kit/xfer's)
+	hl, al, bl: Relay_Probe // the loud relay, one per peer
+	hq, aq, bq: Relay_Probe // the quiet one
+	defer relay_probe_destroy(&hl)
+	defer relay_probe_destroy(&al)
+	defer relay_probe_destroy(&bl)
+	defer relay_probe_destroy(&hq)
+	defer relay_probe_destroy(&aq)
+	defer relay_probe_destroy(&bq)
+	for pair in ([]struct {
+			p:   ^Relay_Probe,
+			ses: ^ksess.Session,
+		}{{&hl, &host.s}, {&al, &alice.s}, {&bl, &bob.s}}) {
+		ksess.relay_route(&pair.p.relay, pair.ses, LOUD, pair.p, relay_probe_deliver, echo = true)
+	}
+	for pair in ([]struct {
+			p:   ^Relay_Probe,
+			ses: ^ksess.Session,
+		}{{&hq, &host.s}, {&aq, &alice.s}, {&bq, &bob.s}}) {
+		ksess.relay_route(&pair.p.relay, pair.ses, QUIET, pair.p, relay_probe_deliver_quiet, echo = false)
+	}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+
+	// THE STAMP. A client's word rides up unsigned; the host writes the id it
+	// already resolved from the peer, so every screen — the author's included,
+	// because this relay echoes — reads the same author.
+	relay_probe_say(&al, 111)
+	pump(boxes)
+	for got in ([][]Relay_Note{relay_probe_drain(&hl), relay_probe_drain(&al), relay_probe_drain(&bl)}) {
+		testing.expect_value(t, len(got), 1)
+		if len(got) == 1 {
+			testing.expect_value(t, got[0].author, alice.s.me)
+			testing.expect_value(t, got[0].n, u32(111))
+		}
+	}
+
+	// The HOST's own word: broadcast, and delivered locally by the same flag —
+	// one code path per side, not a role branch per package.
+	relay_probe_say(&hl, 222)
+	pump(boxes)
+	for got in ([][]Relay_Note{relay_probe_drain(&hl), relay_probe_drain(&al), relay_probe_drain(&bl)}) {
+		testing.expect_value(t, len(got), 1)
+		if len(got) == 1 {
+			testing.expect_value(t, got[0].author, host.s.me)
+		}
+	}
+
+	// ECHO = FALSE, both arms: the client's own upload coming back around is
+	// dropped on arrival, and the host's own broadcast never lands locally.
+	relay_probe_say(&aq, 333)
+	pump(boxes)
+	testing.expect_value(t, len(relay_probe_drain(&aq)), 0) // my own, dropped
+	testing.expect_value(t, len(relay_probe_drain(&hq)), 1) // the relay's own copy
+	testing.expect_value(t, len(relay_probe_drain(&bq)), 1)
+	relay_probe_say(&hq, 444)
+	pump(boxes)
+	testing.expect_value(t, len(relay_probe_drain(&hq)), 0) // authored here, not heard here
+	testing.expect_value(t, len(relay_probe_drain(&aq)), 1)
+	testing.expect_value(t, len(relay_probe_drain(&bq)), 1)
+
+	// THE SPOOF. Every transport relays peer to peer, so a client can hand-frame
+	// a cast with somebody else's id on it. It reaches no rider: not bob's (it
+	// didn't come from HOST_PEER) and not the host's (casts never land on the
+	// authority). RELAY_CAST is 1, and the author is the byte a cheater wants.
+	w := ksess.session_app_begin(&alice.s, LOUD)
+	knet.write_u8(w, 1)
+	knet.write_player_id(w, host.s.me) // "the host said this"
+	knet.write_u32(w, 999)
+	ksess.session_app_flush(&alice.s, ksess.BROADCAST_PEER)
+	pump(boxes)
+	testing.expect_value(t, len(relay_probe_drain(&bl)), 0)
+	testing.expect_value(t, len(relay_probe_drain(&hl)), 0)
+	testing.expect_value(t, len(relay_probe_drain(&al)), 0)
+
+	// THE ADDRESSED CAST, under another player's name — comms' catch-up replay
+	// and the album's joiner backlog in miniature. It reaches exactly that peer,
+	// and it does NOT echo on the host even though this relay echoes: replaying
+	// history to one joiner must not re-file it into the authority's own log.
+	ap, seated := ksess.session_player(&host.s, alice.s.me)
+	testing.expect(t, seated)
+	rw := ksess.relay_begin_as(&hl.relay, bob.s.me)
+	knet.write_u32(rw, 777)
+	ksess.relay_flush(&hl.relay, ap.peer)
+	pump(boxes)
+	testing.expect_value(t, len(relay_probe_drain(&hl)), 0)
+	testing.expect_value(t, len(relay_probe_drain(&bl)), 0)
+	only_alice := relay_probe_drain(&al)
+	testing.expect_value(t, len(only_alice), 1)
+	if len(only_alice) == 1 {
+		testing.expect_value(t, only_alice[0].author, bob.s.me)
+		testing.expect_value(t, only_alice[0].n, u32(777))
+	}
+}

@@ -190,8 +190,8 @@ CaveLobby :: struct {
 	dens_used: int `gd:"backup"`, // round-robin den picker
 	last_wave: int `gd:"backup"`, // wave-announcement edge
 	host_ticks: int `gd:"backup"`, // host: game ticks elapsed
-	hud_hp:     kui.Health_Bar,
-	hud_ab:     kui.Ability_Bar,
+	hud_hp:     kui.Hp_Bar,
+	hud_ab:     kui.Abilities_Bar,
 	chat_sent:  bool, // the Enter that submitted a line must not also re-open chat
 	host_gone:  bool, // the driver's poll mirror (the KIT holds the mechanics latch now)
 	succ_seen:  int, // Ev_Succession count (latched; drivers poll it — host_gone flips back within a frame)

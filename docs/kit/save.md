@@ -77,6 +77,43 @@ mismatched build fails the read cleanly instead of misreading bytes: the automat
 version byte you used to keep by hand. `knet.write_pod`/`read_pod` are that same primitive,
 exposed for any fixed-shape state you still serialize by hand.
 
+## Versioning: what crosses time, what crosses the wire
+
+Three versioning conventions live in this repo, and until this was written down they looked
+like three tastes. They are not — they answer two different questions, and **which one you
+want is decided by what your bytes cross**:
+
+- **Bytes that cross TIME** — a save file, a `gd:"backup"` blob, a succession payload
+  authored by a build you may not be running anymore — take an **FNV field hash**, generated
+  from the shape itself. Nobody is there to negotiate: the reader's only defence is
+  recognizing that the writer's shape isn't its own, and a hand-bumped number is a step an
+  engineer forgets. scriptgen's `<class>_backup_write`/`_read` pair is the worked example;
+  `knet.write_pod`/`read_pod` is the same primitive for hand-serialized state.
+- **Bytes that cross THE WIRE** — every `SES_*` message, the lane wire, the netgd frame —
+  take a **rev constant at the join door**: `ksess.PROTOCOL_REV`, `knet.WIRE_REV`, and each
+  wire-bearing package's own, all folded into the `NET_FINGERPRINT` a `SES_JOIN` carries. A
+  skewed peer is refused with a sentence (`Ev_Join_Denied{.Version}`) before it can misparse
+  a single delta. Bump the rev in **the package whose wire you changed**, in the same commit,
+  and log what moved beside the constant.
+- **`ksave.FORMAT`** is the third, and the one that stays hand-bumped on purpose. It versions
+  the *envelope*, not a field set: there is nothing to hash — magic, format, a game stamp, an
+  id, two length-prefixed byte ranges — and it is the outermost gate, so it has to be
+  readable by a reader that has agreed to nothing yet. Its changelog comment beside the
+  constant is the contract.
+
+Two consequences worth stating, because both look like inconsistencies and neither is:
+
+**The backup wrapper is unversioned, correctly.** The identical `session_snapshot` bytes get
+kit/save's versioned envelope on disk and a bare `[blob_len u32][game blob][snapshot]` on the
+[migration wire](session.md#backup-hosting-and-resume). The snapshot crossing the wire is
+already covered — `PROTOCOL_REV` gates the join, and a peer that never got a seat never gets
+a backup — so a second stamp there would version bytes that cannot arrive from a build that
+disagrees. The file has no such door, which is exactly why it has an envelope.
+
+**A `game_version` mismatch is not a `FORMAT` mismatch.** `Bad_Envelope` is the toolkit's
+verdict; `Wrong_Version` is yours. Keep them separate — a content bump should never look like
+a corrupt file.
+
 ## API by task
 
 **Save** — host only:

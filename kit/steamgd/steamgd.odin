@@ -165,6 +165,22 @@ join_lobby :: proc(lobby_id: u64) {
 	gd.variant_destroy(&r)
 }
 
+// Leave a lobby — the ONE piece of Steam state that outlives the multiplayer
+// peer (a replaced peer drops the connection; Steam keeps you seated in the
+// lobby, still listed to your friends, until you say this). Say it on the way
+// back to the menu and before joining a different lobby; harmless if you are
+// not in it.
+leave_lobby :: proc(lobby_id: u64) {
+	s, ok := steam()
+	if !ok {
+		return
+	}
+	l := vint(i64(lobby_id))
+	defer gd.variant_destroy(&l)
+	r := gd.object_call(s, gd.sname("leaveLobby"), l)
+	gd.variant_destroy(&r)
+}
+
 // Who hosts this lobby — the steam id the client peer connects to.
 lobby_owner :: proc(lobby_id: u64) -> u64 {
 	s, ok := steam()

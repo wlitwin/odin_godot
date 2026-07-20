@@ -54,10 +54,18 @@ Rendezvous_Kind :: enum u8 {
 	None        = 0, // no torch / an unparseable one — the human flow is all there is
 	Native_Addr = 1, // [addr string][port u16]
 	Web_Room    = 2, // [code string]
-	// A Steam lobby id ([id u64]) is the reserved next kind — it arrives with
-	// the Transport-record refactor, which gives raise/dial their per-peer
-	// transport handles.
+	// A Steam peer id ([id u64]) is the reserved next kind. The Transport
+	// record now carries every handle it would need (transport.odin) — what is
+	// missing is one slot: kit/steamgd's `address`, i.e. a verified way to ask
+	// GodotSteam which steam id is behind a multiplayer peer. Fill that slot
+	// and this kind is two switch arms. NOT the lobby id, deliberately: Steam
+	// promotes its own lobby owner, which is rarely the session's backup
+	// target, and the kit keeps ONE heir story — the torch names the bearer.
 }
+
+// Which kinds a transport can light is the transport's own answer
+// (Transport.rendezvous); kboot.boot_succ_config reads it there so a door
+// never has to be told twice.
 
 // A decoded torch. String fields are VIEWS into the torch bytes — copy them
 // out before anything restarts the session (a raise or dial frees
@@ -144,17 +152,20 @@ succession_torch :: proc(sc: ^Succession, wire: ^Session_Wire, target: knet.Play
 	case .Native_Addr:
 		p, has := wire.ses.players[target]
 		if !has {return "", false}
-		addr, aok := peer_address(wire.node, p.peer)
+		// The transport's own address story (Transport.address) — ENet answers
+		// with the peer's remote address; a transport that leaves the slot nil
+		// answers ok=false here.
+		addr, aok := transport_address(wire, p.peer)
 		if !aok {
-			// A transport with no peer-address story (anything but ENet —
-			// Steam, custom peers) can never light the native torch:
-			// migration stays ARMED but silently absent. Say it once instead
-			// of losing the world to a dead host months later. (A Steam lobby
-			// id is the easy rendezvous the Transport-record refactor will
-			// carry; until then, the web room-code arm is the workaround.)
+			// A transport with no peer-address story can never light the
+			// native torch: migration stays ARMED but silently absent. Say it
+			// once instead of losing the world to a dead host months later.
 			if !sc.warned_no_torch {
 				sc.warned_no_torch = true
-				fmt.println("kit/netgd: succession torch UNLIT — this transport exposes no peer address (ENet-only today), so host migration cannot happen on it; use the web rendezvous (kind = .Web_Room + relay) until per-transport rendezvous ships")
+				fmt.printfln(
+					"kit/netgd: succession torch UNLIT — the %q transport fills no `address` slot, so it cannot name an heir and host migration cannot happen on it; use the web rendezvous (kind = .Web_Room + relay), or fill that slot in its Transport record (kit/netgd/transport.odin)",
+					transport_of(wire).name,
+				)
 			}
 			return "", false
 		}

@@ -356,7 +356,10 @@ fire_announce :: proc(s: ^ksess.Session, f: Fire, tag: u8 = FIRE_TAG) {
 // sessions in one process (the test rig, dedicated hosts) never collide.
 Fire_Route :: struct {
 	ses:   ^ksess.Session,
-	fires: [dynamic]Fire,
+	// The shared SES_APP rider queue (ksess.appq): handler pushes, game polls.
+	// It used to be a bare [dynamic]Fire plus a hand-written poll — the fourth
+	// copy of the same eight lines, which is what made the discipline a TYPE.
+	fires: ksess.App_Queue(Fire),
 }
 
 // ...and every peer listens. The guards each game used to hand-roll live
@@ -365,10 +368,11 @@ Fire_Route :: struct {
 // echo skips (your screen drew at cast time). What lands in the queue is
 // exactly "someone else's rock — draw it".
 //
-// EVENTS, NOT CALLBACKS — the handler only FILES; the game drains with
-// fire_poll each frame, on its own stack (the discipline comms/xfer/the
-// lane all follow; the old on_fire callback ran game code mid-session-pump,
-// the one reentrancy hole in the subsystem).
+// EVENTS, NOT CALLBACKS — the handler only FILES into `ksess.App_Queue`; the
+// game drains with fire_poll each frame, on its own stack. That discipline is
+// a TYPE now, not a habit each package re-earns (comms, xfer, the album and
+// this lane all hold the same queue) — the old on_fire callback ran game code
+// mid-session-pump, the one reentrancy hole in the subsystem.
 fire_listen :: proc(fr: ^Fire_Route, s: ^ksess.Session, tag: u8 = FIRE_TAG) {
 	fr^ = Fire_Route{ses = s}
 	ksess.session_app_route(s, tag, fr, fire_handle)
@@ -376,16 +380,11 @@ fire_listen :: proc(fr: ^Fire_Route, s: ^ksess.Session, tag: u8 = FIRE_TAG) {
 
 // Drain one announced fire (call until ok=false each frame, then draw).
 fire_poll :: proc(fr: ^Fire_Route) -> (f: Fire, ok: bool) {
-	if len(fr.fires) == 0 {
-		return {}, false
-	}
-	f = fr.fires[0]
-	ordered_remove(&fr.fires, 0)
-	return f, true
+	return ksess.appq_poll(&fr.fires)
 }
 
 fire_route_destroy :: proc(fr: ^Fire_Route) {
-	delete(fr.fires)
+	ksess.appq_destroy(&fr.fires)
 	fr^ = {}
 }
 
@@ -395,7 +394,7 @@ fire_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 	if fr.ses.is_host || from_peer != ksess.HOST_PEER {return}
 	f, ok := fire_read(r)
 	if !ok || f.shooter == fr.ses.me {return}
-	append(&fr.fires, f)
+	ksess.appq_push(&fr.fires, f)
 }
 
 // ---- predicted hp: the impact you SAW, before the wire agrees ---------------------

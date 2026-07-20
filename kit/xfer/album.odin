@@ -53,7 +53,7 @@ Replay :: struct {
 Album :: struct {
 	x:       Xfer,
 	blobs:   map[Xfer_Key][]u8, // (player, id) -> the latest bytes, owned
-	fresh:   [dynamic]Fresh,
+	fresh:   ksess.App_Queue(Fresh), // landed-since-last-poll, the shared rider queue
 	replays: [dynamic]Replay,
 }
 
@@ -67,7 +67,7 @@ album_destroy :: proc(a: ^Album) {
 		delete(bytes)
 	}
 	delete(a.blobs)
-	delete(a.fresh)
+	ksess.appq_destroy(&a.fresh)
 	for r in a.replays {
 		delete(r.data)
 	}
@@ -83,7 +83,7 @@ album_put :: proc(a: ^Album, id: u8, bytes: []u8) -> bool {
 		return false
 	}
 	album_keep(a, a.x.ses.me, id, bytes)
-	append(&a.fresh, Fresh{from = a.x.ses.me, id = id})
+	ksess.appq_push(&a.fresh, Fresh{from = a.x.ses.me, id = id})
 	return true
 }
 
@@ -108,7 +108,7 @@ album_pump :: proc(a: ^Album, budget := PUMP_CHUNKS) {
 		}
 		if done, is_done := ev.(Ev_Done); is_done {
 			album_keep(a, done.from, done.id, done.bytes)
-			append(&a.fresh, Fresh{from = done.from, id = done.id})
+			ksess.appq_push(&a.fresh, Fresh{from = done.from, id = done.id})
 		}
 	}
 }
@@ -116,11 +116,10 @@ album_pump :: proc(a: ^Album, budget := PUMP_CHUNKS) {
 // Landed payloads since the last poll (mine included, the frame it was put)
 // — the decode/repaint hook. Drain until ok = false.
 album_poll :: proc(a: ^Album) -> (from: knet.Player_Id, id: u8, ok: bool) {
-	if len(a.fresh) == 0 {
+	f, has := ksess.appq_poll(&a.fresh)
+	if !has {
 		return knet.PLAYER_ID_INVALID, 0, false
 	}
-	f := a.fresh[0]
-	ordered_remove(&a.fresh, 0)
 	return f.from, f.id, true
 }
 
@@ -178,8 +177,10 @@ queue_replay :: proc(a: ^Album, to: ksess.Peer_Id, from: knet.Player_Id, id: u8,
 	append(&a.replays, Replay{to = to, from = from, id = id, data = data})
 }
 
-// The catch-up sender: XF_CAST frames addressed to one peer, same chunk
-// size, same budget discipline as xfer_pump.
+// The catch-up sender: casts addressed to one peer under the player who
+// published the payload — same chunk size, same budget discipline as
+// xfer_pump. An addressed cast never echoes, so the backlog can't re-ingest
+// into the host's own shelf on its way out.
 @(private = "file")
 replay_pump :: proc(a: ^Album, budget: int) {
 	ses := a.x.ses
@@ -189,7 +190,7 @@ replay_pump :: proc(a: ^Album, budget: int) {
 	left := budget
 	for left > 0 && len(a.replays) > 0 {
 		r := &a.replays[0]
-		if chunk_send(ses, a.x.tag, XF_CAST, r.from, r.id, &r.seq, r.data, r.to) {
+		if chunk_send(ksess.relay_begin_as(&a.x.relay, r.from), &a.x.relay, r.id, &r.seq, r.data, r.to) {
 			delete(r.data)
 			ordered_remove(&a.replays, 0)
 		}

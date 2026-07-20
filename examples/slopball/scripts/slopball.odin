@@ -68,8 +68,8 @@ Slopball :: struct {
 	ses:     ksess.Session,
 	comms:   kcomms.Comms,
 	boot:    kboot.Boot,
-	running: bool, // transport up (hosting or joining)
-	started: bool, // the world reached this peer
+	// (no `running`/`started` pair: kboot.boot_phase answers both, derived from
+	// the session rather than latched by hand — see slopball_process.)
 
 	// The authored bodies. Each tag's `entity=Name:id` IS the factory
 	// declaration — scriptgen generates the TYPE consts + the kind table,
@@ -166,18 +166,25 @@ slopball_ready :: proc(self: ^Slopball) {
 }
 
 slopball_try_start :: proc(self: ^Slopball) {
-	if self.started || self.auto_peers <= 0 {return}
+	if kboot.boot_phase(&self.boot) == .Playing || self.auto_peers <= 0 {return}
 	if ksess.session_count(&self.ses, connected_only = true, players_only = true) >= self.auto_peers {
 		slopball_on_start(self) // self-gating: non-hosts and re-calls no-op
 	}
 }
 
 slopball_process :: proc(self: ^Slopball, delta: f64) {
-	if !self.running {return}
+	// THE LIFECYCLE, read not kept — `running`/`started` were two bools mirroring
+	// what the session already knew. `.Menu` is "no seat and none coming"; read
+	// BEFORE the pump because boot_pump is the only place the phase RISES, so
+	// `was` against the phase after it is the rising edge `started` existed to
+	// catch (the once-only receipt at the bottom of this proc).
+	was := kboot.boot_phase(&self.boot)
+	if was == .Menu {return}
 
 	events, _, ticks := kboot.boot_pump(&self.boot, delta, now_s())
 
-	if self.started {
+	phase := kboot.boot_phase(&self.boot)
+	if phase == .Playing {
 		drive_my_kicker(self, delta)
 		// The authority's fixed steps, role-free at the call site: the
 		// generated slopball_step holds the host gate (clients no-op) and
@@ -194,6 +201,13 @@ slopball_process :: proc(self: ^Slopball, delta: f64) {
 	// The game's event reactions are the name-paired halves below; the
 	// generated slopball_events holds the switch and every role gate.
 	slopball_events(self, events)
+
+	// The world ARRIVED this frame — the once-only receipt. boot_phase is a
+	// LEVEL and the spawn half below fires per entity, so the edge is computed
+	// here, from two reads of the level, and needs no bool on this struct.
+	if was != .Playing && phase == .Playing {
+		gd.print_str("SB_STARTED")
+	}
 }
 
 // ---- session event halves ---------------------------------------------------
@@ -209,7 +223,7 @@ slopball_player_joined_then :: proc(self: ^Slopball, id: knet.Player_Id, rejoin:
 	if p, ok := ksess.session_player(&self.ses, id); ok {
 		kcomms.comms_welcome(&self.comms, id, rejoin, fmt.tprintf("%s takes the pitch", p.name))
 	}
-	if self.started && !rejoin {
+	if kboot.boot_phase(&self.boot) == .Playing && !rejoin {
 		spawn_kicker(self, id)
 	}
 	slopball_try_start(self)
@@ -234,14 +248,14 @@ slopball_host_left :: proc(self: ^Slopball) {
 // current seat (a late joiner may arrive while a client already simulates)
 // and paint a mid-match score (spawn values seed the edge silently — a
 // baseline, not an edge).
+//
+// The lobby/legend swap is a LEVEL applied per spawn, not a latch: `started`
+// used to be one bool doing double duty (level AND rising edge), and only the
+// edge needed keeping — it rides boot_phase in process(), with the receipt.
 slopball_entity_spawned :: proc(self: ^Slopball, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
 	_ = type
-	if !self.started {
-		self.started = true
-		gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
-		gd.set_bool(cast(gd.Object)self.boot.legend, "visible", true)
-		gd.print_str("SB_STARTED")
-	}
+	gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
+	gd.set_bool(cast(gd.Object)self.boot.legend, "visible", true)
 	if id == self.ball_id && self.ball != nil {
 		seat_ball(self, ksess.session_owner_of(&self.ses, id))
 		if self.ball.score.l != 0 || self.ball.score.r != 0 {

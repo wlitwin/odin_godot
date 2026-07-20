@@ -24,11 +24,16 @@ silently cross at API boundaries. Departed players stay in the roster as disconn
 exactly this reason. Tokens are stored hashed, so a backup snapshot can carry the identity
 table to a would-be new host without handing anyone the secrets.
 
-**Events, not callbacks.** Everything the game needs to react to comes out of one queue,
-drained per frame with `session_poll` — no callbacks into half-initialized script state.
-The one synchronous exception is the entity factory's `make` (the registry needs the
-pointer before a snapshot can apply); react to the spawn itself via `Ev_Spawned`, which
-fires right after.
+**Events, not callbacks — with two named exceptions, not one.** Everything the game
+*reacts* to comes out of one queue, drained per frame with `session_poll`: no callbacks
+into half-initialized script state. But the session does enter your code synchronously in
+two other shapes — when it needs an **answer** it cannot compute (the factory's `make`, the
+interest locator, the backup blob writer) and when your code must run **inside** an
+operation whose state doesn't survive it (the command hooks, an app handler's live packet
+bytes). Which of the three a new feature wants is a mechanical question with a mechanical
+answer: see [three tiers of entry](#three-tiers-of-entry-into-your-code). The rule that
+never bends is the one behind all of them — **nothing runs game code on the transport's
+stack that could have run on the game's frame instead.**
 
 **Three hookups**, and the session is transport-agnostic:
 
@@ -265,6 +270,77 @@ scratch, which re-seeds here or presents the missed changes as fresh events),
 `Ev_Entity_Changed` (opt-in), `Ev_Command_Executed` (host),
 `Ev_Command_Confirmed` / `Ev_Command_Rejected` (client; timeouts surface as rejections
 with the real seq/entity).
+
+## Three tiers of entry into your code
+
+[index.md's house grammar](index.md#the-house-grammar) states the delivery rule for the
+whole kit: poll unions for multi-event, tuple-poll for single-event, synchronous callbacks
+only for the answer the kit cannot proceed without, **everything else is an event.** This
+section is that rule *derived* for kit/session, because the session has the most entry
+points of any package and "the one synchronous exception is the factory's `make`" was
+undercounting them by about six. Each of those six is defensible. What was missing was the
+taxonomy — so a contributor could not tell which mechanism a NEW feature should use without
+asking.
+
+There are three tiers, and **the tier is derived, not chosen**:
+
+1. **Does the session need an answer to finish what it is doing?** It holds a pointer, a
+   position, or a byte range it cannot compute itself, and the operation stops until you
+   hand it over. → **pull callback.**
+2. **Otherwise: does your code need state that exists only INSIDE the operation** — a
+   command's window before its result is decided, a packet's live byte view, the tick the
+   authority is standing in — state that cannot be re-derived a frame later? → **atomic
+   authority hook.**
+3. **Everything else, which is nearly everything.** → **presentation event.**
+
+The tie-breaker, applied in that order: *if the same meaning survives being queued and
+drained next frame, it must be queued.*
+
+### Tier 1 — pull callbacks (the session is asking a question)
+
+The session lends itself your eyes and your memory. It calls, you answer, it continues.
+Keep them **total and cheap**: answer the question, return. Do not mutate the world, send,
+spawn, or despawn inside one — the session is mid-operation and holding invariants.
+
+| callback | asked | why it can't be an event |
+| --- | --- | --- |
+| `Make_Entity_Proc` | on every spawn, both roles | the registry needs the pointer before the spawn tuple's fields can apply |
+| `Free_Entity_Proc` | on every despawn, both roles | only the game knows how its entity dies (and the node must die before the id is reused) |
+| `Locator_Proc` ([interest](#interest-management-area-of-interest)) | per entity, per tick, host | the session cannot read your position fields |
+| `Backup_Blob_Proc` ([backups](#backup-hosting-and-resume)) | per backup refresh, host | the campaign bytes are the game's; the snapshot is written in one pass |
+| kit/sim's `Sample_Proc` / `Step_Proc` / `Resim_Proc` | per tick / per resim | the lane cannot read or advance your simulation |
+
+React to the *event* the answer produced — `Ev_Spawned` fires right after `make`, on the
+host too — rather than doing game work in the answer.
+
+### Tier 2 — atomic authority hooks (the moment does not survive the frame)
+
+These run on the session's stack, inside the operation, because the operation IS the
+context. They may mutate the world through the ordinary mutators; they may not re-enter
+the operation that called them.
+
+| hook | fires inside | the state that would be gone |
+| --- | --- | --- |
+| `<verb>_then` consequences ([net.md](net.md#consequences-verb_then)) | the command's execution, host | the verb's return value and the issuer, before anything else runs |
+| `Command_Hook` / `session_set_type_hook` | the same dispatch, after `_then` | deliberately *pre-result*: the generic layer sees the verdict as it is decided |
+| `App_Handler` / `Relay_Proc` ([app messages](#app-messages)) | the packet switch | `^knet.Reader` is a view into the receive buffer — it dies when the packet does |
+
+The reader one is the trap worth naming: an app handler that *keeps* a slice instead of
+copying it is holding freed transport memory next frame. Which is exactly why every handler
+in the kit does one thing — decode and **file** — and never more. See the queue below.
+
+### Tier 3 — presentation (runs on your frame, world consistent)
+
+Two shapes, one property: they run from `session_tick` / your pump, after the world is
+whole, on the game's own stack. That is the property that matters — not whether you drained
+it or the kit handed it to you.
+
+- **Drained**: `session_poll`'s `Event` union and the generated [event halves](#event-halves-game_event--the-switch-generated); the SES_APP riders' polls (`comms_poll`, `xfer_poll`, `fire_poll`, `album_poll`) — all now the same [`App_Queue`](#the-riders-queue-appq--the-receive-half).
+- **Kit-driven**: the generated [`<field>_edge` halves](net.md#edges-class_field_edge--presenting-delta-lane-changes) (fired by the presentation pass inside `session_tick`) and `session_present`'s `Later_Proc` (drained on the same clock, interp-delayed).
+
+**So: a new feature is tier 3 unless it answers a question the session is blocked on (tier
+1) or reads state the operation destroys (tier 2).** Nothing else earns a synchronous
+entry, and a feature that reaches for one should be able to name its row in a table above.
 
 ## The replicated world
 
@@ -570,6 +646,89 @@ batches ride `SES_APP` on exactly this lane): the receive side routes both chann
 identically, but nothing re-delivers a dropped `.Stream` message and nothing orders it
 against the reliable lane.
 
+### The host relay (`Host_Relay`) — the send half, written once
+
+Almost every app-channel citizen wants the same shape, and kit/comms and kit/xfer each
+hand-rolled it before this existed (xfer.md said so out loud: "kit/comms' shape, sized
+up"). A client sends its word **up** to the host; the host **stamps** the sender it already
+vouched for and rebroadcasts; a peer that receives a stamped cast from anyone but the host
+is looking at a **spoof** and drops it; and the author's own copy comes back — or doesn't —
+by policy. Four rules, three of them security-shaped, copied per package until one of them
+drifted.
+
+```odin
+Relay_Proc :: proc(user: rawptr, author: knet.Player_Id, r: ^knet.Reader)
+
+relay_route    :: proc(hr: ^Host_Relay, s: ^Session, tag: u8, user: rawptr, deliver: Relay_Proc, echo := true)
+relay_unroute  :: proc(hr: ^Host_Relay)
+relay_begin    :: proc(hr: ^Host_Relay) -> ^knet.Writer                       // as ME, either role
+relay_begin_as :: proc(hr: ^Host_Relay, author: knet.Player_Id) -> ^knet.Writer // HOST only
+relay_flush    :: proc(hr: ^Host_Relay, to: Peer_Id = BROADCAST_PEER)
+```
+
+The envelope it owns, inside the `SES_APP` framing:
+
+```
+[tag][RELAY_UP][payload]                     client -> host   (no author: it can't be trusted)
+[tag][RELAY_CAST][author u64][payload]       host -> all/one  (the author the session resolved)
+```
+
+What rides above is a **payload codec and nothing else** — and notably, no role branch at
+the send door:
+
+```odin
+w := ksess.relay_begin(&c.relay)   // host: a stamped cast · client: an upload
+knet.write_u8(w, CO_SAY)
+knet.write_string(w, said)
+ksess.relay_flush(&c.relay)        // host: broadcast (+ local echo) · client: to the host
+```
+
+- **`echo`** answers "does the machine that authored a message also receive it?" once, for
+  both roles: the host's own broadcast delivers locally, and a client's cast coming back
+  with `author == me` delivers — iff `echo`. kit/comms sets it true (authoritative order
+  beats a few milliseconds: what you see IS what everyone sees); kit/xfer sets it false
+  (you already hold the bytes you sent).
+- **`relay_begin_as`** is the host casting under someone else's name — a line the authority
+  authored with no speaker, history replayed under its original speaker, an album payload
+  re-cast under the player who published it. It never rides the wire upward, so nothing it
+  says can be spoofed into existence.
+- **An addressed cast never echoes.** `relay_flush(hr, peer)` is *for that peer* — which is
+  what lets `comms_catchup` replay a whole log to one joiner without re-filing it into the
+  host's own.
+- **`deliver` files and returns.** It gets the payload and the vouched author, and it must
+  not author on the same relay: that would reset the session's scratch writer under the
+  payload it is holding. (Tier 2 above, and the reason tier 3 exists.)
+
+Tags are one byte and collisions are LOUD: `relay_route` asserts on a tag already relayed by
+a different subsystem, naming the taken ones (comms 0, [combat](combat.md)'s fires 1, xfer
+2, [kit/sim](sim.md) 3). Not every citizen needs the relay — the fire lane is cast-only with
+no upload arm, and kit/sim's lane rides `SES_APP` directly on the stream channel with its
+own tick semantics.
+
+### The rider's queue (`appq`) — the receive half
+
+`App_Handler` and `Relay_Proc` both run in the packet switch, so every rider obeys the same
+discipline: **the handler files, the game drains.** That was a convention each package
+re-earned with a private `[dynamic]T` and a hand-written poll — four copies of the same
+eight lines. It is a type now:
+
+```odin
+App_Queue :: struct($T: typeid)
+
+appq_push    :: proc(q: ^App_Queue($T), item: T)              // from the handler
+appq_poll    :: proc(q: ^App_Queue($T)) -> (item: T, ok: bool) // from the game
+appq_items   :: proc(q: ^App_Queue($T)) -> []T                 // what's still pending
+appq_len     :: proc(q: ^App_Queue($T)) -> int
+appq_destroy :: proc(q: ^App_Queue($T))
+```
+
+Riders keep their own public poll — `comms_poll`, `xfer_poll`, `fire_poll`, `album_poll` all
+have the exact names and signatures games already call, and now all delegate here. It is a
+**container, not a subsystem**: no `Session` pointer, no `Session_Run` entry, no
+`run_destroy` line, and it allocates only through the dynamic array's own creation
+allocator — which is what lets the tier-B session and its tier-C riders share one type
+without either inheriting the other's [allocator rule](#the-allocator-tiers).
+
 ## Backup hosting and resume
 
 The host periodically ships a complete re-hostable snapshot — identity table (hashed
@@ -586,6 +745,16 @@ and surviving a dead host are the same contract: [kit/save](save.md) wraps
 session_snapshot :: proc(s: ^Session, w: ^knet.Writer)
 session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backup: []u8) -> bool
 ```
+
+**Why the backup wrapper carries no version and the save file does.** The same
+`session_snapshot` bytes leave the session two ways, in two envelopes:
+`[blob_len u32][game blob][snapshot]` here, and kit/save's magic-and-`FORMAT` envelope on
+disk. That asymmetry is the convention working, not a gap in it — the backup **crosses the
+wire**, where both ends already agreed at the join door (`PROTOCOL_REV` folds into the
+fingerprint, and a skewed peer never got a seat, let alone a backup); the save file
+**crosses time**, where there is no door and no peer to refuse. See
+[save.md's versioning rule](save.md#versioning-what-crosses-time-what-crosses-the-wire) for
+the statement and the third convention (the generated FNV field hash).
 
 `session_host_resume` is called on a fresh session with the factory already installed;
 every other player comes back disconnected and rejoins with their tokens, reclaiming ids,
@@ -826,8 +995,17 @@ can't drop one:
    `keep_*` flag on `session_init` (profiles are the worked example).
 6. **Departure sweep** — what happens to your per-player state when a player leaves?
    `mark_left` is the one funnel (dedup windows, interest pairs prune there).
-7. **Event union** — new game-facing events join `Event`, and scriptgen's
-   `SESSION_EVENTS` table if games should get generated halves.
+7. **Event union — or the tier above it.** New game-facing events join `Event`, and
+   scriptgen's `SESSION_EVENTS` table if games should get generated halves. If your
+   subsystem instead wants to *enter* game code, derive which of the
+   [three tiers](#three-tiers-of-entry-into-your-code) it belongs to before writing the
+   proc type — and if it rides `SES_APP`, take the [relay](#the-host-relay-host_relay--the-send-half-written-once)
+   and the [queue](#the-riders-queue-appq--the-receive-half) rather than a fifth copy of them.
+   Adding a variant will **fail to compile** in `kit/boot/forward.odin`, which holds the
+   kit's own forwarding table as one exhaustive (non-`#partial`) switch — that is the
+   step working as designed, not a breakage. Give the new variant its row: the kit-side
+   consequence (a lane forward, a widget repaint, a succession arm) or an empty case
+   carrying the one word that says why the kit owes it nothing.
 8. **Fingerprint** — if your wire shape depends on game declarations (profile rows do),
    fold it into the build fingerprint so version skew is refused at the door, not
    debugged in the field.
@@ -862,9 +1040,11 @@ can't drop one:
   `session_malformed(s)`'s dropped-packet count (the netgraph draws the latter). Nonzero
   in the field means some client code writes host-lane state locally: silent divergence
   until the next authoritative delta stomps it.
-- **The factory's `make` is the one synchronous call into the game** — keep it to
+- **The factory's `make` is a tier-1 *answer*, not a reaction point** — keep it to
   instantiate-and-return; game reactions belong on `Ev_Spawned`, which fires right after
-  (on the host too, via `session_spawn_make`).
+  (on the host too, via `session_spawn_make`). It is not the session's only synchronous
+  entry — it is one row in [three tiers](#three-tiers-of-entry-into-your-code), which is
+  the page to read before adding another.
 - **Hosts don't get client events.** There is no `Ev_Welcomed`/`Ev_Command_Confirmed` on
   the authority (its commands run directly) — but it *does* get `Ev_State_Applied`,
   `Ev_Spawned`/`Ev_Despawned`, and `Ev_Command_Executed`, which is what repaint code

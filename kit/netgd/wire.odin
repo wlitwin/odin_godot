@@ -41,6 +41,7 @@ import "core:strings"
 Session_Wire :: struct {
 	node:     gd.Node,
 	ses:      ^ksess.Session,
+	transport: ^Transport, // which control plane opened this wire (nil = the raw path; reads as ENet — see transport_of)
 	kind:     u8, // the game's one message byte for session traffic
 	latency:  f64, // injected one-way receive delay, seconds (0 = off)
 	jitter:   f64, // extra per-packet delay, uniform [0, jitter) seconds
@@ -515,13 +516,23 @@ wire_traffic :: proc(wire: ^Session_Wire, allocator := context.temp_allocator) -
 	return strings.to_string(b)
 }
 
-// The LINK's own truth, off ENet's per-peer statistics: smoothed round trip,
-// its variance (the honest jitter), and packet loss percent — the transport's
-// view, independent of anything the session measures. ok=false off-ENet, on
-// an unknown peer, or asked about yourself (a host has no link to itself; ask
-// per client peer there, or just fill the graph on clients).
+// The LINK's own truth: smoothed round trip, its variance (the honest
+// jitter), and packet loss percent — the TRANSPORT's view, independent of
+// anything the session measures. Answered by whichever transport opened this
+// wire (transport.odin's `link` slot); ok=false when that transport has no
+// per-peer statistics story, on an unknown peer, or asked about yourself (a
+// host has no link to itself; ask per client peer there, or just fill the
+// graph on clients). Today ENet is the one transport that answers.
 wire_link_quality :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id) -> (rtt_ms, jitter_ms, loss_pct: f64, ok: bool) {
-	mp := gd.node_get_multiplayer(wire.node)
+	return transport_link(wire, peer)
+}
+
+// ENet's answer to it — the record's `link` slot for ENET (the class check is
+// what makes the raw path safe: a wire that never named a transport reads as
+// ENet, and a non-ENet peer answers ok=false here rather than lying).
+@(private)
+enet_peer_stats :: proc(node: gd.Node, peer: ksess.Peer_Id) -> (rtt_ms, jitter_ms, loss_pct: f64, ok: bool) {
+	mp := gd.node_get_multiplayer(node)
 	if cast(rawptr)mp == nil {return}
 	p := gd.multiplayer_api_get_multiplayer_peer(mp)
 	if cast(rawptr)p == nil {return}
@@ -578,6 +589,12 @@ drop_peer :: proc "contextless" (node: gd.Node, peer: ksess.Peer_Id) {
 // transport up, then start the session over it. The UI around them (status
 // lines, menu hiding) stays the game's — or use kit/boot, which wraps these
 // with the stock lobby ritual.
+//
+// These four are SUGAR over transport_host / transport_join with the flavor
+// picked for you (transport.odin holds the mechanism and the per-transport
+// records). They are the names games already say, and the shortest way to
+// spell the common case; reach for the generic pair when the transport is a
+// variable — a settings menu, a fallback chain, kit/boot's doors.
 
 // Host on `port`. false = the transport refused (port taken) — the session
 // was NOT started; tell the player and let them try again. `token` is the
@@ -585,22 +602,14 @@ drop_peer :: proc "contextless" (node: gd.Node, peer: ksess.Peer_Id) {
 // dead host can reclaim its seat from whoever resumes the run. `dedicated`
 // makes this authority a SERVER, not a player (see session_host_start).
 begin_host :: proc(wire: ^Session_Wire, port: int, name: string, max_peers := 32, token: u64 = 0, dedicated := false) -> bool {
-	if !gd.host(wire.node, port, max_peers) {
-		return false
-	}
-	ksess.session_host_start(wire.ses, name, token, dedicated)
-	return true
+	return transport_host(wire, &ENET, {port = port, max_peers = max_peers}, name, token, dedicated)
 }
 
 // Join `addr:port` as `token`/`name`. false = the transport refused outright;
 // an unreachable host surfaces later as Ev_Join_Failed (the join timeout).
 // `spectate` joins to WATCH (a receive-only seat — see ksess.Player.spectator).
 begin_join :: proc(wire: ^Session_Wire, addr: cstring, port: int, token: u64, name: string, spectate := false) -> bool {
-	if !gd.join(wire.node, addr, port) {
-		return false
-	}
-	ksess.session_client_start(wire.ses, token, name, spectate)
-	return true
+	return transport_join(wire, &ENET, {addr = addr, port = port}, name, token, spectate)
 }
 
 // ---- the same two buttons, WebRTC flavor -----------------------------------------------
@@ -616,24 +625,19 @@ begin_join :: proc(wire: ^Session_Wire, addr: cstring, port: int, token: u64, na
 // authoritative from the first tick; peers drop in when their channel comes
 // up. `token` is the host's reconnect identity, exactly as in begin_host.
 begin_host_web :: proc(wire: ^Session_Wire, url: cstring, name: string, token: u64 = 0, room: cstring = "") -> bool {
-	if !gd.webrtc_host(wire.node, url, room) {
-		return false
-	}
-	ksess.session_host_start(wire.ses, name, token)
-	return true
+	return transport_host(wire, &WEBRTC, {addr = url, room = room}, name, token)
 }
 
 // Join `room` (the code the host shared) through the relay at `url`.
 begin_join_web :: proc(wire: ^Session_Wire, url: cstring, room: cstring, token: u64, name: string) -> bool {
-	if !gd.webrtc_join(wire.node, url, room) {
-		return false
-	}
-	ksess.session_client_start(wire.ses, token, name)
-	return true
+	return transport_join(wire, &WEBRTC, {addr = url, room = room}, name, token)
 }
 
 // Pump the signaling handshake — every frame while a web session lives (the
 // data channel itself is engine-polled; this services the relay socket).
+// WEBRTC's pump slot, so kit/boot drives it for door games without knowing
+// which transport it holds; hand-driven games on the raw path call it (or
+// transport_service) from process() themselves.
 web_poll :: proc(wire: ^Session_Wire) {
 	gd.webrtc_poll(wire.node)
 }

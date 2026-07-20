@@ -60,6 +60,10 @@ four forwards, not the channel plan, not the session.
   `lobby_created`. `Lobby_Type` is Steam's ELobbyType: `Private`, `Friends_Only` (the
   friendslop default), `Public`, `Invisible`.
 - `join_lobby(lobby_id: u64)` — the answer arrives on `lobby_joined`.
+- `leave_lobby(lobby_id: u64)` — the one piece of Steam state that outlives the multiplayer
+  peer. A replaced peer drops the connection; Steam keeps you *seated* in the lobby, still
+  listed to your friends, until you say this. Say it on the way back to the menu and before
+  joining a different lobby; harmless if you are not in it.
 - `lobby_owner(lobby_id: u64) -> u64` — who hosts the lobby; the steam id the client peer
   connects to.
 - `my_steam_id() -> u64`, `persona_name(allocator := context.temp_allocator) -> string` —
@@ -75,6 +79,41 @@ four forwards, not the channel plan, not the session.
 
 Both peer procs print an actionable error and return false if `SteamMultiplayerPeer` isn't
 registered (i.e. you installed a non-MultiplayerPeer build of GodotSteam).
+
+## `TRANSPORT` — Steam's answer to the control-plane record
+
+Steam used to stop at "install a peer": no `begin_*` pair, no kit/boot door, no per-peer
+introspection, no rendezvous — so a Steam game hand-wrote the two-step every other
+transport had wrapped, and every kit feature keyed on a door (the lobby ritual, the
+succession config, the control-plane pump) simply did not happen for it.
+`ksteam.TRANSPORT` is a [`netgd.Transport`](netgd.md#swapping-transports) record, so the
+generic doors work:
+
+```odin
+// on_lobby_created(result, lobby_id):   host
+kboot.boot_open_host(&self.boot, &ksteam.TRANSPORT, {}, name)
+ksteam.invite_overlay(u64(lobby_id))
+
+// on_lobby_joined(lobby_id, ...):       guest
+kboot.boot_open_join(&self.boot, &ksteam.TRANSPORT, ksteam.endpoint_of(u64(lobby_id)), name, token)
+```
+
+The LOBBY half stays in your signal handlers, deliberately: asking for a lobby and getting
+the answer on a signal is a Steam conversation, not a transport verb. What the doors take
+is the `Endpoint` that conversation produces — `endpoint_of(lobby_id)` is
+`{peer_id = lobby_owner(lobby_id)}`, because Steam addresses peers by steam id and the
+lobby is only the phonebook.
+
+**Three slots are nil, each a stated degradation.** `pump` — the engine polls the peer,
+like ENet. `close` — the peer is replaced by the next install; lobby membership is the part
+that outlives it, and the lobby id is yours (call `leave_lobby`). `address` — **this is the
+one that matters**: with no verified way to ask which steam id is behind a multiplayer peer,
+no torch can name an heir, so `rendezvous` is `.None` and **host migration is honestly OFF
+on Steam** rather than armed-and-silently-absent (`succession_torch` prints it once, naming
+the transport). Filling it is small — GodotSteam exposes the mapping on builds that have it —
+but it cannot be verified from this repo (no Steam client, no linked extension, every call
+by name), and a migration path that has never once run is worse than a stated absence. Fill
+the slot against a real build, add the `Rendezvous_Kind` arm, and Steam migrates.
 
 ## Worked example: cavecrawl
 

@@ -6,6 +6,7 @@ import "core:strconv"
 import "core:strings"
 import "godot:gdext"
 import gd "godot:godot"
+import decl "godot:decl"
 
 // ----------------------------------------------------------------------------
 // register_class — runtime-reflection registration (Phase 2 of the reflection
@@ -267,14 +268,12 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 
 	// The kit toolkit's tags — consumed entirely by scriptgen (descriptor
 	// tables, backup codecs, the profile install, sim-block wiring); nothing
-	// to reflect at runtime. `backup` spent a while missing from this skip
-	// and every backup field logged a bogus "unknown gd tag" at boot.
-	// THIS LIST IS A SYNC SURFACE — a scriptgen field token missing here logs
-	// that bogus error on every boot. The other homes when a token is added:
-	// scriptgen/parse.odin's tag dispatch, this skip AND the error text below,
-	// and the docs. (Proc ATTRIBUTES sync separately: build/common.sh
-	// ODIN_GD_ATTRS, build_scripts.ps1, core/diag, core/export_plugin.)
-	if tok0 == "replicate" || tok0 == "backup" || tok0 == "manual" || strings.has_prefix(tok0, "profile=") {
+	// to reflect at runtime. This USED to be a hand-kept list, and `backup`
+	// spent a while missing from it: every backup field logged a bogus
+	// "unknown gd tag" on every boot. It is now a projection of the shared
+	// schema (godot:decl) — a token added there is skipped here by
+	// construction, and named in the error text below by the same table.
+	if decl.field_is_build_only(tok0) {
 		return
 	}
 
@@ -283,8 +282,9 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 			record_error(cls, name_c, "`args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)")
 			return
 		}
-		msg, _ := pool_cstr("unknown gd tag `", tok0, "` (expected `export`, `onready=PATH`, `replicate`, `backup`, `manual`, or `profile=T`)")
-		if msg == nil {msg = "unknown gd tag (expected `export`, `onready=PATH`, `replicate`, `backup`, `manual`, or `profile=T`)"}
+		expected := decl.field_expected(context.temp_allocator)
+		msg, _ := pool_cstr("unknown gd tag `", tok0, "` (expected ", expected, ")")
+		if msg == nil {msg = "unknown gd tag"}
 		record_error(cls, name_c, msg)
 		return
 	}

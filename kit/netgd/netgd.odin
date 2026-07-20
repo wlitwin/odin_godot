@@ -88,12 +88,11 @@ listen_packets :: proc "contextless" (node: gd.Node, method: cstring) -> gd.Erro
 	return gd.connect_to(cast(gd.Object)mp, "peer_packet", cast(gd.Object)node, method)
 }
 
-// Zero-copy view of a Packed_Byte_Array's contents — valid only while `pba` is
-// alive (i.e. inside the receiving method call). Feed it to knet.reader_make;
-// clone anything you keep.
+// Zero-copy view of a Packed_Byte_Array's contents — the packet-handler alias
+// for gd.packed_byte_array_view, which is where the helper lives now (an
+// engine-type ergonomic, beside the engine type: kit/save was importing the
+// whole of kit/netgd for this one proc to read a file). Kept under the short
+// name because every @(gd_method) packet handler in the tree opens with it.
 pba_view :: proc "contextless" (pba: ^gd.Packed_Byte_Array) -> []u8 {
-	n := int(gd.packed_byte_array_size(pba))
-	if n == 0 {return nil}
-	p := gdext.packed_byte_array_operator_index_const(cast(gdext.TypePtr)pba, 0)
-	return ([^]u8)(p)[:n]
+	return gd.packed_byte_array_view(pba)
 }

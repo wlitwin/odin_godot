@@ -12,11 +12,18 @@ neither lane's tick machinery is involved. (Just never *consume* a payload insid
 sim tick — arrival timing is wall-clock, not sim-deterministic; land it in frame code
 and let facts or fields carry the consequences.)
 
-The shape is [kit/comms](comms.md)' shape, sized up: everything routes through
-the host. A client sends paced 8KB `XF_CHUNK` frames to the host; the host
-assembles its own copy AND relays each frame to everyone as `XF_CAST`, stamped
-with the sender — every peer receives every payload exactly once, on any
-transport, and a spoofed cast from a non-host peer drops on the floor.
+Everything routes through the host. A client sends paced 8KB frames up; the host
+assembles its own copy AND relays each frame to everyone, stamped with the
+sender — every peer receives every payload exactly once, on any transport, and a
+spoofed cast from a non-host peer drops on the floor.
+
+That used to be described here as "[kit/comms](comms.md)' shape, sized up", and it
+was — the same state machine, typed out twice. It is
+[`ksess.Host_Relay`](session.md#the-host-relay-host_relay--the-send-half-written-once)
+now (stamp, spoof-drop, echo policy, addressed replay), and xfer is a payload codec
+over it: chunking, assembly, supersede. xfer runs the relay with `echo = false` —
+you already hold the bytes you sent, so your own upload coming back around is
+dropped, on both roles, by one rule instead of two hand-written ones.
 
 ```odin
 import kxfer "godot:kit/xfer"
