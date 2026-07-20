@@ -25,6 +25,7 @@ package kit_net
 // a field-flag filter.
 
 import "core:fmt"
+import "core:slice"
 
 Registry_Entry :: struct {
 	id:     Net_Id,
@@ -822,4 +823,67 @@ registry_write_guard :: proc(reg: ^Registry, ctx: ^Command_Ctx, exempt: Guard_Ex
 		return cls, field, eid, true
 	}
 	return "", "", NET_ID_INVALID, false
+}
+
+// ---- state hash: the cheapest desync forensic --------------------------------
+//
+// registry_state_hash folds the whole replicated world into one number, so two
+// peers can compare a single u64 and know instantly whether their authoritative
+// state agrees — the cheapest desync detector there is, and the natural seed of
+// a replay/rewind that must prove it reproduced the run.
+//
+// It walks the entities in Net_Id ORDER (map iteration is unordered; the hash
+// must not be), and folds in each entity's id, its owner, its .Delta-lane field
+// bytes, and its blob. The .DELTA LANE ONLY, and that restriction is the whole
+// design: owner-streamed fields interpolate and predicted fields run ahead of
+// truth, so two HONEST peers disagree on those every single frame — hashing them
+// would cry desync on a perfectly healthy session. What the delta lane carries
+// is host-authoritative and applied byte-identically on every screen, so two
+// synced peers land on the same number and a difference is a real divergence.
+//
+// FNV-1a, the kit's stable-hash law (decl.fnv1a64) — reimplemented over bytes
+// here because kit/net sits below decl. The number is only ever COMPARED between
+// same-build peers, never persisted, so byte order is a non-issue.
+@(private = "file")
+fnv1a64_bytes :: proc(h: u64, b: []u8) -> u64 {
+	h := h
+	for x in b {
+		h = (h ~ u64(x)) * 0x100000001b3
+	}
+	return h
+}
+
+@(private = "file")
+fnv1a64_u64 :: proc(h: u64, v: u64) -> u64 {
+	h, v := h, v
+	for _ in 0 ..< 8 {
+		h = (h ~ (v & 0xff)) * 0x100000001b3
+		v >>= 8
+	}
+	return h
+}
+
+registry_state_hash :: proc(reg: ^Registry) -> u64 {
+	ids := make([]Net_Id, len(reg.entries), context.temp_allocator)
+	i := 0
+	for id in reg.entries {
+		ids[i] = id
+		i += 1
+	}
+	slice.sort(ids)
+	h := u64(0xcbf29ce484222325)
+	for id in ids {
+		e := &reg.entries[id]
+		h = fnv1a64_u64(h, u64(id))
+		h = fnv1a64_u64(h, u64(e.owner))
+		v := subset_view(e.set.entity_desc, .Delta)
+		if v.struct_bytes > 0 {
+			buf := make([]u8, v.struct_bytes, context.temp_allocator)
+			subset_capture(v, e.entity, buf)
+			h = fnv1a64_bytes(h, buf)
+		}
+		h = fnv1a64_u64(h, u64(e.blob_ver))
+		h = fnv1a64_bytes(h, e.blob)
+	}
+	return h
 }

@@ -1161,6 +1161,47 @@ resume_reowns_the_dead_hosts_entities :: proc(t: ^testing.T) {
 	testing.expect_value(t, mine_e.owner, old_me)
 }
 
+// The STATE HASH: two peers agreeing on the replicated world compute the SAME
+// number; a single diverged byte parts them. The cheapest desync forensic, and
+// the seed a replay uses to prove it reproduced a run. Covers the DELTA lane
+// ONLY — hp is host-authoritative (both peers apply the same bytes) while x is
+// owner-streamed and interpolated (divergent by design), which the hash must
+// exclude or two honest peers read as desynced.
+@(test)
+state_hash_parts_on_a_delta_divergence :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	hbot := Bot{hp = 10, x = 3}
+	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
+	ksess.session_start_replicating(&host.s)
+	now := 50.0
+	for _ in 0 ..< 8 {step(boxes, &now)}
+
+	// Synced: the delta-lane truth (hp) is identical, so the hashes agree.
+	testing.expect(t, alice.bots[id] != nil, "the client received the entity")
+	testing.expect_value(t, alice.bots[id].hp, i32(10))
+	testing.expect_value(t, ksess.session_state_hash(&alice.s), ksess.session_state_hash(&host.s))
+
+	// An owner-streamed / interpolated field diverging does NOT part them — it is
+	// excluded from the hash by construction (or every frame would read desynced).
+	alice.bots[id].x = 999
+	testing.expect_value(t, ksess.session_state_hash(&alice.s), ksess.session_state_hash(&host.s))
+
+	// A DELTA field diverging DOES part them — the desync the probe exists to see.
+	alice.bots[id].hp = 99
+	testing.expect(t, ksess.session_state_hash(&alice.s) != ksess.session_state_hash(&host.s), "a delta-lane divergence must change the hash")
+}
+
 
 // ---- moderation: kick / ban / the door -----------------------------------------
 

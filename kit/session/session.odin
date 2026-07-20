@@ -1599,6 +1599,20 @@ session_owner_of :: proc(s: ^Session, id: knet.Net_Id) -> knet.Player_Id {
 	return knet.PLAYER_ID_INVALID
 }
 
+// A single number over the whole replicated world — two peers that agree on it
+// agree on their authoritative state, and a mismatch is the cheapest desync
+// forensic there is. Print it each act and `expect_same` across the peer logs,
+// or compare it in a unit test after two lanes converge. Covers the DELTA lane
+// only (host-authoritative, byte-identical everywhere) — prediction and
+// interpolation are excluded by construction, so a healthy session never reads
+// as diverged. See knet.registry_state_hash for the walk. Games hand-mint their
+// own procedural checksums (a terrain grown from the seed, an arena scattered
+// from dice); this is the complementary probe for the LIVE entity state they
+// never hashed — and the seed a replay needs to prove it reproduced the run.
+session_state_hash :: proc(s: ^Session) -> u64 {
+	return knet.registry_state_hash(&s.reg)
+}
+
 // The bare call counts PRESENT PEOPLE — connected, non-dedicated — because
 // that is what every gate that says "players" means (min-players, ready
 // checks, max_players). The old bare call counted ghosts: departed seats
