@@ -1695,4 +1695,59 @@ policy_nested_must_fail 'p: ksess.Session `gd:"profile=Loadout"`,' \
 policy_nested_must_fail 'a: knet.Angle `gd:"manual"`,' \
 	'nested manual' 'manual' 'silently skips the whole sub-block'
 
+# ---- fixture 19: the map_variant seam is DELIBERATE — nested type-shape is the ---
+# runtime's job, not scriptgen's. export/onready are Reflect-home tokens; the
+# runtime reflection walk type-checks them at every depth and drops a bad one
+# with a loud record_error at boot. So scriptgen runs the TYPE-shape check at top
+# level only. This is a DECISION, not an oversight (see parse.odin's Tagged_Field
+# seam note): widening it would false-positive on foreign-package bundle types,
+# which map_variant (gd.-only) cannot classify but the runtime's typeid check
+# resolves. This fixture is that decision's teeth — the same tag+type ERRORS at
+# top level and is ACCEPTED nested. Flip either half and someone changed the
+# seam without meaning to.
+seam="$work/seam"
+mkdir -p "$seam"
+# nested: a type map_variant cannot classify, exported inside a block — ACCEPTED
+# (deferred to the runtime), byte-for-byte the case a naive widening would break.
+cat >"$seam/f.odin" <<'ODIN'
+//gd:extends Node
+//gd:class SeamT
+package seam
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Gadget :: struct { x: i32 }
+Blk :: struct {
+	g: Gadget `gd:"export"`,
+}
+SeamT :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 `gd:"replicate"`,
+	blk:    Blk,
+}
+ODIN
+"$SGEN" "$seam" -godot:"$ROOT" >/dev/null 2>&1 \
+	|| fail "a nested export of a map_variant-unclassifiable type must be ACCEPTED (type-shape is the runtime's job at depth) — widening the seam broke this"
+# top level: the identical tag+type — ERRORS "unsupported type" (scriptgen owns
+# the top-level type check).
+cat >"$seam/f.odin" <<'ODIN'
+//gd:extends Node
+//gd:class SeamT
+package seam
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Gadget :: struct { x: i32 }
+SeamT :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 `gd:"replicate"`,
+	g:      Gadget `gd:"export"`,
+}
+ODIN
+out="$("$SGEN" "$seam" -godot:"$ROOT" 2>&1)"
+[[ $? -ne 0 ]] || fail "a TOP-LEVEL export of an unsupported type must still error — the seam is asymmetric by design"
+echo "$out" | grep -q "unsupported type" || fail "top-level unsupported export must say so — got: $out"
+
 echo "SCRIPTGEN_OK"

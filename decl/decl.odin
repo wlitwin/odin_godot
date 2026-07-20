@@ -65,9 +65,20 @@ Slot :: enum u8 {
 // act on — scriptgen builds the factory table from it, and the runtime still
 // owes the Inspector the PackedScene slot the author no longer spells out — so
 // it is Reflect, and walk_field synthesizes the export it implies.
+//
+// This column also decides WHO type-checks a field, and at what depth. The
+// runtime's reflection walk type-checks every Reflect token (export's Variant
+// mapping, onready's object-handle requirement) at ANY depth and drops a bad one
+// with a loud record_error at registration — so scriptgen validates the TYPE of
+// a Reflect token at top level only and defers nested ones to the runtime that
+// owns them. (Widening scriptgen's textual, gd.-only map_variant to nested
+// fields would false-positive on the foreign-package bundle types nested fields
+// usually carry, which the runtime's typeid check resolves and scriptgen's
+// cannot.) A Scriptgen token has no such fallback, so scriptgen type-checks it
+// at EVERY depth. See the seam note in scriptgen/parse.odin's Tagged_Field.
 Home :: enum u8 {
-	Reflect, // the runtime's reflection registrar acts on it
-	Scriptgen, // consumed entirely at build time; nothing to reflect
+	Reflect, // the runtime's reflection registrar acts on it (and type-checks it, at any depth)
+	Scriptgen, // consumed entirely at build time; nothing to reflect — scriptgen type-checks it
 }
 
 Field_Token :: struct {

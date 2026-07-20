@@ -435,31 +435,50 @@ parse_signal_n_field :: proc(s: ^Script, src: string, floc: Loc, fname: string, 
 // the build and died at boot, while the same typo at top level had a spelling
 // gate and an arity gate waiting for it.
 //
-// So: one dispatch, one context variable. The per-token policy below is written
-// as a table in prose because it is about to become one in code — decl's
-// proposed per-context policy column (handle | hoist | refuse | defer) has no
-// place to land until the contexts are a value rather than a call site.
+// So: one dispatch, one context variable — decl.Field_Site, now a value rather
+// than two call sites. The per-token policy is decl.FIELD_POLICY (below in code);
+// this prose is the same table, kept as the human-readable index. "spec-validate"
+// = the spelling/arity gate on `export`'s trailing specs; "type-validate" = the
+// map_variant type-SHAPE check, deferred nested to the runtime that owns Reflect
+// tokens (see the seam note under Tagged_Field).
 //
-//   token          Top_Level                     Nested
-//   ------------   ---------------------------   ------------------------------
-//   replicate/…    handle (record + append)      handle (record + append)
-//   backup         handle                        handle
-//   export         handle (validate + record)    defer to runtime, but VALIDATE
-//   onready=       validate (runtime records)    validate (runtime records)
-//   profile=       handle (one per session)      refuse — never installs nested
-//   entity=        handle (synthesizes export)   refuse — factory row never made
-//   manual         handled by the CALLER         refuse — would eat the subtree
-//   args=          refuse (signal-only spec)     refuse (signal-only spec)
-//   <unknown>      refuse (field_expected)       refuse (field_expected)
+//   token          Top_Level                       Nested
+//   ------------   -----------------------------   ------------------------------
+//   replicate/…    handle (record + type-check)    handle (record + type-check)
+//   backup         handle (record + type-check)    handle (record + type-check)
+//   export         handle (spec+type-validate,     handle (spec-validate only;
+//                    record)                          type deferred to runtime)
+//   onready=       handle (path+type-validate)     handle (path-validate only;
+//                                                     type deferred to runtime)
+//   profile=       handle (one per session)        refuse — never installs nested
+//   entity=        handle (synthesizes export)     refuse — factory row never made
+//   manual         Caller (parse_script drives)    refuse — would eat the subtree
+//   args=          refuse (signal-only spec)       refuse (signal-only spec)
+//   <unknown>      refuse (field_expected)         refuse (field_expected)
 //
-// The one deliberate seam left: TYPE-SHAPE checks (map_variant — "export field
-// of unsupported type", "onready field must be an object handle") still run at
-// top level only. Those ask what a type IS, not whether a tag was spelled
-// right, and a nested field arrives here with generic params already
-// substituted through paths the top-level walk never sees; widening them is a
-// decision of its own (see the map_variant investigation), not a free rename.
-// Named here rather than left to be rediscovered, since being unnamed is exactly
-// what let the other three seams live this long.
+// The one deliberate seam left, and it is left ON PURPOSE, investigated and
+// decided rather than tolerated: TYPE-SHAPE checks (map_variant — "export field
+// of unsupported type", "onready field must be an object handle") run at TOP
+// LEVEL ONLY. This is NOT the silent-failure class the other three seams were.
+// export and onready are Home == .Reflect tokens: the runtime reflection walk
+// OWNS them, and register_class.odin's walk_field type-checks every nested
+// export (variant_type_for → record_error "unsupported type") and every nested
+// onready (must be .Object → record_error) at ANY depth, dropping a bad one
+// LOUDLY at class registration. So a bad nested type is already caught — at
+// boot, not build — the way every other Reflect-home concern is.
+//
+// Widening scriptgen's check to nested would be strictly WORSE, not just
+// redundant: map_variant is textual and understands only the `gd.` qualifier,
+// while nested fields are exactly the ones carrying foreign-package types from
+// imported bundles (kcombat.Effect, kitems.*). Such a type comes back ok=false
+// from map_variant ("unsupported") though the runtime's typeid-based
+// variant_type_for resolves it fine — so a naive widening turns a correct
+// runtime registration into a FALSE build error on legitimate bundle code. No
+// game uses a nested export/onready at all today, so the widening would guard
+// nothing while risking that. The rule the seam follows is the Home column:
+// scriptgen validates the TYPE of Scriptgen-home tokens (replicate/owner/
+// predict/backup — no runtime fallback) at every depth, and defers the type of
+// Reflect-home tokens to the runtime that owns them. Pinned by fixture 19.
 //
 // The per-token, per-context POLICY now lives in decl.FIELD_POLICY (a
 // decl.Field_Site keyed table), consulted once at the top of walk_tagged_field
