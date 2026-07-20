@@ -1569,4 +1569,185 @@ for y in h2_mob_of h2_mob_spawn probe_h2_mob_count on_packet; do
 	echo "$out" | grep -q "yielded: $y" || fail "$y must still yield to the hand-written proc"
 done
 
+# ---- fixture 16: ONE dispatch — a nested tag is checked like a top-level one --
+# The two field walks (parse_script's own-fields loop, recurse_into's embedded
+# one) used to be separate hand-written token chains, and `export`/`onready=`
+# were deferred to the runtime UNVALIDATED in the nested one. So the spelling
+# and bare/value arity gates were top-level only: `gd:"export,rnage=0:100"` one
+# comma deep sailed past the build and died at boot, while the identical typo on
+# the class's own field was a hard error. Both walks now funnel through
+# walk_tagged_field with a decl.Field_Site, and these are the three that slipped.
+#
+# TEETH: every one of these was accepted SILENTLY (exit 0) before the merge.
+nested_tag_must_fail() {
+	local tag="$1" want="$2"
+	local nd="$work/nested_$3"
+	mkdir -p "$nd"
+	cat >"$nd/f.odin" <<ODIN
+//gd:extends Node
+//gd:class NestedTag
+package nested_$3
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Aim :: struct {
+	sens: f32 \`gd:"$tag"\`,
+}
+NestedTag :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 \`gd:"replicate"\`,
+	aim:    Aim,
+}
+@(gd_command="predict")
+nestedtag_hit :: proc(self: ^NestedTag, n: i32) -> bool { self.hp -= n; return true }
+ODIN
+	local out rc
+	out="$("$SGEN" "$nd" -godot:"$ROOT" 2>&1)"
+	rc=$?
+	[[ $rc -ne 0 ]] || fail "nested gd:\"$tag\" must fail the build (it was silently accepted before the walks merged)"
+	echo "$out" | grep -q "$want" || fail "nested gd:\"$tag\" errored, but not with $want — got: $out"
+	# The diagnostic must name the full ACCESS PATH, not the leaf: the whole
+	# point is that you can find the tag inside the block it lives in.
+	echo "$out" | grep -q "NestedTag.aim.sens" || fail "nested tag error must name the path NestedTag.aim.sens — got: $out"
+}
+nested_tag_must_fail 'export,rnage=0:100' 'did you mean `range`' spell
+nested_tag_must_fail 'export,multiline=true' 'takes no value' arity
+nested_tag_must_fail 'onready=' 'needs a node path' onready
+
+# ---- fixture 17: `entity=` LEADS the tag — for EVERY kind, not just export ---
+# The trailing-`entity=` refusal used to live inside the export arm, so the rule
+# stopped applying the moment another token led: `gd:"backup,entity=M:1"` went
+# to an arm that never looks past specs[0] and was accepted SILENTLY (verified
+# against the pre-merge binary) — an entity id that folds into NET_FINGERPRINT
+# and mints a factory row, written down and read by nothing. The check now runs
+# once for all kinds, before the dispatch.
+ent="$work/entlead"
+mkdir -p "$ent"
+entity_trailing_must_fail() {
+	cat >"$ent/f.odin" <<ODIN
+//gd:extends Node
+//gd:class EntLead
+package entlead
+import gd "godot:godot"
+import knet "godot:kit/net"
+import kboot "godot:kit/boot"
+
+Blk :: struct { $2 }
+EntLead :: struct {
+	owner:  gd.Node,
+	boot:   kboot.Boot,
+	net_id: knet.Net_Id,
+	$1
+	blk:    Blk,
+}
+ODIN
+	local out rc
+	out="$("$SGEN" "$ent" -godot:"$ROOT" 2>&1)"
+	rc=$?
+	[[ $rc -ne 0 ]] || fail "$3: a trailing \`entity=\` must fail the build whatever token leads"
+	echo "$out" | grep -q "$4" || fail "$3: wrong diagnostic — got: $out"
+}
+entity_trailing_must_fail 'hp: i32 `gd:"backup,entity=M:1"`,' 'x: i32,' \
+	'top-level backup' 'is a WIRE declaration'
+entity_trailing_must_fail 'x: i32,' 'h: i32 `gd:"backup,entity=M:1"`,' \
+	'nested backup' "declares on the class's OWN scene field"
+
+# ---- fixture 18: the policy TABLE is honored — its Refuse rows still refuse ---
+# The per-context policy is decl.FIELD_POLICY now (a decl.Field_Site keyed
+# table), consulted once at the top of walk_tagged_field. check_field_policy
+# proves every token has a WELL-FORMED row (it fails scriptgen's own build if
+# not, which is why there is no fixture for it — a hole cannot produce a working
+# binary). This fixture proves the other half: that the gate HONORS the rows —
+# the two refusals the table owns that fixtures 16/17 don't already cover, each
+# with the exact reason string the table carries, so a row silently losing its
+# effect (or its wording) is caught here.
+pol="$work/policy"
+mkdir -p "$pol"
+policy_nested_must_fail() {
+	cat >"$pol/f.odin" <<ODIN
+//gd:extends Node
+//gd:class PolT
+package policy
+import gd "godot:godot"
+import knet "godot:kit/net"
+import kboot "godot:kit/boot"
+import ksess "godot:kit/session"
+
+Blk :: struct { $1 }
+PolT :: struct {
+	owner:  gd.Node,
+	boot:   kboot.Boot,
+	ses:    ksess.Session,
+	net_id: knet.Net_Id,
+	blk:    Blk,
+}
+ODIN
+	local out rc
+	out="$("$SGEN" "$pol" -godot:"$ROOT" 2>&1)"
+	rc=$?
+	[[ $rc -ne 0 ]] || fail "$2: a nested \`$3\` must be refused by the policy gate"
+	echo "$out" | grep -q "$4" || fail "$2: wrong diagnostic (the table's reason string drifted?) — got: $out"
+	echo "$out" | grep -q "PolT.blk" || fail "$2: refusal must name the nested path PolT.blk.* — got: $out"
+}
+policy_nested_must_fail 'p: ksess.Session `gd:"profile=Loadout"`,' \
+	'nested profile=' 'profile=' 'silently never installs'
+policy_nested_must_fail 'a: knet.Angle `gd:"manual"`,' \
+	'nested manual' 'manual' 'silently skips the whole sub-block'
+
+# ---- fixture 19: the map_variant seam is DELIBERATE — nested type-shape is the ---
+# runtime's job, not scriptgen's. export/onready are Reflect-home tokens; the
+# runtime reflection walk type-checks them at every depth and drops a bad one
+# with a loud record_error at boot. So scriptgen runs the TYPE-shape check at top
+# level only. This is a DECISION, not an oversight (see parse.odin's Tagged_Field
+# seam note): widening it would false-positive on foreign-package bundle types,
+# which map_variant (gd.-only) cannot classify but the runtime's typeid check
+# resolves. This fixture is that decision's teeth — the same tag+type ERRORS at
+# top level and is ACCEPTED nested. Flip either half and someone changed the
+# seam without meaning to.
+seam="$work/seam"
+mkdir -p "$seam"
+# nested: a type map_variant cannot classify, exported inside a block — ACCEPTED
+# (deferred to the runtime), byte-for-byte the case a naive widening would break.
+cat >"$seam/f.odin" <<'ODIN'
+//gd:extends Node
+//gd:class SeamT
+package seam
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Gadget :: struct { x: i32 }
+Blk :: struct {
+	g: Gadget `gd:"export"`,
+}
+SeamT :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 `gd:"replicate"`,
+	blk:    Blk,
+}
+ODIN
+"$SGEN" "$seam" -godot:"$ROOT" >/dev/null 2>&1 \
+	|| fail "a nested export of a map_variant-unclassifiable type must be ACCEPTED (type-shape is the runtime's job at depth) — widening the seam broke this"
+# top level: the identical tag+type — ERRORS "unsupported type" (scriptgen owns
+# the top-level type check).
+cat >"$seam/f.odin" <<'ODIN'
+//gd:extends Node
+//gd:class SeamT
+package seam
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Gadget :: struct { x: i32 }
+SeamT :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 `gd:"replicate"`,
+	g:      Gadget `gd:"export"`,
+}
+ODIN
+out="$("$SGEN" "$seam" -godot:"$ROOT" 2>&1)"
+[[ $? -ne 0 ]] || fail "a TOP-LEVEL export of an unsupported type must still error — the seam is asymmetric by design"
+echo "$out" | grep -q "unsupported type" || fail "top-level unsupported export must say so — got: $out"
+
 echo "SCRIPTGEN_OK"

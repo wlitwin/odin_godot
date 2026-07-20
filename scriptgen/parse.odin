@@ -416,6 +416,490 @@ parse_signal_n_field :: proc(s: ^Script, src: string, floc: Loc, fname: string, 
 	append(&s.signals, sig)
 }
 
+// ---- the field-tag vocabulary, and the ONE place it is dispatched ------------
+//
+// A `gd:"..."` field tag means slightly different things depending on WHERE it
+// is written, and for most of this file's life that difference was expressed as
+// two hand-written dispatch chains ~3,000 lines apart — one in parse_script for
+// the script struct's own fields, one in recurse_into for everything reached
+// through a `using`/embedded block. Neither had a CONTEXT VARIABLE; each simply
+// re-implemented the token switch, and what one knew the other quietly didn't.
+//
+// That is not a hypothetical: merely mapping the two chains against each other
+// turned up two silent-failure bugs (a nested `gd:"replciate"` was a no-op with
+// no diagnostic while the identical typo at top level had been a hard error for
+// years; a nested `gd:"manual"` matched no arm and swallowed an entire embed's
+// predict fields, backups and tick), and after those were fixed a THIRD of the
+// same class was still open: nested `export`/`onready=` were deferred to the
+// runtime unvalidated, so `gd:"export,rnage=0:100"` one comma deep sailed past
+// the build and died at boot, while the same typo at top level had a spelling
+// gate and an arity gate waiting for it.
+//
+// So: one dispatch, one context variable — decl.Field_Site, now a value rather
+// than two call sites. The per-token policy is decl.FIELD_POLICY (below in code);
+// this prose is the same table, kept as the human-readable index. "spec-validate"
+// = the spelling/arity gate on `export`'s trailing specs; "type-validate" = the
+// map_variant type-SHAPE check, deferred nested to the runtime that owns Reflect
+// tokens (see the seam note under Tagged_Field).
+//
+//   token          Top_Level                       Nested
+//   ------------   -----------------------------   ------------------------------
+//   replicate/…    handle (record + type-check)    handle (record + type-check)
+//   backup         handle (record + type-check)    handle (record + type-check)
+//   export         handle (spec+type-validate,     handle (spec-validate only;
+//                    record)                          type deferred to runtime)
+//   onready=       handle (path+type-validate)     handle (path-validate only;
+//                                                     type deferred to runtime)
+//   profile=       handle (one per session)        refuse — never installs nested
+//   entity=        handle (synthesizes export)     refuse — factory row never made
+//   manual         Caller (parse_script drives)    refuse — would eat the subtree
+//   args=          refuse (signal-only spec)       refuse (signal-only spec)
+//   <unknown>      refuse (field_expected)         refuse (field_expected)
+//
+// The one deliberate seam left, and it is left ON PURPOSE, investigated and
+// decided rather than tolerated: TYPE-SHAPE checks (map_variant — "export field
+// of unsupported type", "onready field must be an object handle") run at TOP
+// LEVEL ONLY. This is NOT the silent-failure class the other three seams were.
+// export and onready are Home == .Reflect tokens: the runtime reflection walk
+// OWNS them, and register_class.odin's walk_field type-checks every nested
+// export (variant_type_for → record_error "unsupported type") and every nested
+// onready (must be .Object → record_error) at ANY depth, dropping a bad one
+// LOUDLY at class registration. So a bad nested type is already caught — at
+// boot, not build — the way every other Reflect-home concern is.
+//
+// Widening scriptgen's check to nested would be strictly WORSE, not just
+// redundant: map_variant is textual and understands only the `gd.` qualifier,
+// while nested fields are exactly the ones carrying foreign-package types from
+// imported bundles (kcombat.Effect, kitems.*). Such a type comes back ok=false
+// from map_variant ("unsupported") though the runtime's typeid-based
+// variant_type_for resolves it fine — so a naive widening turns a correct
+// runtime registration into a FALSE build error on legitimate bundle code. No
+// game uses a nested export/onready at all today, so the widening would guard
+// nothing while risking that. The rule the seam follows is the Home column:
+// scriptgen validates the TYPE of Scriptgen-home tokens (replicate/owner/
+// predict/backup — no runtime fallback) at every depth, and defers the type of
+// Reflect-home tokens to the runtime that owns them. Pinned by fixture 19.
+//
+// The per-token, per-context POLICY now lives in decl.FIELD_POLICY (a
+// decl.Field_Site keyed table), consulted once at the top of walk_tagged_field
+// and checked for completeness by check_field_policy — so the context question
+// is data both walks share, not two hand-written chains that can drift.
+
+// One tagged field declaration, normalized so both contexts hand the dispatch
+// the same shape. A declaration may bind several names (`x, y: f32 `gd:"…"``);
+// the arms that RECORD loop `names`, and the arms that merely diagnose report
+// once, which is why this is a whole declaration and not one name.
+Tagged_Field :: struct {
+	ctx:       decl.Field_Site,
+	names:     []string, // every name this declaration binds, in source order
+	lines:     []int, // each name's line (parallel to `names`)
+	path_base: []string, // access path to the OWNER of these fields ("" at top level)
+	type_text: string, // gd.-normalized, generic params already substituted
+	specs:     []string, // the tag's comma-split tokens (specs[0] selects the kind)
+	tok0:      string, // specs[0], trimmed
+	loc:       Loc,
+	doc:       string, // `///` above the field — export descriptions (top level)
+}
+
+// How a diagnostic NAMES this field: the bare name at top level, the full
+// access path (`aim.weapon.ammo`) inside an embed. Derived rather than passed,
+// because the two loops used to spell it two different ways.
+tagged_label :: proc(tf: Tagged_Field) -> string {
+	if len(tf.names) == 0 {return ""}
+	return join_path(extend_path(tf.path_base, tf.names[0]))
+}
+
+// Validate the SPECS riding behind `export` (`gd:"export,range=0:100,group=Aim"`).
+// Split out of the top-level export arm so the nested context can run the exact
+// same gate — the two halves are projections of godot:decl's EXPORT_SPECS: the
+// NAME set, and the bare/value columns that say which forms of each name are
+// real. The runtime stays the consumer that knows what each spec MEANS (a
+// value's type, a hint's Variant requirement); this only asks whether it EXISTS
+// and was spelled with the right number of halves.
+//
+// Returns the two specs codegen itself consumes (`get=`/`set=` accessor names,
+// empty in the nested context, which emits no wrapper) plus `resource=`.
+check_export_specs :: proc(
+	s: ^Script,
+	tf: Tagged_Field,
+	entity_first: bool,
+) -> (
+	getter, setter, resource_val: string,
+) {
+	label := tagged_label(tf)
+	for si in 1 ..< len(tf.specs) {
+		spec := strings.trim_space(tf.specs[si])
+		if spec == "" {continue}
+		name := spec
+		value := ""
+		if eq := strings.index(spec, "="); eq >= 0 {
+			name = strings.trim_space(spec[:eq])
+			value = strings.trim_space(spec[eq + 1:])
+		}
+		// A TRAILING `entity=` never reaches here — walk_tagged_field refuses it
+		// for every kind before dispatch, since it is deliberately absent from
+		// EXPORT_SPECS (it LEADS the tag now) and this gate would call it a
+		// misspelling.
+		es, known := decl.export_spec(name)
+		if !known {
+			nearest := ""
+			for cand in decl.EXPORT_SPECS {
+				if one_typo_apart(name, cand.name) {
+					nearest = cand.name
+					break
+				}
+			}
+			if nearest != "" {
+				error_at(
+					tf.loc,
+					"%s.%s: unknown export spec %q — did you mean `%s`? (a spec scriptgen doesn't know reaches the engine as nothing: the field registers, the hint silently doesn't)",
+					s.struct_name, label, name, nearest,
+				)
+			} else {
+				error_at(
+					tf.loc,
+					"%s.%s: unknown export spec %q — the set is: %s (drop it, or fix the spelling)",
+					s.struct_name, label, name, decl.export_specs_list(context.temp_allocator),
+				)
+			}
+			continue
+		}
+
+		// PROJECTION — the bare/value columns, which existed to DOCUMENT that
+		// `file` is legal both ways and `multiline` only bare, and which nothing
+		// read. An ARITY typo is the same silent-hint bug the spelling gate was
+		// built for and slips straight through it: `multiline=true` is a
+		// perfectly spelled name whose value the runtime discards, and `range`
+		// bare is a slider with no bounds that dies at BOOT instead of here.
+		// Both columns true (`file`, `dir`, the globals) means both forms are
+		// real and nothing is checked.
+		had_value := strings.index(spec, "=") >= 0
+		if had_value && !es.value {
+			error_at(
+				tf.loc,
+				"%s.%s: `%s` takes no value — write it bare, as `%s` (the runtime discards the value silently, so the hint you meant never reaches the Inspector)",
+				s.struct_name, label, name, name,
+			)
+			continue
+		}
+		if !had_value && !es.bare {
+			error_at(
+				tf.loc,
+				"%s.%s: `%s` needs a value — write `%s=…` (%s)",
+				s.struct_name, label, name, name, es.blurb,
+			)
+			continue
+		}
+
+		switch name {
+		case "get":
+			getter = value
+		case "set":
+			setter = value
+		case "resource":
+			if entity_first && si > 1 {
+				error_at(
+					tf.loc,
+					"%s.%s: `entity=` already fixes the resource hint to PackedScene (that is what a spawnable entity IS) — drop `resource=%s`",
+					s.struct_name, label, value,
+				)
+				continue
+			}
+			resource_val = value
+		}
+	}
+	return
+}
+
+// THE DISPATCH. Both field walks funnel every TAGGED field through here (signals
+// declare by TYPE and are resolved by their callers first; an UNtagged field is
+// an embed candidate and recursing is the caller's job, since the two contexts
+// resolve types from different roots).
+walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
+	label := tagged_label(tf)
+	nested := tf.ctx == .Nested
+	tok0 := tf.tok0
+	specs := tf.specs
+
+	// `entity=` LEADS the tag (decl.Slot's rule for wire declarations). The
+	// refusal for a TRAILING one used to live inside the export arm, which meant
+	// the rule quietly stopped applying the moment another token led:
+	// `gd:"backup,entity=Mob:1"` reached an arm that never looks past specs[0].
+	// Checked here, once, for every kind — a language rule enforced in one arm
+	// is the same seam this merge exists to remove.
+	for si in 1 ..< len(specs) {
+		spec := strings.trim_space(specs[si])
+		name := spec
+		if eq := strings.index(spec, "="); eq >= 0 {name = strings.trim_space(spec[:eq])}
+		if name != "entity" {continue}
+		value := ""
+		if eq := strings.index(spec, "="); eq >= 0 {value = strings.trim_space(spec[eq + 1:])}
+		if nested {
+			error_at(
+				tf.loc,
+				"%s.%s: `entity=` declares on the class's OWN scene field — nested in an embed the export registers but the factory/type row silently never exists; move the field to the top level",
+				s.struct_name, label,
+			)
+		} else {
+			// Refused, not accepted-as-well: a language with two spellings for one
+			// declaration teaches neither, and the three games vendoring this addon
+			// each carry a dozen of these — the rewritten tag IS their upgrade
+			// instructions.
+			error_at(
+				tf.loc,
+				"%s.%s: `entity=` is a WIRE declaration, not an export spec — it LEADS the tag now: write `gd:\"entity=%s\"` (the `export` and `resource=PackedScene` it implies are synthesized)",
+				s.struct_name, label, value,
+			)
+		}
+		return
+	}
+
+	// THE CONTEXT GATE (decl.FIELD_POLICY). Whether a KNOWN leading token may
+	// appear at this site is a language rule, answered once here in data; the arms
+	// below run only for a token the gate passed, and decide only what it MEANS.
+	// An UNKNOWN token is not in the table — it falls through to the unknown-tag
+	// refuse at the bottom, which is where its "expected …" message belongs. This
+	// is what used to be a fistful of `if nested { error; return }` blocks copied
+	// into the profile=/entity=/manual arms and worded slightly differently each
+	// time; the wording now has one home.
+	if ft, known := decl.field_token(tok0); known {
+		pol, has := decl.field_policy(ft.name, tf.ctx)
+		// check_field_policy makes this hole a build error before any corpus is
+		// read; treating !has as anything but "the schema is incomplete" would be
+		// the silent-fallthrough this whole merge exists to kill.
+		assert(has, "decl.FIELD_POLICY is missing a row — check_field_policy should have refused the build")
+		switch pol.action {
+		case .Refuse:
+			error_at(tf.loc, "%s.%s: %s", s.struct_name, label, pol.reason)
+			return
+		case .Caller:
+			// Top-level `manual` is consumed by parse_script's embed branch before
+			// the dispatch is ever called; reaching here is a toolchain bug, not a
+			// user error.
+			assert(false, "a Caller-site token reached the shared dispatch (parse_script must consume top-level `manual` first)")
+			return
+		case .Handle:
+		// fall through to the kind-specific arms
+		}
+	}
+
+	// richer-authoring #1: `gd:"onready=Sprite"` — a private auto-wired node ref.
+	// The rt.Onready table itself is built by the runtime reflection walk
+	// (runtime/register_class.odin) at EVERY depth, so scriptgen keeps only the
+	// cheap build-time checks — which is precisely why the nested context has to
+	// run them too: "the runtime records it" was read as "the runtime validates
+	// it", and an empty path one comma deep wired nothing, silently.
+	if strings.has_prefix(tok0, "onready=") {
+		path := strings.trim_space(tok0[len("onready="):])
+		if path == "" {
+			error_at(tf.loc, "%s.%s: `onready=` needs a node path", s.struct_name, label)
+			return
+		}
+		if !nested {
+			vi, ok := map_variant(tf.type_text)
+			if !ok || vi.enum_name != ".Object" {
+				error_at(tf.loc, "%s.%s: `onready` field must be an object/node handle or pointer (got %q)", s.struct_name, label, tf.type_text)
+			}
+		}
+		return
+	}
+
+	// friendslop toolkit: a LANE token opens a networked field — `replicate`
+	// (delta), `owner` (streamed from the owning peer), or `predict` (kit/sim).
+	// Only names + options are recorded here; generate.odin emits the
+	// knet.Entity_Desc (offset_of/size_of are the consumer compiler's job) plus a
+	// #assert that rejects non-POD fields at compile time with the field's name.
+	if lane := decl.replicate_lane(tok0); lane != .None {
+		rep, rok := parse_replicate_info(lane, tf.type_text, specs, tf.loc, s.struct_name, label)
+		if !rok {return}
+		for nm in tf.names {
+			r := rep
+			r.field = nm
+			r.path = extend_path(tf.path_base, nm)
+			append(&s.replicates, r)
+		}
+		return
+	}
+
+	// friendslop toolkit: `gd:"backup"` — HOST-LOCAL state for host migration
+	// AND save/resume (the same bytes ride both, session.odin's split). generate
+	// emits a version-hashed <class>_backup_write/_read codec over these fields,
+	// so a takeover restores the campaign, not a diorama — no hand-matched
+	// write_u8/read_u8 lists to drift. POD (scalars/structs/fixed arrays),
+	// map[POD]POD, and [dynamic]POD are supported; anything else is a build error.
+	// Rides nesting: scrapyard tags host-local fields inside a `using` embed.
+	if tok0 == "backup" {
+		kind, key, elem, bad := classify_backup(tf.type_text)
+		if bad != "" {
+			error_at(tf.loc, "%s.%s: gd:\"backup\" can't serialize %s", s.struct_name, label, bad)
+			return
+		}
+		for nm in tf.names {
+			append(&s.backups, Backup_Info{
+				field = nm,
+				path  = extend_path(tf.path_base, nm),
+				kind  = kind,
+				key   = key,
+				elem  = elem,
+			})
+		}
+		return
+	}
+
+	// friendslop toolkit: `gd:"profile=Type"` on the class's ksess.Session
+	// field — the DECLARATION form of session_profile_install: the named
+	// POD struct is this game's per-player profile row. scriptgen folds
+	// the row's field-by-field shape into NET_FINGERPRINT (a drifted
+	// profile refuses the join like any other wire skew — the raw install
+	// call left it outside the version door: same-size drift scrambled
+	// rows silently) and installs it inside the generated ready thunk,
+	// before the game's ready can *_start.
+	if strings.has_prefix(tok0, "profile=") {
+		// Nested `profile=` is refused by the context gate above (it silently never
+		// installs — neither the generated ready thunk nor the fingerprint fold
+		// walks nested Sessions), so only the top-level form reaches here.
+		pt := strings.trim_space(tok0[len("profile="):])
+		switch {
+		case pt == "":
+			error_at(tf.loc, "%s.%s: `profile=` names the row struct, e.g. gd:\"profile=Loadout\"", s.struct_name, label)
+		case !strings.has_suffix(tf.type_text, ".Session") && tf.type_text != "Session":
+			error_at(tf.loc, "%s.%s: `profile=` belongs on the ksess.Session field (got %q) — the row installs into that session", s.struct_name, label, tf.type_text)
+		case s.profile_type != "":
+			error_at(tf.loc, "%s.%s: a second profile declaration (%q; already %q) — one row type per session", s.struct_name, label, pt, s.profile_type)
+		case len(tf.names) != 1:
+			error_at(tf.loc, "%s.%s: one session field per profile declaration", s.struct_name, label)
+		case:
+			s.profile_type = pt
+			s.profile_ses = tf.names[0]
+		}
+		return
+	}
+
+	// `gd:"manual"` (the wielder-drives-this-tick opt-out) has no arm here: at top
+	// level parse_script's embed branch consumes it before the dispatch (the
+	// FIELD_POLICY Caller row), and nested it is refused by the context gate (the
+	// Refuse row). Both meanings live in the table now, not in a token check here.
+
+	// `gd:"entity=Name:id"` — a WIRE declaration, so it LEADS the tag (the rule
+	// decl.Slot now states). It carries a permanent public type id, folds into
+	// NET_FINGERPRINT, and becomes a row in the generated factory table; it used
+	// to ride as a trailing spec of `export` purely by accident of the order the
+	// two features were built, which left `profile=T` leading and this not.
+	entity_first := strings.has_prefix(tok0, "entity=")
+	entity_val := ""
+	if entity_first {
+		// Nested leading `entity=` is refused by the context gate above (the export
+		// would register but the factory/type row silently never exists), so only
+		// the top-level form reaches here.
+		entity_val = strings.trim_space(tok0[len("entity="):])
+		// BOTH LEADING TOKENS ARE SYNTHESIZED. An entity field is NECESSARILY an
+		// exported PackedScene — the scene is what the factory instantiates, and the
+		// Inspector slot is how the author hands it over — so `export` and
+		// `resource=PackedScene` were never a choice the tag was recording, only
+		// ceremony it was demanding. Trailing EXPORT specs still ride behind
+		// (`entity=Mob:3,group=Spawns`); a second `resource=` does not, since it
+		// would be overriding a hint the declaration already fixed.
+		syn := make([dynamic]string, 0, len(specs) + 1, context.temp_allocator)
+		append(&syn, "export", "resource=PackedScene")
+		append(&syn, ..specs[1:])
+		specs = syn[:]
+		tok0 = "export"
+	}
+
+	if tok0 != "export" {
+		// `args=` (a signal-only spec used as a leading token) is refused by the
+		// context gate above at both sites, so anything still non-`export` here is
+		// a token the vocabulary does not know at all.
+		//
+		// The field HAS a `gd:"..."` tag but its first token is none the vocabulary
+		// knows — almost certainly a misspelling (`exprot`) that would otherwise
+		// silently leave the field un-exported. The "expected" half is godot:decl's
+		// projection, so a token added to FIELD_TOKENS is known here by construction
+		// rather than by someone remembering this line.
+		//
+		// Nested, this is the bug recorded above: a `gd:"replciate"` one comma deep
+		// was a no-op with zero diagnostic in either half of the toolchain, while
+		// the identical typo at top level had been a hard error for as long as
+		// field_expected has existed. Blocks are exactly where deep tags live.
+		if nested {
+			error_at(
+				tf.loc,
+				"%s.%s: unknown gd tag `%s` (expected %s) — a tag scriptgen doesn't know is silently nothing at this depth, which is how a replicated field stops replicating without a single error",
+				s.struct_name, label, tok0, decl.field_expected(context.temp_allocator),
+			)
+		} else {
+			error_at(
+				tf.loc,
+				"%s.%s: unknown gd tag %q (expected %s)",
+				s.struct_name, label, tok0, decl.field_expected(context.temp_allocator),
+			)
+		}
+		return
+	}
+
+	// ---- `export` ------------------------------------------------------------
+	//
+	// The SPEC gate runs in BOTH contexts (it is the whole point of this
+	// unification): every other first token's spec loop refuses what it doesn't
+	// know, so `gd:"replicate,slcak=0.5"` failed the build — but a typo behind
+	// `export` fell through, reached the runtime as an unknown hint, and
+	// surfaced as a boot-time record_error on a field that had silently lost it.
+	// Two tiers, same tag, no way to tell which one you were about to hit; and
+	// one level of nesting used to drop you from the strict tier to the silent
+	// one without saying so.
+	spec_tf := tf
+	spec_tf.specs = specs
+	getter, setter, _ := check_export_specs(s, spec_tf, entity_first)
+
+	// Past here is RECORDING, and recording is top-level-only: an embed's
+	// exports are registered by the runtime reflection walk under their
+	// namespaced (`aim_sensitivity`) names, not by this table.
+	if nested {return}
+
+	vi, ok := map_variant(tf.type_text)
+	if !ok {
+		error_at(tf.loc, "%s.%s: export field of unsupported type %q", s.struct_name, label, tf.type_text)
+		return
+	}
+
+	// `entity=Name:id` — this scene BODIES a wire entity: the tag is the whole
+	// factory declaration (resolve_entities validates the target and pairs the
+	// typed hooks once the full module is parsed). The "must be a PackedScene
+	// export" check that used to live here is gone with the trailing form —
+	// the hint is synthesized, so it cannot be anything else.
+	if entity_val != "" {
+		target, sep, id_text := strings.partition(entity_val, ":")
+		id, id_ok := strconv.parse_int(strings.trim_space(id_text))
+		switch {
+		case sep != ":" || !id_ok:
+			error_at(tf.loc, "%s.%s: `entity=` wants `Name:id` — the struct this scene bodies and its stable wire id (e.g. entity=Mob:3)", s.struct_name, label)
+		case id <= 0 || id > 65535:
+			error_at(tf.loc, "%s.%s: entity id %d is out of range — pick 1..65535 (0 reads as \"none\", and the id must stay STABLE across builds: saves, rejoins, and backups carry it)", s.struct_name, label, id)
+		case len(tf.names) != 1:
+			error_at(tf.loc, "%s.%s: one scene field per entity — split the multi-name declaration", s.struct_name, label)
+		case:
+			append(&s.entities, Entity_Tag{
+				field   = label,
+				target  = strings.trim_space(target),
+				type_id = id,
+				line    = tf.loc.line,
+			})
+		}
+	}
+
+	for nm, i in tf.names {
+		append(&s.exports, Export_Info {
+			name      = nm,
+			type_text = tf.type_text,
+			vi        = vi,
+			getter    = getter,
+			setter    = setter,
+			line      = i < len(tf.lines) ? tf.lines[i] : tf.loc.line,
+			doc       = tf.doc,
+		})
+	}
+}
+
 // ---- AST parsing -------------------------------------------------------------
 
 // Parse one script file. Returns ok=false when the file has no owner-struct (so it
@@ -701,314 +1185,38 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			}
 			continue
 		}
-		// Tag is comma-separated tokens. The FIRST token selects the kind:
-		//   - `onready=PATH`  -> a private auto-wired node ref (richer-authoring #1)
-		//   - `export[,SPEC]` -> a serialized @export property
+		// Tag is comma-separated tokens; the FIRST selects the kind. Everything
+		// past this point is the SHARED dispatch (walk_tagged_field) — the same
+		// one recurse_into hands its nested fields to. What used to sit inline
+		// here was one of the two chains that drifted apart.
 		specs := strings.split(val, ",")
 		if len(specs) == 0 {continue}
-		tok0 := strings.trim_space(specs[0])
-
 		type_text := normalize_godot_qualifier(node_text(src, f.type), s.godot_alias)
 
-		// richer-authoring #1: `gd:"onready=Sprite"` — must be an object-handle/pointer field.
-		// The rt.Onready table itself is built by the runtime reflection walk
-		// (runtime/register_class.odin); scriptgen keeps only the cheap build-time checks.
-		if strings.has_prefix(tok0, "onready=") {
-			path := strings.trim_space(tok0[len("onready="):])
-			if path == "" {
-				error_at(floc, "%s.%s: `onready=` needs a node path", s.struct_name, field_label)
-				continue
-			}
-			vi, ok := map_variant(type_text)
-			if !ok || vi.enum_name != ".Object" {
-				error_at(floc, "%s.%s: `onready` field must be an object/node handle or pointer (got %q)", s.struct_name, field_label, type_text)
-			}
-			continue
-		}
-
-		// friendslop toolkit: a LANE token opens a networked field — `replicate`
-		// (delta), `owner` (streamed from the owning peer), or `predict` (kit/sim).
-		// Only names + options are recorded here; generate.odin emits the
-		// knet.Entity_Desc (offset_of/size_of are the consumer compiler's job) plus a
-		// #assert that rejects non-POD fields at compile time with the field's name.
-		if lane := decl.replicate_lane(tok0); lane != .None {
-			rep, rok := parse_replicate_info(lane, type_text, specs, floc, s.struct_name, field_label)
-			if !rok {continue}
-			// Multi-name fields (`x, y: f32 `gd:"replicate"``) replicate each name.
-			for nm in f.names {
-				ident, iok := nm.derived.(^ast.Ident)
-				if !iok || ident == nil {continue}
-				r := rep
-				r.field = ident.name
-				r.path = path_of(ident.name)
-				append(&s.replicates, r)
-			}
-			continue
-		}
-
-		// friendslop toolkit: `gd:"backup"` — HOST-LOCAL state for host migration
-		// AND save/resume (the same bytes ride both, session.odin's split). generate
-		// emits a version-hashed <class>_backup_write/_read codec over these fields,
-		// so a takeover restores the campaign, not a diorama — no hand-matched
-		// write_u8/read_u8 lists to drift. POD (scalars/structs/fixed arrays),
-		// map[POD]POD, and [dynamic]POD are supported; anything else is a build error.
-		if tok0 == "backup" {
-			kind, key, elem, bad := classify_backup(type_text)
-			if bad != "" {
-				error_at(floc, "%s.%s: gd:\"backup\" can't serialize %s", s.struct_name, field_label, bad)
-				continue
-			}
-			for nm in f.names {
-				ident, iok := nm.derived.(^ast.Ident)
-				if !iok || ident == nil {continue}
-				append(&s.backups, Backup_Info{
-					field = ident.name,
-					path  = path_of(ident.name),
-					kind  = kind,
-					key   = key,
-					elem  = elem,
-				})
-			}
-			continue
-		}
-
-		// friendslop toolkit: `gd:"profile=Type"` on the class's ksess.Session
-		// field — the DECLARATION form of session_profile_install: the named
-		// POD struct is this game's per-player profile row. scriptgen folds
-		// the row's field-by-field shape into NET_FINGERPRINT (a drifted
-		// profile refuses the join like any other wire skew — the raw install
-		// call left it outside the version door: same-size drift scrambled
-		// rows silently) and installs it inside the generated ready thunk,
-		// before the game's ready can *_start.
-		if strings.has_prefix(tok0, "profile=") {
-			pt := strings.trim_space(tok0[len("profile="):])
-			switch {
-			case pt == "":
-				error_at(floc, "%s.%s: `profile=` names the row struct, e.g. gd:\"profile=Loadout\"", s.struct_name, field_label)
-			case !strings.has_suffix(type_text, ".Session") && type_text != "Session":
-				error_at(floc, "%s.%s: `profile=` belongs on the ksess.Session field (got %q) — the row installs into that session", s.struct_name, field_label, type_text)
-			case s.profile_type != "":
-				error_at(floc, "%s.%s: a second profile declaration (%q; already %q) — one row type per session", s.struct_name, field_label, pt, s.profile_type)
-			case len(f.names) != 1:
-				error_at(floc, "%s.%s: one session field per profile declaration", s.struct_name, field_label)
-			case:
-				s.profile_type = pt
-				if ident, iok := f.names[0].derived.(^ast.Ident); iok && ident != nil {
-					s.profile_ses = ident.name
-				}
-			}
-			continue
-		}
-
-		// `gd:"entity=Name:id"` — a WIRE declaration, so it LEADS the tag (the rule
-		// decl.Slot now states). It carries a permanent public type id, folds into
-		// NET_FINGERPRINT, and becomes a row in the generated factory table; it used
-		// to ride as a trailing spec of `export` purely by accident of the order the
-		// two features were built, which left `profile=T` leading and this not.
-		//
-		// BOTH LEADING TOKENS ARE SYNTHESIZED. An entity field is NECESSARILY an
-		// exported PackedScene — the scene is what the factory instantiates, and the
-		// Inspector slot is how the author hands it over — so `export` and
-		// `resource=PackedScene` were never a choice the tag was recording, only
-		// ceremony it was demanding. Trailing EXPORT specs still ride behind
-		// (`entity=Mob:3,group=Spawns`); a second `resource=` does not, since it
-		// would be overriding a hint the declaration already fixed.
-		entity_first := strings.has_prefix(tok0, "entity=")
-		entity_first_val := ""
-		if entity_first {
-			entity_first_val = strings.trim_space(tok0[len("entity="):])
-			syn := make([dynamic]string, 0, len(specs) + 1, context.temp_allocator)
-			append(&syn, "export", "resource=PackedScene")
-			append(&syn, ..specs[1:])
-			specs = syn[:]
-			tok0 = "export"
-		}
-
-		if tok0 != "export" {
-			if strings.has_prefix(tok0, "args=") {
-				error_at(
-					floc,
-					"%s.%s: `args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)",
-					s.struct_name,
-					field_label,
-				)
-				continue
-			}
-			// The field HAS a `gd:"..."` tag (tag_gd_value succeeded) but its first token is
-			// none the vocabulary knows — almost certainly a misspelling (`exprot`)
-			// that would otherwise silently leave the field un-exported. The "expected"
-			// half is godot:decl's projection: this list was hand-kept and had already
-			// fallen two tokens behind the language (`manual`, `profile=T`).
-			error_at(
-				floc,
-				"%s.%s: unknown gd tag %q (expected %s)",
-				s.struct_name,
-				field_label,
-				tok0,
-				decl.field_expected(context.temp_allocator),
-			)
-			continue
-		}
-
-		vi, ok := map_variant(type_text)
-		if !ok {
-			error_at(floc, "%s.%s: export field of unsupported type %q", s.struct_name, field_label, type_text)
-			continue
-		}
-
-		// Hints/groups/defaults are parsed by the RUNTIME reflection walk from this same
-		// tag (runtime/register_class.odin) — scriptgen only extracts what codegen itself
-		// consumes: the `get=`/`set=` accessor proc names (wrapper emission), the
-		// field's Variant type (wrapper marshalling + the ctor set), and the
-		// `entity=Name:id` declaration (the kboot entity table).
-		//
-		// The gate below is NOT codegen: it is the SPELLING-AND-ARITY check this
-		// loop spent its whole life without. Every other first token's spec loop
-		// refuses what it doesn't know, so `gd:"replicate,slcak=0.5"` failed the
-		// build — but a typo behind `export` fell straight through here, reached the
-		// runtime as an unknown hint, and surfaced as a boot-time record_error on a
-		// field that had silently lost its hint. Two tiers, same tag, no way to tell
-		// which one you were about to hit. Both halves of the check are projections
-		// of godot:decl's EXPORT_SPECS — the NAME set, and the bare/value columns
-		// that say which forms of each name are real. The runtime stays the consumer
-		// that knows what each spec MEANS (a value's type, a hint's Variant
-		// requirement); this only asks whether it EXISTS and was spelled with the
-		// right number of halves.
-		getter := ""
-		setter := ""
-		entity_val := entity_first_val
-		resource_val := ""
-		for si in 1 ..< len(specs) {
-			spec := strings.trim_space(specs[si])
-			if spec == "" {continue}
-			name := spec
-			value := ""
-			if eq := strings.index(spec, "="); eq >= 0 {
-				name = strings.trim_space(spec[:eq])
-				value = strings.trim_space(spec[eq + 1:])
-			}
-			// `entity=` is checked BEFORE the vocabulary, because it is deliberately
-			// absent from EXPORT_SPECS (it LEADS the tag now) and the gate below
-			// would therefore call it a misspelling. Refused, not accepted-as-well: a
-			// language with two spellings for one declaration teaches neither, and
-			// the three games vendoring this addon each carry a dozen of these — the
-			// rewritten tag IS their upgrade instructions.
-			if name == "entity" {
-				error_at(
-					floc,
-					"%s.%s: `entity=` is a WIRE declaration, not an export spec — it LEADS the tag now: write `gd:\"entity=%s\"` (the `export` and `resource=PackedScene` it implies are synthesized)",
-					s.struct_name, field_label, value,
-				)
-				continue
-			}
-
-			es, known := decl.export_spec(name)
-			if !known {
-				nearest := ""
-				for cand in decl.EXPORT_SPECS {
-					if one_typo_apart(name, cand.name) {
-						nearest = cand.name
-						break
-					}
-				}
-				if nearest != "" {
-					error_at(
-						floc,
-						"%s.%s: unknown export spec %q — did you mean `%s`? (a spec scriptgen doesn't know reaches the engine as nothing: the field registers, the hint silently doesn't)",
-						s.struct_name, field_label, name, nearest,
-					)
-				} else {
-					error_at(
-						floc,
-						"%s.%s: unknown export spec %q — the set is: %s (drop it, or fix the spelling)",
-						s.struct_name, field_label, name, decl.export_specs_list(context.temp_allocator),
-					)
-				}
-				continue
-			}
-
-			// PROJECTION — the bare/value columns, which existed to DOCUMENT that
-			// `file` is legal both ways and `multiline` only bare, and which nothing
-			// read. An ARITY typo is the same silent-hint bug the spelling gate was
-			// built for and slips straight through it: `multiline=true` is a
-			// perfectly spelled name whose value the runtime discards, and `range`
-			// bare is a slider with no bounds that dies at BOOT instead of here.
-			// Both columns true (`file`, `dir`, the globals) means both forms are
-			// real and nothing is checked.
-			had_value := strings.index(spec, "=") >= 0
-			if had_value && !es.value {
-				error_at(
-					floc,
-					"%s.%s: `%s` takes no value — write it bare, as `%s` (the runtime discards the value silently, so the hint you meant never reaches the Inspector)",
-					s.struct_name, field_label, name, name,
-				)
-				continue
-			}
-			if !had_value && !es.bare {
-				error_at(
-					floc,
-					"%s.%s: `%s` needs a value — write `%s=…` (%s)",
-					s.struct_name, field_label, name, name, es.blurb,
-				)
-				continue
-			}
-
-			switch name {
-			case "get":
-				getter = value
-			case "set":
-				setter = value
-			case "resource":
-				if entity_first && si > 1 {
-					error_at(
-						floc,
-						"%s.%s: `entity=` already fixes the resource hint to PackedScene (that is what a spawnable entity IS) — drop `resource=%s`",
-						s.struct_name, field_label, value,
-					)
-					continue
-				}
-				resource_val = value
-			}
-		}
-
-		// `entity=Name:id` — this scene BODIES a wire entity: the tag is the whole
-		// factory declaration (resolve_entities validates the target and pairs the
-		// typed hooks once the full module is parsed). The "must be a PackedScene
-		// export" check that used to live here is gone with the trailing form —
-		// the hint is synthesized, so it cannot be anything else.
-		if entity_val != "" {
-			target, sep, id_text := strings.partition(entity_val, ":")
-			id, id_ok := strconv.parse_int(strings.trim_space(id_text))
-			switch {
-			case sep != ":" || !id_ok:
-				error_at(floc, "%s.%s: `entity=` wants `Name:id` — the struct this scene bodies and its stable wire id (e.g. entity=Mob:3)", s.struct_name, field_label)
-			case id <= 0 || id > 65535:
-				error_at(floc, "%s.%s: entity id %d is out of range — pick 1..65535 (0 reads as \"none\", and the id must stay STABLE across builds: saves, rejoins, and backups carry it)", s.struct_name, field_label, id)
-			case len(f.names) != 1:
-				error_at(floc, "%s.%s: one scene field per entity — split the multi-name declaration", s.struct_name, field_label)
-			case:
-				append(&s.entities, Entity_Tag{
-					field   = field_label,
-					target  = strings.trim_space(target),
-					type_id = id,
-					line    = f.pos.line,
-				})
-			}
-		}
-
+		// A declaration may bind several names (`x, y: f32 `gd:"replicate"``).
+		// The dispatch takes the whole declaration so the arms that RECORD can
+		// loop the names while the arms that merely diagnose report once.
+		fnames := make([dynamic]string, 0, len(f.names), context.temp_allocator)
+		flines := make([dynamic]int, 0, len(f.names), context.temp_allocator)
 		for nm in f.names {
-			ident, _ := nm.derived.(^ast.Ident)
-			if ident == nil {continue}
-			append(&s.exports, Export_Info {
-				name      = ident.name,
-				type_text = type_text,
-				vi        = vi,
-				getter    = getter,
-				setter    = setter,
-				line      = ident.pos.line,
-				doc       = extract_doc(f.docs),
-			})
+			ident, iok := nm.derived.(^ast.Ident)
+			if !iok || ident == nil {continue}
+			append(&fnames, ident.name)
+			append(&flines, ident.pos.line)
 		}
+		if len(fnames) == 0 {continue}
+
+		walk_tagged_field(&s, Tagged_Field{
+			ctx       = .Top_Level,
+			names     = fnames[:],
+			lines     = flines[:],
+			path_base = nil, // the script struct IS the root
+			type_text = type_text,
+			specs     = specs,
+			tok0      = strings.trim_space(specs[0]),
+			loc       = floc,
+			doc       = extract_doc(f.docs),
+		})
 	}
 
 	scan_bound_procs(&s, path, src, &file)
@@ -3691,93 +3899,25 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 		}
 		val, has := tag_gd_value(fld.tag)
 		if has {
+			// THE SHARED DISPATCH — the same one parse_script hands the script
+			// struct's own fields to. This used to be a second, hand-written token
+			// chain, and every difference between it and the top-level one was an
+			// accident rather than a decision: `export`/`onready=` reached the
+			// runtime unvalidated here while the identical tag was spelling- and
+			// arity-checked there. `def.fields` is already one row per name, so
+			// this declaration binds exactly one.
 			specs := strings.split(val, ",")
-			if lane := len(specs) > 0 ? decl.replicate_lane(strings.trim_space(specs[0])) : .None; lane != .None {
-				rep, rok := parse_replicate_info(lane, ftype, specs, fld.loc, s.struct_name, join_path(fpath))
-				if rok {
-					rep.field = fld.name
-					rep.path = fpath
-					append(&s.replicates, rep)
-				}
-			}
-			// `gd:"backup"` rides nesting too (scrapyard tags host-local fields inside
-			// a `using`-embedded sub-struct): collect it onto the class with its full
-			// access path, exactly like replicate.
-			if len(specs) > 0 && strings.trim_space(specs[0]) == "backup" {
-				kind, key, elem, bad := classify_backup(ftype)
-				if bad != "" {
-					error_at(fld.loc, "%s.%s: gd:\"backup\" can't serialize %s", s.struct_name, join_path(fpath), bad)
-				} else {
-					append(&s.backups, Backup_Info{field = fld.name, path = fpath, kind = kind, key = key, elem = elem})
-				}
-			}
-			// `gd:"profile=T"` is a TOP-LEVEL declaration on the game class's own
-			// Session field — nested inside an embed it would silently never
-			// install (neither the generated ready thunk nor the fingerprint
-			// fold walks nested Sessions).
-			if len(specs) > 0 && strings.has_prefix(strings.trim_space(specs[0]), "profile=") {
-				error_at(
-					fld.loc,
-					"%s.%s: `profile=` declares on the class's OWN ksess.Session field — nested in an embed it silently never installs; move the declaration to the top level",
-					s.struct_name, join_path(fpath),
-				)
-			}
-			// `entity=` (a spec riding the export tag) is a WIRE declaration —
-			// factory row, stable type id, fingerprint input — and the entity
-			// scan walks only the class's own fields: nested in an embed the
-			// EXPORT registers fine while the factory row silently never
-			// exists, so the entity never spawns over the wire (the recorded
-			// gun-that-never-replicated class through a different door).
-			for spec in specs {
-				if strings.has_prefix(strings.trim_space(spec), "entity=") {
-					error_at(
-						fld.loc,
-						"%s.%s: `entity=` declares on the class's OWN scene field — nested in an embed the export registers but the factory/type row silently never exists; move the field to the top level",
-						s.struct_name, join_path(fpath),
-					)
-				}
-			}
-			// THE SECOND CONTEXT'S UNKNOWN-TOKEN GATE. `export` and `onready=` fall
-			// through on purpose — the runtime reflection walk registers and
-			// validates them from the same tag, at every depth, so scriptgen owns
-			// only `replicate`/`backup` through nesting. But "fall through" used to
-			// mean EVERYTHING unrecognized fell through, and that is a different
-			// thing: a nested `gd:"replciate"` was a no-op with no diagnostic
-			// anywhere, in either half of the toolchain. Top-level, the identical
-			// typo has been a hard error for as long as field_expected has existed
-			// (`unknown gd tag`, right below); one comma of depth turned the loudest
-			// refusal in the language into silence. It is the recorded
-			// gun-that-never-replicated failure reached through the cheapest door
-			// there is, and blocks are exactly where deep tags live.
-			//
-			// The gate asks godot:decl, so a token added to FIELD_TOKENS is known
-			// here by construction rather than by someone remembering this line.
-			tok0 := strings.trim_space(specs[0])
-			if !decl.field_token_shaped(tok0) {
-				error_at(
-					fld.loc,
-					"%s.%s: unknown gd tag `%s` (expected %s) — a tag scriptgen doesn't know is silently nothing at this depth, which is how a replicated field stops replicating without a single error",
-					s.struct_name, join_path(fpath), tok0, decl.field_expected(context.temp_allocator),
-				)
-				continue
-			}
-			// `gd:"manual"` NESTED is the same silence wearing a known token: the
-			// tag matches no arm above, so this `continue` skips the recursion below
-			// and the embed's whole subtree — its predict fields, its backups, its
-			// tick — vanishes. Top-level, `manual` MEANS "recurse, but the wielder
-			// drives the tick" (see parse_script); here it has never meant anything.
-			// Refused rather than quietly made to work: whether a block one level
-			// down may opt its own children out of hoisting is a shelf-design call,
-			// and inventing an answer inside a typo gate is how the two contexts
-			// drifted in the first place.
-			if tok0 == "manual" {
-				error_at(
-					fld.loc,
-					"%s.%s: `gd:\"manual\"` only works on the class's OWN embed — nested one level down it silently skips the whole sub-block (no predict fields, no backups, no tick). Move the embed to the top level and tag it there",
-					s.struct_name, join_path(fpath),
-				)
-				continue
-			}
+			if len(specs) == 0 {continue}
+			walk_tagged_field(s, Tagged_Field{
+				ctx       = .Nested,
+				names     = {fld.name},
+				lines     = {fld.loc.line},
+				path_base = path, // the embed's own access path; leaf appended by the arms
+				type_text = ftype,
+				specs     = specs,
+				tok0      = strings.trim_space(specs[0]),
+				loc       = fld.loc,
+			})
 			continue
 		}
 		if sub, sub_subst, ok := resolve_type(def, ftype); ok {

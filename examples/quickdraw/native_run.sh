@@ -131,6 +131,28 @@ for port in 4189 4196; do
             echo "$EDGE_LATE hp edge(s) fired a frame late — the sim lane's mutations missed the frame's edge pass"; exit 1
         fi
 
+        # THE LAG-COMP HEADROOM RECEIPT. Lag comp dies SILENTLY: when a
+        # shooter's reconstructed view falls past rewind_max the query is
+        # clamped to the floor, the authority judges a half-second-old world,
+        # nothing lands, and until kit/sim grew stat_rewind_clamped nothing
+        # anywhere recorded it. That is exactly how the deep-lead-surplus bug
+        # hid — and this acid could not have caught it: with the deep rung
+        # removed it still PASSES (23 hits, comfortably over the >=10 bar) while
+        # clamping 12 queries, the first eleven shots all judged at exactly the
+        # 30-tick floor, ~16 seconds of degraded lag comp. Measured, both ways:
+        #   with the rung:    clamped=1 (the cold-start shot alone), 30 hits
+        #   without the rung: clamped=12, 23 hits — and a GREEN acid
+        # So the hit count is not a proxy for lag-comp health; the clamp count
+        # is. One cold-start clamp is expected (the first shot lands before the
+        # controller has settled); a moving count past that is the pathology.
+        CLAMPED=$(grep -o "clamped=[0-9]*" "$MLOG" | tail -1 | cut -d= -f2)
+        CLAMPED=${CLAMPED:-0}
+        DEEPEST=$(grep -o "depth=[0-9]*" "$MLOG" | cut -d= -f2 | sort -n | tail -1)
+        echo "lag-comp headroom on the marshal: clamped $CLAMPED, deepest judged view $DEEPEST ticks"
+        if ((CLAMPED > 4)); then
+            echo "lag comp is being clamped repeatedly (clamped=$CLAMPED) — the shooter's view is older than rewind_max can honor, so the authority is judging a stale world and landing nothing. Suspect the sim lead controller (a deep surplus parks the client ahead and every rewound query hits the floor), or a rewind_max too small for this link"; exit 1
+        fi
+
         # THE SHOP, mid-duel: the kill's bounty reaches the deadeye as delta
         # state, its buy is a tick-scheduled verb — and the boots go on at
         # the CLIENT'S next tick, ~15 ticks before the server's word can

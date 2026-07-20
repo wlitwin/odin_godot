@@ -65,9 +65,20 @@ Slot :: enum u8 {
 // act on — scriptgen builds the factory table from it, and the runtime still
 // owes the Inspector the PackedScene slot the author no longer spells out — so
 // it is Reflect, and walk_field synthesizes the export it implies.
+//
+// This column also decides WHO type-checks a field, and at what depth. The
+// runtime's reflection walk type-checks every Reflect token (export's Variant
+// mapping, onready's object-handle requirement) at ANY depth and drops a bad one
+// with a loud record_error at registration — so scriptgen validates the TYPE of
+// a Reflect token at top level only and defers nested ones to the runtime that
+// owns them. (Widening scriptgen's textual, gd.-only map_variant to nested
+// fields would false-positive on the foreign-package bundle types nested fields
+// usually carry, which the runtime's typeid check resolves and scriptgen's
+// cannot.) A Scriptgen token has no such fallback, so scriptgen type-checks it
+// at EVERY depth. See the seam note in scriptgen/parse.odin's Tagged_Field.
 Home :: enum u8 {
-	Reflect, // the runtime's reflection registrar acts on it
-	Scriptgen, // consumed entirely at build time; nothing to reflect
+	Reflect, // the runtime's reflection registrar acts on it (and type-checks it, at any depth)
+	Scriptgen, // consumed entirely at build time; nothing to reflect — scriptgen type-checks it
 }
 
 Field_Token :: struct {
@@ -192,6 +203,126 @@ field_expected :: proc(allocator := context.allocator) -> string {
 field_token_shaped :: proc(tok: string) -> bool {
 	_, ok := field_token(tok)
 	return ok
+}
+
+// ---- the per-context policy: WHERE a tag may appear, and what it means there ---
+//
+// A `gd:"..."` tag rides one of two field SITES: the script struct's own field,
+// or a field reached through a `using`/embedded block. A handful of tokens mean
+// different things — or nothing legal — at depth, and for most of scriptgen's
+// life that per-site difference was expressed as two separate hand-written
+// dispatch chains that drifted: a nested typo was a silent no-op where the same
+// typo at top level was a hard error, and a nested `manual` swallowed a whole
+// sub-block with no diagnostic. The two chains are now one walk, and THIS is the
+// table it consults for the context question — may this token appear here — the
+// answer decided in data rather than re-derived in two places.
+//
+// A THIRD site, "block-proc", appears in this schema's earliest sketch. It is
+// deliberately absent, and its absence is the decision this column closes: it is
+// not a field site at all but the @(gd_command)/@(gd_method)/@(gd_tick) HOISTING
+// that a composed block performs, whose verb ("hoist") has no field-tag meaning.
+// Fields and procs are two dispatches; this is the field one. Named here so the
+// sketch's missing column reads as a ruling, not an oversight.
+Field_Site :: enum u8 {
+	Top_Level, // a field of the script struct itself
+	Nested, // a field reached through a `using`/embedded block
+}
+
+// What the shared dispatch does with a KNOWN token at a site, BEFORE any
+// kind-specific work runs. (An UNKNOWN token never reaches the table — it is
+// refused by the field_token_shaped gate.) This owns exactly the context
+// question the two walks used to answer inconsistently, and nothing about what a
+// token MEANS once it is allowed, which stays scriptgen's to know.
+Field_Action :: enum u8 {
+	Handle, // the dispatch's arm acts on it (whether it RECORDS may still narrow by site)
+	Caller, // consumed by the CALLER before the shared dispatch — reaching it is a toolchain bug
+	Refuse, // illegal at this site; `reason` says why, in the author's own terms
+}
+
+Field_Policy :: struct {
+	token:  string, // a FIELD_TOKENS name, verbatim
+	site:   Field_Site,
+	action: Field_Action,
+	// For Refuse: the whole sentence after "<Class>.<path>: ", its own backticked
+	// token spelling included. It lives here as DATA, not as a literal in the
+	// dispatch, so the same refusal can never again be worded two ways in two
+	// places — which is exactly how the two sites drifted apart. "" for Handle /
+	// Caller (the completeness check enforces the pairing both directions).
+	reason: string,
+}
+
+// THE TABLE. One row per (FIELD_TOKENS token x Field_Site); scriptgen's
+// check_field_policy refuses to generate if a token is missing a row at either
+// site, or a Refuse row has no reason, or a non-Refuse row carries one — the
+// mechanism that keeps this honest, the way FINGERPRINT_CONTRIB keeps the
+// fingerprint column honest. A new token added above without two rows here fails
+// the build, naming itself.
+FIELD_POLICY :: []Field_Policy {
+	// The three lanes and backup: a networked or host-local field means the same
+	// thing at any depth (the kit bundles carry replicate fields several levels
+	// down; scrapyard tags backup fields inside a `using` embed).
+	{"replicate", .Top_Level, .Handle, ""},
+	{"replicate", .Nested, .Handle, ""},
+	{"owner", .Top_Level, .Handle, ""},
+	{"owner", .Nested, .Handle, ""},
+	{"predict", .Top_Level, .Handle, ""},
+	{"predict", .Nested, .Handle, ""},
+	{"backup", .Top_Level, .Handle, ""},
+	{"backup", .Nested, .Handle, ""},
+	// Editor dressing, registered by the runtime reflection walk at every depth:
+	// scriptgen validates the tag in both places (the spelling + arity gates) and
+	// RECORDS only at top level — an embed's exports register under their
+	// namespaced names, not scriptgen's own table. "Handle" both; the record-skip
+	// is the arm's, since it is a what-it-means detail, not a may-it-appear one.
+	{"export", .Top_Level, .Handle, ""},
+	{"export", .Nested, .Handle, ""},
+	{"onready=", .Top_Level, .Handle, ""},
+	{"onready=", .Nested, .Handle, ""},
+	// The three that name the CLASS's OWN field and silently wire nothing nested —
+	// each was a real "declared but never installed" failure reached through a
+	// block, and each refusal names the specific thing that goes missing.
+	{"profile=", .Top_Level, .Handle, ""},
+	{
+		"profile=",
+		.Nested,
+		.Refuse,
+		"`profile=` declares on the class's OWN ksess.Session field — nested in an embed it silently never installs; move the declaration to the top level",
+	},
+	{"entity=", .Top_Level, .Handle, ""},
+	{
+		"entity=",
+		.Nested,
+		.Refuse,
+		"`entity=` declares on the class's OWN scene field — nested in an embed the export registers but the factory/type row silently never exists; move the field to the top level",
+	},
+	// `manual` opts an embed's tick out of auto-hoist. TOP LEVEL the caller
+	// (parse_script) consumes it — it recurses the embed and suppresses only the
+	// auto-call — so it must NEVER reach the shared dispatch; Caller is that
+	// contract, and the dispatch asserts on it. NESTED it has never meant
+	// anything and used to eat the subtree.
+	{"manual", .Top_Level, .Caller, ""},
+	{
+		"manual",
+		.Nested,
+		.Refuse,
+		"`gd:\"manual\"` only works on the class's OWN embed — nested one level down it silently skips the whole sub-block (no predict fields, no backups, no tick). Move the embed to the top level and tag it there",
+	},
+	// A signal payload's parameter NAMES: a Spec token (it rides behind a signal
+	// TYPE), so as a leading token it is the wrong slot at either site.
+	{"args=", .Top_Level, .Refuse, "`args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)"},
+	{"args=", .Nested, .Refuse, "`args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)"},
+}
+
+// The policy for `token` (a FIELD_TOKENS name) at `site`. ok=false means the
+// table has no row — a hole the completeness check turns into a build error, so
+// a caller may treat !ok as "the schema is incomplete", never as "allowed".
+field_policy :: proc(token: string, site: Field_Site) -> (Field_Policy, bool) {
+	for p in FIELD_POLICY {
+		if p.token == token && p.site == site {
+			return p, true
+		}
+	}
+	return {}, false
 }
 
 // ---- export specs: the tokens that ride BEHIND `export` --------------------

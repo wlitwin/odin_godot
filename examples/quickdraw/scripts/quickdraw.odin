@@ -74,6 +74,8 @@ Quickdraw :: struct {
 	frame:      u64,
 	edge_same:  int, // hp edges the authority saw on the writing frame
 	edge_late:  int, // hp edges it saw a frame (or more) behind — the bug
+
+	lead_ticks: int, // client-side frame counter for the once-a-second QD_LEAD trace
 }
 
 now_s :: knet.now_s
@@ -163,6 +165,25 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 	ng.recons = self.lane.stat_reconciles
 	ng.fact_drops = self.lane.stat_facts_dropped
 	kui.netgraph_refresh(&self.netgraph, ng)
+
+	// THE LEAD TRACE (a diagnostic, not a game rule — it prints and asserts
+	// nothing). The deep-lead-surplus bug was a CLIENT pacing pathology whose
+	// only symptom on the authority is a rewind clamp, so the two halves of the
+	// evidence live on opposite ends of the wire: the host tallies clamps on
+	// QD_SHOT below, and a client says what its own lead actually settled at.
+	// This overlay datum was already computed every frame and shown only to a
+	// human watching an on-screen graph — which is exactly why sixty seconds of
+	// mispaced lead could ride through an acid without leaving a mark in a log.
+	// Once a second: enough to see a cold start bleed, cheap enough to leave in.
+	if !ksim.lane_is_authority(&self.lane) {
+		self.lead_ticks += 1
+		if self.lead_ticks % 60 == 0 {
+			gd.print_str(fmt.tprintf(
+				"QD_LEAD tick=%d lead=%d resims=%d rendersat=%d",
+				ksim.lane_now(&self.lane), ng.lead, self.lane.stat_resims, self.lane.stat_render_sat,
+			))
+		}
+	}
 
 	// THE SHOP DOOR — a tick-scheduled verb, issued like any coop command
 	// (a key edge, or the bots' own hands): your gear flips at your NEXT
@@ -490,7 +511,15 @@ adjudicate_shot :: proc(g: ^Quickdraw, shooter_id: knet.Net_Id, gun: ^Gunner, pi
 	// The VERDICT reaches every screen as state (hp, the delta lane); the
 	// tracer already rode the tick's `fired` fact (the mine-form fx above).
 	g.shot_count += 1
-	gd.print_str(fmt.tprintf("QD_SHOT by=%d tick=%d judged=%d", u64(pid), tick, judged))
+	// `depth` is how far back this shot was actually judged; `clamped` is the
+	// lane's running count of queries that fell PAST rewind_max and got pinned
+	// to the floor. A shot whose depth equals the window AND whose clamp count
+	// just moved is lag comp failing quietly — the exact signature the deep-lead
+	// bug produced in the sibling port (rewound=0 on every shot, nothing logged).
+	gd.print_str(fmt.tprintf(
+		"QD_SHOT by=%d tick=%d judged=%d depth=%d clamped=%d",
+		u64(pid), tick, judged, tick - judged, g.lane.stat_rewind_clamped,
+	))
 
 	if victim == 0 {return}
 	hit, _ := gunner_of(&g.boot, victim)
