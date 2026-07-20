@@ -1243,6 +1243,12 @@ main :: proc() {
 		os.exit(1)
 	}
 
+	// Schema invariant, corpus-independent: every field token has a dispatch
+	// policy at every site. Run first, so a toolchain that grew a token without
+	// its policy rows fails here — naming the gap — rather than on the first game
+	// field that happens to use it.
+	check_field_policy()
+
 	// Structural whole-tree pass (helpers in subdirectories included) BEFORE the emit
 	// loop: module-isolation import checks are hard errors even in files the emit loop
 	// never parses, and a marked script hiding in a subdirectory gets a warning instead
@@ -1806,6 +1812,42 @@ resolve_profile :: proc(s: ^Script, scripts_dir: string) {
 				"%s: gd:\"profile=%s\" — no struct %q in this package (the row type lives beside the game; it is POD, ≤ ksess.PROFILE_MAX_SIZE)",
 				s.struct_name, s.profile_type, s.profile_type,
 			)
+		}
+	}
+}
+
+// ---- the per-context policy column, kept honest -----------------------------
+//
+// decl.FIELD_POLICY says, per token per site, whether the shared dispatch
+// handles / refuses / defers-to-caller a leading tag token. walk_tagged_field
+// CONSULTS it, so a hole in the table is not a documentation gap — it is a
+// missing switch arm that would `assert(has)` at parse time on some field a game
+// actually wrote. This turns the hole into a build error BEFORE any corpus is
+// read, naming the token and the site, exactly as check_fingerprint_contrib does
+// for the fingerprint column: every FIELD_TOKENS token needs a row at BOTH sites,
+// a Refuse row must carry its reason, and a non-Refuse row must not (a stray
+// reason is a refusal someone wrote and the action forgot).
+check_field_policy :: proc() {
+	for t in decl.FIELD_TOKENS {
+		for site in decl.Field_Site {
+			pol, has := decl.field_policy(t.name, site)
+			if !has {
+				errorf(
+					"decl.FIELD_TOKENS has `%s` and decl.FIELD_POLICY has no row for it at site %v — add one saying whether the shared dispatch handles, refuses, or defers-to-caller a leading `%s` there (a hole would assert at parse time on the first field that uses it)",
+					t.name, site, t.name,
+				)
+				continue
+			}
+			switch pol.action {
+			case .Refuse:
+				if pol.reason == "" {
+					errorf("decl.FIELD_POLICY refuses `%s` at %v but gives no reason — the dispatch prints it verbatim, so an empty one is a blank error", t.name, site)
+				}
+			case .Handle, .Caller:
+				if pol.reason != "" {
+					errorf("decl.FIELD_POLICY row for `%s` at %v is %v but carries a reason string — reasons are for Refuse only (a refusal someone wrote and the action forgot?)", t.name, site, pol.action)
+				}
+			}
 		}
 	}
 }

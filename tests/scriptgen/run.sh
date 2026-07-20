@@ -1569,14 +1569,14 @@ for y in h2_mob_of h2_mob_spawn probe_h2_mob_count on_packet; do
 	echo "$out" | grep -q "yielded: $y" || fail "$y must still yield to the hand-written proc"
 done
 
-# ---- fixture 9: ONE dispatch — a nested tag is checked like a top-level one --
+# ---- fixture 16: ONE dispatch — a nested tag is checked like a top-level one --
 # The two field walks (parse_script's own-fields loop, recurse_into's embedded
 # one) used to be separate hand-written token chains, and `export`/`onready=`
 # were deferred to the runtime UNVALIDATED in the nested one. So the spelling
 # and bare/value arity gates were top-level only: `gd:"export,rnage=0:100"` one
 # comma deep sailed past the build and died at boot, while the identical typo on
 # the class's own field was a hard error. Both walks now funnel through
-# walk_tagged_field with a Field_Ctx, and these are the three that used to slip.
+# walk_tagged_field with a decl.Field_Site, and these are the three that slipped.
 #
 # TEETH: every one of these was accepted SILENTLY (exit 0) before the merge.
 nested_tag_must_fail() {
@@ -1615,7 +1615,7 @@ nested_tag_must_fail 'export,rnage=0:100' 'did you mean `range`' spell
 nested_tag_must_fail 'export,multiline=true' 'takes no value' arity
 nested_tag_must_fail 'onready=' 'needs a node path' onready
 
-# ---- fixture 10: `entity=` LEADS the tag — for EVERY kind, not just export ---
+# ---- fixture 17: `entity=` LEADS the tag — for EVERY kind, not just export ---
 # The trailing-`entity=` refusal used to live inside the export arm, so the rule
 # stopped applying the moment another token led: `gd:"backup,entity=M:1"` went
 # to an arm that never looks past specs[0] and was accepted SILENTLY (verified
@@ -1652,5 +1652,47 @@ entity_trailing_must_fail 'hp: i32 `gd:"backup,entity=M:1"`,' 'x: i32,' \
 	'top-level backup' 'is a WIRE declaration'
 entity_trailing_must_fail 'x: i32,' 'h: i32 `gd:"backup,entity=M:1"`,' \
 	'nested backup' "declares on the class's OWN scene field"
+
+# ---- fixture 18: the policy TABLE is honored — its Refuse rows still refuse ---
+# The per-context policy is decl.FIELD_POLICY now (a decl.Field_Site keyed
+# table), consulted once at the top of walk_tagged_field. check_field_policy
+# proves every token has a WELL-FORMED row (it fails scriptgen's own build if
+# not, which is why there is no fixture for it — a hole cannot produce a working
+# binary). This fixture proves the other half: that the gate HONORS the rows —
+# the two refusals the table owns that fixtures 16/17 don't already cover, each
+# with the exact reason string the table carries, so a row silently losing its
+# effect (or its wording) is caught here.
+pol="$work/policy"
+mkdir -p "$pol"
+policy_nested_must_fail() {
+	cat >"$pol/f.odin" <<ODIN
+//gd:extends Node
+//gd:class PolT
+package policy
+import gd "godot:godot"
+import knet "godot:kit/net"
+import kboot "godot:kit/boot"
+import ksess "godot:kit/session"
+
+Blk :: struct { $1 }
+PolT :: struct {
+	owner:  gd.Node,
+	boot:   kboot.Boot,
+	ses:    ksess.Session,
+	net_id: knet.Net_Id,
+	blk:    Blk,
+}
+ODIN
+	local out rc
+	out="$("$SGEN" "$pol" -godot:"$ROOT" 2>&1)"
+	rc=$?
+	[[ $rc -ne 0 ]] || fail "$2: a nested \`$3\` must be refused by the policy gate"
+	echo "$out" | grep -q "$4" || fail "$2: wrong diagnostic (the table's reason string drifted?) — got: $out"
+	echo "$out" | grep -q "PolT.blk" || fail "$2: refusal must name the nested path PolT.blk.* — got: $out"
+}
+policy_nested_must_fail 'p: ksess.Session `gd:"profile=Loadout"`,' \
+	'nested profile=' 'profile=' 'silently never installs'
+policy_nested_must_fail 'a: knet.Angle `gd:"manual"`,' \
+	'nested manual' 'manual' 'silently skips the whole sub-block'
 
 echo "SCRIPTGEN_OK"

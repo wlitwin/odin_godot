@@ -456,21 +456,22 @@ parse_signal_n_field :: proc(s: ^Script, src: string, floc: Loc, fname: string, 
 // of unsupported type", "onready field must be an object handle") still run at
 // top level only. Those ask what a type IS, not whether a tag was spelled
 // right, and a nested field arrives here with generic params already
-// substituted through paths the top-level walk never sees; widening them is the
-// next row of the policy column, not a free rename. Named here rather than left
-// to be rediscovered, since being unnamed is exactly what let the other three
-// seams live this long.
-Field_Ctx :: enum {
-	Top_Level, // a field of the script struct itself
-	Nested, // a field reached through a `using`/embedded block
-}
+// substituted through paths the top-level walk never sees; widening them is a
+// decision of its own (see the map_variant investigation), not a free rename.
+// Named here rather than left to be rediscovered, since being unnamed is exactly
+// what let the other three seams live this long.
+//
+// The per-token, per-context POLICY now lives in decl.FIELD_POLICY (a
+// decl.Field_Site keyed table), consulted once at the top of walk_tagged_field
+// and checked for completeness by check_field_policy — so the context question
+// is data both walks share, not two hand-written chains that can drift.
 
 // One tagged field declaration, normalized so both contexts hand the dispatch
 // the same shape. A declaration may bind several names (`x, y: f32 `gd:"…"``);
 // the arms that RECORD loop `names`, and the arms that merely diagnose report
 // once, which is why this is a whole declaration and not one name.
 Tagged_Field :: struct {
-	ctx:       Field_Ctx,
+	ctx:       decl.Field_Site,
 	names:     []string, // every name this declaration binds, in source order
 	lines:     []int, // each name's line (parallel to `names`)
 	path_base: []string, // access path to the OWNER of these fields ("" at top level)
@@ -634,6 +635,35 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
 		return
 	}
 
+	// THE CONTEXT GATE (decl.FIELD_POLICY). Whether a KNOWN leading token may
+	// appear at this site is a language rule, answered once here in data; the arms
+	// below run only for a token the gate passed, and decide only what it MEANS.
+	// An UNKNOWN token is not in the table — it falls through to the unknown-tag
+	// refuse at the bottom, which is where its "expected …" message belongs. This
+	// is what used to be a fistful of `if nested { error; return }` blocks copied
+	// into the profile=/entity=/manual arms and worded slightly differently each
+	// time; the wording now has one home.
+	if ft, known := decl.field_token(tok0); known {
+		pol, has := decl.field_policy(ft.name, tf.ctx)
+		// check_field_policy makes this hole a build error before any corpus is
+		// read; treating !has as anything but "the schema is incomplete" would be
+		// the silent-fallthrough this whole merge exists to kill.
+		assert(has, "decl.FIELD_POLICY is missing a row — check_field_policy should have refused the build")
+		switch pol.action {
+		case .Refuse:
+			error_at(tf.loc, "%s.%s: %s", s.struct_name, label, pol.reason)
+			return
+		case .Caller:
+			// Top-level `manual` is consumed by parse_script's embed branch before
+			// the dispatch is ever called; reaching here is a toolchain bug, not a
+			// user error.
+			assert(false, "a Caller-site token reached the shared dispatch (parse_script must consume top-level `manual` first)")
+			return
+		case .Handle:
+		// fall through to the kind-specific arms
+		}
+	}
+
 	// richer-authoring #1: `gd:"onready=Sprite"` — a private auto-wired node ref.
 	// The rt.Onready table itself is built by the runtime reflection walk
 	// (runtime/register_class.odin) at EVERY depth, so scriptgen keeps only the
@@ -706,16 +736,9 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
 	// rows silently) and installs it inside the generated ready thunk,
 	// before the game's ready can *_start.
 	if strings.has_prefix(tok0, "profile=") {
-		if nested {
-			// Nested it would silently never install — neither the generated ready
-			// thunk nor the fingerprint fold walks nested Sessions.
-			error_at(
-				tf.loc,
-				"%s.%s: `profile=` declares on the class's OWN ksess.Session field — nested in an embed it silently never installs; move the declaration to the top level",
-				s.struct_name, label,
-			)
-			return
-		}
+		// Nested `profile=` is refused by the context gate above (it silently never
+		// installs — neither the generated ready thunk nor the fingerprint fold
+		// walks nested Sessions), so only the top-level form reaches here.
 		pt := strings.trim_space(tok0[len("profile="):])
 		switch {
 		case pt == "":
@@ -733,24 +756,10 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
 		return
 	}
 
-	// `gd:"manual"` is the wielder-drives-this-tick opt-out. At top level the
-	// CALLER handles it (it still recurses — only the auto-call is suppressed),
-	// so reaching the dispatch with it means the nested context.
-	if tok0 == "manual" {
-		// The same silence wearing a known token: nested, the tag matched no arm,
-		// hit a `continue`, and the embed's whole subtree — its predict fields,
-		// its backups, its tick — vanished with no error. Refused rather than
-		// quietly made to work: whether a block one level down may opt its own
-		// children out of hoisting is a shelf-design call, and inventing an
-		// answer inside a typo gate is how the two contexts drifted in the first
-		// place. No in-repo code writes it nested, so the refusal costs nothing.
-		error_at(
-			tf.loc,
-			"%s.%s: `gd:\"manual\"` only works on the class's OWN embed — nested one level down it silently skips the whole sub-block (no predict fields, no backups, no tick). Move the embed to the top level and tag it there",
-			s.struct_name, label,
-		)
-		return
-	}
+	// `gd:"manual"` (the wielder-drives-this-tick opt-out) has no arm here: at top
+	// level parse_script's embed branch consumes it before the dispatch (the
+	// FIELD_POLICY Caller row), and nested it is refused by the context gate (the
+	// Refuse row). Both meanings live in the table now, not in a token check here.
 
 	// `gd:"entity=Name:id"` — a WIRE declaration, so it LEADS the tag (the rule
 	// decl.Slot now states). It carries a permanent public type id, folds into
@@ -760,17 +769,9 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
 	entity_first := strings.has_prefix(tok0, "entity=")
 	entity_val := ""
 	if entity_first {
-		if nested {
-			// The entity scan walks only the class's own fields: nested in an embed
-			// the EXPORT registers fine while the factory row silently never exists,
-			// so the entity never spawns over the wire.
-			error_at(
-				tf.loc,
-				"%s.%s: `entity=` declares on the class's OWN scene field — nested in an embed the export registers but the factory/type row silently never exists; move the field to the top level",
-				s.struct_name, label,
-			)
-			return
-		}
+		// Nested leading `entity=` is refused by the context gate above (the export
+		// would register but the factory/type row silently never exists), so only
+		// the top-level form reaches here.
 		entity_val = strings.trim_space(tok0[len("entity="):])
 		// BOTH LEADING TOKENS ARE SYNTHESIZED. An entity field is NECESSARILY an
 		// exported PackedScene — the scene is what the factory instantiates, and the
@@ -787,14 +788,10 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
 	}
 
 	if tok0 != "export" {
-		if strings.has_prefix(tok0, "args=") {
-			error_at(
-				tf.loc,
-				"%s.%s: `args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)",
-				s.struct_name, label,
-			)
-			return
-		}
+		// `args=` (a signal-only spec used as a leading token) is refused by the
+		// context gate above at both sites, so anything still non-`export` here is
+		// a token the vocabulary does not know at all.
+		//
 		// The field HAS a `gd:"..."` tag but its first token is none the vocabulary
 		// knows — almost certainly a misspelling (`exprot`) that would otherwise
 		// silently leave the field un-exported. The "expected" half is godot:decl's
