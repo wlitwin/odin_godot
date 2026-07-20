@@ -25,6 +25,11 @@ Lane_Box :: struct {
 	owners: map[knet.Net_Id]knet.Player_Id,
 	ax:     i8, // the local player's current intent
 
+	// (a) input-class-by-TYPE probe: what lane_input_of resolved for two
+	// same-size, distinct-type classes (see lane_input_of_routes_by_type_not_size)
+	two_steer: i16,
+	two_aim:   i16,
+
 	// two-step-slot probe: how often each world pass ran on this peer
 	step_calls: int, // the EVERYWHERE pass (live + resim)
 	auth_calls: int, // the AUTHORITY pass (host only, live only)
@@ -558,6 +563,53 @@ lane_two_input_classes_route_per_entity :: proc(t: ^testing.T) {
 	want_a := f32(3) * 2 * (MC_HI - MC_LO + 1)
 	testing.expectf(t, abs(host.movers[A].x - want_a) < 0.001,
 		"class-0 entity should sit at its own i8 fingerprint %v, got %v", want_a, host.movers[A].x)
+}
+
+// (a) lane_input_of resolves the input class by TYPE, not by struct SIZE.
+// Two classes of the SAME size (2 bytes) but DISTINCT types: the old resolver
+// keyed on size_of(T), found two size-2 classes, and asserted "ambiguous" — the
+// footgun that lay in wait until someone grew one input struct to another's
+// size. scriptgen stamps each class's type (lane_class_set_type), so the typed
+// accessor routes each to its own class. TEETH: delete the two set_type lines
+// and this test asserts instead of passing (the pre-fix behaviour).
+Steer_In :: distinct i16
+Aim_In :: distinct i16 // same size as Steer_In (2 bytes), different type
+
+two_steer_sample :: proc(user: rawptr, tick: u64, dst: rawptr) {(cast(^Steer_In)dst)^ = 7}
+two_aim_sample :: proc(user: rawptr, tick: u64, dst: rawptr) {(cast(^Aim_In)dst)^ = 9}
+
+// Read both classes' local input by TYPE inside the world pass and record them.
+two_class_probe_step :: proc(user: rawptr, tick: u64) {
+	b := cast(^Lane_Box)user
+	s, ds := ksim.lane_input_of(&b.lane, b.s.me, Steer_In)
+	a, da := ksim.lane_input_of(&b.lane, b.s.me, Aim_In)
+	if ds {b.two_steer = i16(s)}
+	if da {b.two_aim = i16(a)}
+}
+
+@(test)
+lane_input_of_routes_by_type_not_size :: proc(t: ^testing.T) {
+	box: Lane_Box
+	lbox_make(&box, 1)
+	defer lbox_destroy(&box)
+	ksess.session_host_start(&box.s, "hosty")
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	ksim.lane_init(&box.lane, &box.s, size_of(Steer_In), cfg = cfg) // primary class 0
+	ksim.lane_add_input_class(&box.lane, 1, size_of(Aim_In), two_aim_sample) // class 1, SAME size
+	// The stamps that make type the resolver key. Remove these two lines and the
+	// test asserts "input size ambiguous" — the pre-fix behaviour, on purpose.
+	ksim.lane_class_set_type(&box.lane, 0, typeid_of(Steer_In))
+	ksim.lane_class_set_type(&box.lane, 1, typeid_of(Aim_In))
+	ksim.lane_set_sim(&box.lane, &box, two_steer_sample, two_class_probe_step)
+
+	DT :: 1.0 / 60.0
+	for _ in 1 ..= 8 {
+		ksim.lane_frame(&box.lane, DT)
+	}
+	// Each type resolved to ITS class's sampled value — no cross, no assert.
+	testing.expectf(t, box.two_steer == 7, "Steer_In must resolve to class 0's input (got %v, want 7)", box.two_steer)
+	testing.expectf(t, box.two_aim == 9, "Aim_In must resolve to class 1's input (got %v, want 9) — size resolution could not tell these apart", box.two_aim)
 }
 
 // The surge verb — the full tick-command shape in one proc: rejectable

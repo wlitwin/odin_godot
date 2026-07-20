@@ -89,6 +89,12 @@ Sample_Proc :: proc(user: rawptr, tick: u64, dst: rawptr)
 Input_Class :: struct {
 	id:      u16,
 	size:    int,
+	// The input struct's typeid, when the registrar knew it (the generated
+	// <game>_lane_init always does; a hand-built lane may leave it nil). It is a
+	// LOCAL resolver key only — never on the wire — so lane_input_of can name its
+	// class by TYPE instead of by size, which two input kinds can collide on
+	// after an innocent field add. nil = fall back to size (see class_for_type).
+	type:    typeid,
 	sample:  Sample_Proc,
 	ring:    Input_Ring, // client only: local inputs already fed to prediction
 	scratch: []u8,       // sample destination (size bytes)
@@ -445,7 +451,8 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 	l.inputs = make([dynamic]Input_Class, allocator)
 	if input_size > 0 {
 		// The primary input class (id 0). lane_set_sim attaches its sample;
-		// extra classes ride lane_add_input_class.
+		// extra classes ride lane_add_input_class; its TYPE (for lane_input_of)
+		// is stamped by lane_class_set_type — the generated lane_init does so.
 		lane_class_add(l, 0, input_size, nil, allocator)
 	}
 	l.rx = snap_rx_make(l.slots, allocator)
@@ -467,6 +474,23 @@ lane_add_input_class :: proc(l: ^Lane, id: u16, size: int, sample: Sample_Proc, 
 	assert(id != 0, "class 0 is lane_init's primary input — pass its size to lane_init")
 	assert(size > 0, "an input class needs a non-zero size (inputless entities take no class)")
 	lane_class_add(l, id, size, sample, allocator)
+}
+
+// Record a registered class's input STRUCT TYPE, so lane_input_of can name its
+// class by type instead of by size (two kinds can share a size after a field
+// add). The generated <game>_lane_init stamps every class right after it
+// registers; a hand-built lane may stamp its own or leave them size-resolved.
+// A `typeid` parameter can't carry a nil default in this Odin, which is why this
+// is a separate stamp rather than an argument on lane_init/lane_add_input_class
+// — and keeping it separate leaves the teaching signatures of those two clean.
+lane_class_set_type :: proc(l: ^Lane, id: u16, type: typeid) {
+	ic := lane_class(l, id)
+	assert(ic != nil, "lane_class_set_type: no input class with this id — register it first")
+	// Two classes claiming one type is no better a key than the size it replaced
+	// (distinct types of the same SIZE are exactly what this resolves).
+	other := class_for_type_exact(l, type)
+	assert(other == nil || other == ic, "two input classes share an input struct type — each kind needs its own")
+	ic.type = type
 }
 
 @(private = "file")
@@ -494,11 +518,31 @@ lane_class :: proc(l: ^Lane, id: u16) -> ^Input_Class {
 	return nil
 }
 
-// The class whose input struct is `size` bytes — lane_input_of resolves the
-// class from the typed T it was handed. Ambiguous only if two kinds share a
-// size, which the typed accessor can't disambiguate: then call lane_input.
+// The class that registered exactly `type`, or nil — the exact-match half of
+// class_for_type, split out so lane_class_add can assert uniqueness with it.
 @(private = "file")
-class_for_size :: proc(l: ^Lane, size: int) -> u16 {
+class_for_type_exact :: proc(l: ^Lane, type: typeid) -> ^Input_Class {
+	for &ic in l.inputs {
+		if ic.type != nil && ic.type == type {
+			return &ic
+		}
+	}
+	return nil
+}
+
+// The class lane_input_of means when handed a typed T. Resolves by TYPE first —
+// scriptgen records every class's input typeid, so the common case is exact and
+// unambiguous even when two kinds share a size (the footgun this replaced: add a
+// field to one input struct until it matches another's size, and the old
+// size-keyed resolver asserted or, worse, silently picked the wrong class). A
+// hand-built lane that registered no type falls back to size, which is
+// unambiguous only if no two classes share it — the old behaviour, kept for
+// consumers who never gave a type to resolve by.
+@(private = "file")
+class_for_type :: proc(l: ^Lane, type: typeid, size: int) -> u16 {
+	if ic := class_for_type_exact(l, type); ic != nil {
+		return ic.id
+	}
 	id: u16
 	n := 0
 	for &ic in l.inputs {
@@ -507,7 +551,7 @@ class_for_size :: proc(l: ^Lane, size: int) -> u16 {
 			n += 1
 		}
 	}
-	assert(n == 1, "lane_input_of: input size ambiguous across classes — use lane_input with an explicit class id")
+	assert(n == 1, "lane_input_of: input size ambiguous across classes and no type recorded — use lane_input with an explicit class id, or register the class with its type (the generated lane_init does)")
 	return id
 }
 
@@ -696,6 +740,22 @@ lane_claim :: proc(l: ^Lane, id: knet.Net_Id) {
 // the echo would double the flash) — but a fact minted in the AUTHORITY pass
 // (l.in_auth) includes them, because their everywhere pass never ran the
 // code that announced it.
+//
+// THE TRADE the everywhere-pass skip makes, named so it is not rediscovered as
+// a bug: it ASSUMES the owner's own everywhere pass fired the same fact from the
+// same input. True in the common case — the owner's input reached the host and
+// both passes ran it — but it BREAKS under input loss on the firing tick: the
+// host, missing that packet, HELD the owner's last input and its everywhere pass
+// fired the fact from the extrapolation, while the owner's client ran its own
+// FRESH input and may not have fired it. Skipped, the owner then never sees that
+// one-shot. It stays a skip, not a detect, on purpose: including the owner
+// whenever their input was held would DOUBLE-flash the (far more common) case
+// where the held input fired the same fact on both sides — a rare miss traded
+// for a rare double, no clear win, and facts are cosmetic one-shots the
+// "friends, not forensics" stance already lets loss drop. The guarantee, when a
+// game needs it (a fact the owner MUST see regardless of loss): fire it from the
+// AUTHORITY pass instead of the everywhere pass — l.in_auth includes them by the
+// rule above. That is the knob, not a flag on this call.
 lane_fact :: proc(l: ^Lane, entity: rawptr, args: []u8, kind: u16 = 0) {
 	assert(l.ses.is_host, "facts broadcast from the authority — the generated thunk holds this gate")
 	id := knet.NET_ID_INVALID
@@ -874,10 +934,12 @@ lane_input :: proc(l: ^Lane, player: knet.Player_Id, class: u16 = 0) -> (input: 
 // `drives` means an input EXISTS to drive with — held gaps repeat the last
 // real one, because driving through loss is the point; the raw lane_input's
 // ok is the FRESHNESS bit, for the rare caller that cares. The class is
-// resolved from T's size (the common case: one class per struct type); a lane
-// with two same-sized input kinds must call lane_input with an explicit id.
+// resolved from T's TYPE (scriptgen records it at registration), so two input
+// kinds that happen to share a size no longer collide; a hand-built lane that
+// registered no type falls back to size and must call lane_input with an
+// explicit id if two kinds share one.
 lane_input_of :: proc(l: ^Lane, player: knet.Player_Id, $T: typeid) -> (input: T, drives: bool) {
-	bytes, _ := lane_input(l, player, class_for_size(l, size_of(T)))
+	bytes, _ := lane_input(l, player, class_for_type(l, T, size_of(T)))
 	if bytes == nil {
 		return {}, false
 	}
