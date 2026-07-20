@@ -1391,8 +1391,11 @@ succession_names_the_torch_bearer_ahead_of_need :: proc(t: ^testing.T) {
 	for b in ([]^Peer_Box{&alice, &bob}) {
 		succ, info := ksess.session_successor(&b.s)
 		testing.expect_value(t, succ, alice.s.me)
-		testing.expect_value(t, len(info), 3)
-		testing.expect_value(t, info[2], u8(7))
+		// .bytes, not the value itself: Successor_Info is a struct precisely so
+		// the torch cannot be stringified (or indexed) by accident — reaching
+		// for the bytes is allowed, it just has to be meant.
+		testing.expect_value(t, len(info.bytes), 3)
+		testing.expect_value(t, info.bytes[2], u8(7))
 	}
 	drain(&alice.s)
 	drain(&bob.s)

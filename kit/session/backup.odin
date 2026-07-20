@@ -170,15 +170,34 @@ session_set_successor_info :: proc(s: ^Session, info: []u8) {
 	send_successor(s, BROADCAST_PEER)
 }
 
+// The torch's bytes, in a shape you cannot print by accident.
+//
+// This used to be a plain []u8, and for most of the kit's life it happened to
+// hold a human-readable "addr:port" — so a game logging its torch wrote
+// `string(info)` and it read fine. The day the rendezvous became a typed
+// binary record (a kind byte, a length-prefixed address, a u16 port) that line
+// kept COMPILING — []u8 converts to string, and so does a `distinct []u8`,
+// which was checked rather than assumed — and started printing raw bytes into
+// a log an acid test scraped. One unprintable string cost a whole succession
+// act, three failures deep, with the real machinery working the entire time.
+//
+// A struct is the smallest thing the compiler actually refuses to stringify.
+// The bytes are still right there for anyone who means it (`info.bytes`); what
+// is gone is the accident. To render a torch for a human, decode it —
+// netgd.succession_decode, then netgd.succession_words.
+Successor_Info :: struct {
+	bytes: []u8,
+}
+
 // Who carries the torch, and the rendezvous blob. Answers on BOTH roles:
 // a client reads what the wire delivered; the HOST reads what it authored
 // (it wrote the torch — an empty answer to its own question was a wart the
 // backup_target words halves fell into).
-session_successor :: proc(s: ^Session) -> (knet.Player_Id, []u8) {
+session_successor :: proc(s: ^Session) -> (knet.Player_Id, Successor_Info) {
 	if s.is_host {
-		return s.backup_target, s.succ_info
+		return s.backup_target, {bytes = s.succ_info}
 	}
-	return s.successor, s.successor_info
+	return s.successor, {bytes = s.successor_info}
 }
 
 // Called here and by the join parade (a late joiner hears the standing torch).

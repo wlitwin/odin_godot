@@ -1302,4 +1302,141 @@ echo "$out" | grep -q 'two sides of one line' \
 echo "$out" | grep -q 'Drop @(gd_half)' \
 	|| fail "the fact/half overlap refusal must name the fix"
 
+# ---------------------------------------------------------------------------
+# THE FORGOTTEN ATTRIBUTE — the same bug one step earlier than the sweep above.
+# `check_unpaired_halves` catches a half that DECLARED itself and paired with
+# nothing. This is the case nothing ever caught: exactly the right name, no
+# @(gd_half) at all. Scriptgen collects by attribute so it never looked; Odin
+# does not flag an unused package-level proc so it never looked either; the
+# consequence compiled, read correctly, and never fired. Every resolve_* pass
+# already computes the name before looking it up, so on a miss it asks the
+# package's proc index whether that exact name exists anyway — and when it
+# does, the answer is not "no half was written" but "one was, and never said
+# so".
+hf2="$work/half_undeclared"
+mkdir -p "$hf2"
+cat >"$hf2/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class H2Game
+package h2
+import gd "godot:godot"
+import knet "godot:kit/net"
+import kboot "godot:kit/boot"
+
+H2Game :: struct {
+	owner: gd.Node,
+	boot:  kboot.Boot,
+	mob:   gd.Object `gd:"entity=H2Mob:1"`,
+}
+ODIN
+cat >"$hf2/mob.odin" <<'ODIN'
+//gd:extends Node
+//gd:class H2Mob
+package h2
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+H2Mob :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 `gd:"replicate"`,
+}
+
+@(gd_command)
+h2_bump :: proc(self: ^H2Mob, n: i32) -> bool { self.hp += n; return true }
+
+h2_bump_then :: proc(game: ^H2Game, self: ^H2Mob, by: knet.Player_Id, n: i32) {}
+ODIN
+out="$("$SGEN" "$hf2" -godot:"$ROOT" 2>&1)"
+[[ $? -ne 0 ]] || fail "a correctly named half with no @(gd_half) must fail the build"
+echo "$out" | grep -q 'h2_bump_then exists but never declared itself' \
+	|| fail "the forgotten-attribute refusal must say the proc exists and never declared itself"
+echo "$out" | grep -q 'silently never fires' \
+	|| fail "the forgotten-attribute refusal must name the bug it is preventing"
+echo "$out" | grep -q 'Add @(gd_half)' \
+	|| fail "the forgotten-attribute refusal must name the fix, not just the problem"
+echo "$out" | grep -q 'collects halves by ATTRIBUTE' \
+	|| fail "the forgotten-attribute refusal must say why the name alone was not enough"
+# The weaker diagnostic stands down: "returns a payload but no `_then` consumes
+# it" only SUSPECTS the consequence is missing, and this one KNOWS it was
+# written. Both firing would argue for writing the proc sitting right there.
+echo "$out" | grep -q 'no `h2_bump_then` consequence proc consumes it' \
+	&& fail "the payload warning must not fire beside the refusal that supersedes it"
+
+# The other lookup sites reach the same answer — an entity hook, a delta edge
+# and a sim-lane apply, each named for what it would have been.
+cat >>"$hf2/game.odin" <<'ODIN'
+
+h2_mob_spawned :: proc(self: ^H2Game, id: knet.Net_Id, owner: knet.Player_Id) {}
+ODIN
+cat >>"$hf2/mob.odin" <<'ODIN'
+
+h2_mob_hp_edge :: proc(self: ^H2Mob, old, new: i32) {}
+h2_bump_apply :: proc(self: ^H2Mob, n: i32) {}
+ODIN
+out="$("$SGEN" "$hf2" -godot:"$ROOT" 2>&1)"
+[[ $? -ne 0 ]] || fail "undeclared halves at the hook/edge/apply sites must fail the build"
+echo "$out" | grep -q "h2_mob_spawned exists but never declared itself" \
+	|| fail "the entity spawn-hook site must demand the attribute too"
+echo "$out" | grep -q "h2_mob_hp_edge exists but never declared itself" \
+	|| fail "the delta-edge site must demand the attribute too"
+echo "$out" | grep -q "h2_bump_apply exists but never declared itself" \
+	|| fail "the sim-lane apply site must demand the attribute too"
+
+# THE NEGATIVE CONTROL. Name shadowing is THE way to take a generated thing over
+# by hand — census accessors, acid probes and the four transport forwards all
+# yield to a proc of their name, and every yield is ANNOUNCED, never refused.
+# The new demand keys on names the HALF passes compute, and no generated-yield
+# name is one of those, so a deliberate override must still land in `yielded:`
+# with a zero exit. A yield turning into an error would break the only override
+# mechanism the language has.
+rm -rf "$hf2" && mkdir -p "$hf2"
+cat >"$hf2/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class H2Game
+package h2
+import gd "godot:godot"
+import knet "godot:kit/net"
+import kboot "godot:kit/boot"
+
+H2Game :: struct {
+	owner: gd.Node,
+	boot:  kboot.Boot,
+	mob:   gd.Object `gd:"entity=H2Mob:1"`,
+}
+
+h2_mob_of :: proc(self: ^H2Game, id: knet.Net_Id) -> ^H2Mob { return nil }
+h2_mob_spawn :: proc(self: ^H2Game) -> ^H2Mob { return nil }
+probe_h2_mob_count :: proc(self: ^H2Game) -> gd.Int { return 0 }
+
+@(gd_method)
+on_packet :: proc(self: ^H2Game, id: gd.Int, packet: gd.Packed_Byte_Array) {}
+ODIN
+cat >"$hf2/mob.odin" <<'ODIN'
+//gd:extends Node
+//gd:class H2Mob
+package h2
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+H2Mob :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 `gd:"replicate"`,
+}
+
+@(gd_command)
+h2_bump :: proc(self: ^H2Mob, n: i32) -> bool { self.hp += n; return true }
+
+@(gd_half)
+h2_bump_then :: proc(game: ^H2Game, self: ^H2Mob, by: knet.Player_Id, n: i32) {}
+ODIN
+out="$("$SGEN" "$hf2" -godot:"$ROOT" 2>&1)"
+[[ $? -eq 0 ]] || fail "deliberately shadowed census/probe/forward names must still build: $out"
+echo "$out" | grep -q 'never declared itself' \
+	&& fail "a yielded proc must never be read as a forgotten half"
+for y in h2_mob_of h2_mob_spawn probe_h2_mob_count on_packet; do
+	echo "$out" | grep -q "yielded: $y" || fail "$y must still yield to the hand-written proc"
+done
+
 echo "SCRIPTGEN_OK"

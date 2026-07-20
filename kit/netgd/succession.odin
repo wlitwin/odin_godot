@@ -98,11 +98,11 @@ succession_destroy :: proc(sc: ^Succession) {
 
 // Parse a torch. kind == .None (ok=false) covers both "no torch yet" and a
 // foreign/corrupt one — the callers treat those identically (human flow).
-succession_decode :: proc(info: []u8) -> (rv: Rendezvous, ok: bool) {
-	if len(info) == 0 {
+succession_decode :: proc(info: ksess.Successor_Info) -> (rv: Rendezvous, ok: bool) {
+	if len(info.bytes) == 0 {
 		return {}, false
 	}
-	r := knet.reader_make(info)
+	r := knet.reader_make(info.bytes)
 	kind := Rendezvous_Kind(knet.read_u8(&r))
 	switch kind {
 	case .Native_Addr:
@@ -123,6 +123,24 @@ succession_decode :: proc(info: []u8) -> (rv: Rendezvous, ok: bool) {
 	}
 	rv.kind = kind
 	return rv, true
+}
+
+// A decoded torch, worded for a human — the log line every game writes when it
+// hears who carries the flame ("127.0.0.1:4591", "room QK7MP"). This exists
+// because the obvious way to get one used to be `string(info)` on the raw
+// blob: it compiled, it read fine while the rendezvous happened to be text,
+// and it printed garbage the day the record went binary. Now the raw form
+// refuses to stringify (ksess.Successor_Info) and this is the answer it points
+// at. Temp-allocated: log it, don't keep it.
+succession_words :: proc(rv: Rendezvous, allocator := context.temp_allocator) -> string {
+	switch rv.kind {
+	case .Native_Addr:
+		return fmt.aprintf("%s:%d", rv.addr, rv.port, allocator = allocator)
+	case .Web_Room:
+		return fmt.aprintf("room %s", rv.code, allocator = allocator)
+	case .None:
+	}
+	return ""
 }
 
 // Is there a usable torch to chase? A PEEK — nothing moves, so the game can

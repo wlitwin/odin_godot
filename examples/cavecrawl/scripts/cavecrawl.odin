@@ -403,8 +403,13 @@ cave_lobby_host_left :: proc(self: ^CaveLobby) {
 // before this half fired. The receipt reads the torch back.
 @(gd_half)
 cave_lobby_backup_target :: proc(self: ^CaveLobby, player: knet.Player_Id) {
+	// The torch is the kit's STRUCTURED rendezvous, not a printable string —
+	// decode it, then word it. (This line said `string(info)` for a while after
+	// the record went binary, and printed raw bytes into its own receipt; the
+	// blob's type refuses that now, and succession_words is what it points at.)
 	_, info := ksess.session_successor(&self.ses)
-	gd.print_str(fmt.tprintf("CAVE_TORCH_NAMED player=%d addr=%s", u64(player), string(info)))
+	rv, _ := netgd.succession_decode(info)
+	gd.print_str(fmt.tprintf("CAVE_TORCH_NAMED player=%d addr=%s", u64(player), netgd.succession_words(rv)))
 }
 
 // LIVE MIGRATION, everyone else's half: WORDS ONLY — the kit runs the

@@ -1360,7 +1360,7 @@ main :: proc() {
 	defer delete(method_claims)
 	cmd_calls := make([dynamic]Cmd_Call)
 	defer delete(cmd_calls)
-	proc_names := make(map[string]bool)
+	proc_names := make(map[string]Proc_Site)
 	defer delete(proc_names)
 	fact_decls := make([dynamic]Fact_Candidate)
 	defer delete(fact_decls)
@@ -1376,7 +1376,7 @@ main :: proc() {
 		scan_half_procs(&half_idx, l.path, l.src, &file)
 		scan_method_claims(&method_claims, l.path, l.src, &file, script_structs)
 		scan_command_calls(&cmd_calls, l.path, l.src, &file)
-		scan_proc_names(&proc_names, &file)
+		scan_proc_names(&proc_names, l.path, &file)
 		scan_fact_procs(&fact_decls, l.path, l.src, &file)
 		lint_attributed_receivers(l.path, l.src, &file, script_structs)
 	}
@@ -1388,14 +1388,19 @@ main :: proc() {
 	seen_entity_ids := make(map[int]string)
 	defer delete(seen_entity_ids)
 	for &pend in pending {
-		resolve_then(&pend.script, &half_idx)
-		resolve_tick_then(&pend.script, &half_idx)
-		resolve_edges(&pend.script, &half_idx)
-		resolve_session_events(&pend.script, &half_idx)
-		resolve_migration(&pend.script, &half_idx)
-		resolve_command_applies(&pend.script, &half_idx)
+		// `proc_names` rides along beside the half index: each pass looks a
+		// computed name up in the halves, and on a miss asks whether a proc by
+		// that exact name exists anyway — a half that was written and never
+		// declared itself (demand_half). Threaded, never a package global, so
+		// the passes stay callable in any order and testable one at a time.
+		resolve_then(&pend.script, &half_idx, proc_names)
+		resolve_tick_then(&pend.script, &half_idx, proc_names)
+		resolve_edges(&pend.script, &half_idx, proc_names)
+		resolve_session_events(&pend.script, &half_idx, proc_names)
+		resolve_migration(&pend.script, &half_idx, proc_names)
+		resolve_command_applies(&pend.script, &half_idx, proc_names)
 		validate_command_ids(&pend.script)
-		resolve_entities(&pend.script, by_struct, &seen_entity_ids, &half_idx)
+		resolve_entities(&pend.script, by_struct, &seen_entity_ids, &half_idx, proc_names)
 		resolve_census(&pend.script, proc_names)
 		resolve_probes(&pend.script, by_struct, proc_names)
 		resolve_boot_forwards(&pend.script)

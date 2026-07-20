@@ -1306,12 +1306,18 @@ scan_half_procs :: proc(idx: ^map[string]Half_Candidate, path, src: string, file
 // Pair `s`'s commands with their `<wrapper>_then` consequences and validate the
 // contract at build time — a mispaired consequence must be a build error here,
 // not a proc that silently never fires (the exact bug class the pairing kills).
-resolve_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
+resolve_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
 	for &cmd in s.commands {
 		wrapper := len(cmd.path) > 0 ? fmt.tprintf("%s_%s", to_snake(s.struct_name), cmd.name) : cmd.proc_name
 		then_name := fmt.tprintf("%s_then", wrapper)
 		cand, found := idx[then_name]
 		if !found {
+			// The consequence was WRITTEN and never declared — a stronger
+			// statement than the payload warning below, which only suspects a
+			// consequence is missing. Suppresses it: they are the same proc.
+			if demand_half(procs, then_name, fmt.tprintf("%s's consequence, run on the authority right after the verb applies", wrapper)) {
+				continue
+			}
 			// A direct verb's payload has exactly one consumer — its consequence.
 			// (A COMPOSED verb's payload is the block's offer; declining is fine.)
 			if cmd.payload_count > 0 && len(cmd.path) == 0 {
@@ -1613,7 +1619,7 @@ type_base :: proc(t: string) -> string {
 // Pair and validate one script's entity tags against the module. `by_struct`
 // maps every script struct name to its parsed Script; `seen_ids` accumulates
 // wire-id claims across the whole module (ids collide across FILES too).
-resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^map[int]string, idx: ^map[string]Half_Candidate) {
+resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^map[int]string, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
 	// Every generated name on the entity side is keyed by the TARGET struct
 	// (`<t>_spawn`, `<t>_of`, `<t>_owned_by`, `my_<t>`, `<t>_ids`, and the
 	// `<t>_spawned`/`<t>_freed` hooks it pairs). Two scene fields naming the
@@ -1663,6 +1669,8 @@ resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^m
 			}
 			cand.claimed = true
 			idx[sp_name] = cand
+		} else {
+			demand_half(procs, sp_name, fmt.tprintf("%s's spawn hook, dispatched from %s's entity table", e.target, s.struct_name))
 		}
 		fr_name := strings.concatenate({tsnake, "_freed"})
 		if cand, found := idx[fr_name]; found {
@@ -1671,6 +1679,8 @@ resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^m
 			}
 			cand.claimed = true
 			idx[fr_name] = cand
+		} else {
+			demand_half(procs, fr_name, fmt.tprintf("%s's free hook, dispatched from %s's entity table", e.target, s.struct_name))
 		}
 	}
 }
@@ -2096,15 +2106,76 @@ flatten_param_types :: proc(src: string, pt: ^ast.Proc_Type) -> []string {
 // Every top-level proc name in one file — the package-wide name set that
 // lets generated conveniences (census accessors) yield to hand-written
 // procs name by name instead of colliding.
-scan_proc_names :: proc(taken: ^map[string]bool, file: ^ast.File) {
+// One top-level proc as the name index sees it: where it was written, and
+// whether it DECLARED itself a half. Two passes ask this index questions that
+// are the same question from opposite sides. The yield paths (census
+// accessors, acid probes, transport forwards, and the fact door that refuses
+// instead of yielding) ask "is this generated name already a real proc?" — the
+// answer is presence alone, which is why `half` is ignored there and a
+// deliberate override still yields in silence. The half passes ask "is the
+// name I just failed to find in the half index a real proc that simply never
+// said so?" — see demand_half. `half` is what keeps that second question
+// honest: a proc that DID wear @(gd_half) and was refused during collection
+// (a config value on the attribute, an @(gd_fact) beside it) must never be
+// told to add the attribute it already has.
+Proc_Site :: struct {
+	loc:  Loc,
+	half: bool, // wore @(gd_half) — declared, whether or not collection accepted it
+}
+
+scan_proc_names :: proc(taken: ^map[string]Proc_Site, path: string, file: ^ast.File) {
 	for decl in file.decls {
 		vd, ok := decl.derived.(^ast.Value_Decl)
 		if !ok || len(vd.names) != 1 || len(vd.values) != 1 {continue}
 		if _, is_proc := vd.values[0].derived.(^ast.Proc_Lit); !is_proc {continue}
 		if ident, iok := vd.names[0].derived.(^ast.Ident); iok && ident != nil {
-			taken[ident.name] = true
+			taken[ident.name] = Proc_Site{loc = Loc{path, ident.pos.line}, half = has_attr(vd, "gd_half")}
 		}
 	}
+}
+
+// THE FORGOTTEN ATTRIBUTE — the last silent hole the pairing had.
+// check_unpaired_halves catches the MISNAMED half: it declared itself and
+// claimed nothing, so the sweep sees it and names the real pairing surface.
+// This catches the step before, which nothing has ever caught. Write
+// `gunner_buy_then` with exactly the right name and no @(gd_half), and NOTHING
+// looks at it — not scriptgen, which collects halves by ATTRIBUTE, and not
+// Odin, which does not flag an unused package-level proc. It compiles, it
+// reads correctly at the call site it isn't called from, and the consequence
+// never fires. That is the same bug as a typo'd suffix, one step earlier, and
+// the heuristics that were deleted did not reach it either.
+//
+// Every resolve_* pass already COMPUTES the name it wants before looking it
+// up, so the check costs one map probe on the path that was about to give up:
+// when the half index has no such name, ask the package's proc index whether a
+// proc by exactly that name exists anyway. If it does, this is not "no half
+// was written" — it is "a half was written and never said so", and the fix is
+// exact.
+//
+// WHERE IT IS NOT CALLED, and why. The refusal names @(gd_half) as the fix, so
+// it may only fire where adding @(gd_half) is in fact the fix. Two computed
+// names are refused OUTRIGHT when declared — a `_then` on a one-role session
+// event (that role never hears it) and a `_then` on a migration seam (the
+// seams have no `_then`) — and those sites keep their own refusals, which
+// already name the right fix. Elsewhere the follow-up may be a second error (a
+// `_edge` on a predicted field, an `_apply` on a class that doesn't tick), and
+// that is correct: both errors are true, the second is the one that teaches,
+// and a build that fails twice beats a proc that never fires.
+//
+// Returns whether it spoke, so a site holding a WEAKER diagnostic for the same
+// name can stand down — resolve_then's "returns a payload but no consequence
+// consumes it" warning is a guess that the consequence is missing, and this
+// knows it was written.
+@(private = "file")
+demand_half :: proc(procs: map[string]Proc_Site, name, is_the: string) -> bool {
+	site, exists := procs[name]
+	if !exists || site.half {return false}
+	error_at(
+		site.loc,
+		"%s exists but never declared itself — by name it is %s, but scriptgen collects halves by ATTRIBUTE (the name only decides WHAT they pair with), so with no @(gd_half) above it this is an ordinary proc nothing ever calls and the pairing silently never fires. Add @(gd_half), or rename it if it was never meant to pair.",
+		name, is_the,
+	)
+	return true
 }
 
 // The typed census accessors yield to the game, name by name: an existing
@@ -2112,9 +2183,12 @@ scan_proc_names :: proc(taken: ^map[string]bool, file: ^ast.File) {
 // keeps its meaning; the other three still generate. Sets the per-tag flags
 // generate() honors. Every yield is ANNOUNCED (note_yield) — a silent one is
 // indistinguishable from a typo in the override's name.
-resolve_census :: proc(s: ^Script, taken: map[string]bool) {
-	yield :: proc(taken: map[string]bool, name: string) -> bool {
-		if !taken[name] {return true}
+resolve_census :: proc(s: ^Script, taken: map[string]Proc_Site) {
+	// Presence alone decides a yield — a hand-written override wins whether or
+	// not it wears anything, and none of these five names is a pairing shape,
+	// so demand_half never looks at them and a yield stays silent.
+	yield :: proc(taken: map[string]Proc_Site, name: string) -> bool {
+		if _, hand := taken[name]; !hand {return true}
 		note_yield("census accessor", name)
 		return false
 	}
@@ -2151,7 +2225,7 @@ probe_scalar :: proc(type_text: string) -> (float, boolish, ok: bool) {
 // what this peer SEES with no game code. Per `entity=` kind: count, my-id,
 // and one per replicated scalar field. Needs the boot (the census resolves
 // through it); a hand-written proc wearing a probe's name wins, name by name.
-resolve_probes :: proc(s: ^Script, by_struct: map[string]^Script, taken: map[string]bool) {
+resolve_probes :: proc(s: ^Script, by_struct: map[string]^Script, taken: map[string]Proc_Site) {
 	if s.boot_field == "" || len(s.entities) == 0 {
 		return
 	}
@@ -2160,8 +2234,8 @@ resolve_probes :: proc(s: ^Script, by_struct: map[string]^Script, taken: map[str
 	if !iok || !fok {
 		return // unreachable: both are core Variant types
 	}
-	add :: proc(s: ^Script, taken: map[string]bool, p: Probe_Info, args: ..Arg) -> bool {
-		if taken[p.name] {
+	add :: proc(s: ^Script, taken: map[string]Proc_Site, p: Probe_Info, args: ..Arg) -> bool {
+		if _, hand := taken[p.name]; hand {
 			note_yield("acid probe", p.name) // hand-written wins
 			return false
 		}
@@ -2432,7 +2506,7 @@ scan_fact_procs :: proc(out: ^[dynamic]Fact_Candidate, path, src: string, file: 
 // (its tracked owner), and the despawn-drop all key on it. No anchor = a
 // WORLD fact: the authority alone causes it (mine=true on its screen), every
 // client presents it on the watch clock.
-resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, by_struct: map[string]^Script, taken: map[string]bool) {
+resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, by_struct: map[string]^Script, taken: map[string]Proc_Site) {
 	if len(decls) == 0 {return}
 
 	// The lane owner resolve_sim settled: the class carrying @(gd_sample) or a
@@ -2517,7 +2591,7 @@ resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, by_struct: ma
 			}
 		}
 		if reserved_clash {continue}
-		if taken[door] {
+		if _, hand := taken[door]; hand {
 			// THE ONE EXCEPTION to name-shadowing. Everywhere else in this
 			// language a hand-written proc of the generated name simply wins
 			// (census accessors, acid probes, the transport forwards — see
@@ -2667,7 +2741,7 @@ resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, by_struct: ma
 // a bootless class resolves nothing here (it has no generated dispatch to
 // call, so a stray half surfaces as an undeclared-name error at the call
 // site, never a silent no-fire).
-resolve_session_events :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
+resolve_session_events :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
 	if s.boot_field == "" {
 		return
 	}
@@ -2676,12 +2750,21 @@ resolve_session_events :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
 		bare_name := fmt.tprintf("%s_%s", snake, ev.suffix)
 		then_name := fmt.tprintf("%s_then", bare_name)
 		half := Event_Half{ev = ei}
+		// The `_then` is only DEMANDED on a two-role event. On a one-role one
+		// the declared form is refused outright below (that role never hears
+		// it), so @(gd_half) is not the fix there and naming it would send the
+		// author into a different error to learn the real answer.
+		if ev.role == .Every {
+			demand_half(procs, then_name, fmt.tprintf("the %s shell's authority-only ksess.%s half", s.struct_name, ev.variant))
+		}
 		if cand, found := idx[bare_name]; found {
 			cand.claimed = true
 			idx[bare_name] = cand
 			if check_event_half(s, ev, bare_name, cand) {
 				half.bare = bare_name
 			}
+		} else {
+			demand_half(procs, bare_name, fmt.tprintf("the %s shell's ksess.%s half", s.struct_name, ev.variant))
 		}
 		if cand, found := idx[then_name]; found {
 			// Claimed either way — a `_then` on a one-role event is a REAL
@@ -2772,7 +2855,7 @@ check_event_half :: proc(s: ^Script, ev: Session_Ev, name: string, cand: Half_Ca
 // generated `<snake>_succ_hooks` table carries them and the generated
 // `<snake>_events` tail drains the kit's noted succession, so no fork, no
 // wipe, no chase cap survives in game code.
-resolve_migration :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
+resolve_migration :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
 	if s.boot_field == "" {
 		return
 	}
@@ -2786,7 +2869,11 @@ resolve_migration :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
 			if check_migration_half(s, spec, name, cand) {
 				slots[i]^ = strings.clone(name)
 			}
+		} else {
+			demand_half(procs, name, fmt.tprintf("the %s shell's %q migration seam", s.struct_name, spec.suffix))
 		}
+		// No demand on the `_then`: migration seams have no two-role form, so
+		// the declared version is refused below and @(gd_half) is never its fix.
 		then_name := fmt.tprintf("%s_then", name)
 		if cand, found := idx[then_name]; found {
 			cand.claimed = true
@@ -2856,12 +2943,13 @@ check_migration_half :: proc(s: ^Script, spec: Migration_Half_Spec, name: string
 // game param — it replays inside the tick pipeline, where only sim state
 // exists. Declaring one on a class that doesn't tick is a build error: the
 // half IS the resim's property.
-resolve_command_applies :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
+resolve_command_applies :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
 	ticks := s.tick.proc_name != "" || len(s.block_ticks) > 0
 	for &c in s.commands {
 		name := fmt.tprintf("%s_apply", c.proc_name)
 		cand, found := idx[name]
 		if !found {
+			demand_half(procs, name, fmt.tprintf("%s's predicted effect, replayed by the sim lane's resim", c.proc_name))
 			continue
 		}
 		loc := Loc{path = cand.path, line = cand.line}
@@ -2923,12 +3011,17 @@ resolve_command_applies :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
 // Both optional, both also accept the game-less (self-first) shape. Payload
 // param TYPES are the compiler's to hold — the call site passes the tick's
 // returned values straight through.
-resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
+resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
 	if s.tick.proc_name == "" {
 		return
 	}
 	then_name := fmt.tprintf("%s_then", s.tick.proc_name)
 	fx_name := fmt.tprintf("%s_fx", s.tick.proc_name)
+	// Both asked, never short-circuited: forgetting the attribute on one half
+	// says nothing about the other, and hearing about only one would cost a
+	// second build to learn the rest.
+	undeclared := demand_half(procs, then_name, fmt.tprintf("%s's authority consequence", s.tick.proc_name))
+	if demand_half(procs, fx_name, fmt.tprintf("%s's owning-peer presentation", s.tick.proc_name)) {undeclared = true}
 	if game, _, ok := claim_tick_half(s, idx, then_name, true); ok {
 		s.tick.then_proc = then_name
 		s.tick.then_game = game
@@ -2969,7 +3062,10 @@ resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
 			}
 		}
 	}
-	if s.tick.payload_count > 0 && s.tick.then_proc == "" && s.tick.fx_proc == "" {
+	// `undeclared` stands the warning down: a half that exists and forgot to say
+	// so is already an error naming the same proc, and "nothing consumes the
+	// payload" would only argue for writing what is sitting right there.
+	if s.tick.payload_count > 0 && !undeclared && s.tick.then_proc == "" && s.tick.fx_proc == "" {
 		warn_at(
 			Loc{path = s.path, line = s.tick.line},
 			"tick %s returns a payload but neither `%s` nor `%s` consumes it",
@@ -2986,12 +3082,15 @@ resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
 // atomic old/new). Delta lane only, held here: predicted state resims and
 // owner-streamed state interpolates — each lane has its own presentation
 // answer, and an edge on either would misfire by construction.
-resolve_edges :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
+resolve_edges :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
 	snake := to_snake(s.struct_name)
 	for &r in s.replicates {
 		name := fmt.tprintf("%s_%s_edge", snake, strings.join(r.path, "_", context.temp_allocator))
 		cand, found := idx[name]
-		if !found {continue}
+		if !found {
+			demand_half(procs, name, fmt.tprintf("%s.%s's delta-lane edge", s.struct_name, strings.join(r.path, ".", context.temp_allocator)))
+			continue
+		}
 		cand.claimed = true
 		idx[name] = cand
 		loc := Loc{path = cand.path, line = cand.line}
