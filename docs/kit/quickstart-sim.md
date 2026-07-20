@@ -19,8 +19,8 @@ only explains what moves.
 ## Diff 1 — the retag (the whole wire migration)
 
 ```odin
-x, y: f32 `gd:"replicate,interp,owner,wire=f16"`   // coop: my stream, my truth
-x, y: f32 `gd:"replicate,predict,interp"`          // sim:  server truth, predicted here
+x, y: f32 `gd:"owner,interp,wire=f16"`   // coop: my stream, my truth
+x, y: f32 `gd:"predict,interp"`          // sim:  server truth, predicted here
 ```
 
 One word. The field's writer changes from "its owner's stream" to "the

@@ -44,10 +44,15 @@ Match :: enum u8 {
 // Where a token may appear inside the tag. FIRST tokens select the field's
 // KIND; SPEC tokens ride behind one, tuning it.
 //
-// (The split is not yet a rule the language enforces evenly — `entity=` is a
-// wire declaration riding as a spec while `profile=` is a first token, with no
-// derivable reason. It is recorded here so the inconsistency is a row in a
-// table rather than folklore.)
+// THE RULE, now that the language enforces it evenly: A WIRE DECLARATION IS A
+// FIRST TOKEN. If the thing folds into NET_FINGERPRINT — a lane, a profile row,
+// an entity's stable type id — it names the field's kind and leads the tag.
+// `entity=` used to ride as a spec of `export` while `profile=` led, with no
+// derivable reason, and this comment recorded that as known-and-unfixed; the
+// `entity=Name:id` first form retired it. What remains behind a first token is
+// genuinely subordinate: an export's Inspector dressing, a signal's parameter
+// names, a lane's tuning knobs. The `fingerprint` column below is the tell —
+// every true row is a First.
 Slot :: enum u8 {
 	First,
 	Spec,
@@ -56,7 +61,10 @@ Slot :: enum u8 {
 // WHO consumes the token — the fact the runtime's skip list is a projection
 // of. A Scriptgen token is fully handled at build time (it became a descriptor
 // table, a backup codec, a profile install); the runtime must therefore SKIP
-// it rather than report it as unknown.
+// it rather than report it as unknown. `entity=` is the one token BOTH halves
+// act on — scriptgen builds the factory table from it, and the runtime still
+// owes the Inspector the PackedScene slot the author no longer spells out — so
+// it is Reflect, and walk_field synthesizes the export it implies.
 Home :: enum u8 {
 	Reflect, // the runtime's reflection registrar acts on it
 	Scriptgen, // consumed entirely at build time; nothing to reflect
@@ -78,15 +86,46 @@ Field_Token :: struct {
 	blurb:       string,
 }
 
+// THE THREE LANES ARE THREE TOKENS. `owner` and `predict` used to be options
+// inside `gd:"replicate,…"`, which made the LANE — the one thing that decides
+// who writes the field's bytes — syntactically indistinguishable from a
+// tuning knob, and cost the parser a ~220-line pairwise constraint matrix
+// (owner-xor-predict, slack-needs-predict, glide/cut-needs-predict-and-interp)
+// whose every rule existed only because the lane came last. Leading with the
+// lane makes each lane's option set CLOSED and checkable on its own, and makes
+// the illegal combinations unspellable instead of merely rejected.
 FIELD_TOKENS :: []Field_Token {
 	{"export", .Exact, .First, .Reflect, false, "`export`", "an editor-visible property"},
 	{"onready=", .Prefix, .First, .Reflect, false, "`onready=PATH`", "an auto-wired node reference"},
-	{"replicate", .Exact, .First, .Scriptgen, true, "`replicate`", "a networked field (kit/net descriptors)"},
+	{"replicate", .Exact, .First, .Scriptgen, true, "`replicate`", "a networked field on the DELTA lane (kit/net descriptors)"},
+	{"owner", .Exact, .First, .Scriptgen, true, "`owner`", "a networked field streamed from its owning peer"},
+	{"predict", .Exact, .First, .Scriptgen, true, "`predict`", "a networked field the sim predicts and reconciles (kit/sim)"},
 	{"backup", .Exact, .First, .Scriptgen, true, "`backup`", "a field the session backup carries"},
 	{"manual", .Exact, .First, .Scriptgen, false, "`manual`", "I call the generated thing myself"},
 	{"profile=", .Prefix, .First, .Scriptgen, true, "`profile=T`", "the per-player profile row type"},
-	{"entity=", .Prefix, .Spec, .Scriptgen, true, "`entity=Name:id`", "a spawnable entity type and its stable id"},
+	{"entity=", .Prefix, .First, .Reflect, true, "`entity=Name:id`", "a spawnable entity type and its stable id (an exported PackedScene slot, synthesized)"},
 	{"args=", .Prefix, .Spec, .Reflect, false, "`args=a,b`", "a signal payload's parameter names"},
+}
+
+// The three replication lanes, in the order the docs table reads. Each is a
+// FIRST token; `replicate_lane` answers "is this token a lane, and which".
+Lane :: enum u8 {
+	None,
+	Delta, // `replicate` — host-authoritative, byte-diffed, `_edge` halves pair here
+	Owner, // `owner`     — streamed from the owning peer, interpolated
+	Predict, // `predict`   — sim-predicted, reconciled against server truth
+}
+
+replicate_lane :: proc(tok: string) -> Lane {
+	switch tok {
+	case "replicate":
+		return .Delta
+	case "owner":
+		return .Owner
+	case "predict":
+		return .Predict
+	}
+	return .None
 }
 
 // The token `tok` selects, if the vocabulary knows it. `tok` is one
@@ -185,7 +224,6 @@ EXPORT_SPECS :: []Export_Spec {
 	{"default", .Meta, false, true, "a scalar export's initial value"},
 	{"get", .Meta, false, true, "route reads through a proc"},
 	{"set", .Meta, false, true, "route writes through a proc"},
-	{"entity", .Meta, false, true, "`entity=Name:id` — this scene bodies a wire entity"},
 	{"range", .Hint, false, true, "`range=MIN:MAX[:STEP]` — a slider"},
 	{"enum", .Hint, false, true, "`enum=A:B:C` — a dropdown"},
 	{"multiline", .Hint, true, false, "a multi-line text box"},

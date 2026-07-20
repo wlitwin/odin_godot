@@ -141,7 +141,7 @@ Wire_Codec :: struct {
 // sample) and `b` (later sample) into the ENTITY field at `dst`. All three point
 // at exactly Field_Desc.size bytes. Authors declare one via the tag:
 //
-//     tint: [3]f32 `gd:"replicate,owner,interp=blend_oklab"`
+//     tint: [3]f32 `gd:"owner,interp=blend_oklab"`
 //
 //     blend_oklab :: proc(dst, a, b: rawptr, alpha: f32) { ... }
 //

@@ -113,7 +113,7 @@ stable wire id:
 
 ```odin
 // on CaveLobby — an ordinary drag-drop export, plus the declaration:
-chest_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Chest:2"`,
+chest_scene: ^gd.Resource `gd:"entity=Chest:2"`,
 ```
 
 `kboot.boot_entities(&self.boot, self, cave_lobby_entity_kinds[:])` — one call
@@ -145,7 +145,7 @@ everyone. That is the whole replication story: **change a field, done.**
 Give players' avatars owner-streamed fields:
 
 ```odin
-x, y: f32 `gd:"replicate,interp,owner"`,
+x, y: f32 `gd:"owner,interp"`,
 ```
 
 The OWNER writes them every frame; the toolkit ships last-value snapshots on
@@ -347,7 +347,7 @@ This tutorial built the friendslop shape: host-authoritative, friends-only,
 trust-your-peers. If the game you actually want is CONTESTED — a duel, a
 ranked ladder, anything where a client must not be trusted with its own
 position — the same declarative surface has a server-authoritative twin:
-tag fields `replicate,predict`, move their writes into a `@(gd_tick)`, and
+tag fields `predict`, move their writes into a `@(gd_tick)`, and
 rollback-resimulation with lag compensation comes generated. It is chosen
 per FIELD, so everything you built today (sessions, entities, verbs, chat,
 saves) carries over and the two models compose in one game. Read

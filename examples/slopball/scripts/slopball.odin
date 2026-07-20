@@ -74,8 +74,8 @@ Slopball :: struct {
 	// The authored bodies. Each tag's `entity=Name:id` IS the factory
 	// declaration — scriptgen generates the TYPE consts + the kind table,
 	// and kboot.boot_entities (ready(), below) instantiates/frees them.
-	kicker_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Kicker:1"`,
-	ball_scene:   ^gd.Resource `gd:"export,resource=PackedScene,entity=Ball:2"`,
+	kicker_scene: ^gd.Resource `gd:"entity=Kicker:1"`,
+	ball_scene:   ^gd.Resource `gd:"entity=Ball:2"`,
 
 	// The census is GENERATED (kicker_of / kicker_ids / kicker_owned_by) —
 	// what's left is the hot pointers the input and probes poke every frame.

@@ -1,7 +1,19 @@
-[gd_scene format=3]
+[gd_scene load_steps=2 format=3]
+
+; Floor 2's navmesh — same construction as floor 1 (see level_1.tscn), rift
+; moved to x 280..330, y 60..300. Down here the dens sit EAST of it and the
+; chest and door WEST, so every wave has to walk the ledges to reach the party
+; instead of the straight line it took upstairs. The 🦴 already hanging at
+; (320,200) is inside the gap, so the geometry has a body.
+[sub_resource type="NavigationPolygon" id="np_floor2"]
+vertices = PackedVector2Array(20, 20, 20, 60, 20, 300, 20, 350, 280, 20, 280, 60, 280, 300, 280, 350, 330, 20, 330, 60, 330, 300, 330, 350, 620, 20, 620, 60, 620, 300, 620, 350)
+polygons = [PackedInt32Array(0, 4, 5, 1), PackedInt32Array(1, 5, 6, 2), PackedInt32Array(2, 6, 7, 3), PackedInt32Array(4, 8, 9, 5), PackedInt32Array(6, 10, 11, 7), PackedInt32Array(8, 12, 13, 9), PackedInt32Array(9, 13, 14, 10), PackedInt32Array(10, 14, 15, 11)]
 
 [node name="Level2" type="Node2D"]
 modulate = Color(0.82, 0.86, 1, 1)
+
+[node name="Floor" type="NavigationRegion2D" parent="."]
+navigation_polygon = SubResource("np_floor2")
 
 [node name="ChestSpawn" type="Marker2D" parent="."]
 position = Vector2(200, 260)
@@ -25,13 +37,28 @@ offset_left = 140.0
 offset_top = 80.0
 text = "🪨"
 
+[node name="Rift1" type="Label" parent="."]
+offset_left = 292.0
+offset_top = 80.0
+text = "🕳"
+
+[node name="Rift2" type="Label" parent="."]
+offset_left = 292.0
+offset_top = 140.0
+text = "🕳"
+
 [node name="Stalactite" type="Label" parent="."]
 offset_left = 320.0
 offset_top = 200.0
 text = "🦴"
 
+[node name="Rift3" type="Label" parent="."]
+offset_left = 292.0
+offset_top = 250.0
+text = "🕳"
+
 [node name="Sign" type="Label" parent="."]
 modulate = Color(1, 1, 1, 0.35)
-offset_left = 240.0
+offset_left = 200.0
 offset_top = 340.0
-text = "· the deep warrens ·"
+text = "· the deep warrens · the rift runs deeper here ·"

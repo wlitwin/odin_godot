@@ -425,7 +425,7 @@ import knet "godot:kit/net"
 FPawn :: struct {
 	owner:  gd.Node2d,
 	net_id: knet.Net_Id,
-	x:      f32 `gd:"replicate,predict"`,
+	x:      f32 `gd:"predict"`,
 }
 
 @(gd_tick)
@@ -846,14 +846,19 @@ if [ "$SGEN_RC" -eq 0 ]; then
 	echo "REPGEN_FAIL: unknown replicate option was accepted by scriptgen"
 	exit 1
 fi
-if ! echo "$SGEN_OUT" | grep -q "unknown replicate option"; then
+if ! echo "$SGEN_OUT" | grep -q 'unknown `replicate` option'; then
 	echo "REPGEN_FAIL: scriptgen error doesn't explain the unknown option:"
 	echo "$SGEN_OUT" | tail -3
 	exit 1
 fi
 echo "  ok  unknown replicate option rejected at scriptgen time"
 
-# ---- (4a): `owner` and `predict` on one field — two authority lanes, an error ----
+# ---- (4a): two LANE tokens on one field — two writers, one field, an error ----
+# This used to be `gd:"replicate,owner,predict"` caught by a pairwise
+# owner-xor-predict rule at the bottom of the parser. With the lane as the FIRST
+# token the rule is gone: a second lane token is diagnosed AS a lane, at the
+# point it appears, and the delta-lane-with-options spellings that needed the
+# matrix are simply unspellable.
 LANES="$TMP/lanes"
 mkdir -p "$LANES"
 cat > "$LANES/torn.odin" <<'EOF'
@@ -865,7 +870,7 @@ import gd "godot:godot"
 
 Torn :: struct {
 	owner: gd.Node,
-	x:     f32 `gd:"replicate,owner,predict"`, // two writers, one field: refused
+	x:     f32 `gd:"owner,predict"`, // two writers, one field: refused
 }
 
 torn_ready :: proc(self: ^Torn) {}
@@ -875,15 +880,50 @@ LANES_OUT="$(run_scriptgen "$LANES" 2>&1)"
 LANES_RC=$?
 set -e
 if [ "$LANES_RC" -eq 0 ]; then
-	echo "REPGEN_FAIL: owner+predict on one field was accepted by scriptgen"
+	echo "REPGEN_FAIL: two lane tokens on one field was accepted by scriptgen"
 	exit 1
 fi
-if ! echo "$LANES_OUT" | grep -q "mutually exclusive"; then
+if ! echo "$LANES_OUT" | grep -q "is a LANE, not an option"; then
 	echo "REPGEN_FAIL: scriptgen error doesn't explain the lane conflict:"
 	echo "$LANES_OUT" | tail -3
 	exit 1
 fi
-echo "  ok  owner+predict lane conflict rejected at scriptgen time"
+echo "  ok  two lane tokens on one field rejected at scriptgen time"
+
+# ---- (4a0): the OLD lane-as-option grammar is refused, naming the rewrite ----
+# Three games build against a vendored copy of this addon; the migration error
+# is the whole of their upgrade experience, so it is asserted here as a wire
+# contract would be.
+OLDL="$TMP/oldlane"
+mkdir -p "$OLDL"
+cat > "$OLDL/legacy.odin" <<'EOF'
+//gd:extends Node
+//gd:class Legacy
+package repgen_oldlane
+
+import gd "godot:godot"
+
+Legacy :: struct {
+	owner: gd.Node,
+	x, y:  f32 `gd:"replicate,interp,owner,wire=f16"`,
+}
+
+legacy_ready :: proc(self: ^Legacy) {}
+EOF
+set +e
+OLDL_OUT="$(run_scriptgen "$OLDL" 2>&1)"
+OLDL_RC=$?
+set -e
+if [ "$OLDL_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: the old lane-as-option grammar was silently accepted"
+	exit 1
+fi
+if ! echo "$OLDL_OUT" | grep -q 'write `gd:"owner,interp,wire=f16"`'; then
+	echo "REPGEN_FAIL: the old-form refusal must spell the replacement tag:"
+	echo "$OLDL_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  old lane-as-option form refused with its exact rewrite"
 
 # ---- (4a1b): gd:"backup" on a non-restorable type (a slice) is refused ----
 BADBK="$TMP/badbackup"
@@ -1211,7 +1251,7 @@ import gd "godot:godot"
 
 Spinny :: struct {
 	owner: gd.Node,
-	angle: f32 `gd:"replicate,predict"`,
+	angle: f32 `gd:"predict"`,
 }
 
 @(gd_tick)
@@ -1264,7 +1304,7 @@ if [ "$NOP_RC" -eq 0 ]; then
 	echo "REPGEN_FAIL: @(gd_tick) without predict fields was accepted by scriptgen"
 	exit 1
 fi
-if ! echo "$NOP_OUT" | grep -q 'replicate,predict'; then
+if ! echo "$NOP_OUT" | grep -q 'gd:"predict" fields'; then
 	echo "REPGEN_FAIL: scriptgen error doesn't point at the missing predict tag:"
 	echo "$NOP_OUT" | tail -3
 	exit 1
@@ -1286,7 +1326,7 @@ import gd "godot:godot"
 
 Blip :: struct {
 	owner: gd.Node,
-	x:     f32 `gd:"replicate,predict"`,
+	x:     f32 `gd:"predict"`,
 }
 
 @(gd_tick)
@@ -1323,7 +1363,7 @@ import gd "godot:godot"
 
 Hum :: struct {
 	owner: gd.Node,
-	x:     f32 `gd:"replicate,predict"`,
+	x:     f32 `gd:"predict"`,
 }
 
 @(gd_tick)
@@ -1366,8 +1406,8 @@ import gd "godot:godot"
 
 Comet :: struct {
 	owner: gd.Node,
-	x:     f32 `gd:"replicate,predict"`,
-	tail:  f32 `gd:"replicate,owner"`,
+	x:     f32 `gd:"predict"`,
+	tail:  f32 `gd:"owner"`,
 }
 
 @(gd_tick)
@@ -1396,7 +1436,7 @@ if ! echo "$EDG_OUT" | grep -q "mine-form"; then
 	echo "$EDG_OUT" | tail -3
 	exit 1
 fi
-if ! echo "$EDG_OUT" | grep -q "OWNER-STREAMED"; then
+if ! echo "$EDG_OUT" | grep -q 'is on the `gd:"owner"` lane'; then
 	echo "REPGEN_FAIL: the owner-field edge error doesn't explain the stream lane:"
 	echo "$EDG_OUT" | tail -3
 	exit 1
@@ -1419,7 +1459,7 @@ import gd "godot:godot"
 
 Wisp :: struct {
 	owner: gd.Node,
-	x:     f32 `gd:"replicate,predict"`,
+	x:     f32 `gd:"predict"`,
 }
 
 @(gd_tick)
@@ -1505,7 +1545,7 @@ import knet "godot:kit/net"
 
 Den :: struct {
 	owner:     gd.Node,
-	mob_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Mob:1"`,
+	mob_scene: ^gd.Resource `gd:"entity=Mob:1"`,
 }
 EOF
 cat > "$UNH/mob.odin" <<'EOF'
@@ -1586,7 +1626,7 @@ import gd "godot:godot"
 
 Racer :: struct {
 	owner: gd.Node,
-	x:     f32 `gd:"replicate,predict"`,
+	x:     f32 `gd:"predict"`,
 }
 
 Racer_Input :: struct {
@@ -1634,7 +1674,7 @@ import gd "godot:godot"
 
 Dally :: struct {
 	owner: gd.Node,
-	x:     f32 `gd:"replicate,predict"`,
+	x:     f32 `gd:"predict"`,
 }
 
 Dally_Input :: struct {
@@ -1679,7 +1719,7 @@ import gd "godot:godot"
 
 Refy :: struct {
 	owner: gd.Node,
-	x:     f32 `gd:"replicate,predict"`,
+	x:     f32 `gd:"predict"`,
 }
 
 @(gd_tick)
@@ -1749,9 +1789,13 @@ if ! echo "$APL_OUT" | grep -q "doesn't tick"; then
 fi
 echo "  ok  a _apply half on a non-ticking class rejected at scriptgen time"
 
-# ---- (4a2d): slack= misuse — a reconcile knob, float-and-predict only ----
-# slack on a DISCRETE predicted field would be silently ignored (discrete state
-# reconciles exactly); scriptgen must reject it, and slack on a non-predict field.
+# ---- (4a2d): slack= misuse, in the TWO shapes the lane-first grammar leaves ----
+# On a DISCRETE predicted field slack would be silently ignored (discrete state
+# reconciles exactly), so that stays a real per-lane type check. Off the predict
+# lane entirely it is no longer a "knob without its lane" — `slack=` is simply
+# not in the delta lane's option set, and the refusal names what that lane takes.
+# That swap is the whole point of hoisting the lane: a cross-token implication
+# became a membership question.
 SLK="$TMP/slk"
 mkdir -p "$SLK"
 cat > "$SLK/loosy.odin" <<'EOF'
@@ -1763,8 +1807,8 @@ import gd "godot:godot"
 
 Loosy :: struct {
 	owner: gd.Node,
-	flag:  u8 `gd:"replicate,predict,slack=0.5"`, // discrete: slack is meaningless
-	x:     f32 `gd:"replicate,predict"`,
+	flag:  u8 `gd:"predict,slack=0.5"`, // discrete: slack is meaningless
+	x:     f32 `gd:"predict"`,
 }
 
 @(gd_tick)
@@ -1796,7 +1840,7 @@ import gd "godot:godot"
 
 Coldy :: struct {
 	owner: gd.Node,
-	x:     f32 `gd:"replicate,interp,slack=0.5"`, // not predicted: reconcile knob has no lane
+	x:     f32 `gd:"replicate,interp,slack=0.5"`, // delta lane: slack isn't one of its options
 }
 EOF
 set +e
@@ -1807,7 +1851,7 @@ if [ "$SLK2_RC" -eq 0 ]; then
 	echo "REPGEN_FAIL: slack= on a non-predict field was accepted by scriptgen"
 	exit 1
 fi
-if ! echo "$SLK2_OUT" | grep -q "reconcile knob"; then
+if ! echo "$SLK2_OUT" | grep -q 'unknown `replicate` option'; then
 	echo "REPGEN_FAIL: scriptgen error doesn't explain the slack/predict contract:"
 	echo "$SLK2_OUT" | tail -3
 	exit 1
@@ -1828,7 +1872,7 @@ import gd "godot:godot"
 
 Snappy :: struct {
 	owner: gd.Node,
-	x:     f32 `gd:"replicate,predict,glide=0.1"`, // predicted but not interp: snaps, no glide
+	x:     f32 `gd:"predict,glide=0.1"`, // predicted but not interp: snaps, no glide
 }
 
 @(gd_tick)
@@ -1897,7 +1941,7 @@ import gd "godot:godot"
 
 Twicey :: struct {
 	owner: gd.Node,
-	x:     f32 `gd:"replicate,predict"`,
+	x:     f32 `gd:"predict"`,
 }
 
 @(gd_tick)
@@ -1939,7 +1983,7 @@ package repgen_btk
 import gd "godot:godot"
 
 Hub :: struct {
-	spin: f32 `gd:"replicate,predict"`,
+	spin: f32 `gd:"predict"`,
 }
 
 Hub_In :: struct {
@@ -1984,7 +2028,7 @@ cat > "$SHF/root/play/heat.odin" <<'EOF'
 package play
 
 Heat :: struct {
-	warmth: u16 `gd:"replicate,predict"`,
+	warmth: u16 `gd:"predict"`,
 }
 
 @(gd_tick)
@@ -2041,7 +2085,7 @@ import psim "godot:play/sim"
 Keeper :: struct {
 	owner:  gd.Node,
 	net_id: knet.Net_Id,
-	x:      f32 `gd:"replicate,predict"`,
+	x:      f32 `gd:"predict"`,
 	tally:  psim.Tally, // no predict fields on the SIM shelf: rejected
 }
 
@@ -2170,7 +2214,7 @@ if [ "$CMD1_RC" -eq 0 ]; then
 	echo "REPGEN_FAIL: a command without net_id/replicates was accepted by scriptgen"
 	exit 1
 fi
-echo "$CMD1_OUT" | grep -q 'no gd:"replicate" fields' \
+echo "$CMD1_OUT" | grep -q 'no networked fields' \
 	|| { echo "REPGEN_FAIL: missing the no-replicates command error"; echo "$CMD1_OUT" | tail -3; exit 1; }
 echo "$CMD1_OUT" | grep -q 'no `net_id: knet.Net_Id` field' \
 	|| { echo "REPGEN_FAIL: missing the no-net_id command error"; echo "$CMD1_OUT" | tail -3; exit 1; }
@@ -2283,9 +2327,9 @@ import knet "godot:kit/net"
 
 Den :: struct {
 	owner:   gd.Node2d,
-	a_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Gremlin:5"`,
-	b_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Gremlin:5"`, // duplicate wire id
-	c_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Ghost:9"`,   // no such struct
+	a_scene: ^gd.Resource `gd:"entity=Gremlin:5"`,
+	b_scene: ^gd.Resource `gd:"entity=Gremlin:5"`, // duplicate wire id
+	c_scene: ^gd.Resource `gd:"entity=Ghost:9"`,   // no such struct
 }
 
 gremlin_spawned :: proc(game: ^Den, self: ^Gremlin, id: knet.Net_Id) { // missing the owner param

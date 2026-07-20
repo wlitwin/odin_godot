@@ -594,7 +594,7 @@ lane_set_sim :: proc(l: ^Lane, user: rawptr, sample: Sample_Proc, step: Step_Pro
 lane_track :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, desc: ^knet.Entity_Desc, owner: knet.Player_Id, allocator := mem.Allocator{}) {
 	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	assert(!l.rewound, "lane_track inside a rewound block — the restore holds pointers into the track list; lane_rewound_end first")
-	assert(predict_size(desc) > 0, "lane_track: entity predicts nothing — tag fields gd:\"replicate,predict\"")
+	assert(predict_size(desc) > 0, "lane_track: entity predicts nothing — tag fields gd:\"predict\"")
 	if l.ses.is_host {
 		hist := new(History, allocator)
 		hist^ = history_make(desc, l.slots, allocator)

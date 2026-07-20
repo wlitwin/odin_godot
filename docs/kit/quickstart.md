@@ -33,7 +33,7 @@ Player :: struct {
 	owner:  gd.Node2d,
 	skin:   gd.Polygon2d `gd:"onready=Skin"`,
 	net_id: knet.Net_Id,
-	x, y:   f32 `gd:"replicate,interp,owner,wire=f16"`,
+	x, y:   f32 `gd:"owner,interp,wire=f16"`,
 	pid:    u8 `gd:"replicate"`, // the seat this square belongs to (its color)
 	mine:   bool, // set by the census hook: this peer drives this body
 	tinted: bool,
@@ -89,7 +89,7 @@ HelloNet :: struct {
 	ses:     ksess.Session,
 	comms:   kcomms.Comms,
 	boot:    kboot.Boot,
-	player_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Player:1"`,
+	player_scene: ^gd.Resource `gd:"entity=Player:1"`,
 	me: ^Player,
 }
 
@@ -212,7 +212,7 @@ $GODOT --path examples/hello_net                  # window 2: press Join
 
 **Checkpoint:** two colored squares in both windows; arrows move *your*
 square, and the other window's copy glides after it. That glide is the
-owner-stream + interpolation you declared with `gd:"replicate,interp,owner"`
+owner-stream + interpolation you declared with `gd:"owner,interp"`
 — you wrote none of it.
 
 Then make the wire honest: `HELLO_LATENCY=120 $GODOT --path

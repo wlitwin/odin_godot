@@ -36,7 +36,7 @@ Ball :: struct {
 	// The sim lane — contested: predicted on every screen. The physics ride
 	// the embed (config — friction/cap/bounce/walls — is set at spawn).
 	roll: psim.Roller,
-	hold: u16 `gd:"replicate,predict"`, // kickoff freeze, itself predicted
+	hold: u16 `gd:"predict"`, // kickoff freeze, itself predicted
 
 	// The delta lane beside it — the authority's ledger of consequence, as
 	// ONE field: the scoreboard is one VALUE (l, r, and the match verdict

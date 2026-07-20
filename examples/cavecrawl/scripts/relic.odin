@@ -22,7 +22,7 @@ Relic :: struct {
 	owner:  gd.Node2d,
 	glyph:  gd.Label `gd:"onready=Glyph"`,
 	net_id: knet.Net_Id,
-	x, y:   f32 `gd:"replicate,interp,owner,wire=f16"`,
+	x, y:   f32 `gd:"owner,interp,wire=f16"`,
 }
 
 // Take it (only meaningful while it rests — the consequence checks the

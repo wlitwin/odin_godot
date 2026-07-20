@@ -80,6 +80,50 @@ Bad :: struct {
 	synced:    i32 `gd:"replicate,interp"`, // kit/net tag: scriptgen's, NOT an error, NOT an export
 }
 
+// `gd:"entity=Name:id"` — the one tag BOTH halves of the toolchain act on, and the
+// only one that SYNTHESIZES its own leading tokens. It leads the tag because it is a
+// wire declaration (a permanent public type id, a NET_FINGERPRINT input, a row in the
+// generated factory table); it used to ride as a trailing spec of `export`, which
+// meant every entity field in every game spelled out `export,resource=PackedScene`
+// before getting to say the one thing the tag was for. An entity field is NECESSARILY
+// an exported PackedScene — the scene IS what the factory instantiates — so the
+// registrar puts both back. `deco` proves trailing export specs still ride behind, and
+// `plain` is the control: the same hint, spelled the ordinary way, must be identical.
+Entities :: struct {
+	owner:     gd.Node,
+	mob_scene: gd.Object `gd:"entity=Mob:3"`,
+	deco:      gd.Object `gd:"entity=Chest:4,group=Spawns"`,
+	plain:     gd.Object `gd:"export,resource=PackedScene"`,
+}
+
+@(test)
+entity_first_synthesizes_its_export :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	desc := rt.reflect_class_desc(Entities, info("Entities"))
+	// No "unknown gd tag" — a first token the registrar didn't know would land here.
+	testing.expect_value(t, len(new_errors_since(before)), 0)
+	// Three exports: the tag registers the property the author no longer writes.
+	testing.expect_value(t, int(desc.exports_count), 3)
+
+	ctl, ctl_ok := find_export(desc, "plain")
+	testing.expectf(t, ctl_ok, "the control export is missing")
+	if !ctl_ok {return}
+	for name in ([]string{"mob_scene", "deco"}) {
+		ex, ok := find_export(desc, name)
+		testing.expectf(t, ok, "entity export %s missing — the synthesis dropped the field", name)
+		if !ok {continue}
+		// Byte-for-byte the hint `resource=PackedScene` produces: 17 is
+		// Property_Hint.Resource_Type, and a drift here is an Inspector slot that
+		// silently accepts the wrong resource.
+		testing.expect_value(t, ex.hint, ctl.hint)
+		testing.expect_value(t, string(ex.hint_string), string(ctl.hint_string))
+		testing.expect_value(t, ex.type, ctl.type)
+	}
+	// Trailing export specs still ride behind the declaration.
+	deco, _ := find_export(desc, "deco")
+	testing.expect_value(t, string(deco.group), "Spawns")
+}
+
 // Signal fields (gd.Signal0 … Signal4): detected by TYPE (tag optional), the field name
 // is the signal name, `args=` names the payload (else arg0…). `score` checks routing —
 // signal fields and tagged exports coexist in one struct.

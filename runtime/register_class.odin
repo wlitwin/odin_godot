@@ -277,6 +277,17 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 		return
 	}
 
+	// `gd:"entity=Name:id"` — the one token BOTH halves act on. scriptgen builds
+	// the factory table from it; the Inspector still needs the PackedScene slot
+	// the author no longer spells out, so the `export` and `resource=PackedScene`
+	// the declaration IMPLIES are synthesized here, mirroring scriptgen's
+	// synthesis at build time. Trailing export specs (group=, default=) ride
+	// behind and are parsed by the loop below exactly as they always were.
+	entity_first := strings.has_prefix(tok0, "entity=")
+	if entity_first {
+		tok0 = "export"
+	}
+
 	if tok0 != "export" {
 		if strings.has_prefix(tok0, "args=") {
 			record_error(cls, name_c, "`args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)")
@@ -356,9 +367,6 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 			want_get = true
 		case "set":
 			want_set = true
-		case "entity":
-			// `entity=Name:id` — a BUILD-TIME declaration (scriptgen generates the
-			// kboot entity table from it); the Inspector sees an ordinary export.
 		case:
 			// Anything else is a hint spec (range/enum/multiline/file/resource/...).
 			if has_hint {
@@ -371,6 +379,18 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 				ex.hint = h
 				ex.hint_string = hs
 			}
+		}
+	}
+
+	// The other half of the `entity=` synthesis: the PackedScene hint the tag no
+	// longer spells. Applied AFTER the loop so a trailing spec can't be silently
+	// outranked by it — an author-supplied hint beside `entity=` is scriptgen's
+	// error to report at build time, not something to overwrite here at boot.
+	if entity_first && !has_hint {
+		if h, hs, hok := parse_hint_spec(cls, name_c, "resource", "PackedScene", vt); hok {
+			has_hint = true
+			ex.hint = h
+			ex.hint_string = hs
 		}
 	}
 

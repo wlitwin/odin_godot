@@ -6,7 +6,7 @@ package kit_sim_test
 //   odin test tests/kitsim -collection:godot=$PWD
 //
 // The Mover struct + hand-built Entity_Desc stand in for what scriptgen's
-// gd:"replicate,predict" will generate in a later phase — like kit/net, the
+// gd:"predict" will generate in a later phase — like kit/net, the
 // core must be fully exercisable without codegen. The mini-sim here is the
 // documentation of the tick-proc contract in executable form: a pure step of
 // (predicted fields, input), deterministic under replay.

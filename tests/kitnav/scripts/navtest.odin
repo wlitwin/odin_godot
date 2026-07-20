@@ -27,6 +27,12 @@ nav_test_process :: proc(self: ^NavTest, delta: f64) {
 	self.frames += 1
 	if self.frames < 5 {return} // regions sync on the server's physics cadence
 
+	// The lane claim kit/nav default-denies without. This test has no session
+	// and no lane at all, so "never resimulates" is trivially true here — but
+	// the module makes even the trivial case say it out loud, because the
+	// whole point is that no query anywhere gets to skip the question.
+	knav.pass_never_resims()
+
 	path := knav.path_2d(self.owner, FROM, TO, context.temp_allocator)
 	max_y := f32(0)
 	for p in path {

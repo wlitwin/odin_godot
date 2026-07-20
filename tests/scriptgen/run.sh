@@ -395,7 +395,7 @@ grep -q "offset_of(type_of(Caster{}.lob), cooldown)" "$agen" || fail "the flat c
 grep -q "offset_of(type_of(Caster{}.lob), cd)" "$agen" || fail "the cooldown cd must compose through the block"
 
 # ---- fixture 12: play.Channel — owner-streamed block state + a composed claim ----
-# The third authority model through an embed: the block's `gd:"replicate,owner"` fields must carry
+# The third authority model through an embed: the block's `gd:"owner"` fields must carry
 # the .Owner_Stream flag through composition, and its plain claim command must hoist.
 ch="$work/chancomp"
 mkdir -p "$ch"
@@ -695,7 +695,7 @@ import kboot "godot:kit/boot"
 PrGame :: struct {
 	owner:      gd.Node,
 	boot:       kboot.Boot,
-	mob_scene:  ^gd.Resource `gd:"export,resource=PackedScene,entity=Mob:1"`,
+	mob_scene:  ^gd.Resource `gd:"entity=Mob:1"`,
 }
 
 // The suppression: a hand-written probe wearing the generated name wins.
@@ -1026,5 +1026,166 @@ for src in "build/common.sh" "build/build_scripts.ps1"; do
         fail "$src's attribute allowlist has drifted from decl.ATTRS: schema=[$(echo $schema_attrs)] build=[$(echo $have)]"
     fi
 done
+
+# ---------------------------------------------------------------------------
+# THE TWO GRAMMAR BREAKS, and the only thing that makes them survivable: a
+# refusal that names the REPLACEMENT TAG. Three games build against a vendored
+# copy of this addon and are not in this tree, so for them the error message IS
+# the upgrade documentation. Accepting both spellings was never on the table —
+# a language with two forms for one declaration teaches neither — which puts
+# the entire migration weight on these strings.
+gr="$work/grammar"
+mkdir -p "$gr"
+
+# (a) THE LANE IS THE FIRST TOKEN. `owner`/`predict` used to be options inside
+# `gd:"replicate,…"`, which cost the parser a pairwise constraint matrix and
+# hid the one decision that matters (who writes these bytes) among smoothing
+# constants. Each old form must answer with its exact rewrite.
+cat >"$gr/mob.odin" <<'ODIN'
+//gd:extends Node
+//gd:class GrMob
+package gr
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+GrMob :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	x, y:   f32 `gd:"replicate,interp,owner,wire=f16"`,
+	hp:     i32 `gd:"replicate,predict"`,
+}
+ODIN
+out="$("$SGEN" "$gr" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "the old lane-as-option form must fail the build, not be quietly accepted"
+echo "$out" | grep -q 'is the old lane-as-option form' \
+	|| fail "the old lane form must be named as OLD, not reported as an unknown option"
+echo "$out" | grep -q 'write `gd:"owner,interp,wire=f16"`' \
+	|| fail "the refusal must spell the rewritten tag (options kept, lane hoisted) — it is the whole upgrade"
+echo "$out" | grep -q 'write `gd:"predict"`' \
+	|| fail "a bare replicate,predict must rewrite to the bare predict lane"
+
+# The lane's option set is CLOSED, which is what replaced the matrix: `slack=`
+# is not "an option that requires predict", it is an option the predict lane
+# HAS — so on the delta lane it is simply unknown, and the error names what
+# that lane does take rather than a cross-token implication to reconstruct.
+cat >"$gr/mob.odin" <<'ODIN'
+//gd:extends Node
+//gd:class GrMob
+package gr
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+GrMob :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	x:      f32 `gd:"replicate,slack=0.5"`,
+	y:      f32 `gd:"owner,cut=32"`,
+}
+ODIN
+out="$("$SGEN" "$gr" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "a knob outside its lane's option set must fail the build"
+echo "$out" | grep -q 'unknown `replicate` option "slack=0.5" — the replicate lane takes' \
+	|| fail "an off-lane knob must be answered by the lane's own closed option set"
+echo "$out" | grep -q 'unknown `owner` option "cut=32" — the owner lane takes' \
+	|| fail "the owner lane must name its own options, not predict's"
+
+# One lane per field, said as such: a second lane token is not an unknown
+# option, it is two writers fighting over the same bytes.
+cat >"$gr/mob.odin" <<'ODIN'
+//gd:extends Node
+//gd:class GrMob
+package gr
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+GrMob :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	x:      f32 `gd:"owner,predict"`,
+}
+ODIN
+out="$("$SGEN" "$gr" -godot:"$ROOT" 2>&1)"
+[[ $? -ne 0 ]] || fail "two lane tokens on one field must fail the build"
+echo "$out" | grep -q 'is a LANE, not an option' \
+	|| fail "a second lane token must be diagnosed as a lane, not as a typo'd option"
+
+# All three lanes, spelled the new way, must BUILD — the gate refuses the old
+# grammar, not the language.
+cat >"$gr/mob.odin" <<'ODIN'
+//gd:extends Node
+//gd:class GrMob
+package gr
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+GrMob :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 `gd:"replicate"`,
+	x, y:   f32 `gd:"owner,interp,wire=f16"`,
+	px:     f32 `gd:"predict,interp,slack=0.5,glide=0.1,cut=32"`,
+	fuel:   u16 `gd:"predict"`,
+}
+ODIN
+"$SGEN" "$gr" -godot:"$ROOT" >/dev/null 2>&1 || fail "all three lanes in their new spelling must build"
+
+# (b) `entity=Name:id` LEADS ITS TAG. It is a wire declaration — a permanent
+# public type id, a fingerprint input, a factory-table row — and it rode as a
+# trailing spec of `export` purely by accident of build order. An entity field
+# is NECESSARILY an exported PackedScene, so both leading tokens are synthesized.
+en="$work/entityfirst"
+mkdir -p "$en"
+cat >"$en/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class EnGame
+package en
+import gd "godot:godot"
+import kboot "godot:kit/boot"
+
+EnGame :: struct {
+	owner:     gd.Node,
+	boot:      kboot.Boot,
+	mob_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=EnMob:1"`,
+}
+ODIN
+cat >"$en/mob.odin" <<'ODIN'
+//gd:extends Node
+//gd:class EnMob
+package en
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+EnMob :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 `gd:"replicate"`,
+}
+ODIN
+out="$("$SGEN" "$en" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "the old trailing entity= spec must fail the build"
+echo "$out" | grep -q 'is a WIRE declaration, not an export spec' \
+	|| fail "the old entity= form must be named for WHAT it got wrong, not just refused"
+echo "$out" | grep -q 'write `gd:"entity=EnMob:1"`' \
+	|| fail "the entity= refusal must spell the replacement tag"
+echo "$out" | grep -q 'are synthesized' \
+	|| fail "the refusal must say the export and PackedScene hint come for free, or the fix reads like a loss"
+
+# The new form builds, and the synthesis is real: the entity reaches the
+# factory table exactly as the four-token spelling did.
+perl -pi -e 's/gd:"export,resource=PackedScene,entity=EnMob:1"/gd:"entity=EnMob:1"/' "$en/game.odin"
+"$SGEN" "$en" -godot:"$ROOT" >/dev/null 2>&1 || fail "the first-token entity= form must build"
+grep -q "EnMob" "$en/game.gen.odin" || fail "the synthesized export must still produce the entity's factory row"
+grep -q 'NET_FINGERPRINT' "$en/odin_godot_guard.gen.odin" || fail "the entity must still reach the fingerprint"
+
+# A resource hint beside `entity=` is refused rather than silently outranked —
+# the declaration already fixed the hint, so a second one is a disagreement.
+perl -pi -e 's/gd:"entity=EnMob:1"/gd:"entity=EnMob:1,resource=Texture2D"/' "$en/game.odin"
+out="$("$SGEN" "$en" -godot:"$ROOT" 2>&1)"
+[[ $? -ne 0 ]] || fail "a resource= beside entity= must fail the build"
+echo "$out" | grep -q 'already fixes the resource hint to PackedScene' \
+	|| fail "the redundant-hint refusal must say the hint is already decided"
 
 echo "SCRIPTGEN_OK"

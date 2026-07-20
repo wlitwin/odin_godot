@@ -35,7 +35,7 @@ twin-stick dogfood:
 ```odin
 Runner :: struct {
     owner:  gd.Node2d,
-    x, y:   f32 `gd:"replicate,interp,owner,wire=f16"`,
+    x, y:   f32 `gd:"owner,interp,wire=f16"`,
     hp:     u8  `gd:"replicate"`,
     gun:    u8  `gd:"replicate"`,
 
@@ -43,8 +43,8 @@ Runner :: struct {
     gun_fsm:   play.Machine(Gun_State),   // Ready / Reloading / Jammed — cur replicates
     reload_cd: u16 `gd:"replicate"`,      // host countdown to reload done
 
-    rev_target: u32 `gd:"replicate,owner"`, // who I'm reviving
-    rev_pct:    u8  `gd:"replicate,owner"`, // channel progress 0..255
+    rev_target: u32 `gd:"owner"`, // who I'm reviving
+    rev_pct:    u8  `gd:"owner"`, // channel progress 0..255
 
     seen_hp: play.Edge(u8),               // local: damage-flash edge detector
 }

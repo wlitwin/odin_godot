@@ -4,47 +4,55 @@ Reach for `kit/nav` when a brain needs to walk around walls instead of through t
 engine already owns the hard parts (nav meshes, region merging, funnel pathfinding);
 kit/nav makes the two calls a game actually needs ergonomic, in both dimensions.
 
-**Lane compatibility: NEVER inside a resimulating pass.** These calls query the
-NavigationServer — live engine state that does not rewind. Inside `@(gd_tick)` or the
-everywhere `@(gd_step)` a resim replay would query TODAY's mesh state for YESTERDAY's
-ticks and diverge from the prediction it is rebuilding — the same law as
-[engine casts](sim.md) but worse, because paths steer entities. Legal homes: coop host
-brains (the host never resims) and the sim lane's `@(gd_step="authority")` pass (the
-authority never resims). Path FOLLOWING from a stored polyline is pure math and
-sim-safe anywhere; it's the *query* that must stay on a never-resimming pass.
+**Lane compatibility: NEVER inside a resimulating pass — and the module now enforces it.**
+These calls query the NavigationServer, live engine state that does not rewind. Inside
+`@(gd_tick)` or the everywhere `@(gd_step)`, a resim replay would query TODAY's mesh for
+YESTERDAY's ticks and diverge from the prediction it is rebuilding — the same law as
+[engine casts](sim.md), but worse: a mispredicted cast snaps back, while a bad path
+*steers*, so the error compounds every tick.
+
+That used to be a comment, and comments do not fail builds. It is now default-denied: every
+query asserts that some enclosing scope has called `pass_never_resims()`, the caller's claim
+about its own lane. Legal claimants: a coop host's own tick (the host never resims) and the
+sim lane's `@(gd_step = "authority")` pass (the authority never resims). Path FOLLOWING from
+a stored polyline is pure math and sim-safe anywhere — only the *query* is gated.
 
 ## Mental model
 
-Two calls:
+Three calls, and the first one is the lane claim:
 
 ```odin
+knav.pass_never_resims()                                    // scoped, closes itself
 path := knav.path_2d(self.owner, from, to, context.temp_allocator)
 goal := knav.next_point(path, &self.path_idx, my_pos, reach = 8)
 ```
 
-and the host's brain steps toward `goal` with [kit/ai](ai.md)'s `step_toward`. Positions
-use the toolkit's `[3]f32` convention (2D in xy, z zero), so brain code doesn't care which
+and the host's brain steps toward `goal` with [kit/ai](ai.md)'s `step_toward`. Positions use
+the toolkit's `[3]f32` convention (2D in xy, z zero), so brain code doesn't care which
 adapter fed it.
 
-Unlike the rest of the brain verbs, the path queries **touch the engine** (they ask Godot's
-NavigationServer through a node in the tree) — so they belong in host tick code, not inside
-predicted commands.
+Unlike the rest of the brain verbs, the path queries **touch the engine** — which is the
+whole reason for the claim.
 
 ## API
 
 ```odin
-// The default 2D navigation map of the world `node` lives in.
-map_2d :: proc(node: gd.Node) -> gd.Rid
+// "The pass I am running in never resimulates." Scoped to the enclosing block,
+// closes itself. Every query below asserts this was called.
+pass_never_resims :: proc()
 
-// The default 3D navigation map of the world `node` lives in.
+// The default 2D / 3D navigation map of the world `node` lives in.
+map_2d :: proc(node: gd.Node) -> gd.Rid
 map_3d :: proc(node: gd.Node) -> gd.Rid
 
-// An optimized path across the node's default 2D map ([] when unreachable
-// or the map hasn't synced yet). The caller owns the slice.
+// An optimized path across the node's default map ([] when unreachable or the
+// map hasn't synced yet). The caller owns the slice.
 path_2d :: proc(node: gd.Node, from, to: [3]f32, allocator := context.allocator) -> [][3]f32
-
-// An optimized path across the node's default 3D map. The caller owns it.
 path_3d :: proc(node: gd.Node, from, to: [3]f32, allocator := context.allocator) -> [][3]f32
+
+// The same, against an ALREADY-RESOLVED map. Use these in a loop over agents.
+path_2d_on :: proc(nav_map: gd.Rid, from, to: [3]f32, allocator := context.allocator) -> [][3]f32
+path_3d_on :: proc(nav_map: gd.Rid, from, to: [3]f32, allocator := context.allocator) -> [][3]f32
 
 // The waypoint to walk toward RIGHT NOW. `idx` is the follower's cursor
 // (start it at 0 per fresh path): waypoints within `reach` are consumed and
@@ -54,44 +62,92 @@ next_point :: proc "contextless" (path: [][3]f32, idx: ^int, pos: [3]f32, reach:
 ```
 
 `path_2d`/`path_3d` query the node's *default* world map (via `map_2d`/`map_3d`), which is
-what a bare NavigationRegion2D/3D in the scene registers into.
+what a bare NavigationRegion2D/3D in the scene registers into. The `_on` forms exist because
+that resolution is three engine round trips (node → viewport → world → map): free for one
+agent, pure waste for a brain tick pathing a whole wave against the same map.
 
-## Worked example: a brain walks a navmesh
+## Worked example: the cave dwellers, in `examples/cavecrawl`
 
-From `tests/kitnav/scripts/navtest.odin` — the scene's walkable area is a U, so the path
-from arm-tip to arm-tip must bend down and around; then a kit/ai walker follows it with the
-`next_point` cursor:
+Cavecrawl's floors are authored scenes, so the walkable cave is authored too — a
+`NavigationRegion2D` sits in `levels/level_1.tscn` beside the chest and den markers, its
+polygon a big floor minus a **rift**. Every peer loads that scene locally; only the host ever
+queries it.
+
+The host's brain tick (`scripts/host.odin`) is a single `@(gd_step = "authority")` pass, and
+that is where the claim goes:
 
 ```odin
-path := knav.path_2d(self.owner, FROM, TO, context.temp_allocator)
-
-// A brain following it: kit/ai steps + the kit/nav cursor.
-pos := FROM
-idx := 0
-for _ in 0 ..< 500 {
-	goal, ok := knav.next_point(path, &idx, pos, 8)
-	if !ok {break}
-	pos, _ = kai.step_toward(pos, goal, 5)
+@(private = "file")
+cave_dwellers_think :: proc(self: ^CaveLobby) {
+	knav.pass_never_resims()          // closes itself when this proc returns
+	nav_map := knav.map_2d(self.owner) // resolved ONCE for the whole wave
+	...
+	pos = cave_dweller_walk(self, nav_map, pos, seen.pos)
 }
 ```
 
-In a live game this shape sits inside the host tick: re-query the path on the brain's think
-cadence, reset the cursor to 0 with each fresh path, and feed `goal` to `step_toward` every
-tick. The NPC's `x/y` writes replicate to clients exactly as in the [kit/ai](ai.md) NPC
-model — pathfinding stays a host-only detail.
+and one dweller's step is a query, a cursor, and a kit/ai step:
+
+```odin
+cave_dweller_walk :: proc(self: ^CaveLobby, nav_map: gd.Rid, from, to: [3]f32) -> [3]f32 {
+	path := knav.path_2d_on(nav_map, from, to, context.temp_allocator)
+	idx := 0
+	if goal, ok := knav.next_point(path, &idx, from, DWELLER_SPEED); ok {
+		p, _ := kai.step_toward(from, goal, DWELLER_SPEED)
+		return p
+	}
+	p, _ := kai.step_toward(from, to, DWELLER_SPEED) // empty path: walk the dumb way
+	return p
+}
+```
+
+Three things about that shape are worth copying:
+
+**The path is re-queried every think tick and thrown away.** No polyline is cached, so the
+cursor is always 0 and `next_point`'s first job is to consume the dweller's own snapped
+position. This is not laziness — cavecrawl's `Dweller_Brain` map is `gd:"backup"` and rides
+the takeover snapshot to whoever inherits the host seat, and a cached path would hand a
+successor routes computed against a NavigationServer it never ran. It also sidesteps
+invalidation on a descent, where the whole floor's region is swapped out underneath any
+dweller still standing. One `map_get_path` per agent per tick, at 20 Hz, for single-digit
+waves, buys all of that.
+
+**An empty path is not an error and must not be a freeze.** It means unreachable *or*
+not-yet-synced — and cavecrawl's regions enter the tree with the floor's scenery, a few
+frames before the first den opens. Falling back to the straight-line `step_toward` the game
+used before it had a navmesh keeps a wave moving through the gap.
+
+**That fallback is silent, so the game prints a receipt.** A navmesh that failed to load
+would leave every dweller walking straight and every test passing. A path with an interior
+corner can only have come from the mesh, so the host prints `CAVE_NAV_BENT` once — the acid's
+proof that the rift is walked *around* and not through.
+
+Pathfinding never reaches the wire: the dweller's `x/y` are ordinary owner-streamed
+replicated fields, exactly as in the [kit/ai](ai.md) NPC model. Clients see a monster that
+respects the terrain and run no navigation code at all.
 
 ## Gotchas
 
+- **The lane claim is an assert, not a fallback.** Deliberately: an empty path is a
+  legitimate answer, so a brain that silently got one instead of a lane violation would
+  swallow the single bug this module exists to prevent.
 - **Regions sync into the map on the server's physics cadence** — a path queried the frame
   a region enters the tree is empty. Brains that re-query every think-tick (the normal
-  pattern) shrug this off; one-shot queries must wait a few frames (the test waits 5 and
-  retries).
+  pattern) shrug this off; one-shot queries must wait a few frames (`tests/kitnav` waits 5
+  and retries).
 - An empty slice means *unreachable or not-yet-synced* — treat it as "stand still and ask
-  again", not an error.
+  again" or "fall back to the dumb line", never as an error.
 - The caller owns the returned slice. Pass `context.temp_allocator` for per-tick queries,
   or remember to free.
 - `next_point` needs a persistent cursor per follower, reset to 0 per fresh path. Don't
   nearest-scan the path statelessly — consumed waypoints must never be re-targeted or the
   follower walks backwards.
+- **Path *around*, don't flee *around*.** Fleeing has a direction, not a destination, so
+  cavecrawl's flee branch stays on `kai.step_away` and never queries. A panicked agent can
+  back itself off the mesh; the next path home recovers, because `map_get_path` snaps an
+  off-mesh `from` to the nearest walkable point.
 - 2D paths come back with `z = 0`; `path_2d` drops the z of its inputs. Keep everything in
   the `[3]f32` convention and the same brain code drives both adapters.
+- Nav geometry is a **detour, never a barrier**. Cavecrawl's rift leaves north and south
+  ledges open, because a wave stranded on the wrong side would deadlock the floor-cleared
+  gate. Authored obstacles interact with game rules that assume reachability.

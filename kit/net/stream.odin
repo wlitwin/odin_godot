@@ -2,7 +2,7 @@ package kit_net
 
 // stream — owner-authoritative field streaming with delayed interpolated sampling.
 //
-// Fields flagged .Owner_Stream (gd:"replicate,owner") are authoritative on the
+// Fields flagged .Owner_Stream (gd:"owner") are authoritative on the
 // peer that OWNS the entity, not the host. The owner writes them as last-value
 // snapshots every net tick on the unreliable-ordered channel: a dropped packet
 // is superseded by the next one, so there is no loss story at all. Everyone

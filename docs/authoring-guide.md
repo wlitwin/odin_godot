@@ -127,16 +127,51 @@ error, and the skip list cannot drift apart):
 | --- | --- | --- | --- |
 | `export` | an editor-visible property | the runtime registrar | no |
 | `onready=PATH` | an auto-wired node reference | the runtime registrar | no |
-| `replicate` | a networked field ([kit/net](kit/net.md) descriptors) | scriptgen | yes |
+| `replicate` | a networked field on the DELTA lane ([kit/net](kit/net.md)) | scriptgen | yes |
+| `owner` | a networked field streamed from its owning peer | scriptgen | yes |
+| `predict` | a networked field the sim predicts and reconciles ([kit/sim](kit/sim.md)) | scriptgen | yes |
 | `backup` | a field the session backup carries | scriptgen | yes |
 | `manual` | "I call the generated thing myself" | scriptgen | no |
 | `profile=T` | the per-player profile row type | scriptgen | yes |
+| `entity=Name:id` | a spawnable entity type and its stable id | both | yes |
 
-Two more ride BEHIND a first token as specs: `entity=Name:id` (a spawnable type and its
-stable id, on an exported `PackedScene` field) and `args=a,b` (a signal payload's
+One token rides BEHIND a first token as a spec: `args=a,b` (a signal payload's
 parameter names). "In the wire fingerprint" means the declaration's shape folds into
 `NET_FINGERPRINT`, so two builds that disagree about it are refused at the join door
 rather than misparsing each other's packets.
+
+**A WIRE DECLARATION IS A FIRST TOKEN.** That is the rule the column on the right
+states: if the thing folds into `NET_FINGERPRINT`, it names what the field IS and it
+leads the tag. Two consequences worth spelling out, because both used to read the other
+way:
+
+* **The three lanes are three tokens.** `owner` and `predict` used to be options inside
+  `gd:"replicate,…"`, which put the one decision that matters — who writes these bytes —
+  in the same syntactic position as a smoothing constant. Each lane now carries its own
+  CLOSED option set (below), so `slack=` is not "an option requiring predict", it is an
+  option the predict lane HAS. The combinations that used to be rejected by a pairwise
+  rule (`owner` with `predict`, `slack=` without `predict`) are now unspellable.
+* **`entity=Name:id` leads its tag.** It carries a permanent public type id and builds
+  the factory table; it is not an Inspector detail of an export. An entity field is
+  necessarily an exported `PackedScene`, so both of those are SYNTHESIZED — write
+  `` `gd:"entity=Mob:3"` ``, not `` `gd:"export,resource=PackedScene,entity=Mob:3"` ``.
+  Trailing export specs still ride behind (`entity=Mob:3,group=Spawns`).
+
+| Lane | Tag | Its options |
+| --- | --- | --- |
+| delta | `gd:"replicate"` | `interp`, `interp=angle`, `interp=BLEND_PROC`, `wire=f16`, `wire=CODEC` |
+| owner-streamed | `gd:"owner"` | `interp`, `interp=angle`, `interp=BLEND_PROC`, `wire=f16`, `wire=CODEC` |
+| predicted | `gd:"predict"` | the above, plus `slack=N`, `glide=N`, `cut=N` |
+
+`_edge` halves pair with `gd:"replicate"` fields only — predicted state resims and
+owner-streamed state interpolates, so each of those lanes has its own presentation
+answer.
+
+Both grammars changed in one commit and the old spellings are REFUSED, by an error
+naming the exact replacement tag — the old `replicate,interp,owner,wire=f16` answers with
+`gd:"owner,interp,wire=f16"`. Nothing about the wire moved: the lane a field resolves to
+is what folds into `NET_FINGERPRINT`, and it resolves identically, so a retagged build
+still joins an un-retagged peer's session bit for bit.
 
 ### Exports
 
@@ -187,11 +222,10 @@ float; `multiline` for a `gd.String`. **`array=ELEM`** (on a `gd.Array` field) a
 **`dict=KEY;VALUE`** (on a `gd.Dictionary` field) declare *typed* collections — the same
 Inspector editors GDScript's `Array[T]` / `Dictionary[K,V]` produce. Each element/key/value
 is a builtin (`int`, `float`, `String`, `Vector2`, `Color`, …) or a Resource class name
-(`Texture2D`, `PackedScene`, …). At most one hint per field. A PackedScene export may
-additionally carry **`entity=Name:id`** — a build-time declaration (the Inspector sees an
-ordinary export) that this scene bodies the wire entity `Name` under stable id `id`;
-scriptgen generates the multiplayer factory table from it ([kit/boot](kit/boot.md)'s
-`boot_entities`). Example:
+(`Texture2D`, `PackedScene`, …). At most one hint per field. (A scene that bodies a wire
+entity does NOT declare a hint: **`gd:"entity=Name:id"`** is its own first token and
+synthesizes both the export and the `resource=PackedScene` hint — see [Entities](#entities)
+and [kit/boot](kit/boot.md)'s `boot_entities`.) Example:
 
 ```odin
 Probe :: struct {

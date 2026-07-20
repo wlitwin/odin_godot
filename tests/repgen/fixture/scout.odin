@@ -13,8 +13,8 @@ import gd "godot:godot"
 
 Scout :: struct {
 	owner: gd.Node2d,
-	x:     f32 `gd:"replicate,predict,interp"`,
-	beep:  u16 `gd:"replicate,predict"`,
+	x:     f32 `gd:"predict,interp"`,
+	beep:  u16 `gd:"predict"`,
 }
 
 @(gd_tick)

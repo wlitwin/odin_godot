@@ -11,8 +11,8 @@ package kit_sim
 //
 //   field tag                authority      wire                      applied by
 //   replicate                host           reliable deltas           on arrival
-//   replicate,owner          owning peer    unreliable stream         interpolated in the past
-//   replicate,predict        server sim     tick-stamped snapshots    rollback + resim
+//   owner                    owning peer    unreliable stream         interpolated in the past
+//   predict                  server sim     tick-stamped snapshots    rollback + resim
 //
 // .Predicted fields are excluded from the host delta walk at the mask level
 // (kit/net diff_mask), exactly like .Owner_Stream — the lanes can never fight

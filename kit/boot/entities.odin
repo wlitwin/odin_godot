@@ -8,7 +8,7 @@ package kit_boot
 // back. The declaration now lives where the house puts declarations — a tag
 // on the exported scene field:
 //
-//     mob_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Mob:3"`,
+//     mob_scene: ^gd.Resource `gd:"entity=Mob:3"`,
 //
 // scriptgen turns those tags into `<snake>_entity_kinds` (plus the
 // `MOB_TYPE :: ksess.Entity_Type(3)` constants games used to hand-keep), and

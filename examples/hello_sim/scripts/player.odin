@@ -4,7 +4,7 @@ package hello_sim
 
 // hello_net's Player, PROMOTED to the server-authority sim lane. The diff
 // from the coop file is the promotion checklist (sim.md) in miniature:
-//   step 2 — the retag: `replicate,interp,owner` became `replicate,predict,interp`
+//   step 2 — the retag: `owner,interp` became `predict,interp`
 //            (the field's writer is now the server's simulation, predicted
 //            locally — that one word is the whole wire migration);
 //   step 3 — the writes moved out of the frame loop into @(gd_tick): a pure
@@ -24,7 +24,7 @@ Player :: struct {
 	owner:  gd.Node2d,
 	skin:   gd.Polygon2d `gd:"onready=Skin"`,
 	net_id: knet.Net_Id,
-	x, y:   f32 `gd:"replicate,predict,interp"`,
+	x, y:   f32 `gd:"predict,interp"`,
 	pid:    u8 `gd:"replicate"`, // delta lane, untouched by the promotion
 	mine:   bool,
 	tinted: bool,

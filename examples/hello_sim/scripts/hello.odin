@@ -39,7 +39,7 @@ HelloSim :: struct {
 	running: bool,
 	started: bool,
 
-	player_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Player:1"`,
+	player_scene: ^gd.Resource `gd:"entity=Player:1"`,
 
 	me: ^Player,
 }

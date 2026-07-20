@@ -5,7 +5,7 @@ unplayable unless your shots land where YOUR screen aimed. This is the
 server-authority resim companion's reference game, the way cavecrawl and
 slopball are the coop kit's:
 
-- **Movement** is `gd:"replicate,predict"` state stepped by one `@(gd_tick)`
+- **Movement** is `gd:"predict"` state stepped by one `@(gd_tick)`
   proc — server-simulated from inputs, predicted on your screen (strafe and
   dash answer the stick at any latency), reconciled when they disagree, the
   corrections glided by the render-error smoother.

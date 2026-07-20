@@ -14,11 +14,11 @@ import knet "godot:kit/net"
 Board :: struct {
 	owner:       gd.Node2d,
 	boot:        kboot.Boot, // declares the four standard transport forwards
-	pawn_scene:  ^gd.Resource `gd:"export,resource=PackedScene,entity=Pawn:7"`,
+	pawn_scene:  ^gd.Resource `gd:"entity=Pawn:7"`,
 	// A NON-ticking tagged entity beside the ticking pawn: its typed spawn
 	// helper takes the host-asserted coop route (pawn's routes through
 	// boot_fire_spawn — a client's call predicts).
-	chest_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Chest:8"`,
+	chest_scene: ^gd.Resource `gd:"entity=Chest:8"`,
 }
 
 // Hand-written wins, name by name: this suppresses the generated on_net_down

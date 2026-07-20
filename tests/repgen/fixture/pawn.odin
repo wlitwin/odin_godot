@@ -16,13 +16,13 @@ Pawn :: struct {
 	owner:  gd.Node2d,
 	net_id: knet.Net_Id, // command wire identity (assigned by the session layer)
 	hp:     i32 `gd:"replicate"`,
-	x, y:   f32 `gd:"replicate,interp,owner"`, // multi-name: one desc entry per name
-	rot:    gd.Quaternion `gd:"replicate,interp,owner"`, // classified to hemisphere-safe nlerp
-	aim:    f32 `gd:"replicate,interp=pawn_blend_aim,owner"`, // custom blend math
+	x, y:   f32 `gd:"owner,interp"`, // multi-name: one desc entry per name
+	rot:    gd.Quaternion `gd:"owner,interp"`, // classified to hemisphere-safe nlerp
+	aim:    f32 `gd:"owner,interp=pawn_blend_aim"`, // custom blend math
 	heat:   f32 `gd:"replicate,wire=f16"`, // stock half-float wire encoding
 	charge: i32 `gd:"replicate,wire=pawn_charge_codec"`, // custom fixed-size codec
-	px, py: f32 `gd:"replicate,predict,interp,slack=0.5,glide=0.1,cut=32"`, // kit/sim: per-field reconcile slack + render-error glide/cut
-	fuel:   u16 `gd:"replicate,predict"`, // predicted without interp: steps, never lerps
+	px, py: f32 `gd:"predict,interp,slack=0.5,glide=0.1,cut=32"`, // kit/sim: per-field reconcile slack + render-error glide/cut
+	fuel:   u16 `gd:"predict"`, // predicted without interp: steps, never lerps
 	pace:   Pace, // TICK-COMPOSITION: the block's step hoists, runs after pawn_tick
 	chill:  psim.Cool, // IMPORTED-shelf tick block: the hoist crosses packages
 	warm:   psim.Cool `gd:"manual"`, // MANUAL: predict field still flattens, but the tick is NOT hoisted (the wielder drives it)
@@ -64,7 +64,7 @@ pawn_tick :: proc(self: ^Pawn, input: Pawn_Input, lane: ^ksim.Lane) -> (dashed: 
 // A tick BLOCK: inputless by contract (intent flows through fields the
 // wielder's tick writes), hoisted to run after the entity's own step.
 Pace :: struct {
-	heat: u16 `gd:"replicate,predict"`,
+	heat: u16 `gd:"predict"`,
 	beat: u32 `gd:"backup"`, // NESTED gd:"backup": collected onto Pawn as self.pace.beat
 }
 

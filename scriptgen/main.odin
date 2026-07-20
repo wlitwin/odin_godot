@@ -331,8 +331,11 @@ Rpc_Info :: struct {
 	channel:    int,
 }
 
-// A `gd:"replicate[,interp][,owner]"` field — a kit/net replicated field (friendslop
-// toolkit). scriptgen records only name + options; the generated knet.Entity_Desc uses
+// A networked field: `gd:"replicate"` (delta lane), `gd:"owner"` (owner-streamed),
+// or `gd:"predict"` (kit/sim), each with its own option set. The LANE is the first
+// token — `owner`/`predict` are not options, they select which of the three writers
+// owns the field's bytes, and `owner`/`predict` below are that choice resolved.
+// scriptgen records only name + options; the generated knet.Entity_Desc uses
 // offset_of/size_of, and a generated #assert enforces the POD-only contract at the
 // consumer's compile, naming the offending field.
 Replicate_Info :: struct {

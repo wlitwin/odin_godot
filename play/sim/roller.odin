@@ -26,8 +26,8 @@ package play_sim
 import "core:math"
 
 Roller :: struct {
-	x, y:   f32 `gd:"replicate,predict,interp"`,
-	vx, vy: f32 `gd:"replicate,predict"`,
+	x, y:   f32 `gd:"predict,interp"`,
+	vx, vy: f32 `gd:"predict"`,
 
 	// Config — law, not state: same numbers on every peer, set at spawn.
 	friction:                   f32, // velocity retained per tick (law #5: self-simulating flight)

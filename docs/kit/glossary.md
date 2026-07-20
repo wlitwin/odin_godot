@@ -10,8 +10,8 @@ quality bar; "the co-op kit" and "the friendslop kit" are the same thing.
 
 **lane** — which machinery carries a replicated field, chosen per field by
 its tag. The **delta lane** (`replicate`) is host-authoritative reliable
-state; the **owner stream** (`replicate,owner`) is a peer's own
-unreliable-but-fresh pose; the **predict lane** (`replicate,predict`) is
+state; the **owner stream** (`owner`) is a peer's own
+unreliable-but-fresh pose; the **predict lane** (`predict`) is
 server-simulated state the owner predicts locally (the sim lane,
 [sim.md](sim.md)). The tags are the whole declaration — the lanes never
 fight over a field.

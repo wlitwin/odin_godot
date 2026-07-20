@@ -17,7 +17,7 @@ Kicker :: struct {
 	skin:    gd.Polygon2d `gd:"onready=Skin"`,
 	tag:     gd.Label `gd:"onready=Tag"`,
 	net_id:  knet.Net_Id,
-	x, y:    f32 `gd:"replicate,interp,owner,wire=f16"`,
+	x, y:    f32 `gd:"owner,interp,wire=f16"`,
 	pid:     u8 `gd:"replicate"`, // the seat this avatar belongs to (color + team)
 	mine:    bool, // set by the factory: this peer drives (and streams) this body
 	placed:  bool, // one-shot: the NODE adopts the spawned x/y (scenes instance at 0,0)

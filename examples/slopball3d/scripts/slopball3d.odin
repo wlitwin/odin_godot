@@ -68,8 +68,8 @@ Slopball3 :: struct {
 	// The authored bodies. Each tag's `entity=Name:id` IS the factory
 	// declaration — scriptgen generates the TYPE consts + the kind table,
 	// and kboot.boot_entities (ready(), below) instantiates/frees them.
-	kicker_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Kicker3:1"`,
-	ball_scene:   ^gd.Resource `gd:"export,resource=PackedScene,entity=Ball3:2"`,
+	kicker_scene: ^gd.Resource `gd:"entity=Kicker3:1"`,
+	ball_scene:   ^gd.Resource `gd:"entity=Ball3:2"`,
 
 	kickers:   map[knet.Net_Id]^Kicker3,
 	avatar_of: map[knet.Player_Id]knet.Net_Id,

@@ -16,6 +16,7 @@ import kcombat "godot:kit/combat"
 import kcomms "godot:kit/comms"
 import kinter "godot:kit/interact"
 import kitems "godot:kit/items"
+import knav "godot:kit/nav"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import "core:fmt"
@@ -97,11 +98,83 @@ cave_spawn_dweller :: proc(self: ^CaveLobby) {
 	gd.print_str(fmt.tprintf("CAVE_DEN id=%d at=%.0f,%.0f", u32(id), den.x, den.y))
 }
 
+// Host: one dweller's step toward a point, AROUND the rift instead of through
+// it. kit/nav asks the engine for the polyline; kit/ai walks one tick of it.
+//
+// The path is re-queried every think tick and thrown away — fresh polyline,
+// fresh cursor at 0. That is one map_get_path per dweller per tick (a wave is
+// single digits at 20 Hz, against a map already resolved by the caller), and
+// it buys two things the cached alternative cannot:
+//
+//   * NO path state in Dweller_Brain. The brain map is `gd:"backup"` — it
+//     rides the takeover snapshot to whoever inherits the host seat. A cached
+//     polyline would have to serialize, and a SUCCESSOR would inherit paths
+//     computed against a NavigationServer it never ran. Asking again costs one
+//     tick and is always correct.
+//   * No invalidation on a descent. cave_descend swaps the whole floor's
+//     scenery — and with it the nav region — under any dweller still standing;
+//     a cached path would be pointing at the floor above.
+@(private = "file")
+cave_dweller_walk :: proc(self: ^CaveLobby, nav_map: gd.Rid, from, to: [3]f32) -> [3]f32 {
+	path := knav.path_2d_on(nav_map, from, to, context.temp_allocator)
+
+	// THE RECEIPT, once per process. The fallback below is silent by design —
+	// which means a navmesh that failed to load, or a region that never synced,
+	// would leave every dweller walking the old straight line and every test
+	// still passing. A path with an interior corner can only come from the mesh
+	// (a straight shot returns just its two endpoints), so this line is the
+	// acid's proof that the rift is really being walked around and not through.
+	if !self.nav_bent && len(path) > 2 {
+		self.nav_bent = true
+		gd.print_str(fmt.tprintf("CAVE_NAV_BENT points=%d", len(path)))
+	}
+
+	idx := 0
+	// Cursor 0 on a fresh path: next_point consumes the waypoints already
+	// within reach — the first is always the dweller's own position, snapped
+	// onto the mesh — and hands back the first one it must actually walk to.
+	if goal, ok := knav.next_point(path, &idx, from, DWELLER_SPEED); ok {
+		p, _ := kai.step_toward(from, goal, DWELLER_SPEED)
+		return p
+	}
+	// Empty or exhausted. Three ways to land here and one right answer:
+	// arrived (the step below caps at `to`, so it is a no-op), unreachable, or
+	// the region has not synced into the map yet — it enters the tree with the
+	// floor's scenery a few frames before the first den opens, and kit/nav's
+	// header says a query that early comes back empty. "Stand still and ask
+	// again" would freeze a wave mid-cave, so the dweller falls back to the
+	// dumb straight line it walked before this game had a navmesh.
+	p, _ := kai.step_toward(from, to, DWELLER_SPEED)
+	return p
+}
+
 // Host: one think-tick for every dweller — the WHOLE brain, written from
 // kit/ai verbs: perceive, then a plain switch. State and position are
 // replicated fields; writing them IS the AI's entire network presence.
+//
+// THIS IS THE ONLY PASS THAT MAY ASK THE NAVIGATION SERVER ANYTHING, and the
+// claim below is what makes that enforceable rather than aspirational. The
+// server is live engine state that does not rewind, so a pass that replays
+// history would path old ticks across today's mesh — and a wrong path steers,
+// so the error compounds instead of snapping back.
+//
+// Today cavecrawl cannot violate that even by accident: it is a delta/stream
+// coop game with NO sim lane at all — grep the scripts and there is not one
+// `@(gd_tick)` and not one bare `@(gd_step)`, only the single
+// `@(gd_step = "authority")` this runs under. Nothing here is ever replayed.
+// But "today's game has no rollback" is exactly the kind of reason that rots
+// silently, so the claim is made in CODE at the query site: give cavecrawl a
+// sim lane later, move the brains into a resimulating pass, and the very first
+// path query asserts instead of quietly steering dwellers off a mesh that
+// time-travelled.
 @(private = "file")
 cave_dwellers_think :: proc(self: ^CaveLobby) {
+	knav.pass_never_resims() // scoped: closes itself when this proc returns
+
+	// Resolved ONCE for the whole wave — the node-form path_2d would re-walk
+	// node -> viewport -> world -> map for every dweller, every tick.
+	nav_map := knav.map_2d(self.owner)
+
 	targets := make([dynamic]kai.Target, context.temp_allocator)
 	for id, sp in self.spelunkers {
 		if sp.hp > 0 {
@@ -120,6 +193,11 @@ cave_dwellers_think :: proc(self: ^CaveLobby) {
 		switch {
 		case spotted && dw.hp <= FLEE_BELOW:
 			state = DWELLER_FLEE
+			// NOT pathed, deliberately: fleeing has a direction, not a
+			// destination, and there is nothing to ask the mesh for. A panicked
+			// dweller can back itself into the rift — pathing home from in
+			// there still works, because map_get_path snaps an off-mesh `from`
+			// to the nearest walkable point.
 			pos = kai.step_away(pos, seen.pos, DWELLER_SPEED / 2)
 		case spotted:
 			state = DWELLER_CHASE
@@ -130,10 +208,10 @@ cave_dwellers_think :: proc(self: ^CaveLobby) {
 					cave_hurt_spelunker(self, victim_id, self.spelunkers[victim_id], BITE_DMG, knet.PLAYER_ID_INVALID, false)
 				}
 			} else {
-				pos, _ = kai.step_toward(pos, seen.pos, DWELLER_SPEED)
+				pos = cave_dweller_walk(self, nav_map, pos, seen.pos)
 			}
 		case:
-			pos, _ = kai.step_toward(pos, brain.home, DWELLER_SPEED)
+			pos = cave_dweller_walk(self, nav_map, pos, brain.home)
 		}
 		dw.x = pos.x
 		dw.y = pos.y

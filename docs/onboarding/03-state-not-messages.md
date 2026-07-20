@@ -53,8 +53,8 @@ export — what the scene bodies, and its stable wire id:
 Golf :: struct {
 	owner: gd.Node2d,
 	...
-	hole_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Hole:1"`,
-	ball_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Ball:2"`,
+	hole_scene: ^gd.Resource `gd:"entity=Hole:1"`,
+	ball_scene: ^gd.Resource `gd:"entity=Ball:2"`,
 }
 
 // Optional, typed, name-paired: your bookkeeping when one is born or freed.
@@ -121,7 +121,7 @@ every keypress waiting on a round trip. So the toolkit has exactly one other
 flavor of replication: fields the entity's **owner** writes,
 
 ```odin
-x, y: f32 `gd:"replicate,interp,owner"`,
+x, y: f32 `gd:"owner,interp"`,
 ```
 
 streamed unreliably at tick rate, and rendered by everyone else with a short

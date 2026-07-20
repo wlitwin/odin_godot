@@ -26,7 +26,7 @@ Spelunker :: struct {
 	glyph:     gd.Label `gd:"onready=Glyph"`,
 	pyre:      gd.Cpu_Particles2d `gd:"onready=Pyre"`, // authored death burst
 	net_id:    knet.Net_Id, // assigned by the session at spawn
-	x, y:      f32 `gd:"replicate,interp,owner,wire=f16"`, // half floats on the wire — cave
+	x, y:      f32 `gd:"owner,interp,wire=f16"`, // half floats on the wire — cave
 	// coordinates fit f16 to sub-pixel; the struct (and everything local: shadows,
 	// prediction, ring blobs) stays full f32
 	bag:       [6]kitems.Slot `gd:"replicate"`,

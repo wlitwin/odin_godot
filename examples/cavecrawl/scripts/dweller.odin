@@ -23,7 +23,7 @@ Dweller :: struct {
 	owner:  gd.Node2d,
 	glyph:  gd.Label `gd:"onready=Glyph"`,
 	net_id: knet.Net_Id,
-	x, y:   f32 `gd:"replicate,interp,owner"`, // the HOST owns it: brain writes, clients interp
+	x, y:   f32 `gd:"owner,interp"`, // the HOST owns it: brain writes, clients interp
 	hp:     i32 `gd:"replicate"`,
 	state:  u8 `gd:"replicate"`, // its mood, on every screen
 	php:    kcombat.Predicted_Hp, // scratch: impacts SEEN here, pre-truth

@@ -1,6 +1,22 @@
-[gd_scene format=3]
+[gd_scene load_steps=2 format=3]
+
+; The floor's NAVMESH lives beside its markers, because the walkable cave IS
+; level authoring — one asset says where the chest, the dens, and the ground
+; are. Every peer loads this scene locally (cave_load_scenery); only the HOST
+; queries it, from the authority-only brain tick, so pathing never hits the
+; wire. Shape: one floor minus a RIFT at x 380..430, y 60..300, tiled by eight
+; rectangles that share WHOLE edges so the region merges without leaning on
+; edge_connection_margin. North and south ledges keep both chambers mutually
+; reachable — the rift is a detour, never a barrier, because a wave stranded
+; on the wrong side would deadlock the floor-cleared gate in cave_host_tick.
+[sub_resource type="NavigationPolygon" id="np_floor1"]
+vertices = PackedVector2Array(20, 20, 20, 60, 20, 300, 20, 350, 380, 20, 380, 60, 380, 300, 380, 350, 430, 20, 430, 60, 430, 300, 430, 350, 620, 20, 620, 60, 620, 300, 620, 350)
+polygons = [PackedInt32Array(0, 4, 5, 1), PackedInt32Array(1, 5, 6, 2), PackedInt32Array(2, 6, 7, 3), PackedInt32Array(4, 8, 9, 5), PackedInt32Array(6, 10, 11, 7), PackedInt32Array(8, 12, 13, 9), PackedInt32Array(9, 13, 14, 10), PackedInt32Array(10, 14, 15, 11)]
 
 [node name="Level1" type="Node2D"]
+
+[node name="Floor" type="NavigationRegion2D" parent="."]
+navigation_polygon = SubResource("np_floor1")
 
 [node name="ChestSpawn" type="Marker2D" parent="."]
 position = Vector2(300, 180)
@@ -29,8 +45,28 @@ offset_left = 60.0
 offset_top = 260.0
 text = "🪨"
 
+[node name="Rift1" type="Label" parent="."]
+offset_left = 392.0
+offset_top = 70.0
+text = "🕳"
+
+[node name="Rift2" type="Label" parent="."]
+offset_left = 392.0
+offset_top = 128.0
+text = "🕳"
+
+[node name="Rift3" type="Label" parent="."]
+offset_left = 392.0
+offset_top = 186.0
+text = "🕳"
+
+[node name="Rift4" type="Label" parent="."]
+offset_left = 392.0
+offset_top = 244.0
+text = "🕳"
+
 [node name="Sign" type="Label" parent="."]
 modulate = Color(1, 1, 1, 0.35)
-offset_left = 250.0
+offset_left = 180.0
 offset_top = 340.0
-text = "· the upper galleries ·"
+text = "· the upper galleries · spelunkers rope the rift, dwellers walk around ·"

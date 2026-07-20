@@ -5,7 +5,7 @@ package quickdraw
 // A GUNNER — one duelist, and the sim lane's reference entity. The struct IS
 // the hybrid story in one screen:
 //
-//   x/y/vx/vy/aim/dash_cd  gd:"replicate,predict"  the CONTESTED state — the
+//   x/y/vx/vy/aim/dash_cd  gd:"predict"  the CONTESTED state — the
 //        server simulates it from inputs (gunner_tick below), your own screen
 //        predicts it a few ticks ahead, everyone else's interpolates it. The
 //        tick proc is single-player-looking; the netcode writes itself.
@@ -40,13 +40,13 @@ Gunner :: struct {
 	// `manual` a block COULD now run mid-pipeline, but the dash is a locked-
 	// velocity impulse, not psim.Mover's momentum intent — bespoke movement is
 	// the honest fit here, a design choice, not a shelf limitation.
-	x, y:    f32 `gd:"replicate,predict,interp"`,
-	vx, vy:  f32 `gd:"replicate,predict"`,
+	x, y:    f32 `gd:"predict,interp"`,
+	vx, vy:  f32 `gd:"predict"`,
 	// interp=angle: watched gunners' aim GLIDES the short arc across ±π —
 	// bare predict used to snap it per tick (the "stepped aim" that existed
 	// only because a raw f32 lerp sweeps the long way around the circle).
-	aim:     f32 `gd:"replicate,predict,interp=angle"`,
-	dash_cd: u16 `gd:"replicate,predict"`,
+	aim:     f32 `gd:"predict,interp=angle"`,
+	dash_cd: u16 `gd:"predict"`,
 	fire:    psim.Cool `gd:"manual"`, // driven below — so a dead gunner freezes it by not ticking it
 	lob:     psim.Cool `gd:"manual"`, // the slow projectile's cadence (predicted, like the trigger)
 
@@ -57,7 +57,7 @@ Gunner :: struct {
 
 	// The shop's effect: PREDICTED, so your boots answer the buy at your
 	// next tick, not a round trip later. The buy itself is the verb below.
-	gear: u8 `gd:"replicate,predict"`,
+	gear: u8 `gd:"predict"`,
 
 	// Local scratch — never on the wire.
 	mine:      bool, // set by the census hook: my avatar

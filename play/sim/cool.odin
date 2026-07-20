@@ -35,7 +35,7 @@ package play_sim
 // ticks) so the def table stays the one vocabulary across lanes.
 
 Cool :: struct {
-	left: u16 `gd:"replicate,predict"`, // ticks until due — the predicted countdown
+	left: u16 `gd:"predict"`, // ticks until due — the predicted countdown
 }
 
 // The block tick: count down, never below zero. Inputless by contract —

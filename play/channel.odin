@@ -36,8 +36,8 @@ package play
 //   * THE BAR — presentation off the replicated pct (play.marker fill/follow), yours to draw.
 
 Channel :: struct {
-	target:  u32 `gd:"replicate,owner"`, // net id I'm channeling on (0 = idle) — every screen reads it
-	pct:     u8 `gd:"replicate,owner"`,  // progress 0..255 — the bar every screen draws
+	target:  u32 `gd:"owner"`, // net id I'm channeling on (0 = idle) — every screen reads it
+	pct:     u8 `gd:"owner"`,  // progress 0..255 — the bar every screen draws
 	acc:     f32,                        // owner-local: float-precise progress 0..1 (pct is its broadcast)
 	claimed: u32,                        // host scratch: the target the claim carried, for the game hook
 }

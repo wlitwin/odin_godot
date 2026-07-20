@@ -14,7 +14,7 @@ Player :: struct {
 	owner:  gd.Node2d,
 	skin:   gd.Polygon2d `gd:"onready=Skin"`,
 	net_id: knet.Net_Id,
-	x, y:   f32 `gd:"replicate,interp,owner,wire=f16"`,
+	x, y:   f32 `gd:"owner,interp,wire=f16"`,
 	pid:    u8 `gd:"replicate"`, // the seat this square belongs to (its color)
 	mine:   bool, // set by the census hook: this peer drives this body
 	tinted: bool, // one-shot: skin color applied once pid lands

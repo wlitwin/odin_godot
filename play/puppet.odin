@@ -79,11 +79,11 @@ body_impel :: proc(body: gd.Rigid_Body2d, vx, vy: f32) {
 }
 
 Puppet :: struct {
-	x, y:   f32 `gd:"replicate,interp,owner,wire=f16"`, // pose: the owner stream every screen follows
-	rot:    f32 `gd:"replicate,owner,wire=f16"`, // SNAP, never lerp: an angle
+	x, y:   f32 `gd:"owner,interp,wire=f16"`, // pose: the owner stream every screen follows
+	rot:    f32 `gd:"owner,wire=f16"`, // SNAP, never lerp: an angle
 	// interpolated componentwise sweeps the long way around the ±π wrap —
 	// a spinning kicked ball whipped its markings a full turn in one sample.
-	vx, vy: f32 `gd:"replicate,owner,wire=f16"`, // momentum: carried across ownership handoffs
+	vx, vy: f32 `gd:"owner,wire=f16"`, // momentum: carried across ownership handoffs
 	body:   gd.Rigid_Body2d, // the wrapped node — attach-time, never on the wire
 	skin:   gd.Node2d, // optional visual child — render-error smoothing rides on it
 	ox, oy: f32, // the render error: TRUTH minus what was drawn, decaying to zero

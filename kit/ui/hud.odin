@@ -95,9 +95,10 @@ hp_make :: proc(parent: gd.Node) -> Hp_Bar {
 
 // Text blocks over stock theme: "hp ▓▓▓▓▓▓▓░░░ 70/100". Zero art to install,
 // and a test can read the exact fill back out of the tree.
-// A play.Health block feeds this directly: `kui.hp_refresh(&hb,
-// i32(r.health.hp), i32(r.health.max))` — the widget speaks plain ints on
-// purpose, so no layer owns it.
+// A play.Health block feeds this directly — `kui.hp_refresh(&hb,
+// r.health.hp, r.health.max)`, no casts: the widget speaks plain ints on
+// purpose (so no layer owns it) and the hp chain is i32 end to end, from the
+// replicated field through kcombat's difference arithmetic to here.
 hp_refresh :: proc(hb: ^Hp_Bar, current, max_hp: i32) {
 	filled := 0
 	if max_hp > 0 {

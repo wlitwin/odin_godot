@@ -22,8 +22,8 @@ two):
 | tag | authority | wire | applied by |
 | --- | --- | --- | --- |
 | `replicate` | host | reliable deltas | on arrival |
-| `replicate,owner` | owning peer | unreliable stream | interpolated in the past |
-| `replicate,predict` | server sim | tick-stamped snapshots | rollback + resim |
+| `owner` | owning peer | unreliable stream | interpolated in the past |
+| `predict` | server sim | tick-stamped snapshots | rollback + resim |
 
 Everything the session gives you — identity, roster, reconnect, spawns,
 blobs, stats, chat, the command loop for discrete verbs — keeps working
@@ -31,8 +31,9 @@ unchanged; this page assumes you know that surface (the
 [quickstart](quickstart.md) is the fast route in, the
 [sim quickstart](quickstart-sim.md) the fast route HERE — a coop hello
 promoted in four diffs). Only the contested fast state (movement,
-projectiles) opts into the sim lane, per field. `owner` and `predict` on one field is a build
-error: a field has one writer.
+projectiles) opts into the sim lane, per field. The lane is the tag's FIRST token, which is
+why a field cannot be on two of them: `owner` and `predict` are not options you could
+accidentally both set, they are the token that says what the field is.
 
 **The tick IS the simulation.** Unlike the coop model (gameplay at frame
 rate, the net tick paces the wire), sim-lane gameplay lives in a fixed-rate
@@ -67,9 +68,9 @@ holds every role gate:
 Runner :: struct {
 	owner:   gd.Node2d,
 	net_id:  knet.Net_Id,
-	x, y:    f32 `gd:"replicate,predict,interp"`,
-	vx, vy:  f32 `gd:"replicate,predict"`,
-	fire_cd: u16 `gd:"replicate,predict"`, // even the trigger is predicted state
+	x, y:    f32 `gd:"predict,interp"`,
+	vx, vy:  f32 `gd:"predict"`,
+	fire_cd: u16 `gd:"predict"`, // even the trigger is predicted state
 	hp:      i32 `gd:"replicate"`, // delta lane: never resimmed, wire-fresh
 }
 
@@ -290,7 +291,7 @@ zeroes the lane); `lane_init` on a live lane asserts.
 
 Blocks compose on this lane the way `godot:play`'s compose on the coop one:
 embed a field and the entity gains the block's predicted state (its
-`gd:"replicate,predict"` fields flatten into the descriptor) AND its
+`gd:"predict"` fields flatten into the descriptor) AND its
 `@(gd_tick)` step, hoisted to run after the entity's own tick — the entity
 writes intent, blocks integrate. The shelf ships the shapes the showcase
 games kept hand-rolling; the blessed alias is `psim`:
@@ -669,8 +670,8 @@ game on the two models); the checklist, per contested entity:
 1. **Touch nothing session-shaped.** Identity, roster, chat, stats, spawns,
    saves, the doors, the factory — all of it rides both models unchanged.
    Chests, inventories, scores stay on the delta lane with their verbs.
-2. **Retag the contested fast state.** `replicate,owner` (movement the peer
-   owned) becomes `replicate,predict` — the field's writer changes from "its
+2. **Retag the contested fast state.** `owner` (movement the peer
+   owned) becomes `predict` — the field's writer changes from "its
    owner's stream" to "the server's simulation, predicted locally". Keep
    `interp` on drawn floats. The retag is the whole wire migration.
 3. **Move its writes into a `@(gd_tick)`.** Frame-rate mutation becomes a

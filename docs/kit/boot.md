@@ -160,7 +160,7 @@ it bodies and its stable wire id, and pass the GENERATED table to
 
 ```odin
 // on the game struct — ordinary drag-drop exports, plus the declaration:
-mob_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Mob:3"`,
+mob_scene: ^gd.Resource `gd:"entity=Mob:3"`,
 
 // ready(), after boot_attach (the factory parents under boot.world):
 kboot.boot_entities(&self.boot, self, scrapyard_entity_kinds[:])

@@ -126,13 +126,13 @@ CaveLobby :: struct {
 	// consts, the kind table, and the typed hooks' dispatch from these;
 	// kboot.boot_entities (ready(), below) drives it. Bodies, particles,
 	// and layout stay in the editor.
-	spelunker_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Spelunker:1"`,
-	chest_scene:     ^gd.Resource `gd:"export,resource=PackedScene,entity=Chest:2"`,
-	door_scene:      ^gd.Resource `gd:"export,resource=PackedScene,entity=Door:3"`,
-	pickup_scene:    ^gd.Resource `gd:"export,resource=PackedScene,entity=Pickup:4"`,
-	dweller_scene:   ^gd.Resource `gd:"export,resource=PackedScene,entity=Dweller:5"`,
-	level_scene:     ^gd.Resource `gd:"export,resource=PackedScene,entity=Level:6"`,
-	relic_scene:     ^gd.Resource `gd:"export,resource=PackedScene,entity=Relic:7"`,
+	spelunker_scene: ^gd.Resource `gd:"entity=Spelunker:1"`,
+	chest_scene:     ^gd.Resource `gd:"entity=Chest:2"`,
+	door_scene:      ^gd.Resource `gd:"entity=Door:3"`,
+	pickup_scene:    ^gd.Resource `gd:"entity=Pickup:4"`,
+	dweller_scene:   ^gd.Resource `gd:"entity=Dweller:5"`,
+	level_scene:     ^gd.Resource `gd:"entity=Level:6"`,
+	relic_scene:     ^gd.Resource `gd:"entity=Relic:7"`,
 
 	// The campaign: one CaveLevelDef data asset per floor (scene + loot +
 	// waves), authored in the inspector.
@@ -187,6 +187,10 @@ CaveLobby :: struct {
 	brains:    map[knet.Net_Id]Dweller_Brain `gd:"backup"`,
 	director:  kai.Director `gd:"backup"`,
 	slain_col: ksess.Stat_Col, // the game's own scoreboard column
+	// UNTAGGED on purpose: a print latch, not campaign state. A successor host
+	// re-earns it on its first bent path (host.odin's CAVE_NAV_BENT receipt) —
+	// backing it up would only teach the new host to stay quiet.
+	nav_bent:  bool,
 	dens_used: int `gd:"backup"`, // round-robin den picker
 	last_wave: int `gd:"backup"`, // wave-announcement edge
 	host_ticks: int `gd:"backup"`, // host: game ticks elapsed

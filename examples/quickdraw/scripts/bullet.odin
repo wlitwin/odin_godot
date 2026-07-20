@@ -24,9 +24,9 @@ Bullet :: struct {
 	net_id: knet.Net_Id,
 
 	// The predicted flight — server-simulated, client-predicted, reconciled.
-	x, y:   f32 `gd:"replicate,predict,interp"`,
-	vx, vy: f32 `gd:"replicate,predict"`,
-	life:   u16 `gd:"replicate,predict"`, // ticks of flight left; 0 = spent
+	x, y:   f32 `gd:"predict,interp"`,
+	vx, vy: f32 `gd:"predict"`,
+	life:   u16 `gd:"predict"`, // ticks of flight left; 0 = spent
 
 	// Delta lane: who fired it (splash credit; never splashes its own shooter).
 	pid:     u8 `gd:"replicate"`,

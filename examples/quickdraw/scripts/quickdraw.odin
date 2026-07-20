@@ -46,9 +46,9 @@ Quickdraw :: struct {
 	running: bool,
 	started: bool,
 
-	gunner_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Gunner:1"`,
-	bullet_scene: ^gd.Resource `gd:"export,resource=PackedScene,entity=Bullet:2"`,
-	drone_scene:  ^gd.Resource `gd:"export,resource=PackedScene,entity=Drone:3"`,
+	gunner_scene: ^gd.Resource `gd:"entity=Gunner:1"`,
+	bullet_scene: ^gd.Resource `gd:"entity=Bullet:2"`,
+	drone_scene:  ^gd.Resource `gd:"entity=Drone:3"`,
 
 	// The census is GENERATED (gunner_of / my_gunner / gunner_owned_by /
 	// gunner_ids read the kit's own ledgers) — the only bookkeeping left is

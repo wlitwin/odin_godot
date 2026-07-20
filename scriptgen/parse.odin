@@ -726,12 +726,13 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			continue
 		}
 
-		// friendslop toolkit: `gd:"replicate[,interp][,owner]"` — a kit/net replicated
-		// field. Only names + options are recorded here; generate.odin emits the
+		// friendslop toolkit: a LANE token opens a networked field — `replicate`
+		// (delta), `owner` (streamed from the owning peer), or `predict` (kit/sim).
+		// Only names + options are recorded here; generate.odin emits the
 		// knet.Entity_Desc (offset_of/size_of are the consumer compiler's job) plus a
 		// #assert that rejects non-POD fields at compile time with the field's name.
-		if tok0 == "replicate" {
-			rep, rok := parse_replicate_info(type_text, specs, floc, s.struct_name, field_label)
+		if lane := decl.replicate_lane(tok0); lane != .None {
+			rep, rok := parse_replicate_info(lane, type_text, specs, floc, s.struct_name, field_label)
 			if !rok {continue}
 			// Multi-name fields (`x, y: f32 `gd:"replicate"``) replicate each name.
 			for nm in f.names {
@@ -799,6 +800,30 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			continue
 		}
 
+		// `gd:"entity=Name:id"` — a WIRE declaration, so it LEADS the tag (the rule
+		// decl.Slot now states). It carries a permanent public type id, folds into
+		// NET_FINGERPRINT, and becomes a row in the generated factory table; it used
+		// to ride as a trailing spec of `export` purely by accident of the order the
+		// two features were built, which left `profile=T` leading and this not.
+		//
+		// BOTH LEADING TOKENS ARE SYNTHESIZED. An entity field is NECESSARILY an
+		// exported PackedScene — the scene is what the factory instantiates, and the
+		// Inspector slot is how the author hands it over — so `export` and
+		// `resource=PackedScene` were never a choice the tag was recording, only
+		// ceremony it was demanding. Trailing EXPORT specs still ride behind
+		// (`entity=Mob:3,group=Spawns`); a second `resource=` does not, since it
+		// would be overriding a hint the declaration already fixed.
+		entity_first := strings.has_prefix(tok0, "entity=")
+		entity_first_val := ""
+		if entity_first {
+			entity_first_val = strings.trim_space(tok0[len("entity="):])
+			syn := make([dynamic]string, 0, len(specs) + 1, context.temp_allocator)
+			append(&syn, "export", "resource=PackedScene")
+			append(&syn, ..specs[1:])
+			specs = syn[:]
+			tok0 = "export"
+		}
+
 		if tok0 != "export" {
 			if strings.has_prefix(tok0, "args=") {
 				error_at(
@@ -848,7 +873,7 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		// type, a hint's Variant requirement); this only asks whether it EXISTS.
 		getter := ""
 		setter := ""
-		entity_val := ""
+		entity_val := entity_first_val
 		resource_val := ""
 		for si in 1 ..< len(specs) {
 			spec := strings.trim_space(specs[si])
@@ -865,8 +890,24 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			case "set":
 				setter = value
 			case "entity":
-				entity_val = value
+				// The old trailing form. Refused, not accepted-as-well: a language
+				// with two spellings for one declaration teaches neither, and the
+				// three games vendoring this addon each carry a dozen of these — the
+				// rewritten tag IS their upgrade instructions.
+				error_at(
+					floc,
+					"%s.%s: `entity=` is a WIRE declaration, not an export spec — it LEADS the tag now: write `gd:\"entity=%s\"` (the `export` and `resource=PackedScene` it implies are synthesized)",
+					s.struct_name, field_label, value,
+				)
 			case "resource":
+				if entity_first && si > 1 {
+					error_at(
+						floc,
+						"%s.%s: `entity=` already fixes the resource hint to PackedScene (that is what a spawnable entity IS) — drop `resource=%s`",
+						s.struct_name, field_label, value,
+					)
+					continue
+				}
 				resource_val = value
 			case:
 				if _, known := decl.export_spec(name); !known {
@@ -894,9 +935,11 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 			}
 		}
 
-		// `entity=Name:id` — this exported scene BODIES a wire entity: the tag
-		// is the whole factory declaration (resolve_entities validates the
-		// target and pairs the typed hooks once the full module is parsed).
+		// `entity=Name:id` — this scene BODIES a wire entity: the tag is the whole
+		// factory declaration (resolve_entities validates the target and pairs the
+		// typed hooks once the full module is parsed). The "must be a PackedScene
+		// export" check that used to live here is gone with the trailing form —
+		// the hint is synthesized, so it cannot be anything else.
 		if entity_val != "" {
 			target, sep, id_text := strings.partition(entity_val, ":")
 			id, id_ok := strconv.parse_int(strings.trim_space(id_text))
@@ -905,8 +948,6 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 				error_at(floc, "%s.%s: `entity=` wants `Name:id` — the struct this scene bodies and its stable wire id (e.g. entity=Mob:3)", s.struct_name, field_label)
 			case id <= 0 || id > 65535:
 				error_at(floc, "%s.%s: entity id %d is out of range — pick 1..65535 (0 reads as \"none\", and the id must stay STABLE across builds: saves, rejoins, and backups carry it)", s.struct_name, field_label, id)
-			case resource_val != "PackedScene":
-				error_at(floc, "%s.%s: `entity=` belongs on a PackedScene export — tag the field `gd:\"export,resource=PackedScene,entity=%s\"`", s.struct_name, field_label, entity_val)
 			case len(f.names) != 1:
 				error_at(floc, "%s.%s: one scene field per entity — split the multi-name declaration", s.struct_name, field_label)
 			case:
@@ -1123,7 +1164,7 @@ validate_script :: proc(s: ^Script) {
 		if len(s.replicates) == 0 {
 			error_at(
 				Loc{path = s.path},
-				"%s declares @(gd_command) procs but no gd:\"replicate\" fields — commands mutate replicated state (prediction, revert, and reject-truth all run off the field descriptor)",
+				"%s declares @(gd_command) procs but no networked fields (gd:\"replicate\" / gd:\"owner\" / gd:\"predict\") — commands mutate replicated state (prediction, revert, and reject-truth all run off the field descriptor)",
 				s.struct_name,
 			)
 		}
@@ -1168,7 +1209,7 @@ validate_script :: proc(s: ^Script) {
 		if !has_predict {
 			error_at(
 				Loc{path = s.path, line = s.tick.line},
-				"%s ticks (own @(gd_tick) or an embedded block's) but no gd:\"replicate,predict\" fields — the sim lane snapshots and reconciles predicted state; tag the fields the ticks mutate",
+				"%s ticks (own @(gd_tick) or an embedded block's) but no gd:\"predict\" fields — the sim lane snapshots and reconciles predicted state; tag the fields the ticks mutate",
 				s.struct_name,
 			)
 		}
@@ -1690,7 +1731,7 @@ resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^m
 		if len(target.replicates) == 0 && len(target.commands) == 0 {
 			error_at(
 				loc,
-				"entity %s: the struct has no gd:\"replicate\" fields or @(gd_command) procs — a wire entity needs a descriptor (tag its state, or drop the entity= declaration)",
+				"entity %s: the struct has no networked fields (gd:\"replicate\" / gd:\"owner\" / gd:\"predict\") or @(gd_command) procs — a wire entity needs a descriptor (tag its state, or drop the entity= declaration)",
 				e.target,
 			)
 			continue
@@ -3047,11 +3088,11 @@ resolve_edges :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
 
 		field := fmt.tprintf("%s.%s", s.struct_name, strings.join(r.path, ".", context.temp_allocator))
 		if r.predict {
-			error_at(loc, "%s: %s is PREDICTED — the sim rewrites it on every reconcile, so a delta edge would fire on mispredict scrubs; predicted facts ride the mine-form `_fx` (sim.md)", name, field)
+			error_at(loc, "%s: %s is on the `gd:\"predict\"` lane — the sim rewrites it on every reconcile, so a delta edge would fire on mispredict scrubs; predicted facts ride the mine-form `_fx` (sim.md)", name, field)
 			continue
 		}
 		if r.owner {
-			error_at(loc, "%s: %s is OWNER-STREAMED — it interpolates every frame; dress continuous state from the fields. `_edge` is the delta lane's", name, field)
+			error_at(loc, "%s: %s is on the `gd:\"owner\"` lane — it interpolates every frame; dress continuous state from the fields. `_edge` is `gd:\"replicate\"`'s", name, field)
 			continue
 		}
 		if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") || has_attr(cand.vd, "gd_tick") {
@@ -3417,7 +3458,7 @@ composed_pkg_ref :: proc(def_dir, scripts_dir: string) -> (alias, path: string) 
 
 // THE SHELF LINT — the namespace contract, enforced where block-ness is
 // actually asserted (the embed). `godot:play` is the coop/scratch shelf: its
-// blocks ride the delta lane or stay local, so a gd:"replicate,predict"
+// blocks ride the delta lane or stay local, so a gd:"predict"
 // field there means the block was shelved one lane short — it belongs in
 // `godot:play/sim`. And the mirror: a `godot:play/sim` block with NO
 // predict-tagged fields isn't a sim block at all. Scoped to the two SHELF
@@ -3428,28 +3469,29 @@ shelf_lint :: proc(s: ^Script, def: Struct_Def, path: []string) {
 	if g_godot_root == "" || !strings.has_prefix(def.dir, g_godot_root) {return}
 	rel := strings.trim_prefix(def.dir[len(g_godot_root):], "/")
 	if rel != "play" && rel != "play/sim" {return}
+	// Which SHELF a block belongs on is which LANE its fields declare, and since
+	// the lane became the first token that is a one-token read — this used to
+	// scan the option list behind `replicate` for a buried `predict`.
 	has_predict := false
 	for fld in def.fields {
 		val, has := tag_gd_value(fld.tag)
 		if !has {continue}
-		specs := strings.split(val, ",", context.temp_allocator)
-		if len(specs) == 0 || strings.trim_space(specs[0]) != "replicate" {continue}
-		for spec in specs[1:] {
-			if strings.trim_space(spec) == "predict" {
-				has_predict = true
-			}
+		tok0 := val
+		if ci := strings.index(val, ","); ci >= 0 {tok0 = val[:ci]}
+		if decl.replicate_lane(strings.trim_space(tok0)) == .Predict {
+			has_predict = true
 		}
 	}
 	if rel == "play" && has_predict {
 		error_at(
 			Loc{path = s.path},
-			"%s embeds %s (as %q) from the godot:play shelf, but the block carries gd:\"replicate,predict\" fields — predicted blocks live on the sim shelf: move it to play/sim (import psim \"godot:play/sim\")",
+			"%s embeds %s (as %q) from the godot:play shelf, but the block carries gd:\"predict\" fields — predicted blocks live on the sim shelf: move it to play/sim (import psim \"godot:play/sim\")",
 			s.struct_name, def.id, join_path(path),
 		)
 	} else if rel == "play/sim" && !has_predict {
 		error_at(
 			Loc{path = s.path},
-			"%s embeds %s (as %q) from the godot:play/sim shelf, but the block carries no gd:\"replicate,predict\" fields — the sim shelf is for predicted blocks; timeline-free and coop blocks live on godot:play",
+			"%s embeds %s (as %q) from the godot:play/sim shelf, but the block carries no gd:\"predict\" fields — the sim shelf is for predicted blocks; timeline-free and coop blocks live on godot:play",
 			s.struct_name, def.id, join_path(path),
 		)
 	}
@@ -3605,8 +3647,8 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 		val, has := tag_gd_value(fld.tag)
 		if has {
 			specs := strings.split(val, ",")
-			if len(specs) > 0 && strings.trim_space(specs[0]) == "replicate" {
-				rep, rok := parse_replicate_info(ftype, specs, fld.loc, s.struct_name, join_path(fpath))
+			if lane := len(specs) > 0 ? decl.replicate_lane(strings.trim_space(specs[0])) : .None; lane != .None {
+				rep, rok := parse_replicate_info(lane, ftype, specs, fld.loc, s.struct_name, join_path(fpath))
 				if rok {
 					rep.field = fld.name
 					rep.path = fpath
@@ -3874,11 +3916,53 @@ classify_backup :: proc(type_text: string) -> (kind: Backup_Kind, key: string, e
 	}
 }
 
-// Parse the OPTIONS half of a `gd:"replicate,..."` tag into a Replicate_Info (the
-// caller fills in `field`/`path`). Shared by the top-level field loop and the nested
-// walk. `specs` is the whole comma-split tag; specs[0] is "replicate". ok=false means
-// the field can't be replicated and was already reported (skip it).
+// The option set a lane accepts, for the unknown-option refusal. THE POINT OF
+// THE LANE-FIRST GRAMMAR IS THAT THIS IS A CLOSED SET PER LANE: `slack=` is not
+// "an option that requires predict", it is an option `predict` HAS and the
+// other two do not, so a misplaced knob is answered by "delta fields take
+// interp and wire" rather than by a cross-token implication the author has to
+// reconstruct. What used to be four pairwise rules is now three table rows.
+@(private = "file")
+lane_options :: proc(lane: decl.Lane) -> string {
+	switch lane {
+	case .Owner:
+		return "`interp`, `interp=angle`, `interp=BLEND_PROC`, `wire=f16`, or `wire=CODEC`"
+	case .Predict:
+		return "`interp`, `interp=angle`, `interp=BLEND_PROC`, `slack=N`, `glide=N`, `cut=N`, `wire=f16`, or `wire=CODEC`"
+	case .Delta, .None:
+		return "`interp`, `interp=angle`, `interp=BLEND_PROC`, `wire=f16`, or `wire=CODEC`"
+	}
+	return ""
+}
+
+@(private = "file")
+lane_token :: proc(lane: decl.Lane) -> string {
+	switch lane {
+	case .Owner:
+		return "owner"
+	case .Predict:
+		return "predict"
+	case .Delta, .None:
+		return "replicate"
+	}
+	return "replicate"
+}
+
+// Parse the OPTIONS half of a lane tag into a Replicate_Info (the caller fills in
+// `field`/`path`). Shared by the top-level field loop and the nested walk. `lane`
+// is what specs[0] selected — `replicate` (delta), `owner`, or `predict`; `specs`
+// is the whole comma-split tag. ok=false means the field can't be replicated and
+// was already reported (skip it).
+//
+// THE LANE LEADS, AND THAT IS WHY THIS PROC IS SHORT. It used to take the lane as
+// two optional tokens buried among the tuning knobs, and paid for it with a
+// pairwise constraint matrix at the bottom: owner-xor-predict, slack-needs-predict,
+// glide/cut-needs-predict-AND-interp. Every one of those rules existed only
+// because a reader could not tell, at the point of the token, which lane they were
+// in. With the lane first, `gd:"replicate,owner"` and `gd:"replicate,slack=0.5"` are
+// not REJECTED combinations — they are unspellable, and the checks are gone.
 parse_replicate_info :: proc(
+	lane: decl.Lane,
 	type_text: string,
 	specs: []string,
 	floc: Loc,
@@ -3942,9 +4026,46 @@ parse_replicate_info :: proc(
 		)
 		return {}, false
 	}
-	rep := Replicate_Info{type_text = type_text}
-	for spec_raw in specs[1:] {
+	rep := Replicate_Info {
+		type_text = type_text,
+		owner     = lane == .Owner,
+		predict   = lane == .Predict,
+	}
+	for spec_raw, si in specs[1:] {
 		spec := strings.trim_space(spec_raw)
+		// THE MIGRATION DOOR. `gd:"replicate,predict"` and friends parsed for the
+		// whole life of the language up to this commit, and three games out of
+		// this repo carry hundreds of them. A lane token appearing as an OPTION is
+		// therefore never a typo — it is the old grammar, and the only useful
+		// answer is the rewritten tag, spelled out, so the fix is a paste.
+		if l := decl.replicate_lane(spec); l != .None {
+			if lane == .Delta && l != .Delta {
+				rewritten := make([dynamic]string, 0, len(specs), context.temp_allocator)
+				append(&rewritten, lane_token(l))
+				for other, oi in specs[1:] {
+					if oi == si {continue}
+					if o := strings.trim_space(other); o != "" {append(&rewritten, o)}
+				}
+				old := make([dynamic]string, 0, len(specs), context.temp_allocator)
+				for t in specs {
+					if tt := strings.trim_space(t); tt != "" {append(&old, tt)}
+				}
+				error_at(
+					floc,
+					"%s.%s: `gd:%q` is the old lane-as-option form — write `gd:%q` (the lane is the FIRST token now: `replicate` for the delta lane, `owner` for owner-streamed, `predict` for the kit/sim predicted lane)",
+					struct_name, field_label,
+					strings.join(old[:], ",", context.temp_allocator),
+					strings.join(rewritten[:], ",", context.temp_allocator),
+				)
+			} else {
+				error_at(
+					floc,
+					"%s.%s: `%s` is a LANE, not an option — this field already declared `%s`, and a field has exactly ONE lane (whoever writes its bytes owns them; two writers would fight every tick)",
+					struct_name, field_label, spec, lane_token(lane),
+				)
+			}
+			return {}, false
+		}
 		// `interp=NAME`: custom blend math — NAME is an author proc of type knet.Blend_Proc,
 		// spliced verbatim into the generated descriptor (a missing/mistyped proc fails the
 		// consumer compile on that line).
@@ -3998,8 +4119,10 @@ parse_replicate_info :: proc(
 		// `slack=N`: this predicted float field's own reconcile tolerance (world
 		// units), overriding the lane default — a fast contested object rides loose
 		// drift while precise fields in the same lane stay tight. The numeric literal
-		// is spliced into the descriptor as f32; validated float and predict-only below.
-		if strings.has_prefix(spec, "slack=") {
+		// is spliced into the descriptor as f32. PREDICT-ONLY by membership: on the
+		// other two lanes this prefix simply isn't in the option set, and the
+		// unknown-option arm below names what that lane does take.
+		if lane == .Predict && strings.has_prefix(spec, "slack=") {
 			val := strings.trim_space(spec[len("slack="):])
 			if _, ok := strconv.parse_f64(val); !ok {
 				error_at(floc, "%s.%s: `slack=` needs a number — the reconcile tolerance in world units, e.g. slack=0.5", struct_name, field_label)
@@ -4010,7 +4133,7 @@ parse_replicate_info :: proc(
 		}
 		// `glide=N`: this field's render-error smoothing half-life (seconds), overriding
 		// the lane default — a slow-gliding avatar and a snappy ball can share one lane.
-		if strings.has_prefix(spec, "glide=") {
+		if lane == .Predict && strings.has_prefix(spec, "glide=") {
 			val := strings.trim_space(spec[len("glide="):])
 			if _, ok := strconv.parse_f64(val); !ok {
 				error_at(floc, "%s.%s: `glide=` needs a number — the smoothing half-life in seconds, e.g. glide=0.1", struct_name, field_label)
@@ -4021,7 +4144,7 @@ parse_replicate_info :: proc(
 		}
 		// `cut=N`: this field's snap threshold (world units) — a reconcile error past it
 		// is a teleport, and the whole entity snaps instead of gliding, overriding the lane.
-		if strings.has_prefix(spec, "cut=") {
+		if lane == .Predict && strings.has_prefix(spec, "cut=") {
 			val := strings.trim_space(spec[len("cut="):])
 			if _, ok := strconv.parse_f64(val); !ok {
 				error_at(floc, "%s.%s: `cut=` needs a number — the snap threshold in world units, e.g. cut=32", struct_name, field_label)
@@ -4033,21 +4156,10 @@ parse_replicate_info :: proc(
 		switch spec {
 		case "interp":
 			rep.interp = true
-		case "owner":
-			rep.owner = true
-		case "predict":
-			rep.predict = true
 		case "":
 		case:
-			error_at(floc, "%s.%s: unknown replicate option %q (expected `interp`, `interp=angle`, `interp=BLEND_PROC`, `owner`, `predict`, `wire=f16`, or `wire=CODEC`)", struct_name, field_label, spec)
+			error_at(floc, "%s.%s: unknown `%s` option %q — the %s lane takes %s", struct_name, field_label, lane_token(lane), spec, lane_token(lane), lane_options(lane))
 		}
-	}
-	// A field has ONE authority lane: `owner` streams from its owning peer,
-	// `predict` is server-simulated and client-reconciled (kit/sim). Both at
-	// once would mean two writers fighting over the same bytes every tick.
-	if rep.predict && rep.owner {
-		error_at(floc, "%s.%s: `owner` and `predict` are mutually exclusive — a field is owner-streamed OR server-sim-predicted, never both (pick the lane that owns its writes)", struct_name, field_label)
-		return {}, false
 	}
 	// Bare `interp` must know HOW to blend: classify the declared type into a knet.Lerp_Kind
 	// (quaternions get hemisphere-safe nlerp — a raw componentwise lerp garbles rotations near
@@ -4069,26 +4181,24 @@ parse_replicate_info :: proc(
 	if rep.predict && !rep.interp && rep.lerp == "" {
 		rep.lerp = interp_lerp_kind(type_text) // "" for non-floats: exact compare
 	}
-	// `slack=` is a predict-reconcile knob and only bites on float fields — discrete
-	// predicted state always reconciles exactly (a differing byte is a real event),
-	// so slack there would be silently ignored by predict_within. Reject both misuses.
-	if rep.slack != "" {
-		if !rep.predict {
-			error_at(floc, "%s.%s: `slack=` is a kit/sim reconcile knob — it only applies to a gd:\"replicate,predict\" field (add `predict`, or drop slack=)", struct_name, field_label)
-			return {}, false
-		}
-		if rep.lerp != ".F32" && rep.lerp != ".F64" {
-			error_at(floc, "%s.%s: `slack=` needs a float predicted field (f32/f64, float vectors/colors, or fixed arrays of them) — discrete predicted state always reconciles exactly; drop slack= here", struct_name, field_label)
-			return {}, false
-		}
+	// WHAT SURVIVED THE MATRIX: the two FLOAT-NESS rules, which are per-lane
+	// checks about the field's TYPE, not cross-token implications about other
+	// tokens — the lane can't make an i32 carry a continuous reconcile error.
+	//
+	// `slack=` only bites on float fields: discrete predicted state always
+	// reconciles exactly (a differing byte is a real event), so slack there
+	// would be silently ignored by predict_within.
+	if rep.slack != "" && rep.lerp != ".F32" && rep.lerp != ".F64" {
+		error_at(floc, "%s.%s: `slack=` needs a float predicted field (f32/f64, float vectors/colors, or fixed arrays of them) — discrete predicted state always reconciles exactly; drop slack= here", struct_name, field_label)
+		return {}, false
 	}
 	// `glide=`/`cut=` shape the GLIDE of a reconcile correction — render-error
 	// smoothing, which only exists on a predicted field the eye INTERPOLATES, and
 	// only floats carry that error (.Quat/.Custom snap, so they'd silently ignore it).
 	glide_cut := rep.glide != "" ? "glide=" : (rep.cut != "" ? "cut=" : "")
 	if glide_cut != "" {
-		if !rep.predict || !rep.interp {
-			error_at(floc, "%s.%s: `%s` shapes render-error smoothing — it needs a gd:\"replicate,predict,interp\" field; a non-interp predicted field snaps on reconcile, nothing to glide", struct_name, field_label, glide_cut)
+		if !rep.interp {
+			error_at(floc, "%s.%s: `%s` shapes render-error smoothing — it needs `interp` beside it (`gd:\"predict,interp,%s…\"`); a non-interp predicted field snaps on reconcile, nothing to glide", struct_name, field_label, glide_cut, glide_cut)
 			return {}, false
 		}
 		if rep.lerp != ".F32" && rep.lerp != ".F64" {

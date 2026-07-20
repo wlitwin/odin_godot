@@ -13,7 +13,7 @@ import gd "godot:godot"
 
 Turret :: struct {
 	owner:      gd.Node2d,
-	aimx, aimy: f32 `gd:"replicate,predict,interp"`,
+	aimx, aimy: f32 `gd:"predict,interp"`,
 }
 
 // Distinct from Pawn_Input (a different width, a different intent) — the whole

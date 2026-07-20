@@ -9,6 +9,18 @@ package kit_combat
 // — session-coupled presentation conveniences that live beside the math they
 // serve, not part of that pure core.
 //
+// AND THEY STAY HERE. Splitting the session-coupled half into its own package
+// (the way kit/fx's tracers went) was weighed and REFUSED: the tracers are a
+// VISUAL half, a genuinely separate concern, while the Fire half is a WIRE
+// half serving the very math it sits beside. Two facts settle it. fire_announce
+// takes a bare ^ksess.Session so the authority can announce without holding a
+// listener — cavecrawl calls it exactly that way — and Fire.shooter is a public
+// payload field games read, which is why the fire lane deliberately did NOT
+// ride kit/session's host_relay when that primitive absorbed comms and xfer:
+// the relay's stamp would duplicate a field the game already owns. That is a
+// deliberately game-facing surface, not a layering violation hiding in a
+// header, and a package holding one struct and two procs would be inventory.
+//
 // THE SHAPES:
 //
 //   * Combat state is plain replicated fields on YOUR entity — `hp: i32`,
@@ -35,7 +47,7 @@ import "core:math"
 // ---- health ------------------------------------------------------------------
 
 // The scalar damage core — THE one implementation of the corpse-guarded
-// clamp, generic over the game's hp integer (play.Health's u16, a raw i32
+// clamp, generic over the game's hp integer (play.Health's i32, a raw i32
 // field, a boss's whatever). `dealt` is what actually landed (0 on a corpse
 // or a no-op amount — hit credit reads it); `died` reports the killing blow
 // exactly once. hit() below and play.health_hurt both delegate here — the

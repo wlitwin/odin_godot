@@ -32,8 +32,8 @@ package play_sim
 // the game's, inside its own tick or world pass.
 
 Mover :: struct {
-	x, y:   f32 `gd:"replicate,predict,interp"`,
-	vx, vy: f32 `gd:"replicate,predict"`,
+	x, y:   f32 `gd:"predict,interp"`,
+	vx, vy: f32 `gd:"predict"`,
 
 	// Intent — the wielder's tick writes the velocity it wants, every tick.
 	tx, ty: f32,

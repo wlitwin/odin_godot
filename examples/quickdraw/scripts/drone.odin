@@ -25,7 +25,7 @@ Drone :: struct {
 
 	// The predicted position — server-simulated from the drone's own input,
 	// client-predicted, reconciled. The same predict/interp story as a gunner.
-	x, y: f32 `gd:"replicate,predict,interp"`,
+	x, y: f32 `gd:"predict,interp"`,
 
 	// Delta lane: whose drone (its color; the acid's ownership).
 	pid: u8 `gd:"replicate"`,

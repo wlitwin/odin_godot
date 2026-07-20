@@ -40,7 +40,7 @@ PREDICTED blocks live on the sibling shelf, `godot:play/sim` (blessed alias
 `psim`): `psim.Cool` (Pace's twin — the same due/arm/ready verbs, counting
 itself down inside the sim), `psim.Mover` (momentum movement), and
 `psim.Roller` (the contested rolling body). Same embedding, the other
-timeline — their `replicate,predict` fields resim, and their block ticks
+timeline — their `predict` fields resim, and their block ticks
 hoist onto the entity's. scriptgen polices the split both ways, so the
 shelf an import names IS the lane the state lives on; the block list and
 the contract live in [sim](sim.md#the-predicted-shelf--godotplaysim).
