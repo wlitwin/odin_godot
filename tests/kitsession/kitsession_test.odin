@@ -1095,6 +1095,72 @@ resume_run_from_backup :: proc(t: ^testing.T) {
 	testing.expect(t, host2.s.next_player > bob.s.me)
 }
 
+// The ORPHAN RE-OWN: an entity the dead host was STREAMING under its own player
+// id (a wanderer, a mob, a carried prop — anything a game spawned `owner =
+// ses.me` on the host) has no one to stream it once the host dies. The heir
+// takes the leash automatically now, or it freezes on every screen forever —
+// the silent bug every game hand-rolled a re-own loop to dodge. TEETH: without
+// the re-own in session_host_resume, `pet`'s owner stays the dead host's id.
+@(test)
+resume_reowns_the_dead_hosts_entities :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	// Three owners, the three cases the re-own must tell apart:
+	world := Bot{hp = 5} // PLAYER_ID_INVALID: host-authoritative, survives via is_host
+	world_id := ksess.session_spawn(&host.s, BOT_TYPE, &world, &bot_command_set)
+	pet := Bot{hp = 7} // owned by the HOST's player id: the freeze case
+	pet_id := ksess.session_spawn(&host.s, BOT_TYPE, &pet, &bot_command_set, owner = host.s.me)
+	mine := Bot{hp = 9} // owned by alice (the heir): already hers, must not move
+	mine_id := ksess.session_spawn(&host.s, BOT_TYPE, &mine, &bot_command_set, owner = alice.s.me)
+	ksess.session_start_replicating(&host.s)
+
+	old_host_id := host.s.me
+	now := 50.0
+	for _ in 0 ..< 10 {step(boxes, &now)}
+	testing.expect(t, len(alice.s.backup) > 0)
+
+	_, snap, pok := ksess.session_backup_parts(&alice.s)
+	testing.expect(t, pok)
+	old_me := alice.s.me
+
+	host2: Peer_Box
+	box_make(&host2, 1)
+	defer box_destroy(&host2)
+	testing.expect(t, ksess.session_host_resume(&host2.s, old_me, "alice", snap))
+
+	// The dead host's streamed entity is now the HEIR's — not frozen under a
+	// player who will never return.
+	pe, _ := knet.registry_get(&host2.s.reg, pet_id)
+	testing.expect_value(t, pe.owner, old_me)
+	testing.expect(t, pe.owner != old_host_id, "the pet must not still be owned by the dead host")
+	// The heir's game hears it as an ownership change, so a game gluing an
+	// entity to its owner adopts the pet here.
+	saw_adopt := false
+	for ev in drain(&host2.s) {
+		if oc, ok := ev.(ksess.Ev_Owner_Changed); ok && oc.id == pet_id && oc.owner == old_me {
+			saw_adopt = true
+		}
+	}
+	testing.expect(t, saw_adopt, "re-own must fire Ev_Owner_Changed so the heir adopts it")
+
+	// The controls: host-authoritative world state stays nobody's (is_host runs
+	// it), and the heir's own entity was already hers — neither moves.
+	we, _ := knet.registry_get(&host2.s.reg, world_id)
+	testing.expect_value(t, we.owner, knet.PLAYER_ID_INVALID)
+	mine_e, _ := knet.registry_get(&host2.s.reg, mine_id)
+	testing.expect_value(t, mine_e.owner, old_me)
+}
+
 
 // ---- moderation: kick / ban / the door -----------------------------------------
 

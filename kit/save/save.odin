@@ -43,7 +43,7 @@ MAGIC :: u32(0x46534C50) // "FSLP"
 // ENVELOPE — magic, stamps, two length-prefixed ranges — which has no field
 // set to hash and must be readable by a reader that has agreed to nothing yet.
 // The changelog below IS the contract; bump it with the snapshot layout.
-FORMAT :: u16(3) // 2: entity blobs + wire codecs · 3: the door — locked + denied — rides the roster
+FORMAT :: u16(4) // 2: entity blobs + wire codecs · 3: the door — locked + denied — rides the roster · 4: host id in the snapshot (orphan re-own on takeover)
 
 Header :: struct {
 	game_version: u16,

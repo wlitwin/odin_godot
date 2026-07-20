@@ -72,7 +72,7 @@ backup_slot :: proc(s: ^Session, t: u64) {
 // wraps it in a versioned file envelope — saving a run and surviving a dead
 // host are the SAME contract.
 //
-// Layout: [next_player u64]
+// Layout: [next_player u64][host_id u64]
 //         [cols u8] x [name string]
 //         [players u16] x ([id u64][name string][token_hash u64][cols x i64])
 //         [locked bool][denied u16] x ([token_hash u64][id u64])
@@ -81,6 +81,14 @@ backup_slot :: proc(s: ^Session, t: u64) {
 session_snapshot :: proc(s: ^Session, w: ^knet.Writer) {
 	assert(s.is_host, "the authority owns the truth being snapshotted")
 	knet.write_u64(w, u64(s.next_player))
+	// WHO is hosting when this snapshot is taken. A heir reads it back as the
+	// OLD host's id and re-owns that player's entities to itself — the world
+	// entities the dead host was streaming (owner = its player id) would freeze
+	// on every screen otherwise (each game hand-rolled the re-own loop; now the
+	// kit does). It is s.me, not a fixed HOST id, because a heir-turned-host
+	// carries its own id — and the hash-0 "never JOINed" host signal is
+	// ambiguous once a migration leaves the dead host's row in the roster.
+	knet.write_u64(w, u64(s.me))
 	knet.write_u8(w, u8(len(s.stat_names)))
 	for n in s.stat_names {
 		knet.write_string(w, n)
@@ -286,6 +294,7 @@ session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backu
 
 	r := knet.reader_make(backup)
 	s.next_player = knet.Player_Id(knet.read_u64(&r))
+	old_host := knet.Player_Id(knet.read_u64(&r)) // who wrote this backup; its entities re-own to us
 	cols := int(knet.read_u8(&r))
 	if r.err || cols == 0 || cols > MAX_STAT_COLS { // 0: even a fresh run has "ping"
 		return false
@@ -348,6 +357,31 @@ session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backu
 	}
 	knet.registry_reserve_ids(&s.reg, next_net)
 	knet.registry_commit_shadows(&s.reg)
+
+	// RE-OWN THE ORPHANS. The dead host was STREAMING every entity it owned under
+	// its own player id (wanderers, mobs, carried props — anything alive and
+	// moving that a game spawned `owner = ses.me` on the host). That id is gone
+	// for good, so those entities have no one to stream them: they freeze on
+	// every screen, silently, forever. The heir is the new authority — it takes
+	// the leash. Host-authoritative deltas (owner = PLAYER_ID_INVALID: static
+	// world, flora) already flow from whoever is_host and need no move; a still-
+	// connected client's entities keep their owner and resume when that client
+	// rejoins. Only the OLD HOST's are stranded, and only they move here. Fired
+	// before `replicating`, so no SES_SETOWNER goes out (nobody to tell yet — the
+	// corrected owner rides the SES_WORLD every rejoiner gets); Ev_Owner_Changed
+	// still fires, so a game gluing an entity to its owner adopts it here.
+	if old_host != me && old_host != knet.PLAYER_ID_INVALID {
+		orphans := make([dynamic]knet.Net_Id, context.temp_allocator)
+		for id in s.types {
+			if session_owner_of(s, id) == old_host {
+				append(&orphans, id)
+			}
+		}
+		for id in orphans {
+			session_set_owner(s, id, me)
+		}
+	}
+
 	s.replicating = true // the world is live: rejoiners get SES_WORLD + stats
 	s.stats_dirty = true
 	return true
