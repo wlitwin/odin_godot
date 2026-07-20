@@ -279,6 +279,18 @@ Lane :: struct {
 	stat_render_sat:    int, // render_off8 hit the wire's 31.5-tick ceiling — the authority now rewinds LESS than this screen's true delay (lag comp judges shallow)
 	stat_input_drops:   int, // host: input windows dropped for an unknown class id — zero in a same-build session; a moving count is version skew or garbage on the port
 	stat_cmd_capped:    int, // host: verbs refused by the per-player CMD_HOST_CAP — an honest client never queues this deep; a moving count names the peer flooding you
+	// host: rewound queries whose reconstructed view fell PAST rewind_max and got
+	// clamped to the floor (lane_rewind_view). The counter exists because the
+	// clamp was the one failure in this file with no voice at all: the deep-lead
+	// surplus bug killed lag comp by pushing every query past this ceiling, the
+	// authority judged a half-second-old world, hit nothing, and NOTHING recorded
+	// it — the pathology was found in a sibling port's engine acid, not here.
+	// Counts QUERIES, not shots: a game that also calls lane_rewind_tick for
+	// diagnostics on the same trigger tallies both. A moving count means this
+	// shooter's view is older than the window can honor — either their lead is
+	// mispaced (the controller's job) or rewind_max is genuinely too small for
+	// the link you are serving.
+	stat_rewind_clamped: int,
 
 	// active inline rewind (lane_rewound_begin/end) — live captures to restore
 	wound:           [dynamic]Wound,
@@ -1405,6 +1417,7 @@ lane_rewind_view :: proc(l: ^Lane, shooter: knet.Player_Id) -> (lo: u64, alpha: 
 	view := f64(ack) - off
 	floor_ := t > u64(l.rewind_max) ? t - u64(l.rewind_max) : 1
 	if view <= f64(floor_) {
+		l.stat_rewind_clamped += 1
 		return floor_, 0 // the favor-the-shooter ceiling
 	}
 	lo = u64(view)

@@ -728,6 +728,18 @@ event worth drawing), and the host-side skew/abuse pair —
 version-skew shape) and `stat_cmd_capped` (verbs refused by the per-player
 cap: names the peer flooding you).
 
+`stat_rewind_clamped` is the one to watch if you run lag comp: it counts
+rewound queries whose reconstructed view fell past `rewind_max` and got
+pinned to the floor. That clamp is silent by construction — the authority
+judges an older world than the shooter saw, shots stop landing, and nothing
+else in the lane says so. A clamp or two at cold start is normal (the lead
+controller has not settled yet); a count that keeps moving means either this
+client's lead is mispaced or `rewind_max` is too small for the link you are
+serving. quickdraw's duel acid asserts on exactly this number, because the
+hit count alone does not catch it: with the deep-surplus rung removed the
+acid still passed on hits while clamping twelve queries and judging its
+first eleven shots at the floor.
+
 **Per-field reconcile + glide knobs.** The lane values are defaults; a single
 float field can override each on its tag, so a fast contested object and a
 precise avatar share ONE lane with different behavior:
