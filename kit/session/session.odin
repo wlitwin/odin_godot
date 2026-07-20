@@ -921,6 +921,15 @@ Type_Hook_Entry :: struct {
 // table, the wrong-type bug is structurally impossible, and each type's
 // consequences live next to its verbs. Survives starts, like the catch-all.
 session_set_type_hook :: proc(s: ^Session, type: Entity_Type, user: rawptr, hook: Command_Hook) {
+	// The zero-map class the tracking pin caught three times over (focus,
+	// stats, interest): a map SELF-CARRIES its creation allocator, so the FIRST
+	// insert silently decides where the whole table lives — and this table is
+	// WIRING, freed by session_destroy under the session's allocator. Created on
+	// a caller's ambient and freed on the session's own is the cross-allocator
+	// pairing tier B exists to prevent. Pre-start this is a no-op (ses_allocator
+	// falls back to ambient until session_init resolves one), which is exactly
+	// why it costs nothing to be right.
+	context.allocator = ses_allocator(s)
 	s.type_hooks[type] = Type_Hook_Entry{user = user, hook = hook}
 	s.ctx.hook = ctx_hook_dispatch
 	s.ctx.hook_user = s
@@ -1668,6 +1677,7 @@ session_set_locked :: proc(s: ^Session, locked: bool) {
 // a socket it can talk on, even though the session ignores unseated peers.
 session_kick :: proc(s: ^Session, player: knet.Player_Id, ban := false) -> (was: Peer_Id, ok: bool) {
 	assert(s.is_host, "the authority moderates")
+	context.allocator = ses_allocator(s) // two writers and the ban table's inserts — all the session's
 	p, exists := s.players[player]
 	if !exists || !p.connected || player == s.me {
 		return NO_PEER, false
@@ -1699,6 +1709,7 @@ session_kick :: proc(s: ^Session, player: knet.Player_Id, ban := false) -> (was:
 // a player's departure is broadcast and the roster keeps them (disconnected)
 // so the same token can reclaim the identity later.
 session_peer_disconnected :: proc(s: ^Session, peer: Peer_Id) {
+	context.allocator = ses_allocator(s) // the SES_LEFT writer; this root is called from transport callbacks, whose ambient is nobody's guess
 	if !s.is_host {
 		if peer == HOST_PEER {
 			append(&s.events, Ev_Host_Left{})
@@ -1988,6 +1999,7 @@ wire_fingerprint :: proc(cfg_fp: u64) -> u64 {
 // Graceful goodbye (the host also handles the plain transport disconnect —
 // this just makes the departure immediate instead of timeout-shaped).
 session_client_leave :: proc(s: ^Session) {
+	context.allocator = ses_allocator(s) // the goodbye writer rides the session like every other send path
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_u8(&w, SES_BYE)

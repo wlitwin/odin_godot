@@ -130,7 +130,7 @@ error, and the skip list cannot drift apart):
 | `replicate` | a networked field on the DELTA lane ([kit/net](kit/net.md)) | scriptgen | yes |
 | `owner` | a networked field streamed from its owning peer | scriptgen | yes |
 | `predict` | a networked field the sim predicts and reconciles ([kit/sim](kit/sim.md)) | scriptgen | yes |
-| `backup` | a field the session backup carries | scriptgen | yes |
+| `backup` | a field the session backup carries | scriptgen | no (see below) |
 | `manual` | "I call the generated thing myself" | scriptgen | no |
 | `profile=T` | the per-player profile row type | scriptgen | yes |
 | `entity=Name:id` | a spawnable entity type and its stable id | both | yes |
@@ -140,10 +140,20 @@ parameter names). "In the wire fingerprint" means the declaration's shape folds 
 `NET_FINGERPRINT`, so two builds that disagree about it are refused at the join door
 rather than misparsing each other's packets.
 
+`backup` is the interesting **no**, and it read **yes** here and in the schema until
+scriptgen started checking the column against what it actually serializes. A backup is
+guarded — by the codec's own `fnv1a32` format stamp, at the LOAD door, so a save written
+by a drifted build is refused rather than misread. It is not guarded at the JOIN door,
+deliberately: two peers whose save files disagree have no reason not to play together,
+and folding save shape into the fingerprint would ground them over a file neither is
+about to send the other. The rule the column follows: **yes** iff the shape must match
+across a SOCKET, not merely across a file.
+
 **A WIRE DECLARATION IS A FIRST TOKEN.** That is the rule the column on the right
-states: if the thing folds into `NET_FINGERPRINT`, it names what the field IS and it
-leads the tag. Two consequences worth spelling out, because both used to read the other
-way:
+states, in one direction: if the thing folds into `NET_FINGERPRINT`, it names what the
+field IS and it leads the tag. (Not the converse — `backup` and `manual` lead their tags
+without crossing a wire.) Two consequences worth spelling out, because both used to read
+the other way:
 
 * **The three lanes are three tokens.** `owner` and `predict` used to be options inside
   `gd:"replicate,…"`, which put the one decision that matters — who writes these bytes —

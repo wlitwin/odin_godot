@@ -12,8 +12,11 @@ package reflect_register_test
 // asserted hint ints / hint_strings / offsets / sizes / defaults are exactly the
 // values the old text-generated rt.Export tables carried.
 
+import "base:runtime"
+import "core:reflect"
 import "core:strings"
 import "core:testing"
+import decl "godot:decl"
 import "godot:gdext"
 import gd "godot:godot"
 import rt "godot:runtime"
@@ -675,6 +678,123 @@ error_paths :: proc(t: ^testing.T) {
 	testing.expect(t, xok, "typed collection with a resource element stays an untyped Array export")
 	testing.expect_value(t, tex.type, gdext.Variant_Type.Array)
 	testing.expect_value(t, tex.hint, 0)
+}
+
+// ---- the export-spec vocabulary, closed ----------------------------------------
+//
+// WHAT THIS REPLACES. tests/scriptgen used to extract the case labels of
+// walk_field's meta switch and parse_hint_spec's hint switch with awk and assert
+// them equal to decl.EXPORT_SPECS. That was an admitted stopgap — it could SEE
+// the two lists drift but not stop them, it broke on any reformatting of either
+// switch, and it proved only that a label was TYPED, never that the spec worked.
+// walk_field now dispatches ON the table, so the name set cannot drift; what is
+// left to prove is the part a table can never assert about its consumer — that
+// every name it declares actually reaches the Inspector as something.
+//
+// So: one field per (spec, legal form) the schema declares, run through the REAL
+// registration walk, and zero recorded errors is the proof. The FORMS are here
+// because the bare/value columns are load-bearing too (scriptgen refuses
+// `multiline=true` and bare `range` off them), and a column that no fixture
+// spells is a column nothing tests. A spec added to godot:decl fails this test
+// until someone spells it below, and spelling it fails until the runtime means
+// something by it.
+Vocabulary :: struct {
+	owner:      gd.Node,
+	rng:        i32 `gd:"export,range=0:10,group=Numbers,subgroup=Bounds,default=3"`,
+	choice:     i32 `gd:"export,enum=Idle:Walk"`,
+	prose:      gd.String `gd:"export,multiline"`,
+	any_file:   gd.String `gd:"export,file"`,
+	png_file:   gd.String `gd:"export,file=*.png"`,
+	any_dir:    gd.String `gd:"export,dir"`,
+	level_dir:  gd.String `gd:"export,dir=levels"`,
+	any_gfile:  gd.String `gd:"export,global_file"`,
+	txt_gfile:  gd.String `gd:"export,global_file=*.txt"`,
+	any_gdir:   gd.String `gd:"export,global_dir"`,
+	tmp_gdir:   gd.String `gd:"export,global_dir=/tmp"`,
+	texture:    gd.Object `gd:"export,resource=Texture2D"`,
+	numbers:    gd.Array `gd:"export,array=int"`,
+	prices:     gd.Dictionary `gd:"export,dict=String;int"`,
+	routed:     i32 `gd:"export,get=get_routed,set=set_routed"`,
+}
+
+// Does Vocabulary spell `name`, in the bare form or the `name=VALUE` form? Reads
+// the fixture's own tags rather than a second list beside it — a hand-kept
+// "specs I remembered to cover" array is precisely the thing this file exists to
+// stop existing. Allocation-free: the test runner tracks leaks.
+@(private)
+vocabulary_spells :: proc(name: string, with_value: bool) -> bool {
+	st := runtime.type_info_base(type_info_of(Vocabulary)).variant.(runtime.Type_Info_Struct)
+	for i in 0 ..< int(st.field_count) {
+		body, has := reflect.struct_tag_lookup(reflect.Struct_Tag(st.tags[i]), "gd")
+		if !has {continue}
+		first := true
+		for len(body) > 0 {
+			piece := body
+			if ci := strings.index_byte(body, ','); ci >= 0 {
+				piece = body[:ci]
+				body = body[ci + 1:]
+			} else {
+				body = ""
+			}
+			if first {
+				first = false // the leading token is the field's KIND, not a spec
+				continue
+			}
+			piece = strings.trim_space(piece)
+			pname, had_value := piece, false
+			if eq := strings.index_byte(piece, '='); eq >= 0 {
+				pname = strings.trim_space(piece[:eq])
+				had_value = true
+			}
+			if pname == name && had_value == with_value {return true}
+		}
+	}
+	return false
+}
+
+@(test)
+export_spec_vocabulary_is_implemented :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	fields := []rt.Field_Meta{{field = "routed", getter = dummy_get, setter = dummy_set}}
+	desc := rt.reflect_class_desc(Vocabulary, info("Vocabulary", fields))
+
+	// THE ASSERTION THAT MATTERS: every spec godot:decl declares, in every form it
+	// declares legal, walked by the real registrar with nothing to report. A spec
+	// the table names and the runtime has no arm for records "declared in
+	// godot:decl but walk_field/parse_hint_spec has no arm for it" and lands here.
+	for e in new_errors_since(before) {
+		testing.expectf(t, false, "Vocabulary must register clean: %s.%s: %s", e.class, e.field, e.msg)
+	}
+	testing.expect_value(t, int(desc.exports_count), 15)
+
+	for s in decl.EXPORT_SPECS {
+		if s.bare {
+			testing.expectf(
+				t, vocabulary_spells(s.name, false),
+				"godot:decl declares `%s` legal bare and no Vocabulary field spells it — add one, or drop the `bare` column",
+				s.name,
+			)
+		}
+		if s.value {
+			testing.expectf(
+				t, vocabulary_spells(s.name, true),
+				"godot:decl declares `%s=VALUE` legal and no Vocabulary field spells it — add one, or drop the `value` column",
+				s.name,
+			)
+		}
+	}
+
+	// The hints still had to LAND, not merely fail to complain: two spot checks
+	// across the kind boundary, so a walk that silently classified everything as
+	// Meta would pass the error count and fail here.
+	rngx, _ := find_export(desc, "rng")
+	testing.expect_value(t, rngx.hint, 1) // Range
+	testing.expect_value(t, string(rngx.hint_string), "0,10")
+	testing.expect_value(t, string(rngx.group), "Numbers")
+	testing.expect_value(t, rngx.default_num, 3)
+	dirx, _ := find_export(desc, "level_dir")
+	testing.expect_value(t, dirx.hint, 14) // Dir, with a value behind it
+	testing.expect_value(t, string(dirx.hint_string), "levels")
 }
 
 // Backing bytes for a "Duped" cstring that can NEVER pointer-match the "Duped"

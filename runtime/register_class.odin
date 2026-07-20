@@ -347,28 +347,59 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 			sname = strings.trim_space(spec[:eq])
 			value = strings.trim_space(spec[eq + 1:])
 		}
-		switch sname {
-		case "group":
-			if g, gok := pool_cstr(value); gok {ex.group = g} else {
-				record_error(cls, name_c, "registration name pool exhausted — group dropped")
+		// PROJECTION — the spec VOCABULARY, and whether a name is Inspector
+		// plumbing or the field's one Property_Hint, come from godot:decl's
+		// EXPORT_SPECS. This dispatch used to be two hand-written switches with no
+		// shared vocabulary between them: the one here had NO DEFAULT ARM, so every
+		// name it didn't recognize fell through to parse_hint_spec and came back as
+		// "unknown export hint `gropu`" — the wrong sentence for a meta typo, and a
+		// sentence neither switch could finish with the legal set, because neither
+		// knew the other's labels. tests/scriptgen papered over the split by
+		// extracting both switches' case labels with awk and asserting them equal to
+		// the table; that test could see drift but could not prevent it. Now the
+		// table SELECTS, and each switch below owns only what its names MEAN.
+		sp, sok := decl.export_spec(sname)
+		if !sok {
+			specs := decl.export_specs_list(context.temp_allocator)
+			msg, _ := pool_cstr("unknown export spec `", sname, "` (the set is: ", specs, ")")
+			if msg == nil {msg = "unknown export spec"}
+			record_error(cls, name_c, msg)
+			continue
+		}
+
+		switch sp.kind {
+		case .Meta:
+			switch sname {
+			case "group":
+				if g, gok := pool_cstr(value); gok {ex.group = g} else {
+					record_error(cls, name_c, "registration name pool exhausted — group dropped")
+				}
+			case "subgroup":
+				if g, gok := pool_cstr(value); gok {ex.subgroup = g} else {
+					record_error(cls, name_c, "registration name pool exhausted — subgroup dropped")
+				}
+			case "default":
+				num, str, dok := parse_default(cls, name_c, vt, value)
+				if dok {
+					ex.has_default = true
+					ex.default_num = num
+					ex.default_str = str
+				}
+			case "get":
+				want_get = true
+			case "set":
+				want_set = true
+			case:
+				// godot:decl lists this name as .Meta and nothing here knows what it
+				// DOES. The table records that a spec exists; this file owns its
+				// effect, so the gap is real and silence would be a spec the author
+				// wrote and the Inspector ignored. FIX: add an arm above, or mark the
+				// row .Hint and give parse_hint_spec one.
+				msg, _ := pool_cstr("export spec `", sname, "` is declared in godot:decl but walk_field has no arm for it — add one")
+				if msg == nil {msg = "export spec declared in godot:decl with no walk_field arm"}
+				record_error(cls, name_c, msg)
 			}
-		case "subgroup":
-			if g, gok := pool_cstr(value); gok {ex.subgroup = g} else {
-				record_error(cls, name_c, "registration name pool exhausted — subgroup dropped")
-			}
-		case "default":
-			num, str, dok := parse_default(cls, name_c, vt, value)
-			if dok {
-				ex.has_default = true
-				ex.default_num = num
-				ex.default_str = str
-			}
-		case "get":
-			want_get = true
-		case "set":
-			want_set = true
-		case:
-			// Anything else is a hint spec (range/enum/multiline/file/resource/...).
+		case .Hint:
 			if has_hint {
 				record_error(cls, name_c, "only one export hint allowed")
 				continue
@@ -997,8 +1028,14 @@ parse_hint_spec :: proc(cls, field: cstring, name, value: string, vt: gdext.Vari
 		}
 		return HINT_TYPE_STRING, hs, true
 	case:
-		msg, _ := pool_cstr("unknown export hint `", name, "`")
-		if msg == nil {msg = "unknown export hint"}
+		// NOT the misspelling gate any more — walk_field refuses every name
+		// godot:decl does not list, before this proc is ever called, and names the
+		// legal set while doing it. Reaching here means the schema grew a .Hint row
+		// this file has no arm for, i.e. a hint the author was allowed to write and
+		// the engine would never see. FIX: add a case above with the Property_Hint
+		// and hint_string the name means.
+		msg, _ := pool_cstr("export hint `", name, "` is declared in godot:decl but parse_hint_spec has no arm for it — add one")
+		if msg == nil {msg = "export hint declared in godot:decl with no parse_hint_spec arm"}
 		record_error(cls, field, msg)
 		return 0, "", false
 	}

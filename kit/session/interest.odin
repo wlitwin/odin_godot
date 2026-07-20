@@ -45,6 +45,7 @@ Locator_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y, z:
 // it to everyone already connected (SES_AOI) — without that, clients seated
 // before the flip kept broadcasting their owner streams unfiltered forever.
 session_set_interest :: proc(s: ^Session, radius: f32, hysteresis: f32, user: rawptr, locator: Locator_Proc) {
+	context.allocator = ses_allocator(s) // the SES_AOI re-declare's writer is the session's, not the caller's frame's
 	was := interest_on(s)
 	s.interest_r = radius
 	s.interest_hys = hysteresis
@@ -64,6 +65,12 @@ session_set_interest :: proc(s: ^Session, radius: f32, hysteresis: f32, user: ra
 // default: filtering starts when the game starts saying where they are).
 // `z` defaults away for 2D games.
 session_set_focus :: proc(s: ^Session, player: knet.Player_Id, x, y: f32, z: f32 = 0) {
+	// A zero map captures context.allocator at its FIRST insert and self-carries
+	// it forever after — so this one line decides where s.focus LIVES for the
+	// whole run. Called every host frame from game code, that first caller was
+	// whatever ambient happened to be installed: a frame arena would have handed
+	// the session a map that dies underneath it. The tracking pin caught it.
+	context.allocator = ses_allocator(s)
 	s.focus[player] = {x, y, z}
 }
 

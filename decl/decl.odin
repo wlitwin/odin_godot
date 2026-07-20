@@ -76,9 +76,21 @@ Field_Token :: struct {
 	slot:        Slot,
 	home:        Home,
 	// Its shape folds into NET_FINGERPRINT, so a build that disagrees about it
-	// is refused at the join door rather than misparsing packets. This column
+	// is refused at the JOIN door rather than misparsing packets. This column
 	// is what makes "a declaration that crosses the wire but not the version
 	// door" a thing you can SEE instead of a thing you discover in the field.
+	//
+	// It is checked, not merely written down: scriptgen's FINGERPRINT_CONTRIB
+	// carries one row per token naming the line net_fingerprint writes for it,
+	// and refuses the build if a row and this column disagree, or if a token
+	// this column claims is declared by the corpus and left no trace in the
+	// hashed string. That check found the column's first lie on the day it was
+	// added — `backup` shipped as true and was never serialized. FALSE is right:
+	// a backup is guarded by the codec's own fnv1a32 format stamp at the LOAD
+	// door, and refusing a JOIN over save-file shape would ground two peers
+	// whose saves were never going to meet. The general rule the row follows:
+	// true iff the declaration's shape must match across a SOCKET, not merely
+	// across a file.
 	fingerprint: bool,
 	// How the token is spelled in an error message ("`onready=PATH`"), and the
 	// one-line gloss the docs table shows.
@@ -100,7 +112,7 @@ FIELD_TOKENS :: []Field_Token {
 	{"replicate", .Exact, .First, .Scriptgen, true, "`replicate`", "a networked field on the DELTA lane (kit/net descriptors)"},
 	{"owner", .Exact, .First, .Scriptgen, true, "`owner`", "a networked field streamed from its owning peer"},
 	{"predict", .Exact, .First, .Scriptgen, true, "`predict`", "a networked field the sim predicts and reconciles (kit/sim)"},
-	{"backup", .Exact, .First, .Scriptgen, true, "`backup`", "a field the session backup carries"},
+	{"backup", .Exact, .First, .Scriptgen, false, "`backup`", "a field the session backup carries"},
 	{"manual", .Exact, .First, .Scriptgen, false, "`manual`", "I call the generated thing myself"},
 	{"profile=", .Prefix, .First, .Scriptgen, true, "`profile=T`", "the per-player profile row type"},
 	{"entity=", .Prefix, .First, .Reflect, true, "`entity=Name:id`", "a spawnable entity type and its stable id (an exported PackedScene slot, synthesized)"},
@@ -196,12 +208,16 @@ field_token_shaped :: proc(tok: string) -> bool {
 // error latencies and two different audiences.
 //
 // This table is what lets scriptgen refuse a misspelled spec at BUILD time
-// without owning a sixth copy of the list. tests/scriptgen asserts it against
-// register_class.odin's case labels, the same way it asserts ATTRS against
-// build/common.sh — the runtime is still the CONSUMER (it owns what each spec
-// MEANS: a value's type, a hint's arity, the Variant it requires); this row
-// only records that the name EXISTS, which is the whole of what a spelling
-// check needs.
+// without owning a sixth copy of the list, and — since walk_field started
+// SELECTING on it rather than being asserted against it — it is also what
+// decides which of the runtime's two switches a name reaches. It was briefly
+// only a document: tests/scriptgen extracted both switches' case labels with
+// awk and asserted them equal to this table, which could see drift but not stop
+// it, and left the runtime's own dispatch with no default arm at all. The
+// runtime is still the CONSUMER — it owns what each spec MEANS (a value's type,
+// a hint's arity, the Variant it requires) — and each row here owns only that
+// the name EXISTS and which KIND of thing it is, which is exactly what a
+// spelling check and a two-way dispatch need and no more.
 Export_Spec_Kind :: enum u8 {
 	Meta, // Inspector/codegen plumbing — never a Property_Hint
 	Hint, // becomes the field's ONE Property_Hint (at most one per field)

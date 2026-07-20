@@ -9,7 +9,9 @@ package kit_session_test
 // path — JOIN/WELCOME/UPSERT/LEFT bytes included — is exercised exactly as it
 // runs over the real transport, minus the socket.
 
+import "base:runtime"
 import "core:fmt"
+import "core:mem"
 import "core:testing"
 import "core:time"
 import kcombat "godot:kit/combat"
@@ -403,8 +405,23 @@ box_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, 
 	return bot, &bot_command_set
 }
 
+// The free half. `b.bots` is not a convenience index — it is the OWNERSHIP
+// RECORD, and the `ok` is load-bearing: session_despawn runs this proc on the
+// HOST too (symmetric teardown, so node/map cleanup is written once), and the
+// host's entities in this suite are stack locals handed to session_spawn
+// (`b1 := Bot{...}; session_spawn(&host.s, BOT_TYPE, &b1, ...)`). A blind
+// `free(entity)` here freed a stack address and the test runner's tracking
+// allocator said so — `bad free @ 0x16E61DB58`, a live diagnostic for as long
+// as this suite has had a factory. Free only what THIS factory made; anything
+// else belongs to whoever spawned it. Real games want the same shape: the
+// lookup that tells you the entity is yours is the one that licenses the free.
 box_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	b := cast(^Peer_Box)user
+	mine, ok := b.bots[id]
+	if !ok {
+		return // host-side session_spawn entity — the game owns that memory, not us
+	}
+	assert(rawptr(mine) == entity, "the factory's record and the session disagree about this id")
 	delete_key(&b.bots, id)
 	free(entity)
 	b.freed += 1
@@ -2678,4 +2695,345 @@ host_relay_stamps_spoof_drops_and_echoes :: proc(t: ^testing.T) {
 		testing.expect_value(t, only_alice[0].author, bob.s.me)
 		testing.expect_value(t, only_alice[0].n, u32(777))
 	}
+}
+
+// ---- the allocator pin -------------------------------------------------------
+//
+// kit/session is allocator TIER B (docs/kit/session.md, "The allocator tiers"):
+// it STORES an allocator on Session_Wiring and reinstalls it — `context
+// .allocator = ses_allocator(s)` — at the top of every ROOT that allocates or
+// frees. Until this test existed, that discipline was verified by INSPECTION:
+// someone read every root once and counted. An inventory is a snapshot, not a
+// guarantee — the next root added to session.odin is not covered by a list
+// somebody wrote last month, and the omission is SILENT (the session still
+// runs; it just spends memory it does not own).
+//
+// This is the machine that checks. Two allocators, two different jobs:
+//
+//   OWNED   — a tracking allocator handed to the session as s.allocator before
+//             the first *_start. At teardown it must report no bad frees and
+//             nothing still live: the session frees what it allocates, under
+//             the allocator that allocated it.
+//   FOREIGN — a WATCHING allocator installed as the ambient context.allocator
+//             around the entire lifecycle. The session must never touch it.
+//             Every allocation that reaches it is recorded with its
+//             #caller_location, so a violation names its own call site.
+//
+// The FOREIGN assertion is the real content. The owned one only says the
+// session is internally consistent with itself; the foreign one says every
+// allocating root actually REBOUND. Delete a single `context.allocator =
+// ses_allocator(s)` from any allocating root in session.odin and this test
+// prints the file and line that spent the ambient. That is the failure a hand
+// inventory cannot see, and it is the one that bites in production, where the
+// ambient at packet time is not the ambient at destroy time — the exact
+// assumption kit/sim's Lane had to abandon (a handler-side alloc and its
+// teardown free rode different allocators).
+//
+// What is NOT a violation, and what this pin is careful never to count:
+// EXPLICIT allocator arguments. `make(..., context.temp_allocator)` and
+// kit/net's `_make(allocator)` procs name their allocator and are unaffected
+// by the rebind. Likewise dynamic arrays and maps SELF-CARRY their creation
+// allocator, so they are safe by construction. The hazards this actually
+// watches are the ones that capture context.allocator at the call site:
+// strings.clone (roster names, stat column names), make([]u8, ...) (profile
+// rows, backup blobs), and the registry's per-entity shadow/blob/ring slices.
+
+Foreign_Hit :: struct {
+	mode: mem.Allocator_Mode,
+	loc:  runtime.Source_Code_Location,
+}
+
+// The ambient allocator for the pin's lifecycle. It FORWARDS everything to the
+// backing allocator — a cheating session still runs correctly, so nothing else
+// in the suite changes shape — and records where the cheat came from. A
+// tracking allocator was not enough here: it forgets an allocation the moment
+// something frees it, and a root that allocates AND frees on the ambient is
+// still a root that never rebound. This one never forgets.
+Foreign_Watch :: struct {
+	backing: mem.Allocator,
+	hits:    [dynamic]Foreign_Hit, // allocator set EXPLICITLY — this array must never ride the ambient it watches
+}
+
+foreign_watch_proc :: proc(
+	data: rawptr,
+	mode: mem.Allocator_Mode,
+	size, alignment: int,
+	old_memory: rawptr,
+	old_size: int,
+	loc := #caller_location,
+) -> (
+	[]byte,
+	mem.Allocator_Error,
+) {
+	w := cast(^Foreign_Watch)data
+	#partial switch mode {
+	case .Alloc, .Alloc_Non_Zeroed, .Resize, .Resize_Non_Zeroed:
+		append(&w.hits, Foreign_Hit{mode = mode, loc = loc})
+	case .Free:
+		// A free routed here is the mirror bug: a root that rebound on the
+		// allocating path and forgot on the freeing one. Worth naming too.
+		if old_memory != nil {
+			append(&w.hits, Foreign_Hit{mode = mode, loc = loc})
+		}
+	}
+	return w.backing.procedure(w.backing.data, mode, size, alignment, old_memory, old_size, loc)
+}
+
+foreign_watch :: proc(w: ^Foreign_Watch) -> mem.Allocator {
+	return mem.Allocator{procedure = foreign_watch_proc, data = w}
+}
+
+// The pin's own wire. It cannot reuse Peer_Box: that harness clones envelopes
+// and news up Bots from the AMBIENT allocator, and under this test the ambient
+// is the thing being watched — every box_send clone would read as a session
+// violation and drown the signal. Here every scaffolding allocation names its
+// allocator EXPLICITLY, so the only code that can possibly reach the watch is
+// kit/session itself.
+Pin_Peer :: struct {
+	peer:    ksess.Peer_Id,
+	s:       ksess.Session,
+	out:     [dynamic]Envelope,
+	bots:    map[knet.Net_Id]^Bot,
+	harness: mem.Allocator,
+}
+
+Pin_Loadout :: struct {
+	look:  u8,
+	ready: bool,
+}
+
+pin_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
+	p := cast(^Pin_Peer)user
+	cloned := make([]u8, len(bytes), p.harness)
+	copy(cloned, bytes)
+	append(&p.out, Envelope{to = to_peer, data = cloned})
+}
+
+pin_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (rawptr, ^knet.Command_Set) {
+	p := cast(^Pin_Peer)user
+	if type != BOT_TYPE {
+		return nil, nil
+	}
+	bot := new(Bot, p.harness)
+	p.bots[id] = bot
+	return bot, &bot_command_set
+}
+
+pin_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
+	p := cast(^Pin_Peer)user
+	mine, ok := p.bots[id]
+	if !ok {
+		return // a host-side session_spawn entity — the game owns that memory (see box_free_entity)
+	}
+	delete_key(&p.bots, id)
+	free(mine, p.harness)
+}
+
+pin_peer_make :: proc(p: ^Pin_Peer, peer: ksess.Peer_Id, harness, owned: mem.Allocator) {
+	p.peer = peer
+	p.harness = harness
+	p.out = make([dynamic]Envelope, 0, 8, harness)
+	p.bots = make(map[knet.Net_Id]^Bot, 8, harness)
+	p.s.send = pin_send
+	p.s.send_user = p
+	ksess.session_set_factory(&p.s, p, pin_make_entity, pin_free_entity)
+	// TIER B, the wiring half: hand the session its allocator BEFORE the first
+	// *_start. A zero here would make session_init adopt the ambient — which is
+	// the watch — and the pin would pass vacuously with EVERYTHING foreign and
+	// nothing to compare it against.
+	p.s.allocator = owned
+}
+
+pin_destroy :: proc(p: ^Pin_Peer) {
+	for e in p.out {
+		delete(e.data, p.harness)
+	}
+	delete(p.out)
+	for _, bot in p.bots {
+		free(bot, p.harness)
+	}
+	delete(p.bots)
+	ksess.session_destroy(&p.s)
+}
+
+pin_pump :: proc(peers: []^Pin_Peer) {
+	for progress := true; progress; {
+		progress = false
+		for p in peers {
+			for len(p.out) > 0 {
+				e := p.out[0]
+				ordered_remove(&p.out, 0)
+				for dst in peers {
+					if dst.peer == p.peer {
+						continue
+					}
+					if e.to == ksess.BROADCAST_PEER || dst.peer == e.to {
+						r := knet.reader_make(e.data)
+						ksess.session_handle_packet(&dst.s, p.peer, &r)
+					}
+				}
+				delete(e.data, p.harness)
+				progress = true
+			}
+		}
+	}
+}
+
+pin_step :: proc(peers: []^Pin_Peer, now: ^f64) {
+	now^ += 0.05
+	for p in peers {
+		_, _ = ksess.session_tick(&p.s, 0.05, now^)
+	}
+	pin_pump(peers)
+}
+
+// A do-nothing type hook: the pin installs one only to make the wiring root
+// that creates s.type_hooks run inside the watch. It is never fired.
+pin_type_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
+}
+
+@(test)
+the_session_never_spends_the_ambient_allocator :: proc(t: ^testing.T) {
+	harness := context.allocator // the runner's own; the pin's scaffolding rides this EXPLICITLY
+
+	owned: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&owned, harness, harness)
+	defer mem.tracking_allocator_destroy(&owned)
+	// Collect bad frees instead of panicking on the first: the verdict below
+	// wants to REPORT them all, and a panic raised inside a session root would
+	// take the rest of the teardown with it.
+	owned.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
+
+	watch := Foreign_Watch{backing = harness}
+	watch.hits = make([dynamic]Foreign_Hit, 0, 16, harness)
+	defer delete(watch.hits)
+
+	host, alice, bob: Pin_Peer
+	pin_peer_make(&host, 1, harness, mem.tracking_allocator(&owned))
+	pin_peer_make(&alice, 100, harness, mem.tracking_allocator(&owned))
+	pin_peer_make(&bob, 200, harness, mem.tracking_allocator(&owned))
+	peers := []^Pin_Peer{&host, &alice, &bob}
+
+	// ---- everything from here to the restore runs with the WATCH as ambient --
+	// The session may not touch it: not at start, not in a packet handler, not
+	// on a tick, not at a re-init, not at destroy.
+	prev := context.allocator
+	context.allocator = foreign_watch(&watch)
+
+	ksess.session_configure(&host.s, {max_players = 4})
+	// A WIRING root, inside the watch on purpose. type_hooks is the same
+	// zero-map class as focus/stats — a map's first insert decides where the
+	// whole table lives — but it is wiring, so it is freed at session_destroy
+	// under the session's own allocator. Created on a caller's ambient and
+	// freed on the session's is precisely the cross-allocator pairing this pin
+	// exists to refuse, and nothing else in this lifecycle reaches it.
+	ksess.session_set_type_hook(&host.s, 7, &host, pin_type_hook)
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pin_pump(peers)
+
+	// Both creation paths: one entity built BY HAND (the game owns the memory,
+	// the session owns only the registry shadow) and one through the factory
+	// pair. They allocate different things and rebind at different roots.
+	b1 := Bot{hp = 30, x = 3}
+	id1 := ksess.session_spawn(&host.s, BOT_TYPE, &b1, &bot_command_set)
+	ksess.session_start_replicating(&host.s)
+	pin_pump(peers)
+
+	made, id2 := ksess.session_spawn_make(&host.s, BOT_TYPE, owner = alice.s.me)
+	(cast(^Bot)made).hp = 55
+	(cast(^Bot)made).x = 9
+	ksess.session_spawn_send(&host.s, id2)
+	pin_pump(peers)
+
+	// Blobs and interest: registry-internal slices that capture context
+	// .allocator at their call site, and the SES_AOI re-declare's writer.
+	ksess.session_set_blob(&host.s, id1, transmute([]u8)string("rune-1"))
+	ksess.session_set_interest(&host.s, 300, 50, nil, bot_locate)
+	ksess.session_set_focus(&host.s, alice.s.me, 0, 0)
+
+	// Stat columns (strings.clone) and profile rows (make([]u8, size)) — both
+	// allocated from one entry point and freed in run_destroy, which is the
+	// pairing Tier B exists to protect.
+	kills := ksess.session_stat_column(&host.s, "kills")
+	ksess.session_stat_set(&host.s, alice.s.me, kills, 5)
+	ksess.session_profile_install(&host.s, Pin_Loadout)
+	ksess.session_profile_install(&alice.s, Pin_Loadout)
+	mine := ksess.session_profile_mine(&alice.s, Pin_Loadout)
+	mine.look = 3
+	mine.ready = true
+
+	// Ticks: the delta walk, stream rings, the stats cadence, the profile
+	// relay, the edge pass, and the host's periodic backup snapshot.
+	now := 100.0
+	for _ in 0 ..< 24 {
+		pin_step(peers, &now)
+	}
+
+	// The departure roots, all three shapes — each one allocates a writer, and
+	// each one is reached from a different place in a real game (a moderation
+	// call, a transport callback, the player's own quit button).
+	ksess.session_despawn(&host.s, id1)
+	pin_pump(peers)
+	ksess.session_kick(&host.s, bob.s.me, ban = true)
+	pin_pump(peers)
+	ksess.session_client_leave(&alice.s)
+	pin_pump(peers)
+	ksess.session_peer_disconnected(&host.s, alice.peer)
+	pin_pump(peers)
+
+	// RE-INIT: back to lobby, rehost. session_init's re-entrant teardown frees
+	// the DEAD run — and must free it under the allocator that built it, not
+	// under whatever ambient the rehost happens to run in. This one is a
+	// deliberately hostile ambient, which is the only way to tell.
+	ksess.session_host_start(&host.s, "hosty-again")
+	ksess.session_stat_column(&host.s, "kills")
+	pin_pump(peers)
+
+	pin_destroy(&host)
+	pin_destroy(&alice)
+	pin_destroy(&bob)
+
+	context.allocator = prev
+	// ---- the verdicts --------------------------------------------------------
+
+	// THE ONE THAT IS THE POINT. Every hit is a root that reached memory
+	// without rebinding, and the location IS the root.
+	for h in watch.hits {
+		testing.expectf(
+			t,
+			false,
+			"kit/session spent the AMBIENT allocator (%v) at %s:%d:%d — a root missing `context.allocator = ses_allocator(s)`",
+			h.mode,
+			h.loc.file_path,
+			h.loc.line,
+			h.loc.column,
+		)
+	}
+	testing.expect_value(t, len(watch.hits), 0)
+
+	// A pin that only asserts "no foreign allocations" is satisfied for free by
+	// a session that allocated nothing at all — a lifecycle that quietly stopped
+	// doing work would read as proof. This is the floor that says the run
+	// happened (227 at the time of writing; the floor is loose on purpose, it
+	// guards against ZERO, not against drift).
+	testing.expectf(
+		t,
+		owned.total_allocation_count > 150,
+		"the lifecycle must actually exercise the session (%d allocations) — a silent run would satisfy the foreign assertion vacuously",
+		owned.total_allocation_count,
+	)
+
+	for b in owned.bad_free_array {
+		testing.expectf(t, false, "kit/session bad free @ %p at %s:%d", b.memory, b.location.file_path, b.location.line)
+	}
+	testing.expect_value(t, len(owned.bad_free_array), 0)
+
+	for _, e in owned.allocation_map {
+		testing.expectf(t, false, "kit/session leaked %d bytes from %s:%d", e.size, e.location.file_path, e.location.line)
+	}
+	testing.expect_value(t, len(owned.allocation_map), 0)
 }

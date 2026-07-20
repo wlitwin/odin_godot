@@ -80,6 +80,7 @@ session_stat_names :: proc(s: ^Session) -> []string {
 // acid test's crash reporter; a missing player must read as an all-zero row).
 session_stat_set :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col, value: i64) {
 	assert(s.is_host, "stats are host-accumulated")
+	context.allocator = ses_allocator(s) // s.stats is a zero map: its FIRST insert decides where the whole table lives (see session_set_focus)
 	idx := stat_idx(col)
 	row, _ := s.stats[player]
 	if row[idx] == value {
@@ -92,6 +93,7 @@ session_stat_set :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col, val
 
 session_stat_add :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col, delta: i64) {
 	assert(s.is_host, "stats are host-accumulated")
+	context.allocator = ses_allocator(s) // the twin of session_stat_set, and the same first-insert capture
 	idx := stat_idx(col)
 	row, _ := s.stats[player]
 	row[idx] += delta

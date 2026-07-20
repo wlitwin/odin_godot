@@ -637,6 +637,32 @@ Session_Ev :: struct {
 // entity-cluster suffixes carry an `entity_` prefix so they never collide with
 // the census `<entity>_spawned`/`_freed` hooks (which fire BEFORE the spawn
 // tuple's fields apply; these fire after — the initial-dress home).
+//
+// WHY THIS IS TRANSCRIBED AND NOT GENERATED, since it is the one table in the
+// repo that still is. scriptgen is a BUILD-TIME binary: kit/session is source it
+// PARSES, never source it imports, and importing it to read the union would make
+// a runtime package a build dependency of the tool that generates that package's
+// callers — the build graph would have to produce the generator from the thing
+// the generator produces. Reading the union out of source at scriptgen startup
+// is the other direction and no better: every game build would then depend on
+// text-scraping a kit file, and the failure mode of a scrape that silently
+// matches nothing is an EMPTY event table, which generates a game where no
+// session half fires at all. Neither is worth it for a union that changes a few
+// times a year.
+//
+// So the mirror stays and TWO guards make a forgotten variant unshippable, one
+// per direction it can be forgotten in:
+//
+//   * kit/boot/forward.odin holds one non-`#partial` switch over every variant,
+//     so a new Event does not COMPILE until the kit has decided about it.
+//   * tests/scriptgen asserts this table's `variant` column equals the union,
+//     so a new Event is also a pairable half in every GAME. Without that half
+//     the failure is the quietest one available: the author writes the proc,
+//     nothing generates a call, and it simply never runs.
+//
+// Roles and params still cannot be checked mechanically — nothing but reading
+// the variant says whether a client alone hears it — so a NEW row's role is a
+// judgement, and the test only guarantees somebody had to make it.
 SESSION_EVENTS := [?]Session_Ev {
 	{suffix = "welcomed", variant = "Ev_Welcomed", role = .Client, params = {{"me", "knet.Player_Id", "e.me"}}},
 	{suffix = "player_joined", variant = "Ev_Player_Joined", role = .Every, params = {{"id", "knet.Player_Id", "e.id"}, {"rejoin", "bool", "e.rejoin"}}},
@@ -1784,6 +1810,140 @@ resolve_profile :: proc(s: ^Script, scripts_dir: string) {
 	}
 }
 
+// ---- the fingerprint column, made load-bearing ------------------------------
+//
+// decl.FIELD_TOKENS carries a `fingerprint: bool` per token, and it was written
+// to DOCUMENT which declarations fold into NET_FINGERPRINT. Nothing read it, and
+// a documentation column beside a hand-written serializer drifts the way every
+// other list in this toolchain drifted before it got projected — except that
+// THIS drift has no symptom. A token marked true that net_fingerprint forgets is
+// a wire declaration outside the version door: two builds that disagree about it
+// hash identically, shake hands, and misparse each other's packets for the rest
+// of the session. That is the exact failure the fingerprint exists to prevent,
+// arriving through the fingerprint's own bookkeeping.
+//
+// It had already drifted. `backup` shipped as fingerprint = true and contributes
+// nothing here — correctly, as it turns out (see the column's comment in
+// decl/decl.odin: a save has its own fnv1a32 format stamp and is refused at the
+// LOAD door, not the join door), so the fix was the column, not the serializer.
+// Nothing was going to notice on its own.
+//
+// The serializer cannot be DRIVEN from the table: every contributor has its own
+// shape (`rep path:type owner=…`, `entity Name=id`, `profile T.f:type`) and
+// pushing those into decl would move wire semantics into a package whose entire
+// point is that it is small enough to read. So the table drives a CHECK instead,
+// in both directions a row can be wrong:
+//
+//   * every token needs a row here — a new one does not get to be silently
+//     assumed wire-irrelevant;
+//   * a row's marker is non-empty exactly when decl says the token is a
+//     fingerprint input;
+//   * and if the corpus DECLARES such a token, the serialized string must
+//     actually carry its marker — which is what catches a serializer arm that
+//     gets deleted, reordered into a dead branch, or never written.
+@(private = "file")
+Fingerprint_Contrib :: struct {
+	token:    string, // a decl.FIELD_TOKENS name, verbatim
+	marker:   string, // the line prefix net_fingerprint writes for it ("" = contributes nothing)
+	declared: proc(s: ^Script, scripts_dir: string) -> bool, // nil for non-contributors
+}
+
+@(private = "file")
+FINGERPRINT_CONTRIB := [?]Fingerprint_Contrib {
+	// Editor dressing and node wiring: local presentation, never bytes on a wire.
+	{"export", "", nil},
+	{"onready=", "", nil},
+	// The three lanes all serialize as `rep` lines — one marker, three tokens,
+	// because the lane rides IN the line (`owner=%v predict=%v`) rather than
+	// choosing a different one.
+	{"replicate", "rep ", proc(s: ^Script, _: string) -> bool {
+			for r in s.replicates {if !r.owner && !r.predict {return true}}
+			return false
+		}},
+	{"owner", "rep ", proc(s: ^Script, _: string) -> bool {
+			for r in s.replicates {if r.owner {return true}}
+			return false
+		}},
+	{"predict", "rep ", proc(s: ^Script, _: string) -> bool {
+			for r in s.replicates {if r.predict {return true}}
+			return false
+		}},
+	// Host-local save state. Guarded by the backup codec's OWN fnv1a32 stamp at
+	// the load door — a drifted save is refused there, and refusing the JOIN over
+	// it would ground peers whose save files were never going to meet.
+	{"backup", "", nil},
+	{"manual", "", nil},
+	// The row IS the wire bytes, field by field — but only if it resolved and has
+	// any. An unresolvable row type is already a hard error in resolve_profile and
+	// an empty struct genuinely contributes nothing, so the witness asks the same
+	// question the serializer does rather than a looser one that would refuse a
+	// build for a hole that isn't there.
+	{"profile=", "profile ", proc(s: ^Script, dir: string) -> bool {
+			if s.profile_type == "" {return false}
+			pkg, ok := g_pkgs[dir]
+			if !ok {return false}
+			def, has := pkg[s.profile_type]
+			return has && len(def.fields) > 0
+		}},
+	{"entity=", "entity ", proc(s: ^Script, _: string) -> bool {return len(s.entities) > 0}},
+	{"args=", "", nil}, // a signal's parameter NAMES — engine-side, never wire
+}
+
+// Checks FINGERPRINT_CONTRIB against decl.FIELD_TOKENS and then against what the
+// serializer actually wrote. `text` is the exact string about to be hashed.
+@(private = "file")
+check_fingerprint_contrib :: proc(scripts: []^Script, scripts_dir: string, text: string) {
+	for t in decl.FIELD_TOKENS {
+		row: Fingerprint_Contrib
+		found := false
+		for c in FINGERPRINT_CONTRIB {
+			if c.token == t.name {
+				row = c
+				found = true
+				break
+			}
+		}
+		if !found {
+			errorf(
+				"decl.FIELD_TOKENS has `%s` and scriptgen's FINGERPRINT_CONTRIB has no row for it — add one saying which line net_fingerprint writes for it, or \"\" if it is not a wire declaration",
+				t.name,
+			)
+			continue
+		}
+		contributes := row.marker != ""
+		if contributes != t.fingerprint {
+			if t.fingerprint {
+				errorf(
+					"decl.FIELD_TOKENS marks `%s` a NET_FINGERPRINT input and net_fingerprint writes nothing for it — serialize it here, or clear the column (a wire declaration outside the version door hashes the same on both builds and misparses past the handshake)",
+					t.name,
+				)
+			} else {
+				errorf(
+					"scriptgen's FINGERPRINT_CONTRIB says `%s` reaches the fingerprint and decl.FIELD_TOKENS says it does not — set the column, or drop the marker",
+					t.name,
+				)
+			}
+			continue
+		}
+		if !contributes || had_error {
+			continue // nothing to witness, or the build is already failing for a realer reason
+		}
+		declared := false
+		for s in scripts {
+			if row.declared != nil && row.declared(s, scripts_dir) {
+				declared = true
+				break
+			}
+		}
+		if declared && !strings.contains(text, row.marker) {
+			errorf(
+				"this build declares `%s` and net_fingerprint wrote no %q line for it — the declaration crosses the wire and would not be checked at the join door",
+				t.name, row.marker,
+			)
+		}
+	}
+}
+
 net_fingerprint :: proc(scripts: []^Script, scripts_dir: string) -> u64 {
 	b: strings.Builder
 	strings.builder_init(&b, context.temp_allocator)
@@ -1915,7 +2075,9 @@ net_fingerprint :: proc(scripts: []^Script, scripts_dir: string) -> u64 {
 			}
 		}
 	}
-	return fnv1a64(strings.to_string(b))
+	text := strings.to_string(b)
+	check_fingerprint_contrib(scripts, scripts_dir, text)
+	return fnv1a64(text)
 }
 
 @(private = "file")

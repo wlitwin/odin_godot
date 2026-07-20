@@ -864,20 +864,124 @@ EsThing :: struct {
 ODIN
 "$SGEN" "$es" -godot:"$ROOT" >/dev/null 2>&1 || fail "the real export specs must still build"
 
-# THE EXPORT-SPEC PROJECTION. decl/decl.odin's EXPORT_SPECS is the name set
-# scriptgen refuses against; runtime/register_class.odin is the CONSUMER that
-# gives each name meaning (walk_field's meta switch, parse_hint_spec's hint
-# switch). A spec the runtime grew and the schema didn't would be refused at
-# build time in every game — so the two are asserted equal here, the same way
-# ATTRS is asserted against build/common.sh below.
-schema_specs="$(awk '/^EXPORT_SPECS :: \[\]Export_Spec \{/{f=1;next} f&&/^\}/{f=0} f&&match($0,/\{"[a-z_]+"/){print substr($0, RSTART+2, RLENGTH-3)}' "$ROOT/decl/decl.odin" | sort -u)"
-[[ -n "$schema_specs" ]] || fail "could not read EXPORT_SPECS out of decl/decl.odin"
-rt_specs="$( { awk '/^\t\tswitch sname \{/{f=1;next} f&&/^\t\tcase:/{f=0} f&&match($0,/^\t\tcase "[a-z_]+":/){print substr($0, RSTART+8, RLENGTH-10)}' "$ROOT/runtime/register_class.odin"
-              awk '/^\tswitch name \{/{f=1;next} f&&/^\t\}/{f=0} f&&match($0,/^\tcase "[a-z_]+":/){print substr($0, RSTART+7, RLENGTH-9)}' "$ROOT/runtime/register_class.odin"; } | sort -u)"
-[[ -n "$rt_specs" ]] || fail "could not read the export-spec switches out of runtime/register_class.odin"
-if [[ "$schema_specs" != "$rt_specs" ]]; then
-    fail "decl.EXPORT_SPECS has drifted from register_class.odin: schema=[$(echo $schema_specs)] runtime=[$(echo $rt_specs)]"
-fi
+# ---- fixture: the unknown-token gate reaches NESTED fields ------------------
+# Top-level, `gd:"replciate"` has been a hard error for as long as
+# decl.field_expected has existed. One comma of depth used to turn that into
+# silence: the nested walk handled replicate/backup, deferred export/onready to
+# the runtime, and let everything else fall out the bottom unremarked — so a
+# typo inside an embedded block was a field that simply never replicated, with
+# no diagnostic in either half of the toolchain. Blocks are where deep tags
+# live, which is what made this the cheapest door into the recorded
+# gun-that-never-replicated failure.
+nt="$work/nesttag"
+mkdir -p "$nt"
+cat >"$nt/thing.odin" <<'ODIN'
+//gd:extends Node
+//gd:class NtThing
+package nt
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Inner :: struct {
+	hp: i32 `gd:"replciate"`,
+}
+Blk :: struct { z: i32 `gd:"replicate"` }
+Outer :: struct { using i: Inner, sub: Blk `gd:"manual"` }
+
+NtThing :: struct {
+	owner:   gd.Node,
+	net_id:  knet.Net_Id,
+	using o: Outer,
+}
+ODIN
+out="$("$SGEN" "$nt" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "a typo'd tag on a NESTED field must fail the build, not vanish"
+echo "$out" | grep -q 'NtThing.o.i.hp: unknown gd tag `replciate`' \
+	|| fail "the nested unknown-tag refusal must name the field by its full access path"
+echo "$out" | grep -q 'expected `export`, `onready=PATH`' \
+	|| fail "the nested refusal must list the vocabulary from decl.field_expected, not a local excerpt"
+# `gd:"manual"` nested is the same silence wearing a KNOWN token: it matched no
+# arm, so the nested walk skipped the sub-block entirely — every predict field,
+# backup and tick under it gone, no error. Loud now; whether it should instead
+# be made to WORK one level down is a shelf-design call, and the message says
+# where to put the embed meanwhile.
+echo "$out" | grep -q 'NtThing.o.sub: `gd:"manual"` only works on the class'"'"'s OWN embed' \
+	|| fail "a nested gd:\"manual\" must be refused, not silently skip the sub-block"
+# The control: the same shapes with everything spelled right still build.
+cat >"$nt/thing.odin" <<'ODIN'
+//gd:extends Node
+//gd:class NtThing
+package nt
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Inner :: struct {
+	hp: i32 `gd:"replicate"`,
+}
+Outer :: struct { using i: Inner, dressing: i32 `gd:"export,range=0:9"` }
+
+NtThing :: struct {
+	owner:   gd.Node,
+	net_id:  knet.Net_Id,
+	using o: Outer,
+}
+ODIN
+"$SGEN" "$nt" -godot:"$ROOT" >/dev/null 2>&1 || fail "correct nested tags (and deferred exports) must still build"
+
+# ---- fixture: spec ARITY, the other half of the same silent-hint bug --------
+# A perfectly spelled spec in the wrong FORM slipped through the gate above:
+# `multiline=true` reads like a boolean and the runtime drops the value, and
+# bare `range` is a slider with no bounds that used to die at BOOT. Both forms
+# now come off decl.EXPORT_SPECS's bare/value columns, which until this item
+# were documentation nothing read.
+ar="$work/arity"
+mkdir -p "$ar"
+cat >"$ar/thing.odin" <<'ODIN'
+//gd:extends Node
+//gd:class ArThing
+package ar
+import gd "godot:godot"
+
+ArThing :: struct {
+	owner: gd.Node,
+	note:  gd.String `gd:"export,multiline=true"`,
+	hp:    i32 `gd:"export,range"`,
+}
+ODIN
+out="$("$SGEN" "$ar" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "a spec in an illegal form must fail the BUILD"
+echo "$out" | grep -q '`multiline` takes no value' || fail "a value on a bare-only spec must say so"
+echo "$out" | grep -q '`range` needs a value' || fail "a bare value-only spec must say so"
+# Both legal forms of a both-ways spec still build — `file` is the reason the
+# columns are two bools and not one tri-state enum.
+cat >"$ar/thing.odin" <<'ODIN'
+//gd:extends Node
+//gd:class ArThing
+package ar
+import gd "godot:godot"
+
+ArThing :: struct {
+	owner: gd.Node,
+	any:   gd.String `gd:"export,file"`,
+	png:   gd.String `gd:"export,file=*.png"`,
+}
+ODIN
+"$SGEN" "$ar" -godot:"$ROOT" >/dev/null 2>&1 || fail "both legal forms of `file` must still build"
+
+# THE EXPORT-SPEC PROJECTION lives in tests/reflect_register now, not here.
+# This file used to extract walk_field's and parse_hint_spec's case labels with
+# awk and assert them equal to decl.EXPORT_SPECS — a stopgap by the agent who
+# could not edit runtime/, and one that could SEE the lists drift but not stop
+# them, broke on any reformatting of either switch, and proved only that a label
+# had been TYPED. walk_field now DISPATCHES on the table (unknown name refused
+# before either switch, then .Meta/.Hint selects which one), so the name set
+# cannot drift at all; what remains to prove is that each name MEANS something,
+# which is a claim about the runtime's behavior and belongs in a test that runs
+# it. tests/reflect_register's `export_spec_vocabulary_is_implemented` walks a
+# fixture spelling every spec in every form the columns declare legal and
+# requires zero registration errors.
 
 # ---- fixture: //gd:extends is cross-checked against the owner handle --------
 # The two spellings of one fact used to be free to disagree. The dangerous
@@ -1038,6 +1142,32 @@ for src in "build/common.sh" "build/build_scripts.ps1"; do
         fail "$src's attribute allowlist has drifted from decl.ATTRS: schema=[$(echo $schema_attrs)] build=[$(echo $have)]"
     fi
 done
+
+# ---------------------------------------------------------------------------
+# THE SESSION-EVENT MIRROR. scriptgen's SESSION_EVENTS is transcribed BY HAND
+# from kit/session's Event union — it must be, and that is not laziness: this is
+# a BUILD-TIME binary that PARSES kit/session as text and cannot import it, and
+# an import would make a runtime package a build dependency of the tool that
+# generates its callers. Generating either from the other is a build-graph
+# fight; the practical ceiling is two guards that between them make a forgotten
+# variant impossible to ship, and this is the second of them.
+#
+#   1. kit/boot/forward.odin holds ONE non-`#partial` switch over every variant,
+#      so a new Event does not COMPILE in kit/boot until someone decides what the
+#      kit does about it. (That guard is the compiler's; nothing here to check.)
+#   2. This: the scriptgen table names every variant, so a new Event is also a
+#      pairable half in every game, not a thing only the kit can hear.
+#
+# Without #2 a variant added with a forward in #1 is invisible to game code and
+# fails in the quietest possible way — the game writes `<snake>_thing_happened`,
+# nothing generates a call, and the proc simply never runs.
+ev_union="$(awk '/^Event :: union \{/{f=1;next} f&&/^\}/{f=0} f&&match($0,/Ev_[A-Za-z0-9_]+/){print substr($0,RSTART,RLENGTH)}' "$ROOT/kit/session/session.odin" | sort -u)"
+[[ -n "$ev_union" ]] || fail "could not read the Event union out of kit/session/session.odin"
+ev_table="$(awk '/^SESSION_EVENTS := \[\?\]Session_Ev \{/{f=1;next} f&&/^\}/{f=0} f&&match($0,/variant = "Ev_[A-Za-z0-9_]+"/){print substr($0,RSTART+11,RLENGTH-12)}' "$ROOT/scriptgen/main.odin" | sort -u)"
+[[ -n "$ev_table" ]] || fail "could not read SESSION_EVENTS out of scriptgen/main.odin"
+if [[ "$ev_union" != "$ev_table" ]]; then
+    fail "scriptgen's SESSION_EVENTS has drifted from ksess.Event: union-only=[$(comm -23 <(echo "$ev_union") <(echo "$ev_table") | tr '\n' ' ')] table-only=[$(comm -13 <(echo "$ev_union") <(echo "$ev_table") | tr '\n' ' ')] — give the new variant a row (suffix, role, params) in scriptgen/main.odin"
+fi
 
 # ---------------------------------------------------------------------------
 # THE TWO GRAMMAR BREAKS, and the only thing that makes them survivable: a

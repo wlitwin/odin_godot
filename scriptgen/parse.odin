@@ -862,15 +862,18 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		// field's Variant type (wrapper marshalling + the ctor set), and the
 		// `entity=Name:id` declaration (the kboot entity table).
 		//
-		// The default arm below is NOT codegen: it is the SPELLING gate this loop
-		// spent its whole life without. Every other first token's spec loop refuses
-		// what it doesn't know, so `gd:"replicate,slcak=0.5"` failed the build —
-		// but a typo behind `export` fell straight through here, reached the runtime
-		// as an unknown hint, and surfaced as a boot-time record_error on a field
-		// that had silently lost its hint. Two tiers, same tag, no way to tell which
-		// one you were about to hit. The name set is godot:decl's EXPORT_SPECS —
-		// the runtime stays the consumer that knows what each spec MEANS (a value's
-		// type, a hint's Variant requirement); this only asks whether it EXISTS.
+		// The gate below is NOT codegen: it is the SPELLING-AND-ARITY check this
+		// loop spent its whole life without. Every other first token's spec loop
+		// refuses what it doesn't know, so `gd:"replicate,slcak=0.5"` failed the
+		// build — but a typo behind `export` fell straight through here, reached the
+		// runtime as an unknown hint, and surfaced as a boot-time record_error on a
+		// field that had silently lost its hint. Two tiers, same tag, no way to tell
+		// which one you were about to hit. Both halves of the check are projections
+		// of godot:decl's EXPORT_SPECS — the NAME set, and the bare/value columns
+		// that say which forms of each name are real. The runtime stays the consumer
+		// that knows what each spec MEANS (a value's type, a hint's Variant
+		// requirement); this only asks whether it EXISTS and was spelled with the
+		// right number of halves.
 		getter := ""
 		setter := ""
 		entity_val := entity_first_val
@@ -884,21 +887,77 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 				name = strings.trim_space(spec[:eq])
 				value = strings.trim_space(spec[eq + 1:])
 			}
-			switch name {
-			case "get":
-				getter = value
-			case "set":
-				setter = value
-			case "entity":
-				// The old trailing form. Refused, not accepted-as-well: a language
-				// with two spellings for one declaration teaches neither, and the
-				// three games vendoring this addon each carry a dozen of these — the
-				// rewritten tag IS their upgrade instructions.
+			// `entity=` is checked BEFORE the vocabulary, because it is deliberately
+			// absent from EXPORT_SPECS (it LEADS the tag now) and the gate below
+			// would therefore call it a misspelling. Refused, not accepted-as-well: a
+			// language with two spellings for one declaration teaches neither, and
+			// the three games vendoring this addon each carry a dozen of these — the
+			// rewritten tag IS their upgrade instructions.
+			if name == "entity" {
 				error_at(
 					floc,
 					"%s.%s: `entity=` is a WIRE declaration, not an export spec — it LEADS the tag now: write `gd:\"entity=%s\"` (the `export` and `resource=PackedScene` it implies are synthesized)",
 					s.struct_name, field_label, value,
 				)
+				continue
+			}
+
+			es, known := decl.export_spec(name)
+			if !known {
+				nearest := ""
+				for cand in decl.EXPORT_SPECS {
+					if one_typo_apart(name, cand.name) {
+						nearest = cand.name
+						break
+					}
+				}
+				if nearest != "" {
+					error_at(
+						floc,
+						"%s.%s: unknown export spec %q — did you mean `%s`? (a spec scriptgen doesn't know reaches the engine as nothing: the field registers, the hint silently doesn't)",
+						s.struct_name, field_label, name, nearest,
+					)
+				} else {
+					error_at(
+						floc,
+						"%s.%s: unknown export spec %q — the set is: %s (drop it, or fix the spelling)",
+						s.struct_name, field_label, name, decl.export_specs_list(context.temp_allocator),
+					)
+				}
+				continue
+			}
+
+			// PROJECTION — the bare/value columns, which existed to DOCUMENT that
+			// `file` is legal both ways and `multiline` only bare, and which nothing
+			// read. An ARITY typo is the same silent-hint bug the spelling gate was
+			// built for and slips straight through it: `multiline=true` is a
+			// perfectly spelled name whose value the runtime discards, and `range`
+			// bare is a slider with no bounds that dies at BOOT instead of here.
+			// Both columns true (`file`, `dir`, the globals) means both forms are
+			// real and nothing is checked.
+			had_value := strings.index(spec, "=") >= 0
+			if had_value && !es.value {
+				error_at(
+					floc,
+					"%s.%s: `%s` takes no value — write it bare, as `%s` (the runtime discards the value silently, so the hint you meant never reaches the Inspector)",
+					s.struct_name, field_label, name, name,
+				)
+				continue
+			}
+			if !had_value && !es.bare {
+				error_at(
+					floc,
+					"%s.%s: `%s` needs a value — write `%s=…` (%s)",
+					s.struct_name, field_label, name, name, es.blurb,
+				)
+				continue
+			}
+
+			switch name {
+			case "get":
+				getter = value
+			case "set":
+				setter = value
 			case "resource":
 				if entity_first && si > 1 {
 					error_at(
@@ -909,29 +968,6 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 					continue
 				}
 				resource_val = value
-			case:
-				if _, known := decl.export_spec(name); !known {
-					nearest := ""
-					for es in decl.EXPORT_SPECS {
-						if one_typo_apart(name, es.name) {
-							nearest = es.name
-							break
-						}
-					}
-					if nearest != "" {
-						error_at(
-							floc,
-							"%s.%s: unknown export spec %q — did you mean `%s`? (a spec scriptgen doesn't know reaches the engine as nothing: the field registers, the hint silently doesn't)",
-							s.struct_name, field_label, name, nearest,
-						)
-					} else {
-						error_at(
-							floc,
-							"%s.%s: unknown export spec %q — the set is: %s (drop it, or fix the spelling)",
-							s.struct_name, field_label, name, decl.export_specs_list(context.temp_allocator),
-						)
-					}
-				}
 			}
 		}
 
@@ -3701,8 +3737,47 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 					)
 				}
 			}
-			// export/onready (and any unknown tag) are the runtime reflection walk's to
-			// register and validate — scriptgen owns only `replicate`/`backup` through nesting.
+			// THE SECOND CONTEXT'S UNKNOWN-TOKEN GATE. `export` and `onready=` fall
+			// through on purpose — the runtime reflection walk registers and
+			// validates them from the same tag, at every depth, so scriptgen owns
+			// only `replicate`/`backup` through nesting. But "fall through" used to
+			// mean EVERYTHING unrecognized fell through, and that is a different
+			// thing: a nested `gd:"replciate"` was a no-op with no diagnostic
+			// anywhere, in either half of the toolchain. Top-level, the identical
+			// typo has been a hard error for as long as field_expected has existed
+			// (`unknown gd tag`, right below); one comma of depth turned the loudest
+			// refusal in the language into silence. It is the recorded
+			// gun-that-never-replicated failure reached through the cheapest door
+			// there is, and blocks are exactly where deep tags live.
+			//
+			// The gate asks godot:decl, so a token added to FIELD_TOKENS is known
+			// here by construction rather than by someone remembering this line.
+			tok0 := strings.trim_space(specs[0])
+			if !decl.field_token_shaped(tok0) {
+				error_at(
+					fld.loc,
+					"%s.%s: unknown gd tag `%s` (expected %s) — a tag scriptgen doesn't know is silently nothing at this depth, which is how a replicated field stops replicating without a single error",
+					s.struct_name, join_path(fpath), tok0, decl.field_expected(context.temp_allocator),
+				)
+				continue
+			}
+			// `gd:"manual"` NESTED is the same silence wearing a known token: the
+			// tag matches no arm above, so this `continue` skips the recursion below
+			// and the embed's whole subtree — its predict fields, its backups, its
+			// tick — vanishes. Top-level, `manual` MEANS "recurse, but the wielder
+			// drives the tick" (see parse_script); here it has never meant anything.
+			// Refused rather than quietly made to work: whether a block one level
+			// down may opt its own children out of hoisting is a shelf-design call,
+			// and inventing an answer inside a typo gate is how the two contexts
+			// drifted in the first place.
+			if tok0 == "manual" {
+				error_at(
+					fld.loc,
+					"%s.%s: `gd:\"manual\"` only works on the class's OWN embed — nested one level down it silently skips the whole sub-block (no predict fields, no backups, no tick). Move the embed to the top level and tag it there",
+					s.struct_name, join_path(fpath),
+				)
+				continue
+			}
 			continue
 		}
 		if sub, sub_subst, ok := resolve_type(def, ftype); ok {

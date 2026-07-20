@@ -157,6 +157,18 @@ a custom allocator must keep `context.allocator` STABLE across each subsystem's 
 use, and destroy (the exact assumption the session and Lane were promoted out of),
 because their frees inherit whatever ambient is in force at teardown.
 
+The middle tier is verified by MACHINERY, not by reading. `tests/kitsession`'s
+`the_session_never_spends_the_ambient_allocator` runs a full lifecycle — start,
+join, both spawn paths, blobs, interest, stats, profiles, ticks, kick, leave,
+disconnect, a re-init, destroy — with a tracking allocator handed to the session
+and a *watching* allocator installed as the ambient, then asserts the session
+touched the ambient ZERO times. It is the only way to catch a newly added root
+that forgot to rebind, because the omission is silent: the session still works,
+it just spends memory it does not own. It found four such roots when it was
+first run (`session_set_interest`, `session_set_focus`, `session_stat_set`/`_add`,
+and the three departure roots) — two of them zero maps whose FIRST insert
+silently decided where the whole table lived for the rest of the run.
+
 ## Start, drive, drain
 
 ([kit/boot](boot.md) drives this whole section for you — `boot_host`/
