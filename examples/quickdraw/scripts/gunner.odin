@@ -71,6 +71,7 @@ Gunner :: struct {
 // branches): no seen_* mirror to keep, no resync re-seed to forget, and a
 // same-frame hit+heal that cancels never flashes. The decay and the dead tint
 // stay continuous dressing in gunner_process below.
+@(gd_half)
 gunner_hp_edge :: proc(self: ^Gunner, old, new: i32) {
 	if new < old {
 		self.flash_ttl = 0.25

@@ -33,6 +33,7 @@ scout_tick :: proc(self: ^Scout) -> (pinged: bool, dist: f32) {
 // The every-screen shape: `mine` right after `self` (by NAME — a bool fact
 // can never silently shift into the slot). Facts are wire primitives here by
 // contract: they cross to watching screens.
+@(gd_half)
 scout_tick_fx :: proc(self: ^Scout, mine: bool, pinged: bool, dist: f32) {
 	_ = mine
 	_ = pinged

@@ -78,6 +78,7 @@ pace_tick :: proc(p: ^Pace) {
 // The tick's name-paired halves (self-first shapes; quickdraw exercises the
 // game-first ones): the consequence on the authority, the fx on the owning
 // peer's live pass — the generated thunk holds the role gates.
+@(gd_half)
 pawn_tick_then :: proc(self: ^Pawn, by: knet.Player_Id, dashed: bool) {
 	if dashed && self.hp > 1 {
 		self.hp -= 1
@@ -85,6 +86,7 @@ pawn_tick_then :: proc(self: ^Pawn, by: knet.Player_Id, dashed: bool) {
 	_ = by
 }
 
+@(gd_half)
 pawn_tick_fx :: proc(self: ^Pawn, dashed: bool) {
 	_ = dashed
 }
@@ -113,6 +115,7 @@ pawn_hit :: proc(self: ^Pawn, amount: i32) -> bool {
 // The verb's PREDICTED-EFFECT half (sim-lane verbs only): resims re-run it
 // with the ledgered wire args — relative effects stay exact. The verb above
 // keeps the predicate and the delta-lane write, execute-once.
+@(gd_half)
 pawn_hit_apply :: proc(self: ^Pawn, amount: i32) {
 	self.px += f32(amount) // knockback: relative, the patch can't express it
 }
@@ -146,6 +149,7 @@ pawn_loot :: proc(self: ^Pawn, slot: i32) -> (ok: bool, got: u8) {
 	return true, u8(slot)
 }
 
+@(gd_half)
 pawn_loot_then :: proc(self: ^Pawn, by: knet.Player_Id, slot: i32, got: u8) {
 	self.hp += i32(got) // host-side consequence — an ordinary delta carries it
 }
@@ -153,6 +157,7 @@ pawn_loot_then :: proc(self: ^Pawn, by: knet.Player_Id, slot: i32, got: u8) {
 // The hp EDGE half — delta-lane change presentation, proc-as-subscription:
 // the name pairs it to the field, the session's per-frame pass fires it with
 // the net (old, new) — no seen_* mirror, no resync re-seed to forget.
+@(gd_half)
 pawn_hp_edge :: proc(self: ^Pawn, old, new: i32) {
 	_ = old
 	_ = new

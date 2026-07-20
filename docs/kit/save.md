@@ -63,6 +63,7 @@ CaveLobby :: struct {
 }
 
 // the migration half (kboot.boot_migration's table calls it, host only):
+@(gd_half)
 cave_lobby_backup :: proc(self: ^CaveLobby, w: ^knet.Writer) {
 	if self.started {cave_lobby_backup_write(self, w)}
 }

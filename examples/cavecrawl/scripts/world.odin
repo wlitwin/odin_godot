@@ -23,6 +23,7 @@ import "core:fmt"
 // ---- the census: name-paired spawn/free hooks (fired by the kboot driver;
 // ---- spawn-time fields are NOT set yet — dressing belongs on Ev_Spawned) ----
 
+@(gd_half)
 spelunker_spawned :: proc(game: ^CaveLobby, self: ^Spelunker, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.spelunkers[id] = self
 	if owner != knet.PLAYER_ID_INVALID {
@@ -33,61 +34,74 @@ spelunker_spawned :: proc(game: ^CaveLobby, self: ^Spelunker, id: knet.Net_Id, o
 	}
 }
 
+@(gd_half)
 spelunker_freed :: proc(game: ^CaveLobby, self: ^Spelunker, id: knet.Net_Id) {
 	delete_key(&game.spelunkers, id)
 }
 
+@(gd_half)
 chest_spawned :: proc(game: ^CaveLobby, self: ^Chest, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.chests[id] = self
 }
 
+@(gd_half)
 chest_freed :: proc(game: ^CaveLobby, self: ^Chest, id: knet.Net_Id) {
 	delete_key(&game.chests, id)
 }
 
+@(gd_half)
 door_spawned :: proc(game: ^CaveLobby, self: ^Door, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.doors[id] = self
 }
 
+@(gd_half)
 door_freed :: proc(game: ^CaveLobby, self: ^Door, id: knet.Net_Id) {
 	delete_key(&game.doors, id)
 }
 
+@(gd_half)
 pickup_spawned :: proc(game: ^CaveLobby, self: ^Pickup, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.pickups[id] = self
 }
 
+@(gd_half)
 pickup_freed :: proc(game: ^CaveLobby, self: ^Pickup, id: knet.Net_Id) {
 	delete_key(&game.pickups, id)
 }
 
+@(gd_half)
 dweller_spawned :: proc(game: ^CaveLobby, self: ^Dweller, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.dwellers[id] = self
 }
 
 // A despawned dweller was slain — the hook runs BEFORE the node dies, so the
 // death burst still reads the corpse's position (parented to the world).
+@(gd_half)
 dweller_freed :: proc(game: ^CaveLobby, self: ^Dweller, id: knet.Net_Id) {
 	fx_burst_at(game, self.x, self.y, {0.8, 0.4, 1, 1})
 	delete_key(&game.dwellers, id)
 	delete_key(&game.brains, id) // host-side mind (empty map on clients)
 }
 
+@(gd_half)
 level_spawned :: proc(game: ^CaveLobby, self: ^Level, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.level = self
 }
 
+@(gd_half)
 level_freed :: proc(game: ^CaveLobby, self: ^Level, id: knet.Net_Id) {
 	if game.level == self {
 		game.level = nil
 	}
 }
 
+@(gd_half)
 relic_spawned :: proc(game: ^CaveLobby, self: ^Relic, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.relic = self
 	game.relic_id = id
 }
 
+@(gd_half)
 relic_freed :: proc(game: ^CaveLobby, self: ^Relic, id: knet.Net_Id) {
 	if game.relic_id == id {
 		game.relic = nil
@@ -265,6 +279,7 @@ cave_inscribe :: proc(self: ^CaveLobby) {
 // same code that fills them; this half clears what never was an entity. The
 // rebuild comes through the factory right after — a takeover's backup
 // snapshot or a rejoin's SES_WORLD.
+@(gd_half)
 cave_lobby_wiped :: proc(self: ^CaveLobby) {
 	clear(&self.avatar_of) // spelunker_freed keeps no owner mirror
 	clear(&self.respawn_at)

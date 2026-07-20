@@ -123,6 +123,7 @@ the host included, builds a spawn the same way (instantiate under
 name-paired hook:
 
 ```odin
+@(gd_half)
 chest_spawned :: proc(game: ^CaveLobby, self: ^Chest, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.chests[id] = self
 }
@@ -187,6 +188,7 @@ commands AND the host's own (no "inline authority half" beside each issue
 site), and never for a prediction:
 
 ```odin
+@(gd_half)
 chest_take_then :: proc(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: u8, count: u16, px, py: f32, taken: kitems.Slot) {
 	cave_credit(game, by, self, taken) // an ordinary host mutation — deltas carry it to everyone
 }

@@ -33,6 +33,7 @@ player_process :: proc(self: ^Player, delta: f64) {
 }
 
 // The census hooks — the only bookkeeping the game keeps.
+@(gd_half)
 player_spawned :: proc(game: ^HelloNet, self: ^Player, id: knet.Net_Id, owner: knet.Player_Id) {
 	_ = id
 	if owner == game.ses.me {
@@ -41,6 +42,7 @@ player_spawned :: proc(game: ^HelloNet, self: ^Player, id: knet.Net_Id, owner: k
 	}
 }
 
+@(gd_half)
 player_freed :: proc(game: ^HelloNet, self: ^Player, id: knet.Net_Id) {
 	_ = id
 	if self == game.me {

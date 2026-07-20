@@ -217,12 +217,14 @@ dispatch — from whatever you declared. Undeclared events are skipped; that
 IS the `#partial`:
 
 ```odin
+@(gd_half)
 cave_lobby_player_joined :: proc(self: ^CaveLobby, id: knet.Player_Id, rejoin: bool) {
 	// every peer: repaint, log
 }
 
 // The AUTHORITY consequence — comms lines, fielding a late joiner. The
 // generated dispatch holds the is_host gate; the half never checks a role.
+@(gd_half)
 cave_lobby_player_joined_then :: proc(self: ^CaveLobby, id: knet.Player_Id, rejoin: bool) { ... }
 
 // in process(): the two generated calls, role-free at the call site
@@ -780,11 +782,12 @@ generated writer into.
 halves and one `ready` call; the kit owns the torch, the fork, the wipe, the caps:
 
 ```odin
-my_game_backup    :: proc(self: ^G, w: ^knet.Writer)  // host: the campaign blob (wire the
-                                                      // generated gd:"backup" writer in)
-my_game_took_over :: proc(self: ^G, r: ^knet.Reader)  // heir: read it back, mend, word it
-my_game_wiped     :: proc(self: ^G)                   // every peer: the never-entity pools
-my_game_migrating :: proc(self: ^G, step: kboot.Migrate_Step, target: string, try: int)
+// each wears @(gd_half) — a half that pairs with nothing is a build error
+@(gd_half) my_game_backup    :: proc(self: ^G, w: ^knet.Writer)  // host: the campaign blob (wire
+                                                                 // the generated gd:"backup" writer in)
+@(gd_half) my_game_took_over :: proc(self: ^G, r: ^knet.Reader)  // heir: read it back, mend, word it
+@(gd_half) my_game_wiped     :: proc(self: ^G)                   // every peer: the never-entity pools
+@(gd_half) my_game_migrating :: proc(self: ^G, step: kboot.Migrate_Step, target: string, try: int)
 
 // ready(), after boot_attach:
 kboot.boot_migration(&self.boot, self, my_game_succ_hooks)  // the generated table
@@ -926,6 +929,7 @@ trade_confirm :: proc(self: ^Trade, by: knet.Player_Id) -> (ok: bool, sealed: bo
 // outcomes are ordinary host mutations: deltas carry the verdict and the
 // items to every screen at once, and phantom items are impossible — nothing
 // was predicted into anyone's bag.
+@(gd_half)
 trade_confirm_then :: proc(game: ^MyGame, self: ^Trade, by: knet.Player_Id, sealed: bool) {
 	if !sealed {return}
 	if game_move_offers(game, self) { // validate both bags, then swap

@@ -142,6 +142,7 @@ chest_take :: proc(self: ^Chest, slot: i32, px: f32, py: f32) -> (ok: bool, take
 
 // Fires on the HOST only, after the take applies: the cross-entity half,
 // typed, next to its verb (see "Consequences" below).
+@(gd_half)
 chest_take_then :: proc(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: i32, px: f32, py: f32, taken: kitems.Slot) {
 	cave_credit(game, by, self, taken)
 }
@@ -192,8 +193,8 @@ verb's returned **payload**, firing it on the AUTHORITY only, right after the
 verb applies. Two shapes, detected by the leading param:
 
 ```odin
-chest_take_then :: proc(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: i32, px: f32, py: f32, taken: kitems.Slot)
-door_toggle_then :: proc(self: ^Door, by: knet.Player_Id)   // entity-local: no game param
+@(gd_half) chest_take_then :: proc(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: i32, px: f32, py: f32, taken: kitems.Slot)
+@(gd_half) door_toggle_then :: proc(self: ^Door, by: knet.Player_Id)   // entity-local: no game param
 ```
 
 **Payload returns.** A verb may return `(bool, facts…)` — results after the
@@ -238,12 +239,19 @@ switch ever appears. A composed verb's payload is the block's *offer*
 
 **Build-time contract.** A mispaired consequence is a scriptgen error, not a
 proc that silently never fires: the shape (`[game,] self, by, wire args…,
-payload…`) is validated against the verb, and the pairing suffixes
-(`_then`/`_fx`/`_apply`/`_edge`/`_spawned`/`_freed`) are RESERVED on procs that touch
-a script struct — an unclaimed one (a typo'd verb, a half-deleted pairing) is
-an error with the expected names spelled out: pair it or rename it. A
-suffix-named helper touching no script struct stays a warning at most, and a
-direct verb whose payload nobody consumes warns too. When something
+payload…`) is validated against the verb, and **every half wears `@(gd_half)`**
+— the attribute declares that this proc is *meant* to pair, and a declared half
+that pairs with nothing is an error with the class's real pairing names spelled
+out beside it: rename it, or drop the attribute if it isn't a half.
+
+The name still decides *what* it pairs with — that is what makes the call site
+readable. The attribute decides only that pairing was INTENDED, and that is the
+half a name alone could never carry: a wrong prefix (`chest_taek_then`) and a
+wrong suffix (`chest_take_after`) are now the same error, where the second one
+used to be invisible to everything, Odin included. A proc that merely *ends* in
+`_then` and never claimed to be a half is nothing special and says nothing —
+there is no reserved-suffix list to collide with. A direct verb whose payload
+nobody consumes still warns. When something
 needs to react to commands *generically* (metrics, receipts, replays), the
 untyped [command hook](session.md#command-hooks-the-generic-layer-under-_then)
 remains underneath — `_then` is generated dispatch over the same authority path.
@@ -412,6 +420,7 @@ hands it the net change:
 
 ```odin
 // ([game,] self, old, new: <the field's declared type>) — no results
+@(gd_half)
 gunner_hp_edge :: proc(self: ^Gunner, old, new: i32) {
 	if new < old {self.flash_ttl = 0.25}
 }

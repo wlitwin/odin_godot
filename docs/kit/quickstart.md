@@ -49,6 +49,7 @@ player_process :: proc(self: ^Player, delta: f64) {
 	gd.node2d_set_position(cast(gd.Node2d)self.owner, {self.x, self.y})
 }
 
+@(gd_half)
 player_spawned :: proc(game: ^HelloNet, self: ^Player, id: knet.Net_Id, owner: knet.Player_Id) {
 	_ = id
 	if owner == game.ses.me {
@@ -57,6 +58,7 @@ player_spawned :: proc(game: ^HelloNet, self: ^Player, id: knet.Net_Id, owner: k
 	}
 }
 
+@(gd_half)
 player_freed :: proc(game: ^HelloNet, self: ^Player, id: knet.Net_Id) {
 	_ = id
 	if self == game.me {game.me = nil}
@@ -165,14 +167,17 @@ spawn_player :: proc(self: ^HelloNet, pid: knet.Player_Id) {
 	kboot.boot_spawn_send(&self.boot, id)
 }
 
+@(gd_half)
 hello_net_welcomed :: proc(self: ^HelloNet, me: knet.Player_Id) {
 	gd.print_str(fmt.tprintf("HELLO_SEATED me=%d", u64(me)))
 }
 
+@(gd_half)
 hello_net_player_joined_then :: proc(self: ^HelloNet, id: knet.Player_Id, rejoin: bool) {
 	if kboot.boot_phase(&self.boot) == .Playing && !rejoin {spawn_player(self, id)}
 }
 
+@(gd_half)
 hello_net_entity_spawned :: proc(self: ^HelloNet, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
 	_ = type; _ = id; _ = owner
 	gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false) // a level, applied

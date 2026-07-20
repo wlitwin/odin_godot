@@ -166,9 +166,11 @@ mob_scene: ^gd.Resource `gd:"entity=Mob:3"`,
 kboot.boot_entities(&self.boot, self, scrapyard_entity_kinds[:])
 
 // the game-shaped half stays yours, as typed name-paired hooks (optional):
+@(gd_half)
 mob_spawned :: proc(game: ^Scrapyard, self: ^Mob, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.mobs[id] = self   // bookkeeping — fields NOT set yet; dress on Ev_Spawned
 }
+@(gd_half)
 mob_freed :: proc(game: ^Scrapyard, self: ^Mob, id: knet.Net_Id) {
 	delete_key(&game.mobs, id) // node + fields still alive — death fx go here
 }

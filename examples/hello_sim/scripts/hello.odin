@@ -148,16 +148,19 @@ spawn_player :: proc(self: ^HelloSim, pid: knet.Player_Id) {
 
 // ---- session event halves (identical to hello_net) --------------------------
 
+@(gd_half)
 hello_sim_welcomed :: proc(self: ^HelloSim, me: knet.Player_Id) {
 	gd.print_str(fmt.tprintf("HELLO_SEATED me=%d", u64(me)))
 }
 
+@(gd_half)
 hello_sim_player_joined_then :: proc(self: ^HelloSim, id: knet.Player_Id, rejoin: bool) {
 	if self.started && !rejoin {
 		spawn_player(self, id)
 	}
 }
 
+@(gd_half)
 hello_sim_entity_spawned :: proc(self: ^HelloSim, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
 	_ = type; _ = id; _ = owner
 	if !self.started {

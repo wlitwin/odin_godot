@@ -57,6 +57,7 @@ spelunker_drop :: proc(self: ^Spelunker, slot: i32) -> (ok: bool, dropped: kitem
 }
 
 // Host only: what left the bag becomes a Pickup on the floor.
+@(gd_half)
 spelunker_drop_then :: proc(game: ^CaveLobby, self: ^Spelunker, by: knet.Player_Id, slot: i32, dropped: kitems.Slot) {
 	cave_mint_pickup(game, self, dropped)
 }
@@ -82,6 +83,7 @@ spelunker_throw :: proc(self: ^Spelunker, dx: f32, dy: f32, ox: f32, oy: f32) ->
 }
 
 // Host only: the confirmed cast launches the one rock that hurts.
+@(gd_half)
 spelunker_throw_then :: proc(game: ^CaveLobby, self: ^Spelunker, by: knet.Player_Id, dx: f32, dy: f32, ox: f32, oy: f32, fx: f32, fy: f32) {
 	cave_launch_rock(game, by, {fx, fy}, {dx, dy})
 }
@@ -130,6 +132,7 @@ spelunker_process :: proc(self: ^Spelunker, delta: f64) {
 // (The host's own restores edge SAME-frame because cavecrawl.odin calls
 // session_run_edges right after its host-tick loop — the walk-out must move
 // the body before the next exchange, the acid's crossfire lesson.)
+@(gd_half)
 spelunker_hp_edge :: proc(g: ^CaveLobby, self: ^Spelunker, old, new: i32) {
 	if new <= 0 && old > 0 {
 		gd.cpu_particles2d_restart(self.pyre, false)

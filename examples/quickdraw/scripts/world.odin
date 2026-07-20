@@ -16,6 +16,7 @@ import ksess "godot:kit/session"
 // three maps did, straight from the kit's own ledgers. (The sim lane tracks
 // this spawn ITSELF: the generated kinds row carries gunner_sim_set, and
 // boot_lane's factory does the rest.)
+@(gd_half)
 gunner_spawned :: proc(game: ^Quickdraw, self: ^Gunner, id: knet.Net_Id, owner: knet.Player_Id) {
 	if owner != knet.PLAYER_ID_INVALID && owner == game.ses.me {
 		self.mine = true
@@ -24,6 +25,7 @@ gunner_spawned :: proc(game: ^Quickdraw, self: ^Gunner, id: knet.Net_Id, owner: 
 	gd.print_str(fmt.tprintf("QD_SPAWN id=%d mine=%v", u32(id), owner == game.ses.me))
 }
 
+@(gd_half)
 gunner_freed :: proc(game: ^Quickdraw, self: ^Gunner, id: knet.Net_Id) {
 	if self == game.me_gun {
 		game.me_gun = nil
@@ -33,10 +35,12 @@ gunner_freed :: proc(game: ^Quickdraw, self: ^Gunner, id: knet.Net_Id) {
 // The drone's census hook — the SECOND input-driven kind. Its one game line is
 // the same lane_track_set the kit runs from the generated kinds row (drone's
 // Sim_Set carries its wire class); here we only mark ownership for the sample.
+@(gd_half)
 drone_spawned :: proc(game: ^Quickdraw, self: ^Drone, id: knet.Net_Id, owner: knet.Player_Id) {
 	self.mine = owner != knet.PLAYER_ID_INVALID && owner == game.ses.me
 }
 
+@(gd_half)
 drone_freed :: proc(game: ^Quickdraw, self: ^Drone, id: knet.Net_Id) {
 }
 

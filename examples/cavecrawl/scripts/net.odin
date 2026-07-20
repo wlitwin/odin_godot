@@ -78,6 +78,7 @@ cave_lobby_on_rejoin :: proc(self: ^CaveLobby) {
 
 // The dance's words — the kit already acted (the dial, the caps, the heir
 // arms); each arm narrates. The acid pins the chase receipts here.
+@(gd_half)
 cave_lobby_migrating :: proc(self: ^CaveLobby, step: kboot.Migrate_Step, target: string, try: int) {
 	_ = target
 	switch step {

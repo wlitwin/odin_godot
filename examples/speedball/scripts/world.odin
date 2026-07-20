@@ -14,6 +14,7 @@ import psim "godot:play/sim"
 // The census hooks, down to the game-shaped lines — the generated queries
 // (kicker_of / kicker_ids / kicker_owned_by, kboot.boot_entity_owner) answer
 // everything the old three maps did.
+@(gd_half)
 kicker_spawned :: proc(game: ^Speedball, self: ^Kicker, id: knet.Net_Id, owner: knet.Player_Id) {
 	// The mover's LAW half — config is never on the wire, so every peer
 	// stamps the same numbers here, before the first tick. One call names
@@ -34,12 +35,14 @@ kicker_spawned :: proc(game: ^Speedball, self: ^Kicker, id: knet.Net_Id, owner: 
 	gd.print_str(fmt.tprintf("SPB_SPAWN id=%d mine=%v", u32(id), owner == game.ses.me))
 }
 
+@(gd_half)
 kicker_freed :: proc(game: ^Speedball, self: ^Kicker, id: knet.Net_Id) {
 	if self == game.me_kick {
 		game.me_kick = nil
 	}
 }
 
+@(gd_half)
 ball_spawned :: proc(game: ^Speedball, self: ^Ball, id: knet.Net_Id, owner: knet.Player_Id) {
 	// The roller's LAW half — friction, ceiling, restitution, walls: the
 	// same numbers on every peer, stamped before the first tick.
@@ -56,6 +59,7 @@ ball_spawned :: proc(game: ^Speedball, self: ^Ball, id: knet.Net_Id, owner: knet
 	game.ball = self
 }
 
+@(gd_half)
 ball_freed :: proc(game: ^Speedball, self: ^Ball, id: knet.Net_Id) {
 	if game.ball == self {
 		game.ball = nil

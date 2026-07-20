@@ -159,6 +159,7 @@ speedball_process :: proc(self: ^Speedball, delta: f64) {
 
 // ---- session event halves ---------------------------------------------------
 
+@(gd_half)
 speedball_welcomed :: proc(self: ^Speedball, me: knet.Player_Id) {
 	gd.print_str(fmt.tprintf("SPB_SEATED me=%d", u64(me)))
 }
@@ -166,6 +167,7 @@ speedball_welcomed :: proc(self: ^Speedball, me: knet.Player_Id) {
 // The join's authority consequence: word the arrival, field a late joiner,
 // start the scripted match when the pitch fills — is_host-free (the
 // generated dispatch holds the gate).
+@(gd_half)
 speedball_player_joined_then :: proc(self: ^Speedball, id: knet.Player_Id, rejoin: bool) {
 	if p, ok := ksess.session_player(&self.ses, id); ok {
 		kcomms.comms_welcome(&self.comms, id, rejoin, fmt.tprintf("%s takes the pitch", p.name))
@@ -176,6 +178,7 @@ speedball_player_joined_then :: proc(self: ^Speedball, id: knet.Player_Id, rejoi
 	speedball_try_start(self)
 }
 
+@(gd_half)
 speedball_host_left :: proc(self: ^Speedball) {
 	kui.lobby_set_status(&self.boot.ui, "The host left — this match is over")
 	gd.print_str("SPB_HOST_LEFT")
@@ -185,6 +188,7 @@ speedball_host_left :: proc(self: ^Speedball) {
 // the event (fields are set), never in the ball_spawned census hook (it
 // fires before the spawn tuple applies); the edge half stays silent on
 // first sight by design (a baseline, not an edge).
+@(gd_half)
 speedball_entity_spawned :: proc(self: ^Speedball, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
 	_ = id
 	_ = owner
@@ -199,6 +203,7 @@ speedball_entity_spawned :: proc(self: ^Speedball, id: knet.Net_Id, type: ksess.
 	}
 }
 
+@(gd_half)
 speedball_join_failed :: proc(self: ^Speedball) {
 	gd.print_str("SPB_JOIN_FAILED")
 }
@@ -213,6 +218,7 @@ speedball_join_failed :: proc(self: ^Speedball) {
 // (a late joiner's 3—2) rides Ev_Spawned above — the event fires with the
 // tuple's fields SET, unlike the census hook: spawn values are a baseline,
 // not an edge.
+@(gd_half)
 ball_score_edge :: proc(g: ^Speedball, self: ^Ball, old, new: Score) {
 	if new.l != old.l || new.r != old.r {
 		kui.lobby_set_status(&g.boot.ui, fmt.tprintf("%d — %d", new.l, new.r))
@@ -421,10 +427,12 @@ ball_kicked_fx :: proc(g: ^Speedball, k: ^Kicker, mine: bool, bvx, bvy: f32) {
 
 // The spike's receipt — AUTHORITY only, at the verb's execution tick (the
 // acid counts these on the marshal: the burst must land exactly twice).
+@(gd_half)
 ball_spike_then :: proc(g: ^Speedball, self: ^Ball, by: knet.Player_Id, px, py: f32) {
 	gd.print_str(fmt.tprintf("SPB_SPIKE by=%d tick=%d", u64(by), ksim.lane_now(&g.lane)))
 }
 
+@(gd_half)
 ball_tick_then :: proc(g: ^Speedball, self: ^Ball, by: knet.Player_Id, scored: u8) {
 	if scored == 0 {return}
 	if scored == 1 {

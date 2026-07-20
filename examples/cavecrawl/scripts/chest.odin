@@ -32,6 +32,7 @@ chest_take :: proc(self: ^Chest, slot: i32, px: f32, py: f32) -> (ok: bool, take
 // The cross-entity half, next to its verb: runs on the HOST only, right after
 // the take applies — never on the taker's optimistic run (the credit reaches
 // their screen as an ordinary delta). See host.odin's cave_credit.
+@(gd_half)
 chest_take_then :: proc(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: i32, px: f32, py: f32, taken: kitems.Slot) {
 	cave_credit(game, by, self, taken)
 }

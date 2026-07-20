@@ -268,8 +268,17 @@ export_specs_list :: proc(allocator := context.allocator) -> string {
 // terms of: a proc may carry at most ONE kit primary, and a kit primary never
 // shares a proc with a method-family attribute (the kit verbs never join the
 // engine's method tables).
+//
+// THE LINE BETWEEN Kit_Primary AND Half, since `gd_fact` sat on the wrong side
+// of it until the halves became declarative: a PRIMARY makes a declaration —
+// something downstream is generated FROM it (a verb's wrapper, a tick's thunk,
+// a fact's announce door and its wire id). A HALF pairs with a declaration made
+// elsewhere and generates nothing; the name says which declaration, the
+// attribute says only that pairing is INTENDED. `gd_fact` generates a door and
+// claims a wire id, so it is a primary that happens to bind its bearer by name;
+// `gd_half` is the one member of Half, and pairing with nothing is its error.
 Attr_Family :: enum u8 {
-	Kit_Primary, // the toolkit verbs: the proc IS a command / tick / sample / step
+	Kit_Primary, // the toolkit verbs: the proc IS a command / tick / sample / step / fact door
 	Method, // engine-facing: it joins a method, rpc, or signal table
 	Half, // it pairs with a declaration made elsewhere
 }
@@ -294,7 +303,8 @@ ATTRS :: []Attr {
 	{"gd_tick", .Kit_Primary, "a sim tick"},
 	{"gd_sample", .Kit_Primary, "an input sample"},
 	{"gd_step", .Kit_Primary, "a sim step"},
-	{"gd_fact", .Half, "a world-pass fact door (its bearer is named <event>_fx)"},
+	{"gd_fact", .Kit_Primary, "a world-pass fact door (its bearer is named <event>_fx)"},
+	{"gd_half", .Half, "a pairing half; the NAME says what it pairs with"},
 }
 
 attr :: proc(name: string) -> (Attr, bool) {

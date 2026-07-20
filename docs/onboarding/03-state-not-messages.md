@@ -58,6 +58,7 @@ Golf :: struct {
 }
 
 // Optional, typed, name-paired: your bookkeeping when one is born or freed.
+@(gd_half)
 hole_spawned :: proc(game: ^Golf, self: ^Hole, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.holes[id] = self
 }

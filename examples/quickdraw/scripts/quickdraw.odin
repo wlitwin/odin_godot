@@ -179,6 +179,7 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 
 // ---- session event halves ---------------------------------------------------
 
+@(gd_half)
 quickdraw_welcomed :: proc(self: ^Quickdraw, me: knet.Player_Id) {
 	gd.print_str(fmt.tprintf("QD_SEATED me=%d", u64(me)))
 }
@@ -186,6 +187,7 @@ quickdraw_welcomed :: proc(self: ^Quickdraw, me: knet.Player_Id) {
 // The join's authority consequence: word the arrival, field a late joiner,
 // and start the scripted match when the table fills — the whole block the
 // shell used to wrap in is_host, now gate-free (the dispatch holds it).
+@(gd_half)
 quickdraw_player_joined_then :: proc(self: ^Quickdraw, id: knet.Player_Id, rejoin: bool) {
 	if p, ok := ksess.session_player(&self.ses, id); ok {
 		kcomms.comms_welcome(&self.comms, id, rejoin, fmt.tprintf("%s steps into the dust", p.name))
@@ -196,11 +198,13 @@ quickdraw_player_joined_then :: proc(self: ^Quickdraw, id: knet.Player_Id, rejoi
 	quickdraw_try_start(self)
 }
 
+@(gd_half)
 quickdraw_host_left :: proc(self: ^Quickdraw) {
 	kui.lobby_set_status(&self.boot.ui, "The marshal left — duel's off")
 	gd.print_str("QD_HOST_LEFT")
 }
 
+@(gd_half)
 quickdraw_entity_spawned :: proc(self: ^Quickdraw, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
 	_ = id
 	_ = type
@@ -213,10 +217,12 @@ quickdraw_entity_spawned :: proc(self: ^Quickdraw, id: knet.Net_Id, type: ksess.
 	}
 }
 
+@(gd_half)
 quickdraw_join_denied :: proc(self: ^Quickdraw, reason: ksess.Deny_Reason) {
 	gd.print_str(fmt.tprintf("QD_DENIED reason=%v", reason))
 }
 
+@(gd_half)
 quickdraw_join_failed :: proc(self: ^Quickdraw) {
 	gd.print_str("QD_JOIN_FAILED")
 }
@@ -366,6 +372,7 @@ bot_sample :: proc(g: ^Quickdraw, tick: u64, input: ^Gunner_Input) {
 // shooter's screen aimed (delta-lane damage); the LOB spawns the AUTHORITATIVE
 // bullet — a real net id, announced to every peer — at the same tick the client
 // already predicted its own.
+@(gd_half)
 gunner_tick_then :: proc(g: ^Quickdraw, self: ^Gunner, by: knet.Player_Id, fired: bool, lobbed: bool) {
 	if fired {
 		adjudicate_shot(g, self.net_id, self, by, self.aim, ksim.lane_now(&g.lane))
@@ -386,6 +393,7 @@ gunner_tick_then :: proc(g: ^Quickdraw, self: ^Gunner, by: knet.Player_Id, fired
 // move (the authority's real bullet comes from the _then above — a hosting
 // player's fire is already authoritative, and speculating it too would
 // double the bullet).
+@(gd_half)
 gunner_tick_fx :: proc(g: ^Quickdraw, self: ^Gunner, mine: bool, fired: bool, lobbed: bool) {
 	if fired {
 		gunner_beam(self, self.aim)
@@ -421,6 +429,7 @@ lob_bullet :: proc(g: ^Quickdraw, gun: ^Gunner, owner: knet.Player_Id) {
 
 // The buy's consequence — AUTHORITY only, at the verb's execution tick: the
 // receipt every screen can trust (the acid greps it on the marshal).
+@(gd_half)
 gunner_buy_then :: proc(g: ^Quickdraw, self: ^Gunner, by: knet.Player_Id, item: u8) {
 	gd.print_str(fmt.tprintf("QD_BUY by=%d item=%d tick=%d", u64(by), item, ksim.lane_now(&g.lane)))
 }

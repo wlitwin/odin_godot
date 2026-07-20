@@ -1354,8 +1354,8 @@ main :: proc() {
 	// first param is the GAME struct, so the per-class bound-proc scan never
 	// claims them), then pair each script's commands with their consequences
 	// and each entity tag with its hooks, validating every shape.
-	then_idx := make(map[string]Then_Candidate)
-	defer delete(then_idx)
+	half_idx := make(map[string]Half_Candidate)
+	defer delete(half_idx)
 	method_claims := make([dynamic]Method_Claim)
 	defer delete(method_claims)
 	cmd_calls := make([dynamic]Cmd_Call)
@@ -1373,7 +1373,7 @@ main :: proc() {
 		p.err = silent_parse_diag
 		p.warn = silent_parse_diag
 		if !parser.parse_file(&p, &file) {continue}
-		scan_then_procs(&then_idx, l.path, l.src, &file)
+		scan_half_procs(&half_idx, l.path, l.src, &file)
 		scan_method_claims(&method_claims, l.path, l.src, &file, script_structs)
 		scan_command_calls(&cmd_calls, l.path, l.src, &file)
 		scan_proc_names(&proc_names, &file)
@@ -1382,23 +1382,20 @@ main :: proc() {
 	}
 	by_struct := make(map[string]^Script)
 	defer delete(by_struct)
-	script_snakes := make(map[string]bool)
-	defer delete(script_snakes)
 	for &pend in pending {
 		by_struct[pend.script.struct_name] = &pend.script
-		script_snakes[to_snake(pend.script.struct_name)] = true
 	}
 	seen_entity_ids := make(map[int]string)
 	defer delete(seen_entity_ids)
 	for &pend in pending {
-		resolve_then(&pend.script, &then_idx)
-		resolve_tick_then(&pend.script, &then_idx)
-		resolve_edges(&pend.script, &then_idx)
-		resolve_session_events(&pend.script, &then_idx)
-		resolve_migration(&pend.script, &then_idx)
-		resolve_command_applies(&pend.script, &then_idx)
+		resolve_then(&pend.script, &half_idx)
+		resolve_tick_then(&pend.script, &half_idx)
+		resolve_edges(&pend.script, &half_idx)
+		resolve_session_events(&pend.script, &half_idx)
+		resolve_migration(&pend.script, &half_idx)
+		resolve_command_applies(&pend.script, &half_idx)
 		validate_command_ids(&pend.script)
-		resolve_entities(&pend.script, by_struct, &seen_entity_ids, &then_idx)
+		resolve_entities(&pend.script, by_struct, &seen_entity_ids, &half_idx)
 		resolve_census(&pend.script, proc_names)
 		resolve_probes(&pend.script, by_struct, proc_names)
 		resolve_boot_forwards(&pend.script)
@@ -1414,11 +1411,15 @@ main :: proc() {
 		for &pend in pending {append(&all, &pend.script)}
 		resolve_sim(all[:])
 		// Declared world-pass facts land on the lane owner resolve_sim just
-		// settled — and claim their `_fx` idx entries before the unclaimed
-		// sweep below reads them.
-		resolve_facts(all[:], fact_decls[:], &then_idx, by_struct, proc_names)
+		// settled.
+		resolve_facts(all[:], fact_decls[:], by_struct, proc_names)
+		// Last, with every pass's claims in: the halves that paired with
+		// nothing. Needs the whole script list, not just by_struct — the fix
+		// it prints is each target class's real pairing surface, and an
+		// entity's `_spawned`/`_freed` names are declared on a DIFFERENT class
+		// (whichever one carries the scene's `entity=` tag).
+		check_unpaired_halves(&half_idx, all[:], by_struct)
 	}
-	check_unclaimed_pairs(&then_idx, script_snakes, by_struct)
 	lint_method_claims(method_claims[:], by_struct)
 	{
 		// THE RAW-VERB lint: every command set is complete now (composed verbs

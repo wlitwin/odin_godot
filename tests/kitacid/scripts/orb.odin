@@ -40,6 +40,7 @@ orb_strike :: proc(self: ^Orb, cost: i32) -> (ok: bool, dealt: i32) {
 // payload. Predictions, replays, rejections, and retransmits never reach it —
 // the acid greps exactly two ACID_THEN lines on the server and ZERO on the
 // clients, under injected latency.
+@(gd_half)
 orb_strike_then :: proc(self: ^Orb, by: knet.Player_Id, cost: i32, dealt: i32) {
 	gd.print_str(fmt.tprintf("ACID_THEN cost=%d dealt=%d hp=%d by_ok=%v", cost, dealt, self.hp, by != knet.PLAYER_ID_INVALID))
 }

@@ -49,6 +49,7 @@ chest_claim :: proc(self: ^Chest, by: knet.Player_Id) -> bool {
 }
 
 // Its consequence sees the SAME issuer, once, after `by` — no duplication.
+@(gd_half)
 chest_claim_then :: proc(self: ^Chest, by: knet.Player_Id) {
 	_ = by
 }

@@ -53,6 +53,7 @@ player_process :: proc(self: ^Player, delta: f64) {
 	gd.node2d_set_position(cast(gd.Node2d)self.owner, {self.x, self.y})
 }
 
+@(gd_half)
 player_spawned :: proc(game: ^HelloSim, self: ^Player, id: knet.Net_Id, owner: knet.Player_Id) {
 	_ = id
 	if owner == game.ses.me {
@@ -61,6 +62,7 @@ player_spawned :: proc(game: ^HelloSim, self: ^Player, id: knet.Net_Id, owner: k
 	}
 }
 
+@(gd_half)
 player_freed :: proc(game: ^HelloSim, self: ^Player, id: knet.Net_Id) {
 	_ = id
 	if self == game.me {

@@ -212,6 +212,7 @@ slopball_process :: proc(self: ^Slopball, delta: f64) {
 
 // ---- session event halves ---------------------------------------------------
 
+@(gd_half)
 slopball_welcomed :: proc(self: ^Slopball, me: knet.Player_Id) {
 	gd.print_str(fmt.tprintf("SB_SEATED me=%d", u64(me)))
 }
@@ -219,6 +220,7 @@ slopball_welcomed :: proc(self: ^Slopball, me: knet.Player_Id) {
 // The join's authority consequence: word the arrival, field a drop-in kicker,
 // start the scripted match when the pitch fills — is_host-free (the generated
 // dispatch holds the gate).
+@(gd_half)
 slopball_player_joined_then :: proc(self: ^Slopball, id: knet.Player_Id, rejoin: bool) {
 	if p, ok := ksess.session_player(&self.ses, id); ok {
 		kcomms.comms_welcome(&self.comms, id, rejoin, fmt.tprintf("%s takes the pitch", p.name))
@@ -232,6 +234,7 @@ slopball_player_joined_then :: proc(self: ^Slopball, id: knet.Player_Id, rejoin:
 // The seat outlives the socket, but the SIM must not: a ball owned by the
 // leaver would freeze mid-air on every screen. Authority consequence — the
 // host reclaims the seat.
+@(gd_half)
 slopball_player_left_then :: proc(self: ^Slopball, id: knet.Player_Id) {
 	if self.ball != nil && ksess.session_owner_of(&self.ses, self.ball_id) == id {
 		ksess.session_set_owner(&self.ses, self.ball_id, self.ses.me)
@@ -239,6 +242,7 @@ slopball_player_left_then :: proc(self: ^Slopball, id: knet.Player_Id) {
 	}
 }
 
+@(gd_half)
 slopball_host_left :: proc(self: ^Slopball) {
 	kui.lobby_set_status(&self.boot.ui, "The host left — this match is over")
 	gd.print_str("SB_HOST_LEFT")
@@ -252,6 +256,7 @@ slopball_host_left :: proc(self: ^Slopball) {
 // The lobby/legend swap is a LEVEL applied per spawn, not a latch: `started`
 // used to be one bool doing double duty (level AND rising edge), and only the
 // edge needed keeping — it rides boot_phase in process(), with the receipt.
+@(gd_half)
 slopball_entity_spawned :: proc(self: ^Slopball, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
 	_ = type
 	gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
@@ -265,6 +270,7 @@ slopball_entity_spawned :: proc(self: ^Slopball, id: knet.Net_Id, type: ksess.En
 	gd.print_str(fmt.tprintf("SB_SPAWN id=%d mine=%v", u32(id), owner == self.ses.me))
 }
 
+@(gd_half)
 slopball_owner_changed :: proc(self: ^Slopball, id: knet.Net_Id, owner: knet.Player_Id, prev: knet.Player_Id) {
 	_ = prev
 	if id == self.ball_id {
@@ -273,10 +279,12 @@ slopball_owner_changed :: proc(self: ^Slopball, id: knet.Net_Id, owner: knet.Pla
 	}
 }
 
+@(gd_half)
 slopball_join_denied :: proc(self: ^Slopball, reason: ksess.Deny_Reason) {
 	gd.print_str(fmt.tprintf("SB_DENIED reason=%v", reason))
 }
 
+@(gd_half)
 slopball_join_failed :: proc(self: ^Slopball) {
 	gd.print_str("SB_JOIN_FAILED")
 }
@@ -300,6 +308,7 @@ seat_ball :: proc(self: ^Slopball, owner: knet.Player_Id) {
 // together fires ONCE with the whole old/new — the seen_* mirrors and the
 // per-frame compare are deleted, and first sight (a late joiner's 3—2) seeds
 // silently by design (dressed on slopball_entity_spawned above).
+@(gd_half)
 ball_score_edge :: proc(g: ^Slopball, self: ^Ball, old, new: Score) {
 	if new.l != old.l || new.r != old.r {
 		kui.lobby_set_status(&g.boot.ui, fmt.tprintf("%d — %d", new.l, new.r))

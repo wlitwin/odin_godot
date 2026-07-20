@@ -11,6 +11,7 @@ import kboot "godot:kit/boot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
+@(gd_half)
 kicker3_spawned :: proc(game: ^Slopball3, self: ^Kicker3, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.kickers[id] = self
 	if owner != knet.PLAYER_ID_INVALID {
@@ -22,6 +23,7 @@ kicker3_spawned :: proc(game: ^Slopball3, self: ^Kicker3, id: knet.Net_Id, owner
 	}
 }
 
+@(gd_half)
 kicker3_freed :: proc(game: ^Slopball3, self: ^Kicker3, id: knet.Net_Id) {
 	if self == game.me_kick {
 		game.me_kick = nil
@@ -29,11 +31,13 @@ kicker3_freed :: proc(game: ^Slopball3, self: ^Kicker3, id: knet.Net_Id) {
 	delete_key(&game.kickers, id)
 }
 
+@(gd_half)
 ball3_spawned :: proc(game: ^Slopball3, self: ^Ball3, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.ball = self
 	game.ball_id = id
 }
 
+@(gd_half)
 ball3_freed :: proc(game: ^Slopball3, self: ^Ball3, id: knet.Net_Id) {
 	if game.ball_id == id {
 		game.ball = nil

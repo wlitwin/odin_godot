@@ -501,10 +501,15 @@ Depot :: struct {
 	boot:  kboot.Boot,
 }
 
+@(gd_half)
 depot_backup :: proc(self: ^Depot, w: ^knet.Writer) {}
+@(gd_half)
 depot_took_over :: proc(self: ^Depot, r: ^knet.Reader) {}
+@(gd_half)
 depot_wiped :: proc(self: ^Depot) {}
+@(gd_half)
 depot_migrating :: proc(self: ^Depot, step: kboot.Migrate_Step, target: string, try: int) {}
+@(gd_half)
 depot_welcomed :: proc(self: ^Depot, me: knet.Player_Id) {}
 ODIN
 if ! "$SGEN" "$sc" -godot:"$ROOT" >/dev/null 2>&1; then fail "migration halves must resolve, not error"; fi
@@ -532,6 +537,7 @@ Vault :: struct {
 	boot:  kboot.Boot,
 }
 
+@(gd_half)
 vault_backup :: proc(self: ^Vault, w: ^knet.Writer) {}
 ODIN
 if ! "$SGEN" "$so" -godot:"$ROOT" >/dev/null 2>&1; then fail "a migration-only shell must resolve"; fi
@@ -554,6 +560,7 @@ Depot :: struct {
 	boot:  kboot.Boot,
 }
 
+@(gd_half)
 depot_backup :: proc(self: ^Depot, blob: []u8) {}
 ODIN
 if "$SGEN" "$sb" -godot:"$ROOT" >"$sb/out.log" 2>&1; then fail "a wrong-shape migration half must FAIL the build"; fi
@@ -575,12 +582,15 @@ Depot :: struct {
 	boot:  kboot.Boot,
 }
 
+@(gd_half)
 depot_took_over_then :: proc(self: ^Depot, r: ^knet.Reader) {}
 ODIN
 if "$SGEN" "$st" -godot:"$ROOT" >"$st/out.log" 2>&1; then fail "a migration _then must FAIL the build"; fi
 grep -q "migration halves have no" "$st/out.log" || fail "the _then error must teach the fixed-role rule"
 
-# a one-edit prefix typo = the near-miss teaching, never a silent no-fire
+# A prefix typo. It used to need an EDIT-DISTANCE gate to be noticed at all
+# (one edit from the shell's snake, or silence); a declared half is noticed
+# because it is declared, however far the spelling drifted.
 sn="$work/succnear"
 mkdir -p "$sn"
 cat >"$sn/depot.odin" <<'ODIN'
@@ -596,10 +606,12 @@ Depot :: struct {
 	boot:  kboot.Boot,
 }
 
+@(gd_half)
 depo_backup :: proc(self: ^Depot, w: ^knet.Writer) {}
 ODIN
 if "$SGEN" "$sn" -godot:"$ROOT" >"$sn/out.log" 2>&1; then fail "a near-miss migration prefix must FAIL the build"; fi
-grep -q "looks like a migration half" "$sn/out.log" || fail "the near-miss error must name the pairing"
+grep -q "pairs with nothing" "$sn/out.log" || fail "a typo'd migration half must be refused, not silently dropped"
+grep -q "depot_backup" "$sn/out.log" || fail "the refusal must name the migration half the author meant"
 
 # ---- fixture: the silent-footgun lints (raw-verb call, tag namespace typo,
 # any_seat off the sim lane) — each compiles fine as Odin and used to
@@ -1040,7 +1052,10 @@ mkdir -p "$gr"
 # (a) THE LANE IS THE FIRST TOKEN. `owner`/`predict` used to be options inside
 # `gd:"replicate,…"`, which cost the parser a pairwise constraint matrix and
 # hid the one decision that matters (who writes these bytes) among smoothing
-# constants. Each old form must answer with its exact rewrite.
+# constants. The one-release migration door that rewrote the old form has been
+# removed (the three downstream games are retagged); what must still hold is
+# the permanent law — a lane in the option list means the field named TWO, and
+# the refusal has to say which token was the second one and where a lane goes.
 cat >"$gr/mob.odin" <<'ODIN'
 //gd:extends Node
 //gd:class GrMob
@@ -1057,13 +1072,13 @@ GrMob :: struct {
 ODIN
 out="$("$SGEN" "$gr" -godot:"$ROOT" 2>&1)"
 rc=$?
-[[ $rc -ne 0 ]] || fail "the old lane-as-option form must fail the build, not be quietly accepted"
-echo "$out" | grep -q 'is the old lane-as-option form' \
-	|| fail "the old lane form must be named as OLD, not reported as an unknown option"
-echo "$out" | grep -q 'write `gd:"owner,interp,wire=f16"`' \
-	|| fail "the refusal must spell the rewritten tag (options kept, lane hoisted) — it is the whole upgrade"
-echo "$out" | grep -q 'write `gd:"predict"`' \
-	|| fail "a bare replicate,predict must rewrite to the bare predict lane"
+[[ $rc -ne 0 ]] || fail "a lane in the option list must fail the build, not be quietly accepted"
+echo "$out" | grep -q 'is a LANE, not an option' \
+	|| fail "a second lane token must be named as a LANE, not reported as an unknown option"
+echo "$out" | grep -q 'exactly ONE lane' \
+	|| fail "the refusal must state the one-lane law (whoever writes the bytes owns them)"
+echo "$out" | grep -q 'the FIRST token' \
+	|| fail "the refusal must say where a lane goes — that is the whole fix"
 
 # The lane's option set is CLOSED, which is what replaced the matrix: `slack=`
 # is not "an option that requires predict", it is an option the predict lane
@@ -1187,5 +1202,104 @@ out="$("$SGEN" "$en" -godot:"$ROOT" 2>&1)"
 [[ $? -ne 0 ]] || fail "a resource= beside entity= must fail the build"
 echo "$out" | grep -q 'already fixes the resource hint to PackedScene' \
 	|| fail "the redundant-hint refusal must say the hint is already decided"
+
+# ---------------------------------------------------------------------------
+# @(gd_half): PRESENCE IS DECLARED, THE NAME STILL DECIDES THE PAIRING.
+#
+# Halves used to be collected by SUFFIX, which could only ever catch half the
+# typos. A bad PREFIX (`hf_bump_thn`) still wore `_then`, so the unclaimed sweep
+# saw it and guessed; a bad SUFFIX (`hf_bump_after`) wore nothing anyone
+# indexed, so scriptgen never looked at it and Odin does not flag an unused
+# package-level proc — the half silently never fired, which is the one failure
+# this whole language is built to make impossible. The attribute turns "did the
+# author mean to pair?" from a heuristic into a fact, so the check is arithmetic
+# (claimed, or not) and both typos land in the same error.
+hf="$work/half"
+mkdir -p "$hf"
+cat >"$hf/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class HfGame
+package hf
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+HfGame :: struct {
+	owner: gd.Node,
+	mob:   gd.Object `gd:"entity=HfMob:1"`,
+}
+ODIN
+cat >"$hf/mob.odin" <<'ODIN'
+//gd:extends Node
+//gd:class HfMob
+package hf
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+HfMob :: struct {
+	owner:  gd.Node,
+	net_id: knet.Net_Id,
+	hp:     i32 `gd:"replicate"`,
+}
+
+@(gd_command)
+hf_bump :: proc(self: ^HfMob, n: i32) -> bool { self.hp += n; return true }
+
+@(gd_half)
+hf_bump_then :: proc(game: ^HfGame, self: ^HfMob, by: knet.Player_Id, n: i32) {}
+ODIN
+"$SGEN" "$hf" -godot:"$ROOT" >/dev/null 2>&1 || fail "a correctly named @(gd_half) must build"
+
+# THE BUG THAT HAD NO NET: a wrong suffix. Nothing wore `_then`, so nothing
+# looked, and the consequence never fired.
+perl -pi -e 's/^hf_bump_then ::/hf_bump_after ::/' "$hf/mob.odin"
+out="$("$SGEN" "$hf" -godot:"$ROOT" 2>&1)"
+[[ $? -ne 0 ]] || fail "an @(gd_half) that pairs with nothing must fail the build"
+echo "$out" | grep -q 'pairs with nothing' \
+	|| fail "the unpaired-half refusal must say the half pairs with nothing"
+echo "$out" | grep -q 'silently never fire' \
+	|| fail "the unpaired-half refusal must name the bug it is preventing"
+echo "$out" | grep -q 'HfMob pairs: hf_bump_then' \
+	|| fail "the unpaired-half refusal must name the real pairing targets, not just the problem"
+
+# A wrong PREFIX under a right suffix — the case the deleted ~600 lines of
+# edit-distance guessing existed for — lands in the same one check.
+perl -pi -e 's/^hf_bump_after ::/hf_bmp_then ::/' "$hf/mob.odin"
+out="$("$SGEN" "$hf" -godot:"$ROOT" 2>&1)"
+[[ $? -ne 0 ]] || fail "a prefix-typo'd @(gd_half) must fail the build"
+echo "$out" | grep -q 'HfMob pairs: hf_bump_then' \
+	|| fail "the prefix-typo refusal must name the real pairing targets"
+
+# The pairing target is read off the ^Struct params, and the leading `game:`
+# handle is the CONTEXT, not what the half pairs on — so the class named is the
+# one the author was writing against, and the shell's thirty-odd session-event
+# names never bury it.
+echo "$out" | grep -q 'HfGame pairs:' \
+	&& fail "the game handle must not be offered as the pairing class when a second class is named"
+
+# The census hooks are the one mispairing whose fix is not a rename: they key on
+# the entity-tagged struct, so an untagged target means a missing `entity=` tag.
+perl -pi -e 's/^hf_bmp_then ::/hf_bump_then ::/' "$hf/mob.odin"
+cat >>"$hf/mob.odin" <<'ODIN'
+
+@(gd_half)
+hf_game_spawned :: proc(game: ^HfGame, self: ^HfGame, id: knet.Net_Id, owner: knet.Player_Id) {}
+ODIN
+out="$("$SGEN" "$hf" -godot:"$ROOT" 2>&1)"
+[[ $? -ne 0 ]] || fail "a census hook on an untagged struct must fail the build"
+echo "$out" | grep -q 'no scene field declares `entity=Name:id`' \
+	|| fail "an untagged census hook must name the TAG as the fix, not a rename"
+
+# @(gd_fact) and @(gd_half) are the two sides of one line — a fact DECLARES the
+# door scriptgen generates, a half PAIRS with a declaration made elsewhere — so
+# wearing both is refused rather than resolved into a proc that is somehow each.
+perl -pi -e 's/^\@\(gd_half\)\nhf_game_spawned.*\n//' "$hf/mob.odin"
+perl -0777 -pi -e 's/\n\@\(gd_half\)\nhf_game_spawned[^\n]*\n//' "$hf/mob.odin"
+perl -0777 -pi -e 's/\@\(gd_half\)\nhf_bump_then/\@(gd_fact)\n\@(gd_half)\nhf_bump_then/' "$hf/mob.odin"
+out="$("$SGEN" "$hf" -godot:"$ROOT" 2>&1)"
+[[ $? -ne 0 ]] || fail "@(gd_fact) plus @(gd_half) on one proc must fail the build"
+echo "$out" | grep -q 'two sides of one line' \
+	|| fail "the fact/half overlap refusal must say which attribute declares and which pairs"
+echo "$out" | grep -q 'Drop @(gd_half)' \
+	|| fail "the fact/half overlap refusal must name the fix"
 
 echo "SCRIPTGEN_OK"

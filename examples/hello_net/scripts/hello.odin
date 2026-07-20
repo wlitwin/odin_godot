@@ -195,11 +195,13 @@ spawn_player :: proc(self: ^HelloNet, pid: knet.Player_Id) {
 
 // ---- session event halves (the generated dispatch holds the role gates) ----
 
+@(gd_half)
 hello_net_welcomed :: proc(self: ^HelloNet, me: knet.Player_Id) {
 	gd.print_str(fmt.tprintf("HELLO_SEATED me=%d", u64(me)))
 }
 
 // The join's authority consequence: field a drop-in square for the arrival.
+@(gd_half)
 hello_net_player_joined_then :: proc(self: ^HelloNet, id: knet.Player_Id, rejoin: bool) {
 	if kboot.boot_phase(&self.boot) == .Playing && !rejoin {
 		spawn_player(self, id)
@@ -210,6 +212,7 @@ hello_net_player_joined_then :: proc(self: ^HelloNet, id: knet.Player_Id, rejoin
 // per spawn, not a latch — `started` used to be one bool doing double duty
 // (level AND rising edge), and the edge is the only half that needed keeping:
 // it rides boot_phase in process(), where the receipt prints exactly once.
+@(gd_half)
 hello_net_entity_spawned :: proc(self: ^HelloNet, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
 	_ = type; _ = id; _ = owner
 	gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)

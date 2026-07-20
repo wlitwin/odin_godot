@@ -117,6 +117,7 @@ ball_spike :: proc(self: ^Ball, px, py: f32) -> bool {
 	return true
 }
 
+@(gd_half)
 ball_spike_apply :: proc(self: ^Ball, px, py: f32) {
 	dir := normalized({self.roll.x - px, self.roll.y - py})
 	if dir.x == 0 && dir.y == 0 {

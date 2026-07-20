@@ -349,11 +349,13 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 // just at rejoin start: the OLD socket's death signals can land mid-rejoin
 // (after cave_rejoin_to cleared the flag, before this WELCOME) and re-latch
 // it against the LIVE host, blocking every "are we back?" gate forever.
+@(gd_half)
 cave_lobby_welcomed :: proc(self: ^CaveLobby, me: knet.Player_Id) {
 	self.host_gone = false
 	gd.print_str(fmt.tprintf("CAVE_SEATED me=%d", u64(me)))
 }
 
+@(gd_half)
 cave_lobby_player_joined :: proc(self: ^CaveLobby, id: knet.Player_Id, rejoin: bool) {
 	_ = id
 	_ = rejoin
@@ -363,6 +365,7 @@ cave_lobby_player_joined :: proc(self: ^CaveLobby, id: knet.Player_Id, rejoin: b
 // The host words the flavor lines; comms ships them. Catchup goes FIRST so a
 // fresh joiner's replayed history doesn't duplicate the join line it is
 // about to receive from the broadcast.
+@(gd_half)
 cave_lobby_player_joined_then :: proc(self: ^CaveLobby, id: knet.Player_Id, rejoin: bool) {
 	if p, ok := ksess.session_player(&self.ses, id); ok {
 		verb := rejoin ? "returned to" : "joined"
@@ -370,17 +373,20 @@ cave_lobby_player_joined_then :: proc(self: ^CaveLobby, id: knet.Player_Id, rejo
 	}
 }
 
+@(gd_half)
 cave_lobby_player_left :: proc(self: ^CaveLobby, id: knet.Player_Id) {
 	_ = id
 	gd.print_str(fmt.tprintf("CAVE_PLAYERS n=%d", ksess.session_count(&self.ses, connected_only = true)))
 }
 
+@(gd_half)
 cave_lobby_player_left_then :: proc(self: ^CaveLobby, id: knet.Player_Id) {
 	if p, ok := ksess.session_player(&self.ses, id); ok {
 		kcomms.comms_system(&self.comms, fmt.tprintf("%s wandered off", p.name))
 	}
 }
 
+@(gd_half)
 cave_lobby_host_left :: proc(self: ^CaveLobby) {
 	self.host_gone = true
 	if !self.kicked_out { // the kick already explained this teardown
@@ -395,6 +401,7 @@ cave_lobby_host_left :: proc(self: ^CaveLobby) {
 // LIVE MIGRATION, the host's half: WORDS ONLY now — the session named WHO,
 // and the KIT's ceremony (boot_migration) computed WHERE and broadcast it
 // before this half fired. The receipt reads the torch back.
+@(gd_half)
 cave_lobby_backup_target :: proc(self: ^CaveLobby, player: knet.Player_Id) {
 	_, info := ksess.session_successor(&self.ses)
 	gd.print_str(fmt.tprintf("CAVE_TORCH_NAMED player=%d addr=%s", u64(player), string(info)))
@@ -406,22 +413,26 @@ cave_lobby_backup_target :: proc(self: ^CaveLobby, player: knet.Player_Id) {
 // see the old world. The bearer's own word rides cave_lobby_migrating's
 // .Taking_Over arm (the kit dedupes the double death-signal); the chase
 // receipts live there too.
+@(gd_half)
 cave_lobby_succession :: proc(self: ^CaveLobby, successor: knet.Player_Id) {
 	_ = successor
 	self.succ_seen += 1
 }
 
 // We are the designated backup host from this moment on.
+@(gd_half)
 cave_lobby_backup_received :: proc(self: ^CaveLobby, size: int) {
 	gd.print_str(fmt.tprintf("CAVE_BACKUP size=%d", size))
 }
 
+@(gd_half)
 cave_lobby_kicked :: proc(self: ^CaveLobby) {
 	self.kicked_out = true
 	kui.lobby_set_status(&self.boot.ui, "You were shown the door")
 	gd.print_str("CAVE_KICKED_ME")
 }
 
+@(gd_half)
 cave_lobby_join_denied :: proc(self: ^CaveLobby, reason: ksess.Deny_Reason) {
 	line: string
 	switch reason {
@@ -439,6 +450,7 @@ cave_lobby_join_denied :: proc(self: ^CaveLobby, reason: ksess.Deny_Reason) {
 	gd.print_str(fmt.tprintf("CAVE_DENIED reason=%v", reason))
 }
 
+@(gd_half)
 cave_lobby_join_failed :: proc(self: ^CaveLobby) {
 	gd.print_str("CAVE_JOIN_FAILED")
 }
@@ -449,6 +461,7 @@ cave_lobby_join_failed :: proc(self: ^CaveLobby) {
 // hook: the hook fires before the spawn tuple's fields apply (bookkeeping
 // only), and the edge halves seed silently on first sight (a baseline, not
 // an edge).
+@(gd_half)
 cave_lobby_entity_spawned :: proc(self: ^CaveLobby, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
 	if !self.started {
 		enter_the_cave(self)
@@ -465,6 +478,7 @@ cave_lobby_entity_spawned :: proc(self: ^CaveLobby, id: knet.Net_Id, type: ksess
 // The relic changed hands — every peer hears; the new carrier's process glue
 // starts moving it (no role branch, no carrier map: ownership IS the
 // carrier record).
+@(gd_half)
 cave_lobby_owner_changed :: proc(self: ^CaveLobby, id: knet.Net_Id, owner: knet.Player_Id, prev: knet.Player_Id) {
 	_ = prev
 	if id == self.relic_id {
@@ -473,6 +487,7 @@ cave_lobby_owner_changed :: proc(self: ^CaveLobby, id: knet.Net_Id, owner: knet.
 }
 
 // The host words the handoff for every chat pane.
+@(gd_half)
 cave_lobby_owner_changed_then :: proc(self: ^CaveLobby, id: knet.Net_Id, owner: knet.Player_Id, prev: knet.Player_Id) {
 	_ = prev
 	if id == self.relic_id {
@@ -487,6 +502,7 @@ cave_lobby_owner_changed_then :: proc(self: ^CaveLobby, id: knet.Net_Id, owner: 
 // The floor's inscription (or any future blob) — variable-length state that
 // arrived with the change, the join snapshot, or a resumed backup; one
 // read, every path.
+@(gd_half)
 cave_lobby_blob_changed :: proc(self: ^CaveLobby, id: knet.Net_Id, size: int) {
 	_ = size
 	if self.level != nil && id == self.level.net_id {
@@ -494,6 +510,7 @@ cave_lobby_blob_changed :: proc(self: ^CaveLobby, id: knet.Net_Id, size: int) {
 	}
 }
 
+@(gd_half)
 cave_lobby_state_applied :: proc(self: ^CaveLobby, entities: int) {
 	_ = entities
 	if self.me_spel != nil {
@@ -502,17 +519,20 @@ cave_lobby_state_applied :: proc(self: ^CaveLobby, entities: int) {
 	}
 }
 
+@(gd_half)
 cave_lobby_command_executed :: proc(self: ^CaveLobby, ok: bool, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16) {
 	_ = player
 	gd.print_str(fmt.tprintf("CAVE_EXEC ok=%v entity=%d cmd=%d", ok, u32(entity), cmd))
 }
 
+@(gd_half)
 cave_lobby_command_confirmed :: proc(self: ^CaveLobby, seq: knet.Intent_Seq) {
 	_ = seq
 	dt_ms := self.issue_at > 0 ? int((now_s() - self.issue_at) * 1000) : 0
 	gd.print_str(fmt.tprintf("CAVE_CONFIRM dt_ms=%d", dt_ms))
 }
 
+@(gd_half)
 cave_lobby_command_rejected :: proc(self: ^CaveLobby, seq: knet.Intent_Seq, entity: knet.Net_Id) {
 	_ = seq
 	gd.print_str(fmt.tprintf("CAVE_REJECT entity=%d", u32(entity)))
@@ -525,6 +545,7 @@ cave_lobby_command_rejected :: proc(self: ^CaveLobby, seq: knet.Intent_Seq, enti
 // drop-in join) is structurally NOT an edge — the machinery seeds silently —
 // so the initial scenery load rides Ev_Spawned (below), and the old
 // `seen_depth != 0` guard has nothing left to guard.
+@(gd_half)
 level_depth_edge :: proc(g: ^CaveLobby, self: ^Level, old, new: u8) {
 	cave_load_scenery(g, int(new))
 	if g.me_spel != nil {
@@ -543,6 +564,7 @@ level_depth_edge :: proc(g: ^CaveLobby, self: ^Level, old, new: u8) {
 // run starting — every peer clears its screen off the same delta that rebuilt
 // the floor. A late joiner mid-end-screen is dressed off Ev_Spawned (spawn
 // values seed silently — a baseline, not an edge).
+@(gd_half)
 level_won_edge :: proc(g: ^CaveLobby, self: ^Level, old, new: u8) {
 	if new != 0 {
 		cave_show_won(g)

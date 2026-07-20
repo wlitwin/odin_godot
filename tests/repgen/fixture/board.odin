@@ -29,9 +29,11 @@ board_on_net_down :: proc(self: ^Board) {
 
 // The census hooks — typed, fired by the kboot driver (spawn-time fields are
 // not set yet; presentation waits for Ev_Spawned).
+@(gd_half)
 pawn_spawned :: proc(game: ^Board, self: ^Pawn, id: knet.Net_Id, owner: knet.Player_Id) {
 }
 
+@(gd_half)
 pawn_freed :: proc(game: ^Board, self: ^Pawn, id: knet.Net_Id) {
 }
 

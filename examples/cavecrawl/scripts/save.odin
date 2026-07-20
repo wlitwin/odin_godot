@@ -32,6 +32,7 @@ save_path :: proc() -> cstring {
 // only): every backup that ships to the designated holder carries the same
 // campaign bytes a save file does — a takeover resumes the RUN, not a
 // diorama of it.
+@(gd_half)
 cave_lobby_backup :: proc(self: ^CaveLobby, w: ^knet.Writer) {
 	if !self.started {return}
 	write_game_blob(self, w)
@@ -146,6 +147,7 @@ cave_lobby_on_takeover :: proc(self: ^CaveLobby) {
 // campaign blob back, re-find the columns (idempotent by name — never
 // re-declare), and word the crown. The failure arms word through
 // cave_lobby_migrating.
+@(gd_half)
 cave_lobby_took_over :: proc(self: ^CaveLobby, r: ^knet.Reader) {
 	if !cave_lobby_backup_read(self, r) {
 		gd.print_str("CAVE_TAKEOVER_FAIL blob")

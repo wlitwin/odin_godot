@@ -92,11 +92,13 @@ runner_tick :: proc(self: ^Runner, input: Runner_Input) -> (fired: bool) {
 }
 
 // AUTHORITY only (never resims): the cross-entity consequence.
+@(gd_half)
 runner_tick_then :: proc(g: ^Game, self: ^Runner, by: knet.Player_Id, fired: bool) {
 	if fired { adjudicate_shot(g, self, by) } // lane_rewound lives here
 }
 
 // THIS PLAYER's live pass only (never a resim replay): presentation.
+@(gd_half)
 runner_tick_fx :: proc(g: ^Game, self: ^Runner, fired: bool) {
 	if fired { muzzle_flash(self) } // answers the click NOW, at any latency
 }
@@ -115,6 +117,7 @@ the acting player's live pass only. Declare `mine: bool` right after `self`
 presentation time for the cause — one proc, the framework holds the timing:
 
 ```odin
+@(gd_half)
 runner_tick_fx :: proc(g: ^Game, self: ^Runner, mine: bool, fired: bool) {
 	if fired {
 		muzzle_flash(self)        // every screen
@@ -564,6 +567,7 @@ delta-lane writes stay execute-once.
 ball_spike :: proc(self: ^Ball, px, py: f32) -> bool {
 	return self.hold == 0 && in_reach(self, px, py) // verdict + (any) delta writes
 }
+@(gd_half)
 ball_spike_apply :: proc(self: ^Ball, px, py: f32) {
 	self.vx += ... // RELATIVE — re-run by every resim, never re-pinned
 }
@@ -586,9 +590,11 @@ always the authority and `_fx` always the owner's client:
 @(gd_tick) // the flight: pure predicted state, `landed` routes to the splash
 bullet_tick :: proc(self: ^Bullet) -> (landed: bool) { ...self.x += self.vx... }
 
+@(gd_half)
 gunner_tick_then :: proc(g: ^Game, self: ^Gunner, by: knet.Player_Id, lobbed: bool) {
 	if lobbed { lob_bullet(g, self, by) } // AUTHORITY: the real spawn
 }
+@(gd_half)
 gunner_tick_fx :: proc(g: ^Game, self: ^Gunner, mine: bool, lobbed: bool) {
 	// A HOSTING player is authority AND owner — the _then above already
 	// spawned their real bullet; only a pure client predicts one.

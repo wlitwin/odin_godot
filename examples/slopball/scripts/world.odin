@@ -13,6 +13,7 @@ import ksess "godot:kit/session"
 
 // The census hooks, down to the game-shaped lines — the generated queries
 // (kicker_of / kicker_ids / kicker_owned_by) answer what the old maps did.
+@(gd_half)
 kicker_spawned :: proc(game: ^Slopball, self: ^Kicker, id: knet.Net_Id, owner: knet.Player_Id) {
 	if owner != knet.PLAYER_ID_INVALID && owner == game.ses.me {
 		self.mine = true
@@ -20,17 +21,20 @@ kicker_spawned :: proc(game: ^Slopball, self: ^Kicker, id: knet.Net_Id, owner: k
 	}
 }
 
+@(gd_half)
 kicker_freed :: proc(game: ^Slopball, self: ^Kicker, id: knet.Net_Id) {
 	if self == game.me_kick {
 		game.me_kick = nil
 	}
 }
 
+@(gd_half)
 ball_spawned :: proc(game: ^Slopball, self: ^Ball, id: knet.Net_Id, owner: knet.Player_Id) {
 	game.ball = self
 	game.ball_id = id
 }
 
+@(gd_half)
 ball_freed :: proc(game: ^Slopball, self: ^Ball, id: knet.Net_Id) {
 	if game.ball_id == id {
 		game.ball = nil

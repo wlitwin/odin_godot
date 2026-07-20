@@ -37,6 +37,7 @@ relic_grab :: proc(self: ^Relic, px: f32, py: f32) -> bool {
 // THE HANDOFF ITSELF, host only: first-come — a later grab finds it carried
 // and does nothing (the verb mutates nothing replicated, so the loser's
 // accepted grab is a harmless no-op).
+@(gd_half)
 relic_grab_then :: proc(game: ^CaveLobby, self: ^Relic, by: knet.Player_Id, px: f32, py: f32) {
 	if ksess.session_owner_of(&game.ses, self.net_id) == knet.PLAYER_ID_INVALID {
 		ksess.session_set_owner(&game.ses, self.net_id, by)
@@ -51,6 +52,7 @@ relic_drop :: proc(self: ^Relic) -> bool {
 	return true
 }
 
+@(gd_half)
 relic_drop_then :: proc(game: ^CaveLobby, self: ^Relic, by: knet.Player_Id) {
 	if ksess.session_owner_of(&game.ses, self.net_id) == by {
 		ksess.session_set_owner(&game.ses, self.net_id, knet.PLAYER_ID_INVALID)

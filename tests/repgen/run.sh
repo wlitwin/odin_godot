@@ -890,10 +890,12 @@ if ! echo "$LANES_OUT" | grep -q "is a LANE, not an option"; then
 fi
 echo "  ok  two lane tokens on one field rejected at scriptgen time"
 
-# ---- (4a0): the OLD lane-as-option grammar is refused, naming the rewrite ----
-# Three games build against a vendored copy of this addon; the migration error
-# is the whole of their upgrade experience, so it is asserted here as a wire
-# contract would be.
+# ---- (4a0): a lane hiding in the OPTION list is refused, naming where it goes ----
+# This shape — `replicate` first, a second lane buried among smoothing options —
+# is the pre-lane-first grammar every declaration in this repo and its three
+# downstream games once wore. The one-release migration door that rewrote it for
+# the reader is gone (they are all retagged); the permanent refusal below answers
+# the same input just as exactly, so the shape stays covered.
 OLDL="$TMP/oldlane"
 mkdir -p "$OLDL"
 cat > "$OLDL/legacy.odin" <<'EOF'
@@ -915,15 +917,20 @@ OLDL_OUT="$(run_scriptgen "$OLDL" 2>&1)"
 OLDL_RC=$?
 set -e
 if [ "$OLDL_RC" -eq 0 ]; then
-	echo "REPGEN_FAIL: the old lane-as-option grammar was silently accepted"
+	echo "REPGEN_FAIL: a lane in the option list was silently accepted"
 	exit 1
 fi
-if ! echo "$OLDL_OUT" | grep -q 'write `gd:"owner,interp,wire=f16"`'; then
-	echo "REPGEN_FAIL: the old-form refusal must spell the replacement tag:"
+if ! echo "$OLDL_OUT" | grep -q 'is a LANE, not an option'; then
+	echo "REPGEN_FAIL: the refusal must name the second token as a LANE:"
 	echo "$OLDL_OUT" | tail -3
 	exit 1
 fi
-echo "  ok  old lane-as-option form refused with its exact rewrite"
+if ! echo "$OLDL_OUT" | grep -q 'the FIRST token'; then
+	echo "REPGEN_FAIL: the refusal must say where a lane goes — that is the fix:"
+	echo "$OLDL_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  a lane hiding in the option list refused, naming where a lane goes"
 
 # ---- (4a1b): gd:"backup" on a non-restorable type (a slice) is refused ----
 BADBK="$TMP/badbackup"
@@ -1085,23 +1092,29 @@ camp_host_tick :: proc(self: ^Camp) {
 	self.fires += 1
 }
 
+@(gd_half)
 camp_player_joined :: proc(self: ^Camp, id: knet.Player_Id, rejoin: bool) {
 	_ = id; _ = rejoin
 }
 
+@(gd_half)
 camp_player_joined_then :: proc(self: ^Camp, id: knet.Player_Id, rejoin: bool) {
 	_ = id; _ = rejoin
 }
 
+@(gd_half)
 camp_kicked :: proc(self: ^Camp) {
 }
 
+@(gd_half)
 camp_entity_spawned :: proc(self: ^Camp, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
 	_ = id; _ = type; _ = owner
 }
 
 // NEGATIVE CONTROL: shares the `_kicked` tail but is a genuinely different
-// name (a query, cavecrawl's real case) — must stay silent, not reserved.
+// name (a query, cavecrawl's real case). It used to survive on a heuristic —
+// its prefix was more than one edit from the shell's snake, so the unclaimed
+// sweep let it pass; now it is silent because it never claimed to be a half.
 camp_was_kicked :: proc(self: ^Camp) -> bool {
 	return false
 }
@@ -1166,17 +1179,21 @@ camp_host_tick :: proc(self: ^Camp, tick: u64) { // boot-routed: no lane tick ex
 	self.fires = i32(tick)
 }
 
+@(gd_half)
 camp_kicked_then :: proc(self: ^Camp) { // client-only event: no authority half
 }
 
+@(gd_half)
 camp_backup_target_then :: proc(self: ^Camp, player: knet.Player_Id) { // already authority-only
 	_ = player
 }
 
-cmp_player_joined :: proc(self: ^Camp, id: knet.Player_Id, rejoin: bool) { // one-edit prefix typo
+@(gd_half)
+cmp_player_joined :: proc(self: ^Camp, id: knet.Player_Id, rejoin: bool) { // prefix typo — declared, so the distance no longer decides
 	_ = id; _ = rejoin
 }
 
+@(gd_half)
 camp_owner_changed :: proc(self: ^Camp, id: knet.Net_Id) { // wrong shape (missing owner, prev)
 	_ = id
 }
@@ -1195,7 +1212,8 @@ for want in \
 	"no lane tick in the coop loop" \
 	"never reaches the authority" \
 	"already authority-only" \
-	"looks like a session event half" \
+	"pairs with nothing" \
+	"camp_player_joined" \
 	"the shape is (self: ^Camp, id: knet.Net_Id, owner: knet.Player_Id, prev: knet.Player_Id)" \
 ; do
 	if ! echo "$SHELL_OUT" | grep -qF "$want"; then
@@ -1260,6 +1278,7 @@ spinny_tick :: proc(self: ^Spinny) -> (spun: bool) {
 	return true
 }
 
+@(gd_half)
 spinny_tick_then :: proc(self: ^Spinny, spun: bool) { // missing `by` — the driving seat
 	_ = spun
 }
@@ -1335,6 +1354,7 @@ blip_tick :: proc(self: ^Blip) -> (hit: bool, spot: [2]f32) {
 	return true, {self.x, 0}
 }
 
+@(gd_half)
 blip_tick_fx :: proc(self: ^Blip, mine: bool, hit: bool, spot: [2]f32) {
 	_ = mine; _ = hit; _ = spot
 }
@@ -1372,6 +1392,7 @@ hum_tick :: proc(self: ^Hum) -> (level: f32) {
 	return self.x
 }
 
+@(gd_half)
 hum_tick_fx :: proc(self: ^Hum, mine: bool, level: f32) {
 	_ = mine; _ = level
 }
@@ -1415,10 +1436,12 @@ comet_tick :: proc(self: ^Comet) {
 	self.x += 1
 }
 
+@(gd_half)
 comet_x_edge :: proc(self: ^Comet, old, new: f32) { // predicted: resims scrub it
 	_ = old; _ = new
 }
 
+@(gd_half)
 comet_tail_edge :: proc(self: ^Comet, old, new: f32) { // owner stream: it interpolates
 	_ = old; _ = new
 }
@@ -1443,7 +1466,7 @@ if ! echo "$EDG_OUT" | grep -q 'is on the `gd:"owner"` lane'; then
 fi
 echo "  ok  edge lane contract: predict and owner fields rejected, each pointing at its lane's tool"
 
-# ---- (4a2d): RESERVED PAIRING SUFFIXES — an unclaimed half is an ERROR ----
+# ---- (4a2d): @(gd_half) — a half that pairs with NOTHING is an ERROR ----
 # A typo'd pairing name used to be a proc that silently never fired (_fx and
 # _apply didn't even warn). Now: a suffix-named proc TOUCHING a script struct
 # must pair or the build fails, with the expected name spelled out. A helper
@@ -1468,6 +1491,7 @@ wisp_tick :: proc(self: ^Wisp) -> (blinked: bool) {
 	return true
 }
 
+@(gd_half)
 wisp_tikc_fx :: proc(self: ^Wisp, mine: bool, blinked: bool) { // typo'd tick prefix
 	_ = mine; _ = blinked
 }
@@ -1507,10 +1531,12 @@ gate_toggle :: proc(self: ^Gate) -> bool {
 	return true
 }
 
+@(gd_half)
 gate_togle_then :: proc(self: ^Gate, by: knet.Player_Id) { // typo'd verb
 	_ = by
 }
 
+@(gd_half)
 gate_opn_edge :: proc(self: ^Gate, old, new: u8) { // typo'd field
 	_ = old; _ = new
 }
@@ -1561,6 +1587,7 @@ Mob :: struct {
 	hp:    i32 `gd:"replicate"`,
 }
 
+@(gd_half)
 mbo_spawned :: proc(game: ^Den, self: ^Mob, id: knet.Net_Id, owner: knet.Player_Id) { // typo'd prefix
 }
 EOF
@@ -1577,8 +1604,12 @@ if ! echo "$UNH_OUT" | grep -q 'mob_spawned'; then
 	echo "$UNH_OUT" | tail -3
 	exit 1
 fi
-# The negative control: a `_then` helper touching NO script struct stays a
-# WARNING — the build passes, the note prints.
+# THE NEGATIVE CONTROL, and the reason there is no longer a reserved-suffix
+# list to keep. `_then` used to be RESERVED on any proc touching a script
+# struct, so an innocent helper that merely ended in one had to be let through
+# by a heuristic (no ^Struct param => a warning instead of an error), and the
+# warning was noise on a proc that was never a half. A name means nothing now:
+# undeclared is silent, full stop.
 UNW="$TMP/unw"
 mkdir -p "$UNW"
 cat > "$UNW/plain.odin" <<'EOF'
@@ -1593,7 +1624,7 @@ Plain :: struct {
 	hp:    i32 `gd:"replicate"`,
 }
 
-load_then :: proc(data: []u8) { // innocent helper: no script struct touched
+load_then :: proc(self: ^Plain, data: []u8) { // innocent helper, script struct and all
 	_ = data
 }
 EOF
@@ -1602,15 +1633,31 @@ UNW_OUT="$(run_scriptgen "$UNW" 2>&1)"
 UNW_RC=$?
 set -e
 if [ "$UNW_RC" -ne 0 ]; then
-	echo "REPGEN_FAIL: an innocent _then helper (no script-struct param) failed the build"
+	echo "REPGEN_FAIL: an undeclared proc that merely ends in _then failed the build"
 	exit 1
 fi
-if ! echo "$UNW_OUT" | grep -q "will never fire"; then
-	echo "REPGEN_FAIL: the innocent _then helper lost its warning:"
+if echo "$UNW_OUT" | grep -qE "never fire|pairs with nothing"; then
+	echo "REPGEN_FAIL: an undeclared proc that merely ends in _then must be SILENT, not warned about:"
 	echo "$UNW_OUT" | tail -3
 	exit 1
 fi
-echo "  ok  reserved pairing suffixes: typo'd _fx/_then/_spawned error with the fix named; script-free helpers keep the warning"
+# ...and the same proc, once it CLAIMS to be a half, is an error rather than a
+# warning — a declared intent that pairs with nothing is never "probably fine".
+perl -0777 -pi -e 's/^load_then :: proc/\@(gd_half)\nload_then :: proc/m' "$UNW/plain.odin"
+set +e
+UNW2_OUT="$(run_scriptgen "$UNW" 2>&1)"
+UNW2_RC=$?
+set -e
+if [ "$UNW2_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: an @(gd_half) pairing with nothing was accepted"
+	exit 1
+fi
+if ! echo "$UNW2_OUT" | grep -q "pairs with nothing"; then
+	echo "REPGEN_FAIL: the unpaired-half refusal is missing:"
+	echo "$UNW2_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  @(gd_half): typo'd _fx/_then/_spawned error with the fix named; undeclared look-alikes are silent"
 
 # ---- (4a2b): @(gd_sample)/@(gd_step) contract violations ----
 # A sample writing a struct the lane's ticks don't read is the silent-desync
@@ -1771,6 +1818,7 @@ still_poke :: proc(self: ^Still, amount: i32) -> bool {
 	return true
 }
 
+@(gd_half)
 still_poke_apply :: proc(self: ^Still, amount: i32) {
 }
 EOF
@@ -2282,6 +2330,7 @@ odd_hit :: proc(self: ^Odd, amount: i32) -> bool {
 	return true
 }
 
+@(gd_half)
 odd_hit_then :: proc(self: ^Odd, amount: i32) { // missing the issuer param
 }
 EOF
@@ -2332,6 +2381,7 @@ Den :: struct {
 	c_scene: ^gd.Resource `gd:"entity=Ghost:9"`,   // no such struct
 }
 
+@(gd_half)
 gremlin_spawned :: proc(game: ^Den, self: ^Gremlin, id: knet.Net_Id) { // missing the owner param
 }
 

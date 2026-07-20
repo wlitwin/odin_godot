@@ -34,6 +34,7 @@ pickup_grab :: proc(self: ^Pickup, px: f32, py: f32) -> (ok: bool, grabbed: kite
 
 // Host only: credit the grabber's bag and despawn the emptied pickup for
 // everyone (clients free through the factory; the host frees its own node).
+@(gd_half)
 pickup_grab_then :: proc(game: ^CaveLobby, self: ^Pickup, by: knet.Player_Id, px: f32, py: f32, grabbed: kitems.Slot) {
 	cave_settle_grab(game, by, self.net_id, grabbed)
 }

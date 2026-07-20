@@ -54,6 +54,7 @@ bullet_tick :: proc(self: ^Bullet) -> (landed: bool) {
 // AUTHORITY: the bullet spent itself — splash any gunner in reach (server truth,
 // no rewind: a slow lob is dodgeable by design) and retire it. The client's own
 // predicted copy just freezes at the landing point until this despawn reaches it.
+@(gd_half)
 bullet_tick_then :: proc(g: ^Quickdraw, self: ^Bullet, by: knet.Player_Id, landed: bool) {
 	if !landed {return}
 	gd.print_str(fmt.tprintf("QD_LOB_LAND by=%d tick=%d x=%.1f y=%.1f", u64(by), ksim.lane_now(&g.lane), self.x, self.y))

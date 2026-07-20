@@ -1233,20 +1233,34 @@ validate_script :: proc(s: ^Script) {
 // Composed commands pair on the hoisted name (`runner_weapon_fire_then`), so
 // a block ships the verb and the game keeps the consequence — no index keying.
 
-Then_Candidate :: struct {
+Half_Candidate :: struct {
 	path:    string,
 	line:    int,
 	src:     string,
 	pt:      ^ast.Proc_Type,
 	vd:      ^ast.Value_Decl,
-	claimed: bool, // paired with a command — unclaimed survivors get a likely-typo warning
+	claimed: bool, // some resolve_* pass wired it — an unclaimed survivor is a build error
 }
 
-// Collect every top-level name-paired candidate in one parsed file: `*_then`
-// (command consequences), `*_spawned` / `*_freed` (entity-table hooks).
-// Pairing happens in resolve_then / resolve_entities once every script's
-// full command table and entity tags are known.
-scan_then_procs :: proc(idx: ^map[string]Then_Candidate, path, src: string, file: ^ast.File) {
+// Collect every `@(gd_half)` in one parsed file. Pairing happens in the
+// resolve_* passes once every script's command table, replicate lanes and
+// entity tags are known; each claims the names it actually wires, and
+// check_unpaired_halves turns every survivor into an error.
+//
+// THE ATTRIBUTE DECLARES PRESENCE; THE NAME STILL DECIDES THE PAIRING.
+// `gunner_buy_then` pairs with `gunner_buy`'s wrapper and `spelunker_hp_edge`
+// with Spelunker's `hp` because a pairing you can READ at the call site is the
+// whole point of naming them — that half of the grammar is deliberate and
+// unchanged. What the attribute buys is the check that pairing-by-name alone
+// could never give. Collection used to be by SUFFIX, which caught only half
+// the typos: a bad PREFIX (`gunner_by_then`) still wore a reserved suffix, so
+// the unclaimed sweep saw it and guessed; a bad SUFFIX (`gunner_buy_after` for
+// `gunner_buy_then`) wore nothing, so NOTHING looked at it — not scriptgen,
+// and not Odin, which does not flag an unused package-level proc — and the
+// half silently never fired. Defending the first case cost ~600 lines of
+// heuristics, and it still could not reach the second. A DECLARED intent can
+// be checked against nothing at all: claimed, or a build error.
+scan_half_procs :: proc(idx: ^map[string]Half_Candidate, path, src: string, file: ^ast.File) {
 	for decl in file.decls {
 		vd, ok := decl.derived.(^ast.Value_Decl)
 		if !ok {continue}
@@ -1255,36 +1269,31 @@ scan_then_procs :: proc(idx: ^map[string]Then_Candidate, path, src: string, file
 		if !is_proc {continue}
 		name_ident, _ := vd.names[0].derived.(^ast.Ident)
 		if name_ident == nil {continue}
-		interesting := strings.has_suffix(name_ident.name, "_then") ||
-			strings.has_suffix(name_ident.name, "_fx") ||
-			strings.has_suffix(name_ident.name, "_apply") ||
-			strings.has_suffix(name_ident.name, "_edge") ||
-			strings.has_suffix(name_ident.name, "_spawned") ||
-			strings.has_suffix(name_ident.name, "_freed")
-		if !interesting {
-			// Session event halves (`<game>_player_joined` …) pair by full
-			// suffix — index any candidate wearing one.
-			for ev in SESSION_EVENTS {
-				at := len(name_ident.name) - len(ev.suffix)
-				if at > 0 && name_ident.name[at - 1] == '_' && name_ident.name[at:] == ev.suffix {
-					interesting = true
-					break
-				}
-			}
+		if !has_attr(vd, "gd_half") {continue}
+		if v, _ := attr_value(vd, "gd_half"); v != "" {
+			error_at(
+				Loc{path, name_ident.pos.line},
+				"%s: @(gd_half) takes no config — the NAME says what it pairs with, which is the only thing there is to configure",
+				name_ident.name,
+			)
+			continue
 		}
-		if !interesting {
-			// Migration halves (`<game>_backup` …) — same full-suffix pairing.
-			for spec in MIGRATION_HALVES {
-				at := len(name_ident.name) - len(spec.suffix)
-				if at > 0 && name_ident.name[at - 1] == '_' && name_ident.name[at:] == spec.suffix {
-					interesting = true
-					break
-				}
-			}
+		// @(gd_fact) is the other side of the line: it DECLARES a world-pass
+		// fact (scriptgen generates its announce door and claims a wire id for
+		// it) and merely requires its bearer be named `<event>_fx`. A half
+		// declares nothing and generates nothing. Wearing both would ask
+		// resolve_facts to build a door and the unpaired sweep to demand a
+		// partner for the same proc, so it is refused rather than resolved.
+		if has_attr(vd, "gd_fact") {
+			error_at(
+				Loc{path, name_ident.pos.line},
+				"%s: @(gd_fact) and @(gd_half) are the two sides of one line — a fact DECLARES the door scriptgen generates, a half PAIRS with a declaration made elsewhere. Drop @(gd_half): the `_fx` name is @(gd_fact)'s own shape rule, not a pairing",
+				name_ident.name,
+			)
+			continue
 		}
-		if !interesting {continue}
 		if pl.type == nil {continue}
-		idx[name_ident.name] = Then_Candidate{
+		idx[name_ident.name] = Half_Candidate{
 			path = path,
 			line = name_ident.pos.line,
 			src  = src,
@@ -1297,7 +1306,7 @@ scan_then_procs :: proc(idx: ^map[string]Then_Candidate, path, src: string, file
 // Pair `s`'s commands with their `<wrapper>_then` consequences and validate the
 // contract at build time — a mispaired consequence must be a build error here,
 // not a proc that silently never fires (the exact bug class the pairing kills).
-resolve_then :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
+resolve_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
 	for &cmd in s.commands {
 		wrapper := len(cmd.path) > 0 ? fmt.tprintf("%s_%s", to_snake(s.struct_name), cmd.name) : cmd.proc_name
 		then_name := fmt.tprintf("%s_then", wrapper)
@@ -1394,22 +1403,60 @@ resolve_then :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
 	}
 }
 
-// After every script resolved: an unclaimed pairing candidate that TOUCHES a
-// script struct (a ^Struct param) is a typo'd or half-deleted pairing — the
-// proc would silently never fire, the exact bug class the pairing exists to
-// kill — so it is an ERROR with the expected names spelled out. The pairing
-// suffixes are RESERVED on procs that touch script structs: pair them or
-// rename them. A suffix-named proc touching no script struct keeps the old
-// behavior (a `_then` warns — its prefix is a wrapper name, unguessable
-// here; the rest stay silent): an innocent helper in a math file is none of
-// our business.
-check_unclaimed_pairs :: proc(idx: ^map[string]Then_Candidate, script_snakes: map[string]bool, by_struct: map[string]^Script) {
+// After every script resolved: a `@(gd_half)` that nothing claimed. The
+// attribute is a PROMISE that this proc pairs with a declaration somewhere, so
+// a survivor of the resolve_* passes is a half that would silently never fire
+// — the exact bug class the pairing exists to kill — and it is an error with
+// the real names spelled out beside it.
+//
+// WHAT THIS REPLACED, and why the replacement is smaller AND stronger. When
+// halves were collected by SUFFIX, "did the author mean to pair?" had to be
+// GUESSED: ~600 lines that indexed every proc wearing one of ~30 reserved
+// suffixes, walked its ^Struct params, asked whether its prefix was within one
+// edit of a script's snake, and only then spoke — four per-family hint
+// builders behind an edit-distance gate, plus a RESERVED suffix list that had
+// to grow with every new pairing form or quietly reopen the hole for it. All
+// of that bought exactly one bug: a typo'd PREFIX under a correct suffix. A
+// typo'd SUFFIX walked straight through, because a proc wearing no reserved
+// suffix was indexed by nothing and Odin does not flag an unused package-level
+// proc. The gate is now arithmetic — claimed, or not — so the message spends
+// its whole budget on the FIX instead of on deciding whether to speak.
+check_unpaired_halves :: proc(idx: ^map[string]Half_Candidate, scripts: []^Script, by_struct: map[string]^Script) {
+	by_snake := make(map[string]^Script, context.temp_allocator)
+	for s in scripts {
+		by_snake[to_snake(s.struct_name)] = s
+	}
+
 	for name, cand in idx {
 		if cand.claimed {continue}
 		loc := Loc{path = cand.path, line = cand.line}
 
-		// The script structs this proc touches (^Struct params) — the
-		// reserved-suffix gate, and where the fix-hint comes from.
+		// The census hooks are the one mispairing whose fix is not a rename:
+		// `<target>_spawned`/`_freed` key on the ENTITY-TAGGED struct, so a
+		// hook beside an untagged target is a missing `entity=Name:id`, not a
+		// typo. Matched on the exact snake, so it never fires on a half that
+		// merely resembles one (`cave_lobby_entity_spawned`, the session
+		// event, trims to a prefix no script bears).
+		hook := false
+		for suffix in ([?]string{"_spawned", "_freed"}) {
+			if !strings.has_suffix(name, suffix) {continue}
+			t, known := by_snake[strings.trim_suffix(name, suffix)]
+			if !known {continue}
+			error_at(
+				loc,
+				"@(gd_half) %q is %s's %s hook, but no scene field declares `entity=Name:id` for %s — the entity table is what dispatches it, so it would never fire. Tag the scene export, or rename the proc.",
+				name, t.struct_name, suffix == "_spawned" ? "spawn" : "free", t.struct_name,
+			)
+			hook = true
+			break
+		}
+		if hook {continue}
+
+		// The classes this half actually touches (its ^Struct params). This is
+		// the deleted hints' target-listing kept whole — it is EXACT (a param
+		// type, not a spelling guess), and only the edit-distance gate that
+		// used to sit in front of it is gone. A declared half always speaks;
+		// the params only decide what it is shown.
 		targets := make([dynamic]^Script, context.temp_allocator)
 		if cand.pt.params != nil {
 			for f in cand.pt.params.list {
@@ -1424,237 +1471,92 @@ check_unclaimed_pairs :: proc(idx: ^map[string]Then_Candidate, script_snakes: ma
 				if !dup {append(&targets, s)}
 			}
 		}
-
-		// Session event halves first (their suffixes can nest the legacy ones:
-		// `_entity_spawned` ends in `_spawned`): an unclaimed event-suffix proc
-		// touching a GAME SHELL (a class with the kboot.Boot field) whose PREFIX
-		// is one edit from the game's snake is a typo'd pairing — the generated
-		// `<snake>_events` dispatch would never call it. A genuinely different
-		// prefix (`cave_lobby_WAS_kicked`, a query) or a bootless struct is an
-		// innocent name: no near-pairing, nothing to silently miss.
-		ev_flagged := false
-		for ev in SESSION_EVENTS {
-			at := len(name) - len(ev.suffix)
-			if at <= 0 || name[at - 1] != '_' || name[at:] != ev.suffix {continue}
-			prefix := name[:at - 1]
-			for t in targets {
-				if t.boot_field == "" {continue}
-				if !edit_distance_le1(prefix, to_snake(t.struct_name)) {continue}
-				error_at(
-					loc,
-					"proc %q looks like a session event half, but it doesn't pair — the ksess.%s half on %s is %q. Pair it, or rename it.",
-					name, ev.variant, t.struct_name, fmt.tprintf("%s_%s", to_snake(t.struct_name), ev.suffix),
-				)
-				ev_flagged = true
-				break
-			}
-			break // suffixes never nest within the table — first match decides
+		if len(targets) == 0 {
+			error_at(
+				loc,
+				"@(gd_half) %q pairs with nothing, and it names no script class — every half is written against the class it pairs on (`self: ^Gunner`, or `game: ^Quickdraw, self: ^Gunner`). Give it that parameter and the name that class expects, or drop @(gd_half) if this proc is not a half.",
+				name,
+			)
+			continue
 		}
-		if ev_flagged {continue}
+		// Every half's shape is `(game: ^Shell, self: ^Class, …)` or the
+		// game-less `(self: ^Class, …)` — so when two classes are named, the
+		// LEADING one is the context handle and the rest is what the half pairs
+		// on. Dropping it is positional, not a guess, and it is the difference
+		// between "Gunner pairs: gunner_buy_then, …" and that same answer
+		// buried under the shell's thirty-odd session-event names.
+		pair_on := targets[:]
+		if len(pair_on) > 1 {pair_on = pair_on[1:]}
 
-		// Migration halves, same teaching: an unclaimed migration-suffix proc
-		// touching a game shell whose prefix is one edit from the game's snake
-		// is a typo'd pairing kboot would never call.
-		mig_flagged := false
-		for spec in MIGRATION_HALVES {
-			at := len(name) - len(spec.suffix)
-			if at <= 0 || name[at - 1] != '_' || name[at:] != spec.suffix {continue}
-			prefix := name[:at - 1]
-			for t in targets {
-				if t.boot_field == "" {continue}
-				if !edit_distance_le1(prefix, to_snake(t.struct_name)) {continue}
-				error_at(
-					loc,
-					"proc %q looks like a migration half, but it doesn't pair — kboot.boot_migration's `%s` half on %s is %q. Pair it, or rename it.",
-					name, spec.suffix, t.struct_name, fmt.tprintf("%s_%s", to_snake(t.struct_name), spec.suffix),
-				)
-				mig_flagged = true
-				break
-			}
-			break // suffixes never nest within the table — first match decides
+		surfaces := make([dynamic]string, context.temp_allocator)
+		for t in pair_on {
+			append(&surfaces, pairing_surface(t, scripts))
 		}
-		if mig_flagged {continue}
-
-		switch {
-		case strings.has_suffix(name, "_then"):
-			// A typo'd EVENT `_then` (`cave_loby_player_joined_then`) would fall
-			// into the command-wrapper wording below — name the event pairing.
-			ev_then := false
-			base := strings.trim_suffix(name, "_then")
-			for ev in SESSION_EVENTS {
-				at := len(base) - len(ev.suffix)
-				if at <= 0 || base[at - 1] != '_' || base[at:] != ev.suffix {continue}
-				prefix := base[:at - 1]
-				for t in targets {
-					if t.boot_field == "" {continue}
-					if !edit_distance_le1(prefix, to_snake(t.struct_name)) {continue}
-					error_at(
-						loc,
-						"proc %q looks like a session event's authority half, but it doesn't pair — the ksess.%s halves on %s are %q and %q. Pair it, or rename it.",
-						name, ev.variant, t.struct_name,
-						fmt.tprintf("%s_%s", to_snake(t.struct_name), ev.suffix),
-						fmt.tprintf("%s_%s_then", to_snake(t.struct_name), ev.suffix),
-					)
-					ev_then = true
-					break
-				}
-				break
-			}
-			if ev_then {continue}
-			if len(targets) == 0 {
-				warn_at(
-					loc,
-					"proc %q looks like a command consequence, but no @(gd_command) generates a `%s` wrapper — it will never fire",
-					name,
-					strings.trim_suffix(name, "_then"),
-				)
-				continue
-			}
-			error_at(
-				loc,
-				"proc %q ends in `_then` but pairs with no verb or tick — it would silently never fire. %s Pair it, or rename it (`_then` is a reserved pairing suffix on procs touching script structs).",
-				name, hint_then(targets[:]),
-			)
-		case strings.has_suffix(name, "_fx"):
-			if len(targets) == 0 {continue}
-			error_at(
-				loc,
-				"proc %q ends in `_fx` but pairs with no tick — it would silently never fire. %s Pair it, declare it `@(gd_fact)` (a world-pass fact's half — the generated `%s` door announces it), or rename it (`_fx` is a reserved pairing suffix on procs touching script structs).",
-				name, hint_fx(targets[:]), strings.trim_suffix(name, "_fx"),
-			)
-		case strings.has_suffix(name, "_apply"):
-			if len(targets) == 0 {continue}
-			error_at(
-				loc,
-				"proc %q ends in `_apply` but pairs with no verb — it would silently never fire. %s Pair it, or rename it (`_apply` is a reserved pairing suffix on procs touching script structs).",
-				name, hint_apply(targets[:]),
-			)
-		case strings.has_suffix(name, "_edge"):
-			if len(targets) == 0 {continue}
-			error_at(
-				loc,
-				"proc %q ends in `_edge` but pairs with no replicated delta-lane field — it would silently never fire. %s Pair it, or rename it (`_edge` is a reserved pairing suffix on procs touching script structs).",
-				name, hint_edge(targets[:]),
-			)
-		case strings.has_suffix(name, "_spawned"):
-			check_unclaimed_hook(loc, name, "_spawned", targets[:], script_snakes)
-		case strings.has_suffix(name, "_freed"):
-			check_unclaimed_hook(loc, name, "_freed", targets[:], script_snakes)
-		}
-	}
-}
-
-// The census hooks pair by NAME (`<target_snake>_spawned`/`_freed`) with an
-// entity-tagged struct. Two ways to miss, both errors: the name matches a
-// script that nothing entity-tags (tag the scene export), or a ^Target param
-// says which entity the author meant while the prefix is typo'd (spell the
-// expected name out).
-@(private = "file")
-check_unclaimed_hook :: proc(loc: Loc, name, suffix: string, targets: []^Script, script_snakes: map[string]bool) {
-	kind := suffix == "_spawned" ? "spawn" : "free"
-	if script_snakes[strings.trim_suffix(name, suffix)] {
 		error_at(
 			loc,
-			"proc %q looks like an entity %s hook, but no scene field declares `entity=...` for that struct — it would silently never fire. Tag the scene export (`entity=Name:id`), or rename the proc.",
-			name, kind,
+			"@(gd_half) %q pairs with nothing — it would silently never fire. %s. Rename it to the half you meant, or drop @(gd_half) if this proc is not a half.",
+			name, strings.join(surfaces[:], "; ", context.temp_allocator),
 		)
-		return
-	}
-	for t in targets {
-		for other in targets {
-			for ent in other.entities {
-				if ent.target != t.struct_name {continue}
-				want := fmt.tprintf("%s%s", to_snake(t.struct_name), suffix)
-				if name != want {
-					error_at(
-						loc,
-						"proc %q has a ^%s param and ends in `%s`, but the %s hook pairs by NAME — `%s`. Rename it (or drop the suffix if it isn't the hook).",
-						name, t.struct_name, suffix, kind, want,
-					)
-					return
-				}
-			}
-		}
 	}
 }
 
-// "Gunner pairs: gunner_buy_then, gunner_tick_then." — every _then the
-// targeted classes generate, so the typo'd name has its fix beside it.
+// Every pairing name `t` really offers, comma-joined — the fix material an
+// unpaired half is shown. Nothing here is a guess: each entry is a name some
+// resolve_* pass would claim TODAY, read off the same declarations that pass
+// reads (the command table, the tick, the delta lane, the entity tags, the
+// shell's session and migration seams). The four per-family hint builders this
+// replaces each listed ONE family, so the help an author got was only ever as
+// good as the suffix they happened to type — which is precisely the assumption
+// `@(gd_half)` retires.
 @(private = "file")
-hint_then :: proc(targets: []^Script) -> string {
-	b: strings.Builder
-	strings.builder_init(&b, context.temp_allocator)
-	for t in targets {
-		if strings.builder_len(b) > 0 {strings.write_string(&b, " ")}
-		names := make([dynamic]string, context.temp_allocator)
-		for cmd in t.commands {
-			wrapper := len(cmd.path) > 0 ? fmt.tprintf("%s_%s", to_snake(t.struct_name), cmd.name) : cmd.proc_name
-			append(&names, fmt.tprintf("%s_then", wrapper))
-		}
-		if t.tick.proc_name != "" {
-			append(&names, fmt.tprintf("%s_then", t.tick.proc_name))
-		}
-		if len(names) == 0 {
-			fmt.sbprintf(&b, "%s declares no @(gd_command) verbs and no @(gd_tick), so nothing on it pairs a `_then`.", t.struct_name)
-			continue
-		}
-		fmt.sbprintf(&b, "%s pairs: %s.", t.struct_name, strings.join(names[:], ", ", context.temp_allocator))
-	}
-	return strings.to_string(b)
-}
+pairing_surface :: proc(t: ^Script, scripts: []^Script) -> string {
+	names := make([dynamic]string, context.temp_allocator)
+	snake := to_snake(t.struct_name)
+	ticks := t.tick.proc_name != "" || len(t.block_ticks) > 0
 
-@(private = "file")
-hint_fx :: proc(targets: []^Script) -> string {
-	b: strings.Builder
-	strings.builder_init(&b, context.temp_allocator)
-	for t in targets {
-		if strings.builder_len(b) > 0 {strings.write_string(&b, " ")}
-		if t.tick.proc_name != "" {
-			fmt.sbprintf(&b, "%s's tick pairs as `%s_fx`.", t.struct_name, t.tick.proc_name)
-		} else {
-			fmt.sbprintf(&b, "%s has no @(gd_tick), so nothing on it pairs an `_fx`.", t.struct_name)
+	for cmd in t.commands {
+		wrapper := len(cmd.path) > 0 ? fmt.tprintf("%s_%s", snake, cmd.name) : cmd.proc_name
+		append(&names, fmt.tprintf("%s_then", wrapper))
+		// `_apply` is the SIM lane's predicted-effect half — resolve_command_applies
+		// refuses one on a class that doesn't tick, so offering it there would
+		// name a fix that is itself an error.
+		if ticks {append(&names, fmt.tprintf("%s_apply", cmd.proc_name))}
+	}
+	if t.tick.proc_name != "" {
+		append(&names, fmt.tprintf("%s_then", t.tick.proc_name))
+		append(&names, fmt.tprintf("%s_fx", t.tick.proc_name))
+	}
+	for r in t.replicates {
+		if r.owner || r.predict {continue} // only the delta lane edges
+		append(&names, fmt.tprintf("%s_%s_edge", snake, strings.join(r.path, "_", context.temp_allocator)))
+	}
+	tagged := false
+	for other in scripts {
+		for ent in other.entities {
+			if ent.target == t.struct_name {tagged = true; break}
+		}
+		if tagged {break}
+	}
+	if tagged {
+		append(&names, fmt.tprintf("%s_spawned", snake))
+		append(&names, fmt.tprintf("%s_freed", snake))
+	}
+	if t.boot_field != "" {
+		for ev in SESSION_EVENTS {
+			append(&names, fmt.tprintf("%s_%s", snake, ev.suffix))
+			// A `_then` narrows a half to the authority, which only means
+			// something on an event both roles hear.
+			if ev.role == .Every {append(&names, fmt.tprintf("%s_%s_then", snake, ev.suffix))}
+		}
+		for spec in MIGRATION_HALVES {
+			append(&names, fmt.tprintf("%s_%s", snake, spec.suffix))
 		}
 	}
-	return strings.to_string(b)
-}
 
-@(private = "file")
-hint_edge :: proc(targets: []^Script) -> string {
-	b: strings.Builder
-	strings.builder_init(&b, context.temp_allocator)
-	for t in targets {
-		if strings.builder_len(b) > 0 {strings.write_string(&b, " ")}
-		names := make([dynamic]string, context.temp_allocator)
-		for r in t.replicates {
-			if r.owner || r.predict {continue} // the delta lane only
-			append(&names, fmt.tprintf("%s_%s_edge", to_snake(t.struct_name), strings.join(r.path, "_", context.temp_allocator)))
-		}
-		if len(names) == 0 {
-			fmt.sbprintf(&b, "%s has no delta-lane replicated fields, so nothing on it edges.", t.struct_name)
-			continue
-		}
-		fmt.sbprintf(&b, "%s's fields pair: %s.", t.struct_name, strings.join(names[:], ", ", context.temp_allocator))
+	if len(names) == 0 {
+		return fmt.tprintf("%s declares nothing that pairs a half", t.struct_name)
 	}
-	return strings.to_string(b)
-}
-
-@(private = "file")
-hint_apply :: proc(targets: []^Script) -> string {
-	b: strings.Builder
-	strings.builder_init(&b, context.temp_allocator)
-	for t in targets {
-		if strings.builder_len(b) > 0 {strings.write_string(&b, " ")}
-		names := make([dynamic]string, context.temp_allocator)
-		for cmd in t.commands {
-			append(&names, fmt.tprintf("%s_apply", cmd.proc_name))
-		}
-		if len(names) == 0 {
-			fmt.sbprintf(&b, "%s declares no @(gd_command) verbs, so nothing on it pairs an `_apply`.", t.struct_name)
-			continue
-		}
-		fmt.sbprintf(&b, "%s's verbs pair: %s.", t.struct_name, strings.join(names[:], ", ", context.temp_allocator))
-	}
-	return strings.to_string(b)
+	return fmt.tprintf("%s pairs: %s", t.struct_name, strings.join(names[:], ", ", context.temp_allocator))
 }
 
 // ---------------------------------------------------------------------------
@@ -1670,7 +1572,7 @@ hint_apply :: proc(targets: []^Script) -> string {
 //   <t>_spawned :: proc(game: ^Game, self: ^Target, id: knet.Net_Id, owner: knet.Player_Id)
 //   <t>_freed   :: proc(game: ^Game, self: ^Target, id: knet.Net_Id)
 @(private = "file")
-validate_entity_hook :: proc(cand: Then_Candidate, name, game_struct, target: string, want_owner: bool) -> bool {
+validate_entity_hook :: proc(cand: Half_Candidate, name, game_struct, target: string, want_owner: bool) -> bool {
 	loc := Loc{path = cand.path, line = cand.line}
 	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
 		error_at(loc, "entity hook %s must be a plain proc — the generated table dispatches it, it is never registered", name)
@@ -1711,7 +1613,7 @@ type_base :: proc(t: string) -> string {
 // Pair and validate one script's entity tags against the module. `by_struct`
 // maps every script struct name to its parsed Script; `seen_ids` accumulates
 // wire-id claims across the whole module (ids collide across FILES too).
-resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^map[int]string, idx: ^map[string]Then_Candidate) {
+resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^map[int]string, idx: ^map[string]Half_Candidate) {
 	// Every generated name on the entity side is keyed by the TARGET struct
 	// (`<t>_spawn`, `<t>_of`, `<t>_owned_by`, `my_<t>`, `<t>_ids`, and the
 	// `<t>_spawned`/`<t>_freed` hooks it pairs). Two scene fields naming the
@@ -2530,7 +2432,7 @@ scan_fact_procs :: proc(out: ^[dynamic]Fact_Candidate, path, src: string, file: 
 // (its tracked owner), and the despawn-drop all key on it. No anchor = a
 // WORLD fact: the authority alone causes it (mine=true on its screen), every
 // client presents it on the watch clock.
-resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, idx: ^map[string]Then_Candidate, by_struct: map[string]^Script, taken: map[string]bool) {
+resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, by_struct: map[string]^Script, taken: map[string]bool) {
 	if len(decls) == 0 {return}
 
 	// The lane owner resolve_sim settled: the class carrying @(gd_sample) or a
@@ -2543,7 +2445,19 @@ resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, idx: ^map[str
 		}
 	}
 
-	RESERVED :: [?]string{"_then", "_fx", "_apply", "_edge", "_spawned", "_freed", "_cmd", "_spawn", "_step", "_events"}
+	// The suffixes of names SCRIPTGEN ITSELF emits. A fact's announce door is a
+	// generated proc under the bare event name, so an event called `foo_events`
+	// would emit a second `foo_events` beside the session dispatch — a
+	// redeclaration error pointing at generated code the author never wrote.
+	//
+	// This list used to also carry the six PAIRING suffixes (`_then`, `_fx`,
+	// `_apply`, `_edge`, `_spawned`, `_freed`) and had to grow with every new
+	// pairing form. Those rows are gone because they were never the check that
+	// caught anything: a door colliding with a hand-written half is a collision
+	// with a REAL proc, which `taken` below catches by exact name and explains
+	// far better. What is left is the part `taken` cannot see — names that do
+	// not exist until generate() writes them.
+	GENERATED_SUFFIXES :: [?]string{"_cmd", "_spawn", "_step", "_events"}
 
 	for cand in decls {
 		loc := Loc{path = cand.path, line = cand.line}
@@ -2591,11 +2505,11 @@ resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, idx: ^map[str
 		}
 		if tick_clash {continue}
 		reserved_clash := false
-		for suf in RESERVED {
+		for suf in GENERATED_SUFFIXES {
 			if strings.has_suffix(door, suf) {
 				error_at(
 					loc,
-					"%s: the event name %q ends in the reserved suffix %q — the generated door would collide with that pairing family; rename the event",
+					"%s: the event name %q ends in %q, which scriptgen generates names with — the door would collide with generated code the author never wrote; rename the event",
 					cand.name, door, suf,
 				)
 				reserved_clash = true
@@ -2737,12 +2651,6 @@ resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, idx: ^map[str
 		}
 		if dup {continue}
 
-		// Claim the `_fx` idx entry so the unclaimed-suffix sweep stays quiet.
-		if c2, found := idx[cand.name]; found {
-			c2.claimed = true
-			idx[cand.name] = c2
-		}
-
 		append(&owner.facts, info)
 	}
 }
@@ -2759,7 +2667,7 @@ resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, idx: ^map[str
 // a bootless class resolves nothing here (it has no generated dispatch to
 // call, so a stray half surfaces as an undeclared-name error at the call
 // site, never a silent no-fire).
-resolve_session_events :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
+resolve_session_events :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
 	if s.boot_field == "" {
 		return
 	}
@@ -2776,8 +2684,10 @@ resolve_session_events :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
 			}
 		}
 		if cand, found := idx[then_name]; found {
-			// Claimed either way — the diagnosis here beats the unclaimed-_then
-			// fallback (which would talk about @(gd_command) wrappers).
+			// Claimed either way — a `_then` on a one-role event is a REAL
+			// pairing attempt at a half that cannot exist, and saying which
+			// role never hears it beats the unpaired-half fallback listing
+			// every other name on the shell.
 			cand.claimed = true
 			idx[then_name] = cand
 			loc := Loc{path = cand.path, line = cand.line}
@@ -2810,7 +2720,7 @@ resolve_session_events :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
 // fields>)` exactly, no results — the generated dispatch passes the Ev
 // struct's fields through positionally.
 @(private = "file")
-check_event_half :: proc(s: ^Script, ev: Session_Ev, name: string, cand: Then_Candidate) -> bool {
+check_event_half :: proc(s: ^Script, ev: Session_Ev, name: string, cand: Half_Candidate) -> bool {
 	loc := Loc{path = cand.path, line = cand.line}
 	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
 		error_at(loc, "%s must be a plain proc — the generated %s_events dispatch calls it, it is never registered", name, to_snake(s.struct_name))
@@ -2862,7 +2772,7 @@ check_event_half :: proc(s: ^Script, ev: Session_Ev, name: string, cand: Then_Ca
 // generated `<snake>_succ_hooks` table carries them and the generated
 // `<snake>_events` tail drains the kit's noted succession, so no fork, no
 // wipe, no chase cap survives in game code.
-resolve_migration :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
+resolve_migration :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
 	if s.boot_field == "" {
 		return
 	}
@@ -2893,7 +2803,7 @@ resolve_migration :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
 // One migration half's contract: a plain proc, `(self: ^Game, <the seam's
 // params>)` exactly, no results — kboot calls it through the generated table.
 @(private = "file")
-check_migration_half :: proc(s: ^Script, spec: Migration_Half_Spec, name: string, cand: Then_Candidate) -> bool {
+check_migration_half :: proc(s: ^Script, spec: Migration_Half_Spec, name: string, cand: Half_Candidate) -> bool {
 	loc := Loc{path = cand.path, line = cand.line}
 	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
 		error_at(loc, "%s must be a plain proc — kboot.boot_migration's generated table calls it, it is never registered", name)
@@ -2946,7 +2856,7 @@ check_migration_half :: proc(s: ^Script, spec: Migration_Half_Spec, name: string
 // game param — it replays inside the tick pipeline, where only sim state
 // exists. Declaring one on a class that doesn't tick is a build error: the
 // half IS the resim's property.
-resolve_command_applies :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
+resolve_command_applies :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
 	ticks := s.tick.proc_name != "" || len(s.block_ticks) > 0
 	for &c in s.commands {
 		name := fmt.tprintf("%s_apply", c.proc_name)
@@ -3013,7 +2923,7 @@ resolve_command_applies :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
 // Both optional, both also accept the game-less (self-first) shape. Payload
 // param TYPES are the compiler's to hold — the call site passes the tick's
 // returned values straight through.
-resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
+resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
 	if s.tick.proc_name == "" {
 		return
 	}
@@ -3076,7 +2986,7 @@ resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
 // atomic old/new). Delta lane only, held here: predicted state resims and
 // owner-streamed state interpolates — each lane has its own presentation
 // answer, and an edge on either would misfire by construction.
-resolve_edges :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
+resolve_edges :: proc(s: ^Script, idx: ^map[string]Half_Candidate) {
 	snake := to_snake(s.struct_name)
 	for &r in s.replicates {
 		name := fmt.tprintf("%s_%s_edge", snake, strings.join(r.path, "_", context.temp_allocator))
@@ -3146,7 +3056,7 @@ resolve_edges :: proc(s: ^Script, idx: ^map[string]Then_Candidate) {
 }
 
 @(private = "file")
-claim_tick_half :: proc(s: ^Script, idx: ^map[string]Then_Candidate, name: string, wants_by: bool) -> (game: string, mine: bool, ok: bool) {
+claim_tick_half :: proc(s: ^Script, idx: ^map[string]Half_Candidate, name: string, wants_by: bool) -> (game: string, mine: bool, ok: bool) {
 	cand, found := idx[name]
 	if !found {
 		return "", false, false
@@ -4033,37 +3943,18 @@ parse_replicate_info :: proc(
 	}
 	for spec_raw, si in specs[1:] {
 		spec := strings.trim_space(spec_raw)
-		// THE MIGRATION DOOR. `gd:"replicate,predict"` and friends parsed for the
-		// whole life of the language up to this commit, and three games out of
-		// this repo carry hundreds of them. A lane token appearing as an OPTION is
-		// therefore never a typo — it is the old grammar, and the only useful
-		// answer is the rewritten tag, spelled out, so the fix is a paste.
+		// A lane token in the OPTION list. This arm carried a migration door for
+		// one release — the old `gd:"replicate,predict"` grammar, rewritten for
+		// the reader — which came out once the three games out of this repo were
+		// retagged. What stays is the permanent law it shared a branch with, and
+		// it answers the old form just as exactly: whichever lane you wrote
+		// second, the field already has one.
 		if l := decl.replicate_lane(spec); l != .None {
-			if lane == .Delta && l != .Delta {
-				rewritten := make([dynamic]string, 0, len(specs), context.temp_allocator)
-				append(&rewritten, lane_token(l))
-				for other, oi in specs[1:] {
-					if oi == si {continue}
-					if o := strings.trim_space(other); o != "" {append(&rewritten, o)}
-				}
-				old := make([dynamic]string, 0, len(specs), context.temp_allocator)
-				for t in specs {
-					if tt := strings.trim_space(t); tt != "" {append(&old, tt)}
-				}
-				error_at(
-					floc,
-					"%s.%s: `gd:%q` is the old lane-as-option form — write `gd:%q` (the lane is the FIRST token now: `replicate` for the delta lane, `owner` for owner-streamed, `predict` for the kit/sim predicted lane)",
-					struct_name, field_label,
-					strings.join(old[:], ",", context.temp_allocator),
-					strings.join(rewritten[:], ",", context.temp_allocator),
-				)
-			} else {
-				error_at(
-					floc,
-					"%s.%s: `%s` is a LANE, not an option — this field already declared `%s`, and a field has exactly ONE lane (whoever writes its bytes owns them; two writers would fight every tick)",
-					struct_name, field_label, spec, lane_token(lane),
-				)
-			}
+			error_at(
+				floc,
+				"%s.%s: `%s` is a LANE, not an option — this field already declared `%s`, and a field has exactly ONE lane (whoever writes its bytes owns them; two writers would fight every tick). The lane is the FIRST token: `replicate` for the delta lane, `owner` for owner-streamed, `predict` for the kit/sim predicted lane.",
+				struct_name, field_label, spec, lane_token(lane),
+			)
 			return {}, false
 		}
 		// `interp=NAME`: custom blend math — NAME is an author proc of type knet.Blend_Proc,

@@ -173,7 +173,7 @@ $lines
 }
 
 # scriptgen + odin build one scripts dir into its dll (atomic temp+move publish — see
-# BuildDll). The four -custom-attribute flags: KEEP IN SYNC with build/common.sh
+# BuildDll). The -custom-attribute flags: KEEP IN SYNC with build/common.sh
 # (ODIN_GD_ATTRS) — every scripts build (bash native/web/cross + this Windows-native
 # one) must pass the same set, or @(gd_method)/@(gd_connect)/@(gd_rpc)/@(gd_command)
 # fail to compile.
@@ -187,7 +187,7 @@ function BuildOneScriptsDir([string]$dir) {
     # SYNC with build/common.sh run_scriptgen.
     Run $scriptgenExe @($dir, "-godot:$RootRel")
     $out = Join-Path $Bin (DllLeafForDir $dir)
-    BuildDll $dir $out @("-custom-attribute:gd_method", "-custom-attribute:gd_connect", "-custom-attribute:gd_rpc", "-custom-attribute:gd_command", "-custom-attribute:gd_tick", "-custom-attribute:gd_sample", "-custom-attribute:gd_step", "-custom-attribute:gd_fact")
+    BuildDll $dir $out @("-custom-attribute:gd_method", "-custom-attribute:gd_connect", "-custom-attribute:gd_rpc", "-custom-attribute:gd_command", "-custom-attribute:gd_tick", "-custom-attribute:gd_sample", "-custom-attribute:gd_step", "-custom-attribute:gd_fact", "-custom-attribute:gd_half")
     $script:builtDlls += $out
 }
 
