@@ -35,11 +35,15 @@ import knet "godot:kit/net"
 // The clock never bends more than this — corrections stay beneath perception.
 SCALE_NUDGE_MAX :: 0.02
 
-// The DEEP rung's bend, for an error too big to breathe away. 8% at 60 Hz
-// sheds ~4.8 ticks/s, so a deep surplus is gone in a second or two instead of
-// a quarter-minute — slow-motion you could notice if you went looking, which
-// beats the alternative by a wide margin (see LEAD_DEEP_TICKS).
-SCALE_NUDGE_DEEP :: 0.08
+// The DEEP rung's bend, for an error too big to breathe away. 25% at 60 Hz
+// sheds ~15 ticks/s, so the cold-start overshoot below is gone in about two
+// seconds instead of half a minute. That is a lot of slow-motion by the
+// standards of the ±2% fine bend, and it is the MEASURED value rather than a
+// tasteful one: the pathology is 25-35 ticks deep, it happens while the player
+// is still arriving, and every second of it is a second with no lag
+// compensation at all. A gentler 8% was tried first and simply takes too long
+// to matter.
+SCALE_NUDGE_DEEP :: 0.25
 
 // Where "bend it out" stops being an answer. Both deep rungs share this
 // threshold so they hand off to the fine bend at the same place and cannot
@@ -51,11 +55,29 @@ SCALE_NUDGE_DEEP :: 0.08
 // (we are needlessly far ahead, inputs pooling on the server) cannot be jumped
 // the other way: those ticks are already simulated and their inputs already
 // sent under those numbers, so rewinding the head would re-issue a tick the
-// server has answered and corrupt a ledger indexed by tick. The only honest
-// way to shed lead is to run SLOW — which is what the bend does, and at 2% it
-// takes ~17 seconds to shed 20 ticks while the player carries every one of
-// those 333ms as latency they did not need to have. Hence a coarser bend
-// rather than no rung at all.
+// server has answered and corrupt a ledger indexed by tick. The head only ever
+// moves forward, so the only honest shed is to run SLOW.
+//
+// A DEEP SURPLUS IS THE NORMAL COLD START, not an edge case. The anchor seeds
+// its lead from a clock sync that reads rtt≈0 while cold, the `+= 3` probe then
+// runs for a full round trip before the first ack comes back, and the client
+// lands roughly an RTT over target. At 2% that took twenty seconds to undo what
+// one round trip built.
+//
+// AND THE COST IS NOT JUST LATENCY — IT SILENTLY KILLS LAG COMPENSATION.
+// Measured at 240ms RTT: the client parked 25-35 ticks (~500ms) over target and
+// stayed, resims climbing past 2500, and every lane_rewound query clamped to
+// rewind_max — so the authority judged hitscan against a ~670ms-old world and
+// landed NOTHING, four shots for zero hits, with no error anywhere. After the
+// rung: lead ~9, resims flat, three of four shots rewound onto poses a
+// live-pose server would have missed by 60-130px against a 16px body.
+//
+// DEAD END, recorded so nobody re-derives it: mirroring the forward jump —
+// hold the head still and let the server catch up — OSCILLATES. A stalled
+// client stops sending inputs, the server's buffer drains, and this same
+// controller reads the drained buffer as a DEFICIT and jumps forward; measured
+// lead went 34 -> 95. The correction must keep the input stream CONTINUOUS,
+// which is exactly why it has to be a bend and never a stall.
 LEAD_DEEP_TICKS :: 8.0
 
 // A frame owing more ticks than this drops its backlog (sim_ticker_advance

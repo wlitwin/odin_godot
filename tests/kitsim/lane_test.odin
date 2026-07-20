@@ -2066,3 +2066,186 @@ lane_declared_facts_world_pass :: proc(t: ^testing.T) {
 	testing.expect_value(t, alice.df_calls[3], 1)
 	testing.expect_value(t, bob.df_calls[3], 0)
 }
+
+// ---------------------------------------------------------------------------
+// THE DELAYED WIRE — transit that costs something.
+//
+// `lane_pump` above drains TO QUIET: every packet lands the instant it is
+// sent, so the ack round trip is zero frames and a client's cold start pays
+// nothing. That is why the whole suite was blind to the deep-surplus bug: the
+// lead error never goes deep on a zero-transit wire, so
+// `lane_two_peers_converge`'s "corrections stay inside the nudge" assertion
+// passed happily with a 25% rung sitting in the tree, unentered.
+//
+// This wire holds every parcel a fixed number of frames EACH WAY instead. The
+// cold start then pays a real round trip: the anchor seeds from a cold clock
+// (rtt 0 — nobody pings here), the `+= 3` unacked probe runs for the whole
+// flight time before the first ack comes back, and the client lands far over
+// target. Shedding that is exactly what SCALE_NUDGE_DEEP is for.
+//
+// Ownership: the box's send clones into `out`; this wire takes those clones
+// and owns them from there — including whatever is still in flight when the
+// test ends (wire_destroy).
+Lane_Wire :: struct {
+	frame:  int,
+	hold:   int, // frames of one-way transit
+	flight: [dynamic]Wire_Parcel,
+}
+
+Wire_Parcel :: struct {
+	from: ksess.Peer_Id,
+	to:   ksess.Peer_Id,
+	data: []u8,
+	due:  int, // the wire frame it lands on
+}
+
+wire_make :: proc(hold: int) -> Lane_Wire {
+	return Lane_Wire{hold = hold, flight = make([dynamic]Wire_Parcel)}
+}
+
+wire_destroy :: proc(w: ^Lane_Wire) {
+	for p in w.flight {
+		delete(p.data) // still in flight at teardown — ours to free
+	}
+	delete(w.flight)
+}
+
+// One frame of wire: everything sent since the last step lifts off (landing
+// `hold` frames from now), then everything due lands. Send and receive can
+// never happen on the same frame, which is the whole point.
+wire_step :: proc(w: ^Lane_Wire, boxes: []^Lane_Box) {
+	for b in boxes {
+		for len(b.out) > 0 {
+			p := b.out[0]
+			ordered_remove(&b.out, 0)
+			append(&w.flight, Wire_Parcel{from = b.peer, to = p.to, data = p.data, due = w.frame + w.hold})
+		}
+	}
+	for i := 0; i < len(w.flight); {
+		p := w.flight[i]
+		if p.due > w.frame {
+			i += 1
+			continue
+		}
+		ordered_remove(&w.flight, i)
+		for dst in boxes {
+			if dst.peer == p.from {
+				continue
+			}
+			if p.to == ksess.BROADCAST_PEER || dst.peer == p.to {
+				r := knet.reader_make(p.data)
+				ksess.session_handle_packet(&dst.s, p.from, &r)
+			}
+		}
+		delete(p.data)
+	}
+	w.frame += 1
+}
+
+
+// THE COLD START OVER REAL TRANSIT — the deep-surplus rung's pin.
+//
+// WHAT THIS WOULD CATCH: a lead controller that can only bend ±SCALE_NUDGE_MAX.
+// A client's cold start lands far OVER target (the anchor seeds from a cold
+// clock, then the unacked `+= 3` probe runs for a whole round trip before the
+// first ack can correct it) — measured here at peak ~42 ticks against a target
+// of 9. At 2% that sheds ~1.2 ticks/s: with the deep rung removed this same
+// harness measures 34 ticks still standing at frame 480 and 24 at frame 900,
+// i.e. half a minute parked over target. (It also catches a rung that is merely
+// too GENTLE: at the 8% first tried it reads 16 here, still bleeding.) That is
+// not just latency — every lane_rewound query clamps to rewind_max while it
+// lasts, so the authority
+// judges hitscan against a world half a second stale and lands nothing,
+// silently, with no error anywhere.
+//
+// WHY THE REST OF THE SUITE CANNOT CATCH IT: `lane_pump` drains to quiet, so
+// transit is zero, the probe costs nothing, and the head lands on target by
+// accident. `lane_two_peers_converge` even asserts "corrections stay inside the
+// nudge" and passes with the 25% rung in the tree — the error never goes deep
+// there. Only a wire that HOLDS packets makes the pathology exist at all, which
+// is why the peak assertion below is load-bearing: a harness that stopped
+// reproducing the overshoot would make the convergence assertion vacuous.
+@(test)
+lane_deep_surplus_sheds_cold_start :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+
+	// 7 frames each way — 14 frames of round trip at 60 Hz, ~230ms, the RTT the
+	// pathology was measured at. Nobody pings here, so the session clock stays
+	// cold (rtt 0) and the anchor seeds from margin alone: the honest cold start.
+	HOLD :: 7
+	MARGIN :: 2
+	w := wire_make(HOLD)
+	defer wire_destroy(&w)
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	for _ in 0 ..< 40 { // the join handshake, at 7 frames a hop
+		wire_step(&w, boxes)
+	}
+	testing.expect_value(t, alice.s.me, knet.Player_Id(2))
+
+	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = MARGIN}
+	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+	ksim.lane_set_sim(&host.lane, &host, lbox_sample, lbox_step)
+	ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, lbox_step)
+	lbox_track(&host, 10, 1, &desc)
+	lbox_track(&host, 20, 2, &desc)
+	lbox_track(&alice, 10, 1, &desc)
+	lbox_track(&alice, 20, 2, &desc)
+
+	// The lead the controller is actually driving to. It closes the loop on
+	// (input_ack − batch tick) → margin, and the ack is one one-way transit
+	// stale by the time the client reads it, so the settled tick gap is
+	// margin + HOLD. Derived, not tuned: change HOLD and it moves with it.
+	TARGET :: MARGIN + HOLD
+
+	DT :: 1.0 / 60.0
+	FRAMES :: 480 // 8 seconds — the fine bend alone has shed ~9 ticks by here
+	SETTLE :: 60 // the last second is the "stays there" window
+	peak, settled_hi, settled_lo := i64(0), min(i64), max(i64)
+	for f in 1 ..= FRAMES {
+		host.ax = 1
+		alice.ax = 1
+		ksim.lane_frame(&host.lane, DT)
+		ksim.lane_frame(&alice.lane, DT)
+		ksim.lane_present(&alice.lane, DT)
+		wire_step(&w, boxes)
+		if !alice.lane.anchored {
+			continue
+		}
+		lead := i64(alice.lane.ticker.tick) - i64(host.lane.ticker.tick)
+		peak = max(peak, lead)
+		if f > FRAMES - SETTLE {
+			settled_hi = max(settled_hi, lead)
+			settled_lo = min(settled_lo, lead)
+		}
+	}
+
+	// (1) The harness genuinely built the hole. Without this the rest is
+	// vacuous — exactly the failure mode of the to-quiet pump.
+	testing.expectf(t, peak >= 2 * TARGET,
+		"the delayed wire must reproduce the cold-start overshoot — peak lead %d against target %d", peak, TARGET)
+
+	// (2) And the client CAME DOWN out of it, to target, and stayed. The
+	// broken controller is still 33 ticks up at this frame, so a bound anywhere
+	// near TARGET discriminates by a mile; these are the measured settled
+	// values (a flat 10) with a tick of slack either side.
+	testing.expectf(t, settled_hi <= TARGET + 3,
+		"the deep surplus must be shed, not bled: settled lead %d (peak %d) against target %d", settled_hi, peak, TARGET)
+	testing.expectf(t, settled_lo >= TARGET - 2,
+		"and not overshot the other way: settled lead %d against target %d", settled_lo, TARGET)
+
+	// (3) The deep rung HANDS BACK. Once inside LEAD_DEEP_TICKS the fine bend
+	// owns the clock again — a rung that stayed engaged would leave the scale
+	// parked at 0.75 and the whole session in slow motion.
+	testing.expect(t, abs(alice.lane.ticker.scale - 1.0) <= ksim.SCALE_NUDGE_MAX + 1e-12,
+		"a settled client is back on the fine bend, not stuck in the deep rung")
+}

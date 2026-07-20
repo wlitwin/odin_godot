@@ -21,6 +21,7 @@ package quickdraw
 // line for everybody: after lane_present the fields hold presentation truth —
 // your avatar is sim + glide, remote avatars are the watch-clock blend.
 
+import "core:fmt"
 import gd "godot:godot"
 import knet "godot:kit/net"
 import psim "godot:play/sim"
@@ -64,6 +65,7 @@ Gunner :: struct {
 	painted:   bool,
 	flash_ttl: f64,
 	beam_ttl:  f64,
+	hp_frame:  u64, // AUTHORITY: the _process frame its last hp write happened on (the edge-ordering probe)
 }
 
 // The hurt flash — the hp EDGE half. The session's per-frame pass hands every
@@ -71,11 +73,38 @@ Gunner :: struct {
 // branches): no seen_* mirror to keep, no resync re-seed to forget, and a
 // same-frame hit+heal that cancels never flashes. The decay and the dead tint
 // stay continuous dressing in gunner_process below.
+//
+// AND IT IS THE ACID'S EDGE-ORDERING RECEIPT. A sim game's authority writes
+// hp from INSIDE the sim tick (adjudicate_shot off gunner_tick_then, run_respawns
+// off the authority world pass) — which is inside lane_frame, which runs AFTER
+// session_tick has already made its own edge pass for the frame. Nothing then
+// fires the pass again unless boot_pump does, so every hp edge on the host
+// landed one whole frame behind the tick that caused it: a frame of full-hp,
+// un-teleported host standing where the next tick's world can see it. Coop
+// games never had it — their tick loop lives in the generated <snake>_step,
+// which folds the pass in right after.
+//
+// The probe is the pair: the authority stamps g.frame where it writes hp, this
+// half compares against the frame it is firing on. lag=0 is the fix (boot_pump's
+// ksess.session_run_edges between lane_frame and lane_present); with that call
+// removed every one of these prints lag=1 and the acid goes red. Clients are
+// excluded on purpose — their hp arrives from the wire, a different path with
+// nothing to be early or late about.
 @(gd_half)
-gunner_hp_edge :: proc(self: ^Gunner, old, new: i32) {
+gunner_hp_edge :: proc(g: ^Quickdraw, self: ^Gunner, old, new: i32) {
 	if new < old {
 		self.flash_ttl = 0.25
 	}
+	if !g.ses.is_host || self.hp_frame == 0 {
+		return // a client's wire-delivered edge, or a spawn-time baseline
+	}
+	lag := g.frame - self.hp_frame
+	if lag == 0 {
+		g.edge_same += 1
+	} else {
+		g.edge_late += 1
+	}
+	gd.print_str(fmt.tprintf("QD_EDGE hp=%d lag=%d same=%d late=%d", new, lag, g.edge_same, g.edge_late))
 }
 
 // Sampled once per predicted tick (quickdraw.odin's qd_sample); discovered by

@@ -113,6 +113,24 @@ for port in 4189 4196; do
         grep -q "QD_KILL by=3" "$LOGDIR/rewound-marshal.log" || { echo "hits never became a kill"; exit 1; }
         grep -q "QD_RESPAWN" "$LOGDIR/rewound-marshal.log" || { echo "the kill never respawned"; exit 1; }
 
+        # THE EDGE-ORDERING RECEIPT. A SIM game's authority writes hp from
+        # inside the sim tick — inside lane_frame, which runs AFTER the frame's
+        # session_tick and its edge pass. boot_pump therefore runs the pass
+        # again between lane_frame and lane_present; without that one line
+        # every hp edge here fires a frame behind the tick that caused it
+        # (lag=1 on every line below, and this check goes red). Coop games
+        # were never affected — the generated <snake>_step folds the pass in.
+        MLOG="$LOGDIR/rewound-marshal.log"
+        EDGE_SAME=$(grep -c "QD_EDGE .* lag=0 " "$MLOG" || true)
+        EDGE_LATE=$(grep -c "QD_EDGE .* lag=[1-9]" "$MLOG" || true)
+        echo "edge ordering on the marshal: same-frame $EDGE_SAME, late $EDGE_LATE"
+        if ((EDGE_SAME < 3)); then
+            echo "the authority's hp edges never fired same-frame (same=$EDGE_SAME late=$EDGE_LATE) — session_run_edges is missing from boot_pump"; exit 1
+        fi
+        if ((EDGE_LATE != 0)); then
+            echo "$EDGE_LATE hp edge(s) fired a frame late — the sim lane's mutations missed the frame's edge pass"; exit 1
+        fi
+
         # THE SHOP, mid-duel: the kill's bounty reaches the deadeye as delta
         # state, its buy is a tick-scheduled verb — and the boots go on at
         # the CLIENT'S next tick, ~15 ticks before the server's word can

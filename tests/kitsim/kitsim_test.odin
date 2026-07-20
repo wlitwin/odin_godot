@@ -294,6 +294,20 @@ lead_targets_and_control :: proc(t: ^testing.T) {
 		ksim.SCALE_NUDGE_DEEP > ksim.SCALE_NUDGE_MAX,
 		"the deep rung must shed faster than the bend it takes over from, or it is not a rung",
 	)
+	// A cheap FLOOR, and honest about being one: lane_deep_surplus_sheds_cold_start
+	// is the real pin — it drives a delayed wire and measures the lead actually
+	// settling — and it already discriminates 0.08 (settles 16, red) from 0.25
+	// (settles 10, flat). This line only catches the case that pin's specific
+	// HOLD might let through: a well-meaning reduction to something that still
+	// converges eventually. The rung exists to clear a 25-35 tick cold-start
+	// overshoot in seconds, because every one of those seconds runs with lag
+	// compensation silently dead — rewind clamped, hitscan judging a world half a
+	// second stale, nothing logged. At 60 Hz that means shedding >= 10 ticks/s.
+	testing.expect(
+		t,
+		ksim.SCALE_NUDGE_DEEP * 60 >= 10,
+		"the deep rung must clear a cold-start overshoot in seconds, not tens of seconds",
+	)
 	// It hands back to the fine bend at the SAME threshold its mirror does —
 	// share the number or the two rungs fight over the handoff.
 	testing.expect_value(t, ksim.LEAD_DEEP_TICKS, 8.0)

@@ -65,6 +65,15 @@ Quickdraw :: struct {
 	bot:        string, // QD_BOT: "" | "orbit" | "strafer" | "deadeye"
 	shot_count: int,
 	gear_seen:  u8, // my avatar's last shown gear — the local-flip edge the acid times
+
+	// THE EDGE-ORDERING PROBE (the acid's QD_EDGE receipt). `frame` counts
+	// _process calls; the authority stamps it onto a gunner whenever it writes
+	// hp from inside a tick, and gunner_hp_edge reads it back to say whether
+	// the edge pass saw that write on the frame it happened or a frame later.
+	// See gunner_hp_edge for the bug this exists to catch.
+	frame:      u64,
+	edge_same:  int, // hp edges the authority saw on the writing frame
+	edge_late:  int, // hp edges it saw a frame (or more) behind — the bug
 }
 
 now_s :: knet.now_s
@@ -138,6 +147,7 @@ quickdraw_try_start :: proc(self: ^Quickdraw) {
 
 quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 	if !self.running {return}
+	self.frame += 1 // the edge-ordering probe's clock (gunner_hp_edge)
 
 	// boot_pump drives EVERYTHING now — wire, session, and the sim lane
 	// (predict/simulate, then present) — before this returns.
@@ -486,6 +496,7 @@ adjudicate_shot :: proc(g: ^Quickdraw, shooter_id: knet.Net_Id, gun: ^Gunner, pi
 	hit, _ := gunner_of(&g.boot, victim)
 	vpid := kboot.boot_entity_owner(&g.boot, victim)
 	hit.hp -= 1
+	hit.hp_frame = g.frame // the edge-ordering probe: WHEN the authority wrote it
 	gd.print_str(fmt.tprintf("QD_HIT by=%d on=%d hp=%d", u64(pid), u64(vpid), hit.hp))
 	if hit.hp <= 0 {
 		ksess.session_stat_add(&g.ses, pid, g.kills_col, 1)
@@ -515,6 +526,7 @@ run_respawns :: proc(g: ^Quickdraw, tick: u64) {
 		gun.vx = 0
 		gun.vy = 0
 		gun.hp = MAX_HP
+		gun.hp_frame = g.frame // same stamp, from the AUTHORITY world pass
 		gd.print_str(fmt.tprintf("QD_RESPAWN pid=%d", gun.pid))
 	}
 }
