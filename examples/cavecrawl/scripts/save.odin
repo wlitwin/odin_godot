@@ -67,6 +67,14 @@ cave_lobby_save_run :: proc(self: ^CaveLobby) {
 	ksave.save_write(&self.ses, &w, GAME_VERSION, knet.writer_bytes(&blob))
 	ok := ksave.write_file(save_path(), knet.writer_bytes(&w))
 	gd.print_str(fmt.tprintf("CAVE_SAVED ok=%v bytes=%d", ok, len(knet.writer_bytes(&w))))
+	// #24: the replicated-state fingerprint at the exact moment this snapshot was
+	// taken. session_state_hash walks the DELTA lane (owner-streamed x/y and
+	// interpolation are excluded by construction, so it is stable across the wire
+	// and across a save). The resume prints the same line; the acid asserts they
+	// match, proving the save round-trips the LIVE entity state byte-for-byte —
+	// the desync-forensics probe the game never had, complementing the seed
+	// checksums that only cover procgen.
+	gd.print_str(fmt.tprintf("CAVE_STATE_HASH h=%d", ksess.session_state_hash(&self.ses)))
 	kcomms.comms_system(&self.comms, "the run is etched in stone")
 }
 
@@ -98,6 +106,12 @@ cave_lobby_on_resume :: proc(self: ^CaveLobby) {
 		gd.print_str("CAVE_RESUME_FAIL blob")
 		return
 	}
+	// #24: fingerprint the restored delta lane BEFORE the resumed sim ticks —
+	// it must equal the CAVE_STATE_HASH the save printed. ksave.resume restored
+	// exactly the entities save_write serialized, so a match proves nothing was
+	// dropped or misread across the file. (read_game_blob restored only host-local
+	// caches — brains, the director — which are not on the delta lane this hashes.)
+	gd.print_str(fmt.tprintf("CAVE_STATE_HASH h=%d", ksess.session_state_hash(&self.ses)))
 	if !gd.host(self.owner, port()) {
 		gd.print_str("CAVE_HOST_FAIL")
 		return

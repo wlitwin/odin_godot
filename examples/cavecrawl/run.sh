@@ -251,6 +251,13 @@ resume_act() {
 	expect "$HLOG" "CAVE_SAVED ok=true" "the run was never saved"
 	# The whole world back from disk, under the identity that saved it.
 	expect "$h2log" "CAVE_RESUMED me=1 players=2 entities=[0-9]+ reg=[0-9]+ dwellers=3 gems=3 door=true" "the resumed world is wrong"
+	# #24 STATE HASH: the LIVE replicated state survived the save byte-identical —
+	# the host's fingerprint AT SAVE TIME and the resumer's fingerprint right after
+	# restore (both before any further sim) are the same number. This is the entity
+	# delta lane (dweller hp/mood, spelunker hp/bag/cooldowns/effects, chest slots),
+	# which the seed checksums never covered; a mismatch is a dropped or misread
+	# field in the snapshot.
+	expect_same "$HLOG" "$h2log" "CAVE_STATE_HASH h=[0-9]+" "the replicated state hash did not survive save/resume (#24)"
 	# The GAME BLOB restored the campaign: wave 2 in progress, and the
 	# director must NOT restart wave 1 on top of the saved dwellers.
 	expect "$h2log" "CAVE_BLOB wave=2" "the game blob did not restore"
