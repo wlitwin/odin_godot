@@ -33,6 +33,14 @@ Registry_Entry :: struct {
 	set:    ^Command_Set, // commands + Entity_Desc (desc-only entities use an empty command table)
 	shadow: []u8,
 	owner:  Player_Id, // PLAYER_ID_INVALID = host-owned
+	// LOCAL prediction: this peer expects to own the entity (a transfer it just
+	// requested) and is writing its owner-streamed fields NOW, before the host
+	// confirms. While set, registry_sample_streams leaves it alone — the write
+	// sticks instead of being stomped by the current owner's stream every frame
+	// (the scratch-field dance every pass-the-object game hand-rolled). Cleared
+	// by registry_set_owner when the real transfer lands. Per-peer, never on the
+	// wire — the host and other peers never see it.
+	predict_owner: bool,
 	stream: Stream_Ring, // remote-owned entities: buffered owner-stream snapshots
 	warp:   u8, // owner side: bumped by registry_teleport; rides every stream snapshot
 	tier:   u8, // owner side: stream every Nth tick (0/1 = every tick). A frequency
@@ -511,11 +519,16 @@ registry_teleport :: proc(reg: ^Registry, id: Net_Id) {
 // carry the pre-bump warp, so the first new-warp sample supersedes them with
 // a snap, never a blend. Every peer must apply the same transfer (the
 // session layer broadcasts it ordered with spawns and deltas).
-registry_set_owner :: proc(reg: ^Registry, id: Net_Id, owner: Player_Id, now: f64 = -1) -> bool {
+// `keep_fields` skips the handoff flush below, keeping the entity's CURRENT
+// field values — used when this peer's own predicted-ownership write is the one
+// becoming real (its fields already hold the truth; flushing a stale buffered
+// sample over them would stomp the very prediction the transfer confirmed).
+registry_set_owner :: proc(reg: ^Registry, id: Net_Id, owner: Player_Id, now: f64 = -1, keep_fields := false) -> bool {
 	e, ok := &reg.entries[id]
 	if !ok {
 		return false
 	}
+	e.predict_owner = false // the transfer resolved; the local prediction is over
 	if e.owner == owner {
 		return true
 	}
@@ -525,8 +538,11 @@ registry_set_owner :: proc(reg: ^Registry, id: Net_Id, owner: Player_Id, now: f6
 	// its sim from the render view — interp_delay behind — and a possession
 	// shorter than that delay hands the NEXT owner a pose one possession
 	// stale (slopball's rubber-band: every quick trade snapped the ball back
-	// to the previous owner's previous spot). Watchers re-anchor too.
-	stream_ring_flush_newest(&e.stream, e.entity, e.set.entity_desc)
+	// to the previous owner's previous spot). Watchers re-anchor too. Skipped
+	// when THIS peer's prediction is what confirmed (keep_fields).
+	if !keep_fields {
+		stream_ring_flush_newest(&e.stream, e.entity, e.set.entity_desc)
+	}
 	stream_ring_reset(&e.stream)
 	// ...and BRIDGE the seam: seed the fresh ring with those same fields so
 	// watcher interpolation flows through the handoff instead of pausing an
@@ -536,6 +552,19 @@ registry_set_owner :: proc(reg: ^Registry, id: Net_Id, owner: Player_Id, now: f6
 	}
 	e.warp += 1
 	return true
+}
+
+// LOCAL: predict that this peer is about to own `id` — its owner-streamed field
+// writes hold instead of being stomped by the current owner's stream, so the
+// pickup/strike/possession SHOWS the instant you act, before the host confirms.
+// Set it when you issue the transfer request (a predicted command), writing the
+// fields you want; registry_set_owner clears it when the real transfer lands
+// (kept, if it landed on you). Clear it yourself if the request is DENIED — the
+// entity then resumes sampling and snaps back to the true owner's stream.
+registry_predict_owner :: proc(reg: ^Registry, id: Net_Id, predicting := true) {
+	if e, ok := &reg.entries[id]; ok {
+		e.predict_owner = predicting
+	}
 }
 
 // Owner side: this entity streams only every `tier` ticks (0/1 = every tick).
@@ -652,8 +681,8 @@ registry_apply_streams :: proc(r: ^Reader, reg: ^Registry, me: Player_Id, stamp:
 registry_sample_streams :: proc(reg: ^Registry, t: f64, me: Player_Id) -> int {
 	sampled := 0
 	for _, &e in reg.entries {
-		if e.owner == me || e.stream.count == 0 {
-			continue
+		if e.owner == me || e.predict_owner || e.stream.count == 0 {
+			continue // owned, or predicted-owned (my writes hold), or never streamed
 		}
 		if stream_ring_sample(&e.stream, t, e.entity, e.set.entity_desc) {
 			sampled += 1

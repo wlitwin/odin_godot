@@ -1367,6 +1367,56 @@ registry_rewound_winds_streams_to_the_shooter_view :: proc(t: ^testing.T) {
 	testing.expect_value(t, own.x, f32(100))
 }
 
+// Predicted ownership: a non-owner's write to an owner-streamed field is stomped
+// by sampling UNTIL it flags predict_owner, then it holds — and when the transfer
+// lands with keep_fields, the predicted value survives the handoff instead of
+// being flushed over. The scratch-and-re-raise dance, made framework behaviour.
+@(test)
+registry_predict_owner_holds_local_writes :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	set := knet.Command_Set{entity_desc = &desc}
+	reg := knet.registry_make()
+	defer knet.registry_destroy(&reg)
+
+	ME :: knet.Player_Id(2)
+	OTHER :: knet.Player_Id(3)
+	ball := Mover{x = 5}
+	knet.registry_insert(&reg, 1, &ball, &set, OTHER) // owned by another player
+	e, _ := knet.registry_get(&reg, 1)
+	w := knet.writer_make();defer knet.writer_destroy(&w)
+	ball.x = 0;knet.stream_write(&w, &ball, &desc);knet.stream_ring_push(&e.stream, 1.0, knet.writer_bytes(&w))
+	ball.x = 10;knet.writer_reset(&w);knet.stream_write(&w, &ball, &desc);knet.stream_ring_push(&e.stream, 2.0, knet.writer_bytes(&w))
+
+	// A non-owner write WITHOUT prediction: sampling stomps it to the stream.
+	ball.x = 99
+	knet.registry_sample_streams(&reg, 1.5, ME)
+	testing.expect_value(t, ball.x, f32(5)) // stomped to the interpolated stream
+
+	// WITH prediction: the write holds — a predicted-owned entity is not sampled.
+	knet.registry_predict_owner(&reg, 1, true)
+	ball.x = 99
+	knet.registry_sample_streams(&reg, 1.5, ME)
+	testing.expect_value(t, ball.x, f32(99)) // held
+
+	// The transfer lands on ME: keep_fields keeps the predicted value, and the
+	// prediction flag clears.
+	knet.registry_set_owner(&reg, 1, ME, 3.0, keep_fields = true)
+	testing.expect_value(t, ball.x, f32(99)) // survives the handoff, not flushed
+	testing.expect_value(t, e.owner, ME)
+	testing.expect(t, !e.predict_owner, "the prediction resolved")
+
+	// Contrast — a NON-predicted transfer flushes the newest sample (10) over the
+	// local field: this is the stomp keep_fields exists to skip.
+	ball2 := Mover{x = 99}
+	knet.registry_insert(&reg, 2, &ball2, &set, OTHER)
+	e2, _ := knet.registry_get(&reg, 2)
+	ball2.x = 0;knet.writer_reset(&w);knet.stream_write(&w, &ball2, &desc);knet.stream_ring_push(&e2.stream, 1.0, knet.writer_bytes(&w))
+	ball2.x = 10;knet.writer_reset(&w);knet.stream_write(&w, &ball2, &desc);knet.stream_ring_push(&e2.stream, 2.0, knet.writer_bytes(&w))
+	ball2.x = 99
+	knet.registry_set_owner(&reg, 2, ME, 3.0) // keep_fields = false
+	testing.expect_value(t, ball2.x, f32(10)) // flushed to newest, the local 99 gone
+}
+
 @(test)
 delta_excludes_owner_stream_fields :: proc(t: ^testing.T) {
 	desc := mover_desc()
