@@ -1202,6 +1202,47 @@ state_hash_parts_on_a_delta_divergence :: proc(t: ^testing.T) {
 	testing.expect(t, ksess.session_state_hash(&alice.s) != ksess.session_state_hash(&host.s), "a delta-lane divergence must change the hash")
 }
 
+// session_rewound — coop lag comp at the session layer. It derives the rewind
+// time from the shooter's latency (rtt/2 + interp_delay) and winds owner-
+// streamed targets there. With an absent shooter's rtt at 0, the time is
+// now - interp_delay, which this test makes land exactly on a known sample.
+Rewound_Session_Probe :: struct {
+	target: ^Bot,
+	saw_x:  f32,
+}
+
+@(test)
+session_rewound_judges_at_the_shooter_view :: proc(t: ^testing.T) {
+	host: Peer_Box
+	box_make(&host, 1)
+	defer box_destroy(&host)
+	ksess.session_host_start(&host.s, "hosty")
+
+	// A target owned by another player, with stream history x=0 @1s, x=10 @2s.
+	target := Bot{hp = 50, x = 10}
+	tid := ksess.session_spawn(&host.s, BOT_TYPE, &target, &bot_command_set, owner = knet.Player_Id(5))
+	te, _ := knet.registry_get(&host.s.reg, tid)
+	w := knet.writer_make();defer knet.writer_destroy(&w)
+	target.x = 0;knet.stream_write(&w, &target, &bot_desc)
+	knet.stream_ring_push(&te.stream, 1.0, knet.writer_bytes(&w))
+	target.x = 10;knet.writer_reset(&w);knet.stream_write(&w, &target, &bot_desc)
+	knet.stream_ring_push(&te.stream, 2.0, knet.writer_bytes(&w))
+	target.x = 10 // live
+
+	// Set now directly (NOT via session_tick, which would present the streams and
+	// pre-move the target to now-interp_delay) so now - interp_delay = 1.5; the
+	// shooter isn't a real peer, so its rtt is 0.
+	host.s.now = 1.5 + ksess.session_interp_delay(&host.s)
+
+	probe := Rewound_Session_Probe{target = &target}
+	ksess.session_rewound(&host.s, knet.Player_Id(7), &probe, proc(user: rawptr) {
+		p := cast(^Rewound_Session_Probe)user
+		p.saw_x = p.target.x
+	})
+	testing.expect_value(t, probe.saw_x, f32(5)) // judged where the shooter saw it
+	testing.expect_value(t, target.x, f32(10)) // the live world returns
+}
+
 
 // ---- moderation: kick / ban / the door -----------------------------------------
 

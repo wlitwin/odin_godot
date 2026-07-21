@@ -887,3 +887,46 @@ registry_state_hash :: proc(reg: ^Registry) -> u64 {
 	}
 	return h
 }
+
+// ---- coop lag compensation: judge a shot where the SHOOTER saw the target ----
+//
+// The sim lane rewinds against its tick ledger (ksim.lane_rewound); the coop
+// lane has no ticks, so it rewinds against the Stream_Ring history every
+// owner-streamed entity already buffers. registry_rewound winds every streamed
+// entity EXCEPT the shooter's own back to time `t` (the caller derives it from
+// the shooter's latency), runs `query`, and restores the live pose after — the
+// exact bytes the shooter's screen was interpolating. Host-owned delta entities
+// (owner PLAYER_ID_INVALID) carry no stream history and stay live: this is lag
+// comp for the moving targets a coop shooter aims at — other players, streamed
+// NPCs — not the static world. `query` may despawn an entity (the restore
+// re-resolves the id and skips a gone one), but must not spawn one it expects
+// rewound.
+Rewound_Query :: proc(user: rawptr)
+
+registry_rewound :: proc(reg: ^Registry, t: f64, shooter: Player_Id, user: rawptr, query: Rewound_Query) {
+	Wound :: struct {
+		id:   Net_Id,
+		view: ^Subset_View,
+		live: []u8,
+	}
+	wounds := make([dynamic]Wound, context.temp_allocator)
+	for id, &e in reg.entries {
+		if e.owner == PLAYER_ID_INVALID || e.owner == shooter || e.stream.count == 0 {
+			continue
+		}
+		v := subset_view(e.set.entity_desc, .Owner)
+		if v.struct_bytes == 0 {
+			continue
+		}
+		live := make([]u8, v.struct_bytes, context.temp_allocator)
+		subset_capture(v, e.entity, live)
+		append(&wounds, Wound{id, v, live})
+		stream_ring_sample(&e.stream, t, e.entity, e.set.entity_desc)
+	}
+	query(user)
+	for w in wounds {
+		if e, ok := &reg.entries[w.id]; ok {
+			subset_restore(w.view, e.entity, w.live)
+		}
+	}
+}
