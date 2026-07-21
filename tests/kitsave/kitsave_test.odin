@@ -253,3 +253,54 @@ foreign_and_broken_saves_refuse_to_parse :: proc(t: ^testing.T) {
 	defer box_destroy(&broken)
 	testing.expect(t, !ksave.save_restore(&broken.s, "hosty", &cut, h))
 }
+// ---- versioned local POD records (record_encode/decode, the pure core) -------
+
+// v1 of a profile, and v2 with an appended field — the append-only migration
+// the zero-default handles WITHOUT a version bump.
+Rec_V1 :: struct {
+	cores: u32,
+	parts: u8,
+}
+Rec_V2 :: struct {
+	cores:   u32,
+	parts:   u8,
+	unlocks: u16, // appended at the END — old files read it as zero
+}
+
+@(test)
+record_round_trips_and_migrates :: proc(t: ^testing.T) {
+	VER :: u16(1)
+	p := Rec_V1{cores = 4200, parts = 0b101}
+	bytes := ksave.record_encode(p, VER, context.temp_allocator)
+
+	// Round trip: same type, same version.
+	got, res := ksave.record_decode(Rec_V1, bytes, VER)
+	testing.expect_value(t, res, ksave.Record_Result.Ok)
+	testing.expect_value(t, got.cores, u32(4200))
+	testing.expect_value(t, got.parts, u8(0b101))
+
+	// APPEND-ONLY ZERO-DEFAULT: the v1 bytes decode into v2 at the SAME version —
+	// the shared fields survive, the appended `unlocks` reads as zero.
+	up, ures := ksave.record_decode(Rec_V2, bytes, VER)
+	testing.expect_value(t, ures, ksave.Record_Result.Ok)
+	testing.expect_value(t, up.cores, u32(4200))
+	testing.expect_value(t, up.parts, u8(0b101))
+	testing.expect_value(t, up.unlocks, u16(0)) // the migration, for free
+
+	// A newer file read by an OLDER build truncates cleanly (shared fields only).
+	full := ksave.record_encode(Rec_V2{cores = 1, parts = 2, unlocks = 9}, VER, context.temp_allocator)
+	down, dres := ksave.record_decode(Rec_V1, full, VER)
+	testing.expect_value(t, dres, ksave.Record_Result.Ok)
+	testing.expect_value(t, down.cores, u32(1))
+	testing.expect_value(t, down.parts, u8(2))
+
+	// A different VERSION is .Skew (an incompatible reorder/remove/retype).
+	_, skew := ksave.record_decode(Rec_V1, bytes, VER + 1)
+	testing.expect_value(t, skew, ksave.Record_Result.Skew)
+
+	// Wrong magic / truncation is .Corrupt, never a silent misread.
+	_, badmagic := ksave.record_decode(Rec_V1, []u8{1, 2, 3, 4, 5, 6, 7, 8}, VER)
+	testing.expect_value(t, badmagic, ksave.Record_Result.Corrupt)
+	_, cut := ksave.record_decode(Rec_V1, bytes[:len(bytes) - 2], VER) // lop the tail
+	testing.expect_value(t, cut, ksave.Record_Result.Corrupt)
+}
