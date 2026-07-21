@@ -1305,6 +1305,68 @@ stream_ring_lerps_and_snaps :: proc(t: ^testing.T) {
 	testing.expect_value(t, remote.x, f32(10))
 }
 
+// Coop lag comp: registry_rewound winds an owner-streamed target back to the
+// pose the SHOOTER saw, runs the hit test there, and restores the live pose —
+// while the shooter's OWN entity stays live (they see themselves without delay).
+Rewind_Probe :: struct {
+	target:       ^Mover,
+	own:          ^Mover,
+	saw_target_x: f32,
+	saw_own_x:    f32,
+}
+
+@(test)
+registry_rewound_winds_streams_to_the_shooter_view :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	set := knet.Command_Set{entity_desc = &desc}
+	reg := knet.registry_make()
+	defer knet.registry_destroy(&reg)
+
+	SHOOTER :: knet.Player_Id(2)
+	TARGET_OWNER :: knet.Player_Id(3)
+
+	// A target owned by another player, streamed; and the shooter's own entity.
+	target := Mover{x = 10} // live pose = the newest sample
+	knet.registry_insert(&reg, 1, &target, &set, TARGET_OWNER)
+	own := Mover{x = 100}
+	knet.registry_insert(&reg, 2, &own, &set, SHOOTER)
+
+	// The target's stream history: x=0 at t=1, x=10 at t=2 (so t=1.5 → x=5).
+	te, _ := knet.registry_get(&reg, 1)
+	w := knet.writer_make();defer knet.writer_destroy(&w)
+	target.x = 0;knet.stream_write(&w, &target, &desc)
+	knet.stream_ring_push(&te.stream, 1.0, knet.writer_bytes(&w))
+	target.x = 10;knet.writer_reset(&w);knet.stream_write(&w, &target, &desc)
+	knet.stream_ring_push(&te.stream, 2.0, knet.writer_bytes(&w))
+	target.x = 10 // live, as the host holds it now
+
+	// The shooter's OWN entity ALSO has history (x=50 at t=1, x=100 at t=2) — so
+	// the exclusion is a real test: rewound to 1.5 it would read 75, but the
+	// shooter sees themselves live, so it must stay 100.
+	oe, _ := knet.registry_get(&reg, 2)
+	own.x = 50;knet.writer_reset(&w);knet.stream_write(&w, &own, &desc)
+	knet.stream_ring_push(&oe.stream, 1.0, knet.writer_bytes(&w))
+	own.x = 100;knet.writer_reset(&w);knet.stream_write(&w, &own, &desc)
+	knet.stream_ring_push(&oe.stream, 2.0, knet.writer_bytes(&w))
+	own.x = 100
+
+	// Judge at t=1.5 — the moment the shooter's screen was drawing.
+	probe := Rewind_Probe{target = &target, own = &own}
+	knet.registry_rewound(&reg, 1.5, SHOOTER, &probe, proc(user: rawptr) {
+		p := cast(^Rewind_Probe)user
+		p.saw_target_x = p.target.x
+		p.saw_own_x = p.own.x
+	})
+
+	// Inside the query the target was where the shooter saw it (x=5), NOT its
+	// live x=10 — this is the whole point; the shooter's own entity stayed live.
+	testing.expect_value(t, probe.saw_target_x, f32(5))
+	testing.expect_value(t, probe.saw_own_x, f32(100))
+	// The live world returns after the query.
+	testing.expect_value(t, target.x, f32(10))
+	testing.expect_value(t, own.x, f32(100))
+}
+
 @(test)
 delta_excludes_owner_stream_fields :: proc(t: ^testing.T) {
 	desc := mover_desc()

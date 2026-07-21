@@ -1613,6 +1613,34 @@ session_state_hash :: proc(s: ^Session) -> u64 {
 	return knet.registry_state_hash(&s.reg)
 }
 
+// Host-side lag compensation for the COOP lane — judge `query` against the world
+// as `shooter` saw it when they fired. Every owner-streamed entity except the
+// shooter's own winds back to now − (their one-way transit + the interpolation
+// delay), the pose their screen was drawing; the live world returns after the
+// query. This is ksim.lane_rewound for games that never promoted to the sim
+// lane: a coop shooter's hitscan lands on the target where the SHOOTER aimed,
+// not where the host's stream-lagged copy has since moved it. cavecrawl leashed
+// its cast origins to dodge the lack of this.
+//
+// The rewind time is the standard coop approximation — there is no per-tick ack
+// to derive it from the way the sim lane does, so it trusts the shooter's
+// smoothed RTT and the known interp delay. Host-owned (delta) state has no
+// stream history and is judged live. The host judges its own shots live.
+session_rewound :: proc(s: ^Session, shooter: knet.Player_Id, user: rawptr, query: knet.Rewound_Query) {
+	assert(s.is_host, "lag compensation is the authority's job")
+	if shooter == s.me {
+		query(user) // the host's own screen IS the live world
+		return
+	}
+	lag := s.interp_delay
+	if p, ok := s.players[shooter]; ok {
+		if c := s.clocks[p.peer]; c.initialized {
+			lag += c.rtt * 0.5 // the shot's one-way transit up to us
+		}
+	}
+	knet.registry_rewound(&s.reg, s.now - lag, shooter, user, query)
+}
+
 // The bare call counts PRESENT PEOPLE — connected, non-dedicated — because
 // that is what every gate that says "players" means (min-players, ready
 // checks, max_players). The old bare call counted ghosts: departed seats
