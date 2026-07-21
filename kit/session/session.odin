@@ -30,6 +30,7 @@ package kit_session
 // brick) keep the door open.
 
 import knet "godot:kit/net"
+import "base:intrinsics"
 import "core:fmt"
 import "core:mem"
 import "core:strings"
@@ -401,6 +402,71 @@ session_app_begin :: proc(s: ^Session, tag: u8) -> ^knet.Writer {
 // .Stream message and nothing orders it against the reliable lane.
 session_app_flush :: proc(s: ^Session, to_peer: Peer_Id, channel: Channel = .Reliable) {
 	s.send(s.send_user, to_peer, knet.writer_bytes(&s.app_w), channel)
+}
+
+// ---- typed app messages: a POD payload, decoded for you --------------------
+//
+// The bare route (session_app_route) hands the receiver a raw Reader to parse by
+// hand — the rawptr surface every game re-wrote a read loop against. A TYPED
+// route carries a POD payload struct: session_app_send frames it, and the
+// receiver's handler is called with the decoded value, no read code. The game
+// owns the route record (like kcombat.Fire_Route), so the kit keeps no per-route
+// heap or globals — parallel sessions never collide. POD only (the #assert
+// refuses a pointer or slice, whose bytes a raw copy would carry as a dangling
+// address); for text or variable-length data, frame it yourself on a bare route.
+Typed_Route :: struct($T: typeid) {
+	handler: proc(user: rawptr, from: knet.Player_Id, msg: T),
+	user:    rawptr,
+}
+
+// Route `tag` to a TYPED handler. `route` is a game-owned Typed_Route(T) (a field
+// on your struct); it holds the handler + user so the generated dispatch thunk
+// can reach them. Same survives-*_start and tag-collision rules as
+// session_app_route.
+session_app_listen :: proc(
+	s: ^Session,
+	tag: u8,
+	route: ^Typed_Route($T),
+	user: rawptr,
+	handler: proc(user: rawptr, from: knet.Player_Id, msg: T),
+) {
+	#assert(
+		intrinsics.type_is_nearly_simple_compare(T) && !intrinsics.type_is_pointer(T) && !intrinsics.type_is_multi_pointer(T),
+		"session_app_listen: the payload T must be POD (no strings, slices, maps, or pointers — frame those yourself on a bare session_app_route)",
+	)
+	route.handler = handler
+	route.user = user
+	session_app_route(s, tag, route, app_typed_dispatch(T))
+}
+
+// The per-T dispatch thunk: decode the POD payload and hand it to the typed
+// handler. Concrete per T (the nested proc resolves T at instantiation), so
+// there is exactly one for each payload type the program routes.
+@(private = "file")
+app_typed_dispatch :: proc($T: typeid) -> App_Handler {
+	return proc(user: rawptr, from: knet.Player_Id, from_peer: Peer_Id, r: ^knet.Reader) {
+		route := cast(^Typed_Route(T))user
+		if r.err || r.off + size_of(T) > len(r.data) {
+			return // a short/garbled payload never reaches the handler
+		}
+		msg: T
+		mem.copy(&msg, &r.data[r.off], size_of(T))
+		r.off += size_of(T)
+		route.handler(route.user, from, msg)
+	}
+}
+
+// Send a TYPED payload under `tag` to `to_peer`. The POD bytes are framed once
+// (no build-a-writer dance) and decoded by the matching session_app_listen.
+session_app_send_typed :: proc(s: ^Session, tag: u8, msg: $T, to_peer: Peer_Id, channel: Channel = .Reliable) {
+	#assert(
+		intrinsics.type_is_nearly_simple_compare(T) && !intrinsics.type_is_pointer(T) && !intrinsics.type_is_multi_pointer(T),
+		"session_app_send: the payload T must be POD (no strings, slices, maps, or pointers)",
+	)
+	m := msg
+	w := session_app_begin(s, tag)
+	append(&w.buf, ..(cast([^]u8)&m)[:size_of(T)])
+	session_app_flush(s, to_peer, channel)
 }
 
 // Ship app payload bytes under `tag` — the one-call form when the payload
