@@ -3227,3 +3227,60 @@ the_session_never_spends_the_ambient_allocator :: proc(t: ^testing.T) {
 	}
 	testing.expect_value(t, len(owned.allocation_map), 0)
 }
+
+// REPLAY: record the packets a client receives, then rebuild a fresh client from
+// that tape ALONE and prove — via the state hash — it reconstructs the exact
+// world the recorded client saw. The wire-tap + state_hash desync-forensics answer.
+@(test)
+replay_reconstructs_the_recorded_world :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_record_start(&alice.s) // capture from BEFORE the welcome
+	ksess.session_client_join(&alice.s)
+	pump(boxes) // welcome + world land in the tape
+
+	// A run: two entities (one alice's), host state mutated into deltas.
+	b1 := Bot{hp = 30, x = 3}
+	id1 := ksess.session_spawn(&host.s, BOT_TYPE, &b1, &bot_command_set)
+	b2 := Bot{hp = 10}
+	id2 := ksess.session_spawn(&host.s, BOT_TYPE, &b2, &bot_command_set, owner = alice.s.me)
+	ksess.session_start_replicating(&host.s)
+	now := 50.0
+	for _ in 0 ..< 8 {
+		b1.hp -= 1 // host-authoritative change -> a delta to alice
+		step(boxes, &now)
+	}
+
+	// Copy the tape (a slice into alice's buffer), then rebuild from it alone.
+	src := ksess.session_recording(&alice.s)
+	testing.expect(t, len(src) > 0, "alice recorded packets")
+	rec := make([]u8, len(src));defer delete(rec)
+	copy(rec, src)
+
+	replay: Peer_Box
+	box_make(&replay, 500)
+	defer box_destroy(&replay)
+	ksess.session_client_start(&replay.s, TOKEN_ALICE, "alice") // client mode; the tape seats it
+	fed := ksess.session_replay(&replay.s, rec)
+	testing.expect(t, fed > 0, "packets replayed")
+
+	// Byte-for-byte the same world — the state hash is the proof.
+	testing.expect_value(t, ksess.session_state_hash(&replay.s), ksess.session_state_hash(&alice.s))
+	testing.expect(t, replay.bots[id1] != nil && replay.bots[id2] != nil, "entities rebuilt from the tape")
+	testing.expect_value(t, replay.bots[id1].hp, i32(22)) // 30 - 8, through the replayed deltas
+
+	// Teeth: half the tape rebuilds less, so the hashes must part.
+	replay2: Peer_Box
+	box_make(&replay2, 600)
+	defer box_destroy(&replay2)
+	ksess.session_client_start(&replay2.s, TOKEN_ALICE, "alice")
+	ksess.session_replay(&replay2.s, rec[:len(rec) / 2])
+	testing.expect(t, ksess.session_state_hash(&replay2.s) != ksess.session_state_hash(&alice.s), "a partial replay is not the full world")
+}

@@ -638,6 +638,12 @@ Session :: struct {
 	using wiring: Session_Wiring,
 	using run:    Session_Run,
 	ran:          bool, // session_init completed at least once — gates the re-entrant teardown
+	// REPLAY recording (session_record_start): every packet this session HANDLES,
+	// framed with its arrival time and peer, appended here. A direct Session field
+	// (not run-scoped) because the game drives it explicitly across a run's life —
+	// run_destroy must not wipe a capture the game is still taking. Lazily made.
+	record:       knet.Writer,
+	recording:    bool,
 }
 
 // The session's stored allocator, or the caller's ambient when it is not yet
@@ -784,6 +790,7 @@ session_destroy :: proc(s: ^Session) {
 	// pointers, and plain values):
 	delete(s.type_hooks)
 	knet.writer_destroy(&s.app_w)
+	knet.writer_destroy(&s.record) // the replay capture (nil-safe if never recorded)
 	s^ = {}
 }
 
@@ -1638,6 +1645,62 @@ session_state_hash :: proc(s: ^Session) -> u64 {
 	return knet.registry_state_hash(&s.reg)
 }
 
+// ---- replay: record the received packet stream, feed it back later ----------
+//
+// A replay is a WIRE-TAP: session_record_start makes this session keep every
+// packet it handles (framed with its arrival time and peer); session_recording
+// hands back those bytes to store (wrap them in a ksave file, or ksave.record).
+// session_replay feeds a recording back through session_handle_packet on a fresh
+// session, which reconstructs exactly the world the recorded peer saw — the same
+// welcome, spawns, deltas and streams, in order. Pair it with session_state_hash
+// to PROVE the reproduction (the recorded run and the replay hash identically),
+// which is also the cheapest desync-forensics answer both games hand-rolled
+// checksums for. Record from RIGHT AFTER *_start so the welcome that seeds the
+// world is in the capture.
+session_record_start :: proc(s: ^Session) {
+	if s.record.buf == nil {
+		s.record = knet.writer_make(allocator = ses_allocator(s))
+	} else {
+		knet.writer_reset(&s.record)
+	}
+	s.recording = true
+}
+
+// Stop capturing (the recording is kept until the next record_start or destroy).
+session_record_stop :: proc(s: ^Session) {
+	s.recording = false
+}
+
+// The captured bytes so far — a slice into the session's buffer (copy it if it
+// must outlive the next record_start). Empty if nothing was recorded.
+session_recording :: proc(s: ^Session) -> []u8 {
+	return knet.writer_bytes(&s.record)
+}
+
+// Feed a recording back through the packet path: this session receives every
+// captured packet, in order, exactly as the transport delivered them the first
+// time. `s` should be a fresh CLIENT (session_client_start, factory installed,
+// NOT joined — the recorded welcome does the seating). Returns how many packets
+// replayed. Arrival times are carried in the stream for a paced playback; this
+// feeds them as fast as possible (a deterministic rebuild, not a live watch).
+session_replay :: proc(s: ^Session, recording: []u8) -> int {
+	r := knet.reader_make(recording)
+	n := 0
+	for r.off < len(r.data) {
+		_ = knet.read_f64(&r) // arrival time — carried for paced playback, unused here
+		from := Peer_Id(knet.read_i64(&r))
+		size := int(knet.read_u32(&r))
+		if r.err || size < 0 || r.off + size > len(r.data) {
+			break // truncated recording — stop at the last whole packet
+		}
+		pr := knet.reader_make(r.data[r.off:r.off + size])
+		r.off += size
+		session_handle_packet(s, from, &pr)
+		n += 1
+	}
+	return n
+}
+
 // Host-side lag compensation for the COOP lane — judge `query` against the world
 // as `shooter` saw it when they fired. Every owner-streamed entity except the
 // shooter's own winds back to now − (their one-way transit + the interpolation
@@ -2123,6 +2186,15 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 // hear from the host — except streams, which any owning peer may broadcast).
 session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 	context.allocator = ses_allocator(s) // every receive-path clone/make/free (names, rows, stat names, backup blobs, registry slices) rides the stored allocator
+	if s.recording {
+		// Tap the raw packet BEFORE it is parsed: arrival time, peer, and the whole
+		// byte string (r.off is 0 at entry — this is the transport's delivery). The
+		// replay feeds these back through this same proc, in order.
+		knet.write_f64(&s.record, s.now)
+		knet.write_i64(&s.record, i64(from_peer))
+		knet.write_u32(&s.record, u32(len(r.data)))
+		append(&s.record.buf, ..r.data)
+	}
 	handle_packet_inner(s, from_peer, r)
 	if r.err {
 		// A packet died mid-parse — every inner bail leaves r.err set, so the
