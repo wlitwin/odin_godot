@@ -3344,3 +3344,53 @@ stream_budget_bounds_and_rotates :: proc(t: ^testing.T) {
 	testing.expect_value(t, seen, N) // all rotated through — no starvation
 	testing.expect(t, max_stale < u64(N), "no entity waits longer than the rotation")
 }
+
+// TYPED app routes: session_app_send_typed frames a POD payload and
+// session_app_listen hands it back DECODED — no rawptr read loop.
+Ping_Msg :: struct {
+	a: i32,
+	b: f32,
+}
+Ping_Probe :: struct {
+	got:   Ping_Msg,
+	calls: int,
+}
+
+@(test)
+typed_app_route_decodes_the_payload :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	TAG :: u8(5)
+	route: ksess.Typed_Route(Ping_Msg)
+	probe: Ping_Probe
+	ksess.session_app_listen(&alice.s, TAG, &route, &probe, proc(user: rawptr, from: knet.Player_Id, msg: Ping_Msg) {
+		p := cast(^Ping_Probe)user
+		p.got = msg
+		p.calls += 1
+	})
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	ap, _ := ksess.session_player(&host.s, alice.s.me)
+
+	// The host sends a typed payload; alice's handler gets it decoded.
+	ksess.session_app_send_typed(&host.s, TAG, Ping_Msg{a = 42, b = 3.5}, ap.peer)
+	pump(boxes)
+	testing.expect_value(t, probe.calls, 1)
+	testing.expect_value(t, probe.got.a, i32(42))
+	testing.expect_value(t, probe.got.b, f32(3.5))
+
+	// Teeth: a short payload never reaches the handler (the dispatch bounds-checks).
+	w := ksess.session_app_begin(&host.s, TAG)
+	knet.write_u8(w, 1) // 1 byte, < size_of(Ping_Msg)
+	ksess.session_app_flush(&host.s, ap.peer)
+	pump(boxes)
+	testing.expect_value(t, probe.calls, 1) // still 1 — the short one was dropped
+}
