@@ -30,13 +30,18 @@ on the one before.
 6. **[The shape of a shippable game](06-the-shape-of-a-shippable-game.md)** —
    what you get for free once the model holds: reconnects, drop-in joins,
    saves, host migration, Steam — and the testing habit that keeps it all true.
+7. **[The competitive turn](07-the-competitive-turn.md)** — the co-op model
+   trusts your friends; a duel can't. The authority inverts (server truth,
+   client prediction, rollback) but the surface barely moves: one tag makes an
+   avatar predict-self, one makes a ball contested, and the two-timelines
+   discipline from post 5 carries straight over. Ends with the same soccer game
+   shipped a third way — predict-self plus the claim — running.
 
-Building something contested and competitive rather than co-op — a duel, a
-ranked arena, anything where clients must not be trusted with their own
-position? The same declarative surface has a second story:
-[kit/sim](../kit/sim.md), server-authoritative rollback/resimulation, chosen
-per FIELD so a game can be both. [Timelines](../kit/timelines.md) is the
-choosing guide.
+Posts 1–6 are the co-op path; post 7 is the turn onto the competitive one. Both
+ride the same declarative surface, chosen per FIELD, so a game can be co-op in
+its lobby and server-authoritative in its hitboxes. The deeper references are
+[kit/sim](../kit/sim.md) (the full lane) and [timelines](../kit/timelines.md)
+(the per-field choosing guide).
 
 **Who this is for:** Godot developers comfortable with the editor, scenes, and
 nodes. No Odin experience assumed — the language is small enough to learn from

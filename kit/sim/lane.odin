@@ -726,6 +726,20 @@ lane_claim :: proc(l: ^Lane, id: knet.Net_Id) {
 	}
 }
 
+// How strongly `id` presents from MY predicted timeline right now: 1 while my sim
+// is claiming it (lane_claim this tick), decaying to 0 over ~a quarter second
+// after the influence stops (then it draws the watched view). A read of the same
+// weight lane_present blends by — for a claim-mode game's own telemetry (a
+// netgraph tint, a debug overlay) or an acid proving the claim rose on a touch.
+lane_claimed :: proc(l: ^Lane, id: knet.Net_Id) -> f32 {
+	for &tr in l.tracked {
+		if tr.id == id {
+			return tr.claim
+		}
+	}
+	return 0
+}
+
 // Broadcast a fact to every screen that didn't simulate it live — the
 // generated thunks (an entity tick's mine-form `_fx`, a declared @(gd_fact)
 // door) call this on the authority. Reliable (facts are one-shots, like

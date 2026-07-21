@@ -458,11 +458,17 @@ Two rules keep the pattern honest:
   opponent contests it. Releasing on mere distance pulls your own kick
   backward mid-flight: the fade target is the watched view, sitting
   speed × timeline-skew behind a fast ball, and blending across that gap
-  cancels its forward motion on your screen (speedball shipped this bug for
-  one playtest; its claim-retention block is the reference).
+  cancels its forward motion on your screen (an earlier claim-mode build shipped
+  this bug for one playtest; `examples/claimball`'s `sp_step` claim block — hold
+  while fast, release on slow — is the reference for getting it right).
 
-See `examples/speedball` (and read it
-against `examples/slopball` — the same game on the coop model — to choose).
+The soccer game ships three times, one per model — read them against each other
+to choose: `examples/slopball` (coop, peer-authoritative), `examples/speedball`
+(predict-world — every avatar echoed, no claim), and `examples/claimball`
+(predict-self + the claim dance above). `claimball` is the worked claim-mode
+example: a contested ball predicted on every screen, presented from whoever's sim
+is driving it. The onboarding's
+[competitive turn](../onboarding/07-the-competitive-turn.md) walks the same three.
 
 ## Lag compensation
 
