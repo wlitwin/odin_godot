@@ -3394,3 +3394,51 @@ typed_app_route_decodes_the_payload :: proc(t: ^testing.T) {
 	pump(boxes)
 	testing.expect_value(t, probe.calls, 1) // still 1 — the short one was dropped
 }
+
+// MUSTER: the staging-room decision — who's ready, and whether the host may
+// start. The ready bit is the game's (a test map here); the kit owns the gate.
+muster_ready_set: map[knet.Player_Id]bool
+muster_is_ready :: proc(s: ^ksess.Session, pid: knet.Player_Id) -> bool {
+	return muster_ready_set[pid]
+}
+
+@(test)
+muster_gates_start_on_everyone_ready :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+
+	defer delete(muster_ready_set)
+
+	// Nobody ready: 0/3, and the host cannot start.
+	tal := ksess.muster_tally(&host.s, muster_is_ready)
+	testing.expect_value(t, tal.present, 3)
+	testing.expect_value(t, tal.ready, 0)
+	testing.expect(t, !ksess.muster_can_start(&host.s, 2, muster_is_ready), "no start with nobody ready")
+
+	// Two of three ready: still gated (all present must be ready).
+	muster_ready_set[host.s.me] = true
+	muster_ready_set[alice.s.me] = true
+	tal = ksess.muster_tally(&host.s, muster_is_ready)
+	testing.expect_value(t, tal.ready, 2)
+	testing.expect(t, !ksess.muster_can_start(&host.s, 2, muster_is_ready), "not everyone ready yet")
+
+	// All three ready and >= min: the host may start.
+	muster_ready_set[bob.s.me] = true
+	testing.expect(t, ksess.muster_can_start(&host.s, 2, muster_is_ready), "all ready, min met")
+
+	// A CLIENT never gets to start, no matter the room.
+	testing.expect(t, !ksess.muster_can_start(&alice.s, 2, muster_is_ready), "starting is the host's")
+}

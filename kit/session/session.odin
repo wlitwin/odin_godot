@@ -1703,6 +1703,46 @@ session_roster :: proc(s: ^Session, allocator := context.temp_allocator) -> []Pl
 	return out[:]
 }
 
+// ---- muster: the staging-room paradigm decision (who's ready, may we start) --
+//
+// A ready-up lobby is the last meta-game paradigm every game re-derived: rows of
+// players, a ready bit each, a START the host may press only when the room is
+// set. The BIT lives wherever the game keeps it — a profile row's `ready: bool`,
+// a stat column — so muster_* takes a PREDICATE for it, not a type: the kit owns
+// the DECISION (the count, the gate) and kit/ui's muster widget owns the pixels.
+Muster_Tally :: struct {
+	ready:   int, // present players whose ready bit is set
+	present: int, // present PLAYERS: connected, not a spectator, not the server seat
+}
+
+Ready_Proc :: proc(s: ^Session, pid: knet.Player_Id) -> bool
+
+// How many present players are ready, out of how many present. A watcher and a
+// dedicated-server seat are in the room but not the game — never counted.
+muster_tally :: proc(s: ^Session, ready: Ready_Proc) -> Muster_Tally {
+	t: Muster_Tally
+	for p in session_roster(s) {
+		if p.dedicated || p.spectator || !p.connected {
+			continue
+		}
+		t.present += 1
+		if ready(s, p.id) {
+			t.ready += 1
+		}
+	}
+	return t
+}
+
+// May the host START? Host-only (starting is the authority's to do — a client
+// always gets false), at least `min` present players, every one of them ready.
+muster_can_start :: proc(s: ^Session, min: int, ready: Ready_Proc) -> bool {
+	if !s.is_host {
+		return false
+	}
+	t := muster_tally(s, ready)
+	return t.present >= max(min, 1) && t.ready == t.present
+}
+
 // Which player owns an entity (PLAYER_ID_INVALID = the host/world) — saves
 // games keeping their own reverse maps.
 session_owner_of :: proc(s: ^Session, id: knet.Net_Id) -> knet.Player_Id {
