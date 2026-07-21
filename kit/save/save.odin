@@ -33,6 +33,7 @@ import "godot:gdext"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import "core:mem"
+import "base:intrinsics"
 
 MAGIC :: u32(0x46534C50) // "FSLP"
 // HAND-BUMPED, and the one place in the kit that still should be — see
@@ -167,4 +168,92 @@ read_file :: proc(path: cstring, allocator := context.allocator) -> (bytes: []u8
 	bytes = make([]u8, len(view), allocator)
 	copy(bytes, view)
 	return bytes, true
+}
+
+// ---- versioned local POD records -------------------------------------------
+//
+// A profile, a settings blob, unlocked cosmetics — state that lives on ONE
+// machine, not in the session snapshot. Every game hand-rolled the same shape:
+// a version u16, then a field-by-field write_u32/read_u8 pair, then a fresh-
+// start on a version or length mismatch. record_* is that shape, once — the
+// gd:"backup" POD discipline pointed at a file.
+//
+// The value IS its bytes (POD only — the #assert below refuses a pointer or a
+// slice, which a raw copy would serialize as a dangling address). MIGRATION is
+// append-only zero-default: add new fields at the END and leave the version
+// alone — an older file is SHORTER, and record_decode reads its missing tail as
+// zero. Bump the version only when you REORDER, REMOVE, or RETYPE a field, which
+// makes an old file a .Skew the game restarts from rather than a silent misread.
+// Same-machine bytes: padding and endianness are stable within a version, which
+// is exactly the scope ("local record") this serves.
+RECORD_MAGIC :: u32(0x5245_4344) // "RECD"
+
+Record_Result :: enum u8 {
+	Ok, // decoded into `value`
+	Missing, // no file yet — a fresh start, silently
+	Skew, // a different version — an incompatible format; start fresh, loudly
+	Corrupt, // wrong magic / truncated / garbled; start fresh, loudly
+}
+
+// Frame a POD value into bytes: [MAGIC][version u16][size u32][raw bytes]. The
+// pure half of record_write, so a game can send the record somewhere other than
+// a file (and so it is testable without the engine's FileAccess).
+record_encode :: proc(value: $T, version: u16, allocator := context.allocator) -> []u8 {
+	#assert(
+		intrinsics.type_is_nearly_simple_compare(T) && !intrinsics.type_is_pointer(T) && !intrinsics.type_is_multi_pointer(T),
+		"ksave.record: T must be POD (ints/floats/bools/enums/vectors/fixed arrays — no strings, slices, maps, or pointers; a raw copy would serialize a dangling address)",
+	)
+	v := value
+	w := knet.writer_make(allocator = allocator)
+	knet.write_u32(&w, RECORD_MAGIC)
+	knet.write_u16(&w, version)
+	knet.write_u32(&w, u32(size_of(T)))
+	append(&w.buf, ..(cast([^]u8)&v)[:size_of(T)])
+	return knet.writer_bytes(&w)
+}
+
+// Parse bytes framed by record_encode back into a T of THIS build's layout. A
+// shorter payload (an older, append-only version) leaves the extra tail zero;
+// a longer one is truncated to this build's size. The pure half of record_read.
+record_decode :: proc($T: typeid, bytes: []u8, version: u16) -> (value: T, result: Record_Result) {
+	#assert(
+		intrinsics.type_is_nearly_simple_compare(T) && !intrinsics.type_is_pointer(T) && !intrinsics.type_is_multi_pointer(T),
+		"ksave.record: T must be POD (ints/floats/bools/enums/vectors/fixed arrays — no strings, slices, maps, or pointers)",
+	)
+	r := knet.reader_make(bytes)
+	if knet.read_u32(&r) != RECORD_MAGIC {
+		return {}, .Corrupt
+	}
+	if knet.read_u16(&r) != version {
+		return {}, .Skew
+	}
+	size := int(knet.read_u32(&r))
+	if r.err || size < 0 {
+		return {}, .Corrupt
+	}
+	n := min(size, size_of(T))
+	if r.off + n > len(bytes) {
+		return {}, .Corrupt // the payload is shorter than its own length says
+	}
+	if n > 0 {
+		mem.copy(&value, &bytes[r.off], n) // value is zero-init; any tail past n stays zero
+	}
+	return value, .Ok
+}
+
+// Save a POD record to `path` (a user:// file). false = the disk refused.
+record_write :: proc(value: $T, path: cstring, version: u16) -> bool {
+	bytes := record_encode(value, version, context.temp_allocator)
+	return write_file(path, bytes)
+}
+
+// Load a POD record from `path`. .Missing = no file yet (a fresh start); .Skew /
+// .Corrupt = there was one but this build cannot use it (start fresh, and say so
+// — a silently-dropped save is a worse bug than a loud one).
+record_read :: proc($T: typeid, path: cstring, version: u16) -> (value: T, result: Record_Result) {
+	bytes, ok := read_file(path, context.temp_allocator)
+	if !ok {
+		return {}, .Missing
+	}
+	return record_decode(T, bytes, version)
 }
