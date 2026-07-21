@@ -247,3 +247,50 @@ lobby_refresh :: proc(l: ^Lobby, s: ^ksess.Session) {
 		gd.set_bool(cast(gd.Object)l.rows[i], "visible", false)
 	}
 }
+
+// The MUSTER refresh: lobby_refresh with a READY LAMP on every player — a filled
+// dot when their ready bit is set, a hollow one when not (the bit is the game's,
+// read through `ready`; see ksess.muster_tally). A watcher shows no lamp. Drives
+// the SAME rows as lobby_refresh; call one or the other while staging. Gate the
+// Start button with ksess.muster_can_start:
+//
+//     kui.muster_refresh(&self.lobby, &self.ses, my_ready)
+//     kui.lobby_show_menu(&self.lobby, false, ksess.muster_can_start(&self.ses, 2, my_ready))
+muster_refresh :: proc(l: ^Lobby, s: ^ksess.Session, ready: ksess.Ready_Proc) {
+	roster := ksess.session_roster(s)
+	host := ksess.session_host(s)
+	next := 0
+	for p in roster {
+		if p.dedicated {continue}
+		row: gd.Label
+		if next < len(l.rows) {
+			row = l.rows[next]
+		} else {
+			row = gd.new_label()
+			gd.add_child(cast(gd.Node)l.rows_box, cast(gd.Node)row)
+			append(&l.rows, row)
+		}
+		next += 1
+		gd.set_bool(cast(gd.Object)row, "visible", true)
+
+		crown := p.id == host ? "\xF0\x9F\x91\x91 " : ""
+		you := p.id == s.me ? "  (you)" : ""
+		// The lamp: filled/hollow for a present player, none for a watcher or an
+		// away seat (they are in the room, not the readiness count).
+		lamp := "\xE2\x97\x8B " // ○ hollow — not ready
+		suffix := ""
+		if p.spectator {
+			lamp = ""
+			suffix = "  (watching)"
+		} else if !p.connected {
+			lamp = ""
+			suffix = "  (away)"
+		} else if ready(s, p.id) {
+			lamp = "\xE2\x97\x8F " // ● filled — ready
+		}
+		gd.set_string(cast(gd.Object)row, "text", fmt.ctprintf("%s%s%s%s%s", lamp, crown, p.name, you, suffix))
+	}
+	for i in next ..< len(l.rows) {
+		gd.set_bool(cast(gd.Object)l.rows[i], "visible", false)
+	}
+}
