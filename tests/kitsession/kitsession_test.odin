@@ -3284,3 +3284,63 @@ replay_reconstructs_the_recorded_world :: proc(t: ^testing.T) {
 	ksess.session_replay(&replay2.s, rec[:len(rec) / 2])
 	testing.expect(t, ksess.session_state_hash(&replay2.s) != ksess.session_state_hash(&alice.s), "a partial replay is not the full world")
 }
+
+// BANDWIDTH BUDGET: a per-peer stream cap sends only the highest-priority updates
+// that fit — stalest first, so the send is bounded AND nothing starves. Every
+// entity gets its turn within the rotation.
+@(test)
+stream_budget_bounds_and_rotates :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+	now := f64(1000)
+
+	// A tight per-peer stream budget; interest ON (the budget needs the per-peer
+	// routing it turns on) with a wide radius so every entity stays in the set.
+	ksess.session_configure(&host.s, ksess.Session_Config{stream_budget = 24})
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_set_interest(&host.s, 5000, 0, nil, bot_locate)
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	ksess.session_set_focus(&host.s, alice.s.me, 100, 0)
+	ksess.session_start_replicating(&host.s)
+
+	// N host-streamed entities (owner = the host's own id, so they stream),
+	// clustered near alice's focus so all are in her interest.
+	N :: 8
+	bots: [N]Bot
+	ids: [N]knet.Net_Id
+	for i in 0 ..< N {
+		bots[i] = Bot{hp = 1, x = f32(100 + i)}
+		ids[i] = ksess.session_spawn(&host.s, BOT_TYPE, &bots[i], &bot_command_set, owner = host.s.me)
+	}
+
+	// One tick: the budget sends SOME but not ALL — bounded below the full set.
+	step(boxes, &now)
+	tk := ksess.session_tick_no(&host.s)
+	this_tick := 0
+	for key, sent in host.s.stream_sent {
+		if key.player == alice.s.me && sent == tk {this_tick += 1}
+	}
+	testing.expect(t, this_tick >= 1, "the budget still makes progress")
+	testing.expect(t, this_tick < N, "the budget bounds a tick below the full set")
+
+	// Over many ticks EVERY entity gets its turn (nothing starves) and none waits
+	// longer than the rotation — the stalest-first order guarantees both.
+	for _ in 0 ..< 30 {step(boxes, &now)}
+	tk = ksess.session_tick_no(&host.s)
+	seen := 0
+	max_stale := u64(0)
+	for i in 0 ..< N {
+		if sent, ok := host.s.stream_sent[ksess.Interest_Key{alice.s.me, ids[i]}]; ok {
+			seen += 1
+			if tk - sent > max_stale {max_stale = tk - sent}
+		}
+	}
+	testing.expect_value(t, seen, N) // all rotated through — no starvation
+	testing.expect(t, max_stale < u64(N), "no entity waits longer than the rotation")
+}

@@ -32,6 +32,7 @@ package kit_session
 // relevant to everyone, forever.
 
 import knet "godot:kit/net"
+import "core:slice"
 
 // `z` completes the position for 3D worlds; a 2D game returns 0 and the
 // math collapses to the plane (the focus default matches — 2D callers of
@@ -120,18 +121,25 @@ interest_tick :: proc(s: ^Session) {
 			key := ikey(pid, id)
 			in_set := s.interest[key]
 			lim := in_set ? s.interest_r + s.interest_hys : s.interest_r
-			near := always || d2(focus, x, y, z) <= lim * lim
-			if near && !in_set {
-				s.interest[key] = true
-				// The re-entry resync: everything this peer missed while the
-				// entity was out of sight, in one reconciling spawn tuple.
-				w := knet.writer_make()
-				defer knet.writer_destroy(&w)
-				knet.write_u8(&w, SES_SPAWN)
-				write_spawn_tuple(s, &w, id)
-				s.send(s.send_user, p.peer, knet.writer_bytes(&w), .Reliable)
-			} else if !near && in_set {
+			dd := d2(focus, x, y, z)
+			near := always || dd <= lim * lim
+			if near {
+				// Distance² for the bandwidth budget's near-first tiebreak
+				// (always-visible entities count as centered, 0).
+				s.interest_d2[key] = always ? 0 : dd
+				if !in_set {
+					s.interest[key] = true
+					// The re-entry resync: everything this peer missed while the
+					// entity was out of sight, in one reconciling spawn tuple.
+					w := knet.writer_make()
+					defer knet.writer_destroy(&w)
+					knet.write_u8(&w, SES_SPAWN)
+					write_spawn_tuple(s, &w, id)
+					s.send(s.send_user, p.peer, knet.writer_bytes(&w), .Reliable)
+				}
+			} else if in_set {
 				delete_key(&s.interest, key)
+				delete_key(&s.interest_d2, key)
 			}
 		}
 	}
@@ -188,7 +196,7 @@ interest_send_state :: proc(s: ^Session, changed: ^[dynamic]knet.Net_Id) -> int 
 // per-recipient batches and send them. Used by the host both for its OWN
 // outgoing batch and to forward a client owner's batch (exclude the origin).
 @(private)
-interest_route_streams :: proc(s: ^Session, raw: []u8, exclude: Peer_Id) {
+interest_route_streams :: proc(s: ^Session, raw: []u8, exclude: Peer_Id, tick: u64 = 0) {
 	// The registry owns the batch layout end to end — this routing only ever
 	// sees opaque per-entity ranges to copy, so a wire change there can never
 	// silently mis-split here.
@@ -197,9 +205,24 @@ interest_route_streams :: proc(s: ^Session, raw: []u8, exclude: Peer_Id) {
 	if !ok {
 		return // torn batch: forward nothing (the next tick supersedes)
 	}
+	budget := s.cfg.stream_budget
 	for pid, p in s.players {
 		if !p.connected || pid == s.me || p.peer == exclude {
 			continue
+		}
+		// The peer's interested segments, in the order they will be sent. With a
+		// budget on, that order is PRIORITY: stalest first (nothing starves),
+		// nearest breaking ties — and only the prefix that fits is sent, the rest
+		// deferred to a tick when their staleness has climbed. With no budget the
+		// registry's own order stands and everyone gets everything.
+		picks := make([dynamic]knet.Delta_Seg, 0, len(segs), context.temp_allocator)
+		for seg in segs {
+			if interest_has(s, pid, seg.id) {
+				append(&picks, seg)
+			}
+		}
+		if budget > 0 && len(picks) > 0 {
+			interest_prioritize(s, pid, tick, picks[:])
 		}
 		w := knet.writer_make(128, context.temp_allocator)
 		knet.write_u8(&w, SES_STREAM)
@@ -207,12 +230,18 @@ interest_route_streams :: proc(s: ^Session, raw: []u8, exclude: Peer_Id) {
 		count_at := len(w.buf)
 		knet.write_u16(&w, 0)
 		n := 0
-		for seg in segs {
-			if !interest_has(s, pid, seg.id) {
-				continue
+		used := 0
+		for seg in picks {
+			size := seg.to - seg.from
+			if budget > 0 && n > 0 && used + size > budget {
+				break // the peer's slice is full — the rest ride a later tick
 			}
 			append(&w.buf, ..raw[seg.from:seg.to])
+			used += size
 			n += 1
+			if budget > 0 {
+				s.stream_sent[ikey(pid, seg.id)] = tick // reset this pair's staleness
+			}
 		}
 		if n == 0 {
 			continue
@@ -220,6 +249,35 @@ interest_route_streams :: proc(s: ^Session, raw: []u8, exclude: Peer_Id) {
 		assert(n <= int(max(u16)))
 		knet.writer_patch_u16(&w, count_at, u16(n))
 		s.send(s.send_user, p.peer, knet.writer_bytes(&w), .Stream)
+	}
+}
+
+// Sort a peer's interested segments into SEND order for the budget: stalest
+// first — (tick - the tick this pair last shipped), so an entity skipped for the
+// budget climbs the queue until it goes; then nearest first (smaller distance²).
+// A never-sent pair reads as maximally stale and leads. Stable so equal keys keep
+// the registry's order.
+@(private = "file")
+interest_prioritize :: proc(s: ^Session, pid: knet.Player_Id, tick: u64, picks: []knet.Delta_Seg) {
+	// Odin's sort predicate takes no context, so SCORE each pick into a parallel
+	// array (its staleness/distance are fixed for this tick) and sort that.
+	Score :: struct {
+		seg:   knet.Delta_Seg,
+		stale: u64,
+		d2:    f32,
+	}
+	scored := make([]Score, len(picks), context.temp_allocator)
+	for seg, i in picks {
+		last, sent := s.stream_sent[ikey(pid, seg.id)]
+		stale := sent ? tick - last : max(u64) // never shipped -> maximally stale
+		scored[i] = Score{seg = seg, stale = stale, d2 = s.interest_d2[ikey(pid, seg.id)]}
+	}
+	slice.stable_sort_by(scored, proc(a, b: Score) -> bool {
+		if a.stale != b.stale {return a.stale > b.stale} // stalest first
+		return a.d2 < b.d2 // then nearest
+	})
+	for sc, i in scored {
+		picks[i] = sc.seg
 	}
 }
 

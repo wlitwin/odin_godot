@@ -461,6 +461,14 @@ Session_Config :: struct {
 	backup_interval: f64, // backup-host snapshot refresh cadence
 	max_players:     int, // NEW joins refused past this many present people (0 = DEFAULT_MAX_PLAYERS, 8; negative = unlimited on purpose; rejoins always reclaim their seat)
 	change_events:   bool, // emit Ev_Entity_Changed per dirty entity per tick (repaint THAT, not everything). Off by default: at friendslop scale repaint-everything is usually fine
+	// Per-peer STREAM bandwidth cap, bytes per tick (0 = unlimited, the default).
+	// When set, each peer receives only the highest-priority owner-stream updates
+	// that fit — priority is STALENESS (ticks since that peer last got that
+	// entity), so nothing starves, with distance as the tiebreak (near first).
+	// The lever the O(entities x peers) send needs at scale; requires interest
+	// management (session_set_interest) since only the per-peer routing it turns
+	// on can budget a peer at all — a broadcast fans out through the relay whole.
+	stream_budget:   int,
 	fingerprint:     u64, // the build's WIRE CONTRACT hash. 0 (the default) =
 	// use the generated NET_FINGERPRINT — scriptgen's guard file registers it
 	// at load (default_net_fingerprint), so the version gate is ON without any
@@ -631,7 +639,12 @@ Session_Run :: struct {
 	// interest run state (interest.odin)
 	focus:      map[knet.Player_Id][3]f32, // host: each peer's eyes (z = 0 for 2D games)
 	interest:   map[Interest_Key]bool, // host: (player, entity) pairs currently near
-	aoi_client: bool, // client: the welcome said streams route via the host
+	// bandwidth budget (interest.odin): the tick each (peer, entity) last had a
+	// stream update sent, and its distance² from that peer's focus — the two
+	// inputs the per-peer stream budget prioritizes by (staleness, then near).
+	stream_sent: map[Interest_Key]u64,
+	interest_d2: map[Interest_Key]f32,
+	aoi_client:  bool, // client: the welcome said streams route via the host
 }
 
 Session :: struct {
@@ -685,6 +698,8 @@ run_destroy :: proc(run: ^Session_Run) {
 	delete(run.stats)
 	delete(run.focus)
 	delete(run.interest)
+	delete(run.stream_sent)
+	delete(run.interest_d2)
 	delete(run.backup)
 	delete(run.succ_info)
 	delete(run.successor_info)
@@ -1473,7 +1488,7 @@ net_tick :: proc(s: ^Session) {
 		knet.write_u8(&w, SES_STREAM)
 		if knet.registry_write_streams(&w, &s.reg, s.me, s.now, t) > 0 {
 			if interest_on(s) {
-				interest_route_streams(s, knet.writer_bytes(&w)[1:], 0)
+				interest_route_streams(s, knet.writer_bytes(&w)[1:], 0, t)
 			} else if !s.is_host && s.aoi_client {
 				s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Stream)
 			} else {
@@ -2470,7 +2485,7 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		_ = knet.registry_stream_time(r) // sender stamp (clock-mapped timelines later)
 		_ = knet.registry_apply_streams(r, &s.reg, s.me, s.now)
 		if interest_on(s) {
-			interest_route_streams(s, raw, from_peer)
+			interest_route_streams(s, raw, from_peer, s.ticker.tick)
 		}
 	case SES_APP:
 		tag := knet.read_u8(r)
