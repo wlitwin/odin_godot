@@ -279,6 +279,20 @@ successor_recv :: proc(s: ^Session, r: ^knet.Reader) {
 // owned entities exactly like any reconnect. That includes the dead HOST,
 // if it started with a token (session_host_start's `token` param); without
 // one it returns as a NEW player.
+//
+// WARNING — the dead host's AVATAR re-owns to the heir too. The re-own sweep
+// below (RE-OWN THE ORPHANS) hands EVERY entity the dead host owned to the heir,
+// because the kit can't tell an NPC (adopt it, keep it alive) from the host's
+// own player avatar (park it — the host may reclaim it on rejoin) — both are
+// owned by the same departed seat. So a returning former host that reconnects
+// under its token reseats, but its body now belongs to the heir, and any
+// "my avatar = the entity I own" logic finds nothing to re-embody. If your game
+// lets a former host reclaim its avatar, RE-OWN each player's avatar back to
+// that player's seat on takeover, game-side (scrapyard's succ_fixups is the
+// worked pattern: it walks its by_player census and re-owns each runner to its
+// seat during the crown, leaving mobs with the heir). The deeper root is general:
+// a census keyed on SPAWN-TIME owner goes stale the moment ownership transfers —
+// a game that moves entity ownership at all must handle Ev_Owner_Changed.
 // Returns false on a corrupt blob (destroy the session and start clean).
 session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backup: []u8) -> bool {
 	assert(s.factory_make != nil, "resume recreates entities through the factory — install it first")
@@ -370,6 +384,9 @@ session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backu
 	// before `replicating`, so no SES_SETOWNER goes out (nobody to tell yet — the
 	// corrected owner rides the SES_WORLD every rejoiner gets); Ev_Owner_Changed
 	// still fires, so a game gluing an entity to its owner adopts it here.
+	// CAVEAT: this also grabs the dead host's own AVATAR — a game that lets the
+	// former host reclaim it must re-own avatars back to their seats game-side
+	// (see the WARNING on session_host_resume above).
 	if old_host != me && old_host != knet.PLAYER_ID_INVALID {
 		orphans := make([dynamic]knet.Net_Id, context.temp_allocator)
 		for id in s.types {

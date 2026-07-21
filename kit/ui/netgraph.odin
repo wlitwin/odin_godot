@@ -37,6 +37,21 @@ Net_Stats :: struct {
 	resims:    int, // lane.stat_resims — running tally; the widget sparks its per-frame delta
 	recons:    int, // lane.stat_reconciles — running tally
 	fact_drops: int, // lane.stat_facts_dropped — world facts refused by a full queue; drawn when > 0
+	// Silent-failure counters — each exists precisely BECAUSE the failure it
+	// names is otherwise invisible (a game that never thinks to print it rides a
+	// degraded run without a mark — quickdraw's lag-comp regression did exactly
+	// that through a 60s acid). They draw in a `warn` row only when > 0, and a ▲
+	// marks any that MOVED this refresh: a cold-start clamp of 1 is normal, a
+	// count that keeps CLIMBING is the bug, and the number alone can't tell them
+	// apart. Fills (each optional; 0 = quiet):
+	//   guard_hits     ksess.session_guard_hits(s) — a client wrote a host-lane field (either model)
+	//   input_drops    lane.stat_input_drops       — sim input windows dropped (host)
+	//   cmd_capped     lane.stat_cmd_capped        — verbs refused by the per-player cap (host)
+	//   rewind_clamped lane.stat_rewind_clamped    — a lag-comp rewind clamped to the buffer horizon
+	guard_hits:     u64,
+	input_drops:    int,
+	cmd_capped:     int,
+	rewind_clamped: int,
 	// The bytes-by-kind line, pre-formatted by netgd.wire_traffic(&boot.wire)
 	// — the widget renders it opaquely ("" = skip the row), so kit/ui never
 	// imports the transport.
@@ -51,6 +66,8 @@ Netgraph :: struct {
 	head:    int, // next write slot
 	seen:    int, // resims tally at the last refresh — the spark's shadow
 	primed:  bool, // seen is valid (skip the first frame's bogus delta)
+	warn_seen:   [4]u64, // last-refresh totals of the warn counters — the ▲ (moving) shadow
+	warn_primed: bool,
 }
 
 // Levels 0..8 as the eighth-blocks ▁▂▃▄▅▆▇█ (U+2581..U+2588); index 0 is the
@@ -127,6 +144,38 @@ netgraph_refresh :: proc(ng: ^Netgraph, stats: Net_Stats) {
 			fmt.sbprintf(&b, "  fdrop %d", stats.fact_drops)
 		}
 	}
+
+	// The WARN row: silent-failure counters, drawn only once something has fired,
+	// each flagged ▲ if it MOVED this refresh — a lone cold-start tick reads as a
+	// quiet number, a climbing one wears the arrow. (The delta is the whole point:
+	// nonzero-forever is normal for a clamp that fired once at join; still moving
+	// a minute in is the bug.)
+	warn_labels := [4]string{"gwrite", "idrop", "ccap", "rclamp"}
+	warn := [4]u64 {
+		stats.guard_hits,
+		u64(max(stats.input_drops, 0)),
+		u64(max(stats.cmd_capped, 0)),
+		u64(max(stats.rewind_clamped, 0)),
+	}
+	any_warn := false
+	for v in warn {
+		if v > 0 {
+			any_warn = true
+			break
+		}
+	}
+	if any_warn {
+		strings.write_string(&b, "\nwarn")
+		for v, i in warn {
+			if v == 0 {
+				continue
+			}
+			moving := ng.warn_primed && v > ng.warn_seen[i]
+			fmt.sbprintf(&b, "  %s %d%s", warn_labels[i], v, moving ? "\xE2\x96\xB2" : "") // ▲ = still climbing
+		}
+	}
+	ng.warn_seen = warn
+	ng.warn_primed = true
 
 	gd.set_string(cast(gd.Object)ng.label, "text", fmt.ctprintf("%s", strings.to_string(b)))
 }

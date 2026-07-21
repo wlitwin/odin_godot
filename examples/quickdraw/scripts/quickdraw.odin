@@ -164,6 +164,12 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 	ng.resims = self.lane.stat_resims
 	ng.recons = self.lane.stat_reconciles
 	ng.fact_drops = self.lane.stat_facts_dropped
+	// The sim lane's silent-failure counters (guard_hits rides in from boot). The
+	// rewind clamp is the one this game's own regression hid in: a host-side lag-comp
+	// rewind pinned to the buffer horizon leaves no other trace than this number.
+	ng.input_drops = self.lane.stat_input_drops
+	ng.cmd_capped = self.lane.stat_cmd_capped
+	ng.rewind_clamped = self.lane.stat_rewind_clamped
 	kui.netgraph_refresh(&self.netgraph, ng)
 
 	// THE LEAD TRACE (a diagnostic, not a game rule — it prints and asserts

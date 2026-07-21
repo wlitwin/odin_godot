@@ -222,8 +222,19 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	kitems.items_register(&self.table, TORCH, "torch", 5)
 	kcombat.fire_listen(&self.fires, &self.ses, TAG_FIRE)
 
-	// (The wire-contract version gate is on by default — the generated guard
-	// file registers NET_FINGERPRINT as the session default at load.)
+	// The wire-contract version gate is on by default (the generated guard file
+	// registers NET_FINGERPRINT as the session default at load) — but that hashes
+	// the wire SHAPES, not the MEANING of our item bytes. GEM=1/TORCH=2 are game
+	// constants that never ship; a build that reordered them keeps a byte-identical
+	// Slot layout, passes the door, and then reads a replicated `item=1` as the
+	// wrong thing. Fold the table's contract onto the shape hash so that skew is
+	// refused at the door instead (see kitems.items_contract / session_mix_fingerprint).
+	ksess.session_configure(&self.ses, ksess.Session_Config{
+		fingerprint = ksess.session_mix_fingerprint(0, kitems.items_contract(&self.table)),
+	})
+
+	// The stock stack — lobby, chat+comms, scoreboard, stage/world, wire,
+	// legend — is kit/boot's. Everything below is what makes this CAVECRAWL.
 	// The stock stack — lobby, chat+comms, scoreboard, stage/world, wire,
 	// legend — is kit/boot's. Everything below is what makes this CAVECRAWL.
 	kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{

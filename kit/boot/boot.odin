@@ -867,9 +867,10 @@ boot_code_pulse :: proc(b: ^Boot) {
 // call this (every caller does).
 boot_net_stats :: proc(b: ^Boot) -> kui.Net_Stats {
 	ng := kui.Net_Stats {
-		rtt_ms  = kui.net_ping_ms(b.ses),
-		drops   = ksess.session_malformed(b.ses),
-		traffic = netgd.wire_traffic(&b.wire),
+		rtt_ms     = kui.net_ping_ms(b.ses),
+		drops      = ksess.session_malformed(b.ses),
+		guard_hits = ksess.session_guard_hits(b.ses), // a client wrote a host-lane field (either model) — surface it beside drops
+		traffic    = netgd.wire_traffic(&b.wire),
 	}
 	if _, jit, loss, has := netgd.wire_link_quality(&b.wire, ksess.HOST_PEER); has {
 		ng.jitter_ms = jit

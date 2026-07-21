@@ -133,6 +133,51 @@ definitions_are_redeclarable :: proc(t: ^testing.T) {
 	testing.expect(t, ok && d.max_stack == 1)
 }
 
+// items_contract folds into the wire fingerprint (ksession.session_mix_fingerprint),
+// so it must be blind to registration order and sensitive to every change that
+// alters what a received item byte MEANS. session_mix_fingerprint is deterministic
+// over this string, so contract equality IS fingerprint equality — pinning the
+// string here pins the door behavior without dragging the session runtime in.
+@(test)
+items_contract_canonical_and_meaning_sensitive :: proc(t: ^testing.T) {
+	defer free_all(context.temp_allocator)
+
+	a: kitems.Table
+	kitems.items_register(&a, TORCH, "torch", 5)
+	kitems.items_register(&a, GEM, "gem", 99)
+	defer kitems.table_destroy(&a)
+
+	// Same set, OPPOSITE registration order — reshuffling ready() lines is not a
+	// wire change, so the contract (and thus the fingerprint) must not move.
+	b: kitems.Table
+	kitems.items_register(&b, GEM, "gem", 99)
+	kitems.items_register(&b, TORCH, "torch", 5)
+	defer kitems.table_destroy(&b)
+	testing.expect_value(t, kitems.items_contract(&a), kitems.items_contract(&b))
+
+	// A RENAME: the same id byte now names a different thing on the wire.
+	r: kitems.Table
+	kitems.items_register(&r, TORCH, "lantern", 5)
+	kitems.items_register(&r, GEM, "gem", 99)
+	defer kitems.table_destroy(&r)
+	testing.expect(t, kitems.items_contract(&a) != kitems.items_contract(&r), "a rename must change the contract")
+
+	// A REORDER: swap which id means which item. A replicated item=1 decodes as
+	// the OTHER item on a peer built the old way — the exact silent scramble.
+	s: kitems.Table
+	kitems.items_register(&s, TORCH, "gem", 99)
+	kitems.items_register(&s, GEM, "torch", 5)
+	defer kitems.table_destroy(&s)
+	testing.expect(t, kitems.items_contract(&a) != kitems.items_contract(&s), "swapping id meanings must change the contract")
+
+	// A max_stack change: the receiver acts on it (stacking math), so it counts.
+	m: kitems.Table
+	kitems.items_register(&m, TORCH, "torch", 4)
+	kitems.items_register(&m, GEM, "gem", 99)
+	defer kitems.table_destroy(&m)
+	testing.expect(t, kitems.items_contract(&a) != kitems.items_contract(&m), "a max_stack change must change the contract")
+}
+
 // ---- kit/interact ---------------------------------------------------------------
 
 @(test)

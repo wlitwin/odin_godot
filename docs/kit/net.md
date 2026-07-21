@@ -651,7 +651,81 @@ double-fire, imported).
 
 Shrinking the gap globally (`interp_delay` down, `tick_hz` up via
 `session_configure`) trades smoothness under jitter for freshness — aligning
-presentation is almost always the better spend.
+presentation is almost always the better spend. One `interp_delay` can't be
+right for both a LAN and a 120ms link, though: set it for the LAN and remote
+motion samples past the last packet on a real link; set it for the link and the
+LAN renders needlessly stale. `cfg.interp_adapt` (off by default) makes the
+delay *slew* to the worst active link's need (`rtt/2 + 2·jitter`, over the same
+ClockSync the ping stat reads) — growing promptly for headroom and shrinking
+slowly and hysteretically so it never shrinks into a spike. A set `interp_delay`
+becomes the floor; `session_interp_target` reads where the slew is headed.
+
+### If you drew the cause yourself, you own its clock
+
+Row 3 — *each screen flies its own projectile* — hides a precondition that
+`session_present` cannot check for you. `session_present(mine=false)` delays
+its callback by `interp_delay` **because the cause is rendered through the
+interpolated stream**: the delay is what cancels the stream's transit so the
+effect lands on the rendered cause. That cancellation is only correct when the
+cause really is on the interpolated timeline.
+
+An entity your game **dead-reckons into the past itself** — a spawn-tuple
+projectile you draw at `now - interp_delay` — is *already* delayed. Route its
+consequence (a hit, a splash) through `session_present` and you delay it a
+*second* time: the effect lands `interp_delay` behind a cause that was already
+`interp_delay` behind. (Measured on the C# port: a hit routed through Present
+landed 71px off vs 19px for stamping the hit instant and killing on the stamp.)
+The rule: **if you drew the cause yourself, carry a timestamp and present on it
+— don't ask `session_present`.** Present is for consequences of the
+kit-interpolated stream (streamed avatars, owner-streamed balls), which is
+every row-2 case and most of what you write. Row 3 is the exception, and
+row 3 is where you own the clock.
+
+### Projectiles: put a clock in the spawn tuple
+
+The classic row-3 mistake, worth stating outright because it *looks* correct
+and desyncs silently: replicating a projectile as a spawn-only tuple —
+`{origin, dir, speed}` with **no time in it** — and starting to integrate its
+motion from the moment the packet *arrives*. A peer that does this renders the
+projectile one network-transit behind **forever** (the error never decays; it
+is exactly this peer's ping to the shooter). Two peers at different pings see
+the same bullet in *different places*; a burst spawned in one host frame lands
+on timelines tens of ms apart. The tuple has no clock, so "when did it spawn"
+silently becomes "when did my copy of the packet land."
+
+The fix is one more field and a closed form:
+
+- **Stamp the birth.** Put the host's world-time at spawn (`Birth`) and a
+  `DeadAt` stamp *in the tuple* (5 fields, not 3). Evaluate position as a
+  closed form of `Birth` — `pos(t) = origin + dir·speed·(t − Birth)` — not by
+  integrating from arrival.
+- **Draw it in the past, like everything else remote.** Render at
+  `now - interp_delay`, where every other remote entity already lives, and the
+  bullet is wrong by the *same amount* as the enemy it flies toward — so the
+  on-screen *relationship* is right. (Chasing absolute agreement with host-now
+  is the wrong target: it renders bullets passing through enemies that haven't
+  visibly reacted yet.) Holds flat across every speed and ping.
+- **Kill on the `DeadAt` stamp, not on arrival** — and *not* through
+  `session_present` (you drew the cause; see above).
+- **Bounces** are a re-based tuple (new `origin`/`dir`/`Birth`), plus a
+  replicated segment counter whose *edge* is the bounce sound — not a
+  [fact](#facts-gd_fact--world-pass-broadcasts), because a fact leaves a late
+  joiner flying the original segment.
+
+Steady-state cost is ~nil (a live projectile is a few bytes of tuple); the
+entire cost is the spawn *burst*, so interest-management and `f16` packing
+don't help projectile volume — *batching* the spawns does.
+
+Worth knowing where the line is: a **cosmetic** row-3 visual can skip all of
+this on purpose. cavecrawl's rock tracer ([kit/fx](fx.md) `tracer_add`) is a
+naked spawn-tuple integrated from arrival and drawn at `now` — deliberately,
+because it is a *non-authoritative follower*: the rock that actually hurts is a
+host-authoritative delta entity with a server-side hit test, and the tracer's
+announcement rides the same one-way path as the eventual hp delta, so the two
+visually coincide anyway. Per-peer position divergence on a purely cosmetic
+tracer is a non-issue. The birth-stamp discipline is for a projectile whose
+*position is load-bearing* — anything a peer will read to decide a hit, a
+dodge, or a block.
 
 ## Gotchas
 

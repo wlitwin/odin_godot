@@ -45,6 +45,32 @@ _odin_gd_do_cleanup() {
 trap _odin_gd_do_cleanup EXIT
 
 # ----------------------------------------------------------------------------
+# odin_build_filtered <odin build args...> — run `odin build`, and on SUCCESS strip
+# the wall of benign dsymutil warnings that otherwise makes every first macOS build
+# look half-broken. `-use-single-module` (and Odin's per-symbol object stabs on any
+# -debug build) leaves dsymutil unable to find runtime helpers it inlined out of the
+# final image, so it warns once each — over a thousand lines of
+#   warning: (arm64)  could not find symbol '_runtime::...' in object file '...'
+# that mean nothing and bury any real message. We capture stderr and, ONLY when the
+# build SUCCEEDS, drop exactly that one line shape; a FAILED build passes its stderr
+# through verbatim (a genuine compile/link error is NEVER hidden) and returns odin's
+# exit code so callers under `set -e` abort exactly as before.
+# macOS-only cosmetic — no mirror needed in build_scripts.ps1 (Windows has no dsymutil).
+# ----------------------------------------------------------------------------
+odin_build_filtered() {
+    local errf rc=0
+    errf="$(mktemp)"
+    "$ODIN" build "$@" 2>"$errf" || rc=$?
+    if [[ "$rc" != "0" ]]; then
+        cat "$errf" >&2
+    else
+        grep -vE "^warning: \([a-z0-9_]+\)  ?could not find symbol '.*' in object file '.*'\$" "$errf" >&2 || true
+    fi
+    rm -f "$errf"
+    return "$rc"
+}
+
+# ----------------------------------------------------------------------------
 # build_scriptgen — build the //gd: codegen preprocessor and set SGEN to its path.
 #
 # Builds to a writable TEMP dir, NEVER into the addon: when odin_godot is installed
@@ -66,7 +92,7 @@ build_scriptgen() {
     odin_gd_cleanup_on_exit "$dir"
     SGEN="$dir/scriptgen"
     # -debug is cheap for a small host tool and makes a scriptgen crash debuggable.
-    "$ODIN" build "$ROOT/scriptgen" \
+    odin_build_filtered "$ROOT/scriptgen" \
         -collection:godot="$ROOT" \
         -out:"$SGEN" \
         -debug
@@ -165,13 +191,20 @@ atomic_odin_dll() {
     # stepping, no `frame variable`. One build unit gives a complete .dSYM with source
     # lines AND named/valued proc arguments in lldb, for ~0.2s extra per dll.
     # (Mirrored in build/build_scripts.ps1 BuildDll — keep them in sync.)
-    "$ODIN" build "$pkg" \
+    # odin_build_filtered drops the benign dsymutil warning wall on success and passes
+    # a real error through verbatim (see its header). Capture the code so a failed build
+    # returns exactly as the bare `odin build` did under set -e.
+    local build_rc=0
+    odin_build_filtered "$pkg" \
         -collection:godot="$ROOT" \
         -build-mode:dll \
         -use-single-module \
         -out:"$tmp" \
         ${link_flags[@]+"${link_flags[@]}"} \
-        "$@"
+        "$@" || build_rc=$?
+    if [[ "$build_rc" != "0" ]]; then
+        return "$build_rc"         # caller runs under set -e — abort exactly as before
+    fi
     # Reached only if the build succeeded (callers run under set -e). Publish the .dSYM
     # first (rm the old one even if the new build emitted none — no stale symbols), then
     # the library itself, then scrub the temp intermediates.

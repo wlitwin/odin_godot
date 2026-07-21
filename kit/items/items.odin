@@ -33,6 +33,7 @@ package kit_items
 // Item DEFINITIONS are code, not wire: every peer registers the same table in
 // ready() (ids are game constants), so only 4-byte slots ever ship.
 
+import "core:slice"
 import "core:strings"
 
 Item_Id :: distinct u16
@@ -81,6 +82,47 @@ items_shape :: proc(t: ^Table, id: Item_Id) -> Shape {
 items_def :: proc(t: ^Table, id: Item_Id) -> (Item_Def, bool) {
 	d, ok := t.defs[id]
 	return d, ok
+}
+
+// items_contract — the table's id -> (name, max_stack) mapping as ONE canonical
+// string, sorted by id so REGISTRATION order doesn't matter. Feed it to
+// ksession.session_mix_fingerprint to fold item-table meaning into the wire
+// fingerprint: a build that reordered or renamed its item ids then fails the
+// join door as a version mismatch instead of scrambling a replicated item byte
+// on the receiving peer (see the module header — ids are game constants that
+// never ship, so scriptgen's SHAPE fingerprint, which hashes only the 4-byte
+// Slot LAYOUT, cannot see what a byte MEANS; this is what closes that gap):
+//
+//     kitems.items_register(&self.table, GEM, "gem", 99)          // every id declared
+//     kitems.items_register(&self.table, TORCH, "torch", 5)
+//     cfg.fingerprint = ksession.session_mix_fingerprint(0,       // fold onto the shapes
+//         kitems.items_contract(&self.table))
+//
+// `shape` is omitted on purpose: it is a LOCAL packing detail (packing.odin),
+// never on the wire — only name + max_stack change what a received item byte
+// MEANS. The returned string lives in `allocator` (default: the temp allocator,
+// reclaimed at end of frame — fold it and forget it).
+items_contract :: proc(t: ^Table, allocator := context.temp_allocator) -> string {
+	ids := make([]Item_Id, len(t.defs), context.temp_allocator)
+	i := 0
+	for id in t.defs {
+		ids[i] = id
+		i += 1
+	}
+	slice.sort(ids)
+	b := strings.builder_make(allocator)
+	for id in ids {
+		d := t.defs[id]
+		// "id:name:max;" — the delimiters keep {"ab"} from colliding with {"a","b"}
+		// once the fields concatenate.
+		strings.write_u64(&b, u64(id))
+		strings.write_byte(&b, ':')
+		strings.write_string(&b, d.name)
+		strings.write_byte(&b, ':')
+		strings.write_u64(&b, u64(d.max_stack))
+		strings.write_byte(&b, ';')
+	}
+	return strings.to_string(b)
 }
 
 // Display name ("" for empty/unknown — UIs render blanks, not crashes).

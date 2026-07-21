@@ -163,3 +163,35 @@ Still deliberately out (documented as recipes in [session](session.md), not
 code): character-portable saves, private per-player state, and player-to-
 player trade (the mediating-entity transaction). See the design notes in the
 repository's knowledge base.
+
+**Mobile, the stance:** nothing here is mobile-hostile — Godot exports to
+iOS/Android, the wire is bytes, ENet and WebRTC both run — but two mobile
+realities are unaddressed by design. A phone's link flaps (cell↔wifi handoff,
+backgrounding) far more than the "friends rejoin an evening session" model
+assumes, and touch input has no home in the examples' keyboard/mouse verbs. The
+reconnect machinery (tokens, host takeover) is exactly what a flappy link wants
+and carries over unchanged; the gap is a touch-control layer and a UI that
+reflows to a phone, both game-side. Revisit as a worked example when a game
+ships mobile, not as kit surface.
+
+**Async correspondence (turn-a-day, play-by-mail), the stance:** out of scope,
+and honestly a different toolkit. Everything here assumes a LIVE session — a
+shared clock, interpolation timelines, presence, a host holding authority in
+RAM. An async game (chess-by-notification, a 4X you touch once a day) has no
+live clock and no host: its "wire" is a database row and a push notification,
+its "reconnect" is a fresh load of persisted state. The state-not-messages
+discipline still shapes a turn, but the transport, authority, and persistence
+models are wholly different — build it on a backend plus Godot's HTTP client;
+the netcode kit has nothing to lend it but its taste in serialization.
+
+**Database persistence (accounts, ranked ladders, a world that outlives the
+session), the stance:** deliberately not in the kit, and the seam is clean. The
+kit persists a RUN — [ksave](save.md) writes POD blobs to a local file, backups
+ride the wire, host-takeover resumes from them — but it does not persist a
+PLAYER across runs against a server store. That is a backend concern
+(Postgres/SQLite behind an auth'd API), and the kit stays agnostic: a game reads
+a profile from its backend at boot and hands the bytes to the session as
+ordinary replicated/blob state, then writes results back after the run through
+its own client. The dividing line is authority LIFETIME — the kit owns state for
+the length of a session; anything that must outlive every participant leaving
+lives in your database, not here.

@@ -116,6 +116,20 @@ the generated value, set it for a hand-rolled multi-module contract, or set
 descriptors, tests — a session with no generated fingerprint at all is simply
 unchecked, as before).
 
+One thing the generated hash **cannot** see: a *byte-keyed content table*. The
+hash covers wire SHAPES — the fact that a `Slot` is `{item: u16, count: u16}` —
+but not the MEANING a game pins to those bytes: an item id → definition
+registry, a name → id tag table, anything where "the wire byte is an index into
+game content." Reorder or rename such a table between builds and the *shapes*
+still match, so the door passes — then a replicated `item=1` decodes as the
+wrong thing on the receiving peer, the same silent scramble the shape gate
+exists to prevent. `ksess.session_mix_fingerprint(base, contract)` folds the
+table's canonical text onto the shape hash (pass `base = 0` — it means "onto the
+generated default"; a bare assignment would *replace* the shape gate), so the
+skew is refused at the door too. `kitems.items_contract(&table)` is the
+ready-made producer for item registries (sorted, so registration order doesn't
+matter); cavecrawl folds its `GEM`/`TORCH` table exactly this way.
+
 The cross-entity half of a command — a command proc may only mutate its target
 (that's what the predict/revert/reject-truth machinery protects) — lives in the verb's
 name-paired **[`<verb>_then` consequence](net.md#consequences-verb_then)**: "loot chest

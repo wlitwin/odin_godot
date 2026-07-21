@@ -96,7 +96,8 @@ hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^Player_Input) {
 	if gd.is_action_pressed("ui_up") {input.move[1] -= 1}
 }
 
-// ---- the doors (identical to hello_net, plus the dedicated one) ------------
+// ---- the doors (hello_net's plain host/join pair + the dedicated `serve`; ---
+//      hello_net has since grown optional relay/join-code paths this copy skips)
 
 @(gd_method)
 hello_sim_on_host :: proc(self: ^HelloSim) {
@@ -146,7 +147,7 @@ spawn_player :: proc(self: ^HelloSim, pid: knet.Player_Id) {
 	kboot.boot_spawn_send(&self.boot, id)
 }
 
-// ---- session event halves (identical to hello_net) --------------------------
+// ---- session event halves (the hello_net pattern) ---------------------------
 
 @(gd_half)
 hello_sim_welcomed :: proc(self: ^HelloSim, me: knet.Player_Id) {

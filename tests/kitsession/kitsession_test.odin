@@ -3442,3 +3442,82 @@ muster_gates_start_on_everyone_ready :: proc(t: ^testing.T) {
 	// A CLIENT never gets to start, no matter the room.
 	testing.expect(t, !ksess.muster_can_start(&alice.s, 2, muster_is_ready), "starting is the host's")
 }
+
+// ── adaptive interp delay (interp.odin) ──────────────────────────────────────
+// A PURE controller: it carries no Session or clock, so it is pinned directly
+// with synthetic (need, dt) sequences. The whole design is the asymmetry — grow
+// promptly for correctness headroom, shrink slowly + hysteretically so it never
+// shrinks into a spike. `want` here is the raw link need (rtt/2 + 2*jitter); the
+// controller adds INTERP_MARGIN (10ms) on top.
+
+@(test)
+interp_adapt_reset_and_no_op :: proc(t: ^testing.T) {
+	a: ksess.Interp_Adapt
+	ksess.interp_adapt_reset(&a, 0.15, 0.60)
+	testing.expect_value(t, a.delay, 0.15) // starts AT the floor
+	testing.expect_value(t, a.min, 0.15)
+	testing.expect_value(t, a.max, 0.60)
+	// dt <= 0 never moves the value (pure, resume-safe).
+	testing.expect_value(t, ksess.interp_adapt_update(&a, 1.0, 0), 0.15)
+	testing.expect_value(t, ksess.interp_adapt_update(&a, 1.0, -0.1), 0.15)
+	// A ceiling below the floor collapses to the floor (never renders fresher).
+	b: ksess.Interp_Adapt
+	ksess.interp_adapt_reset(&b, 0.15, 0.05)
+	testing.expect_value(t, b.max, 0.15)
+	testing.expect_value(t, b.delay, 0.15)
+}
+
+@(test)
+interp_adapt_grows_promptly_to_target :: proc(t: ^testing.T) {
+	a: ksess.Interp_Adapt
+	ksess.interp_adapt_reset(&a, 0.05, 0.60) // 50ms floor
+	want := 0.12 * 0.5 + 0.02 * 2.0 // a 120ms link, jitter 20ms -> 0.10
+	target := want + ksess.INTERP_MARGIN // 0.11
+	dt := 1.0 / 60.0
+	steps := 0
+	for a.delay < target - 1e-9 && steps < 240 {
+		ksess.interp_adapt_update(&a, want, dt)
+		steps += 1
+	}
+	testing.expect(t, abs(a.delay - target) < 1e-6, "grew all the way to the target")
+	testing.expect(t, f64(steps) * dt < 1.0, "grew in under a second (0.06 / 0.25 = 0.24s)")
+	// Held at target: another second of the same need does not overshoot.
+	for _ in 0 ..< 60 {ksess.interp_adapt_update(&a, want, dt)}
+	testing.expect(t, abs(a.delay - target) < 1e-6, "holds at the target, no overshoot")
+}
+
+@(test)
+interp_adapt_shrinks_slow_and_hysteretic :: proc(t: ^testing.T) {
+	a: ksess.Interp_Adapt
+	ksess.interp_adapt_reset(&a, 0.05, 0.60)
+	dt := 1.0 / 60.0
+	// Converge high first (want 0.30 -> target 0.31).
+	for _ in 0 ..< 300 {ksess.interp_adapt_update(&a, 0.30, dt)}
+	high := a.delay
+	testing.expect(t, abs(high - (0.30 + ksess.INTERP_MARGIN)) < 1e-6, "converged to the high target")
+
+	// The link improves (want 0.05). For nearly SHRINK_HOLD seconds: nothing.
+	held := 0.0
+	for held < ksess.SHRINK_HOLD - 0.1 {
+		ksess.interp_adapt_update(&a, 0.05, dt)
+		held += dt
+	}
+	testing.expect(t, abs(a.delay - high) < 1e-6, "no shrink until the hold elapses (hysteresis)")
+
+	// Past the hold it begins to shrink — but SLOWLY (~0.02/s, not a snap).
+	for _ in 0 ..< 60 {ksess.interp_adapt_update(&a, 0.05, dt)} // ~1s past the hold
+	dropped := high - a.delay
+	testing.expect(t, dropped > 0, "shrinks once the hold has elapsed")
+	testing.expect(t, dropped < 0.05, "and shrinks slowly — ~0.02/s, far under the 0.25/s grow")
+}
+
+@(test)
+interp_adapt_clamps_to_the_ceiling :: proc(t: ^testing.T) {
+	a: ksess.Interp_Adapt
+	ksess.interp_adapt_reset(&a, 0.05, 0.20) // 200ms ceiling
+	dt := 1.0 / 60.0
+	for _ in 0 ..< 600 {ksess.interp_adapt_update(&a, 0.50, dt)} // a brutal link wants 0.5s
+	testing.expect(t, a.delay <= 0.20 + 1e-9, "never exceeds the ceiling")
+	testing.expect(t, abs(a.delay - 0.20) < 1e-6, "pins at the ceiling under a brutal link")
+	testing.expect(t, abs(a.target - 0.20) < 1e-6, "the target is clamped too")
+}

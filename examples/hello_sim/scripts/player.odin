@@ -11,7 +11,8 @@ package hello_sim
 //            fixed-rate step (predicted fields, input) -> predicted fields;
 //   step 4 — what the frame loop used to read off the devices became the
 //            Player_Input struct (sampled in hello.odin's @(gd_sample)).
-// Everything else — the census hooks, the paint, the scene — is byte-identical.
+// Everything else — the census hooks, the paint, the scene — carries over from
+// hello_net unchanged in shape.
 
 import gd "godot:godot"
 import knet "godot:kit/net"

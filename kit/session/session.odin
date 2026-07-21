@@ -497,6 +497,11 @@ session_app_send_to :: proc(s: ^Session, player: knet.Player_Id, tag: u8, bytes:
 // a 10 Hz game only 1.5 ticks of buffer (not even a stable pair).
 DEFAULT_INTERP_TICKS :: 3.0
 
+// The default adaptive ceiling (Session_Config.interp_delay_max = 0): 12 ticks =
+// 0.6s at 20 Hz, which covers a ~1s-RTT link (rtt/2 = 0.5s) with jitter room to
+// spare. A game on truly worse links raises it explicitly.
+DEFAULT_INTERP_MAX_TICKS :: 12.0
+
 // Predictions whose result never arrives revert after this long.
 DEFAULT_COMMAND_TIMEOUT :: 3.0 // seconds — far beyond any sane RTT
 
@@ -522,6 +527,16 @@ DEFAULT_MAX_PLAYERS :: 8
 Session_Config :: struct {
 	tick_hz:         int, // net ticks per second (0 = knet.DEFAULT_TICK_HZ, 20)
 	interp_delay:    f64, // how far in the past remote entities render
+	// Adaptive interp delay (OFF by default — a set/default interp_delay keeps
+	// meaning exactly what it does). When on, interp_delay SLEWS to track the
+	// worst active link's need (rtt/2 + 2*jitter + margin) instead of holding one
+	// number that can't serve both a LAN and a 120ms link: it GROWS promptly for
+	// correctness headroom and SHRINKS slowly + hysteretically so it never shrinks
+	// into a latency spike (see interp.odin). interp_delay above becomes the FLOOR
+	// (adapting never renders fresher than you asked, and starts there);
+	// interp_delay_max is the ceiling (0 = a generous kit default).
+	interp_adapt:    bool,
+	interp_delay_max: f64, // adaptive ceiling, seconds (0 = DEFAULT_INTERP_MAX_TICKS / hz)
 	command_timeout: f64, // prediction auto-revert horizon
 	join_timeout:    f64, // client_start -> Ev_Join_Failed horizon
 	backup_interval: f64, // backup-host snapshot refresh cadence
@@ -555,6 +570,51 @@ default_net_fingerprint: u64
 // Explicit "no version gate" for Session_Config.fingerprint — distinguishable
 // from 0, which means "use the generated default".
 FINGERPRINT_NONE :: u64(0xFFFFFFFFFFFFFFFF)
+
+// session_mix_fingerprint — fold a game's CONTENT contract into the wire
+// fingerprint. The generated NET_FINGERPRINT hashes wire SHAPES (struct
+// layouts, entity ids, verb signatures) but NOT a byte-keyed content table's
+// VALUE mapping: an item id -> definition registry, a name -> id tag table,
+// anything where "the wire byte is an index into game content". Reorder or
+// rename such a table between builds and the join door still PASSES (the shapes
+// match), then byte 7 decodes as the wrong thing on the receiving peer — a
+// silent state scramble, the least debuggable failure a playtest produces.
+//
+// Fold the table's CANONICAL text in here and a drifted build is refused at the
+// door as a .Version mismatch, exactly like a shape skew. Assign the result to
+// Session_Config.fingerprint (before *_start):
+//
+//     cfg.fingerprint = ksession.session_mix_fingerprint(0, kitems.items_contract(&table))
+//
+// base = 0 means "the generated shape fingerprint" — the common case: you are
+// ADDING your content to the default gate, not replacing it. (A bare
+// `cfg.fingerprint = my_hash` would DROP the shape check entirely, since
+// wire_fingerprint uses cfg.fingerprint INSTEAD of the default when nonzero.)
+// Pass a nonzero base only to keep folding into a value you already composed.
+//
+// The string is hashed order-DEPENDENTLY (FNV-1a, the kit's stable-hash law);
+// a table whose registration order is not itself meaningful must be
+// canonicalized (sorted) by the caller first — see kitems.items_contract for
+// the worked shape.
+session_mix_fingerprint :: proc(base: u64, s: string) -> u64 {
+	fp := base
+	if fp == 0 {
+		fp = default_net_fingerprint // add onto the generated shape hash, don't replace it
+	}
+	// FNV-1a over the bytes, seeded by the base (the kit's stable-hash law —
+	// decl.fnv1a64 / knet.registry_state_hash; folded inline because both live in
+	// packages this one need not import for one loop).
+	for x in transmute([]u8)s {
+		fp = (fp ~ u64(x)) * 0x100000001b3
+	}
+	// Never land on a sentinel: 0 = "use the default", FINGERPRINT_NONE = "gate
+	// off". Either would silently turn a game's deliberate content-fold into the
+	// opposite of what it asked for, so nudge off both.
+	if fp == 0 || fp == FINGERPRINT_NONE {
+		fp = 0x9E3779B97F4A7C15
+	}
+	return fp
+}
 
 // Everything a game wires BEFORE *_start, surviving every re-init: transport,
 // factory, hooks, routes, config, tuning. The scope RULE, enforced by shape:
@@ -640,6 +700,8 @@ Session_Run :: struct {
 	pending_max_age: u64, // ticks
 	join_timeout:    int, // ticks
 	interp_delay:    f64,
+	interp_adapt:    bool, // resolved: is the adaptive slew on?
+	adapt:           Interp_Adapt, // adaptive interp-delay controller (interp.odin) — inert when interp_adapt is false
 	backup_every:    u64, // net ticks between backup refreshes (default 100 = 5s)
 
 	// the replicated world (kit/net): the session drives the per-tick walks
@@ -826,6 +888,14 @@ session_init :: proc(s: ^Session, keep_profiles := false) {
 	s.tick_hz = s.cfg.tick_hz > 0 ? s.cfg.tick_hz : knet.DEFAULT_TICK_HZ
 	hz := f64(s.tick_hz)
 	s.interp_delay = s.cfg.interp_delay > 0 ? s.cfg.interp_delay : DEFAULT_INTERP_TICKS / hz
+	// Adaptive interp delay (opt-in): the resolved interp_delay above is the FLOOR
+	// (and the starting value); the ceiling defaults generously. When off, the
+	// controller is never stepped and interp_delay stays exactly this constant.
+	s.interp_adapt = s.cfg.interp_adapt
+	if s.interp_adapt {
+		ceiling := s.cfg.interp_delay_max > 0 ? s.cfg.interp_delay_max : DEFAULT_INTERP_MAX_TICKS / hz
+		interp_adapt_reset(&s.adapt, s.interp_delay, ceiling)
+	}
 	s.pending_max_age = u64((s.cfg.command_timeout > 0 ? s.cfg.command_timeout : DEFAULT_COMMAND_TIMEOUT) * hz)
 	s.join_timeout = int((s.cfg.join_timeout > 0 ? s.cfg.join_timeout : DEFAULT_JOIN_TIMEOUT) * hz)
 	s.backup_every = u64((s.cfg.backup_interval > 0 ? s.cfg.backup_interval : DEFAULT_BACKUP_INTERVAL) * hz)
@@ -907,6 +977,15 @@ session_tick_no :: proc(s: ^Session) -> u64 {
 // caused it — see session_present and "The two timelines" in docs/kit/net.md.
 session_interp_delay :: proc(s: ^Session) -> f64 {
 	return s.interp_delay
+}
+
+// Where adaptive interp delay is HEADED — the last-computed target the slew is
+// converging on (Session_Config.interp_adapt). Equals session_interp_delay when
+// not adapting (or once converged); a persistent gap between the two is the
+// controller mid-slew (worth a netgraph row — a target riding the ceiling means
+// the link outgrew the cap). Zero before *_start.
+session_interp_target :: proc(s: ^Session) -> f64 {
+	return s.interp_adapt ? s.adapt.target : s.interp_delay
 }
 
 // Present a consequence on the RIGHT timeline — the whole two-timelines
@@ -1411,6 +1490,23 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 	ticks = knet.ticker_advance(&s.ticker, dt)
 	for _ in 0 ..< ticks {
 		net_tick(s)
+	}
+	// Adaptive interp delay (opt-in, interp.odin): slew interp_delay toward the
+	// worst active link's need BEFORE this frame samples the streams against it.
+	// The need reads the SAME per-peer ClockSync rtt/jitter the ping stat and the
+	// sim-lane cold-start lead already use — no second estimator. Off = the field
+	// is untouched and stays the resolved constant.
+	if s.interp_adapt {
+		want := 0.0
+		for _, c in s.clocks {
+			if !c.initialized {
+				continue
+			}
+			if need := c.rtt * 0.5 + c.jitter * 2.0; need > want {
+				want = need
+			}
+		}
+		s.interp_delay = interp_adapt_update(&s.adapt, want, dt)
 	}
 	sampled = knet.registry_sample_streams(&s.reg, now - s.interp_delay, s.me)
 	// The delta-lane WRITE GUARD (kit/net registry.odin): on a client, a
