@@ -197,10 +197,24 @@ the kit's problem now:
 
 ```odin
 fire_announce :: proc(s: ^ksess.Session, f: Fire, tag: u8 = FIRE_TAG)   // HOST-ONLY (asserts)
+fire_announce_to :: proc(s: ^ksess.Session, peer: ksess.Peer_Id, f: Fire, tag: u8 = FIRE_TAG) // addressed
 fire_listen :: proc(fr: ^Fire_Route, s: ^ksess.Session, tag: u8 = FIRE_TAG)
 fire_poll :: proc(fr: ^Fire_Route) -> (f: Fire, ok: bool)
 fire_route_destroy :: proc(fr: ^Fire_Route)
 ```
+
+**`fire_announce_to` — one peer, not the room.** To catch a just-joined player up on
+a recent event, address the replay to *their* `Peer_Id` (from the roster on
+`Ev_Player_Joined`) instead of re-broadcasting to everyone and making every other
+screen dedupe the echo. But read the caution first, because it settles a design
+question: `fire_poll` **drops a fire whose shooter is the receiver** (they drew it at
+cast time), so an addressed replay to the *original caster* — a reconnect reclaiming
+their id — is dropped too. That is correct for a *transient* one-shot, and it is the
+tell that **a persistent effect does not belong on this lane**. A standing zone, a
+lingering glow, anything with a ttl that outlives its frame, should be an **entity**:
+entities replicate to a joiner through the world snapshot by construction — no replay,
+no dedupe, no shooter spoof, no reclaim hole. Use `fire_announce_to` for the tail of a
+*transient* a specific peer should still catch; use an entity for anything that stands.
 
 `fire_announce` is the AUTHORITY's half — it asserts on a client (the receiver drop
 below stays the security boundary; the assert is the teaching moment: a client calling

@@ -363,6 +363,30 @@ fire_announce :: proc(s: ^ksess.Session, f: Fire, tag: u8 = FIRE_TAG) {
 	ksess.session_app_flush(s, ksess.BROADCAST_PEER)
 }
 
+// Announce a Fire to ONE peer instead of the room — the addressed half. A game
+// catching a just-joined player up on a recent event sends only to them, instead
+// of re-broadcasting to everyone and making every other screen dedupe the echo
+// (which is the shape a game reaches for without this: a broadcast replay carries
+// a game-level seq so existing screens can drop the double). `peer` is a joiner's
+// ksess.Peer_Id, from the roster on Ev_Player_Joined.
+//
+// A caution that decides whether you want this at all: `fire_poll` DROPS a fire
+// whose shooter is the receiver (they drew it live at cast time), so an addressed
+// replay to the ORIGINAL caster — a reconnect reclaiming their id — is dropped
+// too. That is correct for a TRANSIENT one-shot (they already saw it), and it is
+// the tell that a PERSISTENT effect does not belong on this lane at all: a
+// standing zone, a lingering glow, anything with a ttl that outlives its frame,
+// should be an ENTITY. Entities replicate to a joiner through the world snapshot
+// by construction — no replay, no dedupe, no shooter spoof, no reclaim hole. Use
+// fire_announce_to for the tail of a transient a specific peer should still catch;
+// use an entity for anything that stands.
+fire_announce_to :: proc(s: ^ksess.Session, peer: ksess.Peer_Id, f: Fire, tag: u8 = FIRE_TAG) {
+	assert(s.is_host, "fire_announce_to is the AUTHORITY's half — clients see fires through fire_poll, they never author them")
+	w := ksess.session_app_begin(s, tag)
+	fire_write(w, f)
+	ksess.session_app_flush(s, peer)
+}
+
 // The listener's registration record + queue. Owned by the GAME (a struct
 // field, one per session) — kit/combat keeps no globals, so parallel
 // sessions in one process (the test rig, dedicated hosts) never collide.
