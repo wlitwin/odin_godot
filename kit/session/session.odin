@@ -1113,6 +1113,31 @@ session_set_owner :: proc(s: ^Session, id: knet.Net_Id, owner: knet.Player_Id) {
 	}
 }
 
+// PREDICTED OWNERSHIP TRANSFER — the client half of carrying/striking/possessing
+// a shared object. Owner-streamed fields are the current owner's to write, so a
+// non-owner's write to them is stomped by stream sampling every frame until the
+// host transfers ownership — a full round trip during which the pickup shows
+// nothing. Call this the moment you REQUEST the transfer (issue your predicted
+// command) and write the fields you want (the ball's velocity, the prop's pose):
+// they hold locally at once, so the action shows now. When the host confirms and
+// the transfer lands on you, those fields become the streamed truth (no re-apply
+// — the scratch-and-re-raise dance every pass-the-object game hand-rolled is
+// gone). If the request is DENIED, clear it (predicting=false): the entity
+// resumes sampling and snaps back to the true owner. Host-authoritative deltas
+// are unaffected — this is only the owner-stream lane.
+session_predict_owner :: proc(s: ^Session, id: knet.Net_Id, predicting := true) {
+	knet.registry_predict_owner(&s.reg, id, predicting)
+}
+
+// Whether this peer is currently predicting ownership of `id` (see
+// session_predict_owner). Cleared automatically when the real transfer lands.
+session_predicting_owner :: proc(s: ^Session, id: knet.Net_Id) -> bool {
+	if e, ok := knet.registry_get(&s.reg, id); ok {
+		return e.predict_owner
+	}
+	return false
+}
+
 // Host: replace an entity's BLOB — the variable-length escape hatch. One
 // opaque payload per entity, shipped reliably to every peer when YOU say it
 // changed (no diffing, no interpolation, no prediction interplay — it is not
@@ -2233,7 +2258,11 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 			return
 		}
 		prev := session_owner_of(s, id)
-		if knet.registry_set_owner(&s.reg, id, owner, s.now) {
+		// If WE predicted this ownership (wrote the entity's owner-streamed fields
+		// before the host confirmed) and it landed on us, keep those fields — the
+		// prediction IS the truth now; the normal handoff flush would stomp it.
+		keep := owner == s.me && session_predicting_owner(s, id)
+		if knet.registry_set_owner(&s.reg, id, owner, s.now, keep_fields = keep) {
 			append(&s.events, Ev_Owner_Changed{id = id, owner = owner, prev = prev})
 		}
 	case SES_BLOB:
