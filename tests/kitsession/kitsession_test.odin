@@ -2085,6 +2085,48 @@ fire_listen_routes_to_other_screens_only :: proc(t: ^testing.T) {
 	testing.expect(t, ksess.session_tick_no(&host.s) > before, "the tick clock advances")
 }
 
+// fire_announce_to sends to ONE peer, not the room — the addressed replay a game
+// uses to catch a joiner up without re-broadcasting and making every other screen
+// dedupe the echo.
+@(test)
+fire_announce_to_addresses_one_peer :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+
+	TAG :: u8(7)
+	aroute, broute: kcombat.Fire_Route
+	defer kcombat.fire_route_destroy(&aroute)
+	defer kcombat.fire_route_destroy(&broute)
+	kcombat.fire_listen(&aroute, &alice.s, TAG)
+	kcombat.fire_listen(&broute, &bob.s, TAG)
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+
+	// Catch ONLY bob up on a standing event (shooter = host, so no caster-drop
+	// muddies the point). Alice, the other peer, must never hear it.
+	bp, _ := ksess.session_player(&host.s, bob.s.me)
+	f := kcombat.Fire{shooter = 1, origin = {5, 5, 0}, ttl = 10, kind = 2}
+	kcombat.fire_announce_to(&host.s, bp.peer, f, TAG)
+	pump(boxes)
+
+	bf, drew := kcombat.fire_poll(&broute)
+	testing.expect(t, drew, "the addressed peer receives it")
+	testing.expect_value(t, bf.kind, u8(2))
+	_, aheard := kcombat.fire_poll(&aroute)
+	testing.expect(t, !aheard, "the OTHER peer must not — addressed, not broadcast")
+}
+
 // ---------------------------------------------------------------------------
 // The VERSION door: Session_Config.fingerprint rides SES_JOIN, and the host
 // refuses a build whose wire contract disagrees — with a sentence (.Version),
