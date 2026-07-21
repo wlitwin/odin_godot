@@ -1,9 +1,10 @@
 package quickdraw
 
 // Spawns + the census hooks. The factory is generated from the entity= tag
-// (quickdraw.odin); what's left is the game-shaped half — and for a sim-lane
-// game the census hook has ONE extra line: lane_track_set puts the entity on
-// the lane with its generated Sim_Set, and from then on it drives itself.
+// (quickdraw.odin); what's left is the game-shaped half. For a sim-lane game the
+// census hook adds NOTHING for the lane — the kit puts the entity on it itself,
+// from the generated kinds row (each Sim_Set carries its wire class, and
+// boot_lane's factory calls lane_track_set); these hooks only mark ownership.
 
 import "core:fmt"
 import gd "godot:godot"
