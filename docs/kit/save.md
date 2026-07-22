@@ -1,17 +1,16 @@
 # kit/save — quit and resume a run
 
-Saving a run to disk, resuming it later, and the persistent identity token that makes
-"later" work. Deliberately cheap: the [session](session.md) snapshot that ships to the backup
-host every few seconds is already a complete re-hostable world, and `session_host_resume`
-already rebuilds one. **Saving a run and surviving a dead host are the SAME contract** —
-kit/save just points it at a file and wraps it in a versioned envelope.
+Save a run to disk, resume it later, and mint the persistent identity token that makes
+"later" work. The [session](session.md) snapshot that ships to the backup host every few
+seconds is already a complete re-hostable world, and `session_host_resume` already rebuilds
+one. **Saving a run and surviving a dead host are the same contract** — kit/save points it at
+a file and wraps it in a versioned envelope.
 
 **Lane compatibility: lane-agnostic (session-level).** The envelope wraps the session
-snapshot — delta-lane and `gd:"backup"` state. Sim-lane RUNTIME state (ledgers, inputs
-in flight) is deliberately not saved: a resumed sim restarts its lane fresh from the
-saved authoritative fields, which is the correct semantics for a server-authority run
-(the sim lane also refuses host *migration* — [sim.md](sim.md) argues why; resuming
-from disk restarts the authority, which is fine).
+snapshot — delta-lane and `gd:"backup"` state. Sim-lane runtime state (ledgers, inputs in
+flight) is not saved: a resumed sim restarts its lane fresh from the saved authoritative
+fields, the correct semantics for a server-authority run. The sim lane refuses host
+*migration* (see [sim.md](sim.md)); resuming from disk restarts the authority.
 
 ```odin
 import ksave "godot:kit/save"
@@ -27,7 +26,7 @@ The file layout:
 
 - `format` is the **toolkit's** layout version (`FORMAT :: u16(3)`, bumped with the
   session snapshot layout — 2: entity blobs + wire codecs · 3: the door — `locked` +
-  `denied` — rides the roster) — a mismatched save refuses to parse instead of reading
+  `denied` — rides the roster). A mismatched save refuses to parse instead of reading
   garbage: a file from an older toolkit comes back `Bad_Envelope`, cleanly, by version.
 - `game_version` is the **game's** own stamp — pass what you like, check what you get;
   content changes are the game's problem to detect.
@@ -50,8 +49,7 @@ helpers are thin FileAccess wrappers so `user://` paths work on every platform, 
 The game blob is the same host-local state host migration ships (see [session](session.md)),
 and you don't hand-serialize it. Tag the fields on your game class `gd:"backup"` and scriptgen
 generates a version-hashed `<class>_backup_write` / `_read` pair over them — so a takeover or a
-resume restores the campaign with no second, hand-kept read list to drift out of order (the
-classic silent-corruption bug this shape exists to kill):
+resume restores the campaign with no second, hand-kept read list to drift out of order:
 
 ```odin
 CaveLobby :: struct {
@@ -74,42 +72,39 @@ if !cave_lobby_backup_read(self, &r) { /* stale or truncated — bail */ }
 Supported: POD scalars, POD structs, POD fixed arrays, `map[POD]POD`, and `[dynamic]POD` (rides
 `using`/embeds like `replicate`). Anything else — a slice, a string, a non-POD element — is a
 build error, spelled out. The version const is a hash of the field set, so a blob from a
-mismatched build fails the read cleanly instead of misreading bytes: the automatic form of the
-version byte you used to keep by hand. `knet.write_pod`/`read_pod` are that same primitive,
-exposed for any fixed-shape state you still serialize by hand.
+mismatched build fails the read cleanly instead of misreading bytes. `knet.write_pod`/`read_pod`
+are that same primitive, exposed for any fixed-shape state you still serialize by hand.
 
 ## Versioning: what crosses time, what crosses the wire
 
-Three versioning conventions live in this repo, and until this was written down they looked
-like three tastes. They are not — they answer two different questions, and **which one you
-want is decided by what your bytes cross**:
+Three versioning conventions live in this repo. Which one you want is decided by what your
+bytes cross.
 
 - **Bytes that cross TIME** — a save file, a `gd:"backup"` blob, a succession payload
   authored by a build you may not be running anymore — take an **FNV field hash**, generated
-  from the shape itself. Nobody is there to negotiate: the reader's only defence is
-  recognizing that the writer's shape isn't its own, and a hand-bumped number is a step an
-  engineer forgets. scriptgen's `<class>_backup_write`/`_read` pair is the worked example;
-  `knet.write_pod`/`read_pod` is the same primitive for hand-serialized state.
+  from the shape itself. There is no peer to negotiate with; the reader's only check is that
+  the writer's shape matches its own. scriptgen's `<class>_backup_write`/`_read` pair is the
+  worked example; `knet.write_pod`/`read_pod` is the same primitive for hand-serialized state.
 - **Bytes that cross THE WIRE** — every `SES_*` message, the lane wire, the netgd frame —
   take a **rev constant at the join door**: `ksess.PROTOCOL_REV`, `knet.WIRE_REV`, and each
   wire-bearing package's own, all folded into the `NET_FINGERPRINT` a `SES_JOIN` carries. A
-  skewed peer is refused with a sentence (`Ev_Join_Denied{.Version}`) before it can misparse
-  a single delta. Bump the rev in **the package whose wire you changed**, in the same commit,
-  and log what moved beside the constant.
-- **`ksave.FORMAT`** is the third, and the one that stays hand-bumped on purpose. It versions
-  the *envelope*, not a field set: there is nothing to hash — magic, format, a game stamp, an
-  id, two length-prefixed byte ranges — and it is the outermost gate, so it has to be
-  readable by a reader that has agreed to nothing yet. Its changelog comment beside the
-  constant is the contract.
+  skewed peer is refused with `Ev_Join_Denied{.Version}` before it can misparse a single
+  delta. Bump the rev in the package whose wire you changed, in the same commit, and log what
+  moved beside the constant.
+- **`ksave.FORMAT`** is the third, and it is hand-maintained. It versions the *envelope*, not
+  a field set: there is nothing to hash — magic, format, a game stamp, an id, two
+  length-prefixed byte ranges — and it is the outermost gate, so it must be readable by a
+  reader that has agreed to nothing yet. Its changelog comment beside the constant is the
+  contract.
 
-Two consequences worth stating, because both look like inconsistencies and neither is:
+Two points that follow from the split:
 
-**The backup wrapper is unversioned, correctly.** The identical `session_snapshot` bytes get
-kit/save's versioned envelope on disk and a bare `[blob_len u32][game blob][snapshot]` on the
+**The backup wrapper is unversioned.** The identical `session_snapshot` bytes get kit/save's
+versioned envelope on disk and a bare `[blob_len u32][game blob][snapshot]` on the
 [migration wire](session.md#backup-hosting-and-resume). The snapshot crossing the wire is
 already covered — `PROTOCOL_REV` gates the join, and a peer that never got a seat never gets
-a backup — so a second stamp there would version bytes that cannot arrive from a build that
-disagrees. The file has no such door, which is exactly why it has an envelope.
+a backup — so a second stamp on the wire would version bytes that cannot arrive from a build
+that disagrees. The file has no such join door, which is why it carries an envelope.
 
 **A `game_version` mismatch is not a `FORMAT` mismatch.** `Bad_Envelope` is the toolkit's
 verdict; `Wrong_Version` is yours. Keep them separate — a content bump should never look like

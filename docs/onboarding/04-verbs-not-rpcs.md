@@ -1,5 +1,7 @@
 # 4 · Verbs, not RPCs
 
+A **command** is how a player runs a mutation and lets the host decide whether it's true. You reach for one whenever a player acts on shared state — taking an item, opening a door, striking a ball. This post shows what a command replaces and how to write one.
+
 Here is "take an item from a chest" the way every RPC tutorial teaches it:
 
 ```gdscript
@@ -20,17 +22,16 @@ func _request_take(slot: int):
     _grant_item.rpc_id(sender, slot)        # tell the taker
 ```
 
-Count the problems. Two code paths for the same action (host vs client), so
-they *will* drift. The client's screen does nothing until the round trip
-finishes, so the game feels like the network. Two players taking the last
-item both pass their local checks and the resolution is whatever race the
-RPCs happen to run — and every new verb repeats all of it.
+There are two code paths for the same action (host vs client), so they *will*
+drift. The client's screen does nothing until the round trip finishes, so the
+game feels like the network. Two players taking the last item both pass their
+local checks, and the resolution is whatever race the RPCs happen to run. Every
+new verb repeats all of it.
 
-The toolkit's position: this entire shape is boilerplate around one idea —
-*a player wants to run a mutation, and the host decides if it's true.* So
-that idea gets a name — a **command** — and the pipeline is generated.
+A command replaces that whole shape: a player wants to run a mutation, and the
+host decides if it's true. The pipeline around that idea is generated.
 
-## A verb is a proc that can say no
+## Writing a command
 
 ```odin
 @(gd_command = "predict")
@@ -43,46 +44,43 @@ chest_take :: proc(self: ^Chest, slot: u8, count: u16, px, py: f32) -> bool {
 }
 ```
 
-Read it again: there is no networking in it. No `is_server()`, no sender ID,
-no sync call. It's single-player code that validates and mutates its entity,
-returning whether it happened. The attribute generates `chest_take_cmd`, and
-calling that does the right thing *wherever it's called*:
+There is no networking in it: no `is_server()`, no sender ID, no sync call. It's
+single-player code that validates and mutates its entity, returning whether it
+happened. The attribute generates `chest_take_cmd`, and calling that does the
+right thing wherever it's called:
 
-- **On the host:** run it. `true` → the mutation stands and the changed
-  fields ride the ordinary delta walk to everyone (post 3 — no sync step,
-  the state machinery *is* the sync step).
-- **On a client:** run it **immediately** — the item appears in the
-  prediction the same frame the player clicked — and send the intent to the
-  host, which runs *the same proc* as the authority. If the host also says
-  `true`, the client's prediction was right and nothing more happens.
+- **On the host:** run it. `true` → the mutation stands and the changed fields
+  ride the ordinary delta walk to everyone (post 3 — there is no separate sync
+  step; the state machinery is the sync step).
+- **On a client:** run it **immediately** — the item appears in the prediction
+  the same frame the player clicked — and send the intent to the host, which
+  runs *the same proc* as the authority. If the host also says `true`, the
+  client's prediction was right and nothing more happens.
 - **If the host says no** — out of range on the host's truth, item already
   gone — the client's predicted mutation **reverts automatically**, and the
   rejection carries the authoritative state back with it.
 
-Now run the race that broke the RPC version: two players grab the last item
-in the same instant. Both predict success — both screens show the grab,
-instantly, which is what a good game *should* show. The host runs the two
-commands in arrival order: first one wins, second returns `false`, the
-loser's screen quietly puts the item back a beat later. You wrote a range
-check and an inventory op. Conflict resolution wasn't code you added — it
-was the pipeline being a pipeline.
+Run the race that broke the RPC version: two players grab the last item in the
+same instant. Both predict success, so both screens show the grab instantly. The
+host runs the two commands in arrival order: the first wins, the second returns
+`false`, and the loser's screen puts the item back a beat later. You wrote a
+range check and an inventory op; the pipeline handles conflict resolution.
 
-This is why the tutorial's promise — **gameplay code has zero role
-branches** — is achievable at all. The roles differ in *when the proc runs
-and what its return is allowed to mean*, and that's precisely the part
-that's generated.
+This is what lets gameplay code carry **zero role branches**. The roles differ
+only in *when the proc runs and what its return is allowed to mean*, and that is
+the generated part.
 
-## The rules that keep it honest
+## Command rules
 
-The pipeline works because command procs accept three constraints:
+Command procs must accept three constraints.
 
-**A command mutates only its target.** `chest_take` touches the chest,
-period. It runs speculatively on clients and authoritatively on the host —
-if it also credited your bag, sent chat, and played a sound, all of that
-would run twice, or on the wrong machine, or before it was true.
+**A command mutates only its target.** `chest_take` touches the chest, period.
+It runs speculatively on clients and authoritatively on the host — if it also
+credited your bag, sent chat, and played a sound, all of that would run twice,
+or on the wrong machine, or before it was true.
 
-**Cross-entity consequences go in the hook.** "The loot lands in MY bag" is
-the host's job, once, after the verdict:
+**Cross-entity consequences go in the hook.** "The loot lands in MY bag" is the
+host's job, once, after the verdict:
 
 ```odin
 game_command_hook :: proc(user: rawptr, player: knet.Player_Id,
@@ -94,46 +92,44 @@ game_command_hook :: proc(user: rawptr, player: knet.Player_Id,
 }
 ```
 
-The hook fires on the authority for every executed command — a client's or
-the host's own — so there's exactly one place where consequences happen,
-instead of an "authority half" pasted beside every call site.
+The hook fires on the authority for every executed command — a client's or the
+host's own — so there's exactly one place where consequences happen.
 
-**Gate before you issue.** A predicted command that will obviously fail
-(no stamina, dead, on cooldown) should be checked before calling
-`chest_take_cmd` at all — a refused prediction still crosses the wire, and
-the proc's own `false` is your safety net, not your UX.
+**Gate before you issue.** A predicted command that will obviously fail (no
+stamina, dead, on cooldown) should be checked before calling `chest_take_cmd` at
+all: a refused prediction still crosses the wire, and the proc's own `false` is
+your safety net, not your UX.
 
-Everything inside the proc must also be **deterministic and revertible** —
-which is why the kit's item/inventory ops (`kitems.take`, grid packing,
-stacking) are plain functions over plain data. That style pays for itself
-here.
+Everything inside the proc must also be **deterministic and revertible**. The
+kit's item/inventory ops (`kitems.take`, grid packing, stacking) are plain
+functions over plain data for this reason.
 
-## What prediction feels like
+## Prediction in practice
 
-Wire it up and play with the built-in latency shim (every kit game exposes
-it as an env knob — 120ms of injected lag):
+Wire it up and play with the built-in latency shim (every kit game exposes it as
+an env knob — 120ms of injected lag):
 
-- Your clicks land **now**. Chests open, items move, doors unlock on your
-  screen the frame you act.
+- Your clicks land **now**. Chests open, items move, doors unlock on your screen
+  the frame you act.
 - Truth arrives a tenth of a second later and — almost always — agrees.
-- When it disagrees, the revert is small and honest: the item you "took"
-  fades back because someone else was faster. Players read that instantly.
+- When it disagrees, the revert is small and honest: the item you "took" fades
+  back because someone else was faster. Players read that instantly.
 
-Compare that to the RPC version, where every interaction waits the round
-trip, or to trusting clients, where the fast kid with Cheat Engine owns your
-economy. Prediction with host verdicts is the only shape that's both
-responsive and honest — and here it costs one attribute.
+The RPC version makes every interaction wait the round trip. Trusting the client
+instead lets a modified client rewrite your economy. Prediction with host
+verdicts is both responsive and honest, and it costs one attribute.
 
-One special case rounds out the action story: some verbs transfer *control*
-rather than items. Puttputt's entire golf mechanic is a strike command whose
-hook hands the ball's ownership to the striker — the ball becomes theirs to
-simulate (post 3's owner-streamed fields) until someone else putts. Grabbing,
-carrying, mounting, possession: all the same three lines. Ownership is just
-state, and by now that sentence should sound familiar.
+## Commands that transfer control
 
-There's one loose thread. The loser's item "fades back a beat later." A
-remote player's pickup effect — when should *your* screen play it? You'd
-think "when the state changes." You'd be wrong in a subtle way that makes
-games feel cheap, and it's the last mental-model shift in the series.
+Some verbs transfer *control* rather than items. Puttputt's golf mechanic is a
+strike command whose hook hands the ball's ownership to the striker — the ball
+becomes theirs to simulate (post 3's owner-streamed fields) until someone else
+putts. Grabbing, carrying, mounting, possession are all the same three lines.
+Ownership is just state.
+
+One question is left open. The loser's item "fades back a beat later," and a
+remote player's pickup effect has to play on your screen at some point — but
+*when*? Not simply "when the state changes"; the timing is the mental-model
+shift the next post covers.
 
 *Next: [The two timelines →](05-the-two-timelines.md)*

@@ -3,12 +3,11 @@
 [kit/net](net.md) is the pure wire core and [kit/session](session.md) is the pure session
 model; **kit/netgd is the only place either touches Godot.** It rides the engine's
 SceneMultiplayer raw-bytes path (`send_bytes` out, the `peer_packet` signal in) on top of
-whatever `MultiplayerPeer` the game installed. The existing ergonomic wrappers already handle
-peer creation — `gd.host` / `gd.join` for ENet, `gd.webrtc_host` / `gd.webrtc_join` for
-browser room codes — so the toolkit works over every transport those support, and
-[Steam](steamgd.md) slots in the same way. Riding SceneMultiplayer (rather than owning the
-peer and polling it) keeps `@(gd_rpc)` and the engine's spawner/synchronizer interop working
-alongside the toolkit.
+whatever `MultiplayerPeer` the game installed. The ergonomic wrappers handle peer creation —
+`gd.host` / `gd.join` for ENet, `gd.webrtc_host` / `gd.webrtc_join` for browser room codes —
+so the toolkit works over every transport those support, and [Steam](steamgd.md) slots in the
+same way. Riding SceneMultiplayer (rather than owning the peer and polling it) keeps
+`@(gd_rpc)` and the engine's spawner/synchronizer interop working alongside the toolkit.
 
 State ownership rule (same as the events package): **no package globals** — a session's
 transport state lives in the owning script's struct. The procs here are stateless sugar.
@@ -17,32 +16,30 @@ transport state lives in the owning script's struct. The procs here are stateles
 
 - **channel 0** — untouched: the engine's own RPC/replication traffic.
 - **`CHANNEL_RELIABLE` (1)** — commands, results, transitions, chat, join snapshots. Sent
-  `RELIABLE`: discrete + rare, so the loss story is "none needed".
+  `RELIABLE`: discrete and rare, so no loss handling is needed.
 - **`CHANNEL_STREAM` (2)** — owner-authoritative state snapshots. Sent
   `UNRELIABLE_ORDERED`: last-value semantics — a drop is superseded by the next tick's
   snapshot.
 
 The transfer-mode aliases (`RELIABLE`, `UNRELIABLE_ORDERED`) and the raw send procs
-(`send_to`, `send_reliable`, `send_stream`) exist so call sites read as intent, but with a
+(`send_to`, `send_reliable`, `send_stream`) let call sites read as intent, but with a
 `Session_Wire` attached you rarely call them yourself — the session's `Send_Proc` does.
 
-If you DO hand-roll a `Send_Proc` (the raw-layer path), translate the peer through
-`wire_engine_peer(to_peer) -> (engine_peer, ok)` — never cast a `ksess.Peer_Id` to an
-engine int. The sentinels don't line up: kit's `BROADCAST_PEER` is `Peer_Id(-1)` (it used
-to alias `NO_PEER`'s 0, so a disconnected seat's peer handed to send became an accidental
-broadcast), and the engine reads a raw -1 as "all except peer 1" — the server silently
-misses every broadcast. `wire_engine_peer` maps broadcast to the engine's 0 and returns
-`ok = false` for `NO_PEER`: a disconnected seat's peer reached the transport — drop the
-send.
+If you hand-roll a `Send_Proc` (the raw-layer path), translate the peer through
+`wire_engine_peer(to_peer) -> (engine_peer, ok)` — never cast a `ksess.Peer_Id` to an engine
+int. The sentinels don't line up: kit's `BROADCAST_PEER` is `Peer_Id(-1)`, but the engine
+reads a raw -1 as "all except peer 1", so a raw cast makes the server silently miss every
+broadcast. `wire_engine_peer` maps broadcast to the engine's 0 and returns `ok = false` for
+`NO_PEER` — a disconnected seat's peer reached the transport, so drop the send.
 
-## Session_Wire: the four one-line forwards
+## Session_Wire and the four forwarding methods
 
-`Session_Wire` is the session's transport binding — the ~50 lines every game used to write
-by hand (the `Send_Proc` adapter with its kind byte + channel pick, the packet route, the
-engine's connection signals, the client's join handshake). In a stock game it lives inside
-[kit/boot](boot.md)'s `Boot` (`boot.wire` — `boot_attach` runs the `wire_attach`/
-`wire_listen` calls below for you); games that skip boot keep it as a field on the script
-struct and wire it directly.
+`Session_Wire` is the session's transport binding: the `Send_Proc` adapter (kind byte +
+reliable/stream channel pick), the packet route, the engine's connection signals, and the
+client's join handshake — roughly 50 lines a game would otherwise write by hand. In a stock
+game it lives inside [kit/boot](boot.md)'s `Boot` (`boot.wire` — `boot_attach` runs the
+`wire_attach`/`wire_listen` calls below for you); games that skip boot keep it as a field on
+the script struct and wire it directly.
 
 Godot signals **must land on `@(gd_method)`s of a script** — scriptgen only processes game
 scripts, so the kit cannot own the receiving methods. The contract: the game keeps four
@@ -86,10 +83,10 @@ it survives `session_host_start` / `session_client_start` / `session_host_resume
 once. `wire_listen` connects `peer_packet` → `on_packet`, `peer_disconnected` →
 `on_peer_left`, `connected_to_server` → `on_net_up`, and **both** `connection_failed` and
 `server_disconnected` → `on_net_down`. Call it after the node is in the tree (`ready()`
-qualifies). Empty method names skip that signal — but see the next section before you skip
-any.
+qualifies). Empty method names skip that signal — but see [the disconnect
+signals](#the-disconnect-signals-are-required) before you skip any.
 
-## The two buttons — ENet and WebRTC flavors of the one door
+## Hosting and joining
 
 Every game's Host/Join handlers repeat the same two-step: bring the transport up, then start
 the session over it. The wire owns both flavors:
@@ -103,41 +100,42 @@ netgd.begin_join(&wire, addr, port, token, name) -> bool
 netgd.begin_host_web(&wire, url, name, token = 0, room = "") -> bool  // false = relay socket refused
 netgd.begin_join_web(&wire, url, room, token, name) -> bool
 netgd.web_poll(&wire)   // every frame: pumps the signaling handshake
-netgd.web_close(&wire)  // full teardown — retry a failed join, or a successor raising a new room
+netgd.web_close(&wire)  // full teardown — retry a failed join, or an heir raising a new room
 ```
 
-`token` is the host's own reconnect identity (see [session](session.md) — it makes a dead
-host reclaimable after a migration). `room` asks the relay to honor a RESERVED code
-instead of minting a fresh one — succession rides it: the dying run's host mints
-tomorrow's code today, and the heir raises the promised room under it while the crew
-knocks on exactly that code (empty = mint, the ordinary host). The web pair differs from
-ENet in one structural way: the room code **does not exist yet** when `begin_host_web`
+`token` is the host's own reconnect token (see [session](session.md)); it makes a dead host
+reclaimable after a host-migration handoff. `room` asks the relay to honor a RESERVED code
+instead of minting a fresh one — host migration uses it: the current host reserves the next
+room code in advance, and the heir hosts under that reserved code while clients reconnect on
+exactly that code (empty = mint a fresh code, the ordinary host case). The web pair differs
+from ENet in one structural way: the room code **does not exist yet** when `begin_host_web`
 returns — the relay assigns it async. Pump `web_poll` each frame and read it back with
 `gd.webrtc_room_code(node)` when it lands; `gd.webrtc_session_state` /
-`gd.webrtc_error_reason` narrate the handshake for your lobby. Everything ABOVE these calls — session, muster, commands, replication — is the same
-code path on both transports; the branch ends the moment the multiplayer peer installs.
+`gd.webrtc_error_reason` narrate the handshake for your lobby. Everything above these calls —
+session, muster, commands, replication — is the same code path on both transports; the branch
+ends the moment the multiplayer peer installs.
 
 [kit/boot](boot.md) wraps both flavors with the stock lobby ceremony: `boot_host` /
 `boot_join` and their `boot_host_web` / `boot_join_web` twins.
 
-All four `begin_*` calls are **sugar** over one mechanism — `transport_host` / `transport_join`
-with the flavor picked for you. They are the shortest way to spell the common case and the
-names games already say; reach for the generic pair when the transport is a *variable* (a
-settings menu, a fallback chain, kit/boot's doors). See [Swapping transports](#swapping-transports).
+All four `begin_*` calls are **sugar** over one mechanism — `transport_host` /
+`transport_join` with the flavor picked for you. They are the shortest way to spell the common
+case and the names games already say; reach for the generic pair when the transport is a
+*variable* (a settings menu, a fallback chain, kit/boot's doors). See [Swapping
+transports](#swapping-transports).
 
-### Join codes for NATIVE ENet (code.odin)
+### Join codes for native ENet (code.odin)
 
-"Send your friend a four-letter code" without Steam and without reading out
-an IP: the same relay the browser build already talks to (native room mode —
-`tests/webrtc/signal_server.mjs` is the reference; the production relay
-speaks it at `/rtc`) becomes a phonebook for plain ENet. The host registers
-its bound port under a minted code; a joiner trades the code for the host's
-observed endpoint; the join proceeds exactly as `begin_join` always did.
+"Send your friend a four-letter code" without Steam and without reading out an IP: the same
+relay the browser build already talks to (native room mode — `tests/webrtc/signal_server.mjs`
+is the reference; the production relay speaks it at `/rtc`) becomes a phonebook for plain
+ENet. The host registers its bound port under a minted code; a joiner trades the code for the
+host's observed endpoint; the join proceeds exactly as `begin_join` does.
 
-**A kit game uses the boot doors** — same shape as every other door, and
-`boot_pump` runs the whole rendezvous (the host's minted code lands in the
-lobby status and `boot_room_code`; a joiner's resolved endpoint walks through
-`boot_join` on its own; a bad code restores the menu with the reason):
+**A kit game uses the boot doors** — same shape as every other door, and `boot_pump` runs the
+whole rendezvous (the host's minted code lands in the lobby status and `boot_room_code`; a
+joiner's resolved endpoint walks through `boot_join` on its own; a bad code restores the menu
+with the reason):
 
 ```odin
 // host — instead of boot_host (also: kui.lobby_show_code reveals the stock
@@ -165,65 +163,59 @@ case .Failed: // rdv.err: .No_Room (typo / host gone), .Full, .Closed — say WH
 }
 ```
 
-`examples/hello_net` is the worked consumer of the boot doors (its `run.sh`
-join-by-code act proves the full loop against a local relay; with
-`HELLO_RELAY` set, its lobby grows the code field). **NAT honesty:** this covers
-the same-LAN pair, the port-forwarded or public host, and the common
-port-preserving home NAT (the relay hands the host each joiner's observed
-endpoint and `wire_punch` warms the mapping with a few UDP packets).
-Symmetric NATs it does NOT cover — there is no TURN for raw ENet; when the
-connect times out, say so and offer the browser build (WebRTC + TURN) and
-Steam, which always work. That trade — a copyable code for most, two spare
-doors for the rest — is the stance.
+`examples/hello_net` is the worked consumer of the boot doors (its `run.sh` join-by-code act
+proves the full loop against a local relay; with `HELLO_RELAY` set, its lobby grows the code
+field). **NAT coverage:** this covers the same-LAN pair, the port-forwarded or public host,
+and the common port-preserving home NAT (the relay hands the host each joiner's observed
+endpoint and `wire_punch` warms the mapping with a few UDP packets). Symmetric NATs it does
+NOT cover — there is no TURN for raw ENet; when the connect times out, say so and offer the
+browser build (WebRTC + TURN) and Steam, which always work. A copyable code serves most
+players; the two spare doors serve the rest.
 
-## The disconnect signals are NOT optional plumbing
+## The disconnect signals are required
 
 - Unwired `peer_disconnected`: an alt-F4'd client haunts the roster forever, and the host
   keeps sending to a ghost.
 - Unwired `connection_failed`: a failed join hangs on "Joining..." with no way out. The same
   forward handles `server_disconnected` — treating a vanished server as host loss.
 
-A MISSPELLED forward is the same bug wearing a compile-clean coat, so scriptgen validates
-every literal method name passed to `wire_listen` / `listen_packets` (and `boot_attach`'s
-`methods`) against the script's registered `@(gd_method)`s — a typo is a build error; an
-empty string stays a deliberate skip.
+A misspelled forward compiles clean but fails at runtime, so scriptgen validates every literal
+method name passed to `wire_listen` / `listen_packets` (and `boot_attach`'s `methods`) against
+the script's registered `@(gd_method)`s — a typo is a build error; an empty string is a skip.
 
-## Succession: the rendezvous ceremony, written once
+## Host migration
 
-The session names WHO carries the torch ([session](session.md#backup-hosting-and-resume));
-`netgd.Succession` owns HOW the survivors find them; `kboot`'s state machine
-owns WHEN (the window, the retry policy, the deferred mechanics —
-`boot_migration` wires the whole dance and most games never touch this layer
-directly). The torch is a typed record — `[kind u8][payload]`, encoded and
-decoded only here (`succession_decode`) — so a new transport adds a
-`Rendezvous_Kind` and two switch arms, never a string-format negotiation:
+The session decides which peer becomes the new host — the heir
+([session](session.md#backup-hosting-and-resume)); `netgd.Succession` owns HOW the survivors
+find that heir; `kboot`'s state machine owns WHEN (the window, the retry policy, the deferred
+mechanics — `boot_migration` wires the whole flow and most games never touch this layer
+directly). The handoff record is typed — `[kind u8][payload]`, encoded and decoded only here
+(`succession_decode`) — so a new transport adds a `Rendezvous_Kind` and two switch arms,
+never a string-format negotiation:
 
-- **`.Native_Addr`** — `[addr][port]`: the bearer's address as the host saw
-  it, plus the seat-derived port the bearer will bind. ENet-only: a transport
-  with no peer-address story can't light this torch (the torch warns once
-  instead of silently shipping no migration).
-- **`.Web_Room`** — `[code]`: the relay honors reservations on create, so the
-  host MINTS tomorrow's room code today; the heir hosts UNDER it and
-  survivors knock on boot's timer (a browser cannot block, and the heir
-  needs a breath to open the room). A Steam lobby id is the reserved next
-  kind (the Transport-record refactor).
+- **`.Native_Addr`** — `[addr][port]`: the heir's address as the host saw it, plus the
+  seat-derived port the heir will bind. ENet-only: a transport with no peer-address story
+  cannot provide this handoff, and warns once rather than silently shipping no migration.
+- **`.Web_Room`** — `[code]`: the relay honors reservations on create, so the host reserves
+  the next room code in advance; the heir hosts under it and survivors reconnect on boot's
+  timer (a browser cannot block, and the heir needs a moment to open the room). A Steam lobby
+  id is the reserved next kind.
 
-Configure once (`Succession{kind, signal_url, base_port, token, name}` —
-`boot_succ_config` does it for door games), then the verbs are stateless:
-`succession_torch` on `Ev_Backup_Target` (host), `succession_raise` (heir),
-`succession_dial` (one attempt at a decoded rendezvous — `kboot`'s machine
-owns tries, gaps, and give-up; `succession_named` peeks so a no-successor
-torch leaves the world standing). The game keeps its campaign blob, its
-census wipe, and its words, as `boot_migration` halves.
+Configure once (`Succession{kind, signal_url, base_port, token, name}` — `boot_succ_config`
+does it for door games), then the verbs are stateless: `succession_torch` on
+`Ev_Backup_Target` (host) publishes the handoff, `succession_raise` (heir), `succession_dial`
+(one attempt at a decoded rendezvous — `kboot`'s machine owns tries, gaps, and give-up;
+`succession_named` peeks so a handoff with no named successor leaves the world standing). The
+game keeps its campaign blob, its census wipe, and its words, as `boot_migration` halves.
 
 ## wire_receive and the kind byte
 
-Every wire packet leads with the game's one message byte (the `kind` passed to
-`wire_attach`). `wire_receive` checks `view[0] != wire.kind` and returns early — other kinds
-are not the wire's; the game routes those itself *before* calling `wire_receive`. This is how
-session traffic shares `peer_packet` with any other raw-bytes protocol the game runs.
+Every wire packet leads with the game's one message byte (the `kind` passed to `wire_attach`).
+`wire_receive` checks `view[0] != wire.kind` and returns early — other kinds are not the
+wire's; the game routes those itself *before* calling `wire_receive`. This is how session
+traffic shares `peer_packet` with any other raw-bytes protocol the game runs.
 
-## wire_set_latency — the bad-link shim
+## wire_set_latency — link simulation
 
 ```odin
 wire_set_latency :: proc(wire: ^Session_Wire, ms: int, jitter_ms := 0, loss_pct := 0, burst := 1, bandwidth_bps := 0)
@@ -233,31 +225,29 @@ Injects one-way **receive** latency (0 disables): every packet this peer receive
 that long before the session sees it — buffered in the wire, delivered by `wire_pump`. The
 delay is app-side, above the transport, so ENet's acks and retransmits still flow at protocol
 level; what you are testing is your *game's* feel under real round trips, not the socket's.
-The toolkit's own acid tests run at 120ms so predictions are proven to bite instantly while
-confirms measurably ride the slow wire.
+The toolkit's own integration tests run at 120ms so predictions are proven to bite instantly
+while confirms measurably ride the slow wire.
 
-A slow link is only half the truth — a BAD link wobbles and drops. `jitter_ms` adds a
-uniform extra `[0, jitter)` per packet, with one honest constraint: delivery stays FIFO per
-sender (the shim sits above ENet's already-ordered channels, and handing packets over
-shuffled would break the ordered-reliable contract no real network can break at this
-layer). `loss_pct` is channel-honest the same way: a **stream** batch rolls the dice and
-vanishes (last-value semantics — the next batch supersedes it, which is the real behavior
-of the unreliable channel), while **reliable** traffic must arrive, so its "loss" costs
-what loss really costs a reliable channel: a retransmit's worth of extra delay.
+`jitter_ms` adds a uniform extra `[0, jitter)` per packet, with one constraint: delivery stays
+FIFO per sender (the shim sits above ENet's already-ordered channels, and reordering here
+would break the ordered-reliable contract). `loss_pct` is channel-honest the same way: a
+**stream** batch rolls the dice and vanishes (last-value semantics — the next batch supersedes
+it, the real behavior of the unreliable channel), while **reliable** traffic must arrive, so
+its "loss" costs what loss really costs a reliable channel: a retransmit's worth of extra
+delay.
 
-Two more knobs make the shim honest about links that are CRUEL, not just bad. `burst` is
-the mean lost-run length in packets: at 1 (the default) losses are independent coin flips;
-past it they arrive Gilbert-Elliott style — long clean stretches, then a burst that eats
-`~burst` consecutive packets, at the *same average rate*. The distinction has teeth: a
-redundant input window shrugs off scattered drops and dies whole inside one burst, and a
-reliable-channel burst stacks retransmit delays into a convoy — which is exactly what real
-WiFi and cellular do to netcode that only ever met the coin flip. `bandwidth_bps` caps the
-modeled downlink (bytes/s, one pipe shared by every sender): sustained overflow doesn't
-drop, it QUEUES, and the delay grows — bufferbloat, the failure narrow links actually have
-long before loss shows up. Up/down asymmetry needs no knob: each end shims its own
-*receive*, so a bad uplink is the OTHER window's numbers (the acids already run each
-process with its own env). Not modeled: per-peer mixing on one receiver — one flaky friend
-among good ones shares your whole shimmed downlink.
+Two more knobs model links that are cruel, not just bad. `burst` is the mean lost-run length
+in packets: at 1 (the default) losses are independent coin flips; past it they arrive
+Gilbert-Elliott style — long clean stretches, then a burst that eats `~burst` consecutive
+packets, at the *same average rate*. Bursts matter because a redundant input window shrugs off
+scattered drops but can be wiped out whole inside one burst, and reliable-channel losses in a
+burst stack their retransmit delays — the pattern real WiFi and cellular produce.
+`bandwidth_bps` caps the modeled downlink (bytes/s, one pipe shared by every sender):
+sustained overflow doesn't drop, it QUEUES, and the delay grows — bufferbloat, the failure
+narrow links have long before loss shows up. Up/down asymmetry needs no knob: each end shims
+its own *receive*, so a bad uplink is the OTHER window's numbers (the integration tests run
+each process with its own env). Not modeled: per-peer mixing on one receiver — one flaky
+friend among good ones shares your whole shimmed downlink.
 
 kit/boot wires all five off env for you:
 
@@ -266,11 +256,11 @@ QD_LATENCY=120 QD_JITTER=30 QD_LOSS=3 ./run_two_windows.sh        # the classic 
 QD_LOSS=3 QD_BURST=4 QD_BANDWIDTH=16000 ./run_two_windows.sh      # cruel: bursty loss on a 16KB/s pipe
 ```
 
-## The wire gauge — bytes by kind, and the link's own truth
+## Traffic and link stats
 
-Every framed byte the wire sends or receives is tallied by session message kind
-(state, stream, cmd, spawn, app — with app split by its tag byte, so the sim
-lane's traffic is named, not lumped), windowed per second. Two reads:
+Every framed byte the wire sends or receives is tallied by session message kind (state,
+stream, cmd, spawn, app — with app split by its tag byte, so the sim lane's traffic is named,
+not lumped), windowed per second. Two reads:
 
 ```odin
 netgd.wire_traffic(&wire) -> string
@@ -278,19 +268,19 @@ netgd.wire_traffic(&wire) -> string
 netgd.wire_link_quality(&wire, peer) -> (rtt_ms, jitter_ms, loss_pct, ok)
 ```
 
-`wire_traffic` is the [netgraph](ui.md)'s traffic row — fill `Net_Stats.traffic`
-with it and you can watch a chatty field's bytes move as you tune `wire=f16`,
-stream rates, or interest. `wire_link_quality` reads ENet's own per-peer
-statistics (smoothed rtt, rtt variance, packet loss ×`PACKET_LOSS_SCALE`) — the
-transport's view, meaningful on clients about the host (`ksess.HOST_PEER`); a
-host asks per client peer. quickdraw's netgraph fill is the worked example.
+`wire_traffic` is the [netgraph](ui.md)'s traffic row — fill `Net_Stats.traffic` with it and
+you can watch a chatty field's bytes move as you tune `wire=f16`, stream rates, or interest.
+`wire_link_quality` reads ENet's own per-peer statistics (smoothed rtt, rtt variance, packet
+loss ×`PACKET_LOSS_SCALE`) — the transport's view, meaningful on clients about the host
+(`ksess.HOST_PEER`); a host asks per client peer. quickdraw's netgraph fill is the worked
+example.
 
-## Kicks: wire_drop is deferred on purpose
+## Kicks: wire_drop
 
 A kick is two calls: `ksess.session_kick` unseats the player (and tells them why); the wire
-severs their socket. But an **immediate** ENet disconnect races its own outgoing queue — the
-`SES_KICKED` the session just sent gets discarded, and the kicked player sees a mystery
-host-crash instead of the truth. So:
+severs their socket. An **immediate** ENet disconnect races its own outgoing queue — the
+`SES_KICKED` the session just sent would be discarded, and the kicked player would see a
+host-crash instead of the reason. So:
 
 ```odin
 wire_drop :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id, after := 0.75)
@@ -307,8 +297,8 @@ netgd.wire_drop(&self.wire, was) // deferred: the KICKED message flushes first
 ```
 
 The actual close is `drop_peer(node, peer)` — usable directly when you don't need the delay.
-It calls `multiplayer_peer_disconnect_peer` with `force=false`, graceful on purpose for the
-same flush reason.
+It calls `multiplayer_peer_disconnect_peer` with `force=false`, graceful for the same flush
+reason.
 
 ## pba_view
 
@@ -321,24 +311,21 @@ i.e. inside the receiving method call. Feed it to `knet.reader_make`; clone anyt
 keep. For raw-bytes listening without a `Session_Wire`, `listen_packets(node, method)`
 connects `peer_packet` to a single `@(gd_method)` on the same node's script.
 
-The helper itself lives one layer down now as `gd.packed_byte_array_view` — it is engine-type
-ergonomics, not networking, and kit/save was importing the whole of kit/netgd for it just to
-read a file off disk. `netgd.pba_view` stays as the alias, because every packet handler in the
-tree opens with it and that line should stay short.
+`gd.packed_byte_array_view` is the underlying helper — engine-type ergonomics, not
+networking. `netgd.pba_view` is an alias for it; every packet handler in the tree opens with
+it, so the short spelling stays.
 
 ## Swapping transports
 
-Nothing on this page mentions ENet specifics because the wire never sees the transport:
-SceneMultiplayer's signals fire identically over any `MultiplayerPeer`. That is the DATA
-plane, and it was always abstract. The CONTROL plane — open, pump, close, who-is-that-peer —
-is the half that used to grow a parallel door-set per transport, each one answering a
-slightly different set of questions and forgetting a different part of the ritual. So the
-questions are a record now (`transport.odin`):
+The data plane is transport-agnostic: SceneMultiplayer's signals fire identically over any
+`MultiplayerPeer`, which is why nothing on this page mentions ENet specifics — the wire never
+sees the transport. The control plane — open, pump, close, who-is-that-peer — is captured in
+one record (`transport.odin`):
 
 ```odin
 Transport :: struct {
     name:       string,           // "enet" / "webrtc" / "steam"
-    rendezvous: Rendezvous_Kind,  // the torch flavor `address` feeds (.None = cannot migrate)
+    rendezvous: Rendezvous_Kind,  // the handoff flavor `address` feeds (.None = cannot migrate)
     open_host:  proc(wire, at: Endpoint, name: string, token: u64, dedicated: bool) -> bool,
     open_join:  proc(wire, at: Endpoint, name: string, token: u64, spectate: bool) -> bool,
     pump:       proc(wire),       // nil = the engine polls it
@@ -356,8 +343,8 @@ Endpoint :: struct {   // WHERE a run lives, in the flavor its transport underst
 }
 ```
 
-`open_host` / `open_join` are **required**; the rest are optional, and a nil slot is a
-DECLARED degradation with a documented consequence rather than a surprise:
+`open_host` / `open_join` are **required**; the rest are optional. A nil slot is a documented
+degradation with a stated consequence:
 
 | slot | nil means | what the user sees |
 |---|---|---|
@@ -366,12 +353,12 @@ DECLARED degradation with a documented consequence rather than a surprise:
 | `link` | no per-peer statistics story | the netgraph blanks its link row instead of showing a confident zero |
 | `address` | no rendezvous handle for a peer | **host migration is off**, and `succession_torch` says so once, naming the transport |
 
-`transport_host` / `transport_join` open a wire and the wire REMEMBERS its transport — that
-one fact is what lets every later verb stop asking. `transport_service` (the per-frame pump,
-driven for you by `boot_pump`), `transport_close`, `wire_link_quality`, and the succession
-torch all dispatch through it. A wire opened the RAW way (`gd.host` by hand, then
-`wire_attach`) never named one and reads as ENet — safe, because every ENet verb
-class-checks the installed peer and answers `ok = false` when it is something else.
+`transport_host` / `transport_join` open a wire and the wire remembers its transport;
+`transport_service` (the per-frame pump, driven for you by `boot_pump`), `transport_close`,
+`wire_link_quality`, and the succession handoff all dispatch through that remembered
+transport. A wire opened the RAW way (`gd.host` by hand, then `wire_attach`) never named one
+and reads as ENet — safe, because every ENet verb class-checks the installed peer and answers
+`ok = false` when it is something else.
 
 Shipped records: `netgd.ENET`, `netgd.WEBRTC`, and `ksteam.TRANSPORT`
 ([steamgd.md](steamgd.md)). A fourth transport fills one record and inherits every door,
@@ -383,7 +370,7 @@ same `MultiplayerPeer` flavor — ENet, WebRTC, or Steam — because there is on
 peer under the SceneMultiplayer and every seat is a peer on it. "Swappable" means the
 host picks the door for the whole run, not that peers pick doors per seat: a Steam owner
 hosting for a non-Steam friend hosts on ENet or WebRTC, and the Steam friends walk
-through that door like everyone else. The honest stance on the neighbors:
+through that door like everyone else. The neighboring features and their status:
 
 - **LAN discovery** — not shipped. A broadcast ping is easy to hand-roll (UDP broadcast
   the port, `begin_join` what answers); the join-code door already covers the same-LAN

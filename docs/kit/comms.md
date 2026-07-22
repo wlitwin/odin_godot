@@ -1,13 +1,12 @@
 # kit/comms — chat, pings, system lines
 
-How friends talk while they play: text chat, positional pings/markers, and host-authored
+How players talk while they play: text chat, positional pings/markers, and host-authored
 system lines ("alice joined the cave"). It rides the [session](session.md)'s SES_APP
 extension point on the reliable channel, so a game wires **zero** extra networking for chat —
 no packet type, no kind byte, no route of its own.
 
 **Lane compatibility: lane-agnostic.** Chat is session-level — it works identically
-beside the coop lane, the sim lane, or both (quickdraw and speedball could wire it
-tomorrow; nothing here touches ticks or prediction).
+beside the coop lane, the sim lane, or both. Nothing here touches ticks or prediction.
 
 ```odin
 import kcomms "godot:kit/comms"
@@ -17,17 +16,16 @@ import kcomms "godot:kit/comms"
 
 Everything routes through the host, which stamps the speaker and rebroadcasts — so every peer
 sees the same lines in the same order (**the host's order**), on any transport. Your own chat
-line comes back with the broadcast rather than echoing locally: authoritative order beats a
-few milliseconds, and what you see IS what everyone sees.
+line comes back with the broadcast rather than echoing locally, so what you see is what
+everyone sees.
 
-That shape is not written here. It is
-[`ksess.Host_Relay`](session.md#the-host-relay-host_relay--the-send-half-written-once) —
-stamp, spoof-drop, echo policy, addressed replay — which kit/comms and [kit/xfer](xfer.md)
-had hand-rolled twice before it existed; comms runs it with `echo = true`, which is that
-"comes back with the broadcast" sentence, as a flag. What is left in this package is a
-payload codec (two message kinds) over a bounded log and the shared rider queue. It shows in
-the calls: `comms_say` writes the same bytes on the host and on a client, and the relay picks
-the arm — there is no `is_host` at a send door anywhere in the package.
+The send half lives in
+[`ksess.Host_Relay`](session.md#the-host-relay-host_relay) —
+stamp, spoof-drop, echo policy, addressed replay — and comms runs it with `echo = true` (that
+is the "comes back with the broadcast" behavior). What kit/comms adds on top is a payload
+codec (two message kinds) over a bounded log and the shared rider queue. `comms_say` writes
+the same bytes on the host and on a client; the relay picks the arm — there is no
+`is_host` at any send door in the package.
 
 Two shapes come out the other end:
 
@@ -85,7 +83,7 @@ comms_line_name :: proc(c: ^Comms, line: Line) -> string    // "" for system lin
 
 `Ev_Line.text` points into the log — copy it if you keep it past a frame.
 
-## Worked excerpt (cavecrawl)
+## Worked example (cavecrawl)
 
 The pump: poll events, repaint the chat box only when a line landed, visualize markers.
 
@@ -124,19 +122,18 @@ case ksess.Ev_Player_Joined:
 - **No kind byte for chat.** Comms frames live *inside* the session's SES_APP framing under
   one tag — the game never multiplexes chat into its own packets. If your game also uses
   SES_APP, claim a different tag (see [session.md](session.md)).
-- **Catchup BEFORE the join line** — the reason `comms_welcome` exists. The join line is
-  about to be minted and broadcast to everyone *including* the joiner; replay first or the
-  joiner sees their own arrival twice. Rejoins skip catchup (a same-session reconnect may
-  still hold this run's log). Use `comms_catchup`/`comms_system` directly only when your
-  ritual differs.
+- **Catchup before the join line.** `comms_welcome` handles this ordering for you. The join
+  line is about to be minted and broadcast to everyone *including* the joiner; replay the log
+  first or the joiner sees their own arrival twice. Rejoins skip catchup (a same-session
+  reconnect may still hold this run's log). Use `comms_catchup`/`comms_system` directly only
+  when your ritual differs.
 - **Your own line does not echo locally** (on a client). It lands when the host's broadcast
-  comes back. That's the point — shared order — but don't paint an optimistic local copy or
-  you'll double it.
+  comes back. Don't paint an optimistic local copy or you'll double it.
 - **`comms_system` asserts `is_host`.** System lines come from the authority; clients that
   want flavor text ask the host (or just say it).
 - **Bytes, not runes:** `MAX_SAY` is a 240-*byte* budget, clipped at a rune boundary (never
-  mid-UTF-8). The host clips again on receipt — the trust boundary doesn't take the client's
-  word for it.
+  mid-UTF-8). The host clips again on receipt — it doesn't take the client's word for the
+  length.
 
 Siblings: [session.md](session.md) (SES_APP routing, roster, events) ·
 [ui.md](ui.md) (the chat box that repaints from this log) · [net.md](net.md) (Writer/Reader).

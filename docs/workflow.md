@@ -1,9 +1,9 @@
 # Workflow — the dev loop, editor DX, and debugging
 
 This is the day-to-day guide: how you build, iterate, get editor help, and debug. Read the
-honest limitations first — they shape everything else.
+limitations first — they shape everything else.
 
-## The one thing to internalize: Odin is AOT-compiled
+## Odin scripts are AOT-compiled
 
 Your `.odin` scripts compile to a native shared library (`.dylib` / `.so` / `.dll`) that the
 engine loads through the GDExtension boundary. **There is no interpreter.** GDScript is
@@ -33,9 +33,9 @@ CI, headless builds, or working from the source repo.
 1. builds the `scriptgen` preprocessor,
 2. runs it over the scripts dir to emit `*.gen.odin` build artifacts beside your sources (you
    never edit these; the loader ignores them as attachable scripts). One of them,
-   `odin_godot_guard.gen.odin`, is the STALENESS GUARD: a compile-time `#load_hash`
-   assert per authored source, so a build path that skips this step — a bare
-   `odin build` against yesterday's `*.gen.odin` — fails at compile time naming the
+   `odin_godot_guard.gen.odin`, is the staleness guard: a compile-time `#load_hash`
+   assert per authored source. A build path that skips this step — a bare
+   `odin build` against yesterday's `*.gen.odin` — fails at compile time, naming the
    drifted file instead of silently compiling stale descriptors,
 3. builds the scripts dll (`odin build <scriptsdir> -build-mode:dll` with
    `-custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc
@@ -134,9 +134,7 @@ checker: because a single `.odin` file isn't a compile unit, it type-checks the 
 unsaved buffer, runs `odin check`, and maps `‹file›(‹line›:‹col›) Error: ‹msg›` back to the
 editor. That check runs on a **background worker** with a result cache, so it never freezes the
 UI (first-call latency ~0.03 ms; the check itself — ~0.5 s warm on a game-sized package —
-completes a moment later and the squiggles update on the next debounce). Routing diagnostics
-through a persistent `ols` was measured and rejected: ols computes them by spawning the **same**
-`odin check`, so it could never be faster than running the check ourselves. The `godot` collection root resolves `odin_godot/root` setting →
+completes a moment later and the squiggles update on the next debounce). The `godot` collection root resolves `odin_godot/root` setting →
 `ODIN_GODOT_ROOT` env → **auto-derived from the installed addon's own location** — so a normal
 `addons/odin_godot/` install needs no configuration; set `odin_godot/root` only if you keep the
 collection somewhere non-standard.
@@ -175,12 +173,12 @@ without the icon simply shows the generic one.
 
 ### Find in Files
 
-The script editor's **Find in Files** (Ctrl/Cmd+Shift+F) searches `.odin` files. Godot builds
-that search's file-type list from a hardcoded set (`gd`, `cs`, `gdshader`) with no hook for a
-GDExtension scripting language, so the Odin editor plugin appends `odin` to the
-`editor/script/search_in_file_extensions` project setting when it loads. The value is applied
-in-memory each session (your `project.godot` is left untouched), and the search dialog re-reads
-it every time it opens — so the `*.odin` filter checkbox is there and checked by default.
+The script editor's **Find in Files** (Ctrl/Cmd+Shift+F) searches `.odin` files. Godot's
+search file-type list is a hardcoded set (`gd`, `cs`, `gdshader`) with no hook for a
+GDExtension scripting language, so on load the Odin editor plugin appends `odin` to the
+`editor/script/search_in_file_extensions` project setting. The value is applied in-memory each session (your `project.godot` is left untouched),
+and the search dialog re-reads it every time it opens — so the `*.odin` filter checkbox is
+there and checked by default.
 
 One known gap remains, functionality-irrelevant: documentation tooltips for `@export`s/methods
 in the Inspector aren't wired (autocomplete *does* show type signatures — see above).
@@ -189,11 +187,12 @@ in the Inspector aren't wired (autocomplete *does* show type signatures — see 
 
 The build writes a `*.gen.odin` registration file next to each script (they must live inside
 the script's package directory — Odin packages are single-directory). They aren't attachable
-or openable in the editor, so the Odin plugin **hides them from the FileSystem dock**. This is
-widget-level hiding: Godot's filesystem scan admits files by extension only (`.gen.odin` ends
-in `.odin`) and the engine has no per-file exclusion hook, so the plugin re-hides them after
-every dock rebuild. They remain real files on disk — external editors, git, and the engine's
-Find in Files (which is also extension-based) still see them.
+or openable in the editor, so the Odin plugin **hides them from the FileSystem dock**,
+re-hiding them after every dock rebuild. This is widget-level hiding: Godot's filesystem
+scan admits files by extension only (`.gen.odin` ends in `.odin`) and there is no per-file
+exclusion hook, so re-hiding after each rebuild is the available mechanism. They remain real
+files on disk — external editors,
+git, and the engine's Find in Files (which is also extension-based) still see them.
 
 To show them (e.g. when inspecting what scriptgen emits), set the
 **`odin_godot/show_generated_files`** project setting to `true` — it takes effect at the next
@@ -277,7 +276,7 @@ Godot copy; details in [debugging.md](debugging.md#jetbrains-ides-rider-clion-id
 
 ### Crashes and panics are reported automatically
 
-A crash or panic in script code is **no longer silent**: an Odin `panic`/`assert` pushes a red
+A crash or panic in script code is reported: an Odin `panic`/`assert` pushes a red
 `ODIN_SCRIPT_PANIC <message> (file:line)` error to the **editor Output**, and a raw fatal
 signal (SIGSEGV etc., e.g. an engine call on a nil handle — macOS/Linux) prints an
 `ODIN_GODOT_CRASH` report to stderr with the **faulting Odin proc symbolized**, pushes a
@@ -291,7 +290,7 @@ same backtrace is in the `.ips` report under `~/Library/Logs/DiagnosticReports/`
 > A `_debug_get_current_stack_info` virtual is wired and produces a correct native Odin
 > backtrace **when invoked**, but Godot only calls it during an active remote-debug session, so
 > it does **not** automatically surface a script-line stack on a plain error. Use `lldb` for
-> your day-to-day stack view. See [Debugging](debugging.md) for the full honest account.
+> your day-to-day stack view. See [Debugging](debugging.md) for the full account.
 
 ### Web / wasm
 

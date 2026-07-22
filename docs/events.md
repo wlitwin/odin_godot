@@ -1,12 +1,12 @@
 # Pure-Odin events — `events.Event(T)`
 
-Godot signals are the engine's cross-boundary contract, and every emit pays for that
-generality: a StringName lookup, one Variant boxed per argument, `Object::emit_signal`
-connection dispatch, then the C trampoline back into your script. When both ends of a
-notification are Odin scripts **in the same dll**, that whole round trip is overhead.
-`import events "godot:events"` gives you a typed observer that dispatches with direct
-proc calls instead — no engine, no boxing, no allocation on the emit path. This is the
-same split C# users know: C# `event` inside the assembly, Godot signals at the edges.
+When both ends of a notification are Odin scripts **in the same dll**, an engine signal
+is more machinery than you need: every emit does a StringName lookup, boxes one Variant
+per argument, runs `Object::emit_signal` connection dispatch, and trampolines back into
+your script through C. `import events "godot:events"` gives you a typed observer that
+dispatches with direct proc calls instead — no engine, no boxing, no allocation on the
+emit path. It is the same split C# users know: a C# `event` inside the assembly, Godot
+signals at the edges.
 
 ```odin
 import events "godot:events"
@@ -29,7 +29,7 @@ enemy_on_slow :: proc(ctx: rawptr, factor: f64) {
 ```
 
 The payload is any Odin type — a struct, a slice, a pointer — passed by value, fully
-typed at compile time. There is no Variant in the path, which also means there is no
+typed at compile time. There is no Variant in the path, so there is no
 `gd.Int`/`f64`-only restriction and no marshalling cost for big payloads.
 
 ## Which tool when
@@ -40,17 +40,16 @@ typed at compile time. There is no Variant in the path, which also means there i
 | Decoupled one-to-many between scripts in the SAME module/dll | **`events.Event(T)`** — direct calls, typed payloads |
 | The hottest loops (per-bullet, per-frame-per-entity) | **neither** — batch the data and iterate (see barrage's SOA bullet field); a callback per element is still a call per element |
 
-## The two rules that keep it safe
+## Two rules for safe use
 
 **1. Same module only.** Script modules are isolated dlls with no cross-imports
-([modules](modules.md)); a subscription is a raw proc pointer + struct pointer, and
-handing those across dlls silently defeats that contract (typeids are module-local;
-`rt.script_of` on another module's class returns nil by construction). The canonical
-shape when the *trigger* comes from another module: the cross-module edge stays **one
-engine call** into the module that owns the event; the fan-out inside the module is the
-`Event`. Barrage's SlowEnemies powerup is the living example — `pickup.odin` (powerups
-module) makes one `object_call("slow_all_enemies")` into the Spawner (enemies module),
-which `events.emit`s to every subscribed Enemy:
+([modules](modules.md)). A subscription is a raw proc pointer plus a struct pointer, and
+those are meaningless in another dll: typeids are module-local, and `rt.script_of` on
+another module's class returns nil. When the *trigger* comes from another module, keep
+the cross-module edge as **one engine call** into the module that owns the event, and let
+the `Event` fan out inside that module. Barrage's SlowEnemies powerup shows the shape:
+`pickup.odin` (powerups module) makes one `object_call("slow_all_enemies")` into the
+Spawner (enemies module), which `events.emit`s to every subscribed Enemy:
 
 ```text
 powerups dll                       enemies dll
@@ -61,7 +60,7 @@ pickup ── object_call (engine) ──> spawner ── events.emit (direct) �
 
 **2. Unsubscribe before the subscriber dies.** The subscription stores your struct
 pointer raw; if the script instance is freed first, the next emit is a use-after-free.
-For a node script that means `<class>_exit_tree` — it fires on `queue_free` *and* scene
+For a node script, do it in `<class>_exit_tree` — it fires on `queue_free` *and* on scene
 teardown:
 
 ```odin
@@ -76,11 +75,11 @@ The publisher frees its list in its own `exit_tree` with `events.destroy`.
 
 ## Hot reload
 
-Same trap as [flow](workflow.md)'s `Action` trees, same fix: subscriptions cache raw
-proc pointers into the scripts dll, so a hot reload leaves them pointing at stale code
-(and a changed-layout reload reallocates structs, dangling the ctx pointers too). The
-self-healing pattern is owner-tagged resubscription in the `<class>_reload` hook —
-idempotent and order-independent across the reload's rebind loop:
+Subscriptions cache raw proc pointers into the scripts dll, so a hot reload leaves them
+pointing at stale code; a changed-layout reload also reallocates structs and dangles the
+ctx pointers. Resubscribe in the `<class>_reload` hook, tagged by owner so it stays
+idempotent and order-independent across the reload's rebind loop (the same pattern
+[flow](workflow.md)'s `Action` trees use):
 
 ```odin
 enemy_subscribe_slow :: proc(self: ^Enemy) {

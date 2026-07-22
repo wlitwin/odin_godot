@@ -16,11 +16,10 @@ dangerous crossing.
 The game writes an ordinary `switch` over a replicated `state: u8` in its **host** tick,
 built from these verbs — cavecrawl's dweller is the documented example.
 
-The NPC model rides what already exists: an NPC is an entity **owned by the host player** —
-the host's brain tick writes `x/y` like any owner writes streamed fields, and every client
-interpolates the motion for free. Its state byte and hp are plain replicated fields. No new
-machinery. The whole network presence of cavecrawl's dweller is this struct
-(`examples/cavecrawl/scripts/dweller.odin`):
+An NPC is an entity **owned by the host player**: the host's brain tick writes `x/y` like
+any owner writes streamed fields, and every client interpolates the motion for free. Its
+state byte and hp are plain replicated fields. The whole network presence of cavecrawl's
+dweller is this struct (`examples/cavecrawl/scripts/dweller.odin`):
 
 ```odin
 Dweller :: struct {
@@ -80,9 +79,9 @@ goal from [kit/nav](nav.md)'s `next_point`.
 
 ## The wave director
 
-Generalized from survivors: the director decides *when* and *how many*; the game decides
-what and where (its spawn code runs per emitted spawn). One wave at a time, the next after
-the field is clear and a breather passes.
+The director decides *when* and *how many*; the game decides what and where (its spawn code
+runs per emitted spawn). One wave at a time, the next after the field is clear and a breather
+passes.
 
 ```odin
 Wave :: struct {
@@ -110,7 +109,7 @@ director_note_death :: proc(d: ^Director, tick: u64, waves: []Wave)
 director_wave :: proc "contextless" (d: ^Director) -> int
 ```
 
-## Worked example: the dweller's whole brain
+## Worked example: the dweller's brain
 
 One think-tick per dweller, host only — perceive, then a plain switch. State and position
 are replicated fields; writing them *is* the AI's entire network presence
@@ -159,17 +158,15 @@ through the [session](session.md) factory (`session_spawn_make` / `session_despa
 ## Gotchas
 
 - **Hoist `director_tick` out of the range expression.** An Odin range bound is
-  re-evaluated per iteration, and `director_tick` has side effects — inlining it in the
-  range silently drains the wave. (The comment in `cave_host_tick` exists because it
-  happened.)
-- The director paces **one spawn per tick** on purpose — spawn bursts read badly and spike
-  the delta batch. Don't loop it.
-- Per-NPC scratch that no one else needs (bite cooldowns, home dens) lives in a host-side
+  re-evaluated per iteration, and `director_tick` has side effects, so inlining it in the
+  range silently drains the wave.
+- The director paces **one spawn per tick**. Don't loop it.
+- Per-NPC state that no one else needs (bite cooldowns, home dens) lives in a host-side
   map (`self.brains[id]`), not in replicated fields — only the *consequences* (`x/y`,
   `state`, `hp`) ship.
-- The host's own screen is only as smooth as the writer — the brain writes `x/y` in tick
+- The host's own screen is only as smooth as the writer: the brain writes `x/y` in tick
   steps. `dweller_process` glides the node toward the sim with `kai.step_toward` at frame
-  rate (+50% slack), on every role: clients shadow the already-smooth stream, the host
-  melts the steps.
+  rate (+50% slack), on every role — clients shadow the already-smooth stream, the host
+  smooths the tick steps.
 - `step_away` at distance zero picks +x arbitrarily; `nearest` with a nil blocker sees
   everything (open world).

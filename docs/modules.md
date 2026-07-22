@@ -1,4 +1,4 @@
-# Script modules — splitting a big project into per-module dlls
+# Script modules — splitting a project into per-module dlls
 
 By default all of a project's Odin scripts are **one package** (`res://scripts/`) compiled
 into **one scripts dll**, and for most projects that is the right shape. **Script modules**
@@ -11,11 +11,11 @@ rebuild-on-save latency stays flat as the project grows.
 Modules buy that flat save latency with slower full builds and a hard isolation rule. Read
 the cost model first — **most projects should not start with modules.**
 
-## When to reach for modules (the honest cost model)
+## When to use modules
 
 Every scripts dll pays a fixed compile floor of roughly **0.85 s** — the Odin front-end
 type-checking the full `godot` binding, paid once *per dll*, no matter how few scripts the
-dll holds. That floor is what shapes the trade:
+dll holds. That floor shapes the trade:
 
 | Project size | Modules? | Why |
 |---|---|---|
@@ -26,8 +26,8 @@ dll holds. That floor is what shapes the trade:
 (Numbers measured on the Apple-silicon macOS dev machine with the editor's `-o:none` dev
 builds; your absolute times will differ, the shape won't.)
 
-A project without a `modules/` dir behaves exactly as before — nothing about modules is
-loaded, built, or exported until you create one.
+A project without a `modules/` dir loads, builds, and exports exactly as a single-dll
+project — nothing about modules is loaded, built, or exported until you create one.
 
 ## Layout and naming rules
 
@@ -52,7 +52,7 @@ your_project/
   export error telling you to rename it.
 - **Class names must be unique across all modules** (see [Collisions](#class-name-collisions)).
 - **Attachable scripts live flat in the module dir** (an Odin package is one directory —
-  same as `scripts/` today). Subdirectories are fine as *helper packages* the module imports
+  same as `scripts/`). Subdirectories are fine as *helper packages* the module imports
   relatively; an edit anywhere under `res://modules/<name>/` counts as an edit to that
   module for rebuild-on-save. A `//gd:`-marked file in a subdirectory is never attachable —
   `scriptgen` warns about it instead of silently skipping it.
@@ -61,9 +61,10 @@ your_project/
 
 ### Creating a module
 
-There is deliberately no template machinery for modules (**Project → Tools → Set Up Odin
-Scripts** creates only the main `res://scripts/` — a module is five lines, a starter dir
-would be overkill). Make the directory and drop in a script:
+There is no template machinery for modules — **Project → Tools → Set Up Odin Scripts**
+creates only the main `res://scripts/`. A module is a directory with a script in it — about
+five lines of boilerplate, so a starter dir would be overkill. Make the directory and drop
+in a script:
 
 ```sh
 mkdir -p modules/enemies
@@ -92,12 +93,14 @@ or just save in the editor). The required boot shim (`odin_godot_boot.gen.odin`)
 generated per module by `scriptgen`, like the main module's; there is no extra boilerplate.
 Attach `res://modules/enemies/enemy.odin` to a node exactly like any other Odin script.
 
-## The rule: no imports between script modules
+## No imports between script modules
 
-A script module must not import another script module (or `scripts/`), and the build
-enforces it twice over: `scriptgen` checks every file's import declarations structurally
-(an absolute-path import, or any relative import that resolves outside the module's
-directory, is a hard error), and a fast grep for `..`-relative imports backstops it
+A script module must not import another script module (or `scripts/`). A package linked into
+two dlls gets **its package globals duplicated per dll** — each dll carries its own copy, so
+writes from one module never reach the other and "shared" state forks silently. The build
+rejects cross-module imports two ways: `scriptgen` checks every file's import declarations
+structurally (an absolute-path import, or any relative import that resolves outside the
+module's directory, is a hard error), and a fast grep for `..`-relative imports backstops it
 (`check_module_isolation` in `build/common.sh`, shared by `build_scripts.sh` and
 `build_export_scripts.sh`, ported in `build_scripts.ps1`):
 
@@ -110,26 +113,24 @@ build_scripts: ILLEGAL cross-module import in '<dir>':
   or move the shared state into exactly one module.
 ```
 
-**Why so hard a rule?** Odin itself would happily compile `import "../enemies"`. But a
-package linked into two dlls gets **its package globals duplicated per dll**: each dll
-carries its own copy, writes from one module never reach the other, and your "shared" state
-silently forks — no error, just two diverging worlds. The build-time rejection turns that
-silent hazard into a loud one.
+Odin itself would compile a cross-module `import "../enemies"` without objection — the
+isolation is a build-tooling rule (scriptgen plus `build_scripts`), not a language one, so
+the check is explicit and loud rather than a compiler error.
 
 The consequences, stated plainly:
 
 - Modules cannot share Odin types, procs, or package globals with each other.
 - Cross-module communication is **engine-mediated and name-based**: signals, method calls
   by name (`gd.object_call`), autoloads.
-- `rt.script_of`'s typed access **stops at the module boundary by construction** (see
-  below).
+- `rt.script_of`'s typed access **stops at the module boundary** (see below).
 - Shared mutable state lives in **exactly one module** (its package globals), or in an
   **autoload** — never in a package two modules both import.
 
 ## Cross-module communication
 
-The engine is the bus. A worked pair, mirroring `tests/modules_spike/` (which verifies it
-headless): `Player` in the main module attacks an `Enemy` from the enemies module.
+Modules communicate through the engine. The following pair mirrors `tests/modules_spike/`
+(which verifies it headless): `Player` in the main module attacks an `Enemy` from the
+enemies module.
 
 ```odin
 // scripts/player.odin — the MAIN module
@@ -184,20 +185,20 @@ Pick the tool by what you need:
 
 ### `rt.script_of` across modules
 
-Within a module, `rt.script_of(obj, T)` is the zero-overhead typed path it always was.
-Across modules it returns `nil` **by construction**: with no cross-module imports you cannot
-even *name* another module's struct type, and the core's class check nils out any same-name
-dodge (a node carrying the enemies module's `Enemy` is never a non-nil `^YourEnemy`). Treat
-`script_of` as "typed access to *my* module's scripts"; everything else goes through the
-engine. (Verified from both sides in `tests/modules_spike/`.)
+Within a module, `rt.script_of(obj, T)` is a zero-overhead typed path. Across modules it
+returns `nil`: with no cross-module imports you cannot name another module's struct type,
+and the core's class check returns nil for a same-name type from another module (a node
+carrying the enemies module's `Enemy` is never a non-nil `^YourEnemy`). Treat `script_of` as
+"typed access to *my* module's scripts"; everything else goes through the engine. (Verified
+from both sides in `tests/modules_spike/`.)
 
 ## Reload: per-module rebuild and swap
 
 Saving a script in the editor rebuilds **only the module containing the saved file** — the
 reload coordinator keeps a content hash per module and kicks one scoped build per *changed*
 module, then hot-swaps just that dll. The other dlls are not rebuilt, not reloaded, not
-touched. That per-module scope is the whole payoff: the ~0.85 s floor is paid once per save,
-for one module, no matter how big the rest of the project is.
+touched. The ~0.85 s floor is paid once per save, for one module, no matter how big the rest
+of the project is.
 
 Semantics of a module swap (all asserted by `tests/modules_spike/`):
 
@@ -209,9 +210,8 @@ Semantics of a module swap (all asserted by `tests/modules_spike/`):
   never see a reload hook. The main module's blackboard survives an enemies-module swap
   untouched.
 
-So if a module keeps meaningful state in package globals, expect it to reset when *that*
-module reloads (this was already true of the single-dll world — the granularity just got
-finer). State that must survive its owner's edit-save loop belongs on instances (exported
+If a module keeps meaningful state in package globals, expect it to reset when *that* module
+reloads. State that must survive its owner's edit-save loop belongs on instances (exported
 fields) or in an autoload in a module you aren't editing.
 
 A compile error in a module's rebuild-on-save surfaces in the editor **Output** panel
@@ -282,7 +282,7 @@ browser by `tests/modules_web/`.
 
 Setting the `BUILD_MODULES=0` environment variable skips modules in `build_scripts.sh` /
 `build_export_scripts.sh` **and** in the export plugin's bundling — loudly, since the result
-intentionally lacks the module classes:
+lacks the module classes:
 
 ```
 odin export: BUILD_MODULES=0 — script modules NOT built or bundled; the exported game will
@@ -294,7 +294,7 @@ dir), CI subsets, and bisecting — not as a shipping configuration.
 
 ## Platform support
 
-Matching the project's honesty convention — verified means *ran*, on that platform:
+Verified means the code path has actually been run on that platform:
 
 | Platform | Status |
 |---|---|

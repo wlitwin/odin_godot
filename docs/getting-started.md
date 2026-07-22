@@ -74,7 +74,7 @@ web.release.wasm32 = "res://bin/libodin_godot.wasm"
 `entry_symbol = "odin_godot_init"` is the core's GDExtension entry point — it registers the
 "Odin" scripting language so the editor recognizes `.odin` files. The **core** dll is what the
 manifest loads; the **scripts** dll (`libodinscripts.dylib`) is loaded *by* the core at runtime,
-so it is deliberately not listed here.
+so it is not listed here.
 
 ### 2b. The `scripts/` package and its boot shim
 
@@ -103,9 +103,9 @@ odin_scripts_boot :: proc "c" (
 }
 ```
 
-To customize it (rare), add a hand-written file defining `odin_scripts_boot` and scriptgen
-detects it and skips generating its own. (The in-repo `tests/`/`examples/` projects predate
-the codegen and still carry a hand-written `boot.odin` — that's the opt-out path in action.)
+To customize it (rare), add a hand-written file defining `odin_scripts_boot`; scriptgen
+detects it and skips generating its own. The in-repo `tests/`/`examples/` projects take this
+opt-out, carrying a hand-written `boot.odin`.
 
 ### 2c. Tell the editor where odin_godot lives
 
@@ -120,7 +120,7 @@ If you launch the editor from outside the Nix shell, it usually can't find `odin
 `PATH`; point it at the compiler with the **`odin_godot/odin_bin`** project setting (absolute
 path to the `odin` binary) so reload-on-save works. (For autocomplete, `odin_godot/ols_bin`
 similarly points at `ols`.) These settings are summarized in
-[Workflow → editor settings](workflow.md#editor-settings).
+[Workflow → editor settings](workflow.md#editor-settings-reference).
 
 ## 3. Write your first script
 

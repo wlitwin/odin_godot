@@ -4,12 +4,11 @@ Reach for `kit/items` when entities carry things: bags, chests, pickups, loot. I
 a 4-byte `Slot`, a definition `Table` (names, stack sizes), and deterministic operations —
 add, take, put, transfer — that are safe inside predicted commands.
 
-**Lane compatibility: COOP wire, sim-safe math.** Inventories replicate as delta-lane
-fields mutated through coop verbs — that pairing is this module's model. The `Slot` ops
-themselves are pure and deterministic (safe inside any predicted command, either lane),
-but whether an `Inventory($N)` bundle can sit under a sim snapshot descriptor is an OPEN
-question — unverified today; a sim game keeps its purse on the delta lane (the hybrid
-composes per-field) until that's proven.
+**Lanes: COOP wire, sim-safe math.** Inventories replicate as delta-lane fields mutated
+through coop verbs. The `Slot` ops themselves are pure and deterministic — safe inside any
+predicted command, on either lane. Whether an `Inventory($N)` bundle can sit under a sim
+snapshot descriptor is still unverified; until that's proven, a sim game keeps its purse on
+the delta lane (the hybrid composes per-field).
 
 ## Mental model
 
@@ -23,17 +22,17 @@ Chest :: struct {
 }
 ```
 
-Which means inventory replication is already solved: slots ride the [kit/net](net.md)
-shadow-delta walk like any other POD field, chest state reaches every peer without one line
-of new wire code, and reject-truth snapshots carry the whole inventory back when a
-prediction loses a race.
+Inventory replication comes for free: slots ride the [kit/net](net.md) shadow-delta walk
+like any other POD field, so chest state reaches every peer without one line of new wire
+code, and reject-truth snapshots carry the whole inventory back when a prediction loses a
+race.
 
-Every operation is **deterministic and allocation-free**, because they run inside
-`@(gd_command)` procs: the predicting client and the host execute the same op from
-byte-identical args and must land on identical slots. Two players grabbing the same last
-item both predict success; the host runs them in arrival order, the second op finds the
-slot empty and rejects, and the loser's optimistic state reverts. Conflict resolution costs
-nothing — it *is* the intent pipeline.
+Every operation is **deterministic and allocation-free**. They run inside `@(gd_command)`
+procs, so the predicting client and the host execute the same op from byte-identical args
+and land on identical slots. Two players grabbing the same last item both predict success;
+the host runs them in arrival order, the second op finds the slot empty and rejects, and the
+loser's optimistic state reverts. Conflict resolution is just the intent pipeline — there is
+no separate reconciliation code.
 
 Item **definitions are code, not wire**: every peer registers the same table in `ready()`
 (ids are game constants), so only 4-byte slots ever ship.
@@ -117,15 +116,14 @@ Inventory :: struct($N: int) {
 }
 ```
 
-## THE RULE: which ops take the Table
+## Which ops take the Table
 
-The rule, not a quirk: **ops that can grow a stack consult the defs** for `max_stack`
-(`add`, `put`, `transfer`); **ops that only drain or read slots don't** (`take`, `remove`,
-`count_of`).
+Ops that can grow a stack consult the defs for `max_stack` — `add`, `put`, `transfer`. Ops
+that only drain or read slots don't — `take`, `remove`, `count_of`.
 
-The table-free ops are exactly the ones usable inside a `@(gd_command)` proc, which sees
-only its entity and args — no ambient state, by design. Crediting with stacking rules
-happens where the table lives: the command hook / host code.
+The table-free ops are exactly the ones usable inside a `@(gd_command)` proc, which sees only
+its entity and args, with no ambient state. Crediting with stacking rules happens where the
+table lives: the command hook or host code.
 
 ## Worked example: looting a chest
 
@@ -158,8 +156,8 @@ cave_credit :: proc(self: ^CaveLobby, player: knet.Player_Id, chest: ^Chest) {
 }
 ```
 
-`last_take` is an untagged scratch field — never on the wire — carrying what the command
-took to the hook. [kit/ui](ui.md)'s `inv_refresh` renders the bag from the same slots and
+`last_take` is a plain field that never rides the wire; it carries what the command took
+across to the hook. [kit/ui](ui.md)'s `inv_refresh` renders the bag from the same slots and
 table.
 
 ## Grid packing (shape as a mechanic)
@@ -181,15 +179,15 @@ items_register(&table, BOOT, "boot", shape = kitems.shape_of("X.", "X.", "XX"))
 ```
 
 Shapes are up to 4x4 with a solid-cell mask (`shape_of` reads row strings), and
-each placement is **self-describing** — the entry stores its shape — so THE
-RULE holds by construction: `pack_move`, `pack_remove`, `pack_at`, and
+each placement is **self-describing** — the entry stores its shape — so the same
+table/table-free split holds: `pack_move`, `pack_remove`, `pack_at`, and
 `pack_fits` are table-free and command-safe (the drag-to-rearrange command is
 one predicted `pack_move`), while the growing ops (`pack_place` with a shape
 you looked up, `pack_add` which stacks then auto-places) live host/hook side
 with the table. `pack_find_spot` scans row-major, so a predicted command and
-the host derive the same anchor from the same grid bytes. Conflicts cost
-nothing, as ever: two players dragging into the same corner both predict, the
-host runs them in arrival order, the loser reverts.
+the host derive the same anchor from the same grid bytes. Conflicts resolve the
+same way: two players dragging into the same corner both predict, the host runs
+them in arrival order, the loser reverts.
 
 ## Gotchas
 

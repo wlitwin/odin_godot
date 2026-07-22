@@ -9,32 +9,12 @@ for wire read/write in [app messages](session.md#app-messages), custom interpola
 procs, `Clock_Sync`, `now_s`, and hand-built descriptors in tests. The engine-facing
 transport lives in [kit/netgd](netgd.md).
 
-**One package, two layers.** `kit/net` is really two things fused under one name, and the
-fusion is deliberate: a shared **replication substrate** (the wire format, the field
-descriptors and codecs, the interpolation blend math, the tick and clock) is consumed by
-BOTH the coop lane described on this page AND [kit/sim](sim.md), the server-authority resim
-lane that lives in its own package — and the **coop lane** proper (the command +
-owned-streams model) is layered on top of it. A split of the substrate into a package of its
-own was weighed and deferred: two consumers is a shared header, not a library, so the
-substrate stays nameless until a third consumer earns the split (which is why `Field_Desc`
-carries sim-only tuning fields like `slack`/`glide`/`cut` with no seam to hang them on).
-[kit/sim](sim.md) calls this same package the substrate *layer* of kit/net; this page calls
-the whole of it the coop replication core — one package, two lanes sharing it, seen from
-either side.
-
-One vocabulary note, because *present* means three different things in the kit:
-`session_present` queues ONE consequence for the render clock (see [the two
-timelines](#the-two-timelines-presenting-consequences)), `lane_present` is
-[kit/sim](sim.md)'s per-frame presentation pump for watched/reconciled entities, and
-`kit/sim/present.odin` is the blend/error math that pump drives — three code paths, one
-word; don't conflate them.
-
 ## The mental model
 
 **Two authorities, disjoint by construction.** This is a command + owned-streams hybrid,
-not tick-rollback netcode — when a game needs the tick-rollback kind (contested,
-cheat-resistant, twitch-fair), that is [kit/sim](sim.md), a third lane BESIDE these two,
-per field, not a different library ([choosing a model](timelines.md)):
+not tick-rollback netcode. When a game needs the tick-rollback kind (contested,
+cheat-resistant, twitch-fair), that is [kit/sim](sim.md) — a third lane beside these two,
+chosen per field, not a different library ([choosing a model](timelines.md)):
 
 - **Owner-authoritative streams** — state with a personal owner (your movement, your aim)
   is authoritative on its owner and *interpolated* by everyone else, host included. Sent as
@@ -97,22 +77,17 @@ screen — optimistically applied if it predicts, otherwise just sent), or
 `.Rejected` (the predicate said no on this peer: final on the host, a
 reverted local apply on a client). "Did it show on my screen?" is
 `knet.command_ok(r)` (`r != .Rejected`); "is it authoritative?" is
-`r == .Applied`. It replaced a plain `bool` whose truth meant
-authoritative-verdict on the host but tentative-local on a client — the one
-return in the feature that used to force a role branch to read correctly.
-(A game not using kit/boot issues through the raw layer below.)
+`r == .Applied`. (A game not using kit/boot issues through the raw layer below.)
 
 **Command ids are stable name hashes, not positions.** The generated
 `<CLASS>_CMD_<VERB>` constants (and both command wires, coop and sim) carry an
-FNV-1a hash of the verb's name — so reordering, adding, or removing procs never
-renumbers the protocol, and a version-skewed peer's unknown id MISSES the
-receiver's lookup and rejects cleanly instead of silently dispatching to
-whatever now lives at that position (the rolling-update landmine this kills).
-A renamed verb is a new id on purpose: it IS a different verb, and stale
-clients get the correct refusal. Same-set collisions are a build error naming
-both verbs (rename one — astronomically rare with a handful of names).
-Hand-built `Command_Desc`/`Sim_Cmd` sets pick their own ids, unique within the
-set (a single command's zero value is fine).
+FNV-1a hash of the verb's name, so reordering, adding, or removing procs never
+renumbers the protocol. A version-skewed peer's unknown id MISSES the receiver's
+lookup and rejects cleanly instead of dispatching to whatever now lives at that
+position. A renamed verb is a new id — it IS a different verb, and stale clients
+get the correct refusal. Same-set collisions are a build error naming both verbs
+(rename one). Hand-built `Command_Desc`/`Sim_Cmd` sets pick their own ids, unique
+within the set (a single command's zero value is fine).
 
 **The tick paces the wire, not the sim.** The fixed net tick (default 20 Hz) is when
 deltas are diffed and streams are sent; gameplay runs at frame rate. Remote entities render
@@ -177,9 +152,8 @@ At most `MAX_REPLICATED_FIELDS :: 64` fields per entity (the dirty mask is one u
 fixed array counts as one field). `Lerp_Kind` covers `.Snap`, `.F32`, `.F64`, `.Quat`
 (nlerp with hemisphere flip), `.Angle` — f32 **radians** blending the shortest
 arc, declared `` heading: f32 `gd:"owner,interp=angle"` `` (a raw
-lerp from `+3.1` to `-3.1` sweeps the long way around; every hand-rolled
-heading blend was this) — and `.Custom` with an author-supplied
-`Blend_Proc :: proc(dst, a, b: rawptr, alpha: f32)` — declared via
+lerp from `+3.1` to `-3.1` sweeps the long way around) — and `.Custom` with
+an author-supplied `Blend_Proc :: proc(dst, a, b: rawptr, alpha: f32)` — declared via
 `` tint: [3]f32 `gd:"owner,interp=blend_oklab"` ``.
 
 ## Consequences (`<verb>_then`)
@@ -199,22 +173,21 @@ verb applies. Two shapes, detected by the leading param:
 
 **Payload returns.** A verb may return `(bool, facts…)` — results after the
 applied bool are in-process values handed straight to the `_then` (they never
-cross the wire), which is what deletes the scratch-field idiom: the chest used
-to record `last_take` in an untagged field for the hook to read; now the verb
-*returns* what it took. Payload types are unconstrained — the generated call
-site lets the compiler hold the `_then` signature to them.
+cross the wire). Payload types are unconstrained — the generated call site lets
+the compiler hold the `_then` signature to them.
 
 **The verb can see the issuer too.** When the *predicate* needs WHO — a trade
 window arbitrating which seat is confirming, a first-come claim recording its
 claimant — declare `by: knet.Player_Id` right after the receiver (after the
 wielder param in a composed block) and the framework fills it: `ctx.me` on the
 issuing peer's optimistic run, the resolved sender on the host — the same
-values the `_then` gets. It never rides the wire, so it can't be forged: the
-client-claimed `side: u8` a hostile peer flips to confirm the *other* side of
-a trade has no place to exist (the worked rewrite is the
-[trade recipe](session.md#recipes-over-existing-pieces)). The name is
-reserved — a wire arg called `by` is a build error; a player the verb merely
-*targets* stays ordinary wire data under any other name (`who`, `target`).
+values the `_then` gets. It never rides the wire, so it can't be forged — a
+hostile client can't hand you a `side: u8` it flipped to confirm the *other*
+party's half of a trade, because WHO is never a wire argument (the worked
+rewrite is the [trade recipe](session.md#recipes-over-existing-pieces)).
+The name is reserved — a wire arg called `by` is a build error; a player the
+verb merely *targets* stays ordinary wire data under any other name (`who`,
+`target`).
 
 ```odin
 @(gd_command = "predict")
@@ -240,28 +213,23 @@ switch ever appears. A composed verb's payload is the block's *offer*
 **Build-time contract.** A mispaired consequence is a scriptgen error, not a
 proc that silently never fires: the shape (`[game,] self, by, wire args…,
 payload…`) is validated against the verb, and **every half wears `@(gd_half)`**
-— the attribute declares that this proc is *meant* to pair, and a declared half
+— the attribute declares that this proc is meant to pair, and a declared half
 that pairs with nothing is an error with the class's real pairing names spelled
 out beside it: rename it, or drop the attribute if it isn't a half.
 
-The name still decides *what* it pairs with — that is what makes the call site
-readable. The attribute decides only that pairing was INTENDED, and that is the
-half a name alone could never carry: a wrong prefix (`chest_taek_then`) and a
-wrong suffix (`chest_take_after`) are now the same error, where the second one
-used to be invisible to everything, Odin included. A proc that merely *ends* in
-`_then` and never claimed to be a half is nothing special and says nothing —
-there is no reserved-suffix list to collide with. A direct verb whose payload
-nobody consumes still warns. When something
-needs to react to commands *generically* (metrics, receipts, replays), the
-untyped [command hook](session.md#command-hooks-the-generic-layer-under-_then)
-remains underneath — `_then` is generated dispatch over the same authority path.
+The name decides *what* a half pairs with; the attribute declares only that
+pairing was intended. Both a wrong prefix (`chest_taek_then`) and a wrong suffix
+(`chest_take_after`) are build errors. A proc that merely *ends* in `_then` and
+never claimed to be a half is nothing special. A direct verb whose payload
+nobody consumes still warns. When something needs to react to commands
+*generically* (metrics, receipts, replays), the untyped
+[command hook](session.md#command-hooks-the-generic-layer-under-_then) remains
+underneath — `_then` is generated dispatch over the same authority path.
 
-**The one shape this deliberately doesn't grow into**: a verb that mutates
-TWO entities (a trade touching both players' bags). Multi-target commands
-would drag revert capture, reject-truth, and replay-reconcile across entity
-boundaries — and invite predicting the other party's state, which feels
-worse, not better. The answer is to make the transaction itself the target:
-the [mediating-entity recipe](session.md#recipes-over-existing-pieces).
+**Multi-target commands.** A command mutates one entity, not two (a trade
+touching both players' bags). Spreading revert capture, reject-truth, and
+replay-reconcile across entity boundaries is not supported. Make the transaction
+itself the target: the [mediating-entity recipe](session.md#recipes-over-existing-pieces).
 
 ## Composing verbs from embedded blocks
 
@@ -274,16 +242,14 @@ gameplay block.
 
 Both import spellings work: `import play "godot:play"` (the idiomatic alias) and a bare
 `import "godot:play"` — scriptgen resolves a bare import by reading the target's package
-clause, so the embed composes either way. (It didn't always: bare imports used to skip the
-embed's fields and verbs *silently* — the entity built, replicated its own fields, and the
-block's never moved. If you're on an older scriptgen, alias your block imports.)
+clause, so the embed composes either way.
 
 Declare the verb on the block, embed the block, and the entity gets the command:
 
 ```odin
 Gun :: struct {
 	ammo:      u8 `gd:"replicate"`,
-	fsm:       play.Machine(Gun_State),
+	state:     Gun_State `gd:"replicate"`, // a replicated FSM is a plain enum field + an edge half
 	reload_cd: u16 `gd:"replicate"`,
 }
 
@@ -369,26 +335,25 @@ spelunker_hp_codec :: knet.Wire_Codec {
 }
 ```
 
-The wire size is FIXED per field — that fixed-size contract is exactly what
-frees the representation: quantize, bit-pack, or ship an *index* into a
-structure both sides grow deterministically (a shared-seed table means the wire
-only needs to name an entry, not carry it). Two rules keep codecs honest:
-`decode(encode(x))` should be stable (receivers hold decoded values; an
-unstable round trip makes confirmed predictions micro-snap), and dirtiness is
-still diffed on struct bytes — a change smaller than the wire precision still
-sends, so pick a precision at least as fine as gameplay cares about.
+The wire size is FIXED per field, which is what frees the representation:
+quantize, bit-pack, or ship an *index* into a structure both sides grow
+deterministically (a shared-seed table means the wire only needs to name an
+entry, not carry it). Two rules keep codecs honest: `decode(encode(x))` should
+be stable (receivers hold decoded values; an unstable round trip makes confirmed
+predictions micro-snap), and dirtiness is still diffed on struct bytes — a change
+smaller than the wire precision still sends, so pick a precision at least as fine
+as gameplay cares about.
 
 ## Collections — the `[dynamic]` stance
 
-A `[dynamic]T`, slice, or map tagged `gd:"replicate"` is a **build error**, by
-decision, not omission. The delta walk's whole contract is flat POD cells — a
-shadow memcmp per field, one bit in a u64 mask, a byte-identical apply on
-every peer. A dynamic's bytes are a header whose elements a memcpy would
-tear, and the deeper problem survives any encoding: **byte-diffing has no
-element identity** — insert one element at the front and every byte after it
-"changed", so the diff ships the world for a one-item edit. Rather than grow
-a worse diff, the toolkit holds that a variable-length ask is always one of
-three real shapes, and each already has first-class machinery:
+A `[dynamic]T`, slice, or map tagged `gd:"replicate"` is a **build error**. The
+delta walk's whole contract is flat POD cells — a shadow memcmp per field, one
+bit in a u64 mask, a byte-identical apply on every peer. A dynamic's bytes are a
+header whose elements a memcpy would tear, and the deeper problem survives any
+encoding: **byte-diffing has no element identity** — insert one element at the
+front and every byte after it "changed", so the diff ships the world for a
+one-item edit. A variable-length ask is always one of three real shapes, and
+each already has first-class machinery:
 
 - **Bounded** → a fixed array + count/sentinel: `bag: [6]kitems.Slot` with
   `ITEM_NONE` empties (cavecrawl). One field, one diff atom, edges and
@@ -426,8 +391,7 @@ gunner_hp_edge :: proc(self: ^Gunner, old, new: i32) {
 }
 ```
 
-This replaces the hand-rolled `seen_*` mirror, the per-frame compare, AND the
-re-seed-on-resync ritual beside them. The semantics, deliberate:
+The semantics:
 
 - **Net change per frame, never per apply.** A predicting client legitimately
   writes a delta-lane field several times in one frame (optimistic apply,
@@ -441,39 +405,35 @@ re-seed-on-resync ritual beside them. The semantics, deliberate:
 - **An EVENT must be bytes — equal values are indistinguishable from no
   event.** The coalescing above means a 1→0→1 pulse inside one frame nets to
   nothing, and "reset to level 1 *from* level 1" changes no bytes at all — an
-  edge cannot fire on a non-change at any cleverness setting, by design. When
-  you catch yourself wanting one to, the field is under-modeled: give the
-  event bytes. The house form is a **generation counter co-located in the
-  diff atom** — `stage: struct { level: u8, run: u16 }`, reset bumps `run` —
-  so same-level resets and within-frame round trips both land as real
-  transitions (`old.run != new.run` is the cleanup branch), and a late
-  joiner's silent seed correctly replays *zero* of them (they see `run = 5`
-  as a baseline, exactly right — no retained-event machinery needed). It is
-  the same move the kit itself makes everywhere state alone can't carry an
-  occurrence: warp serials, spawn seqs, dedup windows. When the occurrence
-  carries payload or must fire exactly-once under resim, it has outgrown
-  edges — that's a `_then` consequence, a session event, a
+  edge cannot fire on a non-change. When you catch yourself wanting one to,
+  the field is under-modeled: give the event bytes. The house form is a
+  **generation counter co-located in the diff atom** — `stage: struct { level: u8, run: u16 }`,
+  reset bumps `run` — so same-level resets and within-frame round trips both
+  land as real transitions (`old.run != new.run` is the cleanup branch), and a
+  late joiner's silent seed correctly replays *zero* of them (they see
+  `run = 5` as a baseline). It is the same move the kit makes everywhere state
+  alone can't carry an occurrence: warp serials, spawn seqs, dedup windows.
+  When the occurrence carries payload or must fire exactly-once under resim, it
+  has outgrown edges — that's a `_then` consequence, a session event, a
   [Fire announcement](combat.md), or a sim-lane fact.
 - **First sight seeds, resync re-seeds — silently.** Spawn values are a
   baseline, not an edge; a wholesale catch-up (interest re-entry, a snapshot
   over live state) is history, not gameplay. Initial dress (a late joiner's
   3—2 scoreboard) rides `Ev_Spawned` — the event fires with the tuple's
   fields SET; the census `_spawned` hook fires before they apply and is
-  bookkeeping only (the trap cavecrawl's floor-1 procgen acid caught live).
+  bookkeeping only.
 - **The host's own mutations edge the same way** — the hurt flash needs no
   `is_host`, ever. (A host-side pulse within one net tick still never reaches
   clients: edges don't repeal "deltas carry state" — hold state a tick.)
   One timing note for authorities: the automatic pass runs inside
-  `session_tick`, so a game tick that mutates AFTER the frame's pump would
-  edge a frame late. That frame only matters when the half MOVES something
-  the next tick's world reads — cavecrawl's respawn walk-out was the worked
-  lesson (one frame of un-teleported host at point-blank range is one more
-  rock through a friend). A coop game that declares its host pass with
-  [`@(gd_step = "authority")`](sim.md#discrete-verbs-on-the-lane) never
-  sees this: the generated `<snake>_step(self, ticks)` runs the loop and
-  the same-frame edge pass together. Hand-driven loops keep the manual fix
-  — the pass is idempotent (diff-then-commit), so it is one call after the
-  loop: `ksess.session_run_edges(&ses)`.
+  `session_tick`, so a game tick that mutates AFTER the frame's pump edges a
+  frame late. That matters when the half MOVES something the next tick's world
+  reads. A coop game that declares its host pass with
+  [`@(gd_step = "authority")`](sim.md#discrete-verbs-on-the-lane) never sees
+  this: the generated `<snake>_step(self, ticks)` runs the loop and the
+  same-frame edge pass together. Hand-driven loops keep the manual fix — the
+  pass is idempotent (diff-then-commit), so it is one call after the loop:
+  `ksess.session_run_edges(&ses)`.
 - **Timing**: the half fires wire-fresh — correct for row 4 of the
   [two-timelines table](#the-two-timelines-presenting-consequences)
   (scoreboards, hp, inventories: never delay these). A row-2 consequence (a
@@ -484,9 +444,9 @@ re-seed-on-resync ritual beside them. The semantics, deliberate:
   mine-form `_fx`, or a verb's consequence.
 
 Delta lane only, held at build time: an `_edge` on a `predict` field errors
-toward the mine-form `_fx` (resims would scrub it), on an `owner` field
-toward dress-from-fields (it interpolates every frame). `play/edge` remains
-for NON-replicated local state, where this machinery can't see.
+toward the mine-form `_fx` (resims would scrub it), on an `owner` field toward
+dress-from-fields (it interpolates every frame). `play/edge` remains for
+NON-replicated local state, where this machinery can't see.
 
 ## Registering entities
 
@@ -606,11 +566,11 @@ listening right now.
 ## Wire, tick, and clocks
 
 `Writer`/`Reader` are a bounds-checked, little-endian, append/cursor pair: fixed-width
-fields, u16-length strings, no varints — deliberately boring. The error model: a `Reader`
-that runs past its data sets a sticky `err` and returns zero values from then on, so
-callers check `r.err` once after a decode block. A malformed packet can never read out of
-bounds or panic — remote input is untrusted by default. `read_string`/`read_bytes` return
-zero-copy views into the packet; clone anything you keep.
+fields, u16-length strings, no varints. The error model: a `Reader` that runs past its data
+sets a sticky `err` and returns zero values from then on, so callers check `r.err` once
+after a decode block. A malformed packet can never read out of bounds or panic — remote
+input is untrusted by default. `read_string`/`read_bytes` return zero-copy views into the
+packet; clone anything you keep.
 
 ```odin
 now_s :: proc "contextless" () -> f64            // monotonic seconds — THE toolkit clock
@@ -754,7 +714,7 @@ The fix is one more field and a closed form:
   `session_present` (you drew the cause; see above).
 - **Bounces** are a re-based tuple (new `origin`/`dir`/`Birth`), plus a
   replicated segment counter whose *edge* is the bounce sound — not a
-  [fact](#facts-gd_fact--world-pass-broadcasts), because a fact leaves a late
+  fact, because a fact leaves a late
   joiner flying the original segment.
 
 Steady-state cost is ~nil (a live projectile is a few bytes of tuple); the
@@ -762,9 +722,9 @@ entire cost is the spawn *burst*, so interest-management and `f16` packing
 don't help projectile volume — *batching* the spawns does.
 
 Worth knowing where the line is: a **cosmetic** row-3 visual can skip all of
-this on purpose. cavecrawl's rock tracer ([kit/fx](fx.md) `tracer_add`) is a
-naked spawn-tuple integrated from arrival and drawn at `now` — deliberately,
-because it is a *non-authoritative follower*: the rock that actually hurts is a
+this. cavecrawl's rock tracer ([kit/fx](fx.md) `tracer_add`) is a
+naked spawn-tuple integrated from arrival and drawn at `now`, because it is a
+*non-authoritative follower*: the rock that actually hurts is a
 host-authoritative delta entity with a server-side hit test, and the tracer's
 announcement rides the same one-way path as the eventual hp delta, so the two
 visually coincide anyway. Per-peer position divergence on a purely cosmetic
@@ -772,22 +732,39 @@ tracer is a non-issue. The birth-stamp discipline is for a projectile whose
 *position is load-bearing* — anything a peer will read to decide a hit, a
 dodge, or a block.
 
+## One package, two lanes
+
+`kit/net` bundles two things under one name. A shared **replication substrate**
+— the wire format, the field descriptors and codecs, the interpolation blend
+math, the tick and clock — is consumed by both the coop lane described on this
+page and by [kit/sim](sim.md), the server-authority resim lane that lives in its
+own package. The **coop lane** proper — the command + owned-streams model — is
+layered on top of that substrate. [kit/sim](sim.md) calls the shared part the
+substrate *layer* of kit/net; this page calls the whole of it the coop
+replication core. `Field_Desc` carries sim-only tuning fields — `slack`,
+`glide`, `cut` — that only the sim lane reads.
+
+Three code paths share the word *present*: `session_present` queues ONE
+consequence for the render clock (see [the two
+timelines](#the-two-timelines-presenting-consequences)); `lane_present` is
+[kit/sim](sim.md)'s per-frame presentation pump for watched/reconciled entities;
+and `kit/sim/present.odin` is the blend/error math that pump drives. They are
+distinct — don't conflate them.
+
 ## Gotchas
 
-- **A client writing a host-lane field is caught, loudly.** The canonical
-  co-op bug — `self.score += 1` on a client compiles, looks right locally,
-  and never replicates — used to diverge silently until the host next
-  dirtied the field. Now every client re-purposes its shadow as "the bytes
-  the framework last put here" and diffs against it once per net tick (the
-  same memcmp walk the host pays to send): a delta-lane field that moved
-  outside the framework asserts, naming the class, the field, and the fix
-  (route it through a verb, or compute it on the authority). Coop
-  speculation and the sim lane's in-flight verbs are exempt while pending —
-  legal optimistic writes never trip it. Two build-time cousins guard the
-  same doctrine: a direct call of a `@(gd_command)` proc is a scriptgen
-  error pointing at the `<verb>_cmd` wrapper, and a gd-shaped tag under a
-  typo'd namespace (`gs:"replicate"`) is named instead of silently ignored.
-  The whole runtime walk strips under `-disable-assert`, like every kit
+- **A client writing a host-lane field is caught, loudly.** `self.score += 1`
+  on a client compiles and looks right locally but never replicates. Every
+  client re-purposes its shadow as "the bytes the framework last put here" and
+  diffs against it once per net tick (the same memcmp walk the host pays to
+  send): a delta-lane field that moved outside the framework asserts, naming
+  the class, the field, and the fix (route it through a verb, or compute it on
+  the authority). Coop speculation and the sim lane's in-flight verbs are exempt
+  while pending — legal optimistic writes never trip it. Two build-time cousins
+  guard the same doctrine: a direct call of a `@(gd_command)` proc is a
+  scriptgen error pointing at the `<verb>_cmd` wrapper, and a gd-shaped tag
+  under a typo'd namespace (`gs:"replicate"`) is named instead of silently
+  ignored. The whole runtime walk strips under `-disable-assert`, like every kit
   guardrail.
 - **Deltas carry STATE, not events.** The walk memcmps entity-vs-shadow once per net tick;
   a replicated byte pulsed `1 → 0` *within* one tick equals its shadow when the diff runs
@@ -812,8 +789,8 @@ dodge, or a block.
   out; deeper non-POD (a struct hiding a string) fails the generated `#assert` at the
   consumer compile, naming the field. Group past-64 field counts into sub-structs (a
   fixed array is one field).
-- **`Intent_Seq` wraparound is not handled**, by design: u32 gives ~4 billion commands per
-  peer per session.
+- **`Intent_Seq` wraparound is not handled**: u32 gives ~4 billion commands per peer per
+  session.
 
 See also: [kit/session](session.md) (drives all of this), [kit/netgd](netgd.md)
 (transport), [kit/sim](sim.md) (the server-authority resim lane beside these two —

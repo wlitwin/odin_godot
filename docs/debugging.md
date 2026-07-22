@@ -1,12 +1,33 @@
 # Debugging Odin scripts
 
-## What you see when the game crashes (from the editor)
+## Mental model: native code, no interpreter
 
-A mistake in script code used to kill the game launched from the editor with **no
-indication of what went wrong** — the editor's Output dock shows the child game's output
-via Godot's debugger channel (push_error/print over TCP), *not* piped stderr, so anything
-that only reached stderr was invisible (and a Finder-launched editor's stderr goes nowhere
-at all). Both failure shapes now report themselves:
+Odin scripts in odin_godot are **AOT-compiled native code** (a `.dylib`/`.so`/`.dll`),
+loaded by the engine through the GDExtension boundary. There is **no interpreter**. That
+single fact decides which tools work:
+
+| Tool | Works for Odin scripts? |
+| --- | --- |
+| Godot **in-editor breakpoints** (gutter dots) | ❌ No — no interpreter to halt (use Tools > Debug Game (Break at Cursor)) |
+| Godot **step / pause / resume** of script lines | ❌ No — lldb steps natively instead |
+| Godot **expression evaluation** in the debugger panel | ❌ No |
+| Godot **remote scene tree / live property edit** | ✅ Yes (engine-side, not script-line) |
+| `gd.print` / `gd.error` / `gd.warn` logging | ✅ Yes — your bread and butter |
+| **native `lldb`** (line breakpoints, stepping, `bt`, `frame variable`) | ✅ Yes — full power, this is the real debugger |
+| **crash backtraces** (signal 11) with Odin proc names | ✅ Yes — built with `-debug`, symbols present |
+
+The Godot debugger panel is built around GDScript's bytecode VM. Your Odin proc is a
+compiled C-ABI function the engine calls through a function pointer; the VM never sees it.
+So the workflow is **logging + lldb + reading crash backtraces**, exactly like debugging a
+native C library — because that is what a script dll is.
+
+## What you see when a script crashes (from the editor)
+
+When a script crashes in a game launched from the editor, it reports what went wrong and
+where. Two facts about where the report lands: the editor's Output dock shows the child
+game's output over Godot's debugger channel (push_error/print over TCP), *not* piped
+stderr — so anything that only reaches stderr is invisible in the Output dock, and a
+Finder-launched editor's stderr goes nowhere at all. Two failure shapes report themselves:
 
 - **Odin `panic` / failed `assert`** (incl. failed type assertions) — the script context's
   assertion proc ([`runtime/panic_native.odin`](../runtime/panic_native.odin)) prints
@@ -32,8 +53,8 @@ at all). Both failure shapes now report themselves:
   …
   ```
 
-  The `at pc` line **names the faulting Odin proc** (pulled from the signal context —
-  the stack walkers lose that frame across the signal trampoline). After reporting, it
+  The `at pc` line **names the faulting Odin proc**, recovered from the signal context
+  (the stack walkers lose that frame across the signal trampoline). After reporting, it
   best-effort push_errors ONE red line toward the editor Output ("Odin: the game CRASHED
   in native code (SIGSEGV …)") and re-raises into **Godot's own crash handler**, whose
   engine backtrace still prints.
@@ -52,16 +73,20 @@ atos -o bin/libodinscripts.dylib.dSYM/Contents/Resources/DWARF/libodinscripts.dy
 (on Linux: `addr2line -f -e bin/libodinscripts.so <offset>`). Usually unnecessary — the
 Odin frames come out symbolized already, as above.
 
-The net covers the hard cases too: **stack overflows** report (the handler runs on a
-`sigaltstack`; Windows: `SetThreadStackGuarantee`); the post-panic/assert/**bounds-check
+### Other crash shapes
+
+The report covers the hard cases too. **Stack overflows** report (the handler runs on a
+`sigaltstack`; Windows: `SetThreadStackGuarantee`). The post-panic/assert/**bounds-check
 trap** is a handled signal (SIGTRAP/SIGILL; Windows: `EXCEPTION_BREAKPOINT`), so those
-never die silently — a bounds-check failure's own index/range message goes to stderr
-only, so the report hints to rerun from a terminal (or under lldb) for it; **exported
-games** leave the report at `user://odin_crash.log` — a post-mortem a player can send in;
-and **Windows** has an SEH twin of the reporter (`core/crash_windows.odin`, DbgHelp
-symbolization against the build's `.pdb`s — compile-verified, awaiting a real-Windows
-run). Honest limits: the mid-crash push_error may not survive to the editor if the
-debugger link dies first — stderr and the crash FILE always carry the full report.
+never die silently — a bounds-check failure's own index/range message goes to stderr only,
+so the report hints to rerun from a terminal (or under lldb) to see it. **Exported games**
+leave the report at `user://odin_crash.log`, a post-mortem a player can send in.
+**Windows** has an SEH twin of the reporter (`core/crash_windows.odin`, DbgHelp
+symbolization against the build's `.pdb`s — compile-verified, awaiting a real-Windows run).
+
+One limit: the mid-crash push_error may not survive to the editor if the debugger link
+dies first — stderr and the crash file always carry the full report.
+
 Verified end-to-end by `tests/crash/run.sh` (sentinel `CRASH_TEST_OK`): panic, segv,
 stack overflow, editor surfacing, and a real exported-.app crash.
 
@@ -100,7 +125,7 @@ ols.json (IDE Completion)** in Godot, then in the IDE right-click the generated
 markers from being flagged. (The same file makes any ols-based editor — Neovim, Zed,
 Sublime, Helix — work out of the box.)
 
-**Debugging** is split by IDE, honestly:
+**Debugging** is split by IDE:
 
 - **Rider**: the Odin plugin does *not* support debugging on Rider ≥ 2025.2, and
   Rider's own Native Executable run configurations run but cannot debug native code.
@@ -114,27 +139,6 @@ Sublime, Helix — work out of the box.)
   `--path /path/to/your/project`. Breakpoints in `.odin` files then bind normally.
   The `godot_lldb.py` pretty-printers are terminal/VS-Code-lldb extras; JetBrains'
   debugger does not load them.
-
-## The one thing to internalize first
-
-Odin scripts in odin_godot are **AOT-compiled native code** (a `.dylib`/`.so`/`.dll`),
-loaded by the engine through the GDExtension boundary. There is **no interpreter**. That
-single fact decides which tools work:
-
-| Tool | Works for Odin scripts? |
-| --- | --- |
-| Godot **in-editor breakpoints** (gutter dots) | ❌ No — no interpreter to halt (use Tools > Debug Game (Break at Cursor)) |
-| Godot **step / pause / resume** of script lines | ❌ No — lldb steps natively instead |
-| Godot **expression evaluation** in the debugger panel | ❌ No |
-| Godot **remote scene tree / live property edit** | ✅ Yes (engine-side, not script-line) |
-| `gd.print` / `gd.error` / `gd.warn` logging | ✅ Yes — your bread and butter |
-| **native `lldb`** (line breakpoints, stepping, `bt`, `frame variable`) | ✅ Yes — full power, this is the real debugger |
-| **crash backtraces** (signal 11) with Odin proc names | ✅ Yes — built with `-debug`, symbols present |
-
-The Godot debugger panel is built around GDScript's bytecode VM. Your Odin proc is a
-compiled C-ABI function the engine calls through a function pointer; the VM never sees it.
-So the workflow is **logging + lldb + reading crash backtraces**, exactly like debugging a
-native C library — because that is what a script dll is.
 
 ---
 
@@ -163,9 +167,9 @@ for genuine fault conditions; use `gd.print` for tracing.
 
 ### Formatted output
 
-The helpers are deliberately tiny and `contextless`, and do **not** pull in `core:fmt`
-(keeping the wasm/web footprint small). For formatted output, format with Odin's `core:fmt`
-first, then print:
+The helpers are tiny and `contextless`, and do **not** pull in `core:fmt` (which keeps the
+wasm/web footprint small). For formatted output, format with Odin's `core:fmt` first, then
+print:
 
 ```odin
 import "core:fmt"
@@ -183,12 +187,12 @@ which is exactly what `gd.print` wants. `tprintf` returns a temp `string` — pa
 
 ## 2. Native debugging with `lldb`
 
-Because the script dll is built `-debug -use-single-module` (see `atomic_odin_dll` in
-`build/common.sh`), every Odin proc is a real, named symbol with **complete DWARF**:
-line tables, typed arguments, struct layouts. The `-use-single-module` half matters —
-with Odin's default separate-modules debug build, macOS `ld` emits a broken one-entry
-debug map and `dsymutil` produces a near-empty `.dSYM` (symbols work, but no line
-breakpoints, no stepping, no `frame variable`). One build unit gives lldb everything.
+The script dll is built `-debug -use-single-module` (see `atomic_odin_dll` in
+`build/common.sh`), so every Odin proc is a real, named symbol with **complete DWARF**:
+line tables, typed arguments, struct layouts. The `-use-single-module` flag is what gives
+line info: with Odin's default separate-modules debug build, macOS `ld` emits a broken
+one-entry debug map and `dsymutil` produces a near-empty `.dSYM` (symbols work, but no
+line breakpoints, no stepping, no `frame variable`). One build unit gives lldb everything.
 
 So lldb debugs Odin scripts like any C library — with source lines. Use the launcher
 (the same one the Project > Tools menu items run; `--break` accepts `file.odin:LINE`
@@ -241,7 +245,7 @@ opaque pointer — and pre-sets a breakpoint on the script assertion proc, so a 
    `/usr/bin/lldb` is an xcrun shim that breaks because Nix points `DEVELOPER_DIR` at an SDK
    with no lldb; the launcher resets `DEVELOPER_DIR` to a real Xcode/CLT install.)
 
-### A real breakpoint hit (verified)
+### Example: a breakpoint hit
 
 Running the showcase with a **line breakpoint** and driving a real physics coin collect,
 the process halts at that exact source line, with the source listed, the full native call
@@ -331,7 +335,7 @@ called it:
 3. Keeps only frames that belong to the scripts dll, and returns Godot's expected shape:
    `Array[ Dictionary{ "function": String, "line": int, "source": String } ]`.
 
-### Why `_Unwind_Backtrace`, not `backtrace()`
+### Full backtraces with omitted frame pointers
 
 Odin **omits frame pointers** and has no flag to keep them, so execinfo's classic
 frame-pointer `backtrace()` returns only the *innermost* frame here. `_Unwind_Backtrace`
@@ -346,7 +350,7 @@ Mapping an address to a source line needs DWARF line-table resolution at runtime
 `"source"`. The **function name** is accurate; the line is not. (lldb, by contrast, *does*
 resolve lines — use it when you need them.)
 
-### ⚠️ Honest limitation: when does this actually surface?
+### When this surfaces
 
 The native capture is **proven to work** (see "Verification" below): called mid-script it
 yields the real Odin frames, e.g. `showcase_scripts::coin_collect`. **But** Godot only
@@ -363,7 +367,7 @@ observes that the virtual is never called):
   RESULT: Godot did NOT call _debug_get_current_stack_info in this headless run.
 ```
 
-So, to be precise about what is and isn't true:
+In summary:
 
 - ✅ The native capture **works** and returns the correct Odin call chain when invoked.
 - ✅ The virtual is wired, correctly typed, and returns a well-formed Array (no log spam).
@@ -396,7 +400,7 @@ sentinel `DEBUG_OK`):
 - **(B) lldb** — launches the real Godot under lldb, breaks on `coin_collect`, drives a real
   physics collect so the breakpoint **fires**, asserts `stop reason = breakpoint` + the
   function in `bt`. → `DEBUG_LLDB_OK`. (Gated: skipped if lldb is unavailable.)
-- **(C) integration (honest)** — runs the showcase with `ODIN_DEBUG_STACK_DUMP=1` and reports
+- **(C) integration** — runs the showcase with `ODIN_DEBUG_STACK_DUMP=1` and reports
   whether Godot actually called the virtual (it does not, outside remote-debug).
 
 Run it: `nix develop --command bash -c 'bash tests/debug/run.sh'`.

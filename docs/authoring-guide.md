@@ -7,7 +7,7 @@ cross-script access, the `gd.*` helper catalog, and editor tooling. New to odin_
 deep dive. For the build/edit/debug loop, see **[Workflow](workflow.md)**.
 
 You write `<name>.odin` in the clean authoring form below; a preprocessor (`scriptgen`, run
-by `build/build_scripts.sh`) reads its struct tags + markers and *auto-emits* a sibling
+by `build/build_scripts.sh`) reads its struct tags + markers and emits a sibling
 `<name>.gen.odin` (the registration boilerplate — Variant trampolines, backing arrays,
 `@(init)` registration) that you never edit. Both compile together into the scripts dll, so
 you author the nice form and get the full typed dispatch for free.
@@ -18,8 +18,8 @@ There is exactly **one file per script**: the `.odin` you write is also the reso
 you attach to a node. Put your scripts under the project (e.g. `res://scripts/foo.odin`)
 and attach `res://scripts/foo.odin` directly in the scene — the loader reads its
 `//gd:class` marker and binds it to the compiled class. The sibling `<name>.gen.odin`
-is a build artifact that lives beside the source; the loader deliberately **ignores
-`*.gen.odin`** so it is never treated as an attachable script. There is no separate
+is a build artifact that lives beside the source; the loader **ignores `*.gen.odin`**, so
+it is never treated as an attachable script. There is no separate
 "resource stub" file to keep in sync.
 
 ## Anatomy of a script
@@ -95,14 +95,13 @@ Player :: struct { owner: gd.Node2d }   // fine — a wider handle; the script o
 Player :: struct { owner: gd.Node2d }   // build error — a NARROWER handle
 ```
 
-The narrow direction is the bug: every class handle is a `rawptr` alias, so Odin
-has no opinion, the class registers as a plain `Node`, and then every
-`gd.node2d_*` call in the script reaches through that handle into an object that
-never was a Node2D — a crash at the engine boundary with nothing pointing back
-at the comment that lied. The error names both spellings and both fixes.
+A narrower handle is the bug: every class handle is a `rawptr` alias, so Odin
+accepts it, the class registers as a plain `Node`, and every `gd.node2d_*` call
+then reaches through that handle into an object that never was a Node2D — a crash
+at the engine boundary. The build error names both spellings and both fixes.
 
-Leave the marker off and the base is **derived** from the handle instead, which
-is the version with only one place to be wrong:
+Leave the marker off and the base is **derived** from the handle instead, so there
+is only one place to be wrong:
 
 ```odin
 //gd:class Coin
@@ -110,18 +109,16 @@ package scripts
 Coin :: struct { owner: gd.Area2d }     // registers as Area2D
 ```
 
-(The old `Node` default survives only where the handle can't be placed — no
-`-godot:` root, or a type that isn't a ClassDB class. The check degrades to
-silence in exactly those cases rather than inventing errors about a class list
-it cannot see.)
+The base falls back to `Node` only where the handle can't be placed — no
+`-godot:` root, or a type that isn't a ClassDB class — and the check stays silent
+in exactly those cases.
 
 ### The tag vocabulary
 
-Every `` `gd:"…"` `` tag opens with ONE token that selects what the field is. The whole
-set, and who consumes each (the table below is the human projection of
-`decl/decl.odin`'s `FIELD_TOKENS` — the schema both scriptgen and the runtime's
-reflection registrar read, so this page, the parser, the boot-time "unknown gd tag"
-error, and the skip list cannot drift apart):
+Every `` `gd:"…"` `` tag opens with ONE token that selects what the field is. The full
+set, and who consumes each, is the human projection of `decl/decl.odin`'s `FIELD_TOKENS`
+— the schema both scriptgen and the runtime's reflection registrar read, so this page, the
+parser, the boot-time "unknown gd tag" error, and the skip list stay in agreement:
 
 | First token | What it declares | Consumed by | In the wire fingerprint |
 | --- | --- | --- | --- |
@@ -140,27 +137,21 @@ parameter names). "In the wire fingerprint" means the declaration's shape folds 
 `NET_FINGERPRINT`, so two builds that disagree about it are refused at the join door
 rather than misparsing each other's packets.
 
-`backup` is the interesting **no**, and it read **yes** here and in the schema until
-scriptgen started checking the column against what it actually serializes. A backup is
-guarded — by the codec's own `fnv1a32` format stamp, at the LOAD door, so a save written
-by a drifted build is refused rather than misread. It is not guarded at the JOIN door,
-deliberately: two peers whose save files disagree have no reason not to play together,
-and folding save shape into the fingerprint would ground them over a file neither is
-about to send the other. The rule the column follows: **yes** iff the shape must match
-across a SOCKET, not merely across a file.
+**`backup` is not in the fingerprint.** A backup is guarded by the codec's own
+`fnv1a32` format stamp at the LOAD door, so a save written by a drifted build is refused
+rather than misread; it is not guarded at the JOIN door. Two peers whose save files
+disagree can still play together, and folding save shape into the fingerprint would ground
+them over a file neither peer is about to send the other. The rule the column follows:
+**yes** iff the shape must match across a SOCKET, not merely across a file.
 
-**A WIRE DECLARATION IS A FIRST TOKEN.** That is the rule the column on the right
-states, in one direction: if the thing folds into `NET_FINGERPRINT`, it names what the
-field IS and it leads the tag. (Not the converse — `backup` and `manual` lead their tags
-without crossing a wire.) Two consequences worth spelling out, because both used to read
-the other way:
+**A wire declaration is a first token.** If a declaration folds into `NET_FINGERPRINT`,
+it names what the field IS and it leads the tag. (`backup` and `manual` lead their tags
+too, without crossing a wire.) Two consequences:
 
-* **The three lanes are three tokens.** `owner` and `predict` used to be options inside
-  `gd:"replicate,…"`, which put the one decision that matters — who writes these bytes —
-  in the same syntactic position as a smoothing constant. Each lane now carries its own
-  CLOSED option set (below), so `slack=` is not "an option requiring predict", it is an
-  option the predict lane HAS. The combinations that used to be rejected by a pairwise
-  rule (`owner` with `predict`, `slack=` without `predict`) are now unspellable.
+* **The three lanes are three tokens.** `replicate`, `owner`, and `predict` are each a
+  first token, and each carries its own CLOSED option set (below). `slack=` is an option
+  the predict lane HAS, not "an option requiring predict"; the invalid combinations
+  (`owner` with `predict`, `slack=` without `predict`) are unspellable.
 * **`entity=Name:id` leads its tag.** It carries a permanent public type id and builds
   the factory table; it is not an Inspector detail of an export. An entity field is
   necessarily an exported `PackedScene`, so both of those are SYNTHESIZED — write
@@ -173,15 +164,13 @@ the other way:
 | owner-streamed | `gd:"owner"` | `interp`, `interp=angle`, `interp=BLEND_PROC`, `wire=f16`, `wire=CODEC` |
 | predicted | `gd:"predict"` | the above, plus `slack=N`, `glide=N`, `cut=N` |
 
-`_edge` halves pair with `gd:"replicate"` fields only — predicted state resims and
-owner-streamed state interpolates, so each of those lanes has its own presentation
-answer.
+`_edge` halves pair with `gd:"replicate"` fields only: predicted state resims and
+owner-streamed state interpolates, so each of those lanes has its own presentation path.
 
-Both grammars changed in one commit and the old spellings are REFUSED, by an error
-naming the exact replacement tag — the old `replicate,interp,owner,wire=f16` answers with
-`gd:"owner,interp,wire=f16"`. Nothing about the wire moved: the lane a field resolves to
-is what folds into `NET_FINGERPRINT`, and it resolves identically, so a retagged build
-still joins an un-retagged peer's session bit for bit.
+A field's resolved lane is what folds into `NET_FINGERPRINT`, so two builds that resolve a
+field to the same lane share a session bit for bit regardless of how the tag is spelled.
+A field picks ONE lane: the deprecated combined spelling `gd:"replicate,interp,owner,wire=f16"`
+is refused at build time, with the error naming its replacement, `gd:"owner,interp,wire=f16"`.
 
 ### Exports
 
@@ -234,7 +223,7 @@ Inspector editors GDScript's `Array[T]` / `Dictionary[K,V]` produce. Each elemen
 is a builtin (`int`, `float`, `String`, `Vector2`, `Color`, …) or a Resource class name
 (`Texture2D`, `PackedScene`, …). At most one hint per field. (A scene that bodies a wire
 entity does NOT declare a hint: **`gd:"entity=Name:id"`** is its own first token and
-synthesizes both the export and the `resource=PackedScene` hint — see [Entities](#entities)
+synthesizes both the export and the `resource=PackedScene` hint — see [Entities](kit/net.md#declaring-a-replicated-entity)
 and [kit/boot](kit/boot.md)'s `boot_entities`.) Example:
 
 ```odin
@@ -307,38 +296,33 @@ Player :: struct {
 }
 ```
 
-Only scalar Variant types support `default=` today (numbers, bool, and `String`). A
-`default=` on a math-struct/handle field is reported at **boot**, by the reflection
-registrar, in the editor's output — not by `scriptgen` (see "Which tier catches what"
-below). It is loud, but it is late. (Set those in `_ready` or from the scene instead.)
+Only scalar Variant types support `default=` (numbers, bool, and `String`). A `default=`
+on a math-struct/handle field is reported at **boot**, by the reflection registrar, in the
+editor's output — not by `scriptgen` (see "Which tier catches what" below), so the message
+is clear but arrives late. Set those in `_ready` or from the scene instead.
 
 ### Which tier catches what
 
-Two different things read a `` `gd:"export,…"` `` tag, and knowing which one is about to
-speak saves a confusing afternoon:
+Two different things read a `` `gd:"export,…"` `` tag; knowing which one reports a given
+problem saves time:
 
 | Tier | When | What it checks | How a failure looks |
 | --- | --- | --- | --- |
 | `scriptgen` | build | the tag's VOCABULARY — the first token, and every spec NAME behind it | `scriptgen: error: player.odin:7: …`, the build stops |
 | the reflection registrar | boot / class registration | what each spec MEANS — a value's type, a hint's arity, the Variant a hint requires | an error in Godot's output, the field registers with that spec dropped |
 
-The split is deliberate: only the runtime knows a field's real Variant width, so only the
-runtime can say `array=` needs a `gd.Array` or that `default=Hero` won't fit a `Vector2`.
-But *spelling* needs none of that, so **a misspelled spec is a build error**:
+Only the runtime knows a field's real Variant width, so only the runtime can say `array=`
+needs a `gd.Array` or that `default=Hero` won't fit a `Vector2`. Spelling needs none of
+that, so **a misspelled spec is a build error**:
 
 ```odin
 hp: i32 `gd:"export,rnage=0:100"`
 // scriptgen: error: Player.hp: unknown export spec "rnage" — did you mean `range`?
 ```
 
-This used to be the language's sharpest inconsistency. `gd:"replicate,slcak=0.5"` failed
-the build, because that spec loop refused what it didn't know; `gd:"export,rnage=0:100"`
-sailed straight through scriptgen — the export-spec loop had no default arm — and surfaced
-at boot as an error on a field that had silently lost its hint. Same tag, same class of
-typo, two latencies and two audiences. The recognized spec set is
-[`decl/decl.odin`](../decl/decl.odin)'s `EXPORT_SPECS`, and `tests/scriptgen` asserts it
-against the registrar's own switches, so the two tiers can't drift into disagreeing about
-which names exist.
+The recognized spec set is [`decl/decl.odin`](../decl/decl.odin)'s `EXPORT_SPECS`, and
+`tests/scriptgen` asserts it against the registrar's own switches, so the two tiers agree
+on which names exist.
 
 ### Getter / setter properties
 
@@ -462,8 +446,8 @@ Enemy :: struct {
 }
 ```
 
-One-way-to-do-it rule: `SignalN`'s parameter must be the payload **struct**, never itself a
-single Variant-mappable type — `gd.SignalN(gd.Vector2)` is rejected. For one payload value,
+`SignalN`'s parameter must be the payload **struct**, never itself a single
+Variant-mappable type — `gd.SignalN(gd.Vector2)` is rejected. For one payload value,
 either `gd.Signal1(gd.Vector2)` (name it with `args=`) or wrap it so the field name names
 it: `gd.SignalN(struct { pos: gd.Vector2 })` → `moved(pos: Vector2)`.
 
@@ -518,39 +502,35 @@ target, use `gd.connect_to` from `_ready` instead. (`@(gd_connect)` requires the
 ## Reserved shapes
 
 Several toolkit declarations are recognized by the SHAPE of a proc rather than by anything
-you write in the attribute — a parameter's name, its position, or its type. That is
-deliberate (the declaration reads as ordinary Odin), but it means a rename can silently
-change what a proc IS. This table is the whole set.
+you write in the attribute — a parameter's name, its position, or its type. The declaration
+reads as ordinary Odin, so a rename can silently change what a proc IS. This table is the
+whole set.
 
 | Shape | Where it is legal | What it means | Rename it and… |
 | --- | --- | --- | --- |
 | first param `self: ^<Class>` | every bound proc | THE receiver — it is how scriptgen knows the proc belongs to this class at all | the proc is not bound; nothing generates, no diagnostic |
 | a pointer param **immediately after the receiver** | `@(gd_command)` / `@(gd_method)` on an *embedded block* | the WIELDER — scriptgen fills it with `self`, so the block can touch the entity that carries it. Never a wire arg (a pointer can't cross the wire) | a pointer there on a *direct* command is a build error ("un-wire-able arg") |
-| `by: knet.Player_Id` (after the receiver/wielder) | `@(gd_command)` | the ISSUER, framework-filled with the true sender — the whole point is that a predicate can arbitrate on WHO without trusting a client-claimed argument | `by` under any other name is an ordinary wire arg, i.e. client-controlled. The name **and** the type together are the declaration; a wire arg *named* `by` is refused outright |
+| `by: knet.Player_Id` (after the receiver/wielder) | `@(gd_command)` | the ISSUER, framework-filled with the true sender — a predicate can arbitrate on WHO without trusting a client-claimed argument | `by` under any other name is an ordinary wire arg, i.e. client-controlled. The name **and** the type together are the declaration; a wire arg *named* `by` is refused outright |
 | `mine: bool` | an `@(gd_fact)` door's `_fx` bearer, and a tick's `_fx` half | the every-screen law: `true` on the screen whose live simulation caused the event, `false` on watchers replaying it off their watch clock | position and name are both checked; the error names the slot |
 | `tick: u64` | `@(gd_sample)` (required, second), `@(gd_step)` (optional, second) | the lane's tick number | on a sample, a build error; on a step, the param is simply not passed |
 | `l: ^ksim.Lane` | reserved *against* you — a generated fact door already names its lane param `l` | — | an author arg named `l` is refused, because the door's own binding would shadow it |
 | a `kit/boot` `Boot` field on the script struct | the game shell | declares the four standard transport forwards (`on_packet` / `on_peer_left` / `on_net_up` / `on_net_down`) | see the note below |
 
-**The `Boot` match, and how tight it is.** The shell used to be declared by *any* field
-whose type name ended in `.Boot` — the loosest match in the language: a game's own
-`startup.Boot`, a vendored library's, anything. It now requires the type's qualifier to
-resolve to an import of `godot:kit/boot`. The **alias is free** (`kboot`, `boot`, whatever
-you import it as) because the import PATH is what is checked, not the spelling; only a
-`Boot` from a different package stops declaring the shell. That is as tight as it goes
-without demanding an explicit tag on the field — which would be a breaking change to every
-existing game, for a case that now cannot fire by accident.
+**The `Boot` match.** The shell is declared by a field whose type's qualifier resolves to
+an import of `godot:kit/boot`. The **alias is free** (`kboot`, `boot`, whatever you import
+it as) — the import PATH is what is checked, not the spelling — so only a `Boot` from a
+different package fails to declare the shell.
 
-## Manual overrides — name shadowing is the pattern
+## Manual overrides
 
 Wherever scriptgen generates a proc *for your convenience*, **a hand-written proc of that
-name wins.** That is the one override mechanism; there is no opt-out tag, no config
-token, no magic path.
+name wins.** That is the one override mechanism; there is no opt-out tag, no config token,
+no magic path.
 
 | Generated | Yields to a hand-written… |
 | --- | --- |
 | census accessors — `<entity>_of`, `<entity>_owned_by`, `my_<entity>`, `<entity>_ids`, `<entity>_spawn` | proc of that name |
-| acid probes — `probe_<entity>_count`, `probe_my_<entity>`, `probe_<entity>_<field>` | proc (or `@(gd_method)`) of that name |
+| acceptance-test probes — `probe_<entity>_count`, `probe_my_<entity>`, `probe_<entity>_<field>` | proc (or `@(gd_method)`) of that name |
 | the four standard transport forwards | `@(gd_method)` of that name |
 
 Every yield is **printed**, once per run:
@@ -559,29 +539,25 @@ Every yield is **printed**, once per run:
 scriptgen: yielded: runner_of (census accessor — the hand-written proc of that name wins)
 ```
 
-which is the line that tells you an intended override took effect — and, when you *didn't*
-intend one, that something in your package is already wearing a generated name. A silent
-yield is indistinguishable from "the generation just didn't happen", which is exactly how a
-typo'd override (`runner_of` where the entity is `Runner_Bot`) used to read.
+That line confirms an intended override took effect — and, when you didn't intend one,
+tells you something in your package is already wearing a generated name. Check it if a proc
+you meant to override (`runner_of` where the entity is `Runner_Bot`) seems to do nothing.
 
 **The one exception: `@(gd_fact)` announce doors refuse.** Write a proc with a declared
-fact's door name and it is a build error, not a yield. The reason is that the door is not a
-convenience you could re-implement: its generated body holds four gates you have no way to
-reproduce from game code — it broadcasts the tuple only on the authority, fires the `_fx`
-half on the causer's *live* pass with `mine=true`, fires it on every watching screen when
-that screen's watch clock reaches the fact's tick with `mine=false`, and stays silent
-through resim replays so a reconcile can't re-announce. A shadowing proc would compile,
-look right, and quietly present the event once, locally, to whoever called it. The error
-says so and asks you to rename yours.
+fact's door name and it is a build error, not a yield. The door is not a convenience you
+could re-implement: its generated body holds four gates game code has no way to reproduce —
+it broadcasts the tuple only on the authority, fires the `_fx` half on the causer's *live*
+pass with `mine=true`, fires it on every watching screen when that screen's watch clock
+reaches the fact's tick with `mine=false`, and stays silent through resim replays so a
+reconcile can't re-announce. The build error asks you to rename yours.
 
-**`gd:"manual"` means "I call the generated thing myself."** It is the *other* half of the
-same idea: not "replace this generated proc", but "stop calling it for me — I own the call
-site." Today it applies to an embedded sim block's `@(gd_tick)` (see
-[kit/sim](kit/sim.md)): the block's state still flattens into the descriptor and its verbs
-still hoist, only the auto-call is suppressed so your own tick can drive it with whatever
-ordering or condition you want. Read it as a general token, not a sim-specific one — a
-`manual` on something with nothing generated to call is a build error naming what it
-expected to find.
+**`gd:"manual"` means "I call the generated thing myself."** Not "replace this generated
+proc", but "stop calling it for me — I own the call site." It applies to an embedded sim
+block's `@(gd_tick)` (see [kit/sim](kit/sim.md)): the block's state still flattens into the
+descriptor and its verbs still hoist, only the auto-call is suppressed so your own tick can
+drive it with whatever ordering or condition you want. It is a general token, not a
+sim-specific one — a `manual` on something with nothing generated to call is a build error
+naming what it expected to find.
 
 ## Generated names
 
@@ -604,16 +580,15 @@ when they do it is a build error naming both declarations rather than a silently
 unreachable verb.
 
 **Wire-id constants — prefixed and unprefixed.** Command ids are class-prefixed
-(`GUNNER_CMD_BUY`, `GUNNER_CMD_PRIMARY_FIRE`); world-pass fact ids are not (`FACT_ROUND_OVER`),
-and neither is `NET_FINGERPRINT`. That is not an oversight: commands are per-entity, so
-several classes in one package legitimately declare a verb of the same name, and the class
-prefix is what keeps their constants apart. Facts and the fingerprint are **module-wide** —
-there is exactly one door per event name across the whole package (a second is a build
-error, as is a u16 hash collision between two events), and exactly one fingerprint. A class
-prefix on those would suggest a per-class namespace that doesn't exist.
+(`GUNNER_CMD_BUY`, `GUNNER_CMD_PRIMARY_FIRE`); world-pass fact ids are not
+(`FACT_ROUND_OVER`), and neither is `NET_FINGERPRINT`. Commands are per-entity, so several
+classes in one package can declare a verb of the same name, and the class prefix keeps their
+constants apart. Facts and the fingerprint are **module-wide** — there is exactly one door
+per event name across the whole package (a second is a build error, as is a u16 hash
+collision between two events), and exactly one fingerprint.
 
-**`<entity>_spawn` vs `<entity>_spawned` — the homophone trap.** These are one letter apart
-and point in opposite directions:
+**`<entity>_spawn` vs `<entity>_spawned`.** These are one letter apart and point in
+opposite directions:
 
 | Name | Who writes it | Who calls it | What it does |
 | --- | --- | --- | --- |
@@ -899,7 +874,7 @@ if gd.object_has_method(enemy, gd.sname("take_damage")) {
 `gd.sname` uses `static = true` (intern once, keep) — correct for the string *literals* these
 calls almost always use.
 
-### Common transforms — moving / rotating a Node2D
+### Common 2D transforms — moving / rotating a Node2D
 
 `gd.Vector2` is just an Odin `[2]f32`, so you get Odin's vector math for free: component access
 (`pos.x`), compound assignment (`pos.x += 10`), and whole-vector arithmetic (`pos += other`,

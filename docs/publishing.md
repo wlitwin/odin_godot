@@ -1,10 +1,12 @@
 # Publishing to the Godot Asset Library
 
-The Asset Library serves a **zip of a git commit** from a public GitHub/GitLab repo. Our
-releases live on an orphan `release` branch whose tree is only the installable addon
+The Asset Library serves a **zip of a git commit** from a public GitHub/GitLab repo. Reach
+for this page when you want to publish `odin_godot` there or ship an update.
+
+Releases live on an orphan `release` branch whose tree is only the installable addon
 (`addons/odin_godot/**` + README/LICENSE/NOTICE), so a user's install dialog shows exactly
-the addon — not the dev tree. `build/release.sh` assembles that branch from the nix-built
-zip; this page is the end-to-end runbook.
+the addon and not the dev tree. `build/release.sh` assembles that branch from the nix-built
+zip. The rest of this page is the end-to-end runbook.
 
 ## One-time setup
 
@@ -62,7 +64,7 @@ git push origin main release --tags
 #    Updates to an accepted asset are reviewed much faster than first submissions.
 ```
 
-## Consumer-facing quirks to remember
+## Consumer-facing notes
 
 - **In-editor AssetLib installs are clean on macOS.** But a user who downloads the zip in a
   *browser* gets `com.apple.quarantine` on the prebuilt dylibs, and Gatekeeper will refuse

@@ -1,23 +1,25 @@
-# kit/steamgd — the Steam transport & invite flow
+# kit/steamgd — Steam transport and invite flow
 
-Steam lobbies, overlay invites, and a Steam `MultiplayerPeer` — over the **GodotSteam**
-GDExtension (the "MultiplayerPeer" build, which registers both the `Steam` singleton and the
-`SteamMultiplayerPeer` class). It plugs in *under* [kit/netgd](netgd.md)'s `Session_Wire`,
-which is the point: the wire never changes.
+Steam lobbies, overlay invites, and a Steam `MultiplayerPeer`. Reach for this when you
+want players to host and join over Steam — friends clicking "Join Game" in the Steam
+overlay — instead of typing IP addresses. It runs on the **GodotSteam** GDExtension (the
+"MultiplayerPeer" build, which registers both the `Steam` singleton and the
+`SteamMultiplayerPeer` class) and plugs in under [kit/netgd](netgd.md)'s `Session_Wire`. The
+wire is the same wire ENet uses; only the transport underneath changes.
 
-## Entirely by name
+## Talking to GodotSteam by name
 
-Everything here talks to GodotSteam **by name** — engine singleton lookup, dynamic
-`object_call`s, ClassDB instantiation — because the toolkit cannot link against classes
-another extension may or may not register. That means:
+Everything here reaches GodotSteam **by name** — engine singleton lookup, dynamic
+`object_call`s, ClassDB instantiation — never a compile-time link, since the toolkit cannot
+link against classes another extension may or may not register. The results:
 
 - this package compiles and ships with **no GodotSteam installed**;
 - `available()` answers at runtime, and every proc no-ops safely without it;
-- a game keeps **one** code path — its `Session_Wire` never changes.
+- your game keeps **one** code path — its `Session_Wire` never changes.
 
-GodotSteam's name surface is isolated in this one file (the `SINGLETON` / `PEER_CLASS`
-constants and the `gd.sname(...)` method names), so API drift across GodotSteam versions
-lands in one place.
+The GodotSteam name surface lives in this one file (the `SINGLETON` / `PEER_CLASS`
+constants and the `gd.sname(...)` method names), so version drift across GodotSteam builds
+lands in a single place.
 
 ## The flow
 
@@ -34,7 +36,7 @@ guest:  friend hits "Join Game" in the Steam overlay ->
         exactly like ENet
 ```
 
-## Why the Session_Wire never changes
+## The wire is transport-agnostic
 
 SceneMultiplayer's signals — `peer_packet`, `peer_disconnected`, `connected_to_server`,
 `connection_failed`, `server_disconnected` — fire identically over **any** `MultiplayerPeer`.
@@ -80,14 +82,10 @@ four forwards, not the channel plan, not the session.
 Both peer procs print an actionable error and return false if `SteamMultiplayerPeer` isn't
 registered (i.e. you installed a non-MultiplayerPeer build of GodotSteam).
 
-## `TRANSPORT` — Steam's answer to the control-plane record
+## The Transport record
 
-Steam used to stop at "install a peer": no `begin_*` pair, no kit/boot door, no per-peer
-introspection, no rendezvous — so a Steam game hand-wrote the two-step every other
-transport had wrapped, and every kit feature keyed on a door (the lobby ritual, the
-succession config, the control-plane pump) simply did not happen for it.
 `ksteam.TRANSPORT` is a [`netgd.Transport`](netgd.md#swapping-transports) record, so the
-generic doors work:
+generic kit/boot doors work with Steam:
 
 ```odin
 // on_lobby_created(result, lobby_id):   host
@@ -98,22 +96,25 @@ ksteam.invite_overlay(u64(lobby_id))
 kboot.boot_open_join(&self.boot, &ksteam.TRANSPORT, ksteam.endpoint_of(u64(lobby_id)), name, token)
 ```
 
-The LOBBY half stays in your signal handlers, deliberately: asking for a lobby and getting
-the answer on a signal is a Steam conversation, not a transport verb. What the doors take
-is the `Endpoint` that conversation produces — `endpoint_of(lobby_id)` is
+The lobby half stays in your signal handlers: asking for a lobby and getting the answer
+back on a signal is a Steam conversation, not a transport verb. What the doors take is the
+`Endpoint` that conversation produces — `endpoint_of(lobby_id)` is
 `{peer_id = lobby_owner(lobby_id)}`, because Steam addresses peers by steam id and the
 lobby is only the phonebook.
 
-**Three slots are nil, each a stated degradation.** `pump` — the engine polls the peer,
-like ENet. `close` — the peer is replaced by the next install; lobby membership is the part
-that outlives it, and the lobby id is yours (call `leave_lobby`). `address` — **this is the
-one that matters**: with no verified way to ask which steam id is behind a multiplayer peer,
-no torch can name an heir, so `rendezvous` is `.None` and **host migration is honestly OFF
-on Steam** rather than armed-and-silently-absent (`succession_torch` prints it once, naming
-the transport). Filling it is small — GodotSteam exposes the mapping on builds that have it —
-but it cannot be verified from this repo (no Steam client, no linked extension, every call
-by name), and a migration path that has never once run is worse than a stated absence. Fill
-the slot against a real build, add the `Rendezvous_Kind` arm, and Steam migrates.
+**Three slots are nil.** Each names a capability Steam does not offer through the generic
+door:
+
+- `pump` — the engine polls the peer, like ENet, so there is nothing to pump.
+- `close` — the peer is replaced by the next install; lobby membership is the part that
+  outlives it, and the lobby id is yours (call `leave_lobby`).
+- `address` — there is no verified way to ask which steam id is behind a multiplayer peer.
+  Without it the host-migration handoff cannot name an heir, so `rendezvous` is `.None` and
+  **host migration is off on Steam**; `succession_torch` reports this once, naming the
+  transport. GodotSteam exposes the peer-to-steam-id mapping on builds that have it, but it
+  cannot be verified from this repo (no Steam client, no linked extension, every call by
+  name). To turn migration on: fill the `address` slot against a real build, add the
+  `Rendezvous_Kind` arm, and Steam migrates.
 
 ## Worked example: cavecrawl
 
@@ -131,7 +132,7 @@ if steamgd.available() && env_int("CAVE_STEAM", 1) != 0 {
 
 The Host button branches on the transport, then both paths converge on `begin_hosting` —
 shared **verbatim** by ENet (`gd.host`) and Steam (`lobby_created`): the session cannot tell
-the transports apart, which is the whole point. Same shape for `begin_joining`.
+the transports apart. Same shape for `begin_joining`.
 
 ```odin
 @(gd_method)
@@ -144,9 +145,8 @@ cave_lobby_on_lobby_created :: proc(self: ^CaveLobby, result: gd.Int, lobby_id: 
 }
 ```
 
-The guest side, with the one guard everybody forgets — **`lobby_joined` fires for the host's
-own lobby too** (hosts join what they create), so check the owner before making a client
-peer:
+The guest side has one guard to remember — **`lobby_joined` fires for the host's own lobby
+too** (hosts join what they create), so check the owner before making a client peer:
 
 ```odin
 @(gd_method)

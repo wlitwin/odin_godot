@@ -4,18 +4,18 @@ Reach for `kit/nav` when a brain needs to walk around walls instead of through t
 engine already owns the hard parts (nav meshes, region merging, funnel pathfinding);
 kit/nav makes the two calls a game actually needs ergonomic, in both dimensions.
 
-**Lane compatibility: NEVER inside a resimulating pass — and the module now enforces it.**
-These calls query the NavigationServer, live engine state that does not rewind. Inside
-`@(gd_tick)` or the everywhere `@(gd_step)`, a resim replay would query TODAY's mesh for
-YESTERDAY's ticks and diverge from the prediction it is rebuilding — the same law as
-[engine casts](sim.md), but worse: a mispredicted cast snaps back, while a bad path
-*steers*, so the error compounds every tick.
+**Lane compatibility: never call these queries inside a resimulating pass; the module
+enforces it.** These calls query the NavigationServer — live engine state that does not
+rewind. Inside `@(gd_tick)` or the everywhere `@(gd_step)`, a resim replay queries today's
+mesh for yesterday's ticks and diverges from the prediction it is rebuilding — the same rule
+as [engine casts](sim.md). A mispredicted cast snaps back, but a bad path *steers*, so the
+error compounds every tick.
 
-That used to be a comment, and comments do not fail builds. It is now default-denied: every
-query asserts that some enclosing scope has called `pass_never_resims()`, the caller's claim
-about its own lane. Legal claimants: a coop host's own tick (the host never resims) and the
-sim lane's `@(gd_step = "authority")` pass (the authority never resims). Path FOLLOWING from
-a stored polyline is pure math and sim-safe anywhere — only the *query* is gated.
+Every query is default-denied: it asserts that some enclosing scope has called
+`pass_never_resims()`, the caller's claim about its own lane. Two scopes may claim it: a coop
+host's own tick (the host never resims) and the sim lane's `@(gd_step = "authority")` pass
+(the authority never resims). Path *following* from a stored polyline is pure math and
+sim-safe anywhere — only the *query* is gated.
 
 ## Mental model
 
@@ -31,8 +31,8 @@ and the host's brain steps toward `goal` with [kit/ai](ai.md)'s `step_toward`. P
 the toolkit's `[3]f32` convention (2D in xy, z zero), so brain code doesn't care which
 adapter fed it.
 
-Unlike the rest of the brain verbs, the path queries **touch the engine** — which is the
-whole reason for the claim.
+Unlike the rest of the brain verbs, the path queries **touch the engine**, which is why they
+need the claim.
 
 ## API
 
@@ -62,11 +62,12 @@ next_point :: proc "contextless" (path: [][3]f32, idx: ^int, pos: [3]f32, reach:
 ```
 
 `path_2d`/`path_3d` query the node's *default* world map (via `map_2d`/`map_3d`), which is
-what a bare NavigationRegion2D/3D in the scene registers into. The `_on` forms exist because
-that resolution is three engine round trips (node → viewport → world → map): free for one
-agent, pure waste for a brain tick pathing a whole wave against the same map.
+what a bare NavigationRegion2D/3D in the scene registers into. Use the `_on` forms in a loop
+over agents: resolving the default map is three engine round trips (node → viewport → world →
+map), free for one agent but pure waste for a brain tick pathing a whole wave against the
+same map.
 
-## Worked example: the cave dwellers, in `examples/cavecrawl`
+## Worked example: cavecrawl (`examples/cavecrawl`)
 
 Cavecrawl's floors are authored scenes, so the walkable cave is authored too — a
 `NavigationRegion2D` sits in `levels/level_1.tscn` beside the chest and den markers, its
@@ -105,22 +106,22 @@ Three things about that shape are worth copying:
 
 **The path is re-queried every think tick and thrown away.** No polyline is cached, so the
 cursor is always 0 and `next_point`'s first job is to consume the dweller's own snapped
-position. This is not laziness — cavecrawl's `Dweller_Brain` map is `gd:"backup"` and rides
-the takeover snapshot to whoever inherits the host seat, and a cached path would hand a
-successor routes computed against a NavigationServer it never ran. It also sidesteps
-invalidation on a descent, where the whole floor's region is swapped out underneath any
-dweller still standing. One `map_get_path` per agent per tick, at 20 Hz, for single-digit
-waves, buys all of that.
+position. Cavecrawl's `Dweller_Brain` map is `gd:"backup"`, so it rides the host-migration
+snapshot to the heir that inherits the host seat; a cached path would hand that heir routes
+computed against a NavigationServer it never ran. Re-querying also sidesteps invalidation on
+a descent, where the whole floor's region is swapped out underneath any dweller still
+standing. The cost is one `map_get_path` per agent per tick, at 20 Hz, for single-digit
+waves.
 
 **An empty path is not an error and must not be a freeze.** It means unreachable *or*
-not-yet-synced — and cavecrawl's regions enter the tree with the floor's scenery, a few
-frames before the first den opens. Falling back to the straight-line `step_toward` the game
-used before it had a navmesh keeps a wave moving through the gap.
+not-yet-synced — cavecrawl's regions enter the tree with the floor's scenery, a few frames
+before the first den opens. Falling back to the straight-line `step_toward` keeps a wave
+moving through that gap.
 
-**That fallback is silent, so the game prints a receipt.** A navmesh that failed to load
-would leave every dweller walking straight and every test passing. A path with an interior
-corner can only have come from the mesh, so the host prints `CAVE_NAV_BENT` once — the acid's
-proof that the rift is walked *around* and not through.
+**The fallback is silent, so the game prints a marker.** A navmesh that failed to load would
+leave every dweller walking straight and every test still passing. A path with an interior
+corner can only have come from the mesh, so the host prints `CAVE_NAV_BENT` once — the
+integration test's proof that the rift is walked *around* and not through.
 
 Pathfinding never reaches the wire: the dweller's `x/y` are ordinary owner-streamed
 replicated fields, exactly as in the [kit/ai](ai.md) NPC model. Clients see a monster that
@@ -128,9 +129,9 @@ respects the terrain and run no navigation code at all.
 
 ## Gotchas
 
-- **The lane claim is an assert, not a fallback.** Deliberately: an empty path is a
-  legitimate answer, so a brain that silently got one instead of a lane violation would
-  swallow the single bug this module exists to prevent.
+- **The lane claim is an assert, not a fallback.** An empty path is a legitimate answer, so
+  a silent fallback in place of a lane violation would swallow the one bug this module exists
+  to prevent.
 - **Regions sync into the map on the server's physics cadence** — a path queried the frame
   a region enters the tree is empty. Brains that re-query every think-tick (the normal
   pattern) shrug this off; one-shot queries must wait a few frames (`tests/kitnav` waits 5

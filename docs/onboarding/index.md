@@ -4,7 +4,7 @@ You have shipped Godot games in GDScript or C#. This series is the bridge from
 there to here: writing your gameplay in compiled Odin, and structuring it so
 multiplayer is a property of your code instead of a feature bolted onto it.
 
-It is deliberately not a reference (that's the [Authoring Guide](../authoring-guide.md))
+It is not a reference (that's the [Authoring Guide](../authoring-guide.md))
 and not a recipe (that's [Build a game in a day](../kit/build-a-game-in-a-day.md)).
 It is the *why* — each post takes one mental-model shift, shows what it buys
 you, and leaves you with something running. Read it in order; each post leans

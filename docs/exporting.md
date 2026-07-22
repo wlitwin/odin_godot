@@ -39,9 +39,9 @@ library as a **sibling of the core dll** (via `dladdr`), since `res://` is packe
 **Script modules.** If the project uses [script modules](modules.md)
 (`res://modules/<name>/`), the export plugin builds **one optimized dll per module** and
 bundles each beside the main scripts dll — the exact sibling layout the exported game scans
-for at runtime. A module whose dll is missing **fails the export loudly, naming the module**
-(an export must never silently ship without a module's classes). The `BUILD_MODULES=0` env
-var skips modules at build *and* bundling — also loudly, since the result intentionally
+for at runtime. A module whose dll is missing **fails the export loudly, naming the module**, so an export
+never silently ships without a module's classes. The `BUILD_MODULES=0` env
+var skips modules at build *and* bundling — also loudly, because the result
 lacks the module classes; it is a scoped-build/CI switch, not a shipping configuration. On
 **web**, all modules compose into the single wasm. See
 [Script Modules — Exporting](modules.md#exporting-with-modules).
@@ -81,7 +81,7 @@ out/Game.app/Contents/Frameworks/libodinscripts.dylib     (scripts — bundled b
 
 ## Cross-compile (Linux / Windows) — build-verified
 
-odin_godot now cross-builds the Linux `.so` and Windows `.dll` (core + scripts) from macOS.
+odin_godot cross-builds the Linux `.so` and Windows `.dll` (core + scripts) from macOS.
 Odin's own driver refuses to *cross-link* a dll, so `build/build_cross.sh` emits a single
 relocatable object (`-build-mode:obj -use-single-module -target:<t>`) and links it with a Nix
 cross **gcc wrapper** (`pkgsCross.gnu64` / `pkgsCross.mingwW64`) that carries the target glibc

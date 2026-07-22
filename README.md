@@ -65,10 +65,9 @@ matter:
 | **Ship it** | hot reload on save, native desktop export, WebAssembly export |
 | **Scale it** | opt-in [script modules](docs/modules.md) — one dll per `res://modules/<name>`, rebuilt + hot-swapped independently so save latency stays flat in large projects |
 
-Because Odin is **ahead-of-time compiled** there are honest, inherent differences from
-interpreted GDScript — no `eval`/REPL, no in-editor breakpoints (use `lldb`), and `@export`
-changes need a recompile (the editor does it for you on save). These are documented up front,
-not hidden — see [Workflow](docs/workflow.md).
+Because Odin is **ahead-of-time compiled**, it differs from interpreted GDScript in a few
+ways: no `eval`/REPL, no in-editor breakpoints (use `lldb`), and `@export` changes need a
+recompile (the editor does it for you on save). See [Workflow](docs/workflow.md).
 
 ## Quickstart
 
@@ -117,8 +116,8 @@ three are its references:
 
 - **`examples/cavecrawl/`** — THE co-op reference: a drop-in-join cave crawler exercising
   every toolkit package (replicated fields, predicted commands + `_then` consequences,
-  generated entity factory, reconnect, save/resume, host migration, Steam), grown
-  brick-by-brick with a latency-injected acid test.
+  generated entity factory, reconnect, save/resume, host migration, Steam), covered by a
+  latency-injected integration test.
 - **`examples/slopball/`** — the smallest complete kit game: a physics co-op ball pitch
   (~850 lines), engine physics replicated through `play.Puppet`. Start here to see the
   whole multiplayer surface in one sitting.
@@ -129,13 +128,13 @@ Single-player and engine-plumbing references:
 
 - **`examples/survivors/`** — a complete top-down arena shooter in pure Odin; each script is
   commented to teach one slice of the binding ([README](examples/survivors/README.md)). Its
-  net layer uses the ENGINE-NATIVE path (`MultiplayerSpawner`/`@(gd_rpc)`) — kept as the
+  net layer uses the ENGINE-NATIVE path (`MultiplayerSpawner`/`@(gd_rpc)`) — a
   GDScript-parity demonstration, not the recommended way to build co-op (that's the kit).
 - **`examples/coop_arena/`** — the engine-native multiplayer path end-to-end: ONE
   peer-authoritative codebase over `MultiplayerSynchronizer` + `@(gd_rpc)` that runs
   single-player, over native ENet, and in the browser over WebRTC (room-code lobby)
-  ([README](examples/coop_arena/README.md)). Predates the friendslop toolkit; it shows the
-  raw engine surface the kit absorbs.
+  ([README](examples/coop_arena/README.md)). It shows the raw engine surface the kit
+  absorbs.
 - **`tests/showcase/`** — a minimal pure-Odin coin-collector; the smallest "everything wired"
   scene. Run it: `$GODOT --path tests/showcase`.
 - **`examples/hello/`** — the lowest-level path: a hand-registered GDExtension class (not a

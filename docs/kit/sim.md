@@ -1,17 +1,16 @@
-# kit/sim — the server-authority resim companion
+# kit/sim — server-authoritative rollback netcode
 
-`kit/sim` is the OTHER netcode model, built as a companion to the friendslop
+`kit/sim` is the second netcode model, a companion to the friendslop coop
 toolkit rather than a replacement: **one authority (the server), inputs-only
-up, tick-stamped snapshots down, rollback + resimulation on clients.** It is
-for the games the coop model deliberately isn't — contested, cheat-resistant,
-twitch-fair. Movement no longer trusts the client's position; the server
-simulates everything from inputs, and your shots are judged where **you**
-saw the target (lag compensation).
+up, tick-stamped snapshots down, rollback + resimulation on clients.** Reach
+for it when a game is contested, cheat-resistant, or twitch-fair — the cases
+the coop model does not cover. Movement no longer trusts the client's
+position; the server simulates everything from inputs, and your shots are
+judged where **you** saw the target (lag compensation).
 
 Like kit/net it is engine-free — every piece runs headless in
-`tests/kitsim`, including a two-session convergence acid over an in-memory
-wire. The design and its history live in the project knowledge doc
-`server-authority-resim-companion`.
+`tests/kitsim`, including a two-session convergence test over an in-memory
+wire.
 
 ## The mental model
 
@@ -27,13 +26,13 @@ two):
 
 Everything the session gives you — identity, roster, reconnect, spawns,
 blobs, stats, chat, the command loop for discrete verbs — keeps working
-unchanged; this page assumes you know that surface (the
-[quickstart](quickstart.md) is the fast route in, the
-[sim quickstart](quickstart-sim.md) the fast route HERE — a coop hello
+unchanged; this page assumes you know that surface. The
+[quickstart](quickstart.md) is the fast route into the coop model, the
+[sim quickstart](quickstart-sim.md) the fast route here (a coop hello
 promoted in four diffs). Only the contested fast state (movement,
-projectiles) opts into the sim lane, per field. The lane is the tag's FIRST token, which is
-why a field cannot be on two of them: `owner` and `predict` are not options you could
-accidentally both set, they are the token that says what the field is.
+projectiles) opts into the sim lane, per field. A field's lane is the tag's
+first token, so a field lives on exactly one lane — `owner` and `predict`
+are alternatives, not flags you combine.
 
 **The tick IS the simulation.** Unlike the coop model (gameplay at frame
 rate, the net tick paces the wire), sim-lane gameplay lives in a fixed-rate
@@ -44,13 +43,13 @@ the stick instantly.
 
 **Mispredictions self-heal; determinism is NOT required.** When
 authoritative state for tick T arrives, the client memcmps it against what
-it predicted at T. Equal (the overwhelmingly common case): nothing happens —
-steady state costs a memcmp. Different: the predicted set rewinds to truth
-and the step proc replays T+1..now from the input ledger. The server's word
-is always final, so approximate re-execution suffices — no fixed-point math,
-no cross-machine float anxiety. The one honest rule: **step procs may touch
-predicted fields, `lane_input`, and per-tick derivables — never wall clocks,
-node state, or un-ledgered randomness.**
+it predicted at T. Equal (the common case): nothing happens — steady state
+costs a memcmp. Different: the predicted set rewinds to truth and the step
+proc replays T+1..now from the input ledger. Because the server's word is
+final, approximate re-execution suffices — no fixed-point math, no
+cross-machine float concerns. The one rule: **step procs may touch predicted
+fields, `lane_input`, and per-tick derivables — never wall clocks, node
+state, or un-ledgered randomness.**
 
 **The loss story is redundancy, nothing retransmits.** Every input packet
 carries the last ~8 unacked inputs; every snapshot batch supersedes the one
@@ -58,11 +57,11 @@ before it. A genuinely lost input (a burst longer than the window) means the
 server briefly holds the player's last input and the client reconciles the
 difference away — degradation, not desync.
 
-## Write the entity, not the netcode
+## Defining a sim entity
 
-Tag the state, declare the input struct by USING it, mark the step — and
-return FACTS. The name-paired halves consume them, and the generated thunk
-holds every role gate:
+Tag the state, declare the input struct by using it, mark the step, and
+return facts. The name-paired halves consume those facts, and the generated
+thunk holds every role gate:
 
 ```odin
 Runner :: struct {
@@ -127,34 +126,31 @@ runner_tick_fx :: proc(g: ^Game, self: ^Runner, mine: bool, fired: bool) {
 ```
 
 - **The actor's screen** fires it inline from the live pass (`mine = true`) —
-  instantly, the old form's moment, never a resim.
+  instantly, the same moment the owner-only form fires, never a resim.
 - **The authority's screen** presents everyone else's facts as they execute
   (`mine = false`) — its view of the world is live truth.
 - **Every other screen** receives the fact tuple (a reliable `SIM_FACT`) and
   fires when its **watch clock** reaches the fact's tick (`mine = false`): the
-  flash lands ON the delayed barrel that fired it, not a render-delay early.
-  This is the replicated-counter-plus-`seen_*` edge every game used to
-  hand-roll, generated — and stricter: two facts coalescing into one batch
-  can't eat a fire, and there is no edge scratch to re-seed on resync.
-  quickdraw's tracer ships on it (its old `shot_seq`/`shot_aim` fields and
-  the hand-detected edge are deleted; the duel acid pins the watcher path).
+  flash lands on the delayed barrel that fired it, not a render-delay early.
+  This is the replicated-counter-plus-`seen_*` edge, generated — stricter than a
+  hand-rolled edge two ways: two facts coalescing into one batch can't eat a
+  fire, and there is no edge scratch to re-seed on a resync. quickdraw's tracer ships on it,
+  and the duel acceptance test pins the watcher path.
 
 The `mine = true` skip **assumes the actor's own live pass fired the same fact
 from the same input** — true unless the actor's input for that tick was lost:
 the authority then held their last input, its everywhere pass fired the fact
-from the extrapolation, and the actor — running its own fresh input — may not
-have. Skipped, they miss that one-shot. It stays a skip (including them whenever
-their input was held would double-flash the common case where both sides fired
-it), and facts are cosmetic one-shots the "friends, not forensics" stance lets
-loss drop. If the actor **must** see a fact regardless of loss, fire it from an
-**authority** world pass (`@(gd_step="authority")`) instead of the entity tick —
-an authority-minted fact includes the owner by construction.
+from the extrapolation, and the actor, running its own fresh input, may not
+have. Skipped, they miss that one-shot. Facts are cosmetic one-shots, and loss
+is allowed to drop them. If the actor **must** see a fact regardless of loss,
+fire it from an **authority** world pass (`@(gd_step="authority")`) instead of
+the entity tick — an authority-minted fact includes the owner by construction.
 
-**Presentation born OUTSIDE an entity's tick — declared world-pass facts
-(`@(gd_fact)`).** A cross-entity event is discovered where no single entity's
-tick can return it: the world pass sees the foot meet the ball, an authority
-half adjudicates a theft. Declare the presentation half and the event is a
-first-class fact — the same laws and timing as tick facts, with no hand gate:
+**World-pass facts — `@(gd_fact)`.** Some presentation is born outside any
+entity's tick: a cross-entity event that no single entity's tick can return —
+the world pass sees the foot meet the ball, an authority half adjudicates a
+theft. Declare the presentation half and the event is a first-class fact, with
+the same rules and timing as tick facts and no hand-written gate:
 
 ```odin
 // The half you write — mine-form, anchored on the causer:
@@ -170,53 +166,51 @@ if kicked {
 }
 ```
 
-The door holds every gate, for every audience: the **causer's** live pass
-fires instantly (`mine = true` — the anchor param's tracked owner is the
-causer), the **authority** broadcasts a reliable `SIM_FACT` and fires live,
-a **watcher** fires when its watch clock reaches the fact's tick (beside the
-delayed avatar that caused it), a **resim** replay never re-fires, and a
-screen with no part in it stays silent at the announce and presents from the
-wire. Omit the anchor param and it is a WORLD fact — the authority's own
+The generated door holds every gate, for every audience: the **causer's** live
+pass fires instantly (`mine = true` — the anchor param's tracked owner is the
+causer), the **authority** broadcasts a reliable `SIM_FACT` and fires live, a
+**watcher** fires when its watch clock reaches the fact's tick (beside the
+delayed avatar that caused it), a **resim** replay never re-fires, and a screen
+with no part in the event stays silent at the announce and presents from the
+wire. Omit the anchor param and it is a **world fact** — the authority's own
 simulation is the causer (`mine = true` on its screen alone); every client
 presents on the watch clock, with no entity. Announce from wherever the sim
 discovers the event — the everywhere pass, the authority pass, or a `_then`
-half; provenance is handled: a fact minted in an authority-only context
-reaches the causer's screen over the wire (they never ran that code), while
-the everywhere-pass form skips them (their own live pass already fired — an
-echo would double the flash). The wire contracts match tick facts: args are
-wire primitives, the anchor must outlive the slowest watch clock (a despawn
-drops late facts — dwell it), and a predicted announce the server never
-confirms can ghost-fire locally, the accepted trade. speedball's kick is the
-worked example — its acid pins the watcher presenting on the watch clock and
-the causer never double-firing.
+half. Provenance is handled: a fact minted in an authority-only context reaches
+the causer's screen over the wire (they never ran that code), while the
+everywhere-pass form skips them (their own live pass already fired). The wire
+contracts match tick facts: args are wire primitives, the anchor must outlive
+the slowest watch clock (a despawn drops late facts — dwell it), and a
+predicted announce the server never confirms can ghost-fire locally.
+speedball's kick is the worked example; its acceptance test pins the watcher
+presenting on the watch clock and the causer never double-firing.
 
-For the rare inline probe that shouldn't be a fact at all (a debug print in
-a tick body), gate on `ksim.lane_live(&lane)` — "the live pass, not a resim
-replay"; never read `lane.resimming` raw.
+For the rare inline probe that should not be a fact at all (a debug print in
+a tick body), gate on `ksim.lane_live(&lane)` — the live pass, not a resim
+replay; never read `lane.resimming` raw.
 
 The wire imposes three contracts, each a build-time error when broken: the
-mine-form fires on **event ticks only** (any tick a bool fact is true — the
-old form is called every tick), its facts must be **wire primitives** (they
-cross to watching screens), and **at least one fact must be a bool** (the
-event trigger). Two edges stay yours: a fact predicted by the owner that the
-server refuses can still ghost-fire locally (the same accepted trade as the
-old form), and a fact's entity must outlive the slowest watch clock — dwell
-the despawn, the same edges-outlive-observers law as everything presented
-late. Keep the old form for continuous owner-only presentation (an engine
-hum, a strain shader) and for effects that must NOT run everywhere — the
-predicted-spawn `_fx` below spawns a client-local projectile, exactly the
-kind of half that stays owner-shaped.
+mine-form fires on **event ticks only** (any tick a bool fact is true), its
+facts must be **wire primitives** (they cross to watching screens), and **at
+least one fact must be a bool** (the event trigger). Two edges stay yours: a
+fact predicted by the owner that the server refuses can still ghost-fire
+locally, and a fact's entity must outlive the slowest watch clock — dwell the
+despawn, the same rule that edges outlive their observers wherever presentation
+runs late. Use the owner-only form (a plain `_fx` without `mine`) for
+continuous owner-only presentation (an engine hum, a strain shader) and for
+effects that must NOT run everywhere — the predicted-spawn `_fx` below spawns a
+client-local projectile, exactly the kind of half that stays owner-shaped.
 
-The game's own half — the device read and the world pass — is typed and
-attributed the same way. `@(gd_sample)` marks the ONE place that touches
+The game's own halves — the device read and the world pass — are typed and
+attributed the same way. `@(gd_sample)` marks the one place that touches
 hardware (never called during a resim); scriptgen pins its input struct to
-the ticks' at build time, so sampling into the wrong struct can't compile.
-`@(gd_step)` is the world pass, AFTER entity ticks. There are two slots, and
+the ticks' at build time, so sampling into the wrong struct cannot compile.
+`@(gd_step)` is the world pass, run after entity ticks. There are two slots, and
 a class may fill one of each: a bare `@(gd_step)` runs EVERYWHERE (live and in
 every resim, on every peer — pure-sim contact), and `@(gd_step="authority")`
 runs on the HOST alone, once per real tick (the authority never resims). A
-game needing both keeps them SEPARATE instead of folding `if is_host` into one
-pass — the last role gate a world pass used to open with, held by the lane:
+game needing both keeps them SEPARATE rather than folding `if is_host` into one
+pass; the lane holds that role gate:
 
 ```odin
 @(gd_sample)
@@ -267,19 +261,18 @@ every frame and forwards `Ev_Owner_Changed`.
 Entity thunks run every simulated tick — live and replay identically, in
 track order — each fed its owner's input (`nil` coasts: an inputless entity
 type, or a remote player on a client whose truth is already inbound). The two
-optional world passes run AFTER entity ticks: the everywhere pass for pure-sim
+optional world passes run after entity ticks: the everywhere pass for pure-sim
 cross-entity work (contact), the authority pass for genuinely WORLD-shaped
 authority work (respawn queues, wave directors). One input **class** per
 distinct `@(gd_tick)` input TYPE — `lane_init` registers the primary
 (class 0), `lane_add_input_class` each extra — and the wire ships one window
-per class per packet ("Two entity kinds, two inputs" below). Two driven
-entities of the SAME kind still share a window; compose that intent into the
-one struct. Quantize by
-DECLARING the quantized type — what the struct holds is what crosses the
-wire (quickdraw's aim is a `u16` turn fraction, ~0.005° resolution, with a
-two-line codec pair at the sample/tick boundary; there is no per-field wire
-machinery on inputs, on purpose — the blob memcpys). A world pass that
-reads inputs takes the typed view:
+per class per packet (see [Two entity kinds, two inputs](#two-entity-kinds-two-inputs)
+below). Two driven entities of the SAME kind still share a window; compose that
+intent into the one struct. Quantize by declaring the quantized type — what the
+struct holds is what crosses the wire (quickdraw's aim is a `u16` turn
+fraction, ~0.005° resolution, with a two-line codec pair at the sample/tick
+boundary; there is no per-field wire machinery on inputs — the blob memcpys).
+A world pass that reads inputs takes the typed view:
 
 ```odin
 input, drives := ksim.lane_input_of(&g.lane, owner, Kicker_Input)
@@ -296,19 +289,18 @@ ingest painting watched truth directly (a hand-driven client that never
 presents never freezes its watched entities); after it, watched fields
 belong to the presenter.
 
-One lifecycle rule either way: lane STATE does not reset with a session
-re-init — the app route survives, the anchor and ledgers don't follow a
-fresh authority. The reset story is `lane_destroy` → `lane_init` (destroy
+One lifecycle rule either way: lane state does not reset with a session
+re-init — the app route survives, but the anchor and ledgers do not follow a
+fresh authority. To reset, call `lane_destroy` then `lane_init` (destroy
 zeroes the lane); `lane_init` on a live lane asserts.
 
-## The predicted shelf — godot:play/sim
+## Predicted blocks — godot:play/sim
 
 Blocks compose on this lane the way `godot:play`'s compose on the coop one:
 embed a field and the entity gains the block's predicted state (its
 `gd:"predict"` fields flatten into the descriptor) AND its
 `@(gd_tick)` step, hoisted to run after the entity's own tick — the entity
-writes intent, blocks integrate. The shelf ships the shapes the showcase
-games kept hand-rolling; the blessed alias is `psim`:
+writes intent, blocks integrate. The alias is `psim`:
 
 ```odin
 import psim "godot:play/sim"
@@ -320,26 +312,25 @@ Kicker :: struct {
 }
 ```
 
-- **`psim.Cool`** — the predicted cooldown, and play.Pace's TWIN NOUN: the
-  same three verbs (`due` / `arm` / `ready`), the other timeline. Pace holds
-  a deadline against a clock you pass in (host scratch, never on the wire);
-  Cool counts itself down inside the sim, so a revolver's cadence or a
-  kick's recovery answers the click at any latency and replays exactly.
-- **`psim.Mover`** — momentum 2D movement (law #4: inertia is the
-  extrapolation smoother). Intent-through-fields: the entity's tick writes
-  the velocity it WANTS every tick and the block approaches it — `accel = 1`
-  collapses the approach to an exact snap for twitch games. Config (accel,
-  bounds) is law, not state: plain untagged fields, stamped at spawn on
-  every peer, never on the wire.
-- **`psim.Roller`** — the contested rolling body, laws #5 and #6 packaged:
-  self-simulating friction, a hard speed ceiling, and energy-eating wall
-  bounce. The game keeps the consequences — speedball's ball detects goals
-  off the roller's clamp (a crossing lands exactly ON the line for one
-  tick) and predicts its own reset.
+- **`psim.Cool`** — the predicted cooldown, the sim-lane counterpart to
+  `play.Pace`: the same three verbs (`due` / `arm` / `ready`) on the other
+  timeline. Pace holds a deadline against a clock you pass in (host scratch,
+  never on the wire); Cool counts itself down inside the sim, so a revolver's
+  cadence or a kick's recovery answers the click at any latency and replays
+  exactly.
+- **`psim.Mover`** — momentum 2D movement. Intent-through-fields: the entity's
+  tick writes the velocity it wants every tick and the block approaches it —
+  `accel = 1` collapses the approach to an exact snap for twitch games. Config
+  (accel, bounds) is fixed, not replicated state: plain untagged fields,
+  stamped at spawn on every peer, never on the wire.
+- **`psim.Roller`** — the contested rolling body: self-simulating friction, a
+  hard speed ceiling, and energy-eating wall bounce. The game keeps the
+  consequences — speedball's ball detects goals off the roller's clamp (a
+  crossing lands exactly on the line for one tick) and predicts its own reset.
 
 **Driving a block yourself — `gd:"manual"`.** Auto-hoist runs a block's tick
-AFTER the wielder's ("intent, then integrate") — the right default, until the
-wielder must act ON the integrated result (a crate pushout after the move) or
+after the wielder's (intent, then integrate) — the right default until the
+wielder must act on the integrated result (a crate pushout after the move) or
 skip the step entirely (a dead avatar that must not count its cooldown down).
 Tag the embed `gd:"manual"` and scriptgen stops auto-calling that block's
 tick; the wielder drives it, wherever and however often it likes:
@@ -356,16 +347,16 @@ gunner_tick :: proc(self: ^Gunner, in: Gunner_Input) -> (fired: bool) {
 ```
 
 The predict fields still flatten into the descriptor — `manual` suppresses only
-the auto-CALL, never the wire. It's the escape hatch for bespoke ordering (any
-order, conditional, or not at all); an untagged embed stays auto-hoisted, so the
-"just embed it and it integrates" case is untouched. quickdraw's revolver is the
-worked example: its dead-man freeze is one skipped call, not a prepay hack.
+the auto-CALL, never the wire. It is the escape hatch for bespoke ordering (any
+order, conditional, or not at all); an untagged embed stays auto-hoisted, so
+the plain embed-and-integrate case is untouched. quickdraw's revolver is the
+worked example: its dead-man freeze is one skipped call.
 
 The namespaces police themselves: embed a predict-tagged block from the
 root `godot:play` shelf and scriptgen errors it toward `play/sim`; embed a
 `play/sim` block that carries no predict fields and it errors back.
-Game-local blocks compose however they like — the lint is the SHELF's
-contract, so `psim.` at a call site always means "this state resims".
+Game-local blocks compose however they like — the lint is the shelf's
+contract, so `psim.` at a call site always means this state resims.
 
 ## What the lane does underneath
 
@@ -381,19 +372,19 @@ contract, so `psim.` at a call site always means "this state resims".
   unknown id (spawn in flight) skips by length and stalls the ack; a missing
   baseline falls back to a per-entity full row. Self-healing in both
   directions with no keyframe-request message.
-- **Predict-self by construction.** Your own entities are ledgered and
-  reconciled; everyone else's are *watched* — truth applies as it arrives,
-  and `lane_present` renders them on a delayed watch clock, blending
-  bracketing batches per field (`Lerp_Kind`, same as streams — and the same
-  clamp-and-hold rule: never extrapolate).
+- **Predict-self.** Your own entities are ledgered and reconciled; everyone
+  else's are *watched* — truth applies as it arrives, and `lane_present`
+  renders them on a delayed watch clock, blending bracketing batches per field
+  (`Lerp_Kind`, same as streams — and the same clamp-and-hold rule: never
+  extrapolate).
 - **Authority snaps, the eye glides.** When a reconcile corrects your
-  avatar, the SIM state snaps to truth (the ledger records it), but
-  `lane_present` draws sim + a decaying error (63 ms half-life, the puppet
+  avatar, the sim state snaps to truth (the ledger records it), but
+  `lane_present` draws sim plus a decaying error (63 ms half-life, the puppet
   constant) on float `interp` fields, so a correction is a lean, not a
   teleport. Past `smooth_cut` the error zeroes and the snap shows —
-  smoothing a deliberate cut looks worse than the cut. This costs the game
-  NOTHING: fields hold sim truth during `lane_frame` and presentation truth
-  after `lane_present`; the lane re-seeds sim state from the ledger before
+  smoothing a cut looks worse than the cut. This is free for the game:
+  fields hold sim truth during `lane_frame` and presentation truth after
+  `lane_present`; the lane re-seeds sim state from the ledger before
   ticking, so dressing nodes from fields keeps working unchanged.
 - **Events, not callbacks.** Packet handlers only file bytes; every call
   into game code happens inside `lane_frame` on your stack.
@@ -411,18 +402,18 @@ trip. `@(gd_tick = "contested")` is the middle path (the Rocket League
 model): **every peer predicts this entity**, so contact with it resolves on
 each screen's own timeline instantly. The server's simulation stays the only
 truth; a wrong guess (the opponent you render in the past touched it first)
-reconciles and glides like any other mispredict. The costs are honest and
-you opt into them per entity: resim CPU on every peer, and exactly that
-mispredict class. Design the tick so consequences that must not double-fire
-stay in `_then` (authority) — but keep RESETS in the tick itself where they
-predict: speedball's goal detection and kickoff freeze live in the ball's
-own tick, so every screen snaps the ball home the instant its simulation
-crosses the line, while the score lands authority-side. Contact belongs in
-the world pass, applied only to the pairs this peer HAS INPUTS for — yours
-on your screen, everyone's on the server; a remote touch reaches you as the
-server's word, never as a local guess.
+reconciles and glides like any other mispredict. You opt into the costs per
+entity: resim CPU on every peer, and exactly that mispredict class. Design the
+tick so consequences that must not double-fire stay in `_then` (authority) —
+but keep RESETS in the tick itself where they predict: speedball's goal
+detection and kickoff freeze live in the ball's own tick, so every screen
+snaps the ball home the instant its simulation crosses the line, while the
+score lands authority-side. Contact belongs in the world pass, applied only to
+the pairs this peer HAS INPUTS for — yours on your screen, everyone's on the
+server; a remote touch reaches you as the server's word, never as a local
+guess.
 
-Two rules keep the pattern honest:
+Rules that keep the pattern honest:
 
 - **Contested entities must be SELF-SIMULATING** — a ball integrates its own
   motion, which is what makes every peer's between-batch prediction good. An
@@ -458,9 +449,8 @@ Two rules keep the pattern honest:
   opponent contests it. Releasing on mere distance pulls your own kick
   backward mid-flight: the fade target is the watched view, sitting
   speed × timeline-skew behind a fast ball, and blending across that gap
-  cancels its forward motion on your screen (an earlier claim-mode build shipped
-  this bug for one playtest; `examples/claimball`'s `sp_step` claim block — hold
-  while fast, release on slow — is the reference for getting it right).
+  cancels its forward motion on your screen. `examples/claimball`'s `sp_step`
+  claim block — hold while fast, release on slow — is the reference.
 
 The soccer game ships three times, one per model — read them against each other
 to choose: `examples/slopball` (coop, peer-authoritative), `examples/speedball`
@@ -505,22 +495,20 @@ window the ack proves). The rewound scope then BLENDS the same bracket pair
 the shooter's screen blended (`predict_blend` over the truth ledger) — not
 the shooter's freshest ack (which advances a whole lead-plus-transit
 between sampling and adjudication), and not a quantized single tick (which
-cost near-tangent shots against the watch clock's interpolation).
-Quickdraw's duel acid caught both live, and measures the result: most
-aimable shots land at 240 ms RTT. Clamped to `rewind_max` (default
-~250 ms) — the favor-the-shooter ceiling; past it a laggy shooter aims at
-the live world like everyone else. The cost of the favor is the classic one:
-occasionally you are hit just after reaching cover. That is the trade this
-model makes; the coop model makes the opposite one.
+costs near-tangent shots against the watch clock's interpolation).
+quickdraw's duel acceptance test measures the result: most aimable shots
+land at 240 ms RTT. Clamped to `rewind_max` (default ~250 ms) — the
+favor-the-shooter ceiling; past it a laggy shooter aims at the live world
+like everyone else. The cost of the favor is the classic one: occasionally
+you are hit just after reaching cover. That is the trade this model makes;
+the coop model makes the opposite one.
 
 ## Discrete verbs on the lane
 
-A verb is everything an input bit isn't: it carries arguments, it can be
+A verb is everything an input bit is not: it carries arguments, it can be
 REJECTED, and it fires once. On a ticking class, `@(gd_command)` keeps the
 exact coop authoring shape — predicate-then-mutate, name-paired `_then` on
-the authority — but executes INSIDE the tick pipeline, because the coop
-loop's optimistic-apply/revert and the lane's rewind/replay must never
-share a baseline:
+the authority — but executes INSIDE the tick pipeline:
 
 ```odin
 @(gd_command)
@@ -550,18 +538,18 @@ scrubs the predicted ones, the same glide as any mispredict.
 
 You may command entities you OWN — and CONTESTED ones whose verb opts in
 with **`@(gd_command = "any_seat")`**. A contested entity lives on your
-prediction ledger by construction, so an open verb speculates exactly like a
-touch does, and two same-tick verbs run in execution order with the
-predicate arbitrating (a spike on the ball is the shape). The opt-in exists
-because prediction scope is not command scope: predict-world marks every
-AVATAR contested too, and marking yours must never hand your taunt or your
-reload to every opponent — without `any_seat`, verbs stay owner-only on both
-ends (the client refuses at the issue site, the host's cheat gate refuses
-the wire). Watched entities can't speculate — command them from the
-authority, or promote them to contested. Bursts are fine: verbs QUEUE per
-entity, and a rejection unwinds the delta-lane speculation chain in order
-without disturbing the survivors. The wrapper returns whether it SCHEDULED
-— the verdict is state (watch the fields, or the authority's `_then`).
+prediction ledger, so an open verb speculates exactly like a touch does, and
+two same-tick verbs run in execution order with the predicate arbitrating (a
+spike on the ball is the shape). Prediction scope is not command scope:
+predict-world marks every AVATAR contested too, so without `any_seat` a verb
+stays owner-only on both ends — the client refuses at the issue site, the
+host's cheat gate refuses the wire — and marking your avatar contested never
+hands your taunt or reload to opponents. Watched entities can't speculate —
+command them from the authority, or promote them to contested. Bursts are
+fine: verbs QUEUE per entity, and a rejection unwinds the delta-lane
+speculation chain in order without disturbing the survivors. The wrapper
+returns whether it SCHEDULED — the verdict is state (watch the fields, or the
+authority's `_then`).
 
 When the predicate needs WHO, declare the issuer: `by: knet.Player_Id`
 right after the receiver, and the lane fills it with the seat that issued
@@ -636,9 +624,10 @@ re-flying it from stale state; when the authority's `Ev_Spawned` arrives the
 factory **matches** it to the projectile you predicted and rekeys — the same
 node, its flight ledger intact, reconciled from there. A refused fire (or one
 the authority never spawns) is culled and its node freed. Splash adjudicates
-SERVER-SIDE on truth, not a rewind — a slow shot is meant to be dodged.
-`examples/quickdraw`'s lob (right-click) is the worked proof; its native acid
-lands the predicted bullet on the client's own tick, no round trip.
+server-side on truth, not a rewind — a slow shot is meant to be dodged.
+`examples/quickdraw`'s lob (right-click) is the worked example; its native
+acceptance test lands the predicted bullet on the client's own tick, no round
+trip.
 
 ## Two entity kinds, two inputs
 
@@ -670,18 +659,18 @@ to register them all — `lane_init` carries the primary, `lane_add_input_class`
 the rest. Nothing else changes: track each entity with its generated `Sim_Set`
 as before, and the right input reaches the right tick everywhere (live, predict,
 resim). A single-input game registers exactly one class and is byte-for-byte the
-old wire.
+single-class wire.
 
 Underneath: a `Lane` holds one ring per class the seat drives and the host holds
 one buffer per (player, class); the batch's input ack is the MIN newest across a
 player's classes, so the client leads enough for its most-starved input and
-trims every ring by that floor. The one deliberate limit: **one driven entity
+trims every ring by that floor. The one limit: **one driven entity
 per class per player** — two entities of the *same* kind driven by one player
 would share a window (give them distinct input structs, or compose their intent
 into one). `examples/quickdraw`'s drone (a companion each duelist steers beside
-their gunner) is the worked proof; its native acid predicts the drone on the
-client's own tick and shows it sweeping its own steer while the gunner strafes
-the other way — the two input classes, orthogonal, from one seat.
+their gunner) is the worked example; its native acceptance test predicts the
+drone on the client's own tick and shows it sweeping its own steer while the
+gunner strafes the other way — the two input classes, orthogonal, from one seat.
 
 ## Promoting a coop game
 
@@ -700,9 +689,9 @@ game on the two models); the checklist, per contested entity:
 3. **Move its writes into a `@(gd_tick)`.** Frame-rate mutation becomes a
    fixed-rate pure step: (predicted fields, input) → predicted fields. This
    is the one honest rewrite — and where engine physics must become
-   query-based kinematics (slopball's `play.Puppet` ball became speedball's
+   query-based kinematics (slopball's `play.Puppet` ball becomes speedball's
    forty lines of bounce arithmetic; see Gotchas).
-4. **Compose the input struct** from what the entity used to read off the
+4. **Compose the input struct** from what the entity read off the
    devices per frame, and sample it in `@(gd_sample)` — the one place that
    still touches hardware.
 5. **Sort the consequences.** Cross-entity outcomes move to `<tick>_then`
@@ -712,7 +701,7 @@ game on the two models); the checklist, per contested entity:
    this" on the coop model goes whole — speedball's diff deletes slopball's
    entire seat-grant machinery (host.odin's proximity arbitration): the
    server simulates everything, and `contested` + `lane_claim` answer the
-   feel questions the seat used to.
+   feel questions the seat previously answered.
 7. **Wire once:** `<game>_lane_init(self, &self.lane, &self.ses, cfg)` +
    `kboot.boot_lane(&self.boot, &self.lane)`, and cross entities off one at
    a time — a hybrid game is a supported end state, not a transition. What
@@ -747,15 +736,14 @@ cap: names the peer flooding you).
 
 `stat_rewind_clamped` is the one to watch if you run lag comp: it counts
 rewound queries whose reconstructed view fell past `rewind_max` and got
-pinned to the floor. That clamp is silent by construction — the authority
-judges an older world than the shooter saw, shots stop landing, and nothing
-else in the lane says so. A clamp or two at cold start is normal (the lead
-controller has not settled yet); a count that keeps moving means either this
-client's lead is mispaced or `rewind_max` is too small for the link you are
-serving. quickdraw's duel acid asserts on exactly this number, because the
-hit count alone does not catch it: with the deep-surplus rung removed the
-acid still passed on hits while clamping twelve queries and judging its
-first eleven shots at the floor.
+pinned to the floor. That clamp is silent — the authority judges an older
+world than the shooter saw, shots stop landing, and nothing else in the lane
+says so. A clamp or two at cold start is normal (the lead controller has not
+settled yet); a count that keeps moving means either this client's lead is
+mispaced or `rewind_max` is too small for the link you are serving.
+quickdraw's duel acceptance test asserts on exactly this number, because the
+hit count alone does not catch a client silently judging its shots at the
+floor.
 
 **Per-field reconcile + glide knobs.** The lane values are defaults; a single
 float field can override each on its tag, so a fast contested object and a
@@ -777,7 +765,7 @@ needs a `predict` float. scriptgen rejects each on the wrong field, spelled out.
 ## Gotchas
 
 - **Step procs re-run.** Anything a step reads must be ledgered or derived
-  from the tick — `knet.now_s()` in a step proc is a mispredict factory.
+  from the tick — `knet.now_s()` in a step proc is a mispredict source.
   Sample devices in `game_sample` only.
 - **Predicted fields are the resim's property.** Don't mutate them outside
   the tick pipeline on a client — the next reconcile will erase your write
@@ -801,25 +789,25 @@ needs a `predict` float. scriptgen rejects each on the wrong field, spelled out.
   server refused around every death — the glide eats the pop). Fine when
   the edge is rare; mirror the fact into a predicted field when it's hot.
 - **Watched entities render in the past** (`watch_delay`), just like owner
-  streams — the two-timelines discipline mutates, it doesn't vanish. Your
-  own avatar is the one thing that never waits.
+  streams — the two-timelines discipline changes shape, it doesn't vanish.
+  Your own avatar is the one thing that never waits.
 - **Present after frame, dress after present.** `lane_present` writes
   PRESENTATION values into the fields (watched interp, own-avatar glide);
   anything that reads sim truth from fields must run inside the tick procs
   or the Step_Proc, not after `lane_present`. The ledger is always the sim
   truth if you need it out-of-band.
 
-## Status and what's next
+## Status
 
 The runtime and the authoring surface are complete and proven headless:
 input pipeline (single- or multi-class), ledgers, snapshots, reconcile, lane
 driver, lag comp, watched interp, render-error smoothing, possession, predicted
-spawns, every-screen tick facts (the mine-form `_fx`: SIM_FACT broadcast,
-watch-clock firing), declared world-pass facts (`@(gd_fact)` + the generated
+spawns, every-screen tick facts (the mine-form `_fx`: `SIM_FACT` broadcast,
+watch-clock firing), declared world-pass facts (`@(gd_fact)` plus the generated
 announce doors, provenance-aware), the `@(gd_tick)`/`@(gd_sample)`/`predict`
 codegen, tick composition through embedded blocks (the `play/sim` shelf
 above), and two worked example games (quickdraw, speedball) with native duel
-acids — the kitsim tests (including loss-and-blackout convergence acids, the
+acceptance tests. The kitsim tests (loss-and-blackout convergence tests, the
 per-class routing fingerprint, the glide-vs-snap assertion, the three-peer
 fact-timing pin, and the four-law declared-fact pin) plus the repgen contract
 pins hold all of it.

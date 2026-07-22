@@ -1,9 +1,10 @@
 # kit/ui — stock-theme widgets
 
 The toolkit's stock widgets, built programmatically — no scene assets to install; any script
-can summon them. Lobby, chat box, scoreboard, and the HUD set (interact prompt, inventory
-grid/hotbar, hp bar, abilities bar). Styling is deliberately stock Godot theme —
-friendslop lobbies are for friends, and games that care can theme the returned nodes.
+can summon them. You get a lobby, a chat box, a scoreboard, and the HUD set (interact prompt,
+inventory grid/hotbar, hp bar, abilities bar). Styling is stock Godot theme; theme the
+returned nodes if your game wants its own look, or replace a widget's chrome wholesale with
+[the adopt contract](#adopting-your-own-scenes).
 
 **Lane compatibility: lane-agnostic.** Widgets read session-level state (roster, stats,
 chat) and whatever values the game hands them — both lanes use them as-is (the netgraph
@@ -20,7 +21,7 @@ import kui "godot:kit/ui"
 **kit/ui builds controls, it never owns flow.** Every widget follows the same contract: a
 `*_make` builds nodes under a parent you supply and hands back the handles; the GAME wires
 the buttons/input and decides when to repaint (`*_refresh` on events, not per frame — except
-the HUD, which the owner repaints live). `*_destroy` frees only the tracking arrays — the
+the HUD, which the owner repaints live); `*_destroy` frees only the tracking arrays — the
 node tree belongs to the scene and is freed with the owner.
 
 Refresh procs reuse their row Labels across repaints and hide extras; nothing reallocates
@@ -64,11 +65,11 @@ chat_submit :: proc(ch: ^Chat, c: ^kcomms.Comms, text: gd.String, sent: ^bool = 
 ```
 
 Paints `name: text` for speech, `* text` for system lines. The game connects
-`chat.input`'s `text_submitted` and calls `chat_submit` from it — the whole handler:
-extract (clamped), say, clear, and PUT THE KEYS BACK ON THE WHEEL. The focus release is
-the part that gets forgotten — without it a keyboard player's WASD stays trapped in the
-chat box after every message; `sent` (the game's latch) stops the submitting Enter from
-immediately re-opening chat when the game binds Enter to "talk".
+`chat.input`'s `text_submitted` and calls `chat_submit` from it. The handler extracts
+(clamped), says, clears, and releases input focus — without the focus release a keyboard
+player's movement keys (WASD) stay trapped in the chat box after every message. `sent` (the
+game's latch) stops the submitting Enter from immediately re-opening chat when the game binds
+Enter to "talk".
 
 **Scoreboard** — players × whatever stat columns the game registered (ping auto-fed,
 damage/kills/deaths from [kit/combat](combat.md), the game's own counters), straight from the
@@ -82,11 +83,10 @@ score_hide :: proc(sb: ^Score, name: string)           // hide a column by name
 score_refresh :: proc(sb: ^Score, s: ^ksess.Session)
 ```
 
-Departed players stay listed — their tallies survive disconnects by design. Some stat
-columns are PLUMBING, not score — a loadout choice replicated through the registry
-(scrapyard's look/iron, the muster's ready bit) has no business on the board;
-`score_hide` keeps it off (once, after the columns are declared; unknown names are a
-harmless no-op).
+Departed players stay listed; their tallies survive disconnects. Some stat columns are
+PLUMBING, not score — a loadout choice replicated through the registry (scrapyard's
+look/iron, the muster's ready bit) has no business on the board; `score_hide` keeps it off
+(call it once, after the columns are declared; unknown names are a harmless no-op).
 
 **HUD** — prompt, inventory/hotbar, hp, abilities:
 
@@ -111,15 +111,13 @@ All text blocks over stock theme: the hp bar renders `hp ▓▓▓▓▓▓▓�
 install, and a test can read the exact fill back out of the tree); abilities render `[rock]`
 ready, `[rock 1.2s]` cooling, `[rock $]` ready-but-unaffordable. Cooldowns count TICKS of
 whichever loop decays them — `tick_hz` is required, so pass `session_tick_hz(&ses)` (or the
-lane's rate on a sim game) and the seconds shown are true at any configured rate. (It used
-to default to 20 Hz; a 60 Hz game that omitted it showed cooldowns 3× too long — the
-footgun is deleted, not documented.) BOTH ability models feed the one widget — `kcombat.Ability_Def` is
-the def vocabulary at every layer: a slot-array game passes its `Cooldowns` bundle
-(`c.cds[:]`); a play-block game gathers its blocks' countdowns into a local array beside the
-same def rows (`[]u16{r.slime.cd, r.ignite.cd}`). With `selected`, the inventory row doubles
-as a hotbar.
+lane's rate on a sim game) and the seconds shown are true at any configured rate. BOTH
+ability models feed the one widget — `kcombat.Ability_Def` is the def vocabulary at every
+layer: a slot-array game passes its `Cooldowns` bundle (`c.cds[:]`); a play-block game
+gathers its blocks' countdowns into a local array beside the same def rows
+(`[]u16{r.slime.cd, r.ignite.cd}`). With `selected`, the inventory row doubles as a hotbar.
 
-## Full replacement: the adopt contract
+## Adopting your own scenes
 
 The kit provides the implementation, never the final look. A game that wants its own
 lobby/chat/scoreboard authors a scene in the editor and hands it to boot
@@ -152,7 +150,7 @@ Row/cell Labels are kit-created — theme them from the scene root. Extra nodes 
 Player key, an address field, the plate — are the game's to wire after `boot_attach`,
 through the widget's `root`.
 
-## Worked excerpt (cavecrawl)
+## Worked example (cavecrawl)
 
 ```odin
 self.ui = kui.lobby_make(self.owner, "C A V E C R A W L")
@@ -204,17 +202,17 @@ kui.abilities_refresh(&self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.s
   Odin-side tracking arrays (`lobby`/`chat`/`score`/`inv`/`abilities` — the widgets that keep
   a `[dynamic]` of reused rows). [`kboot.boot_detach`](boot.md) is their caller: it destroys
   the widget arrays, then queue-frees the container node they lived under (the nodes ride that
-  subtree down). Freeing the game's node instead frees the same nodes — the arrays then leak
-  briefly and die with the process, which is why detach is the supported keep-running path.
-- **`prompt`/`hp` have no `*_destroy` — deliberately.** Their whole state is one Label
-  node (no `[dynamic]`, no map), so zero-value teardown is already correct: the node frees with
-  its parent and the struct holds nothing else. An empty destroy proc would only be ceremony.
-  The `netgraph` is the same shape (a Label + a fixed sparkline array); `netgraph_destroy`
-  exists for call-site symmetry but only zeroes — a game that builds its own netgraph owns it,
-  boot does not (`boot_net_stats` fills a value the game feeds to its own overlay).
+  subtree down). Freeing the game's node instead frees the same nodes, but the tracking arrays
+  then leak until the process exits — so use `boot_detach` to tear down while the game keeps
+  running.
+- **`prompt`/`hp` have no `*_destroy`.** Their whole state is one Label node, which frees with
+  its parent; there is nothing else to release. The `netgraph` is the same shape (a Label plus
+  a fixed sparkline array); `netgraph_destroy` exists for call-site symmetry but only zeroes —
+  a game that builds its own netgraph owns it, boot does not (`boot_net_stats` fills a value
+  the game feeds to its own overlay).
 - Widgets spawn at the anchor origin — position them yourself; layout is the game's call.
 
-## The netgraph — "is it healthy?", drawn
+## Netgraph
 
 A drop-in text overlay (`netgraph_make` / `netgraph_show` /
 `netgraph_refresh(ng, Net_Stats{...})`) that draws the numbers that move when
@@ -228,7 +226,7 @@ warn  rclamp 3▲
 ```
 
 Row 1 is the link: rtt off the replicated ping stat (`net_ping_ms`), jitter
-and loss off [ENet's own per-peer statistics](netgd.md#the-wire-gauge--bytes-by-kind-and-the-links-own-truth)
+and loss off [ENet's own per-peer statistics](netgd.md#traffic-and-link-stats)
 (`netgd.wire_link_quality` — clients fill it about the host), and a quality
 word that rates loss first, then jitter, then raw rtt. Row 2 is the wire's
 bytes-by-kind (`Net_Stats.traffic = netgd.wire_traffic(&boot.wire)` — an
@@ -243,16 +241,15 @@ core (rtt, link jitter/loss, malformed drops, traffic) — a sim game lays its
 lane rows on the result.
 
 The `warn` row (last, and only when something has fired) surfaces the
-**silent-failure counters** — the tallies that exist precisely because the
-failure they name leaves no other trace: `guard_hits` (a client wrote a
-host-lane field), `input_drops` / `cmd_capped` (host: sim inputs dropped, verbs
-refused by the per-player cap), `rewind_clamped` (a lag-comp rewind pinned to the
-buffer horizon). `boot_net_stats` fills `guard_hits` for every game; a sim game
-adds the lane three. Each draws its number only when non-zero, and a **▲** flags
-one that *moved this refresh* — a lone cold-start clamp is normal, a count still
-climbing a minute in is the bug, and the raw number alone can't tell them apart
-(quickdraw's lag-comp regression rode a 60-second acid unmarked because the datum
-lived only on-screen — this row is the fix).
+**silent-failure counters** — the tallies for failures that leave no other
+trace: `guard_hits` (a client wrote a host-lane field), `input_drops` /
+`cmd_capped` (host: sim inputs dropped, verbs refused by the per-player cap),
+`rewind_clamped` (a lag-comp rewind pinned to the buffer horizon).
+`boot_net_stats` fills `guard_hits` for every game; a sim game adds the lane
+three. Each draws its number only when non-zero, and a **▲** flags one that
+*moved this refresh* — a lone cold-start clamp is normal, a count still
+climbing a minute in is the bug, and the raw number alone can't tell them
+apart.
 
 Siblings: [session.md](session.md) (roster, stats, `session_tick_hz`) ·
 [comms.md](comms.md) (the chat log) · [combat.md](combat.md) (`Ability_Def`, cooldowns) ·

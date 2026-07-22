@@ -6,23 +6,23 @@ screen while only the host deals damage. It also auto-publishes damage/kill/deat
 into the [session](session.md) stat registry.
 
 **Lane compatibility: COOP.** The wire halves here — `Predicted_Hp` keyed to delta
-confirmation, host-validated hits, `fire_announce`/tracers — are the coop lane's model in
-mechanism and vocabulary. A [sim-lane](sim.md) game expresses the same ideas natively
-instead: hp as a `predict` field, hits as verbs judged under [lag comp](sim.md), fired
-shots as predicted spawns or declared facts (sim.md says why tracers are superseded by
-projectile *entities* there). The pure math (range/cone checks, damage arithmetic) is
-sim-safe anywhere. Whether the `Cooldowns`/ability bundles can ride a sim snapshot
-descriptor is an OPEN question — unverified today; don't assume it.
+confirmation, host-validated hits, `fire_announce`/tracers — are the coop lane's model. A
+[sim-lane](sim.md) game expresses the same ideas natively: hp as a `predict` field, hits
+as verbs judged under [lag comp](sim.md), fired shots as predicted spawns or declared
+facts (in the sim lane, projectile *entities* supersede tracers — see [sim.md](sim.md)).
+The pure math (range/cone checks, damage arithmetic) is sim-safe anywhere. Whether the
+`Cooldowns`/ability bundles can ride a sim snapshot descriptor is unverified today; don't
+assume it.
 
 ## Mental model
 
 Combat state is **plain replicated fields on your entity** — `hp: i32`, `cds: [4]u16`,
 `fx: [4]Effect` — riding the [kit/net](net.md) delta walk. kit/combat is the *operations*
-on them: deterministic, allocation-free, engine-free, because they run inside predicted
-commands and host ticks — client and host execute the same gates from the same bytes.
-Projectiles are **not entities**: the shooter's cast is predicted (cost and cooldown bite
-instantly), everyone draws local visuals from the same sim math, and only the *host's*
-sim deals damage — peer-owned visuals, host-validated hits.
+on them: deterministic, allocation-free, and engine-free, so they run identically inside
+predicted commands and host ticks — client and host execute the same gates from the same
+bytes. Projectiles are **not entities**: the shooter's cast is predicted (cost and
+cooldown bite instantly), everyone draws local visuals from the same sim math, and only
+the *host's* sim deals damage — peer-owned visuals, host-validated hits.
 
 ## Health and abilities
 
@@ -60,7 +60,7 @@ Cooldowns :: struct($N: int) {
 ```
 
 Defs are code constants (cavecrawl's `ROCK_ABILITY` has `cooldown = 20` — one second at
-20 Hz). The predicted cast is one command proc, zero role branches (`spelunker.odin`):
+20 Hz). The predicted cast is one command proc with zero role branches (`spelunker.odin`):
 
 ```odin
 @(gd_command = "predict")
@@ -72,41 +72,38 @@ spelunker_heal :: proc(self: ^Spelunker) -> bool {
 }
 ```
 
-The verb that issues it pre-gates with `ability_ready` (`input.odin`) — a refused
-prediction still rides the wire, so a key held at full hp would flood the host with doomed
-commands. [kit/ui](ui.md)'s ability bar renders the same `cds` and defs.
+The verb that issues it pre-gates with `ability_ready` (`input.odin`): a refused
+prediction still rides the wire, so a key held at full hp would otherwise flood the host
+with doomed commands. [kit/ui](ui.md)'s ability bar renders the same `cds` and defs.
 
-> **Which layer to use — these helpers, or the `play` blocks?** This is one instance of
-> the toolkit's TWO-LAYER rule, so here is the rule itself. **`kit` is mechanism and
-> vocabulary**: contextless procs, wire formats, replication machinery, descriptor tables
-> — no opinions about game feel, no replicated fields of its own. The litmus: *is this
-> something a block calls?* **`play` is policy and composition**: blocks — structs games
-> embed, carrying `gd:"replicate"` fields and name-paired generated hooks, with defaults
-> that encode a stance. The litmus: *does it hold replicated state or generate hooks?*
-> **The arrow points one way, play → kit, never the reverse** — a block delegates its
-> mechanism down (`play.Ability`'s gate IS `kcombat.cast_gate`, `play.Health`'s clamp IS
-> `kcombat.hurt`), so the two layers cannot drift on what "ready" or "a death" means.
-> Across kit's own math cores the opposite rule holds — independence over sharing
-> (combat/interact/ai each keep their own vocabulary, so a game can take any subset);
-> sharing is the rule *up* the stack, independence *across* it.
->
-> In practice: for the common cases the blocks are the default — **`play.Health`** instead
-> of a raw hp field + `hit` (max, the damage edge, and frac for free), **`play.Ability`**
-> instead of a `Cooldowns` slot + a hand-written command (the cast command is *generated*
-> onto the embedding entity, the cooldown knob replicates, and the applied-vs-rejected
-> semantics are already right). The def type is `kcombat.Ability_Def` at every layer —
-> name and cost live in the game's declared table (a string can never ride a replicated
-> blob, and a wire verb can't carry your resource pointer), which is also what feeds
-> [kit/ui](ui.md)'s ability bar for block and slot-array games alike. Reach for the
-> low-level forms when you're outside the blocks' shape: `ability_try` when a cast
-> **spends a resource** at the gate (cost is a game gate — check it where you issue, and
-> in the authority's hook, against the same def row), `Cooldowns(N)`'s slot array when
-> slots are **dynamic** (castable inventory items indexed at runtime, where named block
-> fields can't), and `hit`/`hurt` when hp lives somewhere a block can't (a transient, an
-> off-entity pool). The examples split along history: cavecrawl/homestead show the
-> low-level way (they predate the blocks and double as a view of the layer underneath);
-> scrapyard shows the block way. New games: start with the blocks. See
-> [kit/net — composing verbs from embedded blocks](net.md#composing-verbs-from-embedded-blocks).
+## Blocks or low-level helpers
+
+For the common cases the [`play`](play.md) blocks are the default:
+
+- **`play.Health`** instead of a raw hp field plus `hit` — you get max, the damage edge,
+  and frac for free.
+- **`play.Ability`** instead of a `Cooldowns` slot plus a hand-written command — the cast
+  command is generated onto the embedding entity, the cooldown knob replicates, and the
+  applied-vs-rejected semantics are already right.
+
+`play.Health`'s clamp and `play.Ability`'s gate delegate to the same `hurt` and `cast_gate`
+these helpers expose, so a raw field and a block agree on what "ready" and "a death" mean.
+The def type is `kcombat.Ability_Def` at every layer — name and cost live in the game's
+declared table (a string can't ride a replicated blob, and a wire verb can't carry your
+resource pointer), which is also what feeds [kit/ui](ui.md)'s ability bar for block and
+slot-array games alike.
+
+Reach for the low-level forms when you're outside the blocks' shape:
+
+- **`ability_try`** when a cast *spends a resource* at the gate — cost is a game gate, so
+  check it where you issue and in the authority's hook, against the same def row.
+- **`Cooldowns(N)`'s slot array** when slots are *dynamic* — castable inventory items
+  indexed at runtime, where named block fields can't reach.
+- **`hit`/`hurt`** when hp lives somewhere a block can't — a transient, an off-entity pool.
+
+cavecrawl and homestead show the low-level way; scrapyard shows the block way. New games
+start with the blocks. See
+[kit/net — composing verbs from embedded blocks](net.md#composing-verbs-from-embedded-blocks).
 
 ## Status effects
 
@@ -129,7 +126,7 @@ effects_tick :: proc "contextless" (fx: []Effect)
 effect_of :: proc "contextless" (fx: []Effect, kind: u8) -> (Effect, bool)
 ```
 
-## Projectiles: one sim, two jobs
+## Projectiles
 
 The same math runs as the host's authoritative sim (damage) and as every peer's local
 visual ([kit/fx](fx.md) tracers) — what you see is what the host computes, offset only by
@@ -154,12 +151,12 @@ projectile_step :: proc "contextless" (p: ^Projectile) -> (alive: bool)
 projectile_hit :: proc "contextless" (from: [3]f32, vel: [3]f32, targets: []Target) -> (best: Target, ok: bool)
 ```
 
-## The cast origin, and leash
+## Cast origin and leash
 
-The lesson: a moving shooter's projectile must carry the **owner-true origin**. Its
-position is owner-streamed, so the host's copy lags a stream behind — launching from the
-lagged copy makes the authoritative rock fly a different line than the one the shooter
-*saw* hit. So the throw command carries the caster's own origin, leashed:
+A moving shooter's projectile must carry the **owner-true origin**. Its position is
+owner-streamed, so the host's copy lags a stream behind — launching from the lagged copy
+makes the authoritative rock fly a different line than the one the shooter *saw* hit. So
+the throw command carries the caster's own origin, leashed:
 
 ```odin
 // leash clamps a CLAIMED point into a disc of radius r around anchor.
@@ -170,7 +167,7 @@ Honest latency offsets pass untouched; teleport-cheese gets dragged back to arm'
 Run it in the command proc itself: on the caster's own prediction `claimed == anchor` and
 it is a no-op — no role branch (`spelunker_throw` in `spelunker.odin`).
 
-## Fire announcements: everyone draws their own rocks
+## Fire announcements
 
 When the host confirms a cast it broadcasts a `Fire` over the session's app channel
 ([session.md](session.md)); every peer runs the same projectile sim locally for the
@@ -190,10 +187,9 @@ fire_write :: proc(w: ^knet.Writer, f: Fire)
 fire_read :: proc(r: ^knet.Reader) -> (f: Fire, ok: bool)
 ```
 
-The plumbing is packaged — the fire lane defaults to `FIRE_TAG :: 1`, beside its tag
-siblings (comms 0, xfer 2, sim 3); give the listener a home (a struct field; no package
-globals, so parallel sessions never collide), and the guards every game hand-rolled are
-the kit's problem now:
+The plumbing is packaged. The fire lane defaults to `FIRE_TAG :: 1` (its tag siblings are
+comms 0, xfer 2, sim 3). Give the listener a home — a struct field, so parallel sessions
+never collide (no package globals):
 
 ```odin
 fire_announce :: proc(s: ^ksess.Session, f: Fire, tag: u8 = FIRE_TAG)   // HOST-ONLY (asserts)
@@ -203,29 +199,25 @@ fire_poll :: proc(fr: ^Fire_Route) -> (f: Fire, ok: bool)
 fire_route_destroy :: proc(fr: ^Fire_Route)
 ```
 
-**`fire_announce_to` — one peer, not the room.** To catch a just-joined player up on
-a recent event, address the replay to *their* `Peer_Id` (from the roster on
-`Ev_Player_Joined`) instead of re-broadcasting to everyone and making every other
-screen dedupe the echo. But read the caution first, because it settles a design
-question: `fire_poll` **drops a fire whose shooter is the receiver** (they drew it at
-cast time), so an addressed replay to the *original caster* — a reconnect reclaiming
-their id — is dropped too. That is correct for a *transient* one-shot, and it is the
-tell that **a persistent effect does not belong on this lane**. A standing zone, a
-lingering glow, anything with a ttl that outlives its frame, should be an **entity**:
-entities replicate to a joiner through the world snapshot by construction — no replay,
-no dedupe, no shooter spoof, no reclaim hole. Use `fire_announce_to` for the tail of a
+**`fire_announce_to` — one peer, not the room.** To catch a just-joined player up on a
+recent event, address the replay to *their* `Peer_Id` (from the roster on
+`Ev_Player_Joined`) instead of re-broadcasting to everyone and making every other screen
+dedupe the echo. One caution: `fire_poll` **drops a fire whose shooter is the receiver**
+(they drew it at cast time), so an addressed replay to the *original caster* — a reconnect
+reclaiming their id — is dropped too. That is correct for a *transient* one-shot, and it
+is the sign that **a persistent effect does not belong on this lane**. A standing zone, a
+lingering glow, anything with a ttl that outlives its frame should be an **entity**:
+entities replicate to a joiner through the world snapshot by construction — no replay, no
+dedupe, no shooter spoof, no reclaim hole. Use `fire_announce_to` for the tail of a
 *transient* a specific peer should still catch; use an entity for anything that stands.
 
-`fire_announce` is the AUTHORITY's half — it asserts on a client (the receiver drop
-below stays the security boundary; the assert is the teaching moment: a client calling
-it would broadcast frames every receiver silently discarded). The listener is EVENTS,
-NOT CALLBACKS: the handler only *files* (into
-[`ksess.App_Queue`](session.md#the-riders-queue-appq--the-receive-half), the same queue comms, xfer and the
-album hold — the discipline is a type now, not a habit each package re-earns), and the game
-drains with `fire_poll` each frame on its own stack — the old `on_fire` callback ran game
-code mid-session-pump, the one reentrancy hole in the subsystem. What lands in the queue is exactly "someone else's
-rock — draw it" (the host's own copy, your own echo, and non-host authors are all
-dropped):
+`fire_announce` is the AUTHORITY's half — it asserts on a client, since a client calling
+it would broadcast frames every receiver discards. The listener files events rather than
+invoking callbacks: the handler only *files* into
+[`ksess.App_Queue`](session.md#the-riders-queue-appq) (the same queue
+comms, xfer, and the album use), and the game drains with `fire_poll` each frame on its
+own stack. What lands in the queue is exactly "someone else's rock — draw it": the host's
+own copy, your own echo, and non-host authors are all dropped.
 
 ```odin
 // host, when the command hook confirms a cast:
@@ -246,17 +238,17 @@ for {
 Raw `fire_write`/`fire_read` stay public for games that need a different envelope.
 
 Tick-paced code (cooldown decay loops, [kit/ai's director](ai.md)) should read the
-session's own clock, `ksess.session_tick_no(s)`, not accumulate a counter — a
-hand-rolled count silently diverges across resume/migration. The exception is a
-**campaign clock** a game deliberately persists in its save blob (cavecrawl's
-`host_ticks` gates respawns across saves): that one must be the game's, because the
-session's tick is local to the session's lifetime.
+session's own clock, `ksess.session_tick_no(s)`, rather than accumulate a counter — a
+hand-rolled count drifts across resume and host-migration. The exception is a **campaign
+clock** a game persists in its save blob (cavecrawl's `host_ticks` gates respawns across
+saves): that one must be the game's own, because the session's tick is local to the
+session's lifetime.
 
-## Predicted hp: the impact you saw, before the wire agrees
+## Predicted hp
 
 When your local rock visually contacts a body, the health you *display* may dip
-immediately — but the replicated hp field is never touched (that is how phantom damage
-stays impossible). The dip lives in an overlay:
+immediately — but the replicated hp field is never touched, so phantom damage is
+impossible. The dip lives in an overlay:
 
 ```odin
 Predicted_Hp :: struct {
@@ -272,9 +264,9 @@ php_display :: proc "contextless" (ph: ^Predicted_Hp, hp_now: i32, now: f64) -> 
 
 `php_note_hit` at visual contact, `php_display` wherever hp renders (`rocks.odin`,
 `rock_impact`). When the authoritative drop lands, the overlay is consumed — no double
-dip. If the host saw a miss, the overlay expires and the bar heals back: wrong for a
-heartbeat, honest forever after. Dips never kill — `php_display` clamps to 1 while real
-hp is positive, so corpses appear only on truth.
+dip. If the host saw a miss, the overlay expires and the bar heals back: briefly wrong,
+then correct. Dips never kill — `php_display` clamps to 1 while real hp is positive, so
+corpses appear only on truth.
 
 ## Auto-published combat stats
 
@@ -292,7 +284,7 @@ credit_hit :: proc(s: ^ksess.Session, cols: Combat_Cols, attacker: knet.Player_I
 credit_kill :: proc(s: ^ksess.Session, cols: Combat_Cols, attacker, victim: knet.Player_Id)
 ```
 
-## Pools: one tick for a whole volley
+## Pools
 
 Every game that host-sims projectiles ends up with the same loop — sweep the tick's segment
 before stepping, remove on hit or expiry, don't corrupt the index while removing. `pool_tick`
@@ -307,13 +299,13 @@ kcombat.pool_tick(&self.lobs, self, nil, nil, lob_splash)            // fly-out-
 ```
 
 `targets` is called **per projectile**, not snapshotted — an `on_hit` that kills changes the
-census for the next projectile in the same pool. A hit always removes (no pool in the dogfoods
+census for the next projectile in the same pool. A hit always removes (no pool in the examples
 pierces); `on_expire` is the fizzle's last word — a lob's splash *is* its expiry.
 
-## Worked example: the host's tick flies the rocks
+## Worked example
 
 From `examples/cavecrawl/scripts/host.odin` (`cave_host_tick`); the full pattern — launch
-on the command hook, announce the `Fire`, draw visuals per frame — is `rocks.odin`:
+on the command hook, announce the `Fire`, draw visuals per frame — is in `rocks.odin`:
 
 ```odin
 kcombat.abilities_tick(sp.cds[:])   // per spelunker
@@ -329,10 +321,10 @@ if hit, hit_ok := kcombat.projectile_hit(from, fl.p.vel, targets[:]); hit_ok {
 
 ## Gotchas
 
-- **Cooldowns and effect clocks count NET TICKS**, not seconds — rate-agnostic by design.
-  Only the authority decays them; clients see the countdown through replication.
+- **Cooldowns and effect clocks count NET TICKS**, not seconds — rate-agnostic. Only the
+  authority decays them; clients see the countdown through replication.
 - A cast raced against the last ticks of a cooldown may mispredict locally — the command
-  still ships, and the host's answer stands. That is the whole model.
+  still ships, and the host's answer stands.
 - `Projectile.vel` is **per tick**. Hit-test with the position *before* `projectile_step`,
   and test the segment even when it returns false — that tick still happened.
 - Carry the owner-true cast origin and `leash` it; the lagged host copy makes witnessed

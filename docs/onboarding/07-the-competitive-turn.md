@@ -1,31 +1,29 @@
 # 7 · The competitive turn
 
-Everything in posts 1–6 rested on one quiet assumption, and post 4 said it out
-loud: **your friends don't cheat.** The co-op model hands each player authority
-over their own avatar — you write your position, everyone else reads it — because
-in a game you play with friends, a client lying about where it stands is a
-problem you solve by finding new friends, not new netcode.
+The co-op model gives each player authority over their own avatar: you write
+your position, everyone else reads it. That works when you trust the other
+players — a client lying about where it stands is a social problem, not a
+netcode one.
 
-Now you want a *duel*. A ranked arena. A fighting game. Something where the other
-player is an opponent, and "trust the client's own position" is the first thing a
-cheater breaks. The whole authority model inverts: the **server** simulates the
-truth, every client **predicts** it locally so the game still feels instant, and
-when a prediction turns out wrong the server's word wins and the screen
-**rolls back and resimulates** to match. Rollback netcode — the thing fighting
-games and Rocket League are built on.
+Competitive games invert that. In a duel, a ranked arena, or a fighting game the
+opponent is not a friend, and "trust the client's own position" is the first
+thing a cheater breaks. So the **server** simulates the truth, every client
+**predicts** it locally so the game still feels instant, and when a prediction
+turns out wrong the server's word wins: the screen **rolls back and
+resimulates** to match. This is rollback netcode — the model fighting games and
+Rocket League are built on.
 
-Here is the good news, and it is the whole reason this post is short: **it is the
-same declarative surface.** You do not learn a new engine. You tag a different
-handful of fields, and the two-timelines discipline from post 5 carries over
-almost unchanged. The competitive lane is called `kit/sim`, and it is chosen
-per **field**, so one game can be co-op in its chat and its scoreboard and
-server-authoritative in its hitboxes.
+The competitive lane is `kit/sim`, and it is the same declarative surface as the
+co-op lane. You do not learn a new engine; you tag a different handful of fields,
+and the two-timelines discipline carries over. The lane is chosen per **field**,
+so one game can be co-op in its chat and its scoreboard and server-authoritative
+in its hitboxes.
 
-## Predict-self: your avatar, on both clocks
+## Predict-self: your avatar on both timelines
 
-In co-op, your avatar's `x, y` were `gd:"owner"` — you owned them, you streamed
-them. In the sim lane they become predicted state, and the tick that moves them
-is a plain proc with a tag:
+In the co-op lane your avatar's `x, y` are `gd:"owner"` — you own them and you
+stream them. In the sim lane they become predicted state, and the tick that
+moves them is a plain proc with a tag:
 
 ```odin
 Fighter :: struct {
@@ -41,46 +39,44 @@ fighter_tick :: proc(self: ^Fighter, input: Fighter_Input) {
 }
 ```
 
-That `@(gd_tick)` is the entire opt-in. Your fighter now runs on your predicted
-timeline (instant to your hand) *and* on the server (the truth), and the lane
-reconciles the two behind your back. The input you read is delivered by the lane,
-not by you — you never send a packet. This is post 4's "verbs, not RPCs" with the
-verb widened to *every frame*.
+`@(gd_tick)` is the entire opt-in. Your fighter runs on your predicted timeline
+(instant to your hand) and on the server (the truth), and the lane reconciles
+the two behind your back. The input you read is delivered by the lane — you
+never send a packet.
 
-## The two timelines, again — but now the other guy is predicted too
+## Choosing per object: predict-self and contested
 
-Post 5's lesson was that a remote avatar is rendered in the *past*. Competitive
-games make you decide, per object, whether to keep it that way:
+A remote avatar renders in the past (see [timelines](../kit/timelines.md)).
+Competitive games make you choose, per object, whether to keep it that way:
 
-- **Predict-self** (the default `@(gd_tick)`): predict only *your* fighter; watch
-  the opponent an interp-delay behind, but *accurately*. Right for anything where
-  a correctly-placed opponent matters — a hitscan shot, a parry window. This is
+- **Predict-self** — the default `@(gd_tick)`. Predict only *your* fighter;
+  watch the opponent an interp-delay behind, but *accurately*. Use it wherever a
+  correctly-placed opponent matters — a hitscan shot, a parry window. This is
   what quickdraw ships.
-- **The shared object** (`@(gd_tick = "contested")`): a ball, a flag, a bomb —
-  something *both* players hit. Marking it `contested` means **every** peer
-  predicts it, so your touch resolves on your screen the instant you make it. The
+- **Contested** — `@(gd_tick = "contested")`. For a shared object both players
+  hit: a ball, a flag, a bomb. Marking it `contested` makes **every** peer
+  predict it, so your touch resolves on your screen the instant you make it. The
   server still owns the truth; a disagreement rolls back and glides.
 
-The soccer example ships **three times**, one game per model, so you can read the
-difference instead of taking it on faith:
+The soccer example ships three times, one game per model, so you can read the
+difference side by side:
 
 | example | model | the ball is… |
 |---|---|---|
-| `examples/slopball`  | co-op (post 5)      | owned by the last toucher; peer-authoritative |
+| `examples/slopball`  | co-op               | owned by the last toucher; peer-authoritative |
 | `examples/speedball` | predict-**world**   | *everyone* predicted (avatars too) — one timeline, constant tiny glides |
 | `examples/claimball` | predict-self + **claim** | only *your* avatar predicted; the ball predicted and **claimed** |
 
-## The claim — the one genuinely new idea
+## The claim
 
-`claimball` is the interesting one, because predict-self plus a contested ball
-raises a question the other two dodge: the ball runs on *your* predicted timeline,
-but your *opponent* is rendered in the past. If you always draw the ball from your
-prediction, a shot your opponent takes appears a whole interp-delay *before* their
-avatar visibly kicks it — predicted ball, past-rendered player, one screen. The
-mixed-timelines artifact from post 5, back with a vengeance.
+`claimball` combines predict-self with a contested ball, which raises a question
+the other two models avoid. The ball runs on *your* predicted timeline, but your
+*opponent* renders in the past. If you always draw the ball from your
+prediction, a shot your opponent takes appears a whole interp-delay *before*
+their avatar visibly kicks it: predicted ball, past-rendered player, one screen.
 
-The fix is one boolean asked continuously — the sim-lane echo of post 5's
-`mine?`: **is my simulation the one driving this ball right now?**
+The fix is one boolean, asked continuously: **is my simulation the one driving
+this ball right now?**
 
 ```odin
 // in the world pass, every tick MY fighter is influencing the ball:
@@ -91,25 +87,24 @@ if ksim.lane_live(&g.lane) {          // presentation — live pass only, never 
 }
 ```
 
-Claimed, the ball draws from your prediction — instant, and legitimately, because
-*you* caused its motion. Unclaimed, it draws the watched view, so your opponent's
-touch moves it *beside their delayed avatar*, exactly where they'll appear to hit
-it. The claim decays over a quarter second when you stop influencing it, so the
-handback is a glide, not a snap.
+Claimed, the ball draws from your prediction — instant, and correctly, because
+*you* caused its motion. Unclaimed, it draws the watched view, so your
+opponent's touch moves it *beside their delayed avatar*, exactly where they will
+appear to hit it. The claim decays over a quarter second when you stop
+influencing the ball, so the handback is a glide, not a snap.
 
-There is exactly one footgun, and `claimball` exists partly to name it: **release
-the claim when the ball SLOWS, never on mere distance.** Your kick's whole flight
-is your consequence — keep the claim while the ball is fast and far. Drop it just
-because the ball got far from your feet and the fade target (the watched view,
-sitting a timeline-skew behind a fast ball) yanks your own kick *backwards*
-mid-flight. Release when it's slow, the two timelines have converged, and nobody
-sees the handoff.
+One rule to get right: **release the claim when the ball slows, never on mere
+distance.** Your kick's whole flight is your consequence, so keep the claim
+while the ball is fast and far. If you drop it just because the ball got far from
+your feet, the fade target — the watched view, sitting a timeline-skew behind a
+fast ball — yanks your own kick *backwards* mid-flight. Release when the ball is
+slow: the two timelines have converged, and nobody sees the handoff.
 
-## Lag compensation comes for free
+## Lag compensation
 
 The hitscan problem — "I shot where my screen showed the target, but the server
 says I missed because its copy already moved" — is one call, because the lane
-already keeps every entity's recent history:
+keeps every entity's recent history:
 
 ```odin
 judged := ksim.lane_rewound_begin(&g.lane, shooter) // wind every OTHER entity
@@ -117,12 +112,12 @@ g.hit = trace_shot(g)                               // back to the shooter's vie
 ksim.lane_rewound_end(&g.lane)
 ```
 
-## What you keep
+## What carries over
 
-Everything post 6 promised is still yours: reconnects, drop-in joins, saves, host
-migration, the wire-version door, Steam. The sim lane rides the same session; a
-game is co-op in its lobby and its chat and server-authoritative in its
-hitboxes, and the reconnect story doesn't know the difference.
+Everything from the co-op lane still holds: reconnects, drop-in joins, saves,
+host migration, the wire-version door, Steam. The sim lane rides the same
+session — a game is co-op in its lobby and its chat and server-authoritative in
+its hitboxes, and the reconnect path treats them the same.
 
 **Run it:**
 
@@ -133,9 +128,8 @@ nix develop --command bash -c 'bash examples/claimball/native_run.sh'  # CLAIMBA
 Three headless processes at 240ms round-trip: a striker drives a ball it
 predicts to a goal, *claiming* it the whole way (so it presents from the
 striker's timeline — `claim` rides near 1), while a watcher who never touches it
-sees it watched (`claim` 0). One ball, two timelines, one screen each — the
-competitive turn, working.
+sees it watched (`claim` 0). One ball, two timelines, one screen each.
 
-Deeper reference: [kit/sim](../kit/sim.md) (the full lane), and
-[timelines](../kit/timelines.md) (the per-field choosing guide — the map for
-deciding what's co-op and what's contested in *your* game).
+Deeper reference: [kit/sim](../kit/sim.md) for the full lane, and
+[timelines](../kit/timelines.md) for the per-field guide to deciding what's
+co-op and what's contested in *your* game.

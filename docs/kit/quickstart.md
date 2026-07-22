@@ -13,9 +13,9 @@ Prerequisite: the toolchain from [Getting Started](../getting-started.md) —
 
 ## The whole game: two files
 
-A kit game is declarations plus plain procs. There are **no RPCs, no role
-branches, no spawn messages, and no interpolation code** anywhere below —
-that absence is the product.
+A kit game is declarations plus plain procs. You write **no RPCs, no role
+branches, no spawn messages, and no interpolation code** — none of that
+appears below.
 
 **`scripts/player.odin`** — one player's square. The struct *is* the
 netcode: `x`/`y` are owner-streamed (you write your own; every other screen
@@ -184,19 +184,17 @@ hello_net_entity_spawned :: proc(self: ^HelloNet, id: knet.Net_Id, type: ksess.E
 }
 ```
 
-**No lifecycle bools.** The `running`/`started` pair this file used to carry
-is [`boot_phase`](boot.md#the-frame-loop-boot_pump) now, and `boot_phase` is
-*derived* from the session — so it is right even for a game that never
-touched a boot door. `boot_phase` is a LEVEL, though, and a swap that must
-happen exactly once needs the rising EDGE: read the phase before
-`boot_pump` (the only place it rises) and compare after, as `process` does
-above. That two-read idiom replaces the bool; nothing is stored.
+**Lifecycle state lives in
+[`boot_phase`](boot.md#the-event-loop), not in bools.** `boot_phase`
+is derived from the session, so it is right even for a game that never touched
+a boot door. It reports a LEVEL, so a swap that must happen exactly once needs
+the rising EDGE: read the phase before `boot_pump` (the only place it rises)
+and compare after, as `process` does above. Nothing is stored.
 
-(One omission, flagged: the living `hello.odin` also carries the optional
-**join-code doors** — with a relay configured, `on_host` mints a shareable
-code via `boot_host_coded` and `on_join` takes a typed one via
-`boot_join_code`. This page shows the address-only forms; the join-codes
-bullet at the bottom points at the stance.)
+The full `hello.odin` also carries the optional **join-code doors**: with a
+relay configured, `on_host` mints a shareable code via `boot_host_coded` and
+`on_join` takes a typed one via `boot_join_code`. This page shows the
+address-only forms; see the join-codes bullet below.
 
 ## The scenes
 
@@ -220,7 +218,7 @@ square, and the other window's copy glides after it. That glide is the
 owner-stream + interpolation you declared with `gd:"owner,interp"`
 — you wrote none of it.
 
-Then make the wire honest: `HELLO_LATENCY=120 $GODOT --path
+Then test under real latency: `HELLO_LATENCY=120 $GODOT --path
 examples/hello_net` injects 120ms each way (every kit game gets the
 `<ENV>_LATENCY/_JITTER/_LOSS` shim from `Options.env`). The remote square
 lags visibly; yours never does. `examples/hello_net/run.sh` runs this exact
@@ -228,23 +226,23 @@ scenario as its first act — two processes, generated probes, one verdict —
 then a second act joins by code through the relay; the
 [testing guide](testing.md) is how you grow your own.
 
-## Where each thing you'll want next lives
+## Where to go next
 
 - A **verb** (an action the host must validate — loot, doors, purchases):
   `@(gd_command)` + a `_then` half — [net.md](net.md), or cavecrawl's
   41-line `chest.odin`.
 - A **reaction to state changing** (score flash, death jingle):
-  a `<class>_<field>_edge` half — [net.md](net.md#edges).
+  a `<class>_<field>_edge` half — [net.md](net.md#edges-class_field_edge--presenting-delta-lane-changes).
 - **Physics bodies** (a real RigidBody2D all peers see): `play.Puppet` —
   slopball is the worked example.
 - **Save/resume, reconnect, host migration, Steam**: already on — see
   [session.md](session.md) for what the stock stack gave you.
 - **Join codes** ("send your friend `KWXP`" instead of an IP): swap
   `boot_host` for `boot_host_coded` and join with `boot_join_code` — the
-  living `hello.odin` carries the optional relay branch;
-  [netgd.md](netgd.md#join-codes-for-native-enet-codeodin) has the stance.
+  full `hello.odin` carries the optional relay branch;
+  [netgd.md](netgd.md#join-codes-for-native-enet-codeodin) covers the options.
 - **Competitive play** (server authority, prediction, lag comp): the sim
   lane — [quickstart-sim.md](quickstart-sim.md) promotes THIS game, then
   [sim.md](sim.md).
-- The terms this page leaned on — halves, census, doors, acid — are one
-  paragraph each in the [glossary](glossary.md).
+- **Glossary**: halves, census, doors, and integration tests each get a
+  paragraph in the [glossary](glossary.md).

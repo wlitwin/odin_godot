@@ -24,9 +24,8 @@ on the embedding entity — `mob_health_hp_edge` for the hit/death/revive
 cues, `runner_weapon_mode_edge` for the gun's jam/reload pops,
 `mob_tele_left_edge` (+ `play.telegraph_landed`, which holds the cancel
 contract) for the eruption. First sight and resyncs seed silently, so the
-birth guards and re-baseline rituals the blocks used to carry are gone with
-their shadows. (A replicated FSM is now just a plain enum field plus its
-edge half — the old `play.Machine` dissolved into that.)
+blocks carry no birth guards or re-baseline rituals. (A replicated FSM is a
+plain enum field plus its edge half.)
 
 Presentation-side (never on the wire): `play.Edge(T)` (fire once on a
 change of DERIVED or local state — a boolean computed from a replicated
@@ -36,14 +35,14 @@ world markers — rings, bars, beacons), `play.Pace` (the re-armed deadline
 every host tick loop re-spells), and `play.Trail` (the authority's
 where-was-it-a-moment-ago ledger — lag-compensated hitscan reads it).
 
-PREDICTED blocks live on the sibling shelf, `godot:play/sim` (blessed alias
+PREDICTED blocks live on the sibling shelf, `godot:play/sim` (alias
 `psim`): `psim.Cool` (Pace's twin — the same due/arm/ready verbs, counting
 itself down inside the sim), `psim.Mover` (momentum movement), and
 `psim.Roller` (the contested rolling body). Same embedding, the other
 timeline — their `predict` fields resim, and their block ticks
 hoist onto the entity's. scriptgen polices the split both ways, so the
 shelf an import names IS the lane the state lives on; the block list and
-the contract live in [sim](sim.md#the-predicted-shelf--godotplaysim).
+the contract live in [sim](sim.md#predicted-blocks--godotplaysim).
 
 A block's cross-entity effects stay YOURS, as the composed verb's
 [`_then` consequence](net.md#consequences-verb_then):
@@ -87,7 +86,7 @@ The feel ledger, all inside the block:
 
 - **Render-error smoothing** — authority snaps (a seat seed, a handoff
   re-anchor) move the BODY instantly, but the drawn `skin` child holds its
-  ground and glides in over ~100ms. Deliberate CUTS (kickoff teleports) past
+  ground and glides in over ~100ms. CUTS (kickoff teleports) past
   `PUPPET_CUT` still snap outright — smoothing a teleport looks worse.
 - **Predicted possession** (`puppet_claim`) — seize the simulation ON SPEC
   the frame YOUR screen sees the touch, without waiting for the grant round

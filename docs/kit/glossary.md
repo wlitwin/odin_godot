@@ -40,14 +40,13 @@ the generated bare-name door ([sim.md](sim.md)).
 instead of hand-mirrored: generated `<entity>_of(id)` / `my_<entity>()` /
 `<entity>_owned_by(player)` / `<entity>_ids()` per `entity=` tag. The
 `_spawned`/`_freed` **census hooks** fire at bookkeeping time — *before*
-spawn fields apply — which is why presentation belongs elsewhere (see
-*dress*).
+spawn fields apply — so presentation belongs elsewhere (see *dress*).
 
 **dress** — presentation applied to an entity when it first appears on a
 screen: tint by team, position the node, build the nameplate. Dress belongs
 on the `Ev_Spawned` event (fields are set there), never in the census hook
-(fields are not), and edge halves deliberately *don't* fire for first sight
-— a late joiner's 3–2 scoreboard is a baseline to dress, not three goals to
+(fields are not), and edge halves *don't* fire for first sight —
+a late joiner's 3–2 scoreboard is a baseline to dress, not three goals to
 celebrate.
 
 **mine / watched** — whose simulation a thing rides on this screen. *Mine*:
@@ -59,8 +58,7 @@ two clocks.
 
 **edge** — a change in replicated state, observed as a transition. The
 `<class>_<field>_edge(game, self, old, new)` half fires once per *net*
-change on every peer — the machinery that replaced hand-rolled `seen_*`
-mirrors and per-frame compares.
+change on every peer.
 
 **door** — a proc that starts or joins a session: `boot_host`, `boot_join`,
 `boot_serve`, and the game's `on_host`/`on_join` methods the stock lobby's
@@ -85,8 +83,8 @@ split: a block *holds* replicated state and generates hooks; a mechanism is
 what it calls — [combat.md](combat.md#health-and-abilities) holds the
 two-layer rule.
 
-**acid** — an acceptance test that runs the *real* game, multi-process,
+**acceptance test** — a test that runs the *real* game, multi-process,
 headless, under an injected bad link, and asserts over printed receipts
-([testing.md](testing.md)). Named for burning through pleasant illusions:
-if the acid is green at 240ms RTT, the feature works where your players
+([testing.md](testing.md)). The codebase's shorthand for one is an *acid
+test*. If it is green at 240ms RTT, the feature works where your players
 actually live.

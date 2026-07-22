@@ -19,7 +19,7 @@ all platforms. For the export pipeline internals see [exporting.md](exporting.md
 > identical across platforms, so there is high confidence, but a Linux/Windows Godot has
 > not loaded these binaries on this macOS host. See **Runtime-confirming** below.
 
-## The two-dll model (why packaging looks the way it does)
+## The two-dll model
 
 odin_godot is a **stable CORE dll** (`libodin_godot.<ext>`, a pure-C-ABI
 `ScriptLanguageExtension`, entry `odin_godot_init`) that at runtime loads a **SCRIPTS dll**
@@ -127,12 +127,12 @@ scr   .dll: PE32+ executable (DLL) x86-64, for MS Windows, 11 sections
    whenever you change a script (the editor's reload-on-save does it automatically in-repo).
 
 You need an `odin` compiler on `PATH` to compile scripts — that is the one host tool a
-consumer project needs. (A future enhancement could ship a prebuilt scripts-build helper.)
+consumer project needs.
 
 This **split layout** — core dll inside `addons/odin_godot/bin/<platform>/`, scripts dll at
 `res://bin/` — is exactly what the suite's `splitaddon` test pins (macOS, where dlopen
 semantics are strictest: the scripts dll is self-contained, so the core's location doesn't
-matter). If a scripts-dll load ever does fail, the core now prints the OS loader's own
+matter). If a scripts-dll load fails, the core prints the OS loader's own
 reason (`odin: loader error: …`) next to the path.
 
 > **Known engine quirk (Godot 4.6, still on master):** a headless `godot --import` of a
@@ -155,7 +155,7 @@ shell provides; otherwise prebuild with `build/build_cross.sh` and bundle manual
 - **Linux / Windows**: the scripts dll cross-compiles (verified); run the export from a host
   with the cross toolchain, or prebuild the scripts dll with `build_cross.sh`.
 
-## Runtime-confirming Linux / Windows (the honest gap)
+## Runtime-confirming Linux / Windows
 
 The binaries are build-verified here but **not run** on Linux/Windows. To close the gap on a
 real host or in CI:
@@ -179,17 +179,13 @@ Because the gdext C-ABI boundary and the loader logic (`dladdr`/sibling-dll look
 macOS + web runtimes are verified, the residual risk is platform-specific link/loader detail,
 not the extension design.
 
-## Troubleshooting: `failed to load scripts dll` / `No loader found` on first open
+## Troubleshooting: `failed to load scripts dll` / `No loader found`
 
-If a freshly-built project failed to load its scripts on the **first** run (often only when
-the editor was launched from a shell with `odin` on `PATH`), the cause was the scripts dll
-being **deleted** during the cold open: opening/importing the project triggers the editor's
-reload-on-save coordinator, which rebuilds the scripts dll — and the old `build_scripts.sh`
-deleted the dll *before* rebuilding, so an interrupted/failed rebuild (the headless import
-exits, or the build errors) left `res://bin` with no scripts dll. **Fixed**:
-`build/build_scripts.sh` (and `.ps1`) now build to a temp file and `mv` it into place
-**atomically**, so an interrupted or failed (re)build never removes the previously-built dll.
-Just rebuild your scripts dll once with the bundled `build_scripts.sh` and reopen.
+Opening or importing a project triggers the editor's reload-on-save coordinator, which
+rebuilds the scripts dll. `build/build_scripts.sh` (and `.ps1`) build to a temp file and `mv`
+it into place **atomically**, so an interrupted or failed (re)build never removes the
+previously-built dll. If scripts fail to load, rebuild the dll once with the bundled
+`build_scripts.sh` and reopen.
 
 ## Verify (in-repo)
 

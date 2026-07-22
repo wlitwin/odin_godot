@@ -9,7 +9,7 @@ use → ship.**
   add it to a Godot project, and write + attach your first `.odin` script (a Node that moves
   on `_process`). A real, copy-pasteable hello-world — and for multiplayer, the
   [quickstart](kit/quickstart.md) is the next stop.
-- **[The onboarding series](onboarding/index.md)** — six posts for Godot developers coming
+- **[The onboarding series](onboarding/index.md)** — seven posts for Godot developers coming
   from GDScript/C#: why compiled scripts, the struct mental model, and the multiplayer
   shift (state-not-messages, verbs-not-RPCs, the two timelines). It's the *why* behind
   everything below — read it alongside your first build, or whenever the toolkit's way of
@@ -78,12 +78,12 @@ use → ship.**
 
 - `examples/cavecrawl` — THE **co-op reference** (see [kit/](kit/index.md)): every
   friendslop-toolkit package in one game, grown brick-by-brick with a latency-injected
-  multi-process acid test (`run.sh`) that doubles as the pattern to steal.
+  multi-process integration test (`run.sh`) that doubles as the pattern to steal.
 - `examples/slopball` / `examples/slopball3d` — the **smallest complete kit games**: a
   physics co-op pitch (engine physics via `play.Puppet`), in 2D and 3D.
 - `examples/quickdraw` — the **server-authority reference** (kit/sim): a western duel
   whose premise is lag compensation — hitscan judged where the shooter's screen aimed,
-  proven by an A/B acid at 240 ms RTT.
+  proven by an A/B acceptance test at 240 ms RTT.
 - `examples/speedball` — **the contested object** (kit/sim): slopball's soccer premise
   on the other netcode — every peer predicts the ball, touches resolve locally. Read
   the two side by side to pick a model.

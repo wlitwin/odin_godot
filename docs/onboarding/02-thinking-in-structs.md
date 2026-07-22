@@ -1,20 +1,17 @@
 # 2 · Thinking in structs
 
-The hard part of switching isn't Odin's syntax — you absorbed that from post
-1's forty lines. The hard part is that a decade of Godot reflexes assume a
-class: inherit a node, override its methods, `self` is everything. Odin
-scripts have no classes. This post remaps each reflex, one at a time, so the
-absence stops feeling like a missing limb.
+Godot scripting assumes a class: you inherit a node, override its methods, and
+`self` is everything. Odin scripts have no classes. A script is three separate
+things instead, and this page maps each GDScript reflex to its Odin form.
 
 The shape to internalize first:
 
 > **A script is a struct (your state) plus free procs (your behavior), riding
 > on an engine node (`self.owner`).**
 
-Three separate things. GDScript fuses them into one `self`; keeping them apart
-is what later makes the state diffable, shippable, and predictable — the
-entire multiplayer story of posts 3–6 rests on your state being *just a
-struct*.
+GDScript fuses those three into one `self`. Keeping them apart means your state
+is just a struct — diffable, shippable, and predictable — which is the property
+the multiplayer toolkit in posts 3–6 relies on.
 
 ## The reflex map
 
@@ -43,33 +40,32 @@ animation track, or GDScript).
 
 ## `self` is not the node
 
-The one trap everyone hits, so it gets its own section. In GDScript, `self`
-*is* the node. In Odin, `self` is your struct, and the node is `self.owner`:
+In GDScript, `self` *is* the node. In Odin, `self` is your struct, and the
+node is `self.owner`:
 
 ```odin
 gd.add_child(self.owner, node)     // ✓ the engine node
 gd.add_child(self, node)           // ✗ hands the engine your struct — segfault
 ```
 
-Both compile (engine handles are raw pointers), which is why the build now
-refuses the second form outright:
+Both compile — engine handles are raw pointers — so the build refuses the
+second form outright:
 
 ```
 scriptgen: error: scripts/powerup.odin:31: gd.add_child: `self` is the
 ^Powerup script struct, not an engine object — pass self.owner
 ```
 
-When an engine API wants an object — `add_child`, `connect_to`,
-`queue_free`, a Callable target — it wants `self.owner`. When *your* code
-wants your state, it wants `self`. The separation you're being forced to
-maintain here is the same one that pays off in post 3.
+When an engine API wants an object — `add_child`, `connect_to`, `queue_free`,
+a Callable target — pass `self.owner`. When your own code wants your state,
+pass `self`.
 
-## Where inheritance went
+## Replacing inheritance
 
-You didn't lose extending *engine* classes — `//gd:extends
-CharacterBody2D` gives you everything the node is. What's gone is
-script-extends-script: no `class_name Enemy extends Actor` with overridden
-methods. The replacements, in the order you'll actually reach for them:
+You keep extending *engine* classes — `//gd:extends CharacterBody2D` gives you
+everything the node is. What Odin has no equivalent for is
+script-extends-script: there is no `class_name Enemy extends Actor` with
+overridden methods. The replacements, in the order you'll reach for them:
 
 **Shared data → a shared struct field.** The GDScript base class holding
 `hp`, `speed`, `faction` becomes a plain struct embedded in each script:
@@ -98,12 +94,11 @@ Because all scripts compile into one package, `Player` in one file is the
 same type in every file — cross-script calls are direct, typed calls, not
 `get("hp")` string lookups.
 
-If you're coming from C#, this is composition-over-inheritance with the
-decision made for you. Most gameplay hierarchies are one level deep and exist
-to share three fields; a struct member does that without the fragile-base
-problems.
+If you're coming from C#, this is composition over inheritance. Most gameplay
+hierarchies are one level deep and exist to share three fields; a struct
+member does that without the fragile-base problems.
 
-## Where autoloads went
+## Replacing autoloads
 
 An autoload is two things in one: a *node* that's always in the tree, and a
 *global* everyone can reach. Odin splits them:
@@ -117,10 +112,10 @@ An autoload is two things in one: a *node* that's always in the tree, and a
   extension ships a pure-Odin event system ([Events](../events.md)) at
   direct-call cost.
 
-## What the compiler now does for you
+## What the compiler checks
 
-The reflex map above is mechanical, and after a week you won't consult it.
-What you'll notice instead:
+The reflex map is mechanical, and after a week you won't consult it. What the
+compiler gives you instead:
 
 - A typo'd field is a compile error, not a runtime `Nil` five playtests later.
 - A signal payload is typed — emit with an `int` where a `Node2d` is declared
@@ -131,9 +126,7 @@ What you'll notice instead:
   scriptgen validates tags at build time and errors in the same
   `path:line:` format your editor already jumps to.
 
-GDScript optimizes for the first hour of a script's life. This setup
-optimizes for the next hundred. That trade gets extreme in the next post,
-where a field tag makes state *network-synchronized* — and the compiler-checked
-struct layout is the only reason it can.
+In the next post, a field tag makes state *network-synchronized* — the
+compiler-checked struct layout is what makes that possible.
 
 *Next: [State, not messages →](03-state-not-messages.md)*

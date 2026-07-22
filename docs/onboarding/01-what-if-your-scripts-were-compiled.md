@@ -95,12 +95,11 @@ a decision you make, not one the runtime makes for you. Gameplay state — a
 thousand things with positions and hit points and timers — is exactly the
 workload it's shaped for.
 
-**The layout is the payoff.** Here's the tier that actually justifies the
-series: because a script's state is a struct with a known memory layout, the
-extension can do things to your state that a dynamic language can't promise.
-Diff it. Snapshot it. Ship it over a network and reconstruct it bit-for-bit on
-another machine. Tag a field `gd:"replicate"` and it is synchronized to every
-player, automatically, every tick:
+**The layout is the payoff.** Because a script's state is a struct with a
+known memory layout, the extension can do things to your state that a dynamic
+language can't promise. Diff it. Snapshot it. Ship it over a network and
+reconstruct it bit-for-bit on another machine. Tag a field `gd:"replicate"`
+and it is synchronized to every player, automatically, every tick:
 
 ```odin
 Chest :: struct {
@@ -114,8 +113,7 @@ Chest :: struct {
 That's not a serialization library you call. It's a property of the field. The
 multiplayer framework built on it (posts 3–6) gives you client prediction,
 drop-in joins, reconnects, saves, and host migration as consequences of your
-structs being structs. This is the part that has no GDScript or C# equivalent,
-and it's why the series exists.
+structs being structs. This is the part that has no GDScript or C# equivalent.
 
 ## The honest costs
 
@@ -126,8 +124,8 @@ and it's why the series exists.
   native backtraces naming your Odin proc ([Debugging](../debugging.md)).
 - **A new language.** Odin is genuinely small — if you've written any C-family
   code the snippets above already read fine — but it is a new language, and
-  its compiler will say no to things GDScript happily lets slide. That is
-  mostly the point.
+  its compiler will say no to things GDScript happily lets slide — catching at
+  build time what GDScript would surface as a runtime crash.
 - **A toolchain.** Everything is pinned in a Nix flake; setup is
   [one page](../getting-started.md).
 

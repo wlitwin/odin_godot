@@ -3,27 +3,31 @@
 Reusable multiplayer game systems under `godot:kit/*`, for one shape of game:
 **you and your friends, one of you hosts, things go wrong together.** 2–8
 players, host-authoritative, drop-in join, reconnect, save/resume, ENet or
-Steam. Built and proven by `examples/cavecrawl`, which grows with every
-package and doubles as the reference implementation.
+Steam. `examples/cavecrawl` is the reference implementation — it grows with
+every package and doubles as the proof that they compose.
 
-**Want to feel it in five minutes?** Run `examples/slopball` in two windows
-(`bash build/build_scripts.sh examples/slopball`, then `$GODOT --path
-examples/slopball` twice — Host in one, Join in the other). **Then build
-your own:** the **[quickstart](quickstart.md)** goes zero-to-two-windows in
-two small files (`examples/hello_net` is its living copy), and the
-**[sim quickstart](quickstart-sim.md)** promotes that game to server
-authority for competitive shapes. From there the
-[tutorial](build-a-game-in-a-day.md) tours the whole surface in cavecrawl,
-linking each page below at the moment you need it — and the
-[glossary](glossary.md) is one paragraph per term of art (halves, census,
-dress, acid...).
+## New here? Start in this order
+
+1. **Feel it in five minutes.** Run `examples/slopball` in two windows:
+   `bash build/build_scripts.sh examples/slopball`, then `$GODOT --path
+   examples/slopball` twice — Host in one, Join in the other.
+2. **Build your own.** The **[quickstart](quickstart.md)** goes
+   zero-to-two-windows in two small files (`examples/hello_net` is its living
+   copy).
+3. **Going competitive?** The **[sim quickstart](quickstart-sim.md)** promotes
+   that same game to server authority for competitive shapes.
+4. **Learn the whole surface.** The **[tutorial](build-a-game-in-a-day.md)**
+   tours every package in cavecrawl, linking each page below at the moment you
+   need it.
+5. **Look up a term.** The **[glossary](glossary.md)** is one paragraph per term
+   of art (halves, census, dress...).
 
 Platform note: macOS is verified end-to-end by the suite; Windows ships
 prebuilt cores with limited runtime verification so far, Linux is
 build-verified only ([status](../../README.md#platform-status)) — co-op
 means your friends' machines, so check before you promise a LAN party.
 
-## The promises
+## Guarantees
 
 - **Zero role branches in gameplay code.** Mutation procs look single-player;
   the host runs them authoritatively, clients predict them, rejections carry
@@ -45,7 +49,7 @@ means your friends' machines, so check before you promise a LAN party.
 | [session](session.md) | `kit/session` | Identity, roster, events, spawn/despawn via factory, stats, moderation, backup hosting |
 | [netgd](netgd.md) | `kit/netgd` | The Godot transport binding: Session_Wire, channels, the latency shim, kick-socket handling |
 | [sim](sim.md) | `kit/sim` | The server-authority resim companion: inputs-only up, tick snapshots down, rollback reconcile, lag compensation — for the contested games the coop model isn't |
-| [timelines](timelines.md) | — | Choosing a timeline model: coop, predict-self, contested object, predict-world, lockstep — what each never-shows-you costs, and the eight laws the showcases learned |
+| [timelines](timelines.md) | — | Choosing a timeline model: coop, predict-self, contested object, predict-world, lockstep — what each never-shows-you costs, and the eight laws the showcases encode |
 | [steamgd](steamgd.md) | `kit/steamgd` | Steam lobbies + invite overlay over GodotSteam, by name — same wire, different door |
 | [comms](comms.md) | `kit/comms` | Chat, system lines, positional pings, drop-in catchup |
 | [xfer](xfer.md) | `kit/xfer` | Chunked large payloads (sprays, skins, level files) — host-relayed, paced, web-safe; the ALBUM keeps the latest per (player, kind) and catches late joiners up |
@@ -57,141 +61,26 @@ means your friends' machines, so check before you promise a LAN party.
 | [save](save.md) | `kit/save` | The versioned save envelope, one-call resume, persistent identity |
 | [ui](ui.md) | `kit/ui` | Stock-theme lobby, chat, scoreboard, HUD widgets |
 | [fx](fx.md) | `kit/fx` | Bursts, flashes, and the projectile tracer pool |
-| [testing](testing.md) | — | Acid-test your game: the shipped harness template and the conventions it encodes |
-
-## The house grammar
-
-Three conventions run through every package. They were real but folkloric —
-written nowhere, learned by reading. Stated here as rules, they are why a new
-package feels familiar before you have read its page.
-
-**Events out; callbacks only for answers.** Seven delivery mechanisms exist,
-and the choice among them is mechanical, not taste:
-
-- A module with *many* event shapes drains a named `Event` union — `session_poll`,
-  `comms_poll`, `xfer_poll` loop until `ok = false`.
-- A module with *one* event shape polls a **bare tuple** — `album_poll` (which
-  `(player, kind)` landed), `fire_poll` (the next projectile to spawn). No union
-  for a queue of one thing.
-- A *value you read* rather than a queue you drain is a **state poll** —
-  `code_poll` (the rendezvous phase), `boot_phase` (where the game is).
-- A **synchronous callback** exists ONLY where the kit needs an answer
-  mid-operation and cannot proceed without it: the factory's `make`/`free` (the
-  registry needs the pointer before a snapshot can apply), the interest
-  `Locator_Proc` (the session can't read your positions), sim's
-  `Sample_Proc`/`Step_Proc`, `Later_Proc`, the command hooks, fx's `On_Hit_Proc`.
-- The **`_then` suffix** is the authority-only half of a generated event pair —
-  the consequence, gated by the generated dispatch so the half never checks a role.
-- **`boot_pump`** forwards slices of the session and comms queues in one call —
-  the composed convenience over the two polls.
-- Engine-side wiring rides Godot signals through **`@(gd_connect)`**.
-
-The rule the seven collapse to: poll unions for multi-event, tuple-poll for
-single-event, synchronous callbacks only for the answer the kit cannot proceed
-without, and **everything else is an event.** Handlers file bytes; game code runs
-on the game's own stack in the pump — never in a callback into half-initialized
-script state, which is the whole reason `session_poll` exists instead of a
-delegate.
-
-One refinement the list above compresses, spelled out in
-[session.md's three tiers](session.md#three-tiers-of-entry-into-your-code) because
-kit/session has the most entry points of any package: the synchronous half is
-really *two* kinds. A **pull callback** is the kit asking a question it cannot
-answer — the factory's `make`, the interest locator, the backup blob writer, sim's
-`Sample_Proc`/`Step_Proc`; you answer and return. An **atomic authority hook** runs
-inside an operation whose state does not survive it — the command hooks and
-`_then`, an app handler holding a live `^knet.Reader` into the receive buffer; you
-act, on the authority, and you do not re-enter. Everything remaining is tier three,
-and the derivation is mechanical: *if the same meaning survives being queued and
-drained next frame, it must be queued.* That is why `ksess.App_Queue` exists as a
-type — the file-and-drain discipline every `SES_APP` rider follows was a convention
-each package re-earned, until it wasn't.
-
-**Four verbs name a lifetime.** A type's constructor tells you who owns its
-memory, so nobody has to guess whether to free it:
-
-- `_make` returns the value — the caller owns it (`chat_make`, `registry_make`,
-  `writer_make`).
-- `_init` initializes memory the caller already holds, in place (`session_init`,
-  `comms_init`, `lane_init`).
-- `_attach` binds to a Godot node whose lifetime the *scene* owns (`wire_attach`,
-  `boot_attach`).
-- **A zero value is ready to use** — every `*_Config` means the defaults at zero,
-  so a zero config is the out-of-the-box session.
-
-Teardown is as precise, and matched to the constructor: `_destroy` frees exactly
-what the module allocated and **never a scene node** (the node tree belongs to the
-scene); `_clear` / `_reset` empty a container without freeing it
-(`chat_clear_input`, `tracers_clear`, `writer_reset`, `later_clear`); `_close`
-ends a connection (`code_close`, `web_close`). Match the teardown verb to the
-constructor and both leaks and double-frees become errors of habit rather than
-runtime surprises.
-
-**A type's whole API is one grep.** The proc prefix IS the type's snake-cased
-name — `registry_*` for `Registry`, `lane_*` for `Lane`, `chat_*` for `Chat` —
-with no exceptions, so `grep registry_` is the complete surface of `Registry` and
-nothing hides under a cleverer name. It is enforced retroactively, and the TYPE
-is usually what moves: kit/ui's last two holdouts, `Health_Bar` and `Ability_Bar`
-wearing `hp_*` and `abilities_*` procs, became `Hp_Bar` and `Abilities_Bar`
-rather than stretching every call site into `health_bar_refresh` — the call site
-is what the rule is for, and a widget named for the noun games already say (`hp`,
-beside `Inv` and `Score`) is the one that reads.
+| [testing](testing.md) | — | Integration-test your game: the shipped harness template and the conventions it encodes |
 
 ## Beyond the basics
 
-The former "post-v1" staples are in, demonstrated by cavecrawl's acid acts:
-**ownership transfer** (`session_set_owner` — carry/mounts/possession; the
+These capabilities are in the kit, demonstrated by cavecrawl's integration-test
+acts: **ownership transfer** (`session_set_owner` — carry/mounts/possession; the
 relic), **downed/revive** (`spelunker_revive` — one predicted command, no
 hook), **host takeover** (`session_backup_parts` + `session_host_resume`
-— the murdered host's run resumes under the backup holder, friends rejoin
+— when the host drops, its run resumes under the backup holder, friends rejoin
 and reclaim themselves), **shared-seed procgen** (replicate the dice, grow
 the world locally — the cavecrawl scatter), **wire codecs** (`wire=f16` /
 custom fixed-size encodings — [net](net.md)), and **entity blobs**
 (`session_set_blob` — variable-length state that rides joins, backups, and
 saves; [session](session.md)).
 
-**Voice, the stance:** not in the toolkit, deliberately. Friendslop groups
-already sit in a Discord call — building voice would spend the complexity
-budget on a solved problem. If you ship on Steam, GodotSteam exposes Steam
-voice as a near-free add-on ([steamgd](steamgd.md) gives you the singleton
-access pattern). The one thing that would change this calculus is PROXIMITY
-voice — the horror-co-op signature mechanic — which needs positional mixing
-the toolkit's replicated positions make easy to drive; revisit when a game
-needs it.
+## Design notes
 
-Still deliberately out (documented as recipes in [session](session.md), not
-code): character-portable saves, private per-player state, and player-to-
-player trade (the mediating-entity transaction). See the design notes in the
-repository's knowledge base.
+Not on the learning path — for contributors and the curious:
 
-**Mobile, the stance:** nothing here is mobile-hostile — Godot exports to
-iOS/Android, the wire is bytes, ENet and WebRTC both run — but two mobile
-realities are unaddressed by design. A phone's link flaps (cell↔wifi handoff,
-backgrounding) far more than the "friends rejoin an evening session" model
-assumes, and touch input has no home in the examples' keyboard/mouse verbs. The
-reconnect machinery (tokens, host takeover) is exactly what a flappy link wants
-and carries over unchanged; the gap is a touch-control layer and a UI that
-reflows to a phone, both game-side. Revisit as a worked example when a game
-ships mobile, not as kit surface.
-
-**Async correspondence (turn-a-day, play-by-mail), the stance:** out of scope,
-and honestly a different toolkit. Everything here assumes a LIVE session — a
-shared clock, interpolation timelines, presence, a host holding authority in
-RAM. An async game (chess-by-notification, a 4X you touch once a day) has no
-live clock and no host: its "wire" is a database row and a push notification,
-its "reconnect" is a fresh load of persisted state. The state-not-messages
-discipline still shapes a turn, but the transport, authority, and persistence
-models are wholly different — build it on a backend plus Godot's HTTP client;
-the netcode kit has nothing to lend it but its taste in serialization.
-
-**Database persistence (accounts, ranked ladders, a world that outlives the
-session), the stance:** deliberately not in the kit, and the seam is clean. The
-kit persists a RUN — [ksave](save.md) writes POD blobs to a local file, backups
-ride the wire, host-takeover resumes from them — but it does not persist a
-PLAYER across runs against a server store. That is a backend concern
-(Postgres/SQLite behind an auth'd API), and the kit stays agnostic: a game reads
-a profile from its backend at boot and hands the bytes to the session as
-ordinary replicated/blob state, then writes results back after the run through
-its own client. The dividing line is authority LIFETIME — the kit owns state for
-the length of a session; anything that must outlive every participant leaving
-lives in your database, not here.
+- **[kit design notes and conventions](conventions.md)** — the house grammar
+  every package shares (events vs. callbacks, the four lifecycle verbs, the
+  one-grep API rule), and what the kit leaves out and where to reach instead
+  (voice, mobile, async correspondence, database persistence).
