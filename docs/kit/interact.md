@@ -2,7 +2,7 @@
 
 Reach for `kit/interact` when a player should get a *use* prompt near chests, doors, and
 pickups, and the host must validate that use from the same geometry. It is three procs and
-one struct — no engine types, no dispatch.
+one struct, with no engine types and no dispatch.
 
 The three procs are pure geometry, legal anywhere, including inside a sim tick. The
 prompt-then-validate pattern around them is written for coop verbs; a sim game runs the same
@@ -12,22 +12,22 @@ geometry inside its own verbs and the authority pass.
 
 Interaction is two questions:
 
-- **Discovery** (client, every frame): which nearby interactable should the prompt point
-  at? → `pick` over candidates the game collects from its registry walk.
-- **Gating** (host, inside the command): is this player actually allowed to use that entity
-  from where they stand? → the command proc calls `in_range`/`facing_ok` with the *same*
-  numbers.
+- **Discovery** (client, every frame) asks which nearby interactable the prompt should
+  point at. `pick` answers this over candidates the game collects from its registry walk.
+- **Gating** (host, inside the command) asks whether this player is actually allowed to use
+  that entity from where they stand. The command proc answers by calling
+  `in_range`/`facing_ok` with the *same* numbers.
 
-Same procs, same constants, zero role branches — the prompt the client shows and the
-validation the host runs cannot disagree about geometry. When the two positions differ in
-time, the host's positions are the truth.
+Because the client and host use the same procs, the same constants, and zero role branches,
+the prompt the client shows and the validation the host runs cannot disagree about geometry.
+When the two positions differ in time, the host's positions are the truth.
 
 The *use* itself is just a command on the target entity (open the door, loot slot 2);
 kit/interact never dispatches anything. See [items.md](items.md) for what a loot command
 does once the gate passes.
 
 Positions are dimension-agnostic `[3]f32` everywhere: 2D games leave `z` at zero, 3D games
-fill it. No engine type in sight.
+fill it. No engine type appears anywhere in the API.
 
 ## API
 
@@ -76,8 +76,9 @@ best, ok := kinter.pick(cands[:], {me.x, me.y, 0}, REACH)
 `ok` drives the [kit/ui](ui.md) prompt text ("E — loot chest", "E — open door"); `best.id`
 is remembered as the interact target.
 
-Gating runs inside the predicted command (`door.odin`) — the same math and the same
-constant, run identically as the client's prediction and the host's authoritative re-run:
+Gating runs inside the predicted command (`door.odin`), using the same math and the same
+constant, and it runs identically in the client's prediction and the host's authoritative
+re-run:
 
 ```odin
 @(gd_command = "predict")
@@ -89,9 +90,9 @@ door_toggle :: proc(self: ^Door, px: f32, py: f32) -> bool {
 ```
 
 The command carries the issuer's claimed position `(px, py)` as args; `chest_take` and
-`pickup_grab` gate identically. The host reuses the gate for non-interaction logic too —
-"is the whole party at the open door?" in `host.odin` is the same `kinter.in_range` call
-with the same `REACH`.
+`pickup_grab` gate identically. The host reuses the gate for non-interaction logic too: the
+"is the whole party at the open door?" check in `host.odin` is the same `kinter.in_range`
+call with the same `REACH`.
 
 ## Gotchas
 
@@ -105,5 +106,5 @@ with the same `REACH`.
   cone". Standing exactly on the target always passes the facing check.
 - `pick` returns the *nearest* passing candidate; per-target `radius` widens the touch,
   not the tiebreak (distance is measured center-to-center).
-- Candidate collection is the game's job — walk your own entity maps into a
+- Candidate collection is the game's job: walk your own entity maps into a
   `temp_allocator` array each frame, as `update_prompt` does.

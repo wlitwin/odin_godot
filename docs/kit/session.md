@@ -1,22 +1,22 @@
 # kit/session — identity, roster, and the driven world
 
 `kit/session` is player identity and the shared roster: who is in this run, under which
-stable `Player_Id`, connected or not — plus the machinery that drives [kit/net](net.md)'s
+stable `Player_Id`, connected or not. It also contains the machinery that drives [kit/net](net.md)'s
 replication walks for you (spawns, deltas, streams, commands, pings, stats, backup
 snapshots). This is the package games talk to: a game wires a transport, a factory, and a
-command hook, then spawns entities and drains events. Like kit/net it is engine-free — the
+command hook, then spawns entities and drains events. Like kit/net it is engine-free: the
 game script owns the sockets and framing, usually via [kit/netgd](netgd.md)'s `Session_Wire`.
 
 ## The mental model
 
 **A player is a reconnect token.** The client generates a random `u64` secret once and
 persists it (`kit/save`'s `persistent_token` does the disk part). The host maps
-token → `Player_Id` forever: reconnecting with the same token — from a new transport peer,
-after a crash, mid-game — reclaims the same id, and with it name, stats, and owned
+token → `Player_Id` forever: reconnecting with the same token (from a new transport peer,
+after a crash, or mid-game) reclaims the same id, and with it name, stats, and owned
 entities. A reclaim only takes a seat that is no longer CONNECTED. A known token arriving
 while its seat is still live is a second instance sharing the identity file (a couch
-playtest, extra browser tabs — same-origin storage hands every tab the same token), and it
-is seated as a NEW player; the transport reaps genuinely dead sockets within seconds, after
+playtest, extra browser tabs; same-origin storage hands every tab the same token), and it
+is seated as a NEW player. The transport reaps genuinely dead sockets within seconds, after
 which the reclaim proceeds. `Peer_Id` (a transport seat, reassigned on reconnect,
 meaningless across runs) and `knet.Player_Id` (an identity) are distinct types, so the two
 cannot silently cross at API boundaries. Departed players stay in the roster as disconnected
@@ -24,23 +24,23 @@ so their seats remain reclaimable. Tokens are stored hashed, so a backup snapsho
 the identity table to a new host without handing anyone the secrets.
 
 **Events, not callbacks.** Everything the game *reacts* to comes out of one queue, drained
-per frame with `session_poll` — no callbacks into half-initialized script state. The
+per frame with `session_poll`. There are no callbacks into half-initialized script state. The
 session enters your code synchronously in two other shapes: when it needs an **answer** it
 cannot compute (the factory's `make`, the interest locator, the backup blob writer), and
 when your code must run **inside** an operation whose state does not survive it (the command
 hooks, an app handler's live packet bytes). Which of the three a given entry point is
-follows a fixed rule — see [three tiers of entry](#three-tiers-of-entry-into-your-code). The
-guarantee behind all three: nothing runs game code on the transport's stack that could have
+follows a fixed rule; see [three tiers of entry](#three-tiers-of-entry-into-your-code). The
+guarantee behind all three is that nothing runs game code on the transport's stack that could have
 run on the game's frame instead.
 
 **Three hookups**, and the session is transport-agnostic:
 
-- **send** — the session hands complete message bytes + a target peer to the game, which
+- **send**: the session hands complete message bytes + a target peer to the game, which
   prefixes *its* session kind byte and ships them (`session_set_transport`).
-- **handle_packet** — the game routes its session kind byte back
+- **handle_packet**: the game routes its session kind byte back
   (`session_handle_packet`).
-- **peer up/down** — the game forwards the transport's connect/disconnect signals
-  (`session_peer_disconnected`; session join is a JOIN *message*, not a socket event — a
+- **peer up/down**: the game forwards the transport's connect/disconnect signals
+  (`session_peer_disconnected`; session join is a JOIN *message*, not a socket event, so a
   connected-but-never-joined peer is nobody).
 
 **Zero role branches.** The same game code runs on host and clients. Commands are issued
@@ -57,7 +57,7 @@ everything before any delta can name an unknown id.
 
 ## Wire it up (before *_start)
 
-All pre-start wiring survives re-init — call these once in `ready()`:
+All pre-start wiring survives re-init: call these once in `ready()`:
 
 ```odin
 session_configure :: proc(s: ^Session, cfg: Session_Config)
@@ -68,7 +68,7 @@ session_app_route :: proc(s: ^Session, tag: u8, user: rawptr, handler: App_Handl
 ```
 
 `Session_Config` holds every tunable; zero-valued fields mean the defaults (a zero config
-is the out-of-the-box session). All durations are **seconds** — the session bakes them to
+is the out-of-the-box session). All durations are **seconds**: the session bakes them to
 tick counts itself, so changing `tick_hz` never silently rescales your timeouts:
 
 ```odin
@@ -88,31 +88,31 @@ Session_Config :: struct {
 
 `max_players` caps at 8 out of the box (this is a 2-8 friendslop framework); set
 `max_players = -1` for an unbounded lobby, and rejoins always reclaim their seat regardless.
-`change_events` stays off by default — at friendslop scale repaint-everything is usually
+`change_events` stays off by default: at friendslop scale repaint-everything is usually
 fine; turn it on to repaint exactly the entities a state batch touched.
 
 **The version door (on by default).** Descriptors are positional, so two builds whose
-replicated declarations disagree do not get an error — a skewed peer misparses every delta
+replicated declarations disagree do not get an error. A skewed peer misparses every delta
 into the wrong fields. scriptgen closes that door without any wiring: it hashes the
 package's whole wire contract (replicated field order/types/lanes, verbs, entity ids, input
 structs field-by-field, fact tuples, rpcs) into the generated `NET_FINGERPRINT`, and the
 guard file registers it as the session default at load. The join carries it: a mismatch is
 refused as `Ev_Join_Denied{.Version}` ("your build and the host's disagree"), and a checked
 host also refuses fingerprint-less clients (pre-check builds). Comment edits and formatting
-never move the hash; a renamed field does (over-refusal is harmless — rebuild both ends).
+never move the hash; a renamed field does (over-refusal is harmless; rebuild both ends).
 The session folds its own `PROTOCOL_REV` in, so a kit upgrade that changes the wire refuses
 skewed peers even when the game's declarations did not move.
 
 `Session_Config.fingerprint` is the override: leave it 0 (the default) to use the generated
 value, set it for a hand-rolled multi-module contract, or set `ksess.FINGERPRINT_NONE` to
-disable the gate (hand-built descriptors, tests — a session with no generated fingerprint is
+disable the gate (hand-built descriptors, tests; a session with no generated fingerprint is
 unchecked).
 
 One thing the generated hash **cannot** see is a *byte-keyed content table*. The hash covers
-wire SHAPES — that a `Slot` is `{item: u16, count: u16}` — but not the MEANING a game pins
+wire SHAPES (that a `Slot` is `{item: u16, count: u16}`) but not the MEANING a game pins
 to those bytes: an item id → definition registry, a name → id tag table, anything where the
 wire byte is an index into game content. Reorder or rename such a table between builds and
-the shapes still match, so the door passes — then a replicated `item=1` decodes as the wrong
+the shapes still match, so the door passes. A replicated `item=1` then decodes as the wrong
 thing on the receiving peer. `ksess.session_mix_fingerprint(base, contract)` folds the
 table's canonical text onto the shape hash (pass `base = 0` to mix onto the generated
 default; a bare assignment would *replace* the shape gate), so that skew is refused at the
@@ -120,7 +120,7 @@ door too. `kitems.items_contract(&table)` is the ready-made producer for item re
 (sorted, so registration order does not matter); cavecrawl folds its `GEM`/`TORCH` table
 this way.
 
-In practice the transport hookup is one line — from cavecrawl's `ready`:
+In practice the transport hookup is one line, from cavecrawl's `ready`:
 
 ```odin
 ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
@@ -132,10 +132,10 @@ netgd.wire_listen(&self.wire, "on_packet", "on_peer_left", "on_net_up", "on_net_
 
 The kit allocates in three tiers, and the session sits in the middle one.
 
-**Explicit param** — kit/net's `*_make` procs (`writer_make`, `registry_make`, …) take an
+**Explicit param**: kit/net's `*_make` procs (`writer_make`, `registry_make`, …) take an
 `allocator` argument; the caller names where every byte lives.
 
-**Stored and rebound** — kit/sim's `Lane` and this `Session` each keep ONE allocator
+**Stored and rebound**: kit/sim's `Lane` and this `Session` each keep ONE allocator
 (`Session_Wiring.allocator`, adopted from `context.allocator` at the first `*_start` and
 held across every re-init) and reinstall it as `context.allocator` at the top of EVERY root:
 the starts, resume, destroy, `session_tick`, the packet entry, `session_present`, the
@@ -147,22 +147,22 @@ arena, a tracking allocator) whose ambient differs from the session's between ca
 `s.allocator` before `*_start` to pin a custom one; leave it zero and the session adopts
 whatever `context.allocator` was in force when it started.
 
-**Ambient** — comms, xfer, album, items, and the UI widgets keep no allocator of their own
+**Ambient**: comms, xfer, album, items, and the UI widgets keep no allocator of their own
 and allocate straight from `context.allocator`. A game driving them under a custom allocator
 must keep `context.allocator` STABLE across each subsystem's init, use, and destroy, because
 their frees inherit whatever ambient is in force at teardown.
 
 The middle tier is verified by machinery, not by reading. `tests/kitsession`'s
-`the_session_never_spends_the_ambient_allocator` runs a full lifecycle — start, join, both
+`the_session_never_spends_the_ambient_allocator` runs a full lifecycle (start, join, both
 spawn paths, blobs, interest, stats, profiles, ticks, kick, leave, disconnect, a re-init,
-destroy — with a tracking allocator handed to the session and a *watching* allocator
+destroy) with a tracking allocator handed to the session and a *watching* allocator
 installed as the ambient, then asserts the session touched the ambient ZERO times. It is the
 only way to catch a newly added root that forgot to rebind, because the omission is silent:
 the session still works, it just spends memory it does not own.
 
 ## Start, drive, drain
 
-([kit/boot](boot.md) drives this whole section for you — `boot_host`/
+([kit/boot](boot.md) drives this whole section for you: `boot_host`/
 `boot_join` call the starts, `boot_pump` ticks and drains. What follows is
 the layer underneath, which stays public for games that want the ritual
 their own way.)
@@ -178,16 +178,16 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader)
 session_peer_disconnected :: proc(s: ^Session, peer: Peer_Id)
 ```
 
-The host is a full player too (name, id, stats) — it just never JOINs over the wire.
+The host is a full player too (name, id, stats); it just never JOINs over the wire.
 
 **Dedicated servers.** `session_host_start(…, dedicated = true)` makes the authority a
 SERVER, not a player. Its seat is flagged `Player.dedicated` on every roster (the welcome
 carries it, so clients know too): games skip it when spawning avatars
 (`if p.dedicated {continue}`), the kit lobby/scoreboard hide it, `session_count()` does not
-count it, and `max_players` caps humans only. Host migration never arms — a dead dedicated
+count it, and `max_players` caps humans only. Host migration never arms: a dead dedicated
 server restarts; migration is the peer model's answer to a *player*-host leaving. This is
-the always-on/public escape hatch; the friends-host-for-friends model is unchanged. One call
-door: [`kboot.boot_serve`](boot.md); see `examples/slopball/server_run.sh`.
+the always-on/public escape hatch; the friends-host-for-friends model is unchanged. There is
+one call door: [`kboot.boot_serve`](boot.md). See `examples/slopball/server_run.sh`.
 
 Clients call `session_client_start` when they begin connecting and `session_client_join`
 once the transport handshake completes; no WELCOME within `join_timeout` produces
@@ -214,8 +214,8 @@ for {
 
 A [kit/boot](boot.md) game never writes that switch. Each event pairs by
 name with a plain proc on the game shell (the class with the `kboot.Boot`
-field), and scriptgen generates `<snake>_events(self, events)` — the
-dispatch — from whatever you declared. Undeclared events are skipped; that
+field), and scriptgen generates `<snake>_events(self, events)` (the
+dispatch) from whatever you declared. Undeclared events are skipped; that
 IS the `#partial`:
 
 ```odin
@@ -239,7 +239,7 @@ The half names are the event names (`_welcomed`, `_player_joined`,
 `_player_left`, `_host_left`, `_join_failed`, `_join_denied`, `_kicked`,
 `_backup_target`, `_succession`, `_backup_received`, `_owner_changed`,
 `_blob_changed`, `_stats_updated`, `_state_applied`, `_command_executed`,
-`_command_confirmed`, `_command_rejected`) — except the entity cluster,
+`_command_confirmed`, `_command_rejected`), except the entity cluster,
 which wears an `entity_` prefix (`_entity_spawned`, `_entity_resynced`,
 `_entity_despawned`, `_entity_changed`) so it can never be mistaken for the
 [census hooks](boot.md): the census `<entity>_spawned` fires BEFORE the
@@ -250,7 +250,7 @@ with the fix spelled out, never a proc that silently doesn't fire.
 
 **Role gates are generated, both kinds.** A two-role event (`player_joined`,
 `player_left`, `entity_spawned`, `owner_changed`, `blob_changed`) may
-declare a `_then` half — authority only, the event's consequence. A
+declare a `_then` half: authority only, the event's consequence. A
 single-role event has its annotation ENFORCED at dispatch: a `(client)`
 event queued just before a mid-batch takeover flipped `is_host` dies at the
 generated gate instead of re-running takeover code (a host death can land as
@@ -262,9 +262,9 @@ client-only event (the authority never hears `Ev_Kicked`) or a host-only one
 The event union: `Ev_Welcomed`, `Ev_Player_Joined` (with `rejoin`), `Ev_Player_Left`,
 `Ev_Host_Left` (alone it ends the run; with [succession](#backup-hosting-and-resume)
 armed, `Ev_Succession` fires beside it and the run survives), `Ev_Join_Failed`,
-`Ev_Join_Denied` (`.Full` / `.Locked` / `.Banned` / `.Version` — each a different
+`Ev_Join_Denied` (`.Full` / `.Locked` / `.Banned` / `.Version`, each a different
 sentence to the player), `Ev_Kicked`, `Ev_Spawned`, `Ev_Resynced` (a KNOWN entity's fields caught up
-wholesale — interest re-entry, a snapshot over live state; generated
+wholesale, as with interest re-entry or a snapshot over live state; generated
 [`<field>_edge` halves](net.md#edges-class_field_edge--presenting-delta-lane-changes)
 re-seed themselves silently, so this event is only for hand-rolled edge
 detection, which re-seeds here or presents the missed changes as fresh events),
@@ -288,7 +288,7 @@ session_owner_of :: proc(s: ^Session, id: knet.Net_Id) -> knet.Player_Id
 
 Spawning is two-phase because the announcement carries a field snapshot:
 make, set your per-spawn fields, then send. A [kit/boot](boot.md) game
-spawns TYPED — every `entity=Name:id` tag generates a `<entity>_spawn`
+spawns TYPED: every `entity=Name:id` tag generates a `<entity>_spawn`
 helper (the tag already knows the struct, so the `TYPE` const and the
 rawptr cast stop existing at spawn sites), paired with the one role-safe
 announce `kboot.boot_spawn_send`. From cavecrawl:
@@ -302,12 +302,12 @@ kboot.boot_spawn_send(&self.boot, sid)
 ```
 
 (For a TICKING entity the same helper routes through `boot_fire_spawn`: the
-host mints the real entity, a client a predicted one — sim.md's fired
+host mints the real entity, a client a predicted one, as in sim.md's fired
 projectile.) The raw `session_spawn_make`/`session_spawn_send` pair stays
 public underneath, and `session_spawn` remains for games that build
 entities by hand.
 
-`session_start_replicating` is the host's "the world is set up — go live": it commits
+`session_start_replicating` is the host's "the world is set up, go live" moment: it commits
 shadows, ships the full world to every already-seated client, and from then on the
 per-tick delta walk broadcasts and every later joiner gets the world behind its welcome.
 `session_teleport` is for the *owner* of a streamed entity declaring a jump (respawn,
@@ -324,7 +324,7 @@ Games rarely write one: tag each exported entity scene with
 `entity=Name:id` and [kboot.boot_entities](boot.md) installs the GENERATED
 factory (scene under `boot.world`, node ledger, typed `*_spawned`/`*_freed`
 census hooks). `session_set_factory` remains the escape hatch for exotic
-creation, and returning nil from `make` skips the entity safely — the wire
+creation, and returning nil from `make` skips the entity safely. The wire
 carries its length, so unknown types are stepped over whole.
 
 ### Entity blobs
@@ -334,11 +334,11 @@ session_set_blob :: proc(s: ^Session, id: knet.Net_Id, data: []u8)
 session_blob :: proc(s: ^Session, id: knet.Net_Id) -> []u8
 ```
 
-The variable-length escape hatch — the RARE-CHANGE arm of
+Entity blobs are the variable-length escape hatch, the RARE-CHANGE arm of
 [net.md's collections stance](net.md#collections--the-dynamic-stance)
 (bounded state takes a fixed array; a live collection of things takes
 entities): one opaque, **author-dirtied** payload per entity. It is not a
-field: no diffing (you say when it changed), no interpolation, no prediction
+field: there is no diffing (you say when it changed), no interpolation, and no prediction
 interplay. The host sets it; it ships reliably to every peer,
 `Ev_Blob_Changed` fires everywhere (the host included), and it rides every
 full snapshot, so late joiners, backup hosts, and saves carry it with **zero
@@ -348,7 +348,7 @@ entity this way; a rejoiner reads it off the same event as everyone else.
 Use per-tick replicated fields for simulation state, app messages for
 event-shaped things, and a blob for variable-length state a *new observer*
 must be able to see. `session_blob` returns a view (copy it if you keep it),
-and re-received duplicates — a rejoin re-delivers the world — are dropped by
+and re-received duplicates (a rejoin re-delivers the world) are dropped by
 version, so the event never double-fires.
 
 ## Roster, moderation, stats
@@ -362,9 +362,9 @@ session_set_locked :: proc(s: ^Session, locked: bool)
 session_kick :: proc(s: ^Session, player: knet.Player_Id, ban := false) -> (was: Peer_Id, ok: bool)
 ```
 
-`session_count`'s bare call counts PRESENT PEOPLE — connected, non-dedicated — which is what
+`session_count`'s bare call counts PRESENT PEOPLE (connected, non-dedicated), which is what
 every gate that says "players" means (min-players, ready checks, `max_players`). Opt DOWN
-for the other censuses: `connected_only = false` includes departed rows (roster size — what a
+for the other censuses: `connected_only = false` includes departed rows (roster size, what a
 save/resume receipt reports), and `players_only = false` counts a dedicated seat (the wire's
 view).
 
@@ -376,16 +376,16 @@ run-scoped but ride the [backup snapshot](#backup-hosting-and-resume), so a take
 launder them; persist them yourself if forever matters).
 
 **Spectators.** `session_client_start(..., spectate = true)` joins to WATCH: the seat
-receives the whole world — spawns, deltas, streams, stats, chat — and is nobody. It
+receives the whole world (spawns, deltas, streams, stats, chat) and is nobody. It
 bypasses `max_players` (a full room can be watched), `session_count()` does not count it,
 player gates and host migration skip it, and the host refuses its commands, streams, and sim
-inputs outright — receive-only past the join. Every roster reads `Player.spectator`
+inputs outright: the seat is receive-only past the join. Every roster reads `Player.spectator`
 (the lobby marks the row "(watching)", the scoreboard skips it); the game's half is the
 same `!p.spectator` guard its spawn loops already give `dedicated`. Promotion is not a flag
-flip — a watcher who wants in leaves and rejoins as a player, through the same doors and
+flip: a watcher who wants in leaves and rejoins as a player, through the same doors and
 gates as anyone.
 
-Stats are generic named i64 counters on the *player* record — host-accumulated, replicated
+Stats are generic named i64 counters on the *player* record: host-accumulated, replicated
 to everyone as a full snapshot at ~2 Hz when dirty, and they survive disconnects like
 everything else identity-shaped. Column 0 is always "ping", fed by the session itself:
 
@@ -398,16 +398,16 @@ session_stat :: proc(s: ^Session, player: knet.Player_Id, col: Stat_Col) -> i64
 ```
 
 **The client-column trap.** `session_stat_column` registers and runs on the HOST (typically
-in your Start handler) — a `Stat_Col` you stored there is zero-value on every client.
+in your Start handler): a `Stat_Col` you stored there is zero-value on every client.
 Handles are 1-BASED so that zero value is `STAT_COL_INVALID`, and every read/write
 **asserts on it with the fix in the message** instead of silently returning column 0 (the
 auto-fed ping). On any peer that did not register the column, resolve BY NAME with
-`session_stat_find` (cheap — do it per read).
+`session_stat_find` (cheap, so do it per read).
 
 ### Player profiles (the lobby's state, typed)
 
 Stats are the *host's* ledger about players; the **profile** is each player's
-own word about themselves — picks, loadout, ready lamp, declared cosmetics.
+own word about themselves: picks, loadout, ready lamp, declared cosmetics.
 One POD struct per seat, one writer per row (its player), host-relayed to
 every screen:
 
@@ -435,34 +435,34 @@ There is no declare call to remember: the session diffs your row once per
 net tick and ships the change; the host relays the table at the stats
 cadence, sends the lot to late joiners behind their welcome, and every peer
 already holds every row when a takeover makes one of them the host. (A raw
-kit consumer without scriptgen installs by hand —
-`ksess.session_profile_install(&ses, Pick)` in ready, before `*_start` —
-and forfeits the fingerprint gate on the row's shape.)
+kit consumer without scriptgen installs by hand:
+`ksess.session_profile_install(&ses, Pick)` in ready, before `*_start`.
+Doing so forfeits the fingerprint gate on the row's shape.)
 `Ev_Profile_Changed{player}` fires wherever a *view* of a row changed (never
-for your own local writes) — and it pairs like every session event: a
+for your own local writes), and it pairs like every session event: a
 `<game>_profile_changed(self, player)` half fires where views change, and
 `<game>_profile_changed_then` is the authority's consequence slot. **The
 muster recipe**: draw rows from `session_roster` + `session_profile_of`;
 gate the host's START on every row's `ready`; in `_profile_changed_then`
-against a live run, a newly-ready row IS the drop-in trigger — spawn them
+against a live run, a newly-ready row IS the drop-in trigger: spawn them
 (the spawn waits for the pick, so there is no spawn/declare race to lose). Rows are the declarer's word (the
-friendslop trust model) — host-*minted* truth (banked currency, dealt
+friendslop trust model); host-*minted* truth (banked currency, dealt
 inventory) belongs in replicated entity fields, not here.
 
 ## Command hooks (the generic layer under _then)
 
-A command proc may only mutate its target — the constraint the predict/revert/reject-truth
+A command proc may only mutate its target: the constraint the predict/revert/reject-truth
 machinery relies on. The cross-entity half of a command lives in the verb's name-paired
 **[`<verb>_then` consequence](net.md#consequences-verb_then)**: "loot chest → items appear
 in MY bag" is a chest-only proc that *returns* what it took, plus a `chest_take_then` that
-credits the issuer on the host — a mutation that reaches everyone as an ordinary delta. The
+credits the issuer on the host, a mutation that reaches everyone as an ordinary delta. The
 loser of a race gets a rejected chest command and no credit; phantom items are impossible.
 The consequence's `game` param is the factory's `user`, the session's one game pointer.
 
 The untyped hooks remain underneath for *generic* reactions that cut across verbs: metrics,
-integration-test receipts, replay logs — anything keyed on "a command ran" rather than on
+integration-test receipts, replay logs, anything keyed on "a command ran" rather than on
 one verb's meaning. Route by type to avoid classifying entities by hand (command ids collide
-across types — every type's first command is 0):
+across types; every type's first command is 0):
 
 ```odin
 ksess.session_set_type_hook(&self.ses, CHEST_TYPE, self, chest_hook)  // wins
@@ -471,16 +471,16 @@ ksess.session_set_command_hook(&self.ses, self, game_hook)            // catch-a
 
 A routed type's hook receives exactly that type's commands. The host's own
 local issues and clients' commands land in the same dispatcher, which runs
-AFTER the verb's `_then`. Survives session starts, like everything wired in
+AFTER the verb's `_then`. It survives session starts, like everything wired in
 `ready()`.
 
 ## Interest management (area of interest)
 
-**Existence global, freshness local.** Every peer still knows every entity —
-spawns, despawns, joins, saves, and migration backups are never filtered, so
+**Existence global, freshness local.** Every peer still knows every entity: spawns,
+despawns, joins, saves, and migration backups are never filtered, so
 everything those give you for free stays free. What interest filters is the
 per-tick STATE traffic: a peer only receives deltas and owner-stream samples
-for entities near its **focus**. Off by default.
+for entities near its **focus**, and it is off by default.
 
 ```odin
 // host, once — before start or mid-run alike; the locator lends the session
@@ -501,7 +501,7 @@ Mechanics worth knowing:
 - **Re-entry resync.** A filtered delta is gone forever, so when an entity
   ENTERS a peer's interest the host sends that peer one full spawn tuple (the
   same reconcile path a rejoin uses): fields and blob catch up at once. The
-  catch-up announces itself as `Ev_Resynced` (not a second `Ev_Spawned` — the
+  catch-up announces itself as `Ev_Resynced` (not a second `Ev_Spawned`; the
   entity was never gone on this peer). The jump is history, not gameplay:
   generated `<field>_edge` halves re-seed silently by construction; any
   hand-rolled `seen_*` scratch re-seeds off the event, or wounds taken while
@@ -510,12 +510,12 @@ Mechanics worth knowing:
   border-dancers don't thrash this.
 - **Streams route via the host.** Owners send their batches to the host
   instead of the transport's blind relay (the packets passed through that
-  machine anyway — no extra hop), and the host forwards per-recipient at
+  machine anyway; no extra hop), and the host forwards per-recipient at
   entity granularity. Streams need no resync: samples are absolute.
 - **Stale ghosts are yours to present.** An entity out of interest keeps its
-  last-known state on that peer's screen — frozen, not gone. Dim it, fog it,
+  last-known state on that peer's screen, frozen, not gone. Dim it, fog it,
   or leave it; that's a game choice.
-- **A peer with no focus yet receives everything** — filtering starts when
+- **A peer with no focus yet receives everything**: filtering starts when
   you start saying where they are. Commands, stats, chat, and everything
   reliable-and-rare stay unfiltered.
 - **A mid-run flip takes.** Joiners learn the stream routing from their
@@ -529,7 +529,7 @@ Mechanics worth knowing:
 `SES_APP` lets packages built on top of the session ([kit/comms](comms.md) is the first)
 ride its transport hookup instead of asking the game for another kind byte: register a
 handler under a small tag, ship bytes with begin/flush. The session applies its seat gates
-before routing — on the host `from` is the resolved sender (unseated peers are nobody and
+before routing: on the host `from` is the resolved sender (unseated peers are nobody and
 get dropped); on a client `from` is `PLAYER_ID_INVALID` and the handler checks
 `from_peer == HOST_PEER` when authority matters.
 
@@ -540,7 +540,7 @@ session_app_send :: proc(s: ^Session, to_peer: Peer_Id, tag: u8, bytes: []u8, ch
 session_app_send_to :: proc(s: ^Session, player: knet.Player_Id, tag: u8, bytes: []u8)
 ```
 
-`channel` defaults to reliable — the right lane for anything event-shaped or that a
+`channel` defaults to reliable: the right lane for anything event-shaped or that a
 consumer must not miss. Pass `.Stream` ONLY for tick-stamped, self-superseding payloads
 where the next send makes a lost one worthless ([kit/sim](sim.md)'s inputs and snapshot
 batches ride `SES_APP` on exactly this lane): the receive side routes both channels
@@ -552,7 +552,7 @@ against the reliable lane.
 Almost every app-channel citizen wants the same shape. A client sends its word **up** to the
 host; the host **stamps** the sender it already vouched for and rebroadcasts; a peer that
 receives a stamped cast from anyone but the host is looking at a **spoof** and drops it; and
-the author's own copy comes back — or does not — by policy.
+the author's own copy comes back, or does not, by policy.
 
 ```odin
 Relay_Proc :: proc(user: rawptr, author: knet.Player_Id, r: ^knet.Reader)
@@ -571,7 +571,7 @@ The envelope it owns, inside the `SES_APP` framing:
 [tag][RELAY_CAST][author u64][payload]       host -> all/one  (the author the session resolved)
 ```
 
-What rides above is a **payload codec and nothing else** — and notably, no role branch at
+What rides above is a **payload codec and nothing else**; notably, there is no role branch at
 the send door:
 
 ```odin
@@ -583,14 +583,14 @@ ksess.relay_flush(&c.relay)        // host: broadcast (+ local echo) · client: 
 
 - **`echo`** answers "does the machine that authored a message also receive it?" once, for
   both roles: the host's own broadcast delivers locally, and a client's cast coming back
-  with `author == me` delivers — iff `echo`. kit/comms sets it true (authoritative order
+  with `author == me` delivers, iff `echo`. kit/comms sets it true (authoritative order
   beats a few milliseconds: what you see IS what everyone sees); kit/xfer sets it false
   (you already hold the bytes you sent).
-- **`relay_begin_as`** is the host casting under someone else's name — a line the authority
+- **`relay_begin_as`** is the host casting under someone else's name: a line the authority
   authored with no speaker, history replayed under its original speaker, an album payload
   re-cast under the player who published it. It never rides the wire upward, so nothing it
   says can be spoofed into existence.
-- **An addressed cast never echoes.** `relay_flush(hr, peer)` is *for that peer* — which is
+- **An addressed cast never echoes.** `relay_flush(hr, peer)` is *for that peer*, which is
   what lets `comms_catchup` replay a whole log to one joiner without re-filing it into the
   host's own.
 - **`deliver` files and returns.** It gets the payload and the vouched author, and it must
@@ -599,7 +599,7 @@ ksess.relay_flush(&c.relay)        // host: broadcast (+ local echo) · client: 
 
 Tags are one byte and collisions are LOUD: `relay_route` asserts on a tag already relayed by
 a different subsystem, naming the taken ones (comms 0, [combat](combat.md)'s fires 1, xfer
-2, [kit/sim](sim.md) 3). Not every citizen needs the relay — the fire lane is cast-only with
+2, [kit/sim](sim.md) 3). Not every citizen needs the relay: the fire lane is cast-only with
 no upload arm, and kit/sim's lane rides `SES_APP` directly on the stream channel with its
 own tick semantics.
 
@@ -618,22 +618,22 @@ appq_len     :: proc(q: ^App_Queue($T)) -> int
 appq_destroy :: proc(q: ^App_Queue($T))
 ```
 
-Riders keep their own public poll — `comms_poll`, `xfer_poll`, `fire_poll`, `album_poll` all
+Riders keep their own public poll: `comms_poll`, `xfer_poll`, `fire_poll`, `album_poll` all
 have the exact names and signatures games call, all delegating here. It is a
 **container, not a subsystem**: no `Session` pointer, no `Session_Run` entry, no
 `run_destroy` line, and it allocates only through the dynamic array's own creation
-allocator — which is what lets the tier-B session and its tier-C riders share one type
+allocator, which is what lets the tier-B session and its tier-C riders share one type
 without either inheriting the other's [allocator rule](#the-allocator-tiers).
 
 ## Backup hosting and resume
 
-The host periodically ships a complete re-hostable snapshot — identity table (hashed
-tokens), roster, allocation cursors, stats, every entity as a spawn tuple — to the eldest
+The host periodically ships a complete re-hostable snapshot (identity table with hashed
+tokens, roster, allocation cursors, stats, every entity as a spawn tuple) to the eldest
 connected client (`Ev_Backup_Received`). The DOOR travels with the roster: `locked` and
 the `denied` ban list ride the snapshot, so a ban outlives the host that issued it and a
-locked room stays locked through a takeover — otherwise the kicked-with-ban player just
+locked room stays locked through a takeover. Otherwise the kicked-with-ban player just
 waits for the migration and walks back in. What a takeover still loses is bounded: up to
-`backup_interval` of world state — whatever moved since the last refresh. Saving a run
+`backup_interval` of world state, whatever moved since the last refresh. Saving a run
 and surviving a dead host are the same contract: [kit/save](save.md) wraps
 `session_snapshot` in a versioned file envelope.
 
@@ -655,10 +655,10 @@ the statement and the third convention (the generated FNV field hash).
 every other player comes back disconnected and rejoins with their tokens, reclaiming ids,
 stats, and owned entities exactly like any reconnect. The dead run's host reclaims its
 own seat the same way when it passed a token to `session_host_start` (with none, it
-returns as a new player). Returns false on a corrupt blob.
+returns as a new player). It returns false on a corrupt blob.
 
-Backups also carry the GAME'S campaign bytes — wave directors, AI clocks, whatever the
-session can't know — via the same blob split kit/save's envelope makes:
+Backups also carry the GAME'S campaign bytes (wave directors, AI clocks, whatever the
+session can't know) via the same blob split kit/save's envelope makes:
 
 ```odin
 Backup_Blob_Proc :: proc(user: rawptr, w: ^knet.Writer)
@@ -667,11 +667,11 @@ session_backup_parts :: proc(s: ^Session, allocator := context.temp_allocator) -
 ```
 
 Don't hand-serialize those bytes: tag the host-local fields `gd:"backup"` and scriptgen
-generates the version-hashed write/read pair (POD, `map[POD]POD`, `[dynamic]POD`) — see
+generates the version-hashed write/read pair (POD, `map[POD]POD`, `[dynamic]POD`); see
 [save](save.md#declaring-the-game-blob--gdbackup). The proc above is what you wire the
 generated writer into.
 
-The whole host-migration handoff is `kboot.boot_migration` — the game declares four
+The whole host-migration handoff is `kboot.boot_migration`: the game declares four
 name-paired halves and one `ready` call; the kit owns the handoff, the fork, the wipe, and
 the caps:
 
@@ -689,15 +689,15 @@ kboot.boot_migration(&self.boot, self, my_game_succ_hooks)  // the generated tab
 
 On `Ev_Backup_Target` the kit computes and broadcasts the rendezvous
 ([`netgd.Succession`](netgd.md#host-migration):
-`addr:port` on native, a reserved room code on web — minted once per run). On
+`addr:port` on native, a reserved room code on web, minted once per run). On
 `Ev_Succession` the kit notes the fork and runs it off the generated `<snake>_events`
-TAIL — so your plain event halves still see the old world — then the heir wipes
+TAIL (so your plain event halves still see the old world), then the heir wipes
 (census-driven: the entity table's `_freed` hooks empty the by-type maps through the same
 code that fills them, then `_wiped` clears the pools), raises the promised transport, calls
 `session_host_resume`, and hands `_took_over` the blob; everyone else chases under the kit's
 caps (the event's refire-on-failed-reconnect is the retry pulse; web knocks ride
-`boot_pump`). Every arm that needs words — the chase dial, the knock, no heir, gave up, the
-heir's failures — fires `_migrating` once; `.Taking_Over` is the heir's own word, deduped
+`boot_pump`). Every arm that needs words (the chase dial, the knock, no heir, gave up, the
+heir's failures) fires `_migrating` once; `.Taking_Over` is the heir's own word, deduped
 against the double death-signal a `kill -9` queues. `kboot.boot_take_over`/`boot_chase` stay
 public for a manual Resume button (window-gated: they refuse on a live seat). Games that
 raise their own transports (Steam) call `kboot.boot_succ_config` once so the ceremony knows
@@ -716,11 +716,11 @@ session_backup_parts :: proc(...) -> (game_blob, snapshot: []u8, ok: bool) // co
 
 The session names WHO; the info blob is opaque to it (a Steam lobby id fits where an
 `addr:port` does). Migration is coop-lane only: `boot_migration` refuses a sim lane
-(the lane's authority cannot migrate without a rebuild — a dead sim server restarts).
+(the lane's authority cannot migrate without a rebuild; a dead sim server restarts).
 
 ## Ownership transfer
 
-Ownership is *which peer's writes stream out* of an entity's owner-stream fields —
+Ownership is *which peer's writes stream out* of an entity's owner-stream fields:
 carrying, mounting, possession, and dragging a downed friend are all one call, usually
 from a command hook:
 
@@ -730,9 +730,9 @@ session_set_owner :: proc(s: ^Session, id: knet.Net_Id, owner: knet.Player_Id)
 
 `PLAYER_ID_INVALID` hands it back to nobody: the entity rests where its last owner left
 it (host-authoritative deltas still flow). Every peer gets `Ev_Owner_Changed{id, owner,
-prev}` — the new carrier starts gluing the entity to itself off that event, role-free.
+prev}`: the new carrier starts gluing the entity to itself off that event, role-free.
 Remote screens SNAP across the handoff (the transfer resets the stream ring and bumps the
-warp), and the old owner stops streaming by construction — `registry_write_streams` only
+warp), and the old owner stops streaming by construction: `registry_write_streams` only
 walks entities owned by me. In-flight packets from the old owner may land for ~a round
 trip; they carry the pre-bump warp, so the first new-warp sample supersedes them with a
 snap, never a blend.
@@ -750,9 +750,9 @@ There are three tiers, and **the tier is derived, not chosen**:
 1. **Does the session need an answer to finish what it is doing?** It holds a pointer, a
    position, or a byte range it cannot compute itself, and the operation stops until you
    hand it over. → **pull callback.**
-2. **Otherwise: does your code need state that exists only INSIDE the operation** — a
-   command's window before its result is decided, a packet's live byte view, the tick the
-   authority is standing in — state that cannot be re-derived a frame later? → **atomic
+2. **Otherwise: does your code need state that exists only INSIDE the operation** (a
+   command's window before its result is decided, a packet's live byte view, or the tick the
+   authority is standing in) that cannot be re-derived a frame later? → **atomic
    authority hook.**
 3. **Everything else, which is nearly everything.** → **presentation event.**
 
@@ -763,7 +763,7 @@ drained next frame, it must be queued.*
 
 The session lends you its eyes and its memory. It calls, you answer, it continues. Keep them
 **total and cheap**: answer the question, return. Do not mutate the world, send, spawn, or
-despawn inside one — the session is mid-operation and holding invariants.
+despawn inside one: the session is mid-operation and holding invariants.
 
 | callback | asked | why it can't be an event |
 | --- | --- | --- |
@@ -773,8 +773,8 @@ despawn inside one — the session is mid-operation and holding invariants.
 | `Backup_Blob_Proc` ([backups](#backup-hosting-and-resume)) | per backup refresh, host | the campaign bytes are the game's; the snapshot is written in one pass |
 | kit/sim's `Sample_Proc` / `Step_Proc` / `Resim_Proc` | per tick / per resim | the lane cannot read or advance your simulation |
 
-React to the *event* the answer produced — `Ev_Spawned` fires right after `make`, on the
-host too — rather than doing game work in the answer.
+React to the *event* the answer produced (`Ev_Spawned` fires right after `make`, on the
+host too) rather than doing game work in the answer.
 
 ### Tier 2 — atomic authority hooks (the moment does not survive the frame)
 
@@ -786,19 +786,19 @@ the operation that called them.
 | --- | --- | --- |
 | `<verb>_then` consequences ([net.md](net.md#consequences-verb_then)) | the command's execution, host | the verb's return value and the issuer, before anything else runs |
 | `Command_Hook` / `session_set_type_hook` | the same dispatch, after `_then` | *pre-result*: the generic layer sees the verdict as it is decided |
-| `App_Handler` / `Relay_Proc` ([app messages](#app-messages)) | the packet switch | `^knet.Reader` is a view into the receive buffer — it dies when the packet does |
+| `App_Handler` / `Relay_Proc` ([app messages](#app-messages)) | the packet switch | `^knet.Reader` is a view into the receive buffer; it dies when the packet does |
 
 The reader is the trap: an app handler that *keeps* a slice instead of copying it is holding
-freed transport memory next frame. Every handler in the kit does one thing — decode and
-**file** — and no more. See the queue below.
+freed transport memory next frame. Every handler in the kit does one thing: decode and
+**file**, and no more. See the queue below.
 
 ### Tier 3 — presentation (runs on your frame, world consistent)
 
 Two shapes, one property: they run from `session_tick` / your pump, after the world is
-whole, on the game's own stack. That is the property that matters — not whether you drained
+whole, on the game's own stack. That is the property that matters: not whether you drained
 it or the kit handed it to you.
 
-- **Drained**: `session_poll`'s `Event` union and the generated [event halves](#event-halves-game_event); the SES_APP riders' polls (`comms_poll`, `xfer_poll`, `fire_poll`, `album_poll`) — all now the same [`App_Queue`](#the-riders-queue-appq).
+- **Drained**: `session_poll`'s `Event` union and the generated [event halves](#event-halves-game_event); the SES_APP riders' polls (`comms_poll`, `xfer_poll`, `fire_poll`, `album_poll`), all now the same [`App_Queue`](#the-riders-queue-appq).
 - **Kit-driven**: the generated [`<field>_edge` halves](net.md#edges-class_field_edge--presenting-delta-lane-changes) (fired by the presentation pass inside `session_tick`) and `session_present`'s `Later_Proc` (drained on the same clock, interp-delayed).
 
 **So: a new feature is tier 3 unless it answers a question the session is blocked on (tier
@@ -808,7 +808,7 @@ entry, and a feature that reaches for one should be able to name its row in a ta
 ## Gotchas
 
 - **`Session_Config` durations are seconds, resolved at `*_start`.** `session_init` bakes
-  them to tick counts against the configured rate — so configure *before* starting, and
+  them to tick counts against the configured rate, so configure *before* starting, and
   mid-run read the resolved fields (`session_tick_hz(s)`, `s.pending_max_age`), not `cfg`.
 - **`session_init` is re-entrant.** `host_start` / `client_start` /
   `host_resume` on a session that already ran tears down the previous *run's* state
@@ -816,32 +816,32 @@ entry, and a feature that reaches for one should be able to name its row in a ta
   wired before start: transport, factory, hooks, app routes, config. Back-to-lobby →
   rehost needs no rewiring; equally, nothing from the old run survives.
 - **Rejoins pass the lock and capacity gates.** A returning token's seat is its
-  own — that is the whole reconnect promise; only a ban shuts a known token out. Don't
+  own: that is the whole reconnect promise; only a ban shuts a known token out. Don't
   count on `session_set_locked` or `max_players` to keep a specific player out: kick with
   `ban = true`.
 - **`session_kick` doesn't sever the socket.** It returns the seat the player held so the
-  game can also drop the transport connection (`netgd.wire_drop`) — without that the
+  game can also drop the transport connection (`netgd.wire_drop`); without that, the
   kicked client still holds a socket it can talk on, even though the session ignores
   unseated peers.
 - **Deltas carry state, not events** (see [kit/net's gotchas](net.md#gotchas)): a
   replicated byte the host pulses within one net tick never ships. Cavecrawl's match flow
   keeps `level.won` at 1 for the whole end screen and every peer reacts to the edge
   locally.
-- **The write guard survives release builds — counting, not halting.** A client's local
+- **The write guard survives release builds: counting, not halting.** A client's local
   write to a host-lane replicated field is the canonical silent-divergence bug (see
   [kit/net's gotchas](net.md#gotchas)); dev builds assert on it with the class, field,
   and fix named. A `-disable-assert` build keeps the walk, logs the first offender ONCE,
-  and counts from there — `session_guard_hits(s)` is the tally, worth surfacing beside
+  and counts from there: `session_guard_hits(s)` is the tally, worth surfacing beside
   `session_malformed(s)`'s dropped-packet count (the netgraph draws the latter). Nonzero
   in the field means some client code writes host-lane state locally: silent divergence
   until the next authoritative delta stomps it.
-- **The factory's `make` is a tier-1 *answer*, not a reaction point** — keep it to
+- **The factory's `make` is a tier-1 *answer*, not a reaction point**: keep it to
   instantiate-and-return; game reactions belong on `Ev_Spawned`, which fires right after
   (on the host too, via `session_spawn_make`). It is not the session's only synchronous
-  entry — it is one row in [three tiers](#three-tiers-of-entry-into-your-code), which is
+  entry: it is one row in [three tiers](#three-tiers-of-entry-into-your-code), which is
   the page to read before adding another.
 - **Hosts don't get client events.** There is no `Ev_Welcomed`/`Ev_Command_Confirmed` on
-  the authority (its commands run directly) — but it *does* get `Ev_State_Applied`,
+  the authority (its commands run directly), but it *does* get `Ev_State_Applied`,
   `Ev_Spawned`/`Ev_Despawned`, and `Ev_Command_Executed`, which is what repaint code
   should key on.
 
@@ -850,10 +850,10 @@ entry, and a feature that reaches for one should be able to name its row in a ta
 ### The trust model — friends, not forensics
 
 **The session trusts its seats the way you trust people you invited.** ENet is plaintext
-UDP — anyone on the path can read the wire (WebRTC and Steam encrypt for free, the honest
+UDP: anyone on the path can read the wire (WebRTC and Steam encrypt for free, the honest
 transport answer for anything public). Owner streams are the owner's word: the host never
 validates that a stream batch names only entities its sender owns. Nothing rate-limits a
-seated peer's reliable traffic — the untrusted-*input* bounds all exist (command caps,
+seated peer's reliable traffic: the untrusted-*input* bounds all exist (command caps,
 input-window ceilings, the xfer payload cap, every length-checked decode), but they bound
 malformed and oversized, not malicious-and-well-formed. The fingerprint gate refuses
 *version skew*, not intent; the write guard catches *your own* bugs, not an attacker.
@@ -862,42 +862,42 @@ What IS defended, today, by default: every decode is bounds-checked and every pa
 counted (`session_malformed`); commands are exactly-once, owner-gated, and dedup-windowed;
 sim inputs are validated and capped both ends; spectator seats are receive-only at four
 separate doors; the version door turns the worst failure mode into a sentence. That is the
-friendslop threat model covered in full: accidents, bugs, and version skew — not adversaries.
+friendslop threat model covered in full: accidents, bugs, and version skew, not adversaries.
 
 A game outgrowing invited-friends play (public lobbies, strangers, stakes) wants the
 **hardening tier**: ride the encrypting transports; host-side stream *ownership* validation
-(the registry knows every owner — the check is an opt-in compare per named entity, the same
+(the registry knows every owner; the check is an opt-in compare per named entity, the same
 door the spectator gate already shows in miniature); per-peer byte/message budgets on the
 reliable channel with a kick policy; and the state-hash probe for desync forensics. None of
-it is built yet; none of it is a redesign — every piece slots into doors that already exist.
+it is built yet; none of it is a redesign: every piece slots into doors that already exist.
 
 ### Recipes over existing pieces
 
 Genre staples that need no new machinery:
 
 **Character-portable saves** (the Valheim model: your character travels between servers,
-worlds stay with their hosts). The character is a client-side blob — bag, appearance,
+worlds stay with their hosts). The character is a client-side blob: bag, appearance,
 whatever follows the PLAYER rather than the world. Persist it with [kit/save's](save.md)
 file helpers; on `Ev_Welcomed`, ship it to the host on an app tag
 (`session_app_send(HOST_PEER, TAG_CHARACTER, blob)`); the host validates and applies it to
-your avatar (an ordinary host-authoritative mutation — deltas carry it to everyone). Save
+your avatar (an ordinary host-authoritative mutation; deltas carry it to everyone). Save
 it back on quit and on the host's periodic beat if you're paranoid. The host stays
 authoritative: a hacked blob is just input to validate, not truth to obey.
 
 **Private per-player state** (roles, a saboteur, secret objectives). Secrets are
-player-addressed app messages — `session_app_send_to(player, tag, bytes)`, or the typed
+player-addressed app messages, `session_app_send_to(player, tag, bytes)`, or the typed
 [`@(gd_message)`](net.md#typed-app-messages-gd_message) form
-(`role_send_to(&ses, player, msg)`) when the secret is a POD payload — not replicated
+(`role_send_to(&ses, player, msg)`) when the secret is a POD payload, not replicated
 fields: the delta walk broadcasts to everyone, and this toolkit does not do per-recipient
 field filtering (every laptop in the room can already run Wireshark). Keep the secret
 host-side, tell exactly who needs to know, and let CONSEQUENCES be public state like
 everything else.
 
-**Player-to-player trade** (the mediating entity — every true multi-party
+**Player-to-player trade** (the mediating entity: every true multi-party
 transaction). A trade mutates TWO players' bags atomically, and a command may
-only mutate its target — so make the TRANSACTION the target. The trade window
+only mutate its target, so make the TRANSACTION the target. The trade window
 is an ordinary entity the host spawns when two players shake hands: its
-replicated fields are the offer slots (item + count, a *reference* — the bags
+replicated fields are the offer slots (item + count, a *reference*; the bags
 stay untouched until commit) and one confirm byte per side. Every edit is a
 single-target predicted command on the Trade, which means every trade race is
 already solved by machinery you have: two edits to the same slot serialize in
@@ -971,11 +971,11 @@ trade_confirm_then :: proc(game: ^MyGame, self: ^Trade, by: knet.Player_Id, seal
 
 What falls out for free: the trade is an entity, so a mid-trade host
 migration resumes with the window intact, a reconnecting player finds their
-table where they left it, and a late joiner spectating the market sees it —
+table where they left it, and a late joiner spectating the market sees it:
 zero catch-up code. `Ev_Player_Left` is the one edge you own: the host
 despawns any table naming the departed (their seat may reclaim it later, but
 an open offer must not outlive its owner's presence). Escrow is the variant
-when a promised item must not be double-promised to two windows — the offer's
+when a promised item must not be double-promised to two windows: the offer's
 `_then` moves the item bag→table on the host instead of referencing it, and
 the failed-commit path hands it back; start with references and reach for
 escrow only when your economy needs the exclusivity. And note what is NOT
@@ -983,66 +983,66 @@ here: predicting the bags themselves. Items landing one beat after the seal
 reads as a handshake; items vanishing from your bag on a rejected prediction
 reads as theft.
 
-**Owner-detected events** (a ball drops in the cup, a cart reaches the checkpoint —
+**Owner-detected events** (a ball drops in the cup, a cart reaches the checkpoint;
 anything derived from state some PLAYER's machine simulates). The rule: **position-derived
 events belong to the position authority.** If the host adjudicates them off its
 stream-sampled copy, the deciding eye runs ~a fifth of a second behind the owner's screen
-and everyone watches the ball roll past the hole. Two shapes, both already primitives — the
+and everyone watches the ball roll past the hole. Two shapes, both already primitives: the
 split is whether the event leaves a *signature in owner state*:
 
 - *State signature* (the common one): the owner's sim applies the event to its OWNED
-  fields — snap the ball into the cup and stop — and that rest state streams out like any
+  fields (snap the ball into the cup and stop) and that rest state streams out like any
   movement. The host runs its own predicate against its copy and fires the authoritative
   CONSEQUENCE (advance the hole, credit the stat) when the signature arrives; convergence
   is guaranteed because the signature is durable, and the wait happens off-screen.
 - *No natural signature* (or the consequence needs arguments): the owner issues a
-  **predicted command** — instant locally, validated by the host, consequences in the
+  **predicted command**: instant locally, validated by the host, consequences in the
   command hook. This is the same machinery as every other verb.
 
-This is a recipe, not tooling: the predicates and signatures are game logic —
-a generic "owner event" message would just be an unvalidated command, strictly worse than
+This is a recipe, not tooling: the predicates and signatures are game logic. A generic
+"owner event" message would just be an unvalidated command, strictly worse than
 the command loop that already exists.
 
 ### Adding a session subsystem (the touchpoint checklist)
 
-The session's subsystems — interest (`interest.odin`), profiles (`profile.odin`), stats
-(`stats.odin`), backup/succession (`backup.odin`) — all integrate through the same ~8
+The session's subsystems, interest (`interest.odin`), profiles (`profile.odin`), stats
+(`stats.odin`), backup/succession (`backup.odin`), all integrate through the same ~8
 touchpoints:
 
-1. **Wire kind(s)** — claim the next `SES_*` id(s) in session.odin's single table; netgd's
+1. **Wire kind(s)**: claim the next `SES_*` id(s) in session.odin's single table; netgd's
    netgraph name table follows it.
-2. **Packet case(s)** — one `case` per kind in the packet switch: role/seat gate first
-   (gate returns leave `r.err` CLEAR — they're not malformed), then call your
+2. **Packet case(s)**: one `case` per kind in the packet switch. Role/seat gate first
+   (gate returns leave `r.err` CLEAR; they're not malformed), then call your
    `<sub>_recv` proc; sticky `r.err` rides back into the malformed counter.
-3. **A net_tick slot** — if you send on a cadence, add one call in `session_net_tick`'s
+3. **A net_tick slot**: if you send on a cadence, add one call in `session_net_tick`'s
    spine (stats/profile ride the ~2 Hz lobby-alive cadence; pick yours).
-4. **Welcome parade** — what does a LATE JOINER need to hear? `host_handle_join` sends
+4. **Welcome parade**: what does a LATE JOINER need to hear? `host_handle_join` sends
    world, stats, profiles, and the standing succession info; a subsystem with standing
    state joins that parade or late joiners live without it.
-5. **State scoping** — run state goes in `Session_Run` (wiped wholesale every re-init —
+5. **State scoping**: run state goes in `Session_Run` (wiped wholesale every re-init;
    a field there can never leak into a rehost); pre-start wiring goes in
    `Session_Wiring` (untouched by re-init). Owned containers add ONE line to
    `run_destroy`. If some state must survive a `host_resume` specifically, that's a
    `keep_*` flag on `session_init` (profiles are the worked example).
-6. **Departure sweep** — what happens to your per-player state when a player leaves?
+6. **Departure sweep**: what happens to your per-player state when a player leaves?
    `mark_left` is the one funnel (dedup windows, interest pairs prune there).
-7. **Event union — or the tier above it.** New game-facing events join `Event`, and
+7. **Event union, or the tier above it.** New game-facing events join `Event`, and
    scriptgen's `SESSION_EVENTS` table if games should get generated halves. If your
    subsystem instead wants to *enter* game code, derive which of the
    [three tiers](#three-tiers-of-entry-into-your-code) it belongs to before writing the
-   proc type — and if it rides `SES_APP`, take the [relay](#the-host-relay-host_relay)
+   proc type; and if it rides `SES_APP`, take the [relay](#the-host-relay-host_relay)
    and the [queue](#the-riders-queue-appq) rather than a fifth copy of them.
    Adding a variant fails to compile in `kit/boot/forward.odin`, which holds the
    kit's own forwarding table as one exhaustive (non-`#partial`) switch. Give the new
    variant its row: the kit-side consequence (a lane forward, a widget repaint, a
    succession arm) or an empty case carrying the one word that says why the kit owes it
    nothing.
-8. **Fingerprint** — if your wire shape depends on game declarations (profile rows do),
+8. **Fingerprint**: if your wire shape depends on game declarations (profile rows do),
    fold it into the build fingerprint so version skew is refused at the door, not
    debugged in the field.
 
 See also: [kit/net](net.md) (the core underneath), [kit/netgd](netgd.md) (the transport
-binding), [kit/sim](sim.md) (the server-authority resim lane — everything on this page,
+binding), [kit/sim](sim.md) (the server-authority resim lane, everything on this page,
 identity through moderation, works unchanged beside it), [kit/comms](comms.md),
 [kit/combat](combat.md), [kit/items](items.md), [kit/ui](ui.md), [kit/save](save.md),
 [kit/steamgd](steamgd.md).

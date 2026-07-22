@@ -1,11 +1,11 @@
 # kit/ai — NPC verbs and the wave director
 
-Reach for `kit/ai` when the host needs NPCs that perceive, chase, flee, patrol — and a
-director that paces enemy waves. It supplies the *verbs*; you write the brain.
+Reach for `kit/ai` when the host needs NPCs that perceive, chase, flee, and patrol, as well
+as a director that paces enemy waves. It supplies the *verbs*; you write the brain.
 
 **Lane compatibility: COOP model, sim-safe math.** The patterns here assume the coop
-NPC shape — host-brained, owner-streamed poses. On the [sim lane](sim.md) an NPC is a
-server-ticked entity with `predict` fields, its brain in the AUTHORITY pass. The
+NPC shape: host-brained, owner-streamed poses. On the [sim lane](sim.md) an NPC is a
+server-ticked entity with `predict` fields, and its brain runs in the AUTHORITY pass. The
 perception/steering math is pure and safe in either; the wave director is
 authority-side logic and ports as-is. See [nav](nav.md) for the one genuinely
 dangerous crossing.
@@ -14,7 +14,7 @@ dangerous crossing.
 
 **Patterns, not a framework**: kit/ai has no Brain type, no behavior tree, no update loop.
 The game writes an ordinary `switch` over a replicated `state: u8` in its **host** tick,
-built from these verbs — cavecrawl's dweller is the documented example.
+built from these verbs. Cavecrawl's dweller is the documented example.
 
 An NPC is an entity **owned by the host player**: the host's brain tick writes `x/y` like
 any owner writes streamed fields, and every client interpolates the motion for free. Its
@@ -80,8 +80,8 @@ goal from [kit/nav](nav.md)'s `next_point`.
 ## The wave director
 
 The director decides *when* and *how many*; the game decides what and where (its spawn code
-runs per emitted spawn). One wave at a time, the next after the field is clear and a breather
-passes.
+runs per emitted spawn). Only one wave runs at a time, and the next one starts after the
+field is clear and a breather passes.
 
 ```odin
 Wave :: struct {
@@ -111,9 +111,9 @@ director_wave :: proc "contextless" (d: ^Director) -> int
 
 ## Worked example: the dweller's brain
 
-One think-tick per dweller, host only — perceive, then a plain switch. State and position
-are replicated fields; writing them *is* the AI's entire network presence
-(`examples/cavecrawl/scripts/host.odin`, `cave_dwellers_think`):
+Each dweller gets one think-tick per host tick, running host-only: it perceives, then runs a
+plain switch. State and position are replicated fields; writing them *is* the AI's entire
+network presence (`examples/cavecrawl/scripts/host.odin`, `cave_dwellers_think`):
 
 ```odin
 pos := [3]f32{dw.x, dw.y, 0}
@@ -162,11 +162,11 @@ through the [session](session.md) factory (`session_spawn_make` / `session_despa
   range silently drains the wave.
 - The director paces **one spawn per tick**. Don't loop it.
 - Per-NPC state that no one else needs (bite cooldowns, home dens) lives in a host-side
-  map (`self.brains[id]`), not in replicated fields — only the *consequences* (`x/y`,
+  map (`self.brains[id]`), not in replicated fields; only the *consequences* (`x/y`,
   `state`, `hp`) ship.
 - The host's own screen is only as smooth as the writer: the brain writes `x/y` in tick
   steps. `dweller_process` glides the node toward the sim with `kai.step_toward` at frame
-  rate (+50% slack), on every role — clients shadow the already-smooth stream, the host
+  rate (+50% slack), on every role: clients shadow the already-smooth stream, and the host
   smooths the tick steps.
 - `step_away` at distance zero picks +x arbitrarily; `nearest` with a nil blocker sees
   everything (open world).

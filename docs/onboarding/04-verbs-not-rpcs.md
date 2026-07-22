@@ -1,6 +1,6 @@
 # 4 · Verbs, not RPCs
 
-A **command** is how a player runs a mutation and lets the host decide whether it's true. You reach for one whenever a player acts on shared state — taking an item, opening a door, striking a ball. This post shows what a command replaces and how to write one.
+A **command** is how a player runs a mutation and lets the host decide whether it's true. You reach for one whenever a player acts on shared state: taking an item, opening a door, striking a ball. This post shows what a command replaces and how to write one.
 
 Here is "take an item from a chest" the way every RPC tutorial teaches it:
 
@@ -49,16 +49,17 @@ single-player code that validates and mutates its entity, returning whether it
 happened. The attribute generates `chest_take_cmd`, and calling that does the
 right thing wherever it's called:
 
-- **On the host:** run it. `true` → the mutation stands and the changed fields
-  ride the ordinary delta walk to everyone (post 3 — there is no separate sync
-  step; the state machinery is the sync step).
-- **On a client:** run it **immediately** — the item appears in the prediction
-  the same frame the player clicked — and send the intent to the host, which
-  runs *the same proc* as the authority. If the host also says `true`, the
-  client's prediction was right and nothing more happens.
-- **If the host says no** — out of range on the host's truth, item already
-  gone — the client's predicted mutation **reverts automatically**, and the
-  rejection carries the authoritative state back with it.
+- **On the host:** it runs directly. If it returns `true`, the mutation stands
+  and the changed fields ride the ordinary delta walk to everyone (see post 3;
+  there is no separate sync step, since the state machinery is the sync step).
+- **On a client:** it runs **immediately**, so the item appears in the
+  prediction the same frame the player clicked, and the intent is sent to the
+  host, which runs *the same proc* as the authority. If the host also says
+  `true`, the client's prediction was right and nothing more happens.
+- **If the host says no** (out of range according to the host's truth, or the
+  item is already gone), the client's predicted mutation **reverts
+  automatically**, and the rejection carries the authoritative state back with
+  it.
 
 Run the race that broke the RPC version: two players grab the last item in the
 same instant. Both predict success, so both screens show the grab instantly. The
@@ -75,7 +76,7 @@ the generated part.
 Command procs must accept three constraints.
 
 **A command mutates only its target.** `chest_take` touches the chest, period.
-It runs speculatively on clients and authoritatively on the host — if it also
+It runs speculatively on clients and authoritatively on the host. If it also
 credited your bag, sent chat, and played a sound, all of that would run twice,
 or on the wrong machine, or before it was true.
 
@@ -92,8 +93,8 @@ game_command_hook :: proc(user: rawptr, player: knet.Player_Id,
 }
 ```
 
-The hook fires on the authority for every executed command — a client's or the
-host's own — so there's exactly one place where consequences happen.
+The hook fires on the authority for every executed command (a client's or the
+host's own), so there's exactly one place where consequences happen.
 
 **Gate before you issue.** A predicted command that will obviously fail (no
 stamina, dead, on cooldown) should be checked before calling `chest_take_cmd` at
@@ -107,11 +108,11 @@ functions over plain data for this reason.
 ## Prediction in practice
 
 Wire it up and play with the built-in latency shim (every kit game exposes it as
-an env knob — 120ms of injected lag):
+an env knob that injects 120ms of lag):
 
 - Your clicks land **now**. Chests open, items move, doors unlock on your screen
   the frame you act.
-- Truth arrives a tenth of a second later and — almost always — agrees.
+- Truth arrives a tenth of a second later and, almost always, agrees.
 - When it disagrees, the revert is small and honest: the item you "took" fades
   back because someone else was faster. Players read that instantly.
 
@@ -122,14 +123,14 @@ verdicts is both responsive and honest, and it costs one attribute.
 ## Commands that transfer control
 
 Some verbs transfer *control* rather than items. Puttputt's golf mechanic is a
-strike command whose hook hands the ball's ownership to the striker — the ball
+strike command whose hook hands the ball's ownership to the striker: the ball
 becomes theirs to simulate (post 3's owner-streamed fields) until someone else
 putts. Grabbing, carrying, mounting, possession are all the same three lines.
 Ownership is just state.
 
 One question is left open. The loser's item "fades back a beat later," and a
-remote player's pickup effect has to play on your screen at some point — but
-*when*? Not simply "when the state changes"; the timing is the mental-model
-shift the next post covers.
+remote player's pickup effect has to play on your screen at some point, but
+*when*? It is not simply "when the state changes"; the timing is the
+mental-model shift the next post covers.
 
 *Next: [The two timelines →](05-the-two-timelines.md)*

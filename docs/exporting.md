@@ -31,19 +31,19 @@ library as a **sibling of the core dll** (via `dladdr`), since `res://` is packe
 
 > **Keep your scripts self-contained.** The exporter bundles `libodinscripts` but **not its
 > transitive native dependencies**. A pure-Odin scripts library is self-contained and ships
-> fine; but if your scripts `foreign import` a third-party native lib, that lib is **not**
-> bundled automatically — `dlopen` will fail on a player's machine (the game then runs with no
-> Odin scripts). If you pull in native deps, add them to the export yourself (e.g. another
-> `add_shared_object` via your own export plugin, or place them beside the executable).
+> fine. If your scripts `foreign import` a third-party native lib, however, that lib is **not**
+> bundled automatically, so `dlopen` will fail on a player's machine and the game will then run
+> with no Odin scripts. If you pull in native deps, add them to the export yourself (e.g.
+> another `add_shared_object` via your own export plugin, or place them beside the executable).
 
 **Script modules.** If the project uses [script modules](modules.md)
 (`res://modules/<name>/`), the export plugin builds **one optimized dll per module** and
-bundles each beside the main scripts dll — the exact sibling layout the exported game scans
-for at runtime. A module whose dll is missing **fails the export loudly, naming the module**, so an export
-never silently ships without a module's classes. The `BUILD_MODULES=0` env
-var skips modules at build *and* bundling — also loudly, because the result
-lacks the module classes; it is a scoped-build/CI switch, not a shipping configuration. On
-**web**, all modules compose into the single wasm. See
+bundles each beside the main scripts dll, which is the exact sibling layout the exported game
+scans for at runtime. A module whose dll is missing **fails the export loudly, naming the
+module**, so an export never silently ships without a module's classes. The `BUILD_MODULES=0`
+env var skips modules at build *and* bundling as well, and it does so just as loudly, because
+the result lacks the module classes; it is a scoped-build/CI switch, not a shipping
+configuration. On **web**, all modules compose into the single wasm. See
 [Script Modules — Exporting](modules.md#exporting-with-modules).
 
 ## Native desktop (macOS) — verified
@@ -64,9 +64,9 @@ out/Game.app/Contents/Frameworks/libodin_godot.dylib      (core — auto-exporte
 out/Game.app/Contents/Frameworks/libodinscripts.dylib     (scripts — bundled by the plugin)
 ```
 
-`tests/phase5/run.sh` reproduces this headless end to end (`PHASE5_OK`): build core → headless
-`--export-release "macOS"` (the plugin compiles + bundles the scripts dll) → run the exported
-`.app` headless and assert the Odin `_ready` ran.
+`tests/phase5/run.sh` reproduces this headless end to end (`PHASE5_OK`): it builds core, runs a
+headless `--export-release "macOS"` export (the plugin compiles and bundles the scripts dll),
+then runs the exported `.app` headless and asserts the Odin `_ready` ran.
 
 **macOS export gotchas:**
 
@@ -77,7 +77,7 @@ out/Game.app/Contents/Frameworks/libodinscripts.dylib     (scripts — bundled b
   `rendering/textures/vram_compression/import_etc2_astc=true` in `project.godot`, else export
   aborts.
 - Two non-fatal `Required virtual method … _update_exports / _get_script_signal_list` warnings
-  may print during the export's class scan. Harmless.
+  may print during the export's class scan. These are harmless.
 
 ## Cross-compile (Linux / Windows) — build-verified
 
@@ -94,7 +94,7 @@ nix develop .#cross --command bash -c 'bash build/build_cross.sh windows tests/p
 
 The outputs are the right format/arch and **export the entry symbol** (`tests/cross/run.sh`
 asserts this; gated to SKIP when no cross toolchain is present). These targets are
-**build-verified but NOT runtime-verified on this macOS host** — a Linux/Windows Godot has to
+**build-verified but NOT runtime-verified on this macOS host**. A Linux/Windows Godot has to
 load them. See **[distribution.md](distribution.md)** for the full status table, the
 packaged addon, and the exact CI steps to runtime-confirm.
 
@@ -102,8 +102,8 @@ packaged addon, and the exact CI steps to runtime-confirm.
 
 The full extension (core `ScriptLanguageExtension` + the generated binding + your compiled
 scripts) builds into **one Emscripten `SIDE_MODULE` wasm**, Godot's web export bundles it, and
-an Odin script's `_ready` **runs in a real browser** — verified by a headless-Chrome driver
-asserting the Odin script ran (and that a `@(gd_method)` returns the right value). The full
+an Odin script's `_ready` **runs in a real browser**. A headless-Chrome driver verifies this,
+asserting that the Odin script ran and that a `@(gd_method)` returns the right value. The full
 pure-Odin coin-collector game loop is also verified in-browser (`tests/web_showcase/`).
 
 ### Toolchain setup (one-time)
@@ -112,12 +112,12 @@ Web export needs the **Odin compiler** *and* **Emscripten** on the machine doing
 (the same as a desktop build, plus emcc). If you work from the Nix dev shell both are already
 present; if you installed the addon into your own project, set them up once:
 
-1. **Install the Emscripten SDK** — <https://emscripten.org/docs/getting_started/downloads.html>:
+1. **Install the Emscripten SDK** from <https://emscripten.org/docs/getting_started/downloads.html>:
    ```sh
    git clone https://github.com/emscripten-core/emsdk && cd emsdk
    ./emsdk install 4.0.20 && ./emsdk activate 4.0.20
    ```
-   **Pin 4.0.20** — it's the exact version Godot 4.6's web templates were built with, so the
+   **Pin 4.0.20**: it's the exact version Godot 4.6's web templates were built with, so the
    dylink/longjmp ABI matches. (Newer emcc generally works too; 4.0.20 is the safe default.)
 
 2. **Point the editor at the binaries.** When you launch Godot from Finder/Steam/the Project
@@ -127,7 +127,7 @@ present; if you installed the addon into your own project, set them up once:
    - `odin_godot/odin_bin` → your `odin`
    - `odin_godot/emcc_bin` → `…/emsdk/upstream/emscripten/emcc`
 
-   With those set, **web export Just Works from the export dialog** — the plugin finds the
+   With those set, **web export Just Works from the export dialog**: the plugin finds the
    tools, builds the wasm, and bundles it. Alternatively, launch the editor from a terminal
    where both are already on `PATH` (e.g. after `source ./emsdk/emsdk_env.sh`).
 
@@ -154,19 +154,19 @@ Requirements, all automated by the example projects:
 - The project `.gdextension` keeps its **native** `macos.*` entries **and** adds
   `web.{debug,release}.wasm32 = "res://bin/libodin_godot.wasm"`. The native entry is what loads
   the extension **on the macOS export host** so the loader recognizes your `.odin` files and
-  **packs them** into the `.pck` — without it the sources are excluded and base types can't
+  **packs them** into the `.pck`. Without it, the sources are excluded and base types can't
   resolve in the browser.
 - The Web export preset needs `variant/extensions_support=true` (selects Godot's dlink web
   runtime).
 - The editor's export plugin builds the wasm at export time (it shells `build/build_web.sh`),
   so the file the `.gdextension` references actually exists.
-- Script code must not import `core:os` — Odin's native OS layer doesn't compile for the wasm
-  target, so the export fails with `Undeclared name: _read_directory_iterator`-style compile
-  errors naming `core/os` files. Go through the engine instead: `gd.singleton_os()` +
+- Script code must not import `core:os`, because Odin's native OS layer doesn't compile for
+  the wasm target, so the export fails with `Undeclared name: _read_directory_iterator`-style
+  compile errors naming `core/os` files. Go through the engine instead: `gd.singleton_os()` +
   `gd.os_get_environment(...)` / `gd.os_has_environment(...)` work on every platform
   (see `examples/barrage/scripts/game_state.odin` for the pattern).
 - Odin's `int` is **32-bit on wasm32** (it's pointer-sized). Never store an engine 64-bit
-  value — above all **instance IDs** (`object_get_instance_id`) — in `int`: it compiles
+  value, above all **instance IDs** (from `object_get_instance_id`), in `int`: it compiles
   clean, works natively, and silently truncates on web, so `gd_instance_from_id` resolves to
   nothing (e.g. "enemies stopped dying, no errors"). Use `i64`/`gd.Int` for IDs and anything
   else that is 64-bit engine-side.
@@ -178,8 +178,8 @@ Cross-Origin-Opener-Policy:   same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-A plain static host or `python -m http.server` does **not** set these — the usual cause of "my
-web export won't start". The addon bundles a one-command Node server that does:
+A plain static host or `python -m http.server` does **not** set these, which is the usual
+cause of "my web export won't start". The addon bundles a one-command Node server that does:
 
 ```sh
 bash addons/odin_godot/build/serve.sh path/to/export_dir   # then open http://localhost:8099/
@@ -190,8 +190,10 @@ tick the **"SharedArrayBuffer support"** box in the HTML5 settings and it config
 
 ### Web caveats
 
-- **No hot reload** in the browser (no `dlopen`, one shared linear memory with the engine).
-- **No native debugging** — debug with `gd.print` → the JS console + browser devtools.
+- The browser offers **no hot reload** (there is no `dlopen`, and only one shared linear
+  memory is used with the engine).
+- **Native debugging isn't available**: debug with `gd.print`, which prints to the JS console
+  and browser devtools.
 - **Emscripten version:** Godot 4.6.2's web templates were built with emscripten **4.0.20**;
   the module runs with the dev shell's **5.0.6** too (`-sSUPPORT_LONGJMP=wasm` keeps the
   longjmp ABI self-contained and the dylink format is cross-compatible). To pin the exact

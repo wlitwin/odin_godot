@@ -1,11 +1,11 @@
 # Choosing a timeline model
 
 This toolkit ships four timeline models, each proven by a worked game. Every
-multiplayer bug you debug is the same question in different clothes — the ball
+multiplayer bug you debug is the same question in different clothes: the ball
 that moves before the kicker arrives, the shot that misses a target you were
-dead-on, the avatar that rubber-bands when it stops: **whose timeline is each
-thing on screen presenting from, and who arbitrates when two screens
-disagree?** Pick the model by what your game contests.
+dead-on, the avatar that rubber-bands when it stops. The question is always
+**whose timeline is each thing on screen presenting from, and who arbitrates
+when two screens disagree?** Pick the model by what your game contests.
 
 ## The four models
 
@@ -16,39 +16,39 @@ disagree?** Pick the model by what your game contests.
 | **Contested object** (kit/sim, claim) | mine NOW, others past, the OBJECT claim-weighted | the server | round-trip waits on YOUR touches | the claim discipline (below) | the lane's claim machinery + kitsim |
 | **Predict-world** (kit/sim, echo) | EVERYTHING at my predicted now | the server | mixed-timeline artifacts, wholesale | constant small corrections on remotes; resim per batch | speedball |
 
-Budgets, per row: the coop model's proven scale is 2–8 players (the session's
-default seat cap — the friendslop shape). Predict-self's worked example is
-duel-scale — quickdraw is a 1v1 — though `boot_serve` accepts up to 32 peers
-by default. Contested-object is proven at the same scale, headless (the kitsim
-acceptance tests run two-to-three peers over an in-memory wire). Predict-world's
-speedball is 1v1 too — larger sim seats, on every row of that half, are
-untested, not impossible.
+The budgets, per row, are these: the coop model's proven scale is 2–8 players
+(the session's default seat cap, the friendslop shape). Predict-self's worked
+example is duel-scale (quickdraw is a 1v1), though `boot_serve` accepts up to
+32 peers by default. Contested-object is proven at the same scale, headless
+(the kitsim acceptance tests run two-to-three peers over an in-memory wire).
+Predict-world's speedball is 1v1 too; larger sim seats, on every row of that
+half, are untested, not impossible.
 
 The session MACHINERY has numbers past the table size: the 32-seat unit
-proof (kitsession's `scale_32_seats` — real sessions over an in-memory
+proof (kitsession's `scale_32_seats`, real sessions over an in-memory
 wire, no engine) seats a 31-client join storm in ~4ms, broadcasts a
 32-entity world in ~5ms, and pays ~0.7ms per 20 Hz net tick for the
-worst case — every entity dirty every tick, per-peer interest collection
-— at ~40 bytes/tick/peer with interest filtering the freshness down to
+worst case (every entity dirty every tick, per-peer interest collection)
+at ~40 bytes/tick/peer, with interest filtering the freshness down to
 each seat's neighborhood. That is the machinery, measured; what 32 REAL
 processes do to a frame budget is the engine-tier proof, which wants a
 quiet box and is not claimed here.
 
-**A fifth model, not shipped here: deterministic lockstep** (the
-fighting-game answer — GGPO-style). It runs one timeline by CONSENSUS: every
+**A fifth model, not shipped here, is deterministic lockstep** (the
+fighting-game answer, GGPO-style). It runs one timeline by CONSENSUS: every
 peer simulates every tick from everyone's inputs, rolling back on late
 arrivals. Contact is bit-exact every frame, which is why the genre that is
 nothing but contact lives there. The costs are why nobody ships a 16-player
 lockstep shooter: cross-machine determinism (a tax the server-authoritative
-models here avoid — the server's word is final, so approximate re-execution
-self-heals), rollback cost that scales with peers, no referee (desyncs detect,
-aimbots see truth), and late-join that is nearly impossible. For a 1v1 game
-that is all contact, lockstep beats everything here; for everything else, one
-of the four above does.
+models here avoid, since the server's word is final, so approximate
+re-execution self-heals), rollback cost that scales with peers, no referee
+(desyncs detect, aimbots see truth), and late-join that is nearly impossible.
+For a 1v1 game that is all contact, lockstep beats everything here; for
+everything else, one of the four above does.
 
 ## How to choose
 
-Ask what is CONTESTED — fought over by players in real time:
+Ask what is CONTESTED (fought over by players in real time):
 
 - **Nothing, really** (co-op loot, building, exploration): the coop kit.
   Friends don't cheat friends, owner streams never mispredict, and the
@@ -57,7 +57,7 @@ Ask what is CONTESTED — fought over by players in real time:
 - **Aim** (shots at moving targets): predict-self + `lane_rewound`. Targets
   must render ACCURATELY (a delayed truth beats an extrapolated guess when
   a hit is judged against it), so remotes stay watched, and the rewind
-  reconstructs the shooter's exact drawn view — quickdraw's duel acceptance
+  reconstructs the shooter's exact drawn view. Quickdraw's duel acceptance
   test proves the shot that lands at 240ms RTT, A/B against the same duel
   judged live.
 - **One object** (the ball, the flag, the crown): contested + claim, or go
@@ -77,19 +77,19 @@ state does the same. One session carries all of it.
 Each rule below is pinned by a test in the suite.
 
 1. **Present consequences on the timeline of their cause.** The coop kit's
-   `session_present(mine?)` boolean, the sim lane's `lane_claim` — same
-   law. A remote cause presents beside its remotely-rendered actor; your
-   cause presents now.
-2. **The claim follows the cause and releases when the cause ends** — never
+   `session_present(mine?)` boolean and the sim lane's `lane_claim` enforce
+   the same law. A remote cause presents beside its remotely-rendered actor;
+   your cause presents now.
+2. **The claim follows the cause and releases when the cause ends**, never
    on distance. Your kick's whole flight is your consequence; releasing a
    claim on a fast object blends across `speed × timeline-skew` and pulls
    your own kick backward mid-flight.
 3. **Judge what was DRAWN.** Lag comp rewinds to the view bound to the
    very input that pulled the trigger (the ack that rode its packet, minus
-   the watch delay, blended to the exact bracket) — never the shooter's
+   the watch delay, blended to the exact bracket), never the shooter's
    freshest ack, which advances a whole lead-plus-transit between aiming
    and adjudication.
-4. **Extrapolation fails only at input changes** — so put INERTIA in the
+4. **Extrapolation fails only at input changes**, so put INERTIA in the
    movement model. A car can't stop instantly; that's not flavor, it's why
    Rocket League's remotes look smooth. Instant-velocity avatars turn every
    remote stop into a pull-back.
@@ -101,22 +101,23 @@ Each rule below is pinned by a test in the suite.
    speeds in the tick (every peer clamps identically), separate overlaps
    gradually along STABLE directions (center-to-center flips sign in deep
    overlap), push along motion. Prediction quality and feel are the same
-   fix. (`psim.Roller` packages #5 and #6 — embed it and both hold by
-   construction; speedball's ball is the worked proof.)
+   fix. (`psim.Roller` packages #5 and #6: embed it and both hold by
+   construction. Speedball's ball is the worked proof.)
 7. **Corrections are for divergence, not float noise.** Exact compares
    resim on every batch of held-input drift; a float epsilon
    (`Lane_Config.tolerance`) lets sub-pixel drift ride until it
-   accumulates. Discrete fields never get slack — a differing flag byte is
+   accumulates. Discrete fields never get slack: a differing flag byte is
    a real event.
 8. **Authority snaps; the eye glides.** Sim state adopts truth instantly,
    the render error decays with a half-life, and a big-enough jump CUTS
-   (smoothing a teleport looks worse than the teleport). Everywhere: the
-   puppet, the lane's glide, predict-world's remote corrections.
+   (smoothing a teleport looks worse than the teleport). This holds
+   everywhere: the puppet, the lane's glide, and predict-world's remote
+   corrections.
 
 ## Reading order
 
-[sim](sim.md) for the machinery; `examples/quickdraw` then
-`examples/speedball` as the worked contrasts — and read speedball against
+Read [sim](sim.md) for the machinery, then `examples/quickdraw` and
+`examples/speedball` as the worked contrasts. Read speedball against
 [slopball](../../examples/slopball/README.md), the same game on the coop
 model, to feel what each arbiter buys. Deeper design notes live in the
 project's `server-authority-resim-companion` ledger.
@@ -128,7 +129,7 @@ hybrid is a supported end state.
 
 ## Gameplay modules
 
-The session layer is identical on both netcodes — identity, chat, transfers,
+The session layer is identical on both netcodes: identity, chat, transfers,
 saves, and the boot ride along untouched. The gameplay modules were grown on
 the coop model; each doc opens with its lane stance:
 

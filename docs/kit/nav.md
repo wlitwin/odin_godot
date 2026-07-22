@@ -5,17 +5,17 @@ engine already owns the hard parts (nav meshes, region merging, funnel pathfindi
 kit/nav makes the two calls a game actually needs ergonomic, in both dimensions.
 
 **Lane compatibility: never call these queries inside a resimulating pass; the module
-enforces it.** These calls query the NavigationServer — live engine state that does not
-rewind. Inside `@(gd_tick)` or the everywhere `@(gd_step)`, a resim replay queries today's
-mesh for yesterday's ticks and diverges from the prediction it is rebuilding — the same rule
-as [engine casts](sim.md). A mispredicted cast snaps back, but a bad path *steers*, so the
-error compounds every tick.
+enforces it.** These calls query the NavigationServer, which holds live engine state that
+does not rewind. Inside `@(gd_tick)` or the everywhere `@(gd_step)`, a resim replay queries
+today's mesh for yesterday's ticks and diverges from the prediction it is rebuilding. This is
+the same rule as [engine casts](sim.md). A mispredicted cast snaps back, but a bad path
+*steers*, so the error compounds every tick.
 
 Every query is default-denied: it asserts that some enclosing scope has called
 `pass_never_resims()`, the caller's claim about its own lane. Two scopes may claim it: a coop
 host's own tick (the host never resims) and the sim lane's `@(gd_step = "authority")` pass
 (the authority never resims). Path *following* from a stored polyline is pure math and
-sim-safe anywhere — only the *query* is gated.
+sim-safe anywhere; only the *query* is gated.
 
 ## Mental model
 
@@ -69,7 +69,7 @@ same map.
 
 ## Worked example: cavecrawl (`examples/cavecrawl`)
 
-Cavecrawl's floors are authored scenes, so the walkable cave is authored too — a
+Cavecrawl's floors are authored scenes, so the walkable cave is authored too. A
 `NavigationRegion2D` sits in `levels/level_1.tscn` beside the chest and den markers, its
 polygon a big floor minus a **rift**. Every peer loads that scene locally; only the host ever
 queries it.
@@ -114,13 +114,13 @@ standing. The cost is one `map_get_path` per agent per tick, at 20 Hz, for singl
 waves.
 
 **An empty path is not an error and must not be a freeze.** It means unreachable *or*
-not-yet-synced — cavecrawl's regions enter the tree with the floor's scenery, a few frames
+not-yet-synced: cavecrawl's regions enter the tree with the floor's scenery, a few frames
 before the first den opens. Falling back to the straight-line `step_toward` keeps a wave
 moving through that gap.
 
 **The fallback is silent, so the game prints a marker.** A navmesh that failed to load would
 leave every dweller walking straight and every test still passing. A path with an interior
-corner can only have come from the mesh, so the host prints `CAVE_NAV_BENT` once — the
+corner can only have come from the mesh, so the host prints `CAVE_NAV_BENT` once. This is the
 integration test's proof that the rift is walked *around* and not through.
 
 Pathfinding never reaches the wire: the dweller's `x/y` are ordinary owner-streamed
@@ -132,16 +132,16 @@ respects the terrain and run no navigation code at all.
 - **The lane claim is an assert, not a fallback.** An empty path is a legitimate answer, so
   a silent fallback in place of a lane violation would swallow the one bug this module exists
   to prevent.
-- **Regions sync into the map on the server's physics cadence** — a path queried the frame
+- **Regions sync into the map on the server's physics cadence**, so a path queried the frame
   a region enters the tree is empty. Brains that re-query every think-tick (the normal
   pattern) shrug this off; one-shot queries must wait a few frames (`tests/kitnav` waits 5
   and retries).
-- An empty slice means *unreachable or not-yet-synced* — treat it as "stand still and ask
+- An empty slice means *unreachable or not-yet-synced*; treat it as "stand still and ask
   again" or "fall back to the dumb line", never as an error.
 - The caller owns the returned slice. Pass `context.temp_allocator` for per-tick queries,
   or remember to free.
 - `next_point` needs a persistent cursor per follower, reset to 0 per fresh path. Don't
-  nearest-scan the path statelessly — consumed waypoints must never be re-targeted or the
+  nearest-scan the path statelessly: consumed waypoints must never be re-targeted, or the
   follower walks backwards.
 - **Path *around*, don't flee *around*.** Fleeing has a direction, not a destination, so
   cavecrawl's flee branch stays on `kai.step_away` and never queries. A panicked agent can

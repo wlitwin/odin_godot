@@ -2,22 +2,22 @@
 
 This page gets you from an empty folder to **two windows moving squares on
 both screens** in about ten minutes. Every line below is real, shipped code
-from `examples/hello_net/` — copy the folder outright, or type along. (Want to
+from `examples/hello_net/`. Copy the folder outright, or type along. (Want to
 *feel* it before reading anything? `examples/slopball` in two windows is the
 five-minute version: `bash build/build_scripts.sh examples/slopball`, then
 run `$GODOT --path examples/slopball` twice, Host in one, Join in the other.)
 
-Prerequisite: the toolchain from [Getting Started](../getting-started.md) —
-`nix develop` in this repo, or the installed addon in your own project (then
-`addons/odin_godot/build/build_scripts.sh` is the build command below).
+Prerequisite: the toolchain from [Getting Started](../getting-started.md),
+either `nix develop` in this repo or the installed addon in your own project
+(then `addons/odin_godot/build/build_scripts.sh` is the build command below).
 
 ## The whole game: two files
 
 A kit game is declarations plus plain procs. You write **no RPCs, no role
-branches, no spawn messages, and no interpolation code** — none of that
+branches, no spawn messages, and no interpolation code**. None of that
 appears below.
 
-**`scripts/player.odin`** — one player's square. The struct *is* the
+**`scripts/player.odin`**: one player's square. The struct *is* the
 netcode: `x`/`y` are owner-streamed (you write your own; every other screen
 interpolates them), `pid` rides the host's reliable lane:
 
@@ -65,7 +65,7 @@ player_freed :: proc(game: ^HelloNet, self: ^Player, id: knet.Net_Id) {
 }
 ```
 
-**`scripts/hello.odin`** — the game. One struct field declares the entity
+**`scripts/hello.odin`**: the game. One struct field declares the entity
 (the tag mints the wire id, the factory, a typed `player_spawn()`, the
 census, and the test probes); `boot_attach` brings the stock lobby, chat,
 transport, and reconnect; the event *halves* at the bottom are how the game
@@ -201,8 +201,8 @@ address-only forms; see the join-codes bullet below.
 Two tiny scenes wire it into the editor: `player.tscn` (a `Node2D` with the
 Player script and a `Skin` Polygon2D square) and `hello.tscn` (a `Node2D`
 with the HelloNet script, its `player_scene` export pointed at
-`player.tscn`). `examples/hello_net/*.tscn` are both under 15 lines of text.
-Plus the standard `project.godot` (main scene = `hello.tscn`) and the
+`player.tscn`). `examples/hello_net/*.tscn` are both under 15 lines of text,
+plus the standard `project.godot` (main scene = `hello.tscn`) and the
 `odin_godot.gdextension` from the template.
 
 ## Run it
@@ -213,36 +213,36 @@ $GODOT --path examples/hello_net &                # window 1: press Host
 $GODOT --path examples/hello_net                  # window 2: press Join
 ```
 
-**Checkpoint:** two colored squares in both windows; arrows move *your*
-square, and the other window's copy glides after it. That glide is the
-owner-stream + interpolation you declared with `gd:"owner,interp"`
-— you wrote none of it.
+**Checkpoint:** you should see two colored squares in both windows; arrows
+move *your* square, and the other window's copy glides after it. That glide
+is the owner-stream + interpolation you declared with `gd:"owner,interp"`.
+You wrote none of it.
 
 Then test under real latency: `HELLO_LATENCY=120 $GODOT --path
 examples/hello_net` injects 120ms each way (every kit game gets the
 `<ENV>_LATENCY/_JITTER/_LOSS` shim from `Options.env`). The remote square
 lags visibly; yours never does. `examples/hello_net/run.sh` runs this exact
-scenario as its first act — two processes, generated probes, one verdict —
+scenario as its first act (two processes, generated probes, one verdict),
 then a second act joins by code through the relay; the
 [testing guide](testing.md) is how you grow your own.
 
 ## Where to go next
 
-- A **verb** (an action the host must validate — loot, doors, purchases):
-  `@(gd_command)` + a `_then` half — [net.md](net.md), or cavecrawl's
+- A **verb** (an action the host must validate: loot, doors, purchases):
+  `@(gd_command)` + a `_then` half; see [net.md](net.md), or cavecrawl's
   41-line `chest.odin`.
 - A **reaction to state changing** (score flash, death jingle):
-  a `<class>_<field>_edge` half — [net.md](net.md#edges-class_field_edge--presenting-delta-lane-changes).
-- **Physics bodies** (a real RigidBody2D all peers see): `play.Puppet` —
-  slopball is the worked example.
-- **Save/resume, reconnect, host migration, Steam**: already on — see
+  a `<class>_<field>_edge` half; see [net.md](net.md#edges-class_field_edge--presenting-delta-lane-changes).
+- **Physics bodies** (a real RigidBody2D all peers see): `play.Puppet`,
+  with slopball as the worked example.
+- **Save/resume, reconnect, host migration, Steam**: already on; see
   [session.md](session.md) for what the stock stack gave you.
 - **Join codes** ("send your friend `KWXP`" instead of an IP): swap
-  `boot_host` for `boot_host_coded` and join with `boot_join_code` — the
+  `boot_host` for `boot_host_coded` and join with `boot_join_code`. The
   full `hello.odin` carries the optional relay branch;
   [netgd.md](netgd.md#join-codes-for-native-enet-codeodin) covers the options.
 - **Competitive play** (server authority, prediction, lag comp): the sim
-  lane — [quickstart-sim.md](quickstart-sim.md) promotes THIS game, then
+  lane: [quickstart-sim.md](quickstart-sim.md) promotes THIS game, then
   [sim.md](sim.md).
 - **Glossary**: halves, census, doors, and integration tests each get a
   paragraph in the [glossary](glossary.md).

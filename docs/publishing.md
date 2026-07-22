@@ -25,8 +25,8 @@ zip. The rest of this page is the end-to-end runbook.
    ```
 
 3. Make an account at <https://godotengine.org/asset-library/> (GitHub login works) and
-   submit the asset (form fields below). First-time submissions are human-reviewed —
-   typically days to a couple of weeks.
+   submit the asset (form fields below). First-time submissions are human-reviewed, and the
+   process typically takes days to a couple of weeks.
 
 ## The submission form
 
@@ -45,13 +45,13 @@ zip. The rest of this page is the end-to-end runbook.
 
 Suggested description (edit to taste):
 
-> Write Godot scripts in Odin. A full ScriptLanguageExtension: attach a .odin file to any
-> node and its lifecycle, @exports, signals, methods, RPCs and hot reload work like
-> GDScript — but compiled, AOT-native code. Ships prebuilt core libraries (macOS / Windows /
-> Linux), an in-editor build pipeline (save-to-reload), native + HTML5/WASM export, typed
-> access to the whole engine API, and a starter template. Requires the Odin compiler (the
-> bundled README names the exact pinned release). macOS is fully verified; Windows/Linux
-> are early — reports welcome.
+> Write Godot scripts in Odin. It is a full ScriptLanguageExtension: attach a .odin file to
+> any node, and its lifecycle, @exports, signals, methods, RPCs, and hot reload work like
+> GDScript, but the code is compiled, AOT-native code. It ships prebuilt core libraries
+> (macOS / Windows / Linux), an in-editor build pipeline (save-to-reload), native + HTML5/WASM
+> export, typed access to the whole engine API, and a starter template. It requires the Odin
+> compiler (the bundled README names the exact pinned release). macOS is fully verified;
+> Windows/Linux are early, and reports are welcome.
 
 ## Releasing an update
 
@@ -72,7 +72,7 @@ git push origin main release --tags
   `xattr -dr com.apple.quarantine addons/odin_godot`. (Long-term: codesign/notarize the
   dylibs.)
 - **`godot --import` exit code**: with any GDExtension, headless `--import` can crash *at
-  exit, after a successful import* (engine bug — see the known-quirk note in
+  exit, after a successful import* (an engine bug; see the known-quirk note in
   [distribution.md](distribution.md)). If a user's CI gates on it, point them at that note.
 - The addon's prebuilt core pins the consumer's **Odin compiler release** (the core↔scripts
   ABI handshake); the addon README states the exact version. Expect "which Odin do I

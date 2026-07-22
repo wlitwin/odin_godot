@@ -9,15 +9,15 @@ driver reads the world through. Reach for the harness whenever you need to
 prove a multiplayer behavior holds across real processes on a real network.
 The reference consumer is `examples/cavecrawl/run.sh`, a four-act test
 covering the story, save/resume, match flow plus moderation, and host
-migration under `kill -9` — all of its plumbing is the harness.
+migration under `kill -9`. All of its plumbing is the harness.
 
 ## The test shape
 
 Launch N *real* headless processes of your *real* main scene under an
 injected bad link (`netgd`'s shim, driven by your `*_LATENCY` / `*_JITTER`
-/ `*_LOSS` env vars — a slow wire, a wobbly one, a lossy one). A GDScript
-`SceneTree` driver presses the same `@(gd_method)`s your buttons fire — no
-mocks anywhere — and prints an UPPERCASE tag for every fact worth
+/ `*_LOSS` env vars: a slow wire, a wobbly one, a lossy one). A GDScript
+`SceneTree` driver presses the same `@(gd_method)`s your buttons fire (no
+mocks anywhere) and prints an UPPERCASE tag for every fact worth
 asserting. Your `run.sh` sources the harness, wraps each scenario in an
 **act**, and asserts over the **logs**:
 
@@ -45,21 +45,20 @@ fslp_verdict MYGAME            # MYGAME_OK / MYGAME_FAIL
 
 ## Harness reference
 
-- `fslp_act NAME TRIES FN` — per-act retries on fresh ports. A bind
+- `fslp_act NAME TRIES FN` gives per-act retries on fresh ports. A bind
   conflict costs a try, not the run; a spent act fails the run, but later
   acts still execute, so one run reports every finding.
-- `fslp_ready LOG PATTERN SECS PID` — wait for a receipt before launching
+- `fslp_ready LOG PATTERN SECS PID` waits for a receipt before launching
   the next peer, failing fast if the process died (the port-in-use race).
-- `fslp_wait_all SECS PIDS...` — drivers exit themselves after
-  `ROLE_DONE`/`ROLE_FAIL`; this waits for that, and reaps stragglers only
-  past the deadline.
-- `fslp_reap [PIDS...]` — TERM, a grace period for stdout to flush, then
-  `-9`. A raw `kill -9` truncates the log buffer. Call `kill -9` yourself
-  when the crash IS the test — cavecrawl's migration act kills its host
-  mid-sentence, because the crash is what it asserts on.
-- `expect` / `expect_same` / `expect_absent` / `expect_count` — the assert
-  vocabulary. All of them flip `FSLP_OK`, so a hand-rolled `grep` for an
-  act's odd shape (asserting across two logs at once, exact counts)
+- `fslp_wait_all SECS PIDS...` waits for drivers to exit themselves after
+  `ROLE_DONE`/`ROLE_FAIL`, and reaps stragglers only past the deadline.
+- `fslp_reap [PIDS...]` sends TERM, allows a grace period for stdout to
+  flush, then sends `-9`. A raw `kill -9` truncates the log buffer. Call
+  `kill -9` yourself when the crash IS the test: cavecrawl's migration act
+  kills its host mid-sentence, because the crash is what it asserts on.
+- `expect` / `expect_same` / `expect_absent` / `expect_count` form the
+  assert vocabulary. All of them flip `FSLP_OK`, so a hand-rolled `grep`
+  for an act's odd shape (asserting across two logs at once, exact counts)
   composes freely with them.
 
 ## Generated probes
@@ -76,7 +75,7 @@ probe_<kind>_<field>(id)       # any replicated SCALAR field; id 0 = mine
 So `game.probe_kicker_hp(0)` in `driver.gd` reads what this peer's screen
 believes, with zero game code. Probes read the same replicated state your
 HUD renders (on a sim-lane game: presentation truth, after `lane_present`).
-Hand-write only the genuinely game-shaped reads — a derived view (a
+Hand-write only the genuinely game-shaped reads: a derived view (a
 predicted-hp overlay), a nearest-scan, a formatted compound. A hand-written
 proc that takes a probe's name suppresses the generated probe of that name.
 
@@ -84,18 +83,18 @@ proc that takes a probe's name suppresses the generated probe of that name.
 
 - **Verdicts come from logs, not exit codes.** The launch subshell owns
   the pids; drivers print `ROLE_DONE` / `ROLE_FAIL` instead.
-- **Assert each fact on every peer that should observe it**, and
-  byte-identical (`expect_same`) where determinism matters — seeds,
+- **Assert each fact on every peer that should observe it**, and assert
+  byte-identical (`expect_same`) where determinism matters: seeds,
   checksums, blob contents.
 - **Branch on what the process BECAME, not what you launched.** Under
   simultaneous joins, which peer seats as player 2 is a race; role-agnostic
   drivers plus asserts over concatenated logs survive it.
 - **Edges need dwells.** A flag flipped and cleared within one poll
-  interval is invisible — hold state long enough for the slowest poller
-  (and the slowest *screen* — see "The two timelines" in [net.md](net.md)).
+  interval is invisible, so hold state long enough for the slowest poller
+  (and the slowest *screen*; see "The two timelines" in [net.md](net.md)).
 - **Exact-value asserts on another peer's fluctuating fields are traps**
   (hp mid-regen); assert ranges or your own printed truth.
 - **Test above 100ms.** Prediction bugs, edge-order bugs, and feel bugs are
   invisible on localhost; every reference test injects 120ms+ (and the shim
-  does jitter and loss too — a flaky wire is a different test than a slow
+  does jitter and loss too; a flaky wire is a different test than a slow
   one).

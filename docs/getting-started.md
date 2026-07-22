@@ -15,7 +15,7 @@ script. By the end you'll have a Node that prints on `_ready` and moves every fr
 
 ## 1. Install the toolchain (Nix)
 
-Everything is pinned in a Nix flake — Odin, the `ols` language server, LLVM/lld, Emscripten,
+Everything is pinned in a Nix flake: Odin, the `ols` language server, LLVM/lld, Emscripten,
 Node, and a `$GODOT` pointing at Godot 4.6.2. You need [Nix with flakes enabled](https://nixos.org/)
 and Godot 4.6.x installed.
 
@@ -44,7 +44,7 @@ An odin_godot project needs three things beyond your normal Godot project:
 
 1. **A `.gdextension` manifest** that loads the compiled **core** dll.
 2. **A `scripts/` package** containing your `.odin` scripts (the required boot shim is
-   generated for you — see 2b).
+   generated for you; see 2b).
 3. **A build** (`build/build_scripts.sh`) that compiles your scripts (and the core) into the
    project's `bin/`.
 
@@ -71,7 +71,7 @@ web.debug.wasm32 = "res://bin/libodin_godot.wasm"
 web.release.wasm32 = "res://bin/libodin_godot.wasm"
 ```
 
-`entry_symbol = "odin_godot_init"` is the core's GDExtension entry point — it registers the
+`entry_symbol = "odin_godot_init"` is the core's GDExtension entry point. It registers the
 "Odin" scripting language so the editor recognizes `.odin` files. The **core** dll is what the
 manifest loads; the **scripts** dll (`libodinscripts.dylib`) is loaded *by* the core at runtime,
 so it is not listed here.
@@ -82,7 +82,7 @@ All of a project's `.odin` scripts compile into **one Odin package** (one shared
 package name and use the *same* `package` line at the top of every `.odin` file in the
 directory.
 
-That package needs one init shim — an `@(export) odin_scripts_boot` the core calls right after
+That package needs one init shim: an `@(export) odin_scripts_boot` the core calls right after
 it loads the dll, so the dll initializes its own `gdext`/`godot` package globals. **`scriptgen`
 generates this for you** as `scripts/odin_godot_boot.gen.odin` on every build, so you normally
 write nothing. For reference, the generated file is:
@@ -125,7 +125,7 @@ similarly points at `ols`.) These settings are summarized in
 ## 3. Write your first script
 
 Create `scripts/mover.odin`. This is a `Node2D` that prints once on `_ready` and walks right
-every frame — built only from constructs verified in the showcase and survivors examples:
+every frame, built only from constructs verified in the showcase and survivors examples:
 
 ```odin
 //gd:extends Node2D       // the Godot base class this script extends
@@ -157,15 +157,15 @@ mover_process :: proc(self: ^Mover, delta: f64) {
 A few rules this demonstrates (full details in the [Authoring Guide](authoring-guide.md)):
 
 - **One script struct per file**, identified by its first field being named `owner`.
-- **Prefix proc names with the struct name** (`mover_ready`, `mover_process`) — all scripts
-  share one package, so the prefix avoids collisions and is stripped to derive the
+- **Prefix proc names with the struct name** (`mover_ready`, `mover_process`). All scripts
+  share one package, so the prefix avoids collisions, and the prefix is stripped to derive the
   GDScript-facing name.
 - The `//gd:` comment markers declare the class. `//gd:extends` names the base class and the
-  `owner` field is the handle you use in code — the two are cross-checked (the handle must be
+  `owner` field is the handle you use in code. The two are cross-checked (the handle must be
   the base or an ancestor of it), and `//gd:extends` may be omitted entirely, in which case the
   base is derived from the handle.
 
-You do **not** write the registration boilerplate — `build/build_scripts.sh` runs `scriptgen`,
+You do **not** write the registration boilerplate: `build/build_scripts.sh` runs `scriptgen`,
 which emits a sibling `mover.gen.odin` (a build artifact you never edit) next to your source.
 
 ## 4. Build
@@ -186,7 +186,7 @@ defaults the scripts dir to `<project>/scripts`.)
 1. Open the project in Godot (`$GODOT --path /path/to/your/project`, or via the Project
    Manager). The editor loads `odin_godot.gdextension` and recognizes `.odin` files.
 2. Add a **`Node2D`** to your scene (the base must match `//gd:extends`).
-3. In the Inspector's **Script** slot, attach `res://scripts/mover.odin` — the same file you
+3. In the Inspector's **Script** slot, attach `res://scripts/mover.odin`, the same file you
    wrote (there is no separate resource stub; the `.odin` *is* the attachable script).
 4. The Inspector now shows the **Speed** `@export` (default 120).
 5. **Run the scene.** You'll see `Mover ready!` in the Output panel and the node walking
@@ -201,11 +201,11 @@ $GODOT --headless --path /path/to/your/project --quit-after 30   # smoke test
 
 ## Next steps
 
-- **Building multiplayer?** → the [co-op quickstart](kit/quickstart.md): zero to two
-  windows moving a player, two small files.
-- **[Authoring Guide](authoring-guide.md)** — exports of every type, signals, methods,
-  resources, cross-script calls, autoloads, the full `gd.*` helper catalog.
-- **[Workflow](workflow.md)** — the edit→reload loop, editor squiggles/autocomplete, and
+- **Building multiplayer?** → the [co-op quickstart](kit/quickstart.md): it takes you from
+  zero to two windows moving a player, in two small files.
+- **[Authoring Guide](authoring-guide.md)** covers exports of every type, signals, methods,
+  resources, cross-script calls, autoloads, and the full `gd.*` helper catalog.
+- **[Workflow](workflow.md)** covers the edit→reload loop, editor squiggles/autocomplete, and
   debugging.
-- Read `examples/survivors/scripts/*.odin` — each is heavily commented to teach one feature.
+- Read `examples/survivors/scripts/*.odin`. Each is heavily commented to teach one feature.
 </content>

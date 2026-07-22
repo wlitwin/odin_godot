@@ -2,13 +2,13 @@
 
 Every co-op (friendslop) project opens the same way: `ready()` builds a
 lobby/chat/scoreboard/stage/world/wire stack, and `process()` runs a
-pump-tick-drain preamble plus five stock event reactions — about a hundred
+pump-tick-drain preamble plus five stock event reactions, about a hundred
 lines of setup before any game code. `kit/boot` provides exactly that shared
 shell, and nothing game-shaped. Every widget and every reaction stays yours;
 boot owns only the boilerplate between them.
 
-Reach for boot when you want the standard friendslop lifecycle — menu →
-lobby → play, host/join, chat, roster, host migration — without hand-writing
+Reach for boot when you want the standard friendslop lifecycle (menu →
+lobby → play, host/join, chat, roster, host migration) without hand-writing
 it. A game that prefers to drive `netgd`/`ksess` directly can still call
 `boot_pump` for the loop and read `boot_phase` for the lifecycle, taking only
 the pieces it uses.
@@ -38,8 +38,8 @@ my_game_step(self, ticks)     // @(gd_step="authority") pass: host gate + edge p
 my_game_events(self, events)  // session-event dispatch over the declared halves (session.md)
 ```
 
-`boot_pump` returns three values: `events` (every session event this frame),
-`marks` (the comms markers) — both temp-allocated — and `ticks` (how many
+`boot_pump` returns three values: `events` (every session event this frame)
+and `marks` (the comms markers), both temp-allocated, plus `ticks` (how many
 fixed net ticks fired this frame). `my_game_step` and `my_game_events` are
 generated; the sections below cover each.
 
@@ -47,13 +47,13 @@ generated; the sections below cover each.
 
 The `methods` list names eight `@(gd_method)` procs declared in *your* script,
 because Godot signals must land on the game's class. Their bodies are
-one-liners — see either example game's `net.odin`. scriptgen validates every
+one-liners; see either example game's `net.odin`. scriptgen validates every
 name in `methods` against the class's registered methods at build time, so a
 typo'd forward is a build error. An empty string `""` skips a signal.
 
-Four of the eight — `on_host`, `on_join`, `on_start`, `on_chat` — you write.
-The other four — `on_packet`, `on_peer_left`, `on_net_up`, `on_net_down` — are
-the transport forwards, and boot generates their bodies (see [Transport
+You write four of the eight: `on_host`, `on_join`, `on_start`, and `on_chat`.
+The other four, `on_packet`, `on_peer_left`, `on_net_up`, and `on_net_down`,
+are the transport forwards, and boot generates their bodies (see [Transport
 forwards](#transport-forwards)); `methods` still names them.
 
 ## Count time in net ticks, not frames
@@ -123,18 +123,18 @@ host's reason, kicked).
 `boot_phase(b)` returns the coarse lifecycle as a `Boot_Phase`, the
 `running`/`started` latch pair answered once:
 
-- `.Menu` — no seat and none coming; the Host/Join doors are showing.
-- `.Connecting` — a join is in flight (a code at the phonebook, or a survivor's
+- `.Menu`: no seat is held and none is coming; the Host/Join doors are showing.
+- `.Connecting`: a join is in flight (a code at the phonebook, or a survivor's
   host-migration chase).
-- `.Lobby` — seated; hosting counts.
-- `.Playing` — the world reached this screen (first spawn, state, or resync).
+- `.Lobby`: a seat is held; hosting counts as this phase too.
+- `.Playing`: the world reached this screen (first spawn, state, or resync).
 
 The phase is derived, not tracked. Each answer is read off the session (`ran` /
 `joined` / `join_waited`) plus boot's own rendezvous, so a game that ran the raw
-way — `netgd`/`ksess` by hand, `boot_pump` for everything after — still gets a
+way (`netgd`/`ksess` by hand, `boot_pump` for everything after) still gets a
 truthful phase without touching a door.
 
-The one fact nothing below boot knows — the world reached this screen — is the
+The one fact nothing below boot knows (the world reached this screen) is the
 single latch boot keeps, and `boot_pump` is its only writer: raised in the drain
 on the first spawn/state/resync, dropped at the top of any frame that finds no
 seat. (`boot_open_host` drops it too, for the one re-seat with no unseated
@@ -147,7 +147,7 @@ dial restarts the session as a client.
 `boot_phase` is a level. A swap that must happen exactly once (hide the lobby,
 print a receipt) wants the rising edge, and no bool is needed: `boot_pump` is
 the only place the phase rises, so read the phase before the pump and compare
-after — see `examples/hello_net`'s `process`.
+after. See `examples/hello_net`'s `process`.
 
 ## Teardown: boot_detach
 
@@ -157,18 +157,19 @@ pre-attach state, so a fresh `boot_attach` rebuilds everything.
 
 Call `boot_detach` on one flow: **back to menu, then re-host or re-join in the
 same live process.** It is the game's explicit verb, wired to no scene-exit
-hook — a game returning to its menu calls it. Skip it before a re-host in the
+hook: a game returning to its menu calls it. Skip it before a re-host in the
 same process and the previous run's tracking arrays, wire containers, and entity
 ledgers leak, and a second `ui_layer`/`stage`/`world` stacks onto the first. When
 the engine tears the whole node down it frees the same nodes anyway (boot lives
 as long as its node) and the Odin memory dies with the process, so there is
 nothing to hook.
-`boot_detach` is idempotent: safe on an already-detached (zeroed) `Boot`.
+`boot_detach` is idempotent: it is safe to call on an already-detached
+(zeroed) `Boot`.
 
 **The ownership rule**, one line per layer: boot lives as long as its node;
 below boot, X destroys what X inits; node trees belong to the scene. Boot
 created the container nodes (`ui_layer` / `stage` / `world`), so `boot_detach`
-queue-frees those — and the widgets, the legend, and the world's entities
+queue-frees those, and the widgets, the legend, and the world's entities
 parented under them ride the subtree down with one free each. The [kui
 `*_destroy`](ui.md) calls free only their Odin-side tracking arrays (the nodes
 belong to the container, i.e. boot); `netgd.wire_detach` frees the wire's own
@@ -179,7 +180,7 @@ gauge and shim containers. Nothing is freed twice.
 On desktop, boot turns vsync off and caps at 120fps. Friendslop games get
 playtested as two windows on one laptop, and with vsync on, the OS pacing an
 occluded window's present makes the background instance *simulate* slow, not
-just draw slow — the whole main loop blocks on the compositor, and every
+just draw slow. The whole main loop blocks on the compositor, and every
 timeline-synced screen stutters for it.
 
 The unthrottle is dev-builds-only, keyed on the build flag `-disable-assert`
@@ -202,17 +203,17 @@ boot_open_host(b, t: ^netgd.Transport, at: netgd.Endpoint, name, token = 0, dedi
 boot_open_join(b, t: ^netgd.Transport, at: netgd.Endpoint, name, token, spectate = false, status = "Joining...") -> bool
 ```
 
-Every named door on this page is those two plus a status line. The ritual —
+Every named door on this page is those two plus a status line. The ritual,
 reconnect identity, [host-migration](netgd.md#swapping-transports) config (its
 flavor comes from the transport's own record, so a door is never told twice),
-phase, menu, chat, roster — is written once, and a new transport inherits all of
-it by filling a `netgd.Transport`. Steam gets both doors for the price of one
-record (`ksteam.TRANSPORT` — [steamgd.md](steamgd.md)).
+phase, menu, chat, and roster, is written once, and a new transport inherits
+all of it by filling a `netgd.Transport`. Steam gets both doors for the price
+of one record (`ksteam.TRANSPORT`, documented in [steamgd.md](steamgd.md)).
 
 ### Dedicated server
 
 `boot_serve(b, port, name)` is the dedicated-server door: same transport, but
-the authority holds an infrastructure seat — no avatar, no roster row,
+the authority holds an infrastructure seat: no avatar, no roster row,
 uncounted by player gates, and host migration never arms (see
 [session.md](session.md)). Nobody presses Start on a server, so auto-start your
 world once `session_count(players_only = true)` reaches your threshold
@@ -220,7 +221,7 @@ world once `session_count(players_only = true)` reaches your threshold
 
 ### Spectator
 
-`boot_spectate(b, addr, port, token, name)` is the watching door — the
+`boot_spectate(b, addr, port, token, name)` is the watching door, the
 dedicated pattern pointed the other way: a seat that sees everything and is
 nobody. It bypasses a full room, counts toward nothing, and is receive-only past
 the join ([session.md's spectator paragraph](session.md) has the contract). Give
@@ -228,8 +229,8 @@ it the same `!p.spectator` skip your spawn loops give `dedicated`.
 
 ## Transport forwards
 
-The four transport forwards — `on_packet`, `on_peer_left`, `on_net_up`,
-`on_net_down` — are generated from the `boot: kboot.Boot` field on your script
+The four transport forwards, `on_packet`, `on_peer_left`, `on_net_up`, and
+`on_net_down`, are generated from the `boot: kboot.Boot` field on your script
 struct. They route through the boot's own wire and session pointers, dispatch by
 name (so they survive hot reload), and can be overridden by hand-writing a
 same-named `@(gd_method)`. The `Options.methods` list still names them (the
@@ -241,8 +242,8 @@ Set `Options.env = "MY"` and `boot_port(b, def)` / `boot_name(b, def)` /
 `boot_token(b)` read `MY_PORT` / `MY_NAME` / `MY_TOKEN` (the token is persisted
 in `user://my_token`). The whole [bad-link
 shim](netgd.md#wire_set_latency--link-simulation) then answers `MY_LATENCY` /
-`MY_JITTER` / `MY_LOSS` without a separate `latency_env` — the per-game env
-family in one prefix.
+`MY_JITTER` / `MY_LOSS` without a separate `latency_env`, putting the whole
+per-game env family under one prefix.
 
 ## Identity and tokens
 
@@ -297,7 +298,7 @@ working, and `session_set_factory` remains the escape hatch for exotic creation.
 ## Entity queries
 
 Every `entity=` tag also generates the typed queries that stand in for a
-hand-kept `map[Net_Id]^T` plus owner and `avatar_of` mirrors — they read the
+hand-kept `map[Net_Id]^T` plus owner and `avatar_of` mirrors; they read the
 kit's own ledgers instead (the registry's entity and owner, the boot's type
 table):
 
@@ -310,7 +311,7 @@ owner := kboot.boot_entity_owner(&self.boot, id) // the owner_pid map
 ```
 
 With these, the spawn/free hooks above shrink to the genuinely game-shaped lines
-(a hot `me_*` pointer, death fx) — or vanish. The owned/ids scans walk the type
+(a hot `me_*` pointer, death fx), or vanish. The owned/ids scans walk the type
 ledger, which is friendslop-sized; keep your own map in the rare game that makes
 them hot.
 

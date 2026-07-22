@@ -1,7 +1,7 @@
 # Distribution — shipping odin_godot as a drop-in addon
 
 This page covers **building the distributable addon** (`nix build`), **what's in it**, and
-**how a user installs it** into a Godot project, compiles their scripts, and exports — for
+**how a user installs it** into a Godot project, compiles their scripts, and exports for
 all platforms. For the export pipeline internals see [exporting.md](exporting.md).
 
 > **Honesty about platform status** (this repo is developed on macOS):
@@ -10,8 +10,8 @@ all platforms. For the export pipeline internals see [exporting.md](exporting.md
 > |----------|-------------|---------|
 > | macOS (arm64/universal) | native | **verified** (full test suite + exported `.app`) |
 > | Web / WASM | native (emscripten) | **verified in a real browser** |
-> | Linux x86-64 | **cross-build verified** (ELF `.so`, entry symbol exported) | **not run here** — needs a Linux host / CI |
-> | Windows x86-64 | **cross-build verified** (PE `.dll`, entry symbol exported) | **not run here** — needs Windows / CI |
+> | Linux x86-64 | **cross-build verified** (ELF `.so`, entry symbol exported) | **not run here** (needs a Linux host / CI) |
+> | Windows x86-64 | **cross-build verified** (PE `.dll`, entry symbol exported) | **not run here** (needs Windows / CI) |
 >
 > "Cross-build verified" means `nix build .#dist-cross` (and `build/build_cross.sh`)
 > produce a `.so`/`.dll` of the right format/arch that **exports the `odin_godot_init`
@@ -23,7 +23,7 @@ all platforms. For the export pipeline internals see [exporting.md](exporting.md
 
 odin_godot is a **stable CORE dll** (`libodin_godot.<ext>`, a pure-C-ABI
 `ScriptLanguageExtension`, entry `odin_godot_init`) that at runtime loads a **SCRIPTS dll**
-(`libodinscripts.<ext>`) — your `.odin` files compiled against the odin_godot Odin
+(`libodinscripts.<ext>`) containing your `.odin` files compiled against the odin_godot Odin
 collection. The core is shipped prebuilt in the addon; **you compile the scripts dll** for
 each project, because they are your code. (On web, core + binding + scripts are AOT-linked
 into one Emscripten `SIDE_MODULE` instead.)
@@ -114,7 +114,7 @@ scr   .dll: PE32+ executable (DLL) x86-64, for MS Windows, 11 sections
 1. Copy `addons/odin_godot/` from the build output into your project's `res://addons/`.
 2. Godot auto-discovers `res://addons/odin_godot/odin_godot.gdextension` on next open. Your
    `.odin` files are now recognized as scripts.
-3. **Compile your scripts dll** (only the scripts — the core is prebuilt). The core looks
+3. **Compile your scripts dll** (only the scripts, since the core is prebuilt). The core looks
    for `res://bin/libodinscripts.<ext>` (and, in exports, beside the core dll):
 
    ```sh
@@ -126,11 +126,11 @@ scr   .dll: PE32+ executable (DLL) x86-64, for MS Windows, 11 sections
    `SKIP_CORE=1` skips rebuilding the core (you already have the prebuilt one). Re-run this
    whenever you change a script (the editor's reload-on-save does it automatically in-repo).
 
-You need an `odin` compiler on `PATH` to compile scripts — that is the one host tool a
+You need an `odin` compiler on `PATH` to compile scripts. That is the one host tool a
 consumer project needs.
 
-This **split layout** — core dll inside `addons/odin_godot/bin/<platform>/`, scripts dll at
-`res://bin/` — is exactly what the suite's `splitaddon` test pins (macOS, where dlopen
+This **split layout** (core dll inside `addons/odin_godot/bin/<platform>/`, scripts dll at
+`res://bin/`) is exactly what the suite's `splitaddon` test pins (macOS, where dlopen
 semantics are strictest: the scripts dll is self-contained, so the core's location doesn't
 matter). If a scripts-dll load fails, the core prints the OS loader's own
 reason (`odin: loader error: …`) next to the path.
@@ -140,7 +140,7 @@ reason (`odin: loader error: …`) next to the path.
 > (`EditorHelp::_gen_extensions_docs` is queued as a deferred call; when the quit wins the
 > race it flushes during `Main::cleanup`, after `~EditorNode` nulled EditorHelp's `doc`).
 > Harmless but scary: the `.godot/` artifacts are complete. In CI, don't gate on
-> `--import`'s exit code — check for the artifacts, or use `--editor --quit-after 30`
+> `--import`'s exit code. Check for the artifacts, or use `--editor --quit-after 30`
 > instead (frames flush the deferred while everything is alive).
 
 ## Export your game
@@ -148,8 +148,8 @@ reason (`odin: loader error: …`) next to the path.
 Exporting is unchanged from [exporting.md](exporting.md): the editor's `OdinExportPlugin`
 compiles the scripts dll for the **target** platform at export and bundles it beside the
 core. For **cross-target desktop exports** (e.g. a Windows build from macOS) the export host
-needs the matching cross toolchain on `PATH` — the same `ODIN_CROSS_*_CC` the `.#cross`
-shell provides; otherwise prebuild with `build/build_cross.sh` and bundle manually.
+needs the matching cross toolchain on `PATH` (the same `ODIN_CROSS_*_CC` the `.#cross`
+shell provides); otherwise prebuild with `build/build_cross.sh` and bundle manually.
 
 - **macOS / Web**: fully automated + verified (see exporting.md).
 - **Linux / Windows**: the scripts dll cross-compiles (verified); run the export from a host
@@ -162,17 +162,17 @@ real host or in CI:
 
 **Linux** (e.g. GitHub Actions `ubuntu-latest`):
 1. Install the matching Godot 4.6.2 **Linux** export templates + editor.
-2. `nix build .#dist-cross` (or run `build/build_cross.sh linux` on the Linux host itself —
-   there it's a *native* build, no cross needed).
+2. `nix build .#dist-cross` (or run `build/build_cross.sh linux` on the Linux host itself,
+   where it's a *native* build with no cross needed).
 3. Place the addon in a test project; build the scripts dll; run headless:
-   `godot --headless --path tests/phase35` and assert the Odin `_ready` sentinel — the same
+   `godot --headless --path tests/phase35` and assert the Odin `_ready` sentinel, the same
    assertion `tests/phase35/run.sh` makes on macOS.
 4. For an exported game: `godot --headless --export-release "Linux/X11" out/game` then run
    `out/game --headless` and assert the sentinel.
 
-**Windows** (e.g. GitHub Actions `windows-latest`): same shape — install Godot 4.6.2 + the
-Windows templates, build the scripts dll (natively with `odin -target:windows_amd64`, or use
-the prebuilt cross dll), drop in the addon, run `godot.exe --headless --path …`.
+**Windows** (e.g. GitHub Actions `windows-latest`) follows the same shape: install Godot 4.6.2
+and the Windows templates, build the scripts dll (natively with `odin -target:windows_amd64`,
+or use the prebuilt cross dll), drop in the addon, and run `godot.exe --headless --path …`.
 
 Because the gdext C-ABI boundary and the loader logic (`dladdr`/sibling-dll lookup, with the
 `LoadLibrary` path already present for Windows in `core:dynlib`) are platform-generic and the

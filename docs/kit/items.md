@@ -1,11 +1,11 @@
 # kit/items — item definitions and stack-aware inventories
 
 Reach for `kit/items` when entities carry things: bags, chests, pickups, loot. It gives you
-a 4-byte `Slot`, a definition `Table` (names, stack sizes), and deterministic operations —
-add, take, put, transfer — that are safe inside predicted commands.
+a 4-byte `Slot`, a definition `Table` (names, stack sizes), and deterministic operations
+(add, take, put, transfer) that are safe inside predicted commands.
 
 **Lanes: COOP wire, sim-safe math.** Inventories replicate as delta-lane fields mutated
-through coop verbs. The `Slot` ops themselves are pure and deterministic — safe inside any
+through coop verbs. The `Slot` ops themselves are pure and deterministic: they are safe inside any
 predicted command, on either lane. Whether an `Inventory($N)` bundle can sit under a sim
 snapshot descriptor is still unverified; until that's proven, a sim game keeps its purse on
 the delta lane (the hybrid composes per-field).
@@ -31,7 +31,7 @@ Every operation is **deterministic and allocation-free**. They run inside `@(gd_
 procs, so the predicting client and the host execute the same op from byte-identical args
 and land on identical slots. Two players grabbing the same last item both predict success;
 the host runs them in arrival order, the second op finds the slot empty and rejects, and the
-loser's optimistic state reverts. Conflict resolution is just the intent pipeline — there is
+loser's optimistic state reverts. Conflict resolution is just the intent pipeline: there is
 no separate reconciliation code.
 
 Item **definitions are code, not wire**: every peer registers the same table in `ready()`
@@ -118,8 +118,8 @@ Inventory :: struct($N: int) {
 
 ## Which ops take the Table
 
-Ops that can grow a stack consult the defs for `max_stack` — `add`, `put`, `transfer`. Ops
-that only drain or read slots don't — `take`, `remove`, `count_of`.
+Ops that can grow a stack consult the defs for `max_stack`: `add`, `put`, `transfer`. Ops
+that only drain or read slots don't: `take`, `remove`, `count_of`.
 
 The table-free ops are exactly the ones usable inside a `@(gd_command)` proc, which sees only
 its entity and args, with no ambient state. Crediting with stacking rules happens where the
@@ -127,7 +127,7 @@ table lives: the command hook or host code.
 
 ## Worked example: looting a chest
 
-The command half — table-free, predicted, range-gated with the same
+The command half is table-free, predicted, and range-gated with the same
 [kit/interact](interact.md) gate the prompt uses (`examples/cavecrawl/scripts/chest.odin`):
 
 ```odin
@@ -141,7 +141,7 @@ chest_take :: proc(self: ^Chest, slot: i32, px: f32, py: f32) -> bool {
 }
 ```
 
-The cross-entity half — host only, in the command hook, where the table lives
+The cross-entity half runs host-only, in the command hook, where the table lives
 (`host.odin`):
 
 ```odin
@@ -162,8 +162,8 @@ table.
 
 ## Grid packing (shape as a mechanic)
 
-For inventories where the SHAPE matters — 2x3 rifles, 3x3 crates, attaché-case
-Tetris — `packing.odin` adds a second board type with the same replication
+For inventories where the SHAPE matters (2x3 rifles, 3x3 crates, attaché-case
+Tetris), `packing.odin` adds a second board type with the same replication
 story: a packed inventory is a fixed array of 10-byte `Packed_Entry` values
 inside a replicated struct, and board dimensions are game constants passed to
 the ops.
@@ -179,7 +179,7 @@ items_register(&table, BOOT, "boot", shape = kitems.shape_of("X.", "X.", "XX"))
 ```
 
 Shapes are up to 4x4 with a solid-cell mask (`shape_of` reads row strings), and
-each placement is **self-describing** — the entry stores its shape — so the same
+each placement is **self-describing** (the entry stores its shape), so the same
 table/table-free split holds: `pack_move`, `pack_remove`, `pack_at`, and
 `pack_fits` are table-free and command-safe (the drag-to-rearrange command is
 one predicted `pack_move`), while the growing ops (`pack_place` with a shape
@@ -191,13 +191,13 @@ them in arrival order, the loser reverts.
 
 ## Gotchas
 
-- Keep command-side ops deterministic: no table, no allocation, no clocks — they re-run on
+- Keep command-side ops deterministic: no table, no allocation, no clocks. They re-run on
   the host from byte-identical args and must land on identical slots.
 - An empty slot is exactly `{ITEM_NONE, 0}`; every op normalizes on the way out. Don't
-  hand-write slots that break this — replication diffs bytes.
+  hand-write slots that break this: replication diffs bytes.
 - Unknown (unregistered) items get `max_stack = 1`: they refuse to stack rather than merge
   blindly.
-- `items_register` asserts on id 0 (the empty-slot marker) and re-registration is safe —
+- `items_register` asserts on id 0 (the empty-slot marker), and re-registration is safe:
   call it in `ready()` every run, on every peer, with the same constants.
-- Returns are budgets, not booleans: `add` may credit less than asked (inventory full) —
-  handle the leftover, like `cave_credit` putting it back in the chest.
+- Returns are budgets, not booleans: `add` may credit less than asked (inventory full).
+  Handle the leftover, as `cave_credit` does by putting it back in the chest.

@@ -1,25 +1,25 @@
 # Building gameplay: the kit + play recipe
 
 Godot's composition guides teach one move: build an entity from small, focused
-**components** — a `HealthComponent`, a `HitboxComponent`, a `VelocityComponent` — each
+**components** (a `HealthComponent`, a `HitboxComponent`, a `VelocityComponent`), each
 owning one concern, attached to a node. That pattern maps cleanly onto single-player, which
 has exactly one runtime (the frame) and one authority (you). A `kit` game has neither: many
-peers run the behavior, and only the host decides. So you still compose — just along a
+peers run the behavior, and only the host decides. So you still compose, just along a
 different axis.
 
-> Single-player composition asks *"what are its parts?"* — health, movement, hitbox.
-> kit + play composition asks *"where does each part live across the wire?"* Same behavior,
-> sliced by authority instead of by concern.
+> Single-player composition asks *"what are its parts?"*: health, movement, hitbox.
+> kit + play composition asks *"where does each part live across the wire?"* It's the same
+> behavior, sliced by authority instead of by concern.
 
 This page is the applied recipe: two layers of composition, the seven slots a networked
 gameplay item is sliced into, one fully worked example (a gun), and the same skeleton shown
 five ways. It assumes the toolkit's three foundations:
 
-- **state-not-messages** — peers converge on replicated state; they don't send each other
+- **state-not-messages**: peers converge on replicated state; they don't send each other
   events.
-- **verbs-not-RPCs** — a client's only reach into the world is a command that runs on the
+- **verbs-not-RPCs**: a client's only reach into the world is a command that runs on the
   host.
-- **the two timelines** — the fixed net tick the host simulates on, distinct from the render
+- **the two timelines**: the fixed net tick the host simulates on, distinct from the render
   frame.
 
 ---
@@ -48,7 +48,7 @@ Runner :: struct {
 ```
 
 `Runner` has a gun state machine, a damage edge, and a revive channel. Adding a behavior is
-adding a field — the same ergonomics as attaching a component node.
+adding a field: the same ergonomics as attaching a component node.
 
 **scriptgen recurses into nested structs.** Embedding `play.Machine(Gun_State)` composes its
 inner `cur: Gun_State \`gd:"replicate"\`` into the `Runner`'s own wire descriptor
@@ -58,8 +58,8 @@ local presentation shadow.
 
 How these differ from Godot components:
 
-- The "components" are **plain Odin sub-structs** (data + free procs), not nodes. No tree, no
-  `get_node`, no per-instance allocation — they're fields, resolved at build time.
+- The "components" are **plain Odin sub-structs** (data + free procs), not nodes. There is no
+  tree, no `get_node`, and no per-instance allocation: they're fields, resolved at build time.
 - Their **"signals" are edges**, not engine signals: you read a `play.Edge` / `play.step`
   transition in the render path, rather than connecting a callback (see
   [Pure-Odin Events](events.md) for when you *do* want a real dispatch).
@@ -67,18 +67,18 @@ How these differ from Godot components:
   at runtime.
 
 scriptgen carries an embedded primitive's wire, export, `@onready`, and signal needs up into
-the parent for free — and so do its **verbs**. A block that declares a `@(gd_command)` on
+the parent for free, and so do its **verbs**. A block that declares a `@(gd_command)` on
 itself has that command hoisted onto whatever entity embeds it (with the wielder threaded
-in), so a self-contained gameplay block — a gun that carries its own `fire`, a door its own
-`open` — drops in as one field and brings both its replicated state *and* its Intent seam.
+in), so a self-contained gameplay block (a gun that carries its own `fire`, a door its own
+`open`) drops in as one field and brings both its replicated state *and* its Intent seam.
 The composition is recursive: you keep leveling up (gun → loadout → character) without
 threading a command declaration back up to the entity by hand. See
 [kit/ — composing verbs from embedded blocks](kit/net.md#composing-verbs-from-embedded-blocks).
 
 ### The `play` toolbox
 
-The primitives you compose from. Four are pure — safe in any timeline. The rest touch the
-engine: `marker` is presentation-only; `Puppet` and `Puppet3` drive physics. Each usually
+These are the primitives you compose from. Four are pure, safe in any timeline. The rest
+touch the engine: `marker` is presentation-only; `Puppet` and `Puppet3` drive physics. Each usually
 fills a particular *slot* in Layer 2 (next section); the last column previews which.
 
 | Primitive | What it is | Pure? | Usually the… |
@@ -86,12 +86,12 @@ fills a particular *slot* in Layer 2 (next section); the last column previews wh
 | `play.Edge(T)` | A client-local shadow of a value; `see` reports the one frame it moved. | ✅ | **Cue** trigger |
 | `play.Pace(T)` | A re-armable deadline: *is it time yet? then schedule the next.* `Deadlines(K,T)` keys several. | ✅ | **Cadence** gate |
 | `play.Machine(S)` | A state machine that **owns** its replicated `cur` (host writes, every peer steps). | ✅ | **State** (a mode) |
-| `play.anim` | Presentation float clocks — `decay`/`ramp`/`advance`/`hold`/`pulse`. | ✅ | **Cue** rendering |
-| `play.marker` | Lazy world-markers — `show`/`follow`/`fill`/`depth` over a built node. | ❌ engine | **Cue** rendering |
+| `play.anim` | Presentation float clocks: `decay`/`ramp`/`advance`/`hold`/`pulse`. | ✅ | **Cue** rendering |
+| `play.marker` | Lazy world-markers: `show`/`follow`/`fill`/`depth` over a built node. | ❌ engine | **Cue** rendering |
 | `play.Puppet` | Single-owner engine physics: the owner's RigidBody2D solver streams pose+velocity; every other screen freezes the body and glides it. `session_set_owner` moves the seat, momentum crosses the seam. | ❌ engine | **State** (a shared body) |
-| `play.Puppet3` | The 3D sibling: RigidBody3D, quaternion rotation (stream-layer `.Quat` nlerp — 3D rotation interps *correctly*, unlike 2D's snap), angular velocity across the seam. Same feel ledger, meters. | ❌ engine | **State** (a shared body) |
+| `play.Puppet3` | The 3D sibling: RigidBody3D, quaternion rotation (stream-layer `.Quat` nlerp; 3D rotation interps *correctly*, unlike 2D's snap), angular velocity across the seam. Same feel ledger, meters. | ❌ engine | **State** (a shared body) |
 
-The one wire rule to keep straight: **only `Machine.cur` crosses the wire** — it's a plain
+The one wire rule to keep straight: **only `Machine.cur` crosses the wire**. It's a plain
 `gd:"replicate"` field. `Edge`, `Pace`, `anim` clocks, and marker handles are all *local
 scratch*: they live in an entity's host brain or its render-side `view`, off the replication
 boundary. `play` never puts anything on the network unless you tag it.
@@ -101,7 +101,7 @@ boundary. `play` never puts anything on the network unless you tag it.
 ## Layer 2: one behavior, sliced by authority
 
 Layer 1 gets the *pieces* onto the entity. Layer 2 is the part with no single-player analog:
-a single behavior — "the gun" — isn't one component. It's one concern spread across the
+a single behavior ("the gun") isn't one component. It's one concern spread across the
 client, the host, and the wire, and the recipe names the slices. A networked gameplay item
 fills some subset of seven slots:
 
@@ -110,7 +110,7 @@ fills some subset of seven slots:
 | 1 | **State** | What's true on every screen? | everyone (replicated) | kit `gd:"replicate"`; `play.Machine` for a mode |
 | 2 | **Cadence** | When is it allowed to act? | client gate + host | `play.Pace` / `Deadlines` |
 | 3 | **Intent** | The one seam a client touches the world. | client → host | `@(gd_command)` |
-| 4 | **Authority** | Who decides — and what decays each tick? | host only | the command hook + `host_*_tick` |
+| 4 | **Authority** | Who decides, and what decays each tick? | host only | the command hook + `host_*_tick` |
 | 5 | **Prediction** | How does it feel instant? | client | the `predict` command body |
 | 6 | **Reconcile** | How does the guess heal back to truth? | client | snap on a host *transition* |
 | 7 | **Cue** | How does it read, once per change, on every screen? | everyone (presentation) | `play.Edge`/`step` → `anim`/`marker` |
@@ -120,7 +120,7 @@ Intent. A mob has no player behind it, so it skips Intent, Prediction, and Recon
 entirely. Treat the skeleton as a *checklist to walk*, not a mandate to fill; the
 [matrix](#the-same-skeleton-five-ways) below shows which items skip what.
 
-Two of these slots — **Prediction** and **Reconcile** — are the ones single-player never
+Two of these slots, **Prediction** and **Reconcile**, are the ones single-player never
 forces you to think about, and they decide the feel of a `kit` game. Most of this page is
 about getting them right.
 
@@ -142,7 +142,7 @@ embedding a field, and the slot anatomy is identical. See
 
 Here's the item, slot by slot (code condensed to each slot's essence).
 
-**1. State** — the minimum every screen needs to render the HUD and let the host gate:
+**1. State** is the minimum every screen needs to render the HUD and let the host gate:
 
 ```odin
 ammo:      u8 `gd:"replicate"`,
@@ -151,8 +151,8 @@ reload_cd: u16 `gd:"replicate"`,      // ticks left on the reload dwell
 jam_taps:  u8,                        // host-only scratch — never replicated
 ```
 
-**2. Cadence** — one clock gates *every* state (a fire cooldown, a reload gap, a jam-clear
-beat), so the trigger can never out-run any of them:
+**2. Cadence** relies on one clock that gates *every* state (a fire cooldown, a reload gap, a
+jam-clear beat), so the trigger can never out-run any of them:
 
 ```odin
 if !play.due(&self.next_shot, now) { return false }
@@ -160,7 +160,7 @@ cd := gun_cooldown(r.gun, r.boost_rate, r.parts)
 play.arm(&self.next_shot, now + f64(cd + 1) / hz)   // +1 tick of grace over the host's gate
 ```
 
-**3. Intent** — the one seam. A `predict` command runs on the *client's* predictor **and** the
+**3. Intent** is the one seam. A `predict` command runs on the *client's* predictor **and** the
 host from the same code:
 
 ```odin
@@ -168,7 +168,7 @@ host from the same code:
 runner_fire :: proc(self: ^Runner, dx, dy, ox, oy: f32) -> bool { ... }
 ```
 
-**4. Authority** — the host owns truth. The command hook decides fire-vs-jam-vs-clear, and
+**4. Authority**: the host owns truth. The command hook decides fire-vs-jam-vs-clear, and
 the per-tick `host_*_tick` runs the reload countdown. Every `play.set` here is the *only*
 side allowed to move the state:
 
@@ -197,10 +197,10 @@ if r.gun_fsm.cur == .Reloading && r.reload_cd > 0 {
 }
 ```
 
-**5. Prediction** — the client runs the *identical* verdict locally, so the shot flies this
+**5. Prediction**: the client runs the *identical* verdict locally, so the shot flies this
 frame with zero felt lag. It works because the jam is **deterministic from state both sides
-share**: the same seed produces the same roll on both machines, so the client isn't guessing
-— it computes the answer the host will reach:
+share**: the same seed produces the same roll on both machines, so the client isn't guessing.
+It computes the answer the host will reach:
 
 ```odin
 // runner.odin — same inputs on client and host → same result, no wire round-trip:
@@ -214,9 +214,9 @@ jam_roll :: proc "contextless" (player: knet.Player_Id, ammo, floor, gun: u8) ->
 ```
 
 The client predicts the fire, the ammo decrement, the auto-reload gap (it holds the pacer for
-the reload duration), and the jam — all locally, all instant.
+the reload duration), and the jam: all locally, all instant.
 
-**6. Reconcile** — prediction and truth re-align without ever clawing back a *good* in-flight
+**6. Reconcile**: prediction and truth re-align without ever clawing back a *good* in-flight
 guess. Snap only on a host **transition**: transitions land at mag boundaries, where
 prediction and authority already agree:
 
@@ -230,7 +230,7 @@ gun_reconcile :: proc(self: ^Scrapyard, r: ^Runner) {
 }
 ```
 
-**7. Cue** — presentation reacts once per change, on every screen, driven by `play.step` off
+**7. Cue**: presentation reacts once per change, on every screen, driven by `play.step` off
 the replicated `cur`. It never decides anything:
 
 ```odin
@@ -256,7 +256,7 @@ underneath the whole recipe.
 ## The same skeleton, five ways
 
 The gun fills all seven slots; most items don't. Here are five real items from scrapyard
-against the skeleton — read the empty cells as the insight: **an item's shape is which slots
+against the skeleton. Read the empty cells as the insight: **an item's shape is which slots
 it skips.**
 
 | Slot | Gun | Revive (channel) | Mob brain | Match phase | Pickup |
@@ -269,11 +269,11 @@ it skips.**
 | **Reconcile** | `gun_reconcile` | — | — | — | — |
 | **Cue** | `gun_edges` (step) | revive-bar marker | telegraph + logs | `step` → banner | despawn |
 
-**Revive — a channeled ability.** A plain (non-predicted) command: `runner_revive` only
+**Revive: a channeled ability.** A plain (non-predicted) command: `runner_revive` only
 asserts the target is down; `host_honor_revive` re-checks `kinter.in_range` and the reviver's
 pulse before granting `hp`. It skips Prediction and Reconcile because you can't honestly
-predict "did my friend agree I'm in reach" — but the *channel bar* is pure local presentation
-off the replicated `rev_pct`, built once and driven with `play.marker`:
+predict "did my friend agree I'm in reach," though the *channel bar* is pure local
+presentation off the replicated `rev_pct`, built once and driven with `play.marker`:
 
 ```odin
 play.show(self.revive_bar, active)
@@ -281,7 +281,7 @@ play.follow(self.revive_bar, d.x, d.y - 44)
 play.fill(cast(gd.Node2d)self.revive_fill, f32(pct) / 255)   // bar shows on EVERY screen
 ```
 
-**Mob brain — a host-only actor.** No player is behind it, so it fills only Cadence +
+**Mob brain: a host-only actor.** No player is behind it, so it fills only Cadence +
 Authority + State + Cue and **skips Intent, Prediction, and Reconcile outright.** Its whole
 behavior is one host proc; its timers are a `play.Deadlines`-style bundle of `Pace` on the net
 tick:
@@ -298,10 +298,10 @@ if frac <= BOSS_ADDS_AT && play.due(&m.brain.next_add, s.tick) {
 }
 ```
 
-**Match phase — a singleton Machine.** The recipe at *game* scope. `world.stage` is a
+**Match phase: a singleton Machine.** This is the recipe at *game* scope. `world.stage` is a
 `play.Machine(u8)` on the world/session singleton; the host drives it through `play.set`
 (lobby → fight → clear → over), and every system reads `w.stage.cur` to gate what it does.
-There's no per-player Intent, so no Prediction or Reconcile — it's the *same* Machine as the
+There's no per-player Intent, so no Prediction or Reconcile. It's the *same* Machine as the
 gun's, owned by a singleton instead of a runner:
 
 ```odin
@@ -309,9 +309,10 @@ if from, to, moved := play.step(&w.stage); moved { /* trace / banner the phase c
 if all_runners_down(self) { play.set(&w.stage, STAGE_OVER); play.arm(&self.over_at, now_s() + 2.5) }
 ```
 
-**Pickup — an ambient world rule.** No command at all: the host scans proximity each tick,
-credits the stat, and despawns the entity. Pure Authority + State + Cue. The client "feels" it
-as its scrap counter ticking up — the fewest slots an item can fill and still be a thing:
+**Pickup: an ambient world rule.** No command at all: the host scans proximity each tick,
+credits the stat, and despawns the entity. It fills only Authority + State + Cue. The client
+"feels" it as its scrap counter ticking up. This is the fewest slots an item can fill and
+still be a thing:
 
 ```odin
 reach := PICKUP_R + (part_has(r.parts, PART_MAGNET) ? MAGNET_REACH : 0)
@@ -320,9 +321,9 @@ if dist2(sc.x, sc.y, r.x, r.y) <= reach*reach {
 }
 ```
 
-**Contact attack — a short idiom, not a block.** Several games in this repo independently
+**Contact attack: a short idiom, not a block.** Several games in this repo independently
 rebuild "attacker in range + per-attacker cooldown → deal damage" (a scuttler's bite, a
-wolf's maul, an arena enemy's touch). Against the blocks it's three lines — a `play.Pace` on
+wolf's maul, an arena enemy's touch). Against the blocks it's three lines: a `play.Pace` on
 the attacker's host brain, a range check, `play.health_hurt` on the victim. There's no
 `play.Melee` block: at this length a block would add a name without hiding anything hard.
 
@@ -333,12 +334,12 @@ if dist2(m.x, m.y, prey.x, prey.y) <= reach*reach && play.ready(&m.brain.bite_cd
 }
 ```
 
-**The authority's ledger — positions, a moment ago.** Every receiver already keeps a ring of
+**The authority's ledger: positions, a moment ago.** Every receiver already keeps a ring of
 *where things were, as seen* (the interp buffer). Some mechanics need the authority-side twin
-— *where things were, as true*: a hitscan beam judged where the shooter saw the mob
+(*where things were, as true*): a hitscan beam judged where the shooter saw the mob
 (scrapyard's lance rewinds ping/2 + interp delay through it), a recall ability rewinding its
 owner, a death recap. The idiom is a fixed ring on host scratch: one write per tick, one
-modulo read at query time. Unwritten slots need a sentinel (or a validity flag) — a mob
+modulo read at query time. Unwritten slots need a sentinel (or a validity flag); a mob
 younger than the window tests live:
 
 ```odin
@@ -359,14 +360,14 @@ that trip people up have hard rules:
 
 1. **State: replicate the minimum, and make a *mode* a `Machine`.** If every screen needs to
    render it or the host needs it to gate, it's `gd:"replicate"`. If it's a small set of
-   named states, it's a `play.Machine` — you get the replicated `cur` and the local step
+   named states, it's a `play.Machine`: you get the replicated `cur` and the local step
    shadow from one field. Everything else (`Edge`, `Pace`, timers, clocks) stays **off the
    wire**.
 
 2. **Predict only what's deterministic from shared inputs.** Client prediction is honest
    *only* when the client can compute the exact answer the host will. Cooldowns and the
    deterministic `jam_roll` qualify; an AOE that mutates many entities, or a check against
-   another player's state, does **not** — those stay host-only (see revive, slime). When in
+   another player's state, does **not**: those stay host-only (see revive, slime). When in
    doubt, don't predict: a plain command that resolves a few frames later beats a prediction
    that has to visibly snap back.
 
@@ -377,15 +378,15 @@ that trip people up have hard rules:
 
 4. **Reconcile on transitions, not every frame.** Snapping prediction to truth every frame
    claws back good in-flight guesses and looks like rubber-banding. Snap only when the host's
-   state *changes* (`play.see` on the replicated `cur`) — those moments are the boundaries
-   where the two already agree.
+   state *changes*, detected via `play.see` on the replicated `cur`. Those moments are the
+   boundaries where the two already agree.
 
 5. **Cue off edges, on every peer, and never decide there.** Presentation reads
    `play.step` / `play.Edge` transitions and fires effects; it's pure, runs identically on
    host and client, and has zero authority. A snapshot catch-up (a late join) must
    `play.sync` the shadows first so a wound taken out of view doesn't replay as a fresh hit.
 
-Answer all seven for your item — and cross off the ones it legitimately skips — and you've
+Answer all seven for your item, cross off the ones it legitimately skips, and you've
 designed a networked gameplay item that will feel right, without re-deriving the client/host
 dance each time.
 
@@ -393,10 +394,10 @@ dance each time.
 
 ## See also
 
-- **[kit/ overview](kit/index.md)** — the per-package reference for the systems the Intent
+- **[kit/ overview](kit/index.md)**: the per-package reference for the systems the Intent
   and Authority slots are built on (`session`, `combat`, `interact`, `net`, …).
-- **[Pure-Odin Events](events.md)** — when a Cue wants a real one-to-many dispatch across
+- **[Pure-Odin Events](events.md)**: when a Cue wants a real one-to-many dispatch across
   systems instead of a per-frame edge read.
-- **The `play/` source** — every primitive is documented at its definition
+- **The `play/` source**: every primitive is documented at its definition
   (`play/edge.odin`, `pace.odin`, `fsm.odin`, `anim.odin`, `marker.odin`); the doc comments
   are the authoritative API reference.

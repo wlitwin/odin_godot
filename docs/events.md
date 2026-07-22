@@ -4,9 +4,9 @@ When both ends of a notification are Odin scripts **in the same dll**, an engine
 is more machinery than you need: every emit does a StringName lookup, boxes one Variant
 per argument, runs `Object::emit_signal` connection dispatch, and trampolines back into
 your script through C. `import events "godot:events"` gives you a typed observer that
-dispatches with direct proc calls instead — no engine, no boxing, no allocation on the
-emit path. It is the same split C# users know: a C# `event` inside the assembly, Godot
-signals at the edges.
+dispatches with direct proc calls instead. There is no engine, no boxing, and no
+allocation on the emit path. It is the same split C# users know: a C# `event` inside the
+assembly, Godot signals at the edges.
 
 ```odin
 import events "godot:events"
@@ -28,7 +28,7 @@ enemy_on_slow :: proc(ctx: rawptr, factor: f64) {
 }
 ```
 
-The payload is any Odin type — a struct, a slice, a pointer — passed by value, fully
+The payload is any Odin type (a struct, a slice, a pointer) passed by value, fully
 typed at compile time. There is no Variant in the path, so there is no
 `gd.Int`/`f64`-only restriction and no marshalling cost for big payloads.
 
@@ -36,9 +36,9 @@ typed at compile time. There is no Variant in the path, so there is no
 
 | | use |
 |---|---|
-| Crossing ANY boundary: another script module, GDScript, `.tscn` `[connection]`s, the Inspector, the editor | **engine signal** (`gd.Signal1(int)` / `gd.SignalN(struct{...})` fields) — the engine is the contract |
-| Decoupled one-to-many between scripts in the SAME module/dll | **`events.Event(T)`** — direct calls, typed payloads |
-| The hottest loops (per-bullet, per-frame-per-entity) | **neither** — batch the data and iterate (see barrage's SOA bullet field); a callback per element is still a call per element |
+| Crossing ANY boundary: another script module, GDScript, `.tscn` `[connection]`s, the Inspector, the editor | **engine signal** (`gd.Signal1(int)` / `gd.SignalN(struct{...})` fields): the engine is the contract |
+| Decoupled one-to-many between scripts in the SAME module/dll | **`events.Event(T)`**: direct calls, typed payloads |
+| The hottest loops (per-bullet, per-frame-per-entity) | **neither**: batch the data and iterate (see barrage's SOA bullet field); a callback per element is still a call per element |
 
 ## Two rules for safe use
 
@@ -60,7 +60,7 @@ pickup ── object_call (engine) ──> spawner ── events.emit (direct) �
 
 **2. Unsubscribe before the subscriber dies.** The subscription stores your struct
 pointer raw; if the script instance is freed first, the next emit is a use-after-free.
-For a node script, do it in `<class>_exit_tree` — it fires on `queue_free` *and* on scene
+For a node script, do it in `<class>_exit_tree`, which fires on `queue_free` *and* on scene
 teardown:
 
 ```odin
@@ -94,22 +94,24 @@ enemy_ready  :: proc(self: ^Enemy) { /* ... */ enemy_subscribe_slow(self) }
 enemy_reload :: proc(self: ^Enemy) { enemy_subscribe_slow(self) }
 ```
 
-(Ordinary game scripts never hot-reload mid-run — this matters for `//gd:tool` scripts
+(Ordinary game scripts never hot-reload mid-run. This matters for `//gd:tool` scripts
 and editor-driven reloads.)
 
 ## Semantics reference
 
-- `subscribe(e, ctx, fn, owner = 0)` — appends; duplicates allowed, fire once each.
-  `owner` is a caller-chosen tag (use the engine instance id) for bulk removal.
-- `unsubscribe(e, ctx, fn)` — removes the first `(fn, ctx)` match.
-- `unsubscribe_owner(e, owner)` — removes every subscription with that tag.
-- `emit(e, payload)` — calls live subscribers in subscription order. Reentrancy-safe:
-  subscribing during an emit defers to the *next* emit; unsubscribing during an emit
-  takes effect immediately (a not-yet-called subscriber removed mid-emit won't fire);
-  nested emits are fine.
-- `count(e)` / `clear(e)` / `destroy(e)` — live count, drop-all, free. `destroy` must
-  not run from inside one of the event's own callbacks.
-- **Not thread-safe** — a main-thread gameplay tool, like the rest of a script.
+- `subscribe(e, ctx, fn, owner = 0)` appends the subscription. Duplicates are allowed,
+  and each fires once. `owner` is a caller-chosen tag (use the engine instance id) for
+  bulk removal.
+- `unsubscribe(e, ctx, fn)` removes the first `(fn, ctx)` match.
+- `unsubscribe_owner(e, owner)` removes every subscription with that tag.
+- `emit(e, payload)` calls live subscribers in subscription order. It is
+  reentrancy-safe: subscribing during an emit defers to the *next* emit, and
+  unsubscribing during an emit takes effect immediately (a not-yet-called subscriber
+  removed mid-emit won't fire). Nested emits are fine.
+- `count(e)` returns the live count, `clear(e)` drops all subscriptions, and
+  `destroy(e)` frees the event. `destroy` must not run from inside one of the event's
+  own callbacks.
+- **Not thread-safe.** This is a main-thread gameplay tool, like the rest of a script.
 
 The package is engine-agnostic (no `godot` import) and unit-tested standalone:
 `tests/events/run.sh` (suite entry `events`, sentinel `EVENTS_OK`).

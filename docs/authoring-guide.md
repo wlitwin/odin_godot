@@ -8,7 +8,7 @@ deep dive. For the build/edit/debug loop, see **[Workflow](workflow.md)**.
 
 You write `<name>.odin` in the clean authoring form below; a preprocessor (`scriptgen`, run
 by `build/build_scripts.sh`) reads its struct tags + markers and emits a sibling
-`<name>.gen.odin` (the registration boilerplate — Variant trampolines, backing arrays,
+`<name>.gen.odin` (the registration boilerplate: Variant trampolines, backing arrays,
 `@(init)` registration) that you never edit. Both compile together into the scripts dll, so
 you author the nice form and get the full typed dispatch for free.
 
@@ -16,7 +16,7 @@ you author the nice form and get the full typed dispatch for free.
 
 There is exactly **one file per script**: the `.odin` you write is also the resource
 you attach to a node. Put your scripts under the project (e.g. `res://scripts/foo.odin`)
-and attach `res://scripts/foo.odin` directly in the scene — the loader reads its
+and attach `res://scripts/foo.odin` directly in the scene. The loader reads its
 `//gd:class` marker and binds it to the compiled class. The sibling `<name>.gen.odin`
 is a build artifact that lives beside the source; the loader **ignores `*.gen.odin`**, so
 it is never treated as an attachable script. There is no separate
@@ -74,9 +74,9 @@ ping_emit_ping :: proc(self: ^Ping, value: int) {
 
 | Marker | Meaning |
 | --- | --- |
-| `//gd:extends <Class>` | The Godot base class. **Optional** — omitted, it is derived from the `owner` field's type. |
+| `//gd:extends <Class>` | The Godot base class. **Optional**: when omitted, it is derived from the `owner` field's type. |
 | `//gd:class <Name>` | Class name override. Defaults to the struct name. |
-| `//gd:tool` | Registers the class as a `@tool` script (`is_tool() == true`) — runs in the editor. |
+| `//gd:tool` | Registers the class as a `@tool` script (`is_tool() == true`) and runs in the editor. |
 | `//gd:icon res://path.svg` | Custom class icon (Scene dock, Create Node/Resource dialog). |
 
 These are the marker comments the engine's resource loader reads to bind the
@@ -97,7 +97,7 @@ Player :: struct { owner: gd.Node2d }   // build error — a NARROWER handle
 
 A narrower handle is the bug: every class handle is a `rawptr` alias, so Odin
 accepts it, the class registers as a plain `Node`, and every `gd.node2d_*` call
-then reaches through that handle into an object that never was a Node2D — a crash
+then reaches through that handle into an object that never was a Node2D, causing a crash
 at the engine boundary. The build error names both spellings and both fixes.
 
 Leave the marker off and the base is **derived** from the handle instead, so there
@@ -109,15 +109,15 @@ package scripts
 Coin :: struct { owner: gd.Area2d }     // registers as Area2D
 ```
 
-The base falls back to `Node` only where the handle can't be placed — no
-`-godot:` root, or a type that isn't a ClassDB class — and the check stays silent
+The base falls back to `Node` only where the handle can't be placed (no
+`-godot:` root, or a type that isn't a ClassDB class), and the check stays silent
 in exactly those cases.
 
 ### The tag vocabulary
 
 Every `` `gd:"…"` `` tag opens with ONE token that selects what the field is. The full
-set, and who consumes each, is the human projection of `decl/decl.odin`'s `FIELD_TOKENS`
-— the schema both scriptgen and the runtime's reflection registrar read, so this page, the
+set, and who consumes each, is the human projection of `decl/decl.odin`'s `FIELD_TOKENS`,
+the schema both scriptgen and the runtime's reflection registrar read, so this page, the
 parser, the boot-time "unknown gd tag" error, and the skip list stay in agreement:
 
 | First token | What it declares | Consumed by | In the wire fingerprint |
@@ -154,7 +154,7 @@ too, without crossing a wire.) Two consequences:
   (`owner` with `predict`, `slack=` without `predict`) are unspellable.
 * **`entity=Name:id` leads its tag.** It carries a permanent public type id and builds
   the factory table; it is not an Inspector detail of an export. An entity field is
-  necessarily an exported `PackedScene`, so both of those are SYNTHESIZED — write
+  necessarily an exported `PackedScene`, so both of those are SYNTHESIZED: write
   `` `gd:"entity=Mob:3"` ``, not `` `gd:"export,resource=PackedScene,entity=Mob:3"` ``.
   Trailing export specs still ride behind (`entity=Mob:3,group=Spawns`).
 
@@ -179,7 +179,7 @@ the property name, the field type maps to a Variant type. `offset`/`size` are
 derived with `offset_of` / `size_of`, so the core narrows native Variant widths
 (Int=i64, Float=f64) to your field's real width (e.g. `f32`).
 
-**Supported field types** — the FULL Godot Variant set. Use the `gd.<Type>` binding
+**Supported field types**: the FULL Godot Variant set. Use the `gd.<Type>` binding
 type (or, for the scalar atoms, the bare Odin scalar, which is width-narrowed):
 
 | Category | Field types |
@@ -195,7 +195,7 @@ meaningfully editable in the Inspector (Godot itself doesn't expose them as expo
 prefer them only for cross-script data, not for editor-tunable values. An unrecognized
 field type is a hard `scriptgen: error:` (so a typo is never silently an `Object`).
 
-**Export hints.** Extend the tag with one comma-separated hint spec —
+**Export hints.** Extend the tag with one comma-separated hint spec:
 `` `gd:"export,SPEC"` ``. Top-level tokens are comma-separated; values WITHIN a spec
 are colon-separated (so a file filter's commas never collide) and are rewritten to
 Godot's comma-joined `hint_string` form:
@@ -218,12 +218,12 @@ Godot's comma-joined `hint_string` form:
 
 `resource=` is for an `Object`/resource-handle field; `range`/`enum` for an int or
 float; `multiline` for a `gd.String`. **`array=ELEM`** (on a `gd.Array` field) and
-**`dict=KEY;VALUE`** (on a `gd.Dictionary` field) declare *typed* collections — the same
-Inspector editors GDScript's `Array[T]` / `Dictionary[K,V]` produce. Each element/key/value
+**`dict=KEY;VALUE`** (on a `gd.Dictionary` field) declare *typed* collections, the same
+Inspector editors that GDScript's `Array[T]` / `Dictionary[K,V]` produce. Each element/key/value
 is a builtin (`int`, `float`, `String`, `Vector2`, `Color`, …) or a Resource class name
 (`Texture2D`, `PackedScene`, …). At most one hint per field. (A scene that bodies a wire
 entity does NOT declare a hint: **`gd:"entity=Name:id"`** is its own first token and
-synthesizes both the export and the `resource=PackedScene` hint — see [Entities](kit/net.md#declaring-a-replicated-entity)
+synthesizes both the export and the `resource=PackedScene` hint; see [Entities](kit/net.md#declaring-a-replicated-entity)
 and [kit/boot](kit/boot.md)'s `boot_entities`.) Example:
 
 ```odin
@@ -241,12 +241,12 @@ Probe :: struct {
 
 > The values still live as untyped `gd.Array` / `gd.Dictionary` handles in Odin (you
 > read/write them through the `array_*` / `dictionary_*` methods); the `array=`/`dict=` tag
-> only drives the export's *typing* — the Inspector widget and the engine-side key/value
+> only drives the export's *typing*: the Inspector widget and the engine-side key/value
 > type enforcement.
 
 **Type-driven form.** Instead of the tag, you can declare the field as a `gd.Typed_Array(T)` /
-`gd.Typed_Dictionary(K, V)` and a bare `gd:"export"` derives the same hint from the type — no
-duplication:
+`gd.Typed_Dictionary(K, V)` and a bare `gd:"export"` derives the same hint from the type,
+with no duplication:
 
 ```odin
 scores: gd.Typed_Array(i64)                       `gd:"export"`,  // == array=int
@@ -256,7 +256,7 @@ loot:   gd.Typed_Dictionary(gd.String, gd.Packed_Scene) `gd:"export"`, // == dic
 Element types are the Odin spellings (`i64`, `gd.String`, `gd.Texture2d`); Resource handles are
 mapped back to their engine class name automatically (`gd.Texture2d` → `Texture2D`). For
 acronym-heavy class names that don't round-trip cleanly (e.g. `JSON`, `GLTFDocument`), use the
-`array=`/`dict=` tag form with the exact name. Don't combine the two on one field — that's a
+`array=`/`dict=` tag form with the exact name. Don't combine the two on one field: that's a
 build-time error.
 
 ### Export groups & subgroups
@@ -298,7 +298,7 @@ Player :: struct {
 
 Only scalar Variant types support `default=` (numbers, bool, and `String`). A `default=`
 on a math-struct/handle field is reported at **boot**, by the reflection registrar, in the
-editor's output — not by `scriptgen` (see "Which tier catches what" below), so the message
+editor's output, not by `scriptgen` (see "Which tier catches what" below), so the message
 is clear but arrives late. Set those in `_ready` or from the scene instead.
 
 ### Which tier catches what
@@ -308,8 +308,8 @@ problem saves time:
 
 | Tier | When | What it checks | How a failure looks |
 | --- | --- | --- | --- |
-| `scriptgen` | build | the tag's VOCABULARY — the first token, and every spec NAME behind it | `scriptgen: error: player.odin:7: …`, the build stops |
-| the reflection registrar | boot / class registration | what each spec MEANS — a value's type, a hint's arity, the Variant a hint requires | an error in Godot's output, the field registers with that spec dropped |
+| `scriptgen` | build | the tag's VOCABULARY: the first token, and every spec NAME behind it | `scriptgen: error: player.odin:7: …`, the build stops |
+| the reflection registrar | boot / class registration | what each spec MEANS: a value's type, a hint's arity, the Variant a hint requires | an error in Godot's output, the field registers with that spec dropped |
 
 Only the runtime knows a field's real Variant width, so only the runtime can say `array=`
 needs a `gd.Array` or that `default=Hero` won't fit a `Vector2`. Spelling needs none of
@@ -326,8 +326,8 @@ on which names exist.
 
 ### Getter / setter properties
 
-Route an export's reads/writes through Odin procs — for validation, clamping, or
-side-effects — with `get=`/`set=`. The named procs take `^<Struct>` plus (for the setter)
+Route an export's reads/writes through Odin procs (for validation, clamping, or
+side-effects) with `get=`/`set=`. The named procs take `^<Struct>` plus (for the setter)
 the field value, and run instead of the raw field access from both GDScript and the editor:
 
 ```odin
@@ -342,15 +342,15 @@ player_set_hp :: proc(self: ^Player, v: i32) { self.hp = clamp(v, 0, 100) }
 ```
 
 The `get`/`set` procs are **plain Odin procs** (no `@(gd_method)` needed) named exactly as
-written in the tag. The backing field still exists — the getter/setter may use it as
+written in the tag. The backing field still exists: the getter/setter may use it as
 storage (as above) or compute from other state. Combine with `group=`/`default=` freely
 (a defaulted getter/setter field applies its default through the setter).
 
 ### @onready node references
 
 A struct field tagged `` `gd:"onready=PATH"` `` is auto-wired to a child node on `_ready`,
-mirroring GDScript's `@onready var sprite = $Sprite`. On the node's READY — *before* any
-`@(gd_connect)` wiring and your own `_ready` proc — the core resolves
+mirroring GDScript's `@onready var sprite = $Sprite`. On the node's READY (*before* any
+`@(gd_connect)` wiring and your own `_ready` proc), the core resolves
 `get_node(owner, "PATH")` and writes the result into the field, so your `_ready` sees a
 fully-resolved, non-null reference:
 
@@ -362,7 +362,7 @@ Player :: struct {
 }
 ```
 
-The field must be an object/node handle (`gd.Node2d`, `gd.Sprite2D`, `gd.Object`, …) — the
+The field must be an object/node handle (`gd.Node2d`, `gd.Sprite2D`, `gd.Object`, …). The
 handle IS the node pointer, so use the bare handle type, not `^gd.Node2d`. An `@onready`
 field is a **private auto-wired ref**, NOT a serialized `@export`: it never appears in the
 property list / Inspector.
@@ -383,7 +383,7 @@ scripts dll (editor save-on-rebuild, or an explicit `script.reload(true)` in a r
 with the **new** code. You rarely need it: a same-layout reload preserves your struct in place
 and re-points all engine entry points (`_process`, methods, signals) to the new code
 automatically. The one thing the swap *can't* fix is a **raw proc pointer you cached into your
-own struct** — a callback/dispatch table, or a behaviour-tree node like `flow.Action`'s
+own struct**, such as a callback/dispatch table, or a behaviour-tree node like `flow.Action`'s
 `Call.fn`. On a same-layout reload those bytes are preserved untouched, so they still point at
 the *old* (still-mapped, now stale) code. Rebuild that state in `reload`:
 
@@ -408,7 +408,7 @@ Signals follow the GDScript pattern of **declare / emit / connect**.
 **Declare** a signal as a typed STRUCT FIELD of one of the `gd.Signal0` … `gd.Signal4`
 marker types (arity = payload count). The **field name is the signal name**, the type
 parameters are the payload types, and the optional `gd:"args=..."` tag names the payload
-(comma-separated, one name per parameter — omitted names synthesize as `arg0`, `arg1`, …).
+(comma-separated, one name per parameter, with omitted names synthesizing as `arg0`, `arg1`, …).
 No tag is required; the field is recognized by its type. Declared signals are reported
 through `_get_script_signal_list`, so GDScript and the editor see them.
 
@@ -422,13 +422,13 @@ Player :: struct {
 }
 ```
 
-The payload types must be Variant-able — the same rule as `@export` and `@(gd_method)`
+The payload types must be Variant-able, following the same rule as `@export` and `@(gd_method)`
 args (object/node handles present as `Object`). A signal field costs one nil pointer of
 instance size and is never read or written at runtime; it exists so the declaration is
 part of the type, checked by the compiler, and visible to reflection.
 
-**`gd.SignalN` — the struct-payload general form.** Its single parameter is the argument
-LIST as an inline struct: the struct's **field names are the arg names** (no `args=` tag —
+**`gd.SignalN`: the struct-payload general form.** Its single parameter is the argument
+LIST as an inline struct: the struct's **field names are the arg names** (no `args=` tag:
 a tag on a `SignalN` field is a build error), and any number of args works. Prefer it for
 5+ payload args (past the arity family's cap) or whenever you want named args without the
 tag:
@@ -447,12 +447,12 @@ Enemy :: struct {
 ```
 
 `SignalN`'s parameter must be the payload **struct**, never itself a single
-Variant-mappable type — `gd.SignalN(gd.Vector2)` is rejected. For one payload value,
+Variant-mappable type, so `gd.SignalN(gd.Vector2)` is rejected. For one payload value,
 either `gd.Signal1(gd.Vector2)` (name it with `args=`) or wrap it so the field name names
 it: `gd.SignalN(struct { pos: gd.Vector2 })` → `moved(pos: Vector2)`.
 
-**Emit** with the generated typed helper `<struct_snake>_emit_<field>` — e.g.
-`ping_emit_pinged(self, value)` — which codegen emits from the signal field and which
+**Emit** with the generated typed helper `<struct_snake>_emit_<field>` (e.g.
+`ping_emit_pinged(self, value)`), which codegen emits from the signal field and which
 calls through `gd.emit`/`gd.emit_args` (returning the engine `Error`, which you may
 ignore):
 
@@ -476,7 +476,7 @@ gd.connect(self.owner, "body_entered", "collect")
 ### Declarative signal wiring (`@(gd_connect)`)
 
 Tag a `@(gd_method)` proc with `@(gd_connect = "signal_name")` to have the core
-auto-connect the **owner's** `signal_name` to this method **on READY** — so you needn't write
+auto-connect the **owner's** `signal_name` to this method **on READY**, so you needn't write
 a `_ready` proc just to wire a signal. The connection happens before your own `_ready` runs
 (order: `@onready` field resolution → `@(gd_connect)` connections → your `_ready`).
 
@@ -495,30 +495,30 @@ enemy_on_body :: proc(self: ^Enemy, body: gd.Node2d) {
 `@(gd_connect)` implies the proc is a signal target, so it must also be a `@(gd_method)` (use
 `@(gd_method, gd_connect = "...")`). The signal must exist on the owner (an engine signal like
 `body_entered` / `area_entered`, or one this script declared with a signal field). It connects
-only the owner's *own* signal to the owner's *own* method — to wire a different emitter or
+only the owner's *own* signal to the owner's *own* method. To wire a different emitter or
 target, use `gd.connect_to` from `_ready` instead. (`@(gd_connect)` requires the
 `-custom-attribute:gd_connect` build flag, which `build/build_scripts.sh` passes for you.)
 
 ## Reserved shapes
 
 Several toolkit declarations are recognized by the SHAPE of a proc rather than by anything
-you write in the attribute — a parameter's name, its position, or its type. The declaration
+you write in the attribute: a parameter's name, its position, or its type. The declaration
 reads as ordinary Odin, so a rename can silently change what a proc IS. This table is the
 whole set.
 
 | Shape | Where it is legal | What it means | Rename it and… |
 | --- | --- | --- | --- |
-| first param `self: ^<Class>` | every bound proc | THE receiver — it is how scriptgen knows the proc belongs to this class at all | the proc is not bound; nothing generates, no diagnostic |
-| a pointer param **immediately after the receiver** | `@(gd_command)` / `@(gd_method)` on an *embedded block* | the WIELDER — scriptgen fills it with `self`, so the block can touch the entity that carries it. Never a wire arg (a pointer can't cross the wire) | a pointer there on a *direct* command is a build error ("un-wire-able arg") |
-| `by: knet.Player_Id` (after the receiver/wielder) | `@(gd_command)` | the ISSUER, framework-filled with the true sender — a predicate can arbitrate on WHO without trusting a client-claimed argument | `by` under any other name is an ordinary wire arg, i.e. client-controlled. The name **and** the type together are the declaration; a wire arg *named* `by` is refused outright |
+| first param `self: ^<Class>` | every bound proc | THE receiver: it is how scriptgen knows the proc belongs to this class at all | the proc is not bound; nothing generates, no diagnostic |
+| a pointer param **immediately after the receiver** | `@(gd_command)` / `@(gd_method)` on an *embedded block* | the WIELDER: scriptgen fills it with `self`, so the block can touch the entity that carries it. Never a wire arg (a pointer can't cross the wire) | a pointer there on a *direct* command is a build error ("un-wire-able arg") |
+| `by: knet.Player_Id` (after the receiver/wielder) | `@(gd_command)` | the ISSUER, framework-filled with the true sender, so a predicate can arbitrate on WHO without trusting a client-claimed argument | `by` under any other name is an ordinary wire arg, i.e. client-controlled. The name **and** the type together are the declaration; a wire arg *named* `by` is refused outright |
 | `mine: bool` | an `@(gd_fact)` door's `_fx` bearer, and a tick's `_fx` half | the every-screen law: `true` on the screen whose live simulation caused the event, `false` on watchers replaying it off their watch clock | position and name are both checked; the error names the slot |
 | `tick: u64` | `@(gd_sample)` (required, second), `@(gd_step)` (optional, second) | the lane's tick number | on a sample, a build error; on a step, the param is simply not passed |
-| `l: ^ksim.Lane` | reserved *against* you — a generated fact door already names its lane param `l` | — | an author arg named `l` is refused, because the door's own binding would shadow it |
+| `l: ^ksim.Lane` | reserved *against* you: a generated fact door already names its lane param `l` | — | an author arg named `l` is refused, because the door's own binding would shadow it |
 | a `kit/boot` `Boot` field on the script struct | the game shell | declares the four standard transport forwards (`on_packet` / `on_peer_left` / `on_net_up` / `on_net_down`) | see the note below |
 
 **The `Boot` match.** The shell is declared by a field whose type's qualifier resolves to
 an import of `godot:kit/boot`. The **alias is free** (`kboot`, `boot`, whatever you import
-it as) — the import PATH is what is checked, not the spelling — so only a `Boot` from a
+it as): the import PATH is what is checked, not the spelling. Only a `Boot` from a
 different package fails to declare the shell.
 
 ## Manual overrides
@@ -529,8 +529,8 @@ no magic path.
 
 | Generated | Yields to a hand-written… |
 | --- | --- |
-| census accessors — `<entity>_of`, `<entity>_owned_by`, `my_<entity>`, `<entity>_ids`, `<entity>_spawn` | proc of that name |
-| acceptance-test probes — `probe_<entity>_count`, `probe_my_<entity>`, `probe_<entity>_<field>` | proc (or `@(gd_method)`) of that name |
+| census accessors: `<entity>_of`, `<entity>_owned_by`, `my_<entity>`, `<entity>_ids`, `<entity>_spawn` | proc of that name |
+| acceptance-test probes: `probe_<entity>_count`, `probe_my_<entity>`, `probe_<entity>_<field>` | proc (or `@(gd_method)`) of that name |
 | the four standard transport forwards | `@(gd_method)` of that name |
 
 Every yield is **printed**, once per run:
@@ -539,24 +539,24 @@ Every yield is **printed**, once per run:
 scriptgen: yielded: runner_of (census accessor — the hand-written proc of that name wins)
 ```
 
-That line confirms an intended override took effect — and, when you didn't intend one,
+That line confirms an intended override took effect and, when you didn't intend one,
 tells you something in your package is already wearing a generated name. Check it if a proc
 you meant to override (`runner_of` where the entity is `Runner_Bot`) seems to do nothing.
 
 **The one exception: `@(gd_fact)` announce doors refuse.** Write a proc with a declared
 fact's door name and it is a build error, not a yield. The door is not a convenience you
-could re-implement: its generated body holds four gates game code has no way to reproduce —
+could re-implement: its generated body holds four gates game code has no way to reproduce:
 it broadcasts the tuple only on the authority, fires the `_fx` half on the causer's *live*
 pass with `mine=true`, fires it on every watching screen when that screen's watch clock
 reaches the fact's tick with `mine=false`, and stays silent through resim replays so a
 reconcile can't re-announce. The build error asks you to rename yours.
 
 **`gd:"manual"` means "I call the generated thing myself."** Not "replace this generated
-proc", but "stop calling it for me — I own the call site." It applies to an embedded sim
+proc", but "stop calling it for me: I own the call site." It applies to an embedded sim
 block's `@(gd_tick)` (see [kit/sim](kit/sim.md)): the block's state still flattens into the
 descriptor and its verbs still hoist, only the auto-call is suppressed so your own tick can
 drive it with whatever ordering or condition you want. It is a general token, not a
-sim-specific one — a `manual` on something with nothing generated to call is a build error
+sim-specific one: a `manual` on something with nothing generated to call is a build error
 naming what it expected to find.
 
 ## Generated names
@@ -565,25 +565,25 @@ Three naming formulas produce identifiers you are expected to *call*, and one pr
 name you are expected to *write*. They are not interchangeable, and two of them are one
 letter apart.
 
-**Command wrappers — two formulas.** A verb declared directly on the entity keeps its own
+**Command wrappers: two formulas.** A verb declared directly on the entity keeps its own
 proc name; a verb hoisted out of an embedded block is renamed after the PATH it was reached
 through, so two blocks of the same type on one entity never collide:
 
 | Declaration | Generated wrapper |
 | --- | --- |
-| `@(gd_command) gunner_buy :: proc(self: ^Gunner, …)` | `gunner_buy_cmd` — i.e. `<proc>_cmd` |
-| `@(gd_command) gun_fire :: proc(self: ^Gun, …)`, embedded as `primary: Gun` on `Gunner` | `gunner_primary_fire_cmd` — i.e. `<class>_<path>_<verb>_cmd` |
+| `@(gd_command) gunner_buy :: proc(self: ^Gunner, …)` | `gunner_buy_cmd` (i.e. `<proc>_cmd`) |
+| `@(gd_command) gun_fire :: proc(self: ^Gun, …)`, embedded as `primary: Gun` on `Gunner` | `gunner_primary_fire_cmd` (i.e. `<class>_<path>_<verb>_cmd`) |
 
 The composed form's path is the FIELD path, joined with `_`, so a block three levels down
 still lands on the entity that owns the net id. Both formulas can reach the same name, and
 when they do it is a build error naming both declarations rather than a silently
 unreachable verb.
 
-**Wire-id constants — prefixed and unprefixed.** Command ids are class-prefixed
+**Wire-id constants: prefixed and unprefixed.** Command ids are class-prefixed
 (`GUNNER_CMD_BUY`, `GUNNER_CMD_PRIMARY_FIRE`); world-pass fact ids are not
 (`FACT_ROUND_OVER`), and neither is `NET_FINGERPRINT`. Commands are per-entity, so several
 classes in one package can declare a verb of the same name, and the class prefix keeps their
-constants apart. Facts and the fingerprint are **module-wide** — there is exactly one door
+constants apart. Facts and the fingerprint are **module-wide**: there is exactly one door
 per event name across the whole package (a second is a build error, as is a u16 hash
 collision between two events), and exactly one fingerprint.
 
@@ -592,25 +592,25 @@ opposite directions:
 
 | Name | Who writes it | Who calls it | What it does |
 | --- | --- | --- | --- |
-| `mob_spawn` | **generated** | **you** | the typed factory — you call it to bring a Mob into the world |
-| `mob_spawned` | **you** | **the framework** | the hook — it calls you once the Mob exists, on every peer |
+| `mob_spawn` | **generated** | **you** | the typed factory: you call it to bring a Mob into the world |
+| `mob_spawned` | **you** | **the framework** | the hook: it calls you once the Mob exists, on every peer |
 
 So `mob_spawn(…)` inside `mob_spawned(…)` is an infinite spawn loop, and a `mob_spawn` you
-wrote by hand silently takes over the factory (it is a census name — it yields, and prints
+wrote by hand silently takes over the factory (it is a census name: it yields, and prints
 `yielded: mob_spawn`). If a spawn seems to do nothing, check that line first. The same
 `-ed` shape marks the other framework-called hook, `<entity>_freed`.
 
 All of these are keyed by the entity's TARGET STRUCT, which is why two `entity=` tags may
-not name the same struct — that would generate the whole census twice.
+not name the same struct. Doing so would generate the whole census twice.
 
 ## Multiplayer RPCs (`@(gd_rpc)`)
 
-> **Two multiplayer stories — pick before you read on.** This section is the
+> **Two multiplayer stories: pick before you read on.** This section is the
 > ENGINE-NATIVE surface: `@(gd_rpc)` mirroring GDScript's `@rpc`, plus the
-> `MultiplayerSpawner`/`MultiplayerSynchronizer` interop it enables — the right
+> `MultiplayerSpawner`/`MultiplayerSynchronizer` interop it enables. It is the right
 > tool for GDScript parity, porting an existing RPC design, or talking to
 > non-Odin peers. **Building a co-op game from scratch? Use the
-> [friendslop toolkit](kit/index.md) instead** — replicated struct fields,
+> [friendslop toolkit](kit/index.md) instead**: replicated struct fields,
 > predicted commands with typed `_then` consequences, generated entity
 > factories, drop-in join, reconnect, and host migration, with zero RPCs to
 > design. The [tutorial](kit/build-a-game-in-a-day.md) builds a whole co-op
@@ -646,7 +646,7 @@ player_take_damage :: proc(self: ^Player, amount: gd.Int) {
 }
 ```
 
-`gd_rpc` implies `gd_method` — an RPC must be a registered, name-dispatchable method, so you
+`gd_rpc` implies `gd_method`: an RPC must be a registered, name-dispatchable method, so you
 can drop the `gd_method` and write just `@(gd_rpc)` if you prefer (both forms are equivalent).
 
 **Config tokens** (mirroring GDScript `@rpc` defaults):
@@ -721,7 +721,7 @@ player_chat :: proc(self: ^Player, msg: gd.String) {
 | React to a peer joining/leaving | `gd.on_peer_connected(self.owner, "on_peer_joined")` · `gd.on_peer_disconnected(self.owner, "on_peer_left")` |
 
 > **Web/WASM:** Godot's web export does not ship `ENetMultiplayerPeer`, so `gd.host`/`gd.join`
-> compile but return `false` on wasm32 — branch on the bool. For browser co-op use the WebRTC
+> compile but return `false` on wasm32, so branch on the bool. For browser co-op use the WebRTC
 > helpers below instead. The query helpers (`is_server`, `my_peer_id`, `rpc_sender_id`,
 > `connected_peers`) are platform-independent and work over any peer (ENet **or** WebRTC).
 
@@ -733,9 +733,9 @@ call executed on the *other* peer with the correct `get_remote_sender_id()`.
 
 For co-op **in the browser, over the internet, with no port-forwarding**, use WebRTC. The
 browser has a native WebRTC stack; Godot exposes it through `WebRTCMultiplayerPeer` /
-`WebRTCPeerConnection`. `godot/Ergonomics_WebRtc.odin` drives the whole async setup — open a
+`WebRTCPeerConnection`. `godot/Ergonomics_WebRtc.odin` drives the whole async setup: open a
 signaling channel, trade an SDP offer/answer, trickle ICE, build the data channels, install
-the peer — so a game only writes:
+the peer, so a game only writes:
 
 ```odin
 // host becomes peer id 1 and gets a ROOM CODE to share; the joiner uses that code:
@@ -750,7 +750,7 @@ lobby_process :: proc(self: ^Lobby, _delta: f64) {
 ```
 
 Once connected, **the same `@(gd_rpc)` methods + `gd.rpc` / `gd.rpc_id` used over ENet just
-work** — a `WebRTCMultiplayerPeer` is a `MultiplayerPeer` like any other, and the high-level
+work**: a `WebRTCMultiplayerPeer` is a `MultiplayerPeer` like any other, and the high-level
 RPC layer is transport-agnostic. Nothing about your RPC code changes; only the transport
 setup does.
 
@@ -767,7 +767,7 @@ setup does.
 peer-to-peer link exists. The server brokers a **room-code lobby**: a host `create`s a room and
 gets a short CODE; a friend `join`s that CODE; the server relays the SDP offer/answer + ICE
 candidates between the two *verbatim* (it never parses their contents). The wire protocol is
-**JSON text frames** over a raw WebSocket (server path `/rtc`) — ANY server speaking this
+**JSON text frames** over a raw WebSocket (server path `/rtc`). Any server speaking this
 small protocol works; a Node reference implementation ships at `tests/webrtc/signal_server.mjs`
 (used by the headless tests; the maintainer runs an Elixir implementation in production):
 
@@ -783,27 +783,27 @@ client -> server                                  server -> client
 
 The host (id 1) creates the offer; the joiner answers. **Deployment:** the *game* traffic is
 peer-to-peer WebRTC (NAT-punching, no port-forwarding), but this signaling server must be
-reachable by both players during setup — host it at a public `wss://HOST/rtc`. `Ergonomics_WebRtc
+reachable by both players during setup, so host it at a public `wss://HOST/rtc`. `Ergonomics_WebRtc
 .odin` already configures a public **STUN** server on the `WebRTCPeerConnection`; for symmetric-NAT
 pairs add a **TURN** relay to its `_ICE_CONFIG_JSON` (localhost needs neither).
 
-> **Native caveat:** desktop/native Godot ships **no** WebRTC implementation — `WebRTCPeer
+> **Native caveat:** desktop/native Godot ships **no** WebRTC implementation: `WebRTCPeer
 > Connection` is an abstract extension point ("No default WebRTC extension configured") that
 > the separate [`godot-webrtc`](https://github.com/godotengine/webrtc-native) GDExtension must
 > fill. So these helpers are a **web-target path**: they compile and run natively, but
 > `initialize` fails unless `godot-webrtc` is installed (out of scope here). Prove + use them
-> in the browser export — which is exactly what `tests/webrtc` does.
+> in the browser export, which is exactly what `tests/webrtc` does.
 
 Proven end-to-end by `tests/webrtc`: **two real headless-Chrome instances** load the same
 exported web page (one `?role=host`, one `?role=join`), establish a genuine browser-native
 WebRTC data channel via the signaling server, and exchange `@(gd_rpc)` calls in both
-directions — asserting, from each browser's JS console, that the call executed on the *other*
+directions, asserting, from each browser's JS console, that the call executed on the *other*
 browser with the correct sender id (the in-browser mirror of `tests/rpc_net`).
 
 ## Ergonomic helpers
 
 The `godot` package ships a hand-written ergonomics layer (`godot/Ergonomics*.odin`) that
-collapses the common — but otherwise verbose — StringName / Variant / method-bind dances
+collapses the common (but otherwise verbose) StringName / Variant / method-bind dances
 into `gd.<helper>(...)` one-liners. Every helper takes/returns `Object`/`Node`/`Resource`,
 which are type-aliases all object handles (`Node2d`, `Area2d`, `Label`, …) collapse to, so a
 script's `self.owner` passes with no cast and a returned `Node` assigns to any handle var.
@@ -847,19 +847,19 @@ script's `self.owner` passes with no cast and a returned `Node` assigns to any h
 / `gd.action_add_*` wrap the `InputMap` singleton (constructing the `InputEventKey` /
 `InputEventMouseButton` for you). Settings/actions registered at runtime are visible to
 GDScript (`ProjectSettings.get_setting`, `InputMap.has_action`, `Input.is_action_pressed`)
-but are NOT persisted to `project.godot` — they are the "register my game's settings +
+but are NOT persisted to `project.godot`: they are the "register my game's settings +
 actions on an autoload's `_ready`" pattern (see below). `gd.get_setting_string` is the one
 that allocates (in `context.allocator`); the rest are `proc "contextless"`.
 
 All helpers are `proc "contextless"` except `gd.get_string`, which allocates the returned
-Odin `string` in `context.allocator` (fine inside any script proc — those run with the
+Odin `string` in `context.allocator` (fine inside any script proc, since those run with the
 script context set). For a script-declared signal field, prefer the generated typed
 `<struct_snake>_emit_<field>` helper; `gd.emit_args` is the by-name escape hatch (and the
-path `gd.emit`/`emit_args` both take — Godot's `emit_signal` is a vararg method, so they
+path `gd.emit`/`emit_args` both take: Godot's `emit_signal` is a vararg method, so they
 varcall it rather than ptrcall).
 
 **The interning pattern.** The `gd.*` helpers above all take plain Odin `cstring`s and do the
-Godot `String` / `String_Name` interning internally — that's the ergonomic path, so reach for a
+Godot `String` / `String_Name` interning internally, which is the ergonomic path, so reach for a
 helper first. When you call a *raw* bound method that has no wrapper, it takes a `String_Name`
 (method/signal/action/animation/property names) or a `String`, and you intern inline with
 `gd.sname("…")` / `gd.gstr("…")` rather than spelling out `new_string_name_cstring(…, true)`:
@@ -871,14 +871,14 @@ if gd.object_has_method(enemy, gd.sname("take_damage")) {
 }
 ```
 
-`gd.sname` uses `static = true` (intern once, keep) — correct for the string *literals* these
+`gd.sname` uses `static = true` (intern once, keep), correct for the string *literals* these
 calls almost always use.
 
 ### Common 2D transforms — moving / rotating a Node2D
 
 `gd.Vector2` is just an Odin `[2]f32`, so you get Odin's vector math for free: component access
 (`pos.x`), compound assignment (`pos.x += 10`), and whole-vector arithmetic (`pos += other`,
-`pos * delta`). The only round-trip is the get/set across the engine boundary — and for the
+`pos * delta`). The only round-trip is the get/set across the engine boundary. For the
 common "move/rotate/scale by a delta" cases, Godot's own one-call methods skip even that, so you
 don't need get → modify → set at all:
 
@@ -892,7 +892,7 @@ don't need get → modify → set at all:
 | set ONE position component (keep the other) | `gd.node2d_set_x(self.owner, 100)` · `gd.node2d_set_y(self.owner, 250)` (and `_global_x` / `_global_y`) |
 
 The `node2d_set_x` / `_set_y` (+ `_global_x` / `_global_y`) helpers cover the absolute-component
-case — "snap x to 100, keep y" — without the get → modify → set round-trip. **The same setters
+case ("snap x to 100, keep y") without the get → modify → set round-trip. **The same setters
 exist for the other positional types:** `node3d_set_x/_y/_z` (+ `_global_*`), and
 `control_set_x/_y`, `control_set_width/_height`, `control_set_global_x/_y`. If you ever need it by
 hand (a component with no setter, or another type), it's plain Odin array math:
@@ -930,7 +930,7 @@ Practical rules for what runs where and who owns which allocation:
   (`*_ready`, `*_process`, …), `@(gd_method)` calls, `@(gd_connect)` handlers and
   `@(gd_rpc)` procs are all invoked by the engine on its main thread; the generated
   trampolines add no synchronization. Don't call `gd.*` / engine APIs from threads you
-  spawn with `core:thread` — compute on the worker, then apply the result back on the
+  spawn with `core:thread`: compute on the worker, then apply the result back on the
   main thread from a lifecycle proc (e.g. poll a mutex-guarded value in `*_process`).
 - **`rt.script_of` is main-thread-only too**: it resolves through the core's live-instance
   registry, which the main thread mutates as script instances are created and freed.
@@ -939,12 +939,12 @@ Practical rules for what runs where and who owns which allocation:
   way, what you `make`/`new` there lives until you free it.
 - **`context.temp_allocator` is call-local.** The core resets its shared temp arena once
   per frame from the main-thread frame pump, so never stash a temp pointer (including
-  `fmt.tprintf`/`fmt.ctprintf` results) across frames — copy anything you keep into
+  `fmt.tprintf`/`fmt.ctprintf` results) across frames. Copy anything you keep into
   `context.allocator` memory.
-- **String-returning helpers allocate — the caller frees.** `gd.get_string` (and helpers
+- **String-returning helpers allocate: the caller frees.** `gd.get_string` (and helpers
   like it that return an Odin `string`) allocate from `context.allocator`; `delete(s)`
   when you're done with it.
-- **`gd.sname` interns forever.** It is `new_string_name_cstring(name, true)` —
+- **`gd.sname` interns forever.** It is `new_string_name_cstring(name, true)`:
   `static = true` hands Godot the cstring pointer to keep for the program's lifetime.
   Pass only string literals (or otherwise program-lifetime, ASCII) names; never a name
   built at runtime from a temporary buffer such as `fmt.ctprintf(...)`.
@@ -955,7 +955,7 @@ Practical rules for what runs where and who owns which allocation:
 
 1. builds the `scriptgen` binary,
 2. runs `scriptgen <scriptsdir>` to emit the `*.gen.odin` build artifacts beside the
-   authored sources (no resource stubs — the authored `.odin` is the attached resource),
+   authored sources (no resource stubs: the authored `.odin` is the attached resource),
 3. builds the scripts dll with `odin build <scriptsdir> -build-mode:dll
    -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc
    -custom-attribute:gd_command -custom-attribute:gd_tick
@@ -968,7 +968,7 @@ The nine `-custom-attribute:` flags are required so the Odin compiler accepts th
 `@(gd_method)` / `@(gd_connect)` / `@(gd_rpc)` / `@(gd_command)` / `@(gd_tick)` /
 `@(gd_sample)` / `@(gd_step)` / `@(gd_fact)` / `@(gd_half)` marker attributes; the
 build script passes them for you. The set lives in `decl/decl.odin`'s `ATTRS`, and
-tests/scriptgen asserts the build scripts against it — Odin refuses an unknown custom
+tests/scriptgen asserts the build scripts against it: Odin refuses an unknown custom
 attribute outright, so a name the schema grew and a build script did not would be a
 compile error in every game.
 
@@ -980,13 +980,13 @@ The build, the **live-editing (show-on-save) loop**, the editor DX (validation /
 
 A scripts dll is one Odin package. Because lifecycle/method procs and generated
 emit helpers live in that shared package, prefix your proc names with the struct
-name (`ping_ready`, `ping_add`) to avoid collisions — the prefix is stripped to
+name (`ping_ready`, `ping_add`) to avoid collisions, since the prefix is stripped to
 derive the GDScript-facing name. One script struct per file (identified by its
 first field being named `owner`).
 
 ## Custom resources
 
-`//gd:extends Resource` makes the script a **custom resource** — a pure data
+`//gd:extends Resource` makes the script a **custom resource**, a pure data
 container (a `RefCounted`, not a scene-tree node), exactly like a GDScript
 `extends Resource`. Everything is the same as any other script; only the base
 differs. Use it for designer-tunable data assets you create, edit in the
@@ -1013,13 +1013,13 @@ item_data_item_total :: proc(self: ^ItemData) -> int {
 ```
 
 - **No lifecycle.** A resource is not in the scene tree, so `_ready` / `_process`
-  / `_physics_process` never fire — omit them. `@export` vars and `@(gd_method)`s
+  / `_physics_process` never fire, so omit them. `@export` vars and `@(gd_method)`s
   work as usual.
 - **First field is `owner: gd.Resource`** (the owner-Object convention), instead
   of a `gd.Node`/`gd.Node2d`.
 - **`.tres` serialization is automatic.** `@export` vars carry the STORAGE usage
-  flag, so Godot's own text-resource serializer writes them — plus a reference to
-  this script — into a `.tres`. Loading the `.tres` reconstructs a live instance
+  flag, so Godot's own text-resource serializer writes them (plus a reference to
+  this script) into a `.tres`. Loading the `.tres` reconstructs a live instance
   with the script re-attached, so its methods still dispatch:
 
   ```gdscript
@@ -1046,7 +1046,7 @@ item_data_item_total :: proc(self: ^ItemData) -> int {
 
 - **Editable in the editor.** Unlike a non-tool *node* script (which the editor
   shows via a read-only placeholder), attaching a resource script builds a real,
-  live instance even in the editor — so its `@export` values are directly editable
+  live instance even in the editor, so its `@export` values are directly editable
   in the Inspector and persist on save.
 - **Resource-typed `@export`.** A field `data: ^gd.Resource
   `gd:"export,resource=ItemData"`` on a *node* script gives a resource-picker slot
@@ -1056,7 +1056,7 @@ item_data_item_total :: proc(self: ^ItemData) -> int {
 
 ## Global class names
 
-Every `//gd:class <Name>` is registered as a **global class** — a first-class engine
+Every `//gd:class <Name>` is registered as a **global class**, a first-class engine
 type, exactly like a GDScript `class_name`. No extra annotation is needed; the class
 name you already declare becomes the global name.
 
@@ -1076,7 +1076,7 @@ hand back `{name, base_type, icon_path}`.
 Because every script in a project compiles into ONE shared dll, a struct type declared
 in one script (e.g. `Enemy`) is the *same* type everywhere. `rt.script_of(obj, T)` turns
 a live Godot object into a typed `^T` pointer to the Odin script struct the engine
-allocated for it — giving DIRECT typed field and proc access across scripts, with no
+allocated for it, giving DIRECT typed field and proc access across scripts, with no
 Variant marshaling:
 
 ```odin
@@ -1095,11 +1095,11 @@ controller_attack :: proc(self: ^Controller, amount: gd.Int) -> int {
 ```
 
 - `script_of` returns `nil` when `obj` is nil or carries no Odin script of *our*
-  language (a foreign-language node, a placeholder, or a plain engine node) — it is
+  language (a foreign-language node, a placeholder, or a plain engine node). It is
   nil-safe, never a wild cast.
-- Works on web too (single module — the same resolver is wired directly).
+- Works on web too (single module: the same resolver is wired directly).
 - **Module boundary:** if the project uses [script modules](modules.md), `script_of` is
-  typed access within *one* module only — across modules it returns `nil` by construction
+  typed access within *one* module only: across modules it returns `nil` by construction
   (modules can't import each other's types), and cross-module access goes through the
   engine (signals, name-based calls, autoloads). See [Script Modules](modules.md).
 - For calling across a dll boundary (e.g. a tool that dispatches by name), the
@@ -1110,13 +1110,13 @@ For shared state with *no* per-node instance to reference (a global score, a con
 table), the package-level "module" pattern (file-private vars + package procs like
 `game_state_add`) is the simplest tool: every script in a project compiles into ONE Odin
 package, so they all share those globals with zero Godot glue. It is NOT, however, a real
-Godot singleton — it is not reachable at `/root/Name`, not visible to GDScript, and has no
+Godot singleton: it is not reachable at `/root/Name`, not visible to GDScript, and has no
 `_ready`. When you need that (a manager node GDScript can call, lifecycle, persistence
-across scene changes), use an **autoload** — see below.
+across scene changes), use an **autoload** (see below).
 
 ## Autoload singletons
 
-A `.odin` script can be a real Godot **autoload** singleton — a node added under `/root`
+A `.odin` script can be a real Godot **autoload** singleton: a node added under `/root`
 at startup, reachable everywhere (from GDScript as `Name` or `/root/Name`, from Odin via
 `gd.get_node` on any node's tree), persistent across scene changes, running `_ready` once.
 
@@ -1177,11 +1177,11 @@ print(GameManager.get_score())
 stripped: `game_manager_add_score` → `add_score`). The node is the SAME instance for the
 whole session, so its struct fields are your singleton state.
 
-> The base must be a `Node` subclass — an autoload entry is added to the scene tree, and a
+> The base must be a `Node` subclass: an autoload entry is added to the scene tree, and a
 > non-`Node` base cannot be parented. (A `Resource`/`RefCounted` script in `[autoload]`
 > would load but not become a `/root` node.)
 
-**Alternative — `Engine.register_singleton`.** For a *non-node* global (e.g. exposing an
+**Alternative: `Engine.register_singleton`.** For a *non-node* global (e.g. exposing an
 object to GDScript as `Engine.get_singleton("Name")` without putting it in the scene tree),
 the binding also has `gd.engine_register_singleton(engine, name, obj)` /
 `gd.engine_get_singleton(engine, name)`. The `[autoload]` node form above is the
@@ -1223,7 +1223,7 @@ tool_widget_ready :: proc(self: ^ToolWidget) {
 ```
 
 `gd.is_editor()` returns `false` at game runtime (including exported builds) and `true`
-while the editor holds the scene open. It's only meaningful inside `//gd:tool` scripts —
+while the editor holds the scene open. It's only meaningful inside `//gd:tool` scripts:
 non-tool scripts never run at edit time.
 
 ### Custom class icons
@@ -1240,13 +1240,13 @@ package my_game_scripts
 
 The path threads into both the script's `_get_class_icon_path` virtual and the global class
 registry's `icon_path` (so `ProjectSettings.get_global_class_list()` carries it). *(The icon
-PIXELS rendering in the dock is a visual editor behavior — the registered path is what these
+PIXELS rendering in the dock is a visual editor behavior: the registered path is what these
 hooks provide.)*
 
 ### EditorPlugin
 
 A `//gd:extends EditorPlugin` script (also `//gd:tool`) is a real editor plugin. Register it
-with the standard Godot plugin format — a `res://addons/<name>/plugin.cfg`:
+with the standard Godot plugin format, a `res://addons/<name>/plugin.cfg`:
 
 ```ini
 [plugin]
@@ -1288,7 +1288,7 @@ my_plugin_exit_tree :: proc(self: ^MyPlugin) {}
 ### EditorInspectorPlugin (advanced)
 
 A `//gd:extends EditorInspectorPlugin` script can customize the Inspector. Expose the engine
-virtuals as `@(gd_method)` procs — the codegen strips the `<struct_snake>_` prefix, so a
+virtuals as `@(gd_method)` procs: the codegen strips the `<struct_snake>_` prefix, so a
 proc named `my_inspector__can_handle` is exposed as the exact virtual `_can_handle` (note the
 double underscore):
 
@@ -1301,6 +1301,6 @@ my_inspector__parse_begin :: proc(self: ^MyInspector, object: ^gd.Object) { /* a
 ```
 
 These virtuals **dispatch into Odin** when invoked (verified headless by calling them
-directly). Whether the editor auto-invokes them during a *live* Inspector rebuild — after
-`add_inspector_plugin()` and selecting a handled object in the dock — is a UI-driven path
+directly). Whether the editor auto-invokes them during a *live* Inspector rebuild (after
+`add_inspector_plugin()` and selecting a handled object in the dock) is a UI-driven path
 that is **visual-only** (not asserted headless).

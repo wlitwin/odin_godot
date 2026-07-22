@@ -9,14 +9,14 @@ touches everything.
 This post is the mental-model shift that removes the problem: **stop thinking
 in messages ("tell the other peers X happened") and start thinking in state
 ("this field is true everywhere").** Structure a game this way from the first
-hour — and the toolkit makes it nearly free — and multiplayer is a property the
+hour (the toolkit makes it nearly free), and multiplayer is a property the
 code already has.
 
 ## The model
 
 One machine, the **host**, owns the truth. Every replicated field lives in a
 struct on every machine, and the toolkit makes everyone's copy converge on the
-host's — automatically, incrementally, every network tick.
+host's automatically and incrementally, every network tick.
 
 You know why this works from post 2: your state is a struct with a fixed
 layout. The toolkit keeps a shadow copy, diffs it after each tick, and ships
@@ -34,7 +34,7 @@ Hole :: struct {
 ```
 
 The host writes `self.hole.idx = 2`; a beat later that byte is true on every
-screen. **Change a field, done.** No `rpc("set_hole", 2)`, no
+screen. **Change a field, and you're done.** No `rpc("set_hole", 2)`, no
 MultiplayerSynchronizer node to configure, no late-joiner-missed-the-call bug:
 a field is *state*, so whoever joins next gets it in their snapshot. An RPC
 only exists at the moment it's sent; a field exists whenever anyone looks.
@@ -43,7 +43,7 @@ only exists at the moment it's sent; a field exists whenever anyone looks.
 
 Replicated structs are **entities** in a registry. Each has a type, a numeric
 `net_id`, and an owner. You declare one with a tag on the scene you already
-export — what the scene bodies, and its stable wire id:
+export, capturing what the scene bodies and its stable wire id:
 
 ```odin
 Golf :: struct {
@@ -64,10 +64,10 @@ scriptgen turns those tags into a factory table, and the same factory runs on
 every machine, host included. There is no separate "server spawns, then sends a
 spawn message you handle differently" path. The host asks the session to spawn;
 the session builds the scene *locally* and tells everyone else to build *the
-same scene*. You write the declaration once and no per-role creation code. A
-player who joins mid-game: the session replays the registry through the same
-table. A resumed save: the same table. Drop-in-join and load-game are already
-handled.
+same scene*. You write the declaration once, and there is no per-role creation
+code to write. When a player joins mid-game, the session replays the registry
+through the same table, and a resumed save uses the same table. Drop-in-join
+and load-game are already handled.
 
 ## Setup
 
@@ -97,22 +97,22 @@ golf_process :: proc(self: ^Golf, delta: f64) {
 
 That is a hosted, joinable game: lobby UI, chat, scoreboard, host/join buttons
 (`kboot.boot_host` / `boot_join`), connection lifecycle, and the pump that
-drives it all. Your game reacts by declaring **event halves** — plain procs
+drives it all. Your game reacts by declaring **event halves**: plain procs
 named for the event (`golf_player_joined`, `golf_entity_spawned`, an
 authority-only `golf_player_joined_then` for consequences) that the generated
-`golf_events` dispatches to. No callbacks into a half-initialized script, and
-no role branch of your own.
+`golf_events` dispatches to. There are no callbacks into a half-initialized
+script, and no role branch of your own to write.
 
 One concept in the join call pays off for the rest of the series: a player
-joins with a **reconnect token** (`ksave.token` — an env var, or a small file
+joins with a **reconnect token** (`ksave.token`, an env var, or a small file
 under `user://`). The token *is* their identity. Crash, restart, rejoin with
 the same token, and you get the same seat, the same stats, the same entities.
 There is no separate reconnect system; identity is state too.
 
 ## Movement: owner-written fields
 
-Host-authoritative fields would make *your own avatar* feel like molasses —
-every keypress waiting on a round trip. So there is one other flavor of
+Host-authoritative fields would make *your own avatar* feel like molasses,
+with every keypress waiting on a round trip. So there is one other flavor of
 replication: fields the entity's **owner** writes,
 
 ```odin
@@ -120,34 +120,34 @@ x, y: f32 `gd:"owner,interp"`,
 ```
 
 streamed unreliably at tick rate, and rendered by everyone else through a short
-interpolation buffer — smooth through jitter and packet loss. Your machine
-moves your avatar with local, zero-latency code; remote screens watch a
-slightly delayed, smoothed version. (That "slightly delayed" becomes post 5.)
+interpolation buffer that stays smooth through jitter and packet loss. Your
+machine moves your avatar with local, zero-latency code; remote screens watch
+a slightly delayed, smoothed version. (That "slightly delayed" becomes post 5.)
 
-Deltas for truth the host owns, streams for motion the owner owns. Disjoint
-sets, both just fields, and the word *message* never appeared.
+The host owns deltas for truth; the owner owns streams for motion. The two are
+disjoint sets, both just fields, and the word *message* never appeared.
 
 ## What the model gives you
 
 Structuring state this way feels like discipline until you list what falls out
 of it, each item a direct consequence of *state-is-the-protocol*:
 
-- **Drop-in joins** — the registry replays through your factory.
-- **Reconnect after a crash** — the token reclaims the seat; the snapshot
+- **Drop-in joins**: the registry replays through your factory.
+- **Reconnect after a crash**: the token reclaims the seat, and the snapshot
   restores the world.
-- **Saves** — a save file is the snapshot machinery pointed at disk
+- **Saves**: a save file is the snapshot machinery pointed at disk
   (`ksave.save_write` / `ksave.resume`, post 6).
-- **Host migration** — a backup snapshot plus "everyone rejoins the new host";
+- **Host migration**: a backup snapshot plus "everyone rejoins the new host";
   the toolkit automates the handoff (post 6).
-- **Single-player** — a session with one seat. Same code. You never build the
-  game twice.
+- **Single-player**: a session with one seat, using the same code. You never
+  build the game twice.
 
 These are consequences of the model rather than separate features. That is the
 value of learning it: you are not learning six systems, you are learning one
 shape that implies six systems.
 
 What's missing is the other half: players don't just *watch* state, they *act*
-on it — and two players acting on the same chest at once is where netcode
+on it. Two players acting on the same chest at once is where netcode
 traditionally gets ugly. That's the next post.
 
 *Next: [Verbs, not RPCs →](04-verbs-not-rpcs.md)*

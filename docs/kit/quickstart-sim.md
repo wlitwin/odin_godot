@@ -1,8 +1,8 @@
 # Quickstart: server authority and client prediction
 
 The [co-op quickstart](quickstart.md)'s game trusts its players: each peer
-writes its own square's position. A competitive game needs the opposite — the
-server owns positions and clients can't lie about where they are. This page
+writes its own square's position. A competitive game needs the opposite: the
+server owns positions, and clients can't lie about where they are. This page
 promotes the hello game to that model in **four small diffs**, following the
 [promotion checklist](sim.md#promoting-a-coop-game). The result is
 `examples/hello_sim/`: `examples/hello_net/` with these four diffs applied,
@@ -13,7 +13,7 @@ You get: clients that can't lie about where they are, your own square still
 moving the *instant* a key goes down (client prediction), and remote squares
 rendering smoothly a breath in the past (the watched clock).
 
-Prerequisite: the co-op quickstart. The session half (lobby, doors, spawns,
+The prerequisite is the co-op quickstart. The session half (lobby, doors, spawns,
 drop-in) carries over *unchanged* apart from the join-code doors, so this page
 only explains what moves.
 
@@ -48,7 +48,7 @@ player_tick :: proc(self: ^Player, input: Player_Input) {
 
 ## Diff 3 — the device read becomes a sample
 
-The one place that still touches hardware, filling my input for tick T:
+The one place that still touches hardware fills my input for tick T:
 
 ```odin
 @(gd_sample)
@@ -68,8 +68,8 @@ hello_sim_lane_init(self, &self.lane, &self.ses) // generated: carries the tick/
 kboot.boot_lane(&self.boot, &self.lane)          // the boot drives the lane from here on
 ```
 
-`lane: ksim.Lane` joins the game struct and the frame-loop drive block is
-deleted — that's the full set of changes. Issue sites and spawn sites keep
+`lane: ksim.Lane` joins the game struct, and the frame-loop drive block is
+deleted. That's the full set of changes. Issue sites and spawn sites keep
 their exact shape on both models.
 
 ## Run it
@@ -80,8 +80,8 @@ $GODOT --path examples/hello_sim &                        # window 1: Host
 HELLO_LATENCY=120 $GODOT --path examples/hello_sim        # window 2: Join
 ```
 
-**Checkpoint:** in the joined window — under 120ms injected each way — your
-square still snaps to your keys with zero lag (prediction), while the host's
+**Checkpoint:** in the joined window, with under 120ms injected each way,
+your square still snaps to your keys with zero lag (prediction), while the host's
 square glides smoothly behind (watched). Remove the latency env and nothing
 about the code changes; the lane runs the same path with less latency to mask.
 `examples/hello_sim/run.sh` pins both receipts headless: the guest's own
@@ -93,16 +93,16 @@ arrives on the watched clock.
 
 A competitive game's trusted machine has three shapes, all the same code:
 
-- **Listen server** — the host window above: a player who is also the
-  authority. Free, and fine among friends; the host has the zero-latency
-  seat.
-- **Dedicated, headless** — `HELLO_ROLE=serve $GODOT --headless --path
-  examples/hello_sim` runs `kboot.boot_serve`: an avatarless referee seat
+- **Listen server.** This is the host window above: a player who is also the
+  authority. It is free and fine among friends, since the host has the
+  zero-latency seat.
+- **Dedicated, headless.** `HELLO_ROLE=serve $GODOT --headless --path
+  examples/hello_sim` runs `kboot.boot_serve`, an avatarless referee seat
   that simulates, fields no square, and never migrates. A dead dedicated
   server restarts rather than handing off; the host-migration handoff belongs
   to the friends-host model. Run this on a VPS for a match that must be fair.
-- **Single** — the host with nobody joined; the same build is your practice
-  range.
+- **Single.** This is the host with nobody joined; the same build is your
+  practice range.
 
 ## What the kit does not do
 
@@ -112,9 +112,9 @@ is half-solved: the
 each joiner's observed endpoint and the host punches a few UDP packets at it,
 so a plain-ENet join crosses LAN, port-forwarded, and the common
 port-preserving home NATs on a four-letter code. Symmetric NATs are an honest
-failure — there is no TURN for raw ENet — so the join reports why and offers
+failure (there is no TURN for raw ENet), so the join reports why and offers
 the doors that always work: the browser build (WebRTC + TURN) and Steam.
 
 See [timelines](timelines.md) for choosing models and [sim.md](sim.md) for
-everything the lane can do — lag-compensated hitscan, contested objects,
-predicted spawns, verbs on the tick timeline.
+everything the lane can do: lag-compensated hitscan, contested objects,
+predicted spawns, and verbs on the tick timeline.

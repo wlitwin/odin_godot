@@ -1,7 +1,7 @@
 # Workflow — the dev loop, editor DX, and debugging
 
 This is the day-to-day guide: how you build, iterate, get editor help, and debug. Read the
-limitations first — they shape everything else.
+limitations first, since they shape everything else.
 
 ## Odin scripts are AOT-compiled
 
@@ -24,9 +24,9 @@ These are inherent to a compiled language. Everything below is built around them
 ## Building
 
 **In the editor:** **Project → Tools → Build Odin Scripts** compiles the current project's
-scripts dll (the same background build as save-on-reload), with progress in the Output panel —
-no terminal needed. Saving a script rebuilds automatically too. The command line below is for
-CI, headless builds, or working from the source repo.
+scripts dll (the same background build as save-on-reload), with progress in the Output panel,
+so no terminal is needed. Saving a script rebuilds automatically too. The command line below is
+for CI, headless builds, or working from the source repo.
 
 `build/build_scripts.sh [PROJECT_DIR] [SCRIPTS_DIR]` runs the full pipeline:
 
@@ -34,14 +34,14 @@ CI, headless builds, or working from the source repo.
 2. runs it over the scripts dir to emit `*.gen.odin` build artifacts beside your sources (you
    never edit these; the loader ignores them as attachable scripts). One of them,
    `odin_godot_guard.gen.odin`, is the staleness guard: a compile-time `#load_hash`
-   assert per authored source. A build path that skips this step — a bare
-   `odin build` against yesterday's `*.gen.odin` — fails at compile time, naming the
+   assert per authored source. A build path that skips this step (a bare
+   `odin build` against yesterday's `*.gen.odin`) fails at compile time, naming the
    drifted file instead of silently compiling stale descriptors,
 3. builds the scripts dll (`odin build <scriptsdir> -build-mode:dll` with
    `-custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc
    -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_sample
-   -custom-attribute:gd_step -custom-attribute:gd_fact -custom-attribute:gd_half` — those
-   flags let the Odin compiler accept the marker attributes), and
+   -custom-attribute:gd_step -custom-attribute:gd_fact -custom-attribute:gd_half`, which let
+   the Odin compiler accept the marker attributes), and
 4. builds the core dll.
 
 ```sh
@@ -63,18 +63,19 @@ Odin `@export` lives in the **compiled** scripts dll, so it doesn't exist until 
 **rebuilt**. To give you the same "save → it appears" loop, the editor recompiles and reloads
 the scripts dll for you:
 
-1. **On save**, the editor (and only the editor — a running/exported game never recompiles)
-   kicks a **background** rebuild of the scripts dll on a worker thread, so the UI never
-   freezes while `odin build` runs (a few seconds). Rapid saves coalesce into one rebuild.
+1. **On save**, the editor (and only the editor, since a running/exported game never
+   recompiles) kicks a **background** rebuild of the scripts dll on a worker thread, so the UI
+   never freezes while `odin build` runs (a few seconds). Rapid saves coalesce into one rebuild.
 2. **When the build finishes**, on the next editor frame the dll is hot-swapped in place: live
-   instances re-bind and **keep their state**, and the Inspector's property lists refresh — so
+   instances re-bind and **keep their state**, and the Inspector's property lists refresh, so
    a freshly-added `@export` appears **without restarting the editor**.
 
 **Format on save.** When `odinfmt` is reachable (it ships with ols; also the
 `odin_godot/odinfmt_bin` setting), saving a script writes **formatted** code to disk and
-updates the open buffer in place — one undo step, caret preserved, no unsaved dot. A
-project-root `odinfmt.json` is honored. Sources that don't parse yet save unformatted
-(never blocked); disable with the `odin_godot/format_on_save` project setting.
+updates the open buffer in place. The change is a single undo step, the caret position is
+preserved, and no unsaved dot appears. A project-root `odinfmt.json` is honored. Sources that
+don't parse yet save unformatted (never blocked); disable with the `odin_godot/format_on_save`
+project setting.
 
 **You can always see where the build is.** A status badge in the editor's **top toolbar**
 shows *Odin: building…* while a rebuild runs, flashes green *live ✓ (X.Xs)* when the swap
@@ -82,17 +83,17 @@ lands, and turns a sticky red *build FAILED* after a broken save (the actual com
 errors are in the Output panel). It hides when idle.
 
 **Play waits for the build.** Pressing Play while a rebuild is in flight blocks (briefly)
-until it finishes, and **refuses to launch on a failed build** — otherwise save-then-Play
-would silently run your *previous* dll. This uses the editor's `EditorPlugin._build` hook,
-the same mechanism C# uses to compile before launch; a red error in the Output explains
-the refusal.
+until it finishes, and **refuses to launch on a failed build**, because otherwise
+save-then-Play would silently run your *previous* dll. This uses the editor's
+`EditorPlugin._build` hook, the same mechanism C# uses to compile before launch; a red error
+in the Output explains the refusal.
 
 **Per-module rebuilds.** In a project using [script modules](modules.md), the rebuild is
 scoped: the coordinator hashes each module's sources and rebuilds + swaps **only the
-module(s) whose sources changed** — a save in `res://modules/enemies/` recompiles that one
+module(s) whose sources changed**. A save in `res://modules/enemies/` recompiles that one
 dll, leaving the main module and every other module's dll (instances, package globals, all
 of it) untouched. That's what keeps save latency flat in large projects; the swapped
-module's own package globals reset (fresh dll). Details in [Script Modules](modules.md).
+module's own package globals reset (fresh dll). See [Script Modules](modules.md) for details.
 
 **Finding the compiler.** The editor often has no `odin` on its `PATH` (e.g. launched from the
 macOS app, not a shell). Point it at the binary with the **`odin_godot/odin_bin`** project
@@ -101,7 +102,7 @@ none resolves, reload-on-save warns once and is skipped (the editor keeps workin
 package defaults to `res://scripts`; override with **`odin_godot/scripts_dir`**.
 
 **Manual trigger.** If save detection misses (or you changed something outside the saved
-file), force the rebuild+reload+refresh by reloading the script — e.g.
+file), force the rebuild+reload+refresh by reloading the script, for example with
 `load("res://scripts/your_script.odin").reload(true)` from a tool script or the editor's
 script-reload affordance. This runs the exact same path as save.
 
@@ -119,29 +120,29 @@ script-reload affordance. This runs the exact same path as save.
 ## Editor DX (validation, autocomplete, highlighting)
 
 Three editor-only features make `.odin` feel like a real scripting language in Godot. All are
-native-only (the web build stubs them) and all degrade gracefully — if a tool binary is
-missing they warn once and the editor keeps working.
+native-only (the web build stubs them) and all degrade gracefully: if a tool binary is
+missing, they warn once and the editor keeps working.
 
 ### Live error squiggles (`_validate`)
 
 The editor surfaces real **Odin compiler** errors as inline squiggles + Errors-panel entries
-as you type, in **two tiers**. **Syntax errors** — the everyday while-typing state: the
-half-typed expression, the missing brace — come from the compiler's own parser running
+as you type, in **two tiers**. **Syntax errors** (the everyday while-typing state: the
+half-typed expression, the missing brace) come from the compiler's own parser running
 **in-process** (~0.1 ms), so the squiggle lands on the very first debounce and the slow check
 is never scheduled for a buffer it couldn't type-check anyway. **Type errors** need the real
 checker: because a single `.odin` file isn't a compile unit, it type-checks the file's
-**package** — it copies the package to a temp overlay, overwrites the one edited file with your
+**package**: it copies the package to a temp overlay, overwrites the one edited file with your
 unsaved buffer, runs `odin check`, and maps `‹file›(‹line›:‹col›) Error: ‹msg›` back to the
 editor. That check runs on a **background worker** with a result cache, so it never freezes the
-UI (first-call latency ~0.03 ms; the check itself — ~0.5 s warm on a game-sized package —
+UI (first-call latency ~0.03 ms; the check itself, ~0.5 s warm on a game-sized package,
 completes a moment later and the squiggles update on the next debounce). The `godot` collection root resolves `odin_godot/root` setting →
-`ODIN_GODOT_ROOT` env → **auto-derived from the installed addon's own location** — so a normal
+`ODIN_GODOT_ROOT` env → **auto-derived from the installed addon's own location**, so a normal
 `addons/odin_godot/` install needs no configuration; set `odin_godot/root` only if you keep the
 collection somewhere non-standard.
 
 > **Scope:** `_validate` shows squiggles for the **file you're editing**. An error your edit
 > causes in a *sibling* file of the same package isn't shown as a live squiggle there (the
-> engine only validates the open file) — but it **does** surface in the Output when the
+> engine only validates the open file), but it **does** surface in the Output when the
 > rebuild-on-save build runs, so cross-file breakage isn't silent, just deferred to save.
 
 ### Autocomplete (`_complete_code`, backed by `ols`)
@@ -158,7 +159,7 @@ symbol's **type/signature** inline (from ols) next to its name. Point at the bin
 
 `.odin` files are token-colored in the Script panel (keywords, comments, strings, numbers,
 PascalCase types, proc calls). It's registered on the first editor frame and touches only the
-Script editor. Limitation: block comments are highlighted per-line — a `/* … */` spanning
+Script editor. Limitation: block comments are highlighted per-line, so a `/* … */` spanning
 lines isn't tracked across them.
 
 ### Icons
@@ -177,25 +178,25 @@ The script editor's **Find in Files** (Ctrl/Cmd+Shift+F) searches `.odin` files.
 search file-type list is a hardcoded set (`gd`, `cs`, `gdshader`) with no hook for a
 GDExtension scripting language, so on load the Odin editor plugin appends `odin` to the
 `editor/script/search_in_file_extensions` project setting. The value is applied in-memory each session (your `project.godot` is left untouched),
-and the search dialog re-reads it every time it opens — so the `*.odin` filter checkbox is
+and the search dialog re-reads it every time it opens, so the `*.odin` filter checkbox is
 there and checked by default.
 
 One known gap remains, functionality-irrelevant: documentation tooltips for `@export`s/methods
-in the Inspector aren't wired (autocomplete *does* show type signatures — see above).
+in the Inspector aren't wired (autocomplete *does* show type signatures; see above).
 
 ### Generated files are hidden in the FileSystem dock
 
 The build writes a `*.gen.odin` registration file next to each script (they must live inside
-the script's package directory — Odin packages are single-directory). They aren't attachable
-or openable in the editor, so the Odin plugin **hides them from the FileSystem dock**,
-re-hiding them after every dock rebuild. This is widget-level hiding: Godot's filesystem
-scan admits files by extension only (`.gen.odin` ends in `.odin`) and there is no per-file
-exclusion hook, so re-hiding after each rebuild is the available mechanism. They remain real
-files on disk — external editors,
-git, and the engine's Find in Files (which is also extension-based) still see them.
+the script's package directory, since Odin packages are single-directory). They aren't
+attachable or openable in the editor, so the Odin plugin **hides them from the FileSystem
+dock**, re-hiding them after every dock rebuild. This is widget-level hiding: Godot's
+filesystem scan admits files by extension only (`.gen.odin` ends in `.odin`) and there is no
+per-file exclusion hook, so re-hiding after each rebuild is the available mechanism. They
+remain real files on disk: external editors, git, and the engine's Find in Files (which is
+also extension-based) still see them.
 
 To show them (e.g. when inspecting what scriptgen emits), set the
-**`odin_godot/show_generated_files`** project setting to `true` — it takes effect at the next
+**`odin_godot/show_generated_files`** project setting to `true`; it takes effect at the next
 dock rebuild (toggling a file save or reopening the project is enough).
 
 <a name="editor-settings"></a>
@@ -216,14 +217,14 @@ Set these as **project settings** (they also have env fallbacks for shell-launch
 
 > **Dev builds vs. exports.** The editor's rebuild-on-save loop compiles at `-o:none` so saves
 > stay fast. **Exports** (desktop and web) compile at `odin_godot/export_optimization` (default
-> `speed`) so shipped games are optimized — the two are independent. For a maximally lean
+> `speed`) so shipped games are optimized. The two are independent. For a maximally lean
 > release, append `-no-bounds-check -disable-assert` via the `SCRIPT_BUILD_FLAGS` env when
 > running the export build script directly.
 
 ## Debugging
 
 Because a script dll is a native library, the workflow is **logging + `lldb` + reading crash
-backtraces** — exactly like debugging a C library. The full reference (with verified
+backtraces**, exactly like debugging a C library. The full reference (with verified
 transcripts) is in **[Debugging](debugging.md)**; the essentials:
 
 ### Logging: `gd.print` / `gd.error` / `gd.warn`
@@ -252,14 +253,14 @@ Zero-setup from the editor: **Project > Tools > Debug Game (LLDB)** opens a term
 running the game under lldb, and **Debug Game (Break at Cursor)** halts it on the script
 line the caret is on; **Generate VS Code Debug Config** wires the same thing into VS
 Code/CodeLLDB (F5, clickable breakpoints in `.odin` files). From a shell, the same
-launcher (it handles the macOS gotchas — SIP re-sign, lldb's `::` mis-parse):
+launcher (it handles the macOS gotchas: SIP re-sign, lldb's `::` mis-parse):
 
 ```sh
 build/debug_game.sh --break player.odin:51 tests/showcase
 ```
 
 The dlls carry full DWARF (`-debug -use-single-module`): file:line breakpoints, stepping,
-and `frame variable` with typed args — `frame variable *self` prints the live script
+and `frame variable` with typed args. `frame variable *self` prints the live script
 struct, and the auto-loaded `godot_lldb.py` summaries render `godot.String`/`String_Name`/
 `Variant` values. A script `panic` freezes the session at the panic site. See
 [debugging.md](debugging.md) for the full tour.
@@ -271,14 +272,15 @@ project root: ols-based editors (Neovim, Zed, Sublime, Helix) get completion for
 scripts + the `godot` collection immediately, and JetBrains IDEs import it via the
 [Odin Support plugin](https://plugins.jetbrains.com/plugin/22933-odin-support)
 (right-click the file). Rider edits great but cannot debug native code (plugin
-limitation on Rider ≥ 2025.2) — CLion/IDEA Ultimate can, pointed at the debuggable
-Godot copy; details in [debugging.md](debugging.md#jetbrains-ides-rider-clion-idea-ultimate-).
+limitation on Rider ≥ 2025.2). CLion/IDEA Ultimate can, pointed at the debuggable
+Godot copy. See [debugging.md](debugging.md#jetbrains-ides-rider-clion-idea-ultimate-)
+for details.
 
 ### Crashes and panics are reported automatically
 
 A crash or panic in script code is reported: an Odin `panic`/`assert` pushes a red
 `ODIN_SCRIPT_PANIC <message> (file:line)` error to the **editor Output**, and a raw fatal
-signal (SIGSEGV etc., e.g. an engine call on a nil handle — macOS/Linux) prints an
+signal (SIGSEGV etc., e.g. an engine call on a nil handle, on macOS/Linux) prints an
 `ODIN_GODOT_CRASH` report to stderr with the **faulting Odin proc symbolized**, pushes a
 one-line error toward the editor, and still chains to Godot's own crash handler. See the
 "What you see when the game crashes" section of [Debugging](debugging.md).
