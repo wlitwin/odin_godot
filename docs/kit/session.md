@@ -78,6 +78,8 @@ tick counts itself, so changing `tick_hz` never silently rescales your timeouts:
 Session_Config :: struct {
 	tick_hz:         int, // net ticks per second (0 = knet.DEFAULT_TICK_HZ, 20)
 	interp_delay:    f64, // how far in the past remote entities render
+	interp_adapt:    bool, // slew interp_delay to the worst link's need? (off; interp_delay = the floor) — see net.md
+	interp_delay_max: f64, // adaptive ceiling, seconds (0 = a generous kit default)
 	command_timeout: f64, // prediction auto-revert horizon
 	join_timeout:    f64, // client_start -> Ev_Join_Failed horizon
 	backup_interval: f64, // backup-host snapshot refresh cadence

@@ -224,6 +224,7 @@ the link goes bad:
 net  42ms  jit 6ms  loss 1.2%  ok
 rx 3.2k state 2.1 stream 0.8 app16 0.2 · tx 0.4k cmd 0.3
 sim  lead 4t  resim ▁▁▂▁▇▁▁…  rec 128
+warn  rclamp 3▲
 ```
 
 Row 1 is the link: rtt off the replicated ping stat (`net_ping_ms`), jitter
@@ -240,6 +241,18 @@ false); quickdraw's fill is the worked example. Booted games skip the
 hand-fill entirely: [`kboot.boot_net_stats(&boot)`](boot.md) returns the coop
 core (rtt, link jitter/loss, malformed drops, traffic) — a sim game lays its
 lane rows on the result.
+
+The `warn` row (last, and only when something has fired) surfaces the
+**silent-failure counters** — the tallies that exist precisely because the
+failure they name leaves no other trace: `guard_hits` (a client wrote a
+host-lane field), `input_drops` / `cmd_capped` (host: sim inputs dropped, verbs
+refused by the per-player cap), `rewind_clamped` (a lag-comp rewind pinned to the
+buffer horizon). `boot_net_stats` fills `guard_hits` for every game; a sim game
+adds the lane three. Each draws its number only when non-zero, and a **▲** flags
+one that *moved this refresh* — a lone cold-start clamp is normal, a count still
+climbing a minute in is the bug, and the raw number alone can't tell them apart
+(quickdraw's lag-comp regression rode a 60-second acid unmarked because the datum
+lived only on-screen — this row is the fix).
 
 Siblings: [session.md](session.md) (roster, stats, `session_tick_hz`) ·
 [comms.md](comms.md) (the chat log) · [combat.md](combat.md) (`Ability_Def`, cooldowns) ·
