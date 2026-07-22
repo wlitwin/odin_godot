@@ -550,6 +550,22 @@ Fact_Info :: struct {
 	path:         string,
 }
 
+// One declared typed app-message — `@(gd_message="TAG")` on a handler
+// `proc(self: ^Owner, from: knet.Player_Id, msg: T)`. scriptgen generates the
+// game-owned Typed_Route(T) storage, a `<class>_messages` registration proc (the
+// game calls it once in ready()), and `<proc>_send` / `<proc>_send_to` doors over
+// the runtime typed-route API (session_app_listen / session_app_send_typed). A
+// POD payload decoded for the handler; the tag is the game's SES_APP tag byte.
+Message_Info :: struct {
+	proc_name:    string, // the author's handler proc (drives the route var + send wrappers)
+	name:         string, // struct-prefix-stripped (the diagnostic / fingerprint name)
+	game:         string, // the receiver struct — the class whose `_messages` proc registers it
+	payload_type: string, // the `msg: T` type text — its layout folds into NET_FINGERPRINT
+	tag_ident:    string, // the declared SES_APP tag constant, spliced verbatim (e.g. TAG_WHISPER)
+	line:         int,
+	path:         string,
+}
+
 Script :: struct {
 	path:        string, // source file path (diagnostics)
 	godot_alias: string, // the file's `godot:godot` import alias ("" = not imported)
@@ -584,6 +600,7 @@ Script :: struct {
 	step_boot:   bool,
 	input_classes: [dynamic]Input_Class_Info, // resolved package-wide (resolve_sim), on the lane OWNER: every input class, sorted by id (0 = primary)
 	facts:        [dynamic]Fact_Info, // declared world-pass facts (resolve_facts), on the lane OWNER — doors + decode thunks + the fact table ride its gen file
+	messages:     [dynamic]Message_Info, // declared typed app-messages (@(gd_message)) — route storage + a `_messages` registration proc + send doors ride this class's gen file
 	boot_field:  string, // the kboot.Boot field's name ("" = none) — generates the standard transport forwards
 	std_forwards: [dynamic]string, // which standard forwards were synthesized (bodies emitted by generate)
 	probes:       [dynamic]Probe_Info, // generated acid probes (resolve_probes; bodies emitted by generate)
@@ -1495,7 +1512,7 @@ main :: proc() {
 		// plain exports) skip it: no kit import, no session to gate.
 		kit_wire := false
 		for s in all_scripts {
-			if len(s.replicates) > 0 || len(s.commands) > 0 || len(s.entities) > 0 || s.tick.proc_name != "" || s.profile_type != "" {
+			if len(s.replicates) > 0 || len(s.commands) > 0 || len(s.entities) > 0 || s.tick.proc_name != "" || s.profile_type != "" || len(s.messages) > 0 {
 				kit_wire = true
 				break
 			}
@@ -2050,6 +2067,18 @@ net_fingerprint :: proc(scripts: []^Script, scripts_dir: string) -> u64 {
 			fmt.sbprintf(&b, "%s\n", f)
 		}
 
+		// Declared typed app-messages (@(gd_message)): the tag→payload binding.
+		// The payload's field LAYOUT is folded package-wide below (like profile
+		// rows), so a drifted payload struct refuses at the join door too.
+		msgs := make([dynamic]string, context.temp_allocator)
+		for m in s.messages {
+			append(&msgs, fmt.tprintf("msg %s tag=%s payload=%s", m.name, m.tag_ident, m.payload_type))
+		}
+		slice.sort(msgs[:]) // registration order is not wire
+		for m in msgs {
+			fmt.sbprintf(&b, "%s\n", m)
+		}
+
 		if s.tick.proc_name != "" {
 			fmt.sbprintf(&b, "tick input=%s class=%d contested=%v", s.tick.input_type, s.tick.input_class, s.tick.contested)
 			if s.tick.fx_mine {
@@ -2113,6 +2142,26 @@ net_fingerprint :: proc(scripts: []^Script, scripts_dir: string) -> u64 {
 			if def, has := pkg[name]; has {
 				for f in def.fields {
 					fmt.sbprintf(&b, "profile %s.%s:%s\n", name, f.name, f.type_text)
+				}
+			}
+		}
+		// Typed app-message payloads (@(gd_message)), same reasoning: the payload
+		// struct IS the wire bytes (session_app_send_typed raw-copies it), so its
+		// field-by-field shape gates the join — a same-size drift would scramble a
+		// message PAST the version door exactly like a profile row.
+		mpays := make([dynamic]string, context.temp_allocator)
+		for s in sorted {
+			for m in s.messages {
+				if !slice.contains(mpays[:], m.payload_type) {
+					append(&mpays, m.payload_type)
+				}
+			}
+		}
+		slice.sort(mpays[:])
+		for name in mpays {
+			if def, has := pkg[name]; has {
+				for f in def.fields {
+					fmt.sbprintf(&b, "msg-payload %s.%s:%s\n", name, f.name, f.type_text)
 				}
 			}
 		}

@@ -96,6 +96,14 @@ story() {
 		# The guest's marker surfaces as a comms event on both peers.
 		expect "$log" "CAVE_MARK player=2 kind=1" "marker missing in $(basename "$log")"
 	done
+	# Phase 2c — the TYPED APP-MESSAGE (@(gd_message)). On arrival the guest sends
+	# a directed greeting to the host (cave_lobby_emote_send → HOST_PEER); the host
+	# decodes it, sees the SENDER resolved to player 2 and the payload intact
+	# (kind=7 spice=41), and answers with a SEAT-ADDRESSED reply
+	# (cave_lobby_emote_send_to → the guest), which the guest presents decoded
+	# (kind=8 spice=42). One message type, both send doors, both directions.
+	expect "$hlog" "CAVE_WHISPER from=2 kind=7 spice=41" "host never got the guest's typed greeting (or the sender wasn't resolved)"
+	expect "$glog" "CAVE_WHISPER from=[0-9]+ kind=8 spice=42" "guest never got the host's seat-addressed reply"
 	# Phase 3 — the cave. Both peers materialize the world and reach the chest
 	# on their own legs (the prompt only shows inside the shared range gate).
 	for log in "$hlog" "$glog"; do

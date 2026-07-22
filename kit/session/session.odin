@@ -469,6 +469,27 @@ session_app_send_typed :: proc(s: ^Session, tag: u8, msg: $T, to_peer: Peer_Id, 
 	session_app_flush(s, to_peer, channel)
 }
 
+// Send a TYPED payload to a PLAYER — the seat-addressed twin of
+// session_app_send_typed (resolves the seat→peer on the authority, like
+// session_app_send_to), for a directed message: a whisper, a private reply.
+// Host-only; a disconnected target or the host itself (no transport loopback) is
+// dropped silently.
+session_app_send_typed_to :: proc(s: ^Session, player: knet.Player_Id, tag: u8, msg: $T, channel: Channel = .Reliable) {
+	#assert(
+		intrinsics.type_is_nearly_simple_compare(T) && !intrinsics.type_is_pointer(T) && !intrinsics.type_is_multi_pointer(T),
+		"session_app_send_typed_to: the payload T must be POD (no strings, slices, maps, or pointers)",
+	)
+	assert(s.is_host, "player-addressed sends resolve seats on the authority")
+	p, ok := s.players[player]
+	if !ok || !p.connected || p.id == s.me {
+		return
+	}
+	m := msg
+	w := session_app_begin(s, tag)
+	append(&w.buf, ..(cast([^]u8)&m)[:size_of(T)])
+	session_app_flush(s, p.peer, channel)
+}
+
 // Ship app payload bytes under `tag` — the one-call form when the payload
 // already exists as a slice (begin/flush avoids the extra copy when you are
 // building it anyway). Same channel rule as session_app_flush.

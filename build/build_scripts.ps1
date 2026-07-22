@@ -187,7 +187,7 @@ function BuildOneScriptsDir([string]$dir) {
     # SYNC with build/common.sh run_scriptgen.
     Run $scriptgenExe @($dir, "-godot:$RootRel")
     $out = Join-Path $Bin (DllLeafForDir $dir)
-    BuildDll $dir $out @("-custom-attribute:gd_method", "-custom-attribute:gd_connect", "-custom-attribute:gd_rpc", "-custom-attribute:gd_command", "-custom-attribute:gd_tick", "-custom-attribute:gd_sample", "-custom-attribute:gd_step", "-custom-attribute:gd_fact", "-custom-attribute:gd_half")
+    BuildDll $dir $out @("-custom-attribute:gd_method", "-custom-attribute:gd_connect", "-custom-attribute:gd_rpc", "-custom-attribute:gd_command", "-custom-attribute:gd_tick", "-custom-attribute:gd_sample", "-custom-attribute:gd_step", "-custom-attribute:gd_fact", "-custom-attribute:gd_half", "-custom-attribute:gd_message")
     $script:builtDlls += $out
 }
 

@@ -451,6 +451,7 @@ ATTRS :: []Attr {
 	{"gd_sample", .Kit_Primary, "an input sample"},
 	{"gd_step", .Kit_Primary, "a sim step"},
 	{"gd_fact", .Kit_Primary, "a world-pass fact door (its bearer is named <event>_fx)"},
+	{"gd_message", .Kit_Primary, "a typed app-message handler (kit/session app route)"},
 	{"gd_half", .Half, "a pairing half; the NAME says what it pairs with"},
 }
 

@@ -138,8 +138,8 @@ generate :: proc(s: ^Script) -> string {
 	// gd:"replicate" field needs the kit/net descriptor + the POD compile-time check
 	// (commands imply replicates — parse validation enforces it — but keep the
 	// condition independent for robustness).
-	if len(s.replicates) > 0 || len(s.commands) > 0 || len(s.entities) > 0 || len(s.backups) > 0 {
-		w(&b, "import knet \"godot:kit/net\"\n")
+	if len(s.replicates) > 0 || len(s.commands) > 0 || len(s.entities) > 0 || len(s.backups) > 0 || len(s.messages) > 0 {
+		w(&b, "import knet \"godot:kit/net\"\n") // @(gd_message) thunks/wrappers name knet.Player_Id
 	}
 	if len(s.replicates) > 0 || len(s.backups) > 0 {
 		w(&b, "import \"base:intrinsics\"\n")
@@ -166,8 +166,8 @@ generate :: proc(s: ^Script) -> string {
 	// build kboot.Entity_Kind rows; the lane wiring names ksess.Session; the
 	// standard transport forwards route into netgd/ksess; the boot-routed step
 	// and the session-event dispatch name ksess too.
-	if len(s.entities) > 0 || has_lane_wiring || len(s.std_forwards) > 0 || s.step_boot || len(s.event_halves) > 0 || has_succ || s.profile_type != "" {
-		w(&b, "import ksess \"godot:kit/session\"\n")
+	if len(s.entities) > 0 || has_lane_wiring || len(s.std_forwards) > 0 || s.step_boot || len(s.event_halves) > 0 || has_succ || s.profile_type != "" || len(s.messages) > 0 {
+		w(&b, "import ksess \"godot:kit/session\"\n") // @(gd_message) names ksess.Typed_Route / session_app_* / Session / Peer_Id / Channel
 	}
 	// The unified `<verb>_cmd` wrappers take the game's one handle (^kboot.Boot)
 	// on BOTH models, so any class with commands names kboot.
@@ -860,6 +860,48 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				// successful send is simply in flight; the host's verdict lands as state.
 				fmt.sbprintf(b, "\t_ = knet.command_issue(ctx, self, &%s_command_set, %s_CMD_%s)\n\treturn .Predicted\n}}\n\n", snake, upper, strings.to_upper(c.name))
 			}
+		}
+	}
+
+	// ---- @(gd_message): typed app-message routes, written by nobody ----
+	// The runtime (ksess.Typed_Route + session_app_listen + session_app_send_typed)
+	// already decodes a POD payload for the handler; generated here is the WIRING:
+	// one game-owned route per message, a `<class>_messages` proc the game calls
+	// once in ready() to register them all, and `<proc>_send`/`<proc>_send_to`
+	// doors. NOT lane-scoped — a coop game and a sim game get these identically
+	// (messages ride the session's app router, not a lane).
+	if len(s.messages) > 0 {
+		w(b, "// ---- @(gd_message) typed app-message routes ----\n\n")
+		for m in s.messages {
+			fmt.sbprintf(b, "@(private = \"file\")\n_%s_route: ksess.Typed_Route(%s)\n", m.proc_name, m.payload_type)
+		}
+		w(b, "\n")
+		fmt.sbprintf(b, "// Register every @(gd_message) route on this class — call ONCE in ready()\n")
+		fmt.sbprintf(b, "// (after boot_attach): `%s_messages(self, &self.ses)`. Routes survive\n", snake)
+		w(b, "// *_start, so once is enough even across a back-to-menu rehost.\n")
+		fmt.sbprintf(b, "%s_messages :: proc(self: ^%s, s: ^ksess.Session) {{\n", snake, cls)
+		for m in s.messages {
+			fmt.sbprintf(
+				b,
+				"\tksess.session_app_listen(s, %s, &_%s_route, self, proc(user: rawptr, from: knet.Player_Id, msg: %s) {{\n",
+				m.tag_ident, m.proc_name, m.payload_type,
+			)
+			fmt.sbprintf(b, "\t\t%s(cast(^%s)user, from, msg)\n", m.proc_name, cls)
+			w(b, "\t})\n")
+		}
+		w(b, "}\n\n")
+		for m in s.messages {
+			fmt.sbprintf(b, "// Send a %s under the %q route to `to_peer` (ksess.HOST_PEER, a seated\n", m.payload_type, m.name)
+			w(b, "// peer, or ksess.BROADCAST_PEER); .Reliable unless you pass otherwise.\n")
+			fmt.sbprintf(
+				b,
+				"%s_send :: proc(s: ^ksess.Session, msg: %s, to_peer: ksess.Peer_Id, channel := ksess.Channel.Reliable) {{\n",
+				m.proc_name, m.payload_type,
+			)
+			fmt.sbprintf(b, "\tksess.session_app_send_typed(s, %s, msg, to_peer, channel)\n}}\n\n", m.tag_ident)
+			fmt.sbprintf(b, "// Send a %s to a specific PLAYER (the seat is resolved on the authority).\n", m.payload_type)
+			fmt.sbprintf(b, "%s_send_to :: proc(s: ^ksess.Session, player: knet.Player_Id, msg: %s) {{\n", m.proc_name, m.payload_type)
+			fmt.sbprintf(b, "\tksess.session_app_send_typed_to(s, player, %s, msg)\n}}\n\n", m.tag_ident)
 		}
 	}
 

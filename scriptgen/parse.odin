@@ -1299,6 +1299,16 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 			continue
 		}
 
+		// `@(gd_message="TAG")` — a typed app-message handler (kit/session app
+		// routes). Not a Godot method: the generated `<class>_messages` proc
+		// registers it and `<proc>_send` ships it, so it never joins the method
+		// tables. Checked here beside commands so it can't be misread as a hook.
+		if has_attr(vd, "gd_message") {
+			config, _ := attr_value(vd, "gd_message")
+			parse_message(s, src, Loc{path, name_ident.pos.line}, proc_name, pt, config)
+			continue
+		}
+
 		// `@(gd_tick[="contested"])` — the class's sim-lane step (kit/sim). Like
 		// commands it is never a Godot method: the generated thunk + Sim_Set
 		// are its only callers.
@@ -2134,6 +2144,79 @@ build_command_info :: proc(
 parse_command :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
 	cmd, _ := build_command_info(src, pt, loc, proc_name, s.struct_name, config, false)
 	append(&s.commands, cmd)
+}
+
+// Build a Message_Info from one @(gd_message="TAG") handler. Contract checks live
+// here: the signature is fixed — `proc(self: ^Owner, from: knet.Player_Id, msg: T)`
+// (a POD payload T decoded for you, the sender resolved into `from`), the tag is
+// required, and the handler returns nothing (it consumes a message, it doesn't
+// answer one). Unlike a command, a direct call is harmless (no framework bypass),
+// so no lint guards it. ok=false = a reported contract violation (had_error stops
+// the build before generate() sees the half-built record).
+build_message_info :: proc(src: string, pt: ^ast.Proc_Type, loc: Loc, proc_name, struct_name, config: string) -> (Message_Info, bool) {
+	m := Message_Info {
+		proc_name = proc_name,
+		name      = strip_struct_prefix(proc_name, struct_name),
+		game      = struct_name,
+		tag_ident = strings.trim_space(config),
+		line      = loc.line,
+		path      = loc.path,
+	}
+	ok := true
+
+	if m.tag_ident == "" {
+		error_at(
+			loc,
+			"message %s: @(gd_message) needs the SES_APP tag it rides — `@(gd_message=\"TAG_WHISPER\")` with a `TAG_WHISPER :: u8(4)` constant (the kit holds tags 0/2/3; pick a free byte)",
+			proc_name,
+		)
+		ok = false
+	}
+
+	// The signature is exactly (self: ^Owner, from: knet.Player_Id, msg: T).
+	if pt.params == nil || len(pt.params.list) != 3 {
+		error_at(
+			loc,
+			"message %s: a @(gd_message) handler is `proc(self: ^%s, from: knet.Player_Id, msg: T)` — the second param is the sender, the third the POD payload decoded for you",
+			proc_name,
+			struct_name,
+		)
+		return m, false // no params to read below — bail rather than index-panic
+	}
+
+	// param 1: `from: knet.Player_Id` (the resolved sender — host fills it, a
+	// client sees PLAYER_ID_INVALID; name is the author's, only the type gates).
+	from_t := strings.trim_space(node_text(src, pt.params.list[1].type))
+	fb := from_t
+	if j := strings.last_index(fb, "."); j >= 0 {fb = fb[j + 1:]}
+	if fb != "Player_Id" {
+		error_at(loc, "message %s: the second param must be `from: knet.Player_Id` (the sender) — got %q", proc_name, from_t)
+		ok = false
+	}
+
+	// param 2: `msg: T` — the payload type. Its field layout folds into
+	// NET_FINGERPRINT (net_fingerprint), so a drifted payload refuses at the door.
+	m.payload_type = strings.trim_space(node_text(src, pt.params.list[2].type))
+	if m.payload_type == "" {
+		error_at(loc, "message %s: the third param must be `msg: T`, a POD payload struct", proc_name)
+		ok = false
+	}
+
+	// A handler consumes a message; it returns nothing (a reply is another send).
+	if pt.results != nil && len(pt.results.list) > 0 {
+		error_at(loc, "message %s: a @(gd_message) handler returns nothing — to answer, send another message back to `from`", proc_name)
+		ok = false
+	}
+
+	return m, ok
+}
+
+// A @(gd_message) handler on the game class: build it and append. Appended even on
+// a contract error (had_error stops the build before generate runs), keeping the
+// diagnostic clean like parse_command.
+parse_message :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
+	msg, _ := build_message_info(src, pt, loc, proc_name, s.struct_name, config)
+	append(&s.messages, msg)
 }
 
 // One @(gd_tick) proc — the class's sim-lane step. Accepted shapes, receiver first:

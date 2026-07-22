@@ -819,6 +819,89 @@ grep -q "belongs on the ksess.Session field" "$pe/out.log" || fail "a profile ta
 grep -q 'no struct "Nope"' "$pe/out.log" || fail "an unresolvable row type must be named"
 grep -q "needs a \`pe_game_ready\`" "$pe/out.log" || fail "a profile without a ready must ask for one"
 
+# ---- fixture: the @(gd_message) typed app-message form ----------------------
+# One annotated handler becomes the game-owned Typed_Route storage, a
+# `<class>_messages` registration proc, and two send doors (peer- and
+# seat-addressed) over the runtime typed-route API. The payload's field-by-field
+# shape folds into NET_FINGERPRINT — a drifted payload must MOVE the hash, like a
+# profile row (same-size layout drift used to scramble a message past the door).
+mg="$work/message"
+mkdir -p "$mg"
+cat >"$mg/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class MgGame
+package mg
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Ping :: struct { seq: u16, hop: u16 }
+
+TAG_PING :: u8(5)
+
+MgGame :: struct {
+	owner: gd.Node,
+}
+
+@(gd_message="TAG_PING")
+mg_game_ping :: proc(self: ^MgGame, from: knet.Player_Id, msg: Ping) {}
+ODIN
+"$SGEN" "$mg" -godot:"$ROOT" >"$mg/out.log" 2>&1 || { cat "$mg/out.log"; fail "the @(gd_message) fixture must generate"; }
+gen="$mg/game.gen.odin"
+grep -q "_mg_game_ping_route: ksess.Typed_Route(Ping)" "$gen" || fail "the game-owned Typed_Route storage is missing"
+grep -q "mg_game_messages :: proc(self: ^MgGame, s: ^ksess.Session)" "$gen" || fail "the <class>_messages registration proc is missing"
+grep -q "session_app_listen(s, TAG_PING, &_mg_game_ping_route, self" "$gen" || fail "the route must register under the declared tag"
+grep -q "mg_game_ping_send :: proc(s: ^ksess.Session, msg: Ping, to_peer: ksess.Peer_Id" "$gen" || fail "the peer-addressed send door is missing"
+grep -q "session_app_send_typed(s, TAG_PING, msg, to_peer, channel)" "$gen" || fail "the send door must frame under the declared tag"
+grep -q "mg_game_ping_send_to :: proc(s: ^ksess.Session, player: knet.Player_Id, msg: Ping)" "$gen" || fail "the seat-addressed send door is missing"
+grep -q "session_app_send_typed_to(s, player, TAG_PING, msg)" "$gen" || fail "the seat-addressed door must resolve on the authority"
+grep -q "_register_net_fingerprint" "$mg/odin_godot_guard.gen.odin" || fail "a @(gd_message) alone is a wire surface (the fingerprint default must register)"
+fp1=$(grep -oE "NET_FINGERPRINT :: u64\(0x[0-9a-f]+\)" "$mg/odin_godot_guard.gen.odin")
+# Reorder the payload's two same-size fields: SIZE unchanged, only the layout —
+# the drift a type NAME can't stand in for. The folded shape must move the hash.
+cat >"$mg/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class MgGame
+package mg
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Ping :: struct { hop: u16, seq: u16 }
+
+TAG_PING :: u8(5)
+
+MgGame :: struct {
+	owner: gd.Node,
+}
+
+@(gd_message="TAG_PING")
+mg_game_ping :: proc(self: ^MgGame, from: knet.Player_Id, msg: Ping) {}
+ODIN
+"$SGEN" "$mg" -godot:"$ROOT" >"$mg/out2.log" 2>&1 || fail "the reordered @(gd_message) fixture must generate"
+fp2=$(grep -oE "NET_FINGERPRINT :: u64\(0x[0-9a-f]+\)" "$mg/odin_godot_guard.gen.odin")
+[[ -n "$fp1" && -n "$fp2" && "$fp1" != "$fp2" ]] || fail "a drifted @(gd_message) payload must move NET_FINGERPRINT (got $fp1 then $fp2)"
+
+# The misuse: a tagless @(gd_message) is loud (the tag is the game's scarce
+# SES_APP byte — scriptgen can't invent it).
+mgerr="$work/msgerr"
+mkdir -p "$mgerr"
+cat >"$mgerr/game.odin" <<'ODIN'
+//gd:extends Node
+//gd:class MeGame
+package me2
+import gd "godot:godot"
+import knet "godot:kit/net"
+
+Ping :: struct { seq: u16 }
+
+MeGame :: struct { owner: gd.Node }
+
+@(gd_message)
+me_game_ping :: proc(self: ^MeGame, from: knet.Player_Id, msg: Ping) {}
+ODIN
+"$SGEN" "$mgerr" -godot:"$ROOT" >"$mgerr/out.log" 2>&1
+[[ $? -ne 0 ]] || fail "a tagless @(gd_message) must fail the build"
+grep -q "needs the SES_APP tag" "$mgerr/out.log" || fail "a tagless message must name the tag it needs"
+
 # ---- fixture: the two validation tiers, made one ---------------------------
 # `gd:"export,rnage=0:100"` used to sail past scriptgen (the export-spec loop
 # had no default arm) and die at BOOT as a record_error on a field that had

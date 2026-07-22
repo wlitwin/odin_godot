@@ -198,6 +198,7 @@ CaveLobby :: struct {
 	hud_ab:     kui.Abilities_Bar,
 	chat_sent:  bool, // the Enter that submitted a line must not also re-open chat
 	host_gone:  bool, // the driver's poll mirror (the KIT holds the mechanics latch now)
+	greeted:    bool, // @(gd_message) dogfood: the one-time greeting fired (not on migration re-welcomes)
 	succ_seen:  int, // Ev_Succession count (latched; drivers poll it — host_gone flips back within a frame)
 	issue_at:   f64, // when my last command left (confirm latency proof)
 
@@ -256,6 +257,9 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	// generated table (backup/took_over/wiped/migrating halves, save.odin +
 	// net.odin) — words and bytes, never mechanics.
 	kboot.boot_migration(&self.boot, self, cave_lobby_succ_hooks)
+	// @(gd_message): register the typed app-message routes (the emote greeting
+	// below). One line, like fire_listen — routes survive *_start, so once is enough.
+	cave_lobby_messages(self, &self.ses)
 
 	self.prompt = kui.prompt_make(self.owner)
 	self.inv = kui.inv_make(self.owner, 6)
@@ -364,6 +368,40 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 cave_lobby_welcomed :: proc(self: ^CaveLobby, me: knet.Player_Id) {
 	self.host_gone = false
 	gd.print_str(fmt.tprintf("CAVE_SEATED me=%d", u64(me)))
+	// A GUEST greets the host on arrival — a @(gd_message), the typed app-message
+	// path (comms carries chat + broadcast pings; THIS is a directed POD payload
+	// decoded for the handler, the sender resolved into `from`). The host greets
+	// back with a SEAT-ADDRESSED reply, so this one arrival exercises both doors.
+	// Once only — not on migration re-welcomes (a greeting is a first-hello, and
+	// the delicate takeover window doesn't want the extra traffic).
+	if !self.ses.is_host && !self.greeted {
+		self.greeted = true
+		cave_lobby_emote_send(&self.ses, Emote{kind = GREET, spice = 41}, ksess.HOST_PEER)
+	}
+}
+
+// ---- @(gd_message): a directed greeting — the typed app-message dogfood -------
+// comms already carries chat and broadcast pings; this is the POINT-TO-POINT typed
+// path a game reaches for when "if you weren't there, you don't get it" is the
+// right behavior. One message type; `kind` tells a greeting from its ack so the
+// host's reply can't loop back into another reply.
+Emote :: struct {
+	kind:  u8, // GREET (guest→host) or GREET_ACK (host→guest)
+	spice: u16, // an arbitrary value, echoed +1 in the ack — proves the payload decoded intact
+}
+TAG_EMOTE :: u8(4) // a free SES_APP tag (kit holds comms 0, xfer 2, sim 3; the game's fire is 1)
+GREET :: u8(7)
+GREET_ACK :: u8(8)
+
+@(gd_message = "TAG_EMOTE")
+cave_lobby_emote :: proc(self: ^CaveLobby, from: knet.Player_Id, msg: Emote) {
+	gd.print_str(fmt.tprintf("CAVE_WHISPER from=%d kind=%d spice=%d", u64(from), msg.kind, msg.spice))
+	// The host answers a greeting with a directed, seat-addressed reply
+	// (cave_lobby_emote_send_to → the authority resolves `from`'s peer). The ack
+	// carries GREET_ACK, so the guest presents it and never greets back.
+	if self.ses.is_host && msg.kind == GREET {
+		cave_lobby_emote_send_to(&self.ses, from, Emote{kind = GREET_ACK, spice = msg.spice + 1})
+	}
 }
 
 @(gd_half)

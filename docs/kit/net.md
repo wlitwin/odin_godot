@@ -558,6 +558,51 @@ the host may say no); and the host's per-peer `Dedup_Window` (64-command sliding
 over intent sequences) makes execution exactly-once through retransmits and reconnect
 replays.
 
+## Typed app-messages (`@(gd_message)`)
+
+Almost everything is *state, not messages* — replicate a field, predict a
+[verb](#the-command-loop), broadcast a fact. But a few things are genuinely
+message-shaped: a **directed signal** (a whisper, an emote to one peer), an
+**out-of-band request/response**, an **app notification tied to no entity** —
+where *"if you weren't there, you don't get it"* is the correct behavior, not a
+bug. That is what an app-message is for, and `@(gd_message)` is its declarative
+form. Annotate a handler with the `SES_APP` [tag](session.md#app-messages) it
+rides (the game owns its tag budget — the kit holds comms 0, xfer 2, sim 3):
+
+```odin
+Whisper :: struct { emote: u8, spice: u16 }   // a POD payload
+TAG_WHISPER :: u8(4)
+
+@(gd_message = "TAG_WHISPER")
+game_whisper :: proc(self: ^Game, from: knet.Player_Id, msg: Whisper) {
+    // the DECODED payload; `from` is the sender (the host resolves it,
+    // PLAYER_ID_INVALID on a client — check on the authority when it matters)
+}
+```
+
+scriptgen generates the game-owned route, a `game_messages(self, &ses)` you call
+once in `ready()` (one line, like `fire_listen`), and two send doors:
+
+```odin
+game_whisper_send(&ses, msg, ksess.HOST_PEER)   // to a peer, or ksess.BROADCAST_PEER
+game_whisper_send_to(&ses, player, msg)         // to a PLAYER (seat resolved on the host)
+```
+
+It is pure sugar over the runtime typed-route API
+([`session_app_send_typed`](session.md#app-messages) / `session_app_listen`),
+which stays available for hand-rolled routing. The payload is **POD** (the raw
+bytes cross the wire — no strings, slices, or pointers; frame those yourself on a
+bare `session_app_route`), and its **field layout folds into `NET_FINGERPRINT`**,
+so a build that drifts the payload shape is refused at the join door like any
+other wire-contract skew. cavecrawl's arrival greeting is the worked example.
+
+The counter-rule, because it is the tempting mistake: **don't send state as a
+message.** "Player X's score is now 5" shipped as a message is lost to a peer who
+joins a second later and gone forever on a dropped packet — replicate the score
+and it is always correct, always caught up. Reach for a message only when you
+*want* the opposite of those guarantees: a fire-and-forget signal to whoever is
+listening right now.
+
 ## Wire, tick, and clocks
 
 `Writer`/`Reader` are a bounds-checked, little-endian, append/cursor pair: fixed-width

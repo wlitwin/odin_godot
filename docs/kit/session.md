@@ -883,7 +883,9 @@ it back on quit and on the host's periodic beat if you're paranoid. The host sta
 authoritative: a hacked blob is just input to validate, not truth to obey.
 
 **Private per-player state** (roles, a saboteur, secret objectives). Secrets are
-player-addressed app messages — `session_app_send_to(player, tag, bytes)` — not replicated
+player-addressed app messages — `session_app_send_to(player, tag, bytes)`, or the typed
+[`@(gd_message)`](net.md#typed-app-messages-gd_message) form
+(`role_send_to(&ses, player, msg)`) when the secret is a POD payload — not replicated
 fields: the delta walk broadcasts by design, and per-recipient field filtering is
 complexity this toolkit deliberately refuses (every laptop in the room can already run
 Wireshark; a friendslop saboteur's secret survives friends, not forensics). Keep the
