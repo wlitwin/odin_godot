@@ -24,8 +24,9 @@ x, y: f32 `gd:"owner,interp,wire=f16"`   // coop: my stream, my truth
 x, y: f32 `gd:"predict,interp"`          // sim:  server truth, predicted here
 ```
 
-One word changes. The field's writer moves from "its owner's stream" to "the
-server's simulation, predicted locally and reconciled".
+In the `Player` entity struct, one word changes. The field's writer moves from
+"its owner's stream" to "the server's simulation, predicted locally and
+reconciled".
 
 ## Diff 2 — movement becomes a tick
 
@@ -61,16 +62,35 @@ hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^Player_Input) {
 }
 ```
 
-## Diff 4 — two wiring lines
+## Diff 4 — add the lane, wire it in `ready()`, drop the per-frame move
+
+Unlike the first three diffs, this one is not a free-standing declaration; it
+lands in specific places. First, the lane is a field on the *game* struct
+(`HelloSim`), beside the session and boot:
+
+```odin
+lane: ksim.Lane, // the sim lane: tick scheduling, prediction, reconcile
+```
+
+Two lines wire it, in `ready()` right after `boot_attach` and `boot_entities`:
 
 ```odin
 hello_sim_lane_init(self, &self.lane, &self.ses) // generated: carries the tick/sample declarations
 kboot.boot_lane(&self.boot, &self.lane)          // the boot drives the lane from here on
 ```
 
-`lane: ksim.Lane` joins the game struct, and the frame-loop drive block is
-deleted. That's the full set of changes. Issue sites and spawn sites keep
-their exact shape on both models.
+Finally, delete the coop game's per-frame movement from `process()`. hello_net
+wrote its own square's position there every frame; that work now belongs to
+`player_tick` (Diff 2), fed by `hello_sample` (Diff 3). What remains in
+`process()` is only the pump, unchanged from the coop game:
+
+```odin
+events, _, _ := kboot.boot_pump(&self.boot, delta, now_s())
+hello_sim_events(self, events)
+```
+
+That is the full set of changes. Issue sites and spawn sites keep their exact
+shape on both models.
 
 ## Run it
 
