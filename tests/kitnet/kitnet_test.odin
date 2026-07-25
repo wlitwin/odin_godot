@@ -199,7 +199,7 @@ full_snapshot_and_revert :: proc(t: ^testing.T) {
 // discovers those and emits COMPOSED offset expressions that name no intermediate
 // type (`offset_of(E, m) + offset_of(type_of(E{}.m), x)`), so the wire core sees an
 // ordinary flat descriptor. This fixture hand-builds exactly that descriptor — the
-// same shape widget.gen.odin emits — and proves the wire path replicates nested
+// same shape scriptgen emits for Widget — and proves the wire path replicates nested
 // fields identically to flat ones (nested-replicate-fields KB doc).
 
 Nested_Move :: struct {

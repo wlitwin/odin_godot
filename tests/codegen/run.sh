@@ -16,9 +16,11 @@ bash "$ROOT/build/build_scripts.sh" "$PROJ"
 
 # Bare-import composition (bare.odin): `import "godot:play"` without an alias must
 # bind the package name and register the embed's replicated fields — the old
-# alias-only rule skipped them SILENTLY (compiled fine, never replicated).
-grep -q 'offset_of(BareProbe, health)' "$PROJ/scripts/bare.gen.odin" \
-  || { echo "CODEGEN_FAIL: bare-import embed did not compose (no health descriptor in bare.gen.odin)"; exit 1; }
+# alias-only rule skipped them SILENTLY (compiled fine, never replicated). The
+# descriptor lands in the ONE consolidated artifact, in bare.odin's section.
+GEN="$PROJ/scripts/odin_godot_scripts.gen.odin"
+grep -q 'offset_of(BareProbe, health)' "$GEN" \
+  || { echo "CODEGEN_FAIL: bare-import embed did not compose (no health descriptor in $GEN)"; exit 1; }
 
 # Make the scripts dll path unambiguous for the core's dynlib load.
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"

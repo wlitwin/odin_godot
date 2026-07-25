@@ -5,7 +5,8 @@ package phase35_scripts
 // ----------------------------------------------------------------------------
 // Ping — the Phase 3.5 CODEGEN-FORM showcase. This is the *nice* authoring form:
 // a struct with tagged exports, plain typed lifecycle/method procs, and `//gd:`
-// markers. scriptgen reads this and emits `ping.gen.odin` with the verbose Phase-3
+// markers. scriptgen reads this and emits its section of `odin_godot_scripts.gen.odin`
+// with the verbose Phase-3
 // registration (trampolines + backing arrays + `@(init) rt.register(...)`).
 //
 // Compare against the HAND-WRITTEN showcase/ping.odin — the generated output

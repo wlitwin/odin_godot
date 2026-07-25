@@ -67,7 +67,7 @@ thing_bump :: proc(self: ^Thing, n: i32) -> bool { self.hp += n; return true }
 ODIN
 
 if ! "$SGEN" "$sp" -godot:"$ROOT" >/dev/null 2>&1; then fail "same-package fixture errored"; fi
-gen="$sp/thing.gen.odin"
+gen="$sp/odin_godot_scripts.gen.odin"
 grep -q "offset_of(Thing, m) + offset_of(type_of(Thing{}.m), x)" "$gen" || fail "missing composed offset for using-nested m.x"
 grep -q "offset_of(Thing, d) + offset_of(type_of(Thing{}.d), inner) + offset_of(type_of(Thing{}.d.inner), x)" "$gen" || fail "missing deep composed offset for d.inner.x"
 grep -q "size_of(type_of(Thing{}.hp))" "$gen" || fail "top-level hp missing"
@@ -105,7 +105,7 @@ hero_hit :: proc(self: ^Hero, n: i32) -> bool { self.hp -= n; return true }
 ODIN
 
 if ! "$SGEN" "$ip" -godot:"$coll" >/dev/null 2>&1; then fail "imported-bundle fixture errored (using-reached export must not error)"; fi
-igen="$ip/hero.gen.odin"
+igen="$ip/odin_godot_scripts.gen.odin"
 grep -q "offset_of(Hero, cs) + offset_of(type_of(Hero{}.cs), hp)" "$igen" || fail "imported bundle replicate field cs.hp not discovered"
 grep -q "offset_of(type_of(Hero{}.cs.fx), kind)" "$igen" || fail "deep field inside imported bundle (cs.fx.kind) not discovered"
 
@@ -135,7 +135,7 @@ fighter_hit :: proc(self: ^Fighter, n: i32) -> bool { self.hp -= n; return true 
 ODIN
 if ! "$SGEN" "$comp" -godot:"$ROOT" >/dev/null 2>&1; then fail "plain embed with export/onready/signal must NOT error"; fi
 # The signal's typed emit helper is generated under the namespaced name the runtime registers.
-grep -q "fighter_emit_aim_fired" "$comp/fighter.gen.odin" || fail "namespaced signal emit helper fighter_emit_aim_fired not generated"
+grep -q "fighter_emit_aim_fired" "$comp/odin_godot_scripts.gen.odin" || fail "namespaced signal emit helper fighter_emit_aim_fired not generated"
 
 # ---- fixture 4: loud guardrail — a non-POD field inside a nested struct ------
 bad="$work/bad"
@@ -191,7 +191,7 @@ G :: struct {
 g_bump :: proc(self: ^G, n: i32) -> bool { self.hold.tag += u8(n); return true }
 ODIN
 if ! "$SGEN" "$gen" -godot:"$ROOT" >/dev/null 2>&1; then fail "generic instantiation must resolve, not error"; fi
-ggen="$gen/g.gen.odin"
+ggen="$gen/odin_godot_scripts.gen.odin"
 grep -q "offset_of(G, m) + offset_of(type_of(G{}.m), cur)" "$ggen" || fail "generic using field m.cur not resolved"
 grep -q "offset_of(type_of(G{}.hold.item), hp)" "$ggen" || fail "substitution into a param-typed field (hold.item.hp) failed"
 
@@ -218,7 +218,7 @@ HeroB :: struct {
 herob_fire :: proc(self: ^HeroB, slot: i32) -> bool { return kcombat.cd_try(&self.cd, int(slot), {cooldown = 10}) }
 ODIN
 if ! "$SGEN" "$kit" -godot:"$ROOT" >/dev/null 2>&1; then fail "embedding real kit bundles (Cooldowns/Inventory) must resolve"; fi
-kgen="$kit/hero.gen.odin"
+kgen="$kit/odin_godot_scripts.gen.odin"
 grep -q "offset_of(HeroB, cd) + offset_of(type_of(HeroB{}.cd), cds)" "$kgen" || fail "kcombat.Cooldowns(3) cds not discovered"
 grep -q "offset_of(HeroB, bag) + offset_of(type_of(HeroB{}.bag), slots)" "$kgen" || fail "kitems.Inventory(8) slots not discovered"
 
@@ -252,7 +252,7 @@ Runner :: struct {
 }
 ODIN
 if ! "$SGEN" "$vc" -godot:"$ROOT" >/dev/null 2>&1; then fail "verb-composition (same-package) must resolve, not error"; fi
-vgen="$vc/runner.gen.odin"
+vgen="$vc/odin_godot_scripts.gen.odin"
 grep -q "RUNNER_CMD_PRIMARY_FIRE :: knet.Cmd_Id" "$vgen" || fail "composed command index const RUNNER_CMD_PRIMARY_FIRE missing"
 grep -q "RUNNER_CMD_SECONDARY_FIRE :: knet.Cmd_Id" "$vgen" || fail "second instance must get its own path-prefixed index (SECONDARY_FIRE)"
 grep -q "RUNNER_CMD_PRIMARY_RELOAD :: knet.Cmd_Id" "$vgen" || fail "plain composed command RUNNER_CMD_PRIMARY_RELOAD missing"
@@ -292,7 +292,7 @@ Mob :: struct {
 }
 ODIN
 if ! "$SGEN" "$ic" -godot:"$coll" >/dev/null 2>&1; then fail "verb-composition (imported block) must resolve, not error"; fi
-icgen="$ic/mob.gen.odin"
+icgen="$ic/odin_godot_scripts.gen.odin"
 grep -q 'import play "godot:play"' "$icgen" || fail "imported block's package must be imported into the generated file"
 grep -q "return play.gun_fire(&self.gun, self, _a0)" "$icgen" || fail "imported composed thunk must qualify (play.) and route + thread owner"
 grep -q "MOB_CMD_GUN_FIRE :: knet.Cmd_Id" "$icgen" || fail "imported composed command index MOB_CMD_GUN_FIRE missing"
@@ -319,7 +319,7 @@ Turret :: struct {
 }
 ODIN
 if ! "$SGEN" "$pg" -godot:"$ROOT" >/dev/null 2>&1; then fail "the real play.Gun block must compose into a consumer, not error"; fi
-tgen="$pg/turret.gen.odin"
+tgen="$pg/odin_godot_scripts.gen.odin"
 grep -q 'import play "godot:play"' "$tgen" || fail "play.Gun consumer must import godot:play"
 grep -q "return play.gun_fire(&self.weapon, _a0, _a1)" "$tgen" || fail "play.gun_fire must route into &self.weapon (imported, qualified, no owner)"
 grep -q "TURRET_CMD_WEAPON_FIRE :: knet.Cmd_Id" "$tgen" || fail "play.Gun's verb must hoist as TURRET_CMD_WEAPON_FIRE"
@@ -355,7 +355,7 @@ Robot :: struct {
 }
 ODIN
 if ! "$SGEN" "$mc" -godot:"$ROOT" >/dev/null 2>&1; then fail "method-composition must resolve, not error"; fi
-mgen="$mc/robot.gen.odin"
+mgen="$mc/odin_godot_scripts.gen.odin"
 grep -q '{name = "gear_level", trampoline = _robot_m_gear_level' "$mgen" || fail "composed method must register under the path-prefixed name gear_level"
 grep -q "gear_level(&self.gear, self, i32(_a0))" "$mgen" || fail "method trampoline must route into &self.gear, thread the owner (self), and pass the arg"
 grep -q '{name = "gear_ping", trampoline = _robot_m_gear_ping' "$mgen" || fail "@(gd_rpc) implies a composed method (gear_ping) too"
@@ -384,7 +384,7 @@ Caster :: struct {
 }
 ODIN
 if ! "$SGEN" "$ab" -godot:"$ROOT" >/dev/null 2>&1; then fail "play.Ability must compose into a consumer, not error"; fi
-agen="$ab/caster.gen.odin"
+agen="$ab/odin_godot_scripts.gen.odin"
 grep -q "CASTER_CMD_LOB_CAST :: knet.Cmd_Id" "$agen" || fail "first ability's cast must hoist as CASTER_CMD_LOB_CAST"
 grep -q "CASTER_CMD_CONE_CAST :: knet.Cmd_Id" "$agen" || fail "second ability instance must get its own path-prefixed cast (CONE_CAST)"
 grep -q "return play.ability_cast(&self.lob, _a0, _a1)" "$agen" || fail "cast thunk must route into &self.lob (imported, qualified, no owner)"
@@ -415,7 +415,7 @@ HeroC :: struct {
 }
 ODIN
 if ! "$SGEN" "$ch" -godot:"$ROOT" >/dev/null 2>&1; then fail "play.Channel must compose into a consumer, not error"; fi
-cgen="$ch/hero.gen.odin"
+cgen="$ch/odin_godot_scripts.gen.odin"
 grep -q 'offset_of(type_of(HeroC{}.rev), target).*flags = {.Owner_Stream}' "$cgen" || fail "the channel's owner flag must carry through the embed (rev.target)"
 grep -q 'offset_of(type_of(HeroC{}.rev), pct).*flags = {.Owner_Stream}' "$cgen" || fail "rev.pct must be owner-streamed through the embed"
 grep -q "HERO_C_CMD_REV_CLAIM :: knet.Cmd_Id" "$cgen" || fail "the channel's claim must hoist as HERO_C_CMD_REV_CLAIM"
@@ -443,7 +443,7 @@ Pawn :: struct {
 }
 ODIN
 if ! "$SGEN" "$hl" -godot:"$ROOT" >/dev/null 2>&1; then fail "play.Health must compose into a consumer, not error"; fi
-hgen="$hl/pawn.gen.odin"
+hgen="$hl/odin_godot_scripts.gen.odin"
 grep -q "offset_of(type_of(Pawn{}.health), hp)" "$hgen" || fail "health.hp must compose into the descriptor"
 grep -q "offset_of(type_of(Pawn{}.health), max)" "$hgen" || fail "health.max must compose into the descriptor"
 grep -q "offset_of(type_of(Pawn{}.health), seen)" "$hgen" && fail "the Edge scratch must stay OFF the wire"
@@ -513,7 +513,7 @@ depot_migrating :: proc(self: ^Depot, step: kboot.Migrate_Step, target: string, 
 depot_welcomed :: proc(self: ^Depot, me: knet.Player_Id) {}
 ODIN
 if ! "$SGEN" "$sc" -godot:"$ROOT" >/dev/null 2>&1; then fail "migration halves must resolve, not error"; fi
-sgen="$sc/depot.gen.odin"
+sgen="$sc/odin_godot_scripts.gen.odin"
 grep -q "_depot_succ_backup :: proc(game: rawptr, w: ^knet.Writer)" "$sgen" || fail "backup thunk not generated"
 grep -q "depot_succ_hooks := kboot.Succ_Hooks" "$sgen" || fail "the Succ_Hooks table not generated"
 grep -q "took_over = _depot_succ_took_over" "$sgen" || fail "took_over not wired into the table"
@@ -541,7 +541,7 @@ Vault :: struct {
 vault_backup :: proc(self: ^Vault, w: ^knet.Writer) {}
 ODIN
 if ! "$SGEN" "$so" -godot:"$ROOT" >/dev/null 2>&1; then fail "a migration-only shell must resolve"; fi
-ogen="$so/vault.gen.odin"
+ogen="$so/odin_godot_scripts.gen.odin"
 grep -q "vault_events :: proc" "$ogen" || fail "migration alone must still emit the events proc"
 grep -q "kboot.boot_migrate_pending(&self.boot)" "$ogen" || fail "migration-only events proc must carry the drain"
 
@@ -733,7 +733,7 @@ Mob :: struct {
 }
 ODIN
 "$SGEN" "$pr" -godot:"$ROOT" >"$pr/out.log" 2>&1 || fail "the probes fixture must generate"
-gen="$pr/game.gen.odin"
+gen="$pr/odin_godot_scripts.gen.odin"
 grep -q "_pr_game_probe_mob_count" "$gen" || fail "probe_mob_count must generate"
 grep -q "_pr_game_probe_my_mob" "$gen" || fail "probe_my_mob must generate"
 grep -q "_pr_game_probe_mob_angry" "$gen" || fail "bool fields get a 1/0 probe"
@@ -765,7 +765,7 @@ PfGame :: struct {
 pf_game_ready :: proc(self: ^PfGame) {}
 ODIN
 "$SGEN" "$pf" -godot:"$ROOT" >"$pf/out.log" 2>&1 || fail "the profile fixture must generate"
-grep -q 'session_profile_install(&(cast(^PfGame)self_raw).ses, Loadout)' "$pf/game.gen.odin" \
+grep -q 'session_profile_install(&(cast(^PfGame)self_raw).ses, Loadout)' "$pf/odin_godot_scripts.gen.odin" \
 	|| fail "the ready thunk must install the declared profile row"
 grep -q "_register_net_fingerprint" "$pf/odin_godot_guard.gen.odin" \
 	|| fail "a profile declaration alone is a kit wire surface (fingerprint default must register)"
@@ -846,7 +846,7 @@ MgGame :: struct {
 mg_game_ping :: proc(self: ^MgGame, from: knet.Player_Id, msg: Ping) {}
 ODIN
 "$SGEN" "$mg" -godot:"$ROOT" >"$mg/out.log" 2>&1 || { cat "$mg/out.log"; fail "the @(gd_message) fixture must generate"; }
-gen="$mg/game.gen.odin"
+gen="$mg/odin_godot_scripts.gen.odin"
 grep -q "_mg_game_ping_route: ksess.Typed_Route(Ping)" "$gen" || fail "the game-owned Typed_Route storage is missing"
 grep -q "mg_game_messages :: proc(self: ^MgGame, s: ^ksess.Session)" "$gen" || fail "the <class>_messages registration proc is missing"
 grep -q "session_app_listen(s, TAG_PING, &_mg_game_ping_route, self" "$gen" || fail "the route must register under the declared tag"
@@ -1125,7 +1125,7 @@ XtDerived :: struct {
 }
 ODIN
 "$SGEN" "$xt" -godot:"$ROOT" >/dev/null 2>&1 || fail "a WIDER owner handle (and an ancestor chain through Object) must stay silent"
-grep -q 'base = "Area2D"' "$xt/derived.gen.odin" || fail "a marker-less script must derive its base from the owner handle"
+grep -q 'base = "Area2D"' "$xt/odin_godot_scripts.gen.odin" || fail "a marker-less script must derive its base from the owner handle"
 
 # ---- fixture: the .Boot match is a package, not a suffix -------------------
 # `strings.has_suffix(ftype, ".Boot")` was the loosest match in the language:
@@ -1150,7 +1150,7 @@ BtGame :: struct {
 }
 ODIN
 "$SGEN" "$bt" -godot:"$ROOT" >/dev/null 2>&1 || fail "a foreign .Boot field must not break the build"
-grep -q "_bt_game_std_on_packet" "$bt/game.gen.odin" \
+grep -q "_bt_game_std_on_packet" "$bt/odin_godot_scripts.gen.odin" \
 	&& fail "a NON-kit/boot .Boot field must not declare the game shell"
 
 # ---- fixture: two declarations, one generated engine method name -----------
@@ -1405,7 +1405,7 @@ echo "$out" | grep -q 'are synthesized' \
 # factory table exactly as the four-token spelling did.
 perl -pi -e 's/gd:"export,resource=PackedScene,entity=EnMob:1"/gd:"entity=EnMob:1"/' "$en/game.odin"
 "$SGEN" "$en" -godot:"$ROOT" >/dev/null 2>&1 || fail "the first-token entity= form must build"
-grep -q "EnMob" "$en/game.gen.odin" || fail "the synthesized export must still produce the entity's factory row"
+grep -q "EnMob" "$en/odin_godot_scripts.gen.odin" || fail "the synthesized export must still produce the entity's factory row"
 grep -q 'NET_FINGERPRINT' "$en/odin_godot_guard.gen.odin" || fail "the entity must still reach the fingerprint"
 
 # A resource hint beside `entity=` is refused rather than silently outranked —

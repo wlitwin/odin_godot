@@ -98,7 +98,8 @@ build_scriptgen() {
         -debug
 }
 
-# run_scriptgen <scripts_dir> — emit the *.gen.odin siblings beside the authored sources.
+# run_scriptgen <scripts_dir> — emit the one odin_godot_scripts.gen.odin (plus the guard
+# and boot shims) beside the authored sources.
 # -godot:<root> lets scriptgen resolve nested `using` bundles imported from godot:kit/*
 # (nested-replicate-fields Phase 2) — the same collection root the binding compiles against.
 run_scriptgen() {

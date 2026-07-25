@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Build the Phase 3.5 dlls via the codegen pipeline:
 #   1. build the `scriptgen` preprocessor
-#   2. run it over the scripts dir to emit `*.gen.odin` build artifacts
-#   3. build the scripts dll (nice-form sources + generated *.gen.odin together)
+#   2. run it over the scripts dir to emit its `*.gen.odin` build artifacts
+#   3. build the scripts dll (nice-form sources + the generated *.gen.odin together)
 #   4. build the core ScriptLanguageExtension dll
 #
 # SINGLE-FILE: the authored `res://scripts/*.odin` are themselves the resources attached

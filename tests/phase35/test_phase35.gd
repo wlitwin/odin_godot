@@ -5,7 +5,7 @@ extends SceneTree
 #
 # These scripts (Ping / Counter / ToolProbe / Mover) were authored in the NICE
 # codegen form (struct tags + plain procs + //gd: markers); their registration was
-# AUTO-EMITTED by scriptgen into *.gen.odin. This test asserts the SAME GDScript-
+# AUTO-EMITTED by scriptgen into odin_godot_scripts.gen.odin. This test asserts the SAME GDScript-
 # parity surface Phase 3 did, proving codegen output == hand-written registration:
 #   1. @export    : an exported var round-trips GDScript<->Odin (set/get + Odin reads it).
 #   2. method     : custom @(gd_method) procs (multi-arg int + float arg/return) work.

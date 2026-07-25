@@ -6,7 +6,7 @@ package codegen_scripts
 // alias) must bind the target's package name and compose exactly like the
 // aliased form. It used to silently skip the embed — the struct compiled,
 // the game ran, and the block's fields just never replicated. run.sh greps
-// this file's .gen.odin for the health descriptor entries.
+// the consolidated odin_godot_scripts.gen.odin for the health descriptor entries.
 
 import gd "godot:godot"
 import "godot:play"

@@ -4,7 +4,7 @@
 #
 # Asserts, end to end:
 #   (1) scriptgen turns `gd:"replicate[,interp][,owner]"` fields into a
-#       knet.Entity_Desc table + public `<snake>_net_desc` in the *.gen.odin,
+#       knet.Entity_Desc table + public `<snake>_net_desc` in odin_godot_scripts.gen.odin,
 #       with multi-name fields expanded and option flags carried — AND turns
 #       @(gd_command[="predict"]) procs into decode thunks, a Command_Desc
 #       table + `<snake>_command_set`, and typed `<proc>_cmd` issue wrappers
@@ -34,14 +34,28 @@ build_scriptgen
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# scriptgen emits ONE odin_godot_scripts.gen.odin per scripts dir, with one
+# banner-marked section per authored source. Positive greps read the whole file;
+# an ABSENCE claim ("pawn must not sprout X") has to read only that class's
+# section, or a sibling class's legitimate X answers for it.
+#   section <consolidated-file> <source.odin>  -> that section on stdout
+section() {
+	awk -v want="// ==== $2 (" 'index($0, want) == 1 {on = 1; next} on && /^\/\/ ==== /{exit} on' "$1"
+}
+
 # ---- (1)+(2): the good fixture generates a descriptor and compiles ----
 GOOD="$TMP/good"
 mkdir -p "$GOOD"
 cp "$ROOT/tests/repgen/fixture/"*.odin "$GOOD/"
 run_scriptgen "$GOOD"
 
-GEN="$GOOD/pawn.gen.odin"
-[ -f "$GEN" ] || { echo "REPGEN_FAIL: scriptgen produced no pawn.gen.odin"; exit 1; }
+GEN="$GOOD/odin_godot_scripts.gen.odin"
+[ -f "$GEN" ] || { echo "REPGEN_FAIL: scriptgen produced no odin_godot_scripts.gen.odin"; exit 1; }
+# Per-class sections, for the absence claims below.
+PAWN_SEC="$TMP/pawn.section"; section "$GEN" pawn.odin >"$PAWN_SEC"
+SCOUT_SEC="$TMP/scout.section"; section "$GEN" scout.odin >"$SCOUT_SEC"
+[ -s "$PAWN_SEC" ] && [ -s "$SCOUT_SEC" ] \
+	|| { echo "REPGEN_FAIL: the consolidated artifact has no per-source section banners"; exit 1; }
 for needle in \
 	'import knet "godot:kit/net"' \
 	'_pawn_net_fields' \
@@ -109,7 +123,7 @@ for needle in \
 done
 # ...and the knet loop's artifacts must NOT appear beside them: one arbiter.
 for stale in '_pawn_cmd_hit' 'invoke = ' 'ctx.is_authority' 'commands = _pawn_commands'; do
-	if grep -qF "$stale" "$GEN"; then
+	if grep -qF "$stale" "$PAWN_SEC"; then
 		echo "REPGEN_FAIL: a ticking class still emits knet command artifact: $stale"
 		exit 1
 	fi
@@ -125,8 +139,7 @@ echo "  ok  sim-command thunks, table, lane wrappers generated; knet loop skippe
 # knet.Command_Outcome — .Applied (host accept) / .Predicted (client in-flight) /
 # .Rejected (predicate said no) — the SAME meaning on every peer, replacing the
 # old role-ambiguous bool. (Pawn/Turret tick, so theirs are sim-scheduled bools.)
-CGEN="$GOOD/chest.gen.odin"
-[ -f "$CGEN" ] || { echo "REPGEN_FAIL: scriptgen produced no chest.gen.odin"; exit 1; }
+CGEN="$GEN" # chest.odin rides the same consolidated artifact
 for needle in \
 	'chest_open_cmd :: proc(b: ^kboot.Boot, self: ^Chest, amount: i32) -> knet.Command_Outcome' \
 	'ctx := &b.ses.ctx' \
@@ -181,7 +194,7 @@ fi
 # STILL flattens into the descriptor (asserted above), but its tick is NOT
 # auto-hoisted — the wielder drives it. So the auto `chill` call is present
 # (asserted above) while the manual `warm` call must be ABSENT.
-if grep -qF 'play_sim.cool_tick(&self.warm)' "$GEN"; then
+if grep -qF 'play_sim.cool_tick(&self.warm)' "$PAWN_SEC"; then
 	echo "REPGEN_FAIL: a gd:\"manual\" block's tick was auto-hoisted (should be wielder-driven)"
 	exit 1
 fi
@@ -194,8 +207,7 @@ echo "  ok  tick thunk + sim set generated (POD-asserted input, coast-on-nil, im
 # everyone else=false), and the decode thunk + `fx =` wiring hand watchers
 # the same half at watch-clock time. Pawn's old-form fx (asserted above) must
 # keep its owner-live shape untouched.
-SCOUT_GEN="$GOOD/scout.gen.odin"
-[ -f "$SCOUT_GEN" ] || { echo "REPGEN_FAIL: scriptgen produced no scout.gen.odin"; exit 1; }
+SCOUT_GEN="$GEN" # scout.odin rides the same consolidated artifact
 for needle in \
 	'_p0, _p1 := scout_tick(self)' \
 	'if _p0 { // an event tick: the facts present' \
@@ -220,13 +232,13 @@ for needle in \
 	fi
 done
 # The old owner-live gate must NOT wrap the mine-form call…
-if grep -qF 'if owner == ksim.lane_me(lane) && !lane.resimming {' "$SCOUT_GEN"; then
+if grep -qF 'if owner == ksim.lane_me(lane) && !lane.resimming {' "$SCOUT_SEC"; then
 	echo "REPGEN_FAIL: the mine-form fx still emits the owner-live-only gate"
 	exit 1
 fi
 # …and the old-form fx (pawn) must NOT grow any fact machinery.
 for stale in 'lane_fact' '_pawn_fx' 'fx = _pawn_fx'; do
-	if grep -qF "$stale" "$GEN"; then
+	if grep -qF "$stale" "$PAWN_SEC"; then
 		echo "REPGEN_FAIL: the old-form fx sprouted every-screen machinery: $stale"
 		exit 1
 	fi
@@ -280,8 +292,7 @@ echo "  ok  gd:\"backup\" codec generated (POD scalar / map / dynamic + nested, 
 # Entity-table artifacts (board.odin's `entity=Pawn:7` scene tag): the TYPE
 # const, the kboot.Entity_Kind row reading the scene THROUGH the field
 # offset, and the typed dispatch for the name-paired census hooks.
-BGEN="$GOOD/board.gen.odin"
-[ -f "$BGEN" ] || { echo "REPGEN_FAIL: scriptgen produced no board.gen.odin"; exit 1; }
+BGEN="$GEN" # board.odin rides the same consolidated artifact
 for needle in \
 	'PAWN_TYPE :: ksess.Entity_Type(7)' \
 	'board_entity_kinds := [?]kboot.Entity_Kind' \
@@ -580,14 +591,13 @@ fi
 echo "  ok  silent paths closed: bare gd_connect, orphan receiver, nested profile=, unresolved using, relative-import embed"
 
 # The second entity's Sim_Set carries its wire class (input_class = 1); the
-# primary pawn's omits it (class 0). Turret's own gen file holds the set.
-TGEN="$GOOD/turret.gen.odin"
-[ -f "$TGEN" ] || { echo "REPGEN_FAIL: scriptgen produced no turret.gen.odin"; exit 1; }
+# primary pawn's omits it (class 0). Both Sim_Sets ride the one artifact.
+TGEN="$GEN" # turret.odin rides the same consolidated artifact
 if ! grep -qF 'turret_sim_set := ksim.Sim_Set{entity_desc = &turret_net_desc, tick = _turret_tick_step, input_size = size_of(Turret_Input), input_class = 1}' "$TGEN"; then
 	echo "REPGEN_FAIL: turret Sim_Set missing its input_class = 1"
 	exit 1
 fi
-if grep -qF 'input_class' "$GEN"; then
+if grep -qF 'input_class' "$PAWN_SEC"; then
 	echo "REPGEN_FAIL: the primary pawn Sim_Set should omit input_class (class 0)"
 	exit 1
 fi
@@ -700,7 +710,7 @@ mkdir -p "$FPB"
 cp "$ROOT/tests/repgen/fixture/"*.odin "$FPB/"
 sed -i.bak 's/chest_open :: proc(self: ^Chest, amount: i32)/chest_open :: proc(self: ^Chest, by: knet.Player_Id, amount: i32)/' "$FPB/chest.odin" && rm -f "$FPB/chest.odin.bak"
 run_scriptgen "$FPB"
-if ! grep -qF 'return chest_open(self, env.by, _a0)' "$FPB/chest.gen.odin"; then
+if ! grep -qF 'return chest_open(self, env.by, _a0)' "$FPB/odin_godot_scripts.gen.odin"; then
 	echo "REPGEN_FAIL: the added issuer param didn't reach the thunk (sed no-op, or the splice order broke)"
 	exit 1
 fi
@@ -1122,7 +1132,7 @@ camp_was_kicked :: proc(self: ^Camp) -> bool {
 camp_ready :: proc(self: ^Camp) {}
 EOF
 run_scriptgen "$SHELL_FIX"
-SHELL_GEN="$SHELL_FIX/camp.gen.odin"
+SHELL_GEN="$SHELL_FIX/odin_godot_scripts.gen.odin"
 for needle in \
 	'camp_step :: proc(self: ^Camp, ticks: int)' \
 	'if self.boot.ses == nil || !self.boot.ses.is_host {return}' \

@@ -18,7 +18,7 @@ APP="$PROJ/out/OdinGamePhase5.app"
 EXE="$APP/Contents/MacOS/OdinGodotPhase5"
 
 # 1. Build the CORE dll into the project bin (the scripts dll is rebuilt by the plugin
-#    at export). This also runs scriptgen so res://scripts/main.gen.odin exists; the
+#    at export). This also runs scriptgen so res://scripts/odin_godot_scripts.gen.odin exists; the
 #    scene attaches the authored res://scripts/main.odin directly (single-file).
 bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null 2>&1
 

@@ -85,19 +85,21 @@ Reload_State :: struct {
 	// THE DELETION PROBE (main thread only — touched exclusively from the
 	// frame pump, no mutex): a names-only fingerprint of the script tree,
 	// re-taken every ~2s. Saves already trigger rebuilds; DELETIONS never
-	// did — a script removed in the dock (or by git) left its `*.gen.odin`
-	// orphan breaking the next build, invisibly (the dock hides gen files).
-	// A changed name SET fires reload_request; scriptgen's orphan sweep does
-	// the rest. Catches creations from outside the editor as a bonus.
+	// did — a script removed in the dock (or by git) left its generated code
+	// behind, breaking the next build invisibly (the dock hides gen files,
+	// and the staleness guard still hashes the vanished source). A changed
+	// name SET fires reload_request; the rebuild's regeneration does the rest.
+	// Catches creations from outside the editor as a bonus.
 	probe_hash: u64,
 	probe_tick: int,
 	// The edge trigger above can MISS a pulse: a source created and deleted
 	// inside one probe window samples as "no change" while the create already
-	// materialized its gen file (the editor's own import can kick that build).
-	// So the probe is also LEVEL-triggered on the inconsistent state itself —
-	// any `*.gen.odin` without its authored sibling forces a sweep. This
-	// remembers the orphan set already kicked, so a sweep that cannot succeed
-	// (read-only tree, ...) fires once instead of every two seconds.
+	// materialized its generated code (the editor's own import can kick that
+	// build). So the probe is also LEVEL-triggered on the inconsistent state
+	// itself — a `// ==== <src>` section in odin_godot_scripts.gen.odin whose
+	// source is gone, or a pre-consolidation `<name>.gen.odin` without its
+	// sibling. This remembers the orphan set already kicked, so a sweep that
+	// cannot succeed (read-only tree, ...) fires once instead of every two seconds.
 	probe_orphans: u64,
 }
 
@@ -549,9 +551,58 @@ names_hash_dir :: proc(dir: string, h: ^u64) {
 	}
 }
 
-// Fingerprint of the ORPHANED gen files under `dir` (recursive): every
-// `*.gen.odin` whose authored `<base>.odin` sibling is gone. The FNV basis
-// back means "no orphans".
+// scriptgen's per-DIR artifacts: ONE consolidated `odin_godot_scripts.gen.odin` holding
+// every script's generated section, plus the staleness guard and the boot shim. None of
+// them has an authored `<base>.odin` sibling, so the file-level pairing rule below skips
+// them — the consolidated file is checked SECTION by section instead.
+@(private = "file")
+SCRIPTS_GEN_NAME :: "odin_godot_scripts.gen.odin"
+@(private = "file")
+GUARD_GEN_NAME :: "odin_godot_guard.gen.odin"
+@(private = "file")
+BOOT_GEN_NAME :: "odin_godot_boot.gen.odin"
+
+// The banner scriptgen writes above each script's section: `// ==== mob.odin (class Mob) ====`.
+@(private = "file")
+SECTION_BANNER :: "// ==== "
+
+// Hash the ORPHANED SECTIONS of a consolidated artifact: each `// ==== <src> (class …`
+// banner whose authored `<src>` is gone. That is the post-consolidation shape of "generated
+// code for a source that no longer exists" — the state that breaks the next build (the
+// section names vanished procs, and the staleness guard `#load_hash`es a missing file).
+@(private = "file")
+orphan_sections_hash :: proc(gen_path, dir: string, h: ^u64) {
+	data, rerr := os.read_entire_file(gen_path, context.temp_allocator)
+	if rerr != nil {
+		return
+	}
+	it := string(data)
+	for line in strings.split_lines_iterator(&it) {
+		if !strings.has_prefix(line, SECTION_BANNER) {
+			continue
+		}
+		rest := line[len(SECTION_BANNER):]
+		cut := strings.index(rest, " (")
+		if cut <= 0 {
+			continue
+		}
+		src := rest[:cut]
+		full := strings.concatenate({dir, "/", src}, context.temp_allocator)
+		if !os.exists(full) {
+			h^ = hash.fnv64a(transmute([]byte)src, h^)
+		}
+	}
+}
+
+// Fingerprint of the ORPHANED generated code under `dir` (recursive). The FNV basis back
+// means "nothing orphaned". Two shapes count, because both break the next build and both
+// are healed by the same rebuild:
+//
+//   1. A SECTION of `odin_godot_scripts.gen.odin` whose authored source is gone — the
+//      everyday case since scriptgen emits one artifact per dir.
+//   2. A per-source `<name>.gen.odin` with no `<name>.odin` — either a stale file from a
+//      build made before consolidation, or one restored by a branch switch. scriptgen's
+//      orphan sweep reaps these on its next run.
 @(private = "file")
 orphans_hash_dir :: proc(dir: string, h: ^u64) {
 	fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
@@ -568,6 +619,13 @@ orphans_hash_dir :: proc(dir: string, h: ^u64) {
 		}
 		if !strings.has_suffix(fi.name, ".gen.odin") {
 			continue
+		}
+		if fi.name == SCRIPTS_GEN_NAME {
+			orphan_sections_hash(fi.fullpath, dir, h)
+			continue
+		}
+		if fi.name == GUARD_GEN_NAME || fi.name == BOOT_GEN_NAME {
+			continue // per-dir shims: unpaired by design
 		}
 		src := strings.concatenate(
 			{fi.fullpath[:len(fi.fullpath) - len(".gen.odin")], ".odin"},
@@ -591,10 +649,12 @@ reload_probe_fs :: proc() {
 	proj := reload_project_dir(context.temp_allocator)
 	scripts := reload_scripts_dir(proj, context.temp_allocator)
 
-	// LEVEL trigger first: an orphaned gen file IS the broken state, however
-	// the tree got there — force past the unchanged-sources skip (deleting an
-	// EMPTY source leaves the content aggregate untouched) so scriptgen's
-	// sweep always runs. One shot per distinct orphan set.
+	// LEVEL trigger first: generated code for a source that no longer exists IS
+	// the broken state, however the tree got there — force past the
+	// unchanged-sources skip (deleting an EMPTY source leaves the content
+	// aggregate untouched) so scriptgen's regeneration always runs. One shot per
+	// distinct orphan set. This is what catches a create+delete inside ONE probe
+	// window, which the name-set edge trigger below samples as "no change".
 	FNV_BASIS :: u64(0xcbf29ce484222325)
 	fired := false
 	orphans := FNV_BASIS
@@ -603,7 +663,7 @@ reload_probe_fs :: proc() {
 		if orphans != g_reload.probe_orphans {
 			g_reload.probe_orphans = orphans
 			fired = true
-			godot.print_str("odin_godot: orphaned .gen.odin on disk (source deleted) — rebuilding to sweep")
+			godot.print_str("odin_godot: generated code for a deleted script on disk — rebuilding to sweep")
 			reload_request(force = true)
 		}
 	} else {

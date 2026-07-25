@@ -111,7 +111,7 @@ fi
 #    be read-only when installed under res://addons/). SGEN_BIN env reuses a prebuilt one.
 build_scriptgen
 
-# 2. Generate *.gen.odin siblings beside the authored sources — for the main scripts dir
+# 2. Generate the odin_godot_scripts.gen.odin artifact beside the authored sources — for the main scripts dir
 #    AND each optional res://modules/<name> script module (multi-module spike). On web all
 #    modules link into this ONE side module: the compose file below @(require)-imports each
 #    module package, and web_startup's @(init) chain runs their registrations too.

@@ -4,17 +4,24 @@ package scriptgen
 // scriptgen — the Phase 3.5 codegen preprocessor for odin_godot.
 //
 // Authors write a CLEAN `.odin` script (struct-tag exports, plain typed lifecycle
-// /method procs, `//gd:` markers). For each such file `scriptgen` emits a sibling
-// `<name>.gen.odin` (same package) containing the verbose Phase-3 registration
-// boilerplate that those scripts otherwise hand-write: the uniform Variant
-// trampolines, the `@(private="file")` backing arrays, the signal-emit helpers, and
-// the `@(init) rt.register(Class_Desc{...})`. The generated output is byte-for-byte
-// EQUIVALENT in effect to the hand-written Phase-3 showcase scripts.
+// /method procs, `//gd:` markers). For a whole scripts dir `scriptgen` emits ONE
+// `odin_godot_scripts.gen.odin` (same package) holding one SECTION per annotated
+// source: the verbose Phase-3 registration boilerplate those scripts otherwise
+// hand-write — the uniform Variant trampolines, the `@(private="file")` backing
+// arrays, the signal-emit helpers, and the `@(init) rt.register(Class_Desc{...})`.
+// The generated output is byte-for-byte EQUIVALENT in effect to the hand-written
+// Phase-3 showcase scripts.
+//
+// ONE ARTIFACT PER DIR: a scripts dir gets exactly three generated files — the
+// consolidated `odin_godot_scripts.gen.odin`, the `odin_godot_guard.gen.odin`
+// staleness guard, and the `odin_godot_boot.gen.odin` shim. Everything else matching
+// `*.gen.odin` is swept as an orphan, which is also what migrates a project off the
+// old one-gen-file-per-source layout on its first build.
 //
 // SINGLE-FILE AUTHORING: the authored `.odin` is the file the user attaches to a node
 // (the loader reads its `//gd:class` marker to bind it to the compiled class). scriptgen
-// emits ONLY the `<name>.gen.odin` build artifact beside the source; there is no separate
-// resource stub. The `.gen.odin` is named so the loader ignores it as an attachable script.
+// emits only build artifacts beside the sources; there is no separate resource stub.
+// The `.gen.odin` suffix is what makes the loader ignore them as attachable scripts.
 //
 // Parsing is done PROPERLY with `core:odin/parser` + `core:odin/ast` (the struct,
 // its fields/tags — including the typed signal fields — and the procs + their typed
@@ -24,7 +31,7 @@ package scriptgen
 //
 // Usage:
 //   scriptgen <scripts_dir>
-//     - emits <name>.gen.odin next to each script in <scripts_dir>
+//     - emits one odin_godot_scripts.gen.odin (plus the guard and boot shims) in <scripts_dir>
 //   (a legacy `-res:<dir>` flag is accepted but ignored — stubs are no longer emitted.)
 // ----------------------------------------------------------------------------
 
@@ -1295,10 +1302,11 @@ main :: proc() {
 	seen_classes := make(map[string]string) // //gd:class name -> file that declared it
 	defer delete(seen_classes)
 	// Every gen file THIS run owns (wrote, or would have written but for an unrelated
-	// earlier error): the `<src>.gen.odin` per emitted script plus the boot shim. Anything
-	// else matching `*.gen.odin` in the dir is a stale orphan (its source was deleted or
-	// renamed) and is removed after the emit loop — a stale gen file otherwise breaks the
-	// build inside "DO NOT EDIT" code.
+	// earlier error): the ONE consolidated `odin_godot_scripts.gen.odin`, the staleness
+	// guard and the boot shim. Anything else matching `*.gen.odin` in the dir is a stale
+	// orphan — a source that was deleted or renamed, or a per-source gen file left by a
+	// build from before consolidation — and is removed after the emit loop. A stale gen
+	// file otherwise breaks the build inside "DO NOT EDIT" code.
 	owned_gen := make(map[string]bool)
 	defer delete(owned_gen)
 
@@ -1307,8 +1315,7 @@ main :: proc() {
 	// bound procs across sibling files, so generation can't happen until every file
 	// has been seen.
 	Pending :: struct {
-		script:   Script,
-		out_path: string,
+		script: Script,
 	}
 	pending := make([dynamic]Pending)
 	helpers := make([dynamic]Helper)
@@ -1353,11 +1360,7 @@ main :: proc() {
 			seen_classes[script.class_name] = path
 		}
 
-		// This script's gen file is ours either way — never orphan-collect it.
-		out_path := strings.concatenate({path[:len(path) - len(".odin")], ".gen.odin"})
-		owned_gen[norm_path(out_path)] = true
-
-		append(&pending, Pending{script = script, out_path = out_path})
+		append(&pending, Pending{script = script})
 	}
 
 	// Pass 2: multi-file classes. A helper file's procs whose first param is
@@ -1485,16 +1488,37 @@ main :: proc() {
 
 	// Generate, now that every file's contribution is in (validation too — a
 	// @(gd_command) found in a helper still needs its class's replicate/net_id).
+	//
+	// ONE artifact per scripts dir. Validate EVERY script first: the file is written
+	// whole, so a single bad script must not leave a half-fresh mix of today's and
+	// yesterday's sections behind (the staleness guard would then blame the wrong file).
 	for &pend in pending {
 		validate_script(&pend.script)
-		if had_error {continue}
-		gen := generate(&pend.script)
-		if werr := os.write_entire_file(pend.out_path, transmute([]byte)gen); werr != nil {
-			errorf("cannot write %q", pend.out_path)
-			continue
+	}
+	if !had_error && len(pending) > 0 {
+		// Sections in source-filename order — deterministic output for the same
+		// inputs, whatever order the directory listing handed the files over.
+		sections := make([dynamic]Gen_Section, 0, len(pending), context.temp_allocator)
+		for &pend in pending {
+			append(&sections, Gen_Section{src_name = path_base(pend.script.path), script = &pend.script})
 		}
-		fmt.printfln("scriptgen: wrote %s", pend.out_path)
-		emitted += 1
+		slice.sort_by(sections[:], proc(a, b: Gen_Section) -> bool {return a.src_name < b.src_name})
+
+		scripts_gen := strings.concatenate(
+			{strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\"), "/", SCRIPTS_GEN_NAME},
+		)
+		owned_gen[norm_path(scripts_gen)] = true
+		gen := generate_all(pending[0].script.pkg, sections[:])
+		// Emission itself can error (an import alias two packages both claim), and a
+		// file we already know is broken must not land on disk under "DO NOT EDIT".
+		if had_error {
+			// the diagnostic is already printed; main exits non-zero below
+		} else if werr := os.write_entire_file(scripts_gen, transmute([]byte)gen); werr != nil {
+			errorf("cannot write %q", scripts_gen)
+		} else {
+			emitted = len(sections)
+			fmt.printfln("scriptgen: wrote %s (%d script section(s))", scripts_gen, emitted)
+		}
 	}
 
 	// Generate the STALENESS GUARD: one compile-time `#load_hash` assert per
@@ -1545,13 +1569,28 @@ main :: proc() {
 	}
 
 	// Orphan cleanup: delete any `*.gen.odin` in the scripts dir that this run does not own
-	// (its authored source was deleted/renamed, or a hand-written boot replaced the shim).
-	// Only on a CLEAN run — after an error nothing was emitted, so nothing is collected.
-	// The dir is re-listed because the emit loop just changed its contents. Scripts live
-	// flat in the one dir (the emit loop above skips subdirectories), so no recursion.
+	// — this run owns exactly the consolidated artifact, the guard and the boot shim. That
+	// sweeps a hand-written boot's replaced shim, AND it is the whole migration story for a
+	// project built before consolidation: its per-source `<name>.gen.odin` files are simply
+	// unowned on the next run and go. Only on a CLEAN run — after an error nothing was
+	// emitted, so nothing is collected. The dir is re-listed because the emit loop just
+	// changed its contents. Scripts live flat in the one dir (the emit loop above skips
+	// subdirectories), so no recursion.
 	remove_orphan_gen(scripts_dir, owned_gen)
 
 	fmt.printfln("scriptgen: generated %d script(s)", emitted)
+}
+
+// The ONE generated artifact per scripts dir, beside the boot and guard shims it sorts
+// with. The `.gen.odin` suffix is load-bearing: the editor keys every special case off it
+// — the FileSystem-dock filter hides it (core/gen_filter.odin), the loader refuses to
+// attach it as a script (core/loader.odin), and the reload hash skips it (core/reload.odin).
+SCRIPTS_GEN_NAME :: "odin_godot_scripts.gen.odin"
+
+// path_base returns the last '/'- or '\'-separated segment of `p` (the filename).
+path_base :: proc(p: string) -> string {
+	if i := strings.last_index_any(p, "/\\"); i >= 0 {return p[i + 1:]}
+	return p
 }
 
 // norm_path returns `p` with backslashes normalized to '/'. The owned-gen map is keyed by
@@ -1565,9 +1604,11 @@ norm_path :: proc(p: string, allocator := context.allocator) -> string {
 	return out
 }
 
-// remove_orphan_gen deletes `*.gen.odin` files under `dir` that are not in `owned` —
-// gen output for sources that no longer exist. A Godot `.uid` sidecar for a removed gen
-// file goes with it (the editor generates those beside every res:// file).
+// remove_orphan_gen deletes `*.gen.odin` files under `dir` that are not in `owned` — a
+// run owns exactly the consolidated artifact, the guard and the boot shim, so this
+// collects gen output for sources that no longer exist AND the per-source
+// `<name>.gen.odin` files a pre-consolidation build left behind. A Godot `.uid` sidecar
+// for a removed gen file goes with it (the editor generates those beside every res:// file).
 remove_orphan_gen :: proc(dir: string, owned: map[string]bool) {
 	dir_fh, oerr := os.open(dir)
 	if oerr != nil {return}
@@ -1584,7 +1625,7 @@ remove_orphan_gen :: proc(dir: string, owned: map[string]bool) {
 			warn_at(Loc{path = fi.fullpath}, "cannot remove stale gen file")
 			continue
 		}
-		fmt.printfln("scriptgen: removed stale %s (no matching source)", fi.fullpath)
+		fmt.printfln("scriptgen: removed stale %s (not generated by this run)", fi.fullpath)
 		uid := strings.concatenate({fi.fullpath, ".uid"})
 		if os.exists(uid) {
 			os.remove(uid)
