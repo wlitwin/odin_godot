@@ -12,11 +12,23 @@ package scriptgen
 // The generated output is byte-for-byte EQUIVALENT in effect to the hand-written
 // Phase-3 showcase scripts.
 //
-// ONE ARTIFACT PER DIR: a scripts dir gets exactly three generated files — the
-// consolidated `odin_godot_scripts.gen.odin`, the `odin_godot_guard.gen.odin`
-// staleness guard, and the `odin_godot_boot.gen.odin` shim. Everything else matching
-// `*.gen.odin` is swept as an orphan, which is also what migrates a project off the
-// old one-gen-file-per-source layout on its first build.
+// ONE ARTIFACT PER DIR: a package dir with annotated scripts gets exactly one generated
+// file, the consolidated `odin_godot_scripts.gen.odin`; the module ROOT gets two more,
+// the `odin_godot_guard.gen.odin` staleness guard and the `odin_godot_boot.gen.odin`
+// shim. Everything else matching `*.gen.odin` anywhere in the tree is swept as an orphan,
+// which is also what migrates a project off the old one-gen-file-per-source layout on its
+// first build.
+//
+// SCRIPT SUBPACKAGES: a module is a TREE, not one flat dir. Every subdirectory holding
+// authored `.odin` sources is its own Odin package and is run through the same per-dir
+// pipeline, so engine-native script classes (HUD widgets, UI, fx, tools) live in
+// `scripts/ui/` and are attachable from there. A subdir with annotated scripts gets its
+// own consolidated `odin_godot_scripts.gen.odin`; one without gets nothing (the plain
+// helper package it always was). Still ONE dll per module — the root package links the
+// subpackages through the import manifest in its guard file. Root-only by construction:
+// the boot shim (a second `odin_scripts_boot` export is a duplicate-symbol link error),
+// the staleness guard (which hashes the WHOLE tree), and every KIT annotation (wire
+// contract, lanes, input struct — see check_subpkg_kit).
 //
 // SINGLE-FILE AUTHORING: the authored `.odin` is the file the user attaches to a node
 // (the loader reads its `//gd:class` marker to bind it to the compiled class). scriptgen
@@ -1275,9 +1287,226 @@ main :: proc() {
 
 	// Structural whole-tree pass (helpers in subdirectories included) BEFORE the emit
 	// loop: module-isolation import checks are hard errors even in files the emit loop
-	// never parses, and a marked script hiding in a subdirectory gets a warning instead
-	// of silently never becoming attachable. See check_tree.
+	// never parses, and a SUBPACKAGE importing the module root is pre-empted there with
+	// a teaching error instead of Odin's raw import-cycle report inside generated code.
+	// See check_tree.
 	check_tree(scripts_dir)
+
+	// THE MODULE TREE. The root dir is a package; so is every subdirectory holding
+	// authored `.odin` sources (Odin: one directory, one package). Each is run through
+	// the SAME per-dir pipeline in `process_pkg_dir` — a subdir with annotated scripts
+	// gets its own consolidated `odin_godot_scripts.gen.odin`, one without gets nothing.
+	// The root goes FIRST: it settles the module's package name, its hand-written-boot
+	// status and its wire fingerprint, all of which the tree-wide artifacts below need.
+	ctx := Module_Ctx {
+		root         = scripts_dir,
+		seen_classes = make(map[string]string),
+		pkg_names    = make(map[string]string),
+		owned_gen    = make(map[string]bool),
+	}
+	pkg_dirs := discover_pkg_dirs(scripts_dir)
+	for d, i in pkg_dirs {
+		process_pkg_dir(&ctx, d, i == 0)
+	}
+
+	// Nothing lands on disk until the WHOLE TREE has validated. Each package's artifact
+	// is written whole, and the guard's `#load_hash` set now spans every package, so one
+	// bad script anywhere must not leave a half-fresh mix of today's and yesterday's
+	// generated code behind — the guard would then blame whichever file it noticed first.
+	if !had_error {
+		for out in ctx.outputs {
+			write_pkg_output(&ctx, out)
+		}
+	}
+
+	// Generate the STALENESS GUARD: one compile-time `#load_hash` assert per
+	// authored source ANYWHERE in the module tree (subpackage entries are named by
+	// their root-relative path, which is what `#load_hash` resolves against the
+	// guard file's own directory), so a build that skipped scriptgen — a bare
+	// `odin build` against stale *.gen.odin — fails AT COMPILE TIME naming the
+	// drifted file, instead of compiling yesterday's descriptors over today's
+	// structs. The guard also carries the IMPORT MANIFEST: one blank side-effect
+	// import per annotated subpackage, without which that subpackage never links
+	// and its generated `@(init)` registration never runs.
+	if !had_error && ctx.root_pkg != "" && len(ctx.tree_files) > 0 {
+		dir := strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\")
+		guard_path := strings.concatenate({dir, "/odin_godot_guard.gen.odin"})
+		ctx.owned_gen[norm_path(guard_path)] = true
+		guard := gen_guard(ctx.root_pkg, ctx.tree_files[:], ctx.fingerprint, ctx.kit_wire, ctx.sub_imports[:])
+		if werr := os.write_entire_file(guard_path, transmute([]byte)guard); werr != nil {
+			errorf("cannot write %q", guard_path)
+		} else {
+			fmt.printfln("scriptgen: wrote %s (staleness guard + fingerprint)", guard_path)
+		}
+	}
+
+	// Generate the REQUIRED boot shim (the `odin_scripts_boot` export the core calls after
+	// dlopen) so users never hand-copy it — UNLESS the project already defines its own.
+	// Skipped when the package has no name (nothing to compile anyway). ROOT ONLY: the
+	// export is one per dll, and every subpackage links into the same one.
+	if !had_error && !ctx.has_boot && ctx.root_pkg != "" {
+		dir := strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\")
+		boot_path := strings.concatenate({dir, "/odin_godot_boot.gen.odin"})
+		ctx.owned_gen[norm_path(boot_path)] = true
+		if werr := os.write_entire_file(boot_path, transmute([]byte)gen_boot(ctx.root_pkg)); werr != nil {
+			errorf("cannot write %q", boot_path)
+		} else {
+			fmt.printfln("scriptgen: wrote %s (boot shim)", boot_path)
+		}
+	}
+
+	if had_error {
+		os.exit(1)
+	}
+
+	// Orphan cleanup, WHOLE TREE: delete any `*.gen.odin` under the module root that this
+	// run does not own — the run owns one consolidated artifact per annotated package dir
+	// plus the root's guard and boot shim. That sweeps a hand-written boot's replaced
+	// shim, a subpackage whose last annotated script was deleted or demoted to a helper,
+	// AND it is the whole migration story for a project built before consolidation: its
+	// per-source `<name>.gen.odin` files are simply unowned on the next run and go. The
+	// sweep recurses because a dir can be left holding ONLY generated files, and the
+	// editor's deletion probe (core/reload.odin orphans_hash_dir) recurses too — an
+	// orphan it can see and scriptgen cannot would be a rebuild loop. Only on a CLEAN
+	// run — after an error nothing was emitted, so nothing is collected.
+	remove_orphan_gen_tree(scripts_dir, ctx.owned_gen)
+
+	fmt.printfln("scriptgen: generated %d script(s)", ctx.emitted)
+}
+
+// ---------------------------------------------------------------------------
+// The module tree
+// ---------------------------------------------------------------------------
+
+// Cross-package state for ONE module: what the per-dir pipeline contributes upward and
+// what the tree-wide artifacts (guard, boot, orphan sweep) read back down.
+Module_Ctx :: struct {
+	root:         string, // absolute module root dir (res://scripts or res://modules/<name>)
+	root_pkg:     string, // the ROOT package's `package` name — guard + boot are emitted in it
+	has_boot:     bool, // the module hand-writes `odin_scripts_boot` — don't generate one
+	emitted:      int, // script sections written across the whole tree
+	fingerprint:  u64, // the module's wire contract hash (root scripts; kit lives there)
+	kit_wire:     bool, // the root declares a kit wire surface — register the fingerprint
+	// //gd:class name -> declaring file, MODULE-WIDE. The runtime registry is keyed by
+	// name alone and keeps the first registration, so a root class and a subpackage class
+	// of the same name would silently drop one.
+	seen_classes: map[string]string,
+	// package name -> declaring dir, MODULE-WIDE. Web export links every package into ONE
+	// wasm side module, where package name IS the symbol prefix.
+	pkg_names:    map[string]string,
+	// Root-relative dirs of the ANNOTATED subpackages, in discovery (sorted) order — the
+	// guard's import manifest.
+	sub_imports:  [dynamic]string,
+	// One entry per package dir with annotated scripts, held until the whole tree has
+	// validated (see the write phase in main).
+	outputs:      [dynamic]Pkg_Output,
+	// Every authored source in the tree, path-relative to the root: the guard hashes all
+	// of them, so an edit in a subpackage is just as staleness-checked as one in the root.
+	tree_files:   [dynamic]Helper,
+	// Every gen file this run owns, tree-wide, keyed by NORMALIZED absolute path.
+	owned_gen:    map[string]bool,
+}
+
+// One package dir's pending artifact: everything needed to write its consolidated
+// `odin_godot_scripts.gen.odin`, resolved and validated but not yet on disk.
+Pkg_Output :: struct {
+	dir:      string, // absolute package dir
+	rel:      string, // root-relative dir ("" = the module root)
+	pkg:      string, // the Odin package name the file declares
+	is_root:  bool,
+	sections: []Gen_Section,
+}
+
+// write_pkg_output — emit one package's consolidated artifact and, for a subpackage,
+// enrol it in the root guard's import manifest.
+write_pkg_output :: proc(ctx: ^Module_Ctx, out: Pkg_Output) {
+	scripts_gen := strings.concatenate(
+		{strings.trim_suffix(strings.trim_suffix(out.dir, "/"), "\\"), "/", SCRIPTS_GEN_NAME},
+	)
+	ctx.owned_gen[norm_path(scripts_gen)] = true
+	gen := generate_all(out.pkg, out.sections)
+	// Emission itself can error (an import alias two packages both claim), and a
+	// file we already know is broken must not land on disk under "DO NOT EDIT".
+	if had_error {
+		return // the diagnostic is already printed; main exits non-zero below
+	}
+	if werr := os.write_entire_file(scripts_gen, transmute([]byte)gen); werr != nil {
+		errorf("cannot write %q", scripts_gen)
+		return
+	}
+	ctx.emitted += len(out.sections)
+	fmt.printfln("scriptgen: wrote %s (%d script section(s))", scripts_gen, len(out.sections))
+	// An ANNOTATED subpackage joins the root guard's import manifest: its generated
+	// `@(init) rt.register(...)` only runs if the package is linked, and nothing else in
+	// the module has any reason to name it.
+	if !out.is_root {append(&ctx.sub_imports, out.rel)}
+}
+
+// discover_pkg_dirs — the module's package dirs: the root (always, index 0) followed by
+// every subdirectory holding at least one AUTHORED `.odin` source, at arbitrary depth,
+// sorted by root-relative path so the run is deterministic. `.gen.odin` files do not
+// count: a dir left holding only generated files is not a package, it is a sweep target.
+discover_pkg_dirs :: proc(root: string) -> []string {
+	out := make([dynamic]string)
+	append(&out, root)
+	subs := make([dynamic]string, context.temp_allocator)
+	walk_pkg_dirs(root, &subs)
+	slice.sort(subs[:])
+	for s in subs {append(&out, s)}
+	return out[:]
+}
+
+@(private = "file")
+walk_pkg_dirs :: proc(dir: string, out: ^[dynamic]string) {
+	dir_fh, oerr := os.open(dir)
+	if oerr != nil {return}
+	files, rderr := os.read_dir(dir_fh, -1, context.allocator)
+	os.close(dir_fh)
+	if rderr != nil {return}
+	for fi in files {
+		if fi.type != .Directory {continue}
+		if strings.has_prefix(fi.name, ".") {continue} // .godot and friends
+		if has_authored_odin(fi.fullpath) {
+			append(out, norm_path(fi.fullpath))
+		}
+		walk_pkg_dirs(fi.fullpath, out)
+	}
+}
+
+@(private = "file")
+has_authored_odin :: proc(dir: string) -> bool {
+	dir_fh, oerr := os.open(dir)
+	if oerr != nil {return false}
+	files, rderr := os.read_dir(dir_fh, -1, context.allocator)
+	os.close(dir_fh)
+	if rderr != nil {return false}
+	for fi in files {
+		if fi.type == .Directory {continue}
+		if !strings.has_suffix(fi.name, ".odin") {continue}
+		if strings.has_suffix(fi.name, ".gen.odin") {continue}
+		return true
+	}
+	return false
+}
+
+// rel_to_root returns `path` relative to the module root with '/' separators ("" for the
+// root itself). Both sides are normalized absolute paths by the time this is called.
+rel_to_root :: proc(root, path: string) -> string {
+	nroot := strings.trim_suffix(norm_path(root), "/")
+	np := norm_path(path)
+	if np == nroot {return ""}
+	if strings.has_prefix(np, strings.concatenate({nroot, "/"}, context.temp_allocator)) {
+		return np[len(nroot) + 1:]
+	}
+	return np
+}
+
+// process_pkg_dir — the whole per-package pipeline for ONE directory of the module tree.
+// Identical work for the root and for a subpackage; the differences are named `is_root`
+// below and are exactly three: the boot/guard/fingerprint bookkeeping is the root's, and
+// KIT annotations are refused in a subpackage.
+process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
+	rel := rel_to_root(ctx.root, scripts_dir)
 
 	dir_fh, oerr := os.open(scripts_dir)
 	if oerr != nil {
@@ -1296,24 +1525,14 @@ main :: proc() {
 	// packages are pulled in on demand during resolution (nested-replicate-fields).
 	index_pkg_dir(norm_path(scripts_dir))
 
-	emitted := 0
-	pkg := "" // the scripts package name (for the generated boot); from the first source file
+	pkg := "" // this dir's package name (for the generated boot); from the first source file
 	has_boot := false // a hand-written `odin_scripts_boot` exists — don't generate one
-	seen_classes := make(map[string]string) // //gd:class name -> file that declared it
-	defer delete(seen_classes)
-	// Every gen file THIS run owns (wrote, or would have written but for an unrelated
-	// earlier error): the ONE consolidated `odin_godot_scripts.gen.odin`, the staleness
-	// guard and the boot shim. Anything else matching `*.gen.odin` in the dir is a stale
-	// orphan — a source that was deleted or renamed, or a per-source gen file left by a
-	// build from before consolidation — and is removed after the emit loop. A stale gen
-	// file otherwise breaks the build inside "DO NOT EDIT" code.
-	owned_gen := make(map[string]bool)
-	defer delete(owned_gen)
 
-	// Pass 1: parse every top-level file. Script files (owner-struct) become pending
+	// Pass 1: parse every file in THIS dir. Script files (owner-struct) become pending
 	// gen output; the rest are HELPERS, remembered for pass 2 — a class may spread its
 	// bound procs across sibling files, so generation can't happen until every file
-	// has been seen.
+	// has been seen. Census scoping is per-package on purpose: halves, method claims and
+	// bound procs for a subpackage's classes resolve against that subpackage alone.
 	Pending :: struct {
 		script: Script,
 	}
@@ -1351,16 +1570,45 @@ main :: proc() {
 		}
 
 		// Duplicate //gd:class across files: the core's name->desc map would silently let the
-		// last-loaded win and mis-bind the other. Catch it here with both file paths. This
+		// last-loaded win and mis-bind the other. Catch it here with both file paths. The map
+		// is MODULE-WIDE, so a subpackage class colliding with a root one is caught too (the
+		// runtime registry is keyed by name alone and keeps the first registration). This
 		// bookkeeping runs BEFORE the had_error skip below so dup detection keeps working
 		// across the remaining files even after an unrelated error.
-		if prev, dup := seen_classes[script.class_name]; dup {
+		if prev, dup := ctx.seen_classes[script.class_name]; dup {
 			error_at(Loc{path = path}, "duplicate //gd:class %q (also declared in %q)", script.class_name, prev)
 		} else {
-			seen_classes[script.class_name] = path
+			ctx.seen_classes[script.class_name] = path
 		}
 
 		append(&pending, Pending{script = script})
+	}
+
+	// This dir's package name joins the module-wide uniqueness requirement: on web export
+	// every package links into ONE wasm side module, where the package name IS the symbol
+	// prefix, so two dirs sharing one name is a link collision waiting for the web build.
+	if pkg != "" {
+		if prev, dup := ctx.pkg_names[pkg]; dup {
+			errorf(
+				"duplicate package name %q — declared in both %q and %q; every package in a module tree needs its OWN name (on web export they all link into one wasm side module, where the package name is the symbol prefix)",
+				pkg, prev, scripts_dir,
+			)
+		} else {
+			ctx.pkg_names[pkg] = scripts_dir
+		}
+	}
+	if is_root {
+		ctx.root_pkg = pkg
+		ctx.has_boot = has_boot
+	} else if has_boot {
+		errorf(
+			"%s: `odin_scripts_boot` is declared in the subpackage %q — the boot export is ONE per dll and every subpackage links into the module's; move it to the module root (%s)",
+			rel, rel, ctx.root,
+		)
+	}
+	// The guard hashes every authored source in the TREE, named by its root-relative path.
+	for l in lintable {
+		append(&ctx.tree_files, Helper{path = rel_to_root(ctx.root, l.path), src = l.src})
 	}
 
 	// Pass 2: multi-file classes. A helper file's procs whose first param is
@@ -1380,6 +1628,19 @@ main :: proc() {
 			scan_bound_procs(&pend.script, h.path, h.src, &file)
 		}
 	}
+
+	// KIT ANNOTATIONS ARE MODULE-ROOT-ONLY, checked as early as the parse allows (every
+	// DECLARED kit surface is in by now — the home file's and the helpers') so the teaching
+	// error arrives before whatever secondary complaint the resolve passes would make about
+	// the same declaration. The stragglers that only exist after name pairing (session and
+	// succession halves, world-pass facts) are caught by the second sweep further down.
+	condemned := false
+	if !is_root {
+		for &pend in pending {
+			if check_subpkg_kit(&pend.script, rel, ctx.root, early = true) {condemned = true}
+		}
+	}
+	if condemned {return}
 
 	// Lint every package file now that the full set of script structs is known —
 	// a helper file's `self: ^Golf` param is only recognizable once Golf's home
@@ -1486,10 +1747,28 @@ main :: proc() {
 		lint_command_calls(cmd_calls[:], all[:])
 	}
 
+	// The SECOND kit sweep: the surfaces that only exist after name pairing — session
+	// and succession halves, world-pass facts, the boot transport forwards. Everything
+	// they need was resolved just above, so a subpackage that paired one is named now.
+	if !is_root {
+		if len(fact_decls) > 0 {
+			error_at(
+				Loc{path = fact_decls[0].path},
+				"@(gd_fact) in the script subpackage %q — %s",
+				rel, subpkg_kit_fix(rel, ctx.root),
+			)
+			return
+		}
+		for &pend in pending {
+			if check_subpkg_kit(&pend.script, rel, ctx.root, early = false) {condemned = true}
+		}
+		if condemned {return}
+	}
+
 	// Generate, now that every file's contribution is in (validation too — a
 	// @(gd_command) found in a helper still needs its class's replicate/net_id).
 	//
-	// ONE artifact per scripts dir. Validate EVERY script first: the file is written
+	// ONE artifact per package dir. Validate EVERY script first: the file is written
 	// whole, so a single bad script must not leave a half-fresh mix of today's and
 	// yesterday's sections behind (the staleness guard would then blame the wrong file).
 	for &pend in pending {
@@ -1497,92 +1776,48 @@ main :: proc() {
 	}
 	if !had_error && len(pending) > 0 {
 		// Sections in source-filename order — deterministic output for the same
-		// inputs, whatever order the directory listing handed the files over.
-		sections := make([dynamic]Gen_Section, 0, len(pending), context.temp_allocator)
+		// inputs, whatever order the directory listing handed the files over. Queued,
+		// not written: main writes every package's artifact once the tree has validated.
+		sections := make([dynamic]Gen_Section, 0, len(pending))
 		for &pend in pending {
 			append(&sections, Gen_Section{src_name = path_base(pend.script.path), script = &pend.script})
 		}
 		slice.sort_by(sections[:], proc(a, b: Gen_Section) -> bool {return a.src_name < b.src_name})
-
-		scripts_gen := strings.concatenate(
-			{strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\"), "/", SCRIPTS_GEN_NAME},
+		append(
+			&ctx.outputs,
+			Pkg_Output{
+				dir = scripts_dir,
+				rel = rel,
+				pkg = pending[0].script.pkg,
+				is_root = is_root,
+				sections = sections[:],
+			},
 		)
-		owned_gen[norm_path(scripts_gen)] = true
-		gen := generate_all(pending[0].script.pkg, sections[:])
-		// Emission itself can error (an import alias two packages both claim), and a
-		// file we already know is broken must not land on disk under "DO NOT EDIT".
-		if had_error {
-			// the diagnostic is already printed; main exits non-zero below
-		} else if werr := os.write_entire_file(scripts_gen, transmute([]byte)gen); werr != nil {
-			errorf("cannot write %q", scripts_gen)
-		} else {
-			emitted = len(sections)
-			fmt.printfln("scriptgen: wrote %s (%d script section(s))", scripts_gen, emitted)
-		}
 	}
 
-	// Generate the STALENESS GUARD: one compile-time `#load_hash` assert per
-	// authored source, so a build that skipped scriptgen — a bare `odin build`
-	// against stale *.gen.odin — fails AT COMPILE TIME naming the drifted
-	// file, instead of compiling yesterday's descriptors over today's structs.
-	if !had_error && pkg != "" && len(lintable) > 0 {
-		dir := strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\")
+	// The module's WIRE CONTRACT hash, and whether it has one at all. Root-only by
+	// construction — every kit annotation is refused in a subpackage above, so a
+	// subpackage contributes nothing a peer could disagree about.
+	if is_root && !had_error {
 		all_scripts := make([dynamic]^Script, 0, len(pending), context.temp_allocator)
 		for &pend in pending {append(&all_scripts, &pend.script)}
-		fp := net_fingerprint(all_scripts[:], dir)
+		ctx.fingerprint = net_fingerprint(all_scripts[:], strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\"))
 		// A module with a kit wire surface registers its fingerprint as the
 		// session default (guard file @(init)) — the version gate is on
 		// without any game wiring. Engine-native-only modules (@(gd_rpc),
 		// plain exports) skip it: no kit import, no session to gate.
-		kit_wire := false
 		for s in all_scripts {
 			if len(s.replicates) > 0 || len(s.commands) > 0 || len(s.entities) > 0 || s.tick.proc_name != "" || s.profile_type != "" || len(s.messages) > 0 {
-				kit_wire = true
+				ctx.kit_wire = true
 				break
 			}
 		}
-		guard_path := strings.concatenate({dir, "/odin_godot_guard.gen.odin"})
-		owned_gen[norm_path(guard_path)] = true
-		if werr := os.write_entire_file(guard_path, transmute([]byte)gen_guard(pkg, lintable[:], fp, kit_wire)); werr != nil {
-			errorf("cannot write %q", guard_path)
-		} else {
-			fmt.printfln("scriptgen: wrote %s (staleness guard + fingerprint)", guard_path)
-		}
 	}
-
-	// Generate the REQUIRED boot shim (the `odin_scripts_boot` export the core calls after
-	// dlopen) so users never hand-copy it — UNLESS the project already defines its own.
-	// Skipped when the package has no name (nothing to compile anyway).
-	if !had_error && !has_boot && pkg != "" {
-		dir := strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\")
-		boot_path := strings.concatenate({dir, "/odin_godot_boot.gen.odin"})
-		owned_gen[norm_path(boot_path)] = true
-		if werr := os.write_entire_file(boot_path, transmute([]byte)gen_boot(pkg)); werr != nil {
-			errorf("cannot write %q", boot_path)
-		} else {
-			fmt.printfln("scriptgen: wrote %s (boot shim)", boot_path)
-		}
-	}
-
-	if had_error {
-		os.exit(1)
-	}
-
-	// Orphan cleanup: delete any `*.gen.odin` in the scripts dir that this run does not own
-	// — this run owns exactly the consolidated artifact, the guard and the boot shim. That
-	// sweeps a hand-written boot's replaced shim, AND it is the whole migration story for a
-	// project built before consolidation: its per-source `<name>.gen.odin` files are simply
-	// unowned on the next run and go. Only on a CLEAN run — after an error nothing was
-	// emitted, so nothing is collected. The dir is re-listed because the emit loop just
-	// changed its contents. Scripts live flat in the one dir (the emit loop above skips
-	// subdirectories), so no recursion.
-	remove_orphan_gen(scripts_dir, owned_gen)
-
-	fmt.printfln("scriptgen: generated %d script(s)", emitted)
 }
 
-// The ONE generated artifact per scripts dir, beside the boot and guard shims it sorts
-// with. The `.gen.odin` suffix is load-bearing: the editor keys every special case off it
+// The ONE generated artifact per PACKAGE dir — the module root's sits beside the boot and
+// guard shims it sorts with; a script subpackage's is the only generated file it holds.
+// The `.gen.odin` suffix is load-bearing: the editor keys every special case off it
 // — the FileSystem-dock filter hides it (core/gen_filter.odin), the loader refuses to
 // attach it as a script (core/loader.odin), and the reload hash skips it (core/reload.odin).
 SCRIPTS_GEN_NAME :: "odin_godot_scripts.gen.odin"
@@ -1604,11 +1839,30 @@ norm_path :: proc(p: string, allocator := context.allocator) -> string {
 	return out
 }
 
-// remove_orphan_gen deletes `*.gen.odin` files under `dir` that are not in `owned` — a
-// run owns exactly the consolidated artifact, the guard and the boot shim, so this
-// collects gen output for sources that no longer exist AND the per-source
-// `<name>.gen.odin` files a pre-consolidation build left behind. A Godot `.uid` sidecar
-// for a removed gen file goes with it (the editor generates those beside every res:// file).
+// remove_orphan_gen_tree — the orphan sweep over a whole module tree. Every package dir
+// under the root may hold generated output, and so may a dir whose last authored source
+// was just deleted (which is exactly why the sweep cannot be limited to the package dirs
+// this run discovered).
+remove_orphan_gen_tree :: proc(dir: string, owned: map[string]bool) {
+	remove_orphan_gen(dir, owned)
+	dir_fh, oerr := os.open(dir)
+	if oerr != nil {return}
+	files, rderr := os.read_dir(dir_fh, -1, context.allocator)
+	os.close(dir_fh)
+	if rderr != nil {return}
+	for fi in files {
+		if fi.type != .Directory {continue}
+		if strings.has_prefix(fi.name, ".") {continue}
+		remove_orphan_gen_tree(fi.fullpath, owned)
+	}
+}
+
+// remove_orphan_gen deletes `*.gen.odin` files in `dir` (non-recursive) that are not in
+// `owned` — a run owns one consolidated artifact per annotated package dir plus the root's
+// guard and boot shim, so this collects gen output for sources that no longer exist AND
+// the per-source `<name>.gen.odin` files a pre-consolidation build left behind. A Godot
+// `.uid` sidecar for a removed gen file goes with it (the editor generates those beside
+// every res:// file).
 remove_orphan_gen :: proc(dir: string, owned: map[string]bool) {
 	dir_fh, oerr := os.open(dir)
 	if oerr != nil {return}
@@ -1637,12 +1891,12 @@ remove_orphan_gen :: proc(dir: string, owned: map[string]bool) {
 // Whole-tree structural checks (module isolation + misplaced //gd: markers)
 // ---------------------------------------------------------------------------
 
-// check_tree — one recursive pass over EVERY authored `.odin` under the scripts dir
-// (the emit loop above only parses TOP-LEVEL files; subdirectories are helper packages):
+// check_tree — one recursive pass over EVERY authored `.odin` under the scripts dir,
+// before any package dir is processed:
 //
 //   1. IMPORT ISOLATION, all files: a script module may import collections
 //      (godot:/core:/base:/vendor:) and packages that RESOLVE INSIDE the module's own
-//      directory (subdir helpers, helpers importing each other). Anything else — an
+//      directory (subpackages, subpackages importing each other). Anything else — an
 //      absolute path, or a relative path that escapes the module root after lexical
 //      normalization — is a HARD ERROR. Odin itself would happily compile
 //      `import "../other_module"`, but a package linked into two script dlls duplicates
@@ -1651,9 +1905,11 @@ remove_orphan_gen :: proc(dir: string, owned: map[string]bool) {
 //      build/common.sh, ported in build/build_scripts.ps1) as a backstop; THIS is the
 //      structural check that also catches absolute paths and creative spellings.
 //
-//   2. MISPLACED MARKERS, subdirectory files only: a `//gd:` header marker on a file in
-//      a subdirectory is a script that will never be attachable (no gen is emitted for
-//      subdirs) — warn, don't error, since the file still compiles as helper code.
+//   2. NO SUBPACKAGE -> ROOT IMPORT, subdirectory files only: the root's generated
+//      import manifest imports every annotated subpackage, so a subpackage importing the
+//      root is always a cycle. Odin would report it, but from inside DO NOT EDIT code —
+//      so it is pre-empted here, teaching-style, before the manifest is even written.
+//      A subpackage importing a SIBLING subpackage is a legal DAG edge and is untouched.
 check_tree :: proc(scripts_dir: string) {
 	check_tree_dir(scripts_dir, scripts_dir, true)
 }
@@ -1698,10 +1954,7 @@ check_file :: proc(path, root: string, is_top: bool) {
 		file_dir = file_dir[:i]
 	}
 	for imp in file.imports {
-		check_import(root, file_dir, path, imp)
-	}
-	if !is_top {
-		warn_subdir_markers(path, src, file.pkg_token.pos.line)
+		check_import(root, file_dir, path, imp, is_top)
 	}
 }
 
@@ -1716,8 +1969,10 @@ explain_isolation :: proc() {
 }
 
 // check_import validates ONE import declaration against the isolation rule. `root` is the
-// absolute scripts dir being compiled; `file_dir` the importing file's dir (normalized).
-check_import :: proc(root, file_dir, path: string, imp: ^ast.Import_Decl) {
+// absolute scripts dir being compiled; `file_dir` the importing file's dir (normalized);
+// `is_top` says the importing file lives in the module ROOT (where importing the root is
+// simply importing yourself, which Odin's own resolver handles).
+check_import :: proc(root, file_dir, path: string, imp: ^ast.Import_Decl, is_top: bool) {
 	ipath := strings.trim(imp.fullpath, "\"")
 	loc := Loc{path, imp.pos.line}
 	// `<collection>:<pkg>` — godot:/core:/base:/vendor: (an unknown collection is odin
@@ -1733,6 +1988,21 @@ check_import :: proc(root, file_dir, path: string, imp: ^ast.Import_Decl) {
 	if resolved != nroot && !strings.has_prefix(resolved, strings.concatenate({nroot, "/"})) {
 		error_at(loc, "ILLEGAL cross-module import %q — resolves to %q, outside this script module's directory (%s)", ipath, resolved, nroot)
 		explain_isolation()
+		return
+	}
+	// The import CYCLE the manifest makes unavoidable. Reported here, naming the fix,
+	// rather than as Odin's cycle report against `odin_godot_guard.gen.odin`.
+	if !is_top && resolved == nroot {
+		error_at(
+			loc,
+			"a subfolder script package cannot import the module root (%q resolves to %s) — the root's generated import manifest already imports every script subpackage, so this is an import CYCLE",
+			ipath, nroot,
+		)
+		fmt.eprintln("  Subfolders hold engine-native script classes and helpers; they are LEAVES of the")
+		fmt.eprintln("  module. Anything that needs the module root's types or state is game-coupled and")
+		fmt.eprintln("  belongs in the module root itself. To share the other way, move the shared code")
+		fmt.eprintln("  DOWN into a subpackage both the root and the subfolder import (sibling subpackage")
+		fmt.eprintln("  imports are legal), or pass what it needs in as an argument.")
 	}
 }
 
@@ -1761,29 +2031,97 @@ resolve_lexical :: proc(base_dir, rel: string) -> string {
 	return strings.to_string(b)
 }
 
-// warn_subdir_markers — the misplaced-marker warning (check_tree case 2). Header region
-// only (lines BEFORE the package decl), matching scan_markers' convention; only the four
-// real markers warn — an unknown `//gd:` line in a helper is not a claim of script-ness.
-warn_subdir_markers :: proc(path, src: string, pkg_line: int) {
-	it := src
-	ln := 0
-	for line in strings.split_lines_iterator(&it) {
-		ln += 1
-		if pkg_line > 0 && ln >= pkg_line {break}
-		l := strings.trim_space(line)
-		if !strings.has_prefix(l, "//gd:") {continue}
-		body := strings.trim_space(l[len("//gd:"):])
-		for kw in ([4]string{"extends", "class", "tool", "icon"}) {
-			if _, ok := marker_arg(body, kw); ok {
-				warn_at(
-					Loc{path, ln},
-					"//gd:%s in a subdirectory file — attachable scripts must live at the top level of the scripts dir; subdirectories are helper packages",
-					kw,
-				)
-				break
-			}
+// ---------------------------------------------------------------------------
+// Kit annotations are module-root-only
+// ---------------------------------------------------------------------------
+//
+// A subpackage script gets the whole ENGINE-NATIVE surface — `//gd:extends`/`//gd:class`,
+// methods, signals, exports, onready, rpc, lifecycles, tool/icon — everything whose
+// generated code needs only `gd`/`gdext`/`rt`. What it does not get is any KIT wiring.
+//
+// The reason is not layering taste. A module's kit surface IS its wire contract: the
+// replicated field order, the verb ids, the entity type ids, the ONE tick input struct,
+// the fact tuples — all folded into NET_FINGERPRINT, which two peers compare at the join
+// door. That contract is defined per MODULE, resolved package-wide (one lane owner, one
+// input class table, one command id space), and it is the most game-coupled thing in a
+// project. Subfolders exist for the opposite kind of code: leaf classes that a HUD or a
+// tools menu attaches, which the module root may not even know about. Letting a lane, a
+// verb or a replicated field hide in one would put half the wire contract somewhere the
+// module-wide resolution passes deliberately cannot see — and the failure would be a
+// fingerprint that silently omits it.
+//
+// So every kit-coupled declaration is a HARD error here, naming the SPECIFIC feature and
+// the file to move. `early` selects the surfaces that are complete right after parsing
+// (the common case, reported before the resolve passes can complain about the same
+// declaration in their own words) from the name-paired ones that only exist afterwards.
+// Returns true if anything fired.
+Subpkg_Kit_Feature :: struct {
+	what:    string, // the offending declaration, as the author wrote it
+	early:   bool, // in by the end of pass 2 (parse + bound procs)
+	present: proc(s: ^Script) -> bool,
+}
+
+SUBPKG_KIT_FEATURES := [?]Subpkg_Kit_Feature {
+	{"a gd:\"replicate\" field tag", true, proc(s: ^Script) -> bool {return len(s.replicates) > 0}},
+	{"a gd:\"backup\" field tag", true, proc(s: ^Script) -> bool {return len(s.backups) > 0}},
+	{"an `entity=` scene field (the entity table)", true, proc(s: ^Script) -> bool {return len(s.entities) > 0}},
+	{"a `net_id` field", true, proc(s: ^Script) -> bool {return s.net_id_type != ""}},
+	{"a gd:\"profile=\" field tag", true, proc(s: ^Script) -> bool {return s.profile_type != ""}},
+	{"a @(gd_command) proc", true, proc(s: ^Script) -> bool {return len(s.commands) > 0}},
+	{"a @(gd_tick) proc", true, proc(s: ^Script) -> bool {
+			return s.tick.proc_name != "" || len(s.block_ticks) > 0
+		}},
+	{"a @(gd_sample) proc", true, proc(s: ^Script) -> bool {return len(s.samples) > 0}},
+	{"a @(gd_step) proc", true, proc(s: ^Script) -> bool {
+			return s.step.proc_name != "" || s.step_auth.proc_name != ""
+		}},
+	{"a @(gd_message) handler", true, proc(s: ^Script) -> bool {return len(s.messages) > 0}},
+	{"a kboot.Boot field (the standard transport forwards)", true, proc(s: ^Script) -> bool {return s.boot_field != ""}},
+	// Name-paired: these exist only once the resolve passes have run.
+	{"a session-event half", false, proc(s: ^Script) -> bool {return len(s.event_halves) > 0}},
+	{"a host-migration (succession) half", false, proc(s: ^Script) -> bool {
+			return s.succ_backup != "" || s.succ_took_over != "" || s.succ_wiped != "" || s.succ_migrating != ""
+		}},
+	{"a declared @(gd_fact) world-pass fact", false, proc(s: ^Script) -> bool {return len(s.facts) > 0}},
+	{"an input class (the sim lane's wire input)", false, proc(s: ^Script) -> bool {return len(s.input_classes) > 0}},
+}
+
+// The one sentence every kit-in-a-subpackage error ends with.
+subpkg_kit_fix :: proc(rel, root: string) -> string {
+	return fmt.tprintf(
+		"kit wiring is part of the MODULE's wire contract (fingerprint, lanes, input struct) and is game-coupled; move this file to the module root (%s). Subfolders like %s/ hold engine-native script classes: extends/class, methods, signals, exports, onready, rpc",
+		root, rel,
+	)
+}
+
+check_subpkg_kit :: proc(s: ^Script, rel, root: string, early: bool) -> bool {
+	fired := false
+	for f in SUBPKG_KIT_FEATURES {
+		if f.early != early {continue}
+		if !f.present(s) {continue}
+		error_at(
+			Loc{path = s.path},
+			"%s declares %s in the script subpackage %q — %s",
+			s.struct_name, f.what, rel, subpkg_kit_fix(rel, root),
+		)
+		fired = true
+	}
+	// The BACKSTOP, in the toolchain's own terms: generation decides its kit imports from
+	// the Script's fields (script_needs). If it would reach for one and the table above
+	// named nothing, the table has a hole — say so rather than emit a subpackage file that
+	// imports kit and fails to link the way the rule exists to prevent.
+	if !fired && !early {
+		n := script_needs(s)
+		if n.knet || n.ksim || n.ksess || n.kboot || n.netgd {
+			error_at(
+				Loc{path = s.path},
+				"%s needs a kit import in the script subpackage %q, but no kit declaration was named — %s (scriptgen bug: SUBPKG_KIT_FEATURES is missing a row)",
+				s.struct_name, rel, subpkg_kit_fix(rel, root),
+			)
+			fired = true
 		}
 	}
+	return fired
 }
 
 // scan_boot_decl reports whether the source DECLARES `odin_scripts_boot` (a line whose
@@ -2226,15 +2564,23 @@ Guard_Entry :: struct {
 // today's structs. A deleted or renamed source fails the #load_hash itself.
 // Not covered, deliberately: files ADDED after generation (nothing references
 // them yet), and imported block packages (godot:play/…) — the guard is this
-// package's contract with its own sources.
-gen_guard :: proc(pkg: string, files: []Helper, fingerprint: u64, kit_wire: bool) -> string {
+// MODULE's contract with its own sources.
+//
+// `files` is the WHOLE module tree, each entry already named by its root-relative
+// path — `#load_hash` resolves relative to the file that writes it, and the guard is
+// written in the root, so `#load_hash("ui/hud.odin", …)` reaches the subpackage source.
+//
+// The guard is also where the module's IMPORT MANIFEST lives (`sub_imports`, root-relative
+// dirs of the annotated subpackages). A subpackage's generated `@(init) rt.register(...)`
+// only runs if the package is LINKED, and a subfolder of leaf classes has by definition
+// nothing the root would otherwise name — so without the manifest those classes would
+// compile, register nothing, and attach as placeholders. Blank side-effect imports keep
+// the manifest from touching the root's namespace; `@(init)` procs of an imported package
+// run regardless of whether anything references the package.
+gen_guard :: proc(pkg: string, files: []Helper, fingerprint: u64, kit_wire: bool, sub_imports: []string) -> string {
 	entries := make([dynamic]Guard_Entry, 0, len(files), context.temp_allocator)
 	for f in files {
-		name := f.path
-		if i := strings.last_index_any(name, "/\\"); i >= 0 {
-			name = name[i + 1:]
-		}
-		append(&entries, Guard_Entry{name = name, crc = hash.crc32(transmute([]u8)f.src)})
+		append(&entries, Guard_Entry{name = norm_path(f.path), crc = hash.crc32(transmute([]u8)f.src)})
 	}
 	// Deterministic output whatever order the directory listed in.
 	slice.sort_by(entries[:], proc(a, b: Guard_Entry) -> bool {return a.name < b.name})
@@ -2245,6 +2591,17 @@ gen_guard :: proc(pkg: string, files: []Helper, fingerprint: u64, kit_wire: bool
 	fmt.sbprintf(&b, "package %s\n\n", pkg)
 	if kit_wire {
 		w(&b, "import _guard_ksess \"godot:kit/session\"\n\n")
+	}
+	if len(sub_imports) > 0 {
+		w(&b, "// THE IMPORT MANIFEST: one blank side-effect import per SCRIPT SUBPACKAGE, so\n")
+		w(&b, "// each subfolder's generated `@(init)` class registration is linked into this\n")
+		w(&b, "// module's one dll. Nothing else in the module names these packages.\n")
+		sorted := slice.clone_to_dynamic(sub_imports, context.temp_allocator)
+		slice.sort(sorted[:])
+		for rel in sorted {
+			fmt.sbprintf(&b, "import _ %q\n", rel)
+		}
+		w(&b, "\n")
 	}
 	w(&b, "// GENERATED by scriptgen — do not edit. THE STALENESS GUARD: each assert\n")
 	w(&b, "// re-hashes an authored source at compile time; a mismatch means this\n")

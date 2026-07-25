@@ -371,5 +371,90 @@ main :: proc() {
     }
     fmt.println("fresh-flag semantics: set on publish, consumed once, cleared by cache-hit pickup")
 
+    check_nested_overlay(root, odin_bin)
+
     fmt.println("VALIDATE_HARNESS_OK")
+}
+
+// ------------------------------------------------------------------
+// NESTED PACKAGES: a script module is a TREE (annotated classes live in subfolders), so
+// `import "ui"` from the module root and `import "../util"` from a subfolder are ordinary.
+// The overlay copies ONE directory's files, so unless it is laid out like the real tree
+// both imports point at nothing and odin reports `Path does not exist` as a SYNTAX error —
+// which aborts the check and takes every real diagnostic with it, reporting a broken buffer
+// as clean-but-for-one-phantom-error. Both directions are pinned here on a throwaway tree
+// (no generated code involved, so this holds on a fresh checkout).
+// ------------------------------------------------------------------
+check_nested_overlay :: proc(root, odin_bin: string) {
+    tmp := os.get_env("TMPDIR", context.allocator)
+    if tmp == "" {tmp = "/tmp"}
+    tree := fmt.tprintf("%s/odin_validate_nested_%d", strings.trim_suffix(tmp, "/"), os.get_pid())
+    os.remove_all(tree)
+    write :: proc(path, body: string) {
+        if err := os.write_entire_file(path, transmute([]u8)body); err != nil {
+            fail(fmt.tprintf("could not write %s", path))
+        }
+    }
+    if err := os.make_directory_all(fmt.tprintf("%s/ui/widgets", tree)); err != nil {fail("could not create ui/widgets/")}
+    if err := os.make_directory_all(fmt.tprintf("%s/util", tree)); err != nil {fail("could not create util/")}
+    defer os.remove_all(tree)
+
+    root_src := "package nested_root\n\nimport \"ui\"\nimport \"util\"\n\nroot_sum :: proc() -> int {\n\treturn util.STEP + ui.GAIN\n}\n"
+    ui_src := "package nested_ui\n\nimport \"../util\"\nimport \"widgets\"\n\nGAIN :: util.STEP * 2 + widgets.PAD\n"
+    // TWO deep, importing UPWARD PAST its parent — the shape a one-ancestor-level mirror
+    // still got wrong (`../../util` resolved to nothing).
+    widgets_src := "package nested_widgets\n\nimport \"../../util\"\n\nPAD :: util.STEP + 1\n"
+    write(fmt.tprintf("%s/game.odin", tree), root_src)
+    write(fmt.tprintf("%s/ui/hud.odin", tree), ui_src)
+    write(fmt.tprintf("%s/ui/widgets/bar.odin", tree), widgets_src)
+    write(fmt.tprintf("%s/util/util.odin", tree), "package nested_util\n\nSTEP :: 7\n")
+
+    // (a) the module ROOT importing its CHILD packages
+    ds := diag.run_check_overlay(root_src, fmt.tprintf("%s/game.odin", tree), root, odin_bin)
+    if len(ds) != 0 {
+        fail(fmt.tprintf("module root importing child packages reported %d diagnostic(s): %v", len(ds), ds[:]))
+    }
+    free_diags(ds[:])
+
+    // (b) a SUBPACKAGE importing a SIBLING package
+    ds2 := diag.run_check_overlay(ui_src, fmt.tprintf("%s/ui/hud.odin", tree), root, odin_bin)
+    if len(ds2) != 0 {
+        fail(fmt.tprintf("subpackage importing a sibling reported %d diagnostic(s): %v", len(ds2), ds2[:]))
+    }
+    free_diags(ds2[:])
+
+    // (c) TWO deep, importing UPWARD PAST its parent (`../../util`)
+    ds3 := diag.run_check_overlay(widgets_src, fmt.tprintf("%s/ui/widgets/bar.odin", tree), root, odin_bin)
+    if len(ds3) != 0 {
+        fail(fmt.tprintf("two-deep subpackage importing ../../util reported %d diagnostic(s): %v", len(ds3), ds3[:]))
+    }
+    free_diags(ds3[:])
+
+    // ...and a real error in the TWO-DEEP buffer still lands, at the right line — the
+    // failure being pinned is an import that does not resolve, which odin reports as a
+    // SYNTAX error that aborts the check and hides everything real behind it.
+    broken := "package nested_widgets\n\nimport \"../../util\"\n\nPAD :: util.STEP + 1\nbad :: proc() {\n\ty: int = \"oops\"\n}\n"
+    ds4 := diag.run_check_overlay(broken, fmt.tprintf("%s/ui/widgets/bar.odin", tree), root, odin_bin)
+    if len(ds4) == 0 {
+        fail("a broken TWO-DEEP buffer reported no diagnostics (the overlay swallowed the check)")
+    }
+    if ds4[0].line != 7 {
+        fail(fmt.tprintf("two-deep diagnostic expected on line 7, got line %d (%q)", ds4[0].line, ds4[0].message))
+    }
+    if strings.index(ds4[0].message, "Path does not exist") >= 0 {
+        fail("the overlay still reports a phantom unresolved-import error instead of the real one")
+    }
+    free_diags(ds4[:])
+
+    // ...and a real error in the ONE-deep subpackage buffer too.
+    broken_ui := "package nested_ui\n\nimport \"../util\"\nimport \"widgets\"\n\nGAIN :: util.STEP * 2 + widgets.PAD\nbad :: proc() {\n\ty: int = \"oops\"\n}\n"
+    ds5 := diag.run_check_overlay(broken_ui, fmt.tprintf("%s/ui/hud.odin", tree), root, odin_bin)
+    if len(ds5) == 0 {
+        fail("a broken SUBPACKAGE buffer reported no diagnostics (the overlay swallowed the check)")
+    }
+    if ds5[0].line != 8 {
+        fail(fmt.tprintf("subpackage diagnostic expected on line 8, got line %d (%q)", ds5[0].line, ds5[0].message))
+    }
+    free_diags(ds5[:])
+    fmt.println("nested packages: root->child, subpackage->sibling and two-deep ../../ imports resolve in the overlay; real errors still land at both depths")
 }

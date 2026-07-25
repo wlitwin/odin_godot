@@ -595,19 +595,21 @@ ensure_overlay :: proc(s: ^Session, abs_path: string) -> (overlay: string, ok: b
     if !seen {
         sync.lock(&s.start_mutex) // serialize counter + copy with start/teardown
         s.pkg_counter += 1
-        ov_dir = fmt.aprintf("%s/pkg%d", s.workspace, s.pkg_counter, allocator = a)
+        // The workspace slot mirrors the edited package's MODULE TREE, and the overlay
+        // sits at the package's place inside it — so `../<sibling>` and `../../<x>`
+        // resolve. overlay_setup_cmd owns the whole layout and reports the overlay dir.
+        slot := fmt.aprintf("%s/pkg%d", s.workspace, s.pkg_counter, allocator = a)
         sync.unlock(&s.start_mutex)
-        q_ov := shell_quote(ov_dir, context.temp_allocator)
-        cp := fmt.ctprintf(
-            "mkdir -p %s && cp %s/*.odin %s/ 2>/dev/null",
-            q_ov,
-            shell_quote(pkgdir, context.temp_allocator),
-            q_ov,
-        )
+        setup_cmd, ov := overlay_setup_cmd(slot, pkgdir, a)
+        ov_dir = ov
+        cp := strings.clone_to_cstring(setup_cmd, context.temp_allocator)
+        delete(setup_cmd, a)
         if libc.system(cp) != 0 {
+            delete(slot, a)
             delete(ov_dir, a)
             return "", false
         }
+        delete(slot, a)
         sync.lock(&s.state_mutex)
         s.pkgs[strings.clone(pkgdir, a)] = ov_dir
         sync.unlock(&s.state_mutex)

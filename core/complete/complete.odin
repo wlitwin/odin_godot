@@ -56,6 +56,138 @@ shell_quote :: proc(s: string, allocator := context.allocator) -> string {
     return strings.to_string(b)
 }
 
+// How far up overlay_setup_cmd will walk looking for the module root. A script module is
+// a handful of levels deep at most; the bound is what keeps a pathological tree (or a
+// checkout whose every ancestor happens to hold Odin sources) from mirroring the world.
+@(private = "file")
+MAX_MODULE_DEPTH :: 8
+
+// overlay_setup_cmd — the shell command that builds a live-buffer overlay of `pkgdir`
+// inside the fresh workspace `work`, laid out so RELATIVE package imports still resolve.
+// Returns the command and the overlay directory the edited file's copy lands in.
+//
+// A flat copy of one directory's `.odin` files is not enough: a script module is a TREE
+// (annotated classes live in subfolders, at any depth), so `import "ui"` from the module
+// root, `import "../util"` from a subfolder and `import "../../util"` from a subfolder of
+// a subfolder are all ordinary. In a flat overlay they point at nothing, and odin reports
+// `Path does not exist` as a SYNTAX error on the import line — which aborts parsing, so
+// completion sees a package that does not resolve at all.
+//
+// So the overlay mirrors the module TREE from its root down to the edited package: every
+// directory on that chain is a real directory in the workspace, and at each level every
+// non-dot sibling that is NOT on the chain is symlinked. For a module root `m` and an
+// edited package `m/ui/widgets`:
+//
+//   <work>/              real; links to every child of `m`      except `ui`
+//   <work>/ui/           real; links to every child of `m/ui`   except `widgets`
+//   <work>/ui/widgets/   the edited package's `.odin` files, COPIED (the live buffer
+//                        overwrites one of them afterwards), plus links to ITS children
+//
+// so `../../util` resolves at `<work>/util`, `../sibling` at `<work>/ui/sibling`, and a
+// child package at `<work>/ui/widgets/<child>`. Editing the module root itself degenerates
+// to `<work>/` holding the copy plus one link per child — the one-level shape.
+//
+// Only the edited package is copied. Everything reached through a symlink is read from
+// DISK, which is exactly right: an unedited package has no live buffer. Dot-directories
+// are skipped (`.godot` and friends are never packages).
+//
+// KEEP IN SYNC with core/diag/diag.odin's copy of this proc — two independent editor
+// features, one overlay shape.
+overlay_setup_cmd :: proc(
+    work, pkgdir: string,
+    allocator := context.allocator,
+) -> (cmd: string, overlay_dir: string) {
+    mroot := module_root_of(pkgdir)
+    rel := pkgdir[min(len(mroot) + 1, len(pkgdir)):] // "" | "ui" | "ui/widgets"
+    ov := rel == "" ? strings.clone(work, allocator) : strings.concatenate({work, "/", rel}, allocator)
+
+    b := strings.builder_make(allocator)
+    q :: proc(s: string) -> string {return shell_quote(s, context.temp_allocator)}
+    fmt.sbprintf(
+        &b,
+        "rm -rf %s && mkdir -p %s && cp %s/*.odin %s/ 2>/dev/null",
+        q(work), q(ov), q(pkgdir), q(ov),
+    )
+    // One pass per level of the chain, root-first. `next` is the chain's own segment at
+    // that level — a real directory in the workspace, so it must not also be a symlink.
+    real_dir := mroot
+    mirror := work
+    for {
+        cut := strings.index_byte(rel, '/')
+        seg := rel
+        if cut >= 0 {seg = rel[:cut]}
+        link_dirs(&b, real_dir, mirror, seg)
+        if seg == "" {break}
+        real_dir = strings.concatenate({real_dir, "/", seg}, context.temp_allocator)
+        mirror = strings.concatenate({mirror, "/", seg}, context.temp_allocator)
+        rel = cut >= 0 ? rel[cut + 1:] : ""
+    }
+    return strings.to_string(b), ov
+}
+
+// module_root_of — the top of `pkgdir`'s script module: walk up while the PARENT is still
+// an Odin package (holds authored `.odin` sources).
+//
+// This is structural rather than the `res://scripts` / `res://modules/<name>` prefix rule
+// the reload coordinator uses, and deliberately so: core/complete holds NO Godot dependency
+// (that is what lets the headless harness drive the real code path), so it has no
+// ProjectSettings to globalize `res://` against. The structural walk lands on the same
+// directory in every layout the toolchain supports, because a module root's parent is
+// either the project directory or `modules/` — and neither is an Odin package. If the walk
+// finds nothing above `pkgdir`, the result is `pkgdir` itself and the layout degenerates
+// to the flat one-level overlay.
+@(private = "file")
+module_root_of :: proc(pkgdir: string) -> string {
+    root := pkgdir
+    for _ in 0 ..< MAX_MODULE_DEPTH {
+        idx := strings.last_index_byte(root, '/')
+        if idx <= 0 {break}
+        parent := root[:idx]
+        if !has_authored_odin(parent) {break}
+        root = parent
+    }
+    return root
+}
+
+// Does `dir` hold at least one AUTHORED `.odin` (a generated artifact does not make a
+// directory a package — a dir left holding only `*.gen.odin` is a sweep target)?
+@(private = "file")
+has_authored_odin :: proc(dir: string) -> bool {
+    fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
+    if err != nil {
+        return false
+    }
+    for fi in fis {
+        if fi.type == .Directory {continue}
+        if strings.has_suffix(fi.name, ".odin") && !strings.has_suffix(fi.name, ".gen.odin") {
+            return true
+        }
+    }
+    return false
+}
+
+// Append one `ln -s` per non-dot subdirectory of `from` into `into`, skipping `except`
+// (the chain's own next level, which is a real directory rather than a link). Failures
+// are swallowed: a missing link only costs the resolution it would have provided.
+@(private = "file")
+link_dirs :: proc(b: ^strings.Builder, from, into, except: string) {
+    fis, err := os.read_directory_by_path(from, -1, context.temp_allocator)
+    if err != nil {
+        return
+    }
+    for fi in fis {
+        if fi.type != .Directory || strings.has_prefix(fi.name, ".") || fi.name == except {
+            continue
+        }
+        fmt.sbprintf(
+            b,
+            " ; ln -s %s %s 2>/dev/null",
+            shell_quote(fi.fullpath, context.temp_allocator),
+            shell_quote(strings.concatenate({into, "/", fi.name}, context.temp_allocator), context.temp_allocator),
+        )
+    }
+}
+
 // U+FFFF — the sentinel `TextEdit::get_text_for_code_completion()` inserts at the caret.
 // (Godot hands `_complete_code` the FULL buffer with this marker at the cursor.)
 @(private)
@@ -669,14 +801,11 @@ run_completion :: proc(
 
     q_work := shell_quote(work, context.temp_allocator)
 
-    // 1. Fresh overlay dir with a copy of every sibling `.odin` (incl. `*.gen.odin`).
-    setup := fmt.ctprintf(
-        "rm -rf %s && mkdir -p %s && cp %s/*.odin %s/ 2>/dev/null",
-        q_work,
-        q_work,
-        shell_quote(pkgdir, context.temp_allocator),
-        q_work,
-    )
+    // 1. Fresh overlay with a copy of every sibling `.odin` (incl. `*.gen.odin`), laid out
+    //    as a mirror of the module tree so relative imports still resolve. The overlay dir
+    //    is the edited package's place IN that mirror, not the workspace root.
+    setup_cmd, pkg_dir_ov := overlay_setup_cmd(work, pkgdir, context.temp_allocator)
+    setup := strings.clone_to_cstring(setup_cmd, context.temp_allocator)
     if libc.system(setup) != 0 {
         return empty, no_hint
     }
@@ -698,7 +827,7 @@ run_completion :: proc(
     }
 
     // 3. Overwrite the edited file with the LIVE (caret-stripped) editor buffer.
-    overlay := fmt.aprintf("%s/%s", work, basename)
+    overlay := fmt.aprintf("%s/%s", pkg_dir_ov, basename)
     defer delete(overlay)
     if werr := os.write_entire_file(overlay, transmute([]u8)clean); werr != nil {
         return empty, no_hint

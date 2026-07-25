@@ -152,6 +152,10 @@ TESTS=(
     # hot reload with other modules provably untouched, engine-mediated cross-module
     # calls, module-local script_of, loud class-collision + cross-import rejection.
     "modspike|MODULES_SPIKE_OK|tests/modules_spike/run.sh"
+    # Script SUBPACKAGES: annotated classes in subfolders of a module (still one dll).
+    # A subfolder script attaches + reloads with state preserved, the root reads it TYPED
+    # in-dll, and the four refusals hold (kit annotation, root import, dup package, dup class).
+    "subpkgspike|SUBPKG_SPIKE_OK|tests/subpkg_spike/run.sh"
     "phase5|PHASE5_OK|tests/phase5/run.sh"
     "showcase|SHOWCASE_OK|tests/showcase/run.sh"
     "autoload|AUTOLOAD_OK|tests/autoload/run.sh"
