@@ -1718,18 +1718,39 @@ check_unpaired_halves :: proc(idx: ^map[string]Half_Candidate, scripts: []^Scrip
 		// used to sit in front of it is gone. A declared half always speaks;
 		// the params only decide what it is shown.
 		targets := make([dynamic]^Script, context.temp_allocator)
+		// A ^Struct param naming a class that this package does not have, but the
+		// module's SUBPACKAGE census does: the class moved into a subfolder and left
+		// its half behind. Remembered so the no-targets branch can say so.
+		stranded_cls, stranded_sub: string
 		if cand.pt.params != nil {
 			for f in cand.pt.params.list {
 				t := strings.trim_space(node_text(cand.src, f.type))
 				if !strings.has_prefix(t, "^") {continue}
 				s, ok := by_struct[t[1:]]
-				if !ok {continue}
+				if !ok {
+					if sub, in_sub := g_subpkg_structs[t[1:]]; in_sub && stranded_cls == "" {
+						stranded_cls, stranded_sub = t[1:], sub
+					}
+					continue
+				}
 				dup := false
 				for x in targets {
 					if x == s {dup = true; break}
 				}
 				if !dup {append(&targets, s)}
 			}
+		}
+		// Checked BEFORE the target listing: a half naming a subpackage class cannot
+		// pair no matter what its other params resolve to (halves pair inside ONE
+		// package), and the shell's thirty-odd session-event names are pure noise
+		// next to the one fact that explains it.
+		if stranded_cls != "" {
+			error_at(
+				loc,
+				"@(gd_half) %q pairs with nothing — it is written against %s, which is declared in the script subpackage %q. Halves pair inside ONE package, so either the half belongs beside its class in %s/, or the class belongs in the module root (a kit-wired class must be there anyway).",
+				name, stranded_cls, stranded_sub, stranded_sub,
+			)
+			continue
 		}
 		if len(targets) == 0 {
 			error_at(
@@ -1887,7 +1908,19 @@ resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^m
 		loc := Loc{path = s.path, line = e.line}
 		target, known := by_struct[e.target]
 		if !known {
-			error_at(loc, "entity %s: no script struct named %q in this module — the tag names the struct the scene bodies (its //gd:class file)", e.target, e.target)
+			// "no such struct" is only ever true of THIS package: the entity table,
+			// its type ids and its census resolve package-wide. When the name is in
+			// the module's subpackage census the struct exists and is simply in the
+			// wrong place — say which place, and why the root is the right one.
+			if sub, in_sub := g_subpkg_structs[e.target]; in_sub {
+				error_at(
+					loc,
+					"entity %s: %q is declared in the script subpackage %q, not the module root — a wire entity IS the module's contract (its type id, descriptor and census are resolved package-wide in the root), so the struct the tag names lives in the module root too; move %s/%s's file up, or point the tag at a root struct",
+					e.target, e.target, sub, sub, e.target,
+				)
+				continue
+			}
+			error_at(loc, "entity %s: no script struct named %q in the module root — the tag names the struct the scene bodies (its //gd:class file)", e.target, e.target)
 			continue
 		}
 		if len(target.replicates) == 0 && len(target.commands) == 0 {

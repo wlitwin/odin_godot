@@ -68,6 +68,12 @@ TESTS=(
     # Golden test for scriptgen's nested replicated/tagged-field discovery (same-package,
     # imported bundles, and the loud plain-nesting guardrail) — drives the binary, no Godot.
     "scriptgen|SCRIPTGEN_OK|tests/scriptgen/run.sh"
+    # THE WEB-TARGET COMPILE PIN: `odin check` of every godot:kit/* package plus
+    # core/play/flowgd for freestanding_wasm32 — no Emscripten, no browser, under a
+    # second. The browser-gated web suites below export toy projects that never link
+    # the full kit, so an unguarded println-family call in kit code used to break
+    # every user's web export with the whole suite green.
+    "kitwasm|KITWASM_OK|tests/kitwasm/run.sh"
     # Pure-Odin unit tests for kit/net — the friendslop toolkit's replication core
     # (wire, shadow-copy deltas, intent pipeline + dedup, tick/clock sync, interp).
     "kitnet|KITNET_OK|tests/kitnet/run.sh"

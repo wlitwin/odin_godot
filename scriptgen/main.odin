@@ -742,6 +742,11 @@ MIGRATION_HALVES := [?]Migration_Half_Spec {
 
 had_error: bool
 
+// Set while a SPECULATIVE pass runs (the subpackage kit pre-scan, see prescan_subpkg_kit):
+// every diagnostic and every had_error is the REAL pass's to report, so a file parsed
+// twice never complains twice. Nothing outside that pre-scan touches it.
+g_quiet_diag: bool
+
 // A diagnostic source location: `path:line:` when both are known, `path:` when only the
 // file is known (line 0), or nothing (a global error). Marker scan line indexes count as
 // lines (1-based), matching the AST's `pos.line`.
@@ -770,6 +775,7 @@ errorf :: proc(format: string, args: ..any) {
 
 // Location-carrying error — prints `scriptgen: error: path:line: message`.
 error_at :: proc(loc: Loc, format: string, args: ..any) {
+	if g_quiet_diag {return}
 	diag_prefix("error", loc)
 	fmt.eprintf(format, ..args)
 	fmt.eprintln()
@@ -783,6 +789,7 @@ warnf :: proc(format: string, args: ..any) {
 }
 
 warn_at :: proc(loc: Loc, format: string, args: ..any) {
+	if g_quiet_diag {return}
 	diag_prefix("warning", loc)
 	fmt.eprintf(format, ..args)
 	fmt.eprintln()
@@ -1320,18 +1327,30 @@ main :: proc() {
 	// authored `.odin` sources (Odin: one directory, one package). Each is run through
 	// the SAME per-dir pipeline in `process_pkg_dir` — a subdir with annotated scripts
 	// gets its own consolidated `odin_godot_scripts.gen.odin`, one without gets nothing.
-	// The root goes FIRST: it settles the module's package name, its hand-written-boot
-	// status and its wire fingerprint, all of which the tree-wide artifacts below need.
+	// The root goes FIRST: it settles the module's package name and its hand-written-boot
+	// status, which the tree-wide artifacts below need.
+	pkg_dirs := discover_pkg_dirs(scripts_dir)
+
+	// BEFORE any of that: the subpackage kit refusal, and the module-wide census of which
+	// struct lives in which subfolder that the root's resolve passes word their errors
+	// with. See prescan_subpkg_kit — a kit declaration in a subfolder is the ROOT CAUSE of
+	// everything the root would otherwise complain about first.
+	prescan_subpkg_kit(scripts_dir, pkg_dirs)
+
 	ctx := Module_Ctx {
 		root         = scripts_dir,
 		seen_classes = make(map[string]string),
 		pkg_names    = make(map[string]string),
 		owned_gen    = make(map[string]bool),
 	}
-	pkg_dirs := discover_pkg_dirs(scripts_dir)
 	for d, i in pkg_dirs {
 		process_pkg_dir(&ctx, d, i == 0)
 	}
+
+	// The wire contract hash, over the whole tree — see module_fingerprint. Before the
+	// write phase: its own toolchain-drift check can fail the build, and a failing build
+	// leaves nothing on disk.
+	module_fingerprint(&ctx)
 
 	// Nothing lands on disk until the WHOLE TREE has validated. Each package's artifact
 	// is written whole, and the guard's `#load_hash` set now spans every package, so one
@@ -1818,23 +1837,47 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 			},
 		)
 	}
+}
 
-	// The module's WIRE CONTRACT hash, and whether it has one at all. Root-only by
-	// construction — every kit annotation is refused in a subpackage above, so a
-	// subpackage contributes nothing a peer could disagree about.
-	if is_root && !had_error {
-		all_scripts := make([dynamic]^Script, 0, len(pending), context.temp_allocator)
-		for &pend in pending {append(&all_scripts, &pend.script)}
-		ctx.fingerprint = net_fingerprint(all_scripts[:], strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\"))
-		// A module with a kit wire surface registers its fingerprint as the
-		// session default (guard file @(init)) — the version gate is on
-		// without any game wiring. Engine-native-only modules (@(gd_rpc),
-		// plain exports) skip it: no kit import, no session to gate.
-		for s in all_scripts {
-			if len(s.replicates) > 0 || len(s.commands) > 0 || len(s.entities) > 0 || s.tick.proc_name != "" || s.profile_type != "" || len(s.messages) > 0 {
-				ctx.kit_wire = true
-				break
+// module_fingerprint — the module's WIRE CONTRACT hash, and whether it has one at all.
+//
+// Runs once over the WHOLE TREE, after every package dir has been processed and before
+// anything is written (check_fingerprint_contrib can fail the build, and a failing build
+// writes nothing). It cannot live in the root's own pass: the root is processed FIRST, and
+// this needs the subpackages' class names.
+//
+// WHY SUBPACKAGE CLASS NAMES FOLD IN. The kit surface is root-only by construction, so a
+// subpackage class contributes no replicated field, verb, entity id or tick — only its
+// NAME, which net_fingerprint writes for every class whether or not it has wire surface.
+// Fold the subpackage names in beside the root's and moving a class between the root and a
+// subfolder is invisible to the hash: pure organization stops being a join-door version
+// break (Deny_Reason.Version) between an old build and a new one. Leaving them out is not
+// an option either — then the move would be invisible in one direction and not the other.
+// A FLAT module has no subpackage names, so its fingerprint is byte-identical to what
+// every shipped build already computed.
+module_fingerprint :: proc(ctx: ^Module_Ctx) {
+	if had_error {return}
+	root_scripts := make([dynamic]^Script, context.temp_allocator)
+	sub_classes := make([dynamic]string, context.temp_allocator)
+	for out in ctx.outputs {
+		for sec in out.sections {
+			if out.is_root {
+				append(&root_scripts, sec.script)
+			} else {
+				append(&sub_classes, sec.script.struct_name)
 			}
+		}
+	}
+	root := strings.trim_suffix(strings.trim_suffix(ctx.root, "/"), "\\")
+	ctx.fingerprint = net_fingerprint(root_scripts[:], sub_classes[:], root)
+	// A module with a kit wire surface registers its fingerprint as the
+	// session default (guard file @(init)) — the version gate is on
+	// without any game wiring. Engine-native-only modules (@(gd_rpc),
+	// plain exports) skip it: no kit import, no session to gate.
+	for s in root_scripts {
+		if len(s.replicates) > 0 || len(s.commands) > 0 || len(s.entities) > 0 || s.tick.proc_name != "" || s.profile_type != "" || len(s.messages) > 0 {
+			ctx.kit_wire = true
+			break
 		}
 	}
 }
@@ -2163,6 +2206,101 @@ check_subpkg_kit :: proc(s: ^Script, rel, root: string, early: bool) -> bool {
 	return fired
 }
 
+// ---- the subpackage PRE-SCAN: the root cause leads --------------------------
+//
+// Script struct name -> the root-relative SUBPACKAGE dir that declares it, module-wide.
+// Filled by prescan_subpkg_kit before any package resolves, so a root pass that fails to
+// find a name can say WHERE it went instead of "no such struct" (resolve_entities,
+// check_unpaired_halves). Empty for a flat module, which is most of them.
+g_subpkg_structs: map[string]string
+
+// prescan_subpkg_kit — refuse kit declarations in a script subpackage BEFORE the module
+// root resolves anything, and census the subpackages' class names on the way past.
+//
+// THE PROBLEM IT SOLVES. Moving one kit entity into a subfolder used to print three
+// DERIVED errors before either real one: the root's `entity Zone: no script struct named
+// "Zone"` (true — the entity table resolves per package), then two `@(gd_half) … pairs
+// with nothing` complaints listing every half the moved class used to claim. The cause was
+// the fourth thing on screen. The root is processed first for good reasons, and errors are
+// printed as they are found, so no amount of care inside the per-dir pipeline can fix that
+// ordering.
+//
+// WHY A PRE-SCAN RATHER THAN A REORDER. Processing subpackages first would reorder every
+// unrelated diagnostic in the tree (a typo in a HUD would then precede a real root error),
+// and it still would not SUPPRESS the derived errors — the root would resolve afterwards
+// and print them anyway. This pass is surgical instead: it is speculative (diagnostics
+// muted, see g_quiet_diag, so a file parsed twice never complains twice), it only asks the
+// one question, and when the answer is yes it prints the refusals and exits — so the
+// author sees the cause and nothing else. Nothing has been written at this point.
+//
+// It repeats pass 1 + pass 2 of process_pkg_dir (parse each file, then let helper files'
+// bound procs join their class) because that is exactly the state `early = true` features
+// are complete in. The later name-paired surfaces — session/succession halves, facts,
+// input classes — still come from the real pass, which is where they first exist.
+prescan_subpkg_kit :: proc(root: string, pkg_dirs: []string) {
+	fired := false
+	for d, i in pkg_dirs {
+		if i == 0 {continue} // the module root: kit belongs there
+		rel := rel_to_root(root, d)
+		for s in prescan_pkg_scripts(d) {
+			g_subpkg_structs[s.struct_name] = rel
+			if check_subpkg_kit(s, rel, root, early = true) {fired = true}
+		}
+	}
+	if fired {
+		os.exit(1)
+	}
+}
+
+// prescan_pkg_scripts — one package dir's script structs, parsed with diagnostics MUTED.
+// The mirror of process_pkg_dir's passes 1 and 2, minus everything that reports or emits.
+@(private = "file")
+prescan_pkg_scripts :: proc(dir: string) -> []^Script {
+	out := make([dynamic]^Script)
+	dir_fh, oerr := os.open(dir)
+	if oerr != nil {return out[:]}
+	files, rderr := os.read_dir(dir_fh, -1, context.allocator)
+	os.close(dir_fh)
+	if rderr != nil {return out[:]}
+
+	// Same as the real pass: index before parsing, so nested `using` bundles resolve.
+	// Idempotent, so the real pass reuses this index rather than redoing it.
+	index_pkg_dir(norm_path(dir))
+
+	g_quiet_diag = true
+	defer g_quiet_diag = false
+
+	helpers := make([dynamic]Helper)
+	for fi in files {
+		if fi.type == .Directory {continue}
+		if !strings.has_suffix(fi.name, ".odin") {continue}
+		if strings.has_suffix(fi.name, ".gen.odin") {continue}
+		src_bytes, rerr := os.read_entire_file_from_path(fi.fullpath, context.allocator)
+		if rerr != nil {continue}
+		src := string(src_bytes)
+		script, has := parse_script(fi.fullpath, src)
+		if !has {
+			append(&helpers, Helper{path = fi.fullpath, src = src})
+			continue
+		}
+		append(&out, new_clone(script))
+	}
+	for h in helpers {
+		file := ast.File {
+			fullpath = h.path,
+			src      = h.src,
+		}
+		p := parser.default_parser()
+		p.err = silent_parse_diag
+		p.warn = silent_parse_diag
+		if !parser.parse_file(&p, &file) {continue}
+		for s in out {
+			scan_bound_procs(s, h.path, h.src, &file)
+		}
+	}
+	return out[:]
+}
+
 // scan_boot_decl reports whether the source DECLARES `odin_scripts_boot` (a line whose
 // trimmed form is `odin_scripts_boot ::` ...). A mention inside a comment or string —
 // e.g. docs referencing the boot shim — must NOT suppress boot generation.
@@ -2421,7 +2559,11 @@ check_fingerprint_contrib :: proc(scripts: []^Script, scripts_dir: string, text:
 	}
 }
 
-net_fingerprint :: proc(scripts: []^Script, scripts_dir: string) -> u64 {
+// net_fingerprint hashes the module's wire contract. `scripts` are the ROOT package's —
+// the only ones that can carry wire surface — and `sub_classes` the struct names declared
+// in SCRIPT SUBPACKAGES, which contribute their name and nothing else (see
+// module_fingerprint for why they contribute it at all).
+net_fingerprint :: proc(scripts: []^Script, sub_classes: []string, scripts_dir: string) -> u64 {
 	b: strings.Builder
 	strings.builder_init(&b, context.temp_allocator)
 
@@ -2429,9 +2571,24 @@ net_fingerprint :: proc(scripts: []^Script, scripts_dir: string) -> u64 {
 	append(&sorted, ..scripts)
 	slice.sort_by(sorted[:], proc(a, b: ^Script) -> bool {return a.struct_name < b.struct_name})
 
+	// ONE class stream, root scripts and subpackage names merged and sorted by name: the
+	// `class <Name>` line lands in the same place either way, so a class that moves
+	// between the root and a subfolder without changing its wire surface hashes the same.
+	// (A subpackage entry carries no Script — there is nothing under it to write.)
+	Fp_Class :: struct {
+		name:   string,
+		script: ^Script, // nil for a subpackage class
+	}
+	classes := make([dynamic]Fp_Class, 0, len(scripts) + len(sub_classes), context.temp_allocator)
+	for s in sorted {append(&classes, Fp_Class{name = s.struct_name, script = s})}
+	for n in sub_classes {append(&classes, Fp_Class{name = n})}
+	slice.sort_by(classes[:], proc(a, b: Fp_Class) -> bool {return a.name < b.name})
+
 	inputs := make([dynamic]string, context.temp_allocator) // distinct tick input types
-	for s in sorted {
-		fmt.sbprintf(&b, "class %s\n", s.struct_name)
+	for c in classes {
+		fmt.sbprintf(&b, "class %s\n", c.name)
+		if c.script == nil {continue}
+		s := c.script
 
 		ents := make([dynamic]Entity_Tag, 0, len(s.entities), context.temp_allocator)
 		append(&ents, ..s.entities[:])

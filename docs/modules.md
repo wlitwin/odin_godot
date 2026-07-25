@@ -134,7 +134,10 @@ scripts/                    package game_main       (the module root)
 This is organization, not splitting: **one dll per module, unchanged.** The root's generated
 guard file carries an `import _ "ui"` manifest line per script subpackage, which is what
 links each subpackage's generated registration into the module's dll. Build commands, the
-`.gdextension`, and export are all untouched.
+`.gdextension`, and export are all untouched. It does not move the wire contract either:
+`NET_FINGERPRINT` folds in the class names of the whole tree, root and subpackages alike, so
+moving a class between the root and a subfolder leaves the hash — and therefore the join
+door — exactly where it was.
 
 **What a subpackage class gets.** The whole engine-native surface: `//gd:extends` /
 `//gd:class` / `//gd:tool` / `//gd:icon`, lifecycle procs, `@(gd_method)`, `@(gd_connect)`,
@@ -194,6 +197,11 @@ so the root can `import "ui"` and read a subpackage's script struct directly:
 `rt.script_of(node, ui.Hud)` returns a typed `^ui.Hud`. The boundary that returns `nil` is
 the *module* boundary, not the package boundary (see
 [`rt.script_of` across modules](#rtscript_of-across-modules)).
+
+Note what the import binds. Odin names a relative import after the **last element of its
+path**, not after the package's declared name: `import "ui"` binds `ui` even though the
+package above declares itself `package game_ui`, and `import "defs"` binds `defs`. Give it
+whatever name you want with an alias — `import d "defs"`.
 
 **When to reach for a subpackage.** Use one when a group of classes is self-contained and the
 module root does not need to name their types: HUD widgets, menus, editor tools, effects.

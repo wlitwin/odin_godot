@@ -180,10 +180,15 @@ succession_torch :: proc(sc: ^Succession, wire: ^Session_Wire, target: knet.Play
 			// once instead of losing the world to a dead host months later.
 			if !sc.warned_no_torch {
 				sc.warned_no_torch = true
-				fmt.printfln(
-					"kit/netgd: succession torch UNLIT — the %q transport fills no `address` slot, so it cannot name an heir and host migration cannot happen on it; use the web rendezvous (kind = .Web_Room + relay), or fill that slot in its Transport record (kit/netgd/transport.odin)",
-					transport_of(wire).name,
-				)
+				// (Native only: the wasm fmt has no stdio — printfln doesn't
+				// exist there, and this line class broke the whole web build
+				// once.)
+				when ODIN_OS != .Freestanding {
+					fmt.printfln(
+						"kit/netgd: succession torch UNLIT — the %q transport fills no `address` slot, so it cannot name an heir and host migration cannot happen on it; use the web rendezvous (kind = .Web_Room + relay), or fill that slot in its Transport record (kit/netgd/transport.odin)",
+						transport_of(wire).name,
+					)
+				}
 			}
 			return "", false
 		}
