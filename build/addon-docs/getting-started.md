@@ -55,10 +55,12 @@ You now have `res://scripts/`:
 - **`hello.odin`** — a minimal example class you'll replace below. Every `.odin` in
   `scripts/` shares the same `package scripts` line at the top.
 
-The first build also drops an **`odin_godot_boot.gen.odin`** next to it — generated, required
-boilerplate (the `odin_scripts_boot` export the core calls after it loads your dll) that you
-never write or edit. (Need to customize it? Add your own file defining `odin_scripts_boot`
-and the generated one steps aside.)
+The first build drops three generated files next to it, all `*.gen.odin` build artifacts you
+never write or edit: **`odin_godot_scripts.gen.odin`** (the registration code for every script
+in the directory), **`odin_godot_boot.gen.odin`** (the `odin_scripts_boot` export the core
+calls after it loads your dll), and **`odin_godot_guard.gen.odin`** (a staleness guard that
+fails the build if the generated code ever drifts from your sources). Need to customize the
+boot shim? Add your own file defining `odin_scripts_boot` and the generated one steps aside.
 
 ### 2b. (Optional) editor settings
 
@@ -109,8 +111,9 @@ A few rules this demonstrates (full details in the [Authoring Guide](authoring-g
 - The `//gd:` markers declare the class. `//gd:extends` is authoritative for the base class;
   the `owner` field type is just the handle you use in code.
 
-You do **not** write the registration boilerplate — the build runs `scriptgen`, which emits a
-sibling `mover.gen.odin` (a build artifact you never edit) next to your source.
+You do **not** write the registration boilerplate — the build runs `scriptgen`, which emits it
+into `scripts/odin_godot_scripts.gen.odin`, one generated file for the whole directory (a
+build artifact you never edit, hidden in the FileSystem dock).
 
 ## 4. Build
 
@@ -132,7 +135,7 @@ script.)
     -Root addons\odin_godot -Project . -SkipCore
   ```
 
-Either way it (1) builds `scriptgen`, (2) generates the `*.gen.odin` siblings, and (3) compiles
+Either way it (1) builds `scriptgen`, (2) generates the `*.gen.odin` build artifacts, and (3) compiles
 your `scripts/` package into `res://bin/libodinscripts.<ext>`. (`SKIP_CORE`/`-SkipCore` skips
 rebuilding the engine core — it's already prebuilt in the addon, so you rarely need it.) Either
 path needs the **Odin compiler** installed (and findable — see `odin_godot/odin_bin`).

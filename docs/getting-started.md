@@ -78,9 +78,10 @@ so it is not listed here.
 
 ### 2b. The `scripts/` package and its boot shim
 
-All of a project's `.odin` scripts compile into **one Odin package** (one shared dll). Pick a
+The `.odin` files in `scripts/` are **one Odin package** compiled into one shared dll. Pick a
 package name and use the *same* `package` line at the top of every `.odin` file in the
-directory.
+directory. (Subfolders are separate packages that compile into the same dll; you don't need
+them to start, and [Script Modules](modules.md) covers them when you do.)
 
 That package needs one init shim: an `@(export) odin_scripts_boot` the core calls right after
 it loads the dll, so the dll initializes its own `gdext`/`godot` package globals. **`scriptgen`
@@ -166,7 +167,8 @@ A few rules this demonstrates (full details in the [Authoring Guide](authoring-g
   base is derived from the handle.
 
 You do **not** write the registration boilerplate: `build/build_scripts.sh` runs `scriptgen`,
-which emits a sibling `mover.gen.odin` (a build artifact you never edit) next to your source.
+which emits it into `scripts/odin_godot_scripts.gen.odin`, one generated file for the whole
+directory (a build artifact you never edit, hidden in the FileSystem dock).
 
 ## 4. Build
 
@@ -176,7 +178,7 @@ From the Nix shell, point the build script at your project directory:
 nix develop --command bash -c 'bash build/build_scripts.sh /path/to/your/project'
 ```
 
-This (1) builds `scriptgen`, (2) generates the `*.gen.odin` siblings, (3) compiles your
+This (1) builds `scriptgen`, (2) generates the `*.gen.odin` build artifacts, (3) compiles your
 `scripts/` package into `bin/libodinscripts.dylib`, and (4) compiles the core into
 `bin/libodin_godot.dylib`. (`build_scripts.sh` takes the project dir as its first argument and
 defaults the scripts dir to `<project>/scripts`.)

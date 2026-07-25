@@ -47,6 +47,9 @@ use → ship.**
   scripts into `res://modules/<name>/` packages, one dll each, rebuilt + hot-swapped
   independently on save. It covers the cost model (when NOT to use them), the no-cross-imports
   rule and why, cross-module communication patterns, reload/collision semantics, and export.
+  The same page also covers two things every project can use without splitting anything:
+  **script subpackages** (annotated classes in subfolders of one module) and **`res://shared/`**
+  (read-only packages of types, constants and pure procs that every module may import).
 
 ## Build multiplayer: the friendslop toolkit — and the server-authority companion
 

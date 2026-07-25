@@ -59,7 +59,7 @@ footer{color:var(--dim);padding:20px 0;border-top:1px solid var(--line);font-siz
 <h3>A project is three pieces</h3>
 <ul>
 <li><code>*.gdextension</code> at project root — loads the CORE dll only (<code>entry_symbol = "odin_godot_init"</code>, <code>compatibility_minimum = "4.6"</code>; scripts dll is loaded by the core at runtime, never listed). Keep native entries even for web.</li>
-<li><code>scripts/</code> — ONE Odin package (same <code>package</code> line in every file). Boot shim <code>odin_godot_boot.gen.odin</code> is generated.</li>
+<li><code>scripts/</code> — one Odin package per directory (same <code>package</code> line in every file of it); subfolders are their own packages in the same dll. Generated per build: <code>odin_godot_scripts.gen.odin</code> per package dir, plus the root's <code>odin_godot_boot.gen.odin</code> + <code>odin_godot_guard.gen.odin</code>.</li>
 <li>Build → <code>bin/libodinscripts.dylib</code> + <code>bin/libodin_godot.dylib</code>.</li>
 </ul>
 <h3>Build / run</h3>
@@ -101,12 +101,12 @@ game_process :: proc(self: ^Game, delta: f64) {
 <!-- ============================ AUTHORING ============================ -->
 <section id="authoring">
 <h2>1 · Authoring contract (scriptgen)</h2>
-<p>Write a clean <code>.odin</code>; scriptgen emits a sibling <code>&lt;file&gt;.gen.odin</code> (trampolines, command tables, signal emitters, <code>@(init)</code> registration). Export hints are read at runtime by reflection from the same tags.</p>
+<p>Write a clean <code>.odin</code>; scriptgen emits one <code>odin_godot_scripts.gen.odin</code> per scripts dir, a banner-marked section per source (trampolines, command tables, signal emitters, <code>@(init)</code> registration). Export hints are read at runtime by reflection from the same tags.</p>
 <div class="cols"><div>
-<h3>Header markers <span class="d">(above <code>package</code>, top-level files only)</span></h3>
+<h3>Header markers <span class="d">(above <code>package</code>; module root or a script subpackage)</span></h3>
 <table>
 <tr><td class="k"><b>//gd:extends</b> Node2D</td><td>REQUIRED for a script file — Godot base class</td></tr>
-<tr><td class="k"><b>//gd:class</b> Name</td><td>class name the loader binds (default: struct name); unique per package</td></tr>
+<tr><td class="k"><b>//gd:class</b> Name</td><td>class name the loader binds (default: struct name); unique across the whole module tree (root + subpackages), and across modules</td></tr>
 <tr><td class="k"><b>//gd:tool</b></td><td>runs in editor too (pair with <code>gd.is_editor()</code>)</td></tr>
 <tr><td class="k"><b>//gd:icon</b> res://p.svg</td><td>class icon</td></tr>
 </table>
@@ -470,12 +470,13 @@ fslp_verdict MYGAME</pre>
 <ul>
 <li>Editor reload builds race CLI builds — PID-scoped temps fixed it, but gates still want the game's editor closed (auto-save can stomp the tree: check lsof on mystery reverts).</li>
 <li>CONSUMER core path: an addon-layout project loads the CORE from <code>addons/odin_godot/bin/&lt;platform&gt;/</code> — build_scripts.sh now detects the layout and publishes the core there automatically (kit/play/scriptgen changes ride the scripts dll and never needed this).</li>
-<li>build_scripts.sh publishes atomically (temp + mv) — an interrupted rebuild never removes the previous dll. Deleted .odin files: the deletion probe sweeps orphan .gen.odin every ~2s.</li>
+<li>build_scripts.sh publishes atomically (temp + mv) — an interrupted rebuild never removes the previous dll. Deleted .odin files: the deletion probe spots the orphaned generated section every ~2s and rebuilds to sweep it.</li>
 <li>Working directory persists across shell calls — background launches inherit the LAST cd; write multi-line commands with the cd on its own line.</li>
 <li>Verdicts from literal log lines, not exit codes (a FAIL run can exit 0). Count retry attempts (<code>grep -c attempt</code>) — retries mask flakes.</li>
 <li>Regex sweeps that abstract a pattern must exclude the new helper's own body (self-recursion) — write the helper AFTER the sweep.</li>
 <li>zsh: backticks command-substitute inside double-quoted git -m; == expands; single-quote message bodies.</li>
-<li>Module rule: no imports between modules (a package in two dlls silently forks its globals); cross-module = engine-mediated by name.</li>
+<li>Module rule: no imports between modules (a package in two dlls silently forks its globals); cross-module = engine-mediated by name. One exemption: <code>res://shared/</code> packages (types/constants/pure procs, verified state-free) — but a shared edit rebuilds EVERY module.</li>
+<li>Subpackages: annotated classes may live in <code>scripts/&lt;sub&gt;/</code> (own package, same dll, attachable from there). Kit declarations stay in the module root; a subpackage importing the root is a cycle (refused).</li>
 <li>Print-receipt tests can't see ART — presentation changes need a viewport-grab probe (SY_SHOT pattern: env path + save viewport texture every 2s).</li>
 </ul>
 <h3>Kit-specific traps</h3>

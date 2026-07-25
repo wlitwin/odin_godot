@@ -45,10 +45,10 @@ Finder-launched editor's stderr goes nowhere at all. Two failure shapes report t
   ```
   ODIN_GODOT_CRASH: fatal signal SIGSEGV — crash in native code (Odin script or engine).
   ODIN_GODOT_CRASH at   pc 0x…  my_scripts::take_damage + 0x20  (…/libodinscripts.dylib)
-  ODIN_GODOT_CRASH from lr 0x…  my_scripts::[enemy.gen.odin]::_enemy_m_on_hit + 0xac  (…)
+  ODIN_GODOT_CRASH from lr 0x…  my_scripts::[odin_godot_scripts.gen.odin]::_enemy_m_on_hit + 0xac  (…)
   ODIN_GODOT_CRASH backtrace (backtrace_symbols_fd):
   0   libodin_godot.dylib   0x… core::[crash.odin]::crash_handler + 496
-  1   libodinscripts.dylib  0x… my_scripts::[enemy.gen.odin]::_enemy_m_on_hit + 172
+  1   libodinscripts.dylib  0x… my_scripts::[odin_godot_scripts.gen.odin]::_enemy_m_on_hit + 172
   2   Godot                 0x… _ZN6Object5callpE… + 184
   …
   ```
@@ -264,7 +264,7 @@ Process … stopped
 -> 50       game_state_add(self.value)
 (lldb) bt
 * frame #0: libodinscripts.dylib`showcase_scripts::coin_collect(...) at coin.odin:50:2
-  frame #1: libodinscripts.dylib`showcase_scripts::[coin.gen.odin]::_coin_m_collect(...) at coin.gen.odin:36:2
+  frame #1: libodinscripts.dylib`showcase_scripts::[odin_godot_scripts.gen.odin]::_coin_m_collect(...) at odin_godot_scripts.gen.odin:…
   frame #2: libodin_godot.dylib`core::[instance.odin]::inst_call + 520
   frame #3: Godot`Object::callp(...) + 184
   frame #4: Godot`Object::emit_signalp(...) + 1568
@@ -305,7 +305,7 @@ Process … stopped
     frame #0: libodinscripts.dylib`my_scripts::take_damage + 44
 (lldb) bt
 * frame #0: libodinscripts.dylib`my_scripts::take_damage + 44
-  frame #1: libodinscripts.dylib`my_scripts::[enemy.gen.odin]::_enemy_m_on_hit + 120
+  frame #1: libodinscripts.dylib`my_scripts::[odin_godot_scripts.gen.odin]::_enemy_m_on_hit + 120
   frame #2: libodin_godot.dylib`core::[instance.odin]::inst_call + 448
   frame #3: Godot`Object::emit_signalp(...) + 1568
   …

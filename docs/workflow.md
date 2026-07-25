@@ -31,16 +31,19 @@ for CI, headless builds, or working from the source repo.
 `build/build_scripts.sh [PROJECT_DIR] [SCRIPTS_DIR]` runs the full pipeline:
 
 1. builds the `scriptgen` preprocessor,
-2. runs it over the scripts dir to emit `*.gen.odin` build artifacts beside your sources (you
-   never edit these; the loader ignores them as attachable scripts). One of them,
-   `odin_godot_guard.gen.odin`, is the staleness guard: a compile-time `#load_hash`
-   assert per authored source. A build path that skips this step (a bare
-   `odin build` against yesterday's `*.gen.odin`) fails at compile time, naming the
-   drifted file instead of silently compiling stale descriptors,
+2. runs it over the scripts dir to emit the `*.gen.odin` build artifacts beside your sources
+   (you never edit these; the loader ignores them as attachable scripts). There are three
+   kinds: `odin_godot_scripts.gen.odin`, one per package directory, holding the registration
+   code for every script in that directory; `odin_godot_boot.gen.odin`, the init shim; and
+   `odin_godot_guard.gen.odin`, the staleness guard, a compile-time `#load_hash` assert per
+   authored source. A build path that skips this step (a bare `odin build` against
+   yesterday's `*.gen.odin`) fails at compile time, naming the drifted file instead of
+   silently compiling stale descriptors,
 3. builds the scripts dll (`odin build <scriptsdir> -build-mode:dll` with
    `-custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc
    -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_sample
-   -custom-attribute:gd_step -custom-attribute:gd_fact -custom-attribute:gd_half`, which let
+   -custom-attribute:gd_step -custom-attribute:gd_fact -custom-attribute:gd_half
+   -custom-attribute:gd_message`, which let
    the Odin compiler accept the marker attributes), and
 4. builds the core dll.
 
@@ -93,7 +96,10 @@ scoped: the coordinator hashes each module's sources and rebuilds + swaps **only
 module(s) whose sources changed**. A save in `res://modules/enemies/` recompiles that one
 dll, leaving the main module and every other module's dll (instances, package globals, all
 of it) untouched. That's what keeps save latency flat in large projects; the swapped
-module's own package globals reset (fresh dll). See [Script Modules](modules.md) for details.
+module's own package globals reset (fresh dll). The one exception is a save under
+`res://shared/`, the [read-only vocabulary tree](modules.md#shared) every module may import:
+that rebuilds and swaps **every** module, because any of them may be compiled against it.
+See [Script Modules](modules.md) for details.
 
 **Finding the compiler.** The editor often has no `odin` on its `PATH` (e.g. launched from the
 macOS app, not a shell). Point it at the binary with the **`odin_godot/odin_bin`** project
@@ -131,9 +137,10 @@ half-typed expression, the missing brace) come from the compiler's own parser ru
 **in-process** (~0.1 ms), so the squiggle lands on the very first debounce and the slow check
 is never scheduled for a buffer it couldn't type-check anyway. **Type errors** need the real
 checker: because a single `.odin` file isn't a compile unit, it type-checks the file's
-**package**: it copies the package to a temp overlay, overwrites the one edited file with your
-unsaved buffer, runs `odin check`, and maps `‹file›(‹line›:‹col›) Error: ‹msg›` back to the
-editor. That check runs on a **background worker** with a result cache, so it never freezes the
+**package**: it copies the package (and the neighboring packages it imports relatively, so a
+helper or subpackage import resolves) to a temp overlay, overwrites the one edited file with
+your unsaved buffer, runs `odin check`, and maps `‹file›(‹line›:‹col›) Error: ‹msg›` back to
+the editor. That check runs on a **background worker** with a result cache, so it never freezes the
 UI (first-call latency ~0.03 ms; the check itself, ~0.5 s warm on a game-sized package,
 completes a moment later and the squiggles update on the next debounce). The `godot` collection root resolves `odin_godot/root` setting →
 `ODIN_GODOT_ROOT` env → **auto-derived from the installed addon's own location**, so a normal
@@ -186,8 +193,9 @@ in the Inspector aren't wired (autocomplete *does* show type signatures; see abo
 
 ### Generated files are hidden in the FileSystem dock
 
-The build writes a `*.gen.odin` registration file next to each script (they must live inside
-the script's package directory, since Odin packages are single-directory). They aren't
+The build writes one `odin_godot_scripts.gen.odin` registration file per scripts directory,
+plus the boot shim and staleness guard (they must live inside the package directory they
+belong to, since Odin packages are single-directory). They aren't
 attachable or openable in the editor, so the Odin plugin **hides them from the FileSystem
 dock**, re-hiding them after every dock rebuild. This is widget-level hiding: Godot's
 filesystem scan admits files by extension only (`.gen.odin` ends in `.odin`) and there is no
@@ -198,6 +206,11 @@ also extension-based) still see them.
 To show them (e.g. when inspecting what scriptgen emits), set the
 **`odin_godot/show_generated_files`** project setting to `true`; it takes effect at the next
 dock rebuild (toggling a file save or reopening the project is enough).
+
+Any `*.gen.odin` a build does not produce is deleted by the next one, printing
+`scriptgen: removed stale <path> (not generated by this run)`. That covers a deleted script's
+leftovers and, on the first build after upgrading odin_godot, the older layout's per-source
+`<name>.gen.odin` files.
 
 <a name="editor-settings"></a>
 ### Editor settings reference

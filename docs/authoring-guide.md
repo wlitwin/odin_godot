@@ -7,20 +7,24 @@ cross-script access, the `gd.*` helper catalog, and editor tooling. New to odin_
 deep dive. For the build/edit/debug loop, see **[Workflow](workflow.md)**.
 
 You write `<name>.odin` in the clean authoring form below; a preprocessor (`scriptgen`, run
-by `build/build_scripts.sh`) reads its struct tags + markers and emits a sibling
-`<name>.gen.odin` (the registration boilerplate: Variant trampolines, backing arrays,
-`@(init)` registration) that you never edit. Both compile together into the scripts dll, so
-you author the nice form and get the full typed dispatch for free.
+by `build/build_scripts.sh`) reads its struct tags + markers and emits the registration
+boilerplate (Variant trampolines, backing arrays, `@(init)` registration) into a generated
+file you never edit. Both compile together into the scripts dll, so you author the nice form
+and get the full typed dispatch for free.
 
 ### Single-file authoring
 
 There is exactly **one file per script**: the `.odin` you write is also the resource
 you attach to a node. Put your scripts under the project (e.g. `res://scripts/foo.odin`)
 and attach `res://scripts/foo.odin` directly in the scene. The loader reads its
-`//gd:class` marker and binds it to the compiled class. The sibling `<name>.gen.odin`
-is a build artifact that lives beside the source; the loader **ignores `*.gen.odin`**, so
-it is never treated as an attachable script. There is no separate
+`//gd:class` marker and binds it to the compiled class. There is no separate
 "resource stub" file to keep in sync.
+
+The generated code lands in **one `odin_godot_scripts.gen.odin` per scripts directory**,
+holding a banner-marked section per script, beside the sources it was generated from (the
+directory's package and the generated file's package must match, so it cannot live anywhere
+else). The loader **ignores `*.gen.odin`**, so a generated file is never treated as an
+attachable script, and the editor hides these files from the FileSystem dock by default.
 
 ## Anatomy of a script
 
@@ -954,19 +958,22 @@ Practical rules for what runs where and who owns which allocation:
 `build/build_scripts.sh [PROJECT_DIR]` runs the full pipeline:
 
 1. builds the `scriptgen` binary,
-2. runs `scriptgen <scriptsdir>` to emit the `*.gen.odin` build artifacts beside the
-   authored sources (no resource stubs: the authored `.odin` is the attached resource),
+2. runs `scriptgen <scriptsdir>` to emit the build artifacts beside the authored sources
+   (one `odin_godot_scripts.gen.odin` per package directory, plus the scripts dir's
+   staleness guard and boot shim; no resource stubs, since the authored `.odin` is the
+   attached resource),
 3. builds the scripts dll with `odin build <scriptsdir> -build-mode:dll
    -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc
    -custom-attribute:gd_command -custom-attribute:gd_tick
    -custom-attribute:gd_sample -custom-attribute:gd_step
-   -custom-attribute:gd_fact -custom-attribute:gd_half`
+   -custom-attribute:gd_fact -custom-attribute:gd_half
+   -custom-attribute:gd_message`
    (the `.gen.odin` are in the same package and compile together),
 4. builds the core dll.
 
-The nine `-custom-attribute:` flags are required so the Odin compiler accepts the
+The ten `-custom-attribute:` flags are required so the Odin compiler accepts the
 `@(gd_method)` / `@(gd_connect)` / `@(gd_rpc)` / `@(gd_command)` / `@(gd_tick)` /
-`@(gd_sample)` / `@(gd_step)` / `@(gd_fact)` / `@(gd_half)` marker attributes; the
+`@(gd_sample)` / `@(gd_step)` / `@(gd_fact)` / `@(gd_half)` / `@(gd_message)` marker attributes; the
 build script passes them for you. The set lives in `decl/decl.odin`'s `ATTRS`, and
 tests/scriptgen asserts the build scripts against it: Odin refuses an unknown custom
 attribute outright, so a name the schema grew and a build script did not would be a
@@ -978,11 +985,27 @@ The build, the **live-editing (show-on-save) loop**, the editor DX (validation /
 
 ## Multiple scripts in one package
 
-A scripts dll is one Odin package. Because lifecycle/method procs and generated
-emit helpers live in that shared package, prefix your proc names with the struct
-name (`ping_ready`, `ping_add`) to avoid collisions, since the prefix is stripped to
+All the `.odin` files in one directory are one Odin package. Because lifecycle/method procs
+and generated emit helpers live in that shared package, prefix your proc names with the
+struct name (`ping_ready`, `ping_add`) to avoid collisions, since the prefix is stripped to
 derive the GDScript-facing name. One script struct per file (identified by its
 first field being named `owner`).
+
+### Organizing a project
+
+A flat `res://scripts/` is the right shape for most projects, and nothing below is needed
+until it stops being comfortable. In order of how much they cost you:
+
+| Shape | Use it for | Cost |
+|---|---|---|
+| **flat `res://scripts/`** | everything, until a directory listing gets hard to read | none; this is the default |
+| **a helper subpackage** (`scripts/util/`, no annotated scripts in it) | pure Odin logic with no engine surface: math, parsers, tables. Import it relatively (`import "util"`) | none; it compiles into the same dll |
+| **a script subpackage** (`scripts/ui/`, with annotated scripts) | self-contained engine-native classes the rest of the game does not need to name: HUD widgets, menus, tools, effects. They attach from their own path (`res://scripts/ui/hud.odin`) | kit declarations must stay in the top-level scripts dir, and a subpackage may not import it back. Still one dll, so a save still rebuilds all of it |
+| **a script module** (`res://modules/<name>/`) | a subsystem, once save latency actually hurts (hundreds of scripts) | its own dll, so no shared types or globals with other modules: cross-module talk is engine-mediated |
+| **`res://shared/`** | types, constants and pure procs several modules must agree on | verified state-free (no mutable globals, no `@(init)`, no scripts), and an edit there rebuilds every module |
+
+The last three are covered in **[Script Modules](modules.md)**, including the cost model,
+the isolation rule, and the exact build-time refusals.
 
 ## Custom resources
 
@@ -1073,8 +1096,8 @@ hand back `{name, base_type, icon_path}`.
 
 ## Typed cross-script references
 
-Because every script in a project compiles into ONE shared dll, a struct type declared
-in one script (e.g. `Enemy`) is the *same* type everywhere. `rt.script_of(obj, T)` turns
+Because every script of one module compiles into ONE shared dll, a struct type declared
+in one script (e.g. `Enemy`) is the *same* type everywhere in that dll. `rt.script_of(obj, T)` turns
 a live Godot object into a typed `^T` pointer to the Odin script struct the engine
 allocated for it, giving DIRECT typed field and proc access across scripts, with no
 Variant marshaling:
@@ -1098,6 +1121,8 @@ controller_attack :: proc(self: ^Controller, amount: gd.Int) -> int {
   language (a foreign-language node, a placeholder, or a plain engine node). It is
   nil-safe, never a wild cast.
 - Works on web too (single module: the same resolver is wired directly).
+- **Subpackages are not a boundary:** a class in a subfolder of the same module lives in the
+  same dll, so import that package and name its type: `rt.script_of(node, ui.Hud)`.
 - **Module boundary:** if the project uses [script modules](modules.md), `script_of` is
   typed access within *one* module only: across modules it returns `nil` by construction
   (modules can't import each other's types), and cross-module access goes through the
@@ -1108,8 +1133,8 @@ controller_attack :: proc(self: ^Controller, amount: gd.Int) -> int {
 
 For shared state with *no* per-node instance to reference (a global score, a constant
 table), the package-level "module" pattern (file-private vars + package procs like
-`game_state_add`) is the simplest tool: every script in a project compiles into ONE Odin
-package, so they all share those globals with zero Godot glue. It is NOT, however, a real
+`game_state_add`) is the simplest tool: the scripts in one directory are one Odin
+package, so they share those globals with zero Godot glue. It is NOT, however, a real
 Godot singleton: it is not reachable at `/root/Name`, not visible to GDScript, and has no
 `_ready`. When you need that (a manager node GDScript can call, lifecycle, persistence
 across scene changes), use an **autoload** (see below).
@@ -1281,9 +1306,9 @@ my_plugin_enter_tree :: proc(self: ^MyPlugin) {
 my_plugin_exit_tree :: proc(self: ^MyPlugin) {}
 ```
 
-> The whole project's Odin scripts compile as **one Odin package**. Because a plugin's
-> `script=` path must live under its addon dir, put the addon's package there (e.g.
-> `res://addons/<name>/*.odin`) and point `build/build_scripts.sh <proj> <that-dir>` at it.
+> A scripts dir compiles into **one dll**, and a plugin's `script=` path must live under its
+> addon dir, so put the addon's package there (e.g. `res://addons/<name>/*.odin`) and point
+> `build/build_scripts.sh <proj> <that-dir>` at it.
 
 ### EditorInspectorPlugin (advanced)
 
