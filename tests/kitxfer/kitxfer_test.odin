@@ -266,3 +266,85 @@ xfer_fast_supersede_keeps_done_bytes :: proc(t: ^testing.T) {
 	kxfer.xfer_pump(&ax) // the drain grace expires: the retiree frees
 	testing.expect_value(t, len(ax.retired), 0)
 }
+
+@(test)
+album_catch_up_never_tears_a_superseded_payload :: proc(t: ^testing.T) {
+	// The torn-completion hole (found as its C# twin, upstream d16bd83): the
+	// host cancels a queued catch-up replay only when the publisher's re-send
+	// COMPLETES on the host (album_keep, on Ev_Done). But the re-send's first
+	// relayed chunk already RESTARTED the joiner's assembly — and in that
+	// window the host keeps shipping the OLD payload's remaining chunks into
+	// it. The ordered channel makes the stale chunk read as the next one, and
+	// a same-length re-send (fixed-size sprays/skins) passes the total check
+	// AND the final length check: the assembly completes NEW head + OLD tail,
+	// and its Ev_Done says it's whole. The fix cancels on Ev_Started — the
+	// relay's FIRST chunk — and drains events BEFORE replay_pump ships more.
+	host, alice, carol: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&carol)
+	early := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(early)
+
+	// OLD ships and lands everywhere: 20_000 bytes = 3 chunks (8K, 8K, 3616).
+	old := payload(0x11, 20_000)
+	defer delete(old)
+	kxfer.album_put(&alice.album, SPRAY, old)
+	settle(early)
+
+	// Carol joins late; the host queues the catch-up of OLD for her.
+	box_make(&carol, 102)
+	boxes := []^Peer_Box{&host, &alice, &carol}
+	ksess.session_client_start(&carol.s, 0xCA401, "carol")
+	ksess.session_client_join(&carol.s)
+	pump(boxes)
+	kxfer.album_welcome(&host.album, carol.s.me)
+
+	// Host tick: the replay ships OLD seq 0+1 (the 2-chunk budget). Carol's
+	// assembly of OLD is underway, one chunk short.
+	kxfer.album_pump(&host.album)
+	pump(boxes)
+
+	// Mid-replay, alice re-sends the SAME id at the SAME length. Her tick
+	// ships NEW seq 0+1; the host relays both on arrival — carol's assembly
+	// RESTARTS at NEW seq 0 and grows to NEW seq 1. The host's own copy is
+	// still one chunk short, so Ev_Done-based cancellation has not fired.
+	new := payload(0xEE, 20_000)
+	defer delete(new)
+	kxfer.album_put(&alice.album, SPRAY, new)
+	kxfer.album_pump(&alice.album)
+	pump(boxes)
+
+	// THE WINDOW. Host tick: pre-fix, replay_pump ran before the drain and
+	// shipped OLD seq 2 — which carol's restarted assembly accepts as its
+	// final chunk (seq matches, length matches) and completes TORN. Post-fix,
+	// the drain sees Ev_Started for (alice, SPRAY) first and the queued
+	// replay dies before a stale chunk ships.
+	kxfer.album_pump(&host.album)
+	pump(boxes)
+
+	// Alice's last tick ships NEW seq 2; everyone settles.
+	kxfer.album_pump(&alice.album)
+	settle(boxes)
+
+	got, ok := kxfer.album_get(&carol.album, alice.s.me, SPRAY)
+	testing.expect(t, ok, "the superseding payload landed on the joiner")
+	testing.expect_value(t, len(got), len(new))
+	stale := 0
+	for v, i in got {
+		if v != new[i] {
+			stale += 1
+		}
+	}
+	testing.expect(
+		t,
+		stale == 0,
+		"the joiner's payload must be ALL-NEW — stale bytes mean the catch-up tore the restarted assembly",
+	)
+}

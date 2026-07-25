@@ -98,19 +98,33 @@ album_get :: proc(a: ^Album, player: knet.Player_Id, id: u8) -> ([]u8, bool) {
 // Ship + receive, once per net tick. Landed payloads move into the shelf
 // and queue for album_poll; catch-up replays share the chunk budget so a
 // joiner's backlog never starves live traffic.
+//
+// The DRAIN runs BEFORE replay_pump, and the order is load-bearing: a
+// Started for (from, id) means the publisher's re-send is already relaying,
+// so any queued catch-up of the OLD payload must die NOW — one more stale
+// chunk shipped this tick can complete the joiner's restarted assembly
+// TORN (new head, old tail: the ordered channel makes it read as the next
+// chunk, and a same-length re-send passes every total check). Cancelling
+// only on Done — the re-send's LAST chunk — leaves that window open the
+// whole relay long. The trade: an upload aborted after its first chunk
+// leaves the joiner without that payload rather than with a stale one (the
+// fresher copy lands via the normal broadcast; an aborted one never does).
 album_pump :: proc(a: ^Album, budget := PUMP_CHUNKS) {
 	xfer_pump(&a.x, budget)
-	replay_pump(a, budget)
 	for {
 		ev, ok := xfer_poll(&a.x)
 		if !ok {
 			break
 		}
-		if done, is_done := ev.(Ev_Done); is_done {
-			album_keep(a, done.from, done.id, done.bytes)
-			ksess.appq_push(&a.fresh, Fresh{from = done.from, id = done.id})
+		switch e in ev {
+		case Ev_Started:
+			cancel_replays(a, e.from, e.id)
+		case Ev_Done:
+			album_keep(a, e.from, e.id, e.bytes)
+			ksess.appq_push(&a.fresh, Fresh{from = e.from, id = e.id})
 		}
 	}
+	replay_pump(a, budget)
 }
 
 // Landed payloads since the last poll (mine included, the frame it was put)
@@ -159,9 +173,16 @@ album_keep :: proc(a: ^Album, from: knet.Player_Id, id: u8, bytes: []u8) {
 	kept := make([]u8, len(bytes))
 	copy(kept, bytes)
 	a.blobs[k] = kept
-	// A fresher payload obsoletes any in-flight catch-up of the old one —
-	// interleaving two chunk streams for one (from, id) would tear the
-	// receiver's assembly.
+	cancel_replays(a, from, id)
+}
+
+// A fresher payload obsoletes any in-flight catch-up of the old one —
+// interleaving two chunk streams for one (from, id) would tear the
+// receiver's assembly. Called from album_keep (a landed payload, and the
+// local short circuit of album_put) AND from album_pump's Started arm (the
+// re-send's FIRST relayed chunk — see the drain-order note there).
+@(private = "file")
+cancel_replays :: proc(a: ^Album, from: knet.Player_Id, id: u8) {
 	for i := len(a.replays) - 1; i >= 0; i -= 1 {
 		if a.replays[i].from == from && a.replays[i].id == id {
 			delete(a.replays[i].data)
