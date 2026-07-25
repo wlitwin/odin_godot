@@ -1149,7 +1149,20 @@ collect_file_imports :: proc(file: ^ast.File) -> map[string]string {
 		name := imp.name.text
 		if name == "" {
 			dir, dok := resolve_import_dir(full)
-			if !dok {continue}
+			if !dok {
+				// A BARE import of a SHARED package (`import "../shared/ids"`): bind its
+				// package name so a `using x: ids.Bundle` embed is seen by the
+				// unresolved-embed trap and refused with the shared-tree limitation,
+				// instead of vanishing silently. Other relative imports stay out of the
+				// map, exactly as before.
+				if sdir, sok := shared_import_dir(file, full); sok {
+					name = package_name_of(sdir)
+					if name == "" {continue}
+					m[name] = full
+					continue
+				}
+				continue
+			}
 			name = package_name_of(dir)
 			if name == "" {continue}
 		}
@@ -1285,12 +1298,23 @@ main :: proc() {
 	// field that happens to use it.
 	check_field_policy()
 
+	// The project's shared vocabulary tree (`<project>/shared`), derived structurally
+	// from the module root — the one place outside this module a file here may import.
+	// Set BEFORE check_tree, which classifies every import against it.
+	g_shared_root = shared_root_of(scripts_dir)
+
 	// Structural whole-tree pass (helpers in subdirectories included) BEFORE the emit
 	// loop: module-isolation import checks are hard errors even in files the emit loop
 	// never parses, and a SUBPACKAGE importing the module root is pre-empted there with
 	// a teaching error instead of Odin's raw import-cycle report inside generated code.
 	// See check_tree.
 	check_tree(scripts_dir)
+
+	// The shared packages check_tree just saw imported must hold no state (and no
+	// scripts, and no imports back into a module) — the condition the exemption rests
+	// on. Transitive: a shared package importing a sibling shared package is checked
+	// too. See scriptgen/shared.odin.
+	verify_shared_tree()
 
 	// THE MODULE TREE. The root dir is a package; so is every subdirectory holding
 	// authored `.odin` sources (Odin: one directory, one package). Each is run through
@@ -1895,10 +1919,12 @@ remove_orphan_gen :: proc(dir: string, owned: map[string]bool) {
 // before any package dir is processed:
 //
 //   1. IMPORT ISOLATION, all files: a script module may import collections
-//      (godot:/core:/base:/vendor:) and packages that RESOLVE INSIDE the module's own
-//      directory (subpackages, subpackages importing each other). Anything else — an
-//      absolute path, or a relative path that escapes the module root after lexical
-//      normalization — is a HARD ERROR. Odin itself would happily compile
+//      (godot:/core:/base:/vendor:), packages that RESOLVE INSIDE the module's own
+//      directory (subpackages, subpackages importing each other), and packages in the
+//      project's SHARED VOCABULARY tree (`<project>/shared/…`, verified state-free —
+//      see shared.odin). Anything else — an absolute path, or a relative path that
+//      escapes the module root after lexical normalization — is a HARD ERROR. Odin
+//      itself would happily compile
 //      `import "../other_module"`, but a package linked into two script dlls duplicates
 //      its package GLOBALS per dll and the "shared" state silently forks. The bash/ps1
 //      builds keep a fast grep for the same rule (check_module_isolation in
@@ -1959,13 +1985,18 @@ check_file :: proc(path, root: string, is_top: bool) {
 }
 
 // The teaching text shared with the bash grep (check_module_isolation in build/common.sh)
-// — why a cross-module import is rejected instead of merely discouraged.
+// — why a cross-module import is rejected instead of merely discouraged, and the one
+// tree that is exempt (see scriptgen/shared.odin).
 @(private = "file")
 explain_isolation :: proc() {
 	fmt.eprintln("  Script modules are ISOLATED packages: a package imported by two script dlls")
 	fmt.eprintln("  duplicates its globals per dll (shared state would silently fork). Talk to")
 	fmt.eprintln("  other modules through the engine (signals / methods / autoloads) instead,")
 	fmt.eprintln("  or move the shared state into exactly one module.")
+	fmt.eprintln("  For types, constants and pure procs — a vocabulary with no state to fork —")
+	fmt.eprintln("  put the package under res://shared/ instead: any module may import it")
+	fmt.eprintln("  (`import \"../shared/<pkg>\"` from res://scripts, `\"../../shared/<pkg>\"` from")
+	fmt.eprintln("  res://modules/<name>), and scriptgen verifies that tree stays state-free.")
 }
 
 // check_import validates ONE import declaration against the isolation rule. `root` is the
@@ -1985,6 +2016,14 @@ check_import :: proc(root, file_dir, path: string, imp: ^ast.Import_Decl, is_top
 	}
 	nroot := norm_path(root)
 	resolved := resolve_lexical(file_dir, ipath)
+	// THE SHARED VOCABULARY TREE. A package under `<project>/shared/` carries no state
+	// to fork (scriptgen verifies that — see shared.odin), so every module may import it,
+	// from the root package or any subpackage, at any depth. Recorded here so the
+	// verification pass covers exactly the shared packages that are actually reached.
+	if under_shared(resolved) {
+		note_shared_import(resolved, loc)
+		return
+	}
 	if resolved != nroot && !strings.has_prefix(resolved, strings.concatenate({nroot, "/"})) {
 		error_at(loc, "ILLEGAL cross-module import %q — resolves to %q, outside this script module's directory (%s)", ipath, resolved, nroot)
 		explain_isolation()

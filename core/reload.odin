@@ -160,6 +160,19 @@ hash_sources :: proc(scripts: string) -> u64 {
 	return h
 }
 
+// Fold the shared tree's content hash into ONE module's, so an edit under res://shared
+// invalidates every module that could import it. `module` == 0 (unreadable/empty dir)
+// stays 0 — "unknown", always build. `shared` == 0 (no shared/ tree at all) returns the
+// module hash untouched, so a project without one behaves exactly as it did before.
+@(private = "file")
+mix_shared_hash :: proc(module, shared: u64) -> u64 {
+	if module == 0 || shared == 0 {
+		return module
+	}
+	b := transmute([8]u8)shared
+	return hash.fnv64a(b[:], module)
+}
+
 // Recursive worker: the scripts dir can hold sub-package directories (the build compiles
 // them too), so an edit anywhere under it must change the hash — a top-level-only scan
 // made saves in a subdirectory silently skip the rebuild.
@@ -256,10 +269,23 @@ reload_request :: proc(force := false) {
 		dir:  string,
 		hash: u64,
 	}
+	// THE SHARED VOCABULARY TREE (res://shared): read-only packages any module may
+	// import (scriptgen/shared.odin). It belongs to no module, so hashing the module
+	// dirs alone would make an edit there rebuild NOTHING. Fold its hash into EVERY
+	// candidate: a shared edit invalidates all modules, which is correct (any of them
+	// may import it) and rare enough to be cheap. No shared/ dir -> 0 -> every hash is
+	// exactly what it was before.
+	shared_dir := strings.concatenate({proj, "/shared"}, context.temp_allocator)
+	shared_h := hash_sources(shared_dir)
+
 	cands := make([dynamic]Candidate, context.temp_allocator)
 	append(
 		&cands,
-		Candidate{name = "", dir = strings.clone(scripts, context.temp_allocator), hash = hash_sources(scripts)},
+		Candidate{
+			name = "",
+			dir  = strings.clone(scripts, context.temp_allocator),
+			hash = mix_shared_hash(hash_sources(scripts), shared_h),
+		},
 	)
 	// Every platform enumerates modules: build_scripts.sh (POSIX) and build_scripts.ps1
 	// (Windows, -ScriptsDir/-SkipModules) both build one named scripts dir per invocation.
@@ -274,7 +300,7 @@ reload_request :: proc(force := false) {
 				Candidate{
 					name = strings.clone(fi.name, context.temp_allocator),
 					dir  = strings.clone(fi.fullpath, context.temp_allocator),
-					hash = hash_sources(fi.fullpath),
+					hash = mix_shared_hash(hash_sources(fi.fullpath), shared_h),
 				},
 			)
 		}
@@ -674,6 +700,10 @@ reload_probe_fs :: proc() {
 	// external tools, ... — deletions too, when the pulse is visible).
 	h := FNV_BASIS
 	names_hash_dir(scripts, &h)
+	// The shared vocabulary tree rides along: a shared source added or deleted from
+	// OUTSIDE the editor (git pull, another tool) is a rebuild for every module, and
+	// reload_request's per-module hashes — which fold shared in — decide the rest.
+	names_hash_dir(strings.concatenate({proj, "/shared"}, context.temp_allocator), &h)
 	if h == FNV_BASIS {
 		return // unreadable/empty: leave the baseline alone
 	}

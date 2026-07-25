@@ -77,6 +77,8 @@ fi
 if [[ "${ODIN_WEB_PREFLIGHT:-1}" != "0" ]]; then
     SCAN_DIRS=("$SCRIPTS")
     [ -d "$PROJ/modules" ] && SCAN_DIRS+=("$PROJ/modules")
+    # The shared vocabulary tree links into the same wasm as the modules that import it.
+    [ -d "$PROJ/shared" ] && SCAN_DIRS+=("$PROJ/shared")
     BAD_IMPORTS="$(
         find "${SCAN_DIRS[@]}" -name '*.odin' \
             ! -name '*.gen.odin' \

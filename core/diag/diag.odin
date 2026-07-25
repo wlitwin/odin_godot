@@ -88,6 +88,21 @@ MAX_MODULE_DEPTH :: 8
 // DISK, which is exactly right: an unedited package has no live buffer. Dot-directories
 // are skipped (`.godot` and friends are never packages).
 //
+// THE SHARED VOCABULARY TREE. A module may also import `res://shared/<pkg>` — read-only
+// types/constants/pure procs every module is allowed to link (scriptgen/shared.odin). That
+// import resolves ABOVE the module root (`../shared/ids` from res://scripts,
+// `../../shared/ids` from res://modules/<name>), i.e. outside a mirror rooted at the module,
+// which is the same phantom `Path does not exist` abort in a new place. So when the project
+// has a shared/ tree the chain is extended UPWARD to the project level and `shared` is
+// symlinked beside it:
+//
+//   <work>/shared        -> <project>/shared        (link)
+//   <work>/scripts/      real; the module root, laid out as above
+//
+// Editing a file UNDER shared/ works by the same mechanism from shared/'s parent, so a
+// shared package's own `../<sibling>` imports resolve. A project with no shared/ tree
+// produces byte-identical commands to before.
+//
 // KEEP IN SYNC with core/complete/complete.odin's copy of this proc — two independent
 // editor features, one overlay shape.
 overlay_setup_cmd :: proc(
@@ -96,7 +111,17 @@ overlay_setup_cmd :: proc(
 ) -> (cmd: string, overlay_dir: string) {
     mroot := module_root_of(pkgdir)
     rel := pkgdir[min(len(mroot) + 1, len(pkgdir)):] // "" | "ui" | "ui/widgets"
-    ov := rel == "" ? strings.clone(work, allocator) : strings.concatenate({work, "/", rel}, allocator)
+    // `up` is the module root's own path relative to `top` ("" = no extension: the
+    // workspace root IS the module root, the pre-shared shape).
+    top, up := shared_chain(mroot)
+    full_rel := rel
+    if up != "" {
+        full_rel = rel == "" ? up : strings.concatenate({up, "/", rel}, context.temp_allocator)
+    }
+    ov :=
+        full_rel == "" \
+        ? strings.clone(work, allocator) \
+        : strings.concatenate({work, "/", full_rel}, allocator)
 
     b := strings.builder_make(allocator)
     q :: proc(s: string) -> string {return shell_quote(s, context.temp_allocator)}
@@ -105,10 +130,31 @@ overlay_setup_cmd :: proc(
         "rm -rf %s && mkdir -p %s && cp %s/*.odin %s/ 2>/dev/null",
         q(work), q(ov), q(pkgdir), q(ov),
     )
-    // One pass per level of the chain, root-first. `next` is the chain's own segment at
-    // that level — a real directory in the workspace, so it must not also be a symlink.
+    // The levels ABOVE the module root exist as real directories already (the `mkdir -p`
+    // above made the whole chain). They need exactly two links, and deliberately no more:
+    // sibling MODULES are never linked, because a module may not import another one.
+    if up != "" {
+        cut := strings.index_byte(up, '/')
+        seg0 := cut >= 0 ? up[:cut] : up
+        if seg0 != "shared" {
+            // The project level: the shared tree beside the module chain.
+            link_one(&b, strings.concatenate({top, "/shared"}, context.temp_allocator), work, "shared")
+        } else if cut >= 0 {
+            // Editing INSIDE shared/: its sibling packages, so `../<sibling>` resolves.
+            rest := up[cut + 1:]
+            c2 := strings.index_byte(rest, '/')
+            link_dirs(
+                &b,
+                strings.concatenate({top, "/shared"}, context.temp_allocator),
+                strings.concatenate({work, "/shared"}, context.temp_allocator),
+                c2 >= 0 ? rest[:c2] : rest,
+            )
+        }
+    }
+    // One pass per level of the MODULE chain, root-first. `seg` is the chain's own segment
+    // at that level — a real directory in the workspace, so it must not also be a symlink.
     real_dir := mroot
-    mirror := work
+    mirror := up == "" ? work : strings.concatenate({work, "/", up}, context.temp_allocator)
     for {
         cut := strings.index_byte(rel, '/')
         seg := rel
@@ -120,6 +166,69 @@ overlay_setup_cmd :: proc(
         rel = cut >= 0 ? rel[cut + 1:] : ""
     }
     return strings.to_string(b), ov
+}
+
+// shared_chain — where the workspace must be rooted so `res://shared` is reachable, and
+// the module root's path relative to it. Returns ("", "") when the shared tree is not in
+// play, which keeps every flat/no-shared project on exactly the old one-module layout.
+//
+// Structural, like module_root_of (this package stays Godot-free): the project dir is the
+// module root's PARENT, or its GRANDPARENT when that parent is `modules`. A file being
+// edited inside the shared tree is recognized the same way, from `shared` appearing as the
+// module root or as its parent.
+@(private = "file")
+shared_chain :: proc(mroot: string) -> (top: string, up: string) {
+    parent := parent_dir(mroot)
+    if parent == "" {return "", ""}
+    base := path_base(mroot)
+    pbase := path_base(parent)
+    // res://modules/<name> — checked first, so a module that happens to be NAMED `shared`
+    // is still a module.
+    if pbase == "modules" {
+        gp := parent_dir(parent)
+        if gp == "" || !is_dir(strings.concatenate({gp, "/shared"}, context.temp_allocator)) {
+            return "", ""
+        }
+        return gp, strings.concatenate({"modules/", base}, context.temp_allocator)
+    }
+    if base == "shared" {return parent, "shared"} // the shared tree root is itself a package
+    if pbase == "shared" {
+        gp := parent_dir(parent)
+        if gp == "" {return "", ""}
+        return gp, strings.concatenate({"shared/", base}, context.temp_allocator)
+    }
+    if !is_dir(strings.concatenate({parent, "/shared"}, context.temp_allocator)) {return "", ""}
+    return parent, base
+}
+
+// The parent directory of `path` ("" when there is none / it is a root segment).
+@(private = "file")
+parent_dir :: proc(path: string) -> string {
+    idx := strings.last_index_byte(path, '/')
+    if idx <= 0 {return ""}
+    return path[:idx]
+}
+
+@(private = "file")
+is_dir :: proc(path: string) -> bool {
+    fi, err := os.stat(path, context.temp_allocator)
+    return err == nil && fi.type == .Directory
+}
+
+// `ln -s <target> <into>/<name>` for ONE directory (the shared tree beside the module
+// chain). Silent on failure, like link_dirs: a missing link only costs the resolution it
+// would have provided.
+@(private = "file")
+link_one :: proc(b: ^strings.Builder, target, into, name: string) {
+    if !is_dir(target) {
+        return
+    }
+    fmt.sbprintf(
+        b,
+        " ; ln -s %s %s 2>/dev/null",
+        shell_quote(target, context.temp_allocator),
+        shell_quote(strings.concatenate({into, "/", name}, context.temp_allocator), context.temp_allocator),
+    )
 }
 
 // module_root_of — the top of `pkgdir`'s script module: walk up while the PARENT is still

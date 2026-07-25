@@ -145,12 +145,36 @@ function DllLeafForDir([string]$dir) {
     return "libodinscripts.dll"
 }
 
+# Normalize `.`/`..` segments PURELY LEXICALLY (no filesystem access, so a mistyped
+# target that does not exist still normalizes) — the ps1 twin of lex_norm_path in
+# build/common.sh and scriptgen's resolve_lexical. Input must be absolute; the result
+# uses '/' separators, which is all the comparisons below need.
+function LexNormPath([string]$path) {
+    $out = New-Object System.Collections.ArrayList
+    foreach ($seg in ($path -replace '\\', '/').Split('/')) {
+        if ($seg -eq '' -or $seg -eq '.') { continue }
+        if ($seg -eq '..') {
+            if ($out.Count -gt 0) { $out.RemoveAt($out.Count - 1) }
+            continue
+        }
+        [void]$out.Add($seg)
+    }
+    return ($out -join '/')
+}
+
 # HARD RULE: no imports between script modules (mirror of check_module_isolation in
 # build/common.sh — KEEP IN SYNC, including the regex). Odin happily compiles a
 # relative `import "../other_module"` — but a package imported by two script dlls
 # duplicates its package GLOBALS per dll (the shared blackboard would silently fork).
-# So any `..` relative import in a script module is rejected here, at build time.
+# So a `..` relative import in a script module is rejected here, at build time.
 # Cross-module communication goes through the ENGINE: signals, methods, autoloads.
+#
+# THE ONE EXEMPTION: `<project>\shared\…` — read-only VOCABULARY (types, constants,
+# pure procs; no state to fork), importable by every module. A `..` import passes
+# exactly when it RESOLVES into that tree (project dir = the module dir's parent, or
+# its grandparent under `modules`); an unresolvable one is illegal like any other
+# escape. scriptgen then verifies the tree really is state-free.
+#
 # TOP-LEVEL FILES ONLY (no -Recurse), matching common.sh: at the module root a `..`
 # import always escapes; in subdirs it can be a legal sibling-helper import, which
 # only scriptgen's lexical AST check can tell apart.
@@ -159,8 +183,23 @@ function CheckModuleIsolation([string]$dir) {
     $hits = Get-ChildItem -Path $dir -Filter *.odin -File -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notlike "*.gen.odin" } |
         Select-String -Pattern $pattern
-    if ($hits) {
-        $lines = ($hits | ForEach-Object { "  $($_.Path):$($_.LineNumber): $($_.Line.Trim())" }) -join "`n"
+    if (-not $hits) { return }
+
+    $abs    = (Resolve-Path -LiteralPath $dir).Path
+    $parent = Split-Path -Parent $abs
+    $proj   = if ((Split-Path -Leaf $parent) -eq "modules") { Split-Path -Parent $parent } else { $parent }
+    $shared = LexNormPath (Join-Path $proj "shared")
+
+    $bad = @()
+    foreach ($h in $hits) {
+        $imp = $null
+        if ($h.Line -match '"(\.\.[^"]*)"') { $imp = $Matches[1] }
+        $resolved = if ($imp) { LexNormPath (Join-Path $abs $imp) } else { "" }
+        if ($resolved -eq $shared -or $resolved.StartsWith("$shared/")) { continue }
+        $bad += "  $($h.Path):$($h.LineNumber): $($h.Line.Trim())"
+    }
+    if ($bad.Count -gt 0) {
+        $lines = ($bad -join "`n")
         throw @"
 ILLEGAL cross-module import in '$dir':
 $lines
@@ -168,6 +207,9 @@ $lines
   duplicates its globals per dll (shared state would silently fork). Talk to
   other modules through the engine (signals / methods / autoloads) instead,
   or move the shared state into exactly one module.
+  For types, constants and pure procs — a vocabulary with no state to fork —
+  put the package under '$shared' instead: any module may import it, and
+  scriptgen verifies that tree stays state-free.
 "@
     }
 }

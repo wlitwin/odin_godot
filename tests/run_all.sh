@@ -156,6 +156,11 @@ TESTS=(
     # A subfolder script attaches + reloads with state preserved, the root reads it TYPED
     # in-dll, and the four refusals hold (kit annotation, root import, dup package, dup class).
     "subpkgspike|SUBPKG_SPIKE_OK|tests/subpkg_spike/run.sh"
+    # SHARED vocabulary tree: res://shared/<pkg> — read-only types/constants/pure procs
+    # importable by EVERY module. Two dlls agree on one vocabulary, one shared edit
+    # rebuilds+swaps both modules in a live editor, and the refusals hold (mutable global,
+    # @(init), //gd: marker, shared->module import, tagged bundle, cross-module import).
+    "sharedspike|SHARED_SPIKE_OK|tests/shared_spike/run.sh"
     "phase5|PHASE5_OK|tests/phase5/run.sh"
     "showcase|SHOWCASE_OK|tests/showcase/run.sh"
     "autoload|AUTOLOAD_OK|tests/autoload/run.sh"

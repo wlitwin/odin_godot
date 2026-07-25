@@ -1181,7 +1181,7 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 						s.struct_name, field_label, nested,
 					)
 				}
-				unresolved_embed_check(floc, s.struct_name, field_label, nested, .Using in f.flags, nest_ctx.imports)
+				unresolved_embed_check(floc, s.struct_name, field_label, nested, .Using in f.flags, nest_ctx.imports, nest_ctx.dir)
 			}
 			continue
 		}
@@ -4011,7 +4011,7 @@ recurse_into :: proc(s: ^Script, def: Struct_Def, path: []string, visited: ^map[
 			// a manual one must not auto-hoist either.
 			recurse_into(s, sub, fpath, visited, sub_prefix, sub_subst, manual)
 		} else {
-			unresolved_embed_check(fld.loc, s.struct_name, join_path(fpath), ftype, fld.is_using, def.imports)
+			unresolved_embed_check(fld.loc, s.struct_name, join_path(fpath), ftype, fld.is_using, def.imports, def.dir)
 		}
 	}
 }
@@ -4078,7 +4078,13 @@ lint_attributed_receivers :: proc(path, src: string, file: ^ast.File, script_str
 	}
 }
 
-unresolved_embed_check :: proc(loc: Loc, class_name, field_label, type_text: string, is_using: bool, imports: map[string]string) {
+unresolved_embed_check :: proc(
+	loc: Loc,
+	class_name, field_label, type_text: string,
+	is_using: bool,
+	imports: map[string]string,
+	from_dir: string,
+) {
 	t := strings.trim_space(type_text)
 	if len(t) == 0 || t[0] == '^' || strings.contains(t, "[") || strings.contains(t, "(") || strings.contains(t, "map[") {
 		return // decorated types are never tag-carrying embeds
@@ -4112,6 +4118,18 @@ unresolved_embed_check :: proc(loc: Loc, class_name, field_label, type_text: str
 				)
 			}
 			return // an indexed bundle whose name isn't a struct there: an enum/union — plain data
+		}
+		// The SHARED vocabulary tree (res://shared/…): a legal import from any module,
+		// but NOT a bundle source — scriptgen resolves nested bundles in the module's own
+		// package tree and in godot: collections only. Name the limitation instead of
+		// dropping the fields, which is exactly the silence this check exists for.
+		if !strings.contains_rune(imp, ':') && from_dir != "" && under_shared(resolve_lexical(from_dir, imp)) {
+			error_at(
+				loc,
+				"%s.%s: %q comes from the SHARED package %q — res://shared/ carries plain types, constants and pure procs, and scriptgen does not resolve gd:\"…\"-tagged BUNDLES across it, so tags on its fields would SILENTLY never register (replicate, backup and composed verbs all vanish). A tagged bundle lives in the module itself or in a godot: collection package; an untagged POD struct from shared/ is fine by value.",
+				class_name, field_label, t, imp,
+			)
+			return
 		}
 		error_at(
 			loc,

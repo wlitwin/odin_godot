@@ -1,0 +1,12 @@
+config_version=5
+
+[application]
+
+config/name="OdinGodotSharedSpike"
+config/features=PackedStringArray("4.6")
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true
+
+[headless]

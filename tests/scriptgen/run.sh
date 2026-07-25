@@ -1862,4 +1862,37 @@ quat_lane 'predict' || fail "gd:\"predict\" (no interp) on a quat must be ACCEPT
 quat_lane 'owner,interp' || fail "gd:\"owner,interp\" on a quat must be ACCEPTED — owner-streamed quats glide (quat_nlerp)"
 quat_lane 'replicate,interp' || fail "gd:\"replicate,interp\" on a quat must be ACCEPTED — delta-lane quats glide (quat_nlerp)"
 
+# ---- fixture 21: a gd-tagged BUNDLE from res://shared/ names its limitation ---
+# A shared package (the read-only vocabulary tree every module may import) is NOT a
+# bundle source: nested resolution reaches the module's own tree and godot: collections
+# only. Embedding a tagged struct from shared/ must be a COMPREHENSIBLE error naming the
+# limitation — never a crash and never a silently dropped replicate field. Supporting it
+# for real is out of scope; being quiet about it is the bug this pins.
+shb="$work/sharedbundle"
+mkdir -p "$shb/scripts" "$shb/shared/ids"
+cat >"$shb/shared/ids/ids.odin" <<'ODIN'
+package shb_ids
+Bundle :: struct { hp: i32 `gd:"replicate"` }
+ODIN
+cat >"$shb/scripts/hero.odin" <<'ODIN'
+//gd:extends Node
+//gd:class ShHero
+package shb_main
+import gd "godot:godot"
+import knet "godot:kit/net"
+import ids "../shared/ids"
+
+ShHero :: struct {
+	owner:   gd.Node,
+	net_id:  knet.Net_Id,
+	using b: ids.Bundle,
+}
+ODIN
+out="$("$SGEN" "$shb/scripts" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "a gd-tagged bundle embedded from res://shared/ must fail the build, not drop the field"
+grep -qF -- 'comes from the SHARED package' <<<"$out" || fail "the shared-bundle error must name the shared tree: $out"
+grep -qF -- 'ShHero.b' <<<"$out" || fail "the shared-bundle error must name the offending field ShHero.b: $out"
+[ -z "$(find "$shb/scripts" -name '*.gen.odin' -print -quit)" ] || fail "the refused shared-bundle tree still left generated code"
+
 echo "SCRIPTGEN_OK"

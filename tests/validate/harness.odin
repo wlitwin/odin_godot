@@ -372,6 +372,7 @@ main :: proc() {
     fmt.println("fresh-flag semantics: set on publish, consumed once, cleared by cache-hit pickup")
 
     check_nested_overlay(root, odin_bin)
+    check_shared_overlay(root, odin_bin)
 
     fmt.println("VALIDATE_HARNESS_OK")
 }
@@ -457,4 +458,92 @@ check_nested_overlay :: proc(root, odin_bin: string) {
     }
     free_diags(ds5[:])
     fmt.println("nested packages: root->child, subpackage->sibling and two-deep ../../ imports resolve in the overlay; real errors still land at both depths")
+}
+
+// ------------------------------------------------------------------
+// THE SHARED VOCABULARY TREE: `res://shared/<pkg>` is importable by every module —
+// `../shared/ids` from res://scripts, `../../shared/ids` from res://modules/<name>, and
+// deeper from a subpackage. Those all resolve ABOVE the module root, so a workspace
+// mirrored from the module alone puts them nowhere and odin reports `Path does not exist`
+// as a SYNTAX error that aborts the check — the exact class of bug the module-tree mirror
+// fixed, one level up. Pinned here on a throwaway project shaped like the real thing:
+//
+//   <proj>/scripts/game.odin        imports "../shared/ids"
+//   <proj>/scripts/ui/hud.odin      imports "../../shared/ids"
+//   <proj>/modules/enemies/e.odin   imports "../../shared/ids"
+//   <proj>/shared/ids/ids.odin      imports "../tuning"   (sibling shared package)
+// ------------------------------------------------------------------
+check_shared_overlay :: proc(root, odin_bin: string) {
+    tmp := os.get_env("TMPDIR", context.allocator)
+    if tmp == "" {tmp = "/tmp"}
+    tree := fmt.tprintf("%s/odin_validate_shared_%d", strings.trim_suffix(tmp, "/"), os.get_pid())
+    os.remove_all(tree)
+    write :: proc(path, body: string) {
+        if err := os.write_entire_file(path, transmute([]u8)body); err != nil {
+            fail(fmt.tprintf("could not write %s", path))
+        }
+    }
+    for d in ([?]string{"scripts/ui", "modules/enemies", "shared/ids", "shared/tuning"}) {
+        if err := os.make_directory_all(fmt.tprintf("%s/%s", tree, d)); err != nil {
+            fail(fmt.tprintf("could not create %s/%s", tree, d))
+        }
+    }
+    defer os.remove_all(tree)
+
+    tuning_src := "package shared_tuning\n\nSTEP :: 7\n"
+    ids_src := "package shared_ids\n\nimport \"../tuning\"\n\nKind :: enum u8 {None, Player, Enemy}\nGAIN :: tuning.STEP * 2\n"
+    game_src := "package shared_game\n\nimport \"../shared/ids\"\n\ngame_gain :: proc() -> int {\n\treturn ids.GAIN\n}\n"
+    hud_src := "package shared_hud\n\nimport \"../../shared/ids\"\n\nhud_kind :: proc() -> ids.Kind {\n\treturn .Player\n}\n"
+    enemy_src := "package shared_enemy\n\nimport \"../../shared/ids\"\n\nenemy_gain :: proc() -> int {\n\treturn ids.GAIN + 1\n}\n"
+    write(fmt.tprintf("%s/shared/tuning/tuning.odin", tree), tuning_src)
+    write(fmt.tprintf("%s/shared/ids/ids.odin", tree), ids_src)
+    write(fmt.tprintf("%s/scripts/game.odin", tree), game_src)
+    write(fmt.tprintf("%s/scripts/ui/hud.odin", tree), hud_src)
+    write(fmt.tprintf("%s/modules/enemies/enemy.odin", tree), enemy_src)
+
+    clean :: proc(root, odin_bin, what, src, path: string) {
+        ds := diag.run_check_overlay(src, path, root, odin_bin)
+        defer free_diags(ds[:])
+        if len(ds) != 0 {
+            for d in ds {
+                if strings.index(d.message, "Path does not exist") >= 0 {
+                    fail(fmt.tprintf("%s: the overlay reports a phantom unresolved-import error (%q)", what, d.message))
+                }
+            }
+            fail(fmt.tprintf("%s reported %d diagnostic(s): %v", what, len(ds), ds[:]))
+        }
+    }
+    // (a) the module ROOT importing a shared package
+    clean(root, odin_bin, "module root importing ../shared/ids", game_src, fmt.tprintf("%s/scripts/game.odin", tree))
+    // (b) a SUBPACKAGE importing it one level deeper
+    clean(root, odin_bin, "subpackage importing ../../shared/ids", hud_src, fmt.tprintf("%s/scripts/ui/hud.odin", tree))
+    // (c) a res://modules/<name> module importing it
+    clean(root, odin_bin, "module importing ../../shared/ids", enemy_src, fmt.tprintf("%s/modules/enemies/enemy.odin", tree))
+    // (d) a SHARED file importing a SIBLING shared package (editing inside shared/)
+    clean(root, odin_bin, "shared package importing a sibling shared package", ids_src, fmt.tprintf("%s/shared/ids/ids.odin", tree))
+
+    // ...and a REAL error still lands, at the right line, in each of the two new shapes —
+    // the failure being pinned is an import that does not resolve, which odin reports as a
+    // SYNTAX error that aborts the check and hides everything real behind it.
+    lands :: proc(root, odin_bin, what, src, path: string, line: int) {
+        ds := diag.run_check_overlay(src, path, root, odin_bin)
+        defer free_diags(ds[:])
+        if len(ds) == 0 {
+            fail(fmt.tprintf("%s: a broken buffer reported no diagnostics (the overlay swallowed the check)", what))
+        }
+        for d in ds {
+            if strings.index(d.message, "Path does not exist") >= 0 {
+                fail(fmt.tprintf("%s: the overlay reports a phantom unresolved-import error instead of the real one", what))
+            }
+        }
+        if ds[0].line != line {
+            fail(fmt.tprintf("%s: expected the diagnostic on line %d, got line %d (%q)", what, line, ds[0].line, ds[0].message))
+        }
+    }
+    broken_module := "package shared_enemy\n\nimport \"../../shared/ids\"\n\nenemy_gain :: proc() -> int {\n\treturn ids.GAIN + 1\n}\nbad :: proc() {\n\ty: int = \"oops\"\n}\n"
+    lands(root, odin_bin, "module importing shared", broken_module, fmt.tprintf("%s/modules/enemies/enemy.odin", tree), 9)
+    broken_shared := "package shared_ids\n\nimport \"../tuning\"\n\nKind :: enum u8 {None, Player, Enemy}\nGAIN :: tuning.STEP * 2\nbad :: proc() {\n\ty: int = \"oops\"\n}\n"
+    lands(root, odin_bin, "shared package importing a sibling", broken_shared, fmt.tprintf("%s/shared/ids/ids.odin", tree), 8)
+
+    fmt.println("shared tree: module/subpackage/module-dir -> res://shared and shared -> sibling shared resolve in the overlay; no phantom 'Path does not exist'; real errors still land")
 }

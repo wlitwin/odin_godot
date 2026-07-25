@@ -107,13 +107,39 @@ run_scriptgen() {
 }
 
 # ----------------------------------------------------------------------------
+# lex_norm_path <path> — normalize `.`/`..` segments PURELY LEXICALLY (no filesystem
+# access, so a target that doesn't exist still normalizes). The bash twin of
+# scriptgen's resolve_lexical; input must be absolute.
+# ----------------------------------------------------------------------------
+lex_norm_path() {
+    local rest="$1" out="" seg
+    while [[ -n "$rest" ]]; do
+        seg="${rest%%/*}"
+        if [[ "$rest" == */* ]]; then rest="${rest#*/}"; else rest=""; fi
+        case "$seg" in
+            ''|.) ;;
+            ..)   out="${out%/*}" ;;
+            *)    out="$out/$seg" ;;
+        esac
+    done
+    echo "$out"
+}
+
+# ----------------------------------------------------------------------------
 # check_module_isolation <scripts_dir>
 #
 # HARD RULE: no imports between script modules. Odin happily compiles a relative
 # `import "../other_module"` — but a package imported by two script dlls duplicates its
-# package GLOBALS per dll (the shared blackboard would silently fork). So any `..`
+# package GLOBALS per dll (the shared blackboard would silently fork). So a `..`
 # relative import in a script module is rejected here, at build time. Cross-module
 # communication goes through the ENGINE: signals, methods (gd.object_call), autoloads.
+#
+# THE ONE EXEMPTION: `<project>/shared/…`. A package there is read-only VOCABULARY —
+# types, constants and pure procs, with no state to fork — so any module may import it
+# (`../shared/<pkg>` from res://scripts, `../../shared/<pkg>` from res://modules/<name>).
+# A `..` import is allowed here exactly when it RESOLVES into that tree; scriptgen then
+# verifies the tree really is state-free (scriptgen/shared.odin). An import whose target
+# cannot be resolved is treated as illegal, like any other escape.
 #
 # The CANONICAL bash implementation, shared by build_scripts.sh (dev loop) and
 # build_export_scripts.sh (export) — ported in build/build_scripts.ps1
@@ -128,18 +154,49 @@ run_scriptgen() {
 # lexical resolution can tell those apart, so subdir depth is left entirely to it.
 # ----------------------------------------------------------------------------
 check_module_isolation() {
-    local dir="$1" hits
+    local dir="$1" hits abs parent proj shared line imp resolved bad=""
     hits="$(find "$dir" -maxdepth 1 -name '*.odin' ! -name '*.gen.odin' -print0 2>/dev/null |
         xargs -0 grep -nE \
         '^[[:space:]]*(@\(require\)[[:space:]]*)?import[[:space:]]+([A-Za-z_][A-Za-z0-9_]*[[:space:]]+)?"\.\.' \
         2>/dev/null || true)"
-    if [[ -n "$hits" ]]; then
+    [[ -z "$hits" ]] && return 0
+
+    # The project dir is the module dir's PARENT, or its GRANDPARENT when that parent is
+    # `modules` — the same structural rule scriptgen uses (shared_root_of).
+    abs="$(cd "$dir" 2>/dev/null && pwd)" || abs="$dir"
+    parent="$(dirname "$abs")"
+    if [[ "$(basename "$parent")" == "modules" ]]; then
+        proj="$(dirname "$parent")"
+    else
+        proj="$parent"
+    fi
+    shared="$proj/shared"
+
+    # Every hit is `path:line:text`; keep the ones that do NOT resolve into shared/.
+    # (The importing file is at the module root by construction — -maxdepth 1 above.)
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        imp="$(printf '%s\n' "$line" | sed -n 's/.*"\(\.\.[^"]*\)".*/\1/p')"
+        resolved=""
+        [[ -n "$imp" ]] && resolved="$(lex_norm_path "$abs/$imp")"
+        if [[ -n "$resolved" && ( "$resolved" == "$shared" || "$resolved" == "$shared"/* ) ]]; then
+            continue
+        fi
+        bad="$bad$line"$'\n'
+    done <<EOF
+$hits
+EOF
+
+    if [[ -n "$bad" ]]; then
         echo "build_scripts: ILLEGAL cross-module import in '$dir':" >&2
-        echo "$hits" >&2
+        printf '%s' "$bad" >&2
         echo "  Script modules are ISOLATED packages: a package imported by two script dlls" >&2
         echo "  duplicates its globals per dll (shared state would silently fork). Talk to" >&2
         echo "  other modules through the engine (signals / methods / autoloads) instead," >&2
         echo "  or move the shared state into exactly one module." >&2
+        echo "  For types, constants and pure procs — a vocabulary with no state to fork —" >&2
+        echo "  put the package under '$shared' instead: any module may import it, and" >&2
+        echo "  scriptgen verifies that tree stays state-free." >&2
         exit 1
     fi
 }
