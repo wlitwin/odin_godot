@@ -7,6 +7,11 @@ set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PROJ="$ROOT/tests/phase3"
 
+# This fixture HAND-WRITES its @(init) registration (that is what the phase pins), so a
+# scriptgen artifact here — e.g. from a repo-wide scriptgen sweep — is a redeclaration
+# compile error. Sweep strays before building.
+rm -f "$PROJ"/scripts/*.gen.odin
+
 bash "$ROOT/build/build_phase3.sh"
 
 # Make the scripts dll path unambiguous for the core's dynlib load.

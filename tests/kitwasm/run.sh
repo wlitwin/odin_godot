@@ -53,6 +53,9 @@ check_wasm() { # check_wasm <pkg_dir> -> odin's exit code, output on stdout
 }
 
 # ---- phase 1: the pin ----
+# The fixture is a plain hand-written package: a scriptgen artifact here (repo-wide
+# sweep) would pin stale #load_hash bytes into the check. Sweep strays first.
+rm -f "$ROOT"/tests/kitwasm/scripts/*.gen.odin
 OUT="$(check_wasm "$ROOT/tests/kitwasm/scripts")"
 RC=$?
 if [ "$RC" -ne 0 ]; then
