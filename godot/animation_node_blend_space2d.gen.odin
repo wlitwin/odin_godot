@@ -9,6 +9,12 @@ Animation_Node_Blend_Space2d_Blend_Mode :: enum int {
     Blend_Mode_Discrete = 1,
     Blend_Mode_Discrete_Carry = 2,
 }
+Animation_Node_Blend_Space2d_Sync_Mode :: enum int {
+    Sync_Mode_None = 0,
+    Sync_Mode_Independent = 1,
+    Sync_Mode_Cyclic_Mutable = 2,
+    Sync_Mode_Cyclic_Constant = 3,
+}
 
 
 
@@ -48,20 +54,23 @@ animation_node_blend_space2d_add_blend_point :: proc "contextless" (
     node_: Animation_Root_Node,
     pos_: Vector2,
     at_index_: Int,
+    name_: String_Name,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("add_blend_point", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 402261981)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 768750458)
     }
     self := self
     node_ := node_
     pos_ := pos_
     at_index_ := at_index_
+    name_ := name_
     args := []__bindgen_gde.TypePtr {
         &node_,
         &pos_,
         &at_index_,
+        &name_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -142,6 +151,62 @@ animation_node_blend_space2d_get_blend_point_node :: proc "contextless" (
     return
 }
 
+animation_node_blend_space2d_set_blend_point_name :: proc "contextless" (
+    self: Animation_Node_Blend_Space2d,
+    point_: Int,
+    name_: String_Name,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_blend_point_name", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3780747571)
+    }
+    self := self
+    point_ := point_
+    name_ := name_
+    args := []__bindgen_gde.TypePtr {
+        &point_,
+        &name_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+animation_node_blend_space2d_get_blend_point_name :: proc "contextless" (
+    self: Animation_Node_Blend_Space2d,
+    point_: Int,
+) -> (ret: String_Name) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_blend_point_name", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 659327637)
+    }
+    self := self
+    point_ := point_
+    args := []__bindgen_gde.TypePtr {
+        &point_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+animation_node_blend_space2d_find_blend_point_by_name :: proc "contextless" (
+    self: Animation_Node_Blend_Space2d,
+    name_: String_Name,
+) -> (ret: i32) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("find_blend_point_by_name", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2458036349)
+    }
+    self := self
+    name_ := name_
+    args := []__bindgen_gde.TypePtr {
+        &name_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 animation_node_blend_space2d_remove_blend_point :: proc "contextless" (
     self: Animation_Node_Blend_Space2d,
     point_: Int,
@@ -172,6 +237,26 @@ animation_node_blend_space2d_get_blend_point_count :: proc "contextless" (
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
+}
+
+animation_node_blend_space2d_reorder_blend_point :: proc "contextless" (
+    self: Animation_Node_Blend_Space2d,
+    from_index_: Int,
+    to_index_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("reorder_blend_point", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3937882851)
+    }
+    self := self
+    from_index_ := from_index_
+    to_index_ := to_index_
+    args := []__bindgen_gde.TypePtr {
+        &from_index_,
+        &to_index_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
 animation_node_blend_space2d_add_triangle :: proc "contextless" (
@@ -501,6 +586,70 @@ animation_node_blend_space2d_is_using_sync :: proc "contextless" (
     if __ptr == nil {
         _gde_name := new_string_name_cstring("is_using_sync", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+animation_node_blend_space2d_set_sync_mode :: proc "contextless" (
+    self: Animation_Node_Blend_Space2d,
+    sync_mode_: Animation_Node_Blend_Space2d_Sync_Mode,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_sync_mode", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2615784488)
+    }
+    self := self
+    sync_mode_ := sync_mode_
+    args := []__bindgen_gde.TypePtr {
+        &sync_mode_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+animation_node_blend_space2d_get_sync_mode :: proc "contextless" (
+    self: Animation_Node_Blend_Space2d,
+) -> (ret: Animation_Node_Blend_Space2d_Sync_Mode) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_sync_mode", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 242032665)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+animation_node_blend_space2d_set_cyclic_length :: proc "contextless" (
+    self: Animation_Node_Blend_Space2d,
+    length_: f64,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_cyclic_length", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 373806689)
+    }
+    self := self
+    length_ := length_
+    args := []__bindgen_gde.TypePtr {
+        &length_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+animation_node_blend_space2d_get_cyclic_length :: proc "contextless" (
+    self: Animation_Node_Blend_Space2d,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_cyclic_length", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1740695150)
     }
     self := self
     args := []__bindgen_gde.TypePtr {

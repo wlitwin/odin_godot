@@ -12,6 +12,7 @@ Editor_Context_Menu_Plugin_Context_Menu_Slot :: enum int {
     Context_Slot_Script_Editor_Code = 4,
     Context_Slot_Scene_Tabs = 5,
     Context_Slot_2d_Editor = 6,
+    Context_Slot_Inspector_Property = 7,
 }
 
 

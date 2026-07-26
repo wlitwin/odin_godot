@@ -78,38 +78,6 @@ audio_effect_spectrum_analyzer_get_buffer_length :: proc "contextless" (
     return
 }
 
-audio_effect_spectrum_analyzer_set_tap_back_pos :: proc "contextless" (
-    self: Audio_Effect_Spectrum_Analyzer,
-    seconds_: f64,
-) {
-    @(static) __ptr: __bindgen_gde.MethodBindPtr
-    if __ptr == nil {
-        _gde_name := new_string_name_cstring("set_tap_back_pos", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 373806689)
-    }
-    self := self
-    seconds_ := seconds_
-    args := []__bindgen_gde.TypePtr {
-        &seconds_,
-    }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
-}
-
-audio_effect_spectrum_analyzer_get_tap_back_pos :: proc "contextless" (
-    self: Audio_Effect_Spectrum_Analyzer,
-) -> (ret: f64) {
-    @(static) __ptr: __bindgen_gde.MethodBindPtr
-    if __ptr == nil {
-        _gde_name := new_string_name_cstring("get_tap_back_pos", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1740695150)
-    }
-    self := self
-    args := []__bindgen_gde.TypePtr {
-    }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
-    return
-}
-
 audio_effect_spectrum_analyzer_set_fft_size :: proc "contextless" (
     self: Audio_Effect_Spectrum_Analyzer,
     size_: Audio_Effect_Spectrum_Analyzer_Fft_Size,

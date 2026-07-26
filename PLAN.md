@@ -10,7 +10,7 @@ Modeled on the sibling project `~/data/code/ocaml/miniml_godot` (a `ScriptLangua
 that embeds the MiniML interpreter). This document is the implementation plan.
 
 ### Locked decisions (2026-06-22)
-- **Godot pin:** **4.6.2 stable** (matches the installed `/Applications/Godot.app`).
+- **Godot pin:** **4.7.1 stable** (matches the installed `/Applications/Godot.app`).
   Its web build uses **emscripten 4.0.11** (per miniml's lesson) — pin that exactly.
 - **Script declaration:** a **codegen preprocessor** (Godin-style) is the primary authoring
   surface — scripts use struct tags / attributes and the tool generates the registration

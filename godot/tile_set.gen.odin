@@ -935,6 +935,23 @@ tile_set_remove_terrain :: proc "contextless" (
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+tile_set_clear_terrains :: proc "contextless" (
+    self: Tile_Set,
+    terrain_set_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("clear_terrains", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
+    }
+    self := self
+    terrain_set_ := terrain_set_
+    args := []__bindgen_gde.TypePtr {
+        &terrain_set_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
 tile_set_set_terrain_name :: proc "contextless" (
     self: Tile_Set,
     terrain_set_: Int,
@@ -1430,7 +1447,7 @@ tile_set_remove_source_level_tile_proxy :: proc "contextless" (
 
 tile_set_set_coords_level_tile_proxy :: proc "contextless" (
     self: Tile_Set,
-    p_source_from_: Int,
+    source_from_: Int,
     coords_from_: Vector2i,
     source_to_: Int,
     coords_to_: Vector2i,
@@ -1441,12 +1458,12 @@ tile_set_set_coords_level_tile_proxy :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1769939278)
     }
     self := self
-    p_source_from_ := p_source_from_
+    source_from_ := source_from_
     coords_from_ := coords_from_
     source_to_ := source_to_
     coords_to_ := coords_to_
     args := []__bindgen_gde.TypePtr {
-        &p_source_from_,
+        &source_from_,
         &coords_from_,
         &source_to_,
         &coords_to_,

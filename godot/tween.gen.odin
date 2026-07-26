@@ -206,6 +206,24 @@ tween_tween_subtween :: proc "contextless" (
     return
 }
 
+tween_tween_await :: proc "contextless" (
+    self: Tween,
+    signal_: Signal,
+) -> (ret: Await_Tweener) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("tween_await", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2242837462)
+    }
+    self := self
+    signal_ := signal_
+    args := []__bindgen_gde.TypePtr {
+        &signal_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 tween_custom_step :: proc "contextless" (
     self: Tween,
     delta_: f64,
@@ -287,6 +305,21 @@ tween_get_total_elapsed_time :: proc "contextless" (
     if __ptr == nil {
         _gde_name := new_string_name_cstring("get_total_elapsed_time", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1740695150)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+tween_has_tweeners :: proc "contextless" (
+    self: Tween,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("has_tweeners", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
     }
     self := self
     args := []__bindgen_gde.TypePtr {

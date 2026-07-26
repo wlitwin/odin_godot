@@ -29,6 +29,11 @@ Open_Xr_Composition_Layer_Swizzle :: enum int {
     Swizzle_Zero = 4,
     Swizzle_One = 5,
 }
+Open_Xr_Composition_Layer_Eye_Visibility :: enum int {
+    Eye_Visibility_Both = 0,
+    Eye_Visibility_Left = 1,
+    Eye_Visibility_Right = 2,
+}
 
 
 
@@ -661,6 +666,38 @@ open_xr_composition_layer_get_border_color :: proc "contextless" (
     if __ptr == nil {
         _gde_name := new_string_name_cstring("get_border_color", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3444240500)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+open_xr_composition_layer_set_eye_visibility :: proc "contextless" (
+    self: Open_Xr_Composition_Layer,
+    eye_visibility_: Open_Xr_Composition_Layer_Eye_Visibility,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_eye_visibility", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 156391336)
+    }
+    self := self
+    eye_visibility_ := eye_visibility_
+    args := []__bindgen_gde.TypePtr {
+        &eye_visibility_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+open_xr_composition_layer_get_eye_visibility :: proc "contextless" (
+    self: Open_Xr_Composition_Layer,
+) -> (ret: Open_Xr_Composition_Layer_Eye_Visibility) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_eye_visibility", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 467669000)
     }
     self := self
     args := []__bindgen_gde.TypePtr {

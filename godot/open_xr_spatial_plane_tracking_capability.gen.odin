@@ -53,6 +53,36 @@ open_xr_spatial_plane_tracking_capability_is_supported :: proc "contextless" (
     return
 }
 
+open_xr_spatial_plane_tracking_capability_start_entity_discovery :: proc "contextless" (
+    self: Open_Xr_Spatial_Plane_Tracking_Capability,
+    spatial_context_: Rid,
+    component_data_: Typed_Array(Open_Xr_Spatial_Component_Data),
+    next_snapshot_create_: Open_Xr_Structure_Base,
+    next_snapshot_query_: Open_Xr_Structure_Base,
+    user_callback_: Callable,
+) -> (ret: Open_Xr_Future_Result) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("start_entity_discovery", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3452714169)
+    }
+    self := self
+    spatial_context_ := spatial_context_
+    component_data_ := component_data_
+    next_snapshot_create_ := next_snapshot_create_
+    next_snapshot_query_ := next_snapshot_query_
+    user_callback_ := user_callback_
+    args := []__bindgen_gde.TypePtr {
+        &spatial_context_,
+        &component_data_,
+        &next_snapshot_create_,
+        &next_snapshot_query_,
+        &user_callback_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 
 // properties
 

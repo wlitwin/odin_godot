@@ -395,6 +395,38 @@ split_container_is_touch_dragger_enabled :: proc "contextless" (
     return
 }
 
+split_container_set_drag_nested_intersections :: proc "contextless" (
+    self: Split_Container,
+    enabled_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_drag_nested_intersections", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    enabled_ := enabled_
+    args := []__bindgen_gde.TypePtr {
+        &enabled_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+split_container_is_dragging_nested_intersections :: proc "contextless" (
+    self: Split_Container,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_dragging_nested_intersections", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 split_container_get_drag_area_control :: proc "contextless" (
     self: Split_Container,
 ) -> (ret: Control) {
@@ -455,6 +487,9 @@ split_container_get_vertical :: proc "contextless" (self: Split_Container) -> Bo
 }
 split_container_get_touch_dragger_enabled :: proc "contextless" (self: Split_Container) -> Bool {
     return split_container_is_touch_dragger_enabled(self)
+}
+split_container_get_drag_nested_intersections :: proc "contextless" (self: Split_Container) -> Bool {
+    return split_container_is_dragging_nested_intersections(self)
 }
 split_container_get_drag_area_highlight_in_editor :: proc "contextless" (self: Split_Container) -> Bool {
     return split_container_is_drag_area_highlight_in_editor_enabled(self)

@@ -85,7 +85,7 @@ web_rtc_peer_connection_extension__get_signaling_state :: proc "contextless" (
 
 web_rtc_peer_connection_extension__initialize :: proc "contextless" (
     self: Web_Rtc_Peer_Connection_Extension,
-    p_config_: Dictionary,
+    config_: Dictionary,
 ) -> (ret: Error) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -93,9 +93,9 @@ web_rtc_peer_connection_extension__initialize :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1494659981)
     }
     self := self
-    p_config_ := p_config_
+    config_ := config_
     args := []__bindgen_gde.TypePtr {
-        &p_config_,
+        &config_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -103,8 +103,8 @@ web_rtc_peer_connection_extension__initialize :: proc "contextless" (
 
 web_rtc_peer_connection_extension__create_data_channel :: proc "contextless" (
     self: Web_Rtc_Peer_Connection_Extension,
-    p_label_: String,
-    p_config_: Dictionary,
+    label_: String,
+    config_: Dictionary,
 ) -> (ret: Web_Rtc_Data_Channel) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -112,11 +112,11 @@ web_rtc_peer_connection_extension__create_data_channel :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4111292546)
     }
     self := self
-    p_label_ := p_label_
-    p_config_ := p_config_
+    label_ := label_
+    config_ := config_
     args := []__bindgen_gde.TypePtr {
-        &p_label_,
-        &p_config_,
+        &label_,
+        &config_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -139,8 +139,8 @@ web_rtc_peer_connection_extension__create_offer :: proc "contextless" (
 
 web_rtc_peer_connection_extension__set_remote_description :: proc "contextless" (
     self: Web_Rtc_Peer_Connection_Extension,
-    p_type_: String,
-    p_sdp_: String,
+    type_: String,
+    sdp_: String,
 ) -> (ret: Error) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -148,11 +148,11 @@ web_rtc_peer_connection_extension__set_remote_description :: proc "contextless" 
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 852856452)
     }
     self := self
-    p_type_ := p_type_
-    p_sdp_ := p_sdp_
+    type_ := type_
+    sdp_ := sdp_
     args := []__bindgen_gde.TypePtr {
-        &p_type_,
-        &p_sdp_,
+        &type_,
+        &sdp_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -160,8 +160,8 @@ web_rtc_peer_connection_extension__set_remote_description :: proc "contextless" 
 
 web_rtc_peer_connection_extension__set_local_description :: proc "contextless" (
     self: Web_Rtc_Peer_Connection_Extension,
-    p_type_: String,
-    p_sdp_: String,
+    type_: String,
+    sdp_: String,
 ) -> (ret: Error) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -169,11 +169,11 @@ web_rtc_peer_connection_extension__set_local_description :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 852856452)
     }
     self := self
-    p_type_ := p_type_
-    p_sdp_ := p_sdp_
+    type_ := type_
+    sdp_ := sdp_
     args := []__bindgen_gde.TypePtr {
-        &p_type_,
-        &p_sdp_,
+        &type_,
+        &sdp_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -181,9 +181,9 @@ web_rtc_peer_connection_extension__set_local_description :: proc "contextless" (
 
 web_rtc_peer_connection_extension__add_ice_candidate :: proc "contextless" (
     self: Web_Rtc_Peer_Connection_Extension,
-    p_sdp_mid_name_: String,
-    p_sdp_mline_index_: Int,
-    p_sdp_name_: String,
+    sdp_mid_name_: String,
+    sdp_mline_index_: Int,
+    sdp_name_: String,
 ) -> (ret: Error) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -191,13 +191,13 @@ web_rtc_peer_connection_extension__add_ice_candidate :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3958950400)
     }
     self := self
-    p_sdp_mid_name_ := p_sdp_mid_name_
-    p_sdp_mline_index_ := p_sdp_mline_index_
-    p_sdp_name_ := p_sdp_name_
+    sdp_mid_name_ := sdp_mid_name_
+    sdp_mline_index_ := sdp_mline_index_
+    sdp_name_ := sdp_name_
     args := []__bindgen_gde.TypePtr {
-        &p_sdp_mid_name_,
-        &p_sdp_mline_index_,
-        &p_sdp_name_,
+        &sdp_mid_name_,
+        &sdp_mline_index_,
+        &sdp_name_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return

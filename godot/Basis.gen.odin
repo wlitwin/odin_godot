@@ -304,6 +304,19 @@ basis_is_finite :: proc "contextless" (
     __ptr(self, raw_data(args), &ret, len(args))
     return
 }
+basis_is_orthonormal :: proc "contextless" (
+    self: ^Basis,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.PtrBuiltInMethod
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_orthonormal", true)
+        __ptr = __bindgen_gde.variant_get_ptr_builtin_method(.Basis, &_gde_name, 3918633141)
+    }
+    args := []__bindgen_gde.TypePtr {
+    }
+    __ptr(self, raw_data(args), &ret, len(args))
+    return
+}
 basis_get_rotation_quaternion :: proc "contextless" (
     self: ^Basis,
 ) -> (ret: Quaternion) {

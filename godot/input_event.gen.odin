@@ -4,6 +4,8 @@ import __bindgen_gde "godot:gdext"
 
 Input_Event_Constants :: enum {
     DEVICE_ID_EMULATION = -1,
+    DEVICE_ID_KEYBOARD = 16,
+    DEVICE_ID_MOUSE = 32,
 }
 
 

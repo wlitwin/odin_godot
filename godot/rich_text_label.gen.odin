@@ -20,6 +20,11 @@ Rich_Text_Label_Meta_Underline :: enum int {
     Meta_Underline_Always = 1,
     Meta_Underline_On_Hover = 2,
 }
+Rich_Text_Label_Image_Unit :: enum int {
+    Image_Unit_Pixel = 0,
+    Image_Unit_Percent = 1,
+    Image_Unit_Em = 2,
+}
 
 Rich_Text_Label_Image_Update_Mask :: enum i64 {
     Update_Texture = 1,
@@ -29,7 +34,7 @@ Rich_Text_Label_Image_Update_Mask :: enum i64 {
     Update_Region = 16,
     Update_Pad = 32,
     Update_Tooltip = 64,
-    Update_Width_In_Percent = 128,
+    Update_Width_Unit = 128,
 }
 
 
@@ -148,22 +153,22 @@ rich_text_label_add_hr :: proc "contextless" (
 rich_text_label_add_image :: proc "contextless" (
     self: Rich_Text_Label,
     image_: Texture2d,
-    width_: Int,
-    height_: Int,
+    width_: f64,
+    height_: f64,
     color_: Color,
     inline_align_: Inline_Alignment,
     region_: Rect2,
     key_: Variant,
     pad_: Bool,
     tooltip_: String,
-    width_in_percent_: Bool,
-    height_in_percent_: Bool,
+    width_unit_: Rich_Text_Label_Image_Unit,
+    height_unit_: Rich_Text_Label_Image_Unit,
     alt_text_: String,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("add_image", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1390915033)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1980227702)
     }
     self := self
     image_ := image_
@@ -175,8 +180,8 @@ rich_text_label_add_image :: proc "contextless" (
     key_ := key_
     pad_ := pad_
     tooltip_ := tooltip_
-    width_in_percent_ := width_in_percent_
-    height_in_percent_ := height_in_percent_
+    width_unit_ := width_unit_
+    height_unit_ := height_unit_
     alt_text_ := alt_text_
     args := []__bindgen_gde.TypePtr {
         &image_,
@@ -188,8 +193,8 @@ rich_text_label_add_image :: proc "contextless" (
         &key_,
         &pad_,
         &tooltip_,
-        &width_in_percent_,
-        &height_in_percent_,
+        &width_unit_,
+        &height_unit_,
         &alt_text_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
@@ -200,20 +205,20 @@ rich_text_label_update_image :: proc "contextless" (
     key_: Variant,
     mask_: Rich_Text_Label_Image_Update_Mask,
     image_: Texture2d,
-    width_: Int,
-    height_: Int,
+    width_: f64,
+    height_: f64,
     color_: Color,
     inline_align_: Inline_Alignment,
     region_: Rect2,
     pad_: Bool,
     tooltip_: String,
-    width_in_percent_: Bool,
-    height_in_percent_: Bool,
+    width_unit_: Rich_Text_Label_Image_Unit,
+    height_unit_: Rich_Text_Label_Image_Unit,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("update_image", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 6389170)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 202998225)
     }
     self := self
     key_ := key_
@@ -226,8 +231,8 @@ rich_text_label_update_image :: proc "contextless" (
     region_ := region_
     pad_ := pad_
     tooltip_ := tooltip_
-    width_in_percent_ := width_in_percent_
-    height_in_percent_ := height_in_percent_
+    width_unit_ := width_unit_
+    height_unit_ := height_unit_
     args := []__bindgen_gde.TypePtr {
         &key_,
         &mask_,
@@ -239,8 +244,8 @@ rich_text_label_update_image :: proc "contextless" (
         &region_,
         &pad_,
         &tooltip_,
-        &width_in_percent_,
-        &height_in_percent_,
+        &width_unit_,
+        &height_unit_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }

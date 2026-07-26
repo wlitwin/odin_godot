@@ -982,6 +982,21 @@ editor_interface_get_open_scenes :: proc "contextless" (
     return
 }
 
+editor_interface_get_unsaved_scenes :: proc "contextless" (
+    self: Editor_Interface,
+) -> (ret: Packed_String_Array) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_unsaved_scenes", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1139954409)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 editor_interface_get_open_scene_roots :: proc "contextless" (
     self: Editor_Interface,
 ) -> (ret: Typed_Array(Node)) {

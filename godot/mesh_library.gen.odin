@@ -461,6 +461,21 @@ mesh_library_get_item_list :: proc "contextless" (
     return
 }
 
+mesh_library_get_item_count :: proc "contextless" (
+    self: Mesh_Library,
+) -> (ret: i32) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_item_count", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3905245786)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 mesh_library_get_last_unused_item_id :: proc "contextless" (
     self: Mesh_Library,
 ) -> (ret: i32) {

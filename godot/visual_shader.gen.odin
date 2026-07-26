@@ -17,7 +17,8 @@ Visual_Shader_Type :: enum int {
     Type_Process_Custom = 7,
     Type_Sky = 8,
     Type_Fog = 9,
-    Type_Max = 10,
+    Type_Texture_Blit = 10,
+    Type_Max = 11,
 }
 Visual_Shader_Varying_Mode :: enum int {
     Varying_Mode_Vertex_To_Frag_Light = 0,

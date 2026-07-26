@@ -71,6 +71,24 @@ editor_translation_parser_plugin__get_recognized_extensions :: proc "contextless
     return
 }
 
+editor_translation_parser_plugin__customize_strings :: proc "contextless" (
+    self: Editor_Translation_Parser_Plugin,
+    strings_: Typed_Array(Packed_String_Array),
+) -> (ret: Typed_Array(Packed_String_Array)) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_customize_strings", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2560709669)
+    }
+    self := self
+    strings_ := strings_
+    args := []__bindgen_gde.TypePtr {
+        &strings_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 
 // properties
 

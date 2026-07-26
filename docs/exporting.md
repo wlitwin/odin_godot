@@ -117,7 +117,7 @@ present; if you installed the addon into your own project, set them up once:
    git clone https://github.com/emscripten-core/emsdk && cd emsdk
    ./emsdk install 4.0.20 && ./emsdk activate 4.0.20
    ```
-   **Pin 4.0.20**: it's the exact version Godot 4.6's web templates were built with, so the
+   **Pin 4.0.20**: it's the exact version Godot 4.7's web templates were built with, so the
    dylink/longjmp ABI matches. (Newer emcc generally works too; 4.0.20 is the safe default.)
 
 2. **Point the editor at the binaries.** When you launch Godot from Finder/Steam/the Project
@@ -194,7 +194,7 @@ tick the **"SharedArrayBuffer support"** box in the HTML5 settings and it config
   memory is used with the engine).
 - **Native debugging isn't available**: debug with `gd.print`, which prints to the JS console
   and browser devtools.
-- **Emscripten version:** Godot 4.6.2's web templates were built with emscripten **4.0.20**;
+- **Emscripten version:** Godot 4.7.1's web templates were built with emscripten **4.0.20**;
   the module runs with the dev shell's **5.0.6** too (`-sSUPPORT_LONGJMP=wasm` keeps the
   longjmp ABI self-contained and the dylink format is cross-compatible). To pin the exact
   version anyway: `EMCC=/path/to/emsdk/.../emcc bash build/build_web.sh`.

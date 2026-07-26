@@ -326,6 +326,20 @@ skeleton_modification2d_jiggle_get_collision_mask :: proc "contextless" (
     return
 }
 
+skeleton_modification2d_jiggle_reset :: proc "contextless" (
+    self: Skeleton_Modification2d_Jiggle,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("reset", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3218959716)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
 skeleton_modification2d_jiggle_set_jiggle_joint_bone2d_node :: proc "contextless" (
     self: Skeleton_Modification2d_Jiggle,
     joint_idx_: Int,

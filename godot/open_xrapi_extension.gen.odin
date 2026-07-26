@@ -286,6 +286,36 @@ open_xrapi_extension_insert_debug_label :: proc "contextless" (
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+open_xrapi_extension_get_view_count :: proc "contextless" (
+    self: Open_Xrapi_Extension,
+) -> (ret: u32) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_view_count", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3905245786)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+open_xrapi_extension_get_view_configuration :: proc "contextless" (
+    self: Open_Xrapi_Extension,
+) -> (ret: u64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_view_configuration", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3905245786)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 open_xrapi_extension_is_initialized :: proc "contextless" (
     self: Open_Xrapi_Extension,
 ) -> (ret: Bool) {
@@ -542,6 +572,40 @@ open_xrapi_extension_unregister_frame_info_extension :: proc "contextless" (
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("unregister_frame_info_extension", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1477360496)
+    }
+    self := self
+    extension_ := extension_
+    args := []__bindgen_gde.TypePtr {
+        &extension_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+open_xrapi_extension_register_projection_layer_extension :: proc "contextless" (
+    self: Open_Xrapi_Extension,
+    extension_: Open_Xr_Extension_Wrapper,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("register_projection_layer_extension", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1477360496)
+    }
+    self := self
+    extension_ := extension_
+    args := []__bindgen_gde.TypePtr {
+        &extension_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+open_xrapi_extension_unregister_projection_layer_extension :: proc "contextless" (
+    self: Open_Xrapi_Extension,
+    extension_: Open_Xr_Extension_Wrapper,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("unregister_projection_layer_extension", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1477360496)
     }
     self := self

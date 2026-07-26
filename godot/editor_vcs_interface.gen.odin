@@ -167,18 +167,36 @@ editor_vcs_interface__discard_file :: proc "contextless" (
 editor_vcs_interface__commit :: proc "contextless" (
     self: Editor_Vcs_Interface,
     msg_: String,
+    amend_: Bool,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("_commit", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 83702148)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2678287736)
     }
     self := self
     msg_ := msg_
+    amend_ := amend_
     args := []__bindgen_gde.TypePtr {
         &msg_,
+        &amend_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+editor_vcs_interface__allow_amends :: proc "contextless" (
+    self: Editor_Vcs_Interface,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_allow_amends", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2240911060)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
 }
 
 editor_vcs_interface__get_diff :: proc "contextless" (

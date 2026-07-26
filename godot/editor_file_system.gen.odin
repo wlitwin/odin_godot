@@ -68,6 +68,21 @@ editor_file_system_is_scanning :: proc "contextless" (
     return
 }
 
+editor_file_system_is_importing :: proc "contextless" (
+    self: Editor_File_System,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_importing", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 editor_file_system_get_scanning_progress :: proc "contextless" (
     self: Editor_File_System,
 ) -> (ret: f64) {

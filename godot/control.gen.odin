@@ -184,6 +184,21 @@ control__structured_text_parser :: proc "contextless" (
     return
 }
 
+control__get_maximum_size :: proc "contextless" (
+    self: Control,
+) -> (ret: Vector2) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_get_maximum_size", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3341600327)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 control__get_minimum_size :: proc "contextless" (
     self: Control,
 ) -> (ret: Vector2) {
@@ -207,6 +222,24 @@ control__get_tooltip :: proc "contextless" (
     if __ptr == nil {
         _gde_name := new_string_name_cstring("_get_tooltip", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3674420000)
+    }
+    self := self
+    at_position_ := at_position_
+    args := []__bindgen_gde.TypePtr {
+        &at_position_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+control__get_tooltip_auto_translate_mode_at :: proc "contextless" (
+    self: Control,
+    at_position_: Vector2,
+) -> (ret: Node_Auto_Translate_Mode) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_get_tooltip_auto_translate_mode_at", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3257223865)
     }
     self := self
     at_position_ := at_position_
@@ -294,6 +327,24 @@ control__make_custom_tooltip :: proc "contextless" (
     return
 }
 
+control__get_cursor_shape :: proc "contextless" (
+    self: Control,
+    at_position_: Vector2,
+) -> (ret: i32) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_get_cursor_shape", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3820158470)
+    }
+    self := self
+    at_position_ := at_position_
+    args := []__bindgen_gde.TypePtr {
+        &at_position_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 control__accessibility_get_contextual_info :: proc "contextless" (
     self: Control,
 ) -> (ret: String) {
@@ -358,6 +409,36 @@ control_accept_event :: proc "contextless" (
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+control_get_maximum_size :: proc "contextless" (
+    self: Control,
+) -> (ret: Vector2) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_maximum_size", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3341600327)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+control_get_combined_maximum_size :: proc "contextless" (
+    self: Control,
+) -> (ret: Vector2) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_combined_maximum_size", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3341600327)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 control_get_minimum_size :: proc "contextless" (
     self: Control,
 ) -> (ret: Vector2) {
@@ -379,6 +460,53 @@ control_get_combined_minimum_size :: proc "contextless" (
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("get_combined_minimum_size", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3341600327)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+control_set_propagate_maximum_size :: proc "contextless" (
+    self: Control,
+    enable_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_propagate_maximum_size", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    enable_ := enable_
+    args := []__bindgen_gde.TypePtr {
+        &enable_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+control_is_propagating_maximum_size :: proc "contextless" (
+    self: Control,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_propagating_maximum_size", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2240911060)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+control_get_bound_minimum_size :: proc "contextless" (
+    self: Control,
+) -> (ret: Vector2) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_bound_minimum_size", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3341600327)
     }
     self := self
@@ -650,6 +778,23 @@ control_reset_size :: proc "contextless" (
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+control_set_custom_maximum_size :: proc "contextless" (
+    self: Control,
+    size_: Vector2,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_custom_maximum_size", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 743155724)
+    }
+    self := self
+    size_ := size_
+    args := []__bindgen_gde.TypePtr {
+        &size_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
 control_set_custom_minimum_size :: proc "contextless" (
     self: Control,
     size_: Vector2,
@@ -913,6 +1058,21 @@ control_get_combined_pivot_offset :: proc "contextless" (
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("get_combined_pivot_offset", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3341600327)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+control_get_custom_maximum_size :: proc "contextless" (
+    self: Control,
+) -> (ret: Vector2) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_custom_maximum_size", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3341600327)
     }
     self := self
@@ -1276,6 +1436,262 @@ control_get_v_size_flags :: proc "contextless" (
     if __ptr == nil {
         _gde_name := new_string_name_cstring("get_v_size_flags", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3781367401)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+control_set_offset_transform_enabled :: proc "contextless" (
+    self: Control,
+    enabled_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_offset_transform_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    enabled_ := enabled_
+    args := []__bindgen_gde.TypePtr {
+        &enabled_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+control_is_offset_transform_enabled :: proc "contextless" (
+    self: Control,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_offset_transform_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+control_set_offset_transform_position :: proc "contextless" (
+    self: Control,
+    offset_: Vector2,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_offset_transform_position", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 743155724)
+    }
+    self := self
+    offset_ := offset_
+    args := []__bindgen_gde.TypePtr {
+        &offset_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+control_get_offset_transform_position :: proc "contextless" (
+    self: Control,
+) -> (ret: Vector2) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_offset_transform_position", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3341600327)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+control_set_offset_transform_position_ratio :: proc "contextless" (
+    self: Control,
+    offset_: Vector2,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_offset_transform_position_ratio", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 743155724)
+    }
+    self := self
+    offset_ := offset_
+    args := []__bindgen_gde.TypePtr {
+        &offset_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+control_get_offset_transform_position_ratio :: proc "contextless" (
+    self: Control,
+) -> (ret: Vector2) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_offset_transform_position_ratio", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3341600327)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+control_set_offset_transform_scale :: proc "contextless" (
+    self: Control,
+    scale_: Vector2,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_offset_transform_scale", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 743155724)
+    }
+    self := self
+    scale_ := scale_
+    args := []__bindgen_gde.TypePtr {
+        &scale_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+control_get_offset_transform_scale :: proc "contextless" (
+    self: Control,
+) -> (ret: Vector2) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_offset_transform_scale", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3341600327)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+control_set_offset_transform_rotation :: proc "contextless" (
+    self: Control,
+    rotation_: f64,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_offset_transform_rotation", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 373806689)
+    }
+    self := self
+    rotation_ := rotation_
+    args := []__bindgen_gde.TypePtr {
+        &rotation_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+control_get_offset_transform_rotation :: proc "contextless" (
+    self: Control,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_offset_transform_rotation", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1740695150)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+control_set_offset_transform_pivot :: proc "contextless" (
+    self: Control,
+    pivot_: Vector2,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_offset_transform_pivot", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 743155724)
+    }
+    self := self
+    pivot_ := pivot_
+    args := []__bindgen_gde.TypePtr {
+        &pivot_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+control_get_offset_transform_pivot :: proc "contextless" (
+    self: Control,
+) -> (ret: Vector2) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_offset_transform_pivot", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3341600327)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+control_set_offset_transform_pivot_ratio :: proc "contextless" (
+    self: Control,
+    pivot_: Vector2,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_offset_transform_pivot_ratio", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 743155724)
+    }
+    self := self
+    pivot_ := pivot_
+    args := []__bindgen_gde.TypePtr {
+        &pivot_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+control_get_offset_transform_pivot_ratio :: proc "contextless" (
+    self: Control,
+) -> (ret: Vector2) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_offset_transform_pivot_ratio", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3341600327)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+control_set_offset_transform_visual_only :: proc "contextless" (
+    self: Control,
+    enabled_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_offset_transform_visual_only", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    enabled_ := enabled_
+    args := []__bindgen_gde.TypePtr {
+        &enabled_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+control_is_offset_transform_visual_only :: proc "contextless" (
+    self: Control,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_offset_transform_visual_only", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
     }
     self := self
     args := []__bindgen_gde.TypePtr {
@@ -2164,6 +2580,38 @@ control_get_tooltip :: proc "contextless" (
     return
 }
 
+control_set_translation_context :: proc "contextless" (
+    self: Control,
+    context_: String_Name,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_translation_context", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3304788590)
+    }
+    self := self
+    context_ := context_
+    args := []__bindgen_gde.TypePtr {
+        &context_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+control_get_translation_context :: proc "contextless" (
+    self: Control,
+) -> (ret: String_Name) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_translation_context", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2002593661)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 control_set_default_cursor_shape :: proc "contextless" (
     self: Control,
     shape_: Control_Cursor_Shape,
@@ -2198,7 +2646,7 @@ control_get_default_cursor_shape :: proc "contextless" (
 
 control_get_cursor_shape :: proc "contextless" (
     self: Control,
-    position_: Vector2,
+    at_position_: Vector2,
 ) -> (ret: Control_Cursor_Shape) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -2206,9 +2654,9 @@ control_get_cursor_shape :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1395773853)
     }
     self := self
-    position_ := position_
+    at_position_ := at_position_
     args := []__bindgen_gde.TypePtr {
-        &position_,
+        &at_position_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -2430,12 +2878,12 @@ control_get_accessibility_description :: proc "contextless" (
 
 control_set_accessibility_live :: proc "contextless" (
     self: Control,
-    mode_: Display_Server_Accessibility_Live_Mode,
+    mode_: Accessibility_Server_Accessibility_Live_Mode,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("set_accessibility_live", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1720261470)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 353443434)
     }
     self := self
     mode_ := mode_
@@ -2447,11 +2895,11 @@ control_set_accessibility_live :: proc "contextless" (
 
 control_get_accessibility_live :: proc "contextless" (
     self: Control,
-) -> (ret: Display_Server_Accessibility_Live_Mode) {
+) -> (ret: Accessibility_Server_Accessibility_Live_Mode) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("get_accessibility_live", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3311037003)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2858591811)
     }
     self := self
     args := []__bindgen_gde.TypePtr {
@@ -2849,6 +3297,20 @@ control_get_shortcut_context :: proc "contextless" (
     return
 }
 
+control_update_maximum_size :: proc "contextless" (
+    self: Control,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("update_maximum_size", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3218959716)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
 control_update_minimum_size :: proc "contextless" (
     self: Control,
 ) {
@@ -2976,6 +3438,9 @@ control_is_localizing_numeral_system :: proc "contextless" (
 
 
 // properties
+control_get_propagate_maximum_size :: proc "contextless" (self: Control) -> Bool {
+    return control_is_propagating_maximum_size(self)
+}
 control_get_clip_contents :: proc "contextless" (self: Control) -> Bool {
     return control_is_clipping_contents(self)
 }
@@ -3044,6 +3509,12 @@ control_get_size_flags_stretch_ratio :: proc "contextless" (self: Control) -> f6
 }
 control_set_size_flags_stretch_ratio :: proc "contextless" (self: Control, value: f64) {
     control_set_stretch_ratio(self, value)
+}
+control_get_offset_transform_enabled :: proc "contextless" (self: Control) -> Bool {
+    return control_is_offset_transform_enabled(self)
+}
+control_get_offset_transform_visual_only :: proc "contextless" (self: Control) -> Bool {
+    return control_is_offset_transform_visual_only(self)
 }
 control_get_localize_numeral_system :: proc "contextless" (self: Control) -> Bool {
     return control_is_localizing_numeral_system(self)

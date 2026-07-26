@@ -17,11 +17,40 @@ import "core:fmt"
 import "core:os"
 import "core:strconv"
 import "core:strings"
+import "core:unicode/utf8"
 
 Diagnostic :: struct {
     line:    int,
     column:  int,
     message: string, // owned (cloned) into the caller's allocator
+}
+
+// clamp_all — bound every diagnostic into `source`'s valid caret range: 1-based line
+// within the text, 1-based column at most one past the line's last rune (the caret-after-
+// last-char position GDScript's own diagnostics use). Two real inputs land outside that
+// range: odin's EOF-class errors carry column 0 (`file(43:0) Expected '}', got EOF`), and
+// package-sibling diagnostics carry positions from a DIFFERENT file than the one the
+// editor attributes them to. Godot 4.6 shrugged out-of-range error positions off; 4.7's
+// ScriptTextEditor stores errors[0] as (line-1, column-1) and its caret x-offset walk
+// indexes the line's char vector with the result UNGUARDED — column 0 becomes -1, wraps
+// to a huge unsigned, and the editor dies on a FATAL CowData bounds check (two editor
+// crashes reproduced on 4.7.1, 2026-07-25). Every diagnostic that reaches the engine
+// must pass through here first.
+clamp_all :: proc(ds: []Diagnostic, source: string) {
+    caps := make([dynamic]int)
+    defer delete(caps)
+    rest := source
+    for line in strings.split_lines_iterator(&rest) {
+        append(&caps, utf8.rune_count_in_string(line) + 1)
+    }
+    for &d in ds {
+        d.line = clamp(d.line, 1, max(len(caps), 1))
+        if d.line - 1 < len(caps) {
+            d.column = clamp(d.column, 1, caps[d.line - 1])
+        } else {
+            d.column = 1
+        }
+    }
 }
 
 @(private)

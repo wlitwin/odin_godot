@@ -20,7 +20,8 @@ Viewport_Scaling3d_Mode :: enum int {
     Scaling_3d_Mode_Fsr2 = 2,
     Scaling_3d_Mode_Metalfx_Spatial = 3,
     Scaling_3d_Mode_Metalfx_Temporal = 4,
-    Scaling_3d_Mode_Max = 5,
+    Scaling_3d_Mode_Nearest = 5,
+    Scaling_3d_Mode_Max = 6,
 }
 Viewport_Msaa :: enum int {
     Msaa_Disabled = 0,
@@ -83,19 +84,23 @@ Viewport_Debug_Draw :: enum int {
     Debug_Draw_Occluders = 24,
     Debug_Draw_Motion_Vectors = 25,
     Debug_Draw_Internal_Buffer = 26,
+    Debug_Draw_Cluster_Area_Lights = 27,
+    Debug_Draw_Area_Light_Atlas = 28,
 }
 Viewport_Default_Canvas_Item_Texture_Filter :: enum int {
     Default_Canvas_Item_Texture_Filter_Nearest = 0,
     Default_Canvas_Item_Texture_Filter_Linear = 1,
     Default_Canvas_Item_Texture_Filter_Linear_With_Mipmaps = 2,
     Default_Canvas_Item_Texture_Filter_Nearest_With_Mipmaps = 3,
-    Default_Canvas_Item_Texture_Filter_Max = 4,
+    Default_Canvas_Item_Texture_Filter_Parent_Node = 4,
+    Default_Canvas_Item_Texture_Filter_Max = 5,
 }
 Viewport_Default_Canvas_Item_Texture_Repeat :: enum int {
     Default_Canvas_Item_Texture_Repeat_Disabled = 0,
     Default_Canvas_Item_Texture_Repeat_Enabled = 1,
     Default_Canvas_Item_Texture_Repeat_Mirror = 2,
-    Default_Canvas_Item_Texture_Repeat_Max = 3,
+    Default_Canvas_Item_Texture_Repeat_Parent_Node = 3,
+    Default_Canvas_Item_Texture_Repeat_Max = 4,
 }
 Viewport_Sdf_Oversize :: enum int {
     Sdf_Oversize_100_Percent = 0,
@@ -1965,7 +1970,7 @@ viewport_is_using_xr :: proc "contextless" (
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("is_using_xr", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2240911060)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
     }
     self := self
     args := []__bindgen_gde.TypePtr {

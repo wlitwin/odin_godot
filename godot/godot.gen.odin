@@ -7,6 +7,7 @@ A_Star2d :: Ref_Counted
 A_Star3d :: Ref_Counted
 A_Star_Grid2d :: Ref_Counted
 Accept_Dialog :: Window
+Accessibility_Server :: Object
 Aim_Modifier3d :: Bone_Constraint3d
 Animatable_Body2d :: Static_Body2d
 Animatable_Body3d :: Static_Body3d
@@ -41,6 +42,7 @@ Animation_Root_Node :: Animation_Node
 Animation_Tree :: Animation_Mixer
 Area2d :: Collision_Object2d
 Area3d :: Collision_Object3d
+Area_Light3d :: Light3d
 Array_Mesh :: Mesh
 Array_Occluder3d :: Occluder3d
 Aspect_Ratio_Container :: Container
@@ -103,10 +105,12 @@ Audio_Stream_Polyphonic :: Audio_Stream
 Audio_Stream_Randomizer :: Audio_Stream
 Audio_Stream_Synchronized :: Audio_Stream
 Audio_Stream_Wav :: Audio_Stream
+Await_Tweener :: Tweener
 Back_Buffer_Copy :: Node2d
 Base_Button :: Control
 Base_Material3d :: Material
 Bit_Map :: Resource
+Blit_Material :: Material
 Bone2d :: Node2d
 Bone_Attachment3d :: Node3d
 Bone_Constraint3d :: Skeleton_Modifier3d
@@ -207,6 +211,7 @@ Dir_Access :: Ref_Counted
 Directional_Light2d :: Light2d
 Directional_Light3d :: Light3d
 Display_Server :: Object
+Drawable_Texture2d :: Texture2d
 E_Net_Connection :: Ref_Counted
 E_Net_Multiplayer_Peer :: Multiplayer_Peer
 E_Net_Packet_Peer :: Packet_Peer
@@ -290,7 +295,10 @@ Framebuffer_Cache_Rd :: Object
 Gd_Extension :: Resource
 Gd_Extension_Manager :: Object
 Gd_Script :: Script
+Gd_Script_Language_Protocol :: Jsonrpc
 Gd_Script_Syntax_Highlighter :: Editor_Syntax_Highlighter
+Gd_Script_Text_Document :: Ref_Counted
+Gd_Script_Workspace :: Ref_Counted
 Gltf_Accessor :: Resource
 Gltf_Animation :: Resource
 Gltf_Buffer_View :: Resource
@@ -631,13 +639,17 @@ Project_Settings :: Object
 Property_Tweener :: Tweener
 Quad_Mesh :: Plane_Mesh
 Quad_Occluder3d :: Occluder3d
+Rd_Acceleration_Structure_Geometry :: Ref_Counted
+Rd_Acceleration_Structure_Instance :: Ref_Counted
 Rd_Attachment_Format :: Ref_Counted
 Rd_Framebuffer_Pass :: Ref_Counted
+Rd_Hit_Group :: Ref_Counted
 Rd_Pipeline_Color_Blend_State :: Ref_Counted
 Rd_Pipeline_Color_Blend_State_Attachment :: Ref_Counted
 Rd_Pipeline_Depth_Stencil_State :: Ref_Counted
 Rd_Pipeline_Multisample_State :: Ref_Counted
 Rd_Pipeline_Rasterization_State :: Ref_Counted
+Rd_Pipeline_Shader :: Ref_Counted
 Rd_Pipeline_Specialization_Constant :: Ref_Counted
 Rd_Sampler_State :: Ref_Counted
 Rd_Shader_File :: Resource
@@ -865,6 +877,7 @@ Video_Stream_Player :: Control
 Video_Stream_Theora :: Video_Stream
 Viewport :: Node
 Viewport_Texture :: Texture2d
+Virtual_Joystick :: Control
 Visible_On_Screen_Enabler2d :: Visible_On_Screen_Notifier2d
 Visible_On_Screen_Enabler3d :: Visible_On_Screen_Notifier3d
 Visible_On_Screen_Notifier2d :: Node2d
@@ -1313,7 +1326,12 @@ Joy_Button :: enum int {
     Paddle3 = 18,
     Paddle4 = 19,
     Touchpad = 20,
-    Sdl_Max = 21,
+    Misc2 = 21,
+    Misc3 = 22,
+    Misc4 = 23,
+    Misc5 = 24,
+    Misc6 = 25,
+    Sdl_Max = 26,
     Max = 128,
 }
 Joy_Axis :: enum int {
@@ -1747,6 +1765,7 @@ init :: proc "contextless" () {
     __Project_Settings_name = new_string_name_cstring("ProjectSettings", true)
     __Os_name = new_string_name_cstring("OS", true)
     __Time_name = new_string_name_cstring("Time", true)
+    __Class_Db_name = new_string_name_cstring("ClassDB", true)
     __Text_Server_Manager_name = new_string_name_cstring("TextServerManager", true)
     __Navigation_Server2d_Manager_name = new_string_name_cstring("NavigationServer2DManager", true)
     __Physics_Server2d_Manager_name = new_string_name_cstring("PhysicsServer2DManager", true)
@@ -1758,7 +1777,6 @@ init :: proc "contextless" () {
     __Geometry3d_name = new_string_name_cstring("Geometry3D", true)
     __Resource_Loader_name = new_string_name_cstring("ResourceLoader", true)
     __Resource_Saver_name = new_string_name_cstring("ResourceSaver", true)
-    __Class_Db_name = new_string_name_cstring("ClassDB", true)
     __Marshalls_name = new_string_name_cstring("Marshalls", true)
     __Translation_Server_name = new_string_name_cstring("TranslationServer", true)
     __Input_name = new_string_name_cstring("Input", true)
@@ -1769,8 +1787,10 @@ init :: proc "contextless" () {
     __Worker_Thread_Pool_name = new_string_name_cstring("WorkerThreadPool", true)
     __Theme_Db_name = new_string_name_cstring("ThemeDB", true)
     __Editor_Interface_name = new_string_name_cstring("EditorInterface", true)
+    __Gd_Script_Language_Protocol_name = new_string_name_cstring("GDScriptLanguageProtocol", true)
     __Java_Class_Wrapper_name = new_string_name_cstring("JavaClassWrapper", true)
     __Java_Script_Bridge_name = new_string_name_cstring("JavaScriptBridge", true)
+    __Accessibility_Server_name = new_string_name_cstring("AccessibilityServer", true)
     __Audio_Server_name = new_string_name_cstring("AudioServer", true)
     __Camera_Server_name = new_string_name_cstring("CameraServer", true)
     __Display_Server_name = new_string_name_cstring("DisplayServer", true)
@@ -1786,6 +1806,7 @@ init :: proc "contextless" () {
     a_star3d_init()
     a_star_grid2d_init()
     accept_dialog_init()
+    accessibility_server_init()
     aim_modifier3d_init()
     animatable_body2d_init()
     animatable_body3d_init()
@@ -1820,6 +1841,7 @@ init :: proc "contextless" () {
     animation_tree_init()
     area2d_init()
     area3d_init()
+    area_light3d_init()
     array_mesh_init()
     array_occluder3d_init()
     aspect_ratio_container_init()
@@ -1882,10 +1904,12 @@ init :: proc "contextless" () {
     audio_stream_randomizer_init()
     audio_stream_synchronized_init()
     audio_stream_wav_init()
+    await_tweener_init()
     back_buffer_copy_init()
     base_button_init()
     base_material3d_init()
     bit_map_init()
+    blit_material_init()
     bone2d_init()
     bone_attachment3d_init()
     bone_constraint3d_init()
@@ -1986,6 +2010,7 @@ init :: proc "contextless" () {
     directional_light2d_init()
     directional_light3d_init()
     display_server_init()
+    drawable_texture2d_init()
     e_net_connection_init()
     e_net_multiplayer_peer_init()
     e_net_packet_peer_init()
@@ -2069,7 +2094,10 @@ init :: proc "contextless" () {
     gd_extension_init()
     gd_extension_manager_init()
     gd_script_init()
+    gd_script_language_protocol_init()
     gd_script_syntax_highlighter_init()
+    gd_script_text_document_init()
+    gd_script_workspace_init()
     gltf_accessor_init()
     gltf_animation_init()
     gltf_buffer_view_init()
@@ -2411,13 +2439,17 @@ init :: proc "contextless" () {
     property_tweener_init()
     quad_mesh_init()
     quad_occluder3d_init()
+    rd_acceleration_structure_geometry_init()
+    rd_acceleration_structure_instance_init()
     rd_attachment_format_init()
     rd_framebuffer_pass_init()
+    rd_hit_group_init()
     rd_pipeline_color_blend_state_init()
     rd_pipeline_color_blend_state_attachment_init()
     rd_pipeline_depth_stencil_state_init()
     rd_pipeline_multisample_state_init()
     rd_pipeline_rasterization_state_init()
+    rd_pipeline_shader_init()
     rd_pipeline_specialization_constant_init()
     rd_sampler_state_init()
     rd_shader_file_init()
@@ -2646,6 +2678,7 @@ init :: proc "contextless" () {
     video_stream_theora_init()
     viewport_init()
     viewport_texture_init()
+    virtual_joystick_init()
     visible_on_screen_enabler2d_init()
     visible_on_screen_enabler3d_init()
     visible_on_screen_notifier2d_init()
@@ -4327,6 +4360,14 @@ singleton_time :: proc "contextless" () -> Time {
     
     return __ptr
 }
+singleton_class_db :: proc "contextless" () -> Class_Db {
+    @(static) __ptr: __bindgen_gde.ObjectPtr
+    if __ptr == nil {
+        __ptr = __bindgen_gde.global_get_singleton(&__Class_Db_name)
+    }
+    
+    return __ptr
+}
 singleton_text_server_manager :: proc "contextless" () -> Text_Server_Manager {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
@@ -4415,14 +4456,6 @@ singleton_resource_saver :: proc "contextless" () -> Resource_Saver {
     
     return __ptr
 }
-singleton_class_db :: proc "contextless" () -> Class_Db {
-    @(static) __ptr: __bindgen_gde.ObjectPtr
-    if __ptr == nil {
-        __ptr = __bindgen_gde.global_get_singleton(&__Class_Db_name)
-    }
-    
-    return __ptr
-}
 singleton_marshalls :: proc "contextless" () -> Marshalls {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
@@ -4503,6 +4536,14 @@ singleton_editor_interface :: proc "contextless" () -> Editor_Interface {
     
     return __ptr
 }
+singleton_gd_script_language_protocol :: proc "contextless" () -> Gd_Script_Language_Protocol {
+    @(static) __ptr: __bindgen_gde.ObjectPtr
+    if __ptr == nil {
+        __ptr = __bindgen_gde.global_get_singleton(&__Gd_Script_Language_Protocol_name)
+    }
+    
+    return __ptr
+}
 singleton_java_class_wrapper :: proc "contextless" () -> Java_Class_Wrapper {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
@@ -4515,6 +4556,14 @@ singleton_java_script_bridge :: proc "contextless" () -> Java_Script_Bridge {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Java_Script_Bridge_name)
+    }
+    
+    return __ptr
+}
+singleton_accessibility_server :: proc "contextless" () -> Accessibility_Server {
+    @(static) __ptr: __bindgen_gde.ObjectPtr
+    if __ptr == nil {
+        __ptr = __bindgen_gde.global_get_singleton(&__Accessibility_Server_name)
     }
     
     return __ptr
@@ -4617,6 +4666,7 @@ class_name_ref :: proc "contextless" ($C: typeid) -> ^String_Name {
     case typeid_of(A_Star3d): return a_star3d_name_ref()
     case typeid_of(A_Star_Grid2d): return a_star_grid2d_name_ref()
     case typeid_of(Accept_Dialog): return accept_dialog_name_ref()
+    case typeid_of(Accessibility_Server): return accessibility_server_name_ref()
     case typeid_of(Aim_Modifier3d): return aim_modifier3d_name_ref()
     case typeid_of(Animatable_Body2d): return animatable_body2d_name_ref()
     case typeid_of(Animatable_Body3d): return animatable_body3d_name_ref()
@@ -4651,6 +4701,7 @@ class_name_ref :: proc "contextless" ($C: typeid) -> ^String_Name {
     case typeid_of(Animation_Tree): return animation_tree_name_ref()
     case typeid_of(Area2d): return area2d_name_ref()
     case typeid_of(Area3d): return area3d_name_ref()
+    case typeid_of(Area_Light3d): return area_light3d_name_ref()
     case typeid_of(Array_Mesh): return array_mesh_name_ref()
     case typeid_of(Array_Occluder3d): return array_occluder3d_name_ref()
     case typeid_of(Aspect_Ratio_Container): return aspect_ratio_container_name_ref()
@@ -4713,10 +4764,12 @@ class_name_ref :: proc "contextless" ($C: typeid) -> ^String_Name {
     case typeid_of(Audio_Stream_Randomizer): return audio_stream_randomizer_name_ref()
     case typeid_of(Audio_Stream_Synchronized): return audio_stream_synchronized_name_ref()
     case typeid_of(Audio_Stream_Wav): return audio_stream_wav_name_ref()
+    case typeid_of(Await_Tweener): return await_tweener_name_ref()
     case typeid_of(Back_Buffer_Copy): return back_buffer_copy_name_ref()
     case typeid_of(Base_Button): return base_button_name_ref()
     case typeid_of(Base_Material3d): return base_material3d_name_ref()
     case typeid_of(Bit_Map): return bit_map_name_ref()
+    case typeid_of(Blit_Material): return blit_material_name_ref()
     case typeid_of(Bone2d): return bone2d_name_ref()
     case typeid_of(Bone_Attachment3d): return bone_attachment3d_name_ref()
     case typeid_of(Bone_Constraint3d): return bone_constraint3d_name_ref()
@@ -4817,6 +4870,7 @@ class_name_ref :: proc "contextless" ($C: typeid) -> ^String_Name {
     case typeid_of(Directional_Light2d): return directional_light2d_name_ref()
     case typeid_of(Directional_Light3d): return directional_light3d_name_ref()
     case typeid_of(Display_Server): return display_server_name_ref()
+    case typeid_of(Drawable_Texture2d): return drawable_texture2d_name_ref()
     case typeid_of(E_Net_Connection): return e_net_connection_name_ref()
     case typeid_of(E_Net_Multiplayer_Peer): return e_net_multiplayer_peer_name_ref()
     case typeid_of(E_Net_Packet_Peer): return e_net_packet_peer_name_ref()
@@ -4900,7 +4954,10 @@ class_name_ref :: proc "contextless" ($C: typeid) -> ^String_Name {
     case typeid_of(Gd_Extension): return gd_extension_name_ref()
     case typeid_of(Gd_Extension_Manager): return gd_extension_manager_name_ref()
     case typeid_of(Gd_Script): return gd_script_name_ref()
+    case typeid_of(Gd_Script_Language_Protocol): return gd_script_language_protocol_name_ref()
     case typeid_of(Gd_Script_Syntax_Highlighter): return gd_script_syntax_highlighter_name_ref()
+    case typeid_of(Gd_Script_Text_Document): return gd_script_text_document_name_ref()
+    case typeid_of(Gd_Script_Workspace): return gd_script_workspace_name_ref()
     case typeid_of(Gltf_Accessor): return gltf_accessor_name_ref()
     case typeid_of(Gltf_Animation): return gltf_animation_name_ref()
     case typeid_of(Gltf_Buffer_View): return gltf_buffer_view_name_ref()
@@ -5241,13 +5298,17 @@ class_name_ref :: proc "contextless" ($C: typeid) -> ^String_Name {
     case typeid_of(Property_Tweener): return property_tweener_name_ref()
     case typeid_of(Quad_Mesh): return quad_mesh_name_ref()
     case typeid_of(Quad_Occluder3d): return quad_occluder3d_name_ref()
+    case typeid_of(Rd_Acceleration_Structure_Geometry): return rd_acceleration_structure_geometry_name_ref()
+    case typeid_of(Rd_Acceleration_Structure_Instance): return rd_acceleration_structure_instance_name_ref()
     case typeid_of(Rd_Attachment_Format): return rd_attachment_format_name_ref()
     case typeid_of(Rd_Framebuffer_Pass): return rd_framebuffer_pass_name_ref()
+    case typeid_of(Rd_Hit_Group): return rd_hit_group_name_ref()
     case typeid_of(Rd_Pipeline_Color_Blend_State): return rd_pipeline_color_blend_state_name_ref()
     case typeid_of(Rd_Pipeline_Color_Blend_State_Attachment): return rd_pipeline_color_blend_state_attachment_name_ref()
     case typeid_of(Rd_Pipeline_Depth_Stencil_State): return rd_pipeline_depth_stencil_state_name_ref()
     case typeid_of(Rd_Pipeline_Multisample_State): return rd_pipeline_multisample_state_name_ref()
     case typeid_of(Rd_Pipeline_Rasterization_State): return rd_pipeline_rasterization_state_name_ref()
+    case typeid_of(Rd_Pipeline_Shader): return rd_pipeline_shader_name_ref()
     case typeid_of(Rd_Pipeline_Specialization_Constant): return rd_pipeline_specialization_constant_name_ref()
     case typeid_of(Rd_Sampler_State): return rd_sampler_state_name_ref()
     case typeid_of(Rd_Shader_File): return rd_shader_file_name_ref()
@@ -5475,6 +5536,7 @@ class_name_ref :: proc "contextless" ($C: typeid) -> ^String_Name {
     case typeid_of(Video_Stream_Theora): return video_stream_theora_name_ref()
     case typeid_of(Viewport): return viewport_name_ref()
     case typeid_of(Viewport_Texture): return viewport_texture_name_ref()
+    case typeid_of(Virtual_Joystick): return virtual_joystick_name_ref()
     case typeid_of(Visible_On_Screen_Enabler2d): return visible_on_screen_enabler2d_name_ref()
     case typeid_of(Visible_On_Screen_Enabler3d): return visible_on_screen_enabler3d_name_ref()
     case typeid_of(Visible_On_Screen_Notifier2d): return visible_on_screen_notifier2d_name_ref()
@@ -5877,6 +5939,8 @@ __Os_name: String_Name
 @(private="file")
 __Time_name: String_Name
 @(private="file")
+__Class_Db_name: String_Name
+@(private="file")
 __Text_Server_Manager_name: String_Name
 @(private="file")
 __Navigation_Server2d_Manager_name: String_Name
@@ -5899,8 +5963,6 @@ __Resource_Loader_name: String_Name
 @(private="file")
 __Resource_Saver_name: String_Name
 @(private="file")
-__Class_Db_name: String_Name
-@(private="file")
 __Marshalls_name: String_Name
 @(private="file")
 __Translation_Server_name: String_Name
@@ -5921,9 +5983,13 @@ __Theme_Db_name: String_Name
 @(private="file")
 __Editor_Interface_name: String_Name
 @(private="file")
+__Gd_Script_Language_Protocol_name: String_Name
+@(private="file")
 __Java_Class_Wrapper_name: String_Name
 @(private="file")
 __Java_Script_Bridge_name: String_Name
+@(private="file")
+__Accessibility_Server_name: String_Name
 @(private="file")
 __Audio_Server_name: String_Name
 @(private="file")

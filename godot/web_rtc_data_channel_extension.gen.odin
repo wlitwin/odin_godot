@@ -61,8 +61,8 @@ web_rtc_data_channel_extension__get_packet :: proc "contextless" (
 
 web_rtc_data_channel_extension__put_packet :: proc "contextless" (
     self: Web_Rtc_Data_Channel_Extension,
-    p_buffer_: ^u8,
-    p_buffer_size_: Int,
+    buffer_: ^u8,
+    buffer_size_: Int,
 ) -> (ret: Error) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -70,11 +70,11 @@ web_rtc_data_channel_extension__put_packet :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3099858825)
     }
     self := self
-    p_buffer_ := p_buffer_
-    p_buffer_size_ := p_buffer_size_
+    buffer_ := buffer_
+    buffer_size_ := buffer_size_
     args := []__bindgen_gde.TypePtr {
-        &p_buffer_,
-        &p_buffer_size_,
+        &buffer_,
+        &buffer_size_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -141,7 +141,7 @@ web_rtc_data_channel_extension__close :: proc "contextless" (
 
 web_rtc_data_channel_extension__set_write_mode :: proc "contextless" (
     self: Web_Rtc_Data_Channel_Extension,
-    p_write_mode_: Web_Rtc_Data_Channel_Write_Mode,
+    write_mode_: Web_Rtc_Data_Channel_Write_Mode,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -149,9 +149,9 @@ web_rtc_data_channel_extension__set_write_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1999768052)
     }
     self := self
-    p_write_mode_ := p_write_mode_
+    write_mode_ := write_mode_
     args := []__bindgen_gde.TypePtr {
-        &p_write_mode_,
+        &write_mode_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }

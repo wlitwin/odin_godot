@@ -267,6 +267,38 @@ editor_spin_slider_is_editing_integer :: proc "contextless" (
     return
 }
 
+editor_spin_slider_set_deferred_drag_mode_enabled :: proc "contextless" (
+    self: Editor_Spin_Slider,
+    enabled_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_deferred_drag_mode_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3216645846)
+    }
+    self := self
+    enabled_ := enabled_
+    args := []__bindgen_gde.TypePtr {
+        &enabled_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+editor_spin_slider_is_deferred_drag_mode_enabled :: proc "contextless" (
+    self: Editor_Spin_Slider,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_deferred_drag_mode_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 
 // properties
 editor_spin_slider_get_read_only :: proc "contextless" (self: Editor_Spin_Slider) -> Bool {
@@ -280,6 +312,12 @@ editor_spin_slider_get_hide_slider :: proc "contextless" (self: Editor_Spin_Slid
 }
 editor_spin_slider_get_editing_integer :: proc "contextless" (self: Editor_Spin_Slider) -> Bool {
     return editor_spin_slider_is_editing_integer(self)
+}
+editor_spin_slider_get_deferred_drag_mode :: proc "contextless" (self: Editor_Spin_Slider) -> Bool {
+    return editor_spin_slider_is_deferred_drag_mode_enabled(self)
+}
+editor_spin_slider_set_deferred_drag_mode :: proc "contextless" (self: Editor_Spin_Slider, value: Bool) {
+    editor_spin_slider_set_deferred_drag_mode_enabled(self, value)
 }
 
 // Only interns the class StringName (used for object construction and as the

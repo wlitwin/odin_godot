@@ -61,8 +61,8 @@ multiplayer_peer_extension__get_packet :: proc "contextless" (
 
 multiplayer_peer_extension__put_packet :: proc "contextless" (
     self: Multiplayer_Peer_Extension,
-    p_buffer_: ^u8,
-    p_buffer_size_: Int,
+    buffer_: ^u8,
+    buffer_size_: Int,
 ) -> (ret: Error) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -70,11 +70,11 @@ multiplayer_peer_extension__put_packet :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3099858825)
     }
     self := self
-    p_buffer_ := p_buffer_
-    p_buffer_size_ := p_buffer_size_
+    buffer_ := buffer_
+    buffer_size_ := buffer_size_
     args := []__bindgen_gde.TypePtr {
-        &p_buffer_,
-        &p_buffer_size_,
+        &buffer_,
+        &buffer_size_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -127,7 +127,7 @@ multiplayer_peer_extension__get_packet_script :: proc "contextless" (
 
 multiplayer_peer_extension__put_packet_script :: proc "contextless" (
     self: Multiplayer_Peer_Extension,
-    p_buffer_: Packed_Byte_Array,
+    buffer_: Packed_Byte_Array,
 ) -> (ret: Error) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -135,9 +135,9 @@ multiplayer_peer_extension__put_packet_script :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 680677267)
     }
     self := self
-    p_buffer_ := p_buffer_
+    buffer_ := buffer_
     args := []__bindgen_gde.TypePtr {
-        &p_buffer_,
+        &buffer_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -175,7 +175,7 @@ multiplayer_peer_extension__get_packet_mode :: proc "contextless" (
 
 multiplayer_peer_extension__set_transfer_channel :: proc "contextless" (
     self: Multiplayer_Peer_Extension,
-    p_channel_: Int,
+    channel_: Int,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -183,9 +183,9 @@ multiplayer_peer_extension__set_transfer_channel :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
     }
     self := self
-    p_channel_ := p_channel_
+    channel_ := channel_
     args := []__bindgen_gde.TypePtr {
-        &p_channel_,
+        &channel_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -207,7 +207,7 @@ multiplayer_peer_extension__get_transfer_channel :: proc "contextless" (
 
 multiplayer_peer_extension__set_transfer_mode :: proc "contextless" (
     self: Multiplayer_Peer_Extension,
-    p_mode_: Multiplayer_Peer_Transfer_Mode,
+    mode_: Multiplayer_Peer_Transfer_Mode,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -215,9 +215,9 @@ multiplayer_peer_extension__set_transfer_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 950411049)
     }
     self := self
-    p_mode_ := p_mode_
+    mode_ := mode_
     args := []__bindgen_gde.TypePtr {
-        &p_mode_,
+        &mode_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -239,7 +239,7 @@ multiplayer_peer_extension__get_transfer_mode :: proc "contextless" (
 
 multiplayer_peer_extension__set_target_peer :: proc "contextless" (
     self: Multiplayer_Peer_Extension,
-    p_peer_: Int,
+    peer_: Int,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -247,9 +247,9 @@ multiplayer_peer_extension__set_target_peer :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
     }
     self := self
-    p_peer_ := p_peer_
+    peer_ := peer_
     args := []__bindgen_gde.TypePtr {
-        &p_peer_,
+        &peer_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -314,8 +314,8 @@ multiplayer_peer_extension__close :: proc "contextless" (
 
 multiplayer_peer_extension__disconnect_peer :: proc "contextless" (
     self: Multiplayer_Peer_Extension,
-    p_peer_: Int,
-    p_force_: Bool,
+    peer_: Int,
+    force_: Bool,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -323,11 +323,11 @@ multiplayer_peer_extension__disconnect_peer :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 300928843)
     }
     self := self
-    p_peer_ := p_peer_
-    p_force_ := p_force_
+    peer_ := peer_
+    force_ := force_
     args := []__bindgen_gde.TypePtr {
-        &p_peer_,
-        &p_force_,
+        &peer_,
+        &force_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -349,7 +349,7 @@ multiplayer_peer_extension__get_unique_id :: proc "contextless" (
 
 multiplayer_peer_extension__set_refuse_new_connections :: proc "contextless" (
     self: Multiplayer_Peer_Extension,
-    p_enable_: Bool,
+    enable_: Bool,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -357,9 +357,9 @@ multiplayer_peer_extension__set_refuse_new_connections :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
     }
     self := self
-    p_enable_ := p_enable_
+    enable_ := enable_
     args := []__bindgen_gde.TypePtr {
-        &p_enable_,
+        &enable_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }

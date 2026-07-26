@@ -599,6 +599,44 @@ collision_object2d_get_shape_owner_one_way_collision_margin :: proc "contextless
     return
 }
 
+collision_object2d_get_shape_owner_one_way_collision_direction :: proc "contextless" (
+    self: Collision_Object2d,
+    owner_id_: Int,
+) -> (ret: Vector2) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_shape_owner_one_way_collision_direction", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2299179447)
+    }
+    self := self
+    owner_id_ := owner_id_
+    args := []__bindgen_gde.TypePtr {
+        &owner_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+collision_object2d_shape_owner_set_one_way_collision_direction :: proc "contextless" (
+    self: Collision_Object2d,
+    owner_id_: Int,
+    direction_: Vector2,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("shape_owner_set_one_way_collision_direction", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 163021252)
+    }
+    self := self
+    owner_id_ := owner_id_
+    direction_ := direction_
+    args := []__bindgen_gde.TypePtr {
+        &owner_id_,
+        &direction_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
 collision_object2d_shape_owner_add_shape :: proc "contextless" (
     self: Collision_Object2d,
     owner_id_: Int,

@@ -10,6 +10,7 @@ Scroll_Container_Scroll_Mode :: enum int {
     Scroll_Mode_Show_Always = 2,
     Scroll_Mode_Show_Never = 3,
     Scroll_Mode_Reserve = 4,
+    Scroll_Mode_Maximize_First = 5,
 }
 Scroll_Container_Scroll_Hint_Mode :: enum int {
     Scroll_Hint_Mode_Disabled = 0,
@@ -235,6 +236,38 @@ scroll_container_get_vertical_scroll_mode :: proc "contextless" (
     if __ptr == nil {
         _gde_name := new_string_name_cstring("get_vertical_scroll_mode", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3987985145)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+scroll_container_set_scroll_horizontal_by_default :: proc "contextless" (
+    self: Scroll_Container,
+    enable_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_scroll_horizontal_by_default", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    enable_ := enable_
+    args := []__bindgen_gde.TypePtr {
+        &enable_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+scroll_container_is_scroll_horizontal_by_default :: proc "contextless" (
+    self: Scroll_Container,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_scroll_horizontal_by_default", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
     }
     self := self
     args := []__bindgen_gde.TypePtr {
@@ -478,6 +511,9 @@ scroll_container_get_scroll_vertical_custom_step :: proc "contextless" (self: Sc
 }
 scroll_container_set_scroll_vertical_custom_step :: proc "contextless" (self: Scroll_Container, value: f64) {
     scroll_container_set_vertical_custom_step(self, value)
+}
+scroll_container_get_scroll_horizontal_by_default :: proc "contextless" (self: Scroll_Container) -> Bool {
+    return scroll_container_is_scroll_horizontal_by_default(self)
 }
 scroll_container_get_scroll_deadzone :: proc "contextless" (self: Scroll_Container) -> i32 {
     return scroll_container_get_deadzone(self)

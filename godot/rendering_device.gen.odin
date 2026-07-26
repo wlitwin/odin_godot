@@ -354,7 +354,8 @@ Rendering_Device_Uniform_Type :: enum int {
     Uniform_Type_Input_Attachment = 9,
     Uniform_Type_Uniform_Buffer_Dynamic = 10,
     Uniform_Type_Storage_Buffer_Dynamic = 11,
-    Uniform_Type_Max = 12,
+    Uniform_Type_Acceleration_Structure = 12,
+    Uniform_Type_Max = 13,
 }
 Rendering_Device_Render_Primitive :: enum int {
     Render_Primitive_Points = 0,
@@ -474,12 +475,22 @@ Rendering_Device_Shader_Stage :: enum int {
     Shader_Stage_Tesselation_Control = 2,
     Shader_Stage_Tesselation_Evaluation = 3,
     Shader_Stage_Compute = 4,
-    Shader_Stage_Max = 5,
+    Shader_Stage_Raygen = 5,
+    Shader_Stage_Any_Hit = 6,
+    Shader_Stage_Closest_Hit = 7,
+    Shader_Stage_Miss = 8,
+    Shader_Stage_Intersection = 9,
+    Shader_Stage_Max = 10,
     Shader_Stage_Vertex_Bit = 1,
     Shader_Stage_Fragment_Bit = 2,
     Shader_Stage_Tesselation_Control_Bit = 4,
     Shader_Stage_Tesselation_Evaluation_Bit = 8,
     Shader_Stage_Compute_Bit = 16,
+    Shader_Stage_Raygen_Bit = 32,
+    Shader_Stage_Any_Hit_Bit = 64,
+    Shader_Stage_Closest_Hit_Bit = 128,
+    Shader_Stage_Miss_Bit = 256,
+    Shader_Stage_Intersection_Bit = 512,
 }
 Rendering_Device_Shader_Language :: enum int {
     Shader_Language_Glsl = 0,
@@ -495,6 +506,9 @@ Rendering_Device_Features :: enum int {
     Supports_Metalfx_Temporal = 4,
     Supports_Buffer_Device_Address = 6,
     Supports_Image_Atomic_32_Bit = 7,
+    Supports_Ray_Query = 11,
+    Supports_Raytracing_Pipeline = 12,
+    Supports_Hdr_Output = 13,
 }
 Rendering_Device_Limit :: enum int {
     Limit_Max_Bound_Uniform_Sets = 0,
@@ -586,6 +600,24 @@ Rendering_Device_Storage_Buffer_Usage :: enum i64 {
 Rendering_Device_Buffer_Creation_Bits :: enum i64 {
     Buffer_Creation_Device_Address_Bit = 1,
     Buffer_Creation_As_Storage_Bit = 2,
+    Buffer_Creation_Acceleration_Structure_Build_Input_Read_Only_Bit = 8,
+}
+Rendering_Device_Acceleration_Structure_Flag_Bits :: enum i64 {
+    Acceleration_Structure_Allow_Update_Bit = 1,
+    Acceleration_Structure_Allow_Compaction_Bit = 2,
+    Acceleration_Structure_Prefer_Fast_Trace_Bit = 4,
+    Acceleration_Structure_Prefer_Fast_Build_Bit = 8,
+    Acceleration_Structure_Low_Memory_Bit = 16,
+}
+Rendering_Device_Acceleration_Structure_Geometry_Flag_Bits :: enum i64 {
+    Acceleration_Structure_Geometry_Opaque_Bit = 1,
+    Acceleration_Structure_Geometry_No_Duplicate_Any_Hit_Invocation_Bit = 2,
+}
+Rendering_Device_Acceleration_Structure_Instance_Flag_Bits :: enum i64 {
+    Acceleration_Structure_Instance_Triangle_Facing_Cull_Disable_Bit = 1,
+    Acceleration_Structure_Instance_Triangle_Flip_Facing_Bit = 2,
+    Acceleration_Structure_Instance_Force_Opaque_Bit = 4,
+    Acceleration_Structure_Instance_Force_No_Opaque_Bit = 8,
 }
 Rendering_Device_Pipeline_Dynamic_State_Flags :: enum i64 {
     Dynamic_State_Line_Width = 1,
@@ -1923,6 +1955,243 @@ rendering_device_compute_pipeline_is_valid :: proc "contextless" (
     return
 }
 
+rendering_device_raytracing_pipeline_create :: proc "contextless" (
+    self: Rendering_Device,
+    raygen_shaders_: Typed_Array(Rd_Pipeline_Shader),
+    miss_shaders_: Typed_Array(Rd_Pipeline_Shader),
+    hit_groups_: Typed_Array(Rd_Hit_Group),
+    max_trace_recursion_depth_: Int,
+) -> (ret: Rid) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("raytracing_pipeline_create", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1489129684)
+    }
+    self := self
+    raygen_shaders_ := raygen_shaders_
+    miss_shaders_ := miss_shaders_
+    hit_groups_ := hit_groups_
+    max_trace_recursion_depth_ := max_trace_recursion_depth_
+    args := []__bindgen_gde.TypePtr {
+        &raygen_shaders_,
+        &miss_shaders_,
+        &hit_groups_,
+        &max_trace_recursion_depth_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_device_raytracing_pipeline_is_valid :: proc "contextless" (
+    self: Rendering_Device,
+    raytracing_pipeline_: Rid,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("raytracing_pipeline_is_valid", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3521089500)
+    }
+    self := self
+    raytracing_pipeline_ := raytracing_pipeline_
+    args := []__bindgen_gde.TypePtr {
+        &raytracing_pipeline_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_device_blas_create :: proc "contextless" (
+    self: Rendering_Device,
+    geometries_: Typed_Array(Rd_Acceleration_Structure_Geometry),
+    flags_: Rendering_Device_Acceleration_Structure_Flag_Bits,
+) -> (ret: Rid) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("blas_create", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1010940044)
+    }
+    self := self
+    geometries_ := geometries_
+    flags_ := flags_
+    args := []__bindgen_gde.TypePtr {
+        &geometries_,
+        &flags_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_device_tlas_create :: proc "contextless" (
+    self: Rendering_Device,
+    max_instance_count_: Int,
+    flags_: Rendering_Device_Acceleration_Structure_Flag_Bits,
+) -> (ret: Rid) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("tlas_create", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 592780330)
+    }
+    self := self
+    max_instance_count_ := max_instance_count_
+    flags_ := flags_
+    args := []__bindgen_gde.TypePtr {
+        &max_instance_count_,
+        &flags_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_device_blas_build :: proc "contextless" (
+    self: Rendering_Device,
+    blas_: Rid,
+) -> (ret: Error) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("blas_build", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 813180755)
+    }
+    self := self
+    blas_ := blas_
+    args := []__bindgen_gde.TypePtr {
+        &blas_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_device_tlas_build :: proc "contextless" (
+    self: Rendering_Device,
+    tlas_: Rid,
+    instances_: Typed_Array(Rd_Acceleration_Structure_Instance),
+) -> (ret: Error) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("tlas_build", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 261981775)
+    }
+    self := self
+    tlas_ := tlas_
+    instances_ := instances_
+    args := []__bindgen_gde.TypePtr {
+        &tlas_,
+        &instances_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_device_hit_sbt_create :: proc "contextless" (
+    self: Rendering_Device,
+    raytracing_pipeline_: Rid,
+    initial_hit_group_capacity_: Int,
+) -> (ret: Rid) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("hit_sbt_create", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2233757277)
+    }
+    self := self
+    raytracing_pipeline_ := raytracing_pipeline_
+    initial_hit_group_capacity_ := initial_hit_group_capacity_
+    args := []__bindgen_gde.TypePtr {
+        &raytracing_pipeline_,
+        &initial_hit_group_capacity_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_device_hit_sbt_set_pipeline :: proc "contextless" (
+    self: Rendering_Device,
+    hit_sbt_: Rid,
+    raytracing_pipeline_: Rid,
+) -> (ret: Error) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("hit_sbt_set_pipeline", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3181288260)
+    }
+    self := self
+    hit_sbt_ := hit_sbt_
+    raytracing_pipeline_ := raytracing_pipeline_
+    args := []__bindgen_gde.TypePtr {
+        &hit_sbt_,
+        &raytracing_pipeline_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_device_hit_sbt_range_alloc :: proc "contextless" (
+    self: Rendering_Device,
+    hit_sbt_: Rid,
+    hit_group_count_: Int,
+) -> (ret: i64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("hit_sbt_range_alloc", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2722015314)
+    }
+    self := self
+    hit_sbt_ := hit_sbt_
+    hit_group_count_ := hit_group_count_
+    args := []__bindgen_gde.TypePtr {
+        &hit_sbt_,
+        &hit_group_count_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_device_hit_sbt_range_free :: proc "contextless" (
+    self: Rendering_Device,
+    hit_sbt_: Rid,
+    range_: Int,
+) -> (ret: Error) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("hit_sbt_range_free", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3804025326)
+    }
+    self := self
+    hit_sbt_ := hit_sbt_
+    range_ := range_
+    args := []__bindgen_gde.TypePtr {
+        &hit_sbt_,
+        &range_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_device_hit_sbt_range_update :: proc "contextless" (
+    self: Rendering_Device,
+    hit_sbt_: Rid,
+    range_: Int,
+    offset_: Int,
+    hit_group_indices_: Packed_Int32_Array,
+) -> (ret: Error) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("hit_sbt_range_update", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1332346675)
+    }
+    self := self
+    hit_sbt_ := hit_sbt_
+    range_ := range_
+    offset_ := offset_
+    hit_group_indices_ := hit_group_indices_
+    args := []__bindgen_gde.TypePtr {
+        &hit_sbt_,
+        &range_,
+        &offset_,
+        &hit_group_indices_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 rendering_device_screen_get_width :: proc "contextless" (
     self: Rendering_Device,
     screen_: Int,
@@ -2532,6 +2801,133 @@ rendering_device_compute_list_end :: proc "contextless" (
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("compute_list_end", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3218959716)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_device_raytracing_list_begin :: proc "contextless" (
+    self: Rendering_Device,
+) -> (ret: i64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("raytracing_list_begin", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2455072627)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_device_raytracing_list_bind_raytracing_pipeline :: proc "contextless" (
+    self: Rendering_Device,
+    raytracing_list_: Int,
+    raytracing_pipeline_: Rid,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("raytracing_list_bind_raytracing_pipeline", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4040184819)
+    }
+    self := self
+    raytracing_list_ := raytracing_list_
+    raytracing_pipeline_ := raytracing_pipeline_
+    args := []__bindgen_gde.TypePtr {
+        &raytracing_list_,
+        &raytracing_pipeline_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_device_raytracing_list_set_push_constant :: proc "contextless" (
+    self: Rendering_Device,
+    raytracing_list_: Int,
+    buffer_: Packed_Byte_Array,
+    size_bytes_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("raytracing_list_set_push_constant", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2772371345)
+    }
+    self := self
+    raytracing_list_ := raytracing_list_
+    buffer_ := buffer_
+    size_bytes_ := size_bytes_
+    args := []__bindgen_gde.TypePtr {
+        &raytracing_list_,
+        &buffer_,
+        &size_bytes_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_device_raytracing_list_bind_uniform_set :: proc "contextless" (
+    self: Rendering_Device,
+    raytracing_list_: Int,
+    uniform_set_: Rid,
+    set_index_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("raytracing_list_bind_uniform_set", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 749655778)
+    }
+    self := self
+    raytracing_list_ := raytracing_list_
+    uniform_set_ := uniform_set_
+    set_index_ := set_index_
+    args := []__bindgen_gde.TypePtr {
+        &raytracing_list_,
+        &uniform_set_,
+        &set_index_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_device_raytracing_list_trace_rays :: proc "contextless" (
+    self: Rendering_Device,
+    raytracing_list_: Int,
+    raygen_shader_index_: Int,
+    hit_sbt_: Rid,
+    width_: Int,
+    height_: Int,
+    depth_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("raytracing_list_trace_rays", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2559472681)
+    }
+    self := self
+    raytracing_list_ := raytracing_list_
+    raygen_shader_index_ := raygen_shader_index_
+    hit_sbt_ := hit_sbt_
+    width_ := width_
+    height_ := height_
+    depth_ := depth_
+    args := []__bindgen_gde.TypePtr {
+        &raytracing_list_,
+        &raygen_shader_index_,
+        &hit_sbt_,
+        &width_,
+        &height_,
+        &depth_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_device_raytracing_list_end :: proc "contextless" (
+    self: Rendering_Device,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("raytracing_list_end", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3218959716)
     }
     self := self

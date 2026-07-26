@@ -43,6 +43,38 @@ new_open_xr_spatial_entity_tracker :: proc "contextless" () -> Open_Xr_Spatial_E
 // Variant is converted to the declared return type (Variant passed through,
 // `Error`/ints via variant_to_int, void ignored).
 
+open_xr_spatial_entity_tracker_set_spatial_context :: proc "contextless" (
+    self: Open_Xr_Spatial_Entity_Tracker,
+    spatial_context_: Rid,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_spatial_context", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2722037293)
+    }
+    self := self
+    spatial_context_ := spatial_context_
+    args := []__bindgen_gde.TypePtr {
+        &spatial_context_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+open_xr_spatial_entity_tracker_get_spatial_context :: proc "contextless" (
+    self: Open_Xr_Spatial_Entity_Tracker,
+) -> (ret: Rid) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_spatial_context", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2944877500)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 open_xr_spatial_entity_tracker_set_entity :: proc "contextless" (
     self: Open_Xr_Spatial_Entity_Tracker,
     entity_: Rid,
@@ -105,6 +137,55 @@ open_xr_spatial_entity_tracker_get_spatial_tracking_state :: proc "contextless" 
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
+}
+
+open_xr_spatial_entity_tracker_get_next :: proc "contextless" (
+    self: Open_Xr_Spatial_Entity_Tracker,
+) -> (ret: Open_Xr_Structure_Base) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_next", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2798796760)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+open_xr_spatial_entity_tracker_add_next :: proc "contextless" (
+    self: Open_Xr_Spatial_Entity_Tracker,
+    next_: Open_Xr_Structure_Base,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("add_next", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 334698771)
+    }
+    self := self
+    next_ := next_
+    args := []__bindgen_gde.TypePtr {
+        &next_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+open_xr_spatial_entity_tracker_remove_next :: proc "contextless" (
+    self: Open_Xr_Spatial_Entity_Tracker,
+    next_: Open_Xr_Structure_Base,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("remove_next", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 334698771)
+    }
+    self := self
+    next_ := next_
+    args := []__bindgen_gde.TypePtr {
+        &next_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
 

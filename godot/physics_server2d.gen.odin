@@ -1268,22 +1268,25 @@ physics_server2d_body_set_shape_as_one_way_collision :: proc "contextless" (
     shape_idx_: Int,
     enable_: Bool,
     margin_: f64,
+    direction_: Vector2,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("body_set_shape_as_one_way_collision", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2556489974)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2389283141)
     }
     self := self
     body_ := body_
     shape_idx_ := shape_idx_
     enable_ := enable_
     margin_ := margin_
+    direction_ := direction_
     args := []__bindgen_gde.TypePtr {
         &body_,
         &shape_idx_,
         &enable_,
         &margin_,
+        &direction_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }

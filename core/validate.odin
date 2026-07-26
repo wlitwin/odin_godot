@@ -163,6 +163,11 @@ lv_validate :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gde
         }
         source_path := string_to_odin(path)
         defer delete(source_path)
+        // CLAMP every diagnostic into the CURRENT document's valid caret range before it
+        // reaches the engine — Godot 4.7's error-position consumer crashes the editor on
+        // out-of-range columns (odin's EOF errors carry column 0). Full rationale on
+        // diag.clamp_all, pinned by the tests/validate harness.
+        diag.clamp_all(ds, source)
         for d in ds {
             ed := godot.new_dictionary_default()
             vd_set_int(&ed, "line", i64(d.line))

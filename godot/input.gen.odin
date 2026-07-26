@@ -579,6 +579,60 @@ input_get_joy_vibration_duration :: proc "contextless" (
     return
 }
 
+input_get_joy_vibration_remaining_duration :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_joy_vibration_remaining_duration", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4025615559)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+input_is_joy_vibrating :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_joy_vibrating", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3067735520)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+input_has_joy_vibration :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("has_joy_vibration", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1116898809)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 input_start_joy_vibration :: proc "contextless" (
     self: Input,
     device_: Int,
@@ -642,6 +696,38 @@ input_vibrate_handheld :: proc "contextless" (
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+input_set_ignore_joypad_on_unfocused_application :: proc "contextless" (
+    self: Input,
+    enable_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_ignore_joypad_on_unfocused_application", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    enable_ := enable_
+    args := []__bindgen_gde.TypePtr {
+        &enable_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+input_is_ignoring_joypad_on_unfocused_application :: proc "contextless" (
+    self: Input,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_ignoring_joypad_on_unfocused_application", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 input_get_gravity :: proc "contextless" (
     self: Input,
 ) -> (ret: Vector3) {
@@ -697,6 +783,259 @@ input_get_gyroscope :: proc "contextless" (
     }
     self := self
     args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+input_get_joy_accelerometer :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) -> (ret: Vector3) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_joy_accelerometer", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 711720468)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+input_get_joy_gravity :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) -> (ret: Vector3) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_joy_gravity", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 711720468)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+input_get_joy_gyroscope :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) -> (ret: Vector3) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_joy_gyroscope", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 711720468)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+input_get_joy_motion_sensors_rate :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_joy_motion_sensors_rate", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2339986948)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+input_is_joy_motion_sensors_enabled :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_joy_motion_sensors_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1116898809)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+input_set_joy_motion_sensors_enabled :: proc "contextless" (
+    self: Input,
+    device_: Int,
+    enable_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_joy_motion_sensors_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 300928843)
+    }
+    self := self
+    device_ := device_
+    enable_ := enable_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+        &enable_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+input_has_joy_motion_sensors :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("has_joy_motion_sensors", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1116898809)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+input_start_joy_motion_sensors_calibration :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("start_joy_motion_sensors_calibration", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+input_stop_joy_motion_sensors_calibration :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("stop_joy_motion_sensors_calibration", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+input_clear_joy_motion_sensors_calibration :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("clear_joy_motion_sensors_calibration", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+input_get_joy_motion_sensors_calibration :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) -> (ret: Dictionary) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_joy_motion_sensors_calibration", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3485342025)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+input_set_joy_motion_sensors_calibration :: proc "contextless" (
+    self: Input,
+    device_: Int,
+    calibration_info_: Dictionary,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_joy_motion_sensors_calibration", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 64545446)
+    }
+    self := self
+    device_ := device_
+    calibration_info_ := calibration_info_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+        &calibration_info_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+input_is_joy_motion_sensors_calibrated :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_joy_motion_sensors_calibrated", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1116898809)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+input_is_joy_motion_sensors_calibrating :: proc "contextless" (
+    self: Input,
+    device_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_joy_motion_sensors_calibrating", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1116898809)
+    }
+    self := self
+    device_ := device_
+    args := []__bindgen_gde.TypePtr {
+        &device_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -1131,6 +1470,9 @@ input_get_emulate_mouse_from_touch :: proc "contextless" (self: Input) -> Bool {
 }
 input_get_emulate_touch_from_mouse :: proc "contextless" (self: Input) -> Bool {
     return input_is_emulating_touch_from_mouse(self)
+}
+input_get_ignore_joypad_on_unfocused_application :: proc "contextless" (self: Input) -> Bool {
+    return input_is_ignoring_joypad_on_unfocused_application(self)
 }
 
 // Only interns the class StringName (used for object construction and as the

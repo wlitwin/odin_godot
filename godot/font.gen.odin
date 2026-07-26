@@ -81,11 +81,13 @@ font_find_variation :: proc "contextless" (
     spacing_space_: Int,
     spacing_glyph_: Int,
     baseline_offset_: f64,
+    palette_index_: Int,
+    custom_colors_: Packed_Color_Array,
 ) -> (ret: Rid) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("find_variation", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2553855095)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3275867622)
     }
     self := self
     variation_coordinates_ := variation_coordinates_
@@ -97,6 +99,8 @@ font_find_variation :: proc "contextless" (
     spacing_space_ := spacing_space_
     spacing_glyph_ := spacing_glyph_
     baseline_offset_ := baseline_offset_
+    palette_index_ := palette_index_
+    custom_colors_ := custom_colors_
     args := []__bindgen_gde.TypePtr {
         &variation_coordinates_,
         &face_index_,
@@ -107,6 +111,8 @@ font_find_variation :: proc "contextless" (
         &spacing_space_,
         &spacing_glyph_,
         &baseline_offset_,
+        &palette_index_,
+        &custom_colors_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -302,6 +308,57 @@ font_get_font_stretch :: proc "contextless" (
     }
     self := self
     args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+font_get_palette_count :: proc "contextless" (
+    self: Font,
+) -> (ret: i64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_palette_count", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3905245786)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+font_get_palette_name :: proc "contextless" (
+    self: Font,
+    index_: Int,
+) -> (ret: String) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_palette_name", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 844755477)
+    }
+    self := self
+    index_ := index_
+    args := []__bindgen_gde.TypePtr {
+        &index_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+font_get_palette_colors :: proc "contextless" (
+    self: Font,
+    index_: Int,
+) -> (ret: Packed_Color_Array) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_palette_colors", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2552048864)
+    }
+    self := self
+    index_ := index_
+    args := []__bindgen_gde.TypePtr {
+        &index_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return

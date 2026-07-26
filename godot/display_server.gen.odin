@@ -47,6 +47,8 @@ Display_Server_Feature :: enum int {
     Feature_Native_Color_Picker = 32,
     Feature_Self_Fitting_Windows = 33,
     Feature_Accessibility_Screen_Reader = 34,
+    Feature_Hdr_Output = 35,
+    Feature_Pip_Mode = 36,
 }
 Display_Server_Accessibility_Role :: enum int {
     Role_Unknown = 0,
@@ -95,6 +97,8 @@ Display_Server_Accessibility_Role :: enum int {
     Role_Title_Bar = 43,
     Role_Dialog = 44,
     Role_Tooltip = 45,
+    Role_Region = 46,
+    Role_Text_Run = 47,
 }
 Display_Server_Accessibility_Popup_Type :: enum int {
     Popup_Menu = 0,
@@ -217,6 +221,13 @@ Display_Server_Window_Mode :: enum int {
     Window_Mode_Fullscreen = 3,
     Window_Mode_Exclusive_Fullscreen = 4,
 }
+Display_Server_Progress_State :: enum int {
+    Progress_State_Noprogress = 0,
+    Progress_State_Indeterminate = 1,
+    Progress_State_Normal = 2,
+    Progress_State_Error = 3,
+    Progress_State_Paused = 4,
+}
 Display_Server_Window_Flags :: enum int {
     Window_Flag_Resize_Disabled = 0,
     Window_Flag_Borderless = 1,
@@ -243,6 +254,7 @@ Display_Server_Window_Event :: enum int {
     Window_Event_Dpi_Change = 6,
     Window_Event_Titlebar_Change = 7,
     Window_Event_Force_Close = 8,
+    Window_Event_Output_Max_Linear_Value_Changed = 9,
 }
 Display_Server_Window_Resize_Edge :: enum int {
     Window_Edge_Top_Left = 0,
@@ -268,6 +280,8 @@ Display_Server_Handle_Type :: enum int {
     Opengl_Context = 3,
     Egl_Display = 4,
     Egl_Config = 5,
+    Glx_Visualid = 6,
+    Glx_Fbconfig = 7,
 }
 Display_Server_Tts_Utterance_Event :: enum int {
     Tts_Utterance_Started = 0,
@@ -2913,6 +2927,26 @@ display_server_window_get_flag :: proc "contextless" (
     return
 }
 
+display_server_window_set_icon :: proc "contextless" (
+    self: Display_Server,
+    icon_: Image,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_set_icon", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2457502155)
+    }
+    self := self
+    icon_ := icon_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &icon_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
 display_server_window_set_window_buttons_offset :: proc "contextless" (
     self: Display_Server,
     offset_: Vector2i,
@@ -2963,6 +2997,46 @@ display_server_window_request_attention :: proc "contextless" (
     self := self
     window_id_ := window_id_
     args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_window_set_taskbar_progress_value :: proc "contextless" (
+    self: Display_Server,
+    value_: f64,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_set_taskbar_progress_value", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3506631519)
+    }
+    self := self
+    value_ := value_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &value_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_window_set_taskbar_progress_state :: proc "contextless" (
+    self: Display_Server,
+    state_: Display_Server_Progress_State,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_set_taskbar_progress_state", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4119882768)
+    }
+    self := self
+    state_ := state_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &state_,
         &window_id_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
@@ -3129,6 +3203,210 @@ display_server_window_get_vsync_mode :: proc "contextless" (
     if __ptr == nil {
         _gde_name := new_string_name_cstring("window_get_vsync_mode", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 578873795)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_is_hdr_output_supported :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_is_hdr_output_supported", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1051549951)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_request_hdr_output :: proc "contextless" (
+    self: Display_Server,
+    enable_: Bool,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_request_hdr_output", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1661950165)
+    }
+    self := self
+    enable_ := enable_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &enable_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_window_is_hdr_output_requested :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_is_hdr_output_requested", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1051549951)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_is_hdr_output_enabled :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_is_hdr_output_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1051549951)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_set_hdr_output_reference_luminance :: proc "contextless" (
+    self: Display_Server,
+    reference_luminance_: f64,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_set_hdr_output_reference_luminance", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3506631519)
+    }
+    self := self
+    reference_luminance_ := reference_luminance_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &reference_luminance_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_window_get_hdr_output_reference_luminance :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_get_hdr_output_reference_luminance", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 218038398)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_get_hdr_output_current_reference_luminance :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_get_hdr_output_current_reference_luminance", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 218038398)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_set_hdr_output_max_luminance :: proc "contextless" (
+    self: Display_Server,
+    max_luminance_: f64,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_set_hdr_output_max_luminance", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3506631519)
+    }
+    self := self
+    max_luminance_ := max_luminance_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &max_luminance_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_window_get_hdr_output_max_luminance :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_get_hdr_output_max_luminance", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 218038398)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_get_hdr_output_current_max_luminance :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_get_hdr_output_current_max_luminance", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 218038398)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_get_output_max_linear_value :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_get_output_max_linear_value", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 218038398)
     }
     self := self
     window_id_ := window_id_
@@ -3650,7 +3928,7 @@ display_server_accessibility_update_set_tooltip :: proc "contextless" (
 display_server_accessibility_update_set_bounds :: proc "contextless" (
     self: Display_Server,
     id_: Rid,
-    p_rect_: Rect2,
+    rect_: Rect2,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -3659,10 +3937,10 @@ display_server_accessibility_update_set_bounds :: proc "contextless" (
     }
     self := self
     id_ := id_
-    p_rect_ := p_rect_
+    rect_ := rect_
     args := []__bindgen_gde.TypePtr {
         &id_,
-        &p_rect_,
+        &rect_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -5627,6 +5905,84 @@ display_server_has_additional_outputs :: proc "contextless" (
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
+}
+
+display_server_is_in_pip_mode :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_in_pip_mode", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1885608816)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_pip_mode_enter :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("pip_mode_enter", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1995695955)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_pip_mode_set_aspect_ratio :: proc "contextless" (
+    self: Display_Server,
+    numerator_: Int,
+    denominator_: Int,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("pip_mode_set_aspect_ratio", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3471927553)
+    }
+    self := self
+    numerator_ := numerator_
+    denominator_ := denominator_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &numerator_,
+        &denominator_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_pip_mode_set_auto_enter_on_background :: proc "contextless" (
+    self: Display_Server,
+    auto_enter_on_background_: Bool,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("pip_mode_set_auto_enter_on_background", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1661950165)
+    }
+    self := self
+    auto_enter_on_background_ := auto_enter_on_background_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &auto_enter_on_background_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
 

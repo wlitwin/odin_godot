@@ -15,7 +15,9 @@ Editor_Dock_Dock_Slot :: enum int {
     Dock_Slot_Right_Ur = 6,
     Dock_Slot_Right_Br = 7,
     Dock_Slot_Bottom = 8,
-    Dock_Slot_Max = 9,
+    Dock_Slot_Bottom_L = 9,
+    Dock_Slot_Bottom_R = 10,
+    Dock_Slot_Max = 11,
 }
 
 Editor_Dock_Dock_Layout :: enum i64 {

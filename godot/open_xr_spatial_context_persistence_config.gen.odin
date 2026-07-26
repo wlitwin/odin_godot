@@ -72,6 +72,21 @@ open_xr_spatial_context_persistence_config_remove_persistence_context :: proc "c
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+open_xr_spatial_context_persistence_config_get_persistence_contexts :: proc "contextless" (
+    self: Open_Xr_Spatial_Context_Persistence_Config,
+) -> (ret: Array) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_persistence_contexts", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3995934104)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 
 // properties
 

@@ -16,8 +16,8 @@ script. By the end you'll have a Node that prints on `_ready` and moves every fr
 ## 1. Install the toolchain (Nix)
 
 Everything is pinned in a Nix flake: Odin, the `ols` language server, LLVM/lld, Emscripten,
-Node, and a `$GODOT` pointing at Godot 4.6.2. You need [Nix with flakes enabled](https://nixos.org/)
-and Godot 4.6.x installed.
+Node, and a `$GODOT` pointing at Godot 4.7.1. You need [Nix with flakes enabled](https://nixos.org/)
+and Godot 4.7.x installed.
 
 ```sh
 cd /path/to/odin_godot
@@ -25,7 +25,7 @@ nix develop                    # drops you in the toolchain shell
 ```
 
 ```
-odin_godot dev shell  (target: Godot 4.6.2 stable)
+odin_godot dev shell  (target: Godot 4.7.1 stable)
   odin:  /nix/store/.../odin  dev-2025-...
   emcc:  /nix/store/.../emcc
   godot: /Applications/Godot.app/Contents/MacOS/Godot

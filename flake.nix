@@ -30,11 +30,11 @@
         # self-contained DLL, so build_cross.sh needs its lib dir (-L) at link time.
         crossWindowsLibdirs = "${pkgs.pkgsCross.mingwW64.windows.mcfgthreads}/lib";
 
-        # Toolchain. Godot itself is NOT pinned here: we target 4.6.2 stable to match the
+        # Toolchain. Godot itself is NOT pinned here: we target 4.7.1 stable to match the
         # installed /Applications/Godot.app (nixpkgs currently ships 4.5.1), so headless
         # tests + interface dumps use $GODOT (default below), overridable.
         #
-        # emscripten: Godot 4.6.2 stable's web templates were built with emscripten
+        # emscripten: Godot 4.7.1 stable's web templates were built with emscripten
         # 4.0.20 (AUTHORITATIVE — the installed web_dlink template's godot.js does
         # `allocString("4.0.20")`). This nixpkgs rev ships 5.0.6.
         #
@@ -67,14 +67,14 @@
         # GODOT is exported from shellHook (NOT a mkShell env attr): an env attr would
         # CLOBBER a caller's exported GODOT, breaking the documented `GODOT=… nix develop`
         # override. The shellHook default respects the environment.
-        #   darwin: default to the installed 4.6.2 app bundle.
+        #   darwin: default to the installed 4.7.1 app bundle.
         #   linux:  no meaningful default — leave empty and tell the user once.
         godotHook =
           if pkgs.stdenv.isDarwin then ''
             export GODOT="''${GODOT:-/Applications/Godot.app/Contents/MacOS/Godot}"
           '' else ''
             export GODOT="''${GODOT:-}"
-            [ -n "$GODOT" ] || echo "note: set GODOT to a Godot 4.6.2 binary (headless tests + api dumps need it)"
+            [ -n "$GODOT" ] || echo "note: set GODOT to a Godot 4.7.1 binary (headless tests + api dumps need it)"
           '';
       in
       {
@@ -84,7 +84,7 @@
 
           shellHook = ''
             ${godotHook}
-            echo "odin_godot dev shell  (target: Godot 4.6.2 stable)"
+            echo "odin_godot dev shell  (target: Godot 4.7.1 stable)"
             echo "  odin:  $(command -v odin)  $(odin version 2>/dev/null | head -1)"
             echo "  emcc:  $(command -v emcc)"
             echo "  godot: $GODOT"

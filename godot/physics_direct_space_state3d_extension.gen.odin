@@ -48,7 +48,7 @@ physics_direct_space_state3d_extension__intersect_ray :: proc "contextless" (
     hit_from_inside_: Bool,
     hit_back_faces_: Bool,
     pick_ray_: Bool,
-    result_: ^Physics_Server3d_Extension_Ray_Result,
+    r_result_: ^Physics_Server3d_Extension_Ray_Result,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -64,7 +64,7 @@ physics_direct_space_state3d_extension__intersect_ray :: proc "contextless" (
     hit_from_inside_ := hit_from_inside_
     hit_back_faces_ := hit_back_faces_
     pick_ray_ := pick_ray_
-    result_ := result_
+    r_result_ := r_result_
     args := []__bindgen_gde.TypePtr {
         &from_,
         &to_,
@@ -74,7 +74,7 @@ physics_direct_space_state3d_extension__intersect_ray :: proc "contextless" (
         &hit_from_inside_,
         &hit_back_faces_,
         &pick_ray_,
-        &result_,
+        &r_result_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -86,7 +86,7 @@ physics_direct_space_state3d_extension__intersect_point :: proc "contextless" (
     collision_mask_: Int,
     collide_with_bodies_: Bool,
     collide_with_areas_: Bool,
-    results_: ^Physics_Server3d_Extension_Shape_Result,
+    r_results_: ^Physics_Server3d_Extension_Shape_Result,
     max_results_: Int,
 ) -> (ret: i32) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
@@ -99,14 +99,14 @@ physics_direct_space_state3d_extension__intersect_point :: proc "contextless" (
     collision_mask_ := collision_mask_
     collide_with_bodies_ := collide_with_bodies_
     collide_with_areas_ := collide_with_areas_
-    results_ := results_
+    r_results_ := r_results_
     max_results_ := max_results_
     args := []__bindgen_gde.TypePtr {
         &position_,
         &collision_mask_,
         &collide_with_bodies_,
         &collide_with_areas_,
-        &results_,
+        &r_results_,
         &max_results_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
@@ -122,7 +122,7 @@ physics_direct_space_state3d_extension__intersect_shape :: proc "contextless" (
     collision_mask_: Int,
     collide_with_bodies_: Bool,
     collide_with_areas_: Bool,
-    result_count_: ^Physics_Server3d_Extension_Shape_Result,
+    r_result_count_: ^Physics_Server3d_Extension_Shape_Result,
     max_results_: Int,
 ) -> (ret: i32) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
@@ -138,7 +138,7 @@ physics_direct_space_state3d_extension__intersect_shape :: proc "contextless" (
     collision_mask_ := collision_mask_
     collide_with_bodies_ := collide_with_bodies_
     collide_with_areas_ := collide_with_areas_
-    result_count_ := result_count_
+    r_result_count_ := r_result_count_
     max_results_ := max_results_
     args := []__bindgen_gde.TypePtr {
         &shape_rid_,
@@ -148,7 +148,7 @@ physics_direct_space_state3d_extension__intersect_shape :: proc "contextless" (
         &collision_mask_,
         &collide_with_bodies_,
         &collide_with_areas_,
-        &result_count_,
+        &r_result_count_,
         &max_results_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
@@ -164,9 +164,9 @@ physics_direct_space_state3d_extension__cast_motion :: proc "contextless" (
     collision_mask_: Int,
     collide_with_bodies_: Bool,
     collide_with_areas_: Bool,
-    closest_safe_: ^f32,
-    closest_unsafe_: ^f32,
-    info_: ^Physics_Server3d_Extension_Shape_Rest_Info,
+    r_closest_safe_: ^f32,
+    r_closest_unsafe_: ^f32,
+    r_info_: ^Physics_Server3d_Extension_Shape_Rest_Info,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -181,9 +181,9 @@ physics_direct_space_state3d_extension__cast_motion :: proc "contextless" (
     collision_mask_ := collision_mask_
     collide_with_bodies_ := collide_with_bodies_
     collide_with_areas_ := collide_with_areas_
-    closest_safe_ := closest_safe_
-    closest_unsafe_ := closest_unsafe_
-    info_ := info_
+    r_closest_safe_ := r_closest_safe_
+    r_closest_unsafe_ := r_closest_unsafe_
+    r_info_ := r_info_
     args := []__bindgen_gde.TypePtr {
         &shape_rid_,
         &transform_,
@@ -192,9 +192,9 @@ physics_direct_space_state3d_extension__cast_motion :: proc "contextless" (
         &collision_mask_,
         &collide_with_bodies_,
         &collide_with_areas_,
-        &closest_safe_,
-        &closest_unsafe_,
-        &info_,
+        &r_closest_safe_,
+        &r_closest_unsafe_,
+        &r_info_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -209,9 +209,9 @@ physics_direct_space_state3d_extension__collide_shape :: proc "contextless" (
     collision_mask_: Int,
     collide_with_bodies_: Bool,
     collide_with_areas_: Bool,
-    results_: rawptr,
+    r_results_: rawptr,
     max_results_: Int,
-    result_count_: ^i32,
+    r_result_count_: ^i32,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -226,9 +226,9 @@ physics_direct_space_state3d_extension__collide_shape :: proc "contextless" (
     collision_mask_ := collision_mask_
     collide_with_bodies_ := collide_with_bodies_
     collide_with_areas_ := collide_with_areas_
-    results_ := results_
+    r_results_ := r_results_
     max_results_ := max_results_
-    result_count_ := result_count_
+    r_result_count_ := r_result_count_
     args := []__bindgen_gde.TypePtr {
         &shape_rid_,
         &transform_,
@@ -237,9 +237,9 @@ physics_direct_space_state3d_extension__collide_shape :: proc "contextless" (
         &collision_mask_,
         &collide_with_bodies_,
         &collide_with_areas_,
-        &results_,
+        &r_results_,
         &max_results_,
-        &result_count_,
+        &r_result_count_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -254,7 +254,7 @@ physics_direct_space_state3d_extension__rest_info :: proc "contextless" (
     collision_mask_: Int,
     collide_with_bodies_: Bool,
     collide_with_areas_: Bool,
-    rest_info_: ^Physics_Server3d_Extension_Shape_Rest_Info,
+    r_rest_info_: ^Physics_Server3d_Extension_Shape_Rest_Info,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -269,7 +269,7 @@ physics_direct_space_state3d_extension__rest_info :: proc "contextless" (
     collision_mask_ := collision_mask_
     collide_with_bodies_ := collide_with_bodies_
     collide_with_areas_ := collide_with_areas_
-    rest_info_ := rest_info_
+    r_rest_info_ := r_rest_info_
     args := []__bindgen_gde.TypePtr {
         &shape_rid_,
         &transform_,
@@ -278,7 +278,7 @@ physics_direct_space_state3d_extension__rest_info :: proc "contextless" (
         &collision_mask_,
         &collide_with_bodies_,
         &collide_with_areas_,
-        &rest_info_,
+        &r_rest_info_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return

@@ -89,6 +89,30 @@ pck_packer_add_file :: proc "contextless" (
     return
 }
 
+pck_packer_add_file_from_buffer :: proc "contextless" (
+    self: Pck_Packer,
+    target_path_: String,
+    data_: Packed_Byte_Array,
+    encrypt_: Bool,
+) -> (ret: Error) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("add_file_from_buffer", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1131482346)
+    }
+    self := self
+    target_path_ := target_path_
+    data_ := data_
+    encrypt_ := encrypt_
+    args := []__bindgen_gde.TypePtr {
+        &target_path_,
+        &data_,
+        &encrypt_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 pck_packer_add_file_removal :: proc "contextless" (
     self: Pck_Packer,
     target_path_: String,

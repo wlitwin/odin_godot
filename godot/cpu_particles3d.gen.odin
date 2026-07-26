@@ -638,16 +638,19 @@ cpu_particles3d_restart :: proc "contextless" (
 cpu_particles3d_request_particles_process :: proc "contextless" (
     self: Cpu_Particles3d,
     process_time_: f64,
+    process_time_residual_: f64,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("request_particles_process", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 373806689)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 66938510)
     }
     self := self
     process_time_ := process_time_
+    process_time_residual_ := process_time_residual_
     args := []__bindgen_gde.TypePtr {
         &process_time_,
+        &process_time_residual_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }

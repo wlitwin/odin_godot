@@ -8,6 +8,7 @@ Gradient_Texture2d_Fill :: enum int {
     Fill_Linear = 0,
     Fill_Radial = 1,
     Fill_Square = 2,
+    Fill_Conic = 3,
 }
 Gradient_Texture2d_Repeat :: enum int {
     Repeat_None = 0,

@@ -1511,6 +1511,30 @@ native_menu_set_item_indentation_level :: proc "contextless" (
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+native_menu_set_item_index :: proc "contextless" (
+    self: Native_Menu,
+    rid_: Rid,
+    idx_: Int,
+    target_idx_: Int,
+) -> (ret: i32) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_item_index", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 23951185)
+    }
+    self := self
+    rid_ := rid_
+    idx_ := idx_
+    target_idx_ := target_idx_
+    args := []__bindgen_gde.TypePtr {
+        &rid_,
+        &idx_,
+        &target_idx_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 native_menu_get_item_count :: proc "contextless" (
     self: Native_Menu,
     rid_: Rid,

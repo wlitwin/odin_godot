@@ -146,6 +146,22 @@ dir_access_get_drive_name :: proc "contextless" (
     return
 }
 
+dir_access_get_drive_label :: proc "contextless" (
+    idx_: Int,
+) -> (ret: String) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_drive_label", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 990163283)
+    }
+    idx_ := idx_
+    args := []__bindgen_gde.TypePtr {
+        &idx_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    return
+}
+
 dir_access_make_dir_absolute :: proc "contextless" (
     path_: String,
 ) -> (ret: Error) {

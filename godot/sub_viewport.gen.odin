@@ -146,6 +146,38 @@ sub_viewport_is_size_2d_override_stretch_enabled :: proc "contextless" (
     return
 }
 
+sub_viewport_set_view_count :: proc "contextless" (
+    self: Sub_Viewport,
+    view_count_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_view_count", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
+    }
+    self := self
+    view_count_ := view_count_
+    args := []__bindgen_gde.TypePtr {
+        &view_count_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+sub_viewport_get_view_count :: proc "contextless" (
+    self: Sub_Viewport,
+) -> (ret: i32) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_view_count", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3905245786)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 sub_viewport_set_update_mode :: proc "contextless" (
     self: Sub_Viewport,
     mode_: Sub_Viewport_Update_Mode,

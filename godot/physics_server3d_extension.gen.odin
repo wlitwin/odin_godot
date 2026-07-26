@@ -2201,7 +2201,7 @@ physics_server3d_extension__body_test_motion :: proc "contextless" (
     max_collisions_: Int,
     collide_separation_ray_: Bool,
     recovery_as_collision_: Bool,
-    result_: ^Physics_Server3d_Extension_Motion_Result,
+    r_result_: ^Physics_Server3d_Extension_Motion_Result,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -2216,7 +2216,7 @@ physics_server3d_extension__body_test_motion :: proc "contextless" (
     max_collisions_ := max_collisions_
     collide_separation_ray_ := collide_separation_ray_
     recovery_as_collision_ := recovery_as_collision_
-    result_ := result_
+    r_result_ := r_result_
     args := []__bindgen_gde.TypePtr {
         &body_,
         &from_,
@@ -2225,7 +2225,7 @@ physics_server3d_extension__body_test_motion :: proc "contextless" (
         &max_collisions_,
         &collide_separation_ray_,
         &recovery_as_collision_,
-        &result_,
+        &r_result_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return

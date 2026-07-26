@@ -1336,6 +1336,26 @@ item_list_ensure_current_is_visible :: proc "contextless" (
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+item_list_center_on_current :: proc "contextless" (
+    self: Item_List,
+    center_verically_: Bool,
+    center_horizontally_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("center_on_current", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3058350285)
+    }
+    self := self
+    center_verically_ := center_verically_
+    center_horizontally_ := center_horizontally_
+    args := []__bindgen_gde.TypePtr {
+        &center_verically_,
+        &center_horizontally_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
 item_list_get_v_scroll_bar :: proc "contextless" (
     self: Item_List,
 ) -> (ret: V_Scroll_Bar) {

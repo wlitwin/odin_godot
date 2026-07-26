@@ -71,6 +71,48 @@ java_class_wrapper_get_exception :: proc "contextless" (
     return
 }
 
+java_class_wrapper_create_sam_callback :: proc "contextless" (
+    self: Java_Class_Wrapper,
+    sam_interface_: String,
+    callable_: Callable,
+) -> (ret: Java_Object) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("create_sam_callback", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2479014754)
+    }
+    self := self
+    sam_interface_ := sam_interface_
+    callable_ := callable_
+    args := []__bindgen_gde.TypePtr {
+        &sam_interface_,
+        &callable_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+java_class_wrapper_create_proxy :: proc "contextless" (
+    self: Java_Class_Wrapper,
+    object_: Object,
+    interfaces_: Packed_String_Array,
+) -> (ret: Java_Object) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("create_proxy", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2694931752)
+    }
+    self := self
+    object_ := object_
+    interfaces_ := interfaces_
+    args := []__bindgen_gde.TypePtr {
+        &object_,
+        &interfaces_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 
 // properties
 

@@ -71,6 +71,22 @@ editor_inspector_instantiate_property_editor :: proc "contextless" (
     return
 }
 
+editor_inspector_create_default_inspector :: proc "contextless" (
+    filter_line_edit_: Line_Edit,
+) -> (ret: Editor_Inspector) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("create_default_inspector", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2419746798)
+    }
+    filter_line_edit_ := filter_line_edit_
+    args := []__bindgen_gde.TypePtr {
+        &filter_line_edit_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    return
+}
+
 
 editor_inspector_edit :: proc "contextless" (
     self: Editor_Inspector,
@@ -117,6 +133,48 @@ editor_inspector_get_edited_object :: proc "contextless" (
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
+}
+
+editor_inspector_collapse_all_folding :: proc "contextless" (
+    self: Editor_Inspector,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("collapse_all_folding", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3218959716)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+editor_inspector_expand_all_folding :: proc "contextless" (
+    self: Editor_Inspector,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("expand_all_folding", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3218959716)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+editor_inspector_expand_revertable :: proc "contextless" (
+    self: Editor_Inspector,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("expand_revertable", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3218959716)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
 

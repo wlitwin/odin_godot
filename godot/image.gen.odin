@@ -651,18 +651,24 @@ image_save_exr :: proc "contextless" (
     self: Image,
     path_: String,
     grayscale_: Bool,
+    color_image_: Bool,
+    max_linear_value_: f64,
 ) -> (ret: Error) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("save_exr", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3108122999)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2018602448)
     }
     self := self
     path_ := path_
     grayscale_ := grayscale_
+    color_image_ := color_image_
+    max_linear_value_ := max_linear_value_
     args := []__bindgen_gde.TypePtr {
         &path_,
         &grayscale_,
+        &color_image_,
+        &max_linear_value_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -671,16 +677,22 @@ image_save_exr :: proc "contextless" (
 image_save_exr_to_buffer :: proc "contextless" (
     self: Image,
     grayscale_: Bool,
+    color_image_: Bool,
+    max_linear_value_: f64,
 ) -> (ret: Packed_Byte_Array) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("save_exr_to_buffer", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3178917920)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1477518536)
     }
     self := self
     grayscale_ := grayscale_
+    color_image_ := color_image_
+    max_linear_value_ := max_linear_value_
     args := []__bindgen_gde.TypePtr {
         &grayscale_,
+        &color_image_,
+        &max_linear_value_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return

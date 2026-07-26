@@ -135,7 +135,7 @@ semantics are strictest: the scripts dll is self-contained, so the core's locati
 matter). If a scripts-dll load fails, the core prints the OS loader's own
 reason (`odin: loader error: …`) next to the path.
 
-> **Known engine quirk (Godot 4.6, still on master):** a headless `godot --import` of a
+> **Known engine quirk (Godot 4.6–4.7, still on master):** a headless `godot --import` of a
 > project containing *any* GDExtension can crash **at exit, after the import succeeded**
 > (`EditorHelp::_gen_extensions_docs` is queued as a deferred call; when the quit wins the
 > race it flushes during `Main::cleanup`, after `~EditorNode` nulled EditorHelp's `doc`).
@@ -161,7 +161,7 @@ The binaries are build-verified here but **not run** on Linux/Windows. To close 
 real host or in CI:
 
 **Linux** (e.g. GitHub Actions `ubuntu-latest`):
-1. Install the matching Godot 4.6.2 **Linux** export templates + editor.
+1. Install the matching Godot 4.7.1 **Linux** export templates + editor.
 2. `nix build .#dist-cross` (or run `build/build_cross.sh linux` on the Linux host itself,
    where it's a *native* build with no cross needed).
 3. Place the addon in a test project; build the scripts dll; run headless:
@@ -170,7 +170,7 @@ real host or in CI:
 4. For an exported game: `godot --headless --export-release "Linux/X11" out/game` then run
    `out/game --headless` and assert the sentinel.
 
-**Windows** (e.g. GitHub Actions `windows-latest`) follows the same shape: install Godot 4.6.2
+**Windows** (e.g. GitHub Actions `windows-latest`) follows the same shape: install Godot 4.7.1
 and the Windows templates, build the scripts dll (natively with `odin -target:windows_amd64`,
 or use the prebuilt cross dll), drop in the addon, and run `godot.exe --headless --path …`.
 

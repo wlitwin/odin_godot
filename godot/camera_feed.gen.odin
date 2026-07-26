@@ -79,6 +79,42 @@ camera_feed__deactivate_feed :: proc "contextless" (
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+camera_feed__set_format :: proc "contextless" (
+    self: Camera_Feed,
+    index_: Int,
+    parameters_: Dictionary,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_set_format", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 31872775)
+    }
+    self := self
+    index_ := index_
+    parameters_ := parameters_
+    args := []__bindgen_gde.TypePtr {
+        &index_,
+        &parameters_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+camera_feed__get_formats :: proc "contextless" (
+    self: Camera_Feed,
+) -> (ret: Array) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_get_formats", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3995934104)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 camera_feed_get_id :: proc "contextless" (
     self: Camera_Feed,
 ) -> (ret: i32) {

@@ -476,6 +476,53 @@ window_get_flag :: proc "contextless" (
     return
 }
 
+window_set_hdr_output_requested :: proc "contextless" (
+    self: Window,
+    requested_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_hdr_output_requested", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    requested_ := requested_
+    args := []__bindgen_gde.TypePtr {
+        &requested_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+window_is_hdr_output_requested :: proc "contextless" (
+    self: Window,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_hdr_output_requested", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+window_get_output_max_linear_value :: proc "contextless" (
+    self: Window,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_output_max_linear_value", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1740695150)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 window_is_maximize_allowed :: proc "contextless" (
     self: Window,
 ) -> (ret: Bool) {
@@ -501,6 +548,40 @@ window_request_attention :: proc "contextless" (
     }
     self := self
     args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+window_set_taskbar_progress_value :: proc "contextless" (
+    self: Window,
+    value_: f64,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_taskbar_progress_value", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 373806689)
+    }
+    self := self
+    value_ := value_
+    args := []__bindgen_gde.TypePtr {
+        &value_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+window_set_taskbar_progress_state :: proc "contextless" (
+    self: Window,
+    state_: Display_Server_Progress_State,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_taskbar_progress_state", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 824071031)
+    }
+    self := self
+    state_ := state_
+    args := []__bindgen_gde.TypePtr {
+        &state_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -2359,6 +2440,9 @@ window_get_maximize_disabled :: proc "contextless" (self: Window) -> Bool {
 }
 window_set_maximize_disabled :: proc "contextless" (self: Window, value: Bool) {
     window_set_flag(self, Window_Flags(12), value)
+}
+window_get_hdr_output_requested :: proc "contextless" (self: Window) -> Bool {
+    return window_is_hdr_output_requested(self)
 }
 window_get_auto_translate :: proc "contextless" (self: Window) -> Bool {
     return window_is_auto_translating(self)

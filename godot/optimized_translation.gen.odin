@@ -41,18 +41,19 @@ new_optimized_translation :: proc "contextless" () -> Optimized_Translation {
 optimized_translation_generate :: proc "contextless" (
     self: Optimized_Translation,
     from_: Translation,
-) {
+) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("generate", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1466479800)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2141509306)
     }
     self := self
     from_ := from_
     args := []__bindgen_gde.TypePtr {
         &from_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
 }
 
 

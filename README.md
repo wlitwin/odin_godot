@@ -1,6 +1,6 @@
 # odin_godot
 
-**Write Godot scripts in [Odin](https://odin-lang.org/).** odin_godot is a Godot 4.6
+**Write Godot scripts in [Odin](https://odin-lang.org/).** odin_godot is a Godot 4.7
 GDExtension that implements the full `ScriptLanguageExtension` API, so a `.odin` file is a
 **first-class Godot script**: attach one to a Node, and its `_ready` / `_process` / signals /
 `@export` vars run as **compiled, AOT native Odin**, dispatched through a typed registry (no
@@ -72,7 +72,7 @@ recompile (the editor does it for you on save). See [Workflow](docs/workflow.md)
 ## Quickstart
 
 ```sh
-nix develop                  # toolchain shell: odin, ols, emcc, llvm/lld, + $GODOT (4.6.2)
+nix develop                  # toolchain shell: odin, ols, emcc, llvm/lld, + $GODOT (4.7.1)
 
 # Build the extension + the example's scripts, then play it:
 bash build/build_scripts.sh examples/survivors

@@ -407,6 +407,44 @@ tree_item_get_autowrap_mode :: proc "contextless" (
     return
 }
 
+tree_item_set_autowrap_trim_flags :: proc "contextless" (
+    self: Tree_Item,
+    column_: Int,
+    flags_: Text_Server_Line_Break_Flag,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_autowrap_trim_flags", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2186029660)
+    }
+    self := self
+    column_ := column_
+    flags_ := flags_
+    args := []__bindgen_gde.TypePtr {
+        &column_,
+        &flags_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+tree_item_get_autowrap_trim_flags :: proc "contextless" (
+    self: Tree_Item,
+    column_: Int,
+) -> (ret: Text_Server_Line_Break_Flag) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_autowrap_trim_flags", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3513056523)
+    }
+    self := self
+    column_ := column_
+    args := []__bindgen_gde.TypePtr {
+        &column_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 tree_item_set_text_overrun_behavior :: proc "contextless" (
     self: Tree_Item,
     column_: Int,
@@ -1228,16 +1266,19 @@ tree_item_is_selected :: proc "contextless" (
 tree_item_select :: proc "contextless" (
     self: Tree_Item,
     column_: Int,
+    set_as_cursor_: Bool,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("select", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 972357352)
     }
     self := self
     column_ := column_
+    set_as_cursor_ := set_as_cursor_
     args := []__bindgen_gde.TypePtr {
         &column_,
+        &set_as_cursor_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -1986,6 +2027,38 @@ tree_item_is_folding_disabled :: proc "contextless" (
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("is_folding_disabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+tree_item_set_accept_children :: proc "contextless" (
+    self: Tree_Item,
+    allowed_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_accept_children", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    allowed_ := allowed_
+    args := []__bindgen_gde.TypePtr {
+        &allowed_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+tree_item_is_accepting_children :: proc "contextless" (
+    self: Tree_Item,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_accepting_children", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
     }
     self := self

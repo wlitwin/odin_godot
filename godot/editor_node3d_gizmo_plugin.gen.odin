@@ -134,6 +134,21 @@ editor_node3d_gizmo_plugin__is_selectable_when_hidden :: proc "contextless" (
     return
 }
 
+editor_node3d_gizmo_plugin__can_commit_handle_on_click :: proc "contextless" (
+    self: Editor_Node3d_Gizmo_Plugin,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_can_commit_handle_on_click", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 editor_node3d_gizmo_plugin__redraw :: proc "contextless" (
     self: Editor_Node3d_Gizmo_Plugin,
     gizmo_: Editor_Node3d_Gizmo,

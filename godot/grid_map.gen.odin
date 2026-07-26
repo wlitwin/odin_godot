@@ -5,6 +5,11 @@ import __bindgen_gde "godot:gdext"
 Grid_Map_Constants :: enum {
     INVALID_CELL_ITEM = -1,
 }
+Grid_Map_Debug_Visibility_Mode :: enum int {
+    Debug_Visibility_Mode_Default = 0,
+    Debug_Visibility_Mode_Force_Show = 1,
+    Debug_Visibility_Mode_Force_Hide = 2,
+}
 
 
 
@@ -203,6 +208,38 @@ grid_map_get_collision_priority :: proc "contextless" (
     if __ptr == nil {
         _gde_name := new_string_name_cstring("get_collision_priority", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1740695150)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+grid_map_set_collision_visibility_mode :: proc "contextless" (
+    self: Grid_Map,
+    visibility_mode_: Grid_Map_Debug_Visibility_Mode,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_collision_visibility_mode", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4160694578)
+    }
+    self := self
+    visibility_mode_ := visibility_mode_
+    args := []__bindgen_gde.TypePtr {
+        &visibility_mode_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+grid_map_get_collision_visibility_mode :: proc "contextless" (
+    self: Grid_Map,
+) -> (ret: Grid_Map_Debug_Visibility_Mode) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_collision_visibility_mode", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3729798365)
     }
     self := self
     args := []__bindgen_gde.TypePtr {
@@ -739,6 +776,132 @@ grid_map_get_used_cells_by_item :: proc "contextless" (
     item_ := item_
     args := []__bindgen_gde.TypePtr {
         &item_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+grid_map_get_used_octants :: proc "contextless" (
+    self: Grid_Map,
+) -> (ret: Typed_Array(Vector3i)) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_used_octants", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3995934104)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+grid_map_get_used_octants_by_item :: proc "contextless" (
+    self: Grid_Map,
+    item_: Int,
+) -> (ret: Typed_Array(Vector3i)) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_used_octants_by_item", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 663333327)
+    }
+    self := self
+    item_ := item_
+    args := []__bindgen_gde.TypePtr {
+        &item_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+grid_map_get_used_cells_in_octant :: proc "contextless" (
+    self: Grid_Map,
+    octant_coords_: Vector3i,
+) -> (ret: Typed_Array(Vector3i)) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_used_cells_in_octant", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2658725580)
+    }
+    self := self
+    octant_coords_ := octant_coords_
+    args := []__bindgen_gde.TypePtr {
+        &octant_coords_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+grid_map_get_used_cells_in_octant_by_item :: proc "contextless" (
+    self: Grid_Map,
+    octant_coords_: Vector3i,
+    item_: Int,
+) -> (ret: Typed_Array(Vector3i)) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_used_cells_in_octant_by_item", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2384667821)
+    }
+    self := self
+    octant_coords_ := octant_coords_
+    item_ := item_
+    args := []__bindgen_gde.TypePtr {
+        &octant_coords_,
+        &item_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+grid_map_get_octants_in_bounds :: proc "contextless" (
+    self: Grid_Map,
+    bounds_: Aabb,
+) -> (ret: Typed_Array(Vector3i)) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_octants_in_bounds", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2489849902)
+    }
+    self := self
+    bounds_ := bounds_
+    args := []__bindgen_gde.TypePtr {
+        &bounds_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+grid_map_get_used_octants_in_bounds :: proc "contextless" (
+    self: Grid_Map,
+    bounds_: Aabb,
+) -> (ret: Typed_Array(Vector3i)) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_used_octants_in_bounds", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2489849902)
+    }
+    self := self
+    bounds_ := bounds_
+    args := []__bindgen_gde.TypePtr {
+        &bounds_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+grid_map_get_octant_coords_from_cell_coords :: proc "contextless" (
+    self: Grid_Map,
+    cell_coords_: Vector3i,
+) -> (ret: Vector3i) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_octant_coords_from_cell_coords", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2075501597)
+    }
+    self := self
+    cell_coords_ := cell_coords_
+    args := []__bindgen_gde.TypePtr {
+        &cell_coords_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return

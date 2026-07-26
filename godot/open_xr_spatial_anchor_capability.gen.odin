@@ -90,6 +90,24 @@ open_xr_spatial_anchor_capability_is_persistence_scope_supported :: proc "contex
     return
 }
 
+open_xr_spatial_anchor_capability_create_default_persistence_context :: proc "contextless" (
+    self: Open_Xr_Spatial_Anchor_Capability,
+    user_callback_: Callable,
+) -> (ret: Open_Xr_Future_Result) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("create_default_persistence_context", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1401033661)
+    }
+    self := self
+    user_callback_ := user_callback_
+    args := []__bindgen_gde.TypePtr {
+        &user_callback_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 open_xr_spatial_anchor_capability_create_persistence_context :: proc "contextless" (
     self: Open_Xr_Spatial_Anchor_Capability,
     scope_: Open_Xr_Spatial_Anchor_Capability_Persistence_Scope,
@@ -150,18 +168,21 @@ open_xr_spatial_anchor_capability_create_new_anchor :: proc "contextless" (
     self: Open_Xr_Spatial_Anchor_Capability,
     transform_: Transform3d,
     spatial_context_: Rid,
+    next_: Open_Xr_Structure_Base,
 ) -> (ret: Open_Xr_Anchor_Tracker) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("create_new_anchor", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 607100373)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4088043487)
     }
     self := self
     transform_ := transform_
     spatial_context_ := spatial_context_
+    next_ := next_
     args := []__bindgen_gde.TypePtr {
         &transform_,
         &spatial_context_,
+        &next_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -230,6 +251,62 @@ open_xr_spatial_anchor_capability_unpersist_anchor :: proc "contextless" (
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
+}
+
+open_xr_spatial_anchor_capability_start_entity_discovery :: proc "contextless" (
+    self: Open_Xr_Spatial_Anchor_Capability,
+    spatial_context_: Rid,
+    component_data_: Typed_Array(Open_Xr_Spatial_Component_Data),
+    next_snapshot_create_: Open_Xr_Structure_Base,
+    next_snapshot_query_: Open_Xr_Structure_Base,
+    user_callback_: Callable,
+) -> (ret: Open_Xr_Future_Result) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("start_entity_discovery", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3452714169)
+    }
+    self := self
+    spatial_context_ := spatial_context_
+    component_data_ := component_data_
+    next_snapshot_create_ := next_snapshot_create_
+    next_snapshot_query_ := next_snapshot_query_
+    user_callback_ := user_callback_
+    args := []__bindgen_gde.TypePtr {
+        &spatial_context_,
+        &component_data_,
+        &next_snapshot_create_,
+        &next_snapshot_query_,
+        &user_callback_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+open_xr_spatial_anchor_capability_do_entity_update :: proc "contextless" (
+    self: Open_Xr_Spatial_Anchor_Capability,
+    spatial_context_: Rid,
+    component_data_: Typed_Array(Open_Xr_Spatial_Component_Data),
+    next_snapshot_create_: Open_Xr_Structure_Base,
+    next_snapshot_query_: Open_Xr_Structure_Base,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("do_entity_update", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3138044275)
+    }
+    self := self
+    spatial_context_ := spatial_context_
+    component_data_ := component_data_
+    next_snapshot_create_ := next_snapshot_create_
+    next_snapshot_query_ := next_snapshot_query_
+    args := []__bindgen_gde.TypePtr {
+        &spatial_context_,
+        &component_data_,
+        &next_snapshot_create_,
+        &next_snapshot_query_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
 

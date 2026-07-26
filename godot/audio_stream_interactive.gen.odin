@@ -14,6 +14,7 @@ Audio_Stream_Interactive_Transition_From_Time :: enum int {
 Audio_Stream_Interactive_Transition_To_Time :: enum int {
     Transition_To_Time_Same_Position = 0,
     Transition_To_Time_Start = 1,
+    Transition_To_Time_Previous_Position = 2,
 }
 Audio_Stream_Interactive_Fade_Mode :: enum int {
     Fade_Disabled = 0,

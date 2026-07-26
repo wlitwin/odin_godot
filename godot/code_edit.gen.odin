@@ -15,6 +15,7 @@ Code_Edit_Code_Completion_Kind :: enum int {
     Kind_Node_Path = 7,
     Kind_File_Path = 8,
     Kind_Plain_Text = 9,
+    Kind_Keyword = 10,
 }
 Code_Edit_Code_Completion_Location :: enum int {
     Location_Local = 0,
@@ -1962,6 +1963,23 @@ code_edit_delete_lines :: proc "contextless" (
     }
     self := self
     args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+code_edit_join_lines :: proc "contextless" (
+    self: Code_Edit,
+    line_ending_: String,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("join_lines", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4063782979)
+    }
+    self := self
+    line_ending_ := line_ending_
+    args := []__bindgen_gde.TypePtr {
+        &line_ending_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }

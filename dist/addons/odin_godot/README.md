@@ -1,7 +1,7 @@
 # odin_godot — write Godot scripts in Odin
 
 This addon makes [Odin](https://odin-lang.org) a first-class scripting language in Godot
-4.6+. You attach `.odin` files to nodes exactly like GDScript — with `_ready`, `_process`,
+4.7+. You attach `.odin` files to nodes exactly like GDScript — with `_ready`, `_process`,
 signals, `@export`, and methods — but they compile to fast native code.
 
 **You are reading this inside an installed addon** (`res://addons/odin_godot/`). Godot has
@@ -33,7 +33,7 @@ That means:
 
 | Need | Where |
 |------|-------|
-| **Godot 4.6+** | <https://godotengine.org> |
+| **Godot 4.7+** | <https://godotengine.org> |
 | **Odin compiler — release `@ODIN_VERSION@`, exactly** (`odin` on your PATH) | <https://github.com/odin-lang/Odin/releases> |
 | **A C linker** Odin can drive | macOS: Xcode Command Line Tools (`xcode-select --install`) · Linux: `gcc`/`clang` · Windows: Visual Studio Build Tools (run builds from a *"x64 Native Tools Command Prompt for VS"*) |
 
@@ -115,7 +115,7 @@ ship in this addon (`bin/macos`, `bin/linux`, `bin/windows`).
 is ahead-of-time linked into one Emscripten module *per project*. The editor's export plugin
 **builds it automatically** when you export to Web, provided you've done the one-time setup:
 
-1. Install the **Emscripten SDK** and activate **4.0.20** (the version Godot 4.6's web
+1. Install the **Emscripten SDK** and activate **4.0.20** (the version Godot 4.7's web
    templates use) — see <https://emscripten.org/docs/getting_started/downloads.html>.
 2. Set the **`odin_godot/emcc_bin`** project setting to the absolute path of `emcc` (and
    `odin_godot/odin_bin` to `odin`) so a Finder/Steam-launched editor can find them.

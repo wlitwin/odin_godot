@@ -40,13 +40,20 @@ Rendering_Server_Cube_Map_Layer :: enum int {
     Cubemap_Layer_Front = 4,
     Cubemap_Layer_Back = 5,
 }
+Rendering_Server_Texture_Drawable_Format :: enum int {
+    Texture_Drawable_Format_Rgba8 = 0,
+    Texture_Drawable_Format_Rgba8_Srgb = 1,
+    Texture_Drawable_Format_Rgbah = 2,
+    Texture_Drawable_Format_Rgbaf = 3,
+}
 Rendering_Server_Shader_Mode :: enum int {
     Shader_Spatial = 0,
     Shader_Canvas_Item = 1,
     Shader_Particles = 2,
     Shader_Sky = 3,
     Shader_Fog = 4,
-    Shader_Max = 5,
+    Shader_Texture_Blit = 5,
+    Shader_Max = 6,
 }
 Rendering_Server_Array_Type :: enum int {
     Array_Vertex = 0,
@@ -107,6 +114,7 @@ Rendering_Server_Light_Type :: enum int {
     Light_Directional = 0,
     Light_Omni = 1,
     Light_Spot = 2,
+    Light_Area = 3,
 }
 Rendering_Server_Light_Param :: enum int {
     Light_Param_Energy = 0,
@@ -197,6 +205,18 @@ Rendering_Server_Particles_Transform_Align :: enum int {
     Particles_Transform_Align_Z_Billboard = 1,
     Particles_Transform_Align_Y_To_Velocity = 2,
     Particles_Transform_Align_Z_Billboard_Y_To_Velocity = 3,
+    Particles_Transform_Align_Local_Billboard = 4,
+}
+Rendering_Server_Particles_Transform_Align_Custom_Src :: enum int {
+    Particles_Align_Channel_Filter_Disabled = 0,
+    Particles_Align_Channel_Filter_X = 1,
+    Particles_Align_Channel_Filter_Y = 2,
+    Particles_Align_Channel_Filter_Z = 3,
+    Particles_Align_Channel_Filter_W = 4,
+}
+Rendering_Server_Particles_Transform_Align_Axis :: enum int {
+    Particles_Align_Axis_X = 0,
+    Particles_Align_Axis_Y = 1,
 }
 Rendering_Server_Particles_Draw_Order :: enum int {
     Particles_Draw_Order_Index = 0,
@@ -236,7 +256,8 @@ Rendering_Server_Viewport_Scaling3d_Mode :: enum int {
     Viewport_Scaling_3d_Mode_Fsr2 = 2,
     Viewport_Scaling_3d_Mode_Metalfx_Spatial = 3,
     Viewport_Scaling_3d_Mode_Metalfx_Temporal = 4,
-    Viewport_Scaling_3d_Mode_Max = 5,
+    Viewport_Scaling_3d_Mode_Nearest = 5,
+    Viewport_Scaling_3d_Mode_Max = 6,
 }
 Rendering_Server_Viewport_Update_Mode :: enum int {
     Viewport_Update_Disabled = 0,
@@ -833,6 +854,36 @@ rendering_server_texture_create_from_native_handle :: proc "contextless" (
     return
 }
 
+rendering_server_texture_drawable_create :: proc "contextless" (
+    self: Rendering_Server,
+    width_: Int,
+    height_: Int,
+    format_: Rendering_Server_Texture_Drawable_Format,
+    color_: Color,
+    with_mipmaps_: Bool,
+) -> (ret: Rid) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("texture_drawable_create", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1993613667)
+    }
+    self := self
+    width_ := width_
+    height_ := height_
+    format_ := format_
+    color_ := color_
+    with_mipmaps_ := with_mipmaps_
+    args := []__bindgen_gde.TypePtr {
+        &width_,
+        &height_,
+        &format_,
+        &color_,
+        &with_mipmaps_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 rendering_server_texture_2d_update :: proc "contextless" (
     self: Rendering_Server,
     texture_: Rid,
@@ -892,6 +943,38 @@ rendering_server_texture_proxy_update :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &texture_,
         &proxy_to_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_server_texture_drawable_blit_rect :: proc "contextless" (
+    self: Rendering_Server,
+    textures_: Typed_Array(Rid),
+    rect_: Rect2i,
+    material_: Rid,
+    modulate_: Color,
+    source_textures_: Typed_Array(Rid),
+    to_mipmap_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("texture_drawable_blit_rect", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4077763890)
+    }
+    self := self
+    textures_ := textures_
+    rect_ := rect_
+    material_ := material_
+    modulate_ := modulate_
+    source_textures_ := source_textures_
+    to_mipmap_ := to_mipmap_
+    args := []__bindgen_gde.TypePtr {
+        &textures_,
+        &rect_,
+        &material_,
+        &modulate_,
+        &source_textures_,
+        &to_mipmap_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -996,6 +1079,38 @@ rendering_server_texture_3d_get :: proc "contextless" (
     texture_ := texture_
     args := []__bindgen_gde.TypePtr {
         &texture_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_server_texture_drawable_generate_mipmaps :: proc "contextless" (
+    self: Rendering_Server,
+    texture_: Rid,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("texture_drawable_generate_mipmaps", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2722037293)
+    }
+    self := self
+    texture_ := texture_
+    args := []__bindgen_gde.TypePtr {
+        &texture_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_server_texture_drawable_get_default_material :: proc "contextless" (
+    self: Rendering_Server,
+) -> (ret: Rid) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("texture_drawable_get_default_material", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2944877500)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -2834,6 +2949,21 @@ rendering_server_spot_light_create :: proc "contextless" (
     return
 }
 
+rendering_server_area_light_create :: proc "contextless" (
+    self: Rendering_Server,
+) -> (ret: Rid) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("area_light_create", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 529393457)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 rendering_server_light_set_color :: proc "contextless" (
     self: Rendering_Server,
     light_: Rid,
@@ -3142,6 +3272,46 @@ rendering_server_light_directional_set_sky_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &light_,
         &mode_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_server_light_area_set_size :: proc "contextless" (
+    self: Rendering_Server,
+    light_: Rid,
+    size_: Vector2,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("light_area_set_size", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3201125042)
+    }
+    self := self
+    light_ := light_
+    size_ := size_
+    args := []__bindgen_gde.TypePtr {
+        &light_,
+        &size_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_server_light_area_set_normalize_energy :: proc "contextless" (
+    self: Rendering_Server,
+    light_: Rid,
+    enable_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("light_area_set_normalize_energy", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1265174801)
+    }
+    self := self
+    light_ := light_
+    enable_ := enable_
+    args := []__bindgen_gde.TypePtr {
+        &light_,
+        &enable_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -4540,19 +4710,22 @@ rendering_server_particles_set_pre_process_time :: proc "contextless" (
 rendering_server_particles_request_process_time :: proc "contextless" (
     self: Rendering_Server,
     particles_: Rid,
-    time_: f64,
+    process_time_: f64,
+    process_time_residual_: f64,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("particles_request_process_time", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1794382983)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1515254041)
     }
     self := self
     particles_ := particles_
-    time_ := time_
+    process_time_ := process_time_
+    process_time_residual_ := process_time_residual_
     args := []__bindgen_gde.TypePtr {
         &particles_,
-        &time_,
+        &process_time_,
+        &process_time_residual_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -4813,6 +4986,46 @@ rendering_server_particles_set_transform_align :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &particles_,
         &align_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_server_particles_set_transform_align_channel_filter :: proc "contextless" (
+    self: Rendering_Server,
+    particles_: Rid,
+    channel_filter_: Rendering_Server_Particles_Transform_Align_Custom_Src,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("particles_set_transform_align_channel_filter", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1303285813)
+    }
+    self := self
+    particles_ := particles_
+    channel_filter_ := channel_filter_
+    args := []__bindgen_gde.TypePtr {
+        &particles_,
+        &channel_filter_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_server_particles_set_transform_align_axis :: proc "contextless" (
+    self: Rendering_Server,
+    particles_: Rid,
+    rotation_axis_: Rendering_Server_Particles_Transform_Align_Axis,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("particles_set_transform_align_axis", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3065310065)
+    }
+    self := self
+    particles_ := particles_
+    rotation_axis_ := rotation_axis_
+    args := []__bindgen_gde.TypePtr {
+        &particles_,
+        &rotation_axis_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -5724,20 +5937,23 @@ rendering_server_viewport_set_size :: proc "contextless" (
     viewport_: Rid,
     width_: Int,
     height_: Int,
+    view_count_: Int,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("viewport_set_size", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4288446313)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3313592705)
     }
     self := self
     viewport_ := viewport_
     width_ := width_
     height_ := height_
+    view_count_ := view_count_
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &width_,
         &height_,
+        &view_count_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -7519,7 +7735,7 @@ rendering_server_environment_set_volumetric_fog :: proc "contextless" (
     emission_energy_: f64,
     anisotropy_: f64,
     length_: f64,
-    p_detail_spread_: f64,
+    detail_spread_: f64,
     gi_inject_: f64,
     temporal_reprojection_: Bool,
     temporal_reprojection_amount_: f64,
@@ -7540,7 +7756,7 @@ rendering_server_environment_set_volumetric_fog :: proc "contextless" (
     emission_energy_ := emission_energy_
     anisotropy_ := anisotropy_
     length_ := length_
-    p_detail_spread_ := p_detail_spread_
+    detail_spread_ := detail_spread_
     gi_inject_ := gi_inject_
     temporal_reprojection_ := temporal_reprojection_
     temporal_reprojection_amount_ := temporal_reprojection_amount_
@@ -7555,7 +7771,7 @@ rendering_server_environment_set_volumetric_fog :: proc "contextless" (
         &emission_energy_,
         &anisotropy_,
         &length_,
-        &p_detail_spread_,
+        &detail_spread_,
         &gi_inject_,
         &temporal_reprojection_,
         &temporal_reprojection_amount_,

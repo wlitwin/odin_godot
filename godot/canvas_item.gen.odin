@@ -34,6 +34,12 @@ Canvas_Item_Clip_Children_Mode :: enum int {
     Clip_Children_And_Draw = 2,
     Clip_Children_Max = 3,
 }
+Canvas_Item_Oversampling_With_Scale :: enum int {
+    Oversampling_With_Scale_Parent_Node = 0,
+    Oversampling_With_Scale_Disabled = 1,
+    Oversampling_With_Scale_Enabled = 2,
+    Oversampling_With_Scale_Max = 3,
+}
 
 
 
@@ -1995,6 +2001,38 @@ canvas_item_get_clip_children_mode :: proc "contextless" (
     if __ptr == nil {
         _gde_name := new_string_name_cstring("get_clip_children_mode", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3581808349)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+canvas_item_set_oversampling_with_scale :: proc "contextless" (
+    self: Canvas_Item,
+    enabled_: Canvas_Item_Oversampling_With_Scale,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_oversampling_with_scale", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 872218804)
+    }
+    self := self
+    enabled_ := enabled_
+    args := []__bindgen_gde.TypePtr {
+        &enabled_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+canvas_item_get_oversampling_with_scale :: proc "contextless" (
+    self: Canvas_Item,
+) -> (ret: Canvas_Item_Oversampling_With_Scale) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_oversampling_with_scale", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2026097197)
     }
     self := self
     args := []__bindgen_gde.TypePtr {

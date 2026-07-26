@@ -38,21 +38,6 @@ new_script_editor_base :: proc "contextless" () -> Script_Editor_Base {
 // Variant is converted to the declared return type (Variant passed through,
 // `Error`/ints via variant_to_int, void ignored).
 
-script_editor_base_get_base_editor :: proc "contextless" (
-    self: Script_Editor_Base,
-) -> (ret: Control) {
-    @(static) __ptr: __bindgen_gde.MethodBindPtr
-    if __ptr == nil {
-        _gde_name := new_string_name_cstring("get_base_editor", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2783021301)
-    }
-    self := self
-    args := []__bindgen_gde.TypePtr {
-    }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
-    return
-}
-
 script_editor_base_add_syntax_highlighter :: proc "contextless" (
     self: Script_Editor_Base,
     highlighter_: Editor_Syntax_Highlighter,
@@ -68,6 +53,21 @@ script_editor_base_add_syntax_highlighter :: proc "contextless" (
         &highlighter_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+script_editor_base_get_base_editor :: proc "contextless" (
+    self: Script_Editor_Base,
+) -> (ret: Control) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_base_editor", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2783021301)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
 }
 
 

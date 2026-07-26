@@ -37,6 +37,28 @@ new_importer_mesh :: proc "contextless" () -> Importer_Mesh {
 // Variants, the variadic `extra: ..Variant` are appended, and the returned
 // Variant is converted to the declared return type (Variant passed through,
 // `Error`/ints via variant_to_int, void ignored).
+importer_mesh_merge_importer_meshes :: proc "contextless" (
+    importer_meshes_: Typed_Array(Importer_Mesh),
+    relative_transforms_: Typed_Array(Transform3d),
+    deduplicate_surfaces_: Bool,
+) -> (ret: Importer_Mesh) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("merge_importer_meshes", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1030647649)
+    }
+    importer_meshes_ := importer_meshes_
+    relative_transforms_ := relative_transforms_
+    deduplicate_surfaces_ := deduplicate_surfaces_
+    args := []__bindgen_gde.TypePtr {
+        &importer_meshes_,
+        &relative_transforms_,
+        &deduplicate_surfaces_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    return
+}
+
 importer_mesh_from_mesh :: proc "contextless" (
     mesh_: Mesh,
 ) -> (ret: Importer_Mesh) {

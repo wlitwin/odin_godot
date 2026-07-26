@@ -403,8 +403,75 @@ csg_shape3d_bake_static_mesh :: proc "contextless" (
     return
 }
 
+csg_shape3d_set_autosmooth :: proc "contextless" (
+    self: Csg_Shape3d,
+    autosmooth_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_autosmooth", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    autosmooth_ := autosmooth_
+    args := []__bindgen_gde.TypePtr {
+        &autosmooth_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+csg_shape3d_is_autosmooth :: proc "contextless" (
+    self: Csg_Shape3d,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_autosmooth", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+csg_shape3d_set_smoothing_angle :: proc "contextless" (
+    self: Csg_Shape3d,
+    smoothing_angle_: f64,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_smoothing_angle", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 373806689)
+    }
+    self := self
+    smoothing_angle_ := smoothing_angle_
+    args := []__bindgen_gde.TypePtr {
+        &smoothing_angle_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+csg_shape3d_get_smoothing_angle :: proc "contextless" (
+    self: Csg_Shape3d,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_smoothing_angle", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1740695150)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 
 // properties
+csg_shape3d_get_autosmooth :: proc "contextless" (self: Csg_Shape3d) -> Bool {
+    return csg_shape3d_is_autosmooth(self)
+}
 csg_shape3d_get_calculate_tangents :: proc "contextless" (self: Csg_Shape3d) -> Bool {
     return csg_shape3d_is_calculating_tangents(self)
 }

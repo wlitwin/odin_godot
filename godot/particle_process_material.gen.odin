@@ -30,7 +30,8 @@ Particle_Process_Material_Particle_Flags :: enum int {
     Particle_Flag_Rotate_Y = 1,
     Particle_Flag_Disable_Z = 2,
     Particle_Flag_Damping_As_Friction = 3,
-    Particle_Flag_Max = 4,
+    Particle_Flag_Inherit_Emitter_Scale = 4,
+    Particle_Flag_Max = 5,
 }
 Particle_Process_Material_Emission_Shape :: enum int {
     Emission_Shape_Point = 0,
@@ -394,6 +395,198 @@ particle_process_material_get_color :: proc "contextless" (
     if __ptr == nil {
         _gde_name := new_string_name_cstring("get_color", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3444240500)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+particle_process_material_set_use_scale_3d :: proc "contextless" (
+    self: Particle_Process_Material,
+    using_scale_3d_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_use_scale_3d", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    using_scale_3d_ := using_scale_3d_
+    args := []__bindgen_gde.TypePtr {
+        &using_scale_3d_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+particle_process_material_is_using_scale_3d :: proc "contextless" (
+    self: Particle_Process_Material,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_using_scale_3d", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+particle_process_material_set_scale_3d_min :: proc "contextless" (
+    self: Particle_Process_Material,
+    scale_3d_min_: Vector3,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_scale_3d_min", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3460891852)
+    }
+    self := self
+    scale_3d_min_ := scale_3d_min_
+    args := []__bindgen_gde.TypePtr {
+        &scale_3d_min_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+particle_process_material_get_scale_3d_min :: proc "contextless" (
+    self: Particle_Process_Material,
+) -> (ret: Vector3) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_scale_3d_min", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3360562783)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+particle_process_material_set_scale_3d_max :: proc "contextless" (
+    self: Particle_Process_Material,
+    scale_3d_max_: Vector3,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_scale_3d_max", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3460891852)
+    }
+    self := self
+    scale_3d_max_ := scale_3d_max_
+    args := []__bindgen_gde.TypePtr {
+        &scale_3d_max_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+particle_process_material_get_scale_3d_max :: proc "contextless" (
+    self: Particle_Process_Material,
+) -> (ret: Vector3) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_scale_3d_max", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3360562783)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+particle_process_material_set_use_rotation_3d :: proc "contextless" (
+    self: Particle_Process_Material,
+    using_rotation_3d_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_use_rotation_3d", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    using_rotation_3d_ := using_rotation_3d_
+    args := []__bindgen_gde.TypePtr {
+        &using_rotation_3d_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+particle_process_material_is_using_rotation_3d :: proc "contextless" (
+    self: Particle_Process_Material,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_using_rotation_3d", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+particle_process_material_set_rotation_3d_min :: proc "contextless" (
+    self: Particle_Process_Material,
+    rotation_3d_min_: Vector3,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_rotation_3d_min", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3460891852)
+    }
+    self := self
+    rotation_3d_min_ := rotation_3d_min_
+    args := []__bindgen_gde.TypePtr {
+        &rotation_3d_min_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+particle_process_material_get_rotation_3d_min :: proc "contextless" (
+    self: Particle_Process_Material,
+) -> (ret: Vector3) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_rotation_3d_min", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3360562783)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+particle_process_material_set_rotation_3d_max :: proc "contextless" (
+    self: Particle_Process_Material,
+    rotation_3d_max_: Vector3,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_rotation_3d_max", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3460891852)
+    }
+    self := self
+    rotation_3d_max_ := rotation_3d_max_
+    args := []__bindgen_gde.TypePtr {
+        &rotation_3d_max_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+particle_process_material_get_rotation_3d_max :: proc "contextless" (
+    self: Particle_Process_Material,
+) -> (ret: Vector3) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_rotation_3d_max", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3360562783)
     }
     self := self
     args := []__bindgen_gde.TypePtr {
@@ -1656,6 +1849,134 @@ particle_process_material_get_collision_bounce :: proc "contextless" (
     return
 }
 
+particle_process_material_set_using_rotation_velocity_3d :: proc "contextless" (
+    self: Particle_Process_Material,
+    use_rotation_velocity_3d_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_using_rotation_velocity_3d", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    use_rotation_velocity_3d_ := use_rotation_velocity_3d_
+    args := []__bindgen_gde.TypePtr {
+        &use_rotation_velocity_3d_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+particle_process_material_is_using_rotation_velocity_3d :: proc "contextless" (
+    self: Particle_Process_Material,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_using_rotation_velocity_3d", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+particle_process_material_set_rotation_velocity_3d_max :: proc "contextless" (
+    self: Particle_Process_Material,
+    rotation_velocity_3d_max_: Vector3,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_rotation_velocity_3d_max", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3460891852)
+    }
+    self := self
+    rotation_velocity_3d_max_ := rotation_velocity_3d_max_
+    args := []__bindgen_gde.TypePtr {
+        &rotation_velocity_3d_max_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+particle_process_material_get_rotation_velocity_3d_max :: proc "contextless" (
+    self: Particle_Process_Material,
+) -> (ret: Vector3) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_rotation_velocity_3d_max", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3360562783)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+particle_process_material_set_rotation_velocity_3d_min :: proc "contextless" (
+    self: Particle_Process_Material,
+    rotation_velocity_3d_min_: Vector3,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_rotation_velocity_3d_min", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3460891852)
+    }
+    self := self
+    rotation_velocity_3d_min_ := rotation_velocity_3d_min_
+    args := []__bindgen_gde.TypePtr {
+        &rotation_velocity_3d_min_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+particle_process_material_get_rotation_velocity_3d_min :: proc "contextless" (
+    self: Particle_Process_Material,
+) -> (ret: Vector3) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_rotation_velocity_3d_min", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3360562783)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+particle_process_material_set_rotation_velocity_3d_curve :: proc "contextless" (
+    self: Particle_Process_Material,
+    rotation_velocity_3d_curve_: Texture2d,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_rotation_velocity_3d_curve", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4051416890)
+    }
+    self := self
+    rotation_velocity_3d_curve_ := rotation_velocity_3d_curve_
+    args := []__bindgen_gde.TypePtr {
+        &rotation_velocity_3d_curve_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+particle_process_material_get_rotation_velocity_3d_curve :: proc "contextless" (
+    self: Particle_Process_Material,
+) -> (ret: Texture2d) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_rotation_velocity_3d_curve", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3635182373)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 
 // properties
 particle_process_material_get_particle_flag_align_y :: proc "contextless" (self: Particle_Process_Material) -> Bool {
@@ -1682,6 +2003,12 @@ particle_process_material_get_particle_flag_damping_as_friction :: proc "context
 particle_process_material_set_particle_flag_damping_as_friction :: proc "contextless" (self: Particle_Process_Material, value: Bool) {
     particle_process_material_set_particle_flag(self, Particle_Process_Material_Particle_Flags(3), value)
 }
+particle_process_material_get_particle_flag_inherit_emitter_scale :: proc "contextless" (self: Particle_Process_Material) -> Bool {
+    return particle_process_material_get_particle_flag(self, Particle_Process_Material_Particle_Flags(4))
+}
+particle_process_material_set_particle_flag_inherit_emitter_scale :: proc "contextless" (self: Particle_Process_Material, value: Bool) {
+    particle_process_material_set_particle_flag(self, Particle_Process_Material_Particle_Flags(4), value)
+}
 particle_process_material_get_angle :: proc "contextless" (self: Particle_Process_Material) -> Vector2 {
     return particle_process_material_get_param(self, Particle_Process_Material_Parameter(7))
 }
@@ -1705,6 +2032,9 @@ particle_process_material_get_angle_curve :: proc "contextless" (self: Particle_
 }
 particle_process_material_set_angle_curve :: proc "contextless" (self: Particle_Process_Material, value: Texture2d) {
     particle_process_material_set_param_texture(self, Particle_Process_Material_Parameter(7), value)
+}
+particle_process_material_get_use_rotation_3d :: proc "contextless" (self: Particle_Process_Material) -> Bool {
+    return particle_process_material_is_using_rotation_3d(self)
 }
 particle_process_material_get_initial_velocity :: proc "contextless" (self: Particle_Process_Material) -> Vector2 {
     return particle_process_material_get_param(self, Particle_Process_Material_Parameter(0))
@@ -1820,6 +2150,12 @@ particle_process_material_get_radial_velocity_curve :: proc "contextless" (self:
 particle_process_material_set_radial_velocity_curve :: proc "contextless" (self: Particle_Process_Material, value: Texture2d) {
     particle_process_material_set_param_texture(self, Particle_Process_Material_Parameter(15), value)
 }
+particle_process_material_get_use_rotation_velocity_3d :: proc "contextless" (self: Particle_Process_Material) -> Bool {
+    return particle_process_material_is_using_rotation_velocity_3d(self)
+}
+particle_process_material_set_use_rotation_velocity_3d :: proc "contextless" (self: Particle_Process_Material, value: Bool) {
+    particle_process_material_set_using_rotation_velocity_3d(self, value)
+}
 particle_process_material_get_linear_accel :: proc "contextless" (self: Particle_Process_Material) -> Vector2 {
     return particle_process_material_get_param(self, Particle_Process_Material_Parameter(3))
 }
@@ -1918,6 +2254,9 @@ particle_process_material_set_damping_curve :: proc "contextless" (self: Particl
 }
 particle_process_material_get_attractor_interaction_enabled :: proc "contextless" (self: Particle_Process_Material) -> Bool {
     return particle_process_material_is_attractor_interaction_enabled(self)
+}
+particle_process_material_get_use_scale_3d :: proc "contextless" (self: Particle_Process_Material) -> Bool {
+    return particle_process_material_is_using_scale_3d(self)
 }
 particle_process_material_get_scale :: proc "contextless" (self: Particle_Process_Material) -> Vector2 {
     return particle_process_material_get_param(self, Particle_Process_Material_Parameter(8))

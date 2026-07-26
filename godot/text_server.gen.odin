@@ -1141,7 +1141,7 @@ text_server_font_is_force_autohinter :: proc "contextless" (
 text_server_font_set_modulate_color_glyphs :: proc "contextless" (
     self: Text_Server,
     font_rid_: Rid,
-    force_autohinter_: Bool,
+    modulate_: Bool,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -1150,10 +1150,10 @@ text_server_font_set_modulate_color_glyphs :: proc "contextless" (
     }
     self := self
     font_rid_ := font_rid_
-    force_autohinter_ := force_autohinter_
+    modulate_ := modulate_
     args := []__bindgen_gde.TypePtr {
         &font_rid_,
-        &force_autohinter_,
+        &modulate_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -1174,6 +1174,142 @@ text_server_font_is_modulate_color_glyphs :: proc "contextless" (
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
+}
+
+text_server_font_get_palette_count :: proc "contextless" (
+    self: Text_Server,
+    font_rid_: Rid,
+) -> (ret: i64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("font_get_palette_count", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2198884583)
+    }
+    self := self
+    font_rid_ := font_rid_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+text_server_font_get_palette_name :: proc "contextless" (
+    self: Text_Server,
+    font_rid_: Rid,
+    index_: Int,
+) -> (ret: String) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("font_get_palette_name", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1464764419)
+    }
+    self := self
+    font_rid_ := font_rid_
+    index_ := index_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+        &index_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+text_server_font_get_palette_colors :: proc "contextless" (
+    self: Text_Server,
+    font_rid_: Rid,
+    index_: Int,
+) -> (ret: Packed_Color_Array) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("font_get_palette_colors", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1595517857)
+    }
+    self := self
+    font_rid_ := font_rid_
+    index_ := index_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+        &index_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+text_server_font_set_palette_custom_colors :: proc "contextless" (
+    self: Text_Server,
+    font_rid_: Rid,
+    colors_: Packed_Color_Array,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("font_set_palette_custom_colors", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4037098590)
+    }
+    self := self
+    font_rid_ := font_rid_
+    colors_ := colors_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+        &colors_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+text_server_font_get_palette_custom_colors :: proc "contextless" (
+    self: Text_Server,
+    font_rid_: Rid,
+) -> (ret: Packed_Color_Array) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("font_get_palette_custom_colors", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1569415609)
+    }
+    self := self
+    font_rid_ := font_rid_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+text_server_font_get_used_palette :: proc "contextless" (
+    self: Text_Server,
+    font_rid_: Rid,
+) -> (ret: i64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("font_get_used_palette", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2198884583)
+    }
+    self := self
+    font_rid_ := font_rid_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+text_server_font_set_used_palette :: proc "contextless" (
+    self: Text_Server,
+    font_rid_: Rid,
+    index_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("font_set_used_palette", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3411492887)
+    }
+    self := self
+    font_rid_ := font_rid_
+    index_ := index_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+        &index_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
 text_server_font_set_hinting :: proc "contextless" (

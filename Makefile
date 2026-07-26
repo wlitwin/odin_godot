@@ -27,7 +27,7 @@ bindings:
 
 # Regenerate the raw engine inputs in the repo root: extension_api.json +
 # gdextension_interface.h. Both are GITIGNORED, so a fresh clone must run this once
-# (with a Godot 4.6.2 binary) before `make bindings`. GODOT comes from the dev shell's
+# (with a Godot 4.7.1 binary) before `make bindings`. GODOT comes from the dev shell's
 # default (macOS app bundle) or the caller's env: `GODOT=/path/to/godot make api-dump`.
 api-dump:
 	nix develop --command bash -c '"$$GODOT" --headless --dump-extension-api --dump-gdextension-interface'

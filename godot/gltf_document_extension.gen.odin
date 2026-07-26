@@ -296,6 +296,24 @@ gltf_document_extension__import_post :: proc "contextless" (
     return
 }
 
+gltf_document_extension__export_get_property_list :: proc "contextless" (
+    self: Gltf_Document_Extension,
+    root_node_: Node,
+) -> (ret: Typed_Array(Dictionary)) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_export_get_property_list", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 186716585)
+    }
+    self := self
+    root_node_ := root_node_
+    args := []__bindgen_gde.TypePtr {
+        &root_node_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 gltf_document_extension__export_preflight :: proc "contextless" (
     self: Gltf_Document_Extension,
     state_: Gltf_State,

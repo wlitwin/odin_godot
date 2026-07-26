@@ -10,6 +10,7 @@ Shader_Mode :: enum int {
     Mode_Particles = 2,
     Mode_Sky = 3,
     Mode_Fog = 4,
+    Mode_Texture_Blit = 5,
 }
 
 

@@ -101,6 +101,26 @@ editor_export_plugin__export_end :: proc "contextless" (
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+editor_export_plugin__end_generate_apple_embedded_project :: proc "contextless" (
+    self: Editor_Export_Plugin,
+    path_: String,
+    will_build_archive_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_end_generate_apple_embedded_project", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2678287736)
+    }
+    self := self
+    path_ := path_
+    will_build_archive_ := will_build_archive_
+    args := []__bindgen_gde.TypePtr {
+        &path_,
+        &will_build_archive_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
 editor_export_plugin__begin_customize_resources :: proc "contextless" (
     self: Editor_Export_Plugin,
     platform_: Editor_Export_Platform,

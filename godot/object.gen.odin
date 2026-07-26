@@ -7,14 +7,14 @@ Object_Constants :: enum {
     NOTIFICATION_PREDELETE = 1,
     NOTIFICATION_EXTENSION_RELOADED = 2,
 }
-Object_Connect_Flags :: enum int {
+
+Object_Connect_Flags :: enum i64 {
     Connect_Deferred = 1,
     Connect_Persist = 2,
     Connect_One_Shot = 4,
     Connect_Reference_Counted = 8,
     Connect_Append_Source_Object = 16,
 }
-
 
 
 object_name_ref :: proc "contextless" () -> ^String_Name {
@@ -65,12 +65,12 @@ object_get_class :: proc "contextless" (
 
 object_is_class :: proc "contextless" (
     self: Object,
-    class_: String,
+    class_: String_Name,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("is_class", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3927539163)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2619796661)
     }
     self := self
     class_ := class_

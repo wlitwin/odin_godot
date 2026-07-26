@@ -53,24 +53,6 @@ script_can_instantiate :: proc "contextless" (
     return
 }
 
-script_instance_has :: proc "contextless" (
-    self: Script,
-    base_object_: Object,
-) -> (ret: Bool) {
-    @(static) __ptr: __bindgen_gde.MethodBindPtr
-    if __ptr == nil {
-        _gde_name := new_string_name_cstring("instance_has", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 397768994)
-    }
-    self := self
-    base_object_ := base_object_
-    args := []__bindgen_gde.TypePtr {
-        &base_object_,
-    }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
-    return
-}
-
 script_has_source_code :: proc "contextless" (
     self: Script,
 ) -> (ret: Bool) {
@@ -176,6 +158,24 @@ script_get_global_name :: proc "contextless" (
     }
     self := self
     args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+script_has_script_method :: proc "contextless" (
+    self: Script,
+    method_name_: String_Name,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("has_script_method", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2619796661)
+    }
+    self := self
+    method_name_ := method_name_
+    args := []__bindgen_gde.TypePtr {
+        &method_name_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -317,6 +317,24 @@ script_get_rpc_config :: proc "contextless" (
     }
     self := self
     args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+script_instance_has :: proc "contextless" (
+    self: Script,
+    base_object_: Object,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("instance_has", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 397768994)
+    }
+    self := self
+    base_object_ := base_object_
+    args := []__bindgen_gde.TypePtr {
+        &base_object_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return

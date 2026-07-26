@@ -72,7 +72,7 @@ audio_effect_hard_limiter_get_ceiling_db :: proc "contextless" (
 
 audio_effect_hard_limiter_set_pre_gain_db :: proc "contextless" (
     self: Audio_Effect_Hard_Limiter,
-    p_pre_gain_: f64,
+    pre_gain_: f64,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -80,9 +80,9 @@ audio_effect_hard_limiter_set_pre_gain_db :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 373806689)
     }
     self := self
-    p_pre_gain_ := p_pre_gain_
+    pre_gain_ := pre_gain_
     args := []__bindgen_gde.TypePtr {
-        &p_pre_gain_,
+        &pre_gain_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -104,7 +104,7 @@ audio_effect_hard_limiter_get_pre_gain_db :: proc "contextless" (
 
 audio_effect_hard_limiter_set_release :: proc "contextless" (
     self: Audio_Effect_Hard_Limiter,
-    p_release_: f64,
+    release_: f64,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -112,9 +112,9 @@ audio_effect_hard_limiter_set_release :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 373806689)
     }
     self := self
-    p_release_ := p_release_
+    release_ := release_
     args := []__bindgen_gde.TypePtr {
-        &p_release_,
+        &release_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }

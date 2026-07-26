@@ -35,7 +35,8 @@ Script_Language_Extension_Code_Completion_Kind :: enum int {
     Code_Completion_Kind_Node_Path = 7,
     Code_Completion_Kind_File_Path = 8,
     Code_Completion_Kind_Plain_Text = 9,
-    Code_Completion_Kind_Max = 10,
+    Code_Completion_Kind_Keyword = 10,
+    Code_Completion_Kind_Max = 11,
 }
 
 

@@ -106,6 +106,43 @@ main :: proc() {
     }
 
     // ------------------------------------------------------------------
+    // 1.4 CLAMP — out-of-range diagnostic positions are bounded to the document's caret
+    //     range before they reach the engine. Godot 4.7's ScriptTextEditor stores
+    //     errors[0] as (line-1, column-1) and indexes the line's char vector with it
+    //     UNGUARDED: odin's EOF-class errors carry column 0 (-> -1 -> huge unsigned) and
+    //     package-sibling diagnostics carry another file's positions — both crashed the
+    //     4.7.1 editor with a FATAL CowData bounds check. clamp_all is the gate.
+    // ------------------------------------------------------------------
+    {
+        csrc := "if\n\tx := 1" // line 1 "if" (2 runes, cap 3), line 2 "\tx := 1" (7 runes, cap 8)
+        cds := []diag.Diagnostic {
+            {line = 1, column = 0, message = ""}, // EOF-class column 0 — the 4.7.1 crasher
+            {line = 1, column = 60, message = ""}, // way past EOL
+            {line = 99, column = 42, message = ""}, // foreign-file line beyond the doc
+            {line = 0, column = 5, message = ""}, // degenerate line 0
+        }
+        diag.clamp_all(cds, csrc)
+        if cds[0].line != 1 || cds[0].column != 1 {
+            fail(fmt.tprintf("clamp: column-0 diagnostic must land at 1:1, got %d:%d", cds[0].line, cds[0].column))
+        }
+        if cds[1].line != 1 || cds[1].column != 3 {
+            fail(fmt.tprintf("clamp: past-EOL column must cap at len+1 (1:3), got %d:%d", cds[1].line, cds[1].column))
+        }
+        if cds[2].line != 2 || cds[2].column != 8 {
+            fail(fmt.tprintf("clamp: beyond-doc line must cap at the last line (2:8), got %d:%d", cds[2].line, cds[2].column))
+        }
+        if cds[3].line != 1 || cds[3].column != 3 {
+            fail(fmt.tprintf("clamp: line-0 diagnostic must land at 1:<=cap (1:3), got %d:%d", cds[3].line, cds[3].column))
+        }
+        eds := []diag.Diagnostic{{line = 5, column = 9, message = ""}}
+        diag.clamp_all(eds, "")
+        if eds[0].line != 1 || eds[0].column != 1 {
+            fail(fmt.tprintf("clamp: empty source must pin to 1:1, got %d:%d", eds[0].line, eds[0].column))
+        }
+        fmt.println("clamp: column-0 / past-EOL / beyond-doc / empty-source positions all bounded")
+    }
+
+    // ------------------------------------------------------------------
     // 1.5 TIER 1 — the resident parser: SYNTAX errors are caught in-process, without the
     //     checker. A type-only error (BROKEN) and the clean fixture must parse silently;
     //     a syntactically broken buffer must report, and orders of magnitude faster than

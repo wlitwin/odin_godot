@@ -280,22 +280,25 @@ editor_export_platform_export_project :: proc "contextless" (
     debug_: Bool,
     path_: String,
     flags_: Editor_Export_Platform_Debug_Flags,
+    notify_: Bool,
 ) -> (ret: Error) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("export_project", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3879521245)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1201906210)
     }
     self := self
     preset_ := preset_
     debug_ := debug_
     path_ := path_
     flags_ := flags_
+    notify_ := notify_
     args := []__bindgen_gde.TypePtr {
         &preset_,
         &debug_,
         &path_,
         &flags_,
+        &notify_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return

@@ -23,6 +23,7 @@ Gpu_Particles3d_Transform_Align :: enum int {
     Transform_Align_Z_Billboard = 1,
     Transform_Align_Y_To_Velocity = 2,
     Transform_Align_Z_Billboard_Y_To_Velocity = 3,
+    Transform_Align_Local_Billboard = 4,
 }
 
 
@@ -957,6 +958,70 @@ gpu_particles3d_get_transform_align :: proc "contextless" (
     return
 }
 
+gpu_particles3d_set_transform_align_channel_filter :: proc "contextless" (
+    self: Gpu_Particles3d,
+    channel_filter_: Rendering_Server_Particles_Transform_Align_Custom_Src,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_transform_align_channel_filter", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 540833286)
+    }
+    self := self
+    channel_filter_ := channel_filter_
+    args := []__bindgen_gde.TypePtr {
+        &channel_filter_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+gpu_particles3d_get_transform_align_channel_filter :: proc "contextless" (
+    self: Gpu_Particles3d,
+) -> (ret: Rendering_Server_Particles_Transform_Align_Custom_Src) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_transform_align_channel_filter", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1664431231)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+gpu_particles3d_set_transform_align_axis :: proc "contextless" (
+    self: Gpu_Particles3d,
+    align_: Rendering_Server_Particles_Transform_Align_Axis,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_transform_align_axis", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3781785913)
+    }
+    self := self
+    align_ := align_
+    args := []__bindgen_gde.TypePtr {
+        &align_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+gpu_particles3d_get_transform_align_axis :: proc "contextless" (
+    self: Gpu_Particles3d,
+) -> (ret: Rendering_Server_Particles_Transform_Align_Axis) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_transform_align_axis", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2427180841)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 gpu_particles3d_convert_from_particles :: proc "contextless" (
     self: Gpu_Particles3d,
     particles_: Node,
@@ -1009,16 +1074,19 @@ gpu_particles3d_get_amount_ratio :: proc "contextless" (
 gpu_particles3d_request_particles_process :: proc "contextless" (
     self: Gpu_Particles3d,
     process_time_: f64,
+    process_time_residual_: f64,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("request_particles_process", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 373806689)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 66938510)
     }
     self := self
     process_time_ := process_time_
+    process_time_residual_ := process_time_residual_
     args := []__bindgen_gde.TypePtr {
         &process_time_,
+        &process_time_residual_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }

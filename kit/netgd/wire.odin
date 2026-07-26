@@ -536,7 +536,7 @@ enet_peer_stats :: proc(node: gd.Node, peer: ksess.Peer_Id) -> (rtt_ms, jitter_m
 	if cast(rawptr)mp == nil {return}
 	p := gd.multiplayer_api_get_multiplayer_peer(mp)
 	if cast(rawptr)p == nil {return}
-	if !bool(gd.object_is_class(cast(gd.Object)p, gd.gstr("ENetMultiplayerPeer"))) {return}
+	if !bool(gd.object_is_class(cast(gd.Object)p, gd.sname("ENetMultiplayerPeer"))) {return}
 	pkt := gd.e_net_multiplayer_peer_get_peer(cast(gd.E_Net_Multiplayer_Peer)p, gd.Int(peer))
 	if cast(rawptr)pkt == nil {return}
 	rtt_ms = gd.e_net_packet_peer_get_statistic(pkt, .Peer_Round_Trip_Time)
@@ -557,7 +557,7 @@ peer_address :: proc(node: gd.Node, peer: ksess.Peer_Id, allocator := context.te
 	if cast(rawptr)mp == nil {return "", false}
 	p := gd.multiplayer_api_get_multiplayer_peer(mp)
 	if cast(rawptr)p == nil {return "", false}
-	if !bool(gd.object_is_class(cast(gd.Object)p, gd.gstr("ENetMultiplayerPeer"))) {return "", false}
+	if !bool(gd.object_is_class(cast(gd.Object)p, gd.sname("ENetMultiplayerPeer"))) {return "", false}
 	pkt := gd.e_net_multiplayer_peer_get_peer(cast(gd.E_Net_Multiplayer_Peer)p, gd.Int(peer))
 	if cast(rawptr)pkt == nil {return "", false}
 	gs := gd.e_net_packet_peer_get_remote_address(pkt)

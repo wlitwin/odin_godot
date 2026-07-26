@@ -3385,6 +3385,24 @@ text_edit_get_first_visible_line :: proc "contextless" (
     return
 }
 
+text_edit_is_line_in_viewport :: proc "contextless" (
+    self: Text_Edit,
+    line_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_line_in_viewport", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1116898809)
+    }
+    self := self
+    line_ := line_
+    args := []__bindgen_gde.TypePtr {
+        &line_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 text_edit_set_line_as_center_visible :: proc "contextless" (
     self: Text_Edit,
     line_: Int,

@@ -267,6 +267,70 @@ font_variation_get_baseline_offset :: proc "contextless" (
     return
 }
 
+font_variation_get_palette_index :: proc "contextless" (
+    self: Font_Variation,
+) -> (ret: i64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_palette_index", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3905245786)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+font_variation_set_palette_index :: proc "contextless" (
+    self: Font_Variation,
+    palette_index_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_palette_index", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
+    }
+    self := self
+    palette_index_ := palette_index_
+    args := []__bindgen_gde.TypePtr {
+        &palette_index_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+font_variation_get_palette_custom_colors :: proc "contextless" (
+    self: Font_Variation,
+) -> (ret: Packed_Color_Array) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_palette_custom_colors", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1392750486)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+font_variation_set_palette_custom_colors :: proc "contextless" (
+    self: Font_Variation,
+    colors_: Packed_Color_Array,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_palette_custom_colors", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3546319833)
+    }
+    self := self
+    colors_ := colors_
+    args := []__bindgen_gde.TypePtr {
+        &colors_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
 
 // properties
 

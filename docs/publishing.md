@@ -40,7 +40,7 @@ zip. The rest of this page is the end-to-end runbook.
 | Issues URL | `https://github.com/wlitwin/odin_godot/issues` |
 | Download commit | the `release`-branch commit for the tag (printed by `release.sh`) |
 | Icon URL | `https://raw.githubusercontent.com/wlitwin/odin_godot/release/addons/odin_godot/icon.svg` |
-| Godot version | `4.6` |
+| Godot version | `4.7` |
 | Asset version | match `version` in `build/dist.nix` (e.g. `0.1.0`) |
 
 Suggested description (edit to taste):

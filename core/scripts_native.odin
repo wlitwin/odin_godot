@@ -250,12 +250,12 @@ check_engine_version_once :: proc() {
 	info := godot.engine_get_version_info(eng)
 	major := version_field(&info, "major")
 	minor := version_field(&info, "minor")
-	if major == 4 && minor == 6 {
+	if major == 4 && minor == 7 {
 		return // the tested range
 	}
 	msg := godot.new_string_odin(
 		fmt.tprintf(
-			"odin_godot is built and tested for Godot 4.6.x — you are on %d.%d. It may not work " +
+			"odin_godot is built and tested for Godot 4.7.x — you are on %d.%d. It may not work " +
 			"correctly; if the script-language ABI changed, expect editor issues or crashes.",
 			major,
 			minor,

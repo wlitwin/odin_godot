@@ -78,7 +78,7 @@ resource_is_odin_script :: proc(resource: gdext.ObjectPtr) -> bool {
     if resource == nil {
         return false
     }
-    name := godot.new_string_cstring("OdinScript")
+    name := godot.new_string_name_cstring("OdinScript", true)
     return bool(godot.object_is_class(cast(godot.Object)resource, name))
 }
 

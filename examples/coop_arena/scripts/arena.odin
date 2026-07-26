@@ -886,7 +886,7 @@ lobby_reset :: proc(self: ^ArenaGame, reason: string) {
 arena_game_on_lobby_input :: proc(self: ^ArenaGame, event: gd.Input_Event) {
 	when IS_WEB {
 		if event == nil {return}
-		if !bool(gd.object_is_class(cast(gd.Object)event, gd.new_string_cstring("InputEventKey"))) {return}
+		if !bool(gd.object_is_class(cast(gd.Object)event, gd.sname("InputEventKey"))) {return}
 		key := cast(gd.Input_Event_Key)event
 		if !bool(gd.input_event_is_pressed(cast(gd.Input_Event)event)) {return}
 		if gd.input_event_key_get_keycode(key) != .V {return}

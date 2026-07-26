@@ -260,9 +260,9 @@ physics_server2d_extension__shape_collide :: proc "contextless" (
     shape_B_: Rid,
     xform_B_: Transform2d,
     motion_B_: Vector2,
-    results_: rawptr,
+    r_results_: rawptr,
     result_max_: Int,
-    result_count_: ^i32,
+    r_result_count_: ^i32,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -276,9 +276,9 @@ physics_server2d_extension__shape_collide :: proc "contextless" (
     shape_B_ := shape_B_
     xform_B_ := xform_B_
     motion_B_ := motion_B_
-    results_ := results_
+    r_results_ := r_results_
     result_max_ := result_max_
-    result_count_ := result_count_
+    r_result_count_ := r_result_count_
     args := []__bindgen_gde.TypePtr {
         &shape_A_,
         &xform_A_,
@@ -286,9 +286,9 @@ physics_server2d_extension__shape_collide :: proc "contextless" (
         &shape_B_,
         &xform_B_,
         &motion_B_,
-        &results_,
+        &r_results_,
         &result_max_,
-        &result_count_,
+        &r_result_count_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -1276,22 +1276,25 @@ physics_server2d_extension__body_set_shape_as_one_way_collision :: proc "context
     shape_idx_: Int,
     enable_: Bool,
     margin_: f64,
+    direction_: Vector2,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("_body_set_shape_as_one_way_collision", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2556489974)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2042146392)
     }
     self := self
     body_ := body_
     shape_idx_ := shape_idx_
     enable_ := enable_
     margin_ := margin_
+    direction_ := direction_
     args := []__bindgen_gde.TypePtr {
         &body_,
         &shape_idx_,
         &enable_,
         &margin_,
+        &direction_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -2173,9 +2176,9 @@ physics_server2d_extension__body_collide_shape :: proc "contextless" (
     shape_: Rid,
     shape_xform_: Transform2d,
     motion_: Vector2,
-    results_: rawptr,
+    r_results_: rawptr,
     result_max_: Int,
-    result_count_: ^i32,
+    r_result_count_: ^i32,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -2188,18 +2191,18 @@ physics_server2d_extension__body_collide_shape :: proc "contextless" (
     shape_ := shape_
     shape_xform_ := shape_xform_
     motion_ := motion_
-    results_ := results_
+    r_results_ := r_results_
     result_max_ := result_max_
-    result_count_ := result_count_
+    r_result_count_ := r_result_count_
     args := []__bindgen_gde.TypePtr {
         &body_,
         &body_shape_,
         &shape_,
         &shape_xform_,
         &motion_,
-        &results_,
+        &r_results_,
         &result_max_,
-        &result_count_,
+        &r_result_count_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -2251,7 +2254,7 @@ physics_server2d_extension__body_test_motion :: proc "contextless" (
     margin_: f64,
     collide_separation_ray_: Bool,
     recovery_as_collision_: Bool,
-    result_: ^Physics_Server2d_Extension_Motion_Result,
+    r_result_: ^Physics_Server2d_Extension_Motion_Result,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -2265,7 +2268,7 @@ physics_server2d_extension__body_test_motion :: proc "contextless" (
     margin_ := margin_
     collide_separation_ray_ := collide_separation_ray_
     recovery_as_collision_ := recovery_as_collision_
-    result_ := result_
+    r_result_ := r_result_
     args := []__bindgen_gde.TypePtr {
         &body_,
         &from_,
@@ -2273,7 +2276,7 @@ physics_server2d_extension__body_test_motion :: proc "contextless" (
         &margin_,
         &collide_separation_ray_,
         &recovery_as_collision_,
-        &result_,
+        &r_result_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return

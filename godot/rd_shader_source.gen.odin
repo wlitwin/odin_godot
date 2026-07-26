@@ -140,6 +140,36 @@ rd_shader_source_get_source_compute :: proc "contextless" (self: Rd_Shader_Sourc
 rd_shader_source_set_source_compute :: proc "contextless" (self: Rd_Shader_Source, value: String) {
     rd_shader_source_set_stage_source(self, Rendering_Device_Shader_Stage(4), value)
 }
+rd_shader_source_get_source_raygen :: proc "contextless" (self: Rd_Shader_Source) -> String {
+    return rd_shader_source_get_stage_source(self, Rendering_Device_Shader_Stage(5))
+}
+rd_shader_source_set_source_raygen :: proc "contextless" (self: Rd_Shader_Source, value: String) {
+    rd_shader_source_set_stage_source(self, Rendering_Device_Shader_Stage(5), value)
+}
+rd_shader_source_get_source_any_hit :: proc "contextless" (self: Rd_Shader_Source) -> String {
+    return rd_shader_source_get_stage_source(self, Rendering_Device_Shader_Stage(6))
+}
+rd_shader_source_set_source_any_hit :: proc "contextless" (self: Rd_Shader_Source, value: String) {
+    rd_shader_source_set_stage_source(self, Rendering_Device_Shader_Stage(6), value)
+}
+rd_shader_source_get_source_closest_hit :: proc "contextless" (self: Rd_Shader_Source) -> String {
+    return rd_shader_source_get_stage_source(self, Rendering_Device_Shader_Stage(7))
+}
+rd_shader_source_set_source_closest_hit :: proc "contextless" (self: Rd_Shader_Source, value: String) {
+    rd_shader_source_set_stage_source(self, Rendering_Device_Shader_Stage(7), value)
+}
+rd_shader_source_get_source_miss :: proc "contextless" (self: Rd_Shader_Source) -> String {
+    return rd_shader_source_get_stage_source(self, Rendering_Device_Shader_Stage(8))
+}
+rd_shader_source_set_source_miss :: proc "contextless" (self: Rd_Shader_Source, value: String) {
+    rd_shader_source_set_stage_source(self, Rendering_Device_Shader_Stage(8), value)
+}
+rd_shader_source_get_source_intersection :: proc "contextless" (self: Rd_Shader_Source) -> String {
+    return rd_shader_source_get_stage_source(self, Rendering_Device_Shader_Stage(9))
+}
+rd_shader_source_set_source_intersection :: proc "contextless" (self: Rd_Shader_Source, value: String) {
+    rd_shader_source_set_stage_source(self, Rendering_Device_Shader_Stage(9), value)
+}
 
 // Only interns the class StringName (used for object construction and as the
 // class argument when methods lazily resolve their binds). Method binds are NOT

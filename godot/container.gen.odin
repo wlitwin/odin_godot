@@ -104,8 +104,43 @@ container_fit_child_in_rect :: proc "contextless" (
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+container_set_accessibility_region :: proc "contextless" (
+    self: Container,
+    region_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_accessibility_region", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    region_ := region_
+    args := []__bindgen_gde.TypePtr {
+        &region_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+container_is_accessibility_region :: proc "contextless" (
+    self: Container,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_accessibility_region", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 
 // properties
+container_get_accessibility_region :: proc "contextless" (self: Container) -> Bool {
+    return container_is_accessibility_region(self)
+}
 
 // Only interns the class StringName (used for object construction and as the
 // class argument when methods lazily resolve their binds). Method binds are NOT
