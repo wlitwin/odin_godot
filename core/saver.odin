@@ -100,10 +100,23 @@ sv_recognize_path :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: 
     ret_bool(ret, strings.has_suffix(odin_path, ".odin"))
 }
 
+// `_get_recognized_extensions(resource) -> PackedStringArray`: MUST be scoped to the
+// resource. ResourceSaver::get_recognized_extensions does NOT gate on _recognize — it
+// concatenates every saver's list, and the editor builds the Save Scene dialog's filters
+// AND its default filename from it (front saver first). Returning ["odin"] unconditionally
+// put "*.odin" first in that dialog for a PackedScene, defaulting new scenes to
+// "node_2d.odin" — which no saver accepts, so the editor errored with "Requested file
+// format unknown: odin". The engine's own savers are resource-scoped the same way
+// (ResourceFormatSaverText: "tscn" for PackedScene, else "tres").
 @(private = "file")
 sv_get_recognized_extensions :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
-    ret_psa(ret, make_psa("odin"))
+    resource := (cast(^gdext.ObjectPtr)args[0])^
+    if resource_is_odin_script(resource) {
+        ret_psa(ret, make_psa("odin"))
+    } else {
+        ret_psa(ret, make_psa())
+    }
 }
 
 // `_set_uid(path, uid) -> Error`: OK (0). We don't maintain a UID side-file.

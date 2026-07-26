@@ -32,6 +32,14 @@ func _initialize() -> void:
 	var scene_os := ProjectSettings.globalize_path(scene_probe)
 	if FileAccess.file_exists(scene_os):
 		DirAccess.remove_absolute(scene_os)
+	# The editor's Save-Scene dialog builds its filter list AND default filename from
+	# ResourceSaver.get_recognized_extensions(scene), which does NOT gate on _recognize —
+	# every saver's _get_recognized_extensions must be resource-scoped itself. When ours
+	# advertised "odin" unconditionally, the front-registered saver put *.odin first, the
+	# dialog defaulted new scenes to "node_2d.odin", and saving died with "Requested file
+	# format unknown: odin". Pin: a scene's extension list carries no "odin".
+	var scene_exts = ResourceSaver.get_recognized_extensions(ps)
+	var scene_exts_ok = scene_exts.has("tscn") and not scene_exts.has("odin")
 	n.free()
 	var scene_rejected = scene_err != OK
 
@@ -109,9 +117,9 @@ package scripts
 		if not fmt_ok:
 			print("SAVE_TEST_FMT_DEBUG: err=%d text=<%s>" % [fmt_err, fmt_text])
 
-	var ok = err == OK and on_disk and scene_rejected and fresh_ok and fixup_ok and fmt_ok
+	var ok = err == OK and on_disk and scene_rejected and scene_exts_ok and fresh_ok and fixup_ok and fmt_ok
 	if ok:
 		print("SAVE_TEST_OK")
 	else:
-		print("SAVE_TEST_FAIL: err=%d on_disk=%s scene_err=%d fresh_ok=%s fixup_ok=%s fmt_ok=%s" % [err, on_disk, scene_err, fresh_ok, fixup_ok, fmt_ok])
+		print("SAVE_TEST_FAIL: err=%d on_disk=%s scene_err=%d scene_exts=%s fresh_ok=%s fixup_ok=%s fmt_ok=%s" % [err, on_disk, scene_err, scene_exts, fresh_ok, fixup_ok, fmt_ok])
 	quit(0 if ok else 1)
