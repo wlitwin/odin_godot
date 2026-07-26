@@ -109,6 +109,9 @@ TESTS=(
     "kitarena|KITARENA_OK|tests/kitarena/run.sh"
     # Pure-Odin unit tests for kit/ai (perception, steering, the wave director).
     "kitai|KITAI_OK|tests/kitai/run.sh"
+    # Pure-Odin unit tests for kit/fx's trauma shake (legacy zero-value feel,
+    # the knobs, coherence, rotation channels).
+    "kitfx|KITFX_OK|tests/kitfx/run.sh"
     # kit/nav adapter: a U-shaped NavigationPolygon the engine path must bend
     # through, followed by a kit/ai walker with the next_point cursor.
     "kitnav|KITNAV_OK|tests/kitnav/run.sh"
