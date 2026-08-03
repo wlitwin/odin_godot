@@ -22,7 +22,7 @@ skeleton3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_skeleton3d :: proc "contextless" () -> Skeleton3d {
-    return __bindgen_gde.classdb_construct_object(skeleton3d_name_ref())
+    return cast(Skeleton3d)__bindgen_gde.classdb_construct_object(skeleton3d_name_ref())
 }
 
 // methods

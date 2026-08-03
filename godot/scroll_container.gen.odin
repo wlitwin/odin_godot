@@ -30,7 +30,7 @@ scroll_container_name :: proc "contextless" () -> String_Name {
 }
 
 new_scroll_container :: proc "contextless" () -> Scroll_Container {
-    return __bindgen_gde.classdb_construct_object(scroll_container_name_ref())
+    return cast(Scroll_Container)__bindgen_gde.classdb_construct_object(scroll_container_name_ref())
 }
 
 // methods

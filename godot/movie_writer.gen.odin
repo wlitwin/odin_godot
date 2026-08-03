@@ -16,7 +16,7 @@ movie_writer_name :: proc "contextless" () -> String_Name {
 }
 
 new_movie_writer :: proc "contextless" () -> Movie_Writer {
-    return __bindgen_gde.classdb_construct_object(movie_writer_name_ref())
+    return cast(Movie_Writer)__bindgen_gde.classdb_construct_object(movie_writer_name_ref())
 }
 
 // methods

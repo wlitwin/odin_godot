@@ -16,7 +16,7 @@ confirmation_dialog_name :: proc "contextless" () -> String_Name {
 }
 
 new_confirmation_dialog :: proc "contextless" () -> Confirmation_Dialog {
-    return __bindgen_gde.classdb_construct_object(confirmation_dialog_name_ref())
+    return cast(Confirmation_Dialog)__bindgen_gde.classdb_construct_object(confirmation_dialog_name_ref())
 }
 
 // methods

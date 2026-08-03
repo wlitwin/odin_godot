@@ -1,5 +1,6 @@
 package godot
 
+import "core:math"
 import gdext "godot:gdext"
 
 // Ergonomic helpers over the generated binding for common — but otherwise verbose — Godot
@@ -59,6 +60,37 @@ connect_to :: proc "contextless" (
 	return object_connect(emitter, s, cb, Int(flags))
 }
 
+// connect_to_bound is connect_to with ONE bound integer argument appended to the
+// callable: the engine passes it AFTER the signal's own args on every dispatch. This is
+// the mechanism behind the indexed `@(gd_connect="Panel/Choice%d:pressed")` form — N
+// sibling emitters share one handler, which tells them apart by the bound index (its
+// trailing parameter). `signal`/`method` must be string literals or otherwise
+// program-lifetime cstrings (interned; see the file header).
+connect_to_bound :: proc "contextless" (
+	emitter: Object,
+	signal: cstring,
+	target: Object,
+	method: cstring,
+	bound: i64,
+	flags := i64(0),
+) -> Error {
+	s := new_string_name_cstring(signal, true)
+	m := new_string_name_cstring(method, true)
+	cb := new_callable_object_string_name(target, m)
+	defer free_callable(cb)
+	// bindv takes the bound args as an engine Array of Variants; every temporary here
+	// is released once the engine holds its own copy inside the bound Callable.
+	idx := Int(bound)
+	iv := variant_from_int(&idx)
+	defer variant_destroy(&iv)
+	arr := new_array_default()
+	defer free_array(arr)
+	array_push_back(&arr, iv)
+	bcb := callable_bindv(&cb, arr)
+	defer free_callable(bcb)
+	return object_connect(emitter, s, bcb, Int(flags))
+}
+
 // callable builds a Callable bound to `obj`'s method `method` (for connect/emit/Timer/etc.).
 // `method` must be a string literal (it is interned — see the file header). The returned
 // Callable is OWNED BY THE CALLER: release it with `free_callable` once the engine holds its
@@ -107,4 +139,21 @@ sname :: proc "contextless" (name: cstring) -> String_Name {
 //     gd.label_set_text(lbl, gd.gstr("Score: 0"))   // or just gd.set_text(lbl, "Score: 0")
 gstr :: proc "contextless" (s: cstring) -> String {
 	return new_string_cstring(s)
+}
+
+// normalized — value-form vector normalization (the generated `vector2_normalized`
+// takes a pointer, so three example games each wrote this wrapper; `gd.Vector2` is a
+// plain [2]f32, so this is pure Odin math — no engine round-trip). Returns the zero
+// vector for near-zero input, the branch every hand-rolled copy carried.
+normalized :: proc "contextless" (v: Vector2) -> Vector2 {
+	l := math.sqrt(v.x * v.x + v.y * v.y)
+	if l <= 0.00001 {return Vector2{}}
+	return Vector2{v.x / l, v.y / l}
+}
+
+// normalized3 — the Vector3 form (slopball3d's `_xz` helper generalized).
+normalized3 :: proc "contextless" (v: Vector3) -> Vector3 {
+	l := math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+	if l <= 0.00001 {return Vector3{}}
+	return Vector3{v.x / l, v.y / l, v.z / l}
 }

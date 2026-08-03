@@ -16,7 +16,7 @@ open_xr_render_model_name :: proc "contextless" () -> String_Name {
 }
 
 new_open_xr_render_model :: proc "contextless" () -> Open_Xr_Render_Model {
-    return __bindgen_gde.classdb_construct_object(open_xr_render_model_name_ref())
+    return cast(Open_Xr_Render_Model)__bindgen_gde.classdb_construct_object(open_xr_render_model_name_ref())
 }
 
 // methods

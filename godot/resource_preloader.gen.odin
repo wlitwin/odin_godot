@@ -16,7 +16,7 @@ resource_preloader_name :: proc "contextless" () -> String_Name {
 }
 
 new_resource_preloader :: proc "contextless" () -> Resource_Preloader {
-    return __bindgen_gde.classdb_construct_object(resource_preloader_name_ref())
+    return cast(Resource_Preloader)__bindgen_gde.classdb_construct_object(resource_preloader_name_ref())
 }
 
 // methods

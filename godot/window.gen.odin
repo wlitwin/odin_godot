@@ -74,7 +74,7 @@ window_name :: proc "contextless" () -> String_Name {
 }
 
 new_window :: proc "contextless" () -> Window {
-    return __bindgen_gde.classdb_construct_object(window_name_ref())
+    return cast(Window)__bindgen_gde.classdb_construct_object(window_name_ref())
 }
 
 // methods

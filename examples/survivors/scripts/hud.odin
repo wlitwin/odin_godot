@@ -8,11 +8,14 @@ package survivors_scripts
 //
 // It pulls its values from two odin_godot mechanisms, on purpose:
 //   * XP / level / time / kills / score : read from the shared game_state MODULE each frame.
-//   * HP                                : received via the player's `health_changed` SIGNAL,
-//                                          wired with a TYPED cross-script connect (gd.connect_to).
+//   * HP                                : received via the player's `health_changed` SIGNAL.
+//     The player is found by GROUP at runtime — no static path — so declarative
+//     @(gd_connect) cannot reach it; `gd.connect_to` from _ready is the documented
+//     escape hatch for runtime-resolved emitters.
 //
 // FEATURES: `@onready` auto-wired child refs (no manual get_node in _ready); property helpers
-// (gd.set_float / gd.set_string) to drive the bars + label; typed cross-script signal CONNECT.
+// (gd.set_float / gd.set_string) to drive the bars + label; the typed group query
+// (rt.first_script_in_group) + manual cross-script signal CONNECT.
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
@@ -30,15 +33,14 @@ Hud :: struct {
 }
 
 hud_ready :: proc(self: ^Hud) {
-	player := find_player(self.owner)
-	if player != nil {
-		p := rt.script_of(player, Player)
-		if p != nil {
-			self.hp = p.health
-			self.max_hp = p.max_health
-		}
+	// Typed, class-checked group lookup — one call replaces the find-node + rt.script_of pair.
+	p := rt.first_script_in_group(self.owner, GROUP_PLAYER, Player)
+	if p != nil {
+		self.hp = p.health
+		self.max_hp = p.max_health
 		// TYPED cross-script CONNECT: player.health_changed -> this.on_health_changed.
-		gd.connect_to(player, "health_changed", self.owner, "on_health_changed")
+		// Manual on purpose — a group-resolved emitter has no static path for @(gd_connect).
+		gd.connect_to(p.owner, "health_changed", self.owner, "on_health_changed")
 	}
 	if self.health_bar != nil {
 		gd.set_float(self.health_bar, "max_value", f64(self.max_hp))

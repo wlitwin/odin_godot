@@ -11,6 +11,7 @@ package slopball
 
 import gd "godot:godot"
 import knet "godot:kit/net"
+import play "godot:play"
 
 Kicker :: struct {
 	owner:   gd.Character_Body2d,
@@ -32,9 +33,8 @@ kicker_team :: proc "contextless" (pid: u8) -> u8 {
 }
 
 kicker_process :: proc(self: ^Kicker, delta: f64) {
-	if !self.painted && self.pid != 0 {
-		self.painted = true
-		gd.polygon2d_set_color(self.skin, peer_color(int(self.pid)))
+	if play.latch(&self.painted, self.pid != 0) {
+		gd.polygon2d_set_color(self.skin, gd.peer_color(int(self.pid)))
 	}
 	// My own body is driven by input.odin (move_and_slide, then publish).
 	// Everyone else's glides to their stream.

@@ -14,6 +14,7 @@ import gd "godot:godot"
 import kai "godot:kit/ai"
 import kcombat "godot:kit/combat"
 import knet "godot:kit/net"
+import play "godot:play"
 
 DWELLER_IDLE :: u8(0)
 DWELLER_CHASE :: u8(1)
@@ -38,8 +39,7 @@ dweller_process :: proc(self: ^Dweller, delta: f64) {
 	// pace (+slack so it never falls behind): on clients this shadows the
 	// already-smooth stream, on the host it melts the steps. Same cure as
 	// the rocks: sim on ticks, render on the frame clock. No role branch.
-	if !self.seen {
-		self.seen = true
+	if play.latch(&self.seen, true) {
 		self.rx, self.ry = self.x, self.y
 	}
 	glide := DWELLER_SPEED * f32(knet.DEFAULT_TICK_HZ) * 1.5 * f32(delta)
@@ -53,5 +53,5 @@ dweller_process :: proc(self: ^Dweller, delta: f64) {
 	case DWELLER_FLEE:
 		glyph = "\xF0\x9F\x92\xA8" // 💨
 	}
-	gd.set_string(cast(gd.Object)self.glyph, "text", glyph)
+	gd.set_text(cast(gd.Object)self.glyph, glyph)
 }

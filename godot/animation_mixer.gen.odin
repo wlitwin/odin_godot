@@ -30,7 +30,7 @@ animation_mixer_name :: proc "contextless" () -> String_Name {
 }
 
 new_animation_mixer :: proc "contextless" () -> Animation_Mixer {
-    return __bindgen_gde.classdb_construct_object(animation_mixer_name_ref())
+    return cast(Animation_Mixer)__bindgen_gde.classdb_construct_object(animation_mixer_name_ref())
 }
 
 // methods

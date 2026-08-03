@@ -16,7 +16,7 @@ open_xr_extension_wrapper_extension_name :: proc "contextless" () -> String_Name
 }
 
 new_open_xr_extension_wrapper_extension :: proc "contextless" () -> Open_Xr_Extension_Wrapper_Extension {
-    return __bindgen_gde.classdb_construct_object(open_xr_extension_wrapper_extension_name_ref())
+    return cast(Open_Xr_Extension_Wrapper_Extension)__bindgen_gde.classdb_construct_object(open_xr_extension_wrapper_extension_name_ref())
 }
 
 // methods

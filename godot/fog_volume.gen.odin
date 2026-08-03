@@ -16,7 +16,7 @@ fog_volume_name :: proc "contextless" () -> String_Name {
 }
 
 new_fog_volume :: proc "contextless" () -> Fog_Volume {
-    return __bindgen_gde.classdb_construct_object(fog_volume_name_ref())
+    return cast(Fog_Volume)__bindgen_gde.classdb_construct_object(fog_volume_name_ref())
 }
 
 // methods

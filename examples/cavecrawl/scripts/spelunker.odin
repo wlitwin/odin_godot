@@ -118,7 +118,7 @@ spelunker_heal :: proc(self: ^Spelunker) -> bool {
 spelunker_process :: proc(self: ^Spelunker, delta: f64) {
 	gd.node2d_set_position(self.owner, {self.x, self.y})
 	// Everyone can see who's dead — the corpse glyph replicates with hp.
-	gd.set_string(cast(gd.Object)self.glyph, "text", self.hp > 0 ? "\xE2\x9B\x8F" : "\xF0\x9F\x92\x80") // ⛏ / 💀
+	gd.set_text(cast(gd.Object)self.glyph, self.hp > 0 ? "\xE2\x9B\x8F" : "\xF0\x9F\x92\x80") // ⛏ / 💀
 }
 
 // THE HP EDGE — death and return, one half for every screen, no was_dead

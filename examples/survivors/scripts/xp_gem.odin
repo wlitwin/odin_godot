@@ -1,5 +1,6 @@
 //gd:extends Area2D
 //gd:class XpGem
+//gd:group gems
 package survivors_scripts
 
 // ----------------------------------------------------------------------------
@@ -23,8 +24,10 @@ XpGem :: struct {
 }
 
 xp_gem_ready :: proc(self: ^XpGem) {
+	// Zero-guard, deliberately not `gd:"default=1"`: xp_gem.tscn STORES `value`, so a declared
+	// default would be overwritten by the scene load — the guard is what actually protects a
+	// zero-seeded gem. ("gems" group membership is declared with //gd:group at the top.)
 	if self.value == 0 {self.value = 1}
-	gd.add_to_group(self.owner, "gems")
 }
 
 xp_gem_physics_process :: proc(self: ^XpGem, delta: f64) {
@@ -41,7 +44,7 @@ xp_gem_physics_process :: proc(self: ^XpGem, delta: f64) {
 	rng := p.pickup_range
 	if dist <= rng * rng {
 		// Within magnet range — accelerate toward the player.
-		dir := normalized(d)
+		dir := gd.normalized(d)
 		pull := f32(140) + rng // closer => snappier (range adds a base speed)
 		me.x += dir.x * pull * f32(delta)
 		me.y += dir.y * pull * f32(delta)

@@ -23,7 +23,7 @@ class_db_name :: proc "contextless" () -> String_Name {
 }
 
 new_class_db :: proc "contextless" () -> Class_Db {
-    return __bindgen_gde.classdb_construct_object(class_db_name_ref())
+    return cast(Class_Db)__bindgen_gde.classdb_construct_object(class_db_name_ref())
 }
 
 // methods

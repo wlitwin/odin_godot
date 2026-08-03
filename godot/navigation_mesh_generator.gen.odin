@@ -16,7 +16,7 @@ navigation_mesh_generator_name :: proc "contextless" () -> String_Name {
 }
 
 new_navigation_mesh_generator :: proc "contextless" () -> Navigation_Mesh_Generator {
-    return __bindgen_gde.classdb_construct_object(navigation_mesh_generator_name_ref())
+    return cast(Navigation_Mesh_Generator)__bindgen_gde.classdb_construct_object(navigation_mesh_generator_name_ref())
 }
 
 // methods

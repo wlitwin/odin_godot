@@ -29,7 +29,7 @@ gpu_particles_collision_height_field3d_name :: proc "contextless" () -> String_N
 }
 
 new_gpu_particles_collision_height_field3d :: proc "contextless" () -> Gpu_Particles_Collision_Height_Field3d {
-    return __bindgen_gde.classdb_construct_object(gpu_particles_collision_height_field3d_name_ref())
+    return cast(Gpu_Particles_Collision_Height_Field3d)__bindgen_gde.classdb_construct_object(gpu_particles_collision_height_field3d_name_ref())
 }
 
 // methods

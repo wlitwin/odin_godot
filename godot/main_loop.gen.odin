@@ -28,7 +28,7 @@ main_loop_name :: proc "contextless" () -> String_Name {
 }
 
 new_main_loop :: proc "contextless" () -> Main_Loop {
-    return __bindgen_gde.classdb_construct_object(main_loop_name_ref())
+    return cast(Main_Loop)__bindgen_gde.classdb_construct_object(main_loop_name_ref())
 }
 
 // methods

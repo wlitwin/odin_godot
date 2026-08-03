@@ -16,7 +16,7 @@ area_light3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_area_light3d :: proc "contextless" () -> Area_Light3d {
-    return __bindgen_gde.classdb_construct_object(area_light3d_name_ref())
+    return cast(Area_Light3d)__bindgen_gde.classdb_construct_object(area_light3d_name_ref())
 }
 
 // methods

@@ -16,7 +16,7 @@ status_indicator_name :: proc "contextless" () -> String_Name {
 }
 
 new_status_indicator :: proc "contextless" () -> Status_Indicator {
-    return __bindgen_gde.classdb_construct_object(status_indicator_name_ref())
+    return cast(Status_Indicator)__bindgen_gde.classdb_construct_object(status_indicator_name_ref())
 }
 
 // methods

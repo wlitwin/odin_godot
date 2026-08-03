@@ -68,6 +68,5 @@ hud_refresh :: proc(self: ^Hud) {
 	s := game_state_get()
 	if s == self.shown {return}
 	self.shown = s
-	text := fmt.ctprintf("Score: %d", s)
-	gd.label_set_text(self.owner, gd.new_string_cstring(text))
+	gd.set_text(self.owner, fmt.ctprintf("Score: %d", s))
 }

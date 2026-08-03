@@ -16,7 +16,7 @@ render_data_rd_name :: proc "contextless" () -> String_Name {
 }
 
 new_render_data_rd :: proc "contextless" () -> Render_Data_Rd {
-    return __bindgen_gde.classdb_construct_object(render_data_rd_name_ref())
+    return cast(Render_Data_Rd)__bindgen_gde.classdb_construct_object(render_data_rd_name_ref())
 }
 
 // methods

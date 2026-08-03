@@ -16,7 +16,7 @@ bone_attachment3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_bone_attachment3d :: proc "contextless" () -> Bone_Attachment3d {
-    return __bindgen_gde.classdb_construct_object(bone_attachment3d_name_ref())
+    return cast(Bone_Attachment3d)__bindgen_gde.classdb_construct_object(bone_attachment3d_name_ref())
 }
 
 // methods

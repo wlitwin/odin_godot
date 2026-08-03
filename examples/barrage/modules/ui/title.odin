@@ -5,7 +5,7 @@ package barrage_ui
 // ----------------------------------------------------------------------------
 // Title — the menu scene root (ui MODULE). Its Play button's `pressed` is wired to
 // `start_game` in title.tscn ([connection]); starting = real SCENE LOADING
-// (change_scene_to_file into game.tscn). The heading pulses via flowgd.tween — an
+// (gd.change_scene into game.tscn). The heading pulses via flowgd.tween — an
 // engine Tween wrapped as a flow.Action and ticked from _process (docs: flow).
 // ----------------------------------------------------------------------------
 
@@ -16,7 +16,9 @@ import flowgd "godot:flowgd"
 Title :: struct {
 	owner: gd.Control,
 
-	heading: gd.Node, // resolved by relative path in _ready
+	heading: gd.Node `gd:"onready=Heading"`, // auto-wired child ref (@onready)
+	// The GameState autoload (absolute onready path), resolved before _ready runs.
+	gs: gd.Object `gd:"onready=/root/GameState"`,
 
 	anim:  flow.Action,
 	built: bool,
@@ -43,12 +45,8 @@ title_ready :: proc(self: ^Title) {
 	// browser console for it; on web, print_str lands in console.log).
 	gd.print_str("BARRAGE_TITLE_READY")
 	// GameState survives scene switches (autoload) — a fresh title = a fresh run.
-	gs := gd.node_get_node(cast(gd.Node)self.owner, gd.new_node_path_cstring("/root/GameState"))
-	if gs != nil {
-		m := gd.sname("reset")
-		_ = gd.object_call(cast(gd.Object)gs, m)
-	}
-	self.heading = gd.node_get_node(cast(gd.Node)self.owner, gd.new_node_path_cstring("Heading"))
+	// Cross-module by-name call on the onready-wired handle (nil-quiet if absent).
+	gd.vcall_void(self.gs, "reset")
 	self.anim = flowgd.tween(cast(gd.Node)self.owner, configure_pulse)
 	self.built = true
 }
@@ -62,8 +60,5 @@ title_process :: proc(self: ^Title, delta: f64) {
 // start_game — title.tscn [connection] target for the Play button's `pressed`.
 @(gd_method)
 title_start_game :: proc(self: ^Title) {
-	tree := gd.node_get_tree(cast(gd.Node)self.owner)
-	if tree == nil {return}
-	path := gd.new_string_cstring("res://game.tscn")
-	_ = gd.scene_tree_change_scene_to_file(tree, path)
+	gd.change_scene(self.owner, "res://game.tscn")
 }

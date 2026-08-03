@@ -16,7 +16,7 @@ theme_db_name :: proc "contextless" () -> String_Name {
 }
 
 new_theme_db :: proc "contextless" () -> Theme_Db {
-    return __bindgen_gde.classdb_construct_object(theme_db_name_ref())
+    return cast(Theme_Db)__bindgen_gde.classdb_construct_object(theme_db_name_ref())
 }
 
 // methods

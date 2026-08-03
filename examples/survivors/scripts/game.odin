@@ -1,39 +1,42 @@
 //gd:extends Node2D
 //gd:class Game
+//gd:group game
 package survivors_scripts
 
 // ----------------------------------------------------------------------------
 // Game — the root orchestrator + state machine (Playing / LevelUp-paused / GameOver). It:
-//   * resets the run, binds WASD onto the ui_* actions, and joins the "game" group on _ready;
+//   * resets the run and binds WASD onto the ui_* actions on _ready (its "game" group
+//     membership is declared with //gd:group above — no add_to_group boilerplate);
 //   * advances the shared run-time clock each frame while Playing;
-//   * listens (typed cross-script CONNECT) to the player's `leveled_up` -> opens the upgrade
+//   * listens (declarative @(gd_connect)) to the player's `leveled_up` -> opens the upgrade
 //     menu + PAUSES the tree, and `died` -> shows the game-over screen;
 //   * settles each owed level-up after the player picks (multiple levels => sequential menus);
 //   * exposes @(gd_method) accessors (get_level / get_kills / …) so the headless test can
 //     observe the shared module's state from GDScript.
 //
-// FEATURES: @onready child refs; tree PAUSE via gd.scene_tree_set_pause; the Input ergonomics
-// (gd.action_add_key) to bind WASD; typed cross-script connects + calls into the menus/player.
+// FEATURES: SCRIPT-RESOLVING @onready refs (`^LevelupMenu` / `^GameOver` — the node AND its
+// typed script struct in one declaration, no rt.script_of at the use sites); the gd.pause
+// one-liner; the Input ergonomics (gd.action_add_key) to bind WASD; declarative //gd:group
+// membership; typed cross-script calls into the menus/player.
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
-import rt "godot:runtime"
 
 Game :: struct {
 	owner:      gd.Node2d,
 	player:     gd.Node `gd:"onready=Player"`,
 	spawner:    gd.Node `gd:"onready=Spawner"`,
-	levelup:    gd.Node `gd:"onready=LevelUpMenu"`,
-	gameover:   gd.Node `gd:"onready=GameOver"`,
+	// Script-resolving onready: resolved to the node's TYPED script struct before _ready
+	// (nil + a loud error if the node lacks the script — never a wrong cast).
+	levelup:    ^LevelupMenu `gd:"onready=LevelUpMenu"`,
+	gameover:   ^GameOver    `gd:"onready=GameOver"`,
 }
 
 game_ready :: proc(self: ^Game) {
 	game_state_reset()
-	gd.add_to_group(self.owner, GROUP_GAME)
 
 	// A fresh scene must start unpaused (restart reloads while paused).
-	tree := gd.get_tree(self.owner)
-	if tree != nil {gd.scene_tree_set_pause(tree, false)}
+	gd.pause(self.owner, false)
 
 	// Bind WASD onto the default ui_* movement actions (arrows already map to them).
 	gd.action_add_key("ui_left", i64(gd.Key.A))
@@ -41,12 +44,9 @@ game_ready :: proc(self: ^Game) {
 	gd.action_add_key("ui_up", i64(gd.Key.W))
 	gd.action_add_key("ui_down", i64(gd.Key.S))
 
-	// Wire the player's signals to us (typed cross-script connect: the emitter is the player,
-	// not our own owner, so connect_to rather than @(gd_connect)).
-	if self.player != nil {
-		gd.connect_to(self.player, "leveled_up", self.owner, "on_level_up")
-		gd.connect_to(self.player, "died", self.owner, "on_player_died")
-	}
+	// The player's signals are wired declaratively: @(gd_connect="Player:...") on the
+	// handlers below — the path-qualified form reaches another emitter, so no manual
+	// connect_to here anymore.
 }
 
 game_process :: proc(self: ^Game, delta: f64) {
@@ -57,12 +57,12 @@ game_process :: proc(self: ^Game, delta: f64) {
 
 // on_level_up — the player crossed a level boundary. Enter the LevelUp state, pause the tree,
 // and open the upgrade menu (which keeps running because its process_mode is Always).
-@(gd_method)
+// Auto-wired to the child Player's declared signal (path-qualified @(gd_connect)).
+@(gd_method, gd_connect = "Player:leveled_up")
 game_on_level_up :: proc(self: ^Game) {
 	if game_state_get_state() != .Playing {return} // already showing a menu
 	game_state_set_state(.LevelUp)
-	tree := gd.get_tree(self.owner)
-	if tree != nil {gd.scene_tree_set_pause(tree, true)}
+	gd.pause(self.owner, true)
 	game_present_levelup(self)
 }
 
@@ -74,38 +74,33 @@ game_after_pick :: proc(self: ^Game) {
 		game_present_levelup(self)
 		return
 	}
-	if self.levelup != nil {gd.set_bool(self.levelup, "visible", false)}
+	if self.levelup != nil {gd.set_bool(self.levelup.owner, "visible", false)}
 	game_state_set_state(.Playing)
-	tree := gd.get_tree(self.owner)
-	if tree != nil {gd.scene_tree_set_pause(tree, false)}
+	gd.pause(self.owner, false)
 }
 
 @(private = "file")
 game_present_levelup :: proc(self: ^Game) {
-	if self.levelup == nil {return}
-	m := rt.script_of(self.levelup, LevelupMenu)
-	if m != nil {levelup_menu_present(m)}
+	// self.levelup is already the TYPED menu struct (script-resolving onready) — call straight in.
+	if self.levelup != nil {levelup_menu_present(self.levelup)}
 }
 
 // on_player_died — show the game-over screen and pause.
-@(gd_method)
+@(gd_method, gd_connect = "Player:died")
 game_on_player_died :: proc(self: ^Game) {
 	game_state_set_state(.GameOver)
-	tree := gd.get_tree(self.owner)
-	if tree != nil {gd.scene_tree_set_pause(tree, true)}
-	if self.gameover != nil {
-		go := rt.script_of(self.gameover, GameOver)
-		if go != nil {game_over_present(go)}
-	}
+	gd.pause(self.owner, true)
+	if self.gameover != nil {game_over_present(self.gameover)}
 }
 
 // game_restart — the game-over menu calls this (typed): reset state and reload the scene.
+// (reload_current_scene has no one-liner wrapper, so this keeps the explicit get_tree.)
 game_restart :: proc(self: ^Game) {
-	tree := gd.get_tree(self.owner)
-	if tree == nil {return}
-	gd.scene_tree_set_pause(tree, false)
+	gd.pause(self.owner, false)
 	game_state_reset()
-	gd.scene_tree_reload_current_scene(tree)
+	if tree := gd.get_tree(self.owner); tree != nil {
+		gd.scene_tree_reload_current_scene(tree)
+	}
 }
 
 // ---- @(gd_method) accessors: let GDScript / the test read the shared module's state ----

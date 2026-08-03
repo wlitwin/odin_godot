@@ -26,7 +26,7 @@ node3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_node3d :: proc "contextless" () -> Node3d {
-    return __bindgen_gde.classdb_construct_object(node3d_name_ref())
+    return cast(Node3d)__bindgen_gde.classdb_construct_object(node3d_name_ref())
 }
 
 // methods

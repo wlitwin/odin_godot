@@ -82,6 +82,7 @@ ping_emit_ping :: proc(self: ^Ping, value: int) {
 | `//gd:class <Name>` | Class name override. Defaults to the struct name. |
 | `//gd:tool` | Registers the class as a `@tool` script (`is_tool() == true`) and runs in the editor. |
 | `//gd:icon res://path.svg` | Custom class icon (Scene dock, Create Node/Resource dialog). |
+| `//gd:group a b` | Declarative group membership: every instance joins the named groups on READY (space-separated, repeatable). Replaces `gd.add_to_group` boilerplate in `_ready`; pairs with the typed group queries (`rt.scripts_in_group` & co.). |
 
 These are the marker comments the engine's resource loader reads to bind the
 authored `res://scripts/<x>.odin` resource (the same file you compile) to its
@@ -127,7 +128,7 @@ parser, the boot-time "unknown gd tag" error, and the skip list stay in agreemen
 | First token | What it declares | Consumed by | In the wire fingerprint |
 | --- | --- | --- | --- |
 | `export` | an editor-visible property | the runtime registrar | no |
-| `onready=PATH` | an auto-wired node reference | the runtime registrar | no |
+| `onready=PATH` | an auto-wired node reference (`^ScriptStruct` field: node + typed script struct) | the runtime registrar | no |
 | `replicate` | a networked field on the DELTA lane ([kit/net](kit/net.md)) | scriptgen | yes |
 | `owner` | a networked field streamed from its owning peer | scriptgen | yes |
 | `predict` | a networked field the sim predicts and reconciles ([kit/sim](kit/sim.md)) | scriptgen | yes |
@@ -221,7 +222,16 @@ Godot's comma-joined `hint_string` form:
 | `gd:"export,dict=String;Texture2D"` | typed-dict, resource values | `Type_String` / `"4:;24/17:Texture2D"` |
 
 `resource=` is for an `Object`/resource-handle field; `range`/`enum` for an int or
-float; `multiline` for a `gd.String`. **`array=ELEM`** (on a `gd.Array` field) and
+float; `multiline` for a `gd.String`. **A typed resource handle derives its own
+`resource=` hint**: `bullet_scene: gd.Packed_Scene `` `gd:"export"` `` is the preferred
+spelling — the build reads the class from the type, the Inspector shows a PackedScene
+picker, and no cast is needed at the call site (`gd.instantiate(self.bullet_scene)`).
+Spell `resource=` only on a type-erased `gd.Object` field. Either way the hint is
+mandatory for object exports, and the build refuses one without it: the hint is what
+makes the runtime take a reference on the assigned resource, so a hint-less object
+export would hold a dangling pointer once the scene loader's own reference drops
+(node handles are not exportable at all — wire scene nodes with `onready=`).
+**`array=ELEM`** (on a `gd.Array` field) and
 **`dict=KEY;VALUE`** (on a `gd.Dictionary` field) declare *typed* collections, the same
 Inspector editors that GDScript's `Array[T]` / `Dictionary[K,V]` produce. Each element/key/value
 is a builtin (`int`, `float`, `String`, `Vector2`, `Color`, …) or a Resource class name
@@ -371,6 +381,70 @@ handle IS the node pointer, so use the bare handle type, not `^gd.Node2d`. An `@
 field is a **private auto-wired ref**, NOT a serialized `@export`: it never appears in the
 property list / Inspector.
 
+**Script-resolving form — `^<script struct>`.** When the field's type is a pointer to one
+of your own script structs, the core resolves the node *and* its typed Odin script struct
+(`rt.script_of` semantics) in one step — the two-field idiom (a handle field plus a
+`rt.script_of` call in `_ready`) collapses into one declaration:
+
+```odin
+Player :: struct {
+	owner: gd.Character_Body2d,
+	hud:   ^Hud `gd:"onready=HudLayer/Hud"`,   // node -> ^Hud, wired before _ready
+}
+
+// instead of:
+//   hud_control: gd.Control `gd:"onready=HudLayer/Hud"`,
+//   hud_script:  ^Hud,                          // + rt.script_of in _ready
+```
+
+The pointee must be a script struct in the module (build error otherwise). The ref is
+class-checked: if the node exists but carries no `Hud` script, the field stays nil and a
+loud `push_error` names the field — never a wrongly-typed pointer. The declared form is
+also **hot-reload safe**: after a changed-layout reload the core re-resolves these refs
+once every instance has migrated, where a hand-cached `rt.script_of` pointer would dangle.
+
+A typed ref is your **struct**, not the node — engine calls take the node, which is the
+ref's `.owner`: `gd.canvas_item_set_visible(self.hud.owner, false)`. Passing the ref
+itself is a compile error (`Cannot assign value ... of type '^Hud' to 'Canvas_Item'`):
+engine handles are a *distinct* type, so no ordinary pointer can pose as one.
+
+**Array form — `[N]Handle` / `[N]^Script` with a `%d` template.** A fixed-array field
+wires N sibling nodes in one declaration; the path holds exactly one `%d`, substituted
+with 0-based indices at READY:
+
+```odin
+Shop :: struct {
+	owner:   gd.Control,
+	cards:   [9]gd.Button `gd:"onready=Grid/Card%d"`,   // Grid/Card0 … Grid/Card8
+	choices: [3]^Choice   `gd:"onready=Panel/Choice%d"`, // typed script refs work too
+}
+```
+
+Each element resolves independently (a missing index leaves that slot nil with the
+engine's path error); a `%d` on a scalar field — or an array without one — is a build
+error. This replaces the numbered-field bank (`card0`, `card1`, …) plus the hand-written
+regather loop in `_ready`.
+
+**Scene-unique names — `%Name`.** Godot's unique-name syntax (a node with *Access as
+Unique Name* checked, GDScript's `$` `%Name`) works in any `onready=` path — the marker
+passes straight through to `get_node`, so you don't have to hard-code the path from the
+owner:
+
+```odin
+Player :: struct {
+	owner: gd.Character_Body2d,
+	hud:   ^Hud       `gd:"onready=%Hud"`,          // unique name, anywhere in the scene
+	ammo:  gd.Label   `gd:"onready=%Hud/AmmoLabel"`, // unique segment, then a normal path
+	slots: [4]gd.Button `gd:"onready=%Inv/Slot%d"`,  // combines with the array template
+}
+```
+
+Only a `%` at a *segment start* (path start or right after `/`) is the unique-name
+marker; the array template's `%d` is recognized mid-name only (`Slot%d`), so a unique
+name that itself starts with `d` (`%dock`) is never mistaken for a template. Any other
+mid-name `%` is a build error. Unique names resolve through the owning scene's registry,
+so they follow the same scoping rules as GDScript's `%Name`.
+
 ### Lifecycle & methods
 
 Both are plain Odin procs whose first parameter is `^<Struct>`:
@@ -497,11 +571,51 @@ enemy_on_body :: proc(self: ^Enemy, body: gd.Node2d) {
 ```
 
 `@(gd_connect)` implies the proc is a signal target, so it must also be a `@(gd_method)` (use
-`@(gd_method, gd_connect = "...")`). The signal must exist on the owner (an engine signal like
-`body_entered` / `area_entered`, or one this script declared with a signal field). It connects
-only the owner's *own* signal to the owner's *own* method. To wire a different emitter or
-target, use `gd.connect_to` from `_ready` instead. (`@(gd_connect)` requires the
-`-custom-attribute:gd_connect` build flag, which `build/build_scripts.sh` passes for you.)
+`@(gd_method, gd_connect = "...")`). The signal must exist on the emitter (an engine signal
+like `body_entered` / `area_entered`, or one a script declared with a signal field).
+
+**Path-qualified form — another node's signal.** `@(gd_connect = "Path/To/Node:signal")`
+wires a *different emitter*'s signal to this method: the part before the last `:` is a node
+path resolved at READY exactly like an `onready=` ref (owner-relative, absolute
+`/root/...`, or `..` — anything `get_node` takes), the part after is the signal:
+
+```odin
+// The child turret's own `fired` signal, into the parent — no _ready connect call.
+@(gd_method, gd_connect = "Turret/Barrel:fired")
+tank_on_fired :: proc(self: ^Tank, heat: gd.Int) { ... }
+```
+
+Children ready before parents, so a child emitter's script (and its declared signals)
+exists by the time the parent wires. A missing node or signal fails **soft and loud**: the
+connection is skipped and a `push_error` names the declaring class/method. For an emitter
+you only know at runtime (spawned scenes), `gd.connect_to` from `_ready` remains the
+manual escape hatch. (`@(gd_connect)` requires the `-custom-attribute:gd_connect` build
+flag, which `build/build_scripts.sh` passes for you.)
+
+**Indexed form — one handler for a bank of emitters.** A single `%d` in the path probes
+`Choice0`, `Choice1`, … (silently, until the first missing index) and connects **each**
+match with its index **bound** as a trailing callable argument — the engine passes it
+after the signal's own args on every dispatch:
+
+```odin
+// Panel/Choice0..ChoiceN's `pressed` all wire here; `idx` says which fired.
+@(gd_method, gd_connect = "Panel/Choice%d:pressed")
+menu_on_choice :: proc(self: ^Menu, idx: gd.Int) {
+	menu_pick(self, int(idx))
+}
+```
+
+This replaces the N one-line stub handlers (`pick0`, `pick1`, `pick2`) the bank pattern
+used to force. Index 0 must exist — a declaration that wires nothing is a loud
+`push_error`, not a silent no-op.
+
+Scene-unique names work in the path part too, with the same rules as `onready=`
+(segment-start `%` = unique-name marker, mid-name `%d` = the indexed template):
+
+```odin
+@(gd_method, gd_connect = "%SavePanel:saved")     // unique-name emitter
+@(gd_method, gd_connect = "%Inv/Slot%d:pressed")  // unique prefix + indexed bank
+```
 
 ## Reserved shapes
 
@@ -733,6 +847,21 @@ These are proven end-to-end by `tests/rpc_net`: two real headless Godot processe
 a client) connect over ENet and exchange `@(gd_rpc)` calls in both directions, asserting each
 call executed on the *other* peer with the correct `get_remote_sender_id()`.
 
+**Launch parameters — who am I, from the outside.** A networked instance gets told its
+role/relay/room from outside the game: an env var natively (how launch scripts and the acid
+harness steer host/client instances), the page URL's query string on web (the
+friend-clicks-a-link front door). `gd.launch_param` reads both in one call, env first:
+
+```odin
+role := gd.launch_param("COOP_ROLE", "role")   // env COOP_ROLE, else ?role= on web
+url  := gd.web_query("url")                     // web-only knob; "" on native
+```
+
+`gd.web_query` evaluates `location.search` through the JavaScriptBridge (values
+percent-decoded via `gd.uri_decode`); `gd.IS_WEB` is the compiled-for-the-browser constant
+the platform branches use. Results are temp-allocated. Both coop examples boot through
+this — their native and in-browser acids are its proof.
+
 ### WebRTC / web co-op (`gd.webrtc_host` / `gd.webrtc_join`)
 
 For co-op **in the browser, over the internet, with no port-forwarding**, use WebRTC. The
@@ -819,6 +948,10 @@ script's `self.owner` passes with no cast and a returned `Node` assigns to any h
 | Get the SceneTree | `tree := gd.get_tree(self.owner)` |
 | Parent a node | `gd.add_child(self.owner, child)` |
 | Group add / check / remove | `gd.add_to_group(self.owner, "enemies")` · `gd.is_in_group(self.owner, "enemies")` · `gd.remove_from_group(self.owner, "enemies")` |
+| Iterate a group | `for n in gd.nodes_in_group(self.owner, "enemies") { ... }` (live members, temp-allocated) |
+| One group member | `game := gd.first_in_group(self.owner, "game")` |
+| Group → script structs | `for p in rt.scripts_in_group(self.owner, "players", player) { ... }` · `rt.first_script_in_group(self.owner, "game", Game)` (see [Typed cross-script references](#typed-cross-script-references)) |
+| Unpack an engine array | `kids := gd.array_unpack(&children)` (any `Typed_Array` return → Odin slice, element-converted) |
 | Load a resource | `res := gd.load("res://icon.png")` |
 | Load a PackedScene | `scene := gd.load_scene("res://enemy.tscn")` |
 | Instance a PackedScene | `node := gd.instantiate(scene)` |
@@ -855,9 +988,12 @@ but are NOT persisted to `project.godot`: they are the "register my game's setti
 actions on an autoload's `_ready`" pattern (see below). `gd.get_setting_string` is the one
 that allocates (in `context.allocator`); the rest are `proc "contextless"`.
 
-All helpers are `proc "contextless"` except `gd.get_string`, which allocates the returned
-Odin `string` in `context.allocator` (fine inside any script proc, since those run with the
-script context set). For a script-declared signal field, prefer the generated typed
+All helpers are `proc "contextless"` except the ones that allocate: `gd.get_string`
+(returned Odin `string`, in `context.allocator` — `delete` it) and the slice-returning
+queries `gd.nodes_in_group` / `gd.array_unpack` / `rt.scripts_in_group` (in
+`context.temp_allocator` by default — call-local, iterate now and don't stash, or pass a
+real allocator to keep the slice). All are fine inside any script proc, since those run
+with the script context set. For a script-declared signal field, prefer the generated typed
 `<struct_snake>_emit_<field>` helper; `gd.emit_args` is the by-name escape hatch (and the
 path `gd.emit`/`emit_args` both take: Godot's `emit_signal` is a vararg method, so they
 varcall it rather than ptrcall).
@@ -1128,8 +1264,135 @@ controller_attack :: proc(self: ^Controller, amount: gd.Int) -> int {
   (modules can't import each other's types), and cross-module access goes through the
   engine (signals, name-based calls, autoloads). See [Script Modules](modules.md).
 - For calling across a dll boundary (e.g. a tool that dispatches by name), the
-  GDScript-style `obj.call("method", args...)` path remains available; `script_of` is the
-  zero-overhead typed path within the shared scripts dll.
+  GDScript-style by-name path is `gd.vcall` (below); `script_of` is the zero-overhead
+  typed path within the shared scripts dll.
+
+**Typed spawning.** The instantiate → add_child → `script_of` → poke ritual is three
+helpers, split by WHEN the spawnee's `_ready` should see your pokes:
+
+```odin
+// poke-first (fields visible to the spawnee's _ready): spawn_scripted + add_child
+node, b := rt.spawn_scripted(self.bullet_scene, Bullet)
+if b == nil { return }
+b.dir = dir; b.damage = dmg
+gd.add_child(arena, node)
+
+// just-spawn-it (pokes happen after _ready ran):
+if e := rt.spawn_as(parent, self.enemy_scene, Enemy); e != nil { e.tier = 2 }
+
+// from a physics callback (body_entered, contact resolution): deferred parenting —
+// _ready runs at idle time, so pokes through the returned ^T are ready-visible.
+if g := rt.spawn_as_deferred(parent, self.gem_scene, Gem); g != nil { g.value = 5 }
+```
+
+All are nil-safe (nil scene, failed instantiate, or a root without the expected script
+→ nil `^T`; the caller's nil-check decides whether that's fatal).
+
+**By-name calls — `gd.vcall`.** Where types can't be shared (across script modules, or
+any engine-mediated dispatch), `gd.vcall` converts Odin arguments to Variants
+automatically, calls by name, and frees every temporary; the typed forms unwrap the
+result. One line instead of two per argument:
+
+```odin
+gd.vcall_void(spawner, "register_kill")
+hits := gd.vcall_int(field, "spawn_aimed", x, y, sx, sy, speed, dmg, gd.Int(1))
+if gd.vcall_bool(game_state, "is_cleared") { ... }
+```
+
+Accepted argument types: integers, floats, bool, cstring/string, `gd.String`,
+`gd.String_Name`, object/node handles, `Vector2/2i/3/3i/4`, `Color`, `Rect2`, and
+prebuilt `Variant`s (passed through, caller keeps ownership). Anything else refuses the
+WHOLE call with a loud error — never a half-converted argument list. A nil target is a
+silent no-op returning zero (by-name targets are routinely group/path lookups that
+legitimately miss). `method` must be a string literal (interned).
+
+**Typed group queries.** The scene tree's group index is the decoupled "find that kind of
+thing" query (`gd.add_to_group` in `_ready`; no node paths, no hand-kept registries), and
+the `rt` layer composes it with `script_of` so the answer comes back as script structs,
+class-checked — a member carrying a different script (or none) is skipped, never
+reinterpreted:
+
+```odin
+// every player, as struct pointers (temp-allocated: iterate now, don't stash):
+for p in rt.scripts_in_group(self.owner, "players", player) {
+	p.hp -= 1                                     // direct field access
+	pos := gd.node2d_get_global_position(p.owner) // engine calls via the owner
+}
+
+// the single-expected-object query (the game orchestrator, the world, the camera):
+game := rt.first_script_in_group(self.owner, "game", Game)
+```
+
+`first_script_in_group` scans past members with other scripts, so a mixed group can never
+hand back a wrong class (contrast with `gd.first_in_group` + `script_of`, which inspects
+only whichever node the engine lists first). The node-level forms (`gd.nodes_in_group`,
+`gd.first_in_group`) and the generic engine-array unpacker (`gd.array_unpack`) live in the
+[ergonomics layer](#ergonomic-helpers). One timing note: nodes join groups as they enter
+the tree, so a group scan inside another node's `_ready` can run before later siblings
+have registered — scan from process/tick code, where the question is actually asked.
+
+### Any-class references & static dispatch ("interfaces")
+
+`script_of` answers "is this exactly class T". The other question games ask — a bullet
+hitting *anything damageable*, a cursor over *anything interactable* — needs the reverse:
+"whatever this is, hand me its struct AND tell me what it is." That is
+`rt.script_any(obj) -> (ptr: rawptr, id: typeid)`: nil,nil for a plain engine node, a
+foreign module's class, or no script at all.
+
+Odin has no interfaces on purpose; the pattern the typeid unlocks is the **per-type static
+table** — one entry per class, constant for all instances, nothing registered per instance
+and no lifecycle to forget (the C++/C# vtable, spelled out):
+
+```odin
+Damage_Entry :: struct {
+	id:   typeid,
+	hurt: proc(ctx: rawptr, amount: int),
+}
+
+DAMAGE_IMPLS := [?]Damage_Entry {
+	{typeid_of(bug),    proc(ctx: rawptr, n: int) {bug_take_damage(cast(^bug)ctx, n)}},
+	{typeid_of(cactus), proc(ctx: rawptr, n: int) {cactus_smash(cast(^cactus)ctx)}},
+}
+
+// the one call site every projectile shares:
+hurt :: proc(node: gd.Object, amount: int) -> bool {
+	if d, ptr, ok := rt.dispatch(DAMAGE_IMPLS[:], node); ok {
+		d.hurt(ptr, amount)
+		return true
+	}
+	return false
+}
+```
+
+`rt.dispatch(table, obj)` composes the resolve and the table scan; `rt.lookup(table, id)`
+is the scan alone (for call sites that must distinguish "not a script" from "no entry",
+or that already hold the typeid). Both are generic on the ENTRY type: any struct with an
+`id: typeid` field fits, checked at instantiation — so `INTERACT_IMPLS`, `SAVE_IMPLS`,
+and friends reuse the same two helpers with their own entry shapes, no shared header
+struct and no id-must-be-first layout convention. The `[:]` at the call site is what
+erases the table's LENGTH (`[2]Damage_Entry` → `[]Damage_Entry`); the `$E` type parameter
+erases the entry TYPE — two axes of "slice polymorphism", both compile-checked.
+
+Why an array and a loop, not a `map[typeid]`? Deliberate: at game-type counts a scan of
+contiguous pairs beats or ties a hash (and `script_any`'s engine round trip dominates
+either), and — the load-bearing part — the `[?]` literal is CONSTANT-initialized into the
+binary, while a package-global map must be BUILT, and global/`@(init)`-time building runs
+at dll load, exactly where the web target's allocator is not yet usable (the
+`runtime/context.odin` trap; scriptgen's own generated tables are `[?]` arrays for the
+same reason). If the set outgrows a scan or you want per-file registration, a map
+lazy-initialized inside the dispatch proc (first call is always post-boot) is the safe
+spelling.
+
+The proc literals must be capture-free (Odin has no closures) — `ctx` is how the instance
+travels, which is exactly a vtable's `this`. Type safety is `script_of`'s class check,
+relocated: the core reports the instance's class name, and `script_any` resolves it against
+*this dll's own registry* to a typeid — a class this module never registered resolves to
+nil, so a foreign module's struct can never be handed out under a wrong layout. Same
+main-thread contract as `script_of`; works on web (the resolver is wired directly there).
+For a closed set with per-type *call sites* rather than one shared verb, a tagged union
+(`union {^bug, ^cactus}` + exhaustive `switch`) buys compile-time completeness checking
+instead — pick the table when N types share one verb, the union when the switch sites
+want the compiler watching them.
 
 For shared state with *no* per-node instance to reference (a global score, a constant
 table), the package-level "module" pattern (file-private vars + package procs like

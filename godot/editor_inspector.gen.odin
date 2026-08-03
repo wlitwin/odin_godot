@@ -16,7 +16,7 @@ editor_inspector_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_inspector :: proc "contextless" () -> Editor_Inspector {
-    return __bindgen_gde.classdb_construct_object(editor_inspector_name_ref())
+    return cast(Editor_Inspector)__bindgen_gde.classdb_construct_object(editor_inspector_name_ref())
 }
 
 // methods

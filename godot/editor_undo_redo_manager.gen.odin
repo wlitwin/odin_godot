@@ -21,7 +21,7 @@ editor_undo_redo_manager_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_undo_redo_manager :: proc "contextless" () -> Editor_Undo_Redo_Manager {
-    return __bindgen_gde.classdb_construct_object(editor_undo_redo_manager_name_ref())
+    return cast(Editor_Undo_Redo_Manager)__bindgen_gde.classdb_construct_object(editor_undo_redo_manager_name_ref())
 }
 
 // methods

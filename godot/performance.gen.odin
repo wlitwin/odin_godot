@@ -84,7 +84,7 @@ performance_name :: proc "contextless" () -> String_Name {
 }
 
 new_performance :: proc "contextless" () -> Performance {
-    return __bindgen_gde.classdb_construct_object(performance_name_ref())
+    return cast(Performance)__bindgen_gde.classdb_construct_object(performance_name_ref())
 }
 
 // methods

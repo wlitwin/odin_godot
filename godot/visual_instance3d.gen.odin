@@ -16,7 +16,7 @@ visual_instance3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_visual_instance3d :: proc "contextless" () -> Visual_Instance3d {
-    return __bindgen_gde.classdb_construct_object(visual_instance3d_name_ref())
+    return cast(Visual_Instance3d)__bindgen_gde.classdb_construct_object(visual_instance3d_name_ref())
 }
 
 // methods

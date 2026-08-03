@@ -43,6 +43,9 @@ Scripts_Dll :: struct {
 	// the scripts dll its `obj -> Odin script struct` resolver (core's odin_script_struct),
 	// which `rt.script_of` then uses. Exported by the runtime package (linked into the dll).
 	odin_scripts_set_core_api: proc "c" (script_struct: rt.Script_Struct_Proc),
+	// The any-class resolver handoff behind `rt.script_any` (per-type dispatch tables).
+	// Same pattern; optional — nil on a scripts dll built before it existed.
+	odin_scripts_set_core_api2: proc "c" (script_struct_any: rt.Script_Struct_Any_Proc),
 	// Panic-surfacing handoff (same pattern): the core hands the scripts dll a push_error
 	// reporter right after boot, so a script panic/assert shows RED in the editor Output
 	// (the runtime's assertion proc is stderr-only until this is installed). Exported by
@@ -470,6 +473,9 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 	if dll.odin_scripts_set_core_api != nil {
 		dll.odin_scripts_set_core_api(odin_script_struct)
 	}
+	if dll.odin_scripts_set_core_api2 != nil {
+		dll.odin_scripts_set_core_api2(odin_script_struct_any)
+	}
 	// Hand over the panic reporter so ODIN_SCRIPT_PANIC lines also reach the editor
 	// Output via push_error (stderr is written by the runtime side regardless).
 	if dll.odin_scripts_set_panic_report != nil {
@@ -763,6 +769,9 @@ odin_scripts_reload :: proc(module := "") -> bool {
 	// Re-hand the resolver to the freshly-swapped dll (it has its own runtime globals).
 	if new_dll.odin_scripts_set_core_api != nil {
 		new_dll.odin_scripts_set_core_api(odin_script_struct)
+	}
+	if new_dll.odin_scripts_set_core_api2 != nil {
+		new_dll.odin_scripts_set_core_api2(odin_script_struct_any)
 	}
 	// ... and the panic reporter (same per-dll globals reasoning).
 	if new_dll.odin_scripts_set_panic_report != nil {

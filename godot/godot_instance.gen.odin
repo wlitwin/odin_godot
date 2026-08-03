@@ -16,7 +16,7 @@ godot_instance_name :: proc "contextless" () -> String_Name {
 }
 
 new_godot_instance :: proc "contextless" () -> Godot_Instance {
-    return __bindgen_gde.classdb_construct_object(godot_instance_name_ref())
+    return cast(Godot_Instance)__bindgen_gde.classdb_construct_object(godot_instance_name_ref())
 }
 
 // methods

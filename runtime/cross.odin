@@ -68,3 +68,90 @@ script_of :: proc "contextless" (obj: gdext.ObjectPtr, $T: typeid) -> ^T {
 	}
 	return cast(^T)core_script_struct(obj, want)
 }
+
+// ---- The any-class resolver (the static-dispatch door) ----
+
+// The core's `obj -> (script struct, class identity)` resolver — Script_Struct_Proc's
+// sibling for when the caller does NOT know the class: instead of verifying a requested
+// name, the core REPORTS the instance's class (ptr + len of its heap-copy name — not
+// NUL-terminated, valid while the instance lives) and returns the struct pointer.
+Script_Struct_Any_Proc :: proc "c" (obj: gdext.ObjectPtr, class_ptr: ^[^]u8, class_len: ^int) -> rawptr
+
+@(private)
+core_script_struct_any: Script_Struct_Any_Proc
+
+// Called by the core right after boot (dlsym'd, same pattern as odin_scripts_set_core_api).
+// Optional in both skew directions: an older core never calls it and `script_any` below
+// just returns nil; an older scripts dll lacks this export and the core skips it.
+@(export)
+odin_scripts_set_core_api2 :: proc "c" (script_struct_any: Script_Struct_Any_Proc) {
+	core_script_struct_any = script_struct_any
+}
+
+// script_any resolves a live Godot object to its Odin script struct WITHOUT naming the
+// class: `(pointer, typeid)`, or `(nil, nil)` when `obj` is nil, carries no Odin script,
+// or carries a class THIS dll didn't register. That last clause is the type-safety story
+// (script_of's class compare, relocated): the reported name is resolved against this
+// dll's own registry, so another module's instance misses and can never be handed out
+// under a wrong layout.
+//
+// The typeid is the door to per-TYPE dispatch — the static-vtable pattern where N
+// damageable/interactable/savable classes share one table and instances carry nothing:
+//
+//	ptr, id := rt.script_any(body)
+//	for e in DAMAGE_IMPLS {           // static [?]struct{id: typeid, hurt: proc(...)}
+//		if e.id == id { e.hurt(ptr, amount); break }
+//	}
+//
+// Same main-thread contract as script_of.
+script_any :: proc "contextless" (obj: gdext.ObjectPtr) -> (ptr: rawptr, id: typeid) {
+	if core_script_struct_any == nil || obj == nil {
+		return nil, nil
+	}
+	name_ptr: [^]u8
+	name_len: int
+	p := core_script_struct_any(obj, &name_ptr, &name_len)
+	if p == nil || name_ptr == nil || name_len <= 0 {
+		return nil, nil
+	}
+	id = typeid_for_class_name(string(name_ptr[:name_len]))
+	if id == nil {
+		return nil, nil
+	}
+	return p, id
+}
+
+// lookup finds the table entry whose `id` field matches — the scan behind a per-type
+// dispatch table, packaged as the two-value form Odin ifs want:
+//
+//	if e, ok := rt.lookup(DAMAGE_IMPLS[:], id); ok { e.hurt(ptr, amount) }
+//
+// Generic on the ENTRY type: any struct with an `id: typeid` field fits (checked at
+// instantiation), so Damageable/Interactable/Savable tables all share this one helper —
+// no common header, no id-first layout convention, no casts. The slice param is the
+// LENGTH eraser: `[2]Damage_Entry` and `[7]Interact_Entry` both pass as `TABLE[:]`.
+lookup :: proc "contextless" (table: []$E, id: typeid) -> (entry: E, ok: bool) {
+	if id != nil {
+		for e in table {
+			if e.id == id {
+				return e, true
+			}
+		}
+	}
+	return {}, false
+}
+
+// dispatch composes script_any + lookup — the whole "interface" pattern in one call:
+//
+//	if d, ptr, ok := rt.dispatch(DAMAGE_IMPLS[:], body); ok { d.hurt(ptr, amount) }
+//
+// ok=false folds "not an Odin script" and "no table entry for its class" together; when
+// a call site needs to tell those apart (rare), use script_any + lookup separately.
+dispatch :: proc "contextless" (table: []$E, obj: gdext.ObjectPtr) -> (entry: E, ctx: rawptr, ok: bool) {
+	ptr, id := script_any(obj)
+	if ptr == nil {
+		return {}, nil, false
+	}
+	e, found := lookup(table, id)
+	return e, ptr, found
+}

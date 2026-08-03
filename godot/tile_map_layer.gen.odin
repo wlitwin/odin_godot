@@ -21,7 +21,7 @@ tile_map_layer_name :: proc "contextless" () -> String_Name {
 }
 
 new_tile_map_layer :: proc "contextless" () -> Tile_Map_Layer {
-    return __bindgen_gde.classdb_construct_object(tile_map_layer_name_ref())
+    return cast(Tile_Map_Layer)__bindgen_gde.classdb_construct_object(tile_map_layer_name_ref())
 }
 
 // methods

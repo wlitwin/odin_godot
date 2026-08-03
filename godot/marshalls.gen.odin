@@ -16,7 +16,7 @@ marshalls_name :: proc "contextless" () -> String_Name {
 }
 
 new_marshalls :: proc "contextless" () -> Marshalls {
-    return __bindgen_gde.classdb_construct_object(marshalls_name_ref())
+    return cast(Marshalls)__bindgen_gde.classdb_construct_object(marshalls_name_ref())
 }
 
 // methods

@@ -16,7 +16,7 @@ xrvrs_name :: proc "contextless" () -> String_Name {
 }
 
 new_xrvrs :: proc "contextless" () -> Xrvrs {
-    return __bindgen_gde.classdb_construct_object(xrvrs_name_ref())
+    return cast(Xrvrs)__bindgen_gde.classdb_construct_object(xrvrs_name_ref())
 }
 
 // methods

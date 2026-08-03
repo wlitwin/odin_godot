@@ -16,7 +16,7 @@ range_name :: proc "contextless" () -> String_Name {
 }
 
 new_range :: proc "contextless" () -> Range {
-    return __bindgen_gde.classdb_construct_object(range_name_ref())
+    return cast(Range)__bindgen_gde.classdb_construct_object(range_name_ref())
 }
 
 // methods

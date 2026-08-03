@@ -16,7 +16,7 @@ directional_light2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_directional_light2d :: proc "contextless" () -> Directional_Light2d {
-    return __bindgen_gde.classdb_construct_object(directional_light2d_name_ref())
+    return cast(Directional_Light2d)__bindgen_gde.classdb_construct_object(directional_light2d_name_ref())
 }
 
 // methods

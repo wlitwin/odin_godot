@@ -21,7 +21,7 @@ pin_joint3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_pin_joint3d :: proc "contextless" () -> Pin_Joint3d {
-    return __bindgen_gde.classdb_construct_object(pin_joint3d_name_ref())
+    return cast(Pin_Joint3d)__bindgen_gde.classdb_construct_object(pin_joint3d_name_ref())
 }
 
 // methods

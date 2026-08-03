@@ -39,6 +39,12 @@ Field_Meta :: struct {
 	doc:    cstring,
 	getter: proc "c" (self: rawptr, ret: gdext.VariantPtr),
 	setter: proc "c" (self: rawptr, value: gdext.VariantPtr),
+	// Godot class spelling scriptgen derived from a TYPED resource handle
+	// (`gd.Packed_Scene` -> "PackedScene") when the tag spells no `resource=`.
+	// Reflection cannot recover it (every refcounted handle erases to the same
+	// ^rawptr), and the Resource_Type hint it synthesizes is what switches on
+	// inst_set's refcount hold — without it the field would dangle.
+	resource_class: cstring,
 }
 
 // Everything reflection cannot see about a class. INTERNAL to the scripts dll (see
@@ -58,6 +64,10 @@ Class_Info :: struct {
 	signals_count:     i32,
 	connections:       [^]Connection,
 	connections_count: i32,
+	// `//gd:group a b` — group names the core joins on READY (static cstrings in the
+	// generated file, dll-lifetime).
+	groups:            [^]cstring,
+	groups_count:      i32,
 	rpcs:              [^]Rpc,
 	rpcs_count:        i32,
 	fields:            [^]Field_Meta,
@@ -99,6 +109,8 @@ reflect_class_desc :: proc "contextless" (id: typeid, info: Class_Info) -> Class
 		signals_count     = info.signals_count,
 		connections       = info.connections,
 		connections_count = info.connections_count,
+		groups            = info.groups,
+		groups_count      = info.groups_count,
 		rpcs              = info.rpcs,
 		rpcs_count        = info.rpcs_count,
 		tool              = info.tool,
@@ -218,6 +230,31 @@ detect_dup_member_names :: proc(class: cstring, ex_start, sig_start: int) {
 	}
 }
 
+// Classify the '%' characters in an onready/@(gd_connect) node path. A '%' at a
+// SEGMENT START (path start or right after '/') is Godot's scene-unique-name marker
+// (`%Hud`, `%doc/Sprite`) — engine NodePath syntax, passed through to get_node
+// untouched. Only a MID-SEGMENT `%d` (`Card%d`) is the array/index template. The
+// split is load-bearing: a unique name that happens to start with 'd' (`%dock`)
+// contains the bytes "%d", and a naive index() would substitute into it. tmpl_at is
+// the byte offset of the first mid-segment `%d` (-1 if none) — the core substitutes
+// indices there; stray counts mid-segment '%'s that are neither (always refused).
+// Exported: the core's resolve/probe loops use tmpl_at for the same reason, and
+// scriptgen mirrors this rule build-time (scan_path_template in parse.odin).
+scan_onready_template :: proc "contextless" (path: string) -> (tmpl_at: int, tmpl_count: int, stray: int) {
+	tmpl_at = -1
+	for i in 0 ..< len(path) {
+		if path[i] != '%' {continue}
+		if i == 0 || path[i - 1] == '/' {continue}
+		if i + 1 < len(path) && path[i + 1] == 'd' {
+			if tmpl_at < 0 {tmpl_at = i}
+			tmpl_count += 1
+		} else {
+			stray += 1
+		}
+	}
+	return
+}
+
 // One tagged field -> an Export or Onready pool entry (or a recorded error). Ports
 // scriptgen's tag grammar verbatim: the first comma-separated token selects the kind
 // (`export` / `onready=PATH`), the rest are group/subgroup/default/get/set plus at
@@ -248,9 +285,55 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 			record_error(cls, name_c, "`onready=` needs a node path")
 			return
 		}
-		if vt, vok := variant_type_for(fti.id); !vok || vt != .Object {
-			record_error(cls, name_c, "`onready` field must be an object/node handle or pointer")
+		// ARRAY onready — `[N]gd.Button` / `[N]^script struct` with a `%d` path template:
+		// unwrap the fixed array here so the ELEMENT type runs through the same scalar
+		// classification below; `count` marks the entry and the core substitutes 0-based
+		// indices into the template at resolve time.
+		elem_ti := fti
+		count := 0
+		if ai, is_arr := runtime.type_info_base(fti).variant.(runtime.Type_Info_Array); is_arr && ai.elem != nil {
+			elem_ti = ai.elem
+			count = ai.count
+			if count <= 0 || count > 4096 {
+				record_error(cls, name_c, "`onready=` array field needs a fixed length between 1 and 4096")
+				return
+			}
+		}
+		// The `%d` template contract: arrays need exactly one MID-NAME `%d` (and no
+		// stray mid-name '%'); scalars none. A '%' at a segment start is Godot's
+		// scene-unique-name marker (`%Hud`) — engine path syntax, passed through
+		// untouched (see scan_onready_template for why the split matters).
+		_, tmpl_count, stray := scan_onready_template(path)
+		if count > 0 {
+			if tmpl_count != 1 || stray != 0 {
+				record_error(cls, name_c, "`onready=` on an array field needs exactly one mid-name `%d` in the path (e.g. `Shop/Card%d`), substituted with 0-based indices; a leading `%Name` is a scene-unique name and fine")
+				return
+			}
+		} else if tmpl_count != 0 || stray != 0 {
+			record_error(cls, name_c, "`onready=` path has a '%' inside a node name — only `%Name` at a segment start (scene-unique name) is valid here; the `%d` template form is for FIXED-ARRAY fields ([N]gd.Node2d, [N]^Script)")
 			return
+		}
+		// SCRIPT-RESOLVING onready: the (element) type is `^S` where S is a struct — the
+		// author wants the target's Odin SCRIPT STRUCT (rt.script_of), not the node
+		// handle. Classified STRUCTURALLY, which is unambiguous: every Godot handle is a
+		// rawptr alias (gd.Node2d, ...) or a pointer-to-rawptr (^gd.Resource and
+		// friends) — never a pointer-to-struct. Whether S is actually a REGISTERED
+		// script class can't be known mid-walk (its own `@(init)` may not have run yet),
+		// so only the typeid is recorded here; fixup_onready_script_targets resolves or
+		// refuses it at manifest time. Without this arm the blanket any-pointer->.Object
+		// rule below accepted `^S` and the core wrote a raw NODE pointer into it — type
+		// confusion wearing a passing build.
+		script_id: typeid
+		if pi, is_ptr := runtime.type_info_base(elem_ti).variant.(runtime.Type_Info_Pointer); is_ptr && pi.elem != nil {
+			if _, is_st := runtime.type_info_base(pi.elem).variant.(runtime.Type_Info_Struct); is_st {
+				script_id = pi.elem.id
+			}
+		}
+		if script_id == nil {
+			if vt, vok := variant_type_for(elem_ti.id); !vok || vt != .Object {
+				record_error(cls, name_c, "`onready` field must be an object/node handle or pointer (or a fixed array of them)")
+				return
+			}
 		}
 		if onready_pool_count >= MAX_REFLECT_ONREADY {
 			record_error(cls, name_c, "registration onready pool exhausted — field dropped")
@@ -261,7 +344,7 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 			record_error(cls, name_c, "registration name pool exhausted — field dropped")
 			return
 		}
-		onready_pool[onready_pool_count] = Onready{offset = offset, path = path_c}
+		onready_pool[onready_pool_count] = Onready{offset = offset, path = path_c, field = name_c, script_id = script_id, count = i32(count)}
 		onready_pool_count += 1
 		return
 	}
@@ -422,6 +505,26 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 			has_hint = true
 			ex.hint = h
 			ex.hint_string = hs
+		}
+	}
+
+	// OBJECT exports must end up hinted — the hint is load-bearing, not cosmetic:
+	// inst_set's resource refcounting keys off Property_Hint.Resource_Type, so a
+	// hint-less object export stores an UNREFERENCED pointer that dangles once the
+	// loader's transient ref drops (a delayed SIGSEGV far from the field). scriptgen
+	// derives the class from a typed handle (`gd.Packed_Scene`) and ships it here in
+	// Field_Meta.resource_class; when neither that nor an explicit `resource=` /
+	// `entity=` provided a hint, refuse the registration loudly.
+	if vt == .Object && !has_hint {
+		if meta != nil && meta.resource_class != nil {
+			if h, hs, hok := parse_hint_spec(cls, name_c, "resource", string(meta.resource_class), vt); hok {
+				has_hint = true
+				ex.hint = h
+				ex.hint_string = hs
+			}
+		} else {
+			record_error(cls, name_c, "object export needs a resource class — type the field (e.g. `gd.Packed_Scene`) so the build derives it, or spell `resource=<Class>`; a hint-less object export stores an unreferenced pointer that dangles after scene load")
+			return
 		}
 	}
 
@@ -750,7 +853,9 @@ variant_type_for :: proc "contextless" (id: typeid) -> (gdext.Variant_Type, bool
 	// ---- misc handles ----
 	case gd.Rid:
 		return .Rid, true
-	case rawptr: // gd.Object and every non-refcounted class handle alias (gd.Node2d, ...)
+	// gd.Object (a DISTINCT rawptr — its typeid is its own) and every class handle
+	// alias of it (gd.Node2d, ...); bare rawptr kept for hand-spelled interop fields.
+	case rawptr, gd.Object:
 		return .Object, true
 	case gd.Callable:
 		return .Callable, true
@@ -1268,6 +1373,34 @@ registration_errors :: proc "contextless" () -> []Registration_Error {
 	return reg_errors[:reg_error_count]
 }
 
+// Resolve every script-onready entry's target typeid to its registered class name.
+// Called ONCE from odin_scripts_manifest (native and web both pull the manifest right
+// after boot, before the registration-errors drain): every class `@(init)` has run by
+// then, so a `^S` whose S is a script struct resolves NOW — mid-walk it could not
+// (registration order). An S that is NOT a registered script class is refused loudly,
+// and the entry is NEUTRALIZED (path = nil; the core skips those): the fallback would
+// be writing a raw node pointer into a typed struct field, the exact confusion the
+// structural classification exists to kill.
+fixup_onready_script_targets :: proc "contextless" () {
+	for i in 0 ..< registry_count {
+		for &o in desc_onready(registry[i]) {
+			if o.script_id == nil || o.script_class != nil {
+				continue
+			}
+			if name := class_name_for_typeid(o.script_id); name != nil {
+				o.script_class = name
+			} else {
+				record_error(
+					registry[i].name,
+					o.field,
+					"`onready=` on a `^T` field resolves the target node's SCRIPT STRUCT (rt.script_of semantics), so T must be a registered script struct — this T is not one. For a plain node reference use a class handle type (gd.Node, gd.Node2d, ...), not a pointer to a struct",
+				)
+				o.path = nil
+			}
+		}
+	}
+}
+
 // TEST-ONLY: reset the walk's pools + error table + the CLASS REGISTRY (runtime.odin —
 // same package) so `odin test` cases (which share one process) can exercise exhaustion
 // and duplicate-registration without poisoning later cases. Never called in
@@ -1280,6 +1413,7 @@ reflect_register_reset_for_tests :: proc "contextless" () {
 	signal_arg_pool_count = 0
 	reg_error_count = 0
 	registry_count = 0
+	onready_fixup_done = false
 }
 
 // The core pulls this right after the manifest (dlsym'd by name on native, called

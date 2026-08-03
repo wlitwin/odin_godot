@@ -16,7 +16,7 @@ multiplayer_spawner_name :: proc "contextless" () -> String_Name {
 }
 
 new_multiplayer_spawner :: proc "contextless" () -> Multiplayer_Spawner {
-    return __bindgen_gde.classdb_construct_object(multiplayer_spawner_name_ref())
+    return cast(Multiplayer_Spawner)__bindgen_gde.classdb_construct_object(multiplayer_spawner_name_ref())
 }
 
 // methods

@@ -27,10 +27,9 @@ install_controls :: proc "contextless" () {
 drive_my_kicker :: proc(self: ^Slopball, delta: f64) {
 	me := self.me_kick
 	if me == nil {return}
-	if !me.placed {
+	if play.latch(&me.placed, true) {
 		// Ev_Spawned means BORN — the replicated x/y are set; put the BODY there
 		// once (the scene instanced it at the origin, inside the corner walls).
-		me.placed = true
 		gd.node2d_set_position(cast(gd.Node2d)me.owner, {me.x, me.y})
 	}
 
@@ -44,7 +43,7 @@ drive_my_kicker :: proc(self: ^Slopball, delta: f64) {
 		if gd.is_action_pressed("slop_up") {dir.y -= 1}
 		if gd.is_action_pressed("slop_down") {dir.y += 1}
 	}
-	dir = normalized(dir)
+	dir = gd.normalized(dir)
 
 	// The engine does the collision: walls stop me, the frozen ball is solid.
 	gd.character_body2d_set_velocity(me.owner, {dir.x * KICKER_SPEED, dir.y * KICKER_SPEED})
@@ -101,9 +100,9 @@ drive_my_kicker :: proc(self: ^Slopball, delta: f64) {
 kick_aim :: proc(self: ^Slopball, away: gd.Vector2) -> gd.Vector2 {
 	if self.bot == "striker" && self.me_kick != nil {
 		gx: f32 = kicker_team(self.me_kick.pid) == 1 ? PITCH_W : 0 // team 1 scores RIGHT
-		return normalized({gx - self.ball.puppet.x, PITCH_H/2 - self.ball.puppet.y})
+		return gd.normalized({gx - self.ball.puppet.x, PITCH_H/2 - self.ball.puppet.y})
 	}
-	return normalized(away)
+	return gd.normalized(away)
 }
 
 // The striker walks at the ball (slightly behind it, so contact pushes goalward);
@@ -114,17 +113,17 @@ bot_steer :: proc(self: ^Slopball) -> gd.Vector2 {
 		// The repro dog: runs at the ball forever, never kicks — possession
 		// trades by contact, the way humans dribble into each other.
 		d := gd.Vector2{self.ball.puppet.x - self.me_kick.x, self.ball.puppet.y - self.me_kick.y}
-		return normalized(d)
+		return gd.normalized(d)
 	}
 	if self.bot != "striker" {return {}}
 	if self.ball.score.won != 0 {return {}}
 	me := self.me_kick
 	bx, by := self.ball.puppet.x, self.ball.puppet.y
 	gx: f32 = kicker_team(me.pid) == 1 ? PITCH_W : 0
-	behind := normalized({bx - gx, by - PITCH_H/2}) // from goal, through the ball
+	behind := gd.normalized({bx - gx, by - PITCH_H/2}) // from goal, through the ball
 	tx := bx + behind.x*4
 	ty := by + behind.y*4
 	d := gd.Vector2{tx - me.x, ty - me.y}
 	if math.abs(d.x) < 2 && math.abs(d.y) < 2 {return {}}
-	return normalized(d)
+	return gd.normalized(d)
 }

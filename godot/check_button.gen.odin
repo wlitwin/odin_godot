@@ -16,7 +16,7 @@ check_button_name :: proc "contextless" () -> String_Name {
 }
 
 new_check_button :: proc "contextless" () -> Check_Button {
-    return __bindgen_gde.classdb_construct_object(check_button_name_ref())
+    return cast(Check_Button)__bindgen_gde.classdb_construct_object(check_button_name_ref())
 }
 
 // methods

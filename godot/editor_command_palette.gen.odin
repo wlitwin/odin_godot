@@ -16,7 +16,7 @@ editor_command_palette_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_command_palette :: proc "contextless" () -> Editor_Command_Palette {
-    return __bindgen_gde.classdb_construct_object(editor_command_palette_name_ref())
+    return cast(Editor_Command_Palette)__bindgen_gde.classdb_construct_object(editor_command_palette_name_ref())
 }
 
 // methods

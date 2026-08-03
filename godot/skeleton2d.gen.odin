@@ -16,7 +16,7 @@ skeleton2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_skeleton2d :: proc "contextless" () -> Skeleton2d {
-    return __bindgen_gde.classdb_construct_object(skeleton2d_name_ref())
+    return cast(Skeleton2d)__bindgen_gde.classdb_construct_object(skeleton2d_name_ref())
 }
 
 // methods

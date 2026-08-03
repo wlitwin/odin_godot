@@ -28,7 +28,7 @@ audio_server_name :: proc "contextless" () -> String_Name {
 }
 
 new_audio_server :: proc "contextless" () -> Audio_Server {
-    return __bindgen_gde.classdb_construct_object(audio_server_name_ref())
+    return cast(Audio_Server)__bindgen_gde.classdb_construct_object(audio_server_name_ref())
 }
 
 // methods

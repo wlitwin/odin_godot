@@ -16,7 +16,7 @@ translation_server_name :: proc "contextless" () -> String_Name {
 }
 
 new_translation_server :: proc "contextless" () -> Translation_Server {
-    return __bindgen_gde.classdb_construct_object(translation_server_name_ref())
+    return cast(Translation_Server)__bindgen_gde.classdb_construct_object(translation_server_name_ref())
 }
 
 // methods

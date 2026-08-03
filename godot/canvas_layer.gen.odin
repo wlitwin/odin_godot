@@ -16,7 +16,7 @@ canvas_layer_name :: proc "contextless" () -> String_Name {
 }
 
 new_canvas_layer :: proc "contextless" () -> Canvas_Layer {
-    return __bindgen_gde.classdb_construct_object(canvas_layer_name_ref())
+    return cast(Canvas_Layer)__bindgen_gde.classdb_construct_object(canvas_layer_name_ref())
 }
 
 // methods

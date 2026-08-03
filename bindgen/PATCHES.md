@@ -560,3 +560,41 @@ The fixed-arg marshalling uses the generic `variant_from(&arg)` group; every
 fixed arg of the current 15 (StringName/Object/String/int) is covered. A future
 vararg method whose fixed arg or non-Variant return isn't an int-like/`variant_from`-able
 type would need the group extended (none exist in 4.6.2).
+
+## Distinct handle type (2026-08-02)
+
+`godot.Object` became a **distinct** rawptr (`godot/Variant.odin`), so an arbitrary
+pointer — above all a `^script_struct` — no longer converts implicitly into an
+engine-handle parameter (that confusion compiled silently and SIGSEGV'd inside the
+engine). `distinct rawptr` still converts implicitly TO `rawptr`, so every generated
+method body passing `self` into `__bindgen_gde` ptrcalls is unaffected. Only the
+rawptr → handle RETURN direction needed casts:
+
+### `upstream/templates/bindgen_view_engine.temple.twig`
+- `new_<class>`: the `{% if this.cast_on_new %}` conditional collapsed to an
+  unconditional `return cast({{ this.self }})__bindgen_gde.classdb_construct_object(...)`
+  (the cast is bit-neutral where it was already absent, required now that the
+  return type is distinct from rawptr).
+
+### `upstream/templates/bindgen_view_core.temple.twig`
+- `singleton_<name>`: `return __ptr` → `return cast({{ singleton.type }})__ptr`
+  (the cached `@(static) __ptr` stays `__bindgen_gde.ObjectPtr`).
+
+### `Makefile`
+- `templates.odin` now depends on `$(UPSTREAM)/templates/*.temple.twig`
+  (`TEMPLATE_SRC`). Before, a template edit was silently ignored and `generate`
+  reused the stale transpiled `templates.odin`.
+
+### Verification
+- Regenerated (`make -C bindgen`): diff vs prior output is exactly the two cast
+  shapes (+ trailing-whitespace loss on the singleton blank line); `odin check
+  godot/` → 0 errors.
+- Callers: the whole tree needed 5 explicit casts (`core/loader.odin`,
+  `core/language.odin` ×2, `godot/Ergonomics_WebRtc.odin` ×2 — refcounted
+  `^Object` handles passed where `Object` is expected, same bits, now spelled) and
+  2 typeid-dispatch arms widened (`runtime/register_class.odin` variant_type_for,
+  `godot/Ergonomics_Calls.odin` vcall) — a handle's typeid is now `Object`, not
+  `rawptr`. Every kit/example/test package compiles unchanged.
+- The refusal is pinned in `tests/scriptgen/run.sh` (handle_guard fixture): a
+  `^Menu` passed to `canvas_item_set_visible` must NOT compile; the `.owner`
+  spelling must.

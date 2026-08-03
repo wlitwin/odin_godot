@@ -218,6 +218,19 @@ scan_markers :: proc(src: string, s: ^Script, pkg_line: int) {
 		} else if rest, ok := marker_arg(body, "icon"); ok {
 			s.marked = true
 			s.icon = strings.trim_space(rest)
+		} else if rest, ok := marker_arg(body, "group"); ok {
+			// `//gd:group a b` — declarative group membership: the core joins each named
+			// group on READY (before onready/@(gd_connect)/your ready), collapsing the
+			// `gd.add_to_group(self.owner, ...)` ready boilerplate. Space-separated,
+			// repeatable across lines; names accumulate.
+			s.marked = true
+			names := strings.fields(strings.trim_space(rest), context.temp_allocator)
+			if len(names) == 0 {
+				error_at(loc, "//gd:group needs one or more group names (space-separated)")
+			}
+			for n in names {
+				append(&s.groups, n)
+			}
 		} else if _, ok := marker_arg(body, "signal"); ok {
 			// The comment-marker signal form is GONE (breaking change) — signals are typed
 			// struct fields now. Point straight at the replacement instead of "unknown marker".
@@ -229,7 +242,7 @@ scan_markers :: proc(src: string, s: ^Script, pkg_line: int) {
 			// A `//gd:` line that matches no known marker is almost always a typo
 			// (`//gd:extend`, `//gd:singal`) that would otherwise silently no-op — and the
 			// `//gd:` namespace is reserved, so erroring is safe.
-			error_at(loc, "unknown //gd: marker %q (expected one of: extends/class/tool/icon)", body)
+			error_at(loc, "unknown //gd: marker %q (expected one of: extends/class/tool/icon/group)", body)
 		}
 	}
 }
@@ -611,6 +624,27 @@ check_export_specs :: proc(
 	return
 }
 
+// Classify the '%' characters in an onready/@(gd_connect) node path. A '%' at a
+// SEGMENT START (path start or right after '/') is Godot's scene-unique-name marker
+// (`%Hud`, `%doc/Sprite`) — engine syntax, passed through to get_node untouched. Only
+// a MID-SEGMENT `%d` (`Card%d`) is our array/index template. The split matters: a
+// unique name that happens to start with 'd' (`%dock`) contains the two bytes "%d"
+// and a naive `strings.index` would substitute into it. Returns the count of
+// mid-segment `%d` templates and of stray mid-segment '%'s (neither marker nor
+// template — always an error at the call sites).
+scan_path_template :: proc(path: string) -> (tmpl_count: int, stray: int) {
+	for i in 0 ..< len(path) {
+		if path[i] != '%' {continue}
+		if i == 0 || path[i - 1] == '/' {continue}
+		if i + 1 < len(path) && path[i + 1] == 'd' {
+			tmpl_count += 1
+		} else {
+			stray += 1
+		}
+	}
+	return
+}
+
 // THE DISPATCH. Both field walks funnel every TAGGED field through here (signals
 // declare by TYPE and are resolved by their callers first; an UNtagged field is
 // an embed candidate and recursing is the caller's job, since the two contexts
@@ -695,10 +729,45 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
 			error_at(tf.loc, "%s.%s: `onready=` needs a node path", s.struct_name, label)
 			return
 		}
+		// ARRAY form — `cards: [9]gd.Button `gd:"onready=Shop/Card%d"`` (also `[N]^Script`):
+		// strip the `[N]` so the ELEMENT type takes the scalar rules below; the path must
+		// then be a `%d` template (exactly one, 0-based at resolve). A template on a
+		// scalar field is refused — it would wire a literal `%d` node name.
+		t := strings.trim_space(tf.type_text)
+		is_array := false
+		if strings.has_prefix(t, "[") {
+			if rb := strings.index_byte(t, ']'); rb > 1 {
+				if n, nok := strconv.parse_int(strings.trim_space(t[1:rb])); nok && n > 0 {
+					is_array = true
+					t = strings.trim_space(t[rb + 1:])
+				}
+			}
+		}
+		tmpl_count, stray := scan_path_template(path)
+		if is_array && (tmpl_count != 1 || stray != 0) {
+			error_at(tf.loc, "%s.%s: `onready=` on a fixed-array field needs exactly one mid-name `%%d` in the path (e.g. `Shop/Card%%d`, substituted with 0-based indices; a leading `%%Name` is a scene-unique name and fine)", s.struct_name, label)
+			return
+		}
+		if !is_array && (tmpl_count != 0 || stray != 0) {
+			error_at(tf.loc, "%s.%s: `onready=` path has a '%%' inside a node name — only `%%Name` at a segment start (scene-unique name) is valid here; the `%%d` template form is for FIXED-ARRAY fields ([N]gd.Node2d, [N]^Script)", s.struct_name, label)
+			return
+		}
+		// `^Ident` — the SCRIPT-RESOLVING form (`hud: ^hud`): the field wants the target
+		// node's SCRIPT STRUCT (rt.script_of at READY), not the node handle. The target
+		// may be declared in a file that hasn't parsed yet, so it is only RECORDED here;
+		// resolve_onready_scripts validates the name once every file is in. Both depths
+		// ride this (the runtime walk classifies structurally at any depth). `rawptr` is
+		// carved out: `^rawptr` is a hand-spelled refcounted HANDLE, not a struct.
+		if strings.has_prefix(t, "^") {
+			if pointee := strings.trim_space(t[1:]); pointee != "rawptr" && is_odin_ident(pointee) {
+				append(&s.onready_scripts, Onready_Script_Ref{field = label, target = pointee, loc = tf.loc})
+				return
+			}
+		}
 		if !nested {
-			vi, ok := map_variant(tf.type_text)
+			vi, ok := map_variant(t)
 			if !ok || vi.enum_name != ".Object" {
-				error_at(tf.loc, "%s.%s: `onready` field must be an object/node handle or pointer (got %q)", s.struct_name, label, tf.type_text)
+				error_at(tf.loc, "%s.%s: `onready` field must be an object/node handle or pointer — or a fixed array of them (got %q)", s.struct_name, label, tf.type_text)
 			}
 		}
 		return
@@ -862,6 +931,44 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
 		return
 	}
 
+	// OBJECT-typed export: the hint is NOT ceremony here. inst_set's resource
+	// refcounting keys off the Resource_Type hint — a hint-less object export
+	// stores an UNREFERENCED pointer that dangles once the loader's transient
+	// ref drops, a delayed SIGSEGV far from this line. A typed handle
+	// (`gd.Packed_Scene`) derives the hint from the ENGINE CLASS INDEX and
+	// ships it to the runtime via Field_Meta.resource_class (reflection can't:
+	// every refcounted handle erases to the same ^rawptr). A type-erased
+	// `gd.Object` — or a non-Resource handle, which no Inspector slot can hold —
+	// is refused. Index unavailable degrades to silence (classes.odin's rule);
+	// the runtime's registration refusal is the backstop there.
+	res_class := ""
+	if vi.enum_name == ".Object" && entity_val == "" {
+		has_resource_spec := false
+		for sp in specs[1:] {
+			if strings.has_prefix(strings.trim_space(sp), "resource=") {
+				has_resource_spec = true
+				break
+			}
+		}
+		if !has_resource_spec {
+			handle := strings.trim_space(tf.type_text)
+			if strings.has_prefix(handle, "^") {handle = strings.trim_space(handle[1:])}
+			if di := strings.last_index(handle, "."); di >= 0 {handle = handle[di + 1:]}
+			is_resource, known := class_handle_covers("Resource", handle)
+			switch {
+			case known && !is_resource:
+				error_at(
+					tf.loc,
+					"%s.%s: exported object handle %q is not a Resource — only Resources ride an Inspector slot (wire scene nodes with `onready=` instead); a type-erased gd.Object must spell `resource=<Class>`",
+					s.struct_name, label, tf.type_text,
+				)
+				return
+			case is_resource:
+				res_class = godot_class_name(handle)
+			}
+		}
+	}
+
 	// `entity=Name:id` — this scene BODIES a wire entity: the tag is the whole
 	// factory declaration (resolve_entities validates the target and pairs the
 	// typed hooks once the full module is parsed). The "must be a PackedScene
@@ -896,6 +1003,7 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
 			setter    = setter,
 			line      = i < len(tf.lines) ? tf.lines[i] : tf.loc.line,
 			doc       = tf.doc,
+			res_class = res_class,
 		})
 	}
 }
@@ -1381,8 +1489,46 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 			append(&s.methods, m)
 
 			// `@(gd_connect="signal")` — auto-connect owner.signal -> this method on READY.
+			// `@(gd_connect="Path/To/Node:signal")` — the EMITTER is another node, resolved
+			// at READY like an `onready=` ref. Split at the LAST ':' (node names cannot
+			// contain one; NodePath's property-subpath ':' never names a signal).
 			if sig, has := attr_value(vd, "gd_connect"); has {
-				append(&s.connections, Connection_Info{signal = sig, method = m.gd_name})
+				conn_path := ""
+				if ci := strings.last_index_byte(sig, ':'); ci >= 0 {
+					conn_path = strings.trim_space(sig[:ci])
+					sig = strings.trim_space(sig[ci + 1:])
+					switch {
+					case conn_path == "":
+						error_at(
+							Loc{path, name_ident.pos.line},
+							"%s: @(gd_connect) on %q — the path part before ':' is empty; spell the emitter path (`\"Child:sig\"`) or drop the ':' for the owner's own signal (`\"sig\"`)",
+							s.struct_name, proc_name,
+						)
+					case sig == "" || !is_odin_ident(sig):
+						error_at(
+							Loc{path, name_ident.pos.line},
+							"%s: @(gd_connect) on %q — %q is not a signal name; the form is \"Path/To/Node:signal\"",
+							s.struct_name, proc_name, sig,
+						)
+					}
+				}
+				// INDEXED form: one mid-name `%d` in the path — the core probes Choice0,
+				// Choice1, … and binds each index as the handler's trailing arg. A '%' at
+				// a SEGMENT START is a scene-unique name (`"%SaveButton:pressed"`) and
+				// passes through to get_node; scan_path_template keeps the two apart (a
+				// unique name may itself start with 'd'). A '%' anywhere in the signal
+				// part is never valid.
+				tmpl_count, stray := scan_path_template(conn_path)
+				indexed := tmpl_count > 0
+				if tmpl_count > 1 || stray != 0 || strings.contains(sig, "%") {
+					error_at(
+						Loc{path, name_ident.pos.line},
+						"%s: @(gd_connect) on %q — '%%' is only valid as ONE mid-name `%%d` template in the path part (`\"Panel/Choice%%d:pressed\"`, probing 0,1,2,… with the index bound as the handler's trailing parameter) or as a `%%Name` scene-unique segment (`\"%%SaveButton:pressed\"`)",
+						s.struct_name, proc_name,
+					)
+					indexed = false
+				}
+				append(&s.connections, Connection_Info{signal = sig, method = m.gd_name, path = conn_path, indexed = indexed})
 			}
 
 			// `@(gd_rpc[="..."])` — expose this method to Godot's high-level multiplayer.
@@ -1889,6 +2035,23 @@ type_base :: proc(t: string) -> string {
 	base := t
 	if i := strings.last_index(base, "."); i >= 0 {base = base[i + 1:]}
 	return base
+}
+
+// Validate the SCRIPT-RESOLVING onready fields (`hud: ^hud `gd:"onready=Path"``): the
+// pointee must be a script struct somewhere in the module (parse only RECORDED the name —
+// the declaring file may come after the referencing one). Nothing is generated from
+// these: the runtime walk classifies the field structurally and the manifest-time fixup
+// binds the class name; this pass exists so a typo'd or non-script pointee is a BUILD
+// error with a source location, not a boot-time registration error.
+resolve_onready_scripts :: proc(s: ^Script, by_struct: map[string]^Script) {
+	for r in s.onready_scripts {
+		if _, is_script := by_struct[r.target]; is_script {continue}
+		error_at(
+			r.loc,
+			"%s.%s: `onready=` on a `^%s` field auto-resolves the target node's SCRIPT STRUCT (rt.script_of) at ready, but %q is not a script struct in this module — for a plain node reference use the class handle type itself (gd.Node, gd.Node2d, ...), never a pointer to it",
+			s.struct_name, r.field, r.target, r.target,
+		)
+	}
 }
 
 // Pair and validate one script's entity tags against the module. `by_struct`

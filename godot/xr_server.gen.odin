@@ -33,7 +33,7 @@ xr_server_name :: proc "contextless" () -> String_Name {
 }
 
 new_xr_server :: proc "contextless" () -> Xr_Server {
-    return __bindgen_gde.classdb_construct_object(xr_server_name_ref())
+    return cast(Xr_Server)__bindgen_gde.classdb_construct_object(xr_server_name_ref())
 }
 
 // methods

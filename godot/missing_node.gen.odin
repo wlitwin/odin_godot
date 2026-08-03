@@ -16,7 +16,7 @@ missing_node_name :: proc "contextless" () -> String_Name {
 }
 
 new_missing_node :: proc "contextless" () -> Missing_Node {
-    return __bindgen_gde.classdb_construct_object(missing_node_name_ref())
+    return cast(Missing_Node)__bindgen_gde.classdb_construct_object(missing_node_name_ref())
 }
 
 // methods

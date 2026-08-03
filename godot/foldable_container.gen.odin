@@ -20,7 +20,7 @@ foldable_container_name :: proc "contextless" () -> String_Name {
 }
 
 new_foldable_container :: proc "contextless" () -> Foldable_Container {
-    return __bindgen_gde.classdb_construct_object(foldable_container_name_ref())
+    return cast(Foldable_Container)__bindgen_gde.classdb_construct_object(foldable_container_name_ref())
 }
 
 // methods

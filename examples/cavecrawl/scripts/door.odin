@@ -29,5 +29,5 @@ door_toggle :: proc(self: ^Door, px: f32, py: f32) -> bool {
 door_process :: proc(self: ^Door, delta: f64) {
 	gd.node2d_set_position(self.owner, {self.x, self.y})
 	// 🚪 closed, 🕳 an open doorway
-	gd.set_string(cast(gd.Object)self.glyph, "text", self.open ? "\xF0\x9F\x95\xB3" : "\xF0\x9F\x9A\xAA")
+	gd.set_text(cast(gd.Object)self.glyph, self.open ? "\xF0\x9F\x95\xB3" : "\xF0\x9F\x9A\xAA")
 }

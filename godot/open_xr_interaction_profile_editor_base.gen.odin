@@ -16,7 +16,7 @@ open_xr_interaction_profile_editor_base_name :: proc "contextless" () -> String_
 }
 
 new_open_xr_interaction_profile_editor_base :: proc "contextless" () -> Open_Xr_Interaction_Profile_Editor_Base {
-    return __bindgen_gde.classdb_construct_object(open_xr_interaction_profile_editor_base_name_ref())
+    return cast(Open_Xr_Interaction_Profile_Editor_Base)__bindgen_gde.classdb_construct_object(open_xr_interaction_profile_editor_base_name_ref())
 }
 
 // methods

@@ -21,7 +21,7 @@ tab_container_name :: proc "contextless" () -> String_Name {
 }
 
 new_tab_container :: proc "contextless" () -> Tab_Container {
-    return __bindgen_gde.classdb_construct_object(tab_container_name_ref())
+    return cast(Tab_Container)__bindgen_gde.classdb_construct_object(tab_container_name_ref())
 }
 
 // methods

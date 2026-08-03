@@ -301,7 +301,7 @@ display_server_name :: proc "contextless" () -> String_Name {
 }
 
 new_display_server :: proc "contextless" () -> Display_Server {
-    return __bindgen_gde.classdb_construct_object(display_server_name_ref())
+    return cast(Display_Server)__bindgen_gde.classdb_construct_object(display_server_name_ref())
 }
 
 // methods

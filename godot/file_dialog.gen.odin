@@ -43,7 +43,7 @@ file_dialog_name :: proc "contextless" () -> String_Name {
 }
 
 new_file_dialog :: proc "contextless" () -> File_Dialog {
-    return __bindgen_gde.classdb_construct_object(file_dialog_name_ref())
+    return cast(File_Dialog)__bindgen_gde.classdb_construct_object(file_dialog_name_ref())
 }
 
 // methods

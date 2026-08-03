@@ -16,7 +16,7 @@ engine_name :: proc "contextless" () -> String_Name {
 }
 
 new_engine :: proc "contextless" () -> Engine {
-    return __bindgen_gde.classdb_construct_object(engine_name_ref())
+    return cast(Engine)__bindgen_gde.classdb_construct_object(engine_name_ref())
 }
 
 // methods

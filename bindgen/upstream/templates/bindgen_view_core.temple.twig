@@ -73,8 +73,8 @@ singleton_{{ singleton.snake_name }} :: proc "contextless" () -> {{ singleton.ty
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__{{ singleton.name }}_name)
     }
-    
-    return __ptr
+
+    return cast({{ singleton.type }})__ptr
 }
 {% end %}
 

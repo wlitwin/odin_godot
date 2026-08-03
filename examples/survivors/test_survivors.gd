@@ -204,15 +204,16 @@ func _run() -> void:
 		"pierce_bonus": player.get("pierce_bonus"),
 	}
 	var wc_before := _weapon_count(player)
-	# Invoke the first choice's handler exactly the way a click would (the Button's `pressed`
-	# is connected to this @(gd_method) in the menu's _ready). A big gem can fund several
-	# levels at once, so keep choosing until every owed menu is settled and the run resumes.
-	levelup.call("pick0")
+	# Invoke the choice handler exactly the way a click would: the indexed @(gd_connect)
+	# wires every Choice button's `pressed` to on_choice with that button's index bound as
+	# the trailing arg, so a click on Choice0 dispatches on_choice(0). A big gem can fund
+	# several levels at once, so keep choosing until every owed menu is settled.
+	levelup.call("on_choice", 0)
 	await process_frame
 	await process_frame
 	var guard := 0
 	while bool(levelup.visible) and get_root().get_tree().paused and guard < 16:
-		levelup.call("pick0")
+		levelup.call("on_choice", 0)
 		await process_frame
 		await process_frame
 		guard += 1

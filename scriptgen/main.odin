@@ -247,6 +247,12 @@ Export_Info :: struct {
 	line:      int,
 	// `///` doc comment above the field (property description for the editor doc panel).
 	doc:       string,
+	// Godot class spelling derived from a TYPED resource handle (`bullet: gd.Packed_Scene`
+	// -> "PackedScene") when the tag spells no `resource=` itself. Published via
+	// Field_Meta.resource_class so the runtime can synthesize the Resource_Type hint —
+	// reflection can't recover it (every refcounted handle erases to the same ^rawptr),
+	// and WITHOUT the hint inst_set skips the refcount hold and the field dangles.
+	res_class: string,
 }
 
 // extract_doc joins the `///` lines of a doc comment group into a description string (leading
@@ -325,9 +331,14 @@ Signal_Info :: struct {
 }
 
 // A `@(gd_connect="signal")` declaration on a method: auto-connect owner.signal -> method.
+// The path-qualified form `@(gd_connect="Path/To/Node:signal")` names another EMITTER,
+// resolved at READY like an `onready=` ref (split at the LAST ':' — node names cannot
+// contain one); `path` is "" for the plain owner form.
 Connection_Info :: struct {
-	signal: string, // the signal name on the owner node
-	method: string, // the GDScript-exposed method name (the @(gd_method) gd_name)
+	signal:  string, // the signal name on the emitter
+	method:  string, // the GDScript-exposed method name (the @(gd_method) gd_name)
+	path:    string, // emitter node path ("" = the owner itself)
+	indexed: bool,   // path holds one `%d`: probe 0,1,2,… and bind each index (trailing arg)
 }
 
 // `MultiplayerAPI.RPCMode` int values (extension_api.json: MultiplayerAPI.RPCMode).
@@ -597,7 +608,9 @@ Script :: struct {
 	marked:      bool, // saw at least one valid `//gd:` marker (intent signal for diagnostics)
 	tool:        bool,
 	icon:        string, // `//gd:icon <res-path>` — custom class icon (""=none)
+	groups:      [dynamic]string, // `//gd:group a b` — joined on READY by the core
 	exports:     [dynamic]Export_Info,
+	onready_scripts: [dynamic]Onready_Script_Ref, // `^ScriptStruct` onready fields, validated module-wide (resolve_onready_scripts)
 	lifecycles:  [dynamic]Lifecycle_Info,
 	methods:     [dynamic]Method_Info,
 	signals:     [dynamic]Signal_Info,
@@ -637,6 +650,15 @@ Script :: struct {
 	// row type — folded into NET_FINGERPRINT, installed in the ready thunk.
 	profile_type: string, // the row struct's name ("" = none declared)
 	profile_ses:  string, // the Session field the install targets
+}
+
+// A SCRIPT-RESOLVING onready field (`hud: ^hud `gd:"onready=Path"``): the pointee names
+// a script struct whose declaring file may parse after this one, so parse records it and
+// resolve_onready_scripts validates the name once the whole module is in.
+Onready_Script_Ref :: struct {
+	field:  string, // the field's label (error messages)
+	target: string, // the pointee identifier — must be a script struct in the module
+	loc:    Loc,
 }
 
 // One session event a game shell paired a half with. The BARE half fires
@@ -1757,6 +1779,7 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 		resolve_command_applies(&pend.script, &half_idx, proc_names)
 		validate_command_ids(&pend.script)
 		resolve_entities(&pend.script, by_struct, &seen_entity_ids, &half_idx, proc_names)
+		resolve_onready_scripts(&pend.script, by_struct)
 		resolve_census(&pend.script, proc_names)
 		resolve_probes(&pend.script, by_struct, proc_names)
 		resolve_boot_forwards(&pend.script)

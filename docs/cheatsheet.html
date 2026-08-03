@@ -109,6 +109,7 @@ game_process :: proc(self: ^Game, delta: f64) {
 <tr><td class="k"><b>//gd:class</b> Name</td><td>class name the loader binds (default: struct name); unique across the whole module tree (root + subpackages), and across modules</td></tr>
 <tr><td class="k"><b>//gd:tool</b></td><td>runs in editor too (pair with <code>gd.is_editor()</code>)</td></tr>
 <tr><td class="k"><b>//gd:icon</b> res://p.svg</td><td>class icon</td></tr>
+<tr><td class="k"><b>//gd:group</b> a b</td><td>join groups at READY (space-separated, repeatable) — no add_to_group ready code</td></tr>
 </table>
 <h3>Struct rules</h3>
 <ul>
@@ -126,14 +127,14 @@ player_enter_tree / _exit_tree / _reload   // reload = re-capture cached ptrs af
 <tr><td class="k"><b>@(gd_rpc)</b> / @(gd_rpc="any_peer,unreliable,call_local,channel=2")</td><td>implies gd_method; Godot high-level RPC (tokens: authority|any_peer, reliable|unreliable|unreliable_ordered, call_local, channel=N)</td></tr>
 <tr><td class="k"><b>@(gd_command)</b></td><td>kit/net verb, host-runs; issued from Odin via generated <code>&lt;proc&gt;_cmd</code> (the ONLY role branch lives in gen code)</td></tr>
 <tr><td class="k"><b>@(gd_command="predict")</b></td><td>client applies optimistically; reject/timeout auto-reverts, reject carries truth. Return bool = APPLIED</td></tr>
-<tr><td class="k"><b>@(gd_connect="signal")</b></td><td>auto-connect owner.signal → this method at ready (must be gd_method)</td></tr>
+<tr><td class="k"><b>@(gd_connect="signal")</b></td><td>auto-connect owner.signal → this method at ready (must be gd_method). <b>"Path/To/Node:signal"</b>: another node's signal — path resolved like onready= at ready; missing node/signal skips soft + loud. <b>"Bank/Btn%d:sig"</b>: probes 0,1,2,… and wires EACH with the index BOUND as the handler's trailing arg (one handler per bank; index 0 required). Scene-unique emitters work: <b>"%SavePanel:saved"</b>, <b>"%Inv/Slot%d:pressed"</b></td></tr>
 </table>
 <div class="warn"><b>THE METHOD TRAP (now a build error):</b> a class's proc scan covers its OWN file + HEADERLESS helper files only — an attributed or lifecycle-named <code>^Game</code> proc written in a file that declares <code>//gd:class Other</code> binds to nothing, so scriptgen refuses the build and tells you to move it to a headerless file. Plain cross-class helper procs stay legal. (Marker-less files are HELPERS — no class identity; any number of classes may extend plain <code>Node</code>.)</div>
 </div><div>
 <h3>Field tags <span class="d">(gd:"…" — first token selects kind)</span></h3>
 <table>
 <tr><td class="k"><b>export</b>[,SPEC…]</td><td>@export property. One hint: <code>range=0:100:5</code> · <code>enum=A:B:C</code> · <code>multiline</code> · <code>file=*.png</code> · <code>dir</code> · <code>resource=Texture2D</code> · <code>array=int</code> · <code>dict=String;PackedScene</code>. Plus <code>group=</code>/<code>subgroup=</code>/<code>default=</code>/<code>get=</code>/<code>set=</code>. Typed_Array/Typed_Dictionary derive hints from type.</td></tr>
-<tr><td class="k"><b>onready=</b>Path/To/Node</td><td>auto-wired node ref at ready (before gd_connect and your ready); deep paths ok; object-handle field, NOT an export; re-resolved on hot reload</td></tr>
+<tr><td class="k"><b>onready=</b>Path/To/Node</td><td>auto-wired node ref at ready (before gd_connect and your ready); deep paths ok; object-handle field, NOT an export; re-resolved on hot reload. Field typed <code>^ScriptStruct</code>: resolves node + TYPED script struct in one step (rt.script_of semantics — nil + loud error on a wrong/missing script; reload-safe); engine calls take the NODE — spell <code>self.hud.owner</code>, the ref itself is a compile error (handles are a distinct type). Fixed array + <code>%d</code> template (<code>cards: [9]gd.Button `gd:"onready=Grid/Card%d"`</code>, also [N]^Script): each 0-based index resolves independently. Scene-unique names pass through (<code>%Hud</code>, <code>%Hud/Ammo</code>, <code>%Inv/Slot%d</code>) — segment-start % = unique marker, mid-name %d = template, so <code>%dock</code> stays a name</td></tr>
 <tr><td class="k"><b>replicate</b>[,interp][,owner][,wire=f16]</td><td>kit/net field. <code>interp</code>: remotes lerp (f32/f64/Quat; <code>interp=my_blend</code> custom). <code>owner</code>: owner-authoritative unreliable stream. <code>wire=f16</code> half-float encode (f32 only); <code>wire=my_codec</code> custom. POD ONLY — handles/strings/arrays rejected at compile with field name. Max 64 fields (fixed array = 1).</td></tr>
 <tr><td class="k">signals: <b>gd.Signal0…Signal4</b> field `gd:"args=a,b"` · <b>gd.SignalN(struct{…})</b></td><td>field name = signal name; emit via generated <code>&lt;snake&gt;_emit_&lt;name&gt;(self, …)</code></td></tr>
 <tr><td class="k"><b>///</b> doc comment</td><td>above field = property tooltip; above struct = class doc</td></tr>
@@ -180,7 +181,18 @@ Runner :: struct {
 <tr><td class="k">set_int/float/bool/string(obj,"prop",v) · get_int/… · set_value/get_value(Variant)</td><td>dynamic by-name Object get/set; get_string allocates</td></tr>
 <tr><td class="k">set_text(obj, ctext) · get_text(obj)</td><td>any Control with a text property</td></tr>
 <tr><td class="k">add_to_group / is_in_group / remove_from_group</td><td>group names = literals (interned)</td></tr>
+<tr><td class="k">nodes_in_group(node,"g")→[]Node · first_in_group(node,"g")→Node</td><td>group query; slice = temp-allocated, iterate now</td></tr>
+<tr><td class="k">nearest_in_group(node,"g",origin)→(Node2d,ok) · nodes_in_group_within(node,"g",origin,r)→[]Node2d</td><td>spatial group queries (auto-aim, AoE); squared-distance, temp-allocated</td></tr>
+<tr><td class="k">rt.scripts_in_group(node,"g",S)→[]^S · rt.first_script_in_group(node,"g",S)→^S</td><td>group → script structs, class-checked (skips other scripts)</td></tr>
+<tr><td class="k">rt.spawn_scripted(scene,T)→(node,^T) · rt.spawn_as(parent,scene,T)→^T · rt.spawn_as_deferred</td><td>typed spawn; scripted = poke BEFORE add_child (ready-visible), deferred = physics-safe</td></tr>
+<tr><td class="k">vcall_void/int/float/bool/str(obj,"method",args…) · vcall→Variant</td><td>by-name call, args auto→Variant (cross-module); nil obj = quiet no-op; bad arg type refuses LOUD</td></tr>
+<tr><td class="k">rt.script_any(obj)→(rawptr, typeid)</td><td>any-class resolve → per-type static dispatch tables ("interfaces")</td></tr>
+<tr><td class="k">rt.dispatch(TABLE[:], obj)→(entry, ctx, ok) · rt.lookup(TABLE[:], id)→(entry, ok)</td><td>generic over any entry struct with an `id: typeid` field</td></tr>
+<tr><td class="k">array_unpack(&typed_array)→[]T</td><td>any engine Typed_Array → Odin slice</td></tr>
 <tr><td class="k">node2d_set_x/_y · control_set_width/… </td><td>one-component setters, 2D/3D/Control</td></tr>
+<tr><td class="k">pause(node,b) · is_paused · change_scene(node,"res://x.tscn") · quit(node)</td><td>SceneTree one-liners (nil-safe out of tree)</td></tr>
+<tr><td class="k">normalized(v2) · normalized3(v3) · peer_color(peer_id)→Color</td><td>value-form math + the default per-peer tint</td></tr>
+<tr><td class="k">play.every(&acc, dt, period)→bool · play.latch(&fired, cond)→bool</td><td>delta-accumulator cadence (carries remainder) · fire-once first-arrival</td></tr>
 </table>
 </div><div>
 <h3>Signals / input / multiplayer</h3>
@@ -193,6 +205,7 @@ Runner :: struct {
 <tr><td class="k">webrtc_host(node,url,room="") · webrtc_join(node,url,room) · webrtc_poll (every frame) · webrtc_room_code · webrtc_session_state · webrtc_error_reason · webrtc_close</td><td>browser transport; N-peer star (host+7); same @(gd_rpc) code path</td></tr>
 <tr><td class="k">animation_play/stop · sprite_play/stop · audio_play/stop(2d)</td><td>gameplay one-liners</td></tr>
 <tr><td class="k">env_string("NAME","fallback") · env_int("NAME", 0)</td><td>env knobs (acid harness style)</td></tr>
+<tr><td class="k">launch_param("COOP_ROLE","role") · web_query("room") · uri_decode(s) · gd.IS_WEB</td><td>launch config: env var natively, ?query on web (friend-clicks-a-link front door); web_query = "" on native; temp-allocated</td></tr>
 <tr><td class="k">sname(lit) · gstr(ctext) · callable(obj,"m") · variant_destroy(&v)</td><td>intern / build / release</td></tr>
 </table>
 <h3>Editor / debug</h3>
@@ -396,10 +409,10 @@ clear := d.done && live_count == 0</pre>
 //gd:class Hud
 Hud :: struct {
     owner:  gd.Control,
-    status: gd.Label `gd:"onready=Status"`,        // deep paths fine: `gd:"onready=Boss/Fill"`
-    cards:  [9]gd.Button,                           // arrays can't onready → wire in hud_ready
+    status: gd.Label `gd:"onready=Status"`,          // deep paths fine: `gd:"onready=Boss/Fill"`
+    cards:  [9]gd.Button `gd:"onready=Shop/Card%d"`, // array onready: Card0…Card8 at ready
+    ammo:   gd.Label `gd:"onready=%AmmoLabel"`,      // scene-unique name — no hard-coded path
 }
-hud_ready :: proc(self: ^Hud) { for i in 0..&lt;9 { self.cards[i] = cast(gd.Button)gd.get_node(self.owner, fmt.ctprintf("Shop/Card%d", i)) } }
 // game: node := gd.instantiate(scene); gd.add_child(ui_layer, node); self.hud = rt.script_of(node, Hud)
 // behavior wiring stays game-side: gd.connect_to(btn, "pressed", self.owner, "on_buy")</pre>
 <p class="d">Anchors replace layout math. Dynamic position over an anchored node: shift the AUTHORED offsets (get_offset at ready, set base−dy per frame) — absolute set_position discards the editor's numbers. Kit widgets: pass Options.lobby_scene etc. — the kit adopts named nodes; extras are yours to wire by name after boot_attach.</p>

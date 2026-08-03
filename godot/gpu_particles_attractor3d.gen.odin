@@ -16,7 +16,7 @@ gpu_particles_attractor3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_gpu_particles_attractor3d :: proc "contextless" () -> Gpu_Particles_Attractor3d {
-    return __bindgen_gde.classdb_construct_object(gpu_particles_attractor3d_name_ref())
+    return cast(Gpu_Particles_Attractor3d)__bindgen_gde.classdb_construct_object(gpu_particles_attractor3d_name_ref())
 }
 
 // methods

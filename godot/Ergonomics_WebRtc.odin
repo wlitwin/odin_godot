@@ -588,8 +588,8 @@ _setup_connection :: proc "contextless" (s: ^Webrtc_Session, remote_id: int) {
 	defer free_callable(sd_cb)
 	ic_cb := _make_callable(_on_ice_candidate, c)
 	defer free_callable(ic_cb)
-	object_connect(conn, sd_sig, sd_cb, 0)
-	object_connect(conn, ic_sig, ic_cb, 0)
+	object_connect(cast(Object)conn, sd_sig, sd_cb, 0)
+	object_connect(cast(Object)conn, ic_sig, ic_cb, 0)
 
 	// add_peer builds the data channels the multiplayer peer needs; must precede create_offer.
 	web_rtc_multiplayer_peer_add_peer(s.rtc, conn, Int(remote_id), 1)

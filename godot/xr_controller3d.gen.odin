@@ -16,7 +16,7 @@ xr_controller3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_xr_controller3d :: proc "contextless" () -> Xr_Controller3d {
-    return __bindgen_gde.classdb_construct_object(xr_controller3d_name_ref())
+    return cast(Xr_Controller3d)__bindgen_gde.classdb_construct_object(xr_controller3d_name_ref())
 }
 
 // methods

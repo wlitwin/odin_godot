@@ -23,7 +23,7 @@ gd_extension_manager_name :: proc "contextless" () -> String_Name {
 }
 
 new_gd_extension_manager :: proc "contextless" () -> Gd_Extension_Manager {
-    return __bindgen_gde.classdb_construct_object(gd_extension_manager_name_ref())
+    return cast(Gd_Extension_Manager)__bindgen_gde.classdb_construct_object(gd_extension_manager_name_ref())
 }
 
 // methods

@@ -34,7 +34,7 @@ geometry2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_geometry2d :: proc "contextless" () -> Geometry2d {
-    return __bindgen_gde.classdb_construct_object(geometry2d_name_ref())
+    return cast(Geometry2d)__bindgen_gde.classdb_construct_object(geometry2d_name_ref())
 }
 
 // methods

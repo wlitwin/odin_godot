@@ -50,7 +50,7 @@ script_language_extension_name :: proc "contextless" () -> String_Name {
 }
 
 new_script_language_extension :: proc "contextless" () -> Script_Language_Extension {
-    return __bindgen_gde.classdb_construct_object(script_language_extension_name_ref())
+    return cast(Script_Language_Extension)__bindgen_gde.classdb_construct_object(script_language_extension_name_ref())
 }
 
 // methods

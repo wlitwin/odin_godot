@@ -33,7 +33,7 @@ texture_rect_name :: proc "contextless" () -> String_Name {
 }
 
 new_texture_rect :: proc "contextless" () -> Texture_Rect {
-    return __bindgen_gde.classdb_construct_object(texture_rect_name_ref())
+    return cast(Texture_Rect)__bindgen_gde.classdb_construct_object(texture_rect_name_ref())
 }
 
 // methods

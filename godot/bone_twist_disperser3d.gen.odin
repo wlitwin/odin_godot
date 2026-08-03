@@ -21,7 +21,7 @@ bone_twist_disperser3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_bone_twist_disperser3d :: proc "contextless" () -> Bone_Twist_Disperser3d {
-    return __bindgen_gde.classdb_construct_object(bone_twist_disperser3d_name_ref())
+    return cast(Bone_Twist_Disperser3d)__bindgen_gde.classdb_construct_object(bone_twist_disperser3d_name_ref())
 }
 
 // methods

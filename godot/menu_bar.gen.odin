@@ -16,7 +16,7 @@ menu_bar_name :: proc "contextless" () -> String_Name {
 }
 
 new_menu_bar :: proc "contextless" () -> Menu_Bar {
-    return __bindgen_gde.classdb_construct_object(menu_bar_name_ref())
+    return cast(Menu_Bar)__bindgen_gde.classdb_construct_object(menu_bar_name_ref())
 }
 
 // methods

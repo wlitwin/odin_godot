@@ -16,7 +16,7 @@ ray_cast2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_ray_cast2d :: proc "contextless" () -> Ray_Cast2d {
-    return __bindgen_gde.classdb_construct_object(ray_cast2d_name_ref())
+    return cast(Ray_Cast2d)__bindgen_gde.classdb_construct_object(ray_cast2d_name_ref())
 }
 
 // methods

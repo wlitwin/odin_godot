@@ -16,7 +16,7 @@ polygon2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_polygon2d :: proc "contextless" () -> Polygon2d {
-    return __bindgen_gde.classdb_construct_object(polygon2d_name_ref())
+    return cast(Polygon2d)__bindgen_gde.classdb_construct_object(polygon2d_name_ref())
 }
 
 // methods

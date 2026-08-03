@@ -142,7 +142,7 @@ ld_load :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.T
     object, self := odin_script_construct()
     odin_script_set_source(self, text)
 
-    v := godot.variant_from_object(&object)
+    v := godot.variant_from_object(cast(^godot.Object)&object)
     ret_variant(ret, v)
 }
 

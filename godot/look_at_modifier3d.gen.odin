@@ -21,7 +21,7 @@ look_at_modifier3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_look_at_modifier3d :: proc "contextless" () -> Look_At_Modifier3d {
-    return __bindgen_gde.classdb_construct_object(look_at_modifier3d_name_ref())
+    return cast(Look_At_Modifier3d)__bindgen_gde.classdb_construct_object(look_at_modifier3d_name_ref())
 }
 
 // methods

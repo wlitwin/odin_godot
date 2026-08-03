@@ -41,7 +41,7 @@ slider_joint3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_slider_joint3d :: proc "contextless" () -> Slider_Joint3d {
-    return __bindgen_gde.classdb_construct_object(slider_joint3d_name_ref())
+    return cast(Slider_Joint3d)__bindgen_gde.classdb_construct_object(slider_joint3d_name_ref())
 }
 
 // methods

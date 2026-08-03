@@ -105,7 +105,7 @@ node_name :: proc "contextless" () -> String_Name {
 }
 
 new_node :: proc "contextless" () -> Node {
-    return __bindgen_gde.classdb_construct_object(node_name_ref())
+    return cast(Node)__bindgen_gde.classdb_construct_object(node_name_ref())
 }
 
 // methods

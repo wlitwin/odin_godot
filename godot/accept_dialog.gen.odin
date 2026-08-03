@@ -16,7 +16,7 @@ accept_dialog_name :: proc "contextless" () -> String_Name {
 }
 
 new_accept_dialog :: proc "contextless" () -> Accept_Dialog {
-    return __bindgen_gde.classdb_construct_object(accept_dialog_name_ref())
+    return cast(Accept_Dialog)__bindgen_gde.classdb_construct_object(accept_dialog_name_ref())
 }
 
 // methods

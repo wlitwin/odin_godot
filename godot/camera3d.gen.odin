@@ -30,7 +30,7 @@ camera3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_camera3d :: proc "contextless" () -> Camera3d {
-    return __bindgen_gde.classdb_construct_object(camera3d_name_ref())
+    return cast(Camera3d)__bindgen_gde.classdb_construct_object(camera3d_name_ref())
 }
 
 // methods

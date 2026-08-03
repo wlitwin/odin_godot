@@ -25,7 +25,7 @@ virtual_joystick_name :: proc "contextless" () -> String_Name {
 }
 
 new_virtual_joystick :: proc "contextless" () -> Virtual_Joystick {
-    return __bindgen_gde.classdb_construct_object(virtual_joystick_name_ref())
+    return cast(Virtual_Joystick)__bindgen_gde.classdb_construct_object(virtual_joystick_name_ref())
 }
 
 // methods

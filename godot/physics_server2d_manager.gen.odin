@@ -16,7 +16,7 @@ physics_server2d_manager_name :: proc "contextless" () -> String_Name {
 }
 
 new_physics_server2d_manager :: proc "contextless" () -> Physics_Server2d_Manager {
-    return __bindgen_gde.classdb_construct_object(physics_server2d_manager_name_ref())
+    return cast(Physics_Server2d_Manager)__bindgen_gde.classdb_construct_object(physics_server2d_manager_name_ref())
 }
 
 // methods

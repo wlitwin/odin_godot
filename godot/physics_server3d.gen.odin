@@ -202,7 +202,7 @@ physics_server3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_physics_server3d :: proc "contextless" () -> Physics_Server3d {
-    return __bindgen_gde.classdb_construct_object(physics_server3d_name_ref())
+    return cast(Physics_Server3d)__bindgen_gde.classdb_construct_object(physics_server3d_name_ref())
 }
 
 // methods

@@ -32,13 +32,12 @@ package survivors_scripts
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
-import gdext "godot:gdext"
 import rt "godot:runtime"
 import "core:fmt"
 import "core:strconv"
 import "core:math"
 
-IS_WEB :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
+IS_WEB :: gd.IS_WEB // the library's compiled-for-the-browser test (transport selection below)
 
 // ARENA_W / ARENA_H are shared package constants from spawner.odin (640 x 360).
 DEFAULT_PORT :: 7777
@@ -131,80 +130,9 @@ vi :: proc "contextless" (x: int) -> gd.Variant {v := i64(x); return gd.variant_
 @(private = "file")
 vf :: proc "contextless" (x: f32) -> gd.Variant {v := f64(x); return gd.variant_from(&v)}
 
-@(private = "file")
-read_env :: proc(key: cstring) -> string {
-	os := gd.singleton_os()
-	k := gd.new_string_cstring(key)
-	if !bool(gd.os_has_environment(os, k)) {return ""}
-	s := gd.os_get_environment(os, k)
-	return str_to_odin(s)
-}
-
-@(private = "file")
-str_to_odin :: proc(s: gd.String) -> string {
-	s := s
-	n := gdext.string_to_utf8_chars(cast(gdext.StringPtr)&s, nil, 0)
-	if n <= 0 {return ""}
-	buf := make([]u8, n, context.temp_allocator)
-	gdext.string_to_utf8_chars(cast(gdext.StringPtr)&s, cast(cstring)raw_data(buf), n)
-	return string(buf)
-}
-
-// web_query reads a value from the page URL's query string (web only); "" otherwise.
-@(private = "file")
-web_query :: proc(key: string) -> string {
-	when IS_WEB {
-		js := gd.singleton_java_script_bridge()
-		code := gd.new_string_cstring("location.search || ''")
-		v := gd.java_script_bridge_eval(js, code, true)
-		search := gd.variant_to_string(&v)
-		s := str_to_odin(search)
-		if len(s) > 0 && s[0] == '?' {s = s[1:]}
-		// split on '&', find key=
-		start := 0
-		for i := 0; i <= len(s); i += 1 {
-			if i == len(s) || s[i] == '&' {
-				kv := s[start:i]
-				eq := -1
-				for j in 0 ..< len(kv) {
-					if kv[j] == '=' {eq = j; break}
-				}
-				if eq > 0 && kv[:eq] == key {
-					return uri_decode(kv[eq + 1:])
-				}
-				start = i + 1
-			}
-		}
-		return ""
-	} else {
-		return ""
-	}
-}
-
-// uri_decode does a minimal percent-decode (enough for ws:// signaling urls).
-@(private = "file")
-uri_decode :: proc(s: string) -> string {
-	out := make([]u8, len(s), context.temp_allocator)
-	n := 0
-	i := 0
-	for i < len(s) {
-		if s[i] == '%' && i + 2 < len(s) {
-			hi := hexval(s[i + 1]); lo := hexval(s[i + 2])
-			if hi >= 0 && lo >= 0 {out[n] = u8(hi * 16 + lo); n += 1; i += 3; continue}
-		}
-		out[n] = s[i]; n += 1; i += 1
-	}
-	return string(out[:n])
-}
-@(private = "file")
-hexval :: proc(c: u8) -> int {
-	switch {
-	case c >= '0' && c <= '9': return int(c - '0')
-	case c >= 'a' && c <= 'f': return int(c - 'a' + 10)
-	case c >= 'A' && c <= 'F': return int(c - 'A' + 10)
-	}
-	return -1
-}
+// (Launch configuration — env vars natively, ?query on web — reads through the library:
+// gd.launch_param / gd.env_string / gd.web_query. The hand-rolled read_env/web_query/
+// uri_decode cluster that used to live here was promoted into godot/Ergonomics_Launch.odin.)
 
 @(private = "file")
 player_node :: proc(self: ^NetGame, peer_id: int) -> gd.Node {
@@ -268,10 +196,7 @@ net_game_ready :: proc(self: ^NetGame) {
 	self.spawner = sp
 
 	// Resolve the launch mode: env (native headless) or ?role= (web headless), else windowed.
-	role := read_env("COOP_ROLE")
-	when IS_WEB {
-		if role == "" {role = web_query("role")}
-	}
+	role := gd.launch_param("COOP_ROLE", "role")
 	// accept both the native (server/client) and web URL (host/join) naming.
 	if role == "server" || role == "client" || role == "single" || role == "host" || role == "join" {
 		self.headless = true
@@ -280,31 +205,24 @@ net_game_ready :: proc(self: ^NetGame) {
 		case "client", "join": self.role = .Client
 		case "single": self.role = .Single
 		}
-		if p := read_env("COOP_PORT"); p != "" {
+		if p := gd.env_string("COOP_PORT"); p != "" {
 			if v, ok := strconv.parse_int(p); ok {self.port = v}
 		}
-		if a := read_env("COOP_ADDR"); a != "" {self.addr = a}
+		if a := gd.env_string("COOP_ADDR"); a != "" {self.addr = a}
 		when IS_WEB {
-			if u := web_query("url"); u != "" {self.url = u}
-			if r := web_query("room"); r != "" {self.room = r}
+			if u := gd.web_query("url"); u != "" {self.url = u}
+			if r := gd.web_query("room"); r != "" {self.room = r}
 		}
 		if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}
 		log(fmt.tprintf("COOP_BOOT role=%v web=%v", self.role, IS_WEB))
 	} else {
 		self.headless = false
 		if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", true)}
-		wire_button(self, "SingleButton", "on_single")
-		wire_button(self, "HostButton", "on_host")
-		wire_button(self, "JoinButton", "on_join")
+		// The Single/Host/Join buttons are wired declaratively — path-qualified
+		// @(gd_connect = "StartScreen/...Button:pressed") on the handlers below (the
+		// emitters are static children of coop.tscn, so no manual connect_to).
 	}
 	update_hud(self)
-}
-
-@(private = "file")
-wire_button :: proc(self: ^NetGame, name: cstring, method: cstring) {
-	if self.start_screen == nil {return}
-	b := gd.get_node(self.start_screen, name)
-	if b != nil {gd.connect_to(b, "pressed", self.owner, method)}
 }
 
 net_game_process :: proc(self: ^NetGame, delta: f64) {
@@ -640,21 +558,22 @@ host_spawn_enemy_hp :: proc(self: ^NetGame, id: int, pos: gd.Vector2, hp: int) {
 @(private = "file")
 sn :: proc "contextless" (s: cstring) -> gd.String_Name {return gd.new_string_name_cstring(s, true)}
 
-// ---- windowed button handlers ----------------------------------------------
+// ---- windowed button handlers (each auto-wired to its static StartScreen Button by the
+//      path-qualified @(gd_connect); headless runs never press them) --------------------
 
-@(gd_method)
+@(gd_method, gd_connect = "StartScreen/SingleButton:pressed")
 net_game_on_single :: proc(self: ^NetGame) {
 	self.role = .Single
 	if self.status != nil {gd.set_string(self.status, "text", "Single Player")}
 	if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}
 }
-@(gd_method)
+@(gd_method, gd_connect = "StartScreen/HostButton:pressed")
 net_game_on_host :: proc(self: ^NetGame) {
 	self.role = .Server
 	if self.status != nil {gd.set_string(self.status, "text", "Hosting...")}
 	if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}
 }
-@(gd_method)
+@(gd_method, gd_connect = "StartScreen/JoinButton:pressed")
 net_game_on_join :: proc(self: ^NetGame) {
 	self.role = .Client
 	if self.status != nil {gd.set_string(self.status, "text", "Joining...")}

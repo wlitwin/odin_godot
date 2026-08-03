@@ -22,7 +22,7 @@ progress_bar_name :: proc "contextless" () -> String_Name {
 }
 
 new_progress_bar :: proc "contextless" () -> Progress_Bar {
-    return __bindgen_gde.classdb_construct_object(progress_bar_name_ref())
+    return cast(Progress_Bar)__bindgen_gde.classdb_construct_object(progress_bar_name_ref())
 }
 
 // methods

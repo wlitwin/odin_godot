@@ -16,7 +16,7 @@ open_xr_composition_layer_equirect_name :: proc "contextless" () -> String_Name 
 }
 
 new_open_xr_composition_layer_equirect :: proc "contextless" () -> Open_Xr_Composition_Layer_Equirect {
-    return __bindgen_gde.classdb_construct_object(open_xr_composition_layer_equirect_name_ref())
+    return cast(Open_Xr_Composition_Layer_Equirect)__bindgen_gde.classdb_construct_object(open_xr_composition_layer_equirect_name_ref())
 }
 
 // methods

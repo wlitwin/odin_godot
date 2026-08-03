@@ -16,7 +16,7 @@ gd_script_language_protocol_name :: proc "contextless" () -> String_Name {
 }
 
 new_gd_script_language_protocol :: proc "contextless" () -> Gd_Script_Language_Protocol {
-    return __bindgen_gde.classdb_construct_object(gd_script_language_protocol_name_ref())
+    return cast(Gd_Script_Language_Protocol)__bindgen_gde.classdb_construct_object(gd_script_language_protocol_name_ref())
 }
 
 // methods

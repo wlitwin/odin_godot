@@ -16,7 +16,7 @@ editor_selection_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_selection :: proc "contextless" () -> Editor_Selection {
-    return __bindgen_gde.classdb_construct_object(editor_selection_name_ref())
+    return cast(Editor_Selection)__bindgen_gde.classdb_construct_object(editor_selection_name_ref())
 }
 
 // methods

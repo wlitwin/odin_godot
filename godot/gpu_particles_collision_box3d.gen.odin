@@ -16,7 +16,7 @@ gpu_particles_collision_box3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_gpu_particles_collision_box3d :: proc "contextless" () -> Gpu_Particles_Collision_Box3d {
-    return __bindgen_gde.classdb_construct_object(gpu_particles_collision_box3d_name_ref())
+    return cast(Gpu_Particles_Collision_Box3d)__bindgen_gde.classdb_construct_object(gpu_particles_collision_box3d_name_ref())
 }
 
 // methods

@@ -16,7 +16,7 @@ spot_light3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_spot_light3d :: proc "contextless" () -> Spot_Light3d {
-    return __bindgen_gde.classdb_construct_object(spot_light3d_name_ref())
+    return cast(Spot_Light3d)__bindgen_gde.classdb_construct_object(spot_light3d_name_ref())
 }
 
 // methods

@@ -16,7 +16,7 @@ fabrik3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_fabrik3d :: proc "contextless" () -> Fabrik3d {
-    return __bindgen_gde.classdb_construct_object(fabrik3d_name_ref())
+    return cast(Fabrik3d)__bindgen_gde.classdb_construct_object(fabrik3d_name_ref())
 }
 
 // methods

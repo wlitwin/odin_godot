@@ -16,7 +16,7 @@ animated_sprite2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_animated_sprite2d :: proc "contextless" () -> Animated_Sprite2d {
-    return __bindgen_gde.classdb_construct_object(animated_sprite2d_name_ref())
+    return cast(Animated_Sprite2d)__bindgen_gde.classdb_construct_object(animated_sprite2d_name_ref())
 }
 
 // methods

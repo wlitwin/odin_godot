@@ -23,7 +23,7 @@ jsonrpc_name :: proc "contextless" () -> String_Name {
 }
 
 new_jsonrpc :: proc "contextless" () -> Jsonrpc {
-    return __bindgen_gde.classdb_construct_object(jsonrpc_name_ref())
+    return cast(Jsonrpc)__bindgen_gde.classdb_construct_object(jsonrpc_name_ref())
 }
 
 // methods

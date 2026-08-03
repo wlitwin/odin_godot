@@ -16,7 +16,7 @@ v_scroll_bar_name :: proc "contextless" () -> String_Name {
 }
 
 new_v_scroll_bar :: proc "contextless" () -> V_Scroll_Bar {
-    return __bindgen_gde.classdb_construct_object(v_scroll_bar_name_ref())
+    return cast(V_Scroll_Bar)__bindgen_gde.classdb_construct_object(v_scroll_bar_name_ref())
 }
 
 // methods

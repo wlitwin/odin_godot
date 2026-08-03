@@ -23,7 +23,7 @@ tree_item_name :: proc "contextless" () -> String_Name {
 }
 
 new_tree_item :: proc "contextless" () -> Tree_Item {
-    return __bindgen_gde.classdb_construct_object(tree_item_name_ref())
+    return cast(Tree_Item)__bindgen_gde.classdb_construct_object(tree_item_name_ref())
 }
 
 // methods

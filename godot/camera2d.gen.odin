@@ -24,7 +24,7 @@ camera2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_camera2d :: proc "contextless" () -> Camera2d {
-    return __bindgen_gde.classdb_construct_object(camera2d_name_ref())
+    return cast(Camera2d)__bindgen_gde.classdb_construct_object(camera2d_name_ref())
 }
 
 // methods

@@ -16,7 +16,7 @@ path_follow2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_path_follow2d :: proc "contextless" () -> Path_Follow2d {
-    return __bindgen_gde.classdb_construct_object(path_follow2d_name_ref())
+    return cast(Path_Follow2d)__bindgen_gde.classdb_construct_object(path_follow2d_name_ref())
 }
 
 // methods

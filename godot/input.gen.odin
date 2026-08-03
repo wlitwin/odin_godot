@@ -43,7 +43,7 @@ input_name :: proc "contextless" () -> String_Name {
 }
 
 new_input :: proc "contextless" () -> Input {
-    return __bindgen_gde.classdb_construct_object(input_name_ref())
+    return cast(Input)__bindgen_gde.classdb_construct_object(input_name_ref())
 }
 
 // methods

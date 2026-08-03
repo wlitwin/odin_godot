@@ -28,7 +28,7 @@ copy_transform_modifier3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_copy_transform_modifier3d :: proc "contextless" () -> Copy_Transform_Modifier3d {
-    return __bindgen_gde.classdb_construct_object(copy_transform_modifier3d_name_ref())
+    return cast(Copy_Transform_Modifier3d)__bindgen_gde.classdb_construct_object(copy_transform_modifier3d_name_ref())
 }
 
 // methods

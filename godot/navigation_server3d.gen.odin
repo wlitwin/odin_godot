@@ -28,7 +28,7 @@ navigation_server3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_navigation_server3d :: proc "contextless" () -> Navigation_Server3d {
-    return __bindgen_gde.classdb_construct_object(navigation_server3d_name_ref())
+    return cast(Navigation_Server3d)__bindgen_gde.classdb_construct_object(navigation_server3d_name_ref())
 }
 
 // methods

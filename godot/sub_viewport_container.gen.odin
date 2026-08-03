@@ -16,7 +16,7 @@ sub_viewport_container_name :: proc "contextless" () -> String_Name {
 }
 
 new_sub_viewport_container :: proc "contextless" () -> Sub_Viewport_Container {
-    return __bindgen_gde.classdb_construct_object(sub_viewport_container_name_ref())
+    return cast(Sub_Viewport_Container)__bindgen_gde.classdb_construct_object(sub_viewport_container_name_ref())
 }
 
 // methods

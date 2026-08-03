@@ -21,7 +21,7 @@ csg_shape3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_csg_shape3d :: proc "contextless" () -> Csg_Shape3d {
-    return __bindgen_gde.classdb_construct_object(csg_shape3d_name_ref())
+    return cast(Csg_Shape3d)__bindgen_gde.classdb_construct_object(csg_shape3d_name_ref())
 }
 
 // methods

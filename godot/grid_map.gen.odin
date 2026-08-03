@@ -22,7 +22,7 @@ grid_map_name :: proc "contextless" () -> String_Name {
 }
 
 new_grid_map :: proc "contextless" () -> Grid_Map {
-    return __bindgen_gde.classdb_construct_object(grid_map_name_ref())
+    return cast(Grid_Map)__bindgen_gde.classdb_construct_object(grid_map_name_ref())
 }
 
 // methods

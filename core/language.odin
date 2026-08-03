@@ -469,11 +469,11 @@ odin_language_register :: proc() {
 
     // Instantiate the singleton and register it with the engine's ScriptServer.
     odin_language_object = gdext.classdb_construct_object(&odin_language_class_name)
-    godot.engine_register_script_language(godot.singleton_engine(), odin_language_object)
+    godot.engine_register_script_language(godot.singleton_engine(), cast(godot.Object)odin_language_object)
 }
 
 odin_language_unregister :: proc() {
     if odin_language_object != nil {
-        godot.engine_unregister_script_language(godot.singleton_engine(), odin_language_object)
+        godot.engine_unregister_script_language(godot.singleton_engine(), cast(godot.Object)odin_language_object)
     }
 }

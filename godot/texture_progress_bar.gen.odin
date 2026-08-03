@@ -27,7 +27,7 @@ texture_progress_bar_name :: proc "contextless" () -> String_Name {
 }
 
 new_texture_progress_bar :: proc "contextless" () -> Texture_Progress_Bar {
-    return __bindgen_gde.classdb_construct_object(texture_progress_bar_name_ref())
+    return cast(Texture_Progress_Bar)__bindgen_gde.classdb_construct_object(texture_progress_bar_name_ref())
 }
 
 // methods

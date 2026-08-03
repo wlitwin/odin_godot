@@ -30,7 +30,7 @@ sprite_base3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_sprite_base3d :: proc "contextless" () -> Sprite_Base3d {
-    return __bindgen_gde.classdb_construct_object(sprite_base3d_name_ref())
+    return cast(Sprite_Base3d)__bindgen_gde.classdb_construct_object(sprite_base3d_name_ref())
 }
 
 // methods

@@ -16,7 +16,7 @@ project_settings_name :: proc "contextless" () -> String_Name {
 }
 
 new_project_settings :: proc "contextless" () -> Project_Settings {
-    return __bindgen_gde.classdb_construct_object(project_settings_name_ref())
+    return cast(Project_Settings)__bindgen_gde.classdb_construct_object(project_settings_name_ref())
 }
 
 // methods

@@ -23,7 +23,7 @@ area2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_area2d :: proc "contextless" () -> Area2d {
-    return __bindgen_gde.classdb_construct_object(area2d_name_ref())
+    return cast(Area2d)__bindgen_gde.classdb_construct_object(area2d_name_ref())
 }
 
 // methods

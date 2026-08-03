@@ -16,7 +16,7 @@ text_server_manager_name :: proc "contextless" () -> String_Name {
 }
 
 new_text_server_manager :: proc "contextless" () -> Text_Server_Manager {
-    return __bindgen_gde.classdb_construct_object(text_server_manager_name_ref())
+    return cast(Text_Server_Manager)__bindgen_gde.classdb_construct_object(text_server_manager_name_ref())
 }
 
 // methods

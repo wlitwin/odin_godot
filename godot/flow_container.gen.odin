@@ -27,7 +27,7 @@ flow_container_name :: proc "contextless" () -> String_Name {
 }
 
 new_flow_container :: proc "contextless" () -> Flow_Container {
-    return __bindgen_gde.classdb_construct_object(flow_container_name_ref())
+    return cast(Flow_Container)__bindgen_gde.classdb_construct_object(flow_container_name_ref())
 }
 
 // methods

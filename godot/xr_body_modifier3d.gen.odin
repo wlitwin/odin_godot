@@ -26,7 +26,7 @@ xr_body_modifier3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_xr_body_modifier3d :: proc "contextless" () -> Xr_Body_Modifier3d {
-    return __bindgen_gde.classdb_construct_object(xr_body_modifier3d_name_ref())
+    return cast(Xr_Body_Modifier3d)__bindgen_gde.classdb_construct_object(xr_body_modifier3d_name_ref())
 }
 
 // methods

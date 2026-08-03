@@ -16,7 +16,7 @@ light_occluder2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_light_occluder2d :: proc "contextless" () -> Light_Occluder2d {
-    return __bindgen_gde.classdb_construct_object(light_occluder2d_name_ref())
+    return cast(Light_Occluder2d)__bindgen_gde.classdb_construct_object(light_occluder2d_name_ref())
 }
 
 // methods

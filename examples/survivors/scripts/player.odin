@@ -1,5 +1,6 @@
 //gd:extends CharacterBody2D
 //gd:class Player
+//gd:group player
 package survivors_scripts
 
 // ----------------------------------------------------------------------------
@@ -72,23 +73,10 @@ approach :: proc(cur, target, max_delta: f32) -> f32 {
 	return cur
 }
 
-// ---- cached input action names (interned once) ----
-@(private = "file")
-left_name, right_name, up_name, down_name: gd.String_Name
-@(private = "file")
-names_ready: bool
-
-@(private = "file")
-ensure_names :: proc "contextless" () {
-	if names_ready {return}
-	left_name = gd.new_string_name_cstring("ui_left", true)
-	right_name = gd.new_string_name_cstring("ui_right", true)
-	up_name = gd.new_string_name_cstring("ui_up", true)
-	down_name = gd.new_string_name_cstring("ui_down", true)
-	names_ready = true
-}
-
 player_ready :: proc(self: ^Player) {
+	// Ready-time ZERO-GUARDS, deliberately not `gd:"default=..."`: game.tscn STORES all of
+	// these properties (damage_mult / fire_rate_mult explicitly at 0.0), so a declared
+	// default would be overwritten by the scene load — the guards are load-bearing.
 	if self.move_speed == 0 {self.move_speed = 200}
 	if self.max_health == 0 {self.max_health = 100}
 	if self.pickup_range == 0 {self.pickup_range = 70}
@@ -97,8 +85,8 @@ player_ready :: proc(self: ^Player) {
 
 	self.health = self.max_health
 
-	// Join the "player" group so enemies, gems and the HUD can find us by group.
-	gd.add_to_group(self.owner, GROUP_PLAYER)
+	// (Group membership — "player", so enemies, gems and the HUD can find us — is declared
+	// with `//gd:group` at the top of the file; the core joins it at READY.)
 
 	// Equip the starting weapon (the pistol).
 	if self.starting_weapon != nil {
@@ -107,15 +95,15 @@ player_ready :: proc(self: ^Player) {
 }
 
 player_process :: proc(self: ^Player, delta: f64) {
-	ensure_names()
 	if self.health <= 0 {return}
 
 	// Movement: read the real input axes, build a target velocity, then EASE the actual velocity
 	// toward it so the hero accelerates from rest and coasts to a stop (momentum) instead of
-	// snapping on/off with the keys.
+	// snapping on/off with the keys. gd.sname interns each literal ONCE (static StringNames),
+	// so the per-frame calls are cheap — no hand-kept name cache needed.
 	input := gd.singleton_input()
-	dx := f32(gd.input_get_axis(input, left_name, right_name))
-	dy := f32(gd.input_get_axis(input, up_name, down_name))
+	dx := f32(gd.input_get_axis(input, gd.sname("ui_left"), gd.sname("ui_right")))
+	dy := f32(gd.input_get_axis(input, gd.sname("ui_up"), gd.sname("ui_down")))
 	tvx := dx * self.move_speed
 	tvy := dy * self.move_speed
 	if dx != 0 && dy != 0 { // normalize diagonals so they aren't ~1.41x faster
@@ -137,15 +125,15 @@ player_process :: proc(self: ^Player, delta: f64) {
 	gd.node2d_set_position(self.owner, pos)
 }
 
-// player_add_weapon instantiates weapon_scene, assigns it the given WeaponConfig (TYPED), and
+// player_add_weapon spawns weapon_scene, assigns it the given WeaponConfig (TYPED), and
 // parents it under the player so it moves with us. Used for the starting weapon and by
-// AddWeapon upgrades.
+// AddWeapon upgrades. rt.spawn_scripted is the poke-BEFORE-add shape: it resolves the typed
+// ref WITHOUT parenting, so the weapon's _ready sees `config` already assigned.
 @(private = "file")
 player_add_weapon :: proc(self: ^Player, cfg: ^gd.Resource) {
 	if self.weapon_scene == nil || cfg == nil {return}
-	w := gd.instantiate(cast(gd.Packed_Scene)self.weapon_scene)
+	w, ws := rt.spawn_scripted(cast(gd.Packed_Scene)self.weapon_scene, Weapon)
 	if w == nil {return}
-	ws := rt.script_of(w, Weapon)
 	if ws != nil {ws.config = cfg} // typed cross-script WRITE, before _ready reads it
 	gd.add_child(self.owner, w)
 }

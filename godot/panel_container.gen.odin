@@ -16,7 +16,7 @@ panel_container_name :: proc "contextless" () -> String_Name {
 }
 
 new_panel_container :: proc "contextless" () -> Panel_Container {
-    return __bindgen_gde.classdb_construct_object(panel_container_name_ref())
+    return cast(Panel_Container)__bindgen_gde.classdb_construct_object(panel_container_name_ref())
 }
 
 // methods

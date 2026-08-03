@@ -27,10 +27,9 @@ install_controls :: proc "contextless" () {
 drive_my_kicker :: proc(self: ^Slopball3, delta: f64) {
 	me := self.me_kick
 	if me == nil {return}
-	if !me.placed {
+	if play.latch(&me.placed, true) {
 		// Ev_Spawned means BORN — the replicated pos is set; put the BODY there
 		// once (the scene instanced it at the origin, inside the corner walls).
-		me.placed = true
 		gd.node3d_set_position(cast(gd.Node3d)me.owner, me.pos)
 	}
 

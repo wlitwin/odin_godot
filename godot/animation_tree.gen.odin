@@ -21,7 +21,7 @@ animation_tree_name :: proc "contextless" () -> String_Name {
 }
 
 new_animation_tree :: proc "contextless" () -> Animation_Tree {
-    return __bindgen_gde.classdb_construct_object(animation_tree_name_ref())
+    return cast(Animation_Tree)__bindgen_gde.classdb_construct_object(animation_tree_name_ref())
 }
 
 // methods

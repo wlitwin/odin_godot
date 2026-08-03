@@ -21,7 +21,7 @@ multiplayer_synchronizer_name :: proc "contextless" () -> String_Name {
 }
 
 new_multiplayer_synchronizer :: proc "contextless" () -> Multiplayer_Synchronizer {
-    return __bindgen_gde.classdb_construct_object(multiplayer_synchronizer_name_ref())
+    return cast(Multiplayer_Synchronizer)__bindgen_gde.classdb_construct_object(multiplayer_synchronizer_name_ref())
 }
 
 // methods

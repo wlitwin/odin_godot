@@ -17,6 +17,7 @@ package coop_arena
 
 import gd "godot:godot"
 import rt "godot:runtime"
+import "godot:play"
 
 BULLET_SPEED :: f32(460)
 BULLET_LIFETIME :: f32(1.2)
@@ -37,15 +38,15 @@ arena_bullet_physics_process :: proc(self: ^ArenaBullet, delta: f64) {
 	pos.y += self.dir.y * BULLET_SPEED * f32(delta)
 	gd.node2d_set_global_position(self.owner, pos)
 
-	self.life += f32(delta)
-	if self.life >= BULLET_LIFETIME {
+	// play.every fires once when `life` has accumulated a full BULLET_LIFETIME — the expiry.
+	if play.every(&self.life, f32(delta), BULLET_LIFETIME) {
 		gd.node_queue_free(self.owner)
 		return
 	}
 
 	// Only the firing peer's own bullet resolves hits (owner-authoritative damage).
 	if !self.owned {return}
-	target, ok := nearest_enemy(self.owner, pos)
+	target, ok := gd.nearest_in_group(self.owner, GROUP_ENEMIES, pos)
 	if !ok {return}
 	tpos := gd.node2d_get_global_position(target)
 	dx := tpos.x - pos.x

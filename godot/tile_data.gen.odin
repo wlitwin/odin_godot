@@ -16,7 +16,7 @@ tile_data_name :: proc "contextless" () -> String_Name {
 }
 
 new_tile_data :: proc "contextless" () -> Tile_Data {
-    return __bindgen_gde.classdb_construct_object(tile_data_name_ref())
+    return cast(Tile_Data)__bindgen_gde.classdb_construct_object(tile_data_name_ref())
 }
 
 // methods

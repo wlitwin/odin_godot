@@ -21,7 +21,7 @@ visible_on_screen_enabler2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_visible_on_screen_enabler2d :: proc "contextless" () -> Visible_On_Screen_Enabler2d {
-    return __bindgen_gde.classdb_construct_object(visible_on_screen_enabler2d_name_ref())
+    return cast(Visible_On_Screen_Enabler2d)__bindgen_gde.classdb_construct_object(visible_on_screen_enabler2d_name_ref())
 }
 
 // methods

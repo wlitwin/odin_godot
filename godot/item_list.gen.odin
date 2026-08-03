@@ -31,7 +31,7 @@ item_list_name :: proc "contextless" () -> String_Name {
 }
 
 new_item_list :: proc "contextless" () -> Item_List {
-    return __bindgen_gde.classdb_construct_object(item_list_name_ref())
+    return cast(Item_List)__bindgen_gde.classdb_construct_object(item_list_name_ref())
 }
 
 // methods

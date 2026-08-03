@@ -16,7 +16,7 @@ csg_cylinder3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_csg_cylinder3d :: proc "contextless" () -> Csg_Cylinder3d {
-    return __bindgen_gde.classdb_construct_object(csg_cylinder3d_name_ref())
+    return cast(Csg_Cylinder3d)__bindgen_gde.classdb_construct_object(csg_cylinder3d_name_ref())
 }
 
 // methods

@@ -16,7 +16,7 @@ two_bone_ik3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_two_bone_ik3d :: proc "contextless" () -> Two_Bone_Ik3d {
-    return __bindgen_gde.classdb_construct_object(two_bone_ik3d_name_ref())
+    return cast(Two_Bone_Ik3d)__bindgen_gde.classdb_construct_object(two_bone_ik3d_name_ref())
 }
 
 // methods

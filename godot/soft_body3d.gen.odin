@@ -20,7 +20,7 @@ soft_body3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_soft_body3d :: proc "contextless" () -> Soft_Body3d {
-    return __bindgen_gde.classdb_construct_object(soft_body3d_name_ref())
+    return cast(Soft_Body3d)__bindgen_gde.classdb_construct_object(soft_body3d_name_ref())
 }
 
 // methods

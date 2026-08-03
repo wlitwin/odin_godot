@@ -16,7 +16,7 @@ popup_name :: proc "contextless" () -> String_Name {
 }
 
 new_popup :: proc "contextless" () -> Popup {
-    return __bindgen_gde.classdb_construct_object(popup_name_ref())
+    return cast(Popup)__bindgen_gde.classdb_construct_object(popup_name_ref())
 }
 
 // methods

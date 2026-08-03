@@ -16,7 +16,7 @@ separator_name :: proc "contextless" () -> String_Name {
 }
 
 new_separator :: proc "contextless" () -> Separator {
-    return __bindgen_gde.classdb_construct_object(separator_name_ref())
+    return cast(Separator)__bindgen_gde.classdb_construct_object(separator_name_ref())
 }
 
 // methods

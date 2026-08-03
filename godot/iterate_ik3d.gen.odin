@@ -16,7 +16,7 @@ iterate_ik3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_iterate_ik3d :: proc "contextless" () -> Iterate_Ik3d {
-    return __bindgen_gde.classdb_construct_object(iterate_ik3d_name_ref())
+    return cast(Iterate_Ik3d)__bindgen_gde.classdb_construct_object(iterate_ik3d_name_ref())
 }
 
 // methods

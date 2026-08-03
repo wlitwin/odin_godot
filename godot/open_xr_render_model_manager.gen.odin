@@ -22,7 +22,7 @@ open_xr_render_model_manager_name :: proc "contextless" () -> String_Name {
 }
 
 new_open_xr_render_model_manager :: proc "contextless" () -> Open_Xr_Render_Model_Manager {
-    return __bindgen_gde.classdb_construct_object(open_xr_render_model_manager_name_ref())
+    return cast(Open_Xr_Render_Model_Manager)__bindgen_gde.classdb_construct_object(open_xr_render_model_manager_name_ref())
 }
 
 // methods

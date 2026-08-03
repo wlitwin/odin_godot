@@ -21,7 +21,7 @@ collision_object2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_collision_object2d :: proc "contextless" () -> Collision_Object2d {
-    return __bindgen_gde.classdb_construct_object(collision_object2d_name_ref())
+    return cast(Collision_Object2d)__bindgen_gde.classdb_construct_object(collision_object2d_name_ref())
 }
 
 // methods

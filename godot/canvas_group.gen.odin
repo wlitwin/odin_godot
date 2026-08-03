@@ -16,7 +16,7 @@ canvas_group_name :: proc "contextless" () -> String_Name {
 }
 
 new_canvas_group :: proc "contextless" () -> Canvas_Group {
-    return __bindgen_gde.classdb_construct_object(canvas_group_name_ref())
+    return cast(Canvas_Group)__bindgen_gde.classdb_construct_object(canvas_group_name_ref())
 }
 
 // methods

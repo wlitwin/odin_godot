@@ -20,7 +20,7 @@ collision_polygon2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_collision_polygon2d :: proc "contextless" () -> Collision_Polygon2d {
-    return __bindgen_gde.classdb_construct_object(collision_polygon2d_name_ref())
+    return cast(Collision_Polygon2d)__bindgen_gde.classdb_construct_object(collision_polygon2d_name_ref())
 }
 
 // methods

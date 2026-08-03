@@ -668,7 +668,7 @@ rendering_device_name :: proc "contextless" () -> String_Name {
 }
 
 new_rendering_device :: proc "contextless" () -> Rendering_Device {
-    return __bindgen_gde.classdb_construct_object(rendering_device_name_ref())
+    return cast(Rendering_Device)__bindgen_gde.classdb_construct_object(rendering_device_name_ref())
 }
 
 // methods

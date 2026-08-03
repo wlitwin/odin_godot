@@ -21,7 +21,7 @@ box_container_name :: proc "contextless" () -> String_Name {
 }
 
 new_box_container :: proc "contextless" () -> Box_Container {
-    return __bindgen_gde.classdb_construct_object(box_container_name_ref())
+    return cast(Box_Container)__bindgen_gde.classdb_construct_object(box_container_name_ref())
 }
 
 // methods

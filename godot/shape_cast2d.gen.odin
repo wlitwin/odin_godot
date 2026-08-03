@@ -16,7 +16,7 @@ shape_cast2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_shape_cast2d :: proc "contextless" () -> Shape_Cast2d {
-    return __bindgen_gde.classdb_construct_object(shape_cast2d_name_ref())
+    return cast(Shape_Cast2d)__bindgen_gde.classdb_construct_object(shape_cast2d_name_ref())
 }
 
 // methods

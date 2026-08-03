@@ -49,7 +49,7 @@ lightmap_gi_name :: proc "contextless" () -> String_Name {
 }
 
 new_lightmap_gi :: proc "contextless" () -> Lightmap_Gi {
-    return __bindgen_gde.classdb_construct_object(lightmap_gi_name_ref())
+    return cast(Lightmap_Gi)__bindgen_gde.classdb_construct_object(lightmap_gi_name_ref())
 }
 
 // methods

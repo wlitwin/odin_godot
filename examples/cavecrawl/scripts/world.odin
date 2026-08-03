@@ -157,7 +157,7 @@ cave_scatter :: proc(self: ^CaveLobby, depth: int) {
 		y := int(splitmix32(&state) % 230) + 60
 		sum = sum * 31 + u32(x) * 7 + u32(y)
 		node := gd.new_label()
-		gd.set_string(cast(gd.Object)node, "text", i % 2 == 0 ? "\xF0\x9F\xAA\xA8" : "\xF0\x9F\x8D\x84") // 🪨 / 🍄
+		gd.set_text(cast(gd.Object)node, i % 2 == 0 ? "\xF0\x9F\xAA\xA8" : "\xF0\x9F\x8D\x84") // 🪨 / 🍄
 		gd.add_child(self.scenery, cast(gd.Node)node)
 		gd.control_set_position(cast(gd.Control)node, {f32(x), f32(y)}, false)
 	}

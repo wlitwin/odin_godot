@@ -32,6 +32,11 @@ const BIT_INT := 1 << 5
 const BIT_FLOAT := 1 << 6
 const BIT_BOOL := 1 << 7
 const BIT_STRING := 1 << 8
+const BIT_NODES_IN_GROUP := 1 << 9
+const BIT_FIRST_IN_GROUP := 1 << 10
+const BIT_SCRIPTS_IN_GROUP := 1 << 11
+const BIT_FIRST_SCRIPT := 1 << 12
+const BIT_ARRAY_SLICE := 1 << 13
 
 func _init() -> void:
 	process_frame.connect(_run, CONNECT_ONE_SHOT)
@@ -80,6 +85,10 @@ func _run() -> void:
 		"add_to_group/is_in_group": BIT_GROUP, "spawn/load_scene/instantiate/add_child": BIT_SPAWN,
 		"set_int/get_int": BIT_INT, "set_float/get_float": BIT_FLOAT,
 		"set_bool/get_bool": BIT_BOOL, "set_string/get_string": BIT_STRING,
+		"nodes_in_group": BIT_NODES_IN_GROUP, "first_in_group": BIT_FIRST_IN_GROUP,
+		"rt.scripts_in_group": BIT_SCRIPTS_IN_GROUP,
+		"rt.first_script_in_group": BIT_FIRST_SCRIPT,
+		"array_unpack": BIT_ARRAY_SLICE,
 	}
 	for name in checks:
 		if (r & checks[name]) == 0:
@@ -106,6 +115,12 @@ func _run() -> void:
 	# group membership is observable through the SceneTree group index.
 	if not scene.is_in_group("ergo"):
 		_fail("add_to_group not observable: Main not in group 'ergo'"); return
+
+	# the iteration-test group holds exactly the two nodes the Odin side enrolled
+	# (Tester + the script-less Bullet) — the same population its queries walked.
+	var iter_members := get_nodes_in_group("ergo_iter")
+	if iter_members.size() != 2:
+		_fail("group 'ergo_iter' has %d members (expected 2)" % iter_members.size()); return
 
 	# ===== 4. signals: connect, then ask the Odin script to emit =====
 	if not scene.has_signal("pinged"):

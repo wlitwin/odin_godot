@@ -22,7 +22,7 @@ scene_tree_name :: proc "contextless" () -> String_Name {
 }
 
 new_scene_tree :: proc "contextless" () -> Scene_Tree {
-    return __bindgen_gde.classdb_construct_object(scene_tree_name_ref())
+    return cast(Scene_Tree)__bindgen_gde.classdb_construct_object(scene_tree_name_ref())
 }
 
 // methods

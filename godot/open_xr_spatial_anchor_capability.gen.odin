@@ -20,7 +20,7 @@ open_xr_spatial_anchor_capability_name :: proc "contextless" () -> String_Name {
 }
 
 new_open_xr_spatial_anchor_capability :: proc "contextless" () -> Open_Xr_Spatial_Anchor_Capability {
-    return __bindgen_gde.classdb_construct_object(open_xr_spatial_anchor_capability_name_ref())
+    return cast(Open_Xr_Spatial_Anchor_Capability)__bindgen_gde.classdb_construct_object(open_xr_spatial_anchor_capability_name_ref())
 }
 
 // methods

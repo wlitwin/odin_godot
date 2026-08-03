@@ -17,7 +17,7 @@ resource_uid_name :: proc "contextless" () -> String_Name {
 }
 
 new_resource_uid :: proc "contextless" () -> Resource_Uid {
-    return __bindgen_gde.classdb_construct_object(resource_uid_name_ref())
+    return cast(Resource_Uid)__bindgen_gde.classdb_construct_object(resource_uid_name_ref())
 }
 
 // methods

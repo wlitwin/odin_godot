@@ -22,7 +22,7 @@ open_xr_android_thread_settings_extension_name :: proc "contextless" () -> Strin
 }
 
 new_open_xr_android_thread_settings_extension :: proc "contextless" () -> Open_Xr_Android_Thread_Settings_Extension {
-    return __bindgen_gde.classdb_construct_object(open_xr_android_thread_settings_extension_name_ref())
+    return cast(Open_Xr_Android_Thread_Settings_Extension)__bindgen_gde.classdb_construct_object(open_xr_android_thread_settings_extension_name_ref())
 }
 
 // methods

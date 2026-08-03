@@ -11,15 +11,19 @@ package survivors_scripts
 //   * @export PackedScene + four EnemyConfig slots — the spawn template + the type pool.
 //   * difficulty scaling                            — interval_at(t) / weights from game_state's
 //                                                      run_time (the shared module).
-//   * typed cross-script WRITE                       — assigns the chosen config onto the fresh
-//                                                      enemy BEFORE add_child, so its _ready
-//                                                      reads the right stats.
+//   * typed spawn (rt.spawn_scripted)                — poke-before-add: assigns the chosen
+//                                                      config onto the fresh enemy BEFORE
+//                                                      add_child, so its _ready reads the
+//                                                      right stats.
+//   * play.every                                     — the spawn cadence accumulator as one
+//                                                      call (period = the live curve).
 //   * @(gd_method) interval_at                        — exposes the difficulty curve so the test
 //                                                       can assert it scales.
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
 import rt "godot:runtime"
+import play "godot:play"
 import "core:math"
 import "core:math/rand"
 
@@ -35,7 +39,7 @@ Spawner :: struct {
 	brute:       ^gd.Resource `gd:"export,resource=EnemyConfig"`,
 	tank:        ^gd.Resource `gd:"export,resource=EnemyConfig"`,
 
-	accum: f32, // time since the last spawn
+	accum: f32, // play.every's accumulator (plain untagged field — private, not exported)
 }
 
 // interval_at — seconds between spawns at run-time `t`. Starts ~0.9s and ramps down toward a
@@ -50,11 +54,13 @@ spawner_interval_at :: proc(self: ^Spawner, t: f64) -> f64 {
 
 spawner_process :: proc(self: ^Spawner, delta: f64) {
 	if game_state_get_state() != .Playing {return}
-	self.accum += f32(delta)
 	t := game_state_get_run_time()
-	if f64(self.accum) < spawner_interval_at(self, t) {return}
-	self.accum = 0
-	spawner_spawn_one(self, t)
+	// play.every collapses the accumulate/compare/reset dance to one call; the period (the
+	// live difficulty curve) may change between calls, and the remainder carries so a long
+	// frame doesn't lose spawn time.
+	if play.every(&self.accum, f32(delta), f32(spawner_interval_at(self, t))) {
+		spawner_spawn_one(self, t)
+	}
 }
 
 // weighted enemy pick. `t` (seconds) shifts the mix: swarmers/grunts dominate early; brutes
@@ -83,16 +89,14 @@ spawner_spawn_one :: proc(self: ^Spawner, t: f64) {
 	if self.enemy_scene == nil {return}
 	arena := gd.get_parent(self.owner)
 	if arena == nil {return}
-	enemy := gd.instantiate(cast(gd.Packed_Scene)self.enemy_scene)
-	if enemy == nil {return}
 
-	// Typed cross-script WRITE: choose this enemy's type before it enters the tree, so its
-	// _ready reads the chosen EnemyConfig.
+	// Typed spawn, poke-BEFORE-add: rt.spawn_scripted resolves the typed ref WITHOUT
+	// parenting, so the chosen EnemyConfig is assigned before the enemy enters the tree —
+	// its _ready reads the right stats.
+	enemy, es := rt.spawn_scripted(cast(gd.Packed_Scene)self.enemy_scene, Enemy)
+	if enemy == nil {return}
 	cfg := spawner_pick_config(self, t)
-	if cfg != nil {
-		es := rt.script_of(enemy, Enemy)
-		if es != nil {es.config = cfg}
-	}
+	if cfg != nil && es != nil {es.config = cfg}
 
 	gd.add_child(arena, enemy)
 	gd.node2d_set_global_position(cast(gd.Node2d)enemy, random_edge_point())

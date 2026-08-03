@@ -16,7 +16,7 @@ java_script_bridge_name :: proc "contextless" () -> String_Name {
 }
 
 new_java_script_bridge :: proc "contextless" () -> Java_Script_Bridge {
-    return __bindgen_gde.classdb_construct_object(java_script_bridge_name_ref())
+    return cast(Java_Script_Bridge)__bindgen_gde.classdb_construct_object(java_script_bridge_name_ref())
 }
 
 // methods

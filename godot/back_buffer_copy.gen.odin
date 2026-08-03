@@ -21,7 +21,7 @@ back_buffer_copy_name :: proc "contextless" () -> String_Name {
 }
 
 new_back_buffer_copy :: proc "contextless" () -> Back_Buffer_Copy {
-    return __bindgen_gde.classdb_construct_object(back_buffer_copy_name_ref())
+    return cast(Back_Buffer_Copy)__bindgen_gde.classdb_construct_object(back_buffer_copy_name_ref())
 }
 
 // methods

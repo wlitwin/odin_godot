@@ -16,7 +16,7 @@ script_editor_base_name :: proc "contextless" () -> String_Name {
 }
 
 new_script_editor_base :: proc "contextless" () -> Script_Editor_Base {
-    return __bindgen_gde.classdb_construct_object(script_editor_base_name_ref())
+    return cast(Script_Editor_Base)__bindgen_gde.classdb_construct_object(script_editor_base_name_ref())
 }
 
 // methods

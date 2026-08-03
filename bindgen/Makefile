@@ -49,7 +49,10 @@ temple $(TEMPLE_CLI):
 	cd $(UPSTREAM) && mkdir -p bin && odin build temple/cli/ -o:speed -out:bin/temple_cli
 
 # 2. templates.odin (package name must be `bindgen`)
-templates $(UPSTREAM)/bindgen/templates.odin: $(TEMPLE_CLI)
+# Depends on the .twig sources: without them a template edit is silently ignored
+# and `generate` reuses the stale transpiled templates.odin.
+TEMPLATE_SRC := $(wildcard $(UPSTREAM)/templates/*.temple.twig)
+templates $(UPSTREAM)/bindgen/templates.odin: $(TEMPLE_CLI) $(TEMPLATE_SRC)
 	cd $(UPSTREAM) && ./bin/temple_cli bindgen bindgen bindgen
 
 # 3. bindgen generator

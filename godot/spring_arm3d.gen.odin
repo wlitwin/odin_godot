@@ -16,7 +16,7 @@ spring_arm3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_spring_arm3d :: proc "contextless" () -> Spring_Arm3d {
-    return __bindgen_gde.classdb_construct_object(spring_arm3d_name_ref())
+    return cast(Spring_Arm3d)__bindgen_gde.classdb_construct_object(spring_arm3d_name_ref())
 }
 
 // methods

@@ -30,7 +30,7 @@ csg_polygon3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_csg_polygon3d :: proc "contextless" () -> Csg_Polygon3d {
-    return __bindgen_gde.classdb_construct_object(csg_polygon3d_name_ref())
+    return cast(Csg_Polygon3d)__bindgen_gde.classdb_construct_object(csg_polygon3d_name_ref())
 }
 
 // methods

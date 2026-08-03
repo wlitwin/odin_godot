@@ -703,7 +703,7 @@ rendering_server_name :: proc "contextless" () -> String_Name {
 }
 
 new_rendering_server :: proc "contextless" () -> Rendering_Server {
-    return __bindgen_gde.classdb_construct_object(rendering_server_name_ref())
+    return cast(Rendering_Server)__bindgen_gde.classdb_construct_object(rendering_server_name_ref())
 }
 
 // methods

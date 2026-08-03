@@ -16,7 +16,7 @@ editor_interface_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_interface :: proc "contextless" () -> Editor_Interface {
-    return __bindgen_gde.classdb_construct_object(editor_interface_name_ref())
+    return cast(Editor_Interface)__bindgen_gde.classdb_construct_object(editor_interface_name_ref())
 }
 
 // methods

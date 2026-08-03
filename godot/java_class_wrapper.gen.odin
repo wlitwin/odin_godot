@@ -16,7 +16,7 @@ java_class_wrapper_name :: proc "contextless" () -> String_Name {
 }
 
 new_java_class_wrapper :: proc "contextless" () -> Java_Class_Wrapper {
-    return __bindgen_gde.classdb_construct_object(java_class_wrapper_name_ref())
+    return cast(Java_Class_Wrapper)__bindgen_gde.classdb_construct_object(java_class_wrapper_name_ref())
 }
 
 // methods

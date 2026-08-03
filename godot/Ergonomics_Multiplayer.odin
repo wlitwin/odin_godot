@@ -164,3 +164,20 @@ rpc_id :: proc "contextless" (node: Node, peer_id: int, method: cstring, args: .
 	name := new_string_name_cstring(method, true)
 	return node_rpc_id(node, Int(peer_id), name, ..args)
 }
+
+// peer_color — a distinct, readable colour per peer id, stable on every screen (host id
+// 1 is blue; others cycle warm hues). Promoted verbatim from three example games that
+// each hand-copied it: avatars/trails/name-tags want SOME per-peer tint and this is the
+// serviceable default; games with real palettes simply don't call it.
+peer_color :: proc "contextless" (peer_id: int) -> Color {
+	switch peer_id % 4 {
+	case 1:
+		return Color{0.35, 0.65, 1.0, 1} // host — blue
+	case 2:
+		return Color{1.0, 0.62, 0.2, 1} // orange
+	case 3:
+		return Color{0.5, 0.9, 0.4, 1} // green
+	case:
+		return Color{0.9, 0.45, 0.9, 1} // magenta
+	}
+}

@@ -16,7 +16,7 @@ engine_debugger_name :: proc "contextless" () -> String_Name {
 }
 
 new_engine_debugger :: proc "contextless" () -> Engine_Debugger {
-    return __bindgen_gde.classdb_construct_object(engine_debugger_name_ref())
+    return cast(Engine_Debugger)__bindgen_gde.classdb_construct_object(engine_debugger_name_ref())
 }
 
 // methods

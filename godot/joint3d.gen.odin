@@ -16,7 +16,7 @@ joint3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_joint3d :: proc "contextless" () -> Joint3d {
-    return __bindgen_gde.classdb_construct_object(joint3d_name_ref())
+    return cast(Joint3d)__bindgen_gde.classdb_construct_object(joint3d_name_ref())
 }
 
 // methods

@@ -1,16 +1,20 @@
 //gd:extends Node2D
 //gd:class PowerupManager
+//gd:group powerup_manager
 package barrage_powerups
 
 // ----------------------------------------------------------------------------
 // PowerupManager — spawns pickups (powerups MODULE). Holds the drop TABLE as a typed
 // array of PowerupConfig resources (the `array=` export: the Inspector edits a real
-// list of .tres slots) and instantiates pickup.tscn on request — `spawn_drop` is called
-// by name from the enemies module. Drops cycle round-robin so the suite can predict
-// what falls.
+// list of .tres slots) and spawns pickup.tscn on request — `spawn_drop` is called by
+// name (gd.vcall) from the enemies module. Pickup is THIS module's class, so the
+// spawn itself is typed: rt.spawn_as_deferred hands back a ^Pickup and the config is
+// poked as a plain field. Drops cycle round-robin so the suite can predict what falls.
+// Group membership ("powerup_manager") is declared by the `//gd:group` marker up top.
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
+import rt "godot:runtime"
 
 PowerupManager :: struct {
 	owner: gd.Node2d,
@@ -25,24 +29,20 @@ PowerupManager :: struct {
 	next: int,
 }
 
-powerup_manager_ready :: proc(self: ^PowerupManager) {
-	grp := gd.new_string_name_cstring("powerup_manager", true)
-	gd.node_add_to_group(cast(gd.Node)self.owner, grp, false)
-}
-
 @(gd_method)
 powerup_manager_spawn_drop :: proc(self: ^PowerupManager, pos: gd.Vector2) {
-	if self.pickup_scene == nil {return}
 	n := int(gd.array_size(&self.drop_table))
 	if n == 0 {return}
-	inst := gd.instantiate(cast(gd.Packed_Scene)self.pickup_scene)
-	if inst == nil {return}
-	gd.node2d_set_position(cast(gd.Node2d)inst, pos)
-	gd.add_child_deferred(cast(gd.Node)self.owner, inst) // spawn_drop arrives mid-physics
+	// Typed spawn, deferred: spawn_drop arrives mid-physics, so parenting waits for
+	// idle time — which also makes the pokes below visible to the pickup's _ready.
+	p := rt.spawn_as_deferred(self.owner, cast(gd.Packed_Scene)self.pickup_scene, Pickup)
+	if p == nil {return}
+	gd.node2d_set_position(p.owner, pos)
 
-	// Hand the pickup its config (round-robin through the drop table).
+	// Hand the pickup its config (round-robin through the drop table) — a direct typed
+	// field poke: manager and pickup share this dll, no engine call needed.
 	cv := gd.array_get(&self.drop_table, gd.Int(self.next % n))
+	defer gd.variant_destroy(&cv)
 	self.next += 1
-	m := gd.sname("set_config")
-	_ = gd.object_call(cast(gd.Object)inst, m, cv)
+	p.config = cast(^gd.Resource)gd.variant_to_object(&cv)
 }

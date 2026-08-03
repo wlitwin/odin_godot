@@ -625,6 +625,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				// %q — user-authored text can carry quotes/backslashes.
 				fmt.sbprintf(b, ", doc = %q", ex.doc)
 			}
+			if ex.res_class != "" {
+				// Hint class derived from the typed resource handle (see parse.odin's
+				// object-export block) — the runtime synthesizes resource=<this> from it.
+				fmt.sbprintf(b, ", resource_class = \"%s\"", ex.res_class)
+			}
 			if ex.getter != "" {
 				fmt.sbprintf(b, ", getter = _%s_get_%s", snake, ex.name)
 			}
@@ -676,11 +681,28 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	// (No signal tables: signals are declared by typed struct fields, so the runtime
 	// reflection walk builds the rt.Signal tables itself at registration.)
 
-	// connections (@(gd_connect="signal") declarations)
+	// connections (@(gd_connect="signal") / @(gd_connect="Path:signal") declarations)
 	if len(s.connections) > 0 {
 		fmt.sbprintf(b, "@(private = \"file\")\n_%s_connections := [?]rt.Connection {{\n", snake)
 		for c in s.connections {
-			fmt.sbprintf(b, "\t{{signal = \"%s\", method = \"%s\"}},\n", c.signal, c.method)
+			switch {
+			case c.indexed:
+				fmt.sbprintf(b, "\t{{signal = \"%s\", method = \"%s\", path = \"%s\", indexed = true}},\n", c.signal, c.method, c.path)
+			case c.path != "":
+				fmt.sbprintf(b, "\t{{signal = \"%s\", method = \"%s\", path = \"%s\"}},\n", c.signal, c.method, c.path)
+			case:
+				fmt.sbprintf(b, "\t{{signal = \"%s\", method = \"%s\"}},\n", c.signal, c.method)
+			}
+		}
+		w(b, "}\n\n")
+	}
+
+	// groups (//gd:group declarations) — joined by the core on READY.
+	if len(s.groups) > 0 {
+		fmt.sbprintf(b, "@(private = \"file\")\n_%s_groups := [?]cstring {{", snake)
+		for g, i in s.groups {
+			if i > 0 {w(b, ", ")}
+			fmt.sbprintf(b, "%q", g)
 		}
 		w(b, "}\n\n")
 	}
@@ -1874,6 +1896,10 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	if len(s.connections) > 0 {
 		fmt.sbprintf(b, "\t\t\tconnections = raw_data(_%s_connections[:]),\n", snake)
 		fmt.sbprintf(b, "\t\t\tconnections_count = %d,\n", len(s.connections))
+	}
+	if len(s.groups) > 0 {
+		fmt.sbprintf(b, "\t\t\tgroups = raw_data(_%s_groups[:]),\n", snake)
+		fmt.sbprintf(b, "\t\t\tgroups_count = %d,\n", len(s.groups))
 	}
 	if len(s.rpcs) > 0 {
 		fmt.sbprintf(b, "\t\t\trpcs = raw_data(_%s_rpcs[:]),\n", snake)

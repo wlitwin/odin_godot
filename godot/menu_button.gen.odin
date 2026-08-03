@@ -16,7 +16,7 @@ menu_button_name :: proc "contextless" () -> String_Name {
 }
 
 new_menu_button :: proc "contextless" () -> Menu_Button {
-    return __bindgen_gde.classdb_construct_object(menu_button_name_ref())
+    return cast(Menu_Button)__bindgen_gde.classdb_construct_object(menu_button_name_ref())
 }
 
 // methods

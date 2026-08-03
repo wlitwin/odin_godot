@@ -29,7 +29,7 @@ resource_loader_name :: proc "contextless" () -> String_Name {
 }
 
 new_resource_loader :: proc "contextless" () -> Resource_Loader {
-    return __bindgen_gde.classdb_construct_object(resource_loader_name_ref())
+    return cast(Resource_Loader)__bindgen_gde.classdb_construct_object(resource_loader_name_ref())
 }
 
 // methods

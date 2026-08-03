@@ -16,7 +16,7 @@ color_rect_name :: proc "contextless" () -> String_Name {
 }
 
 new_color_rect :: proc "contextless" () -> Color_Rect {
-    return __bindgen_gde.classdb_construct_object(color_rect_name_ref())
+    return cast(Color_Rect)__bindgen_gde.classdb_construct_object(color_rect_name_ref())
 }
 
 // methods

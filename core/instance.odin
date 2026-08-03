@@ -5,6 +5,7 @@ import "godot:godot"
 import rt "godot:runtime"
 
 import "base:runtime"
+import "core:fmt"
 import "core:mem"
 import "core:strings"
 import "core:sync"
@@ -381,6 +382,35 @@ odin_script_struct :: proc "c" (obj: gdext.ObjectPtr, want_class: cstring) -> ra
 	return nil
 }
 
+// The ANY-class sibling of odin_script_struct, behind `rt.script_any`: the same live-
+// instance lookup, but instead of VERIFYING a caller-supplied class it REPORTS the class,
+// writing the instance's name (ptr + len of the core's heap copy — not NUL-terminated,
+// valid while the instance lives) and returning the struct pointer. The type-safety that
+// odin_script_struct gets from its compare is not lost, just relocated: the scripts dll
+// resolves the reported name against ITS OWN registry to a typeid, so a class the calling
+// dll never registered (a foreign module's instance) resolves to nil there, and a struct
+// can never be handed out under a wrong layout.
+@(export)
+odin_script_struct_any :: proc "c" (obj: gdext.ObjectPtr, class_ptr: ^[^]u8, class_len: ^int) -> rawptr {
+	context = gdext.godot_context()
+	if obj == nil || odin_language_object == nil || class_ptr == nil || class_len == nil {
+		return nil
+	}
+	data := gdext.object_get_script_instance(obj, odin_language_object)
+	if data == nil {
+		return nil
+	}
+	oi := cast(^Odin_Instance)data
+	sync.lock(&live_lock)
+	defer sync.unlock(&live_lock)
+	if x, ok := live_by_owner[obj]; ok && x == oi {
+		class_ptr^ = raw_data(oi.class_name)
+		class_len^ = len(oi.class_name)
+		return oi.user
+	}
+	return nil
+}
+
 // Allocator for the user script struct. Godot's `mem_alloc` guarantees only 16-byte
 // alignment (and the gdext wrapper ignores the alignment argument), so an over-aligned
 // class (Class_Desc.align > 16, e.g. SIMD fields) must live on the alignment-honoring
@@ -617,14 +647,131 @@ node_enable_physics_process :: proc(owner: gdext.ObjectPtr, enable: bool) {
 	gdext.object_method_bind_ptrcall(set_physics_process_bind, owner, &args[0], nil)
 }
 
-// Resolve `@onready`-style node refs (richer-authoring #1): write get_node(owner, path)
-// into each tagged field. Runs at NOTIFICATION_READY, and again after a changed-layout
-// hot-reload migration (the re-alloc zeroed those fields).
+// Which onready entries a resolve pass touches. Node handles and SCRIPT refs (a
+// `^<script struct>` field — get_node + the class-checked struct resolver) diverge on
+// hot reload: a migrated instance can re-resolve its node handles immediately, but a
+// script ref points into ANOTHER instance's struct, which the rebind loop may re-alloc
+// AFTER this instance resolved — so script refs get their own pass once every
+// instance is rebound (rebind_all_instances).
 @(private)
-resolve_onready_refs :: proc "contextless" (oi: ^Odin_Instance) {
+Onready_Pass :: enum {
+	All,
+	Nodes_Only,
+	Scripts_Only,
+}
+
+// Resolve `@onready`-style refs (richer-authoring #1): write get_node(owner, path) —
+// or, for a `^<script struct>` field, that node's Odin script struct — into each tagged
+// field. Runs at NOTIFICATION_READY, and again after a hot-reload rebind (see
+// Onready_Pass for the split).
+@(private)
+resolve_onready_refs :: proc "contextless" (oi: ^Odin_Instance, pass := Onready_Pass.All) {
 	for o in rt.desc_onready(oi.desc) {
-		node := godot.get_node(cast(godot.Object)oi.owner, o.path)
-		(cast(^gdext.ObjectPtr)(uintptr(oi.user) + o.offset))^ = cast(gdext.ObjectPtr)node
+		if o.path == nil {
+			// Neutralized at boot: a `^T` whose T is no registered script class
+			// (fixup_onready_script_targets recorded the error; never write into it).
+			continue
+		}
+		is_script := o.script_class != nil
+		if (pass == .Nodes_Only && is_script) || (pass == .Scripts_Only && !is_script) {
+			continue
+		}
+		if o.count == 0 {
+			resolve_onready_slot(oi, o, o.path, rawptr(uintptr(oi.user) + o.offset))
+			continue
+		}
+		// ARRAY form (`cards: [9]gd.Button `gd:"onready=Shop/Card%d"``): substitute
+		// 0-based indices into the walk-validated `%d` template; elements are
+		// pointer-sized, contiguous from offset. The ctprintf path is temp-arena
+		// memory, consumed by get_node inside the call. scan_onready_template (not a
+		// naive index) finds the substitution point: a scene-unique segment may itself
+		// start with 'd' (`%dock/Card%d`) and must pass through to get_node intact.
+		context = gdext.godot_context()
+		tmpl := string(o.path)
+		di, _, _ := rt.scan_onready_template(tmpl)
+		if di < 0 {
+			// Unreachable via the walk (it refuses template-less array paths); guards
+			// hand-authored descs from substituting into a unique-name marker.
+			godot.error_str(fmt.tprintf("%s.%s: onready array path %q has no `%%d` template — nothing resolved", oi.class_name, string(o.field), tmpl))
+			continue
+		}
+		for i in 0 ..< int(o.count) {
+			ip := fmt.ctprintf("%s%d%s", tmpl[:di], i, tmpl[di + 2:])
+			resolve_onready_slot(oi, o, ip, rawptr(uintptr(oi.user) + o.offset + uintptr(i) * size_of(rawptr)))
+		}
+	}
+}
+
+// Cap for the indexed `@(gd_connect="…%d:sig")` probe: generous for button banks,
+// small enough that a pathological scene can't stall READY.
+INDEXED_CONNECT_MAX :: 64
+
+// Wire one INDEXED connection declaration: substitute 0-based indices into the `%d`
+// template, probing SILENTLY (get_node_or_null — a missing index is the loop's normal
+// terminator, not an error) and connecting each match with its index bound as the
+// handler's trailing arg. Zero matches is LOUD: the declaration wired nothing, which
+// otherwise reads as "the handler never fires" with no hint why.
+@(private)
+wire_indexed_connection :: proc "contextless" (oi: ^Odin_Instance, c: rt.Connection) {
+	context = gdext.godot_context()
+	tmpl := string(c.path)
+	di, _, _ := rt.scan_onready_template(tmpl)
+	if di < 0 {
+		// Unreachable via scriptgen (indexed is only set when a template exists);
+		// guards hand-authored descs from substituting into a unique-name marker.
+		godot.error_str(fmt.tprintf("%s.%s: indexed @(gd_connect) path %q has no `%%d` template — nothing wired", oi.class_name, string(c.method), tmpl))
+		return
+	}
+	wired := 0
+	for i in 0 ..< INDEXED_CONNECT_MAX {
+		ip := fmt.ctprintf("%s%d%s", tmpl[:di], i, tmpl[di + 2:])
+		np := godot.new_node_path_cstring(ip)
+		node := godot.node_get_node_or_null(cast(godot.Node)oi.owner, np)
+		godot.free_node_path(np)
+		if node == nil {
+			break
+		}
+		godot.connect_to_bound(cast(godot.Object)node, c.signal, cast(godot.Object)oi.owner, c.method, i64(i))
+		wired += 1
+	}
+	if wired == 0 {
+		godot.error_str(
+			fmt.tprintf(
+				"%s.%s: @(gd_connect=\"%s:%s\") matched no node at index 0 — nothing wired",
+				oi.class_name,
+				string(c.method),
+				tmpl,
+				string(c.signal),
+			),
+		)
+	}
+}
+
+// Resolve ONE onready slot: get_node, then either the handle write or the class-checked
+// script-struct resolve (rt.script_of semantics). Nil-safe on a missing node (get_node
+// already printed the engine's path error); a node WITHOUT the wanted script is LOUD —
+// the path resolved, so a silently-nil typed ref would read as "onready didn't run",
+// not "wrong script on the node".
+@(private)
+resolve_onready_slot :: proc "contextless" (oi: ^Odin_Instance, o: rt.Onready, path: cstring, slot: rawptr) {
+	node := godot.get_node(cast(godot.Object)oi.owner, path)
+	if o.script_class == nil {
+		(cast(^gdext.ObjectPtr)slot)^ = cast(gdext.ObjectPtr)node
+		return
+	}
+	p := odin_script_struct(cast(gdext.ObjectPtr)node, o.script_class)
+	(cast(^rawptr)slot)^ = p
+	if node != nil && p == nil {
+		context = gdext.godot_context()
+		godot.error_str(
+			fmt.tprintf(
+				"%s.%s: onready script ref %q found the node, but it carries no %s Odin script — field left nil",
+				oi.class_name,
+				string(o.field),
+				string(path),
+				string(o.script_class),
+			),
+		)
 	}
 }
 
@@ -638,13 +785,49 @@ inst_notification :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, w
 	}
 	switch int(what) {
 	case NOTIFICATION_READY:
+		// `//gd:group` memberships first of all: group-based lookups running from ANY
+		// sibling's onready/connections/ready (rt.first_script_in_group and friends)
+		// must already see this node grouped. The names are static cstrings from the
+		// generated table (dll-lifetime), so the static intern in add_to_group is right.
+		for g in rt.desc_groups(oi.desc) {
+			godot.add_to_group(cast(godot.Object)oi.owner, g)
+		}
 		// Resolve `@onready`-style node refs (richer-authoring #1) FIRST, so the user's
 		// _ready (and the gd_connect wiring below) sees fully resolved, non-null references.
 		resolve_onready_refs(oi)
 		// Wire `@(gd_connect="signal")` declarations: connect owner.signal -> owner.method
 		// before the user's ready runs, so the connections are live for the rest of _ready.
+		// The path-qualified form (`"Path/To/Node:signal"`) resolves the EMITTER like an
+		// `onready=` ref first — children ready before parents, so a child emitter's script
+		// (and its declared signals) exists by now.
 		for c in rt.desc_connections(oi.desc) {
-			godot.connect(cast(godot.Object)oi.owner, c.signal, c.method)
+			if c.path == nil {
+				godot.connect(cast(godot.Object)oi.owner, c.signal, c.method)
+				continue
+			}
+			if c.indexed {
+				wire_indexed_connection(oi, c)
+				continue
+			}
+			emitter := godot.get_node(cast(godot.Object)oi.owner, c.path)
+			if emitter == nil {
+				// get_node already printed the engine's path error; name the DECLARATION
+				// too, or the red line points at a path with no hint of which class/method
+				// asked for it.
+				context = gdext.godot_context()
+				godot.error_str(
+					fmt.tprintf(
+						"%s.%s: @(gd_connect=\"%s:%s\") found no node at %q — connection skipped",
+						oi.class_name,
+						string(c.method),
+						string(c.path),
+						string(c.signal),
+						string(c.path),
+					),
+				)
+				continue
+			}
+			godot.connect_to(cast(godot.Object)emitter, c.signal, cast(godot.Object)oi.owner, c.method)
 		}
 		if oi.desc.lifecycle.ready != nil {
 			oi.desc.lifecycle.ready(oi.user)
@@ -1140,6 +1323,33 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
 			oi.desc.lifecycle.reload(oi.user)
 		}
 	}
+
+	// SECOND PASS — script-onready refs (`hud: ^hud`). They point into OTHER instances'
+	// structs, so no instance's refs are trustworthy until EVERY instance is rebound:
+	// a changed-layout target re-allocs its struct, dangling whatever the first loop
+	// (or the pre-reload world) resolved. Same-layout instances need this too — their
+	// bytes survived, but the struct their pointer targets may not have. (The manual
+	// `rt.script_of`-in-ready idiom has exactly this dangle and no second chance;
+	// the declared form is what makes reload safe.) Reload hooks above run BEFORE
+	// this pass, so they must not dereference script-onready refs.
+	for oi in snapshot {
+		if oi == nil || oi.desc.onready_count == 0 {
+			continue
+		}
+		if only != nil && !(oi.class_name in only) {
+			continue
+		}
+		has_script := false
+		for o in rt.desc_onready(oi.desc) {
+			if o.script_class != nil {
+				has_script = true
+				break
+			}
+		}
+		if has_script && bool(godot.node_is_inside_tree(cast(godot.Node)oi.owner)) {
+			resolve_onready_refs(oi, .Scripts_Only)
+		}
+	}
 }
 
 // Two descriptors share a struct layout iff size/align match AND every @export keeps
@@ -1288,8 +1498,11 @@ migrate_instance :: proc(oi: ^Odin_Instance, new_desc: rt.Class_Desc, new_cache:
 	// The re-alloc zeroed the `@onready` fields; resolve them again so the migrated
 	// instance doesn't run the new code against nil node refs. Guarded: get_node is only
 	// meaningful once the owner is in the tree (pre-READY instances resolve at READY).
+	// NODES ONLY: script refs point into other instances' structs, which the rebind
+	// loop may still re-alloc after this one — they re-resolve in rebind_all_instances'
+	// second pass, once every instance is rebound.
 	if oi.desc.onready_count > 0 && bool(godot.node_is_inside_tree(cast(godot.Node)oi.owner)) {
-		resolve_onready_refs(oi)
+		resolve_onready_refs(oi, .Nodes_Only)
 	}
 
 	// The snapshot Variants own refs (String/Object/...); destroy them or every

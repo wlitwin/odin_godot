@@ -1,5 +1,6 @@
 //gd:extends Node2D
 //gd:class BulletField
+//gd:group bullet_field
 package barrage_bullets
 
 // ----------------------------------------------------------------------------
@@ -19,9 +20,10 @@ package barrage_bullets
 //     packed array's data pointer — no per-element calls) and handed to the
 //     RenderingServer with a single multimesh_set_buffer. One draw call for everything.
 //   * ISOLATION: other modules (player, enemies, boss) may not import this package —
-//     they find this node by group and call the @(gd_method) emitters through the
-//     engine (`object_call`), and listen to its typed signal fields. That boundary is
-//     the script-modules contract (docs/modules.md).
+//     they find this node by group (joined declaratively via the `//gd:group` marker
+//     above) and call the @(gd_method) emitters through the engine — spelled
+//     `gd.vcall` on their side — and listen to its typed signal fields. That boundary
+//     is the script-modules contract (docs/modules.md).
 // ----------------------------------------------------------------------------
 
 import "core:math"
@@ -114,10 +116,8 @@ bullet_field_ready :: proc(self: ^BulletField) {
 	)
 	self.buffer = gd.new_packed_float32_array_default()
 	gd.packed_float32_array_resize(&self.buffer, MAX_BULLETS * INSTANCE_FLOATS)
-
-	// Discoverable by the other modules: they get_first_node_in_group("bullet_field").
-	grp := gd.new_string_name_cstring("bullet_field", true)
-	gd.node_add_to_group(cast(gd.Node)self.owner, grp, false)
+	// Discoverability is declarative: the `//gd:group bullet_field` marker up top joins
+	// the group at READY — the other modules gd.first_in_group("bullet_field") us.
 }
 
 // ---- emitters: the engine-callable API other modules drive ----------------
@@ -267,12 +267,8 @@ bullet_field_physics_process :: proc(self: ^BulletField, delta: f64) {
 @(private = "file")
 field_player_probe :: proc(self: ^BulletField) -> (px, py, prad: f32, ok: bool) {
 	if self.player == nil {
-		tree := gd.node_get_tree(cast(gd.Node)self.owner)
-		if tree == nil {return}
-		grp := gd.new_string_name_cstring("player", true)
-		n := gd.scene_tree_get_first_node_in_group(tree, grp)
-		if n == nil {return}
-		self.player = cast(gd.Object)n
+		self.player = gd.first_in_group(self.owner, "player")
+		if self.player == nil {return}
 		self.player_radius = 10
 	}
 	p := gd.node2d_get_position(cast(gd.Node2d)self.player)

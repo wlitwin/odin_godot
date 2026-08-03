@@ -16,7 +16,7 @@ v_slider_name :: proc "contextless" () -> String_Name {
 }
 
 new_v_slider :: proc "contextless" () -> V_Slider {
-    return __bindgen_gde.classdb_construct_object(v_slider_name_ref())
+    return cast(V_Slider)__bindgen_gde.classdb_construct_object(v_slider_name_ref())
 }
 
 // methods

@@ -13,6 +13,7 @@ package ergonomics_scripts
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
+import rt "godot:runtime"
 
 Tester :: struct {
 	owner:     gd.Node2d,
@@ -42,6 +43,11 @@ BIT_INT :: 1 << 5
 BIT_FLOAT :: 1 << 6
 BIT_BOOL :: 1 << 7
 BIT_STRING :: 1 << 8
+BIT_NODES_IN_GROUP :: 1 << 9
+BIT_FIRST_IN_GROUP :: 1 << 10
+BIT_SCRIPTS_IN_GROUP :: 1 << 11
+BIT_FIRST_SCRIPT :: 1 << 12
+BIT_ARRAY_SLICE :: 1 << 13
 
 tester_ready :: proc(self: ^Tester) {
 	r: i64 = 0
@@ -66,6 +72,40 @@ tester_ready :: proc(self: ^Tester) {
 	// --- scenes: spawn = load_scene + instantiate + add_child ---
 	bullet := gd.spawn(self.owner, "res://bullet.tscn")
 	if bullet != nil && gd.get_node(self.owner, "Bullet") != nil {r |= BIT_SPAWN}
+
+	// --- group ITERATION: Tester + the (script-less) Bullet share a group, so the
+	// node query must see both and the script-typed queries must filter to just us. ---
+	if bullet != nil {
+		gd.add_to_group(self.owner, "ergo_iter")
+		gd.add_to_group(bullet, "ergo_iter")
+
+		members := gd.nodes_in_group(self.owner, "ergo_iter")
+		if len(members) == 2 && members[0] != nil && members[1] != nil {
+			r |= BIT_NODES_IN_GROUP
+		}
+		if gd.first_in_group(self.owner, "ergo_iter") != nil {r |= BIT_FIRST_IN_GROUP}
+
+		// Exactly ONE member carries this script, and it is us — the script-less
+		// Bullet must be skipped, not returned reinterpreted.
+		ts := rt.scripts_in_group(self.owner, "ergo_iter", Tester)
+		if len(ts) == 1 && ts[0] == self {r |= BIT_SCRIPTS_IN_GROUP}
+		if rt.first_script_in_group(self.owner, "ergo_iter", Tester) == self {
+			r |= BIT_FIRST_SCRIPT
+		}
+	}
+
+	// --- generic typed-array unpack, over a real engine return (get_children) ---
+	{
+		children := gd.node_get_children(self.owner, false)
+		defer gd.free_array(children.untyped)
+		kids := gd.array_unpack(&children)
+		// Target (scene child) + spawned Bullet, live handles throughout.
+		if len(kids) >= 2 {
+			ok := true
+			for k in kids {if k == nil {ok = false}}
+			if ok {r |= BIT_ARRAY_SLICE}
+		}
+	}
 
 	// --- dynamic properties on the Target node, by name ---
 	if target != nil {

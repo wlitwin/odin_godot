@@ -36,7 +36,7 @@ open_xr_hand_name :: proc "contextless" () -> String_Name {
 }
 
 new_open_xr_hand :: proc "contextless" () -> Open_Xr_Hand {
-    return __bindgen_gde.classdb_construct_object(open_xr_hand_name_ref())
+    return cast(Open_Xr_Hand)__bindgen_gde.classdb_construct_object(open_xr_hand_name_ref())
 }
 
 // methods

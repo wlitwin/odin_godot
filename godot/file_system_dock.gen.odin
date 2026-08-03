@@ -16,7 +16,7 @@ file_system_dock_name :: proc "contextless" () -> String_Name {
 }
 
 new_file_system_dock :: proc "contextless" () -> File_System_Dock {
-    return __bindgen_gde.classdb_construct_object(file_system_dock_name_ref())
+    return cast(File_System_Dock)__bindgen_gde.classdb_construct_object(file_system_dock_name_ref())
 }
 
 // methods

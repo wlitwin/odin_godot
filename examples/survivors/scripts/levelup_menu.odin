@@ -8,10 +8,13 @@ package survivors_scripts
 // player clicks one -> apply it to the player (typed) -> ask the Game to resume (or show the
 // next owed choice). Its CanvasLayer process_mode is Always, so it keeps working while paused.
 //
-// FEATURES: a big bank of typed custom-resource `@export` slots (the upgrade pool); `@onready`
-// button/label refs; `gd.connect_to` wiring each Button's `pressed` to a @(gd_method) handler;
-// reading a custom resource's String fields generically (gd.get_string); typed cross-script
-// calls into the player (apply_upgrade) and the Game (after_pick).
+// FEATURES: a big bank of typed custom-resource `@export` slots (the upgrade pool — the
+// numbered fields are deliberate: EXPORT fields have no array form, each is an Inspector
+// slot); an `@onready` ARRAY (`Panel/Choice%d`) wiring the three Buttons in one declaration;
+// ONE indexed `@(gd_connect = "...%d:pressed")` handler with the pressed button's index bound
+// as the trailing arg (replaces per-button stubs); reading a custom resource's String fields
+// generically (gd.get_string); typed cross-script calls into the player (apply_upgrade) and
+// the Game (after_pick) found by group (rt.first_script_in_group).
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
@@ -36,10 +39,9 @@ LevelupMenu :: struct {
 	upgrade8: ^gd.Resource `gd:"export,resource=UpgradeConfig"`,
 	upgrade9: ^gd.Resource `gd:"export,resource=UpgradeConfig"`,
 
-	// child controls
-	choice0: gd.Node `gd:"onready=Panel/Choice0"`,
-	choice1: gd.Node `gd:"onready=Panel/Choice1"`,
-	choice2: gd.Node `gd:"onready=Panel/Choice2"`,
+	// child controls — the onready ARRAY form: one declaration resolves Panel/Choice0..2
+	// (the `%d` is substituted with 0-based indices at READY).
+	choices: [3]gd.Button `gd:"onready=Panel/Choice%d"`,
 
 	// the 3 currently-offered upgrades
 	offered:  [3]^gd.Resource,
@@ -48,9 +50,7 @@ LevelupMenu :: struct {
 
 levelup_menu_ready :: proc(self: ^LevelupMenu) {
 	gd.set_bool(self.owner, "visible", false)
-	if self.choice0 != nil {gd.connect_to(self.choice0, "pressed", self.owner, "pick0")}
-	if self.choice1 != nil {gd.connect_to(self.choice1, "pressed", self.owner, "pick1")}
-	if self.choice2 != nil {gd.connect_to(self.choice2, "pressed", self.owner, "pick2")}
+	// (Each Choice button's `pressed` is wired declaratively — see levelup_menu_on_choice.)
 }
 
 @(private = "file")
@@ -82,9 +82,8 @@ levelup_menu_present :: proc(self: ^LevelupMenu) {
 	}
 
 	self.noffered = pick
-	buttons := [3]gd.Node{self.choice0, self.choice1, self.choice2}
 	for i in 0 ..< 3 {
-		btn := buttons[i]
+		btn := self.choices[i]
 		if btn == nil {continue}
 		if i < pick {
 			cfg := pool[idx[i]]
@@ -107,24 +106,20 @@ levelup_menu_choose :: proc(self: ^LevelupMenu, i: int) {
 	cfg := self.offered[i]
 	if cfg == nil {return}
 
-	player := find_player(self.owner)
-	if player != nil {
-		p := rt.script_of(player, Player)
-		if p != nil {player_apply_upgrade(p, cfg)}
+	// Typed, class-checked group lookups — one call replaces the find-node + rt.script_of pair.
+	if p := rt.first_script_in_group(self.owner, GROUP_PLAYER, Player); p != nil {
+		player_apply_upgrade(p, cfg)
 	}
-	game := find_game(self.owner)
-	if game != nil {
-		g := rt.script_of(game, Game)
-		if g != nil {game_after_pick(g)}
+	if g := rt.first_script_in_group(self.owner, GROUP_GAME, Game); g != nil {
+		game_after_pick(g)
 	}
 }
 
-// The three button handlers (each Button's `pressed` is connected to one in _ready). They are
-// @(gd_method) so the engine can dispatch the signal to them — and the test can invoke them
-// exactly the way a click would.
-@(gd_method)
-levelup_menu_pick0 :: proc(self: ^LevelupMenu) {levelup_menu_choose(self, 0)}
-@(gd_method)
-levelup_menu_pick1 :: proc(self: ^LevelupMenu) {levelup_menu_choose(self, 1)}
-@(gd_method)
-levelup_menu_pick2 :: proc(self: ^LevelupMenu) {levelup_menu_choose(self, 2)}
+// on_choice — THE button handler: the indexed @(gd_connect) probes Panel/Choice0, 1, 2 and
+// connects each button's `pressed` here with that button's index BOUND as the trailing arg.
+// One @(gd_method) replaces the three per-button stubs — and the test can still invoke it
+// exactly the way a click would: `levelup.call("on_choice", 0)`.
+@(gd_method, gd_connect = "Panel/Choice%d:pressed")
+levelup_menu_on_choice :: proc(self: ^LevelupMenu, idx: gd.Int) {
+	levelup_menu_choose(self, int(idx))
+}

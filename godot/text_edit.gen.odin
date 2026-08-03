@@ -81,7 +81,7 @@ text_edit_name :: proc "contextless" () -> String_Name {
 }
 
 new_text_edit :: proc "contextless" () -> Text_Edit {
-    return __bindgen_gde.classdb_construct_object(text_edit_name_ref())
+    return cast(Text_Edit)__bindgen_gde.classdb_construct_object(text_edit_name_ref())
 }
 
 // methods

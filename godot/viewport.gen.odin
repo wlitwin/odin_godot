@@ -139,7 +139,7 @@ viewport_name :: proc "contextless" () -> String_Name {
 }
 
 new_viewport :: proc "contextless" () -> Viewport {
-    return __bindgen_gde.classdb_construct_object(viewport_name_ref())
+    return cast(Viewport)__bindgen_gde.classdb_construct_object(viewport_name_ref())
 }
 
 // methods

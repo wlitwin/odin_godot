@@ -25,5 +25,5 @@ Level :: struct {
 }
 
 level_process :: proc(self: ^Level, delta: f64) {
-	gd.set_string(cast(gd.Object)self.glyph, "text", fmt.ctprintf("depth %d", self.depth))
+	gd.set_text(cast(gd.Object)self.glyph, fmt.ctprintf("depth %d", self.depth))
 }

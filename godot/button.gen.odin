@@ -16,7 +16,7 @@ button_name :: proc "contextless" () -> String_Name {
 }
 
 new_button :: proc "contextless" () -> Button {
-    return __bindgen_gde.classdb_construct_object(button_name_ref())
+    return cast(Button)__bindgen_gde.classdb_construct_object(button_name_ref())
 }
 
 // methods

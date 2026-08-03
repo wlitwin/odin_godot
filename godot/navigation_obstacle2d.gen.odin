@@ -16,7 +16,7 @@ navigation_obstacle2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_navigation_obstacle2d :: proc "contextless" () -> Navigation_Obstacle2d {
-    return __bindgen_gde.classdb_construct_object(navigation_obstacle2d_name_ref())
+    return cast(Navigation_Obstacle2d)__bindgen_gde.classdb_construct_object(navigation_obstacle2d_name_ref())
 }
 
 // methods

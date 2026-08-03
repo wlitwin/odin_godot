@@ -23,7 +23,7 @@ voxel_gi_name :: proc "contextless" () -> String_Name {
 }
 
 new_voxel_gi :: proc "contextless" () -> Voxel_Gi {
-    return __bindgen_gde.classdb_construct_object(voxel_gi_name_ref())
+    return cast(Voxel_Gi)__bindgen_gde.classdb_construct_object(voxel_gi_name_ref())
 }
 
 // methods

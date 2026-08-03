@@ -126,7 +126,7 @@ accessibility_server_name :: proc "contextless" () -> String_Name {
 }
 
 new_accessibility_server :: proc "contextless" () -> Accessibility_Server {
-    return __bindgen_gde.classdb_construct_object(accessibility_server_name_ref())
+    return cast(Accessibility_Server)__bindgen_gde.classdb_construct_object(accessibility_server_name_ref())
 }
 
 // methods

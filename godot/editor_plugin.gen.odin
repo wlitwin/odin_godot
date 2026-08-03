@@ -48,7 +48,7 @@ editor_plugin_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_plugin :: proc "contextless" () -> Editor_Plugin {
-    return __bindgen_gde.classdb_construct_object(editor_plugin_name_ref())
+    return cast(Editor_Plugin)__bindgen_gde.classdb_construct_object(editor_plugin_name_ref())
 }
 
 // methods

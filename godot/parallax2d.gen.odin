@@ -16,7 +16,7 @@ parallax2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_parallax2d :: proc "contextless" () -> Parallax2d {
-    return __bindgen_gde.classdb_construct_object(parallax2d_name_ref())
+    return cast(Parallax2d)__bindgen_gde.classdb_construct_object(parallax2d_name_ref())
 }
 
 // methods

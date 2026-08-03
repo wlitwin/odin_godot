@@ -21,7 +21,7 @@ undo_redo_name :: proc "contextless" () -> String_Name {
 }
 
 new_undo_redo :: proc "contextless" () -> Undo_Redo {
-    return __bindgen_gde.classdb_construct_object(undo_redo_name_ref())
+    return cast(Undo_Redo)__bindgen_gde.classdb_construct_object(undo_redo_name_ref())
 }
 
 // methods

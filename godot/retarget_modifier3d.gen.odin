@@ -22,7 +22,7 @@ retarget_modifier3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_retarget_modifier3d :: proc "contextless" () -> Retarget_Modifier3d {
-    return __bindgen_gde.classdb_construct_object(retarget_modifier3d_name_ref())
+    return cast(Retarget_Modifier3d)__bindgen_gde.classdb_construct_object(retarget_modifier3d_name_ref())
 }
 
 // methods

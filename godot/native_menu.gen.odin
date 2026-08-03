@@ -31,7 +31,7 @@ native_menu_name :: proc "contextless" () -> String_Name {
 }
 
 new_native_menu :: proc "contextless" () -> Native_Menu {
-    return __bindgen_gde.classdb_construct_object(native_menu_name_ref())
+    return cast(Native_Menu)__bindgen_gde.classdb_construct_object(native_menu_name_ref())
 }
 
 // methods

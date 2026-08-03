@@ -21,7 +21,7 @@ editor_spin_slider_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_spin_slider :: proc "contextless" () -> Editor_Spin_Slider {
-    return __bindgen_gde.classdb_construct_object(editor_spin_slider_name_ref())
+    return cast(Editor_Spin_Slider)__bindgen_gde.classdb_construct_object(editor_spin_slider_name_ref())
 }
 
 // methods

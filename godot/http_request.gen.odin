@@ -32,7 +32,7 @@ http_request_name :: proc "contextless" () -> String_Name {
 }
 
 new_http_request :: proc "contextless" () -> Http_Request {
-    return __bindgen_gde.classdb_construct_object(http_request_name_ref())
+    return cast(Http_Request)__bindgen_gde.classdb_construct_object(http_request_name_ref())
 }
 
 // methods

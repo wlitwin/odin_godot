@@ -16,7 +16,7 @@ physics_server3d_extension_name :: proc "contextless" () -> String_Name {
 }
 
 new_physics_server3d_extension :: proc "contextless" () -> Physics_Server3d_Extension {
-    return __bindgen_gde.classdb_construct_object(physics_server3d_extension_name_ref())
+    return cast(Physics_Server3d_Extension)__bindgen_gde.classdb_construct_object(physics_server3d_extension_name_ref())
 }
 
 // methods

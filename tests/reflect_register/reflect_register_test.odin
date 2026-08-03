@@ -83,6 +83,60 @@ Bad :: struct {
 	synced:    i32 `gd:"replicate,interp"`, // kit/net tag: scriptgen's, NOT an error, NOT an export
 }
 
+// ---- script-resolving onready fixtures (`buddy: ^Ally `gd:"onready=..."``) -------
+
+// The TARGET script struct — registered as a class in the fixup test.
+Ally :: struct {
+	owner: gd.Node,
+	hp:    i32 `gd:"export"`,
+}
+
+// NOT a script class: a `^Not_A_Script` onready target must be refused at fixup.
+Not_A_Script :: struct {
+	x: int,
+}
+
+Script_Refs :: struct {
+	owner:    gd.Node,
+	buddy:    ^Ally `gd:"onready=Allies/Buddy"`,
+	node_ref: gd.Node2d `gd:"onready=Sprite"`, // control: a plain handle beside it
+}
+
+Bad_Script_Ref :: struct {
+	owner: gd.Node,
+	oops:  ^Not_A_Script `gd:"onready=Nope"`,
+}
+
+// Array onready: fixed arrays of handles / script pointers with a `%d` path template.
+Squadron :: struct {
+	owner:  gd.Node,
+	cards:  [4]gd.Node2d `gd:"onready=Deck/Card%d"`,
+	allies: [2]^Ally `gd:"onready=Squad/Ally%d"`,
+}
+
+Bad_Arrays :: struct {
+	owner:       gd.Node,
+	no_tmpl:     [3]gd.Node2d `gd:"onready=Deck/Card"`, // array without a %d template
+	tmpl_scalar: gd.Node2d `gd:"onready=Deck/Card%d"`,  // %d on a scalar field
+}
+
+// Scene-unique-name paths (`%Hud`): engine NodePath syntax, passed through verbatim.
+// The trap case is a unique name starting with 'd' — `%dock` contains the bytes "%d"
+// and must NOT read as an array template (segment-start '%' is always the marker).
+Unique_Refs :: struct {
+	owner: gd.Node,
+	hud:   gd.Node2d `gd:"onready=%Hud"`,
+	dock:  gd.Node2d `gd:"onready=%dock"`,            // unique name starting with 'd'
+	deep:  gd.Node `gd:"onready=%dock/Label"`,        // unique segment, then a normal path
+	slots: [3]gd.Node2d `gd:"onready=%dock/Slot%d"`,  // unique prefix + mid-name template
+}
+
+Bad_Unique :: struct {
+	owner: gd.Node,
+	mid:   gd.Node2d `gd:"onready=Deck/Ca%rd"`, // stray '%' inside a node name
+	arr:   [2]gd.Node2d `gd:"onready=%dock"`,   // array whose only "%d" bytes are a unique marker
+}
+
 // `gd:"entity=Name:id"` — the one tag BOTH halves of the toolchain act on, and the
 // only one that SYNTHESIZES its own leading tokens. It leads the tag because it is a
 // wire declaration (a permanent public type id, a NET_FINGERPRINT input, a row in the
@@ -125,6 +179,54 @@ entity_first_synthesizes_its_export :: proc(t: ^testing.T) {
 	// Trailing export specs still ride behind the declaration.
 	deco, _ := find_export(desc, "deco")
 	testing.expect_value(t, string(deco.group), "Spawns")
+}
+
+// A hint-less OBJECT export is refused at registration: the Resource_Type hint is
+// what switches on inst_set's refcount hold, so without one the field stores an
+// unreferenced pointer that dangles once the loader's transient ref drops — a
+// delayed SIGSEGV far from the declaration (the desert-shooter bullet_scene crash).
+Dangling :: struct {
+	owner: gd.Node,
+	scene: gd.Object `gd:"export"`, // type-erased AND hint-less: refused, dropped
+	fine:  i32 `gd:"export"`, // an innocent sibling must survive the refusal
+}
+
+@(test)
+hintless_object_export_is_refused :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	desc := rt.reflect_class_desc(Dangling, info("Dangling"))
+	errs := new_errors_since(before)
+	testing.expectf(t, len(errs) == 1, "expected exactly one refusal, got %d", len(errs))
+	_, registered := find_export(desc, "scene")
+	testing.expect(t, !registered, "the dangling-prone export must be dropped, not registered hint-less")
+	_, kept := find_export(desc, "fine")
+	testing.expect(t, kept, "the refusal must not take the sibling export down with it")
+}
+
+// The other half: scriptgen derives the class from a TYPED handle
+// (`gd.Texture2d` -> "Texture2D") and ships it in Field_Meta.resource_class; the
+// walk synthesizes the same hint `resource=Texture2D` would have produced —
+// byte-for-byte, proven against an explicitly-spelled control.
+Derived :: struct {
+	owner:   gd.Node,
+	skin:    gd.Texture2d `gd:"export"`, // typed handle + meta -> synthesized hint
+	control: gd.Object `gd:"export,resource=Texture2D"`,
+}
+
+@(test)
+field_meta_resource_class_synthesizes_the_hint :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	fields := []rt.Field_Meta{{field = "skin", line = 1, resource_class = "Texture2D"}}
+	desc := rt.reflect_class_desc(Derived, info("Derived", fields))
+	testing.expect_value(t, len(new_errors_since(before)), 0)
+
+	skin, sok := find_export(desc, "skin")
+	ctl, cok := find_export(desc, "control")
+	testing.expect(t, sok && cok, "both exports must register")
+	if !sok || !cok {return}
+	testing.expect_value(t, skin.hint, ctl.hint)
+	testing.expect_value(t, string(skin.hint_string), string(ctl.hint_string))
+	testing.expect_value(t, skin.type, ctl.type)
 }
 
 // Signal fields (gd.Signal0 … Signal4): detected by TYPE (tag optional), the field name
@@ -851,6 +953,115 @@ test_reset_clears_class_registry :: proc(t: ^testing.T) {
 	rt.reflect_register_reset_for_tests()
 	_ = rt.odin_scripts_manifest(&n)
 	testing.expect_value(t, int(n), 0)
+}
+
+// ---- script-resolving onready (`buddy: ^Ally`) -----------------------------------
+
+@(test)
+walk_classifies_script_onready :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	desc := rt.reflect_class_desc(Script_Refs, info("ScriptRefs"))
+	testing.expect_value(t, len(new_errors_since(before)), 0)
+	testing.expect_value(t, int(desc.onready_count), 2)
+	ors := rt.desc_onready(desc)
+	// The ^Ally field: structural classification records the POINTEE typeid; the class
+	// name stays nil until the manifest-time fixup (Ally's own `@(init)` may not have
+	// run yet mid-walk, so the name is unknowable here).
+	testing.expect_value(t, ors[0].offset, offset_of(Script_Refs, buddy))
+	testing.expect_value(t, string(ors[0].path), "Allies/Buddy")
+	testing.expect_value(t, string(ors[0].field), "buddy")
+	testing.expect_value(t, ors[0].script_id, typeid_of(Ally))
+	testing.expect(t, ors[0].script_class == nil, "class name resolves at fixup, not mid-walk")
+	// The plain handle rides beside it, script-free.
+	testing.expect_value(t, ors[1].offset, offset_of(Script_Refs, node_ref))
+	testing.expect(t, ors[1].script_id == nil, "a handle field must not classify as a script ref")
+}
+
+@(test)
+walk_classifies_onready_arrays :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	desc := rt.reflect_class_desc(Squadron, info("Squadron"))
+	testing.expect_value(t, len(new_errors_since(before)), 0)
+	testing.expect_value(t, int(desc.onready_count), 2)
+	ors := rt.desc_onready(desc)
+	// [4]gd.Node2d: a handle array — count recorded, template kept verbatim.
+	testing.expect_value(t, ors[0].offset, offset_of(Squadron, cards))
+	testing.expect_value(t, string(ors[0].path), "Deck/Card%d")
+	testing.expect_value(t, int(ors[0].count), 4)
+	testing.expect(t, ors[0].script_id == nil, "handle array must not classify as script")
+	// [2]^Ally: a script array — ELEMENT classification (pointee typeid), count 2.
+	testing.expect_value(t, ors[1].offset, offset_of(Squadron, allies))
+	testing.expect_value(t, int(ors[1].count), 2)
+	testing.expect_value(t, ors[1].script_id, typeid_of(Ally))
+
+	// The template contract is enforced both ways: array without %d, %d on a scalar.
+	before2 := len(rt.registration_errors())
+	bad := rt.reflect_class_desc(Bad_Arrays, info("BadArrays"))
+	errs := new_errors_since(before2)
+	testing.expect_value(t, len(errs), 2)
+	testing.expect_value(t, int(bad.onready_count), 0)
+}
+
+@(test)
+walk_accepts_unique_name_paths :: proc(t: ^testing.T) {
+	before := len(rt.registration_errors())
+	desc := rt.reflect_class_desc(Unique_Refs, info("UniqueRefs"))
+	testing.expect_value(t, len(new_errors_since(before)), 0)
+	testing.expect_value(t, int(desc.onready_count), 4)
+	ors := rt.desc_onready(desc)
+	testing.expect_value(t, string(ors[0].path), "%Hud")
+	// `%dock` contains the bytes "%d" — segment-start '%' is the unique-name marker,
+	// never a template: scalar classification, path kept verbatim.
+	testing.expect_value(t, string(ors[1].path), "%dock")
+	testing.expect_value(t, int(ors[1].count), 0)
+	testing.expect_value(t, string(ors[2].path), "%dock/Label")
+	// Array behind a deceptive unique prefix: the template is found MID-NAME.
+	testing.expect_value(t, string(ors[3].path), "%dock/Slot%d")
+	testing.expect_value(t, int(ors[3].count), 3)
+	at, n, stray := rt.scan_onready_template("%dock/Slot%d")
+	testing.expect_value(t, at, 10) // the core substitutes at Slot%d, not into %dock
+	testing.expect_value(t, n, 1)
+	testing.expect_value(t, stray, 0)
+
+	// Refusals: a stray '%' inside a name; an array path whose only "%d" is a marker.
+	before2 := len(rt.registration_errors())
+	bad := rt.reflect_class_desc(Bad_Unique, info("BadUnique"))
+	testing.expect_value(t, len(new_errors_since(before2)), 2)
+	testing.expect_value(t, int(bad.onready_count), 0)
+}
+
+@(test)
+onready_script_fixup :: proc(t: ^testing.T) {
+	rt.reflect_register_reset_for_tests()
+	before := len(rt.registration_errors())
+
+	rt.register_class(Ally, info("Ally"))
+	rt.register_class(Script_Refs, info("ScriptRefs"))
+	rt.register_class(Bad_Script_Ref, info("BadScriptRef"))
+
+	// The first manifest pull runs the fixup: every `@(init)` has run by then.
+	n: i32
+	descs := rt.odin_scripts_manifest(&n)
+	testing.expect_value(t, int(n), 3)
+
+	// ^Ally binds to Ally's registered class name and the entry stays live...
+	ors := rt.desc_onready(descs[1])
+	testing.expect_value(t, string(ors[0].script_class), "Ally")
+	testing.expect(t, ors[0].path != nil, "resolved entry stays live")
+	testing.expect(t, ors[1].script_class == nil, "the plain handle stays a node ref")
+
+	// ...and ^Not_A_Script is refused + NEUTRALIZED (path nil'd, so the core can
+	// never write a raw node pointer into the typed field).
+	bors := rt.desc_onready(descs[2])
+	testing.expect(t, bors[0].script_class == nil, "unregistered target must not resolve")
+	testing.expect(t, bors[0].path == nil, "refused entry is neutralized")
+	errs := new_errors_since(before)
+	testing.expect_value(t, len(errs), 1)
+	if len(errs) == 1 {
+		testing.expect_value(t, string(errs[0].class), "BadScriptRef")
+		testing.expect_value(t, string(errs[0].field), "oops")
+	}
+	rt.reflect_register_reset_for_tests()
 }
 
 @(test)

@@ -24,7 +24,7 @@ graph_edit_name :: proc "contextless" () -> String_Name {
 }
 
 new_graph_edit :: proc "contextless" () -> Graph_Edit {
-    return __bindgen_gde.classdb_construct_object(graph_edit_name_ref())
+    return cast(Graph_Edit)__bindgen_gde.classdb_construct_object(graph_edit_name_ref())
 }
 
 // methods

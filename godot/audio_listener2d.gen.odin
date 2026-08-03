@@ -16,7 +16,7 @@ audio_listener2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_audio_listener2d :: proc "contextless" () -> Audio_Listener2d {
-    return __bindgen_gde.classdb_construct_object(audio_listener2d_name_ref())
+    return cast(Audio_Listener2d)__bindgen_gde.classdb_construct_object(audio_listener2d_name_ref())
 }
 
 // methods

@@ -16,7 +16,7 @@ editor_file_system_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_file_system :: proc "contextless" () -> Editor_File_System {
-    return __bindgen_gde.classdb_construct_object(editor_file_system_name_ref())
+    return cast(Editor_File_System)__bindgen_gde.classdb_construct_object(editor_file_system_name_ref())
 }
 
 // methods

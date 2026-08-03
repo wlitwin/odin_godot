@@ -22,7 +22,7 @@ slider_name :: proc "contextless" () -> String_Name {
 }
 
 new_slider :: proc "contextless" () -> Slider {
-    return __bindgen_gde.classdb_construct_object(slider_name_ref())
+    return cast(Slider)__bindgen_gde.classdb_construct_object(slider_name_ref())
 }
 
 // methods

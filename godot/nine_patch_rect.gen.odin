@@ -21,7 +21,7 @@ nine_patch_rect_name :: proc "contextless" () -> String_Name {
 }
 
 new_nine_patch_rect :: proc "contextless" () -> Nine_Patch_Rect {
-    return __bindgen_gde.classdb_construct_object(nine_patch_rect_name_ref())
+    return cast(Nine_Patch_Rect)__bindgen_gde.classdb_construct_object(nine_patch_rect_name_ref())
 }
 
 // methods

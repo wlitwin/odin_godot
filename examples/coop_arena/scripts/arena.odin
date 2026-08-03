@@ -1,5 +1,6 @@
 //gd:extends Node2D
 //gd:class ArenaGame
+//gd:group arena_game
 package coop_arena
 
 // ----------------------------------------------------------------------------
@@ -33,13 +34,13 @@ package coop_arena
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
-import gdext "godot:gdext"
 import rt "godot:runtime"
+import "godot:play"
 import "core:fmt"
 import "core:strconv"
 import "core:math"
 
-IS_WEB :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
+IS_WEB :: gd.IS_WEB // the library's compiled-for-the-browser test (transport selection below)
 
 DEFAULT_PORT :: 7777
 SCRIPT_ENEMY_ID :: 9001
@@ -147,74 +148,9 @@ log :: proc(s: string) {gd.print_str(s)}
 @(private = "file")
 vi :: proc "contextless" (x: int) -> gd.Variant {v := i64(x); return gd.variant_from(&v)}
 
-@(private = "file")
-read_env :: proc(key: cstring) -> string {
-	os := gd.singleton_os()
-	k := gd.new_string_cstring(key)
-	if !bool(gd.os_has_environment(os, k)) {return ""}
-	s := gd.os_get_environment(os, k)
-	return str_to_odin(s)
-}
-
-@(private = "file")
-str_to_odin :: proc(s: gd.String) -> string {
-	s := s
-	n := gdext.string_to_utf8_chars(cast(gdext.StringPtr)&s, nil, 0)
-	if n <= 0 {return ""}
-	buf := make([]u8, n, context.temp_allocator)
-	gdext.string_to_utf8_chars(cast(gdext.StringPtr)&s, cast(cstring)raw_data(buf), n)
-	return string(buf)
-}
-
-@(private = "file")
-web_query :: proc(key: string) -> string {
-	when IS_WEB {
-		js := gd.singleton_java_script_bridge()
-		code := gd.new_string_cstring("location.search || ''")
-		v := gd.java_script_bridge_eval(js, code, true)
-		search := gd.variant_to_string(&v)
-		s := str_to_odin(search)
-		if len(s) > 0 && s[0] == '?' {s = s[1:]}
-		start := 0
-		for i := 0; i <= len(s); i += 1 {
-			if i == len(s) || s[i] == '&' {
-				kv := s[start:i]
-				eq := -1
-				for j in 0 ..< len(kv) {if kv[j] == '=' {eq = j; break}}
-				if eq > 0 && kv[:eq] == key {return uri_decode(kv[eq + 1:])}
-				start = i + 1
-			}
-		}
-		return ""
-	} else {
-		return ""
-	}
-}
-
-@(private = "file")
-uri_decode :: proc(s: string) -> string {
-	out := make([]u8, len(s), context.temp_allocator)
-	n := 0; i := 0
-	for i < len(s) {
-		if s[i] == '%' && i + 2 < len(s) {
-			hi := hexval(s[i + 1]); lo := hexval(s[i + 2])
-			if hi >= 0 && lo >= 0 {out[n] = u8(hi * 16 + lo); n += 1; i += 3; continue}
-		}
-		out[n] = s[i]; n += 1; i += 1
-	}
-	return string(out[:n])
-}
-@(private = "file")
-hexval :: proc(c: u8) -> int {
-	switch {
-	case c >= '0' && c <= '9': return int(c - '0')
-	case c >= 'a' && c <= 'f': return int(c - 'a' + 10)
-	case c >= 'A' && c <= 'F': return int(c - 'A' + 10)
-	}
-	return -1
-}
-@(private = "file")
-sn :: proc "contextless" (s: cstring) -> gd.String_Name {return gd.new_string_name_cstring(s, true)}
+// (Launch configuration — env vars natively, ?query on web — reads through the library:
+// gd.launch_param / gd.env_string / gd.web_query. The hand-rolled read_env/web_query/
+// uri_decode cluster that used to live here was promoted into godot/Ergonomics_Launch.odin.)
 
 @(private = "file")
 pawn_start :: proc "contextless" (peer_id: int) -> gd.Vector2 {
@@ -246,7 +182,7 @@ first_enemy :: proc(self: ^ArenaGame) -> gd.Node {
 @(private = "file")
 update_hud :: proc(self: ^ArenaGame) {
 	if self.hud_info != nil {
-		gd.set_string(self.hud_info, "text", fmt.ctprintf("Lv %d   XP %d/%d   Kills %d", self.my_level, self.my_xp, XP_TO_LEVEL, self.kills))
+		gd.set_text(self.hud_info, fmt.ctprintf("Lv %d   XP %d/%d   Kills %d", self.my_level, self.my_xp, XP_TO_LEVEL, self.kills))
 	}
 }
 
@@ -269,7 +205,8 @@ arena_game_ready :: proc(self: ^ArenaGame) {
 	self.url = "ws://127.0.0.1:9080"
 	self.mode = .Boot
 	self.my_level = 1
-	gd.add_to_group(self.owner, GROUP_GAME)
+	// (GROUP_GAME membership is declared by the `//gd:group arena_game` marker up top —
+	// joined at READY, before this proc runs.)
 
 	// Build the enemy MultiplayerSpawner on EVERY peer (the client's spawner instantiates the
 	// host's res://arena_enemy.tscn spawns). spawn_path is the sibling Enemies node.
@@ -280,10 +217,7 @@ arena_game_ready :: proc(self: ^ArenaGame) {
 	gd.multiplayer_spawner_set_spawn_path(sp, gd.new_node_path_cstring("../Enemies"))
 	self.spawner = sp
 
-	role := read_env("COOP_ROLE")
-	when IS_WEB {
-		if role == "" {role = web_query("role")}
-	}
+	role := gd.launch_param("COOP_ROLE", "role")
 	if role == "server" || role == "client" || role == "single" || role == "host" || role == "join" {
 		self.headless = true
 		switch role {
@@ -291,55 +225,42 @@ arena_game_ready :: proc(self: ^ArenaGame) {
 		case "client", "join": self.role = .Client
 		case "single":         self.role = .Single
 		}
-		if p := read_env("COOP_PORT"); p != "" {if v, ok := strconv.parse_int(p); ok {self.port = v}}
-		if a := read_env("COOP_ADDR"); a != "" {self.addr = a}
+		if p := gd.env_string("COOP_PORT"); p != "" {if v, ok := strconv.parse_int(p); ok {self.port = v}}
+		if a := gd.env_string("COOP_ADDR"); a != "" {self.addr = a}
 		when IS_WEB {
-			if u := web_query("url"); u != "" {self.url = u}
-			if r := web_query("room"); r != "" {self.room = r}
+			if u := gd.web_query("url"); u != "" {self.url = u}
+			if r := gd.web_query("room"); r != "" {self.room = r}
 		}
 		if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}
 		log(fmt.tprintf("ARENA_BOOT role=%v web=%v", self.role, IS_WEB))
 	} else {
 		self.headless = false
 		when IS_WEB {
-			if u := web_query("url"); u != "" {self.url = u} // let a deploy pin the relay via ?url=
+			if u := gd.web_query("url"); u != "" {self.url = u} // let a deploy pin the relay via ?url=
 		}
 		if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", true)}
 		// Default the signaling URL field to the real value so a joiner usually only needs the room
 		// code (it stays editable for other deploys).
-		if self.url_edit != nil {gd.set_string(self.url_edit, "text", fmt.ctprintf("%s", self.url))}
-		if self.code_label != nil {gd.set_string(self.code_label, "text", "")}
-		wire_button(self, "SingleButton", "on_single")
-		wire_button(self, "HostButton", "on_host")
-		wire_button(self, "JoinButton", "on_join")
+		if self.url_edit != nil {gd.set_text(self.url_edit, fmt.ctprintf("%s", self.url))}
+		if self.code_label != nil {gd.set_text(self.code_label, "")}
+		// The Single/Host/Join buttons are wired DECLARATIVELY — each handler below carries
+		// @(gd_connect = "StartScreen/<Button>:pressed"), connected at READY before this runs.
 		when IS_WEB {
 			// Web paste fix (Bug 2): the built-in LineEdit paste reads DisplayServer.clipboard_get,
 			// which is empty in the web export (the browser clipboard is async + permissioned). We
 			// intercept Ctrl/Cmd+V on the lobby fields and read navigator.clipboard via the JS bridge.
-			wire_signal(self, "UrlEdit", "gui_input", "on_lobby_input")
-			wire_signal(self, "RoomEdit", "gui_input", "on_lobby_input")
+			// TWO emitters feed ONE handler, so this stays manual gd.connect_to (one @(gd_connect)
+			// declares one emitter path) — the fields are already onready-resolved above.
+			if self.url_edit != nil {gd.connect_to(self.url_edit, "gui_input", self.owner, "on_lobby_input")}
+			if self.room_edit != nil {gd.connect_to(self.room_edit, "gui_input", self.owner, "on_lobby_input")}
 			// Headless self-drive hooks for the gated browser harness (no human needed).
-			switch web_query("lobbytest") {
+			switch gd.web_query("lobbytest") {
 			case "retry": self.lobby_test = .Retry
 			case "paste": self.lobby_test = .Paste
 			}
 		}
 	}
 	update_hud(self)
-}
-
-@(private = "file")
-wire_button :: proc(self: ^ArenaGame, name: cstring, method: cstring) {
-	if self.start_screen == nil {return}
-	b := gd.get_node(self.start_screen, name)
-	if b != nil {gd.connect_to(b, "pressed", self.owner, method)}
-}
-
-@(private = "file")
-wire_signal :: proc(self: ^ArenaGame, name: cstring, signal: cstring, method: cstring) {
-	if self.start_screen == nil {return}
-	b := gd.get_node(self.start_screen, name)
-	if b != nil {gd.connect_to(b, signal, self.owner, method)}
 }
 
 @(private = "file")
@@ -392,7 +313,7 @@ arena_game_process :: proc(self: ^ArenaGame, delta: f64) {
 			// Scripted sessions quit on failure so the harness sees a deterministic timeout.
 			if self.alive_t > CONNECT_TIMEOUT {
 				log(fmt.tprintf("%v_TIMEOUT: no peer", self.role))
-				quit_now(self, 1)
+				gd.quit(self.owner, 1)
 			}
 		} else {
 			// WINDOWED (Bug 1): RECOVER on ANY connect failure — a signaling error (no_room/full),
@@ -427,7 +348,7 @@ arena_game_process :: proc(self: ^ArenaGame, delta: f64) {
 			scripted_tick(self, delta)
 			if self.alive_t > GLOBAL_TIMEOUT && !self.done {
 				log(fmt.tprintf("%v_TIMEOUT: scripted loop did not complete", self.role))
-				quit_now(self, 1)
+				gd.quit(self.owner, 1)
 			}
 		} else {
 			free_play_tick(self, delta)
@@ -442,18 +363,18 @@ start_session :: proc(self: ^ArenaGame) {
 		ok := self.role == .Server \
 			? gd.webrtc_host(self.owner, fmt.ctprintf("%s", self.url)) \
 			: gd.webrtc_join(self.owner, fmt.ctprintf("%s", self.url), fmt.ctprintf("%s", self.room))
-		if ok {log(fmt.tprintf("WEBRTC_%v_STARTED url=%s room=%s", self.role, self.url, self.room))} else {log("TRANSPORT_FAIL"); quit_now(self, 1)}
+		if ok {log(fmt.tprintf("WEBRTC_%v_STARTED url=%s room=%s", self.role, self.url, self.room))} else {log("TRANSPORT_FAIL"); gd.quit(self.owner, 1)}
 	} else {
 		if self.role == .Server {
 			if gd.host(self.owner, self.port) {
 				gd.on_peer_connected(self.owner, "on_peer_connected")
 				gd.on_peer_disconnected(self.owner, "on_peer_disconnected")
 				log(fmt.tprintf("HOST_OK port=%d is_server=%v", self.port, gd.is_server(self.owner)))
-			} else {log("HOST_FAIL"); quit_now(self, 1)}
+			} else {log("HOST_FAIL"); gd.quit(self.owner, 1)}
 		} else {
 			if gd.join(self.owner, fmt.ctprintf("%s", self.addr), self.port) {
 				log(fmt.tprintf("CLIENT_STARTED addr=%s port=%d", self.addr, self.port))
-			} else {log("CLIENT_FAIL"); quit_now(self, 1)}
+			} else {log("CLIENT_FAIL"); gd.quit(self.owner, 1)}
 		}
 	}
 }
@@ -472,7 +393,7 @@ lobby_web_update :: proc(self: ^ArenaGame) {
 				self.room = code
 				log(fmt.tprintf("ROOM_CODE %s", code)) // headless driver scrapes this
 				if !self.headless && self.code_label != nil {
-					gd.set_string(self.code_label, "text", fmt.ctprintf("ROOM CODE:  %s   (share with a friend)", code))
+					gd.set_text(self.code_label, fmt.ctprintf("ROOM CODE:  %s   (share with a friend)", code))
 				}
 			}
 		}
@@ -480,27 +401,21 @@ lobby_web_update :: proc(self: ^ArenaGame) {
 		// Windowed status line.
 		if self.status == nil {return}
 		if reason := gd.webrtc_error_reason(self.owner); reason != "" {
-			gd.set_string(self.status, "text", fmt.ctprintf("Error: %s", reason))
+			gd.set_text(self.status, fmt.ctprintf("Error: %s", reason))
 			return
 		}
 		if self.mode == .Play {
-			gd.set_string(self.status, "text", "Connected!")
+			gd.set_text(self.status, "Connected!")
 		} else if self.role == .Server {
 			if self.room_logged {
-				gd.set_string(self.status, "text", "Waiting for a friend to join...")
+				gd.set_text(self.status, "Waiting for a friend to join...")
 			} else {
-				gd.set_string(self.status, "text", "Hosting — contacting signaling server...")
+				gd.set_text(self.status, "Hosting — contacting signaling server...")
 			}
 		} else {
-			gd.set_string(self.status, "text", fmt.ctprintf("Joining room %s...", self.room))
+			gd.set_text(self.status, fmt.ctprintf("Joining room %s...", self.room))
 		}
 	}
-}
-
-@(private = "file")
-quit_now :: proc(self: ^ArenaGame, code: int) {
-	tree := gd.get_tree(self.owner)
-	if tree != nil {gd.scene_tree_quit(tree, gd.Int(code))}
 }
 
 // ---- pawn spawning (host-orchestrated, OWNER-authoritative) -----------------
@@ -508,7 +423,10 @@ quit_now :: proc(self: ^ArenaGame, code: int) {
 @(private = "file")
 spawn_pawn_local :: proc(self: ^ArenaGame, peer_id: int) {
 	if pawn_node(self, peer_id) != nil {return}
-	p := gd.instantiate(gd.load_scene("res://arena_player.tscn"))
+	// rt.spawn_scripted = instantiate + resolve the root's TYPED script in one step, without
+	// parenting — we name the node, add it, then poke the script AFTER add_child (this site's
+	// pokes recolor/arm an already-ready pawn on purpose).
+	p, cp := rt.spawn_scripted(gd.load_scene("res://arena_player.tscn"), ArenaPlayer)
 	if p == nil {return}
 	gd.node_set_name(p, gd.new_string_name_cstring(fmt.ctprintf("P%d", peer_id), false))
 	gd.add_child(self.players, p)
@@ -516,7 +434,6 @@ spawn_pawn_local :: proc(self: ^ArenaGame, peer_id: int) {
 	// owner (the owner sims its own pawn; everyone else renders the synced transform).
 	gd.node_set_multiplayer_authority(p, gd.Int(peer_id), true)
 	gd.node2d_set_position(cast(gd.Node2d)p, pawn_start(peer_id))
-	cp := rt.script_of(p, ArenaPlayer)
 	if cp != nil {
 		arena_player_recolor(cp, peer_id)
 		// Arm auto-fire on MY OWN pawn. In the headless co-op test the host disarms its own pawn
@@ -549,11 +466,10 @@ arena_broadcast_damage :: proc(game: ^ArenaGame, eid: int, amount: int, killer: 
 @(private = "file")
 arena_spawn_bullet :: proc(game: ^ArenaGame, shooter: int, origin: gd.Vector2, dir: gd.Vector2, damage: int, color: gd.Color, owned: bool) {
 	if game.bullets == nil {return}
-	b := gd.instantiate(gd.load_scene("res://arena_bullet.tscn"))
+	b, bs := rt.spawn_scripted(gd.load_scene("res://arena_bullet.tscn"), ArenaBullet)
 	if b == nil {return}
 	gd.add_child(game.bullets, b)
 	gd.node2d_set_global_position(cast(gd.Node2d)b, origin)
-	bs := rt.script_of(b, ArenaBullet)
 	if bs != nil {
 		bs.dir = dir; bs.damage = damage; bs.owner_peer = shooter; bs.owned = owned
 		body := gd.get_node(b, "Body")
@@ -586,10 +502,12 @@ grant_xp :: proc(self: ^ArenaGame, amount: int) {
 
 @(private = "file")
 host_spawn_enemy :: proc(self: ^ArenaGame, id: int, pos: gd.Vector2, hp: int) {
-	e := gd.instantiate(gd.load_scene("res://arena_enemy.tscn"))
+	// poke-BEFORE-add: rt.spawn_scripted resolves the typed script with the node still
+	// unparented, so id/hp are set before add_child and the enemy's _ready SEES the poked
+	// hp (its default guard must not overwrite SINGLE_ENEMY_HP / SINGLE_TOUGH_HP).
+	e, ce := rt.spawn_scripted(gd.load_scene("res://arena_enemy.tscn"), ArenaEnemy)
 	if e == nil {return}
 	gd.node_set_name(e, gd.new_string_name_cstring(fmt.ctprintf("E%d", id), false))
-	ce := rt.script_of(e, ArenaEnemy)
 	if ce != nil {ce.id = id; ce.hp = hp}
 	gd.node2d_set_position(cast(gd.Node2d)e, pos)
 	gd.add_child(self.enemies, e)
@@ -608,7 +526,7 @@ host_enemy_sim :: proc(self: ^ArenaGame, delta: f64) {
 		epos := gd.node2d_get_position(cast(gd.Node2d)e)
 		tp, tnode, ok := nearest_pawn(self, epos)
 		if !ok {continue}
-		d := normalized(gd.Vector2{tp.x - epos.x, tp.y - epos.y})
+		d := gd.normalized(gd.Vector2{tp.x - epos.x, tp.y - epos.y})
 		epos.x += d.x * ENEMY_SPEED * f32(delta)
 		epos.y += d.y * ENEMY_SPEED * f32(delta)
 		gd.node2d_set_position(cast(gd.Node2d)e, epos)
@@ -685,7 +603,7 @@ scripted_tick :: proc(self: ^ArenaGame, delta: f64) {
 			self.done = true
 			log(fmt.tprintf("SERVER_SUMMARY pawns=%d kills=%d", pawn_count(self), self.kills))
 			log("SERVER_DONE")
-			quit_now(self, 0)
+			gd.quit(self.owner)
 		}
 	case .Client:
 		me := gd.my_peer_id(self.owner)
@@ -729,7 +647,7 @@ scripted_tick :: proc(self: ^ArenaGame, delta: f64) {
 			self.done = true
 			log(fmt.tprintf("CLIENT_SUMMARY pawns=%d level=%d", pawn_count(self), self.my_level))
 			log("CLIENT_DONE")
-			quit_now(self, 0)
+			gd.quit(self.owner)
 		}
 	case .None:
 	}
@@ -777,7 +695,7 @@ single_tick :: proc(self: ^ArenaGame, delta: f64) {
 			self.done = true
 			log(fmt.tprintf("SINGLE_SUMMARY kills=%d level=%d", self.kills, self.my_level))
 			log("SINGLE_DONE")
-			quit_now(self, 0)
+			gd.quit(self.owner)
 		}
 	}
 }
@@ -789,9 +707,9 @@ free_play_tick :: proc(self: ^ArenaGame, delta: f64) {
 	// Pawns self-drive (input + auto-fire) in arena_player.odin; the host just feeds the horde.
 	host_enemy_sim(self, delta)
 	if self.role == .Client {return}
-	self.spawn_accum += f32(delta)
-	if self.spawn_accum > FREE_SPAWN_INTERVAL {
-		self.spawn_accum = 0
+	// play.every — the fixed-cadence drip: accumulate delta, fire once per interval, carry
+	// the remainder. Replaces the hand-rolled add/compare/reset accumulator block.
+	if play.every(&self.spawn_accum, f32(delta), FREE_SPAWN_INTERVAL) {
 		id := self.next_id; self.next_id += 1
 		ex := f32(20) + f32((id * 73) % 600)
 		host_spawn_enemy(self, id, gd.Vector2{ex, 12}, COOP_ENEMY_HP)
@@ -804,26 +722,29 @@ free_play_tick :: proc(self: ^ArenaGame, delta: f64) {
 @(private = "file")
 read_lobby_url :: proc(self: ^ArenaGame) {
 	if self.url_edit != nil {
-		if t := gd.get_string(self.url_edit, "text"); len(t) > 0 {self.url = t}
+		if t := gd.get_text(self.url_edit); len(t) > 0 {self.url = t}
 	}
 }
 
-@(gd_method)
+// The lobby buttons wire themselves: @(gd_connect = "Path/To/Node:signal") connects the named
+// emitter's signal to this method at READY (path resolved like an onready ref) — no _ready
+// connect calls. Headless runs connect too, harmlessly: the start screen is hidden.
+@(gd_method, gd_connect = "StartScreen/SingleButton:pressed")
 arena_game_on_single :: proc(self: ^ArenaGame) {
 	self.role = .Single
-	if self.status != nil {gd.set_string(self.status, "text", "Single Player")}
+	if self.status != nil {gd.set_text(self.status, "Single Player")}
 	if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}
 }
 // Host: keep the lobby panel up so the assigned ROOM CODE can be DISPLAYED to share; the panel is
 // dropped on connect (in the Connecting->Play transition). Status is driven by lobby_web_update.
-@(gd_method)
+@(gd_method, gd_connect = "StartScreen/HostButton:pressed")
 arena_game_on_host :: proc(self: ^ArenaGame) {begin_host(self)}
 // Join: read the room code the friend shared (RoomEdit) + URL, then connect. Panel drops on
 // connect; errors (no_room/full) surface via lobby_web_update -> lobby_reset.
-@(gd_method)
+@(gd_method, gd_connect = "StartScreen/JoinButton:pressed")
 arena_game_on_join :: proc(self: ^ArenaGame) {
 	if self.room_edit != nil {
-		if t := gd.get_string(self.room_edit, "text"); len(t) > 0 {self.room = t}
+		if t := gd.get_text(self.room_edit); len(t) > 0 {self.room = t}
 	}
 	begin_join(self, "")
 }
@@ -836,7 +757,7 @@ begin_host :: proc(self: ^ArenaGame) {
 	read_lobby_url(self)
 	self.role = .Server
 	set_lobby_buttons_enabled(self, false)
-	if self.status != nil {gd.set_string(self.status, "text", "Hosting...")}
+	if self.status != nil {gd.set_text(self.status, "Hosting...")}
 	// Native (ENet) has no room code to show — drop the panel immediately.
 	when !IS_WEB {if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}}
 }
@@ -846,7 +767,7 @@ begin_join :: proc(self: ^ArenaGame, room: string) {
 	if room != "" {self.room = room}
 	self.role = .Client
 	set_lobby_buttons_enabled(self, false)
-	if self.status != nil {gd.set_string(self.status, "text", "Joining...")}
+	if self.status != nil {gd.set_text(self.status, "Joining...")}
 	when !IS_WEB {if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", false)}}
 }
 
@@ -869,9 +790,9 @@ lobby_reset :: proc(self: ^ArenaGame, reason: string) {
 	self.reset_count += 1
 	if self.start_screen != nil {gd.set_bool(self.start_screen, "visible", true)}
 	set_lobby_buttons_enabled(self, true)
-	if self.code_label != nil {gd.set_string(self.code_label, "text", "")}
+	if self.code_label != nil {gd.set_text(self.code_label, "")}
 	if self.status != nil {
-		gd.set_string(self.status, "text", fmt.ctprintf("Connection failed (%s). Pick Host or Join to try again.", reason))
+		gd.set_text(self.status, fmt.ctprintf("Connection failed (%s). Pick Host or Join to try again.", reason))
 	}
 	log(fmt.tprintf("LOBBY_RESET reason=%s count=%d", reason, self.reset_count))
 }
@@ -936,10 +857,10 @@ lobby_paste_poll :: proc(self: ^ArenaGame, delta: f64) {
 		self.paste_t += delta
 		js := gd.singleton_java_script_bridge()
 		dv := gd.java_script_bridge_eval(js, gd.new_string_cstring("String(window.__gdClipDone||0)"), true)
-		done := str_to_odin(gd.variant_to_string(&dv))
+		done := gd.gd_string_to_odin(gd.variant_to_string(&dv))
 		if done == "1" {
 			tv := gd.java_script_bridge_eval(js, gd.new_string_cstring("(window.__gdClip==null?'':String(window.__gdClip))"), true)
-			text := str_to_odin(gd.variant_to_string(&tv))
+			text := gd.gd_string_to_odin(gd.variant_to_string(&tv))
 			apply_paste(self, sanitize_line(text))
 			self.paste_pending = false
 		} else if done == "2" || self.paste_t > 3.0 {
@@ -987,7 +908,7 @@ lobby_test_drive :: proc(self: ^ArenaGame, delta: f64) {
 					log("LOBBY_RETRY_RESET_OK")
 					self.lt_phase = 2; self.lt_t = 0
 				} else if self.lt_t > 30 {
-					log("LOBBY_RETRY_FAIL: no reset after a failed join"); quit_now(self, 1)
+					log("LOBBY_RETRY_FAIL: no reset after a failed join"); gd.quit(self.owner, 1)
 				}
 			case 2:
 				begin_host(self) // second attempt, no page reload
@@ -996,9 +917,9 @@ lobby_test_drive :: proc(self: ^ArenaGame, delta: f64) {
 			case 3:
 				if self.room_logged {
 					log("LOBBY_RETRY_OK")
-					quit_now(self, 0)
+					gd.quit(self.owner)
 				} else if self.lt_t > 30 {
-					log("LOBBY_RETRY_FAIL: re-host produced no room code"); quit_now(self, 1)
+					log("LOBBY_RETRY_FAIL: re-host produced no room code"); gd.quit(self.owner, 1)
 				}
 			}
 		case .Paste:
@@ -1013,7 +934,7 @@ lobby_test_drive :: proc(self: ^ArenaGame, delta: f64) {
 			case 1:
 				js := gd.singleton_java_script_bridge()
 				wv := gd.java_script_bridge_eval(js, gd.new_string_cstring("String(window.__gdWrote||0)"), true)
-				w := str_to_odin(gd.variant_to_string(&wv))
+				w := gd.gd_string_to_odin(gd.variant_to_string(&wv))
 				if w == "1" {
 					ev := gd.new_input_event_key()
 					gd.input_event_key_set_keycode(ev, gd.Key.V)
@@ -1023,15 +944,15 @@ lobby_test_drive :: proc(self: ^ArenaGame, delta: f64) {
 					log("LOBBY_TEST_PASTE_KEY")
 					self.lt_phase = 2; self.lt_t = 0
 				} else if w == "2" || self.lt_t > 10 {
-					log("LOBBY_PASTE_FAIL: clipboard write blocked"); quit_now(self, 1)
+					log("LOBBY_PASTE_FAIL: clipboard write blocked"); gd.quit(self.owner, 1)
 				}
 			case 2:
 				if self.room_edit != nil {
-					if t := gd.get_string(self.room_edit, "text"); t == "WXYZ" {
+					if t := gd.get_text(self.room_edit); t == "WXYZ" {
 						log(fmt.tprintf("LOBBY_PASTE_OK field=room text=%s", t))
-						quit_now(self, 0)
+						gd.quit(self.owner)
 					} else if self.lt_t > 10 {
-						log(fmt.tprintf("LOBBY_PASTE_FAIL: field text=%q", t)); quit_now(self, 1)
+						log(fmt.tprintf("LOBBY_PASTE_FAIL: field text=%q", t)); gd.quit(self.owner, 1)
 					}
 				}
 			}
@@ -1070,7 +991,7 @@ arena_game_spawn_pawn :: proc(self: ^ArenaGame, peer_id: gd.Int) {
 arena_game_fired :: proc(self: ^ArenaGame, shooter: gd.Int, ox: gd.Int, oy: gd.Int, dx: gd.Int, dy: gd.Int) {
 	origin := gd.Vector2{f32(ox), f32(oy)}
 	dir := gd.Vector2{f32(dx) / 1000, f32(dy) / 1000}
-	arena_spawn_bullet(self, int(shooter), origin, dir, 0, peer_color(int(shooter)), false)
+	arena_spawn_bullet(self, int(shooter), origin, dir, 0, gd.peer_color(int(shooter)), false)
 }
 
 // damage — PEER-authoritative shared damage. The firing peer broadcasts (call_local) the hit it

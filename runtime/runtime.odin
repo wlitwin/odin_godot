@@ -84,9 +84,30 @@ Export :: struct {
 // `get_node(owner, path)` and writes the resulting Object pointer into the script field at
 // `offset`. The field is a private auto-wired ref (NOT a serialized @export), so it never
 // appears in the property/export list. Mirrors the Connection flow exactly.
+//
+// SCRIPT-RESOLVING form: a field typed `^<script struct>` (`hud: ^hud `gd:"onready=..."``)
+// wants the target node's Odin SCRIPT STRUCT, not the node handle — the core resolves
+// `get_node` and then the struct via its class-checked resolver (rt.script_of semantics),
+// collapsing the two-field handle+`rt.script_of`-in-ready idiom into one declaration.
+// `script_id` is the pointee's typeid, recorded by the reflection walk; like Class_Desc.id
+// it is DLL-LOCAL and opaque to the core. The walk cannot resolve it to a class name
+// (the target's own `@(init)` may not have run yet), so `script_class` is filled in by
+// fixup_onready_script_targets once the manifest is first pulled — nil script_class +
+// non-nil script_id never reaches the core (a failed fixup neutralizes the entry by
+// nil'ing `path`, which the core skips). `field` is the field's name, for error messages.
+//
+// ARRAY form — `cards: [9]gd.Button `gd:"onready=Shop/Card%d"``: a FIXED ARRAY of
+// handles (or `[N]^script struct`) with an INDEXED path template. `count` > 0 marks it;
+// `path` then contains exactly one `%d` (walk-validated), substituted with 0-based
+// indices at resolve time. Elements are pointer-sized, laid out contiguously from
+// `offset`. count == 0 is the scalar form above.
 Onready :: struct {
-	offset: uintptr,
-	path:   cstring,
+	offset:       uintptr,
+	path:         cstring,
+	field:        cstring,
+	script_id:    typeid,
+	script_class: cstring,
+	count:        i32,
 }
 
 // The uniform trampoline a custom method is invoked through. GDScript-initiated
@@ -116,9 +137,24 @@ Signal :: struct {
 // A declarative signal connection (from `@(gd_connect="signal")` on a method): on the
 // node's READY, the core connects owner.`signal` -> owner.`method`, so the author needn't
 // write a `ready` proc just to wire a signal.
+//
+// PATH-QUALIFIED form — `@(gd_connect="Path/To/Node:signal")`: `path` names the EMITTER
+// node (owner-relative, absolute, or `..`-style — anything get_node takes), resolved at
+// READY exactly like an `onready=` ref, then emitter.`signal` -> owner.`method`. nil
+// `path` = the plain form above (the owner emits its own signal). scriptgen splits the
+// declaration at the LAST ':' (node names cannot contain ':'), so only the split parts
+// cross the boundary here.
+//
+// INDEXED form — `@(gd_connect="Panel/Choice%d:pressed")` (`indexed` set, `path` holds
+// exactly one `%d`): the core probes indices 0, 1, 2, … until a node is missing and
+// connects EACH match with its index BOUND as a trailing callable arg — one handler for
+// N sibling emitters, told apart by its trailing index parameter. Index 0 must exist
+// (loud error otherwise).
 Connection :: struct {
-	signal: cstring,
-	method: cstring,
+	signal:  cstring,
+	method:  cstring,
+	path:    cstring,
+	indexed: bool,
 }
 
 // An `@(gd_rpc)` declaration on a `@(gd_method)` proc: the method is exposed to Godot's
@@ -171,6 +207,10 @@ Class_Desc :: struct {
 	connections_count: i32,
 	onready:           [^]Onready,
 	onready_count:     i32,
+	// `//gd:group a b` — groups the core joins on the node's READY (before onready /
+	// connection wiring / the user's ready). Static cstrings, dll-lifetime.
+	groups:            [^]cstring,
+	groups_count:      i32,
 	// `@(gd_rpc)` method RPC configs — reported to the engine via `_get_rpc_config`.
 	rpcs:              [^]Rpc,
 	rpcs_count:        i32,
@@ -203,6 +243,9 @@ desc_connections :: proc "contextless" (d: Class_Desc) -> []Connection {
 }
 desc_onready :: proc "contextless" (d: Class_Desc) -> []Onready {
 	return d.onready[:d.onready_count]
+}
+desc_groups :: proc "contextless" (d: Class_Desc) -> []cstring {
+	return d.groups[:d.groups_count]
 }
 desc_rpcs :: proc "contextless" (d: Class_Desc) -> []Rpc {
 	return d.rpcs[:d.rpcs_count]
@@ -283,11 +326,42 @@ class_name_for_typeid :: proc "contextless" (id: typeid) -> cstring {
 	return nil
 }
 
+// The reverse: a registered class NAME to its script struct typeid. Compared by VALUE —
+// the name arrives as core-owned bytes (an Odin_Instance's heap copy), never this dll's
+// static cstring, so pointer identity would always miss. nil when no class of that name
+// is registered HERE, which is what keeps `rt.script_any` module-safe: a foreign module's
+// class name misses this registry and resolves to nothing. Same linear walk / cost story
+// as class_name_for_typeid above.
+typeid_for_class_name :: proc "contextless" (name: string) -> typeid {
+	if name == "" {
+		return nil
+	}
+	for i in 0 ..< registry_count {
+		if string(registry[i].name) == name {
+			return registry[i].id
+		}
+	}
+	return nil
+}
+
 // The core pulls this right after `odin_scripts_boot`, dlsym'd by name, to learn
 // which classes the scripts dll provides. C-shaped: out-param count + returned
 // pointer (no Odin multi-return across the dll boundary).
+//
+// Also the earliest every-`@(init)`-has-run hook, so the script-onready fixup lives
+// here (once): each `^<script struct>` onready entry's typeid resolves to its
+// registered class name NOW, which mid-walk registration order made impossible.
+// Runs before the core's registration-errors drain on both native and web, so a
+// bad target surfaces through the normal error pass.
+@(private)
+onready_fixup_done: bool
+
 @(export)
 odin_scripts_manifest :: proc "c" (out_count: ^i32) -> [^]Class_Desc {
+	if !onready_fixup_done {
+		onready_fixup_done = true
+		fixup_onready_script_targets()
+	}
 	if out_count != nil {
 		out_count^ = i32(registry_count)
 	}

@@ -6,9 +6,9 @@ package barrage_powerups
 // Pickup — a falling powerup (powerups MODULE). An Area2D whose `body_entered` is
 // auto-wired to `collect` by @(gd_connect) — the declarative signal hookup (docs:
 // signals). On contact with the player it reads its PowerupConfig (typed, same
-// package) and applies the effect BY NAME: player buffs via Player.apply_powerup,
-// the SlowEnemies debuff via every node in the "enemies" group — both cross-module
-// engine calls.
+// package) and applies the effect BY NAME (gd.vcall): player buffs via
+// Player.apply_powerup, the SlowEnemies debuff via the enemies module's spawner —
+// both cross-module engine calls.
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
@@ -19,7 +19,7 @@ Pickup :: struct {
 
 	fall_speed: f32 `gd:"export,range=20:300:5"`,
 
-	config: ^gd.Resource, // assigned by the manager right after instancing
+	config: ^gd.Resource, // poked TYPED by the manager's rt.spawn_as_deferred (same dll)
 }
 
 pickup_ready :: proc(self: ^Pickup) {
@@ -34,11 +34,6 @@ pickup_physics_process :: proc(self: ^Pickup, delta: f64) {
 		return
 	}
 	gd.node2d_set_position(self.owner, pos)
-}
-
-@(gd_method)
-pickup_set_config :: proc(self: ^Pickup, config: ^gd.Resource) {
-	self.config = config
 }
 
 // collect — @(gd_connect): scriptgen wires owner.body_entered -> this method at _ready.
@@ -56,27 +51,15 @@ pickup_collect :: proc(self: ^Pickup, body: ^gd.Node2d) {
 	}
 
 	if Powerup_Kind(cfg.kind) == .SlowEnemies {
-		// ONE cross-module engine call into the enemies module; the per-enemy fan-out
+		// ONE cross-module vcall into the enemies module; the per-enemy fan-out
 		// happens over there on a pure-Odin events.Event — the canonical split
 		// (docs/events.md): engine calls cross the module boundary, direct typed
-		// calls handle the one-to-many inside it.
-		if tree := gd.node_get_tree(cast(gd.Node)self.owner); tree != nil {
-			grp := gd.new_string_name_cstring("spawner", true)
-			if sp := gd.scene_tree_get_first_node_in_group(tree, grp); sp != nil {
-				m := gd.sname("slow_all_enemies")
-				factor := f64(cfg.magnitude)
-				fv := gd.variant_from(&factor)
-				_ = gd.object_call(cast(gd.Object)sp, m, fv)
-			}
-		}
+		// calls handle the one-to-many inside it. (vcall on a missed group lookup
+		// is a quiet no-op — no nil guard needed.)
+		gd.vcall_void(gd.first_in_group(self.owner, "spawner"), "slow_all_enemies", f64(cfg.magnitude))
 	} else {
 		// Player buff: the colliding body IS the player (only body on this layer).
-		m := gd.sname("apply_powerup")
-		k := gd.Int(cfg.kind)
-		kv := gd.variant_from(&k)
-		mag := f64(cfg.magnitude)
-		mv := gd.variant_from(&mag)
-		_ = gd.object_call(cast(gd.Object)body, m, kv, mv)
+		gd.vcall_void(cast(gd.Object)body, "apply_powerup", cfg.kind, f64(cfg.magnitude))
 	}
 	gd.node_queue_free(cast(gd.Node)self.owner)
 }

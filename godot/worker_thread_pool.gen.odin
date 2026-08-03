@@ -16,7 +16,7 @@ worker_thread_pool_name :: proc "contextless" () -> String_Name {
 }
 
 new_worker_thread_pool :: proc "contextless" () -> Worker_Thread_Pool {
-    return __bindgen_gde.classdb_construct_object(worker_thread_pool_name_ref())
+    return cast(Worker_Thread_Pool)__bindgen_gde.classdb_construct_object(worker_thread_pool_name_ref())
 }
 
 // methods

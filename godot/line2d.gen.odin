@@ -31,7 +31,7 @@ line2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_line2d :: proc "contextless" () -> Line2d {
-    return __bindgen_gde.classdb_construct_object(line2d_name_ref())
+    return cast(Line2d)__bindgen_gde.classdb_construct_object(line2d_name_ref())
 }
 
 // methods

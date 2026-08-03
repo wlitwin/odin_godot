@@ -35,7 +35,7 @@ code_edit_name :: proc "contextless" () -> String_Name {
 }
 
 new_code_edit :: proc "contextless" () -> Code_Edit {
-    return __bindgen_gde.classdb_construct_object(code_edit_name_ref())
+    return cast(Code_Edit)__bindgen_gde.classdb_construct_object(code_edit_name_ref())
 }
 
 // methods

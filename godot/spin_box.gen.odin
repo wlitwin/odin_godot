@@ -16,7 +16,7 @@ spin_box_name :: proc "contextless" () -> String_Name {
 }
 
 new_spin_box :: proc "contextless" () -> Spin_Box {
-    return __bindgen_gde.classdb_construct_object(spin_box_name_ref())
+    return cast(Spin_Box)__bindgen_gde.classdb_construct_object(spin_box_name_ref())
 }
 
 // methods

@@ -16,7 +16,7 @@ open_xr_visibility_mask_name :: proc "contextless" () -> String_Name {
 }
 
 new_open_xr_visibility_mask :: proc "contextless" () -> Open_Xr_Visibility_Mask {
-    return __bindgen_gde.classdb_construct_object(open_xr_visibility_mask_name_ref())
+    return cast(Open_Xr_Visibility_Mask)__bindgen_gde.classdb_construct_object(open_xr_visibility_mask_name_ref())
 }
 
 // methods

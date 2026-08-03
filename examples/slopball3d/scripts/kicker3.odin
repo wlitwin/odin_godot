@@ -11,6 +11,7 @@ package slopball3d
 
 import gd "godot:godot"
 import knet "godot:kit/net"
+import play "godot:play"
 
 Kicker3 :: struct {
 	owner:   gd.Character_Body3d,
@@ -32,11 +33,10 @@ kicker3_team :: proc "contextless" (pid: u8) -> u8 {
 }
 
 kicker3_process :: proc(self: ^Kicker3, delta: f64) {
-	if !self.painted && self.pid != 0 {
-		self.painted = true
+	if play.latch(&self.painted, self.pid != 0) {
 		// 3D has no per-node modulate: give this capsule its own material.
 		mat := gd.new_standard_material3d()
-		gd.base_material3d_set_albedo(cast(gd.Base_Material3d)mat, peer_color(int(self.pid)))
+		gd.base_material3d_set_albedo(cast(gd.Base_Material3d)mat, gd.peer_color(int(self.pid)))
 		gd.geometry_instance3d_set_material_override(cast(gd.Geometry_Instance3d)self.skin, cast(gd.Material)mat)
 	}
 	// My own body is driven by input.odin (move_and_slide, then publish).

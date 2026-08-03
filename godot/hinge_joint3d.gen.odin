@@ -32,7 +32,7 @@ hinge_joint3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_hinge_joint3d :: proc "contextless" () -> Hinge_Joint3d {
-    return __bindgen_gde.classdb_construct_object(hinge_joint3d_name_ref())
+    return cast(Hinge_Joint3d)__bindgen_gde.classdb_construct_object(hinge_joint3d_name_ref())
 }
 
 // methods

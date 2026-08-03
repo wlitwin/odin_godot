@@ -16,7 +16,7 @@ open_xr_spatial_marker_tracking_capability_name :: proc "contextless" () -> Stri
 }
 
 new_open_xr_spatial_marker_tracking_capability :: proc "contextless" () -> Open_Xr_Spatial_Marker_Tracking_Capability {
-    return __bindgen_gde.classdb_construct_object(open_xr_spatial_marker_tracking_capability_name_ref())
+    return cast(Open_Xr_Spatial_Marker_Tracking_Capability)__bindgen_gde.classdb_construct_object(open_xr_spatial_marker_tracking_capability_name_ref())
 }
 
 // methods

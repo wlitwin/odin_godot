@@ -20,7 +20,7 @@ timer_name :: proc "contextless" () -> String_Name {
 }
 
 new_timer :: proc "contextless" () -> Timer {
-    return __bindgen_gde.classdb_construct_object(timer_name_ref())
+    return cast(Timer)__bindgen_gde.classdb_construct_object(timer_name_ref())
 }
 
 // methods

@@ -52,7 +52,7 @@ canvas_item_name :: proc "contextless" () -> String_Name {
 }
 
 new_canvas_item :: proc "contextless" () -> Canvas_Item {
-    return __bindgen_gde.classdb_construct_object(canvas_item_name_ref())
+    return cast(Canvas_Item)__bindgen_gde.classdb_construct_object(canvas_item_name_ref())
 }
 
 // methods

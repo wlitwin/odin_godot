@@ -25,7 +25,7 @@ reflection_probe_name :: proc "contextless" () -> String_Name {
 }
 
 new_reflection_probe :: proc "contextless" () -> Reflection_Probe {
-    return __bindgen_gde.classdb_construct_object(reflection_probe_name_ref())
+    return cast(Reflection_Probe)__bindgen_gde.classdb_construct_object(reflection_probe_name_ref())
 }
 
 // methods

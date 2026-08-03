@@ -25,7 +25,7 @@ texture_button_name :: proc "contextless" () -> String_Name {
 }
 
 new_texture_button :: proc "contextless" () -> Texture_Button {
-    return __bindgen_gde.classdb_construct_object(texture_button_name_ref())
+    return cast(Texture_Button)__bindgen_gde.classdb_construct_object(texture_button_name_ref())
 }
 
 // methods

@@ -57,8 +57,9 @@ main :: proc() {
     if rerr != nil {fail(fmt.tprintf("could not read fixture %s", fixture))}
 
     // Inject a partial member-completion line `gd.node2d_set_p` right after the
-    // `ensure_names()` call inside player_process, with the U+FFFF caret marker at its end —
-    // exactly the shape Godot's get_text_for_code_completion() produces.
+    // `singleton_input()` line inside player_process (a stable first-statement anchor),
+    // with the U+FFFF caret marker at its end — exactly the shape Godot's
+    // get_text_for_code_completion() produces.
     marker := "￿" // U+FFFF, the caret sentinel Godot inserts
     inject := strings.concatenate({"\tgd.node2d_set_p", marker})
 
@@ -67,7 +68,7 @@ main :: proc() {
     for ln in lines {
         strings.write_string(&b, ln)
         strings.write_byte(&b, '\n')
-        if strings.contains(ln, "ensure_names()") {
+        if strings.contains(ln, "gd.singleton_input()") {
             strings.write_string(&b, inject)
             strings.write_byte(&b, '\n')
         }
@@ -210,7 +211,7 @@ main :: proc() {
     for ln in lines {
         strings.write_string(&sb, ln)
         strings.write_byte(&sb, '\n')
-        if strings.contains(ln, "ensure_names()") {
+        if strings.contains(ln, "gd.singleton_input()") {
             strings.write_string(&sb, sig_inject)
             strings.write_byte(&sb, '\n')
         }

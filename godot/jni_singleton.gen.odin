@@ -16,7 +16,7 @@ jni_singleton_name :: proc "contextless" () -> String_Name {
 }
 
 new_jni_singleton :: proc "contextless" () -> Jni_Singleton {
-    return __bindgen_gde.classdb_construct_object(jni_singleton_name_ref())
+    return cast(Jni_Singleton)__bindgen_gde.classdb_construct_object(jni_singleton_name_ref())
 }
 
 // methods

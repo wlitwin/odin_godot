@@ -16,7 +16,7 @@ occluder_instance3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_occluder_instance3d :: proc "contextless" () -> Occluder_Instance3d {
-    return __bindgen_gde.classdb_construct_object(occluder_instance3d_name_ref())
+    return cast(Occluder_Instance3d)__bindgen_gde.classdb_construct_object(occluder_instance3d_name_ref())
 }
 
 // methods

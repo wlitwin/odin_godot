@@ -16,7 +16,7 @@ input_map_name :: proc "contextless" () -> String_Name {
 }
 
 new_input_map :: proc "contextless" () -> Input_Map {
-    return __bindgen_gde.classdb_construct_object(input_map_name_ref())
+    return cast(Input_Map)__bindgen_gde.classdb_construct_object(input_map_name_ref())
 }
 
 // methods

@@ -23,7 +23,7 @@ decal_name :: proc "contextless" () -> String_Name {
 }
 
 new_decal :: proc "contextless" () -> Decal {
-    return __bindgen_gde.classdb_construct_object(decal_name_ref())
+    return cast(Decal)__bindgen_gde.classdb_construct_object(decal_name_ref())
 }
 
 // methods

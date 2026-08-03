@@ -52,7 +52,8 @@ free_cs :: proc(cs: [dynamic]complete.Completion) {
 }
 
 // Build the player buffer with `<prefix>` injected (with the U+FFFF caret marker) right after
-// `ensure_names()` — the exact shape Godot's get_text_for_code_completion() produces.
+// the `singleton_input()` line (player_process's stable first statement) — the exact shape
+// Godot's get_text_for_code_completion() produces.
 make_code :: proc(base: string, prefix: string) -> string {
     inject := strings.concatenate({"\tgd.", prefix, "￿"}) // U+FFFF caret marker at end
     lines := strings.split_lines(base)
@@ -60,7 +61,7 @@ make_code :: proc(base: string, prefix: string) -> string {
     for ln in lines {
         strings.write_string(&b, ln)
         strings.write_byte(&b, '\n')
-        if strings.contains(ln, "ensure_names()") {
+        if strings.contains(ln, "gd.singleton_input()") {
             strings.write_string(&b, inject)
             strings.write_byte(&b, '\n')
         }

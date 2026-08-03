@@ -20,7 +20,7 @@ touch_screen_button_name :: proc "contextless" () -> String_Name {
 }
 
 new_touch_screen_button :: proc "contextless" () -> Touch_Screen_Button {
-    return __bindgen_gde.classdb_construct_object(touch_screen_button_name_ref())
+    return cast(Touch_Screen_Button)__bindgen_gde.classdb_construct_object(touch_screen_button_name_ref())
 }
 
 // methods

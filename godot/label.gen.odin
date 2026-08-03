@@ -16,7 +16,7 @@ label_name :: proc "contextless" () -> String_Name {
 }
 
 new_label :: proc "contextless" () -> Label {
-    return __bindgen_gde.classdb_construct_object(label_name_ref())
+    return cast(Label)__bindgen_gde.classdb_construct_object(label_name_ref())
 }
 
 // methods

@@ -16,7 +16,7 @@ physics_body2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_physics_body2d :: proc "contextless" () -> Physics_Body2d {
-    return __bindgen_gde.classdb_construct_object(physics_body2d_name_ref())
+    return cast(Physics_Body2d)__bindgen_gde.classdb_construct_object(physics_body2d_name_ref())
 }
 
 // methods

@@ -16,7 +16,7 @@ shader_include_db_name :: proc "contextless" () -> String_Name {
 }
 
 new_shader_include_db :: proc "contextless" () -> Shader_Include_Db {
-    return __bindgen_gde.classdb_construct_object(shader_include_db_name_ref())
+    return cast(Shader_Include_Db)__bindgen_gde.classdb_construct_object(shader_include_db_name_ref())
 }
 
 // methods

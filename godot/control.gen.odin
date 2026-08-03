@@ -123,7 +123,7 @@ control_name :: proc "contextless" () -> String_Name {
 }
 
 new_control :: proc "contextless" () -> Control {
-    return __bindgen_gde.classdb_construct_object(control_name_ref())
+    return cast(Control)__bindgen_gde.classdb_construct_object(control_name_ref())
 }
 
 // methods

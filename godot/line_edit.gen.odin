@@ -65,7 +65,7 @@ line_edit_name :: proc "contextless" () -> String_Name {
 }
 
 new_line_edit :: proc "contextless" () -> Line_Edit {
-    return __bindgen_gde.classdb_construct_object(line_edit_name_ref())
+    return cast(Line_Edit)__bindgen_gde.classdb_construct_object(line_edit_name_ref())
 }
 
 // methods

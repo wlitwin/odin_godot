@@ -16,7 +16,7 @@ open_xr_composition_layer_cylinder_name :: proc "contextless" () -> String_Name 
 }
 
 new_open_xr_composition_layer_cylinder :: proc "contextless" () -> Open_Xr_Composition_Layer_Cylinder {
-    return __bindgen_gde.classdb_construct_object(open_xr_composition_layer_cylinder_name_ref())
+    return cast(Open_Xr_Composition_Layer_Cylinder)__bindgen_gde.classdb_construct_object(open_xr_composition_layer_cylinder_name_ref())
 }
 
 // methods

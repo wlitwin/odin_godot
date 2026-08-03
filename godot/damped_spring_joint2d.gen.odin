@@ -16,7 +16,7 @@ damped_spring_joint2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_damped_spring_joint2d :: proc "contextless" () -> Damped_Spring_Joint2d {
-    return __bindgen_gde.classdb_construct_object(damped_spring_joint2d_name_ref())
+    return cast(Damped_Spring_Joint2d)__bindgen_gde.classdb_construct_object(damped_spring_joint2d_name_ref())
 }
 
 // methods

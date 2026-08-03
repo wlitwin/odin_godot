@@ -50,5 +50,5 @@ pickup_process :: proc(self: ^Pickup, delta: f64) {
 	case kitems.ITEM_NONE:
 		glyph = "" // grabbed; the despawn is on its way
 	}
-	gd.set_string(cast(gd.Object)self.glyph, "text", glyph)
+	gd.set_text(cast(gd.Object)self.glyph, glyph)
 }

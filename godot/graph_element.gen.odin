@@ -16,7 +16,7 @@ graph_element_name :: proc "contextless" () -> String_Name {
 }
 
 new_graph_element :: proc "contextless" () -> Graph_Element {
-    return __bindgen_gde.classdb_construct_object(graph_element_name_ref())
+    return cast(Graph_Element)__bindgen_gde.classdb_construct_object(graph_element_name_ref())
 }
 
 // methods

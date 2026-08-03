@@ -1,5 +1,6 @@
 //gd:extends Area2D
 //gd:class Enemy
+//gd:group enemies
 package survivors_scripts
 
 // ----------------------------------------------------------------------------
@@ -13,7 +14,9 @@ package survivors_scripts
 //   * @export of a PackedScene       — `gem_scene` (xp_gem.tscn) dropped on death.
 //   * typed cross-script READ         — rt.script_of(config, EnemyConfig).
 //   * runtime restyling               — scales the body + recolors the Polygon2D from config.
-//   * groups                          — joins "enemies" for targeting/area-damage queries.
+//   * groups                          — "enemies" membership (for targeting/area-damage
+//                                       queries) is DECLARED with //gd:group above; the core
+//                                       joins it at READY.
 //   * lifecycle _physics_process      — chases the player each physics tick AND, while it is
 //                                       touching the player, deals its contact damage on a
 //                                       rate-limited per-enemy cooldown (continuous bleed —
@@ -77,8 +80,6 @@ enemy_ready :: proc(self: ^Enemy) {
 			gd.polygon2d_set_color(cast(gd.Polygon2d)body, cfg.color)
 		}
 	}
-
-	gd.add_to_group(self.owner, GROUP_ENEMIES)
 }
 
 enemy_physics_process :: proc(self: ^Enemy, delta: f64) {
@@ -87,7 +88,7 @@ enemy_physics_process :: proc(self: ^Enemy, delta: f64) {
 	if player == nil {return}
 	me := gd.node2d_get_global_position(self.owner)
 	target := gd.node2d_get_global_position(player)
-	dir := normalized(gd.Vector2{target.x - me.x, target.y - me.y})
+	dir := gd.normalized(gd.Vector2{target.x - me.x, target.y - me.y})
 	me.x += dir.x * self.speed * f32(delta)
 	me.y += dir.y * self.speed * f32(delta)
 	gd.node2d_set_global_position(self.owner, me)
@@ -123,19 +124,19 @@ enemy_take_damage :: proc(self: ^Enemy, amount: int) {
 	}
 }
 
-// enemy_drop_gem instantiates gem_scene at our position and seeds its XP value TYPED.
+// enemy_drop_gem spawns gem_scene at our position and seeds its XP value TYPED.
 @(private = "file")
 enemy_drop_gem :: proc(self: ^Enemy) {
 	if self.gem_scene == nil {return}
 	arena := find_game(self.owner)
 	if arena == nil {return}
-	gem := gd.instantiate(cast(gd.Packed_Scene)self.gem_scene)
-	if gem == nil {return}
-	gs := rt.script_of(gem, XpGem)
-	if gs != nil {gs.value = self.xp_value} // typed WRITE before _ready
-	// Set the gem's LOCAL position (the arena/Game root sits at the origin, so local == world)
-	// and DEFER the tree insertion: a death often happens inside a bullet's area_entered
-	// (physics flush), where adding a monitoring Area2D immediately is illegal.
-	gd.node2d_set_position(cast(gd.Node2d)gem, gd.node2d_get_global_position(self.owner))
-	gd.add_child_deferred(arena, gem)
+	// DEFERRED typed spawn: a death often happens inside a bullet's area_entered (physics
+	// flush), where adding a monitoring Area2D immediately is illegal — rt.spawn_as_deferred
+	// parents at idle time instead, which also makes the pokes below ready-visible by
+	// construction (the gem's _ready runs after this proc returns).
+	gs := rt.spawn_as_deferred(arena, cast(gd.Packed_Scene)self.gem_scene, XpGem)
+	if gs == nil {return}
+	gs.value = self.xp_value // typed WRITE before _ready
+	// Set the gem's LOCAL position (the arena/Game root sits at the origin, so local == world).
+	gd.node2d_set_position(gs.owner, gd.node2d_get_global_position(self.owner))
 }

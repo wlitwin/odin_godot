@@ -30,7 +30,7 @@ ip_name :: proc "contextless" () -> String_Name {
 }
 
 new_ip :: proc "contextless" () -> Ip {
-    return __bindgen_gde.classdb_construct_object(ip_name_ref())
+    return cast(Ip)__bindgen_gde.classdb_construct_object(ip_name_ref())
 }
 
 // methods

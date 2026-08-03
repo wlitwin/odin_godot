@@ -16,7 +16,7 @@ video_stream_player_name :: proc "contextless" () -> String_Name {
 }
 
 new_video_stream_player :: proc "contextless" () -> Video_Stream_Player {
-    return __bindgen_gde.classdb_construct_object(video_stream_player_name_ref())
+    return cast(Video_Stream_Player)__bindgen_gde.classdb_construct_object(video_stream_player_name_ref())
 }
 
 // methods

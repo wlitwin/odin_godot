@@ -14,7 +14,8 @@ package survivors_scripts
 //
 // FEATURES: the kind SWITCH over a custom-resource enum; typed cross-resource READ of the
 // WeaponConfig; typed cross-script READ of the parent Player's live mults each shot; runtime
-// node creation (bullets + blades); group/area queries (util) for targeting and area damage.
+// node creation (bullets + blades); group/area queries for targeting and area damage
+// (gd.nearest_in_group auto-aim; util's damage_enemies_in_radius on gd.nodes_in_group_within).
 // ----------------------------------------------------------------------------
 
 import gd "godot:godot"
@@ -120,10 +121,11 @@ weapon_tick_projectile :: proc(self: ^Weapon, delta: f64) {
 	if self.timer > 0 {return}
 
 	origin := gd.node2d_get_global_position(self.owner)
-	target, ok := nearest_enemy(self.owner, origin)
+	// Auto-aim: the built-in closest-group-member query (squared distance, no per-candidate sqrt).
+	target, ok := gd.nearest_in_group(self.owner, GROUP_ENEMIES, origin)
 	if !ok {return}
 	tpos := gd.node2d_get_global_position(target)
-	aim := normalized(gd.Vector2{tpos.x - origin.x, tpos.y - origin.y})
+	aim := gd.normalized(gd.Vector2{tpos.x - origin.x, tpos.y - origin.y})
 	dist := math.sqrt((tpos.x - origin.x) * (tpos.x - origin.x) + (tpos.y - origin.y) * (tpos.y - origin.y))
 	if dist > self.range {return} // nothing in range — hold fire
 
@@ -152,11 +154,13 @@ weapon_fire_bullet :: proc(self: ^Weapon, origin: gd.Vector2, dir: gd.Vector2, d
 	if self.bullet_scene == nil {return}
 	arena := find_game(self.owner)
 	if arena == nil {return}
-	b := gd.instantiate(cast(gd.Packed_Scene)self.bullet_scene)
+	// Typed spawn — a poke-AFTER-add site, on purpose: the bullet's _ready only zero-guards
+	// its exports (against the scene's stored values), and the pokes below then override
+	// them. So parent FIRST, then write through the typed ref rt.spawn_scripted resolved.
+	b, bs := rt.spawn_scripted(cast(gd.Packed_Scene)self.bullet_scene, Bullet)
 	if b == nil {return}
 	gd.add_child(arena, b)
 	gd.node2d_set_global_position(cast(gd.Node2d)b, origin)
-	bs := rt.script_of(b, Bullet)
 	if bs != nil {
 		bs.dir = dir
 		bs.damage = dmg

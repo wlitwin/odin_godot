@@ -1895,4 +1895,266 @@ grep -qF -- 'comes from the SHARED package' <<<"$out" || fail "the shared-bundle
 grep -qF -- 'ShHero.b' <<<"$out" || fail "the shared-bundle error must name the offending field ShHero.b: $out"
 [ -z "$(find "$shb/scripts" -name '*.gen.odin' -print -quit)" ] || fail "the refused shared-bundle tree still left generated code"
 
+# ---- fixture: object exports — typed handles derive the resource hint, ------
+# hint-less erased/node handles refuse. The hint is load-bearing (it switches
+# on inst_set's refcount hold); a hint-less object export dangles after scene
+# load, so the build must either derive the class or stop.
+oex="$work/oex"
+mkdir -p "$oex"
+cat >"$oex/shooter.odin" <<'ODIN'
+//gd:extends Node2D
+//gd:class Shooter
+package oex
+import gd "godot:godot"
+
+Shooter :: struct {
+	owner:        gd.Node,
+	bullet_scene: gd.Packed_Scene `gd:"export"`,                      // typed -> derived hint
+	portrait:     gd.Object       `gd:"export,resource=Texture2D"`,   // explicit -> untouched
+}
+ODIN
+if ! "$SGEN" "$oex" -godot:"$ROOT" >/dev/null 2>&1; then fail "typed resource-handle export must NOT error"; fi
+grep -q 'resource_class = "PackedScene"' "$oex/odin_godot_scripts.gen.odin" || fail "typed gd.Packed_Scene export must derive resource_class=PackedScene in Field_Meta"
+grep -q 'resource_class = "Texture2D"' "$oex/odin_godot_scripts.gen.odin" && fail "an explicit resource= spec must not ALSO synthesize resource_class"
+
+oerase="$work/oerase"
+mkdir -p "$oerase"
+cat >"$oerase/erased.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Erased
+package oerase
+import gd "godot:godot"
+
+Erased :: struct {
+	owner: gd.Node,
+	thing: gd.Object `gd:"export"`,   // type-erased AND hint-less: refuse
+}
+ODIN
+out="$("$SGEN" "$oerase" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "a hint-less gd.Object export must fail the build (it dangles after scene load)"
+grep -qF -- 'resource=<Class>' <<<"$out" || fail "the erased-object error must point at resource=<Class>: $out"
+
+onode="$work/onode"
+mkdir -p "$onode"
+cat >"$onode/noder.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Noder
+package onode
+import gd "godot:godot"
+
+Noder :: struct {
+	owner: gd.Node,
+	buddy: gd.Node2d `gd:"export"`,   // a NODE is not an Inspector resource: refuse
+}
+ODIN
+out="$("$SGEN" "$onode" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "an exported node handle must fail the build"
+grep -qF -- 'onready=' <<<"$out" || fail "the node-handle error must point at onready=: $out"
+
+# ---- script-resolving onready (`buddy: ^Buddy `gd:"onready=..."``) ----------
+# Happy path: the pointee is a script struct declared in a file that sorts AFTER the
+# referencing one — resolve_onready_scripts must validate module-wide, not parse-order.
+oscript="$work/oscript"
+mkdir -p "$oscript"
+cat >"$oscript/a_leader.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Leader
+package oscript
+import gd "godot:godot"
+
+Leader :: struct {
+	owner: gd.Node,
+	buddy: ^Buddy `gd:"onready=Allies/Buddy"`,
+	spot:  gd.Node2d `gd:"onready=Spot"`,       // a plain handle rides beside it
+	cards: [3]gd.Node2d `gd:"onready=Deck/Card%d"`, // array form: %d template
+	squad: [2]^Buddy `gd:"onready=Squad%d"`,        // array of SCRIPT refs
+	hud:   gd.Node2d `gd:"onready=%Hud"`,           // scene-unique name
+	dock:  ^Buddy `gd:"onready=%dock"`,             // unique name starting with 'd' (NOT a template)
+	slots: [2]gd.Node2d `gd:"onready=%dock/Slot%d"`, // unique prefix + mid-name template
+}
+ODIN
+cat >"$oscript/z_buddy.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Buddy
+package oscript
+import gd "godot:godot"
+
+Buddy :: struct {
+	owner: gd.Node,
+	hp:    i32 `gd:"export"`,
+}
+ODIN
+"$SGEN" "$oscript" -godot:"$ROOT" >/dev/null 2>&1 || fail "a ^ScriptStruct onready must build (target declared in a later file)"
+
+# Refuse: a pointer to a NON-script struct — silently accepting it used to hand the
+# field a raw node pointer reinterpreted as ^T.
+obad="$work/obad"
+mkdir -p "$obad"
+cat >"$obad/bad.odin" <<'ODIN'
+//gd:extends Node
+//gd:class BadRef
+package obad
+import gd "godot:godot"
+
+Plain :: struct { x: int }
+
+BadRef :: struct {
+	owner: gd.Node,
+	oops:  ^Plain `gd:"onready=Nope"`,
+}
+ODIN
+out="$("$SGEN" "$obad" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "a ^non-script onready must fail the build"
+grep -qF -- 'not a script struct' <<<"$out" || fail "the ^non-script error must name the problem: $out"
+
+# Array-onready template contract: array without %d, %d on a scalar, a stray '%'
+# inside a name, and an array whose only "%d" bytes are a unique-name marker — refused.
+oarr="$work/oarr"
+mkdir -p "$oarr"
+cat >"$oarr/arr.odin" <<'ODIN'
+//gd:extends Node
+//gd:class ArrBad
+package oarr
+import gd "godot:godot"
+
+ArrBad :: struct {
+	owner:  gd.Node,
+	cards:  [3]gd.Node2d `gd:"onready=Deck/Card"`,
+	scalar: gd.Node2d `gd:"onready=Deck/Card%d"`,
+	stray:  gd.Node2d `gd:"onready=Deck/Ca%rd"`,
+	umark:  [2]gd.Node2d `gd:"onready=%dock"`,
+}
+ODIN
+out="$("$SGEN" "$oarr" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "array-onready template violations must fail the build"
+grep -qF -- 'needs exactly one mid-name `%d`' <<<"$out" || fail "missing-template error absent: $out"
+grep -qF -- "for FIXED-ARRAY fields" <<<"$out" || fail "template-on-scalar error absent: $out"
+grep -qF -- "ArrBad.stray" <<<"$out" || fail "stray mid-name %% must be refused: $out"
+grep -qF -- "ArrBad.umark" <<<"$out" || fail "array with only a unique marker must be refused: $out"
+
+# ---- path-qualified gd_connect (`@(gd_connect="Path/To/Node:signal")`) ------
+oconn="$work/oconn"
+mkdir -p "$oconn"
+cat >"$oconn/listener.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Listener
+//gd:group sentries watchers
+package oconn
+import gd "godot:godot"
+
+Listener :: struct {
+	owner: gd.Node,
+}
+
+@(gd_method, gd_connect = "Turret/Barrel:fired")
+listener_on_fired :: proc(self: ^Listener) {}
+
+@(gd_method, gd_connect = "area_entered")
+listener_on_area :: proc(self: ^Listener) {}
+
+@(gd_method, gd_connect = "Row/Btn%d:pressed")
+listener_on_btn :: proc(self: ^Listener, idx: gd.Int) {}
+
+@(gd_method, gd_connect = "%SavePanel:saved")
+listener_on_saved :: proc(self: ^Listener) {}
+
+@(gd_method, gd_connect = "%dock:docked")
+listener_on_dock :: proc(self: ^Listener) {}
+ODIN
+"$SGEN" "$oconn" -godot:"$ROOT" >/dev/null 2>&1 || fail "path-qualified gd_connect must build"
+cgen="$oconn/odin_godot_scripts.gen.odin"
+grep -qF -- '{signal = "fired", method = "on_fired", path = "Turret/Barrel"}' "$cgen" || fail "path-qualified connection row missing/wrong"
+grep -qF -- '{signal = "area_entered", method = "on_area"}' "$cgen" || fail "plain connection row must stay path-less"
+grep -qF -- '_listener_groups := [?]cstring {"sentries", "watchers"}' "$cgen" || fail "//gd:group table missing/wrong"
+grep -qF -- 'groups = raw_data(_listener_groups[:])' "$cgen" || fail "//gd:group Class_Info wiring missing"
+grep -qF -- '{signal = "pressed", method = "on_btn", path = "Row/Btn%d", indexed = true}' "$cgen" || fail "indexed connection row missing/wrong"
+grep -qF -- '{signal = "saved", method = "on_saved", path = "%SavePanel"}' "$cgen" || fail "scene-unique connection row missing/wrong"
+grep -qF -- '{signal = "docked", method = "on_dock", path = "%dock"}' "$cgen" || fail "a %d-prefixed unique name must stay a plain (non-indexed) row"
+
+# Refuse the malformed forms loudly: empty path, empty/garbage signal.
+obadc="$work/obadc"
+mkdir -p "$obadc"
+cat >"$obadc/badc.odin" <<'ODIN'
+//gd:extends Node
+//gd:class BadConn
+package obadc
+import gd "godot:godot"
+
+BadConn :: struct {
+	owner: gd.Node,
+}
+
+@(gd_method, gd_connect = ":fired")
+badconn_a :: proc(self: ^BadConn) {}
+
+@(gd_method, gd_connect = "Turret:")
+badconn_b :: proc(self: ^BadConn) {}
+
+@(gd_method, gd_connect = "Row%d/Btn%d:pressed")
+badconn_c :: proc(self: ^BadConn) {}
+
+@(gd_method, gd_connect = "Tur%ret:fired")
+badconn_d :: proc(self: ^BadConn) {}
+ODIN
+out="$("$SGEN" "$obadc" -godot:"$ROOT" 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "malformed gd_connect forms must fail the build"
+grep -qF -- "the path part before ':' is empty" <<<"$out" || fail "empty-path error missing: $out"
+grep -qF -- 'is not a signal name' <<<"$out" || fail "empty-signal error missing: $out"
+grep -qF -- 'only valid as ONE mid-name `%d` template' <<<"$out" || fail "double-%d error missing: $out"
+grep -qF -- '"badconn_d"' <<<"$out" || fail "stray mid-name %% in a connect path must be refused: $out"
+
+# ---- distinct-handle refusal: a ^script_struct is NOT an engine handle -------
+# The desert-shooter footgun, pinned: passing a typed onready ref (a SCRIPT STRUCT
+# pointer) where a node handle belongs. gd.Object is a DISTINCT rawptr
+# (godot/Variant.odin), so this must refuse at compile time — it used to convert
+# implicitly (handles were plain rawptr aliases) and SIGSEGV inside the engine.
+hguard="$work/handle_guard"
+mkdir -p "$hguard"
+cat >"$hguard/world.odin" <<'ODIN'
+package handle_guard
+import gd "godot:godot"
+
+Menu :: struct {
+	owner: gd.Node,
+}
+
+World :: struct {
+	owner: gd.Node,
+	menu:  ^Menu,
+}
+
+hide_menu :: proc (w: ^World) {
+	gd.canvas_item_set_visible(w.menu, false)
+}
+ODIN
+out="$("$ODIN" check "$hguard" -collection:godot="$ROOT" -no-entry-point 2>&1)"
+rc=$?
+[[ $rc -ne 0 ]] || fail "a ^script_struct passed as a node handle must NOT compile"
+grep -q "Cannot assign value 'w.menu' of type '\^Menu'" <<<"$out" || fail "handle-guard refusal shape changed: $out"
+# The positive twin: the same call through the node (`.owner`) must build — so this
+# pin can never rot into "fails for an unrelated reason".
+cat >"$hguard/world.odin" <<'ODIN'
+package handle_guard
+import gd "godot:godot"
+
+Menu :: struct {
+	owner: gd.Node,
+}
+
+World :: struct {
+	owner: gd.Node,
+	menu:  ^Menu,
+}
+
+hide_menu :: proc (w: ^World) {
+	gd.canvas_item_set_visible(w.menu.owner, false)
+}
+ODIN
+"$ODIN" check "$hguard" -collection:godot="$ROOT" -no-entry-point >/dev/null 2>&1 || fail "the .owner spelling must compile (handle family broke)"
+
 echo "SCRIPTGEN_OK"

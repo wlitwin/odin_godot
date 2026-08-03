@@ -21,7 +21,7 @@ audio_listener3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_audio_listener3d :: proc "contextless" () -> Audio_Listener3d {
-    return __bindgen_gde.classdb_construct_object(audio_listener3d_name_ref())
+    return cast(Audio_Listener3d)__bindgen_gde.classdb_construct_object(audio_listener3d_name_ref())
 }
 
 // methods

@@ -76,6 +76,130 @@ is_in_group :: proc "contextless" (node: Object, group: cstring) -> bool {
 	return node_is_in_group(node, g)
 }
 
+// ---- Group queries ----
+//
+// The scene tree's group index is the decoupled "find that kind of thing" query — no node
+// paths, no hand-kept registries. These wrap `SceneTree.get_nodes_in_group` and hide the
+// typed-array/Variant unpacking (Ergonomics_Arrays.odin). For "which of my SCRIPT structs
+// are in the group", see the runtime package's `rt.scripts_in_group` /
+// `rt.first_script_in_group`, which compose these with `rt.script_of`.
+
+// nodes_in_group returns the live members of the named group, allocated in
+// `context.temp_allocator` by default (call-local — iterate now, don't stash; pass an
+// allocator to keep the slice). Members freed this frame are dropped rather than returned
+// as nils, so it is safe to `queue_free` members while iterating the result. Empty when
+// `node` is not in a tree:
+//
+//     for n in gd.nodes_in_group(self.owner, "enemies") {
+//         gd.node2d_set_x(n, 0)   // n is gd.Node — passes to any helper with no cast
+//     }
+nodes_in_group :: proc(node: Object, group: cstring, allocator := context.temp_allocator) -> []Node {
+	tree := node_get_tree(node)
+	if tree == nil {return nil}
+	g := new_string_name_cstring(group, true)
+	arr := scene_tree_get_nodes_in_group(tree, g)
+	defer free_array(arr.untyped)
+	n := int(array_size(&arr.untyped))
+	out := make([dynamic]Node, 0, n, allocator)
+	for i in 0 ..< n {
+		v := array_get(&arr.untyped, Int(i))
+		if obj := variant_to_object(&v); obj != nil {
+			append(&out, obj)
+		}
+		variant_destroy(&v)
+	}
+	return out[:]
+}
+
+// first_in_group returns one member of the named group (the engine's first), or nil when
+// the group is empty or `node` is not in a tree — the single-expected-node query:
+//
+//     game := gd.first_in_group(self.owner, "game")
+first_in_group :: proc "contextless" (node: Object, group: cstring) -> Node {
+	tree := node_get_tree(node)
+	if tree == nil {return nil}
+	g := new_string_name_cstring(group, true)
+	return scene_tree_get_first_node_in_group(tree, g)
+}
+
+// nearest_in_group returns the group member (as a Node2d) closest to `origin` by
+// squared distance — auto-aim's query, promoted from the identical helper two example
+// games hand-rolled. `ok` is false when the group is empty (or `node` is out of tree).
+// Members must be CanvasItem-derived (their global position is what's compared).
+//
+//     if target, ok := gd.nearest_in_group(self.owner, "enemies", pos); ok { ... }
+nearest_in_group :: proc(node: Object, group: cstring, origin: Vector2) -> (best: Node2d, ok: bool) {
+	best_d := max(f32)
+	for n in nodes_in_group(node, group) {
+		p := node2d_get_global_position(cast(Node2d)n)
+		dx := p.x - origin.x
+		dy := p.y - origin.y
+		d := dx * dx + dy * dy
+		if d < best_d {
+			best_d = d
+			best = cast(Node2d)n
+			ok = true
+		}
+	}
+	return
+}
+
+// nodes_in_group_within returns the group members (as Node2d) within `radius` of
+// `origin` — the area-of-effect query (aura/orbit damage, blast waves). Temp-allocated
+// by default, like nodes_in_group; compose with rt.script_of for typed hits.
+nodes_in_group_within :: proc(node: Object, group: cstring, origin: Vector2, radius: f32, allocator := context.temp_allocator) -> []Node2d {
+	r2 := radius * radius
+	out := make([dynamic]Node2d, 0, 8, allocator)
+	for n in nodes_in_group(node, group) {
+		p := node2d_get_global_position(cast(Node2d)n)
+		dx := p.x - origin.x
+		dy := p.y - origin.y
+		if dx * dx + dy * dy <= r2 {
+			append(&out, cast(Node2d)n)
+		}
+	}
+	return out[:]
+}
+
+// ---- SceneTree one-liners ----
+//
+// The `tree := gd.get_tree(owner); if tree != nil { one call }` dance, collapsed — 18
+// sites across the examples wrapped exactly one SceneTree method each. All are nil-safe
+// no-ops when `node` is not in a tree.
+
+// pause pauses/unpauses the whole tree (menus, game-over screens).
+pause :: proc "contextless" (node: Object, paused: bool) {
+	if tree := node_get_tree(node); tree != nil {
+		scene_tree_set_pause(tree, paused)
+	}
+}
+
+// is_paused reports the tree's pause state (false when out of tree).
+is_paused :: proc "contextless" (node: Object) -> bool {
+	if tree := node_get_tree(node); tree != nil {
+		return bool(scene_tree_is_paused(tree))
+	}
+	return false
+}
+
+// change_scene switches to the scene at `path` (deferred by the engine to frame end).
+//
+//     gd.change_scene(self.owner, "res://gameover.tscn")
+change_scene :: proc "contextless" (node: Object, path: cstring) -> Error {
+	tree := node_get_tree(node)
+	if tree == nil {return .Failed}
+	p := new_string_cstring(path)
+	defer free_string(p)
+	return scene_tree_change_scene_to_file(tree, p)
+}
+
+// quit exits the game loop with `code` (deferred to frame end, like GDScript quit()).
+quit :: proc "contextless" (node: Object, code := i64(0)) {
+	if tree := node_get_tree(node); tree != nil {
+		scene_tree_quit(tree, Int(code))
+	}
+}
+
 // ---- Node2D position-component setters ----
 //
 // Setting ONE component of a Node2D's position ("snap x to 100, keep y") otherwise needs the

@@ -50,7 +50,7 @@ generic6dof_joint3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_generic6dof_joint3d :: proc "contextless" () -> Generic6dof_Joint3d {
-    return __bindgen_gde.classdb_construct_object(generic6dof_joint3d_name_ref())
+    return cast(Generic6dof_Joint3d)__bindgen_gde.classdb_construct_object(generic6dof_joint3d_name_ref())
 }
 
 // methods

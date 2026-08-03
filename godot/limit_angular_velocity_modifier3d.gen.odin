@@ -16,7 +16,7 @@ limit_angular_velocity_modifier3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_limit_angular_velocity_modifier3d :: proc "contextless" () -> Limit_Angular_Velocity_Modifier3d {
-    return __bindgen_gde.classdb_construct_object(limit_angular_velocity_modifier3d_name_ref())
+    return cast(Limit_Angular_Velocity_Modifier3d)__bindgen_gde.classdb_construct_object(limit_angular_velocity_modifier3d_name_ref())
 }
 
 // methods

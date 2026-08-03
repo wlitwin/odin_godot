@@ -39,7 +39,7 @@ os_name :: proc "contextless" () -> String_Name {
 }
 
 new_os :: proc "contextless" () -> Os {
-    return __bindgen_gde.classdb_construct_object(os_name_ref())
+    return cast(Os)__bindgen_gde.classdb_construct_object(os_name_ref())
 }
 
 // methods

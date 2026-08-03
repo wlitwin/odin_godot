@@ -27,7 +27,7 @@ aspect_ratio_container_name :: proc "contextless" () -> String_Name {
 }
 
 new_aspect_ratio_container :: proc "contextless" () -> Aspect_Ratio_Container {
-    return __bindgen_gde.classdb_construct_object(aspect_ratio_container_name_ref())
+    return cast(Aspect_Ratio_Container)__bindgen_gde.classdb_construct_object(aspect_ratio_container_name_ref())
 }
 
 // methods

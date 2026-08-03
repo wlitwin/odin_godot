@@ -16,7 +16,7 @@ render_data_extension_name :: proc "contextless" () -> String_Name {
 }
 
 new_render_data_extension :: proc "contextless" () -> Render_Data_Extension {
-    return __bindgen_gde.classdb_construct_object(render_data_extension_name_ref())
+    return cast(Render_Data_Extension)__bindgen_gde.classdb_construct_object(render_data_extension_name_ref())
 }
 
 // methods

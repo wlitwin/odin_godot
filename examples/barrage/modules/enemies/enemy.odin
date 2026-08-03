@@ -1,5 +1,6 @@
 //gd:extends Node2D
 //gd:class Enemy
+//gd:group enemies
 package barrage_enemies
 
 // ----------------------------------------------------------------------------
@@ -14,6 +15,7 @@ package barrage_enemies
 
 import events "godot:events"
 import gd "godot:godot"
+import "godot:play"
 import rt "godot:runtime"
 
 Enemy :: struct {
@@ -28,14 +30,16 @@ Enemy :: struct {
 }
 
 enemy_ready :: proc(self: ^Enemy) {
+	// Zero-guards, not `default=`: enemy.tscn STORES these exports explicitly (at 0), and
+	// a scene-stored value overrides a declared default — the guards must stay.
 	if self.hp == 0 {self.hp = 6}
 	if self.fire_ivl == 0 {self.fire_ivl = 1.4}
 	if self.radius == 0 {self.radius = 14}
 	if self.drift == 0 {self.drift = 40}
 	self.slow = 1
+	// Group membership is declarative (`//gd:group enemies` up top). Seed the fire
+	// accumulator half an interval in so the first volley comes at fire_ivl/2.
 	self.fire_cd = self.fire_ivl * 0.5
-	grp := gd.new_string_name_cstring("enemies", true)
-	gd.node_add_to_group(cast(gd.Node)self.owner, grp, false)
 	enemy_subscribe_slow(self)
 }
 
@@ -47,17 +51,12 @@ enemy_on_slow :: proc(ctx: rawptr, factor: f64) {
 	self.slow = f32(factor) // stretches this enemy's whole timeline (see physics_process)
 }
 
-// find_spawner — SAME-module publisher lookup (group + typed script_of; both scripts
-// live in this dll, so the direct struct pointer is legal — never do this across
-// modules, see docs/events.md).
+// find_spawner — SAME-module publisher lookup: the typed group query. Both scripts live
+// in this dll, so the direct struct pointer is legal — never do this across modules,
+// see docs/events.md.
 @(private = "file")
 find_spawner :: proc(self: ^Enemy) -> ^Spawner {
-	tree := gd.node_get_tree(cast(gd.Node)self.owner)
-	if tree == nil {return nil}
-	grp := gd.new_string_name_cstring("spawner", true)
-	sp := gd.scene_tree_get_first_node_in_group(tree, grp)
-	if sp == nil {return nil}
-	return rt.script_of(cast(gd.Object)sp, Spawner)
+	return rt.first_script_in_group(self.owner, "spawner", Spawner)
 }
 
 // The documented resubscribe pattern (events.odin header): owner-tagged, idempotent,
@@ -86,24 +85,21 @@ enemy_exit_tree :: proc(self: ^Enemy) {
 	}
 }
 
+// find_field — the CROSS-module lookup (BulletField lives in another dll, so only an
+// engine Object handle, never a typed struct). Cached per instance: this runs every
+// physics tick, so pay the group query once, not per frame.
 @(private)
 find_field :: proc(node: gd.Node, cache: ^gd.Object) -> gd.Object {
 	if cache^ == nil {
-		if tree := gd.node_get_tree(node); tree != nil {
-			grp := gd.new_string_name_cstring("bullet_field", true)
-			cache^ = cast(gd.Object)gd.scene_tree_get_first_node_in_group(tree, grp)
-		}
+		cache^ = gd.first_in_group(node, "bullet_field")
 	}
 	return cache^
 }
 
 @(private)
 find_player_pos :: proc(node: gd.Node) -> (gd.Vector2, bool) {
-	if tree := gd.node_get_tree(node); tree != nil {
-		grp := gd.new_string_name_cstring("player", true)
-		if p := gd.scene_tree_get_first_node_in_group(tree, grp); p != nil {
-			return gd.node2d_get_position(cast(gd.Node2d)p), true
-		}
+	if p := gd.first_in_group(node, "player"); p != nil {
+		return gd.node2d_get_position(cast(gd.Node2d)p), true
 	}
 	return {}, false
 }
@@ -115,37 +111,20 @@ enemy_physics_process :: proc(self: ^Enemy, delta: f64) {
 	if pos.y > 780 {pos.y = -40} 	// wrap: keeps the pressure up without despawn logic
 	gd.node2d_set_position(self.owner, pos)
 
-	field := find_field(cast(gd.Node)self.owner, &self.field)
+	field := find_field(self.owner, &self.field)
 	if field == nil {return}
 
 	// Re-register with the field (id = the engine-wide instance id; update-or-add).
-	id := gd.object_get_instance_id(cast(gd.Object)self.owner)
-	m := gd.sname("register_enemy")
-	idv := gd.Int(id)
-	iv := gd.variant_from(&idv)
-	pv := gd.variant_from(&pos)
-	r := f64(self.radius)
-	rv := gd.variant_from(&r)
-	_ = gd.object_call(field, m, iv, pv, rv)
+	// Cross-module call by NAME: gd.vcall converts each Odin arg to a Variant for us.
+	id := gd.object_get_instance_id(self.owner)
+	gd.vcall_void(field, "register_enemy", gd.Int(id), pos, f64(self.radius))
 
-	self.fire_cd -= dt
-	if self.fire_cd <= 0 {
-		self.fire_cd = self.fire_ivl
-		if target, ok := find_player_pos(cast(gd.Node)self.owner); ok {
-			am := gd.sname("spawn_aimed")
-			apv := gd.variant_from(&pos)
-			tv := gd.variant_from(&target)
-			n := gd.Int(3)
-			nv := gd.variant_from(&n)
-			spd := f64(180)
-			sv := gd.variant_from(&spd)
-			spread := f64(0.5)
-			spv := gd.variant_from(&spread)
-			hostile := gd.Bool(true)
-			hv := gd.variant_from(&hostile)
-			dmg := gd.Int(1)
-			dv := gd.variant_from(&dmg)
-			_ = gd.object_call(field, am, apv, tv, nv, sv, spv, hv, dv)
+	// Fire cadence: play.every accumulates dt (here pre-scaled by the slow debuff) and
+	// fires once per fire_ivl, carrying the remainder.
+	if play.every(&self.fire_cd, dt, self.fire_ivl) {
+		if target, ok := find_player_pos(self.owner); ok {
+			// n=3 bullets, speed 180, spread 0.5 rad, hostile, 1 damage.
+			gd.vcall_void(field, "spawn_aimed", pos, target, 3, 180.0, 0.5, true, 1)
 		}
 	}
 }
@@ -156,13 +135,10 @@ enemy_physics_process :: proc(self: ^Enemy, delta: f64) {
 enemy_take_hit :: proc(self: ^Enemy, damage: gd.Int) -> gd.Bool {
 	self.hp -= int(damage)
 	if self.hp <= 0 {
-		if field := find_field(cast(gd.Node)self.owner, &self.field); field != nil {
-			m := gd.sname("unregister_enemy")
-			id := gd.Int(gd.object_get_instance_id(cast(gd.Object)self.owner))
-			iv := gd.variant_from(&id)
-			_ = gd.object_call(field, m, iv)
+		if field := find_field(self.owner, &self.field); field != nil {
+			gd.vcall_void(field, "unregister_enemy", gd.Int(gd.object_get_instance_id(self.owner)))
 		}
-		gd.node_queue_free(cast(gd.Node)self.owner)
+		gd.node_queue_free(self.owner)
 		return true // died — the Spawner scores it + may drop a powerup
 	}
 	return false

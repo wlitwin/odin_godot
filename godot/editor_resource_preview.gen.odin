@@ -16,7 +16,7 @@ editor_resource_preview_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_resource_preview :: proc "contextless" () -> Editor_Resource_Preview {
-    return __bindgen_gde.classdb_construct_object(editor_resource_preview_name_ref())
+    return cast(Editor_Resource_Preview)__bindgen_gde.classdb_construct_object(editor_resource_preview_name_ref())
 }
 
 // methods

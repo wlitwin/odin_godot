@@ -16,7 +16,7 @@ root_motion_view_name :: proc "contextless" () -> String_Name {
 }
 
 new_root_motion_view :: proc "contextless" () -> Root_Motion_View {
-    return __bindgen_gde.classdb_construct_object(root_motion_view_name_ref())
+    return cast(Root_Motion_View)__bindgen_gde.classdb_construct_object(root_motion_view_name_ref())
 }
 
 // methods

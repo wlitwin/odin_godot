@@ -21,7 +21,7 @@ audio_stream_player_name :: proc "contextless" () -> String_Name {
 }
 
 new_audio_stream_player :: proc "contextless" () -> Audio_Stream_Player {
-    return __bindgen_gde.classdb_construct_object(audio_stream_player_name_ref())
+    return cast(Audio_Stream_Player)__bindgen_gde.classdb_construct_object(audio_stream_player_name_ref())
 }
 
 // methods

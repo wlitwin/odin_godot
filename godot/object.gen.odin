@@ -26,7 +26,7 @@ object_name :: proc "contextless" () -> String_Name {
 }
 
 new_object :: proc "contextless" () -> Object {
-    return __bindgen_gde.classdb_construct_object(object_name_ref())
+    return cast(Object)__bindgen_gde.classdb_construct_object(object_name_ref())
 }
 
 // methods

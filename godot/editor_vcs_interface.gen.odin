@@ -29,7 +29,7 @@ editor_vcs_interface_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_vcs_interface :: proc "contextless" () -> Editor_Vcs_Interface {
-    return __bindgen_gde.classdb_construct_object(editor_vcs_interface_name_ref())
+    return cast(Editor_Vcs_Interface)__bindgen_gde.classdb_construct_object(editor_vcs_interface_name_ref())
 }
 
 // methods

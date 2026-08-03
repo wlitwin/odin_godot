@@ -16,7 +16,7 @@ physics_direct_space_state2d_extension_name :: proc "contextless" () -> String_N
 }
 
 new_physics_direct_space_state2d_extension :: proc "contextless" () -> Physics_Direct_Space_State2d_Extension {
-    return __bindgen_gde.classdb_construct_object(physics_direct_space_state2d_extension_name_ref())
+    return cast(Physics_Direct_Space_State2d_Extension)__bindgen_gde.classdb_construct_object(physics_direct_space_state2d_extension_name_ref())
 }
 
 // methods

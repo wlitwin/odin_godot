@@ -4325,328 +4325,328 @@ singleton_performance :: proc "contextless" () -> Performance {
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Performance_name)
     }
-    
-    return __ptr
+
+    return cast(Performance)__ptr
 }
 singleton_engine :: proc "contextless" () -> Engine {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Engine_name)
     }
-    
-    return __ptr
+
+    return cast(Engine)__ptr
 }
 singleton_project_settings :: proc "contextless" () -> Project_Settings {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Project_Settings_name)
     }
-    
-    return __ptr
+
+    return cast(Project_Settings)__ptr
 }
 singleton_os :: proc "contextless" () -> Os {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Os_name)
     }
-    
-    return __ptr
+
+    return cast(Os)__ptr
 }
 singleton_time :: proc "contextless" () -> Time {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Time_name)
     }
-    
-    return __ptr
+
+    return cast(Time)__ptr
 }
 singleton_class_db :: proc "contextless" () -> Class_Db {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Class_Db_name)
     }
-    
-    return __ptr
+
+    return cast(Class_Db)__ptr
 }
 singleton_text_server_manager :: proc "contextless" () -> Text_Server_Manager {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Text_Server_Manager_name)
     }
-    
-    return __ptr
+
+    return cast(Text_Server_Manager)__ptr
 }
 singleton_navigation_server2d_manager :: proc "contextless" () -> Navigation_Server2d_Manager {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Navigation_Server2d_Manager_name)
     }
-    
-    return __ptr
+
+    return cast(Navigation_Server2d_Manager)__ptr
 }
 singleton_physics_server2d_manager :: proc "contextless" () -> Physics_Server2d_Manager {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Physics_Server2d_Manager_name)
     }
-    
-    return __ptr
+
+    return cast(Physics_Server2d_Manager)__ptr
 }
 singleton_navigation_server3d_manager :: proc "contextless" () -> Navigation_Server3d_Manager {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Navigation_Server3d_Manager_name)
     }
-    
-    return __ptr
+
+    return cast(Navigation_Server3d_Manager)__ptr
 }
 singleton_physics_server3d_manager :: proc "contextless" () -> Physics_Server3d_Manager {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Physics_Server3d_Manager_name)
     }
-    
-    return __ptr
+
+    return cast(Physics_Server3d_Manager)__ptr
 }
 singleton_navigation_mesh_generator :: proc "contextless" () -> Navigation_Mesh_Generator {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Navigation_Mesh_Generator_name)
     }
-    
-    return __ptr
+
+    return cast(Navigation_Mesh_Generator)__ptr
 }
 singleton_ip :: proc "contextless" () -> Ip {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Ip_name)
     }
-    
-    return __ptr
+
+    return cast(Ip)__ptr
 }
 singleton_geometry2d :: proc "contextless" () -> Geometry2d {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Geometry2d_name)
     }
-    
-    return __ptr
+
+    return cast(Geometry2d)__ptr
 }
 singleton_geometry3d :: proc "contextless" () -> Geometry3d {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Geometry3d_name)
     }
-    
-    return __ptr
+
+    return cast(Geometry3d)__ptr
 }
 singleton_resource_loader :: proc "contextless" () -> Resource_Loader {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Resource_Loader_name)
     }
-    
-    return __ptr
+
+    return cast(Resource_Loader)__ptr
 }
 singleton_resource_saver :: proc "contextless" () -> Resource_Saver {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Resource_Saver_name)
     }
-    
-    return __ptr
+
+    return cast(Resource_Saver)__ptr
 }
 singleton_marshalls :: proc "contextless" () -> Marshalls {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Marshalls_name)
     }
-    
-    return __ptr
+
+    return cast(Marshalls)__ptr
 }
 singleton_translation_server :: proc "contextless" () -> Translation_Server {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Translation_Server_name)
     }
-    
-    return __ptr
+
+    return cast(Translation_Server)__ptr
 }
 singleton_input :: proc "contextless" () -> Input {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Input_name)
     }
-    
-    return __ptr
+
+    return cast(Input)__ptr
 }
 singleton_input_map :: proc "contextless" () -> Input_Map {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Input_Map_name)
     }
-    
-    return __ptr
+
+    return cast(Input_Map)__ptr
 }
 singleton_engine_debugger :: proc "contextless" () -> Engine_Debugger {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Engine_Debugger_name)
     }
-    
-    return __ptr
+
+    return cast(Engine_Debugger)__ptr
 }
 singleton_gd_extension_manager :: proc "contextless" () -> Gd_Extension_Manager {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Gd_Extension_Manager_name)
     }
-    
-    return __ptr
+
+    return cast(Gd_Extension_Manager)__ptr
 }
 singleton_resource_uid :: proc "contextless" () -> Resource_Uid {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Resource_Uid_name)
     }
-    
-    return __ptr
+
+    return cast(Resource_Uid)__ptr
 }
 singleton_worker_thread_pool :: proc "contextless" () -> Worker_Thread_Pool {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Worker_Thread_Pool_name)
     }
-    
-    return __ptr
+
+    return cast(Worker_Thread_Pool)__ptr
 }
 singleton_theme_db :: proc "contextless" () -> Theme_Db {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Theme_Db_name)
     }
-    
-    return __ptr
+
+    return cast(Theme_Db)__ptr
 }
 singleton_editor_interface :: proc "contextless" () -> Editor_Interface {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Editor_Interface_name)
     }
-    
-    return __ptr
+
+    return cast(Editor_Interface)__ptr
 }
 singleton_gd_script_language_protocol :: proc "contextless" () -> Gd_Script_Language_Protocol {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Gd_Script_Language_Protocol_name)
     }
-    
-    return __ptr
+
+    return cast(Gd_Script_Language_Protocol)__ptr
 }
 singleton_java_class_wrapper :: proc "contextless" () -> Java_Class_Wrapper {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Java_Class_Wrapper_name)
     }
-    
-    return __ptr
+
+    return cast(Java_Class_Wrapper)__ptr
 }
 singleton_java_script_bridge :: proc "contextless" () -> Java_Script_Bridge {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Java_Script_Bridge_name)
     }
-    
-    return __ptr
+
+    return cast(Java_Script_Bridge)__ptr
 }
 singleton_accessibility_server :: proc "contextless" () -> Accessibility_Server {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Accessibility_Server_name)
     }
-    
-    return __ptr
+
+    return cast(Accessibility_Server)__ptr
 }
 singleton_audio_server :: proc "contextless" () -> Audio_Server {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Audio_Server_name)
     }
-    
-    return __ptr
+
+    return cast(Audio_Server)__ptr
 }
 singleton_camera_server :: proc "contextless" () -> Camera_Server {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Camera_Server_name)
     }
-    
-    return __ptr
+
+    return cast(Camera_Server)__ptr
 }
 singleton_display_server :: proc "contextless" () -> Display_Server {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Display_Server_name)
     }
-    
-    return __ptr
+
+    return cast(Display_Server)__ptr
 }
 singleton_native_menu :: proc "contextless" () -> Native_Menu {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Native_Menu_name)
     }
-    
-    return __ptr
+
+    return cast(Native_Menu)__ptr
 }
 singleton_rendering_server :: proc "contextless" () -> Rendering_Server {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Rendering_Server_name)
     }
-    
-    return __ptr
+
+    return cast(Rendering_Server)__ptr
 }
 singleton_navigation_server2d :: proc "contextless" () -> Navigation_Server2d {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Navigation_Server2d_name)
     }
-    
-    return __ptr
+
+    return cast(Navigation_Server2d)__ptr
 }
 singleton_navigation_server3d :: proc "contextless" () -> Navigation_Server3d {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Navigation_Server3d_name)
     }
-    
-    return __ptr
+
+    return cast(Navigation_Server3d)__ptr
 }
 singleton_physics_server2d :: proc "contextless" () -> Physics_Server2d {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Physics_Server2d_name)
     }
-    
-    return __ptr
+
+    return cast(Physics_Server2d)__ptr
 }
 singleton_physics_server3d :: proc "contextless" () -> Physics_Server3d {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Physics_Server3d_name)
     }
-    
-    return __ptr
+
+    return cast(Physics_Server3d)__ptr
 }
 singleton_xr_server :: proc "contextless" () -> Xr_Server {
     @(static) __ptr: __bindgen_gde.ObjectPtr
     if __ptr == nil {
         __ptr = __bindgen_gde.global_get_singleton(&__Xr_Server_name)
     }
-    
-    return __ptr
+
+    return cast(Xr_Server)__ptr
 }
 
 @(require_results)

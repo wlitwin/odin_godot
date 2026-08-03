@@ -1,5 +1,6 @@
 //gd:extends Node2D
 //gd:class Boss
+//gd:group enemies boss
 package barrage_enemies
 
 // ----------------------------------------------------------------------------
@@ -27,7 +28,13 @@ Boss :: struct {
 	}),
 	defeated: gd.Signal0,
 
-	max_hp: int `gd:"export,range=50:2000:10"`,
+	// `default=` replaces the old `if max_hp == 0` ready-guard — safe here because
+	// boss.tscn stores no max_hp (a scene-stored value would override the default).
+	max_hp: int `gd:"export,range=50:2000:10,default=300"`,
+
+	// The GameState autoload, auto-wired at READY (absolute onready path) — no
+	// get_node in ready.
+	gs: gd.Object `gd:"onready=/root/GameState"`,
 
 	// runtime
 	hp:        int,
@@ -42,21 +49,14 @@ Boss :: struct {
 BOSS_RADIUS :: 36
 
 boss_ready :: proc(self: ^Boss) {
-	if self.max_hp == 0 {self.max_hp = 300}
+	// max_hp arrives via its declared `default=`; group membership ("enemies" + "boss")
+	// via the `//gd:group` marker — both handled before this proc runs.
 	self.hp = self.max_hp
-	grp := gd.new_string_name_cstring("enemies", true)
-	gd.node_add_to_group(cast(gd.Node)self.owner, grp, false)
-	bgrp := gd.new_string_name_cstring("boss", true)
-	gd.node_add_to_group(cast(gd.Node)self.owner, bgrp, false)
 	gd.node2d_set_position(self.owner, gd.Vector2{480, 160})
 
 	// One flag read decides pacing for the whole fight (see game_state_is_test).
-	gs := gd.node_get_node(cast(gd.Node)self.owner, gd.new_node_path_cstring("/root/GameState"))
-	if gs != nil {
-		m := gd.sname("is_test")
-		v := gd.object_call(cast(gd.Object)gs, m)
-		self.fast = bool(gd.variant_to_bool(&v))
-	}
+	// self.gs is the onready-wired autoload; vcall_bool is nil-quiet (false) if absent.
+	self.fast = gd.vcall_bool(self.gs, "is_test")
 
 	// The fight, declared once. Odin procs aren't closures — each step reaches its
 	// state through the ctx pointer tick() passes (= ^Boss).
@@ -89,20 +89,11 @@ boss_enter_phase_3 :: proc(ctx: rawptr) {boss_emit_phase(cast(^Boss)ctx, 3, "sto
 
 @(private = "file")
 boss_ring :: proc(self: ^Boss, n: int, speed: f64, phase_off: f32) {
-	field := find_field(cast(gd.Node)self.owner, &self.field)
+	field := find_field(self.owner, &self.field)
 	if field == nil {return}
 	pos := gd.node2d_get_position(self.owner)
-	m := gd.sname("spawn_ring")
-	pv := gd.variant_from(&pos)
-	nn := gd.Int(n)
-	nv := gd.variant_from(&nn)
-	sp := speed
-	sv := gd.variant_from(&sp)
-	ph := f64(phase_off)
-	phv := gd.variant_from(&ph)
-	dmg := gd.Int(1)
-	dv := gd.variant_from(&dmg)
-	_ = gd.object_call(field, m, pv, nv, sv, phv, dv)
+	// Cross-module by-name call: gd.vcall boxes every arg (int, Vector2, floats) itself.
+	gd.vcall_void(field, "spawn_ring", pos, n, speed, f64(phase_off), 1)
 }
 
 @(private = "file")
@@ -134,33 +125,25 @@ boss_physics_process :: proc(self: ^Boss, delta: f64) {
 	flow.tick(&self.script, self, delta)
 
 	// Register with the field (same contract as Enemy; bigger circle).
-	field := find_field(cast(gd.Node)self.owner, &self.field)
+	field := find_field(self.owner, &self.field)
 	if field == nil {return}
 	pos := gd.node2d_get_position(self.owner)
 	// Slow horizontal weave so the fight isn't a turret shoot.
 	pos.x = 480 + 260 * math.sin(self.ring_t * 0.25)
 	gd.node2d_set_position(self.owner, pos)
-	m := gd.sname("register_enemy")
-	id := gd.Int(gd.object_get_instance_id(cast(gd.Object)self.owner))
-	iv := gd.variant_from(&id)
-	pv := gd.variant_from(&pos)
-	r := f64(BOSS_RADIUS)
-	rv := gd.variant_from(&r)
-	_ = gd.object_call(field, m, iv, pv, rv)
+	id := gd.Int(gd.object_get_instance_id(self.owner))
+	gd.vcall_void(field, "register_enemy", id, pos, f64(BOSS_RADIUS))
 }
 
 @(gd_method)
 boss_take_hit :: proc(self: ^Boss, damage: gd.Int) -> gd.Bool {
 	self.hp -= int(damage)
 	if self.hp <= 0 {
-		if field := find_field(cast(gd.Node)self.owner, &self.field); field != nil {
-			m := gd.sname("unregister_enemy")
-			id := gd.Int(gd.object_get_instance_id(cast(gd.Object)self.owner))
-			iv := gd.variant_from(&id)
-			_ = gd.object_call(field, m, iv)
+		if field := find_field(self.owner, &self.field); field != nil {
+			gd.vcall_void(field, "unregister_enemy", gd.Int(gd.object_get_instance_id(self.owner)))
 		}
 		boss_emit_defeated(self)
-		gd.node_queue_free(cast(gd.Node)self.owner)
+		gd.node_queue_free(self.owner)
 		return true
 	}
 	return false

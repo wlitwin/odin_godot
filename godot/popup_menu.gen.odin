@@ -16,7 +16,7 @@ popup_menu_name :: proc "contextless" () -> String_Name {
 }
 
 new_popup_menu :: proc "contextless" () -> Popup_Menu {
-    return __bindgen_gde.classdb_construct_object(popup_menu_name_ref())
+    return cast(Popup_Menu)__bindgen_gde.classdb_construct_object(popup_menu_name_ref())
 }
 
 // methods

@@ -47,7 +47,7 @@ rich_text_label_name :: proc "contextless" () -> String_Name {
 }
 
 new_rich_text_label :: proc "contextless" () -> Rich_Text_Label {
-    return __bindgen_gde.classdb_construct_object(rich_text_label_name_ref())
+    return cast(Rich_Text_Label)__bindgen_gde.classdb_construct_object(rich_text_label_name_ref())
 }
 
 // methods

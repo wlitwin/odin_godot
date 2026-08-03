@@ -118,7 +118,13 @@ Packed_Vector3_Array :: Packed_Array(Vector3)
 Packed_Vector4_Array :: Packed_Array(Vector4)
 Packed_Color_Array :: Packed_Array(Color)
 
-Object :: gd.ObjectPtr
+// distinct: a handle is an ENGINE object, and nothing else may pose as one. Every
+// class handle (Node, Control, ...) is a plain alias of this one distinct type, so
+// handle-to-handle flows stay cast-free — but an arbitrary pointer (above all a
+// `^script_struct`, whose deref the engine would then walk as an Object) no longer
+// converts implicitly. That exact confusion compiled silently and SIGSEGV'd in the
+// engine; now it is a build error. Interop stays rawptr on the gdext side.
+Object :: distinct gd.ObjectPtr
 Ref_Counted :: ^Object
 
 Some_Packable :: union {

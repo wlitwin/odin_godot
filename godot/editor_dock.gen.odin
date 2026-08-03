@@ -37,7 +37,7 @@ editor_dock_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_dock :: proc "contextless" () -> Editor_Dock {
-    return __bindgen_gde.classdb_construct_object(editor_dock_name_ref())
+    return cast(Editor_Dock)__bindgen_gde.classdb_construct_object(editor_dock_name_ref())
 }
 
 // methods

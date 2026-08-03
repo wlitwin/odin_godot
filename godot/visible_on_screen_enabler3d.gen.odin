@@ -21,7 +21,7 @@ visible_on_screen_enabler3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_visible_on_screen_enabler3d :: proc "contextless" () -> Visible_On_Screen_Enabler3d {
-    return __bindgen_gde.classdb_construct_object(visible_on_screen_enabler3d_name_ref())
+    return cast(Visible_On_Screen_Enabler3d)__bindgen_gde.classdb_construct_object(visible_on_screen_enabler3d_name_ref())
 }
 
 // methods

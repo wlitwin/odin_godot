@@ -25,7 +25,7 @@ animation_player_name :: proc "contextless" () -> String_Name {
 }
 
 new_animation_player :: proc "contextless" () -> Animation_Player {
-    return __bindgen_gde.classdb_construct_object(animation_player_name_ref())
+    return cast(Animation_Player)__bindgen_gde.classdb_construct_object(animation_player_name_ref())
 }
 
 // methods
