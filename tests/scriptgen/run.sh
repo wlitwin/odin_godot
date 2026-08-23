@@ -388,7 +388,8 @@ if ! "$SGEN" "$ab" -godot:"$ROOT" >/dev/null 2>&1; then fail "play.Ability must 
 agen="$ab/odin_godot_scripts.gen.odin"
 grep -q "CASTER_CMD_LOB_CAST :: knet.Cmd_Id" "$agen" || fail "first ability's cast must hoist as CASTER_CMD_LOB_CAST"
 grep -q "CASTER_CMD_CONE_CAST :: knet.Cmd_Id" "$agen" || fail "second ability instance must get its own path-prefixed cast (CONE_CAST)"
-grep -q "return play.ability_cast(&self.lob, _a0, _a1)" "$agen" || fail "cast thunk must route into &self.lob (imported, qualified, no owner)"
+grep -q "return play.ability_cast(&self.lob, _a0, _a1, _a2, _a3)" "$agen" || fail "cast thunk must route into &self.lob (imported, qualified, no owner) with aim + the owner-carried origin (dx, dy, ox, oy)"
+grep -q "caster_lob_cast_cmd :: proc(b: ^kboot.Boot, self: ^Caster, dx: f32, dy: f32, ox: f32, oy: f32)" "$agen" || fail "the cast's issue wrapper must carry the origin after its aim (dx, dy, ox, oy)"
 # The knob is FLAT since play went canonical-shelf: play.Ability_Def is gone
 # (the def table is kcombat's; a string name can never ride a replicated
 # blob), and the block replicates a bare cooldown beside its countdown.

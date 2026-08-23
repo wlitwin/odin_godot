@@ -291,7 +291,8 @@ pull's aim + carried origin — `ox, oy` is the wielder's OWN muzzle, so an owne
 wielder's shot leaves where its screen saw it, not the host's lagged copy; leash it there with
 `kcombat.leash` before launching),
 **`play.Ability`** (a cooldown-gated cast, the slow lob/cone/buff: embed one per slot,
-`ability_arm` it, run the effect in your hook on `ok`; the block owns its cooldown, since a
+`ability_arm` it, run the effect in your hook on `ok` from the cast's aim + carried origin,
+leashed like the gun's; the block owns its cooldown, since a
 slow ability's gate dwarfs the round-trip; for casts that spend a resource or slots indexed
 at runtime, drop down to `kcombat.Cooldowns`/`ability_try`, the layer underneath: see
 [kit/combat](combat.md#health-and-abilities)), and **`play.Channel`** (hold-to-progress, the
