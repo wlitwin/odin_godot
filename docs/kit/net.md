@@ -286,7 +286,10 @@ package works identically: the generated file imports and qualifies it (`play.gu
 
 `godot:play` ships worked ones: **`play.Gun`** (mag + reload + jam, knob-configured by a
 `Gun_Def`, host-authoritative and client-predicted through its `gun_fire` verb: embed
-`weapon: play.Gun`, `gun_equip` it, pace the trigger, spawn the shot in your hook),
+`weapon: play.Gun`, `gun_equip` it, pace the trigger, spawn the shot in your hook from the
+pull's aim + carried origin — `ox, oy` is the wielder's OWN muzzle, so an owner-streamed
+wielder's shot leaves where its screen saw it, not the host's lagged copy; leash it there with
+`kcombat.leash` before launching),
 **`play.Ability`** (a cooldown-gated cast, the slow lob/cone/buff: embed one per slot,
 `ability_arm` it, run the effect in your hook on `ok`; the block owns its cooldown, since a
 slow ability's gate dwarfs the round-trip; for casts that spend a resource or slots indexed

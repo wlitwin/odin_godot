@@ -26,8 +26,22 @@ package play
 //     time the trigger.
 //   * EFFECT — WHAT a shot does. A projectile / hitscan / damage touches the game's world, which
 //     the gun can't know. Read `g.fired` at the issue site to draw YOUR muzzle flash, and in the
-//     command hook (keyed by this command's index) to spawn the authoritative shot from `g.aim`.
-//     Cross-entity effects are the game's, exactly as any command's are.
+//     command hook (keyed by this command's index) to spawn the authoritative shot from the
+//     pull's aim AND ORIGIN (the wire args). Cross-entity effects are the game's, exactly as
+//     any command's are.
+//
+// THE PULL CARRIES ITS ORIGIN (ox, oy) — the wielder's own muzzle, as the shooter's screen saw
+// it. On an OWNER-STREAMED wielder (x/y `gd:"owner"`, the kit/net avatar default) the host's
+// copy lags a stream behind, so a shot the host launches from ITS copy of the wielder leaves
+// from behind a moving shooter — on every screen, including the shooter's, whose own tracer
+// left the live muzzle. That is a gameplay divergence (the wounding line is not the line the
+// shooter saw hit), not a presentation one. The claimed origin is UNTRUSTED input: in your
+// `_then` hook leash it against your copy before launching —
+// `kcombat.leash({ox, oy, 0}, {self.x, self.y, 0}, LEASH)` — honest latency offsets pass,
+// teleport-cheese is dragged back to arm's length (cavecrawl's spelunker_throw is the pattern).
+// The gun can't leash for you: it does not know the wielder's position (below). A wielder whose
+// position the host simulates itself (a kit/sim `gd:"predict"` body) just passes its own x/y —
+// host and owner agree on the tick's position, so the leash is a no-op there.
 //
 // The wielder is NOT threaded in (unlike a game-specific composed command): the gun is
 // self-contained through its knobs, so `gun_fire` reaches nothing outside the block — which is
@@ -58,6 +72,7 @@ Gun :: struct {
 	salt:         u32 `gd:"replicate"`,      // jam-seed context the game sets (floor/run/player); 0 is fine
 	spent:        u32 `gd:"replicate"`,      // lifetime rounds consumed since equip — the jam roll's never-repeating half
 	aim_x, aim_y: f32,                       // scratch: the last pull's aim, for the game's effect hook (host-side)
+	origin_x, origin_y: f32,                 // scratch: the last pull's CLAIMED origin (the wielder's own muzzle) — leash it in the hook
 	fired:        bool,                      // scratch: did the last pull send a live round — the game's EFFECT signal
 }
 
@@ -82,10 +97,13 @@ gun_equip :: proc(g: ^Gun, def: Gun_Def, salt: u32 = 0) {
 // clear-tap), so it is always true; a `false` would tell kit/net to REVERT the transition, which a
 // jam or a reload must never do. Whether a live round actually LEFT THE BARREL is `g.fired`, which
 // the game reads at the issue site (draw the muzzle flash) and in its command hook (spawn the
-// shot). `dx,dy` is the aim, stashed for that hook — the gun itself is aim-agnostic.
+// shot). `dx,dy` is the aim and `ox,oy` the wielder's OWN muzzle position at the pull (the
+// owner-carried origin — see the header: leash it in the hook), both stashed for that hook —
+// the gun itself is aim- and position-agnostic.
 @(gd_command = "predict")
-gun_fire :: proc(g: ^Gun, dx, dy: f32) -> bool {
+gun_fire :: proc(g: ^Gun, dx, dy: f32, ox, oy: f32) -> bool {
 	g.aim_x, g.aim_y = dx, dy
+	g.origin_x, g.origin_y = ox, oy
 	g.fired = false
 	switch g.mode {
 	case .Reloading:

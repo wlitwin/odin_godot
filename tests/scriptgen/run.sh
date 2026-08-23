@@ -321,7 +321,8 @@ ODIN
 if ! "$SGEN" "$pg" -godot:"$ROOT" >/dev/null 2>&1; then fail "the real play.Gun block must compose into a consumer, not error"; fi
 tgen="$pg/odin_godot_scripts.gen.odin"
 grep -q 'import play "godot:play"' "$tgen" || fail "play.Gun consumer must import godot:play"
-grep -q "return play.gun_fire(&self.weapon, _a0, _a1)" "$tgen" || fail "play.gun_fire must route into &self.weapon (imported, qualified, no owner)"
+grep -q "return play.gun_fire(&self.weapon, _a0, _a1, _a2, _a3)" "$tgen" || fail "play.gun_fire must route into &self.weapon (imported, qualified, no owner) with aim + the owner-carried origin (dx, dy, ox, oy)"
+grep -q "turret_weapon_fire_cmd :: proc(b: ^kboot.Boot, self: ^Turret, dx: f32, dy: f32, ox: f32, oy: f32)" "$tgen" || fail "the issue wrapper must carry the pull's origin after its aim (dx, dy, ox, oy)"
 grep -q "TURRET_CMD_WEAPON_FIRE :: knet.Cmd_Id" "$tgen" || fail "play.Gun's verb must hoist as TURRET_CMD_WEAPON_FIRE"
 grep -q "size_of(type_of(Turret{}.weapon.def))" "$tgen" || fail "the Gun_Def knob-blob must replicate through the embed"
 grep -q "offset_of(type_of(Turret{}.weapon), mode)" "$tgen" || fail "the Gun_Mode mode field must compose through the block"

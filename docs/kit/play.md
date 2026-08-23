@@ -47,8 +47,10 @@ block list and the contract live in [sim](sim.md#predicted-blocks--godotplaysim)
 
 A block's cross-entity effects stay YOURS, as the composed verb's
 [`_then` consequence](net.md#consequences-verb_then):
-`runner_weapon_fire_then` spawns the slug; `play.Gun` only resolves the
-trigger. Blocks are the reference for writing your own; the pattern is
+`runner_weapon_fire_then` spawns the slug — from the pull's carried origin
+(the wielder's own muzzle, leashed against the host's copy with
+`kcombat.leash`); `play.Gun` only resolves the trigger. Blocks are the
+reference for writing your own; the pattern is
 documented on their source headers (`play/*.odin`), which remain the long
 answer to everything on this page.
 
