@@ -48,6 +48,12 @@ Tracer_Hit :: struct {
 
 On_Hit_Proc :: proc(user: rawptr, hit: Tracer_Hit)
 
+// A tracer's ttl ran out with nothing hit — where it stopped. The clip-spark
+// hook (a shot the cover clamped: the sparks belong at the clipped face, on
+// the frame the flight ARRIVES there — games used to book that moment on a
+// wall clock and drain a deadline queue).
+On_Expire_Proc :: proc(user: rawptr, shooter: knet.Player_Id, pos: [3]f32)
+
 tracers_destroy :: proc(t: ^Tracers) {
 	delete(t.live)
 	t^ = {}
@@ -92,10 +98,13 @@ tracer_add :: proc(t: ^Tracers, parent: gd.Node, f: kcombat.Fire, glyph: string,
 }
 
 // Fly every tracer one frame; on visual contact call `on_hit` (the game
-// plays its impact: predicted hp dip, burst, flash, hud) and reap. Expired
-// tracers reap silently. Contact sweeps the frame's segment, so it lands on
-// the frame the crossing happens — never after the authority's tick.
-tracers_frame :: proc(t: ^Tracers, delta: f64, user: rawptr, targets: Targets_Proc, on_hit: On_Hit_Proc) {
+// plays its impact: predicted hp dip, burst, flash, hud) and reap. An
+// EXPIRED tracer (ttl out, nothing hit) calls `on_expire` with its final
+// position — the clipped-shot sparks land the frame the flight gets there,
+// no wall-clock booking (nil = reap silently, the old behavior). Contact
+// sweeps the frame's segment, so it lands on the frame the crossing
+// happens — never after the authority's tick.
+tracers_frame :: proc(t: ^Tracers, delta: f64, user: rawptr, targets: Targets_Proc, on_hit: On_Hit_Proc, on_expire: On_Expire_Proc = nil) {
 	dt := f32(delta)
 	for i := 0; i < len(t.live); {
 		v := &t.live[i]
@@ -112,6 +121,9 @@ tracers_frame :: proc(t: ^Tracers, delta: f64, user: rawptr, targets: Targets_Pr
 			continue
 		}
 		if v.left <= 0 {
+			if on_expire != nil {
+				on_expire(user, v.shooter, v.pos)
+			}
 			gd.node_queue_free(cast(gd.Node)v.node)
 			unordered_remove(&t.live, i)
 			continue

@@ -71,30 +71,41 @@ the_director_paces_waves :: proc(t: ^testing.T) {
 	tick := u64(0)
 
 	spawned := 0
+	starts := 0 // wave_started: the "wave N rolls in" edge, no consumer-side shadow
 	// Wave 1 arms on the first tick, spawns one per tick after.
 	for _ in 0 ..< 4 {
 		tick += 1
-		spawned += kai.director_tick(&d, tick, waves)
+		n, ws := kai.director_tick(&d, tick, waves)
+		spawned += n
+		if ws {starts += 1}
 	}
 	testing.expect_value(t, spawned, 2)
+	testing.expect_value(t, starts, 1) // announced exactly once, the tick it armed
 	testing.expect_value(t, kai.director_wave(&d), 1)
 	testing.expect_value(t, d.alive, 2)
 
 	// Nothing more while the field is hostile.
 	tick += 1
-	testing.expect_value(t, kai.director_tick(&d, tick, waves), 0)
+	{
+		n, _ := kai.director_tick(&d, tick, waves)
+		testing.expect_value(t, n, 0)
+	}
 
 	// The wave falls; the breather starts counting from the LAST death.
 	kai.director_note_death(&d, tick, waves)
 	kai.director_note_death(&d, tick, waves)
 	for _ in 0 ..< 9 { // rest=10: still calm
 		tick += 1
-		testing.expect_value(t, kai.director_tick(&d, tick, waves), 0)
+		{
+		n, _ := kai.director_tick(&d, tick, waves)
+		testing.expect_value(t, n, 0)
+	}
 	}
 	spawned2 := 0
 	for _ in 0 ..< 6 {
 		tick += 1
-		spawned2 += kai.director_tick(&d, tick, waves)
+		n2, _ := kai.director_tick(&d, tick, waves)
+		spawned2 += n2
 	}
 	testing.expect_value(t, spawned2, 3)
 	testing.expect_value(t, kai.director_wave(&d), 2)
@@ -105,7 +116,10 @@ the_director_paces_waves :: proc(t: ^testing.T) {
 	}
 	for _ in 0 ..< 15 {
 		tick += 1
-		testing.expect_value(t, kai.director_tick(&d, tick, waves), 0)
+		{
+		n, _ := kai.director_tick(&d, tick, waves)
+		testing.expect_value(t, n, 0)
+	}
 	}
 	testing.expect(t, d.done)
 }

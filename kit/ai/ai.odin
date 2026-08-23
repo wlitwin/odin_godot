@@ -112,26 +112,28 @@ Director :: struct {
 }
 
 // Once per host tick. Returns how many to spawn NOW (the director paces one
-// per tick — spawn bursts read badly and spike the delta batch).
-director_tick :: proc(d: ^Director, tick: u64, waves: []Wave) -> (spawn: int) {
+// per tick — spawn bursts read badly and spike the delta batch) and whether a
+// NEW WAVE just rolled in — the "wave N!" banner/horn moment every consumer
+// shadowed with a `wave_seen` compare of its own.
+director_tick :: proc(d: ^Director, tick: u64, waves: []Wave) -> (spawn: int, wave_started: bool) {
 	if d.done {
-		return 0
+		return 0, false
 	}
 	if d.pending > 0 {
 		d.pending -= 1
 		d.alive += 1
-		return 1
+		return 1, false
 	}
 	if d.alive > 0 || tick < d.rest_until {
-		return 0
+		return 0, false
 	}
 	if d.wave >= len(waves) {
 		d.done = true
-		return 0
+		return 0, false
 	}
 	d.pending = waves[d.wave].count
 	d.wave += 1
-	return 0 // spawning starts next tick
+	return 0, true // spawning starts next tick; the wave is announced NOW
 }
 
 // The game reports each director-spawned NPC's death. When the wave clears,

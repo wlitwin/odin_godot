@@ -1591,7 +1591,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	// is what makes the second one harmless). Call it with boot_pump's events,
 	// any frame order you like: `<snake>_events(self, events)`.
 	has_succ := s.succ_backup != "" || s.succ_took_over != "" || s.succ_wiped != "" || s.succ_migrating != ""
-	if len(s.event_halves) > 0 || has_succ {
+	has_born := s.embodied != ""
+	for e in s.entities {
+		if e.born != "" {has_born = true}
+	}
+	if len(s.event_halves) > 0 || has_succ || has_born {
 		fmt.sbprintf(
 			b,
 			"// Dispatch this frame's session events to the class's declared halves\n"+
@@ -1601,12 +1605,74 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			"%s_events :: proc(self: ^%s, events: []ksess.Event) {{\n",
 			snake, cls,
 		)
-		if len(s.event_halves) == 0 {
+		if len(s.event_halves) == 0 && !has_born {
 			w(b, "\t_ = events\n")
 		} else {
 			w(b, "\tfor ev in events {\n\t\t#partial switch e in ev {\n")
 		}
+		if has_born {
+			// THE BORN ARM, typed: Ev_Spawned means the fields are SET — resolve
+			// the entity through the census and hand it to its kind's `<t>_born`
+			// (the dress every game used to write as a type-switch in its
+			// untyped entity_spawned half), then the embodied latch: an AVATAR
+			// kind of MINE was born — my spawn, my drop-in, my reconnect
+			// reclaiming its standing body. A declared untyped half still runs,
+			// after the typed dispatch (merged below into this same arm).
+			w(b, "\t\tcase ksess.Ev_Spawned:\n")
+			emitted_switch := false
+			for e in s.entities {
+				if e.born == "" {continue}
+				tsnake := to_snake(e.target)
+				if !emitted_switch {
+					w(b, "\t\t\tswitch e.type {\n")
+					emitted_switch = true
+				}
+				fmt.sbprintf(
+					b,
+					"\t\t\tcase %s_TYPE:\n\t\t\t\tif _e, _ok := kboot.boot_entity(&self.%s, e.id, %s_TYPE); _ok {{\n\t\t\t\t\t%s(self, cast(^%s)_e, e.id, e.owner)\n\t\t\t\t}}\n",
+					strings.to_upper(tsnake), s.boot_field, strings.to_upper(tsnake), e.born, e.target,
+				)
+			}
+			if emitted_switch {
+				w(b, "\t\t\t}\n")
+			}
+			if s.embodied != "" {
+				cond := strings.builder_make(context.temp_allocator)
+				for e in s.entities {
+					if !e.avatar {continue}
+					if strings.builder_len(cond) > 0 {
+						w(&cond, " || ")
+					}
+					fmt.sbprintf(&cond, "e.type == %s_TYPE", strings.to_upper(to_snake(e.target)))
+				}
+				fmt.sbprintf(
+					b,
+					"\t\t\tif (%s) && self.%s.ses != nil && e.owner == self.%s.ses.me {{\n\t\t\t\t%s(self, e.id)\n\t\t\t}}\n",
+					strings.to_string(cond), s.boot_field, s.boot_field, s.embodied,
+				)
+			}
+			// The declared untyped half, folded into this arm (two case arms on
+			// one variant would not compile).
+			for h in s.event_halves {
+				if SESSION_EVENTS[h.ev].variant != "Ev_Spawned" {continue}
+				args := strings.builder_make(context.temp_allocator)
+				for p in SESSION_EVENTS[h.ev].params {
+					fmt.sbprintf(&args, ", %s", p.field)
+				}
+				if h.bare != "" {
+					fmt.sbprintf(b, "\t\t\t%s(self%s)\n", h.bare, strings.to_string(args))
+				}
+				if h.then_proc != "" {
+					fmt.sbprintf(
+						b,
+						"\t\t\tif self.%s.ses != nil && self.%s.ses.is_host {{\n\t\t\t\t%s(self%s)\n\t\t\t}}\n",
+						s.boot_field, s.boot_field, h.then_proc, strings.to_string(args),
+					)
+				}
+			}
+		}
 		for h in s.event_halves {
+			if has_born && SESSION_EVENTS[h.ev].variant == "Ev_Spawned" {continue} // folded into the born arm above
 			ev := SESSION_EVENTS[h.ev]
 			args := strings.builder_make(context.temp_allocator)
 			for p in ev.params {
@@ -1642,7 +1708,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				)
 			}
 		}
-		if len(s.event_halves) > 0 {
+		if len(s.event_halves) > 0 || has_born {
 			w(b, "\t\t}\n\t}\n")
 		}
 		if has_succ {
@@ -1753,7 +1819,10 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		// fires inside boot_spawn_send, not from the next pump's batch). A class
 		// that declares no session-event halves has no dispatcher to hand over;
 		// it passes nil and keeps the queue path (nothing to dress at born).
-		has_events := len(s.event_halves) > 0 || s.succ_backup != "" || s.succ_took_over != "" || s.succ_wiped != "" || s.succ_migrating != ""
+		has_events := len(s.event_halves) > 0 || s.succ_backup != "" || s.succ_took_over != "" || s.succ_wiped != "" || s.succ_migrating != "" || s.embodied != ""
+		for e in s.entities {
+			if e.born != "" {has_events = true}
+		}
 		if has_events {
 			fmt.sbprintf(
 				b,

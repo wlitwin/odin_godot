@@ -111,6 +111,14 @@ chat_refresh :: proc(ch: ^Chat, c: ^kcomms.Comms) {
 	}
 }
 
+// Is the keyboard IN the chat box right now? The predicate every game (and
+// seven examples) re-derived as `gd.control_has_focus(boot.chat.input)` to
+// gate its own hotkeys — movement, the held scoreboard, ability keys — off
+// while typing.
+chat_typing :: proc(ch: ^Chat) -> bool {
+	return cast(rawptr)ch.input != nil && bool(gd.control_has_focus(cast(gd.Control)ch.input, false))
+}
+
 // The whole text_submitted handler: extract (clamped — the utf8 length
 // report exceeds the buffer on long lines, a bounds-check trap two games
 // hit), say it, clear the box, and PUT THE KEYS BACK ON THE WHEEL. The

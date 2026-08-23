@@ -74,6 +74,21 @@ Gun :: struct {
 	aim_x, aim_y: f32,                       // scratch: the last pull's aim, for the game's effect hook (host-side)
 	origin_x, origin_y: f32,                 // scratch: the last pull's CLAIMED origin (the wielder's own muzzle) — leash it in the hook
 	fired:        bool,                      // scratch: did the last pull send a live round — the game's EFFECT signal
+	pull:         Gun_Pull,                  // scratch: WHICH arm of the FSM the last pull ran — receipts/sfx read it
+	                                         // instead of reverse-engineering the transition from post-state
+}
+
+// What one trigger pull actually did — the outcome `fired` compresses to a
+// bool. Hosts used to infer these from the post-pull state (a fresh jam reads
+// as taps == def.jam_taps, an unjam as Ready-and-not-fired), which is exactly
+// the kind of fragile archaeology a scratch enum deletes.
+Gun_Pull :: enum u8 {
+	Held,      // reloading: the pull was absorbed (the pacer usually prevents it)
+	Fired,     // a live round left the barrel (fired = true)
+	Jammed,    // the round was a dud — ejected, the mash begins
+	Empty,     // dry click: the reload begins
+	Clear_Tap, // a mash pull chipped a tap (still jammed)
+	Cleared,   // the LAST tap — Ready again, no round yet
 }
 
 // gun_equip — host-only, at spawn or on a weapon swap: stamp the knobs, top off the mag, go
@@ -107,25 +122,33 @@ gun_fire :: proc(g: ^Gun, dx, dy: f32, ox, oy: f32) -> bool {
 	g.fired = false
 	switch g.mode {
 	case .Reloading:
-	// The pacer holds through a reload; a stray pull that raced it is a no-op (still applied).
+		// The pacer holds through a reload; a stray pull that raced it is a no-op (still applied).
+		g.pull = .Held
 	case .Jammed:
 		// Mash to clear — each pull chips a tap; no round leaves until it's Ready again.
 		if g.taps > 0 {g.taps -= 1}
-		if g.taps == 0 {g.mode = .Ready}
+		g.pull = .Clear_Tap
+		if g.taps == 0 {
+			g.mode = .Ready
+			g.pull = .Cleared
+		}
 	case .Ready:
 		if g.ammo == 0 {
 			// Empty — begin the reload; the host counts it down in gun_tick, the pacer holds.
 			g.mode = .Reloading
 			g.reload_cd = g.def.reload_ticks
+			g.pull = .Empty
 		} else if gun_jams(g) {
 			g.ammo -= 1 // the dud is ejected
 			g.spent += 1
 			g.mode = .Jammed
 			g.taps = g.def.jam_taps
+			g.pull = .Jammed
 		} else {
 			g.ammo -= 1
 			g.spent += 1
 			g.fired = true // a live round flew
+			g.pull = .Fired
 			if g.ammo == 0 {
 				g.mode = .Reloading
 				g.reload_cd = g.def.reload_ticks

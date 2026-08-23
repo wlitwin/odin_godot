@@ -28,6 +28,7 @@ package kit_boot
 // event on a game's behalf, and nothing here is a place to put game logic.
 
 import ksess "godot:kit/session"
+import kxfer "godot:kit/xfer"
 import ksim "godot:kit/sim"
 import kui "godot:kit/ui"
 
@@ -51,6 +52,12 @@ boot_forward :: proc(b: ^Boot, ev: ksess.Event) {
 
 	case ksess.Ev_Player_Joined:
 		roster_changed(b)
+		if b.album != nil && b.ses != nil && b.ses.is_host {
+			// The album's join-time catch-up: every kept payload replays to the
+			// newcomer, addressed and paced — a registered album never forgets
+			// its late joiners.
+			kxfer.album_welcome(b.album, e.id)
+		}
 
 	case ksess.Ev_Player_Left:
 		// The lane hears departures like it hears ownership moves — same
@@ -160,7 +167,7 @@ boot_forward :: proc(b: ^Boot, ev: ksess.Event) {
 // "Joining..." with the doors still hidden by the join door that opened them.
 // Only the join-CODE path ever put the menu back (boot_code_pulse's .Failed
 // arm) — this is that same line, owed to the other three ends and paid.
-@(private = "file")
+@(private)
 boot_doors_again :: proc(b: ^Boot, status: string) {
 	kui.lobby_set_status(&b.ui, status)
 	kui.lobby_show_menu(&b.ui, true, false)

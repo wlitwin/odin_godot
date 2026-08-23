@@ -2168,7 +2168,69 @@ resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^m
 		} else {
 			demand_half(procs, fr_name, fmt.tprintf("%s's free hook, dispatched from %s's entity table", e.target, s.struct_name))
 		}
+		// `<t>_born` — the BORN moment, typed: Ev_Spawned's arm in the generated
+		// events dispatch resolves the entity through the census and calls it with
+		// the fields SET, on every peer (the host's own inside boot_spawn_send).
+		// The make-time `<t>_spawned` above stays the bookkeeping hook; this is
+		// where the type-switch dress every game wrote in `<game>_entity_spawned`
+		// goes instead. Same shape as _spawned.
+		bn_name := strings.concatenate({tsnake, "_born"})
+		if cand, found := idx[bn_name]; found {
+			if validate_entity_hook(cand, bn_name, s.struct_name, e.target, want_owner = true) {
+				e.born = bn_name
+			}
+			cand.claimed = true
+			idx[bn_name] = cand
+		} else {
+			demand_half(procs, bn_name, fmt.tprintf("%s's born hook, dispatched typed from %s_events' Ev_Spawned arm", e.target, to_snake(s.struct_name)))
+		}
 	}
+
+	// `<game>_embodied(self, id)` — I inhabit a body now: an AVATAR-kind entity
+	// owned by ME was born (my spawn, my drop-in, my reconnect reclaiming its
+	// standing body — each arrives as Ev_Spawned on my screen). The one latch
+	// every game kept as `started`-plus-owner-checks in entity_spawned.
+	em_name := fmt.aprintf("%s_embodied", to_snake(s.struct_name))
+	if cand, found := idx[em_name]; found {
+		has_avatar := false
+		for &e in s.entities {
+			if e.avatar {has_avatar = true}
+		}
+		loc := Loc{path = cand.path, line = cand.line}
+		if !has_avatar {
+			error_at(loc, "%s: no entity kind declares `avatar` — the embodied moment IS an avatar kind of mine being born; tag the body's scene (gd:\"entity=Runner:2,avatar\") or drop the half", em_name)
+		} else if !validate_embodied_hook(cand, em_name, s.struct_name) {
+			// error already reported
+		} else {
+			s.embodied = em_name
+		}
+		cand.claimed = true
+		idx[em_name] = cand
+	}
+}
+
+// `<game>_embodied(self: ^Game, id: knet.Net_Id)` — shape check.
+@(private = "file")
+validate_embodied_hook :: proc(cand: Half_Candidate, name, game_struct: string) -> bool {
+	loc := Loc{path = cand.path, line = cand.line}
+	if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") {
+		error_at(loc, "%s must be a plain proc — the generated events dispatch calls it, it is never registered", name)
+		return false
+	}
+	types := make([dynamic]string, context.temp_allocator)
+	if cand.pt.params != nil {
+		for f in cand.pt.params.list {
+			t := strings.trim_space(node_text(cand.src, f.type))
+			for _ in 0 ..< max(1, len(f.names)) {
+				append(&types, t)
+			}
+		}
+	}
+	if len(types) != 2 || types[0] != fmt.tprintf("^%s", game_struct) || type_base(types[1]) != "Net_Id" {
+		error_at(loc, "%s: expected `proc(self: ^%s, id: knet.Net_Id)` — the body itself comes back through the census (`<kind>_of(&boot, id)`)", name, game_struct)
+		return false
+	}
+	return true
 }
 
 // Classify a `gd:"replicate,interp"` field's type into a knet.Lerp_Kind literal

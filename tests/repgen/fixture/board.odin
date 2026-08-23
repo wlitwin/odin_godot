@@ -42,6 +42,22 @@ pawn_spawned :: proc(game: ^Board, self: ^Pawn, id: knet.Net_Id, owner: knet.Pla
 pawn_freed :: proc(game: ^Board, self: ^Pawn, id: knet.Net_Id) {
 }
 
+// The BORN moment, typed: Ev_Spawned's arm in the generated board_events
+// resolves the pawn through the census and calls this with the fields SET —
+// the dress that used to be a type-switch in an untyped entity_spawned half.
+@(gd_half)
+pawn_born :: proc(game: ^Board, self: ^Pawn, id: knet.Net_Id, owner: knet.Player_Id) {
+	_ = game; _ = self; _ = id; _ = owner
+}
+
+// MY avatar-kind entity (the pawn — `avatar` on its tag) was born: my spawn,
+// my drop-in, my reconnect reclaiming its standing body.
+@(gd_half)
+board_embodied :: proc(self: ^Board, id: knet.Net_Id) {
+	_ = self; _ = id
+}
+
+
 // The lane's GAME half — typed device read + up to TWO world passes; scriptgen
 // emits the rawptr thunks and `board_lane_init` (input size from Pawn_Input,
 // each pass wired to its slot from the attribute token). Both passes here:

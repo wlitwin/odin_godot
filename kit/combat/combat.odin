@@ -343,11 +343,25 @@ projectile_hit :: proc "contextless" (from: [3]f32, vel: [3]f32, targets: []Targ
 // visual impacts and health drops naturally coincide.
 
 Fire :: struct {
-	shooter: knet.Player_Id,
+	shooter: knet.Player_Id, // WHO CAUSED IT — always honest: the echo skip
+	                         // reads `predicted`, so a host-authored instant
+	                         // (a nova, a reaction) keeps its real causer
 	origin:  [3]f32,
-	vel:     [3]f32, // per tick
+	vel:     [3]f32, // per tick. A no-flight kind (a ring, a zone flash) may
+	                 // reuse these spatial slots for spatial payload (a radius,
+	                 // an offset) — vel is genuinely unused there. IDS do not
+	                 // ride here: an ability/status id packed into vel.z works
+	                 // only in 2D — that is what `arg` is for.
 	ttl:     u16,
 	kind:    u8, // game-defined (which ability/visual)
+	arg:     u16, // the game's payload word beside `kind` — an ability id, a
+	              // status id, a variant — instead of a float-packed vel lane
+	// The shooter's OWN screen already drew this at cast time (a predicted
+	// cast, a client-side tracer): its echo is skipped, everyone else draws.
+	// False = nobody has drawn it yet — EVERY screen draws from the lane, the
+	// causer's included (host-authored instants stopped spoofing `shooter`
+	// to reach the caster's screen the day this bit existed).
+	predicted: bool,
 }
 
 fire_write :: proc(w: ^knet.Writer, f: Fire) {
@@ -356,6 +370,8 @@ fire_write :: proc(w: ^knet.Writer, f: Fire) {
 	for i in 0 ..< 3 {knet.write_f32(w, f.vel[i])}
 	knet.write_u16(w, f.ttl)
 	knet.write_u8(w, f.kind)
+	knet.write_u16(w, f.arg)
+	knet.write_bool(w, f.predicted)
 }
 
 fire_read :: proc(r: ^knet.Reader) -> (f: Fire, ok: bool) {
@@ -364,7 +380,19 @@ fire_read :: proc(r: ^knet.Reader) -> (f: Fire, ok: bool) {
 	for i in 0 ..< 3 {f.vel[i] = knet.read_f32(r)}
 	f.ttl = knet.read_u16(r)
 	f.kind = knet.read_u8(r)
+	f.arg = knet.read_u16(r)
+	f.predicted = knet.read_bool(r)
 	return f, !r.err
+}
+
+// The fire lane's own wire revision — folded into the session fingerprint at
+// load (the shift is this package's lane; sim 16, netgd 24). A Fire wire
+// change bumps THIS constant in the same commit.
+WIRE_REV :: u64(2) // 1: the first Fire wire · 2: Fire carries arg (u16) + predicted (bool)
+
+@(init, private = "file")
+register_wire_rev :: proc "contextless" () {
+	ksess.session_register_wire_rev(WIRE_REV, 32)
 }
 
 // The fire lane's default SES_APP tag, beside its siblings (comms 0, xfer 2,
@@ -382,6 +410,18 @@ fire_announce :: proc(s: ^ksess.Session, f: Fire, tag: u8 = FIRE_TAG) {
 	w := ksess.session_app_begin(s, tag)
 	fire_write(w, f)
 	ksess.session_app_flush(s, ksess.BROADCAST_PEER)
+	// THE LOOPBACK: the broadcast is wire-only, so the host's own screen used
+	// to be the one place the lane didn't reach — every consumer hand-drew
+	// other players' fires at the announce site (`if shooter != me
+	// { draw }`) and its own at cast. The announcer's copy lands in its own
+	// route's queue instead (the relay's echo pattern), under the SAME skip
+	// rule every receiver applies — one drain draws on every screen.
+	if user, handler := ksess.session_app_route_of(s, tag); handler == fire_handle && user != nil {
+		fr := cast(^Fire_Route)user
+		if !(f.predicted && f.shooter == s.me) {
+			ksess.appq_push(&fr.fires, f)
+		}
+	}
 }
 
 // Announce a Fire to ONE peer instead of the room — the addressed half. A game
@@ -391,11 +431,11 @@ fire_announce :: proc(s: ^ksess.Session, f: Fire, tag: u8 = FIRE_TAG) {
 // a game-level seq so existing screens can drop the double). `peer` is a joiner's
 // ksess.Peer_Id, from the roster on Ev_Player_Joined.
 //
-// A caution that decides whether you want this at all: `fire_poll` DROPS a fire
-// whose shooter is the receiver (they drew it live at cast time), so an addressed
-// replay to the ORIGINAL caster — a reconnect reclaiming their id — is dropped
-// too. That is correct for a TRANSIENT one-shot (they already saw it), and it is
-// the tell that a PERSISTENT effect does not belong on this lane at all: a
+// A caution that decides whether you want this at all: `fire_poll` DROPS a
+// PREDICTED fire whose shooter is the receiver (they drew it live at cast
+// time), so an addressed replay of one to the ORIGINAL caster — a reconnect
+// reclaiming their id — is dropped too. That is correct for a TRANSIENT
+// one-shot (they already saw it), and it is
 // standing zone, a lingering glow, anything with a ttl that outlives its frame,
 // should be an ENTITY. Entities replicate to a joiner through the world snapshot
 // by construction — no replay, no dedupe, no shooter spoof, no reclaim hole. Use
@@ -419,11 +459,14 @@ Fire_Route :: struct {
 	fires: ksess.App_Queue(Fire),
 }
 
-// ...and every peer listens. The guards each game used to hand-roll live
-// here now: only the HOST authors fires (a spoofed peer announcement is
-// dropped), the host itself skips (its screen drew at launch), and your own
-// echo skips (your screen drew at cast time). What lands in the queue is
-// exactly "someone else's rock — draw it".
+// ...and every peer listens — the HOST INCLUDED, through the loopback in
+// fire_announce. The guards each game used to hand-roll live here now: only
+// the HOST authors fires (a spoofed peer announcement is dropped), and a
+// PREDICTED fire skips its own shooter's echo (that screen drew at cast
+// time). Everything else in the queue is "a fire this screen has not drawn
+// yet — draw it": another player's rock on any screen, and a host-authored
+// instant (a nova, a reaction — predicted=false) on EVERY screen, its
+// causer's too, under its causer's honest name.
 //
 // EVENTS, NOT CALLBACKS — the handler only FILES into `ksess.App_Queue`; the
 // game drains with fire_poll each frame, on its own stack. That discipline is
@@ -448,9 +491,9 @@ fire_route_destroy :: proc(fr: ^Fire_Route) {
 @(private = "file")
 fire_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id, r: ^knet.Reader) {
 	fr := cast(^Fire_Route)user
-	if fr.ses.is_host || from_peer != ksess.HOST_PEER {return}
+	if fr.ses.is_host || from_peer != ksess.HOST_PEER {return} // wire copies are for clients; the host's rides the loopback
 	f, ok := fire_read(r)
-	if !ok || f.shooter == fr.ses.me {return}
+	if !ok || (f.predicted && f.shooter == fr.ses.me) {return}
 	ksess.appq_push(&fr.fires, f)
 }
 

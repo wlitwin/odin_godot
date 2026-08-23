@@ -71,6 +71,20 @@ Lobby :: struct {
 	rows:      [dynamic]gd.Label, // reused across refreshes
 }
 
+// A SCREEN OVERLAY (a fade, a vignette, a full-rect flash) attached the way
+// every game hand-rolled it: mouse-invisible, transparent at birth, and
+// anchored full-rect with the OFFSETS reset too — set_anchors_preset alone
+// re-derives offsets to PRESERVE the birth rect, which parks a 512px texture
+// in the top-left quadrant and a zero-size ColorRect at nothing (the trap
+// each game found live). Parent it on kboot's fx_layer: above the field,
+// under every widget, no node_move_child index-squatting on the UI layer.
+overlay_attach :: proc(layer: gd.Node, node: gd.Control) {
+	gd.control_set_mouse_filter(node, .Mouse_Filter_Ignore)
+	gd.canvas_item_set_modulate(cast(gd.Canvas_Item)node, {1, 1, 1, 0})
+	gd.add_child(layer, cast(gd.Node)node)
+	gd.control_set_anchors_and_offsets_preset(node, .Preset_Full_Rect, .Preset_Mode_Minsize, 0)
+}
+
 // Build the lobby under `parent` (any node in the tree). Call from ready().
 lobby_make :: proc(parent: gd.Node, title: string) -> Lobby {
 	l: Lobby

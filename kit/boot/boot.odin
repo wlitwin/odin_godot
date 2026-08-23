@@ -43,6 +43,7 @@ package kit_boot
 import gd "godot:godot"
 import "godot:gdext"
 import kcomms "godot:kit/comms"
+import kxfer "godot:kit/xfer"
 import knet "godot:kit/net"
 import netgd "godot:kit/netgd"
 import ksave "godot:kit/save"
@@ -148,6 +149,8 @@ Options :: struct {
 	min_players: int, // host's Start button appears at this count (default 2)
 	spatial:     bool, // 3D game: stage/world become Node3D containers (default Node2D)
 	keep_vsync:  bool, // opt OUT of the desktop playtest unthrottle (see unthrottle_desktop)
+	max_fps:     int, // the unthrottle's cap (0 = 120): a laptop game that wants 60 says so
+	                  // here instead of re-capping by hand right after boot_attach
 	// FULL REPLACEMENT (nil = the kit's stock build): a game that wants its
 	// own look authors a scene in the editor and the kit ADOPTS it — resolves
 	// the nodes it drives by NAME and pours the stock behavior in. The
@@ -172,7 +175,7 @@ Options :: struct {
 // server is paced by the browser, and background tabs are the browser's law.
 // A shipping build that prefers tear-free rendering sets Options.keep_vsync.
 @(private = "file")
-unthrottle_desktop :: proc() {
+unthrottle_desktop :: proc(max_fps: int) {
 	// DEV BUILDS ONLY. A shipped build must neither tear by default nor cap a
 	// 240 Hz display at 120 — the playtest unthrottle keys on the BUILD, not
 	// on whichever display server the player happens to run. -disable-assert
@@ -189,7 +192,7 @@ unthrottle_desktop :: proc() {
 	s := string(buf[:n])
 	if s == "headless" || s == "web" {return}
 	gd.display_server_window_set_vsync_mode(ds, .Vsync_Disabled, 0)
-	gd.engine_set_max_fps(gd.singleton_engine(), 120)
+	gd.engine_set_max_fps(gd.singleton_engine(), gd.Int(max_fps > 0 ? max_fps : 120))
 }
 
 Boot :: struct {
@@ -201,6 +204,9 @@ Boot :: struct {
 	wire:   netgd.Session_Wire,
 	stage:    gd.Node, // scenery container (draws behind world)
 	world:    gd.Node, // entity container
+	fx_layer: gd.Node, // CanvasLayer BETWEEN the field and the widgets — screen fades,
+	                   // vignettes, full-rect flashes (kui.overlay_attach); games used to
+	                   // node_move_child their overlays under the chat at index 0/1
 	ui_layer: gd.Node, // CanvasLayer all the widgets live on — ABOVE the field
 
 	ses:         ^ksess.Session,
@@ -213,6 +219,14 @@ Boot :: struct {
 	// game pointer the typed hooks receive, and the per-entity node ledger
 	// games used to keep by hand.
 	ent_kinds: []Entity_Kind,
+	album:     ^kxfer.Album, // boot_album: pumped per net tick, welcomed per join — nil = no album
+	talk_sent: bool, // chat_submit's anti-re-grab latch: pass &b.talk_sent to boot_chat/chat_submit,
+	                 // boot_keys_frame consumes it (the submitting ENTER must not reopen the chat)
+	// The WEBRTC door's surfaced state (boot_web_pulse): the assigned room
+	// code (a boot-owned clone; "" until the relay replies) and the last
+	// handshake state worded, so edges word once.
+	web_room:       string,
+	web_state_seen: gd.Webrtc_State,
 	ent_game:  rawptr,
 	ent_nodes: map[knet.Net_Id]gd.Node,
 	// The game's generated event dispatcher (`<game>_events` behind a rawptr
@@ -312,13 +326,19 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 	b.min_players = opts.min_players > 0 ? opts.min_players : 2
 
 	if !opts.keep_vsync {
-		unthrottle_desktop()
+		unthrottle_desktop(opts.max_fps)
 	}
 
 	// Every widget lives on a CanvasLayer: layers draw above world-space
 	// CanvasItems no matter what z_index entities carry, so a full-screen
 	// playfield can never bury the chat (homestead found it live — its
 	// grass covered the viewport and z>0 entities beat every Control).
+	// The FX layer first (screen fades/vignettes ride above the field but
+	// under every widget — layers stack in add order at the same layer index).
+	fxl := gd.new_canvas_layer()
+	gd.node_set_name(cast(gd.Node)fxl, gd.new_string_name_cstring("BootFx", true))
+	gd.add_child(node, cast(gd.Node)fxl)
+	b.fx_layer = cast(gd.Node)fxl
 	layer := gd.new_canvas_layer()
 	gd.node_set_name(cast(gd.Node)layer, gd.new_string_name_cstring("BootUi", true))
 	gd.add_child(node, cast(gd.Node)layer)
@@ -454,6 +474,7 @@ boot_detach :: proc(b: ^Boot) {
 	delete(b.ent_types)
 	// The boot-owned string clones the doors minted (callers passed temps;
 	// boot_succ_end may have pre-freed succ_room — delete("") is a no-op).
+	delete(b.web_room)
 	delete(b.succ_name)
 	delete(b.succ_url)
 	delete(b.succ_room)
@@ -462,6 +483,9 @@ boot_detach :: proc(b: ^Boot) {
 	// (ui_layer: lobby/chat/score/legend; world: every live entity).
 	if cast(rawptr)b.ui_layer != nil {
 		gd.node_queue_free(b.ui_layer)
+	}
+	if cast(rawptr)b.fx_layer != nil {
+		gd.node_queue_free(b.fx_layer)
 	}
 	if cast(rawptr)b.stage != nil {
 		gd.node_queue_free(b.stage)
@@ -480,6 +504,7 @@ boot_detach :: proc(b: ^Boot) {
 // comms markers, both temp-allocated, so the game's own switch sees everything.
 boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, marks: []kcomms.Ev_Marker, ticks: int) {
 	boot_code_pulse(b) // the join-code phonebook (no-op unless a coded door opened)
+	boot_web_pulse(b) // the WebRTC room's twin (no-op unless the wire is WEBRTC)
 	// The transport's own control plane, before anything asks whether a session
 	// exists — on WebRTC this IS the handshake that brings one up. One nil
 	// check on every other transport. (Web games used to hand-call web_poll
@@ -502,6 +527,11 @@ boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, mar
 	b.succ_now = now
 	boot_succ_pulse(b, now) // the web chase's knock pump (no-op native / idle)
 	ticks, _ = ksess.session_tick(b.ses, delta, now)
+	if b.album != nil {
+		for _ in 0 ..< ticks {
+			kxfer.album_pump(b.album) // chunks ship on the net cadence, like everything else
+		}
+	}
 
 	evs := make([dynamic]ksess.Event, context.temp_allocator)
 	for {
@@ -633,6 +663,11 @@ boot_open_host :: proc(
 	if token == 0 {
 		token = boot_token(b)
 	}
+	// Fold whatever the LAST door left open (a stale web signaling socket, a
+	// failed attempt's holdings) so this one binds clean — the leak every
+	// by-hand rejoin path had to remember (idempotent; ENet holds nothing).
+	netgd.transport_close(&b.wire)
+	boot_web_reset(b)
 	if !netgd.transport_host(&b.wire, t, at, name, token, dedicated) {
 		return false
 	}
@@ -673,6 +708,10 @@ boot_open_join :: proc(
 	spectate := false,
 	status := "Joining...",
 ) -> bool {
+	// Same fold as boot_open_host: the last door's holdings die before this
+	// one binds (a retry after a failed web join reuses the socket slot).
+	netgd.transport_close(&b.wire)
+	boot_web_reset(b)
 	if !netgd.transport_join(&b.wire, t, at, name, token, spectate) {
 		return false
 	}
@@ -713,6 +752,32 @@ boot_serve :: proc(b: ^Boot, port: int, name: string, max_peers := 32, token: u6
 		return false
 	}
 	kui.lobby_set_status(&b.ui, fmt.tprintf("Serving on :%d", port))
+	return true
+}
+
+// Register the game's ALBUM (kit/xfer: latest-payload-per-(player, kind) —
+// sprays, skins) so its two chores become the kit's: boot_pump pumps it once
+// per net tick (chunks ship on the session's cadence) and every Ev_Player_Joined
+// welcomes the newcomer with the kept payloads (the host-side catch-up games
+// forgot until "the late joiner sees no sprays" was filed as a bug). ready(),
+// after kxfer.album_init.
+boot_album :: proc(b: ^Boot, a: ^kxfer.Album) {
+	b.album = a
+}
+
+// The SOLO door: the same game, alone — a full authority session over
+// netgd.OFFLINE (an OfflineMultiplayerPeer seats you as host id 1; broadcasts
+// cleanly reach nobody), through the SAME ritual as every door (world_seen
+// reset, lobby folded, phase readable), so the solo path stops being the one
+// hand-rolled special case that bypassed it. The whole authoritative sim runs
+// exactly as it does with friends; succession never arms (.None — nobody to
+// migrate to). token 0 → boot_token, like the other doors.
+boot_single :: proc(b: ^Boot, name: string, token: u64 = 0) -> bool {
+	if !boot_open_host(b, &netgd.OFFLINE, {}, name, token) {
+		kui.lobby_set_status(&b.ui, "Could not start solo (no multiplayer node?)")
+		return false
+	}
+	kui.lobby_set_status(&b.ui, "Solo — the same game, alone")
 	return true
 }
 
@@ -824,9 +889,83 @@ boot_join_code :: proc(b: ^Boot, url: cstring, code: string, token: u64, name: s
 }
 
 // The minted join code — "" until the relay answers (the lobby status shows
-// it too; this is for games that paint it somewhere of their own).
+// it too; this is for games that paint it somewhere of their own). Answers
+// for BOTH coded doors: the native join-code relay and a WebRTC room
+// (boot_web_pulse keeps the latter current — web games used to poll
+// gd.webrtc_room_code behind a hand latch).
 boot_room_code :: proc(b: ^Boot) -> string {
+	if netgd.transport_of(&b.wire) == &netgd.WEBRTC {
+		return b.web_room
+	}
 	return b.rdv.is_host ? netgd.code_room(&b.rdv) : ""
+}
+
+// The WEBRTC door's rendezvous pump — boot_code_pulse's twin (that one is
+// the native join-code phonebook; this one the browser room). Surfaces what
+// every web game hand-latched in its own process():
+//   * the assigned ROOM CODE the moment the relay replies: logged as
+//     `BOOT_ROOM_CODE <code>` (drivers scrape it), worded in the lobby
+//     status pre-world ("share it with the crew") or into chat mid-run (a
+//     room born mid-run is a takeover's — the lobby is long gone), and
+//     readable via boot_room_code.
+//   * the handshake's state EDGES pre-world: "handshaking…", and .Failed
+//     with the relay's worded reason + the doors restored — the same
+//     treatment the join-code door's failures get.
+// A fresh door voids the last room's surfaced state (the code was that
+// run's; a takeover's new room re-surfaces through the pulse).
+@(private = "file")
+boot_web_reset :: proc(b: ^Boot) {
+	delete(b.web_room)
+	b.web_room = ""
+	b.web_state_seen = .Idle
+}
+
+@(private = "file")
+boot_web_pulse :: proc(b: ^Boot) {
+	if netgd.transport_of(&b.wire) != &netgd.WEBRTC {
+		return
+	}
+	node := b.wire.node
+	if cast(rawptr)node == nil {
+		return
+	}
+	if b.web_room == "" {
+		if code := gd.webrtc_room_code(node); len(code) > 0 {
+			b.web_room = strings.clone(code)
+			gd.print_str(fmt.tprintf("BOOT_ROOM_CODE %s", code))
+			if b.world_seen {
+				if b.comms != nil && b.ses != nil && b.ses.is_host {
+					kcomms.comms_system(b.comms, fmt.tprintf("new room %s — share it to call the crew back", code))
+				}
+			} else {
+				kui.lobby_set_status(&b.ui, fmt.tprintf("ROOM CODE  %s  — share it with the crew", code))
+			}
+		}
+	}
+	st := gd.webrtc_session_state(node)
+	if st == b.web_state_seen || b.world_seen {
+		b.web_state_seen = st
+		return
+	}
+	b.web_state_seen = st
+	#partial switch st {
+	case .Handshaking:
+		kui.lobby_set_status(&b.ui, "handshaking…")
+	case .Failed:
+		r := gd.webrtc_error_reason(node)
+		why := "the signaling socket dropped"
+		switch r {
+		case "no_room":
+			why = "no room wears that code"
+		case "full":
+			why = "that room is full"
+		case "":
+			why = "connection failed"
+		case:
+			why = r
+		}
+		boot_doors_again(b, fmt.tprintf("Web room failed — %s", why))
+	}
 }
 
 // The rendezvous pump: surface state edges in the lobby, complete a joiner's
@@ -900,5 +1039,39 @@ boot_net_stats :: proc(b: ^Boot) -> kui.Net_Stats {
 
 // Chat's text_submitted, one call (see kui.chat_submit for the trap it fixes).
 boot_chat :: proc(b: ^Boot, text: gd.String, sent: ^bool = nil) {
-	kui.chat_submit(&b.chat, b.comms, text, sent)
+	kui.chat_submit(&b.chat, b.comms, text, sent != nil ? sent : &b.talk_sent)
+}
+
+// THE FLOW KEYS, once per frame — the trio every game re-rolled in its
+// proven order (and each re-earned a trap of it): the HELD scoreboard
+// (refresh-then-show; the kit built the board all along and no game code
+// ever showed it), ENTER-to-talk with the anti-re-grab latch (the submitting
+// ENTER is still "just pressed" when this check runs — un-latched, every
+// send reopened the chat and you could never leave; games shipped 150 ms
+// timers for it), and ESC handing the keyboard back from a chat you thought
+// better of. Returns whether the keyboard was IN CHAT at frame start — gate
+// your own hotkeys (movement, abilities, the menu's other ESC meaning) on
+// it: `typing := kboot.boot_keys_frame(&b, "sy_talk", "sy_board", "sy_menu")`.
+// "" skips a binding (a game with no scoreboard passes no board action).
+boot_keys_frame :: proc(b: ^Boot, talk_action: cstring = "", board_action: cstring = "", esc_action: cstring = "") -> (typing: bool) {
+	typing = kui.chat_typing(&b.chat)
+	if board_action != "" {
+		if gd.is_action_just_pressed(board_action) && !typing {
+			kui.score_refresh(&b.score, b.ses)
+			kui.score_show(&b.score, true)
+		}
+		if gd.is_action_just_released(board_action) {
+			kui.score_show(&b.score, false)
+		}
+	}
+	if esc_action != "" && typing && gd.is_action_just_pressed(esc_action) {
+		gd.control_release_focus(cast(gd.Control)b.chat.input)
+	}
+	if talk_action != "" {
+		if gd.is_action_just_pressed(talk_action) && !typing && !b.talk_sent {
+			gd.control_grab_focus(cast(gd.Control)b.chat.input, false)
+		}
+		b.talk_sent = false // the submit frame's hold expires with the frame
+	}
+	return
 }

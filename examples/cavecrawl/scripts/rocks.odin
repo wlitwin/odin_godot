@@ -33,6 +33,7 @@ rock_fire :: proc(shooter: knet.Player_Id, origin: [2]f32, aim: [2]f32) -> (f: k
 			vel     = {dx / n * ROCK_SPEED, dy / n * ROCK_SPEED, 0},
 			ttl     = ROCK_TTL,
 			kind    = FIRE_ROCK,
+			predicted = true, // the shooter's screen threw its own at cast — its echo skips
 		},
 		true
 }
@@ -43,21 +44,18 @@ add_visual_rock :: proc(self: ^CaveLobby, f: kcombat.Fire) {
 }
 
 // Host: a confirmed throw (spelunker_throw_then) launches the AUTHORITATIVE
-// rock (the only kind that hurts), shows the host its own visual, and
-// announces the fire so every other peer draws theirs. The shooter's visual
-// already flew at cast time — it skips its own announcement.
+// rock (the only kind that hurts) and announces the fire — the lane reaches
+// every screen from there, the host's own included (the loopback), and the
+// shooter's predicted visual (it flew at cast time) skips its own echo.
 cave_launch_rock :: proc(self: ^CaveLobby, shooter: knet.Player_Id, origin: [2]f32, aim: [2]f32) {
 	f, ok := rock_fire(shooter, origin, aim)
 	if !ok {return}
 	append(&self.flying, Cave_Rock{p = kcombat.Projectile{pos = f.origin, vel = f.vel, left = f.ttl}, shooter = shooter})
-	if shooter != self.ses.me {
-		add_visual_rock(self, f) // the host's screen (its own casts drew at cast time)
-	}
 	kcombat.fire_announce(&self.ses, f, TAG_FIRE)
 }
 
-// Every peer: somebody ELSE's rock (kcombat.fire_listen already dropped the
-// host's own copy, my echo, and anything a non-host tried to author).
+// Every screen — the host's included (the announce loops back into this
+// drain): a rock this screen has not drawn yet.
 cave_on_fire :: proc(self: ^CaveLobby, f: kcombat.Fire) {
 	add_visual_rock(self, f)
 }

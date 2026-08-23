@@ -210,6 +210,17 @@ phase, menu, chat, and roster, is written once, and a new transport inherits
 all of it by filling a `netgd.Transport`. Steam gets both doors for the price
 of one record (`ksteam.TRANSPORT`, documented in [steamgd.md](steamgd.md)).
 
+### Single player (the solo door)
+
+`boot_single(b, name)` is the same game, alone: a full authority session over
+`netgd.OFFLINE` — an `OfflineMultiplayerPeer` seats you as host id 1 and your
+per-tick broadcasts cleanly reach nobody (without one, `send_bytes` with no
+peer installed spams "peer isn't set" every tick — the gotcha every
+hand-rolled solo path re-derived). The whole authoritative sim runs exactly
+as it does with friends, the door ritual included, so solo stops being the
+one path that bypassed `boot_open_host`. Succession never arms (nobody to
+migrate to); works identically on native and web.
+
 ### Dedicated server
 
 `boot_serve(b, port, name)` is the dedicated-server door: same transport, but
@@ -251,13 +262,39 @@ Identity pairs with [`ksave.token`](save.md): the
 env-or-file-or-per-instance ladder in one call. The same-machine seat-stealing
 behavior is a documented option.
 
-## Chat and net stats
+## Chat, keys, and net stats
 
-`boot_chat(b, text, &sent)` is the whole `text_submitted` handler, focus release
-included ([kui.chat_submit](ui.md)). `boot_net_stats(b)` returns the shared co-op
-[`kui.Net_Stats`](ui.md#netgraph) fill (rtt, link
+`boot_chat(b, text)` is the whole `text_submitted` handler, focus release
+included ([kui.chat_submit](ui.md)); it latches `b.talk_sent` so the
+submitting ENTER can't reopen the chat. `boot_keys_frame(b, "talk", "board",
+"esc")` is the flow-key trio once per frame — the HELD scoreboard
+(refresh-then-show), ENTER-to-talk behind that latch, ESC handing the
+keyboard back from the chat — returning whether the keyboard was IN CHAT at
+frame start, which is the one gate your own hotkeys read
+(`kui.chat_typing(&b.chat)` is the raw predicate). `boot_net_stats(b)` returns
+the shared co-op [`kui.Net_Stats`](ui.md#netgraph) fill (rtt, link
 jitter/loss, malformed drops, bytes-by-kind); a sim-lane game lays its `sim` /
 lead / resim rows on the result before `netgraph_refresh`.
+
+## The album (payload catch-up), registered
+
+A game with a [kit/xfer album](xfer.md) (sprays, skins) hands it to boot once —
+`boot_album(b, &album)` after `album_init` — and both of its chores become the
+kit's: `boot_pump` pumps it once per net tick, and every `Ev_Player_Joined`
+replays the kept payloads to the newcomer (`album_welcome`), so a late joiner
+never again sees a blank spray wall because a game forgot the host's half.
+
+## The web room, surfaced
+
+The WebRTC door's rendezvous is pumped like the join-code phonebook's:
+`boot_web_pulse` (inside `boot_pump`) logs `BOOT_ROOM_CODE <code>` the moment
+the relay assigns one, words it in the lobby status pre-world ("share it with
+the crew") or into chat mid-run (a room born mid-run is a takeover's), and
+words a failed handshake with the relay's reason + the doors restored —
+everything web games hand-latched in their own `process()`. `boot_room_code(b)`
+answers for both coded doors now. The doors also `transport_close` whatever
+the LAST door left open before binding, so a retry or a by-hand rejoin never
+inherits a stale signaling socket.
 
 ## The entity factory
 

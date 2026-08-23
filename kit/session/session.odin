@@ -1946,6 +1946,44 @@ session_roster :: proc(s: ^Session, allocator := context.temp_allocator) -> []Pl
 	return out[:]
 }
 
+// Does this seat FIELD AN AVATAR — a connected person to deal a body to?
+// The one predicate every spawn loop needs and half of them got wrong by
+// omission: a dedicated server holds an infrastructure seat (no avatar) and a
+// spectator watches (boot_spectate's doc said the `!p.spectator` skip was the
+// game's half — which is exactly how it got skipped).
+player_fields_avatar :: proc "contextless" (p: Player) -> bool {
+	return p.connected && !p.dedicated && !p.spectator
+}
+
+// The seats that field avatars, in roster order — the spawn loop's list:
+//
+//	for p in ksess.session_players_fielding(&self.ses) {
+//	    host_spawn_runner(self, p.id)
+//	}
+session_players_fielding :: proc(s: ^Session, allocator := context.temp_allocator) -> []Player {
+	out := make([dynamic]Player, 0, len(s.players), allocator)
+	for p in session_roster(s, allocator) {
+		if player_fields_avatar(p) {
+			append(&out, p)
+		}
+	}
+	return out[:]
+}
+
+// Is the seat that OWNS `id` still present (connected)? The "ghost body"
+// predicate every co-op game with persistent avatars re-spelled three ways
+// (a standing body whose player left must not hold a wipe open, block a
+// mend, or count as a defender). False for an unowned entity (nobody's), a
+// departed seat, or an unknown owner.
+session_owner_present :: proc(s: ^Session, id: knet.Net_Id) -> bool {
+	owner := session_owner_of(s, id)
+	if owner == knet.PLAYER_ID_INVALID {
+		return false
+	}
+	p, ok := s.players[owner]
+	return ok && p.connected
+}
+
 // ---- muster: the staging-room paradigm decision (who's ready, may we start) --
 //
 // A ready-up lobby is the last meta-game paradigm every game re-derived: rows of
@@ -2518,6 +2556,19 @@ registered_wire_revs: u64
 
 session_register_wire_rev :: proc "contextless" (rev: u64, shift: uint) {
 	registered_wire_revs |= rev << shift
+}
+
+// The route registered on `tag` (session_app_route) — for a subsystem that
+// wants to reach ITS OWN receive queue on the machine that is also the
+// sender (kcombat's fire loopback: the host announces and its own screen
+// hears it through the same drain every client uses). The caller compares
+// `handler` against its own to know the user pointer's type.
+session_app_route_of :: proc(s: ^Session, tag: u8) -> (user: rawptr, handler: App_Handler) {
+	if int(tag) >= MAX_APP_TAGS {
+		return nil, nil
+	}
+	route := s.app[tag]
+	return route.user, route.handler
 }
 
 @(private = "file")

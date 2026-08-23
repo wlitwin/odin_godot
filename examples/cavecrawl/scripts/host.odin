@@ -304,7 +304,7 @@ cave_host_tick :: proc(self: ^CaveLobby) {
 	// (The call is HOISTED: an Odin range bound is re-evaluated per
 	// iteration, and director_tick has side effects — inlining it in the
 	// range silently drains the wave.)
-	to_spawn := kai.director_tick(&self.director, u64(self.host_ticks), self.waves[:self.waves_n])
+	to_spawn, _ := kai.director_tick(&self.director, u64(self.host_ticks), self.waves[:self.waves_n])
 	for _ in 0 ..< to_spawn {
 		cave_spawn_dweller(self)
 	}

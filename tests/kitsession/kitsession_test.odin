@@ -1509,6 +1509,80 @@ session_rewound_covers_host_owned_streams_at_full_rtt :: proc(t: ^testing.T) {
 	testing.expect_value(t, lp.x, f32(112))
 }
 
+// THE FIRE LANE reaches every screen — the HOST'S OWN included (the loopback
+// in fire_announce), under one skip rule: a PREDICTED fire (its shooter's
+// screen drew it at cast) skips only that shooter's echo; a host-authored
+// instant (predicted=false) draws on EVERY screen under its causer's honest
+// name — no more `shooter = host` spoof to reach the caster, no more
+// `if player != me { draw }` at the announce site. `arg` carries the id-ish
+// payload the games used to float-pack into vel.z. TEETH: without the
+// loopback the host's queue stays empty; with the old shooter==me drop the
+// unpredicted nova never reaches its own caster.
+@(test)
+fire_lane_reaches_every_screen_once :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+	routes: [3]kcombat.Fire_Route
+	defer for &fr in routes {kcombat.fire_route_destroy(&fr)}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+	kcombat.fire_listen(&routes[0], &host.s)
+	kcombat.fire_listen(&routes[1], &alice.s)
+	kcombat.fire_listen(&routes[2], &bob.s)
+
+	drain_fires :: proc(fr: ^kcombat.Fire_Route) -> (got: [dynamic]kcombat.Fire) {
+		got = make([dynamic]kcombat.Fire, context.temp_allocator)
+		for {
+			f, ok := kcombat.fire_poll(fr)
+			if !ok {break}
+			append(&got, f)
+		}
+		return
+	}
+
+	// ALICE's predicted rock (her screen drew it at cast): the host confirms
+	// and announces. Everyone but alice draws it — the host from its own
+	// loopback, bob from the wire — and the ability id rides `arg`, not vel.
+	kcombat.fire_announce(&host.s, kcombat.Fire{shooter = alice.s.me, kind = 1, arg = 7, predicted = true})
+	pump(boxes)
+	hf := drain_fires(&routes[0])
+	testing.expect_value(t, len(hf), 1) // the loopback: the host's screen draws from the SAME drain
+	testing.expect_value(t, hf[0].shooter, alice.s.me)
+	testing.expect_value(t, hf[0].arg, u16(7))
+	testing.expect_value(t, len(drain_fires(&routes[2])), 1) // bob, over the wire
+	testing.expect_value(t, len(drain_fires(&routes[1])), 0) // alice drew at cast — her echo skips
+
+	// A host-authored INSTANT centered on alice (a nova, a reaction):
+	// predicted=false, shooter stays HONEST — and alice's screen draws it too
+	// (the old lane forced `shooter = host` to get the ring onto her screen).
+	kcombat.fire_announce(&host.s, kcombat.Fire{shooter = alice.s.me, kind = 9, predicted = false})
+	pump(boxes)
+	af := drain_fires(&routes[1])
+	testing.expect_value(t, len(af), 1)
+	testing.expect_value(t, af[0].shooter, alice.s.me) // attribution survives the wire
+	testing.expect_value(t, len(drain_fires(&routes[0])), 1) // the host's screen too
+	testing.expect_value(t, len(drain_fires(&routes[2])), 1)
+
+	// The HOST's own predicted shot: its screen drew at launch — the loopback
+	// skips it, the clients draw it.
+	kcombat.fire_announce(&host.s, kcombat.Fire{shooter = host.s.me, kind = 2, predicted = true})
+	pump(boxes)
+	testing.expect_value(t, len(drain_fires(&routes[0])), 0)
+	testing.expect_value(t, len(drain_fires(&routes[1])), 1)
+	testing.expect_value(t, len(drain_fires(&routes[2])), 1)
+}
+
 // ---- moderation: kick / ban / the door -----------------------------------------
 
 @(test)
@@ -2311,11 +2385,12 @@ fire_listen_routes_to_other_screens_only :: proc(t: ^testing.T) {
 	ksess.session_client_join(&bob.s)
 	pump(boxes)
 
-	// The host confirms alice's cast and announces it: BOB polls it out
-	// (payload intact); ALICE skips her own echo (she drew at cast time);
-	// the HOST skips (its screen drew at launch). Nothing fires mid-pump —
-	// the queue holds until each game's own drain.
-	f := kcombat.Fire{shooter = 2, origin = {10, 20, 0}, vel = {3, 0, 0}, ttl = 30, kind = 1}
+	// The host confirms alice's PREDICTED cast and announces it: BOB polls it
+	// out (payload intact); ALICE skips her own echo (she drew at cast time —
+	// `predicted` says so); the HOST draws it from its own loopback, the same
+	// drain every peer uses. Nothing fires mid-pump — the queue holds until
+	// each game's own drain.
+	f := kcombat.Fire{shooter = 2, origin = {10, 20, 0}, vel = {3, 0, 0}, ttl = 30, kind = 1, predicted = true}
 	kcombat.fire_announce(&host.s, f, TAG)
 	pump(boxes)
 	bf, drew := kcombat.fire_poll(&broute)
@@ -2326,9 +2401,12 @@ fire_listen_routes_to_other_screens_only :: proc(t: ^testing.T) {
 	_, extra := kcombat.fire_poll(&broute)
 	testing.expect(t, !extra, "one announcement, one fire")
 	_, aecho := kcombat.fire_poll(&aroute)
-	testing.expect(t, !aecho, "alice skips her own echo")
-	_, hecho := kcombat.fire_poll(&hroute)
-	testing.expect(t, !hecho, "the host's screen drew at launch")
+	testing.expect(t, !aecho, "alice skips her own echo (predicted)")
+	hf, hdrew := kcombat.fire_poll(&hroute)
+	testing.expect(t, hdrew, "the host draws alice's rock from its own loopback")
+	testing.expect_value(t, hf.shooter, knet.Player_Id(2))
+	_, hextra := kcombat.fire_poll(&hroute)
+	testing.expect(t, !hextra, "the loopback delivers exactly once")
 
 	// A CLIENT trying to author a fire reaches no other screen. The
 	// announce wrapper asserts against the attempt now, so the spoof takes

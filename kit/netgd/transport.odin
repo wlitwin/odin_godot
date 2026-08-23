@@ -222,6 +222,36 @@ enet_address :: proc(
 	return peer_address(wire.node, peer, allocator)
 }
 
+// ---- OFFLINE (single player) ------------------------------------------------
+//
+// The same game, alone: NO network transport (ENet is absent from the web
+// export; there is nobody to reach anyway), but the session still needs to be
+// a valid HOST — an OfflineMultiplayerPeer gives it unique id 1 and a place
+// for its per-tick broadcasts to cleanly reach nobody. Without it,
+// send_bytes with no peer installed spams "peer isn't set" every tick — the
+// gotcha every game's hand-rolled `on_single` existed to re-derive. Works
+// identically on native and web; rendezvous .None (nobody to migrate to).
+OFFLINE := Transport {
+	name       = "offline",
+	rendezvous = .None,
+	open_host  = offline_open_host,
+	// open_join: a solo door has no join half — transport_join asserts.
+	// pump/close/link/address: nothing to service or fold; the peer is inert
+	// (installing the next door's real peer replaces it, like ENet's).
+}
+
+@(private = "file")
+offline_open_host :: proc(wire: ^Session_Wire, at: Endpoint, name: string, token: u64, dedicated: bool) -> bool {
+	_ = at
+	mp := gd.node_get_multiplayer(wire.node)
+	if cast(rawptr)mp == nil {
+		return false
+	}
+	gd.multiplayer_api_set_multiplayer_peer(mp, gd.new_offline_multiplayer_peer())
+	ksess.session_host_start(wire.ses, name, token, dedicated)
+	return true
+}
+
 // ---- WebRTC ----------------------------------------------------------------
 
 WEBRTC := Transport {

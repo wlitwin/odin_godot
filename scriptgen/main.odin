@@ -506,8 +506,10 @@ Entity_Tag :: struct {
 	avatar:    bool, // `avatar` — this kind is a seat's body (host takeover parks it)
 	// Resolved by resolve_entities (module-wide): the optional name-paired
 	// typed hooks ("" = not declared).
-	spawned: string, // <target_snake>_spawned
+	spawned: string, // <target_snake>_spawned — MAKE time (fields unset; bookkeeping)
 	freed:   string, // <target_snake>_freed
+	born:    string, // <target_snake>_born — Ev_Spawned time (fields SET; the dress),
+	                 // dispatched typed from the generated <game>_events
 	has_tick:  bool, // the target declares @(gd_tick) — the kinds row carries its Sim_Set
 	gen_spawn: bool, // emit the typed `<entity>_spawn` helper (hand-written name wins)
 	// Which census accessors to emit (resolve_census): a hand-written proc
@@ -641,6 +643,7 @@ Script :: struct {
 	std_forwards: [dynamic]string, // which standard forwards were synthesized (bodies emitted by generate)
 	probes:       [dynamic]Probe_Info, // generated acid probes (resolve_probes; bodies emitted by generate)
 	event_halves: [dynamic]Event_Half, // session-event halves (resolve_session_events) — the generated `<snake>_events` dispatch
+	embodied:     string, // `<snake>_embodied(self, id)` — MY avatar-kind entity was born (resolve_entities; needs an `avatar` kind)
 
 	// Migration halves (resolve_migration): the host-migration dance's four
 	// name-paired seams — kboot.boot_migration's generated hook table. "" =

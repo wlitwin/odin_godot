@@ -177,11 +177,15 @@ impacts and health drops coincide.
 
 ```odin
 Fire :: struct {
-	shooter: knet.Player_Id,
-	origin:  [3]f32,
-	vel:     [3]f32, // per tick
-	ttl:     u16,
-	kind:    u8, // game-defined (which ability/visual)
+	shooter:   knet.Player_Id, // WHO CAUSED IT — always honest (the echo skip reads `predicted`)
+	origin:    [3]f32,
+	vel:       [3]f32, // per tick; a no-flight kind may reuse it for SPATIAL payload (a radius)
+	ttl:       u16,
+	kind:      u8,  // game-defined (which ability/visual)
+	arg:       u16, // the game's payload word beside kind — an ability/status id, a variant
+	                // (ids used to be float-packed into vel.z, which only works in 2D)
+	predicted: bool, // the shooter's OWN screen drew this at cast time — skip its echo.
+	                 // false = nobody drew it yet: EVERY screen draws, the causer's included
 }
 fire_write :: proc(w: ^knet.Writer, f: Fire)
 fire_read :: proc(r: ^knet.Reader) -> (f: Fire, ok: bool)
@@ -202,9 +206,9 @@ fire_route_destroy :: proc(fr: ^Fire_Route)
 **`fire_announce_to`: one peer, not the room.** To catch a just-joined player up on a
 recent event, address the replay to *their* `Peer_Id` (from the roster on
 `Ev_Player_Joined`) instead of re-broadcasting to everyone and making every other screen
-dedupe the echo. One caution: `fire_poll` **drops a fire whose shooter is the receiver**
-(they drew it at cast time), so an addressed replay to the *original caster* (a reconnect
-reclaiming their id) is dropped too. That is correct for a *transient* one-shot, and it
+dedupe the echo. One caution: `fire_poll` **drops a `predicted` fire whose shooter is the
+receiver** (they drew it at cast time), so an addressed replay of one to the *original
+caster* (a reconnect reclaiming their id) is dropped too. That is correct for a *transient* one-shot, and it
 is the sign that **a persistent effect does not belong on this lane**. A standing zone, a
 lingering glow, anything with a ttl that outlives its frame should be an **entity**:
 entities replicate to a joiner through the world snapshot by construction, so there is no
@@ -216,8 +220,13 @@ it would broadcast frames every receiver discards. The listener files events rat
 invoking callbacks: the handler only *files* into
 [`ksess.App_Queue`](session.md#the-riders-queue-appq) (the same queue
 comms, xfer, and the album use), and the game drains with `fire_poll` each frame on its
-own stack. What lands in the queue is exactly "someone else's rock, draw it": the host's
-own copy, your own echo, and non-host authors are all dropped.
+own stack. The lane reaches **every screen, the host's included**: `fire_announce` loops
+the announcement back into the host's own route (the same drain every client uses), so
+nobody hand-draws other players' fires at the announce site anymore. What lands in the
+queue is exactly "a fire this screen has not drawn yet": a `predicted` fire skips only
+its own shooter's echo, a host-authored instant (`predicted = false` — a nova, a
+reaction) draws everywhere under its causer's honest name (the lane used to force
+`shooter = host` to reach the caster's screen), and non-host authors are dropped.
 
 ```odin
 // host, when the command hook confirms a cast:
@@ -227,11 +236,12 @@ kcombat.fire_announce(&self.ses, f)
 fires: kcombat.Fire_Route   // a field on your game struct
 kcombat.fire_listen(&self.fires, &self.ses)
 
-// every frame, drain and draw (fire_route_destroy on exit):
+// every frame, drain and draw (fire_route_destroy on exit) — EVERY screen,
+// the host's included; a predicted fire never echoes to its own shooter:
 for {
 	f, ok := kcombat.fire_poll(&self.fires)
 	if !ok {break}
-	// draw their rock
+	// draw the rock
 }
 ```
 

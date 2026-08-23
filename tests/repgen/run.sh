@@ -295,15 +295,22 @@ echo "  ok  gd:\"backup\" codec generated (POD scalar / map / dynamic + nested, 
 # Entity-table artifacts (board.odin's `entity=Pawn:7` scene tag): the TYPE
 # const, the kboot.Entity_Kind row reading the scene THROUGH the field
 # offset, the typed dispatch for the name-paired census hooks, and the
-# `<game>_entities` install wrapper — Board declares no session-event halves,
-# so it hands boot_entities a nil dispatcher (the queue path; born-at-send
-# needs `<game>_events` to deliver to — pinned on the examples' acids).
+# `<game>_entities` install wrapper — Board declares typed BORN hooks
+# (pawn_born + board_embodied), so a dispatcher IS generated and handed to
+# boot_entities: the born arm resolves the pawn through the census, calls the
+# typed hook with fields SET, and fires embodied when MY avatar kind is born.
 BGEN="$GEN" # board.odin rides the same consolidated artifact
 for needle in \
 	'PAWN_TYPE :: ksess.Entity_Type(7)' \
 	'board_entity_kinds := [?]kboot.Entity_Kind' \
 	'board_entities :: proc(self: ^Board, b: ^kboot.Boot)' \
-	'kboot.boot_entities(b, self, board_entity_kinds[:], nil)' \
+	'kboot.boot_entities(b, self, board_entity_kinds[:], _board_events_thunk)' \
+	'board_events :: proc(self: ^Board, events: []ksess.Event)' \
+	'case ksess.Ev_Spawned:' \
+	'case PAWN_TYPE:' \
+	'pawn_born(self, cast(^Pawn)_e, e.id, e.owner)' \
+	'if (e.type == PAWN_TYPE) && self.boot.ses != nil && e.owner == self.boot.ses.me {' \
+	'board_embodied(self, e.id)' \
 	'scene_offset = offset_of(Board, pawn_scene)' \
 	'spawned = _board_ent_spawned_pawn' \
 	'freed = _board_ent_freed_pawn' \
