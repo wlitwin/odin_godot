@@ -117,7 +117,7 @@ embodies and its stable wire id:
 chest_scene: ^gd.Resource `gd:"entity=Chest:2"`,
 ```
 
-`kboot.boot_entities(&self.boot, self, cave_lobby_entity_kinds[:])` (one call
+`cave_lobby_entities(self, &self.boot)` (one call
 in `ready()`, after `boot_attach`) installs the generated table: every peer,
 the host included, builds a spawn the same way (instantiate under `boot.world`,
 free on despawn, id→node ledger). Your bookkeeping is a typed, name-paired

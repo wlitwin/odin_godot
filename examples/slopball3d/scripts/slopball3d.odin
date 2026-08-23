@@ -120,7 +120,7 @@ slopball3_ready :: proc(self: ^Slopball3) {
 	// The factory, written by nobody: the generated table (from the entity=
 	// tags above) makes/frees under boot.world; world.odin's *_spawned/
 	// *_freed hooks keep the kicker/ball census.
-	kboot.boot_entities(&self.boot, self, slopball3_entity_kinds[:])
+	slopball3_entities(self, &self.boot)
 
 	self.goals_to = gd.env_int("SLOP3_GOALS", 3)
 	self.bot = gd.env_string("SLOP3_BOT", "")
@@ -231,7 +231,18 @@ slopball3_host_left :: proc(self: ^Slopball3) {
 // baseline, not an edge).
 @(gd_half)
 slopball3_entity_spawned :: proc(self: ^Slopball3, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
-	_ = type
+	if type == KICKER3_TYPE {
+		if k, ok := kicker3_of(&self.boot, id); ok {
+			// BORN = the fields are set: the BODY adopts the spawned pos once
+			// (the scene instanced it at the origin, inside the corner walls).
+			// Same frame as the spawn on every role — the host's fires inside
+			// boot_spawn_send — so nothing ever sees it unplaced.
+			gd.node3d_set_position(cast(gd.Node3d)k.owner, k.pos)
+			if k.mine {
+				self.me_kick = k // MINE from birth (the census set `mine`; this is the dressed body)
+			}
+		}
+	}
 	if !self.started {
 		self.started = true
 		gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)

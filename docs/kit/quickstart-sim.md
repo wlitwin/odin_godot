@@ -72,7 +72,7 @@ lands in specific places. First, the lane is a field on the *game* struct
 lane: ksim.Lane, // the sim lane: tick scheduling, prediction, reconcile
 ```
 
-Two lines wire it, in `ready()` right after `boot_attach` and `boot_entities`:
+Two lines wire it, in `ready()` right after `boot_attach` and `<game>_entities`:
 
 ```odin
 hello_sim_lane_init(self, &self.lane, &self.ses) // generated: carries the tick/sample declarations

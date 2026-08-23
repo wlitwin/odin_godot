@@ -11,11 +11,14 @@ package kit_boot
 //     mob_scene: ^gd.Resource `gd:"entity=Mob:3"`,
 //
 // scriptgen turns those tags into `<snake>_entity_kinds` (plus the
-// `MOB_TYPE :: ksess.Entity_Type(3)` constants games used to hand-keep), and
-// this driver turns the table into the session's factory:
+// `MOB_TYPE :: ksess.Entity_Type(3)` constants games used to hand-keep) and a
+// typed install wrapper, `<snake>_entities`, that hands this driver the table
+// AND the class's generated event dispatcher — the dispatcher is what lets
+// the authority's own spawns be BORN AT THE SEND (boot_born below):
 //
 //     // ready(), AFTER boot_attach (the factory parents under b.world):
-//     kboot.boot_entities(&self.boot, self, scrapyard_entity_kinds[:])
+//     scrapyard_entities(self, &self.boot)
+//     // the raw door: kboot.boot_entities(&self.boot, self, <table>[:], <events or nil>)
 //
 // The genuinely game-shaped halves stay yours, as name-paired TYPED hooks
 // scriptgen wires into the table (both optional, per entity):
@@ -52,17 +55,59 @@ Entity_Kind :: struct {
 	                             // factory tracks/untracks the entity on the lane itself
 }
 
+// The game's session-event dispatcher behind a rawptr — the generated
+// `<game>_events` thunked (scriptgen emits it beside the kind table). Handing
+// it to boot_entities is what turns on BORN AT THE SEND for the authority.
+Events_Proc :: proc(game: rawptr, events: []ksess.Event)
+
 // Install the table as the session's factory. `game` is the struct carrying
 // the tagged scene fields (scene_offset resolves against it) — it is also
 // named as the session's game pointer, so `<verb>_then` consequences keep
 // receiving the game, not this driver.
-boot_entities :: proc(b: ^Boot, game: rawptr, kinds: []Entity_Kind) {
+//
+// `events` (the generated `<game>_entities` wrapper passes it; the raw door
+// defaults to nil) is the game's event dispatcher. With it, the AUTHORITY's
+// own spawns are BORN AT THE SEND: `<game>_entity_spawned` runs inside
+// boot_spawn_send, before it returns — the symmetric guarantee to a client's
+// (whose make → fields → Ev_Spawned is one synchronous flow) — so no engine
+// callback (render, a physics step, a later _process) can ever see the host's
+// node parented but undressed. Without it the host hears its own spawns from
+// the next pump's batch, which for any spawn made AFTER the pump (a host
+// step, a timer, a later _process) is the NEXT frame: one rendered frame at
+// the scene's default pose. A hand-rolled game that drains the batch itself
+// passes nil and keeps the queue; one that passes a dispatcher must not ALSO
+// expect the host's Ev_Spawned in boot_pump's events — it is delivered here.
+boot_entities :: proc(b: ^Boot, game: rawptr, kinds: []Entity_Kind, events: Events_Proc = nil) {
 	assert(b.ses != nil, "boot_entities comes AFTER boot_attach — it installs the factory on the attached session")
 	assert(game != nil, "boot_entities needs the game struct — its tagged scene fields are the table's scenes")
 	b.ent_kinds = kinds
 	b.ent_game = game
+	b.ent_events = events
 	ksess.session_set_factory(b.ses, b, boot_make_entity, boot_free_entity)
 	ksess.session_set_game(b.ses, game)
+	// Only with a dispatcher to hand the event to — a nil hook keeps the
+	// session's queue path, so a batch-draining game never silently loses
+	// its own spawns.
+	ksess.session_set_born(b.ses, b, events != nil ? boot_born : nil)
+}
+
+// The authority's spawn is BORN (kit/session's born hook, installed above):
+// the fields are set and announced — dress it NOW, inside the spawn site's
+// call. The game's dispatcher runs on a one-element batch, so the SAME
+// `<game>_entity_spawned` half fires, with the same role gate, as it would
+// from boot_pump's batch on any other peer. Two things boot_forward's
+// Ev_Spawned arm does NOT happen here on purpose: (1) the phase latch is
+// deferred to the next pump (world_pending — boot_phase rises only in
+// boot_pump, the level games edge-detect across it); (2) nothing is queued —
+// the host's own Ev_Spawned is not in that frame's batch. Re-entrant by
+// construction: the census already ran at make, the registry row exists, a
+// handler that spawns again just recurses this door.
+@(private = "file")
+boot_born :: proc(user: rawptr, ev: ksess.Ev_Spawned) {
+	b := cast(^Boot)user
+	b.world_pending = true
+	one := [1]ksess.Event{ev}
+	b.ent_events(b.ent_game, one[:])
 }
 
 // The node an entity rides — what the hand-written `nodes[id]` map was for

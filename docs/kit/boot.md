@@ -262,16 +262,16 @@ lead / resim rows on the result before `netgraph_refresh`.
 ## The entity factory
 
 Tag each exported entity scene with what it embodies and its stable wire id,
-then pass the generated table to `boot_entities`. The make/free switches, the
-`TYPE` consts, the `spawn_scene` helper, and the id→node map are all generated,
-so none of them exist in your code:
+then install the generated factory with the generated `<game>_entities`. The
+make/free switches, the `TYPE` consts, the `spawn_scene` helper, and the
+id→node map are all generated, so none of them exist in your code:
 
 ```odin
 // on the game struct — ordinary drag-drop exports, plus the declaration:
 mob_scene: ^gd.Resource `gd:"entity=Mob:3"`,
 
 // ready(), after boot_attach (the factory parents under boot.world):
-kboot.boot_entities(&self.boot, self, scrapyard_entity_kinds[:])
+scrapyard_entities(self, &self.boot)
 
 // the game-shaped half stays yours, as typed name-paired hooks (optional):
 @(gd_half)
@@ -287,6 +287,35 @@ mob_freed :: proc(game: ^Scrapyard, self: ^Mob, id: knet.Net_Id) {
 The id (`Mob:3`) is explicit and stable: it rides saves, rejoins, and migration
 backups, so entities are never auto-numbered across builds. scriptgen errors on
 duplicates, unknown structs, and mis-shaped hooks at build time.
+
+**Born at the send.** `<game>_entities` hands boot the kind table AND the
+class's generated event dispatcher, and the dispatcher is what makes the
+AUTHORITY's own spawns *born at the send*: `<game>_entity_spawned` runs inside
+`kboot.boot_spawn_send`, before it returns — the symmetric guarantee to a
+client's (whose make → fields → `Ev_Spawned` is one synchronous flow). So no
+render, physics step, or later `_process` can ever see the host's node parented
+but undressed, and the host's own `Ev_Spawned` is NOT in that frame's
+`boot_pump` batch. Two consequences worth knowing: `boot_phase` still rises
+only in `boot_pump` (the host's `entity_spawned` runs with the phase not yet
+risen — the latch is promoted at the next pump, so the `was`/`phase` edge
+idiom across the pump keeps working); and the raw door,
+`kboot.boot_entities(&self.boot, self, <table>[:], events)`, takes the
+dispatcher as an optional last argument — `nil` keeps the queue path for a
+hand-rolled game that drains the batch itself (nothing is ever lost silently).
+
+**Where the first placement goes — and why `_process` alone is not it.** Godot
+runs no `_process` on a node added to the tree DURING the `_process` pass (the
+engine iterates a copy of the process list; a node added in `_physics_process`
+skips that physics step but does get `_process` the same render frame). Every
+host-step spawn is added during `_process`, so an entity that positions itself
+only in its own `_process` renders its spawn frame at the scene's default pose
+on the spawner's screen — no matter when `Ev_Spawned` fires. The contract is:
+`<game>_entity_spawned` is the initial-dress home (place the node from its
+fields there — it is same-frame on every role now), the entity's `_process`
+maintains from then on; or ship the scene hidden and reveal in the dress, as
+homestead does. The same first-frame gap exists for a client's PREDICTED spawn
+(`boot_spawn_predicted`, which has no `Ev_Spawned` until the authority's
+rekeys it) — dress at the fire site, or hide until first present.
 
 `boot_node(b, id)` looks up an entity's node (the `nodes[id]` map).
 `boot_entities_wipe(b)` is the back-to-lobby / takeover wipe, and it is

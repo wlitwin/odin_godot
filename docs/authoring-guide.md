@@ -238,7 +238,7 @@ is a builtin (`int`, `float`, `String`, `Vector2`, `Color`, …) or a Resource c
 (`Texture2D`, `PackedScene`, …). At most one hint per field. (A scene that bodies a wire
 entity does NOT declare a hint: **`gd:"entity=Name:id"`** is its own first token and
 synthesizes both the export and the `resource=PackedScene` hint; see [Entities](kit/net.md#declaring-a-replicated-entity)
-and [kit/boot](kit/boot.md)'s `boot_entities`.) Example:
+and [kit/boot](kit/boot.md)'s entity factory (`<game>_entities`).) Example:
 
 ```odin
 Probe :: struct {

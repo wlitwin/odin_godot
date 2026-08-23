@@ -234,6 +234,19 @@ Make_Entity_Proc :: proc(user: rawptr, type: Entity_Type, id: knet.Net_Id, owner
 // — free the node/struct.
 Free_Entity_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr)
 
+// Host-side, optional: the authority's OWN spawn is BORN — called SYNCHRONOUSLY
+// inside session_spawn / session_spawn_send, in place of queueing Ev_Spawned,
+// the instant the entity's spawn fields are set and announced. Without it the
+// host hears its own spawns like everyone else: from the event queue, at the
+// next poll — which on a frame loop is the NEXT frame for any spawn made
+// after the drain (a host step, a timer, a later _process), one rendered
+// frame with the node undressed. The client path (apply_spawn_tuple) stays
+// queued on purpose: a joiner's world arrives in one packet behind its
+// WELCOME, and hearing spawns before Ev_Welcomed / mid-snapshot would be a
+// worse ordering than a same-frame batch. kboot installs this from
+// boot_entities when it holds the game's generated dispatcher.
+Born_Proc :: proc(user: rawptr, ev: Ev_Spawned)
+
 // Host-side: called SYNCHRONOUSLY right after a client command executes (ok
 // or rejected) — before any same-frame command can touch the entity again.
 // This is the sanctioned spot for THE CROSS-ENTITY HALF of a command: a
@@ -669,6 +682,8 @@ Session_Wiring :: struct {
 	factory_make:  Make_Entity_Proc,
 	factory_free:  Free_Entity_Proc,
 	game_user:     rawptr, // session_set_game's explicit override (nil = the factory user)
+	born_user:     rawptr,
+	born:          Born_Proc, // host: its own spawns delivered at the send (nil = queued like every other peer's)
 	cmd_hook_user: rawptr,
 	cmd_hook:      Command_Hook, // host: the cross-entity half of commands (the catch-all)
 	type_hooks:    map[Entity_Type]Type_Hook_Entry, // host: per-type routing (wins over the catch-all)
@@ -1084,6 +1099,26 @@ session_set_game :: proc(s: ^Session, user: rawptr) {
 	s.ctx.game_user = user
 }
 
+// Install the authority's born hook (see Born_Proc; pre-start wiring, survives
+// starts). With it installed, session_spawn / session_spawn_send deliver the
+// host's own Ev_Spawned to `born` synchronously and queue NOTHING for that
+// spawn — a poll loop never sees it. nil restores the queue.
+session_set_born :: proc(s: ^Session, user: rawptr, born: Born_Proc) {
+	s.born_user = user
+	s.born = born
+}
+
+// The authority's spawn is BORN: fields set, announced — hand it to the born
+// hook this instant, or queue it for the poll like every other peer's.
+@(private = "file")
+born_or_queued :: proc(s: ^Session, ev: Ev_Spawned) {
+	if s.born != nil {
+		s.born(s.born_user, ev)
+		return
+	}
+	append(&s.events, ev)
+}
+
 // Install the host-side command hook (see Command_Hook; survives session
 // start). This is the CATCH-ALL: entities whose type has a
 // session_set_type_hook route there instead. All hooks reach the ctx through
@@ -1178,7 +1213,7 @@ session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet
 		write_spawn_tuple(s, &w, id)
 		broadcast(s, knet.writer_bytes(&w), .Reliable)
 	}
-	append(&s.events, Ev_Spawned{id = id, type = type, owner = owner}) // pre-filled entity: born now
+	born_or_queued(s, Ev_Spawned{id = id, type = type, owner = owner}) // pre-filled entity: born now
 	return id
 }
 
@@ -1187,7 +1222,8 @@ session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet
 // the spawn announcement carries a field snapshot: make, set your per-spawn
 // fields on the returned entity, then session_spawn_send — which is where
 // Ev_Spawned fires (the entity is BORN once its fields are set; an event at
-// make time would hand the game an empty shell).
+// make time would hand the game an empty shell). Fires INTO the born hook
+// when one is installed (session_set_born), queued otherwise.
 session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_ID_INVALID) -> (entity: rawptr, id: knet.Net_Id) {
 	assert(s.is_host, "only the authority spawns; clients create via the factory")
 	assert(s.factory_make != nil, "session_spawn_make needs session_set_factory")
@@ -1220,7 +1256,11 @@ session_spawn_send :: proc(s: ^Session, id: knet.Net_Id) {
 		broadcast(s, knet.writer_bytes(&w), .Reliable)
 	}
 	if e, ok := knet.registry_get(&s.reg, id); ok {
-		append(&s.events, Ev_Spawned{id = id, type = s.types[id], owner = e.owner})
+		// BORN — here, not at make: the fields are set and on the wire. With a
+		// born hook installed this fires the game's dress before this call
+		// returns (no engine callback can see the authority's node undressed);
+		// without one it queues for the poll like any peer's.
+		born_or_queued(s, Ev_Spawned{id = id, type = s.types[id], owner = e.owner})
 	}
 }
 

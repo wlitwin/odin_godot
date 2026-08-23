@@ -41,6 +41,7 @@ if grep -qE "SCRIPT ERROR|signal 11" "$SLOG"; then
     echo "slopball: runtime errors in the solo log"; ok=0
 fi
 
+
 if ((ok==1)); then
     echo "SLOPBALL_SINGLE_OK proved: headless RigidBody2D ball + move_and_slide striker, kick -> goal -> match, solo"
     exit 0

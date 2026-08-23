@@ -17,8 +17,11 @@ kicker3_spawned :: proc(game: ^Slopball3, self: ^Kicker3, id: knet.Net_Id, owner
 	if owner != knet.PLAYER_ID_INVALID {
 		game.avatar_of[owner] = id
 		if owner == game.ses.me {
+			// Census time: fields NOT set yet. `mine` is role knowledge and
+			// belongs here; `me_kick` is set at BORN (slopball3_entity_spawned),
+			// once the body has adopted its spawned pos — the drive never runs
+			// on an unplaced body, on any role.
 			self.mine = true
-			game.me_kick = self
 		}
 	}
 }

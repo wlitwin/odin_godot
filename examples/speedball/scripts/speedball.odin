@@ -73,7 +73,7 @@ speedball_ready :: proc(self: ^Speedball) {
 		min_players = 1,
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
-	kboot.boot_entities(&self.boot, self, speedball_entity_kinds[:])
+	speedball_entities(self, &self.boot)
 
 	// PREDICT-WORLD: batches echo every player's held input, every peer ticks
 	// every kicker AND the ball — one timeline for the whole pitch (the

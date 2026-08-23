@@ -254,7 +254,7 @@ generated, carrying the input size, the typed procs, and each pass wired to
 its slot:
 
 ```odin
-// ready(), beside boot_attach + boot_entities:
+// ready(), beside boot_attach + <game>_entities:
 game_lane_init(self, &self.lane, &self.ses) // cfg = ksim.Lane_Config{...} to tune
 kboot.boot_lane(&self.boot, &self.lane)
 ```

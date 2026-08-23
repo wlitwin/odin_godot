@@ -25,13 +25,8 @@ install_controls :: proc "contextless" () {
 }
 
 drive_my_kicker :: proc(self: ^Slopball, delta: f64) {
-	me := self.me_kick
+	me := self.me_kick // set at BORN (slopball_entity_spawned): a placed body, or nothing to drive
 	if me == nil {return}
-	if play.latch(&me.placed, true) {
-		// Ev_Spawned means BORN — the replicated x/y are set; put the BODY there
-		// once (the scene instanced it at the origin, inside the corner walls).
-		gd.node2d_set_position(cast(gd.Node2d)me.owner, {me.x, me.y})
-	}
 
 	typing := bool(gd.control_has_focus(cast(gd.Control)self.boot.chat.input, false))
 	dir: gd.Vector2

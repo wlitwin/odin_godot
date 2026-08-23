@@ -105,7 +105,7 @@ hello_net_ready :: proc(self: ^HelloNet) {
 		env = "HELLO",
 		min_players = 1,
 	})
-	kboot.boot_entities(&self.boot, self, hello_net_entity_kinds[:])
+	hello_net_entities(self, &self.boot) // the generated factory (+ born-at-send for the host's own spawns)
 	switch gd.env_string("HELLO_ROLE", "") {
 	case "host": hello_net_on_host(self)
 	case "join": hello_net_on_join(self)

@@ -291,11 +291,16 @@ echo "  ok  gd:\"backup\" codec generated (POD scalar / map / dynamic + nested, 
 
 # Entity-table artifacts (board.odin's `entity=Pawn:7` scene tag): the TYPE
 # const, the kboot.Entity_Kind row reading the scene THROUGH the field
-# offset, and the typed dispatch for the name-paired census hooks.
+# offset, the typed dispatch for the name-paired census hooks, and the
+# `<game>_entities` install wrapper — Board declares no session-event halves,
+# so it hands boot_entities a nil dispatcher (the queue path; born-at-send
+# needs `<game>_events` to deliver to — pinned on the examples' acids).
 BGEN="$GEN" # board.odin rides the same consolidated artifact
 for needle in \
 	'PAWN_TYPE :: ksess.Entity_Type(7)' \
 	'board_entity_kinds := [?]kboot.Entity_Kind' \
+	'board_entities :: proc(self: ^Board, b: ^kboot.Boot)' \
+	'kboot.boot_entities(b, self, board_entity_kinds[:], nil)' \
 	'scene_offset = offset_of(Board, pawn_scene)' \
 	'spawned = _board_ent_spawned_pawn' \
 	'freed = _board_ent_freed_pawn' \
@@ -315,7 +320,7 @@ for needle in \
 		exit 1
 	fi
 done
-echo "  ok  entity table generated (TYPE const, kinds row, typed census hooks)"
+echo "  ok  entity table generated (TYPE const, kinds row, typed census hooks, <game>_entities wrapper)"
 
 # @(gd_sample)/@(gd_step) artifacts (board.odin's lane game half): a rawptr
 # thunk PER input class holding the typed cast, and `board_lane_init` carrying

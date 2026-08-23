@@ -251,7 +251,7 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	// fields' entity= tags) instantiates/frees under boot.world; the typed
 	// *_spawned/*_freed hooks in world.odin keep the census. `self` is also
 	// what every `<verb>_then` consequence receives as its game param.
-	kboot.boot_entities(&self.boot, self, cave_lobby_entity_kinds[:])
+	cave_lobby_entities(self, &self.boot)
 	// The migration dance, danced by the kit: the torch, the takeover/chase
 	// fork, the census-driven wipe, the caps. The game's four seams ride the
 	// generated table (backup/took_over/wiped/migrating halves, save.odin +

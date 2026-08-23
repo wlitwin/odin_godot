@@ -67,7 +67,7 @@ hello_net_ready :: proc(self: ^HelloNet) {
 		// the standard eight names, and scriptgen still validates they exist.)
 	})
 	// The factory, written by nobody — the entity tag above IS the table.
-	kboot.boot_entities(&self.boot, self, hello_net_entity_kinds[:])
+	hello_net_entities(self, &self.boot)
 
 	// With a relay configured, the lobby grows its join-code field — a human
 	// types a friend's code and presses Join (see on_join).

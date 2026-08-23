@@ -77,6 +77,25 @@ three_peers() {
 		expect_absent "$l" "SCRIPT ERROR|signal 11" "runtime errors in $(basename "$l")"
 	done
 
+	# BORN AT THE SEND: the HOST's own spawns are dressed on the frame they are
+	# spawned. Every kicker here is spawned AFTER the pump — spawn_world runs
+	# from the join's authority consequence (the events dispatch), the watcher's
+	# drop-in from the same half — so SB_SENT (the spawn site, right after
+	# boot_spawn_send) and SB_SPAWN (the dress, slopball_entity_spawned, fired
+	# from INSIDE the send) must carry the same frame for the same id. Before
+	# the fix the dress came from the NEXT pump's batch: frame+1, one rendered
+	# frame with the body at the origin (was=0,0 is that pose, now never shown).
+	local sent_n=0 sid sframe
+	while read -r sid sframe; do
+		sent_n=$((sent_n+1))
+		if ! grep -qE "SB_SPAWN id=${sid} .*frame=${sframe}( |$)" "$hlog"; then
+			echo "  FAIL: born-at-send — host kicker ${sid} sent on frame ${sframe}, dressed: $(grep -oE "SB_SPAWN id=${sid} [^$]*" "$hlog" | head -n1)"
+			return 1
+		fi
+	done < <(sed -nE 's/.*SB_SENT id=([0-9]+) frame=([0-9]+).*/\1 \2/p' "$hlog")
+	if ((sent_n < 2)); then echo "  FAIL: born-at-send — expected >=2 SB_SENT receipts on the host, got ${sent_n}"; return 1; fi
+	echo "  born-at-send: ${sent_n} host spawns dressed on their own frame"
+
 	# CONVERGENCE: highest tick reported by all three, positions within 8px.
 	# (awk/sed only — the nix dev shell carries no python.)
 	local hpts="$FSLP_LOGS/h.pts" spts="$FSLP_LOGS/s.pts" wpts="$FSLP_LOGS/w.pts"

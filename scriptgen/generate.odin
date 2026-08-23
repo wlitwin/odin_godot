@@ -1703,7 +1703,8 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				fmt.sbprintf(b, "@(private = \"file\")\n_%s_ent_freed_%s :: proc(game: rawptr, entity: rawptr, id: knet.Net_Id) {{\n\t%s(cast(^%s)game, cast(^%s)entity, id)\n}}\n\n", snake, tsnake, e.freed, cls, e.target)
 			}
 		}
-		fmt.sbprintf(b, "// The factory table — pass to kboot.boot_entities(&self.boot, self, %s_entity_kinds[:]).\n", snake)
+		fmt.sbprintf(b, "// The factory table — %s_entities(self, &self.boot) installs it (below); the raw\n", snake)
+		w(b, "// door is kboot.boot_entities(&self.boot, self, <table>[:], <events>).\n")
 		fmt.sbprintf(b, "%s_entity_kinds := [?]kboot.Entity_Kind {{\n", snake)
 		for e in s.entities {
 			tsnake := to_snake(e.target)
@@ -1726,6 +1727,32 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			w(b, "},\n")
 		}
 		w(b, "}\n\n")
+
+		// The install wrapper: the table AND the game's event dispatcher, handed
+		// to boot in one typed call — the dispatcher is what lets the AUTHORITY's
+		// own spawns be born at the send (boot_born: `<game>_entity_spawned`
+		// fires inside boot_spawn_send, not from the next pump's batch). A class
+		// that declares no session-event halves has no dispatcher to hand over;
+		// it passes nil and keeps the queue path (nothing to dress at born).
+		has_events := len(s.event_halves) > 0 || s.succ_backup != "" || s.succ_took_over != "" || s.succ_wiped != "" || s.succ_migrating != ""
+		if has_events {
+			fmt.sbprintf(
+				b,
+				"@(private = \"file\")\n_%s_events_thunk :: proc(game: rawptr, events: []ksess.Event) {{\n\t%s_events(cast(^%s)game, events)\n}}\n\n",
+				snake, snake, cls,
+			)
+		}
+		fmt.sbprintf(
+			b,
+			"// Install the generated entity factory on the boot (ready(), after boot_attach):\n"+
+			"// the kind table above plus the class's event dispatcher, so the authority's own\n"+
+			"// spawns are BORN AT THE SEND — `%s_entity_spawned` runs inside\n"+
+			"// kboot.boot_spawn_send, before it returns, never a frame later.\n"+
+			"%s_entities :: proc(self: ^%s, b: ^kboot.Boot) {{\n"+
+			"\tkboot.boot_entities(b, self, %s_entity_kinds[:], %s)\n"+
+			"}}\n\n",
+			snake, snake, cls, snake, has_events ? fmt.tprintf("_%s_events_thunk", snake) : "nil",
+		)
 
 		// The typed census — the registry/boot ledgers queried back, so the
 		// hand-kept `map[Net_Id]^T` + owner + avatar_of mirrors become the

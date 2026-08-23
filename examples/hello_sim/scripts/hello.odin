@@ -56,7 +56,7 @@ hello_sim_ready :: proc(self: ^HelloSim) {
 		// methods omitted = kboot.STANDARD_METHODS — the eight names above
 		// were the list every game wrote anyway
 	})
-	kboot.boot_entities(&self.boot, self, hello_sim_entity_kinds[:])
+	hello_sim_entities(self, &self.boot)
 
 	// The promotion's ENTIRE wiring (checklist step 7): the generated
 	// lane_init carries the tick/sample declarations; the boot drives the

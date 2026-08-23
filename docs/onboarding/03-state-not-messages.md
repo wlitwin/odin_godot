@@ -82,7 +82,7 @@ golf_ready :: proc(self: ^Golf) {
 		methods  = {"on_host", "on_join", "on_start", "on_chat",
 		            "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
-	kboot.boot_entities(&self.boot, self, golf_entity_kinds[:]) // the generated factory
+	golf_entities(self, &self.boot) // the generated factory
 }
 
 @(gd_step = "authority") // the host's fixed step — the gate and loop are generated

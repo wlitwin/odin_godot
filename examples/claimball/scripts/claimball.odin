@@ -94,7 +94,7 @@ claimball_ready :: proc(self: ^Claimball) {
 		min_players = 1,
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
-	kboot.boot_entities(&self.boot, self, claimball_entity_kinds[:])
+	claimball_entities(self, &self.boot)
 
 	// PREDICT-SELF (echo_inputs = false — the claimball/speedball fork): no input
 	// echo, so each peer ticks only ITS OWN kicker (fresh from its ring) and the

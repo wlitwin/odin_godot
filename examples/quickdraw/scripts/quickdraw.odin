@@ -92,7 +92,7 @@ quickdraw_ready :: proc(self: ^Quickdraw) {
 		min_players = 1,
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
-	kboot.boot_entities(&self.boot, self, quickdraw_entity_kinds[:])
+	quickdraw_entities(self, &self.boot)
 
 	// The sim lane beside the session — the wiring is GENERATED from the
 	// @(gd_sample)/@(gd_step) attributes (typed procs, input size, and the

@@ -215,6 +215,11 @@ Boot :: struct {
 	ent_kinds: []Entity_Kind,
 	ent_game:  rawptr,
 	ent_nodes: map[knet.Net_Id]gd.Node,
+	// The game's generated event dispatcher (`<game>_events` behind a rawptr
+	// thunk), when the game handed it over (the generated `<game>_entities`
+	// does). It is what lets boot deliver the AUTHORITY's own Ev_Spawned at
+	// the send — boot_born — instead of from the next pump's batch.
+	ent_events: Events_Proc,
 	// It LOOKS like a copy of the session's `types` map, and it is not — twice
 	// over, both load-bearing. (1) LIFETIME: both despawn paths delete the
 	// session's row BEFORE calling the factory free (session_despawn and the
@@ -254,6 +259,11 @@ Boot :: struct {
 	// too, for the one re-seat that never has an unseated frame (menu → host
 	// again inside a live process). Read boot_phase(b), never this.
 	world_seen: bool,
+	// A host spawn born BETWEEN pumps (boot_born) owes the latch above its
+	// rise — at the next pump, not at the send. The phase is a level games
+	// edge-detect ACROSS the pump ("boot_pump is the only place the phase
+	// RISES"); a mid-frame rise would slip past that edge on the host.
+	world_pending: bool,
 
 	// boot_host_coded/boot_join_code's state (the join-code rendezvous,
 	// netgd/code.odin): pumped inside boot_pump — a host's minted code lands
@@ -486,6 +496,7 @@ boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, mar
 	// pump that may deliver the welcome re-seating us this very frame.
 	if !b.ses.joined {
 		b.world_seen = false
+		b.world_pending = false
 	}
 	netgd.wire_pump(&b.wire, now)
 	b.succ_now = now
@@ -500,6 +511,13 @@ boot_pump :: proc(b: ^Boot, delta: f64, now: f64) -> (events: []ksess.Event, mar
 		}
 		boot_forward(b, ev) // THE kit-side table — one full switch, forward.odin
 		append(&evs, ev)
+	}
+	if b.world_pending {
+		// The authority's own spawns since the last pump were born at their
+		// send (boot_born) — the world reached this screen then; the PHASE
+		// reports it here, where it always has (see world_pending).
+		b.world_seen = true
+		b.world_pending = false
 	}
 
 	mks := make([dynamic]kcomms.Ev_Marker, context.temp_allocator)
@@ -632,6 +650,7 @@ boot_open_host :: proc(
 	// boot_detach between) never spends a frame unseated — and without this the
 	// dead run's world would still read as "on this screen".
 	b.world_seen = false
+	b.world_pending = false
 	kui.lobby_show_menu(&b.ui, false, false)
 	kui.lobby_refresh(&b.ui, b.ses)
 	kui.chat_show(&b.chat, true)

@@ -132,7 +132,7 @@ slopball_ready :: proc(self: ^Slopball) {
 	// The factory, written by nobody: the generated table (from the entity=
 	// tags above) makes/frees under boot.world; world.odin's *_spawned/
 	// *_freed hooks keep the kicker/ball census.
-	kboot.boot_entities(&self.boot, self, slopball_entity_kinds[:])
+	slopball_entities(self, &self.boot)
 
 	self.goals_to = gd.env_int("SLOP_GOALS", 3)
 	self.bot = gd.env_string("SLOP_BOT", "")
@@ -258,16 +258,36 @@ slopball_host_left :: proc(self: ^Slopball) {
 // edge needed keeping — it rides boot_phase in process(), with the receipt.
 @(gd_half)
 slopball_entity_spawned :: proc(self: ^Slopball, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
-	_ = type
 	gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
 	gd.set_bool(cast(gd.Object)self.boot.legend, "visible", true)
+	was := gd.Vector2{} // where the body sat until this dress (the scene default)
+	if type == KICKER_TYPE {
+		if k, ok := kicker_of(&self.boot, id); ok {
+			// BORN = the fields are set: the BODY adopts the spawned x/y once
+			// (the scene instanced it at the origin, inside the corner walls).
+			// Same frame as the spawn on every role — the host's fires inside
+			// boot_spawn_send — so no render, physics step, or drive ever sees
+			// it unplaced; kicker_process / drive_my_kicker carry it from here.
+			was = gd.node2d_get_position(cast(gd.Node2d)k.owner)
+			gd.node2d_set_position(cast(gd.Node2d)k.owner, {k.x, k.y})
+			if k.mine {
+				self.me_kick = k // MINE from birth (the census set `mine`; this is the dressed body)
+			}
+		}
+	}
 	if id == self.ball_id && self.ball != nil {
 		seat_ball(self, ksess.session_owner_of(&self.ses, id))
 		if self.ball.score.l != 0 || self.ball.score.r != 0 {
 			kui.lobby_set_status(&self.boot.ui, fmt.tprintf("%d — %d", self.ball.score.l, self.ball.score.r))
 		}
 	}
-	gd.print_str(fmt.tprintf("SB_SPAWN id=%d mine=%v", u32(id), owner == self.ses.me))
+	// frame= pairs with SB_SENT (the spawn site's receipt): on the host they
+	// are EQUAL — born at the send, not the next pump. was= is the pose the
+	// body held until now (the scene default), the proof the dress mattered.
+	gd.print_str(fmt.tprintf(
+		"SB_SPAWN id=%d mine=%v frame=%d was=%.0f,%.0f",
+		u32(id), owner == self.ses.me, gd.engine_get_process_frames(gd.singleton_engine()), was.x, was.y,
+	))
 }
 
 @(gd_half)

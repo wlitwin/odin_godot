@@ -10,14 +10,18 @@ import gd "godot:godot"
 import kboot "godot:kit/boot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
+import "core:fmt"
 
 // The census hooks, down to the game-shaped lines — the generated queries
 // (kicker_of / kicker_ids / kicker_owned_by) answer what the old maps did.
 @(gd_half)
 kicker_spawned :: proc(game: ^Slopball, self: ^Kicker, id: knet.Net_Id, owner: knet.Player_Id) {
+	// Census time: fields NOT set yet. `mine` is role knowledge (who drives
+	// this body) and belongs here; `me_kick` — the pointer the drive reads —
+	// is set at BORN (slopball_entity_spawned), once the body has adopted its
+	// spawned x/y. The drive never runs on an unplaced body, on any role.
 	if owner != knet.PLAYER_ID_INVALID && owner == game.ses.me {
 		self.mine = true
-		game.me_kick = self
 	}
 }
 
@@ -77,4 +81,8 @@ spawn_kicker :: proc(self: ^Slopball, pid: knet.Player_Id) {
 	// not thread a parked teammate (the acid learned this as an own-goal).
 	k.y = PITCH_H/2 + off[rank % 4]
 	kboot.boot_spawn_send(&self.boot, kid)
+	// Receipt: the frame this spawn was SENT on. BORN AT THE SEND means the
+	// dress (SB_SPAWN, printed by slopball_entity_spawned — on the host from
+	// INSIDE the send above) carries the same frame number; the acid pins it.
+	gd.print_str(fmt.tprintf("SB_SENT id=%d frame=%d", u32(kid), gd.engine_get_process_frames(gd.singleton_engine())))
 }

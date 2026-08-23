@@ -3521,3 +3521,101 @@ interp_adapt_clamps_to_the_ceiling :: proc(t: ^testing.T) {
 	testing.expect(t, abs(a.delay - 0.20) < 1e-6, "pins at the ceiling under a brutal link")
 	testing.expect(t, abs(a.target - 0.20) < 1e-6, "the target is clamped too")
 }
+
+// ---- born at the send: the authority's own Ev_Spawned, synchronously ----------
+
+Born_Probe :: struct {
+	s:          ^ksess.Session,
+	got:        [dynamic]ksess.Ev_Spawned,
+	hp_at_born: i32, // the entity's FIELDS as the hook sees them (set before the send = dressed)
+	known:      bool, // the registry knows the id inside the hook
+}
+
+born_probe_hook :: proc(user: rawptr, ev: ksess.Ev_Spawned) {
+	p := cast(^Born_Probe)user
+	append(&p.got, ev)
+	if e, ok := knet.registry_get(&p.s.reg, ev.id); ok {
+		p.known = true
+		p.hp_at_born = (cast(^Bot)e.entity).hp
+	}
+}
+
+@(test)
+born_hook_delivers_the_hosts_own_spawns_at_the_send :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	probe := Born_Probe{s = &host.s}
+	defer delete(probe.got)
+	ksess.session_set_born(&host.s, &probe, born_probe_hook) // pre-start wiring: survives the start
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	drain(&host.s)
+	drain(&alice.s)
+	ksess.session_start_replicating(&host.s)
+	pump(boxes)
+	drain(&alice.s)
+
+	// The factory pair: MAKE is not born (fields unset) — SEND is, and it fires
+	// before session_spawn_send returns, with the registry row and the fields
+	// already in place.
+	made, id := ksess.session_spawn_make(&host.s, BOT_TYPE, owner = alice.s.me)
+	testing.expect_value(t, len(probe.got), 0)
+	(cast(^Bot)made).hp = 7
+	ksess.session_spawn_send(&host.s, id)
+	testing.expect_value(t, len(probe.got), 1)
+	testing.expect_value(t, probe.got[0].id, id)
+	testing.expect_value(t, probe.got[0].type, BOT_TYPE)
+	testing.expect_value(t, probe.got[0].owner, alice.s.me)
+	testing.expect(t, probe.known, "the registry knows the entity inside the born hook")
+	testing.expect_value(t, probe.hp_at_born, i32(7))
+
+	// And the host's queue carries NOTHING for it — a poll loop never sees a
+	// born-delivered spawn twice.
+	for ev in drain(&host.s) {
+		_, is_spawn := ev.(ksess.Ev_Spawned)
+		testing.expect(t, !is_spawn, "host queue must not carry a born-delivered spawn")
+	}
+
+	// The by-hand door (session_spawn, pre-filled entity) is born at the call.
+	hand := Bot{hp = 3}
+	id2 := ksess.session_spawn(&host.s, BOT_TYPE, &hand, &bot_command_set)
+	testing.expect_value(t, len(probe.got), 2)
+	testing.expect_value(t, probe.got[1].id, id2)
+	testing.expect_value(t, probe.hp_at_born, i32(3))
+	testing.expect_value(t, len(drain(&host.s)), 0)
+
+	// The CLIENT path is untouched: alice hears both from her queue, in order.
+	pump(boxes)
+	seen := make([dynamic]knet.Net_Id, context.temp_allocator)
+	for ev in drain(&alice.s) {
+		if sp, ok := ev.(ksess.Ev_Spawned); ok {
+			append(&seen, sp.id)
+		}
+	}
+	testing.expect_value(t, len(seen), 2)
+	if len(seen) == 2 {
+		testing.expect_value(t, seen[0], id)
+		testing.expect_value(t, seen[1], id2)
+	}
+
+	// nil restores the queue: the host's next spawn is polled like before.
+	ksess.session_set_born(&host.s, nil, nil)
+	late := Bot{hp = 1}
+	id3 := ksess.session_spawn(&host.s, BOT_TYPE, &late, &bot_command_set)
+	testing.expect_value(t, len(probe.got), 2)
+	polled := false
+	for ev in drain(&host.s) {
+		if sp, ok := ev.(ksess.Ev_Spawned); ok && sp.id == id3 {
+			polled = true
+		}
+	}
+	testing.expect(t, polled, "without a born hook the host's own spawn is polled as before")
+}

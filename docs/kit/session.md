@@ -210,6 +210,20 @@ for {
 }
 ```
 
+**The authority's own spawns, born at the send.** `session_set_born(s, user, born)`
+installs an optional host-side hook: with it, `session_spawn` / `session_spawn_send`
+hand the host's OWN `Ev_Spawned` to `born` synchronously — inside the spawn
+call, the instant the fields are set and announced — and queue nothing for that
+spawn. Without it the host hears its own spawns from the queue like every other
+peer, which on a frame loop is the NEXT drain: for any spawn made after the
+frame's drain (a host step, a timer, a later `_process`) that is one rendered
+frame with the node parented but undressed. The client path (`apply_spawn_tuple`)
+stays queued on purpose — a joiner's world lands in one packet behind its
+`WELCOME`, and hearing spawns before `Ev_Welcomed` or mid-snapshot would be a
+worse order than a same-frame batch. [kit/boot](boot.md) installs the hook from
+the generated `<game>_entities`, so a boot game never touches it; a raw-path
+game that wants it calls it before `*_start`.
+
 ### Event halves (<game>_<event>)
 
 A [kit/boot](boot.md) game never writes that switch. Each event pairs by
@@ -244,7 +258,12 @@ which wears an `entity_` prefix (`_entity_spawned`, `_entity_resynced`,
 `_entity_despawned`, `_entity_changed`) so it can never be mistaken for the
 [census hooks](boot.md): the census `<entity>_spawned` fires BEFORE the
 spawn tuple's fields apply (wiring), `<game>_entity_spawned` fires after
-(the initial-dress home). Each half's params are the event's fields,
+(the initial-dress home — ON THE AUTHORITY it fires inside
+`kboot.boot_spawn_send`, before that call returns, so the host's own
+`Ev_Spawned` is never in `boot_pump`'s batch and no frame ever renders the
+host's node undressed; see [boot.md](boot.md#the-entity-factory) for why the
+first placement belongs here and not in the entity's `_process`). Each half's
+params are the event's fields,
 positionally; a mispaired shape or a one-edit-typo'd name is a build error
 with the fix spelled out, never a proc that silently doesn't fire.
 
@@ -298,7 +317,7 @@ sp, sid := spelunker_spawn(&self.boot, owner = p.id)
 sp.x = SPAWN_X + f32(i) * 60
 sp.y = SPAWN_Y
 sp.hp = MAX_HP
-kboot.boot_spawn_send(&self.boot, sid)
+kboot.boot_spawn_send(&self.boot, sid) // on the host, `<game>_entity_spawned` runs INSIDE this call
 ```
 
 (For a TICKING entity the same helper routes through `boot_fire_spawn`: the
@@ -321,9 +340,10 @@ Free_Entity_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr)
 ```
 
 Games rarely write one: tag each exported entity scene with
-`entity=Name:id` and [kboot.boot_entities](boot.md) installs the GENERATED
-factory (scene under `boot.world`, node ledger, typed `*_spawned`/`*_freed`
-census hooks). `session_set_factory` remains the escape hatch for exotic
+`entity=Name:id` and the generated `<game>_entities` ([kboot.boot_entities](boot.md)
+underneath) installs the GENERATED factory (scene under `boot.world`, node
+ledger, typed `*_spawned`/`*_freed` census hooks, the host's own spawns born at
+the send). `session_set_factory` remains the escape hatch for exotic
 creation, and returning nil from `make` skips the entity safely. The wire
 carries its length, so unknown types are stepped over whole.
 

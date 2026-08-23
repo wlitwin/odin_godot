@@ -92,9 +92,12 @@ boot_forward :: proc(b: ^Boot, ev: ksess.Event) {
 
 	case ksess.Ev_Spawned, ksess.Ev_Resynced, ksess.Ev_State_Applied:
 		// The one fact boot_phase cannot read off the session: the world is on
-		// THIS screen. Every role lands here — a host's own first spawn too —
-		// which is what makes the raw path (netgd/ksess by hand) report a
-		// truthful phase without boot's doors ever having been touched.
+		// THIS screen. Every role lands here — a raw host's own first spawn
+		// too — which is what makes the raw path (netgd/ksess by hand) report
+		// a truthful phase without boot's doors ever having been touched. (A
+		// boot host with the generated dispatcher hears its OWN spawns at the
+		// send instead — boot_born, entities.odin — and raises this latch via
+		// world_pending at the same pump; only its Ev_Spawned skips this arm.)
 		b.world_seen = true
 
 	case ksess.Ev_Despawned:
