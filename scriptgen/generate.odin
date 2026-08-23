@@ -1737,6 +1737,12 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				// factory puts every spawn on the sim lane — no game code.
 				fmt.sbprintf(b, ", sim_set = &%s_sim_set", tsnake)
 			}
+			if e.stream_hz > 0 {
+				fmt.sbprintf(b, ", stream_hz = %d", e.stream_hz)
+			}
+			if e.avatar {
+				w(b, ", avatar = true")
+			}
 			w(b, "},\n")
 		}
 		w(b, "}\n\n")

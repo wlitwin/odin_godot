@@ -200,7 +200,13 @@ stream_blend :: proc(entity: rawptr, desc: ^Entity_Desc, lo, hi: []u8, alpha: f3
 		lerp := f.lerp if .Interp in f.flags else Lerp_Kind.Snap
 		switch lerp {
 		case .Snap:
-			copy(dst[:f.size], lo[off:off + f.size]) // step: hold until the next stamp
+			// Step: hold the older sample until the next stamp — and AT the
+			// stamp (alpha == 1: t landed exactly on it, the common case when
+			// the sample clock ticks in lockstep with the sender's) take the
+			// newer one, or a discrete value lands a whole tick behind the
+			// interpolated fields beside it.
+			src := alpha >= 1 ? hi : lo
+			copy(dst[:f.size], src[off:off + f.size])
 		case .F32:
 			df := ([^]f32)(dst)
 			lf := ([^]f32)(&lo[off])

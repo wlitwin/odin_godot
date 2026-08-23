@@ -288,6 +288,28 @@ The id (`Mob:3`) is explicit and stable: it rides saves, rejoins, and migration
 backups, so entities are never auto-numbered across builds. scriptgen errors on
 duplicates, unknown structs, and mis-shaped hooks at build time.
 
+**The kind's knobs ride the tag too**, as trailing entity tokens (export specs
+may still follow them):
+
+```odin
+mob_scene:    ^gd.Resource `gd:"entity=Mob:3,stream_hz=30"`, // AI the eye reads through interp
+runner_scene: ^gd.Resource `gd:"entity=Runner:2,avatar"`,    // a SEAT'S body, not an NPC
+```
+
+* `stream_hz=N` — the kind's owner-stream rate. It lands on the session as a
+  per-TYPE declaration (`session_set_type_stream_hz`), so every spawn of the
+  kind carries it on every peer — the host's own, a client's wire spawn, and
+  the heir's takeover rebuild. The per-id `session_set_stream_hz` it replaces
+  was a send-side hint each spawn site re-applied by hand and a takeover
+  silently lost (the heir streamed mobs at full rate). The per-id call still
+  exists for a one-off and wins by being later.
+* `avatar` — this kind is a player's BODY. The one place the session reads it
+  is a host takeover's orphan sweep: the dead host's NPCs are adopted by the
+  heir (so they keep living), but its avatar is PARKED with its seat —
+  owner unchanged, reclaimable by the token holder who dials back in — instead
+  of becoming the heir's. (Before the tag every orphan was adopted and each
+  game re-owned avatars back by hand from a spawn-time owner map.)
+
 **Born at the send.** `<game>_entities` hands boot the kind table AND the
 class's generated event dispatcher, and the dispatcher is what makes the
 AUTHORITY's own spawns *born at the send*: `<game>_entity_spawned` runs inside

@@ -430,6 +430,14 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 			sname = strings.trim_space(spec[:eq])
 			value = strings.trim_space(spec[eq + 1:])
 		}
+		// An ENTITY's own trailing token (`stream_hz=`, `avatar` — godot:decl's
+		// ENTITY_SPECS): scriptgen's, consumed onto the kind row at build time;
+		// the synthesized export here just steps over it.
+		if entity_first {
+			if _, is_entity_spec := decl.entity_spec(sname); is_entity_spec {
+				continue
+			}
+		}
 		// PROJECTION — the spec VOCABULARY, and whether a name is Inspector
 		// plumbing or the field's one Property_Hint, come from godot:decl's
 		// EXPORT_SPECS. This dispatch used to be two hand-written switches with no

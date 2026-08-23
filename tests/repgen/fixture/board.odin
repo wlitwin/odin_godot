@@ -14,11 +14,16 @@ import knet "godot:kit/net"
 Board :: struct {
 	owner:       gd.Node2d,
 	boot:        kboot.Boot, // declares the four standard transport forwards
-	pawn_scene:  ^gd.Resource `gd:"entity=Pawn:7"`,
+	// The pawn is a SEAT'S BODY (`avatar`): a host takeover parks it with its
+	// seat instead of adopting it — the knob rides the tag, onto the kinds row.
+	pawn_scene:  ^gd.Resource `gd:"entity=Pawn:7,avatar"`,
 	// A NON-ticking tagged entity beside the ticking pawn: its typed spawn
 	// helper takes the host-asserted coop route (pawn's routes through
-	// boot_fire_spawn — a client's call predicts).
-	chest_scene: ^gd.Resource `gd:"entity=Chest:8"`,
+	// boot_fire_spawn — a client's call predicts). Its owner stream is
+	// DECLARED at 20 Hz (`stream_hz=`), so every spawn of the kind — on every
+	// peer, the heir's rebuild included — carries the rate; an export spec may
+	// still trail behind the entity's own tokens.
+	chest_scene: ^gd.Resource `gd:"entity=Chest:8,stream_hz=20,group=Loot"`,
 }
 
 // Hand-written wins, name by name: this suppresses the generated on_net_down

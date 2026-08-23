@@ -53,6 +53,13 @@ Entity_Kind :: struct {
 	freed:        proc(game: rawptr, entity: rawptr, id: knet.Net_Id), // nil = no hook
 	sim_set:      ^ksim.Sim_Set, // generated from @(gd_tick); with boot_lane the
 	                             // factory tracks/untracks the entity on the lane itself
+	// Declared knobs off the tag's trailing tokens:
+	stream_hz:    int,  // `entity=Mob:3,stream_hz=30` — the kind's owner-stream rate, installed
+	                    // on the session per TYPE (session_set_type_stream_hz) so every spawn
+	                    // on every peer — the heir's resume rebuild included — carries it
+	avatar:       bool, // `entity=Runner:2,avatar` — this kind is a SEAT'S BODY, not an NPC:
+	                    // a host takeover parks it with its seat (reclaimable) instead of
+	                    // adopting it like the dead host's NPCs (session_set_avatar_type)
 }
 
 // The game's session-event dispatcher behind a rawptr — the generated
@@ -85,6 +92,17 @@ boot_entities :: proc(b: ^Boot, game: rawptr, kinds: []Entity_Kind, events: Even
 	b.ent_events = events
 	ksess.session_set_factory(b.ses, b, boot_make_entity, boot_free_entity)
 	ksess.session_set_game(b.ses, game)
+	// The kinds' declared knobs become session wiring (pre-start, survives
+	// re-init like the factory): a per-type stream rate, and which kinds are
+	// seats' bodies.
+	for &k in kinds {
+		if k.stream_hz > 0 {
+			ksess.session_set_type_stream_hz(b.ses, k.type, k.stream_hz)
+		}
+		if k.avatar {
+			ksess.session_set_avatar_type(b.ses, k.type, true)
+		}
+	}
 	// Only with a dispatcher to hand the event to — a nil hook keeps the
 	// session's queue path, so a batch-draining game never silently loses
 	// its own spawns.

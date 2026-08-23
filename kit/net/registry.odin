@@ -580,7 +580,15 @@ registry_set_stream_tier :: proc(reg: ^Registry, id: Net_Id, tier: u8) {
 // per-entity frequency tier: a tiered entity is written only on the ticks its
 // id+tier phase selects, so different entities send on different ticks and the
 // byte rate stays smooth (~1/tier of them per tick) instead of pulsing.
-registry_write_streams :: proc(w: ^Writer, reg: ^Registry, me: Player_Id, sender_now: f64, tick: u64 = 0) -> int {
+// `keep_history`: the AUTHORITY's flag — every snapshot it ships of its OWN
+// streamed entities (the mobs, its own avatar) is also pushed into that
+// entity's ring, stamped with the same sender clock, so registry_rewound can
+// wind host-owned bodies back to what a client's screen was drawing exactly
+// like it winds other clients' bodies (whose rings fill from their inbound
+// streams). Without it the host's own entities had no history and were
+// judged LIVE for a lagged shooter — the one hole coop lag comp left, which
+// every game with host-brained targets re-ledgered by hand.
+registry_write_streams :: proc(w: ^Writer, reg: ^Registry, me: Player_Id, sender_now: f64, tick: u64 = 0, keep_history := false) -> int {
 	write_f64(w, sender_now)
 	count_at := len(w.buf)
 	write_u16(w, 0) // patched below
@@ -601,6 +609,15 @@ registry_write_streams :: proc(w: ^Writer, reg: ^Registry, me: Player_Id, sender
 		write_u8(w, e.warp)
 		write_u16(w, u16(n))
 		stream_write(w, e.entity, e.set.entity_desc)
+		if keep_history {
+			// The ring holds STRUCT-layout snapshots (what the receive side
+			// decodes to — wire encodings like f16 never reach a ring), so the
+			// history is a subset_capture of the entity, not the wire bytes.
+			v := subset_view(e.set.entity_desc, .Owner)
+			hist := make([]u8, v.struct_bytes, context.temp_allocator)
+			subset_capture(v, e.entity, hist)
+			stream_ring_push(&e.stream, sender_now, hist, e.warp)
+		}
 		count += 1
 	}
 	assert(count <= int(max(u16)))
@@ -940,6 +957,10 @@ registry_rewound :: proc(reg: ^Registry, t: f64, shooter: Player_Id, user: rawpt
 	}
 	wounds := make([dynamic]Wound, context.temp_allocator)
 	for id, &e in reg.entries {
+		// Everything with a stream history but the shooter's own body: other
+		// clients' bodies (rings from their inbound streams) AND the authority's
+		// own (rings it keeps of what it shipped — registry_write_streams
+		// keep_history). No history = never streamed = judged live.
 		if e.owner == PLAYER_ID_INVALID || e.owner == shooter || e.stream.count == 0 {
 			continue
 		}

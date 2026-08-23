@@ -27,6 +27,7 @@ Pawn :: struct {
 	chill:  psim.Cool, // IMPORTED-shelf tick block: the hoist crosses packages
 	warm:   psim.Cool `gd:"manual"`, // MANUAL: predict field still flattens, but the tick is NOT hoisted (the wielder drives it)
 	state:  u8 `gd:"replicate"`,
+	lap:    u8 `gd:"owner"`, // a DISCRETE owner field: an owner-local one-shot counter (dash/jump/emote) — it edges (no interp)
 	speed:  f64 `gd:"export,range=0:10"`, // exports and replicates coexist
 	local:  int, // untagged: never replicated
 	// gd:"backup" — host-local migration/save state, all three kinds; the nested
@@ -159,6 +160,15 @@ pawn_loot_then :: proc(self: ^Pawn, by: knet.Player_Id, slot: i32, got: u8) {
 // the net (old, new) — no seen_* mirror, no resync re-seed to forget.
 @(gd_half)
 pawn_hp_edge :: proc(self: ^Pawn, old, new: i32) {
+	_ = old
+	_ = new
+}
+
+// An OWNER-lane edge: `lap` is a discrete counter the owner bumps (the
+// one-shot idiom — dash, jump, emote). It snaps on arrival and edges like any
+// delta field on every screen; only INTERPOLATED owner fields are refused.
+@(gd_half)
+pawn_lap_edge :: proc(self: ^Pawn, old, new: u8) {
 	_ = old
 	_ = new
 }

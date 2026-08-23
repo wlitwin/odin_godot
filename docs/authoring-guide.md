@@ -161,7 +161,11 @@ too, without crossing a wire.) Two consequences:
   the factory table; it is not an Inspector detail of an export. An entity field is
   necessarily an exported `PackedScene`, so both of those are SYNTHESIZED: write
   `` `gd:"entity=Mob:3"` ``, not `` `gd:"export,resource=PackedScene,entity=Mob:3"` ``.
-  Trailing export specs still ride behind (`entity=Mob:3,group=Spawns`).
+  The kind's own knobs trail as entity tokens — `stream_hz=N` (the kind's
+  owner-stream rate, every peer, every spawn) and `avatar` (a seat's body: a host
+  takeover parks it with its seat instead of adopting it) — and export specs may
+  still ride behind them (`entity=Mob:3,stream_hz=30,group=Spawns`); see
+  [kit/boot](kit/boot.md#the-entity-factory).
 
 | Lane | Tag | Its options |
 | --- | --- | --- |

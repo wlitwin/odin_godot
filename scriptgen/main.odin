@@ -500,6 +500,10 @@ Entity_Tag :: struct {
 	target:  string, // the entity struct the scene bodies ("Mob")
 	type_id: int,    // the stable ksess.Entity_Type value
 	line:    int,
+	// The tag's trailing ENTITY tokens (not export specs): the kind's declared
+	// knobs, emitted on its kboot.Entity_Kind row.
+	stream_hz: int,  // `stream_hz=N` — owner-stream rate, per type, every peer
+	avatar:    bool, // `avatar` — this kind is a seat's body (host takeover parks it)
 	// Resolved by resolve_entities (module-wide): the optional name-paired
 	// typed hooks ("" = not declared).
 	spawned: string, // <target_snake>_spawned
@@ -722,6 +726,7 @@ Session_Ev :: struct {
 // the variant says whether a client alone hears it — so a NEW row's role is a
 // judgement, and the test only guarantees somebody had to make it.
 SESSION_EVENTS := [?]Session_Ev {
+	{suffix = "seated", variant = "Ev_Seated", role = .Every, params = {{"me", "knet.Player_Id", "e.me"}}},
 	{suffix = "welcomed", variant = "Ev_Welcomed", role = .Client, params = {{"me", "knet.Player_Id", "e.me"}}},
 	{suffix = "player_joined", variant = "Ev_Player_Joined", role = .Every, params = {{"id", "knet.Player_Id", "e.id"}, {"rejoin", "bool", "e.rejoin"}}},
 	{suffix = "player_left", variant = "Ev_Player_Left", role = .Every, params = {{"id", "knet.Player_Id", "e.id"}}},

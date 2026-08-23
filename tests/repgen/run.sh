@@ -252,6 +252,9 @@ for needle in \
 	'_pawn_edge_hp :: proc(entity: rawptr, game: rawptr, old: rawptr)' \
 	'pawn_hp_edge(self, (cast(^type_of(self.hp))old)^, self.hp)' \
 	'{field = 0, fire = _pawn_edge_hp}' \
+	'_pawn_edge_lap :: proc(entity: rawptr, game: rawptr, old: rawptr)' \
+	'pawn_lap_edge(self, (cast(^type_of(self.lap))old)^, self.lap)' \
+	'fire = _pawn_edge_lap}' \
 	'edges = _pawn_edges[:]' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
@@ -259,7 +262,7 @@ for needle in \
 		exit 1
 	fi
 done
-echo "  ok  edge half generated (thunk, field-indexed Edge_Desc, command-set wiring)"
+echo "  ok  edge half generated (thunk, field-indexed Edge_Desc, command-set wiring; a discrete owner-lane field edges too)"
 
 # gd:"backup" — the host-local migration/save codec. All three kinds (POD scalar,
 # map[POD]POD, [dynamic]POD) plus a NESTED field (pace.beat, proving the walk
@@ -305,6 +308,8 @@ for needle in \
 	'spawned = _board_ent_spawned_pawn' \
 	'freed = _board_ent_freed_pawn' \
 	'sim_set = &pawn_sim_set' \
+	'avatar = true},' \
+	'stream_hz = 20},' \
 	'return rt.script_of(node, Pawn)' \
 	'pawn_of :: proc(b: ^kboot.Boot, id: knet.Net_Id) -> (^Pawn, bool)' \
 	'pawn_owned_by :: proc(b: ^kboot.Boot, owner: knet.Player_Id) -> (^Pawn, bool)' \
@@ -1436,8 +1441,9 @@ echo "  ok  mine-form fx contract violations rejected: non-wire fact, no bool tr
 
 # ---- (4a2c2): `_edge` lane contract — the delta lane only ----
 # An edge on a PREDICTED field would fire on every mispredict scrub; on an
-# OWNER-STREAMED field it would fire every interpolated frame. Both rejected,
-# each pointing at that lane's real presentation tool.
+# INTERPOLATED owner-streamed field it would fire every frame (the render
+# sampler rewrites it). Both rejected, each pointing at that lane's real
+# presentation tool. (A DISCRETE owner field edges fine — pawn.odin's `lap`.)
 EDG="$TMP/edg"
 mkdir -p "$EDG"
 cat > "$EDG/comet.odin" <<'EOF'
@@ -1450,7 +1456,7 @@ import gd "godot:godot"
 Comet :: struct {
 	owner: gd.Node,
 	x:     f32 `gd:"predict"`,
-	tail:  f32 `gd:"owner"`,
+	tail:  f32 `gd:"owner,interp"`,
 }
 
 @(gd_tick)
@@ -1464,7 +1470,7 @@ comet_x_edge :: proc(self: ^Comet, old, new: f32) { // predicted: resims scrub i
 }
 
 @(gd_half)
-comet_tail_edge :: proc(self: ^Comet, old, new: f32) { // owner stream: it interpolates
+comet_tail_edge :: proc(self: ^Comet, old, new: f32) { // owner stream + interp: the sampler rewrites it every frame
 	_ = old; _ = new
 }
 EOF
@@ -1481,12 +1487,12 @@ if ! echo "$EDG_OUT" | grep -q "mine-form"; then
 	echo "$EDG_OUT" | tail -3
 	exit 1
 fi
-if ! echo "$EDG_OUT" | grep -q 'is on the `gd:"owner"` lane'; then
-	echo "REPGEN_FAIL: the owner-field edge error doesn't explain the stream lane:"
+if ! echo "$EDG_OUT" | grep -q 'is an INTERPOLATED `gd:"owner"` field'; then
+	echo "REPGEN_FAIL: the owner-field edge error doesn't explain the interp sampler (and name the discrete form that works):"
 	echo "$EDG_OUT" | tail -3
 	exit 1
 fi
-echo "  ok  edge lane contract: predict and owner fields rejected, each pointing at its lane's tool"
+echo "  ok  edge lane contract: predict and interpolated-owner fields rejected, each pointing at its lane's tool"
 
 # ---- (4a2d): @(gd_half) — a half that pairs with NOTHING is an ERROR ----
 # A typo'd pairing name used to be a proc that silently never fired (_fx and

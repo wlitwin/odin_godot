@@ -118,6 +118,35 @@ effects_refresh_and_expire :: proc(t: ^testing.T) {
 	testing.expect(t, bok && b.left == 15)
 }
 
+// The status EDGE helpers read the (old, new) pair an `<entity>_fx_edge` half
+// receives: landed = the kind appeared, faded = it left, a same-kind refresh is
+// neither — no shadow bool beside the entity, no first-sight/resync rule to
+// re-roll (the edge machinery owns both).
+@(test)
+effects_landed_and_faded_read_the_edge_pair :: proc(t: ^testing.T) {
+	old, new: [2]kcombat.Effect
+	// Empty -> CHILL lands.
+	testing.expect(t, kcombat.effects_add(new[:], CHILL, 30, 10))
+	testing.expect(t, kcombat.effects_landed(old[:], new[:], CHILL))
+	testing.expect(t, !kcombat.effects_faded(old[:], new[:], CHILL))
+	testing.expect(t, !kcombat.effects_landed(old[:], new[:], BURN), "a kind that never appeared did not land")
+	// A REFRESH (present on both sides, power/clock bumped) is neither.
+	old = new
+	testing.expect(t, kcombat.effects_add(new[:], CHILL, 40, 50))
+	testing.expect(t, !kcombat.effects_landed(old[:], new[:], CHILL))
+	testing.expect(t, !kcombat.effects_faded(old[:], new[:], CHILL))
+	// BURN lands beside it; then CHILL fades while BURN stays.
+	old = new
+	testing.expect(t, kcombat.effects_add(new[:], BURN, 5, 40))
+	testing.expect(t, kcombat.effects_landed(old[:], new[:], BURN))
+	testing.expect(t, !kcombat.effects_landed(old[:], new[:], CHILL))
+	old = new
+	for &e in new {if e.kind == CHILL {e = {}}}
+	testing.expect(t, kcombat.effects_faded(old[:], new[:], CHILL))
+	testing.expect(t, !kcombat.effects_faded(old[:], new[:], BURN))
+	testing.expect(t, !kcombat.effects_landed(old[:], new[:], CHILL))
+}
+
 @(test)
 projectiles_fly_and_expire :: proc(t: ^testing.T) {
 	p := kcombat.Projectile{pos = {0, 0, 0}, vel = {10, 0, 0}, left = 3}

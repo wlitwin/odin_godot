@@ -215,6 +215,27 @@ effects_tick :: proc "contextless" (fx: []Effect) {
 	}
 }
 
+// The status EDGE helpers — for the `<entity>_fx_edge(old, new: [N]Effect)`
+// half: a tagged fixed array is ONE diff atom (kit/net/edge.odin), so the
+// generated half hands you the whole old/new array once per net change, and
+// "the slime just LANDED" is a question about the pair — present in `new`,
+// absent in `old` — not a shadow bool kept beside the entity with its own
+// first-sight/resync rules. landed = the kind appeared; faded = it left.
+// (A same-kind REFRESH — power/clock bumped while already present — is
+// neither: the half still fires, both read false; compare the rows yourself
+// for a re-apply cue.)
+effects_landed :: proc "contextless" (old, new: []Effect, kind: u8) -> bool {
+	_, was := effect_of(old, kind)
+	_, is := effect_of(new, kind)
+	return is && !was
+}
+
+effects_faded :: proc "contextless" (old, new: []Effect, kind: u8) -> bool {
+	_, was := effect_of(old, kind)
+	_, is := effect_of(new, kind)
+	return was && !is
+}
+
 effect_of :: proc "contextless" (fx: []Effect, kind: u8) -> (Effect, bool) {
 	for e in fx {
 		if e.kind == kind && e.kind != EFFECT_NONE {

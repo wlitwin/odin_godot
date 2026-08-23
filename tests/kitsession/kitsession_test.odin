@@ -42,12 +42,17 @@ Peer_Box :: struct {
 	sent:  int, // bytes this box handed the transport (the scale test's receipt)
 	out:   [dynamic]Envelope,
 	bots:  map[knet.Net_Id]^Bot, // factory-created entities (clients)
+	laps:  map[knet.Net_Id]^Lapper, // the owner-lane edge probe's bodies
 	freed: int, // factory frees observed
 
 	// the `<field>_edge` probe: what the hp edge half saw on this peer
 	edge_fires: int,
 	edge_old:   i32,
 	edge_new:   i32,
+	// the OWNER-lane edge probe (Lapper.lap, a discrete owner-streamed counter)
+	lap_fires: int,
+	lap_old:   u8,
+	lap_new:   u8,
 }
 
 box_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
@@ -74,6 +79,10 @@ box_destroy :: proc(b: ^Peer_Box) {
 		free(bot)
 	}
 	delete(b.bots)
+	for _, l in b.laps {
+		free(l)
+	}
+	delete(b.laps)
 	ksess.session_destroy(&b.s)
 }
 
@@ -142,15 +151,19 @@ join_builds_the_roster_everywhere :: proc(t: ^testing.T) {
 	testing.expect_value(t, hp.name, "hosty")
 
 	aev := drain(&alice.s)
-	testing.expect_value(t, len(aev), 2) // WELCOME, then the join-time stats snapshot
-	_, welcomed := aev[0].(ksess.Ev_Welcomed)
+	testing.expect_value(t, len(aev), 3) // SEATED, WELCOME, then the join-time stats snapshot
+	se, seated := aev[0].(ksess.Ev_Seated)
+	testing.expect(t, seated && se.me == 2, "the seat comes first, every role's own moment")
+	_, welcomed := aev[1].(ksess.Ev_Welcomed)
 	testing.expect(t, welcomed)
-	_, statsed := aev[1].(ksess.Ev_Stats_Updated)
+	_, statsed := aev[2].(ksess.Ev_Stats_Updated)
 	testing.expect(t, statsed, "the scoreboard rides along with the welcome")
 
 	hev := drain(&host.s)
-	testing.expect_value(t, len(hev), 1)
-	j, joined := hev[0].(ksess.Ev_Player_Joined)
+	testing.expect_value(t, len(hev), 2) // the host's own SEATED (from host_start), then alice's join
+	hse, hseated := hev[0].(ksess.Ev_Seated)
+	testing.expect(t, hseated && hse.me == 1, "the host is seated too — at host_start")
+	j, joined := hev[1].(ksess.Ev_Player_Joined)
 	testing.expect(t, joined && j.id == 2 && !j.rejoin)
 
 	// Bob joins: alice must hear about him WITHOUT rejoining anything.
@@ -394,9 +407,44 @@ bot_command_set := knet.Command_Set{entity_desc = &bot_desc, commands = bot_cmds
 BOT_TYPE :: ksess.Entity_Type(7)
 UNKNOWN_TYPE :: ksess.Entity_Type(99)
 
+// The OWNER-LANE EDGE probe: a body whose `lap` is a DISCRETE owner-streamed
+// counter (no interp — the one-shot idiom: dash, jump, emote; the owner bumps
+// it, every screen edges on it) beside an interpolated owner-streamed `x`.
+// scriptgen refuses an edge only on the INTERPOLATED owner field; this desc is
+// what it generates for the discrete one.
+Lapper :: struct {
+	lap: u8,
+	x:   f32,
+}
+
+lapper_fields := [?]knet.Field_Desc{
+	{offset = offset_of(Lapper, lap), size = size_of(u8), flags = {.Owner_Stream}},
+	// x ships as a HALF FLOAT (scrapyard's runners do): the wire bytes are not the
+	// struct bytes, so any history that stores wire bytes in a struct-layout ring
+	// trips here (the bounds trap the lance act caught).
+	{offset = offset_of(Lapper, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32, wire = .F16},
+}
+lapper_desc := knet.Entity_Desc{fields = lapper_fields[:]}
+
+lapper_lap_edge_thunk :: proc(entity: rawptr, game: rawptr, old: rawptr) {
+	b := cast(^Peer_Box)game
+	b.lap_fires += 1
+	b.lap_old = (cast(^u8)old)^
+	b.lap_new = (cast(^Lapper)entity).lap
+}
+
+lapper_edges := [?]knet.Edge_Desc{{field = 0, fire = lapper_lap_edge_thunk}}
+lapper_command_set := knet.Command_Set{entity_desc = &lapper_desc, edges = lapper_edges[:]}
+LAP_TYPE :: ksess.Entity_Type(11)
+
 // The client-side factory: heap-allocate a Bot for BOT_TYPE, refuse the rest.
 box_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (rawptr, ^knet.Command_Set) {
 	b := cast(^Peer_Box)user
+	if type == LAP_TYPE {
+		l := new(Lapper)
+		b.laps[id] = l
+		return l, &lapper_command_set
+	}
 	if type != BOT_TYPE {
 		return nil, nil
 	}
@@ -417,6 +465,13 @@ box_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, 
 // lookup that tells you the entity is yours is the one that licenses the free.
 box_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	b := cast(^Peer_Box)user
+	if l, is_lap := b.laps[id]; is_lap {
+		assert(rawptr(l) == entity, "the factory's record and the session disagree about this id")
+		delete_key(&b.laps, id)
+		free(entity)
+		b.freed += 1
+		return
+	}
 	mine, ok := b.bots[id]
 	if !ok {
 		return // host-side session_spawn entity — the game owns that memory, not us
@@ -1161,6 +1216,133 @@ resume_reowns_the_dead_hosts_entities :: proc(t: ^testing.T) {
 	testing.expect_value(t, mine_e.owner, old_me)
 }
 
+// THE PARKED AVATAR: the dead host was a PLAYER too, and its body is a seat's
+// body, not an NPC. The re-own sweep adopts the dead host's NPCs (the pet
+// above) but PARKS an entity of a declared avatar KIND — owner left as the
+// departed seat, exactly like a disconnected client's body — so the former
+// host dialing back in under its token reseats and re-embodies it. The kind
+// is declared once (`entity=Runner:2,avatar` → session_set_avatar_type); the
+// sweep needs nothing else. TEETH: without the type check the avatar moves to
+// the heir and the returning host's "my avatar = what I own" finds nothing —
+// the regression scrapyard's succ_fixups re-owned back by hand from a
+// spawn-time owner map.
+@(test)
+resume_parks_avatars_with_their_seat :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+	// The declaration, pre-start on every peer (kboot does it from the kind table).
+	ksess.session_set_avatar_type(&host.s, LAP_TYPE, true)
+	ksess.session_set_avatar_type(&alice.s, LAP_TYPE, true)
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	pet := Bot{hp = 7} // the host's NPC: adopted by the heir
+	pet_id := ksess.session_spawn(&host.s, BOT_TYPE, &pet, &bot_command_set, owner = host.s.me)
+	_, body_id := ksess.session_spawn_make(&host.s, LAP_TYPE, host.s.me) // the host's BODY: parked
+	ksess.session_spawn_send(&host.s, body_id)
+	ksess.session_start_replicating(&host.s)
+
+	old_host_id := host.s.me
+	now := 50.0
+	for _ in 0 ..< 10 {step(boxes, &now)}
+	_, snap, pok := ksess.session_backup_parts(&alice.s)
+	testing.expect(t, pok)
+	old_me := alice.s.me
+
+	host2: Peer_Box
+	box_make(&host2, 1)
+	defer box_destroy(&host2)
+	ksess.session_set_avatar_type(&host2.s, LAP_TYPE, true) // the heir's wiring carries the declaration
+	testing.expect(t, ksess.session_host_resume(&host2.s, old_me, "alice", snap))
+
+	pe, _ := knet.registry_get(&host2.s.reg, pet_id)
+	testing.expect_value(t, pe.owner, old_me) // the NPC is the heir's now
+	be, bok := knet.registry_get(&host2.s.reg, body_id)
+	testing.expect(t, bok, "the dead host's body survived the takeover")
+	testing.expect_value(t, be.owner, old_host_id) // PARKED with its seat — reclaimable
+	adopted_body := false
+	for ev in drain(&host2.s) {
+		if oc, ok := ev.(ksess.Ev_Owner_Changed); ok && oc.id == body_id {
+			adopted_body = true
+		}
+	}
+	testing.expect(t, !adopted_body, "a parked avatar fires no Ev_Owner_Changed — nothing moved")
+}
+
+// The DECLARED stream rate: `session_set_type_stream_hz` is pre-start wiring
+// (kboot installs it from the `entity=Mob:3,stream_hz=30` tag), so EVERY
+// insert of the type carries the tier — the host's own spawn, a client's wire
+// spawn, and the heir's resume rebuild. The per-id hint it replaces was a
+// send-side chore the game re-applied by hand at each spawn site and FORGOT
+// after a takeover (the heir streamed mobs at full rate — scrapyard's latent
+// bug). TEETH: without apply_type_stream_hz at the three insert sites, the
+// tiers below read 0 on one peer or another.
+@(test)
+type_stream_hz_rides_every_insert :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	// Declared BEFORE start on every peer (kboot's boot_entities runs in ready):
+	// 10 Hz at the default 20 Hz tick = every other tick, tier 2.
+	ksess.session_set_type_stream_hz(&host.s, BOT_TYPE, 10)
+	ksess.session_set_type_stream_hz(&alice.s, BOT_TYPE, 10)
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	pet := Bot{hp = 7}
+	pet_id := ksess.session_spawn(&host.s, BOT_TYPE, &pet, &bot_command_set, owner = host.s.me)
+	ksess.session_start_replicating(&host.s)
+	now := 50.0
+	for _ in 0 ..< 10 {step(boxes, &now)}
+
+	// The host's own spawn and alice's wire spawn both carry the tier.
+	he, _ := knet.registry_get(&host.s.reg, pet_id)
+	testing.expect_value(t, he.tier, u8(2))
+	ae, aok := knet.registry_get(&alice.s.reg, pet_id)
+	testing.expect(t, aok, "alice has the pet")
+	testing.expect_value(t, ae.tier, u8(2))
+
+	// A per-id hint still wins by being later (a one-off boss at 5 Hz = tier 4).
+	ksess.session_set_stream_hz(&host.s, pet_id, 5)
+	he2, _ := knet.registry_get(&host.s.reg, pet_id)
+	testing.expect_value(t, he2.tier, u8(4))
+
+	// The heir's resume rebuild re-applies the DECLARATION (its wiring carries
+	// it; the dead host's per-id one-off does not ride the snapshot) — the
+	// case the imperative hint silently lost.
+	_, snap, pok := ksess.session_backup_parts(&alice.s)
+	testing.expect(t, pok)
+	host2: Peer_Box
+	box_make(&host2, 1)
+	defer box_destroy(&host2)
+	ksess.session_set_type_stream_hz(&host2.s, BOT_TYPE, 10)
+	testing.expect(t, ksess.session_host_resume(&host2.s, alice.s.me, "alice", snap))
+	re, rok := knet.registry_get(&host2.s.reg, pet_id)
+	testing.expect(t, rok, "the heir rebuilt the pet")
+	testing.expect_value(t, re.tier, u8(2))
+
+	// Undeclared (0) clears: a fresh spawn streams at full rate again.
+	ksess.session_set_type_stream_hz(&host.s, BOT_TYPE, 0)
+	full := Bot{hp = 1}
+	full_id := ksess.session_spawn(&host.s, BOT_TYPE, &full, &bot_command_set, owner = host.s.me)
+	fe, _ := knet.registry_get(&host.s.reg, full_id)
+	testing.expect(t, fe.tier <= 1, "an undeclared type streams every tick")
+}
+
 // The STATE HASH: two peers agreeing on the replicated world compute the SAME
 // number; a single diverged byte parts them. The cheapest desync forensic, and
 // the seed a replay uses to prove it reproduced a run. Covers the DELTA lane
@@ -1203,9 +1385,10 @@ state_hash_parts_on_a_delta_divergence :: proc(t: ^testing.T) {
 }
 
 // session_rewound — coop lag comp at the session layer. It derives the rewind
-// time from the shooter's latency (rtt/2 + interp_delay) and winds owner-
-// streamed targets there. With an absent shooter's rtt at 0, the time is
-// now - interp_delay, which this test makes land exactly on a known sample.
+// time from the shooter's latency (rtt + interp_delay — the full round trip)
+// and winds owner-streamed targets there. With an absent shooter's rtt at 0,
+// the time is now - interp_delay, which this test makes land exactly on a
+// known sample.
 Rewound_Session_Probe :: struct {
 	target: ^Bot,
 	saw_x:  f32,
@@ -1243,6 +1426,88 @@ session_rewound_judges_at_the_shooter_view :: proc(t: ^testing.T) {
 	testing.expect_value(t, target.x, f32(10)) // the live world returns
 }
 
+
+// The authority's OWN streamed bodies rewind too — and the rewind is the FULL
+// round trip plus interp. A host-brained mob (owner = the host) streams from
+// the host; before, its ring was empty on the host (the author receives no
+// stream of its own) and session_rewound judged it LIVE for a lagged shooter —
+// the hole scrapyard's view_rewind + play.Trail ledger filled by hand. Now
+// registry_write_streams (keep_history, the host's flag) pushes every shipped
+// snapshot into the ring, and session_rewound winds the body back rtt +
+// interp: the stream's trip down to the shooter AND the shot's trip back up.
+// TEETH: without keep_history the probe reads the live x; with the old
+// rtt/2 formula it reads 2 ticks too recent.
+@(test)
+session_rewound_covers_host_owned_streams_at_full_rtt :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	// A host-OWNED streamed body (a mob), marching one unit per tick.
+	mob := Bot{hp = 9, x = 0}
+	mid := ksess.session_spawn(&host.s, BOT_TYPE, &mob, &bot_command_set, owner = host.s.me)
+	ksess.session_start_replicating(&host.s)
+	now := 10.0
+	for i in 1 ..= 12 {
+		mob.x = f32(i)
+		step(boxes, &now) // the host's tick ships x=i stamped now, and keeps it
+	}
+	me_e, _ := knet.registry_get(&host.s.reg, mid)
+	testing.expect(t, me_e.stream.count > 0, "the authority keeps a history of its own stream")
+
+	// Alice's measured round trip: 2 ticks (0.1 s). interp_delay is 3 ticks.
+	ap, _ := ksess.session_player(&host.s, alice.s.me)
+	host.s.clocks[ap.peer] = knet.Clock_Sync{rtt = 0.1, initialized = true}
+	secs := ksess.session_rewind_secs(&host.s, alice.s.me)
+	testing.expect(t, abs(secs - (0.1 + ksess.session_interp_delay(&host.s))) < 1e-9, "rewind = RTT + interp, the full round trip")
+
+	// Judged as alice saw it: 5 ticks ago (2 RTT + 3 interp) → x = 12 - 5 = 7.
+	probe := Rewound_Session_Probe{target = &mob}
+	ksess.session_rewound(&host.s, alice.s.me, &probe, proc(user: rawptr) {
+		p := cast(^Rewound_Session_Probe)user
+		p.saw_x = p.target.x
+	})
+	testing.expect_value(t, probe.saw_x, f32(7))
+	testing.expect_value(t, mob.x, f32(12)) // the live world returns
+
+	// The host's own shot judges live, and the rewind reads 0.
+	testing.expect_value(t, ksess.session_rewind_secs(&host.s, host.s.me), 0)
+	probe.saw_x = -1
+	ksess.session_rewound(&host.s, host.s.me, &probe, proc(user: rawptr) {
+		p := cast(^Rewound_Session_Probe)user
+		p.saw_x = p.target.x
+	})
+	testing.expect_value(t, probe.saw_x, f32(12))
+
+	// A WIRE-ENCODED host-owned body (Lapper.x ships as f16 — scrapyard's
+	// runners do): the history the host keeps must be the STRUCT-layout
+	// snapshot the ring expects, not the wire bytes (a bounds trap otherwise).
+	body, bid := ksess.session_spawn_make(&host.s, LAP_TYPE, host.s.me)
+	ksess.session_spawn_send(&host.s, bid)
+	lp := cast(^Lapper)body
+	for i in 1 ..= 12 {
+		lp.x = f32(100 + i) // exact in f16
+		step(boxes, &now)
+	}
+	Lap_Probe :: struct {
+		target: ^Lapper,
+		saw_x:  f32,
+	}
+	lprobe := Lap_Probe{target = lp}
+	ksess.session_rewound(&host.s, alice.s.me, &lprobe, proc(user: rawptr) {
+		p := cast(^Lap_Probe)user
+		p.saw_x = p.target.x
+	})
+	testing.expect_value(t, lprobe.saw_x, f32(107)) // 5 ticks back, through the f16 history
+	testing.expect_value(t, lp.x, f32(112))
+}
 
 // ---- moderation: kick / ban / the door -----------------------------------------
 
@@ -2335,6 +2600,97 @@ profiles_declare_echo_and_catchup :: proc(t: ^testing.T) {
 	testing.expect(t, cv.ready)
 }
 
+// THE SEATED MOMENT, every role, and the PRE-SEAT row. Ev_Seated fires for
+// the host at host_start and for a client at its welcome (beside the client's
+// Ev_Welcomed) — one role-free half for per-seat declares. And a profile row
+// written BEFORE any seat exists (a lobby pick ahead of hosting/joining) is a
+// PENDING row that lands under the seat the moment it is taken and ships from
+// there: no "am I joined yet" guard, no re-declare on seat. TEETH: without the
+// host's append the host's `_seated` half never runs; without prof_seat a
+// pre-seat write sits under seat 0 forever (prof_tick skips me == 0) and the
+// peers see a zero row.
+@(test)
+seated_fires_every_role_and_preseat_rows_land :: proc(t: ^testing.T) {
+	Pick :: struct {
+		look:  u8,
+		ready: bool,
+	}
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+	ksess.session_profile_install(&host.s, Pick)
+	ksess.session_profile_install(&alice.s, Pick)
+	ksess.session_profile_install(&bob.s, Pick)
+
+	// Pre-seat writes: the host picks before hosting, alice before joining.
+	ksess.session_profile_mine(&host.s, Pick).look = 4
+	ksess.session_profile_mine(&alice.s, Pick).look = 9
+	testing.expect_value(t, ksess.session_profile_mine(&host.s, Pick).look, u8(4)) // the local echo holds pre-seat too
+
+	ksess.session_host_start(&host.s, "hosty")
+	// The HOST is seated: its `_seated` half runs, with its id.
+	host_seated := false
+	for ev in drain(&host.s) {
+		if se, ok := ev.(ksess.Ev_Seated); ok && se.me == host.s.me {host_seated = true}
+	}
+	testing.expect(t, host_seated, "the host hears Ev_Seated at host_start")
+	testing.expect_value(t, ksess.session_profile_mine(&host.s, Pick).look, u8(4)) // the pending row is now MY row
+
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+	// A client hears Ev_Seated BEFORE Ev_Welcomed, with its id.
+	seated_at, welcomed_at := -1, -1
+	for ev, i in drain(&alice.s) {
+		#partial switch e in ev {
+		case ksess.Ev_Seated:
+			if e.me == alice.s.me {seated_at = i}
+		case ksess.Ev_Welcomed:
+			welcomed_at = i
+		}
+	}
+	testing.expect(t, seated_at >= 0, "a client hears Ev_Seated at its welcome")
+	testing.expect(t, welcomed_at > seated_at, "Ev_Seated comes first, Ev_Welcomed right behind it")
+	testing.expect_value(t, ksess.session_profile_mine(&alice.s, Pick).look, u8(9))
+
+	// THE ROW RODE THE HELLO: the host holds alice's word the instant it seated
+	// her — no net tick has run, yet her row is there, filed BEFORE her
+	// Ev_Player_Joined (a host that spawns at the seat reads her loadout, not
+	// a zero row her declare would overwrite a tick later — the spawn/declare
+	// race drop-in lobbies used to gate by hand).
+	ha0, ha0ok := ksess.session_profile_of(&host.s, alice.s.me, Pick)
+	testing.expect(t, ha0ok && ha0.look == 9, "the pre-seat row arrived with the join hello")
+	joined_after_row := false
+	saw_row := false
+	for ev in drain(&host.s) {
+		#partial switch e in ev {
+		case ksess.Ev_Profile_Changed:
+			if e.player == alice.s.me {saw_row = true}
+		case ksess.Ev_Player_Joined:
+			if e.id == alice.s.me && saw_row {joined_after_row = true}
+		}
+	}
+	testing.expect(t, joined_after_row, "the host's profile_changed for the joiner precedes its player_joined")
+
+	// Both pre-seat rows SHIP from under their seats: bob sees them.
+	now := 100.0
+	for _ in 0 ..< 12 {step(boxes, &now)}
+	hv, hok := ksess.session_profile_of(&bob.s, host.s.me, Pick)
+	testing.expect(t, hok && hv.look == 4, "the host's pre-seat pick reached a client")
+	av, aok := ksess.session_profile_of(&bob.s, alice.s.me, Pick)
+	testing.expect(t, aok && av.look == 9, "alice's pre-seat pick reached a client")
+	// And the host holds alice's word (the declare landed, not a zero row).
+	ha, haok := ksess.session_profile_of(&host.s, alice.s.me, Pick)
+	testing.expect(t, haok && ha.look == 9)
+}
+
 @(test)
 profile_table_scopes_to_the_run :: proc(t: ^testing.T) {
 	// The rehost/re-declare hole: profile rows are RUN state. A back-to-lobby
@@ -2519,6 +2875,71 @@ edge_halves_fire_on_net_change :: proc(t: ^testing.T) {
 	testing.expect_value(t, host.edge_fires, 2) // the host's screen flashed
 	testing.expect_value(t, host.edge_new, i32(3))
 	testing.expect_value(t, alice.edge_fires, 1) // the catch-up presented NOTHING
+}
+
+// The OWNER-LANE edge: a DISCRETE owner-streamed field (Lapper.lap — the
+// owner bumps it; dash/jump/emote) edges on every screen exactly like a delta
+// field: first sight seeds silently, the owner's own bump edges on its screen,
+// the host's applied stream edges on the host, the rebroadcast edges on the
+// watcher — (old, new) intact, once per bump, no hand shadow and no hand
+// first-sight seed. (Only an INTERPOLATED owner field is refused, at build
+// time: the render sampler rewrites it every frame.) TEETH: the machinery is
+// the registry's byte diff after stream sampling — if sampling ever moved
+// behind the edge pass, or the edge pass grew a lane filter, this goes dark.
+@(test)
+owner_lane_discrete_field_edges :: proc(t: ^testing.T) {
+	host, alice, bob: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	box_make(&bob, 101)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	defer box_destroy(&bob)
+	boxes := []^Peer_Box{&host, &alice, &bob}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+	ksess.session_client_join(&bob.s)
+	pump(boxes)
+
+	// Alice's body, through the factory on every peer (she owns it — she streams it).
+	_, id := ksess.session_spawn_make(&host.s, LAP_TYPE, alice.s.me)
+	ksess.session_spawn_send(&host.s, id)
+	ksess.session_start_replicating(&host.s)
+	now := 0.0
+	for _ in 0 ..< 4 {step(boxes, &now)}
+
+	mine, has := alice.laps[id]
+	testing.expect(t, has, "alice's factory made her body")
+	testing.expect_value(t, host.lap_fires, 0) // spawn values seed, never edge
+	testing.expect_value(t, alice.lap_fires, 0)
+	testing.expect_value(t, bob.lap_fires, 0)
+
+	// The owner's bump: her screen edges now; the host's applied stream edges
+	// there; the rebroadcast edges on bob — each once, old 0 -> new 1.
+	mine.lap += 1
+	for _ in 0 ..< 4 {step(boxes, &now)}
+	testing.expect_value(t, alice.lap_fires, 1)
+	testing.expect_value(t, alice.lap_old, u8(0))
+	testing.expect_value(t, alice.lap_new, u8(1))
+	testing.expect_value(t, host.lap_fires, 1)
+	testing.expect_value(t, host.lap_old, u8(0))
+	testing.expect_value(t, host.lap_new, u8(1))
+	testing.expect_value(t, bob.lap_fires, 1)
+	testing.expect_value(t, bob.lap_old, u8(0))
+	testing.expect_value(t, bob.lap_new, u8(1))
+
+	// Steady state never re-fires; the next bump fires exactly once more everywhere.
+	for _ in 0 ..< 4 {step(boxes, &now)}
+	testing.expect_value(t, host.lap_fires, 1)
+	mine.lap += 1
+	for _ in 0 ..< 4 {step(boxes, &now)}
+	testing.expect_value(t, alice.lap_fires, 2)
+	testing.expect_value(t, host.lap_fires, 2)
+	testing.expect_value(t, bob.lap_fires, 2)
+	testing.expect_value(t, bob.lap_new, u8(2))
 }
 
 // session_run_edges: the authority's SAME-FRAME pass — a game tick that

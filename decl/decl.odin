@@ -392,6 +392,36 @@ export_spec :: proc(name: string) -> (Export_Spec, bool) {
 	return {}, false
 }
 
+// THE ENTITY'S OWN TRAILING TOKENS — knobs of the KIND `entity=Name:id`
+// declares, riding behind it beside any export specs (`entity=Mob:3,
+// stream_hz=30,group=Spawns`). scriptgen CONSUMES them (onto the generated
+// kboot.Entity_Kind row); the runtime, which synthesizes the export the
+// declaration implies and walks its trailing specs, must SKIP them rather
+// than report an unknown export spec — this table is what both halves read,
+// so a new knob is one row, not a scriptgen string and a runtime string that
+// drift. (The registration error the first draft logged — "unknown export
+// spec `avatar`" — is the failure mode this row prevents.)
+Entity_Spec :: struct {
+	name:  string,
+	bare:  bool, // legal as a bare token
+	value: bool, // legal as `name=VALUE`
+	blurb: string,
+}
+
+ENTITY_SPECS :: []Entity_Spec {
+	{"stream_hz", false, true, "`stream_hz=N` — the kind's owner-stream rate, applied to every spawn of the type on every peer"},
+	{"avatar", true, false, "`avatar` — this kind is a seat's body: a host takeover parks it with its seat instead of adopting it"},
+}
+
+entity_spec :: proc(name: string) -> (Entity_Spec, bool) {
+	for s in ENTITY_SPECS {
+		if s.name == name {
+			return s, true
+		}
+	}
+	return {}, false
+}
+
 // PROJECTION — the whole spec set, comma-joined, for the fallback half of a
 // misspelling error. Declaration order (meta first, then hints) is the order
 // the docs table reads in, so the message and the page agree. The "did you

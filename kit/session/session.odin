@@ -76,6 +76,17 @@ Player :: struct {
 
 // ---- events: everything the game reacts to, drained per frame --------------
 
+// I HOLD A SEAT NOW — every role, once per seat taken: the host at
+// session_host_start, a client at its WELCOME (just before Ev_Welcomed). The
+// role-free "seated" moment: per-seat declares (your profile row, your
+// cosmetics, a greeting) belong in its half and run the same way on either
+// side — the host no longer hand-calls them at its own start because
+// Ev_Welcomed is the client's alone. Not re-fired by a host takeover: the
+// heir's seat is the seat it already held (its profile row rode across).
+Ev_Seated :: struct {
+	me: knet.Player_Id,
+}
+
 Ev_Welcomed :: struct {
 	me: knet.Player_Id, // (client) the host accepted us; the roster is seeded
 }
@@ -189,6 +200,7 @@ Ev_Command_Rejected :: struct {
 }
 
 Event :: union {
+	Ev_Seated,
 	Ev_Welcomed,
 	Ev_Player_Joined,
 	Ev_Player_Left,
@@ -687,6 +699,16 @@ Session_Wiring :: struct {
 	cmd_hook_user: rawptr,
 	cmd_hook:      Command_Hook, // host: the cross-entity half of commands (the catch-all)
 	type_hooks:    map[Entity_Type]Type_Hook_Entry, // host: per-type routing (wins over the catch-all)
+	// Per-TYPE owner-stream rate (session_set_type_stream_hz): applied to
+	// every insert of that type — the host's own spawn, a client's wire spawn,
+	// the heir's resume rebuild — so the hint is a declaration, not a chore
+	// each spawn site (and every takeover) has to remember. 0/absent = full rate.
+	type_stream_hz: map[Entity_Type]int,
+	// Which entity TYPES are seats' bodies (session_set_avatar_type, from the
+	// `entity=Runner:2,avatar` tag via kboot): the one fact a host takeover
+	// needs to tell a PLAYER's parked body from the dead host's NPCs — see the
+	// RE-OWN THE ORPHANS sweep in backup.odin.
+	avatar_types: map[Entity_Type]bool,
 
 	// The write guard's extra exemption (session_set_guard_exempt): "this
 	// entity's delta-lane divergence is legal right now". kboot.boot_lane
@@ -712,6 +734,10 @@ Session_Wiring :: struct {
 	// The rows themselves are run state — session_init re-seeds prof.size
 	// from this after the wipe.
 	prof_size: int,
+	// MY row as written BEFORE I held a seat (session_profile_mine while
+	// unseated — a lobby pick before hosting/joining): parked here, outside
+	// the run, and moved under my seat id at host_start / welcome (prof_seat).
+	prof_pending: []u8,
 
 	// our reconnect secret (the game persists it across runs; every *_start
 	// reassigns it, and a resumed host relies on it surviving the re-init)
@@ -976,6 +1002,9 @@ session_destroy :: proc(s: ^Session) {
 	// The wiring's own two containers (everything else there is procs,
 	// pointers, and plain values):
 	delete(s.type_hooks)
+	delete(s.type_stream_hz)
+	delete(s.avatar_types)
+	delete(s.prof_pending)
 	knet.writer_destroy(&s.app_w)
 	knet.writer_destroy(&s.record) // the replay capture (nil-safe if never recorded)
 	s^ = {}
@@ -1206,6 +1235,7 @@ session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet
 	context.allocator = ses_allocator(s) // the registry's per-entity shadows free in run_destroy — allocate them there too (a spawn from a lane tick runs under l.allocator otherwise)
 	id := knet.registry_spawn(&s.reg, entity, set, owner)
 	s.types[id] = type
+	apply_type_stream_hz(s, id, type)
 	if s.replicating {
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
@@ -1234,6 +1264,7 @@ session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_
 	assert(entity != nil, "the factory returned nil for a host-side spawn")
 	knet.registry_insert(&s.reg, id, entity, set, owner)
 	s.types[id] = type
+	apply_type_stream_hz(s, id, type)
 	// The send is OWED: a make whose send never comes is a half-spawn that
 	// exists on the host and on late joiners (SES_WORLD walks the registry)
 	// but never on already-seated peers — per-join-order worlds. net_tick
@@ -1290,7 +1321,10 @@ session_teleport :: proc(s: ^Session, id: knet.Net_Id) {
 // wrong for a runner sliding across the floor. Only the sender's batch changes;
 // hp/other host DELTAS are untouched (event-driven already) and authoritative
 // hit tests read full-precision struct state at full rate. Send-side local hint,
-// not replicated — re-apply after a host migration, like interest.
+// not replicated — a per-id ONE-OFF: it must be re-applied after a host
+// migration, like interest. A kind's standing rate is DECLARED instead
+// (session_set_type_stream_hz below / the `entity=Mob:3,stream_hz=30` tag),
+// which every insert on every peer honors, takeovers included.
 session_set_stream_hz :: proc(s: ^Session, id: knet.Net_Id, hz: int) -> (actual_hz: int) {
 	rate := session_tick_hz(s)
 	if hz <= 0 || hz >= rate {
@@ -1310,6 +1344,54 @@ session_set_stream_hz :: proc(s: ^Session, id: knet.Net_Id, hz: int) -> (actual_
 // the Hz form above.
 session_set_stream_tier :: proc(s: ^Session, id: knet.Net_Id, tier: u8) {
 	knet.registry_set_stream_tier(&s.reg, id, tier)
+}
+
+// The DECLARED form of session_set_stream_hz: every entity of `type` streams
+// at `hz` from the moment it is inserted — the host's own spawn, a client's
+// wire spawn, the heir's resume rebuild. Pre-start wiring (survives re-init
+// like the factory); kboot.boot_entities installs it from the generated kind
+// table (`gd:"entity=Mob:3,stream_hz=30"`), so a game never re-applies the
+// hint by hand and a takeover can't silently drop it. The per-id call above
+// still works for a one-off (a boss, a carried object) and wins by being
+// later. 0 = full rate (clears a previous declaration).
+session_set_type_stream_hz :: proc(s: ^Session, type: Entity_Type, hz: int) {
+	context.allocator = ses_allocator(s) // wiring map: created and freed under the session's own (the zero-map rule, session_set_type_hook)
+	if hz <= 0 {
+		delete_key(&s.type_stream_hz, type)
+		return
+	}
+	s.type_stream_hz[type] = hz
+}
+
+// Declare `type` a SEAT'S BODY (an avatar) — or not. Pre-start wiring, from
+// the `entity=Runner:2,avatar` tag through kboot.boot_entities. The session
+// reads it in exactly one place: a host takeover's orphan sweep (backup.odin)
+// PARKS avatar entities with their departed seat — owner unchanged, so the
+// token holder who dials back in reseats AND re-embodies the body it left
+// standing — and adopts everything else the dead host owned (its NPCs, its
+// world) to the heir so they keep living. Without the declaration every
+// orphan is adopted, avatars included, and a returning former host finds its
+// body owned by the heir (the regression scrapyard's succ_fixups used to
+// patch game-side, keyed on a spawn-time owner map the census no longer keeps).
+session_set_avatar_type :: proc(s: ^Session, type: Entity_Type, avatar: bool) {
+	context.allocator = ses_allocator(s) // wiring map (the zero-map rule, session_set_type_hook)
+	if avatar {
+		s.avatar_types[type] = true
+	} else {
+		delete_key(&s.avatar_types, type)
+	}
+}
+
+// Is `type` a declared avatar kind?
+session_is_avatar_type :: proc(s: ^Session, type: Entity_Type) -> bool {
+	return s.avatar_types[type]
+}
+
+@(private = "file")
+apply_type_stream_hz :: proc(s: ^Session, id: knet.Net_Id, type: Entity_Type) {
+	if hz, declared := s.type_stream_hz[type]; declared {
+		session_set_stream_hz(s, id, hz)
+	}
 }
 
 // Host: OWNERSHIP TRANSFER — hand an entity's owner-stream authority to a
@@ -1532,6 +1614,7 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 	}
 	knet.registry_insert(&s.reg, id, entity, set, owner)
 	s.types[id] = type
+	apply_type_stream_hz(s, id, type)
 	knet.apply_full(&body, entity, set.entity_desc)
 	knet.registry_bless(&s.reg, id) // spawn dress baseline (write guard)
 	append(&s.events, Ev_Spawned{id = id, type = type, owner = owner})
@@ -1709,7 +1792,10 @@ net_tick :: proc(s: ^Session) {
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
 		knet.write_u8(&w, SES_STREAM)
-		if knet.registry_write_streams(&w, &s.reg, s.me, s.now, t) > 0 {
+		// The authority keeps its OWN streams' history too (keep_history): that
+		// is what lets session_rewound wind a host-owned body back to what a
+		// client's screen was drawing — the hole coop lag comp used to leave.
+		if knet.registry_write_streams(&w, &s.reg, s.me, s.now, t, keep_history = s.is_host) > 0 {
 			if interest_on(s) {
 				interest_route_streams(s, knet.writer_bytes(&w)[1:], 0, t)
 			} else if !s.is_host && s.aoi_client {
@@ -1980,31 +2066,51 @@ session_replay :: proc(s: ^Session, recording: []u8) -> int {
 }
 
 // Host-side lag compensation for the COOP lane — judge `query` against the world
-// as `shooter` saw it when they fired. Every owner-streamed entity except the
-// shooter's own winds back to now − (their one-way transit + the interpolation
-// delay), the pose their screen was drawing; the live world returns after the
-// query. This is ksim.lane_rewound for games that never promoted to the sim
-// lane: a coop shooter's hitscan lands on the target where the SHOOTER aimed,
-// not where the host's stream-lagged copy has since moved it. cavecrawl leashed
-// its cast origins to dodge the lack of this.
+// as `shooter` saw it when they fired. Every streamed body except the shooter's
+// own winds back to the pose their screen was drawing; the live world returns
+// after the query. Covers BOTH timelines a coop host judges: other clients'
+// bodies (their inbound streams are the history) and the authority's OWN
+// streamed bodies — its mobs, its avatar — whose history the host keeps of
+// what it shipped (registry_write_streams keep_history). Host-authoritative
+// deltas (owner = nobody) have no stream history and are judged live; the
+// host judges its own shots live. This is ksim.lane_rewound for games that
+// never promoted to the sim lane: a coop shooter's hitscan lands on the
+// target where the SHOOTER aimed, not where the host's copy has since moved it.
 //
-// The rewind time is the standard coop approximation — there is no per-tick ack
-// to derive it from the way the sim lane does, so it trusts the shooter's
-// smoothed RTT and the known interp delay. Host-owned (delta) state has no
-// stream history and is judged live. The host judges its own shots live.
+// THE REWIND TIME, derived once so nobody ships it half-off again: a sample the
+// host held at T (received from its owner, or authored and sent) reaches the
+// shooter one transit later and is drawn interp_delay after that; the shot the
+// shooter fires at that sight takes one more transit back up. So the sight the
+// shot was aimed at is the host's sample from now − (RTT + interp_delay) — the
+// FULL round trip, not half of it: the stream's trip down and the shot's trip
+// up both count. There is no per-tick ack to derive it from the way the sim
+// lane does, so it trusts the shooter's smoothed RTT (the session's own ping
+// clock; until its first pong lands the rewind is interp only — conservative,
+// behind the truth, never ahead) and the known interp delay. Games that judge
+// by hand read the same number from session_rewind_secs.
 session_rewound :: proc(s: ^Session, shooter: knet.Player_Id, user: rawptr, query: knet.Rewound_Query) {
 	assert(s.is_host, "lag compensation is the authority's job")
 	if shooter == s.me {
 		query(user) // the host's own screen IS the live world
 		return
 	}
+	knet.registry_rewound(&s.reg, s.now - session_rewind_secs(s, shooter), shooter, user, query)
+}
+
+// How far in the past `shooter`'s screen was, in seconds, by the rule above
+// (RTT + interp_delay; 0 for the host's own shots): the rewind session_rewound
+// applies, exposed for a game that sweeps its own ledger or prints a receipt.
+session_rewind_secs :: proc(s: ^Session, shooter: knet.Player_Id) -> f64 {
+	if shooter == s.me {
+		return 0
+	}
 	lag := s.interp_delay
 	if p, ok := s.players[shooter]; ok {
 		if c := s.clocks[p.peer]; c.initialized {
-			lag += c.rtt * 0.5 // the shot's one-way transit up to us
+			lag += c.rtt // the stream's trip down to them AND the shot's trip back up
 		}
 	}
-	knet.registry_rewound(&s.reg, s.now - lag, shooter, user, query)
+	return lag
 }
 
 // The bare call counts PRESENT PEOPLE — connected, non-dedicated — because
@@ -2065,6 +2171,8 @@ session_host_start :: proc(s: ^Session, name: string, token: u64 = 0, dedicated 
 		s.tokens[token_hash(token)] = s.me
 	}
 	s.joined = true
+	prof_seat(s) // a row written before the seat existed lands under it now
+	append(&s.events, Ev_Seated{me = s.me}) // the host is seated too — the same half a client gets
 }
 
 // Host: close (or reopen) the door. Locked = NEW joins are refused with
@@ -2201,6 +2309,15 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 		spectate = false // a pre-spectator build's JOIN ends at the fingerprint
 		r.err = false
 	}
+	// The joiner's pre-seat profile row (trailing; a pre-row build's JOIN ends
+	// at the spectate flag): kept only if it is exactly one row of the
+	// installed type — the fingerprint below already refuses a foreign shape.
+	hello_row: []u8
+	if n := int(knet.read_u16(r)); !r.err && n > 0 && n == s.prof.size && r.off + n <= len(r.data) {
+		hello_row = r.data[r.off:r.off + n]
+		r.off += n
+	}
+	r.err = false
 
 	// The FIRST gate: the builds must speak the same wire. A version-skewed
 	// peer's descriptors would misparse every delta into garbage fields — no
@@ -2280,6 +2397,13 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 		}
 	}
 	s.by_peer[peer] = id
+	// The row that rode the hello is the seat's word from this instant: file it
+	// before the welcome's table ships and before Ev_Player_Joined fires, so
+	// the joiner's first sight of itself and the host's join half both read
+	// it. (It is the joiner's LATEST word — it replaces a rejoiner's old row.)
+	if hello_row != nil {
+		prof_adopt(s, id, hello_row)
+	}
 
 	// WELCOME the joiner with the full roster (their own entry included —
 	// clients learn `me` from your_id).
@@ -2359,6 +2483,18 @@ session_client_join :: proc(s: ^Session) {
 	knet.write_string(&w, s.name)
 	knet.write_u64(&w, wire_fingerprint(s.cfg.fingerprint))
 	knet.write_bool(&w, s.spectate) // trailing like the fingerprint: older joins just end sooner
+	// MY PROFILE ROW RIDES THE HELLO (trailing too): the row I wrote before I
+	// had a seat (a lobby pick — prof_pending) reaches the host WITH the join,
+	// so the host holds my word the instant it seats me — a game that spawns
+	// at the seat reads my loadout, not a zero row that my declare overwrites
+	// a tick later (the spawn/declare race every drop-in lobby had to gate by
+	// hand). [size u16][row bytes]; size 0 = nothing to say yet.
+	if s.prof_pending != nil && s.prof.size == len(s.prof_pending) {
+		knet.write_u16(&w, u16(s.prof.size))
+		append(&w.buf, ..s.prof_pending)
+	} else {
+		knet.write_u16(&w, 0)
+	}
 	s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
 }
 
@@ -2369,7 +2505,7 @@ session_client_join :: proc(s: ^Session) {
 // same commit. (This log used to register the whole kit's changes: its rev 3
 // and 8 were netgd's, rev 4 was kit/sim's — a convention that held only by
 // engineers remembering a constant in a package they weren't editing.)
-PROTOCOL_REV :: u64(9) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: (moved: netgd rev 2) · 4: (moved: kit/sim rev 2) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream routing mid-run · 7: spectator seats (SES_JOIN intent + roster rows carry the flag) · 8: (moved: netgd rev 3) · 9: SES_APP riders carry the host-relay envelope ([RELAY_UP|RELAY_CAST][author]) — relay.odin
+PROTOCOL_REV :: u64(10) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: (moved: netgd rev 2) · 4: (moved: kit/sim rev 2) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream routing mid-run · 7: spectator seats (SES_JOIN intent + roster rows carry the flag) · 8: (moved: netgd rev 3) · 9: SES_APP riders carry the host-relay envelope ([RELAY_UP|RELAY_CAST][author]) — relay.odin · 10: SES_JOIN carries the joiner's pre-seat profile row ([size u16][row]; 0 = none)
 
 // Wire revisions of the packages ABOVE the session (kit/sim's lane wire,
 // netgd's frame) — the session cannot import upward, so they register at
@@ -2454,6 +2590,8 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 	s.aoi_client = knet.read_bool(r)
 	s.joined = true
 	s.join_waited = -1 // the join-timeout clock disarms
+	prof_seat(s) // a row written before the seat existed lands under it now (and wins over the table's old copy of me)
+	append(&s.events, Ev_Seated{me = me})
 	append(&s.events, Ev_Welcomed{me = me})
 }
 

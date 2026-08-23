@@ -202,6 +202,8 @@ for {
 	ev, ok := ksess.session_poll(&self.ses)
 	if !ok {break}
 	#partial switch e in ev {
+	case ksess.Ev_Seated:    // I HOLD A SEAT — every role (host at host_start, client at its welcome):
+	                         // per-seat declares go here, role-free
 	case ksess.Ev_Welcomed:  // (client) the host accepted us; the roster is seeded
 	case ksess.Ev_Spawned:   // BORN, on every peer: entity exists AND its spawn-time fields are set
 	                         // (host hears its own at spawn_send/session_spawn — dress/reveal here)
@@ -278,7 +280,9 @@ gate is why the succession half needs no `is_host`). A `_then` on a
 client-only event (the authority never hears `Ev_Kicked`) or a host-only one
 (`Ev_Backup_Target` is already authority-only) is a build error.
 
-The event union: `Ev_Welcomed`, `Ev_Player_Joined` (with `rejoin`), `Ev_Player_Left`,
+The event union: `Ev_Seated` (every role's "I hold a seat now" — the host's at
+`session_host_start`, a client's right before its `Ev_Welcomed`; not re-fired by a
+takeover, the heir's seat is the one it held), `Ev_Welcomed`, `Ev_Player_Joined` (with `rejoin`), `Ev_Player_Left`,
 `Ev_Host_Left` (alone it ends the run; with [succession](#backup-hosting-and-resume)
 armed, `Ev_Succession` fires beside it and the run survives), `Ev_Join_Failed`,
 `Ev_Join_Denied` (`.Full` / `.Locked` / `.Banned` / `.Version`, each a different
@@ -441,7 +445,10 @@ Pick :: struct { look, iron: u8, ready: bool }
 ses: ksess.Session `gd:"profile=Pick"`
 
 // MY row: write freely, read instantly — the local echo IS the row
-// (a click that lagged its own screen by the relay cadence read as broken):
+// (a click that lagged its own screen by the relay cadence read as broken).
+// BEFORE a seat exists it is a PENDING row that lands under your seat the
+// moment you take one and ships from there — a lobby pick ahead of hosting
+// or joining needs no "am I joined yet" guard and no re-declare on seat:
 ksess.session_profile_mine(&self.ses, Pick).look += 1
 
 // anyone's row, in session_roster order (stable slots on every screen):
@@ -461,8 +468,11 @@ Doing so forfeits the fingerprint gate on the row's shape.)
 `Ev_Profile_Changed{player}` fires wherever a *view* of a row changed (never
 for your own local writes), and it pairs like every session event: a
 `<game>_profile_changed(self, player)` half fires where views change, and
-`<game>_profile_changed_then` is the authority's consequence slot. **The
-muster recipe**: draw rows from `session_roster` + `session_profile_of`;
+`<game>_profile_changed_then` is the authority's consequence slot. Meta you
+keep in your own record (a saved loadout, a persistent vault) is declared
+from the `<game>_seated(self, me)` half — every role, once per seat taken —
+not from `_welcomed` (the client's alone) plus a hand call at the host's
+start. **The muster recipe**: draw rows from `session_roster` + `session_profile_of`;
 gate the host's START on every row's `ready`; in `_profile_changed_then`
 against a live run, a newly-ready row IS the drop-in trigger: spawn them
 (the spawn waits for the pick, so there is no spawn/declare race to lose). Rows are the declarer's word (the
@@ -757,6 +767,32 @@ walks entities owned by me. In-flight packets from the old owner may land for ~a
 trip; they carry the pre-bump warp, so the first new-warp sample supersedes them with a
 snap, never a blend.
 
+## Coop lag compensation (session_rewound)
+
+A coop shooter aims at what its screen shows — the host's truth as of a round trip
+plus the interp delay AGO — so a hitscan judged against the host's live world lands
+behind a moving target. `session_rewound` judges where the **shooter** saw it:
+
+```odin
+// host, in the fire verb's `_then`: sweep the beam against the world AS THE SHOOTER SAW IT
+ksess.session_rewound(&self.ses, by, &sweep, proc(user: rawptr) {
+    sw := cast(^Sweep)user
+    for id, m in sw.game.mobs { /* m.x, m.y READ where the shooter saw them */ }
+})
+// the live world is back here: wound the live bodies you collected
+```
+
+For the span of the query every streamed body but the shooter's own is wound back —
+**both timelines**: other clients' bodies (their inbound streams are the history) and
+the authority's own streamed bodies (its mobs, its avatar — the host keeps the history
+of what it shipped, `registry_write_streams` `keep_history`). Host-authoritative deltas
+(owner = nobody) have no stream history and judge live; the host's own shots judge
+live. The rewind is **RTT + interp_delay** — the stream's trip down to the shooter and
+the shot's trip back up both count (the half-RTT form is the classic off-by-one-transit;
+it's derived once in `session_rewound`'s comment). `session_rewind_secs(s, shooter)`
+returns the same number for a receipt or a hand-swept ledger. Until the shooter's first
+pong lands the rewind is interp only — conservative, never ahead of the truth.
+
 ## Three tiers of entry into your code
 
 [index.md's house grammar](conventions.md#the-house-grammar) states the delivery rule for the
@@ -863,7 +899,10 @@ entry, and a feature that reaches for one should be able to name its row in a ta
 - **Hosts don't get client events.** There is no `Ev_Welcomed`/`Ev_Command_Confirmed` on
   the authority (its commands run directly), but it *does* get `Ev_State_Applied`,
   `Ev_Spawned`/`Ev_Despawned`, and `Ev_Command_Executed`, which is what repaint code
-  should key on.
+  should key on. The one seat-time thing both roles share — "I hold a seat now, declare
+  my per-seat meta" — is `Ev_Seated` (every role), so a `_seated` half replaces the
+  client-only `_welcomed` half plus the hand call at the host's own start that games
+  used to pair with it.
 
 ## Internals and design notes
 

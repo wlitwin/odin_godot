@@ -32,9 +32,10 @@ once on a change of DERIVED or local state, such as a boolean computed from
 a replicated array or a persistence profile; a replicated field itself
 takes the generated half above), `play.Anim` clocks (tiny float eases),
 `play.Marker` (lazy world markers: rings, bars, beacons), `play.Pace` (the
-re-armed deadline every host tick loop re-spells), and `play.Trail` (the
-authority's where-was-it-a-moment-ago ledger, which lag-compensated hitscan
-reads).
+re-armed deadline every host tick loop re-spells), and `play.Trail` (an
+authority-side where-was-it-a-moment-ago ledger for host-only state —
+lag-compensated hitscan against streamed bodies reads the session's own
+history through `ksess.session_rewound` instead).
 
 PREDICTED blocks live on the sibling shelf, `godot:play/sim` (alias
 `psim`): `psim.Cool` (Pace's twin, with the same due/arm/ready verbs,

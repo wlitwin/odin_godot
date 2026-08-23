@@ -37,6 +37,11 @@ boot_forward :: proc(b: ^Boot, ev: ksess.Event) {
 
 	// ---- seats -------------------------------------------------------------
 
+	case ksess.Ev_Seated:
+		// Every role's "I hold a seat now" — the game's `_seated` half is the
+		// place for per-seat declares; boot's own seat-time work rides the
+		// client's Ev_Welcomed below (the host never had a welcome to wait for).
+
 	case ksess.Ev_Welcomed:
 		boot_succ_seated(b) // seated means a host EXISTS: any chase window shuts
 		// The roster RODE the welcome — paint it now, not at the next change.

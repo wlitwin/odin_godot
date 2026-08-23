@@ -856,6 +856,8 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
 	// two features were built, which left `profile=T` leading and this not.
 	entity_first := strings.has_prefix(tok0, "entity=")
 	entity_val := ""
+	entity_stream_hz := 0
+	entity_avatar := false
 	if entity_first {
 		// Nested leading `entity=` is refused by the context gate above (the export
 		// would register but the factory/type row silently never exists), so only
@@ -870,7 +872,39 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
 		// would be overriding a hint the declaration already fixed.
 		syn := make([dynamic]string, 0, len(specs) + 1, context.temp_allocator)
 		append(&syn, "export", "resource=PackedScene")
-		append(&syn, ..specs[1:])
+		// The ENTITY's own trailing tokens ride here too — knobs of the KIND, not
+		// of the export — and are consumed now so the export-spec walk below never
+		// sees them: `stream_hz=N` (the owner-stream rate every spawn of this type
+		// carries, on every peer) and `avatar` (this kind is a seat's body — a host
+		// takeover parks it with its seat instead of adopting it). Anything else
+		// trailing is still an export spec (`group=`, …).
+		for sp in specs[1:] {
+			t := strings.trim_space(sp)
+			sname, _, sval := strings.partition(t, "=")
+			sname = strings.trim_space(sname)
+			// The vocabulary is godot:decl's ENTITY_SPECS (the runtime skips the
+			// same rows); the MEANING of each row is decided here.
+			if es, is_entity := decl.entity_spec(sname); is_entity {
+				has_val := strings.contains(t, "=")
+				if (has_val && !es.value) || (!has_val && !es.bare) {
+					error_at(tf.loc, "%s.%s: entity token `%s` is spelled %s", s.struct_name, label, sname, es.blurb)
+					continue
+				}
+				switch sname {
+				case "stream_hz":
+					v, ok := strconv.parse_int(strings.trim_space(sval))
+					if !ok || v <= 0 || v > 1000 {
+						error_at(tf.loc, "%s.%s: `stream_hz=` wants a positive rate in Hz (e.g. entity=Mob:3,stream_hz=30) — it is the kind's owner-stream rate, applied by the session to every spawn of the type", s.struct_name, label)
+					} else {
+						entity_stream_hz = v
+					}
+				case "avatar":
+					entity_avatar = true
+				}
+				continue
+			}
+			append(&syn, sp)
+		}
 		specs = syn[:]
 		tok0 = "export"
 	}
@@ -986,10 +1020,12 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
 			error_at(tf.loc, "%s.%s: one scene field per entity — split the multi-name declaration", s.struct_name, label)
 		case:
 			append(&s.entities, Entity_Tag{
-				field   = label,
-				target  = strings.trim_space(target),
-				type_id = id,
-				line    = tf.loc.line,
+				field     = label,
+				target    = strings.trim_space(target),
+				type_id   = id,
+				line      = tf.loc.line,
+				stream_hz = entity_stream_hz,
+				avatar    = entity_avatar,
 			})
 		}
 	}
@@ -3623,8 +3659,16 @@ resolve_edges :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[st
 			error_at(loc, "%s: %s is on the `gd:\"predict\"` lane — the sim rewrites it on every reconcile, so a delta edge would fire on mispredict scrubs; predicted facts ride the mine-form `_fx` (sim.md)", name, field)
 			continue
 		}
-		if r.owner {
-			error_at(loc, "%s: %s is on the `gd:\"owner\"` lane — it interpolates every frame; dress continuous state from the fields. `_edge` is `gd:\"replicate\"`'s", name, field)
+		if r.owner && r.interp {
+			// The owner lane's CONTINUOUS fields (`interp`) are rewritten by the
+			// render-time sampler every frame — an edge on them would fire
+			// forever; dress from the fields. A DISCRETE owner field (a u8 lap
+			// counter, a bool, an enum — the owner-local one-shot idiom: dash,
+			// jump, emote) snaps on arrival and edges exactly like a delta
+			// field: the registry diffs every entity after stream sampling,
+			// seeds on first sight, re-seeds on resync — the hand shadow +
+			// seed games wrote for it is the same machinery, minus the resync.
+			error_at(loc, "%s: %s is an INTERPOLATED `gd:\"owner\"` field — the render sampler rewrites it every frame, so it can't edge; dress continuous state from the fields. A discrete owner field (a counter, a bool, an enum; no `interp`) edges fine", name, field)
 			continue
 		}
 		if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") || has_attr(cand.vd, "gd_tick") {

@@ -1,10 +1,14 @@
 package kit_combat
 
-// trail — THE AUTHORITY'S LEDGER: where something was, a moment ago. The
-// receive side of the kit already keeps this ring (the stream ring: where
-// things were, AS SEEN); Trail is the authority-side twin (AS TRUE), indexed
-// by tick. Lag-compensated hitscan judges a shot where the SHOOTER saw the
-// target; a recall ability rewinds its owner; a death recap points backward.
+// trail — AN AUTHORITY-SIDE LEDGER: where something was, a moment ago,
+// indexed by tick, for state the session does NOT stream — a recall ability
+// rewinding its owner, a death recap pointing backward, a host-only value
+// with no wire presence. For lag-compensated hitscan against STREAMED bodies
+// reach for ksess.session_rewound instead: the session keeps every streamed
+// body's history itself (other clients' inbound streams, and the host's own
+// shipped ones) and winds them back rtt + interp for the span of the judge —
+// the per-tick trail_note ledger scrapyard's lance/mender once kept is that
+// machinery, written by the game.
 //
 //   Mob_Brain :: struct { hist: kcombat.Trail(30), ... }  // 30 ticks of truth
 //   kcombat.trail_note(&m.brain.hist, tick, m.x, m.y)     // top of the host tick

@@ -103,10 +103,63 @@ prof_row :: proc(s: ^Session, pid: knet.Player_Id, make_missing: bool) -> []u8 {
 
 // MY row, writable — the local echo IS this memory. The session diffs it
 // against the last declare once per net tick and ships the change itself.
+// Write it whenever you like: BEFORE a seat exists (a lobby pick ahead of
+// hosting/joining) it is a PENDING row parked outside the run, and it lands
+// under your seat id the moment you take one (host_start / welcome), where the
+// auto-declare ships it — no "am I joined yet" guard, no re-declare on seat.
+// (A pending row is your latest word: it wins over the welcome table's old
+// copy of you on a rejoin.) Unseated = no seat id yet, or the seat gone
+// (kicked); a row written between two runs under a stale seat id is wiped
+// with that run like every other row — keep persistent meta in your own
+// record and declare it from the `_seated` half.
 session_profile_mine :: proc(s: ^Session, $T: typeid) -> ^T {
 	assert(s.prof.size == size_of(T), "session_profile_mine before session_profile_install (or with a different T)")
 	context.allocator = ses_allocator(s) // a first read MAKES my row (prof_row) — owned run state, freed in prof_destroy
+	if s.me == knet.PLAYER_ID_INVALID || !s.joined {
+		if s.prof_pending == nil {
+			s.prof_pending = make([]u8, s.prof.size)
+		}
+		return cast(^T)raw_data(s.prof_pending)
+	}
 	return cast(^T)raw_data(prof_row(s, s.me, true))
+}
+
+// Host: a joiner's row that rode its JOIN hello — file it under the seat
+// exactly as a landed declare would be (the relay goes out at the next stats
+// cadence; the host's own view changed, so its Ev_Profile_Changed fires). The
+// one difference from a declare: it is filed BEFORE Ev_Player_Joined, so the
+// seat never exists without its word.
+@(private)
+prof_adopt :: proc(s: ^Session, pid: knet.Player_Id, bytes: []u8) {
+	if s.prof.size == 0 || len(bytes) != s.prof.size {
+		return
+	}
+	context.allocator = ses_allocator(s)
+	row := prof_row(s, pid, true)
+	if mem.compare(row, bytes) == 0 {
+		return
+	}
+	copy(row, bytes)
+	s.prof.dirty = true
+	append(&s.events, Ev_Profile_Changed{player = pid})
+}
+
+// Seat taken (host_start / client welcome): the pending pre-seat row, if any,
+// becomes my row — replacing whatever the run held under my id (a welcome
+// table's stale copy of me: my latest word wins). The auto-declare ships it
+// from here like any row.
+@(private)
+prof_seat :: proc(s: ^Session) {
+	if s.prof_pending == nil {
+		return
+	}
+	context.allocator = ses_allocator(s)
+	if s.prof.size == len(s.prof_pending) {
+		row := prof_row(s, s.me, true)
+		copy(row, s.prof_pending)
+	}
+	delete(s.prof_pending)
+	s.prof_pending = nil
 }
 
 // Anyone's row, as THIS peer currently sees it (value copy; zero row until
