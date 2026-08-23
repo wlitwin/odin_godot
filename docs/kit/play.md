@@ -72,9 +72,17 @@ Ball :: struct {
 }
 
 // spawn (every peer):    play.puppet_attach(&self.puppet, self.owner, x, y)
+// Ev_Spawned (born):     play.puppet_born(&b.puppet)   // the BODY onto the spawned fields, then the seat below
 // every frame:           play.puppet_frame(&self.puppet)
 // Ev_Owner_Changed:      play.puppet_seat(&b.puppet, e.owner == ses.me)
 ```
+
+`puppet_born` is the body's FIRST placement (the node's, for a puppet): call it
+from `<game>_entity_spawned`, before the seat. The scene instanced the body at
+its default pose, and a body born mid-frame (a host-step spawn, an arrival under
+an injected delay) gets no `puppet_frame` until the NEXT frame — one rendered
+frame in the corner, then a cut. See [boot.md](boot.md#the-entity-factory),
+"Where the first placement goes".
 
 WHO owns it is the game's call, made with `ksess.session_set_owner` from
 host code or a `_then`: last-toucher-owns (a ball), the carrier (a crate),

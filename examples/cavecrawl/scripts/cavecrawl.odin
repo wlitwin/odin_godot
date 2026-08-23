@@ -517,6 +517,7 @@ cave_lobby_join_failed :: proc(self: ^CaveLobby) {
 // an edge).
 @(gd_half)
 cave_lobby_entity_spawned :: proc(self: ^CaveLobby, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
+	cave_place(self, id, type) // the node's FIRST placement — world.odin
 	if !self.started {
 		enter_the_cave(self)
 	}

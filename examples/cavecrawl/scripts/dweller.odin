@@ -14,7 +14,6 @@ import gd "godot:godot"
 import kai "godot:kit/ai"
 import kcombat "godot:kit/combat"
 import knet "godot:kit/net"
-import play "godot:play"
 
 DWELLER_IDLE :: u8(0)
 DWELLER_CHASE :: u8(1)
@@ -29,7 +28,6 @@ Dweller :: struct {
 	state:  u8 `gd:"replicate"`, // its mood, on every screen
 	php:    kcombat.Predicted_Hp, // scratch: impacts SEEN here, pre-truth
 	rx, ry: f32, // scratch: where THIS screen draws it (see dweller_process)
-	seen:   bool, // scratch: first frame snaps instead of gliding in from 0,0
 }
 
 dweller_process :: proc(self: ^Dweller, delta: f64) {
@@ -39,9 +37,7 @@ dweller_process :: proc(self: ^Dweller, delta: f64) {
 	// pace (+slack so it never falls behind): on clients this shadows the
 	// already-smooth stream, on the host it melts the steps. Same cure as
 	// the rocks: sim on ticks, render on the frame clock. No role branch.
-	if play.latch(&self.seen, true) {
-		self.rx, self.ry = self.x, self.y
-	}
+	// (rx/ry were seeded AT the sim when the dweller was born — cave_place.)
 	glide := DWELLER_SPEED * f32(knet.DEFAULT_TICK_HZ) * 1.5 * f32(delta)
 	p, _ := kai.step_toward({self.rx, self.ry, 0}, {self.x, self.y, 0}, glide)
 	self.rx, self.ry = p.x, p.y

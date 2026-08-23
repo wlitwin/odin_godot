@@ -240,6 +240,20 @@ puppet_frame :: proc(p: ^Puppet, dt: f32 = 1.0 / 60) {
 	puppet_skin_frame(p, dt)
 }
 
+// puppet_born — the body was just instanced (the scene's default pose) and
+// the fields just landed (Ev_Spawned): put the body ON the fields, no glide.
+// Call from `<game>_entity_spawned`, before puppet_seat. Without it a
+// watcher's body sits at the origin until its first puppet_frame — which is
+// the NEXT frame for a body born mid-frame (a host-step spawn, an arrival
+// under an injected delay; Godot runs no _process on a node added during
+// the _process pass) — one rendered frame in the corner, then a cut.
+puppet_born :: proc(p: ^Puppet) {
+	if cast(rawptr)p.body == nil {return}
+	body_cut(p.body, p.x, p.y, p.rot)
+	p.ox = 0 // born IS a cut — nothing to glide from
+	p.oy = 0
+}
+
 // puppet_place — the simulator teleports the body (kickoff, round reset).
 // Pair with ksess.session_teleport(id) on the same frame so remote interp
 // snaps to the new spot instead of sliding across the pitch.

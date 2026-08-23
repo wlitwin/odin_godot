@@ -214,6 +214,12 @@ hello_net_player_joined_then :: proc(self: ^HelloNet, id: knet.Player_Id, rejoin
 // it rides boot_phase in process(), where the receipt prints exactly once.
 @(gd_half)
 hello_net_entity_spawned :: proc(self: ^HelloNet, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
-	_ = type; _ = id; _ = owner
+	_ = type; _ = owner
+	// BORN = the fields are set: the node's FIRST placement is here — the
+	// entity's _process carries it from the next frame on (Godot runs no
+	// _process on a node added mid-_process, which every host-step spawn is).
+	if p, ok := player_of(&self.boot, id); ok {
+		gd.node2d_set_position(cast(gd.Node2d)p.owner, {p.x, p.y})
+	}
 	gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
 }

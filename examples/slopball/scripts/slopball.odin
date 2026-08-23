@@ -276,6 +276,7 @@ slopball_entity_spawned :: proc(self: ^Slopball, id: knet.Net_Id, type: ksess.En
 		}
 	}
 	if id == self.ball_id && self.ball != nil {
+		play.puppet_born(&self.ball.puppet) // the BODY on the spawned fields, before the seat (see play.puppet_born)
 		seat_ball(self, ksess.session_owner_of(&self.ses, id))
 		if self.ball.score.l != 0 || self.ball.score.r != 0 {
 			kui.lobby_set_status(&self.boot.ui, fmt.tprintf("%d — %d", self.ball.score.l, self.ball.score.r))

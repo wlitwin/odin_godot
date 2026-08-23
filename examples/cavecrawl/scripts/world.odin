@@ -20,6 +20,43 @@ import ksess "godot:kit/session"
 import kui "godot:kit/ui"
 import "core:fmt"
 
+// BORN = the fields are set: the node's FIRST placement. Here, not in the
+// entity's _process — Godot runs no _process on a node added DURING the
+// _process pass (every host-step spawn, every arrival under an injected
+// delay), so a _process-only placement renders the spawn frame at the
+// origin. The per-frame _process carries it from here. Same frame as the
+// spawn on every role: the host's fires inside boot_spawn_send. (See
+// docs/kit/boot.md, "Where the first placement goes".)
+cave_place :: proc(self: ^CaveLobby, id: knet.Net_Id, type: ksess.Entity_Type) {
+	node, has := kboot.boot_node(&self.boot, id)
+	if !has {return}
+	at: gd.Vector2
+	switch type {
+	case SPELUNKER_TYPE:
+		e, ok := spelunker_of(&self.boot, id); if !ok {return}
+		at = {e.x, e.y}
+	case CHEST_TYPE:
+		e, ok := chest_of(&self.boot, id); if !ok {return}
+		at = {e.x, e.y}
+	case DOOR_TYPE:
+		e, ok := door_of(&self.boot, id); if !ok {return}
+		at = {e.x, e.y}
+	case PICKUP_TYPE:
+		e, ok := pickup_of(&self.boot, id); if !ok {return}
+		at = {e.x, e.y}
+	case DWELLER_TYPE:
+		e, ok := dweller_of(&self.boot, id); if !ok {return}
+		e.rx, e.ry = e.x, e.y // seed the render glide AT the sim — never from 0,0
+		at = {e.x, e.y}
+	case RELIC_TYPE:
+		e, ok := relic_of(&self.boot, id); if !ok {return}
+		at = {e.x, e.y}
+	case:
+		return // LEVEL: no pose
+	}
+	gd.node2d_set_position(cast(gd.Node2d)node, at)
+}
+
 // ---- the census: name-paired spawn/free hooks (fired by the kboot driver;
 // ---- spawn-time fields are NOT set yet — dressing belongs on Ev_Spawned) ----
 

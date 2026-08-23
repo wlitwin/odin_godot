@@ -243,9 +243,23 @@ quickdraw_host_left :: proc(self: ^Quickdraw) {
 
 @(gd_half)
 quickdraw_entity_spawned :: proc(self: ^Quickdraw, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
-	_ = id
-	_ = type
 	_ = owner
+	// BORN = the fields are set: the node's FIRST placement, here — not in the
+	// entity's _process (Godot runs no _process on a node added mid-_process:
+	// every host-step spawn, every arrival under delay — the spawn frame
+	// would render at the origin). The per-frame _process carries it on.
+	// A rekeyed PREDICTED bullet reads its presented pose here: lane_present
+	// ran inside boot_pump, before this dispatch. (docs/kit/boot.md.)
+	if node, has := kboot.boot_node(&self.boot, id); has {
+		switch type {
+		case GUNNER_TYPE:
+			if e, ok := gunner_of(&self.boot, id); ok {gd.node2d_set_position(cast(gd.Node2d)node, {e.x, e.y})}
+		case DRONE_TYPE:
+			if e, ok := drone_of(&self.boot, id); ok {gd.node2d_set_position(cast(gd.Node2d)node, {e.x, e.y})}
+		case BULLET_TYPE:
+			if e, ok := bullet_of(&self.boot, id); ok {gd.node2d_set_position(cast(gd.Node2d)node, {e.x, e.y})}
+		}
+	}
 	if !self.started {
 		self.started = true
 		gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
@@ -462,6 +476,12 @@ lob_bullet :: proc(g: ^Quickdraw, gun: ^Gunner, owner: knet.Player_Id) {
 	b.life = LOB_LIFE
 	b.pid = u8(owner)
 	kboot.boot_spawn_send(&g.boot, bid)
+	// The node's FIRST placement, at the fire site: a client's PREDICTED
+	// bullet has no Ev_Spawned until the authority's spawn rekeys it, and its
+	// own _process runs only NEXT frame (added mid-_process) — without this
+	// line it renders one frame at the origin. On the host it is the pose
+	// the born dress just set (quickdraw_entity_spawned, inside the send).
+	gd.node2d_set_position(cast(gd.Node2d)b.owner, {b.x, b.y})
 }
 
 // The buy's consequence — AUTHORITY only, at the verb's execution tick: the

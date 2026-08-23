@@ -163,7 +163,13 @@ hello_sim_player_joined_then :: proc(self: ^HelloSim, id: knet.Player_Id, rejoin
 
 @(gd_half)
 hello_sim_entity_spawned :: proc(self: ^HelloSim, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
-	_ = type; _ = id; _ = owner
+	_ = type; _ = owner
+	// BORN = the fields are set: the node's FIRST placement is here — the
+	// entity's _process carries it from the next frame on (Godot runs no
+	// _process on a node added mid-_process, which every host-step spawn is).
+	if p, ok := player_of(&self.boot, id); ok {
+		gd.node2d_set_position(cast(gd.Node2d)p.owner, {p.x, p.y})
+	}
 	if !self.started {
 		self.started = true
 		gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)

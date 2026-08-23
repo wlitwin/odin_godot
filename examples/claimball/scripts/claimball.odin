@@ -213,8 +213,21 @@ claimball_host_left :: proc(self: ^Claimball) {
 // first sight by design (a baseline, not an edge).
 @(gd_half)
 claimball_entity_spawned :: proc(self: ^Claimball, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
-	_ = id
 	_ = owner
+	// BORN = the fields are set: the node's FIRST placement, here — not in the
+	// entity's _process (Godot runs no _process on a node added mid-_process:
+	// every host-step spawn, every arrival under delay — the spawn frame
+	// would render at the origin). The per-frame _process carries it on; a
+	// predicted entity reads its presented pose (lane_present ran in the
+	// pump, before this dispatch). (docs/kit/boot.md.)
+	if node, has := kboot.boot_node(&self.boot, id); has {
+		switch type {
+		case KICKER_TYPE:
+			if e, ok := kicker_of(&self.boot, id); ok {gd.node2d_set_position(cast(gd.Node2d)node, {e.run.x, e.run.y})}
+		case BALL_TYPE:
+			if e, ok := ball_of(&self.boot, id); ok {gd.node2d_set_position(cast(gd.Node2d)node, {e.roll.x, e.roll.y})}
+		}
+	}
 	if !self.started {
 		self.started = true
 		gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)

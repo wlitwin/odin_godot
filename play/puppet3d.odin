@@ -192,6 +192,15 @@ puppet3_seat :: proc(p: ^Puppet3, mine: bool) {
 	}
 }
 
+// puppet3_born — the body was just instanced (the scene's default pose) and
+// the fields just landed (Ev_Spawned): put the body ON the fields, no glide
+// (see puppet_born). Call from `<game>_entity_spawned`, before puppet3_seat.
+puppet3_born :: proc(p: ^Puppet3) {
+	if cast(rawptr)p.body == nil {return}
+	body3_cut(p.body, p.pos, p.rot)
+	p.off = {} // born IS a cut — nothing to glide from
+}
+
 // puppet3_frame — every peer, every frame, after the solver ran. The simulator
 // publishes the body onto the stream; watchers glide the frozen body along
 // the interpolated fields.
