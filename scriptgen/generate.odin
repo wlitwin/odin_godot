@@ -1471,7 +1471,13 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				w(b, "// authority broadcasts to watching screens (they fire on the watch\n")
 				w(b, "// clock, beside the delayed avatar), the causer's live pass fires now\n")
 				w(b, "// (mine=true), a resim replay never re-fires, and screens with no part\n")
-				w(b, "// in it stay silent.\n")
+				if f.anchor != "" {
+					w(b, "// in it stay silent. Announced on a CORPSE (an anchor the game already\n")
+					w(b, "// despawned/untracked) it shows nowhere — not on the wire, not here, not\n")
+					w(b, "// later on a watcher: a fact meant to be seen is announced BEFORE the despawn.\n")
+				} else {
+					w(b, "// in it stay silent.\n")
+				}
 				fmt.sbprintf(b, "%s :: proc(l: ^ksim.Lane", f.name)
 				if f.anchor != "" {
 					fmt.sbprintf(b, ", %s: ^%s", f.anchor_param, f.anchor)
@@ -1480,6 +1486,13 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 					fmt.sbprintf(b, ", %s: %s", a, f.arg_types[i])
 				}
 				w(b, ") {\n")
+				if f.anchor != "" {
+					// The corpse gate, FIRST: lane_fact skips the wire for an untracked
+					// anchor and fire_facts drops a filed fact whose anchor died, but the
+					// authority clause below would still present it on the host's own
+					// screen — the one place nobody else sees. Nowhere, consistently.
+					fmt.sbprintf(b, "\tif !ksim.lane_tracks_entity(l, %s) {{\n\t\treturn // a corpse: already untracked — nobody is told, so nobody shows it (the host included)\n\t}}\n", f.anchor_param)
+				}
 				w(b, "\tif ksim.lane_is_authority(l) {\n")
 				w(b, "\t\t_fw := knet.writer_make(64, context.temp_allocator)\n")
 				for a, i in f.arg_names {

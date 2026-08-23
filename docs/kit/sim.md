@@ -186,7 +186,13 @@ the causer's screen over the wire (they never ran that code), while the
 everywhere-pass form skips them (their own live pass already fired). The wire
 contracts match tick facts: args are wire primitives, the anchor must outlive
 the slowest watch clock (a despawn drops late facts, so dwell it), and a
-predicted announce the server never confirms can ghost-fire locally.
+predicted announce the server never confirms can ghost-fire locally. An
+anchored door called on a **corpse** — an anchor the game already
+despawned/untracked — shows nowhere, consistently: nobody is told, so nobody
+presents it, the authority's own screen included (the door gates on
+`ksim.lane_tracks_entity` first). A fact meant to be seen is announced
+*before* the despawn; a host-only flash was the old symptom of getting that
+order wrong.
 speedball's kick is the worked example; its acceptance test pins the watcher
 presenting on the watch clock and the causer never double-firing.
 

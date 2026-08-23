@@ -358,6 +358,7 @@ for needle in \
 	'FACT_PAWN_BUMPED :: u16(0x' \
 	'FACT_BOARD_HORN :: u16(0x' \
 	'pawn_bumped :: proc(l: ^ksim.Lane, p: ^Pawn, force: f32)' \
+	'if !ksim.lane_tracks_entity(l, p) {' \
 	'board_horn :: proc(l: ^ksim.Lane, side: u8)' \
 	'ksim.lane_fact(l, p, knet.writer_bytes(&_fw), FACT_PAWN_BUMPED)' \
 	'ksim.lane_fact(l, nil, knet.writer_bytes(&_fw), FACT_BOARD_HORN)' \
@@ -380,7 +381,13 @@ if ! grep -qF 'lane.in_auth = true' "$GEN"; then
 	echo "REPGEN_FAIL: the tick _then wrap is missing the in_auth provenance mark"
 	exit 1
 fi
-echo "  ok  fact doors generated (FNV ids, gates, decode thunks, table installed in lane_init)"
+# The corpse gate is the ANCHORED door's alone — an anchorless fact has no
+# body to outlive; exactly one gate (pawn_bumped), none keyed on nil.
+if [ "$(grep -cF 'ksim.lane_tracks_entity(l, ' "$BGEN")" != "1" ] || grep -qF 'lane_tracks_entity(l, nil' "$BGEN"; then
+	echo "REPGEN_FAIL: the corpse gate must appear once (the anchored door) and never on the anchorless one"
+	exit 1
+fi
+echo "  ok  fact doors generated (FNV ids, gates incl. the corpse gate, decode thunks, table installed in lane_init)"
 
 # ---- @(gd_fact) contract violations are scriptgen-time errors ----
 # Five misuses in one lane-carrying package, plus the no-lane package: each

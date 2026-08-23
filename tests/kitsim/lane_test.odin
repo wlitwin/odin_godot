@@ -66,10 +66,10 @@ Lane_Box :: struct {
 	// declared world-pass fact probe (@(gd_fact) doors): one recorder slot
 	// per kind under test — calls, the mine bit, the watch clock at fire,
 	// and whether the thunk saw a nil entity (the anchorless form)
-	df_calls: [4]int,
-	df_mine:  [4]bool,
-	df_clock: [4]f64,
-	df_nil:   [4]bool,
+	df_calls: [5]int,
+	df_mine:  [5]bool,
+	df_clock: [5]f64,
+	df_nil:   [5]bool,
 	fx_clock:  f64, // lane.watch_clock at the fire (0 on a live-pass fire)
 	fx_newest: u64, // rx.newest at the fire — proves the watcher fired BEHIND the wire
 }
@@ -2006,17 +2006,24 @@ lane_facts_reach_every_screen_on_time :: proc(t: ^testing.T) {
 //       (mine=true there), every client presents at the watch clock with a
 //       nil entity;
 //   (4) despawn-drop — an anchored fact whose anchor untracks before the
-//       watch clock arrives is dropped, never fired against a dead entity.
+//       watch clock arrives is dropped, never fired against a dead entity;
+//   (5) corpse announce — a door called on an anchor the authority ALREADY
+//       untracked shows nowhere: not on the wire (nobody to tell), not on the
+//       authority's own screen (the door's corpse gate), not later. Before the
+//       gate the host alone presented it (mine=false via the authority
+//       clause) — a visual nobody else got, on the author's own screen.
 
 DF_BUMP :: u16(0x1001) // slot 0: everywhere-pass anchored
 DF_ADJU :: u16(0x1002) // slot 1: authority-context anchored (provenance)
 DF_HORN :: u16(0x1003) // slot 2: anchorless
 DF_LATE :: u16(0x1004) // slot 3: despawn-drop (must never fire)
+DF_DEAD :: u16(0x1005) // slot 4: corpse announce (must fire NOWHERE)
 
 DF_BUMP_AT :: u64(60)
 DF_ADJU_AT :: u64(120)
 DF_HORN_AT :: u64(150)
 DF_LATE_AT :: u64(180)
+DF_DEAD_AT :: u64(240)
 
 df_record :: proc(slot: int, entity: rawptr, lane: ^ksim.Lane, mine: bool) {
 	b := cast(^Lane_Box)ksim.lane_game(lane)
@@ -2030,17 +2037,23 @@ df_fx_bump :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df
 df_fx_adju :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(1, entity, lane, mine)}
 df_fx_horn :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(2, entity, lane, mine)}
 df_fx_late :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(3, entity, lane, mine)}
+df_fx_dead :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(4, entity, lane, mine)}
 
 df_table := [?]ksim.Fact_Desc{
 	{id = DF_BUMP, fx = df_fx_bump},
 	{id = DF_ADJU, fx = df_fx_adju},
 	{id = DF_HORN, fx = df_fx_horn},
 	{id = DF_LATE, fx = df_fx_late},
+	{id = DF_DEAD, fx = df_fx_dead},
 }
 
-// Mirrors the generated ANCHORED door: authority broadcasts, the live pass
-// fires where this screen's own simulation caused it.
+// Mirrors the generated ANCHORED door: the corpse gate first, then the
+// authority broadcasts, then the live pass fires where this screen's own
+// simulation caused it.
 df_door :: proc(l: ^ksim.Lane, entity: rawptr, kind: u16, slot: int) {
+	if !ksim.lane_tracks_entity(l, entity) {
+		return // a corpse: nobody is told, so nobody shows it (the host included)
+	}
 	if ksim.lane_is_authority(l) {
 		ksim.lane_fact(l, entity, {}, kind)
 	}
@@ -2085,6 +2098,18 @@ df_step_auth :: proc(user: rawptr, tick: u64) {
 		df_door_horn(&b.lane)
 	case DF_LATE_AT:
 		df_door(&b.lane, b.movers[20], DF_LATE, 3)
+	case DF_DEAD_AT:
+		// The authority despawns its own avatar and — the ordering bug the
+		// gate exists for — announces on the corpse in the same pass.
+		m := b.movers[10]
+		if !ksim.lane_tracks_entity(&b.lane, m) {
+			b.df_calls[4] += 100 // "was tracked right before" — a sentinel the assert reads
+		}
+		ksim.lane_untrack(&b.lane, 10)
+		if ksim.lane_tracks_entity(&b.lane, m) {
+			b.df_calls[4] += 1000 // "untracked right after" — likewise
+		}
+		df_door(&b.lane, m, DF_DEAD, 4)
 	}
 }
 
@@ -2184,6 +2209,15 @@ lane_declared_facts_world_pass :: proc(t: ^testing.T) {
 	testing.expect_value(t, host.df_calls[3], 1)
 	testing.expect_value(t, alice.df_calls[3], 1)
 	testing.expect_value(t, bob.df_calls[3], 0)
+
+	// (5) The corpse announce: the authority untracked its avatar and called
+	// the door on it in the same pass. Nowhere — no wire copy reached a
+	// client, and the host's own screen stayed dark too (the sentinels above
+	// would have pushed the count past 0 if lane_tracks_entity misread either side
+	// of the untrack).
+	testing.expect_value(t, host.df_calls[4], 0)
+	testing.expect_value(t, alice.df_calls[4], 0)
+	testing.expect_value(t, bob.df_calls[4], 0)
 }
 
 // ---------------------------------------------------------------------------

@@ -399,6 +399,28 @@ lane_owner_of :: proc(l: ^Lane, entity: rawptr) -> knet.Player_Id {
 	return knet.PLAYER_ID_INVALID
 }
 
+// Does the lane still track `entity` — a body it knows (tracked, not yet
+// untracked)? The pointer-keyed twin of spawn.odin's lane_tracks(id), for the
+// call sites that hold the entity, not its id. lane_owner_of can't answer it:
+// PLAYER_ID_INVALID is also what a tracked world/contested entity owns. The
+// generated anchored fact doors
+// gate on this FIRST, so a fact announced on a corpse (an entity the game
+// already untracked/despawned) shows NOWHERE: lane_fact already skips the
+// wire (nobody to tell), fire_facts already drops a filed fact whose anchor
+// died, and without this gate the authority's own screen was the one place
+// it still fired (mine=false through the door's authority clause) — a
+// presentation nobody else gets, on exactly the screen the author watches,
+// masking the real bug (a fact meant to be seen is announced BEFORE the
+// despawn). Games may read it too, wherever a handle might outlive its body.
+lane_tracks_entity :: proc(l: ^Lane, entity: rawptr) -> bool {
+	for &tr in l.tracked {
+		if tr.entity == entity {
+			return true
+		}
+	}
+	return false
+}
+
 // The most unfired facts a client holds — an untrusted-input bound far above
 // any honest burst (the watch clock drains the queue within a watch_delay).
 @(private = "file")
@@ -783,7 +805,10 @@ lane_fact :: proc(l: ^Lane, entity: rawptr, args: []u8, kind: u16 = 0) {
 			}
 		}
 		if id == knet.NET_ID_INVALID {
-			return // untracked (mid-despawn): nobody left to tell
+			// Untracked (mid-despawn): nobody left to tell. The generated doors
+			// gate on lane_tracks_entity before reaching here, so their local
+			// showing is skipped too; this is the belt for a hand-written caller.
+			return
 		}
 	} else {
 		assert(kind != 0, "an entity-tick fact always has its entity — nil anchors belong to declared @(gd_fact) doors")
