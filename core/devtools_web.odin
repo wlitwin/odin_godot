@@ -61,3 +61,6 @@ lv_lookup_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]
 // No filesystem saving on web (export-only, no editor) — the ResourceFormatSaver is desktop-only.
 odin_saver_register :: proc() {
 }
+
+odin_saver_unregister :: proc() {
+}

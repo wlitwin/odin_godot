@@ -942,6 +942,33 @@ duplicate_class_names :: proc(t: ^testing.T) {
 }
 
 @(test)
+class_registry_overflow_is_loud :: proc(t: ^testing.T) {
+	// A fixed allocation-free registry is intentional during dll init, but hitting its
+	// bound must never make a valid script disappear without an author-facing error.
+	rt.reflect_register_reset_for_tests()
+	for _ in 0 ..< rt.MAX_CLASSES + 1 {
+		// nil names deliberately bypass duplicate-name detection; this test targets only
+		// the storage bound and needs no dynamically allocated cstrings.
+		rt.register(rt.Class_Desc{})
+	}
+
+	n: i32
+	_ = rt.odin_scripts_manifest(&n)
+	testing.expect_value(t, int(n), rt.MAX_CLASSES)
+	errs := rt.registration_errors()
+	testing.expect_value(t, len(errs), 1)
+	if len(errs) == 1 {
+		testing.expect(
+			t,
+			errs[0].msg != nil && strings.contains(string(errs[0].msg), "registry is full"),
+			"overflow must explain why the class was dropped",
+		)
+	}
+
+	rt.reflect_register_reset_for_tests()
+}
+
+@(test)
 test_reset_clears_class_registry :: proc(t: ^testing.T) {
 	// The test-only reset must clear the class registry too — otherwise duplicate-name
 	// cases would poison every later test in this shared process.

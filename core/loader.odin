@@ -174,6 +174,8 @@ odin_loader_register :: proc() {
 
     // Construct the loader and register it (at front so it wins for `.odin`).
     odin_loader_object = gdext.classdb_construct_object(&odin_loader_class_name)
+    // classdb_construct_object gives us one owned RefCounted reference; ResourceLoader
+    // takes another while registered. Shutdown removes its ref, then releases ours.
     odin_loader_instance = cast(^OdinResourceFormatLoader)gdext.object_get_instance_binding(
         odin_loader_object,
         gdext.library,
@@ -192,5 +194,10 @@ odin_loader_unregister :: proc() {
             get_resource_loader(),
             cast(godot.Resource_Format_Loader)odin_loader_object,
         )
+        refcounted_release(odin_loader_object)
+        odin_loader_object = nil
+        odin_loader_instance = nil
     }
+    delete(loader_virtuals)
+    loader_virtuals = nil
 }

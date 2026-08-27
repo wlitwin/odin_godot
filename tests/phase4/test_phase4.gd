@@ -43,11 +43,18 @@ func _run() -> void:
 	if script.get_instance_base_type() != "Node":
 		_fail("reloader base type is %s, expected Node" % str(script.get_instance_base_type()))
 		return
+	var toggle_script = load("res://scripts/lifecycle_toggle.odin")
+	if toggle_script == null:
+		_fail("lifecycle_toggle.odin failed to load")
+		return
 
 	# ---- build the live instance ----
 	var node := Node.new()
 	node.set_script(script)
 	root.add_child(node)
+	var toggle := Node.new()
+	toggle.set_script(toggle_script)
+	root.add_child(toggle)
 
 	# ===== 1. assert v1 behavior =====
 	var step_v1 = node.call("get_step")
@@ -61,6 +68,20 @@ func _run() -> void:
 	var moved = int(node.get("position"))
 	if moved <= 0 or (moved % 10) != 0:
 		_fail("v1 process did not advance position by steps of 10: position=%d" % moved)
+		return
+
+	# v1 exposes only _physics_process. Fresh-instance setup must enable it without
+	# accidentally enabling the absent idle-process callback.
+	await physics_frame
+	await physics_frame
+	if int(toggle.call("get_mode")) != 1:
+		_fail("lifecycle fixture did not start in physics-only v1")
+		return
+	if int(toggle.get("physics_ticks")) <= 0:
+		_fail("v1 physics callback was not enabled")
+		return
+	if int(toggle.get("process_ticks")) != 0:
+		_fail("v1 absent process callback ran unexpectedly")
 		return
 
 	# ===== 2. set preserved state =====
@@ -89,6 +110,9 @@ func _run() -> void:
 	if int(step_v2) != 100:
 		_fail("after reload get_step()=%s, expected 100 (v2 not live)" % str(step_v2))
 		return
+	if int(toggle.call("get_mode")) != 2:
+		_fail("lifecycle fixture did not rebind to process-only v2")
+		return
 
 	# ===== 5b. state preserved across the reload (no tick since the swap) =====
 	var preserved = int(node.get("position"))
@@ -98,10 +122,24 @@ func _run() -> void:
 
 	# ===== 5c. v2 `process` now runs on the SAME instance, off the preserved base =====
 	await process_frame
+	await process_frame
 	var after = int(node.get("position"))
 	# 1005 + 100*k proves: base 1005 preserved AND v2 step (100) applied.
 	if after <= 1005 or ((after - 1005) % 100) != 0:
 		_fail("v2 process did not advance preserved state by steps of 100: position=%d (was 1005)" % after)
+		return
+
+	# The same live node must now receive idle process and stop receiving physics.
+	var physics_at_swap := int(toggle.get("physics_ticks"))
+	await process_frame
+	await process_frame
+	if int(toggle.get("process_ticks")) <= 0:
+		_fail("reload added _process but did not enable it on the live node")
+		return
+	await physics_frame
+	await physics_frame
+	if int(toggle.get("physics_ticks")) != physics_at_swap:
+		_fail("reload removed _physics_process but left it enabled on the live node")
 		return
 
 	print("PHASE4_OK")

@@ -81,6 +81,9 @@ uninitialize_odin_module :: proc "c" (user_data: rawptr, level: gdext.Initializa
     if level != .Scene {
         return
     }
+    // Reverse registration order so no service retains another extension object while
+    // its class is being removed.
+    odin_saver_unregister()
     odin_loader_unregister()
     odin_language_unregister()
     // Unregister EVERY ClassDB class this level registered (script/language/loader/

@@ -194,6 +194,117 @@ doomed_process :: proc(self: ^Doomed, delta: f64) {
 		return
 	print("GEN_ORPHAN_SWEPT (probe rebuilt; the sweep reaped the section)")
 
+	# ===== 7. NEW-CLASS INSPECTOR REFRESH: a script attached while its class is NOT yet
+	# in the dll (brand-new file, build still to land) gets an EMPTY placeholder; the
+	# swap's placeholder refresh must make its exports appear in-process. This is the
+	# "create a Resource script, .tres Inspector shows nothing" papercut — GDScript
+	# parity: new classes show up without an editor restart.
+	var gunsrc := "res://scripts/gun_probe.odin"
+	var gf := FileAccess.open(gunsrc, FileAccess.WRITE)
+	gf.store_string("""//gd:extends Resource
+//gd:class GunProbe
+package reload_exports_scripts
+
+import gd "godot:godot"
+
+GunProbe :: struct {
+	owner:  gd.Resource,
+	damage: gd.Int `gd:\"export\"`,
+	spread: f32 `gd:\"export\"`,
+}
+""")
+	gf.close()
+
+	# Attach IMMEDIATELY — before any rebuild can land — the placeholder must be created
+	# while the class is unknown, or this test degrades into the fresh-attach case.
+	var gscript = load(gunsrc)
+	if gscript == null:
+		_fail("gun_probe.odin did not load as a script"); return
+	var res := Resource.new()
+	res.set_script(gscript)
+	if _has_export(res, "damage"):
+		print("  note: GunProbe registered before attach — the stale-placeholder path was NOT exercised this run")
+	var shown := false
+	for i in range(4800): # creation probe ~every 120 frames, then a build + swap
+		await process_frame
+		if _has_export(res, "damage"):
+			shown = true
+			break
+	if not shown:
+		_fail("new class's exports never appeared on its placeholder after rebuild+swap (props=%s)" % str(_export_names(res)))
+		return
+	# The set-fallback must hold the value once the property exists (Inspector editability).
+	res.set("damage", 7)
+	if int(res.get("damage")) != 7:
+		_fail("new-class placeholder property not settable after refresh")
+		return
+	print("NEW_CLASS_EXPORTS_SHOWN (stale placeholder refreshed when the class landed)")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(gunsrc))
+
+	# QUIESCE before the skew phase: the deletion above triggers one more probe rebuild;
+	# phase 8 needs an idle pipeline so ITS request bakes the skew root (an in-flight
+	# build could otherwise swallow the request into a real-root rerun). Wait for the
+	# sweep's gen rewrite, then settle so its dll swap lands too.
+	var probe_swept := false
+	for i in range(4800):
+		await process_frame
+		if not _gen_has_section(scripts_gen, "gun_probe.odin"):
+			probe_swept = true
+			break
+	if not probe_swept:
+		_fail("gun_probe's generated section was never swept before the skew phase"); return
+	for i in range(600):
+		await process_frame
+
+	# ===== 8. ABI-SKEW REFUSAL IS LOUD: rebuild against a doctored addon checkout (one
+	# boundary struct grown -> different ABI hash — run.sh prepares it). The deferred
+	# swap must REFUSE the dll (old code kept, no crash) and the refusal must surface
+	# as an editor error with the restart-the-editor diagnosis; run.sh asserts the
+	# message text in this process's stderr. This pins the 3-day silent failure mode:
+	# addon updated on disk while the editor kept the core it mapped at startup.
+	var skewroot := OS.get_environment("ODIN_GODOT_SKEW_ROOT")
+	if skewroot == "":
+		_fail("ODIN_GODOT_SKEW_ROOT not set (run via run.sh)"); return
+	ProjectSettings.set_setting("odin_godot/root", skewroot)
+	# reload_request skips the build when no source changed (force=false path), so give
+	# the skew build a real edit — content is irrelevant, the ABI mismatch is the point.
+	_write_src(original_src + "\n// skew-phase probe edit\n")
+	var err2 = script.reload(true)
+	if err2 != OK:
+		ProjectSettings.set_setting("odin_godot/root", null)
+		_fail("skew-phase reload kick returned %s" % str(err2)); return
+	# A refused swap leaves no in-process marker to poll — and a build already in
+	# flight can swallow this request into a coalesced rerun that re-resolves the
+	# root LATER. So hold the skew root pinned for a wall-clock window generous
+	# enough for any queued build + rerun + deferred swap to drain: whichever build
+	# ends up carrying the request, it resolves the SKEW root and gets refused.
+	var t0 := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < 20000:
+		await process_frame
+	if not _has_export(node, "speed"):
+		ProjectSettings.set_setting("odin_godot/root", null)
+		_fail("old code was NOT kept after the refused skew swap"); return
+	print("SKEW_SWAP_REFUSED_OLD_CODE_KEPT")
+
+	# Recovery: restore the real root; the same pipeline must go green again in this
+	# session (a refusal poisons nothing). Reuse the widget marker edit as the probe.
+	ProjectSettings.set_setting("odin_godot/root", null)
+	var v3 := original_src.replace(MARKER, NEW_FIELD_DECL)
+	_write_src(v3)
+	var err3 = script.reload(true)
+	if err3 != OK:
+		_fail("recovery reload kick returned %s" % str(err3)); return
+	var recovered := false
+	for i in range(4800):
+		await process_frame
+		if _has_export(node, "new_field"):
+			recovered = true
+			break
+	_write_src(original_src)
+	if not recovered:
+		_fail("pipeline did not recover after restoring the real collection root"); return
+	print("SKEW_RECOVERED_AFTER_RESTORE")
+
 	print("RELOAD_EXPORTS_OK")
 	done = true
 	quit(0)

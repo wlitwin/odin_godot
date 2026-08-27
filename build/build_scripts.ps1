@@ -119,14 +119,77 @@ if (-not $SkipCore) {
     BuildDll (Join-Path $RootRel "core") $core @()
 }
 
-# 2. scriptgen preprocessor — build to a writable TEMP dir, NOT into the addon (which may be
-#    read-only when installed under res://addons/ and shouldn't collect build artifacts).
-#    KEEP IN SYNC with build/common.sh (build_scriptgen) — the bash builds share one helper;
-#    this is its Windows-native mirror.
-$scriptgenDir = Join-Path ([System.IO.Path]::GetTempPath()) ("odin_godot_sgen_" + [System.Guid]::NewGuid().ToString("N"))
-New-Item -ItemType Directory -Force -Path $scriptgenDir | Out-Null
-$scriptgenExe = Join-Path $scriptgenDir "scriptgen.exe"
-Run $Odin @("build", (Join-Path $RootRel "scriptgen"), "-collection:godot=$RootRel", "-out:$scriptgenExe", "-debug")
+# 2. scriptgen preprocessor — content-addressed in a writable USER cache, never the
+#    addon (which may be read-only and must not collect exported build artifacts).
+#    The key mirrors build/common.sh: exact compiler binary/version + host + every
+#    scriptgen and godot:decl source. SGEN_BIN remains an explicit override for CI.
+function GetStringSha256([string]$text) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($text)
+        return (($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString("x2") }) -join "")
+    } finally {
+        $sha.Dispose()
+    }
+}
+
+if ($env:SGEN_BIN -and (Test-Path -LiteralPath $env:SGEN_BIN -PathType Leaf)) {
+    $scriptgenExe = $env:SGEN_BIN
+    Write-Host "build_scripts.ps1: using prebuilt scriptgen (SGEN_BIN=$scriptgenExe)"
+} else {
+    $odinCommand = (Get-Command $Odin -ErrorAction Stop).Source
+    $odinVersion = (& $Odin version 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) { throw "failed to query Odin version: $odinVersion" }
+    $compilerHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $odinCommand).Hash.ToLowerInvariant()
+
+    $sourceRecords = foreach ($sourceRoot in @(
+        (Join-Path $rootAbs "scriptgen"),
+        (Join-Path $rootAbs "decl")
+    )) {
+        Get-ChildItem -LiteralPath $sourceRoot -Filter *.odin -File -Recurse
+    }
+    $sourceRecords = $sourceRecords |
+        Sort-Object FullName |
+        ForEach-Object {
+            $relative = $_.FullName.Substring($rootAbs.Length).TrimStart('\', '/') -replace '\\', '/'
+            $digest = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()
+            "$relative`0$digest"
+        }
+    $keyMaterial = @(
+        "odin_godot-scriptgen-cache-v1",
+        "host=windows/$env:PROCESSOR_ARCHITECTURE",
+        "compiler-path=$odinCommand",
+        "compiler-version=$odinVersion",
+        "compiler-sha256=$compilerHash"
+    ) + $sourceRecords
+    $cacheKey = GetStringSha256 ($keyMaterial -join "`0")
+
+    if ($env:ODIN_GODOT_TOOL_CACHE_DIR) {
+        $cacheBase = $env:ODIN_GODOT_TOOL_CACHE_DIR
+    } elseif ($env:LOCALAPPDATA) {
+        $cacheBase = Join-Path $env:LOCALAPPDATA "odin_godot\tools"
+    } else {
+        $cacheBase = Join-Path ([System.IO.Path]::GetTempPath()) "odin_godot-tools"
+    }
+    $scriptgenDir = Join-Path (Join-Path $cacheBase "scriptgen") $cacheKey
+    $scriptgenExe = Join-Path $scriptgenDir "scriptgen.exe"
+    if (Test-Path -LiteralPath $scriptgenExe -PathType Leaf) {
+        Write-Host "build_scripts.ps1: scriptgen cache hit ($cacheKey)"
+    } else {
+        New-Item -ItemType Directory -Force -Path $scriptgenDir | Out-Null
+        $candidate = Join-Path $scriptgenDir (".scriptgen.tmp." + [System.Guid]::NewGuid().ToString("N") + ".exe")
+        $candidatePdb = [System.IO.Path]::ChangeExtension($candidate, ".pdb")
+        try {
+            Run $Odin @("build", (Join-Path $RootRel "scriptgen"), "-collection:godot=$RootRel", "-out:$candidate", "-debug")
+            $finalPdb = [System.IO.Path]::ChangeExtension($scriptgenExe, ".pdb")
+            if (Test-Path -LiteralPath $candidatePdb) { Move-Item -Force $candidatePdb $finalPdb }
+            Move-Item -Force $candidate $scriptgenExe
+        } finally {
+            Remove-Item -Force -ErrorAction SilentlyContinue $candidate, $candidatePdb
+        }
+        Write-Host "build_scripts.ps1: cached scriptgen ($cacheKey)"
+    }
+}
 
 # ---------------------------------------------------------------------------
 # Multi-module support — the Windows mirror of build/build_scripts.sh (KEEP IN SYNC):
@@ -222,15 +285,52 @@ $lines
 # (No return value: a PowerShell function's output stream would also capture the odin/
 # scriptgen stdout `& $exe` emits inside Run — the built path is tracked via $builtDlls.)
 $builtDlls = @()
+
+function GetAuthoredSourcesFingerprint([string]$dir) {
+    $dirAbs = (Resolve-Path -LiteralPath $dir).Path.TrimEnd('\', '/')
+    $records = Get-ChildItem -LiteralPath $dirAbs -Filter *.odin -File -Recurse |
+        Where-Object {
+            $_.Name -notlike "*.gen.odin" -and
+            $_.FullName.Substring($dirAbs.Length).TrimStart('\', '/') -notmatch '(^|[\\/])(\.|bin)([\\/]|$)'
+        } |
+        Sort-Object FullName |
+        ForEach-Object {
+            $relative = $_.FullName.Substring($dirAbs.Length).TrimStart('\', '/') -replace '\\', '/'
+            $digest = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()
+            "$relative`0$digest"
+        }
+    return (GetStringSha256 ($records -join "`0"))
+}
+
 function BuildOneScriptsDir([string]$dir) {
     CheckModuleIsolation $dir
-    # -godot:<root> lets scriptgen resolve nested `using` bundles imported from godot:kit/*
-    # (nested-replicate-fields Phase 2) — same root the binding compiles against. KEEP IN
-    # SYNC with build/common.sh run_scriptgen.
-    Run $scriptgenExe @($dir, "-godot:$RootRel")
     $out = Join-Path $Bin (DllLeafForDir $dir)
-    BuildDll $dir $out @("-custom-attribute:gd_method", "-custom-attribute:gd_connect", "-custom-attribute:gd_rpc", "-custom-attribute:gd_command", "-custom-attribute:gd_tick", "-custom-attribute:gd_sample", "-custom-attribute:gd_step", "-custom-attribute:gd_fact", "-custom-attribute:gd_half", "-custom-attribute:gd_message")
-    $script:builtDlls += $out
+
+    # Mirror build_scripts.sh's source transaction: create/delete/save bursts can land
+    # between generation and compile. Retry a changed snapshot instead of surfacing the
+    # generated #load_hash guard as a false persistent compiler error.
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        $before = GetAuthoredSourcesFingerprint $dir
+        $buildError = $null
+        try {
+            # -godot:<root> resolves nested `using` bundles imported from godot:kit/*.
+            Run $scriptgenExe @($dir, "-godot:$RootRel")
+            BuildDll $dir $out @("-custom-attribute:gd_method", "-custom-attribute:gd_connect", "-custom-attribute:gd_rpc", "-custom-attribute:gd_command", "-custom-attribute:gd_tick", "-custom-attribute:gd_sample", "-custom-attribute:gd_step", "-custom-attribute:gd_fact", "-custom-attribute:gd_half", "-custom-attribute:gd_message")
+        } catch {
+            $buildError = $_
+        }
+        $after = GetAuthoredSourcesFingerprint $dir
+        if ($before -ne $after) {
+            if ($attempt -lt 3) {
+                Write-Host "build_scripts.ps1: authored sources changed during build; regenerating (attempt $($attempt + 1)/3)"
+                continue
+            }
+            throw "authored sources kept changing during 3 build attempts; save again when the edit burst settles"
+        }
+        if ($null -ne $buildError) { throw $buildError }
+        $script:builtDlls += $out
+        return
+    }
 }
 
 # 3+4. Build the requested scripts dir; when it is the MAIN one, also build each

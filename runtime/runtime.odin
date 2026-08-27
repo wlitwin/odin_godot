@@ -302,6 +302,11 @@ register :: proc "contextless" (desc: Class_Desc) {
 		}
 	}
 	if registry_count >= MAX_CLASSES {
+		record_error(
+			desc.name,
+			nil,
+			"script class registry is full (maximum 256 classes in one scripts DLL) — this class was DROPPED; split the project into script modules or increase MAX_CLASSES and rebuild the addon",
+		)
 		return
 	}
 	registry[registry_count] = desc

@@ -73,29 +73,97 @@ odin_build_filtered() {
 # ----------------------------------------------------------------------------
 # build_scriptgen — build the //gd: codegen preprocessor and set SGEN to its path.
 #
-# Builds to a writable TEMP dir, NEVER into the addon: when odin_godot is installed
+# Builds to a writable user cache, NEVER into the addon: when odin_godot is installed
 # under res://addons/ that dir may be read-only (and shouldn't collect build artifacts
-# or leak a binary into res:// that the exporter would pack).
+# or leak a binary into res:// that the exporter would pack). The content-addressed key
+# covers the host/compiler binary + version and every scriptgen/godot:decl source, so a
+# hit is safe across projects while edits/toolchain changes rebuild automatically.
 #
 # SGEN_BIN (env): if set to an executable, use it as-is and SKIP the rebuild — a test
-# runner can pre-build scriptgen once and fan it out across many script builds. Default
-# (unset) keeps today's behavior: build fresh per invocation.
+# runner can still provide and fan out an explicit binary.
 # ----------------------------------------------------------------------------
+_odin_gd_sha256_stdin() {
+    if command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 | awk '{print $1}'
+    elif command -v sha256sum >/dev/null 2>&1; then
+        sha256sum | awk '{print $1}'
+    else
+        return 1
+    fi
+}
+
 build_scriptgen() {
     if [[ -n "${SGEN_BIN:-}" && -x "${SGEN_BIN}" ]]; then
         SGEN="$SGEN_BIN"
         echo "common.sh: using prebuilt scriptgen (SGEN_BIN=$SGEN)"
         return 0
     fi
-    local dir
-    dir="$(mktemp -d)"
-    odin_gd_cleanup_on_exit "$dir"
-    SGEN="$dir/scriptgen"
+
+    local compiler_path compiler_version key cache_base cache_dir candidate src rel
+    compiler_path="$(command -v "$ODIN" 2>/dev/null || true)"
+    [[ -n "$compiler_path" ]] || compiler_path="$ODIN"
+    compiler_version="$("$ODIN" version 2>&1)"
+
+    # Paths are included relative to ROOT, followed by their bytes. `decl` is the only
+    # godot: package scriptgen imports; compiler-bundled core packages are pinned by the
+    # exact compiler binary digest in the same stream.
+    key="$({
+        printf 'odin_godot-scriptgen-cache-v1\0'
+        printf 'host=%s/%s\0' "$(uname -s)" "$(uname -m)"
+        printf 'compiler-path=%s\0compiler-version=%s\0' "$compiler_path" "$compiler_version"
+        printf 'compiler-bytes\0'
+        cat "$compiler_path"
+        find "$ROOT/scriptgen" "$ROOT/decl" -type f -name '*.odin' -print | LC_ALL=C sort |
+            while IFS= read -r src; do
+                rel="${src#"$ROOT"/}"
+                printf '\0source=%s\0' "$rel"
+                cat "$src"
+            done
+    } | _odin_gd_sha256_stdin)" || key=""
+
+    # A minimal host without a SHA-256 utility still works; it simply gets the old
+    # per-invocation temp build rather than an unsafely keyed cache entry.
+    if [[ -z "$key" ]]; then
+        cache_dir="$(mktemp -d)"
+        odin_gd_cleanup_on_exit "$cache_dir"
+        SGEN="$cache_dir/scriptgen"
+        odin_build_filtered "$ROOT/scriptgen" \
+            -collection:godot="$ROOT" \
+            -out:"$SGEN" \
+            -debug
+        return 0
+    fi
+
+    if [[ -n "${ODIN_GODOT_TOOL_CACHE_DIR:-}" ]]; then
+        cache_base="$ODIN_GODOT_TOOL_CACHE_DIR"
+    elif [[ -n "${XDG_CACHE_HOME:-}" ]]; then
+        cache_base="$XDG_CACHE_HOME/odin_godot"
+    else
+        cache_base="${TMPDIR:-/tmp}/odin_godot-tools-${UID:-user}"
+    fi
+    cache_dir="$cache_base/scriptgen/$key"
+    SGEN="$cache_dir/scriptgen"
+    if [[ -x "$SGEN" ]]; then
+        echo "common.sh: scriptgen cache hit ($key)"
+        return 0
+    fi
+
+    mkdir -p "$cache_dir"
+    chmod 700 "$cache_dir" 2>/dev/null || true
+    candidate="$cache_dir/.scriptgen.tmp.$$"
+    odin_gd_cleanup_on_exit "$candidate" "$candidate.dSYM"
     # -debug is cheap for a small host tool and makes a scriptgen crash debuggable.
     odin_build_filtered "$ROOT/scriptgen" \
         -collection:godot="$ROOT" \
-        -out:"$SGEN" \
+        -out:"$candidate" \
         -debug
+    if [[ -d "$candidate.dSYM" ]]; then
+        rm -rf "$SGEN.dSYM"
+        mv -f "$candidate.dSYM" "$SGEN.dSYM"
+    fi
+    mv -f "$candidate" "$SGEN"
+    chmod 700 "$SGEN"
+    echo "common.sh: cached scriptgen ($key)"
 }
 
 # run_scriptgen <scripts_dir> — emit the one odin_godot_scripts.gen.odin (plus the guard
@@ -104,6 +172,29 @@ build_scriptgen() {
 # (nested-replicate-fields Phase 2) — the same collection root the binding compiles against.
 run_scriptgen() {
     "$SGEN" "$1" -godot:"$ROOT"
+}
+
+# authored_sources_fingerprint <scripts_dir> — a deterministic, path-aware digest of
+# compiler-authored inputs. Build scripts use it as a transaction fence around
+# scriptgen+compile: if a save/delete lands mid-build, regenerate and retry rather than
+# surfacing a transient stale-generated-code failure. Empty means SHA-256 unavailable.
+authored_sources_fingerprint() {
+    local dir="$1" src rel
+    {
+        find "$dir" \
+            \( -type d \( -name '.*' -o -name bin \) -prune \) -o \
+            \( -type f -name '*.odin' ! -name '*.gen.odin' -print \) |
+            LC_ALL=C sort |
+            while IFS= read -r src; do
+                rel="${src#"$dir"/}"
+                printf 'source=%s\0' "$rel"
+                # A delete between find and cat is itself a fingerprint change, not a
+                # reason for this observation pass to abort.
+                if ! cat "$src" 2>/dev/null; then
+                    printf '\0missing-during-scan\0'
+                fi
+            done
+    } | _odin_gd_sha256_stdin
 }
 
 # ----------------------------------------------------------------------------

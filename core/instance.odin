@@ -493,8 +493,8 @@ seed_container_field :: proc "contextless" (user: rawptr, ex: ^Export_Cache) {
 // all Packed_*_Arrays). That set is exactly "builtin types with a ptr destructor":
 // variant_get_ptr_destructor returns nil for the POD ones, and every engine destructor
 // is null-safe, so a zeroed field is a harmless no-op. `.Object` is EXCLUDED — it's a
-// raw handle whose Resource refcounting is handled explicitly (script_hold_ref/
-// script_release_ref). Called wherever the field's storage dies (inst_free, migrate
+// raw handle whose Resource refcounting is handled explicitly (refcounted_hold/
+// refcounted_release). Called wherever the field's storage dies (inst_free, migrate
 // re-alloc) or is overwritten (inst_set / write_export_variant) — without it every
 // instance leaked one COW allocation per engine-typed export for the process lifetime.
 @(private)
@@ -539,7 +539,7 @@ odin_make_script_instance :: proc(script: gdext.ObjectPtr, owner: gdext.ObjectPt
 	// script via `script_instance->get_script()` — e.g. inside `Object::connect` /
 	// `Object::emit_signalp` for a script-declared signal. This mirrors godot-cpp,
 	// whose ScriptInstance keeps the script alive through a `Ref<Script>` member.
-	script_hold_ref(script)
+	refcounted_hold(script)
 
 	// Allocate + zero the script's own struct; write the owner Object* at offset 0.
 	// gdext's godot allocator zeroes on `.Alloc` (see gdext/context.odin) — the explicit
@@ -583,7 +583,7 @@ ref_bind: gdext.MethodBindPtr
 unref_bind: gdext.MethodBindPtr
 
 @(private)
-script_hold_ref :: proc "contextless" (obj: gdext.ObjectPtr) {
+refcounted_hold :: proc "contextless" (obj: gdext.ObjectPtr) {
 	if obj == nil {return}
 	if ref_bind == nil {
 		cn := godot.new_string_name_cstring("RefCounted", true)
@@ -595,11 +595,11 @@ script_hold_ref :: proc "contextless" (obj: gdext.ObjectPtr) {
 	gdext.object_method_bind_ptrcall(ref_bind, obj, nil, cast(gdext.TypePtr)&result)
 }
 
-// Release the reference taken by script_hold_ref. `unreference` returns true when the
+// Release the reference taken by refcounted_hold. `unreference` returns true when the
 // refcount reached zero, in which case WE are responsible for destroying the object
 // (this is precisely what `Ref<T>::unref()` does in the engine).
 @(private)
-script_release_ref :: proc "contextless" (obj: gdext.ObjectPtr) {
+refcounted_release :: proc "contextless" (obj: gdext.ObjectPtr) {
 	if obj == nil {return}
 	if unref_bind == nil {
 		cn := godot.new_string_name_cstring("RefCounted", true)
@@ -947,7 +947,7 @@ inst_free :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) {
 		return
 	}
 	untrack_live_instance(oi)
-	script_release_ref(oi.script) // release the ref taken in odin_make_script_instance
+	refcounted_release(oi.script) // release the ref taken in odin_make_script_instance
 	// Release any resource references retained by RESOURCE-typed @export fields (inst_set),
 	// and destruct every engine-value export field with heap internals (String, packed
 	// arrays, Array, Dictionary, ...) — otherwise each instance leaks those allocations
@@ -956,7 +956,7 @@ inst_free :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) {
 		for &ex in oi.cache.exports {
 			if ex.type == .Object && ex.hint == i64(godot.Property_Hint.Resource_Type) {
 				fld := rawptr(uintptr(oi.user) + ex.offset)
-				script_release_ref((cast(^gdext.ObjectPtr)fld)^)
+				refcounted_release((cast(^gdext.ObjectPtr)fld)^)
 			}
 			destruct_export_field(oi.user, &ex)
 		}
@@ -1014,8 +1014,8 @@ inst_set :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, name: gdex
 			ex.setter(oi.user, value)
 			newp := fld^
 			if newp != old {
-				script_hold_ref(newp)
-				script_release_ref(old)
+				refcounted_hold(newp)
+				refcounted_release(old)
 			}
 		} else {
 			ex.setter(oi.user, value)
@@ -1066,8 +1066,8 @@ inst_set :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, name: gdex
 			ex.to_type(dst, value)
 			newp := (cast(^gdext.ObjectPtr)dst)^
 			if newp != old {
-				script_hold_ref(newp)
-				script_release_ref(old)
+				refcounted_hold(newp)
+				refcounted_release(old)
 			}
 		} else {
 			ex.to_type(dst, value)
@@ -1307,12 +1307,25 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
 			// old (still-mapped) desc so nothing dangles. It simply won't update.
 			continue
 		}
+		had_process := oi.desc.lifecycle.process != nil
+		had_physics_process := oi.desc.lifecycle.physics_process != nil
+		needs_process := new_desc.lifecycle.process != nil
+		needs_physics_process := new_desc.lifecycle.physics_process != nil
 		new_cache := ensure_class_cache(new_desc)
 		if layout_compatible(oi.desc, new_desc) {
 			oi.desc = new_desc
 			oi.cache = new_cache
 		} else {
 			migrate_instance(oi, new_desc, new_cache)
+		}
+		// Godot's process flags live on the owner Node; swapping the descriptor alone
+		// cannot add/remove callbacks for an already-live instance. Mirror fresh instance
+		// creation whenever the new generation changes either lifecycle entry point.
+		if had_process != needs_process {
+			node_enable_process(oi.owner, needs_process)
+		}
+		if had_physics_process != needs_physics_process {
+			node_enable_physics_process(oi.owner, needs_physics_process)
 		}
 		// Hot-reload hook: the instance is now bound to the NEW desc + (preserved or
 		// migrated) state. Give the script a chance to rebuild what the swap can't fix

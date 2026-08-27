@@ -287,9 +287,24 @@ odin_saver_register :: proc() {
     register_extension_class(&odin_saver_class_name, godot.resource_format_saver_name_ref(), &class_info)
 
     odin_saver_object = gdext.classdb_construct_object(&odin_saver_class_name)
+    // Keep the construction reference; ResourceSaver owns another while registered.
+    // Shutdown removes the registry reference first, then releases this one.
     godot.resource_saver_add_resource_format_saver(
         godot.singleton_resource_saver(),
         cast(godot.Resource_Format_Saver)odin_saver_object,
         true,
     )
+}
+
+odin_saver_unregister :: proc() {
+    if odin_saver_object != nil {
+        godot.resource_saver_remove_resource_format_saver(
+            godot.singleton_resource_saver(),
+            cast(godot.Resource_Format_Saver)odin_saver_object,
+        )
+        refcounted_release(odin_saver_object)
+        odin_saver_object = nil
+    }
+    delete(saver_virtuals)
+    saver_virtuals = nil
 }

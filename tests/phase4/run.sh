@@ -7,6 +7,19 @@ set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PROJ="$ROOT/tests/phase4"
 
+# The live test swaps this authored fixture to v2. Always start at v1, and restore both
+# source + generated artifacts on exit so repeated/local test runs leave a coherent tree.
+cp "$PROJ/fixtures/lifecycle_toggle_v1.odin" "$PROJ/scripts/lifecycle_toggle.odin"
+LOG=""
+restore_v1() {
+    cp "$PROJ/fixtures/lifecycle_toggle_v1.odin" "$PROJ/scripts/lifecycle_toggle.odin"
+    SKIP_CORE=1 bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null 2>&1 || true
+    if [ -n "$LOG" ]; then
+        rm -f "$LOG"
+    fi
+}
+trap restore_v1 EXIT
+
 # Build core + scripts v1 (default RELOAD_V=1).
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
 
@@ -21,7 +34,6 @@ export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
 # Capture the output: PHASE4_OK still flows to stdout (run_all greps it), and we ALSO assert
 # the `<class>_reload` hook fired on the swap (reloader.odin prints RELOAD_HOOK_FIRED from it).
 LOG="$(mktemp)"
-trap 'rm -f "$LOG"' EXIT
 "$GODOT" --headless --path "$PROJ" --script test_phase4.gd 2>&1 | tee "$LOG"
 RC=${PIPESTATUS[0]}
 if [ "$RC" -ne 0 ]; then

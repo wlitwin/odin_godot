@@ -77,14 +77,40 @@ dll_leaf_for_dir() {
 # forwards extra odin flags to the scripts builds ONLY — e.g. `-define:RELOAD_V=2`.
 BUILT_DLLS=()
 build_one_scripts_dir() {
-    local dir="$1" out
+    local dir="$1" out attempt before after gen_rc build_rc
     check_module_isolation "$dir"
-    run_scriptgen "$dir"
     out="$BIN/$(dll_leaf_for_dir "$dir")"
-    atomic_odin_dll "$dir" "$out" \
-        ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \
-        -debug ${SCRIPT_BUILD_FLAGS:-}
-    BUILT_DLLS+=("$out")
+
+    # Treat generation + compilation as one source-tree transaction. Editor saves are
+    # coalesced, but files can still be created/deleted while this process is compiling.
+    # The generated #load_hash guard correctly rejects that stale snapshot; retry it here
+    # (at most twice) instead of reporting a false compiler failure to the editor.
+    for attempt in 1 2 3; do
+        before="$(authored_sources_fingerprint "$dir" 2>/dev/null || true)"
+        gen_rc=0
+        run_scriptgen "$dir" || gen_rc=$?
+        build_rc="$gen_rc"
+        if [[ "$gen_rc" == "0" ]]; then
+            atomic_odin_dll "$dir" "$out" \
+                ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \
+                -debug ${SCRIPT_BUILD_FLAGS:-} || build_rc=$?
+        fi
+        after="$(authored_sources_fingerprint "$dir" 2>/dev/null || true)"
+
+        if [[ -n "$before" && -n "$after" && "$before" != "$after" ]]; then
+            if [[ "$attempt" -lt "3" ]]; then
+                echo "build_scripts: authored sources changed during build; regenerating (attempt $((attempt + 1))/3)" >&2
+                continue
+            fi
+            echo "build_scripts: authored sources kept changing during 3 build attempts; save again when the edit burst settles" >&2
+            return 1
+        fi
+        if [[ "$build_rc" != "0" ]]; then
+            return "$build_rc"
+        fi
+        BUILT_DLLS+=("$out")
+        return 0
+    done
 }
 
 # 2+3. Build the requested scripts dir; when it is the MAIN one, also build each

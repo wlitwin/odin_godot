@@ -66,6 +66,57 @@ Scripts_Dll :: struct {
 	odin_scripts_registration_errors: proc "c" (out_count: ^i32) -> [^]rt.Registration_Error,
 }
 
+// Pure-data half of the native handshake. These symbols are safe to call before boot;
+// keeping the inspection in one place prevents initial load and hot reload from drifting
+// into different compatibility rules.
+@(private = "file")
+Scripts_Dll_Contract :: struct {
+	abi:  u32,
+	odin: string,
+}
+
+@(private = "file")
+scripts_dll_has_required_symbols :: proc "contextless" (dll: ^Scripts_Dll) -> bool {
+	return dll != nil &&
+	       dll.__handle != nil &&
+	       dll.odin_scripts_boot != nil &&
+	       dll.odin_scripts_manifest != nil
+}
+
+@(private = "file")
+scripts_dll_contract :: proc "contextless" (dll: ^Scripts_Dll) -> Scripts_Dll_Contract {
+	contract := Scripts_Dll_Contract{
+		abi  = 0,
+		odin = "unknown (older scripts dll)",
+	}
+	if dll == nil {
+		return contract
+	}
+	if dll.odin_scripts_abi_version != nil {
+		contract.abi = dll.odin_scripts_abi_version()
+	}
+	if dll.odin_scripts_odin_version != nil {
+		if version := dll.odin_scripts_odin_version(); version != nil {
+			contract.odin = string(version)
+		}
+	}
+	return contract
+}
+
+// Rejected candidates have published no descriptors or proc pointers, so they are safe
+// to unload immediately. Successful generations deliberately remain mapped until the
+// generation-ownership work in TODO.md makes their retirement provably safe.
+@(private = "file")
+scripts_dll_discard :: proc(dll: ^Scripts_Dll) {
+	if dll == nil {
+		return
+	}
+	if dll.__handle != nil {
+		_ = dynlib.unload_library(dll.__handle)
+	}
+	dll^ = {}
+}
+
 // ----------------------------------------------------------------------------
 // Multi-module spike: scripts can be split into SEVERAL dlls — the MAIN module
 // (res://scripts -> libodinscripts.<ext>, always present, exactly the pre-spike single
@@ -361,7 +412,7 @@ scripts_dll_path :: proc() -> string {
 @(private = "file")
 load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: bool) {
 	_, lok := dynlib.initialize_symbols(&dll, path, "", "__handle")
-	if !lok || dll.__handle == nil || dll.odin_scripts_boot == nil || dll.odin_scripts_manifest == nil {
+	if !lok || !scripts_dll_has_required_symbols(&dll) {
 		// Include the loader's own reason (dlerror / GetLastError text) — "failed to
 		// load" alone has sent people chasing phantom linkage theories before.
 		gdext_print("odin: failed to load scripts dll", path)
@@ -378,6 +429,7 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 		} else {
 			scripts_note_error(fmt.tprintf("odin_godot: failed to load script module dll %s", path))
 		}
+		scripts_dll_discard(&dll)
 		return {}, false
 	}
 
@@ -388,43 +440,35 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 	// it initialize its gdext/godot globals against this core) is exactly what must not
 	// happen. nil symbol = built before this handshake existed = also a mismatch. The fix is
 	// always "rebuild your scripts dll".
-	scripts_abi := u32(0)
-	if dll.odin_scripts_abi_version != nil {
-		scripts_abi = dll.odin_scripts_abi_version()
-	}
-	if scripts_abi != rt.ABI_VERSION {
+	contract := scripts_dll_contract(&dll)
+	if contract.abi != rt.ABI_VERSION {
 		gdext_print(
 			"odin: scripts dll ABI mismatch (rebuild your scripts: build/build_scripts.sh) — core wants",
-			fmt.tprintf("v%d, scripts dll is v%d (%s)", rt.ABI_VERSION, scripts_abi, path),
+			fmt.tprintf("v%d, scripts dll is v%d (%s)", rt.ABI_VERSION, contract.abi, path),
 		)
 		if main {
 			g_scripts_abi_skew = true
 			g_abi_core = rt.ABI_VERSION
-			g_abi_scripts = scripts_abi
+			g_abi_scripts = contract.abi
 		} else {
 			scripts_note_error(
 				fmt.tprintf(
 					"odin_godot: script module dll %s has ABI v%d, core wants v%d — rebuild it (build/build_scripts.sh)",
 					path,
-					scripts_abi,
+					contract.abi,
 					rt.ABI_VERSION,
 				),
 			)
 		}
-		surface_load_failure_runtime(fmt.tprintf("ABI mismatch: core v%d, scripts v%d", rt.ABI_VERSION, scripts_abi))
+		surface_load_failure_runtime(fmt.tprintf("ABI mismatch: core v%d, scripts v%d", rt.ABI_VERSION, contract.abi))
+		scripts_dll_discard(&dll)
 		return {}, false
 	}
 
 	// Compiler-skew handshake (also pre-boot, also pure data): matching struct SIZES across
 	// different Odin compiler releases do not guarantee the same layout/calling conventions.
 	// A missing symbol (a dll built before this handshake) is a mismatch too — never a crash.
-	scripts_odin := "unknown (older scripts dll)"
-	if dll.odin_scripts_odin_version != nil {
-		if cs := dll.odin_scripts_odin_version(); cs != nil {
-			scripts_odin = string(cs)
-		}
-	}
-	if scripts_odin != ODIN_VERSION {
+	if contract.odin != ODIN_VERSION {
 		// The fix depends on which side is "wrong", and for an ADDON consumer it is
 		// almost always their compiler: the core ships PREBUILT, so "rebuild scripts"
 		// with their (different) Odin can never converge on a match. Name the exact
@@ -436,19 +480,19 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 				"install that exact release (odin-lang.org), then rebuild scripts " +
 				"(Project > Tools > Build Odin Scripts). A prebuilt core pins the Odin " +
 				"version; building the core from source with your Odin also works.",
-				scripts_odin,
+				contract.odin,
 				ODIN_VERSION,
 			),
 		)
 		if main {
 			g_scripts_odin_skew = true
-			g_odin_scripts = strings.clone(scripts_odin)
+			g_odin_scripts = strings.clone(contract.odin)
 		} else {
 			scripts_note_error(
 				fmt.tprintf(
 					"odin_godot: script module dll %s was built with Odin %s, but the core requires %s — install that Odin release and rebuild",
 					path,
-					scripts_odin,
+					contract.odin,
 					ODIN_VERSION,
 				),
 			)
@@ -456,10 +500,11 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 		surface_load_failure_runtime(
 			fmt.tprintf(
 				"scripts dll built with Odin %s, but this core requires Odin %s — install that release, then rebuild scripts",
-				scripts_odin,
+				contract.odin,
 				ODIN_VERSION,
 			),
 		)
+		scripts_dll_discard(&dll)
 		return {}, false
 	}
 
@@ -742,30 +787,69 @@ odin_scripts_reload :: proc(module := "") -> bool {
 		return false
 	}
 
-	// 2. Load + boot + manifest the NEW dll.
+	// 2. Load and validate the NEW dll before executing any of its boot code.
 	new_dll: Scripts_Dll
 	_, lok := dynlib.initialize_symbols(&new_dll, unique, "", "__handle")
-	if !lok ||
-	   new_dll.__handle == nil ||
-	   new_dll.odin_scripts_boot == nil ||
-	   new_dll.odin_scripts_manifest == nil {
+	if !lok || !scripts_dll_has_required_symbols(&new_dll) {
 		gdext_print("odin reload: failed to load new scripts dll", unique)
+		scripts_dll_discard(&new_dll)
+		os.remove(unique)
 		return false
 	}
-	new_dll.odin_scripts_boot(saved_get_proc_address, gdext.library)
-	// ABI handshake on the swapped-in dll too (same reasoning as the initial load): never read
-	// a manifest whose Class_Desc layout might differ from this core's.
-	new_abi := u32(0)
-	if new_dll.odin_scripts_abi_version != nil {
-		new_abi = new_dll.odin_scripts_abi_version()
-	}
-	if new_abi != rt.ABI_VERSION {
+	contract := scripts_dll_contract(&new_dll)
+	if contract.abi != rt.ABI_VERSION {
 		gdext_print(
 			"odin reload: new scripts dll ABI mismatch — keeping old code",
-			fmt.tprintf("(core v%d, new dll v%d)", rt.ABI_VERSION, new_abi),
+			fmt.tprintf("(core v%d, new dll v%d)", rt.ABI_VERSION, contract.abi),
 		)
+		// Say it WHERE THE USER LOOKS, with the RIGHT fix. This runs on the main
+		// thread with the engine fully up (deferred swap / Script.reload), so
+		// push_error is safe — unlike the boot-path handshake, which is stderr-only.
+		// At swap time the scripts dll was JUST rebuilt from the addon's current
+		// sources, so a mismatch here almost always means the addon was updated
+		// while this editor kept the core dll it mapped at startup (a GDExtension
+		// cannot hot-swap itself) — "rebuild scripts" advice would be a treadmill.
+		// stderr alone let an editor session silently run days-old scripts while
+		// fresh Play runs loaded the new dlls and worked, which reads as anything
+		// but the real cause.
+		msg := godot.new_string_odin(
+			fmt.tprintf(
+				"odin_godot: reload REJECTED — your freshly-built scripts (ABI v%d) don't match " +
+					"the odin_godot core this session loaded at startup (v%d). The addon was " +
+					"updated while the editor was running: RESTART THE EDITOR to load the new " +
+					"core. Until then the previously-loaded scripts stay active in the editor " +
+					"(Play runs are unaffected — they load fresh).",
+				contract.abi,
+				rt.ABI_VERSION,
+			),
+		)
+		godot.gd_push_error(godot.variant_from_string(&msg))
+		scripts_dll_discard(&new_dll)
+		os.remove(unique)
 		return false
 	}
+	if contract.odin != ODIN_VERSION {
+		gdext_print(
+			"odin reload: new scripts dll compiler mismatch — keeping old code",
+			fmt.tprintf("(core Odin %s, new dll Odin %s)", ODIN_VERSION, contract.odin),
+		)
+		msg := godot.new_string_odin(
+			fmt.tprintf(
+				"odin_godot: reload REJECTED — your freshly-built scripts use Odin %s, but " +
+					"the loaded core requires Odin %s. Install that exact compiler release and " +
+					"rebuild; the previously-loaded scripts remain active.",
+				contract.odin,
+				ODIN_VERSION,
+			),
+		)
+		godot.gd_push_error(godot.variant_from_string(&msg))
+		scripts_dll_discard(&new_dll)
+		os.remove(unique)
+		return false
+	}
+
+	// Compatibility passed: boot, hand off core APIs, then read the manifest.
+	new_dll.odin_scripts_boot(saved_get_proc_address, gdext.library)
 	// Re-hand the resolver to the freshly-swapped dll (it has its own runtime globals).
 	if new_dll.odin_scripts_set_core_api != nil {
 		new_dll.odin_scripts_set_core_api(odin_script_struct)
@@ -798,6 +882,8 @@ odin_scripts_reload :: proc(module := "") -> bool {
 			gdext_print("odin reload: module class collision", msg)
 			scripts_note_error(msg)
 			delete(msg)
+			scripts_dll_discard(&new_dll)
+			os.remove(unique)
 			return false
 		}
 	}

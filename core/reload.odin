@@ -8,6 +8,7 @@ import "core:c/libc"
 import "core:fmt"
 import "core:hash"
 import "core:os"
+import "core:slice"
 import "core:strings"
 import "core:sync"
 import "core:thread"
@@ -149,11 +150,11 @@ reload_scripts_dir :: proc(proj: string, allocator := context.allocator) -> stri
 // Content hash of the AUTHORED `.odin` sources in `scripts` (skipping generated `*.gen.odin`).
 // Used to skip a rebuild when nothing the compiler cares about actually changed — which is
 // what makes the feature loop-safe against the editor re-importing the build's `*.gen.odin`
-// output. Hashes each file's name + bytes (fnv64a chained); unreadable dir => 0.
+// output. Hashes each file's relative path + bytes (fnv64a chained); unreadable dir => 0.
 @(private = "file")
 hash_sources :: proc(scripts: string) -> u64 {
 	h: u64 = 0xcbf29ce484222325 // fnv64a offset basis
-	hash_sources_dir(scripts, &h)
+	hash_sources_dir(scripts, "", &h)
 	if h == 0xcbf29ce484222325 {
 		return 0 // nothing hashed (unreadable or empty) — treat like "unknown", always build
 	}
@@ -177,18 +178,25 @@ mix_shared_hash :: proc(module, shared: u64) -> u64 {
 // them too), so an edit anywhere under it must change the hash — a top-level-only scan
 // made saves in a subdirectory silently skip the rebuild.
 @(private = "file")
-hash_sources_dir :: proc(dir: string, h: ^u64) {
+hash_sources_dir :: proc(dir, relative_dir: string, h: ^u64) {
 	fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
 	if err != nil {
 		return
 	}
+	// os directory enumeration order is unspecified. Stable ordering makes the same
+	// source tree produce the same fingerprint across processes/filesystems.
+	slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {return a.name < b.name})
 	for fi in fis {
+		relative_path := fi.name
+		if relative_dir != "" {
+			relative_path = strings.concatenate({relative_dir, "/", fi.name}, context.temp_allocator)
+		}
 		if fi.type == .Directory {
 			// Skip hidden dirs and build output — not compiler inputs.
 			if strings.has_prefix(fi.name, ".") || fi.name == "bin" {
 				continue
 			}
-			hash_sources_dir(fi.fullpath, h)
+			hash_sources_dir(fi.fullpath, relative_path, h)
 			continue
 		}
 		// Only authored sources; skip generated artifacts.
@@ -197,7 +205,7 @@ hash_sources_dir :: proc(dir: string, h: ^u64) {
 		}
 		data, rerr := os.read_entire_file(fi.fullpath, context.temp_allocator)
 		if rerr == nil {
-			h^ = hash.fnv64a(transmute([]byte)fi.name, h^)
+			h^ = hash.fnv64a(transmute([]byte)relative_path, h^)
 			h^ = hash.fnv64a(data, h^)
 		}
 	}
@@ -557,23 +565,28 @@ print_build_errors :: proc(output: string) {
 // generated artifacts skipped) — cheap enough for a ~2s cadence: readdir only,
 // no file contents.
 @(private = "file")
-names_hash_dir :: proc(dir: string, h: ^u64) {
+names_hash_dir :: proc(dir, relative_dir: string, h: ^u64) {
 	fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
 	if err != nil {
 		return
 	}
+	slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {return a.name < b.name})
 	for fi in fis {
+		relative_path := fi.name
+		if relative_dir != "" {
+			relative_path = strings.concatenate({relative_dir, "/", fi.name}, context.temp_allocator)
+		}
 		if fi.type == .Directory {
 			if strings.has_prefix(fi.name, ".") || fi.name == "bin" {
 				continue
 			}
-			names_hash_dir(fi.fullpath, h)
+			names_hash_dir(fi.fullpath, relative_path, h)
 			continue
 		}
 		if !strings.has_suffix(fi.name, ".odin") || strings.has_suffix(fi.name, ".gen.odin") {
 			continue
 		}
-		h^ = hash.fnv64a(transmute([]byte)fi.name, h^)
+		h^ = hash.fnv64a(transmute([]byte)relative_path, h^)
 	}
 }
 
@@ -635,6 +648,7 @@ orphans_hash_dir :: proc(dir: string, h: ^u64) {
 	if err != nil {
 		return
 	}
+	slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {return a.name < b.name})
 	for fi in fis {
 		if fi.type == .Directory {
 			if strings.has_prefix(fi.name, ".") || fi.name == "bin" {
@@ -699,11 +713,11 @@ reload_probe_fs :: proc() {
 	// EDGE trigger: a changed authored-name set (creations from git pulls,
 	// external tools, ... — deletions too, when the pulse is visible).
 	h := FNV_BASIS
-	names_hash_dir(scripts, &h)
+	names_hash_dir(scripts, "scripts", &h)
 	// The shared vocabulary tree rides along: a shared source added or deleted from
 	// OUTSIDE the editor (git pull, another tool) is a rebuild for every module, and
 	// reload_request's per-module hashes — which fold shared in — decide the rest.
-	names_hash_dir(strings.concatenate({proj, "/shared"}, context.temp_allocator), &h)
+	names_hash_dir(strings.concatenate({proj, "/shared"}, context.temp_allocator), "shared", &h)
 	if h == FNV_BASIS {
 		return // unreadable/empty: leave the baseline alone
 	}

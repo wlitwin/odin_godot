@@ -32,12 +32,25 @@ export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
 # it explicitly (an installed addons/odin_godot/ install derives it automatically).
 export ODIN_GODOT_ROOT="$ROOT"
 
+# Doctored second checkout for the ABI-skew phase (phase 8): clone the collection root
+# (APFS clonefile — instant; plain cp -R fallback) and grow Class_Desc, which is folded
+# into ABI_VERSION, so a scripts dll built against the copy carries a DIFFERENT ABI hash
+# than this core — the exact "addon updated while the editor kept its startup core" skew.
+SKEWROOT="$(mktemp -d)"
+for d in build decl dist events flow flowgd gdext godot kit kititems libgd play runtime scriptgen; do
+	[ -d "$ROOT/$d" ] || continue
+	cp -c -R "$ROOT/$d" "$SKEWROOT/$d" 2>/dev/null || cp -R "$ROOT/$d" "$SKEWROOT/$d"
+done
+perl -0pi -e 's/\nClass_Desc :: struct \{/\nClass_Desc :: struct \{\n\t_abi_skew_test_pad: u64,/' "$SKEWROOT/runtime/runtime.odin"
+grep -q '_abi_skew_test_pad' "$SKEWROOT/runtime/runtime.odin" || { echo "RELOAD_EXPORTS_FAIL: skew-root doctoring failed"; exit 1; }
+export ODIN_GODOT_SKEW_ROOT="$SKEWROOT"
+
 # First pass: write .godot/extension_list.cfg + import so the editor loads the GDExtension.
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
 
 echo "== editor --headless --script test_reload_exports.gd =="
 LOG="$(mktemp)"
-trap 'rm -f "$LOG" "$SCRIPTS"/doomed.odin "$SCRIPTS"/doomed.odin.uid; git -C "$ROOT" checkout -- tests/reload_exports/scripts/widget.odin 2>/dev/null || true' EXIT
+trap 'rm -f "$LOG" "$SCRIPTS"/doomed.odin "$SCRIPTS"/doomed.odin.uid "$SCRIPTS"/gun_probe.odin "$SCRIPTS"/gun_probe.odin.uid; rm -rf "$SKEWROOT"; git -C "$ROOT" checkout -- tests/reload_exports/scripts/widget.odin 2>/dev/null || true' EXIT
 set +e
 "$GODOT" --editor --headless --path "$PROJ" --script test_reload_exports.gd >"$LOG" 2>&1
 RC=$?
@@ -47,6 +60,11 @@ echo "----- driver output -----"; cat "$LOG"; echo "-------------------------"
 if grep -qE "signal 11|Segmentation|must be overridden|Required virtual" "$LOG"; then
 	echo "RELOAD_EXPORTS_FAIL: crash / missing-virtual error during run"
 	grep -nE "signal 11|Segmentation|must be overridden|Required virtual" "$LOG" | head
+	exit 1
+fi
+if grep -q "background scripts build FAILED" "$LOG"; then
+	echo "RELOAD_EXPORTS_FAIL: a create/delete edit burst surfaced a transient build failure"
+	grep -n "background scripts build FAILED" "$LOG" | head
 	exit 1
 fi
 if grep -q "RELOAD_EXPORTS_FAIL" "$LOG"; then
@@ -62,7 +80,26 @@ if ! grep -q "GEN_ORPHAN_SWEPT" "$LOG"; then
 	echo "RELOAD_EXPORTS_FAIL: the deletion probe never swept the deleted script's generated section"
 	exit 1
 fi
+if ! grep -q "NEW_CLASS_EXPORTS_SHOWN" "$LOG"; then
+	echo "RELOAD_EXPORTS_FAIL: new-class placeholder never showed its exports after the swap"
+	exit 1
+fi
+if ! grep -q "SKEW_SWAP_REFUSED_OLD_CODE_KEPT" "$LOG"; then
+	echo "RELOAD_EXPORTS_FAIL: ABI-skew phase did not refuse cleanly (old code not kept?)"
+	exit 1
+fi
+if ! grep -q "RESTART THE EDITOR" "$LOG"; then
+	echo "RELOAD_EXPORTS_FAIL: the ABI-skew refusal never surfaced as an editor error (stderr-only again?)"
+	exit 1
+fi
+if ! grep -q "SKEW_RECOVERED_AFTER_RESTORE" "$LOG"; then
+	echo "RELOAD_EXPORTS_FAIL: reload pipeline did not recover after the skew root was restored"
+	exit 1
+fi
 echo "  ok  new @export appeared in-process after save+rebuild+reload (no restart)"
 echo "  ok  a deleted script's generated section swept itself (the deletion probe)"
+echo "  ok  create/delete coalescing completed without a transient failed-build state"
+echo "  ok  a brand-new class's exports appeared on its stale placeholder after the swap"
+echo "  ok  an ABI-skewed rebuild is refused LOUDLY (restart-the-editor error), old code kept, pipeline recovers"
 echo "  (visual-only, not asserted)  live Inspector PANEL redraw"
 echo "RELOAD_EXPORTS_OK"

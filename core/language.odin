@@ -475,5 +475,11 @@ odin_language_register :: proc() {
 odin_language_unregister :: proc() {
     if odin_language_object != nil {
         godot.engine_unregister_script_language(godot.singleton_engine(), cast(godot.Object)odin_language_object)
+        // ScriptLanguage is Object-derived (not RefCounted); unregistering only removes
+        // it from ScriptServer, so the extension must destroy the instance it constructed.
+        gdext.object_destroy(odin_language_object)
+        odin_language_object = nil
     }
+    delete(language_virtuals)
+    language_virtuals = nil
 }
