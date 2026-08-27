@@ -66,9 +66,13 @@ Status: `[ ]` pending, `[~]` in progress, `[x]` complete.
     approximate mapped bytes, and a restart recommendation (`0` disables the warning).
   - Once the remaining ownership is explicit, unload retired generations at the gate instead
     of relying on the operational warning.
-- [ ] Avoid recompiling unaffected modules.
-  - Map changed paths to module roots without walking and hashing every module on each save.
-  - Keep a periodic full reconciliation for external filesystem changes and deletions.
+- [x] Avoid recompiling unaffected modules.
+  - Save and editor-reload callbacks preserve their resource paths; coalesced worker jobs map
+    them directly to the main/module roots and hash only those roots (shared edits remain global).
+  - The first worker probe establishes all hash baselines without rebuilding, and a wall-clock
+    ~30s full reconciliation catches external content changes/deletions without taxing each save.
+  - The multi-module editor regression traces the pre-walk plan and proves an enemies save plus
+    its generated-file refresh both remain scoped to the enemies module.
 - [ ] Reduce toolchain coupling at the native boundary.
   - Audit ABI-visible types and allocator ownership, document the exact compiler constraint,
     and evaluate a narrower C ABI so compatible scripts do not require compiler lockstep.

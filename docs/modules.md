@@ -412,10 +412,12 @@ and `scriptgen` will say so at build time rather than let two dlls disagree at p
 ## Reload: per-module rebuild and swap
 
 Saving a script in the editor rebuilds **only the module containing the saved file**: the
-reload coordinator keeps a content hash per module and kicks one scoped build per *changed*
-module, then hot-swaps just that dll. The other dlls are not rebuilt, not reloaded, not
-touched. The ~0.85 s floor is paid once per save, for one module, no matter how big the rest
-of the project is.
+reload coordinator maps the resource path directly to its module root, hashes that root (not
+every module), and kicks one scoped build per *changed* module before hot-swapping just that
+dll. A first background probe establishes all hash baselines, and a slower full reconciliation
+catches out-of-editor content edits/deletions. The other dlls are not rebuilt, not reloaded,
+or touched during an ordinary save. The ~0.85 s floor is paid once per save, for one module,
+no matter how big the rest of the project is.
 
 Semantics of a module swap (all asserted by `tests/modules_spike/`):
 

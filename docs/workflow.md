@@ -92,11 +92,14 @@ save-then-Play would silently run your *previous* dll. This uses the editor's
 in the Output explains the refusal.
 
 **Per-module rebuilds.** In a project using [script modules](modules.md), the rebuild is
-scoped: the coordinator hashes each module's sources and rebuilds + swaps **only the
-module(s) whose sources changed**. A save in `res://modules/enemies/` recompiles that one
-dll, leaving the main module and every other module's dll (instances, package globals, all
-of it) untouched. That's what keeps save latency flat in large projects; the swapped
-module's own package globals reset (fresh dll). The one exception is a save under
+scoped: the saved resource path maps directly to its module root, so the worker neither walks
+nor hashes unrelated modules before rebuilding + swapping **only the module(s) whose sources
+changed**. Coalesced saves retain every affected root. A save in `res://modules/enemies/`
+recompiles that one dll, leaving the main module and every other module's dll (instances,
+package globals, all of it) untouched. A slower background reconciliation still catches
+external edits and deletions that did not produce a save callback. That's what keeps save
+latency flat in large projects; the swapped module's own package globals reset (fresh dll).
+The one exception is a save under
 `res://shared/`, the [read-only vocabulary tree](modules.md#shared) every module may import:
 that rebuilds and swaps **every** module, because any of them may be compiled against it.
 See [Script Modules](modules.md) for details.

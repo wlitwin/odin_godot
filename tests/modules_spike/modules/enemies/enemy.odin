@@ -34,6 +34,7 @@ Enemy :: struct {
 	hp:         gd.Int `gd:"export"`,
 	position:   gd.Int `gd:"export"`,
 	ready_mark: gd.Int `gd:"export"`,
+	//TARGET_SCAN_FIELD
 }
 
 enemy_ready :: proc(self: ^Enemy) {

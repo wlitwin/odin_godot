@@ -178,5 +178,5 @@ odin_scripts_reload :: proc(module := "") -> bool {
 // (native core/reload.odin) does not exist here. `OdinScript._reload` references this on
 // all platforms; on web it is a no-op (the editor-hint branch is never taken anyway).
 @(private)
-reload_request :: proc() {
+reload_request :: proc(force := false, probe := false, reconcile := false, source_path := "") {
 }

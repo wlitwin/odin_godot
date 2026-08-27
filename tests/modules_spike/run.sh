@@ -34,9 +34,10 @@ cleanup_generated() {
 }
 cleanup_generated
 LOG="$(mktemp)"
+TLOG="$(mktemp)"
 CLOG="$(mktemp)"
 ILOG="$(mktemp)"
-trap 'rm -f "$LOG" "$CLOG" "$ILOG"; cleanup_generated' EXIT
+trap 'rm -f "$LOG" "$TLOG" "$CLOG" "$ILOG"; cleanup_generated' EXIT
 
 # Build core + the main module + the enemies module (v1).
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
@@ -47,6 +48,31 @@ export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
 
 # First pass: write .godot/extension_list.cfg so the runtime loads the extension.
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+
+# ---- targeted scan: an enemies save must select only the enemies source tree ----
+# Opt-in worker diagnostics expose the scan plan chosen before any filesystem walk. Ignore the
+# initial all-module baseline; between the request/OK markers every plan must stay targeted.
+export ODIN_RELOAD_TRACE_SCANS=1
+"$GODOT" --editor --headless --path "$PROJ" --script test_targeted_scan.gd 2>&1 | tee "$TLOG"
+TRC=${PIPESTATUS[0]}
+unset ODIN_RELOAD_TRACE_SCANS
+if [ "$TRC" -ne 0 ] || ! grep -q "TARGETED_MODULE_SCAN_OK" "$TLOG"; then
+    echo "MODULES_SPIKE_FAIL: editor save did not remain scoped to the enemies module"
+    exit 1
+fi
+TARGET_TRACE="$(awk '/TARGETED_SCAN_REQUEST/{capture=1; next} /TARGETED_MODULE_SCAN_OK/{capture=0} capture && /ODIN_RELOAD_SCAN_SCOPE/{print}' "$TLOG")"
+if ! grep -q "ODIN_RELOAD_SCAN_SCOPE module=enemies" <<<"$TARGET_TRACE"; then
+    echo "MODULES_SPIKE_FAIL: enemies save did not select the enemies scan scope"
+    exit 1
+fi
+if grep -q "ODIN_RELOAD_SCAN_SCOPE all reason=bulk" <<<"$TARGET_TRACE"; then
+    echo "MODULES_SPIKE_FAIL: enemies save fell back to a bulk all-module source scan"
+    exit 1
+fi
+echo "  ok  editor save hashes/builds only its owning module"
+# The driver restores enemy.odin before exiting; rebuild that module once so the on-disk
+# DLL and restored authored layout are coherent for the existing runtime phase below.
+SKIP_CORE=1 BUILD_MODULES=0 bash "$ROOT/build/build_scripts.sh" "$PROJ" "$PROJ/modules/enemies"
 
 # ---- phase 1: main ----
 "$GODOT" --headless --path "$PROJ" --script test_modules.gd 2>&1 | tee "$LOG"

@@ -1027,19 +1027,22 @@ v_reload :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.
     //   * RUNNING GAME: the on-disk dll was already rebuilt out-of-band (e.g. the Phase-4
     //     hot-reload test); swap it synchronously and re-bind live instances in place.
     context = gdext.godot_context()
+    self := cast(^OdinScript)instance
+    path := ""
+    if self != nil && self.object != nil {
+        gpath := godot.resource_get_path(cast(godot.Resource)self.object)
+        path = string_to_odin(gpath, context.temp_allocator)
+    }
     if bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
-        reload_request()
+        reload_request(source_path = path)
         ret_int(ret, 0) // 0 == OK; the rebuild+swap happens asynchronously
         return
     }
     // Multi-module: swap ONLY the module this script belongs to (res://modules/<name>/...
     // -> "<name>", anything else -> "" == the MAIN module). A single-module project always
     // resolves to "" — the pre-spike behavior.
-    self := cast(^OdinScript)instance
     module := ""
-    if self != nil && self.object != nil {
-        gpath := godot.resource_get_path(cast(godot.Resource)self.object)
-        path := string_to_odin(gpath, context.temp_allocator)
+    if path != "" {
         module = scripts_module_for_res_path(path)
     }
     ok := odin_scripts_reload(module)

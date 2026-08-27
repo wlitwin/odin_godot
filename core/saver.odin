@@ -189,7 +189,8 @@ sv_save :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.T
     // and the build is skipped). Doing it right after the write guarantees the rebuild sees the
     // new content. reload_request is editor-gated + non-blocking, and hash-deduped if _reload
     // also fires.
-    reload_request()
+    saved_path := string_to_odin(path, context.temp_allocator)
+    reload_request(source_path = saved_path)
 
     ret_int(ret, 0) // OK
 }

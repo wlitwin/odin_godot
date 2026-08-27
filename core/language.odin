@@ -118,14 +118,44 @@ lv_get_string_delimiters :: proc "c" (instance: gdext.ExtensionClassInstancePtr,
 lv_noop :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
 }
 
-// `_reload_all_scripts` / `_reload_scripts` / `_reload_tool_script` — the editor's bulk/tool
-// "reload" affordances. We treat them as a MANUAL trigger for the rebuild-on-save flow:
-// kick a background scripts rebuild (editor-gated, coalesced — see reload.odin). This gives
-// a reliable on-demand "recompile my Odin @exports" even if per-file save detection misses.
+// The editor's reload affordances feed the rebuild-on-save flow. Preserve the paths Godot
+// provides for `_reload_scripts`/`_reload_tool_script`: generated-file refreshes call these
+// after a build, and collapsing them into a pathless bulk request would immediately walk every
+// module again. `_reload_all_scripts` remains the intentional all-module/manual escape hatch.
 @(private = "file")
-lv_reload_request :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+lv_reload_all_scripts :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
     reload_request()
+}
+
+@(private = "file")
+reload_script_object :: proc(script: godot.Script) -> bool {
+    if script == nil {return false}
+    gpath := godot.resource_get_path(cast(godot.Resource)script)
+    path := string_to_odin(gpath, context.temp_allocator)
+    if path == "" || !strings.has_suffix(path, ".odin") {return false}
+    reload_request(source_path = path)
+    return true
+}
+
+@(private = "file")
+lv_reload_scripts :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+    context = gdext.godot_context()
+    scripts := cast(^godot.Array)args[0]
+    if scripts == nil {return}
+    for i in 0 ..< godot.array_size(scripts) {
+        value := godot.array_get(scripts, i)
+        object := godot.variant_to_object(&value)
+        _ = reload_script_object(cast(godot.Script)object)
+        godot.variant_destroy(&value)
+    }
+}
+
+@(private = "file")
+lv_reload_tool_script :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+    context = gdext.godot_context()
+    script := (cast(^godot.Script)args[0])^
+    _ = reload_script_object(script)
 }
 
 @(private = "file")
@@ -441,9 +471,9 @@ odin_language_register :: proc() {
     add("_debug_get_stack_level_instance", lv_ptr_null) // void*
     add("_debug_get_globals", lv_dict_empty) // Dictionary
     add("_debug_parse_stack_level_expression", lv_string_empty) // String
-    add("_reload_all_scripts", lv_reload_request) // void — manual rebuild-on-demand trigger
-    add("_reload_scripts", lv_reload_request) // void — manual rebuild-on-demand trigger
-    add("_reload_tool_script", lv_reload_request) // void — manual rebuild-on-demand trigger
+    add("_reload_all_scripts", lv_reload_all_scripts) // void — all-module manual trigger
+    add("_reload_scripts", lv_reload_scripts) // void — path-scoped editor refresh
+    add("_reload_tool_script", lv_reload_tool_script) // void — path-scoped tool refresh
     add("_get_public_functions", lv_array_empty) // typedarray::Dictionary
     add("_get_public_constants", lv_dict_empty) // Dictionary
     add("_get_public_annotations", lv_array_empty) // typedarray::Dictionary

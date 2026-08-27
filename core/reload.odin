@@ -107,7 +107,9 @@ Reload_State :: struct {
 	// name SET fires reload_request; the rebuild's regeneration does the rest.
 	// Catches creations from outside the editor as a bonus.
 	probe_hash: u64,
-	probe_tick: int,
+	probe_initialized: bool,
+	probe_next_ns: i64,
+	reconcile_next_ns: i64,
 	// The edge trigger above can MISS a pulse: a source created and deleted
 	// inside one probe window samples as "no change" while the create already
 	// materialized its generated code (the editor's own import can kick that
@@ -117,6 +119,9 @@ Reload_State :: struct {
 	// sibling. This remembers the orphan set already kicked, so a sweep that
 	// cannot succeed (read-only tree, ...) fires once instead of every two seconds.
 	probe_orphans: u64,
+	// True only while the first worker probe is establishing content-hash baselines.
+	// A source save racing that scan is forced so the baseline cannot swallow the edit.
+	baseline_in_flight: bool,
 }
 
 @(private)
@@ -132,6 +137,12 @@ Reload_Job :: struct {
 	log_path: string,
 	force:    bool,
 	probe:    bool,
+	reconcile: bool,
+	baseline_probe: bool,
+	// The main module is stored as "". Multiple names arise when save requests
+	// coalesce while another build is running.
+	scan_all:       bool,
+	target_modules: [dynamic]string,
 }
 
 @(private = "file")
@@ -139,6 +150,50 @@ Reload_Candidate :: struct {
 	name: string, // "" == the main module
 	dir:  string,
 	hash: u64,
+}
+
+@(private = "file")
+reload_job_add_target :: proc(job: ^Reload_Job, module: string) {
+	if job == nil || job.scan_all {return}
+	for existing in job.target_modules {
+		if existing == module {return}
+	}
+	append(&job.target_modules, strings.clone(module, core_allocator()))
+}
+
+@(private = "file")
+reload_job_set_scan_all :: proc(job: ^Reload_Job) {
+	if job == nil || job.scan_all {return}
+	for module in job.target_modules {
+		delete(module, core_allocator())
+	}
+	delete(job.target_modules)
+	job.target_modules = nil
+	job.scan_all = true
+}
+
+@(private = "file")
+reload_job_merge_scope :: proc(job, old: ^Reload_Job) {
+	if job == nil || old == nil {return}
+	if job.scan_all || old.scan_all {
+		reload_job_set_scan_all(job)
+		return
+	}
+	for module in old.target_modules {
+		reload_job_add_target(job, module)
+	}
+}
+
+// Turn an editor resource path into a build scope without touching the filesystem.
+// Shared code can affect every DLL; a normal save maps directly to one module root.
+@(private = "file")
+reload_job_scope_source :: proc(job: ^Reload_Job, source_path: string) {
+	if source_path == "" || source_path == "res://shared" ||
+	   strings.has_prefix(source_path, "res://shared/") {
+		reload_job_set_scan_all(job)
+		return
+	}
+	reload_job_add_target(job, scripts_module_for_res_path(source_path))
 }
 
 // Absolute filesystem path of `res://` for the open project (globalized, trailing-/ trimmed).
@@ -245,9 +300,11 @@ hash_sources_dir :: proc(dir, relative_dir: string, h: ^u64) {
 // reload virtuals. Resolves everything that needs Godot here, then hands an opaque shell
 // command to a worker thread. Returns immediately (non-blocking).
 // `force` bypasses the unchanged-sources skip — used by the manual "Build Odin Scripts" editor
-// action so a click always rebuilds (and gives feedback), even with nothing edited.
+// action so a click always rebuilds (and gives feedback), even with nothing edited. A non-empty
+// `source_path` scopes filesystem work to its owning module; shared/ and pathless bulk requests
+// intentionally reconcile every module.
 @(private)
-reload_request :: proc(force := false, probe := false) {
+reload_request :: proc(force := false, probe := false, reconcile := false, source_path := "") {
 	// Hard gate: never rebuild outside the editor (a shipped game has no compiler and must
 	// never shell out to one).
 	if !bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
@@ -288,6 +345,12 @@ reload_request :: proc(force := false, probe := false) {
 	job.scripts = scripts
 	job.force = force
 	job.probe = probe
+	job.reconcile = reconcile
+	if probe || source_path == "" {
+		reload_job_set_scan_all(job)
+	} else {
+		reload_job_scope_source(job, source_path)
+	}
 
 	// Constant per project. Set/read under the same mutex as the queue, then give the
 	// worker its own clone so no unsynchronized state string is observed.
@@ -299,6 +362,9 @@ reload_request :: proc(force := false, probe := false) {
 
 	start_now := false
 	discard: ^Reload_Job
+	// The first probe records content baselines without rebuilding every module. Mark it
+	// before publishing the job so a concurrent real save can force its target if needed.
+	job.baseline_probe = probe && !g_reload.probe_initialized
 	if g_reload.worker_running {
 		old := cast(^Reload_Job)g_reload.pending_job
 		// A real save/manual request outranks the periodic filesystem probe. Otherwise
@@ -308,13 +374,20 @@ reload_request :: proc(force := false, probe := false) {
 		} else {
 			if old != nil {
 				job.force = job.force || old.force
+				if !old.probe || job.probe {
+					reload_job_merge_scope(job, old)
+				}
 				discard = old
+			}
+			if !job.probe && g_reload.baseline_in_flight {
+				job.force = true
 			}
 			g_reload.pending_job = rawptr(job)
 			g_reload.build_pending = true
 		}
 	} else {
 		g_reload.worker_running = true
+		g_reload.baseline_in_flight = job.baseline_probe
 		start_now = true
 	}
 	sync.unlock(&g_reload.mutex)
@@ -336,6 +409,10 @@ destroy_reload_job :: proc(job: ^Reload_Job) {
 	if job.proj != "" {delete(job.proj, a)}
 	if job.scripts != "" {delete(job.scripts, a)}
 	if job.log_path != "" {delete(job.log_path, a)}
+	for module in job.target_modules {
+		delete(module, a)
+	}
+	delete(job.target_modules)
 	free(job, a)
 }
 
@@ -349,7 +426,7 @@ spawn_build_worker :: proc(job: ^Reload_Job) {
 // Worker-side deletion/name probe. It performs every readdir/read/exists operation and
 // only publishes a tiny decision + editor notice under the state mutex.
 @(private = "file")
-reload_probe_worker :: proc(job: ^Reload_Job) -> (build: bool, force: bool) {
+reload_probe_worker :: proc(job: ^Reload_Job) -> (prepare: bool, force: bool, baseline: bool) {
 	FNV_BASIS :: u64(0xcbf29ce484222325)
 
 	orphans := FNV_BASIS
@@ -365,19 +442,30 @@ reload_probe_worker :: proc(job: ^Reload_Job) -> (build: bool, force: bool) {
 		if orphans != state.probe_orphans {
 			state.probe_orphans = orphans
 			state.probe_notice = .Orphaned_Generated_Code
-			build = true
+			prepare = true
 			force = true
 		}
 	} else {
 		state.probe_orphans = 0
 	}
-	if h != FNV_BASIS {
-		old := state.probe_hash
-		state.probe_hash = h
-		if old != 0 && old != h && !build {
+	old := state.probe_hash
+	initialized := state.probe_initialized
+	state.probe_hash = h
+	state.probe_initialized = true
+	if initialized {
+		if old != h && !prepare {
 			state.probe_notice = .Script_Set_Changed
-			build = true
+			prepare = true
 		}
+	} else if !prepare {
+		// Establish every module's content baseline off-thread. This prevents the first
+		// later targeted save/reconciliation from rebuilding untouched modules merely
+		// because they had no hash entry yet.
+		prepare = true
+		baseline = true
+	}
+	if job.reconcile && !prepare {
+		prepare = true
 	}
 	sync.unlock(&state.mutex)
 	return
@@ -387,31 +475,79 @@ reload_probe_worker :: proc(job: ^Reload_Job) -> (build: bool, force: bool) {
 // entire function runs on the worker: save callbacks no longer enumerate directories or
 // read source bytes on the editor thread.
 @(private = "file")
-prepare_reload_command :: proc(job: ^Reload_Job, force: bool) -> (cmd: string, build: bool) {
+prepare_reload_command :: proc(
+	job: ^Reload_Job,
+	force: bool,
+	baseline := false,
+) -> (cmd: string, build: bool) {
+	// Test/debug-only trace of the plan chosen BEFORE any module tree is walked. Kept
+	// behind an environment flag so normal editor saves stay quiet.
+	if os.get_env("ODIN_RELOAD_TRACE_SCANS", context.temp_allocator) == "1" {
+		if job.scan_all {
+			reason := "bulk"
+			if job.baseline_probe {
+				reason = "baseline"
+			} else if job.reconcile {
+				reason = "reconcile"
+			} else if job.probe {
+				reason = "probe"
+			}
+			os.write_string(
+				os.stderr,
+				fmt.tprintf("ODIN_RELOAD_SCAN_SCOPE all reason=%s\n", reason),
+			)
+		} else {
+			for name in job.target_modules {
+				label := name
+				if label == "" {label = "main"}
+				os.write_string(
+					os.stderr,
+					fmt.tprintf("ODIN_RELOAD_SCAN_SCOPE module=%s\n", label),
+				)
+			}
+		}
+	}
 	shared_dir := strings.concatenate({job.proj, "/shared"}, context.temp_allocator)
 	shared_h := hash_sources(shared_dir)
 
 	cands := make([dynamic]Reload_Candidate, context.temp_allocator)
-	append(
-		&cands,
-		Reload_Candidate{
-			name = "",
-			dir  = strings.clone(job.scripts, context.temp_allocator),
-			hash = mix_shared_hash(hash_sources(job.scripts), shared_h),
-		},
-	)
-	mroot := strings.concatenate({job.proj, "/modules"}, context.temp_allocator)
-	if fis, rerr := os.read_directory_by_path(mroot, -1, context.temp_allocator); rerr == nil {
-		for fi in fis {
-			if fi.type != .Directory || strings.has_prefix(fi.name, ".") {
-				continue
+	if job.scan_all {
+		append(
+			&cands,
+			Reload_Candidate{
+				name = "",
+				dir  = strings.clone(job.scripts, context.temp_allocator),
+				hash = mix_shared_hash(hash_sources(job.scripts), shared_h),
+			},
+		)
+		mroot := strings.concatenate({job.proj, "/modules"}, context.temp_allocator)
+		if fis, rerr := os.read_directory_by_path(mroot, -1, context.temp_allocator); rerr == nil {
+			for fi in fis {
+				if fi.type != .Directory || strings.has_prefix(fi.name, ".") {
+					continue
+				}
+				append(
+					&cands,
+					Reload_Candidate{
+						name = strings.clone(fi.name, context.temp_allocator),
+						dir  = strings.clone(fi.fullpath, context.temp_allocator),
+						hash = mix_shared_hash(hash_sources(fi.fullpath), shared_h),
+					},
+				)
+			}
+		}
+	} else {
+		for name in job.target_modules {
+			dir := strings.clone(job.scripts, context.temp_allocator)
+			if name != "" {
+				dir = strings.concatenate({job.proj, "/modules/", name}, context.temp_allocator)
 			}
 			append(
 				&cands,
 				Reload_Candidate{
-					name = strings.clone(fi.name, context.temp_allocator),
-					dir  = strings.clone(fi.fullpath, context.temp_allocator),
-					hash = mix_shared_hash(hash_sources(fi.fullpath), shared_h),
+					name = strings.clone(name, context.temp_allocator),
+					dir  = dir,
+					hash = mix_shared_hash(hash_sources(dir), shared_h),
 				},
 			)
 		}
@@ -425,6 +561,10 @@ prepare_reload_command :: proc(job: ^Reload_Job, force: bool) -> (cmd: string, b
 	}
 	for c in cands {
 		prev, seen := state.last_hashes[c.name]
+		if baseline && !seen {
+			state.last_hashes[strings.clone(c.name, core_allocator())] = c.hash
+			continue
+		}
 		if !force && c.hash != 0 && seen && prev == c.hash {
 			continue
 		}
@@ -528,6 +668,9 @@ finish_reload_job :: proc(
 	state := job.state
 	sync.lock(&state.mutex)
 	state.worker_running = false
+	if job.baseline_probe {
+		state.baseline_in_flight = false
+	}
 	if did_build {
 		state.build_running = false
 		state.last_build_ms = build_ms
@@ -551,6 +694,7 @@ finish_reload_job :: proc(
 	state.build_pending = false
 	if has_next {
 		state.worker_running = true
+		state.baseline_in_flight = next_job.baseline_probe
 	}
 	sync.unlock(&state.mutex)
 
@@ -569,16 +713,18 @@ build_worker_entry :: proc(data: rawptr) {
 	context.allocator = runtime.heap_allocator()
 
 	force := job.force
+	baseline := false
 	if job.probe {
-		probe_build, probe_force := reload_probe_worker(job)
-		if !probe_build {
+		probe_prepare, probe_force, probe_baseline := reload_probe_worker(job)
+		if !probe_prepare {
 			finish_reload_job(job, false, 0, 0, "")
 			return
 		}
 		force = force || probe_force
+		baseline = probe_baseline
 	}
 
-	cmd, should_build := prepare_reload_command(job, force)
+	cmd, should_build := prepare_reload_command(job, force, baseline)
 	if !should_build {
 		finish_reload_job(job, false, 0, 0, "")
 		return
@@ -750,12 +896,22 @@ orphans_hash_dir :: proc(dir: string, h: ^u64) {
 // build_worker_entry, sharing the same coalescing queue as save-triggered builds.
 @(private = "file")
 reload_probe_fs :: proc() {
-	g_reload.probe_tick += 1
-	if g_reload.probe_tick < 120 { // ~2s at editor frame rates
+	SECOND_NS :: i64(1_000_000_000)
+	now := time.tick_now()._nsec
+	if g_reload.probe_next_ns == 0 {
+		g_reload.probe_next_ns = now + 2 * SECOND_NS
+		g_reload.reconcile_next_ns = now + 30 * SECOND_NS
 		return
 	}
-	g_reload.probe_tick = 0
-	reload_request(probe = true)
+	if now < g_reload.probe_next_ns {
+		return
+	}
+	g_reload.probe_next_ns = now + 2 * SECOND_NS
+	reconcile := now >= g_reload.reconcile_next_ns
+	if reconcile {
+		g_reload.reconcile_next_ns = now + 30 * SECOND_NS
+	}
+	reload_request(probe = true, reconcile = reconcile)
 }
 
 @(private)
