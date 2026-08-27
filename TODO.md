@@ -11,11 +11,15 @@ Status: `[ ]` pending, `[~]` in progress, `[x]` complete.
   - Initial load and hot reload use the same required-symbol, ABI, and Odin compiler checks.
   - A rejected DLL is unloaded and its temporary reload copy is removed.
   - ABI and compiler mismatches produce actionable editor errors.
-- [ ] Define and enforce the instance/reload threading contract.
-  - Either all instance create/free/rebind operations are main-thread-only, or the live
-    instance registry pins each entry while a reload snapshot is in use.
-  - Script lookup/cache access follows the same synchronization rule.
-  - Add a stress test covering reload during instance churn before unloading old DLLs.
+- [x] Define and enforce the instance/reload threading contract.
+  - A writer-preferring execution gate drains in-flight script callbacks before a native
+    DLL is published and blocks new descriptor/cache/user access until rebind completes.
+  - Reload snapshots pin each live entry; a synchronous free from a reload hook retires the
+    instance immediately but defers destruction until the walk releases its pin.
+  - Class-cache and ScriptInstance-vtable initialization are serialized without adding a
+    lock to the steady-state method/property lookup fast paths.
+  - The Phase 4 stress probe holds an old-generation call on a worker while reloading and
+    destroys another instance re-entrantly from its reload hook.
 - [~] Replace the fixed 256-class registry, or make the bound a generated/build-time limit.
   - Until the fixed bound is removed, overflow must fail loudly and never silently omit a
     class from the manifest.
@@ -46,14 +50,22 @@ Status: `[ ]` pending, `[~]` in progress, `[x]` complete.
 - [x] Cache the `scriptgen` tool between builds.
   - Cache keys include the exact Odin compiler, scriptgen sources, and generator dependencies.
   - Unix and PowerShell build paths share the same invalidation behavior.
-- [ ] Move source scanning/hashing off the editor main thread.
-  - Save handling only queues dirty paths/modules; filesystem reads and hashing run on the
-    existing build worker.
-  - Bursts remain coalesced and a completed build is never labeled with a newer fingerprint.
-- [ ] Bound native DLL generations retained by hot reload.
+- [x] Move source scanning/hashing off the editor main thread.
+  - Save handling resolves only Godot-backed settings and queues an owned request; recursive
+    source reads, module enumeration, orphan detection, fingerprints, and command assembly
+    run on the serialized build worker.
+  - Save bursts remain latest-request coalesced, manual force requests retain priority, and
+    periodic probes cannot replace a pending real save or flicker the compiler-busy status.
+  - A completed build remains paired with the hashes/modules selected by that worker job.
+- [~] Bound native DLL generations retained by hot reload.
   - Do not unload a generation while proc pointers or instances can still reference it.
-  - Once generation ownership is explicit, unload retired generations; until then, surface a
-    restart recommendation after a configurable count/byte estimate.
+  - The execution gate now proves no old trampoline is on an engine callback stack at the
+    swap point; remaining work is explicit ownership for removed-class instances, returned
+    property metadata, and user-cached raw proc pointers.
+  - A configurable retained-generation interval now surfaces the running generation count,
+    approximate mapped bytes, and a restart recommendation (`0` disables the warning).
+  - Once the remaining ownership is explicit, unload retired generations at the gate instead
+    of relying on the operational warning.
 - [ ] Avoid recompiling unaffected modules.
   - Map changed paths to module roots without walking and hashing every module on each save.
   - Keep a periodic full reconciliation for external filesystem changes and deletions.
@@ -66,7 +78,7 @@ Status: `[ ]` pending, `[~]` in progress, `[x]` complete.
 - [x] Reflection/registration unit suite passes, including registry overflow coverage.
 - [x] Phase 4 lifecycle/reload suite passes with no integration-owned shutdown leaks.
 - [~] Reload/export verification covers every guarded transition.
-  - [x] ABI rejection, lifecycle transitions, and create/delete coalescing without an
-    intermediate failed build.
+  - [x] ABI rejection, lifecycle transitions, create/delete coalescing, worker-call drain,
+    and a re-entrant instance free without an intermediate failed build.
   - [ ] Add a doctored compiler-version rejection fixture.
 - [ ] macOS/Linux and Windows build helpers have equivalent cache and cleanup semantics.

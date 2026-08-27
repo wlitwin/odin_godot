@@ -47,6 +47,10 @@ func _run() -> void:
 	if toggle_script == null:
 		_fail("lifecycle_toggle.odin failed to load")
 		return
+	var victim_script = load("res://scripts/reload_victim.odin")
+	if victim_script == null:
+		_fail("reload_victim.odin failed to load")
+		return
 
 	# ---- build the live instance ----
 	var node := Node.new()
@@ -55,6 +59,9 @@ func _run() -> void:
 	var toggle := Node.new()
 	toggle.set_script(toggle_script)
 	root.add_child(toggle)
+	var victim := Node.new()
+	victim.set_script(victim_script)
+	root.add_child(victim)
 
 	# ===== 1. assert v1 behavior =====
 	var step_v1 = node.call("get_step")
@@ -84,12 +91,6 @@ func _run() -> void:
 		_fail("v1 absent process callback ran unexpectedly")
 		return
 
-	# ===== 2. set preserved state =====
-	node.set("position", 1005)
-	if int(node.get("position")) != 1005:
-		_fail("could not set position=1005 (got %d)" % int(node.get("position")))
-		return
-
 	# ===== 3. rebuild scripts dll as v2 (edit-save simulation) =====
 	var out := []
 	var code := OS.execute("bash", [ProjectSettings.globalize_path("res://rebuild_v2.sh")], out, true)
@@ -99,11 +100,36 @@ func _run() -> void:
 
 	# ===== 4. trigger reload through the engine =====
 	# `Script.reload(keep_state)` routes to OdinScript._reload, which swaps the dll
-	# and re-binds this live instance in place. No frame elapses across this call.
+	# and re-binds this live instance in place. Hold an old-generation method open on a
+	# worker thread first: reload must drain that call rather than racing its trampoline.
+	var worker := Thread.new()
+	var thread_err := worker.start(Callable(node, "hold_reload_reader").bind(500))
+	if thread_err != OK:
+		_fail("could not start reload reader thread: %s" % str(thread_err))
+		return
+	await create_timer(0.075).timeout
+	# Set the preservation sentinel AFTER the await (the v1 process callback ticks while
+	# the timer runs), immediately before the synchronous swap.
+	node.set("position", 1005)
+	if int(node.get("position")) != 1005:
+		worker.wait_to_finish()
+		_fail("could not set position=1005 (got %d)" % int(node.get("position")))
+		return
+	var reload_started := Time.get_ticks_msec()
 	var err = script.reload(true)
+	var reload_elapsed := Time.get_ticks_msec() - reload_started
+	worker.wait_to_finish()
 	if err != OK:
 		_fail("script.reload(true) returned error %s" % str(err))
 		return
+	if reload_elapsed < 250:
+		_fail("reload did not drain the in-flight script call (returned in %dms)" % reload_elapsed)
+		return
+	print("RELOAD_READER_DRAINED (%dms)" % reload_elapsed)
+	if is_instance_valid(victim):
+		_fail("reload victim survived its synchronous reload-hook free")
+		return
+	print("RELOAD_SNAPSHOT_FREE_SAFE")
 
 	# ===== 5a. v2 behavior is now live (method returns the new value) =====
 	var step_v2 = node.call("get_step")

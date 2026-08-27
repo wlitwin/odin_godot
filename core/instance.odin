@@ -38,6 +38,12 @@ Odin_Instance :: struct {
 	user:       rawptr, // the allocated script struct (owner ptr at offset 0)
 	cache:      ^Class_Cache, // interned names + cached Variant constructors (per class)
 	class_name: string, // OWNED (heap) copy of desc.name — survives a dll swap (Phase 4)
+	// Reload snapshots pin the bookkeeping object so a synchronous Godot re-entry can
+	// free an instance during lifecycle.reload without invalidating the walk. The retired
+	// flag means Godot called free and the instance is no longer discoverable; destruction
+	// waits for the last snapshot pin.
+	reload_pins: int,
+	retired:    bool,
 }
 
 // ----------------------------------------------------------------------------
@@ -76,10 +82,13 @@ track_live_instance :: proc(oi: ^Odin_Instance) {
 }
 
 @(private)
-untrack_live_instance :: proc(oi: ^Odin_Instance) {
+retire_live_instance :: proc(oi: ^Odin_Instance) -> (destroy_now: bool) {
 	context.allocator = core_allocator()
 	sync.lock(&live_lock)
 	defer sync.unlock(&live_lock)
+	if oi.retired {
+		return false
+	}
 	for x, i in live_instances {
 		if x == oi {
 			unordered_remove(&live_instances, i)
@@ -88,6 +97,49 @@ untrack_live_instance :: proc(oi: ^Odin_Instance) {
 	}
 	if x, ok := live_by_owner[oi.owner]; ok && x == oi {
 		delete_key(&live_by_owner, oi.owner)
+	}
+	oi.retired = true
+	return oi.reload_pins == 0
+}
+
+// Stable reload walk: pin every entry while holding the registry lock. The execution
+// gate blocks frees on other threads, while these pins cover synchronous/re-entrant
+// frees caused by Godot calls or lifecycle.reload on the reload-owning thread.
+@(private)
+pin_live_instance_snapshot :: proc(allocator := context.temp_allocator) -> []^Odin_Instance {
+	sync.lock(&live_lock)
+	defer sync.unlock(&live_lock)
+	snapshot := make([]^Odin_Instance, len(live_instances), allocator)
+	copy(snapshot, live_instances[:])
+	for oi in snapshot {
+		if oi != nil {
+			oi.reload_pins += 1
+		}
+	}
+	return snapshot
+}
+
+@(private)
+snapshot_instance_is_live :: proc "contextless" (oi: ^Odin_Instance) -> bool {
+	if oi == nil {return false}
+	sync.lock(&live_lock)
+	live := !oi.retired
+	sync.unlock(&live_lock)
+	return live
+}
+
+@(private)
+release_live_instance_snapshot :: proc(snapshot: []^Odin_Instance) {
+	for oi in snapshot {
+		if oi == nil {continue}
+		sync.lock(&live_lock)
+		assert(oi.reload_pins > 0)
+		oi.reload_pins -= 1
+		destroy_now := oi.retired && oi.reload_pins == 0
+		sync.unlock(&live_lock)
+		if destroy_now {
+			destroy_odin_instance(oi)
+		}
 	}
 }
 
@@ -174,11 +226,19 @@ sn_bits :: #force_inline proc "contextless" (n: godot.String_Name) -> uintptr {
 @(private)
 class_caches: map[string]^Class_Cache
 
+// Two threaded instance creations of the same class may race before either cache is
+// published. Reload mutations are excluded by the execution gate; this lock handles
+// the normal reader/reader creation case without serializing hot set/get/call paths.
+@(private)
+class_cache_lock: sync.Mutex
+
 @(private)
 ensure_class_cache :: proc(desc: rt.Class_Desc) -> ^Class_Cache {
 	// Core-owned bookkeeping must live on the Odin heap allocator (Godot's mem_alloc
 	// ignores alignment; Odin maps assert cache-line alignment).
 	context.allocator = core_allocator()
+	sync.lock(&class_cache_lock)
+	defer sync.unlock(&class_cache_lock)
 
 	if class_caches == nil {
 		class_caches = make(map[string]^Class_Cache)
@@ -299,7 +359,12 @@ instance_names_ready: bool
 variant_to_float: gdext.TypeFromVariantConstructorProc
 
 @(private)
+instance_globals_lock: sync.Mutex
+
+@(private)
 ensure_instance_globals :: proc() {
+	sync.lock(&instance_globals_lock)
+	defer sync.unlock(&instance_globals_lock)
 	if !instance_names_ready {
 		process_name = godot.new_string_name_cstring("_process", true)
 		physics_process_name = godot.new_string_name_cstring("_physics_process", true)
@@ -363,6 +428,8 @@ ensure_instance_globals :: proc() {
 @(export)
 odin_script_struct :: proc "c" (obj: gdext.ObjectPtr, want_class: cstring) -> rawptr {
 	context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
 	if obj == nil || odin_language_object == nil {
 		return nil
 	}
@@ -393,6 +460,8 @@ odin_script_struct :: proc "c" (obj: gdext.ObjectPtr, want_class: cstring) -> ra
 @(export)
 odin_script_struct_any :: proc "c" (obj: gdext.ObjectPtr, class_ptr: ^[^]u8, class_len: ^int) -> rawptr {
 	context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
 	if obj == nil || odin_language_object == nil || class_ptr == nil || class_len == nil {
 		return nil
 	}
@@ -521,6 +590,8 @@ apply_export_default :: proc "contextless" (user: rawptr, ex: ^Export_Cache) {
 // engine ScriptInstancePtr to hand back from `_instance_create`.
 @(private)
 odin_make_script_instance :: proc(script: gdext.ObjectPtr, owner: gdext.ObjectPtr, desc: rt.Class_Desc) -> gdext.ScriptInstancePtr {
+	script_access_enter()
+	defer script_access_leave()
 	ensure_instance_globals()
 
 	oi := new(Odin_Instance)
@@ -779,6 +850,8 @@ resolve_onready_slot :: proc "contextless" (oi: ^Odin_Instance, o: rt.Onready, p
 
 @(private)
 inst_notification :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, what: i32, reversed: bool) {
+	script_access_enter()
+	defer script_access_leave()
 	oi := cast(^Odin_Instance)instance
 	if oi == nil || oi.user == nil {
 		return
@@ -852,6 +925,8 @@ inst_call :: proc "c" (
 	ret: gdext.VariantPtr,
 	error: ^gdext.CallError,
 ) {
+	script_access_enter()
+	defer script_access_leave()
 	oi := cast(^Odin_Instance)self
 	if oi == nil || oi.user == nil {
 		if error != nil {error.error = .Invalid_Method}
@@ -909,6 +984,8 @@ inst_call :: proc "c" (
 
 @(private)
 inst_has_method :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, name: gdext.StringNamePtr) -> bool {
+	script_access_enter()
+	defer script_access_leave()
 	oi := cast(^Odin_Instance)instance
 	if oi == nil {
 		return false
@@ -940,13 +1017,8 @@ inst_get_language :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) -
 }
 
 @(private)
-inst_free :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) {
+destroy_odin_instance :: proc(oi: ^Odin_Instance) {
 	context = gdext.godot_context()
-	oi := cast(^Odin_Instance)instance
-	if oi == nil {
-		return
-	}
-	untrack_live_instance(oi)
 	refcounted_release(oi.script) // release the ref taken in odin_make_script_instance
 	// Release any resource references retained by RESOURCE-typed @export fields (inst_set),
 	// and destruct every engine-value export field with heap internals (String, packed
@@ -966,6 +1038,20 @@ inst_free :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) {
 		mem.free(oi.user, user_struct_allocator(oi.desc.align))
 	}
 	free(oi)
+}
+
+@(private)
+inst_free :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) {
+	script_access_enter()
+	defer script_access_leave()
+	context = gdext.godot_context()
+	oi := cast(^Odin_Instance)instance
+	if oi == nil {
+		return
+	}
+	if retire_live_instance(oi) {
+		destroy_odin_instance(oi)
+	}
 }
 
 // ---- vtable: Phase-3 @export property surfaces ----
@@ -994,6 +1080,8 @@ inst_find_export :: proc "contextless" (oi: ^Odin_Instance, name: gdext.StringNa
 // Variant's native width (Int=i64, Float=f64) to the field's real width as needed.
 @(private)
 inst_set :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, name: gdext.StringNamePtr, value: gdext.VariantPtr) -> bool {
+	script_access_enter()
+	defer script_access_leave()
 	oi := cast(^Odin_Instance)instance
 	if oi == nil || oi.user == nil {
 		return false
@@ -1078,6 +1166,8 @@ inst_set :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, name: gdex
 
 @(private)
 inst_get :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, name: gdext.StringNamePtr, ret: gdext.VariantPtr) -> bool {
+	script_access_enter()
+	defer script_access_leave()
 	oi := cast(^Odin_Instance)instance
 	if oi == nil || oi.user == nil {
 		return false
@@ -1129,6 +1219,8 @@ inst_get :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, name: gdex
 @(private)
 inst_get_property_list :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, count: ^u32) -> [^]gdext.PropertyInfo {
 	context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
 	oi := cast(^Odin_Instance)instance
 	if oi == nil || oi.cache == nil || len(oi.cache.exports) == 0 {
 		if count != nil {count^ = 0}
@@ -1207,6 +1299,8 @@ inst_free_method_list :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPt
 
 @(private)
 inst_get_property_type :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, name: gdext.StringNamePtr, is_valid: ^bool) -> gdext.Variant_Type {
+	script_access_enter()
+	defer script_access_leave()
 	oi := cast(^Odin_Instance)instance
 	ex := inst_find_export(oi, name)
 	if ex != nil {
@@ -1224,6 +1318,8 @@ inst_validate_property :: proc "c" (instance: gdext.ExtensionScriptInstanceDataP
 
 @(private)
 inst_get_method_argument_count :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, name: gdext.StringNamePtr, is_valid: ^bool) -> i64 {
+	script_access_enter()
+	defer script_access_leave()
 	oi := cast(^Odin_Instance)instance
 	if oi != nil && oi.cache != nil {
 		n := (cast(^godot.String_Name)name)^
@@ -1285,17 +1381,15 @@ inst_is_placeholder :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr)
 // completely untouched). nil == rebind everything (the single-module behavior).
 @(private)
 rebind_all_instances :: proc(only: map[string]bool = nil) {
-	// Snapshot the registry under the lock, rebind OUTSIDE it: the rebind path calls into
-	// Godot (ensure_class_cache interning, get_node) and into script code
-	// (lifecycle.reload, which may call rt.script_of -> odin_script_struct -> the same
-	// non-recursive live_lock).
-	sync.lock(&live_lock)
-	snapshot := make([]^Odin_Instance, len(live_instances), context.temp_allocator)
-	copy(snapshot, live_instances[:])
-	sync.unlock(&live_lock)
+	// Pin the registry snapshot, then rebind outside live_lock: this path calls Godot
+	// and script code (including rt.script_of, which takes live_lock). The surrounding
+	// reload writer gate excludes other threads; pins cover a synchronous free caused
+	// by one of those re-entrant calls on this thread.
+	snapshot := pin_live_instance_snapshot()
+	defer release_live_instance_snapshot(snapshot)
 
 	for oi in snapshot {
-		if oi == nil {
+		if !snapshot_instance_is_live(oi) {
 			continue
 		}
 		if only != nil && !(oi.class_name in only) {
@@ -1327,6 +1421,12 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
 		if had_physics_process != needs_physics_process {
 			node_enable_physics_process(oi.owner, needs_physics_process)
 		}
+		// A synchronous Godot re-entry above may have freed this instance. Its snapshot
+		// pin keeps the bookkeeping memory valid, but a retired instance must not receive
+		// a user reload hook.
+		if !snapshot_instance_is_live(oi) {
+			continue
+		}
 		// Hot-reload hook: the instance is now bound to the NEW desc + (preserved or
 		// migrated) state. Give the script a chance to rebuild what the swap can't fix
 		// itself — chiefly raw proc pointers it cached into its own struct, which on a
@@ -1346,7 +1446,7 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
 	// the declared form is what makes reload safe.) Reload hooks above run BEFORE
 	// this pass, so they must not dereference script-onready refs.
 	for oi in snapshot {
-		if oi == nil || oi.desc.onready_count == 0 {
+		if !snapshot_instance_is_live(oi) || oi.desc.onready_count == 0 {
 			continue
 		}
 		if only != nil && !(oi.class_name in only) {

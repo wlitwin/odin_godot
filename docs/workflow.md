@@ -119,9 +119,11 @@ script-reload affordance. This runs the exact same path as save.
 - The live Inspector *panel* repaint after a swap is a visual editor behavior; the property
   list it reads is updated immediately in-process (verified headless), but eyeballing the panel
   repaint needs a display.
-- This is a dev-loop convenience. The reload also has two known follow-ups: each reload leaks
-  the previous dll image (a bounded temp-dir is a TODO), and an edit that *newly* adds a
-  `_process` lifecycle (nil → non-nil) does not yet re-call `set_process` on rebind.
+- This is a dev-loop convenience. Previous native dll generations remain mapped so stale
+  property metadata and user-cached proc pointers cannot become dangling calls. The editor
+  warns after 24 retained generations (including an approximate byte total) and recommends a
+  restart; tune the interval with `odin_godot/reload_generation_warning_count`, or set it to
+  `0` to disable the warning. Old on-disk reload copies are removed at the next session start.
 
 ## Editor DX (validation, autocomplete, highlighting)
 
@@ -224,6 +226,7 @@ Set these as **project settings** (they also have env fallbacks for shell-launch
 | `odin_godot/emcc_bin` | `EMCC` | absolute path to Emscripten's `emcc` (**web export** only) |
 | `odin_godot/root` | `ODIN_GODOT_ROOT` | the odin_godot checkout, for the `-collection:godot` root |
 | `odin_godot/scripts_dir` | — | the scripts package (default `res://scripts`) |
+| `odin_godot/reload_generation_warning_count` | — | warn after this many retained native hot-reload generations and each interval thereafter (default `24`; `0` disables) |
 | `odin_godot/export_optimization` | `ODIN_EXPORT_OPT` | Odin `-o:` level for **exported** builds: `none`/`minimal`/`size`/`speed`/`aggressive` (default `speed`) |
 | `odin_godot/default_icon` | — | editor icon for `.odin` scripts with no `//gd:icon` (default `res://addons/odin_godot/icon.svg`; `""` = engine generic) |
 | `odin_godot/show_generated_files` | — | `true` shows `*.gen.odin` build artifacts in the FileSystem dock (hidden by default) |

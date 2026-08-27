@@ -45,3 +45,17 @@ if ! grep -q "RELOAD_HOOK_FIRED" "$LOG"; then
     exit 1
 fi
 echo "  ok  <class>_reload hook fired on the swap (RELOAD_HOOK_FIRED)"
+if ! grep -q "RELOAD_READER_DRAINED" "$LOG"; then
+    echo "PHASE4_FAIL: reload did not drain an in-flight old-generation method"
+    exit 1
+fi
+if ! grep -q "RELOAD_SNAPSHOT_FREE_SAFE" "$LOG"; then
+    echo "PHASE4_FAIL: synchronous instance free invalidated the reload snapshot"
+    exit 1
+fi
+echo "  ok  reload drained an in-flight script call and survived re-entrant instance free"
+if ! grep -q "ODIN_RELOAD_GENERATIONS_RETAINED" "$LOG"; then
+    echo "PHASE4_FAIL: retained DLL generation warning was not surfaced"
+    exit 1
+fi
+echo "  ok  retained DLL generation cost surfaced with a restart recommendation"

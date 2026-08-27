@@ -130,9 +130,10 @@ scripts_dll_discard :: proc(dll: ^Scripts_Dll) {
 
 @(private)
 Scripts_Module :: struct {
-	name:    string, // "" == the MAIN module. Heap-owned clone otherwise.
-	path:    string, // heap-owned dll base path (the published, non-unique-copy path)
-	dll:     Scripts_Dll,
+	name:      string, // "" == the MAIN module. Heap-owned clone otherwise.
+	path:      string, // heap-owned dll base path (the published, non-unique-copy path)
+	dll:       Scripts_Dll,
+	dll_bytes: int, // approximate mapped bytes; used for the retained-generation warning
 	// Class names this module currently provides. Each entry is ONE heap clone shared
 	// with the `scripts_classes` map key (so a per-module reload can delete the key and
 	// free the clone exactly once).
@@ -141,6 +142,74 @@ Scripts_Module :: struct {
 
 @(private)
 g_modules: [dynamic]Scripts_Module
+
+// Successful hot reloads deliberately keep the previous image mapped: removed classes,
+// returned property metadata, and user-cached raw proc pointers do not yet have explicit
+// generation ownership. Track that cost and tell long-running editor sessions when a restart
+// is sensible instead of letting the safe retention policy look like an unexplained leak.
+@(private)
+g_retained_reload_generations: int
+@(private)
+g_retained_reload_bytes: int
+@(private)
+g_retained_last_warning: int
+
+RETAINED_GENERATION_WARNING_DEFAULT :: 24
+
+@(private = "file")
+scripts_dll_file_size :: proc(path: string) -> int {
+	info, err := os.stat(path, context.temp_allocator)
+	if err != nil || info.size <= 0 {
+		return 0
+	}
+	return int(info.size)
+}
+
+@(private = "file")
+retained_generation_warning_limit :: proc() -> int {
+	ps := godot.singleton_project_settings()
+	key := godot.new_string_cstring("odin_godot/reload_generation_warning_count")
+	defer godot.free_string(key)
+	if !bool(godot.project_settings_has_setting(ps, key)) {
+		return RETAINED_GENERATION_WARNING_DEFAULT
+	}
+	default_value: godot.Int = RETAINED_GENERATION_WARNING_DEFAULT
+	def := godot.variant_from_int(&default_value)
+	defer godot.variant_destroy(&def)
+	v := godot.project_settings_get_setting(ps, key, def)
+	defer godot.variant_destroy(&v)
+	return int(godot.variant_to_int(&v))
+}
+
+@(private = "file")
+note_retained_reload_generation :: proc(bytes: int) {
+	g_retained_reload_generations += 1
+	if bytes > 0 {
+		g_retained_reload_bytes += bytes
+	}
+
+	limit := retained_generation_warning_limit()
+	if limit <= 0 || g_retained_reload_generations < limit {
+		return
+	}
+	if g_retained_last_warning > 0 &&
+	   g_retained_reload_generations - g_retained_last_warning < limit {
+		return
+	}
+	g_retained_last_warning = g_retained_reload_generations
+
+	message := fmt.tprintf(
+		"ODIN_RELOAD_GENERATIONS_RETAINED: odin_godot has retained %d old scripts DLL " +
+			"generation(s) (~%.1f MiB) so existing native references stay valid. Restart the " +
+			"editor to release them. Set odin_godot/reload_generation_warning_count to change " +
+			"this interval, or 0 to disable the warning.",
+		g_retained_reload_generations,
+		f64(g_retained_reload_bytes) / (1024.0 * 1024.0),
+	)
+	gdext_print("odin reload: retained old DLL generations", message)
+	msg := godot.new_string_odin(message)
+	godot.gd_push_warning(godot.variant_from_string(&msg))
+}
 
 // Human-readable module name for error messages.
 @(private = "file")
@@ -634,7 +703,12 @@ load_extra_modules :: proc(main_dll_path: string) {
 		}
 		append(
 			&g_modules,
-			Scripts_Module{name = strings.clone(f.name), path = strings.clone(f.path), dll = dll},
+			Scripts_Module{
+				name = strings.clone(f.name),
+				path = strings.clone(f.path),
+				dll = dll,
+				dll_bytes = scripts_dll_file_size(f.path),
+			},
 		)
 		mod := &g_modules[len(g_modules) - 1]
 		n: i32
@@ -662,7 +736,15 @@ odin_scripts_load :: proc() {
 	cleanup_stale_reload_copies(path)
 
 	if dll, ok := load_scripts_dll(path, true); ok {
-		append(&g_modules, Scripts_Module{name = "", path = strings.clone(path), dll = dll})
+		append(
+			&g_modules,
+			Scripts_Module{
+				name = "",
+				path = strings.clone(path),
+				dll = dll,
+				dll_bytes = scripts_dll_file_size(path),
+			},
+		)
 		mod := &g_modules[len(g_modules) - 1]
 		n: i32
 		descs := dll.odin_scripts_manifest(&n)
@@ -763,6 +845,16 @@ cleanup_stale_reload_copies :: proc(base: string) {
 @(private)
 odin_scripts_reload :: proc(module := "") -> bool {
 	context.allocator = core_allocator()
+	// A reload nested inside an Odin ScriptInstance callback would eventually return
+	// into old code with a possibly-migrated self. It cannot be made safe by waiting
+	// (this thread owns the reader lease), so require the caller to defer it.
+	if !script_reload_can_begin() {
+		gdext_print(
+			"odin reload: rejected inside an active Odin script call",
+			"defer Script.reload until the current method/lifecycle callback returns",
+		)
+		return false
+	}
 
 	mi := module_index(module)
 	if mi < 0 {
@@ -848,6 +940,12 @@ odin_scripts_reload :: proc(module := "") -> bool {
 		return false
 	}
 
+	// The candidate is valid and no user code has run from it yet. Close the execution
+	// gate before booting/publishing it: this drains every old trampoline and keeps
+	// instance creation, property access, and descriptor reads out of the mutation.
+	script_reload_begin()
+	defer script_reload_end()
+
 	// Compatibility passed: boot, hand off core APIs, then read the manifest.
 	new_dll.odin_scripts_boot(saved_get_proc_address, gdext.library)
 	// Re-hand the resolver to the freshly-swapped dll (it has its own runtime globals).
@@ -918,7 +1016,13 @@ odin_scripts_reload :: proc(module := "") -> bool {
 	//    may run after). Instances of other modules are skipped — untouched by design.
 	rebind_all_instances(affected)
 
+	old_bytes := mod.dll_bytes
+	if old_bytes <= 0 {
+		old_bytes = len(data)
+	}
 	mod.dll = new_dll
+	mod.dll_bytes = len(data)
+	note_retained_reload_generation(old_bytes)
 	return true
 }
 

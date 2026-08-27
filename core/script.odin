@@ -156,6 +156,8 @@ odin_script_free_strings :: proc(self: ^OdinScript) {
 // yield (nondeterministic across runs), so instead we warn once (naming the candidates) and
 // resolve nothing — the caller falls back to a harmless placeholder.
 odin_script_resolve_desc :: proc(self: ^OdinScript) -> (rt.Class_Desc, bool) {
+	script_access_enter()
+	defer script_access_leave()
     if self == nil {
         return {}, false
     }
@@ -270,6 +272,8 @@ v_get_language :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]
 @(private = "file")
 v_get_instance_base_type :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     base := self != nil && self.base_type != "" ? self.base_type : "Node"
     // Prefer the registered class's declared base when we can resolve it.
@@ -304,6 +308,8 @@ v_set_source_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: 
 @(private = "file")
 v_can_instantiate :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     // A non-tool script must NOT really instantiate in the EDITOR: returning true
     // there makes the engine build a REAL instance (running game code / introspection
     // in edit mode) instead of a placeholder, which is what crashes the Scene dock as
@@ -320,6 +326,8 @@ v_can_instantiate :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: 
 @(private = "file")
 v_is_tool :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     is_tool := false
     if desc, ok := odin_script_resolve_desc(self); ok {
@@ -555,6 +563,8 @@ refresh_placeholder_exports :: proc() {
 
 @(private = "file")
 update_placeholder_exports :: proc(placeholder: gdext.ScriptInstancePtr, self: ^OdinScript) {
+	script_access_enter()
+	defer script_access_leave()
     desc, ok := odin_script_resolve_desc(self)
     if !ok {
         return
@@ -578,6 +588,8 @@ update_placeholder_exports :: proc(placeholder: gdext.ScriptInstancePtr, self: ^
 @(private = "file")
 v_get_script_signal_list :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     arr := godot.new_array_default()
     if desc, ok := odin_script_resolve_desc(self); ok {
@@ -609,6 +621,8 @@ v_get_script_signal_list :: proc "c" (instance: gdext.ExtensionClassInstancePtr,
 @(private = "file")
 v_get_documentation :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     arr := godot.new_array_default()
     if desc, ok := odin_script_resolve_desc(self); ok {
@@ -651,6 +665,8 @@ v_get_documentation :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args
 @(private = "file")
 v_get_members :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     arr := godot.new_array_default()
     if desc, ok := odin_script_resolve_desc(self); ok {
@@ -666,6 +682,8 @@ v_get_members :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]g
 @(private = "file")
 v_get_member_line :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     name := string_name_to_odin(cast(gdext.StringNamePtr)args[0])
     defer delete(name)
@@ -686,6 +704,8 @@ v_get_member_line :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: 
 @(private = "file")
 v_get_script_method_list :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     arr := godot.new_array_default()
     if desc, ok := odin_script_resolve_desc(self); ok {
@@ -716,6 +736,8 @@ v_get_script_method_list :: proc "c" (instance: gdext.ExtensionClassInstancePtr,
 @(private = "file")
 v_get_script_property_list :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     arr := godot.new_array_default()
     if desc, ok := odin_script_resolve_desc(self); ok {
@@ -753,6 +775,8 @@ v_get_script_property_list :: proc "c" (instance: gdext.ExtensionClassInstancePt
 @(private = "file")
 v_get_rpc_config :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     d := godot.new_dictionary_default()
     if desc, ok := odin_script_resolve_desc(self); ok {
@@ -824,6 +848,8 @@ v_get_base_script :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: 
 @(private = "file")
 v_get_global_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     name := ""
     if self != nil && self.class_name != "" {
@@ -839,6 +865,8 @@ v_get_global_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: 
 @(private = "file")
 v_has_property_default_value :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     name := string_name_to_odin(cast(gdext.StringNamePtr)args[0])
     defer delete(name)
@@ -859,6 +887,8 @@ v_has_property_default_value :: proc "c" (instance: gdext.ExtensionClassInstance
 @(private = "file")
 v_get_property_default_value :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     name := string_name_to_odin(cast(gdext.StringNamePtr)args[0])
     defer delete(name)
@@ -919,6 +949,8 @@ resolved_default_icon :: proc() -> string {
 @(private = "file")
 v_get_class_icon_path :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     icon := ""
     if self != nil && self.icon != "" {
@@ -935,6 +967,8 @@ v_get_class_icon_path :: proc "c" (instance: gdext.ExtensionClassInstancePtr, ar
 @(private = "file")
 v_has_method :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     method := string_name_to_odin(cast(gdext.StringNamePtr)args[0])
     defer delete(method)
@@ -965,6 +999,8 @@ v_has_method :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gd
 @(private = "file")
 v_has_script_signal :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     signal := string_name_to_odin(cast(gdext.StringNamePtr)args[0])
     defer delete(signal)
@@ -1025,6 +1061,8 @@ v_placeholder_erased :: proc "c" (instance: gdext.ExtensionClassInstancePtr, arg
 @(private = "file")
 v_instance_create :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     owner := (cast(^gdext.ObjectPtr)args[0])^
     // Phase 2: build a REAL script instance bound to the registered Class_Desc, so the
@@ -1045,6 +1083,8 @@ v_instance_create :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: 
 @(private = "file")
 v_placeholder_instance_create :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
+	script_access_enter()
+	defer script_access_leave()
     self := cast(^OdinScript)instance
     owner := (cast(^gdext.ObjectPtr)args[0])^
     inst := gdext.placeholder_script_instance_create(odin_language_object, self.object, owner)

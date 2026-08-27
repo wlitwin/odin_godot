@@ -16,6 +16,7 @@ package phase4_scripts
 // desc/proc ptrs re-pointed — full state preserved.
 // ----------------------------------------------------------------------------
 
+import "core:time"
 import gd "godot:godot"
 
 RELOAD_V :: #config(RELOAD_V, 1)
@@ -43,6 +44,14 @@ reloader_process :: proc(self: ^Reloader, delta: f64) {
 @(gd_method)
 reloader_get_step :: proc(self: ^Reloader) -> int {
 	return STEP
+}
+
+// Concurrency probe: the Phase 4 harness invokes this method on a Godot Thread, then
+// reloads synchronously on the main thread. The core must wait for this old-generation
+// trampoline to return before it mutates descriptors or instance state.
+@(gd_method)
+reloader_hold_reload_reader :: proc(self: ^Reloader, milliseconds: int) {
+	time.sleep(time.Duration(milliseconds) * time.Millisecond)
 }
 
 // Hot-reload hook: runs on each live instance AFTER the dll swap, with the NEW code. A real
