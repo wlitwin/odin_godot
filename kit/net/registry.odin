@@ -335,19 +335,21 @@ registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = ni
 			r.err = true // can't size the unknown entity's fields — abandon the rest
 			break
 		}
+		// Transaction boundary: apply_delta is deliberately a tiny in-place
+		// codec, but a reliable session packet must never expose its prefix. The
+		// full replicated-field capture includes the speculative state currently
+		// on screen; restoring it also restores the exact pre-unwind prediction
+		// without re-running gameplay code or rewriting pending reverts.
+		before := fields_capture(e.entity, e.set.entity_desc, context.temp_allocator)
 		reconcile := has_pending_for(ctx, id)
 		if reconcile {
 			unwind_pending(ctx, e)
 		}
 		_ = apply_delta(r, e.entity, e.set.entity_desc)
-		// A truncated batch stops mid-entity (apply_delta's per-field bounds
-		// checks contain the tear to one entity's later fields) — but the
-		// UNWIND above already ran, so the replay and the bless below MUST
-		// still run even on the error path: skipping them left pendings
-		// holding stale reverts (the next reconcile re-restored dead bytes)
-		// and unblessed framework writes (a write-guard false positive). The
-		// damage from a bad packet must never outlive the packet.
-		bad := r.err
+		if r.err {
+			fields_restore(e.entity, e.set.entity_desc, before)
+			break
+		}
 		if reconcile {
 			replay_pending(ctx, e)
 		}
@@ -357,9 +359,6 @@ registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = ni
 		// pending's speculation is legal (the guard skips pending entities),
 		// and its retirement re-blesses.
 		shadow_capture(e.entity, e.shadow, e.set.entity_desc)
-		if bad {
-			break // the count reports FULLY applied entities; this one tore
-		}
 		if changed != nil {
 			append(changed, id)
 		}
@@ -400,6 +399,10 @@ registry_apply_fulls :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = nil
 			r.err = true
 			break
 		}
+		// apply_full is the same in-place codec as apply_delta. Join/resync data
+		// is reliable too, so a torn entity restores as one unit and is never
+		// shadow-blessed as an authoritative baseline.
+		before := fields_capture(e.entity, e.set.entity_desc, context.temp_allocator)
 		owned_here := me != PLAYER_ID_INVALID && e.owner == me
 		skip: Subset_Skips
 		if owned_here {
@@ -407,6 +410,7 @@ registry_apply_fulls :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = nil
 		}
 		apply_full(r, e.entity, e.set.entity_desc, skip)
 		if r.err {
+			fields_restore(e.entity, e.set.entity_desc, before)
 			break
 		}
 		// A full overwrites EVERY declared field — the baseline is authoritative
@@ -660,11 +664,51 @@ registry_collect_stream_segs :: proc(raw: []u8, segs: ^[dynamic]Delta_Seg) -> (s
 }
 
 // Buffer a received stream batch into the target entities' rings, stamped with
-// `stamp` (the caller's timeline — see the header comment). Entities that are
-// unknown, owned by `me` (never accept a stream for state this peer is
-// authoritative over), or size-mismatched are skipped by length. Returns how
-// many entities were buffered.
-registry_apply_streams :: proc(r: ^Reader, reg: ^Registry, me: Player_Id, stamp: f64) -> int {
+// `stamp` (the caller's timeline — see the header comment). When `sender` is
+// known (the host resolved the transport peer to a seat), EVERY row must name
+// an entity that seat currently owns and have the exact declared wire size;
+// the complete batch is preflighted before any ring changes. A trusted host
+// relay passes PLAYER_ID_INVALID: unknown/locally-owned/size-mismatched rows
+// retain the forward-compatible skip-by-length behavior. Returns how many
+// entities were buffered.
+registry_apply_streams :: proc(
+	r: ^Reader,
+	reg: ^Registry,
+	me: Player_Id,
+	stamp: f64,
+	sender := PLAYER_ID_INVALID,
+) -> int {
+	// Structural atomicity matters even on a last-value lane: a torn datagram
+	// must not advance some entity rings while the rest of the batch is refused.
+	// With a resolved sender this is also the ownership admission pass.
+	probe := r^
+	probe_count := int(read_u16(&probe))
+	if probe.err {
+		r.err = true
+		return 0
+	}
+	for _ in 0 ..< probe_count {
+		id := read_net_id(&probe)
+		_ = read_u8(&probe)
+		n := int(read_u16(&probe))
+		_ = reader_view(&probe, n)
+		if probe.err {
+			r.err = true
+			return 0
+		}
+		if sender != PLAYER_ID_INVALID {
+			e, found := &reg.entries[id]
+			if !found || e.owner != sender || n != stream_wire_size(e.set.entity_desc) {
+				r.err = true
+				return 0
+			}
+		}
+	}
+	if len(reader_remaining(&probe)) != 0 {
+		r.err = true
+		return 0
+	}
+
 	count := int(read_u16(r))
 	applied := 0
 	for _ in 0 ..< count {
@@ -725,6 +769,27 @@ registry_host_command :: proc(reg: ^Registry, ctx: ^Command_Ctx, by: Player_Id, 
 	e, found := &reg.entries[h.entity]
 	if !found {
 		return false, false, h
+	}
+	// Access is descriptor policy, not gameplay predicate policy. Reject it
+	// with authoritative truth like any other refused command so a predicting
+	// client retires immediately instead of waiting for timeout.
+	c := command_find(e.set, h.cmd)
+	if c == nil {
+		command_result_write(out, h, false, e.entity, e.set)
+		return true, false, h
+	}
+	switch c.access {
+	case .Any_Seat:
+	case .Owner:
+		if e.owner != by {
+			command_result_write(out, h, false, e.entity, e.set)
+			return true, false, h
+		}
+	case .Authority:
+		// registry_host_command is the REMOTE ingress. Authority-authored calls
+		// run through their generated local wrapper and never arrive here.
+		command_result_write(out, h, false, e.entity, e.set)
+		return true, false, h
 	}
 	// THE authoritative run: the verb's `_then` consequence fires inside the
 	// thunk. `by` is the ISSUER'S Player_Id — it keys the dedup window AND

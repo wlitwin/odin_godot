@@ -4,7 +4,7 @@ package repgen_fixture
 
 // repgen fixture: exercises every gd:"replicate" shape scriptgen must handle —
 // bare, with options, multi-name fields, mixing with export/plain fields — plus
-// the @(gd_command) surface: predicted and host-only commands, wire-typed args
+// the @(gd_command) surface: predicted and authority-only commands, wire-typed args
 // (including knet ids), and the required `net_id` identity field.
 
 import gd "godot:godot"
@@ -121,10 +121,10 @@ pawn_hit_apply :: proc(self: ^Pawn, amount: i32) {
 	self.px += f32(amount) // knockback: relative, the patch can't express it
 }
 
-// Host-only command (no predict): string + id args exercise the wider wire types.
+// Authority-only command: string + id args exercise the wider wire types.
 // `who` is a player the verb TARGETS — ordinary wire data, legal under any name
 // but the reserved `by`.
-@(gd_command)
+@(gd_command = "authority")
 pawn_mark :: proc(self: ^Pawn, label: string, who: knet.Player_Id) -> bool {
 	self.state = 1
 	return true

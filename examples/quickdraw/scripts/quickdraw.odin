@@ -168,8 +168,12 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 	// rewind clamp is the one this game's own regression hid in: a host-side lag-comp
 	// rewind pinned to the buffer horizon leaves no other trace than this number.
 	ng.input_drops = self.lane.stat_input_drops
+	ng.input_rejected = self.lane.stat_input_rejected
+	ng.ack_rejected = self.lane.stat_ack_rejected
 	ng.cmd_capped = self.lane.stat_cmd_capped
+	ng.cmd_rejected = self.lane.stat_cmd_rejected
 	ng.rewind_clamped = self.lane.stat_rewind_clamped
+	ng.echo_dropped = self.lane.stat_echo_dropped
 	kui.netgraph_refresh(&self.netgraph, ng)
 
 	// THE LEAD TRACE (a diagnostic, not a game rule — it prints and asserts

@@ -173,6 +173,7 @@ script_needs :: proc(s: ^Script) -> (n: Gen_Needs) {
 	// Any declared migration half pulls kboot (the hooks table + the events-tail
 	// drain) and ksess (the events proc's signature).
 	has_succ := s.succ_backup != "" || s.succ_took_over != "" || s.succ_wiped != "" || s.succ_migrating != ""
+	coop_commands := len(s.commands) > 0 && s.tick.proc_name == "" && len(s.block_ticks) == 0
 	// entity tables (`entity=Name:id` scene fields) name ksess.Entity_Type and
 	// build kboot.Entity_Kind rows; the lane wiring names ksess.Session; the
 	// standard transport forwards route into netgd/ksess; the boot-routed step
@@ -180,7 +181,7 @@ script_needs :: proc(s: ^Script) -> (n: Gen_Needs) {
 	// ksess.Typed_Route / session_app_* / Session / Peer_Id / Channel.
 	n.ksess =
 		len(s.entities) > 0 || has_lane_wiring || len(s.std_forwards) > 0 || s.step_boot ||
-		len(s.event_halves) > 0 || has_succ || s.profile_type != "" || len(s.messages) > 0
+		len(s.event_halves) > 0 || has_succ || s.profile_type != "" || len(s.messages) > 0 || coop_commands
 	// The unified `<verb>_cmd` wrappers take the game's one handle (^kboot.Boot)
 	// on BOTH models, so any class with commands names kboot.
 	n.kboot = len(s.entities) > 0 || len(s.commands) > 0 || has_succ
@@ -874,7 +875,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 
 		fmt.sbprintf(b, "@(private = \"file\")\n_%s_commands := [?]knet.Command_Desc {{\n", snake)
 		for c in s.commands {
-			fmt.sbprintf(b, "\t{{name = %q, id = %s_CMD_%s, predict = %v, invoke = _%s_cmd_%s}},\n", c.name, upper, strings.to_upper(c.name), c.predict, snake, c.name)
+			fmt.sbprintf(b, "\t{{name = %q, id = %s_CMD_%s, predict = %v, access = .%v, invoke = _%s_cmd_%s}},\n", c.name, upper, strings.to_upper(c.name), c.predict, c.access, snake, c.name)
 		}
 		w(b, "}\n\n")
 	}
@@ -990,6 +991,14 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			fmt.sbprintf(b, "\t\tknet.command_hook_local(ctx, self.net_id, %s_CMD_%s, _ok) // same cross-entity path client commands take\n", upper, strings.to_upper(c.name))
 			w(b, "\t\tif _ok {return .Applied}\n\t\treturn .Rejected\n\t}\n")
+			switch c.access {
+			case .Authority:
+				w(b, "\treturn .Rejected // authority-only verbs never cross the ingress boundary\n}\n\n")
+				continue // no encoder/send tail exists for a verb that cannot cross the wire
+			case .Owner:
+				w(b, "\tif ksess.session_owner_of(b.ses, self.net_id) != ctx.me {return .Rejected}\n")
+			case .Any_Seat:
+			}
 			fmt.sbprintf(b, "\tknet.command_begin(ctx, self.net_id, %s_CMD_%s)\n", upper, strings.to_upper(c.name))
 			for a in c.args {
 				fmt.sbprintf(b, "\tknet.write_%s(&ctx.msg, %s)\n", a.wire, a.name)
@@ -1293,11 +1302,10 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			}
 			fmt.sbprintf(b, "@(private = \"file\")\n_%s_sim_cmds := [?]ksim.Sim_Cmd {{\n", snake)
 			for c in s.commands {
-				aseat := c.any_seat ? ", any_seat = true" : ""
 				if c.apply_proc != "" {
-					fmt.sbprintf(b, "\t{{name = %q, id = %s_CMD_%s, exec = _%s_simcmd_%s, apply = _%s_simcmd_%s_apply%s}},\n", c.name, upper, strings.to_upper(c.name), snake, c.name, snake, c.name, aseat)
+					fmt.sbprintf(b, "\t{{name = %q, id = %s_CMD_%s, exec = _%s_simcmd_%s, apply = _%s_simcmd_%s_apply, access = .%v}},\n", c.name, upper, strings.to_upper(c.name), snake, c.name, snake, c.name, c.access)
 				} else {
-					fmt.sbprintf(b, "\t{{name = %q, id = %s_CMD_%s, exec = _%s_simcmd_%s%s}},\n", c.name, upper, strings.to_upper(c.name), snake, c.name, aseat)
+					fmt.sbprintf(b, "\t{{name = %q, id = %s_CMD_%s, exec = _%s_simcmd_%s, access = .%v}},\n", c.name, upper, strings.to_upper(c.name), snake, c.name, c.access)
 				}
 			}
 			w(b, "}\n\n")
@@ -1398,6 +1406,13 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 					snake, ic.class_id, ic.sample, cls, ic.type_name,
 				)
 			}
+			if ic.validate != "" {
+				fmt.sbprintf(
+					b,
+					"@(private = \"file\")\n_%s_lane_validate_%d :: proc(user: rawptr, input: rawptr) -> bool {{\n\treturn %s(cast(^%s)user, cast(^%s)input)\n}}\n\n",
+					snake, ic.class_id, ic.validate, cls, ic.type_name,
+				)
+			}
 		}
 		if s.step.proc_name != "" {
 			fmt.sbprintf(
@@ -1440,12 +1455,18 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		)
 		if len(s.input_classes) > 0 && s.input_classes[0].type_name != "" {
 			fmt.sbprintf(b, "\tksim.lane_class_set_type(l, 0, typeid_of(%s))\n", s.input_classes[0].type_name)
+			if s.input_classes[0].validate != "" {
+				fmt.sbprintf(b, "\tksim.lane_class_set_validate(l, 0, _%s_lane_validate_0)\n", snake)
+			}
 		}
 		if len(s.input_classes) > 1 {
 			for ic in s.input_classes[1:] {
 				sample_ref := ic.sample != "" ? fmt.tprintf("_%s_lane_sample_%d", snake, ic.class_id) : "nil"
 				fmt.sbprintf(b, "\tksim.lane_add_input_class(l, %d, size_of(%s), %s)\n", ic.class_id, ic.type_name, sample_ref)
 				fmt.sbprintf(b, "\tksim.lane_class_set_type(l, %d, typeid_of(%s))\n", ic.class_id, ic.type_name)
+				if ic.validate != "" {
+					fmt.sbprintf(b, "\tksim.lane_class_set_validate(l, %d, _%s_lane_validate_%d)\n", ic.class_id, snake, ic.class_id)
+				}
 			}
 		}
 		if len(s.facts) > 0 {

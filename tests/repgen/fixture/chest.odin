@@ -7,7 +7,7 @@ package repgen_fixture
 // .Rejected (predicate said no) — one meaning on every peer, so the call site
 // needs no is_host branch. (Pawn/Turret tick, so their verbs are sim-lane
 // scheduled and return bool; this pins the coop path — both the predicting and
-// the host-only wrapper shapes.)
+// the non-predicted and authority-only wrapper shapes.)
 
 import gd "godot:godot"
 import knet "godot:kit/net"
@@ -22,17 +22,25 @@ Chest :: struct {
 
 // PREDICT: the client applies optimistically, so its issue is .Predicted (held)
 // or .Rejected (the local apply reverted).
-@(gd_command = "predict")
+@(gd_command = "predict,any_seat")
 chest_open :: proc(self: ^Chest, amount: i32) -> bool {
 	if self.gold < amount {return false}
 	self.gold -= amount
 	return true
 }
 
-// HOST-ONLY (non-predict): the client never runs the predicate locally, so it
+// NON-PREDICTED + OPEN: the client never runs the predicate locally, so it
 // cannot locally reject — a successful send is simply in flight (.Predicted).
-@(gd_command)
+@(gd_command = "any_seat")
 chest_seal :: proc(self: ^Chest) -> bool {
+	self.sealed = true
+	return true
+}
+
+// An authority-only maintenance verb remains callable through the same wrapper
+// on every peer; non-authority callers receive .Rejected without sending.
+@(gd_command = "authority")
+chest_lockdown :: proc(self: ^Chest) -> bool {
 	self.sealed = true
 	return true
 }
@@ -41,7 +49,7 @@ chest_seal :: proc(self: ^Chest) -> bool {
 // filled — ctx.me on the issuing peer, the resolved sender on the host — and
 // never rides the wire, so the predicate arbitrates on WHO without trusting a
 // client-claimed argument (the spoofable-`side` wart, deleted).
-@(gd_command = "predict")
+@(gd_command = "predict,any_seat")
 chest_claim :: proc(self: ^Chest, by: knet.Player_Id) -> bool {
 	if self.claim != 0 {return false} // first come — later claims reject
 	self.claim = u64(by)

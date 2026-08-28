@@ -19,7 +19,7 @@ Door :: struct {
 	open:   bool `gd:"replicate"`,
 }
 
-@(gd_command = "predict")
+@(gd_command = "predict,any_seat")
 door_toggle :: proc(self: ^Door, px: f32, py: f32) -> bool {
 	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false}
 	self.open = !self.open

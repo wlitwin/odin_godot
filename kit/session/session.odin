@@ -327,7 +327,7 @@ SES_BLOB :: u8(21) // host -> all  [id][ver u32][len u32][bytes] — an entity b
 
 SES_DECLARE :: u8(22) // client -> host  [size u16][row bytes] — my profile row (profile.odin)
 SES_PROFILES :: u8(23) // host -> all    [size u16][players u16] x ([id][row]) — the profile table
-SES_AOI :: u8(24) // host -> all    [aoi bool] — stream routing changed MID-RUN (session_set_interest after clients joined; the welcome covers everyone later)
+SES_AOI :: u8(24) // host -> all    [aoi bool] — stream filtering changed MID-RUN (session_set_interest after clients joined; the welcome covers everyone later)
 
 // One past the highest SES_* id — the ONE number a new wire kind bumps,
 // right here beside its constant. netgd's per-kind gauge derives its table
@@ -834,7 +834,8 @@ Session_Run :: struct {
 	// inputs the per-peer stream budget prioritizes by (staleness, then near).
 	stream_sent: map[Interest_Key]u64,
 	interest_d2: map[Interest_Key]f32,
-	aoi_client:  bool, // client: the welcome said streams route via the host
+	aoi_client:  bool, // client: the host declared AOI filtering (all client
+	                  // streams route through the host authority gateway)
 }
 
 Session :: struct {
@@ -1782,12 +1783,12 @@ net_tick :: proc(s: ^Session) {
 	}
 
 	// Owner streams: last-value snapshots of every entity WE own, unreliable
-	// (a drop is superseded by the next tick's snapshot). Any peer can own.
-	// Routing depends on interest: normally the transport's relay fans the
-	// batch out; with interest on, the HOST is the router — its own batch is
-	// split per recipient here, and clients send theirs to the host (the
-	// SES_STREAM handler forwards), which costs no extra hop: the relay was
-	// that same machine all along.
+	// (a drop is superseded by the next tick's snapshot). Every client sends to
+	// the HOST first: only it can resolve transport peer → player → authoritative
+	// ownership, so it is the one enforceable admission point. The physical ENet
+	// topology already relays through that machine; this merely makes the relay
+	// explicit. The host fans out whole batches normally and AOI-splits them
+	// when interest is enabled.
 	{
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
@@ -1798,7 +1799,7 @@ net_tick :: proc(s: ^Session) {
 		if knet.registry_write_streams(&w, &s.reg, s.me, s.now, t, keep_history = s.is_host) > 0 {
 			if interest_on(s) {
 				interest_route_streams(s, knet.writer_bytes(&w)[1:], 0, t)
-			} else if !s.is_host && s.aoi_client {
+			} else if !s.is_host {
 				s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Stream)
 			} else {
 				broadcast(s, knet.writer_bytes(&w), .Stream)
@@ -2309,12 +2310,17 @@ mark_left :: proc(s: ^Session, id: knet.Player_Id) {
 }
 
 @(private = "file")
-host_broadcast :: proc(s: ^Session, bytes: []u8, except := knet.PLAYER_ID_INVALID) {
+host_broadcast :: proc(
+	s: ^Session,
+	bytes: []u8,
+	except := knet.PLAYER_ID_INVALID,
+	channel := Channel.Reliable,
+) {
 	for _, p in s.players {
 		if !p.connected || p.id == s.me || p.id == except {
 			continue
 		}
-		s.send(s.send_user, p.peer, bytes, .Reliable)
+		s.send(s.send_user, p.peer, bytes, channel)
 	}
 }
 
@@ -2543,7 +2549,7 @@ session_client_join :: proc(s: ^Session) {
 // same commit. (This log used to register the whole kit's changes: its rev 3
 // and 8 were netgd's, rev 4 was kit/sim's — a convention that held only by
 // engineers remembering a constant in a package they weren't editing.)
-PROTOCOL_REV :: u64(10) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: (moved: netgd rev 2) · 4: (moved: kit/sim rev 2) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream routing mid-run · 7: spectator seats (SES_JOIN intent + roster rows carry the flag) · 8: (moved: netgd rev 3) · 9: SES_APP riders carry the host-relay envelope ([RELAY_UP|RELAY_CAST][author]) — relay.odin · 10: SES_JOIN carries the joiner's pre-seat profile row ([size u16][row]; 0 = none)
+PROTOCOL_REV :: u64(11) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: (moved: netgd rev 2) · 4: (moved: kit/sim rev 2) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream filtering mid-run · 7: spectator seats (SES_JOIN intent + roster rows carry the flag) · 8: (moved: netgd rev 3) · 9: SES_APP riders carry the host-relay envelope ([RELAY_UP|RELAY_CAST][author]) — relay.odin · 10: SES_JOIN carries the joiner's pre-seat profile row ([size u16][row]; 0 = none) · 11: every client owner stream enters through the host ownership gateway before relay
 
 // Wire revisions of the packages ABOVE the session (kit/sim's lane wire,
 // netgd's frame) — the session cannot import upward, so they register at
@@ -2703,8 +2709,8 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 			session_peer_disconnected(s, from_peer)
 		}
 	case SES_AOI:
-		// Stream routing flipped mid-run (the welcome told joiners; this
-		// tells everyone who was already seated).
+		// Host-side stream FILTERING flipped mid-run (all client streams route
+		// through the host regardless; this records whether it AOI-splits them).
 		if s.is_host || !s.joined {
 			return
 		}
@@ -2889,8 +2895,9 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		if !seated {
 			return
 		}
-		if p, has := s.players[pid]; has && p.spectator {
-			return // a watching seat issues nothing — receive-only past the join
+		p, has := s.players[pid]
+		if !has || !p.connected || p.spectator {
+			return // a departed/watching seat issues nothing past the join
 		}
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
@@ -2923,21 +2930,39 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		if !s.joined {
 			return
 		}
+		sender := knet.PLAYER_ID_INVALID
 		if s.is_host {
-			// A watching seat streams nothing (it owns nothing to stream) —
-			// the host refuses at the door. Clients keep the friends-not-
-			// forensics trust model for peer broadcasts, as ever.
-			if pid, seated := s.by_peer[from_peer]; seated {
-				if p, has := s.players[pid]; has && p.spectator {
-					return
-				}
+			// Resolve the transport identity before parsing attacker-controlled
+			// rows. Unseated, disconnected, and watching peers own no stream lane.
+			pid, seated := s.by_peer[from_peer]
+			if !seated {
+				return
 			}
+			p, has := s.players[pid]
+			if !has || !p.connected || p.spectator {
+				return
+			}
+			sender = pid
+		} else if from_peer != HOST_PEER {
+			// Clients accept owner state only after the authority gateway relays
+			// it. A direct peer packet cannot prove which player owned its rows.
+			return
 		}
 		raw := r.data[r.off:] // the batch, pre-parse (the host may forward it)
 		_ = knet.registry_stream_time(r) // sender stamp (clock-mapped timelines later)
-		_ = knet.registry_apply_streams(r, &s.reg, s.me, s.now)
-		if interest_on(s) {
-			interest_route_streams(s, raw, from_peer, s.ticker.tick)
+		_ = knet.registry_apply_streams(r, &s.reg, s.me, s.now, sender)
+		if r.err {
+			return // transactional parse/ownership refusal: apply and forward nothing
+		}
+		if s.is_host {
+			if interest_on(s) {
+				interest_route_streams(s, raw, from_peer, s.ticker.tick)
+			} else {
+				w := knet.writer_make(len(raw) + 1, context.temp_allocator)
+				knet.write_u8(&w, SES_STREAM)
+				append(&w.buf, ..raw)
+				host_broadcast(s, knet.writer_bytes(&w), except = sender, channel = .Stream)
+			}
 		}
 	case SES_APP:
 		tag := knet.read_u8(r)

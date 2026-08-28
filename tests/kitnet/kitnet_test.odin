@@ -463,9 +463,9 @@ probe_cmd_mark :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) 
 probe_commands := [?]knet.Command_Desc {
 	// Hand-built sets pick their own STABLE wire ids (Command_Desc.id) —
 	// lookup is by id now, never by array position.
-	{name = "add", id = CMD_ADD, predict = true, invoke = probe_cmd_add},
-	{name = "torn", id = CMD_TORN, predict = true, invoke = probe_cmd_torn},
-	{name = "mark", id = CMD_MARK, predict = false, invoke = probe_cmd_mark},
+	{name = "add", id = CMD_ADD, predict = true, access = .Any_Seat, invoke = probe_cmd_add},
+	{name = "torn", id = CMD_TORN, predict = true, access = .Any_Seat, invoke = probe_cmd_torn},
+	{name = "mark", id = CMD_MARK, predict = false, access = .Any_Seat, invoke = probe_cmd_mark},
 }
 
 Capture :: struct {
@@ -702,7 +702,7 @@ probe_cmd_loot :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) 
 command_then_fires_on_authority_only :: proc(t: ^testing.T) {
 	LOOT :: knet.Cmd_Id(0xc57) // hash-sized like a generated id, unique within the set
 	desc := probe_desc()
-	cmds := [?]knet.Command_Desc{{name = "loot", id = LOOT, predict = true, invoke = probe_cmd_loot}}
+	cmds := [?]knet.Command_Desc{{name = "loot", id = LOOT, predict = true, access = .Any_Seat, invoke = probe_cmd_loot}}
 	set := knet.Command_Set{entity_desc = &desc, commands = cmds[:]}
 
 	log := Then_Log{}
@@ -757,6 +757,59 @@ command_malformed_input_rejects :: proc(t: ^testing.T) {
 	// Unknown command index from a hostile/mismatched peer: rejected, no panic.
 	r2 := knet.reader_make(nil)
 	testing.expect(t, !knet.command_execute(&host, &set, 200, &r2, &env))
+}
+
+@(test)
+command_access_is_enforced_before_predicate :: proc(t: ^testing.T) {
+	OWNER :: knet.Cmd_Id(0x101)
+	OPEN :: knet.Cmd_Id(0x102)
+	AUTH :: knet.Cmd_Id(0x103)
+	desc := probe_desc()
+	cmds := [?]knet.Command_Desc{
+		{name = "owner", id = OWNER, access = .Owner, invoke = probe_cmd_mark},
+		{name = "open", id = OPEN, access = .Any_Seat, invoke = probe_cmd_mark},
+		{name = "authority", id = AUTH, access = .Authority, invoke = probe_cmd_mark},
+	}
+	set := knet.Command_Set{entity_desc = &desc, commands = cmds[:]}
+	reg := knet.registry_make()
+	defer knet.registry_destroy(&reg)
+	host := Probe{state = 1}
+	id := knet.registry_spawn(&reg, &host, &set, knet.Player_Id(7))
+	ctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&ctx)
+
+	issue := proc(
+		reg: ^knet.Registry,
+		ctx: ^knet.Command_Ctx,
+		by: knet.Player_Id,
+		id: knet.Net_Id,
+		cmd: knet.Cmd_Id,
+		seq: u32,
+		value: u8,
+	) -> (responded, ok: bool) {
+		w := knet.writer_make(16, context.temp_allocator)
+		knet.write_net_id(&w, id)
+		knet.write_u16(&w, u16(cmd))
+		knet.write_u32(&w, seq)
+		knet.write_u8(&w, value)
+		r := knet.reader_make(knet.writer_bytes(&w))
+		out := knet.writer_make(32, context.temp_allocator)
+		responded, ok, _ = knet.registry_host_command(reg, ctx, by, &r, &out)
+		return
+	}
+
+	responded, ok := issue(&reg, &ctx, 8, id, OWNER, 1, 2)
+	testing.expect(t, responded && !ok, "non-owner gets an explicit rejection")
+	testing.expect_value(t, host.state, u8(1)) // predicate never ran
+	responded, ok = issue(&reg, &ctx, 8, id, AUTH, 2, 3)
+	testing.expect(t, responded && !ok, "remote authority-only command rejected")
+	testing.expect_value(t, host.state, u8(1))
+	responded, ok = issue(&reg, &ctx, 8, id, OPEN, 3, 4)
+	testing.expect(t, responded && ok, "any seated issuer may ask")
+	testing.expect_value(t, host.state, u8(4))
+	responded, ok = issue(&reg, &ctx, 7, id, OWNER, 1, 5)
+	testing.expect(t, responded && ok, "the authoritative owner may ask")
+	testing.expect_value(t, host.state, u8(5))
 }
 
 @(test)
@@ -851,6 +904,65 @@ registry_batched_deltas :: proc(t: ^testing.T) {
 	r2 := knet.reader_make(knet.writer_bytes(&w))
 	testing.expect_value(t, knet.registry_apply_deltas(&r2, &creg), 1)
 	testing.expect_value(t, cdot.v, u16(8))
+}
+
+@(test)
+registry_malformed_entity_updates_commit_nothing :: proc(t: ^testing.T) {
+	desc := probe_desc()
+	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+
+	sreg := knet.registry_make()
+	defer knet.registry_destroy(&sreg)
+	host := Probe{hp = 44, x = 12, y = 23, state = 7}
+	id := knet.registry_spawn(&sreg, &host, &set)
+
+	creg := knet.registry_make()
+	defer knet.registry_destroy(&creg)
+	client := Probe{hp = 5, x = 6, y = 7, state = 8, local_only = 99}
+	knet.registry_insert(&creg, id, &client, &set)
+
+	// All replicated fields are dirty. Truncating the LAST one proves fields
+	// decoded earlier in the row are rolled back too, and no change event leaks.
+	dw := knet.writer_make()
+	defer knet.writer_destroy(&dw)
+	testing.expect_value(t, knet.registry_write_deltas(&dw, &sreg), 1)
+	delta := knet.writer_bytes(&dw)
+	changed := make([dynamic]knet.Net_Id)
+	defer delete(changed)
+	dr := knet.reader_make(delta[:len(delta) - 1])
+	testing.expect_value(t, knet.registry_apply_deltas(&dr, &creg, nil, &changed), 0)
+	testing.expect(t, dr.err)
+	testing.expect_value(t, len(changed), 0)
+	testing.expect_value(t, client.hp, i32(5))
+	testing.expect_value(t, client.x, f32(6))
+	testing.expect_value(t, client.y, f32(7))
+	testing.expect_value(t, client.state, u8(8))
+	testing.expect_value(t, client.local_only, 99)
+
+	// The reliable retransmit still lands cleanly: the torn attempt advanced
+	// neither live state nor the receiver's framework shadow.
+	dr = knet.reader_make(delta)
+	testing.expect_value(t, knet.registry_apply_deltas(&dr, &creg), 1)
+	testing.expect(t, !dr.err)
+	testing.expect_value(t, client.hp, host.hp)
+	testing.expect_value(t, client.x, host.x)
+	testing.expect_value(t, client.y, host.y)
+	testing.expect_value(t, client.state, host.state)
+
+	// Full join/resync rows have the same all-or-nothing contract.
+	client = Probe{hp = -5, x = -6, y = -7, state = 2, local_only = 101}
+	fw := knet.writer_make()
+	defer knet.writer_destroy(&fw)
+	_ = knet.registry_write_fulls(&fw, &sreg)
+	full := knet.writer_bytes(&fw)
+	fr := knet.reader_make(full[:len(full) - 1])
+	testing.expect_value(t, knet.registry_apply_fulls(&fr, &creg), 0)
+	testing.expect(t, fr.err)
+	testing.expect_value(t, client.hp, i32(-5))
+	testing.expect_value(t, client.x, f32(-6))
+	testing.expect_value(t, client.y, f32(-7))
+	testing.expect_value(t, client.state, u8(2))
+	testing.expect_value(t, client.local_only, 101)
 }
 
 @(test)
@@ -1003,13 +1115,11 @@ registry_delta_replays_pending_prediction :: proc(t: ^testing.T) {
 	testing.expect_value(t, host.hp, i32(18))
 }
 
-// A TORN batch must not outlive itself: the unwind has already run when the
-// tear is noticed, so the replay and the shadow bless must run anyway. The
-// old code broke between the halves — the prediction visibly vanished (the
-// entity sat at its unwound baseline) and the pendings kept stale reverts
-// for the next reconcile to re-restore.
+// A TORN entity update is transactional: it restores the exact speculative
+// state that was visible before unwind, leaves pending reverts alone, and does
+// not bless a partial authoritative baseline.
 @(test)
-registry_truncated_delta_still_replays :: proc(t: ^testing.T) {
+registry_truncated_delta_is_transactional :: proc(t: ^testing.T) {
 	pdesc := probe_desc()
 	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
 
@@ -1044,8 +1154,7 @@ registry_truncated_delta_still_replays :: proc(t: ^testing.T) {
 	testing.expect_value(t, client.hp, i32(18))
 
 	// The host's own tick moves hp to 12; the delta arrives TRUNCATED inside
-	// the field bytes. Nothing applies (per-field bounds check), but the
-	// predictions must still stand replayed on the unwound baseline.
+	// the field bytes. Nothing applies and the pre-packet prediction remains.
 	host.hp = 12
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
@@ -1055,7 +1164,7 @@ registry_truncated_delta_still_replays :: proc(t: ^testing.T) {
 	testing.expect_value(t, knet.registry_apply_deltas(&torn, &creg, &cctx), 0)
 	testing.expect(t, torn.err)
 	testing.expect_value(t, knet.pending_count(&cctx.pending), 2)
-	testing.expect_value(t, client.hp, i32(18)) // 10 baseline + replayed +5 +3
+	testing.expect_value(t, client.hp, i32(18)) // exact pre-packet speculative state
 
 	// No cascade: the same delta arriving WHOLE (reliable retransmit) then
 	// reconciles cleanly — authoritative 12 under the replayed predictions.
@@ -1478,6 +1587,14 @@ registry_streams_end_to_end :: proc(t: ^testing.T) {
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	testing.expect_value(t, knet.registry_write_streams(&w, &oreg, ME, 1.0), 2)
+
+	// A resolved transport sender cannot forge another owner's row. Admission
+	// is whole-batch and happens before any stream ring is advanced.
+	forged := knet.reader_make(knet.writer_bytes(&w))
+	_ = knet.registry_stream_time(&forged)
+	testing.expect_value(t, knet.registry_apply_streams(&forged, &rreg, OTHER, 1.0, OTHER), 0)
+	testing.expect(t, forged.err, "sender must match authoritative ownership")
+	testing.expect_value(t, knet.registry_sample_streams(&rreg, 1.0, OTHER), 0)
 
 	r := knet.reader_make(knet.writer_bytes(&w))
 	testing.expect_value(t, knet.registry_stream_time(&r), 1.0)

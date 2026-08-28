@@ -687,6 +687,12 @@ Three naming formulas produce identifiers you are expected to *call*, and one pr
 name you are expected to *write*. They are not interchangeable, and two of them are one
 letter apart.
 
+**Command policy tokens.** `@(gd_command)` is owner-only by default. Add `predict` for
+optimistic local execution, `any_seat` for a shared interaction, or `authority` for a verb
+that must never enter from a client; combine independent tokens with a comma, for example
+`@(gd_command = "predict,any_seat")`. The same vocabulary applies whether the class uses
+co-op replication or the sim lane, and access is enforced before the verb predicate.
+
 **Command wrappers: two formulas.** A verb declared directly on the entity keeps its own
 proc name; a verb hoisted out of an embedded block is renamed after the PATH it was reached
 through, so two blocks of the same type on one entity never collide:

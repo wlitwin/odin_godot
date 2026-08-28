@@ -3,7 +3,8 @@ package kit_net
 // command — the intent→command→result runtime loop (the DX heart of the toolkit).
 //
 // A command is a plain proc `proc(self: ^Cls, args…) -> bool` marked
-// `@(gd_command)` (host-only) or `@(gd_command="predict")` (optimistic). The
+// `@(gd_command)` or `@(gd_command="predict")` (optimistic), with owner access
+// by default and optional `any_seat` / `authority` policy tokens. The
 // AUTHOR writes single-player-looking mutation code with zero role branches;
 // scriptgen generates a decode thunk, a Command_Desc table, and a typed
 // `<proc>_cmd` issue wrapper — the generated wrapper holds the ONLY role branch:
@@ -92,6 +93,20 @@ Command_Proc :: proc(entity: rawptr, r: ^Reader, env: ^Command_Env) -> bool
 // bytes are unchanged — the encoders still write u16(id).
 Cmd_Id :: distinct u16
 
+// Who may issue a verb through the authority ingress. The declaration is
+// independent of the verb predicate: predicates decide whether an otherwise
+// authorized action applies to current game state; access decides whether the
+// sender was allowed to ask at all. Shared by the immediate co-op loop and the
+// tick-scheduled sim lane so promoting an entity does not change vocabulary.
+//
+// Owner is zero so omitted policy is secure by default in both generated and
+// hand-built tables. Open world interactions must say Any_Seat explicitly.
+Command_Access :: enum u8 {
+	Owner,
+	Any_Seat,
+	Authority,
+}
+
 Command_Desc :: struct {
 	name:    string, // stripped verb ("open") — diagnostics only
 	// The verb's STABLE wire id — what `command_begin` ships and receivers look
@@ -104,6 +119,7 @@ Command_Desc :: struct {
 	// the canonical id law — ksim.Sim_Cmd.id mirrors it and points back here.
 	id:      Cmd_Id,
 	predict: bool,
+	access:  Command_Access,
 	invoke:  Command_Proc,
 }
 

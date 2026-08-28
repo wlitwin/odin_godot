@@ -72,6 +72,7 @@ predict_wire_size :: proc(desc: ^knet.Entity_Desc) -> int {
 // client's newest fully-applied tick (0 = nothing acked yet → all fulls).
 // Returns the row count.
 snap_write :: proc(w: ^knet.Writer, entries: []Entry, tick: u64, baseline: u64, input_ack: u64) -> int {
+	assert(len(entries) <= int(max(u16)), "snapshot entity count exceeds its u16 wire field")
 	knet.write_u64(w, tick)
 	knet.write_u64(w, baseline)
 	knet.write_u64(w, input_ack)
@@ -88,6 +89,7 @@ snap_write :: proc(w: ^knet.Writer, entries: []Entry, tick: u64, baseline: u64, 
 		base, have_base := history_read(e.hist, baseline)
 
 		pred := knet.subset_view(desc, .Predicted)
+		assert(pred.wire_bytes <= int(max(u16)), "full snapshot row exceeds its u16 wire length")
 		knet.write_net_id(w, e.id)
 		if !have_base {
 			// New entity or lapped baseline: the full row that needs nothing.

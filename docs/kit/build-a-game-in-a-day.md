@@ -167,7 +167,7 @@ past, staying smooth through jitter and drops. Two contracts to respect:
 A verb is a plain proc on the entity it mutates:
 
 ```odin
-@(gd_command = "predict")
+@(gd_command = "predict,any_seat")
 chest_take :: proc(self: ^Chest, slot: u8, count: u16, px, py: f32) -> (ok: bool, taken: kitems.Slot) {
 	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false, {}}
 	taken = kitems.take(self.slots[:], int(slot), count)

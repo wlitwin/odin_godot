@@ -129,6 +129,48 @@ lane_pump :: proc(boxes: []^Lane_Box) {
 	}
 }
 
+// Adversarial app-message helpers: these deliberately bypass lane_command and
+// input_write so the authority ingress sees forged sequence/tick/ack/size data.
+lane_raw_command :: proc(
+	from: ^Lane_Box,
+	tag: u8,
+	seq: u32,
+	tick: u64,
+	id: knet.Net_Id,
+	cmd: u16,
+	args: []u8 = nil,
+) {
+	w := ksess.session_app_begin(&from.s, tag)
+	knet.write_u8(w, ksim.SIM_CMD)
+	knet.write_u32(w, seq)
+	knet.write_u64(w, tick)
+	knet.write_net_id(w, id)
+	knet.write_u16(w, cmd)
+	knet.write_bytes(w, args)
+	ksess.session_app_flush(&from.s, ksess.HOST_PEER)
+}
+
+lane_raw_input :: proc(
+	from: ^Lane_Box,
+	tag: u8,
+	ack: u64,
+	first: u64,
+	value: u8 = 0,
+	render_off: u8 = 0,
+) {
+	w := ksess.session_app_begin(&from.s, tag)
+	knet.write_u8(w, ksim.SIM_INPUT)
+	knet.write_u64(w, ack)
+	knet.write_u8(w, render_off)
+	knet.write_u8(w, 1) // one registered class
+	knet.write_u16(w, 0)
+	knet.write_u64(w, first)
+	knet.write_u8(w, 1)
+	knet.write_u16(w, 1)
+	knet.write_u8(w, value)
+	ksess.session_app_flush(&from.s, ksess.HOST_PEER, .Stream)
+}
+
 // Direct-velocity step so a zero intent FREEZES the world — quiescence makes
 // the convergence assertions exact instead of chasing a moving sum.
 lane_mover_step :: proc(m: ^Mover, ax: i8) {
@@ -624,6 +666,149 @@ mover_surge_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.
 }
 
 @(test)
+lane_rejects_replayed_bounded_and_stale_authority_traffic :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	cmds := [?]ksim.Sim_Cmd{{id = 0, exec = mover_surge_exec}}
+	set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+		commands    = cmds[:],
+	}
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+	testing.expect_value(t, alice.s.me, knet.Player_Id(2))
+
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
+	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
+	m := new(Mover)
+	m.hp = 10
+	host.movers[20] = m
+	host.owners[20] = 2
+	ksim.lane_track_set(&host.lane, 20, m, &set, 2)
+
+	DT :: 1.0 / 60.0
+	// Tick 2 issues a real snapshot to Alice, establishing the authority's
+	// per-seat issued-ack range even though this test client has no sim lane.
+	ksim.lane_frame(&host.lane, DT)
+	ksim.lane_frame(&host.lane, DT)
+	lane_pump(boxes)
+
+	// A forged future ack cannot become a delta baseline or rewind tag, while
+	// its otherwise-plausible input is still accepted (downlink loss must not
+	// silence uplink input).
+	lane_raw_input(&alice, host.lane.tag, host.lane.ticker.tick + 100, host.lane.ticker.tick + 1)
+	lane_pump(boxes)
+	testing.expect_value(t, host.lane.stat_ack_rejected, 1)
+
+	// A future input outside lead_max is rejected before touching the ring.
+	lane_raw_input(&alice, host.lane.tag, 2, host.lane.ticker.tick + u64(host.lane.lead_max) + 1)
+	lane_pump(boxes)
+	testing.expect_value(t, host.lane.stat_input_rejected, 1)
+
+	// Duplicate reliable delivery executes exactly once.
+	at := host.lane.ticker.tick + 1
+	lane_raw_command(&alice, host.lane.tag, 1, at, 20, 0)
+	lane_raw_command(&alice, host.lane.tag, 1, at, 20, 0)
+	lane_pump(boxes)
+	ksim.lane_frame(&host.lane, DT)
+	testing.expect_value(t, m.x, f32(50))
+	testing.expect_value(t, m.hp, i32(9))
+
+	// Even with the largest claimed render offset, a valid issued ack cannot
+	// move judgment outside the authority's rewind ceiling.
+	lane_raw_input(&alice, host.lane.tag, 2, host.lane.ticker.tick + 1, render_off = max(u8))
+	lane_pump(boxes)
+	ksim.lane_frame(&host.lane, DT)
+	judged := ksim.lane_rewind_tick(&host.lane, 2)
+	floor_ :=
+		host.lane.step_tick > u64(host.lane.rewind_max) ? host.lane.step_tick - u64(host.lane.rewind_max) : 1
+	testing.expect(
+		t,
+		judged >= floor_ && judged <= host.lane.step_tick,
+		"client render offset stays inside the authority rewind window",
+	)
+
+	// Sequence zero, oversized arguments, and an implausibly future stamp all
+	// receive rejection and never occupy the scheduled-command cap.
+	before_rejected := host.lane.stat_cmd_rejected
+	lane_raw_command(&alice, host.lane.tag, 0, host.lane.ticker.tick + 1, 20, 0)
+	too_big := make([]u8, ksim.CMD_ARGS_MAX + 1)
+	lane_raw_command(&alice, host.lane.tag, 2, host.lane.ticker.tick + 1, 20, 0, too_big)
+	delete(too_big)
+	lane_raw_command(
+		&alice,
+		host.lane.tag,
+		3,
+		host.lane.ticker.tick + u64(host.lane.lead_max) + 1,
+		20,
+		0,
+	)
+	lane_pump(boxes)
+	ksim.lane_frame(&host.lane, DT)
+	testing.expect_value(t, m.x, f32(50))
+	testing.expect(
+		t,
+		host.lane.stat_cmd_rejected >= before_rejected + 3,
+		"zero, oversize, and future commands are all counted",
+	)
+
+	// Reauthorize at execution: ownership changed after the reliable packet was
+	// filed, so Alice's formerly-valid command no longer runs.
+	at = host.lane.ticker.tick + 2
+	lane_raw_command(&alice, host.lane.tag, 4, at, 20, 0)
+	lane_pump(boxes)
+	ksim.lane_set_owner(&host.lane, 20, 1)
+	ksim.lane_frame(&host.lane, DT)
+	ksim.lane_frame(&host.lane, DT)
+	testing.expect_value(t, m.x, f32(50))
+	testing.expect_value(t, m.hp, i32(9))
+
+	// Entity lifecycle cleanup removes a filed future command immediately; it
+	// cannot execute later against a recycled net id.
+	ksim.lane_set_owner(&host.lane, 20, 2)
+	at = host.lane.ticker.tick + 2
+	lane_raw_command(&alice, host.lane.tag, 5, at, 20, 0)
+	lane_pump(boxes)
+	testing.expect(t, ksim.lane_untrack(&host.lane, 20))
+	ksim.lane_frame(&host.lane, DT)
+	ksim.lane_frame(&host.lane, DT)
+	testing.expect_value(t, m.x, f32(50))
+	testing.expect_value(t, m.hp, i32(9))
+
+	// Player lifecycle cleanup is the other reliable-race edge. The boot event
+	// drain calls lane_drop_player on Ev_Player_Left; the queued verb disappears
+	// with the seat's input/dedup state.
+	m2 := new(Mover)
+	m2.hp = 10
+	host.movers[30] = m2
+	host.owners[30] = 2
+	ksim.lane_track_set(&host.lane, 30, m2, &set, 2)
+	at = host.lane.ticker.tick + 2
+	lane_raw_command(&alice, host.lane.tag, 6, at, 30, 0)
+	lane_pump(boxes)
+	ksim.lane_drop_player(&host.lane, 2)
+	ksim.lane_frame(&host.lane, DT)
+	ksim.lane_frame(&host.lane, DT)
+	testing.expect_value(t, m2.x, f32(0))
+	testing.expect_value(t, m2.hp, i32(10))
+}
+
+@(test)
 lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 	desc := mover_desc()
 	cmds := [?]ksim.Sim_Cmd{{exec = mover_surge_exec}}
@@ -751,8 +936,8 @@ lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 	// PREDICTION to every seat, never command authority; id 2 stays closed to
 	// pin the split.
 	cmds_c := [?]ksim.Sim_Cmd{
-		{id = 0, exec = mover_surge_exec, any_seat = true},
-		{id = 1, exec = mover_dash_exec, any_seat = true},
+		{id = 0, exec = mover_surge_exec, access = .Any_Seat},
+		{id = 1, exec = mover_dash_exec, access = .Any_Seat},
 		{id = 2, exec = mover_surge_exec},
 	}
 	set_c := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds_c[:], contested = true}

@@ -1613,26 +1613,6 @@ validate_script :: proc(s: ^Script) {
 				s.struct_name,
 			)
 		}
-		// `any_seat` widens a verb's COMMAND scope to every seat — only
-		// meaningful on a contested sim class, and silently dead anywhere
-		// else, which is exactly the class of quiet flag this build step
-		// exists to refuse.
-		for c in s.commands {
-			if !c.any_seat {continue}
-			if s.tick.proc_name == "" && len(s.block_ticks) == 0 {
-				error_at(
-					Loc{path = s.path},
-					"command %s: `any_seat` is a sim-lane declaration — %s does not tick, and coop verbs are host-validated and issuable by any seat already; drop it",
-					c.proc_name, s.struct_name,
-				)
-			} else if !s.tick.contested {
-				error_at(
-					Loc{path = s.path, line = s.tick.line},
-					"command %s: `any_seat` opens the verb to every seat on a CONTESTED class only — mark %s's tick @(gd_tick=\"contested\") (predict-the-contested-object), or drop any_seat (verbs stay owner-only)",
-					c.proc_name, s.struct_name,
-				)
-			}
-		}
 	}
 	if s.tick.proc_name != "" || len(s.block_ticks) > 0 {
 		has_predict := false
@@ -2318,8 +2298,10 @@ build_command_info :: proc(
 	cmd := Command_Info {
 		proc_name = proc_name,
 		name      = strip_struct_prefix(proc_name, struct_name),
+		access    = .Owner,
 	}
 	ok := true
+	access_set := false
 
 	for part in strings.split(config, ",") {
 		tok := strings.trim_space(part)
@@ -2327,10 +2309,29 @@ build_command_info :: proc(
 		case "":
 		case "predict":
 			cmd.predict = true
+		case "owner":
+			if access_set {
+				error_at(loc, "command %s: access declared more than once", proc_name)
+				ok = false
+			}
+			cmd.access = .Owner
+			access_set = true
 		case "any_seat":
-			cmd.any_seat = true
+			if access_set {
+				error_at(loc, "command %s: access declared more than once", proc_name)
+				ok = false
+			}
+			cmd.access = .Any_Seat
+			access_set = true
+		case "authority":
+			if access_set {
+				error_at(loc, "command %s: access declared more than once", proc_name)
+				ok = false
+			}
+			cmd.access = .Authority
+			access_set = true
 		case:
-			error_at(loc, "command %s: unknown config token %q (expected `predict` or `any_seat`)", proc_name, tok)
+			error_at(loc, "command %s: unknown config token %q (expected `predict`, `owner`, `any_seat`, or `authority`)", proc_name, tok)
 			ok = false
 		}
 	}
@@ -2615,9 +2616,31 @@ parse_tick :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^as
 // tick reads dies here instead of desyncing quietly. One sample per input
 // TYPE — a game driving two entity kinds declares two, one per kind.
 parse_sample :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^ast.Proc_Type, config: string) {
-	if config != "" {
-		error_at(loc, "sample %s: @(gd_sample) takes no config (got %q)", proc_name, config)
-		return
+	validate := ""
+	for part in strings.split(config, ",") {
+		tok := strings.trim_space(part)
+		switch {
+		case tok == "":
+		case tok == "validate":
+			if validate != "" {
+				error_at(loc, "sample %s: validator declared more than once", proc_name)
+				return
+			}
+			validate = fmt.tprintf("%s_validate", proc_name)
+		case strings.has_prefix(tok, "validate="):
+			if validate != "" {
+				error_at(loc, "sample %s: validator declared more than once", proc_name)
+				return
+			}
+			validate = strings.trim_space(tok[len("validate="):])
+			if validate == "" {
+				error_at(loc, "sample %s: `validate=` needs a proc name", proc_name)
+				return
+			}
+		case:
+			error_at(loc, "sample %s: unknown config token %q (expected `validate` or `validate=PROC`)", proc_name, tok)
+			return
+		}
 	}
 	types := flatten_param_types(src, pt)
 	if len(types) != 2 || types[0] != "u64" || !strings.has_prefix(types[1], "^") {
@@ -2639,7 +2662,7 @@ parse_sample :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^
 			return
 		}
 	}
-	append(&s.samples, Sim_Proc_Info{proc_name = proc_name, line = loc.line, input_type = itype})
+	append(&s.samples, Sim_Proc_Info{proc_name = proc_name, line = loc.line, input_type = itype, validate = validate})
 }
 
 // @(gd_step) procs — the lane's world passes, run AFTER entity ticks. Two
@@ -3060,6 +3083,7 @@ resolve_sim :: proc(scripts: []^Script) {
 		for sm in owner.samples {
 			if sm.input_type == t {
 				info.sample = sm.proc_name
+				info.validate = sm.validate
 				info.line = sm.line
 				break
 			}

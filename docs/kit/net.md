@@ -40,8 +40,11 @@ arrays): raw bytes are compared and copied, and nothing follows pointers. String
 dynamic data travel as explicit reliable messages, never as replicated fields.
 
 **Intent → command → result.** A command is a plain proc `proc(self: ^Cls, args…) -> bool`
-marked `@(gd_command)` (host-only) or `@(gd_command="predict")` (optimistic). The author
-writes single-player-looking mutation code with zero role branches; scriptgen generates a
+marked `@(gd_command)` or `@(gd_command="predict")` (optimistic). Commands are
+**owner-only by default**. Add `any_seat` for a world interaction that every seated
+player may ask for (`@(gd_command="predict,any_seat")`), or `authority` for a verb
+that must never cross client ingress. The author writes single-player-looking mutation
+code with zero role branches; scriptgen generates a
 decode thunk, a `Command_Desc` table, and a typed `<proc>_cmd` issue wrapper holding the
 *only* role branch: the authority runs the proc directly (deltas carry the change), a
 client serializes the args once, optionally re-runs the *same* proc from those bytes
@@ -51,6 +54,10 @@ before the optimistic run is the automatic revert. The verb's cross-entity half 
 the looter, launch the projectile, hand off ownership) is a second plain proc named
 `<verb>_then` ([consequences](#consequences-verb_then), below), which fires on the
 authority only, right after the verb applies. Then:
+
+- **Access before predicate**: the authority independently enforces the generated
+  `owner` / `any_seat` / `authority` policy before gameplay code runs. The predicate
+  still decides whether an authorized ask applies to current game state.
 
 - **Confirm**: header only, since the optimistic state already matches and nothing needs
   to replay.
@@ -111,7 +118,7 @@ Chest :: struct {
 	slots:  [8]kitems.Slot `gd:"replicate"`,
 }
 
-@(gd_command = "predict")
+@(gd_command = "predict,any_seat")
 chest_take :: proc(self: ^Chest, slot: i32, px: f32, py: f32) -> (ok: bool, taken: kitems.Slot) {
 	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false, {}}
 	taken = kitems.take(self.slots[:], int(slot), 99) // the whole stack
@@ -193,7 +200,7 @@ verb merely *targets* stays ordinary wire data under any other name (`who`,
 `target`).
 
 ```odin
-@(gd_command = "predict")
+@(gd_command = "predict,any_seat")
 trade_confirm :: proc(self: ^Trade, by: knet.Player_Id) -> (ok: bool, sealed: bool)
 ```
 

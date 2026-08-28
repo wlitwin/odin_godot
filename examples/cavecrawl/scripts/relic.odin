@@ -28,7 +28,7 @@ Relic :: struct {
 // Take it (only meaningful while it rests — the consequence checks the
 // current owner; racing grabbers both predict, the host's arrival order
 // decides).
-@(gd_command = "predict")
+@(gd_command = "predict,any_seat")
 relic_grab :: proc(self: ^Relic, px: f32, py: f32) -> bool {
 	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false}
 	return true

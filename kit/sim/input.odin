@@ -33,6 +33,12 @@ INPUT_REDUNDANCY :: 8
 MAX_INPUT_REDUNDANCY :: 64
 MAX_INPUT_SIZE :: 256
 
+// Frame-safe semantic admission for one typed input blob. scriptgen wraps an
+// authored `@(gd_sample="validate")` pair in this raw runtime shape. The proc
+// may clamp/normalize through `input` and returns whether the result is legal;
+// it must not retain the pointer (packet/sample scratch lifetime only).
+Input_Validate_Proc :: proc(user: rawptr, input: rawptr) -> bool
+
 // Raw fixed-size blob append/view — the packet layout carries the size once
 // in its header, so per-input length prefixes would be dead bytes. The view
 // read applies the Reader's sticky-error bounds rule by hand, the same move
@@ -98,6 +104,11 @@ input_read :: proc(r: ^Input_Ring, tick: u64) -> (input: []u8, ok: bool) {
 // ack in one packet, and a conditionally-absent segment would desync every
 // read behind it.
 input_write :: proc(w: ^knet.Writer, r: ^Input_Ring, acked: u64, redundancy := INPUT_REDUNDANCY) -> int {
+	assert(redundancy >= 0 && redundancy <= MAX_INPUT_REDUNDANCY,
+		"input redundancy exceeds the receiver's u8/bounded-work contract")
+	// Keep release builds safe too: a bad hand-written caller must never wrap
+	// the u8 count or make a receiver do more work than its advertised cap.
+	redundancy_limit := clamp(redundancy, 0, MAX_INPUT_REDUNDANCY)
 	// The window is the CONTIGUOUS run of noted ticks ending at head, walked
 	// downward — never assumed. The ring legitimately has holes: a lead-
 	// controller JUMP skips ticks wholesale (they were never simulated), and
@@ -105,7 +116,7 @@ input_write :: proc(w: ^knet.Writer, r: ^Input_Ring, acked: u64, redundancy := I
 	first := r.head + 1 // the empty window, self-describing
 	count := 0
 	if r.head > 0 {
-		red := min(redundancy, r.ring.slots)
+		red := min(redundancy_limit, r.ring.slots)
 		for t := r.head; count < red && t > acked; t -= 1 {
 			if _, ok := input_read(r, t); !ok {
 				break // a hole (jump / lap): the window ends here
@@ -170,18 +181,92 @@ input_buffer_destroy :: proc(b: ^Input_Buffer) {
 // Duplicates (redundancy re-delivering, out-of-order arrival) and stale ticks
 // (≤ popped) are skipped silently; that is the redundancy story working, not
 // an error. Returns how many genuinely new inputs were buffered.
-input_buffer_apply :: proc(b: ^Input_Buffer, r: ^knet.Reader, tag: u64 = 0) -> int {
-	first := knet.read_u64(r)
-	count := int(knet.read_u8(r))
-	size := int(knet.read_u16(r))
-	if r.err || count > MAX_INPUT_REDUNDANCY || size != b.ring.size {
+@(private)
+Input_Window_Header :: struct {
+	first: u64,
+	count: int,
+	size:  int,
+}
+
+// Read and preflight one window without consuming its blob bytes. lane_handle
+// uses this on a copy of the Reader to validate an entire multi-class packet
+// before applying any class; input_buffer_apply uses the same gate for direct
+// callers and tests.
+@(private)
+input_window_header :: proc(r: ^knet.Reader, expected_size: int, max_tick: u64) -> Input_Window_Header {
+	h := Input_Window_Header{
+		first = knet.read_u64(r),
+		count = int(knet.read_u8(r)),
+		size  = int(knet.read_u16(r)),
+	}
+	if r.err || h.count > MAX_INPUT_REDUNDANCY || h.size != expected_size {
 		r.err = true
+		return h
+	}
+	// Validate the WHOLE window before touching the ring. Besides bounding how
+	// far an untrusted client may write into the future, this catches u64 tick
+	// wrap and truncation transactionally: malformed input buffers nothing,
+	// rather than committing the prefix that happened to decode first.
+	if h.count > 0 {
+		last_delta := u64(h.count - 1)
+		if h.first == 0 ||
+		   h.first > max(u64) - last_delta ||
+		   h.first + last_delta > max_tick ||
+		   len(knet.reader_remaining(r)) < h.count * h.size {
+			r.err = true
+		}
+	}
+	return h
+}
+
+@(private)
+input_window_validate :: proc(
+	r: ^knet.Reader,
+	expected_size: int,
+	max_tick := max(u64),
+	validate: Input_Validate_Proc = nil,
+	user: rawptr = nil,
+) -> bool {
+	h := input_window_header(r, expected_size, max_tick)
+	if r.err {
+		return false
+	}
+	for _ in 0 ..< h.count {
+		blob := knet.reader_view(r, h.size)
+		if r.err || (validate != nil && !validate(user, raw_data(blob))) {
+			r.err = true
+			return false
+		}
+	}
+	return !r.err
+}
+
+input_buffer_apply :: proc(
+	b: ^Input_Buffer,
+	r: ^knet.Reader,
+	tag: u64 = 0,
+	max_tick := max(u64),
+	validate: Input_Validate_Proc = nil,
+	user: rawptr = nil,
+) -> int {
+	// Direct callers get the same all-before-any semantic gate as lane_handle.
+	// The probe's blob views alias the packet, so a sanitizer's clamped bytes
+	// are exactly the bytes copied into the ring below.
+	if validate != nil {
+		probe := r^
+		if !input_window_validate(&probe, b.ring.size, max_tick, validate, user) {
+			r.err = true
+			return 0
+		}
+	}
+	h := input_window_header(r, b.ring.size, max_tick)
+	if r.err {
 		return 0
 	}
 	fresh := 0
-	for k in 0 ..< count {
-		t := first + u64(k)
-		blob := knet.reader_view(r, size)
+	for k in 0 ..< h.count {
+		t := h.first + u64(k)
+		blob := knet.reader_view(r, h.size)
 		if r.err {
 			return fresh
 		}

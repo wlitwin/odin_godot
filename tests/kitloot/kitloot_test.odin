@@ -130,7 +130,7 @@ chest_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Chest, slots), size = size_of([4]kitems.Slot)},
 }
 chest_desc := knet.Entity_Desc{fields = chest_fields[:]}
-chest_cmds := [?]knet.Command_Desc{{name = "take", predict = true, invoke = chest_cmd_take}}
+chest_cmds := [?]knet.Command_Desc{{name = "take", predict = true, access = .Any_Seat, invoke = chest_cmd_take}}
 chest_set := knet.Command_Set{entity_desc = &chest_desc, commands = chest_cmds[:]}
 
 spel_fields := [?]knet.Field_Desc {
@@ -139,7 +139,7 @@ spel_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Spelunker, bag), size = size_of([4]kitems.Slot)},
 }
 spel_desc := knet.Entity_Desc{fields = spel_fields[:]}
-spel_cmds := [?]knet.Command_Desc{{name = "drop", predict = true, invoke = spel_cmd_drop}}
+spel_cmds := [?]knet.Command_Desc{{name = "drop", predict = true, access = .Any_Seat, invoke = spel_cmd_drop}}
 spel_set := knet.Command_Set{entity_desc = &spel_desc, commands = spel_cmds[:]}
 
 pickup_fields := [?]knet.Field_Desc {
@@ -149,7 +149,7 @@ pickup_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Pickup, count), size = size_of(u16)},
 }
 pickup_desc := knet.Entity_Desc{fields = pickup_fields[:]}
-pickup_cmds := [?]knet.Command_Desc{{name = "grab", predict = true, invoke = pickup_cmd_grab}}
+pickup_cmds := [?]knet.Command_Desc{{name = "grab", predict = true, access = .Any_Seat, invoke = pickup_cmd_grab}}
 pickup_set := knet.Command_Set{entity_desc = &pickup_desc, commands = pickup_cmds[:]}
 
 door_fields := [?]knet.Field_Desc {
@@ -158,7 +158,7 @@ door_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Door, open), size = size_of(bool)},
 }
 door_desc := knet.Entity_Desc{fields = door_fields[:]}
-door_cmds := [?]knet.Command_Desc{{name = "toggle", predict = true, invoke = door_cmd_toggle}}
+door_cmds := [?]knet.Command_Desc{{name = "toggle", predict = true, access = .Any_Seat, invoke = door_cmd_toggle}}
 door_set := knet.Command_Set{entity_desc = &door_desc, commands = door_cmds[:]}
 
 CHEST_TYPE :: ksess.Entity_Type(1)
@@ -261,9 +261,9 @@ loot_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd
 		grabbed := pickup.last_grab
 		credited := kitems.add(&b.table, spel.bag[:], grabbed.item, grabbed.count)
 		assert(credited == grabbed.count, "test bags have room for grabs")
+		// session_despawn owns the complete lifecycle: registry removal, map/node
+		// cleanup through box_free_entity, event emission, and peer notification.
 		ksess.session_despawn(&b.s, entity)
-		delete_key(&b.pickups, entity)
-		free(pickup)
 	}
 }
 
@@ -674,7 +674,9 @@ grab_race_despawns_exactly_once :: proc(t: ^testing.T) {
 		testing.expect_value(t, kitems.count_of(b.spelunkers[bob_av].bag[:], GEM), 0)
 		testing.expect_value(t, gems_in_view(b), 31)
 	}
-	// The clients' factories freed exactly one entity each.
+	// Every peer's factory freed exactly one entity. In particular, the host
+	// must not manually free again after session_despawn invokes its factory.
+	testing.expect_value(t, cv.host.freed, 1)
 	testing.expect_value(t, cv.alice.freed, 1)
 	testing.expect_value(t, cv.bob.freed, 1)
 

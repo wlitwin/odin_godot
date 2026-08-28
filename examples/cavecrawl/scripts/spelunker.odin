@@ -96,7 +96,7 @@ spelunker_throw_then :: proc(game: ^CaveLobby, self: ^Spelunker, by: knet.Player
 // Add a channel timer on top if your game wants held-E revives.
 // PREDICTED: the friend is up on the reviver's screen this frame; a stale
 // revive (they bled out between screens) reverts through reject-truth.
-@(gd_command = "predict")
+@(gd_command = "predict,any_seat")
 spelunker_revive :: proc(self: ^Spelunker, px: f32, py: f32) -> bool {
 	if self.hp > 0 {return false} // not down: nothing to revive
 	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false}

@@ -46,12 +46,20 @@ Net_Stats :: struct {
 	// apart. Fills (each optional; 0 = quiet):
 	//   guard_hits     ksess.session_guard_hits(s) — a client wrote a host-lane field (either model)
 	//   input_drops    lane.stat_input_drops       — sim input windows dropped (host)
+	//   input_rejected lane.stat_input_rejected    — malformed/future input packets (host)
+	//   ack_rejected   lane.stat_ack_rejected      — forged/stale snapshot evidence (host)
 	//   cmd_capped     lane.stat_cmd_capped        — verbs refused by the per-player cap (host)
+	//   cmd_rejected   lane.stat_cmd_rejected      — replay/bounds/access verb refusals (host)
 	//   rewind_clamped lane.stat_rewind_clamped    — a lag-comp rewind clamped to the buffer horizon
+	//   echo_dropped   lane.stat_echo_dropped      — predict-world echo rows past the u8 ceiling
 	guard_hits:     u64,
 	input_drops:    int,
+	input_rejected: int,
+	ack_rejected:   int,
 	cmd_capped:     int,
+	cmd_rejected:   int,
 	rewind_clamped: int,
+	echo_dropped:   int,
 	// The bytes-by-kind line, pre-formatted by netgd.wire_traffic(&boot.wire)
 	// — the widget renders it opaquely ("" = skip the row), so kit/ui never
 	// imports the transport.
@@ -66,7 +74,7 @@ Netgraph :: struct {
 	head:    int, // next write slot
 	seen:    int, // resims tally at the last refresh — the spark's shadow
 	primed:  bool, // seen is valid (skip the first frame's bogus delta)
-	warn_seen:   [4]u64, // last-refresh totals of the warn counters — the ▲ (moving) shadow
+	warn_seen:   [8]u64, // last-refresh totals of the warn counters — the ▲ (moving) shadow
 	warn_primed: bool,
 }
 
@@ -150,12 +158,16 @@ netgraph_refresh :: proc(ng: ^Netgraph, stats: Net_Stats) {
 	// quiet number, a climbing one wears the arrow. (The delta is the whole point:
 	// nonzero-forever is normal for a clamp that fired once at join; still moving
 	// a minute in is the bug.)
-	warn_labels := [4]string{"gwrite", "idrop", "ccap", "rclamp"}
-	warn := [4]u64 {
+	warn_labels := [8]string{"gwrite", "idrop", "irej", "arej", "ccap", "crej", "rclamp", "edrop"}
+	warn := [8]u64 {
 		stats.guard_hits,
 		u64(max(stats.input_drops, 0)),
+		u64(max(stats.input_rejected, 0)),
+		u64(max(stats.ack_rejected, 0)),
 		u64(max(stats.cmd_capped, 0)),
+		u64(max(stats.cmd_rejected, 0)),
 		u64(max(stats.rewind_clamped, 0)),
+		u64(max(stats.echo_dropped, 0)),
 	}
 	any_warn := false
 	for v in warn {

@@ -42,9 +42,9 @@ Locator_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y, z:
 // Host: turn interest management on (radius <= 0 turns it off). `hysteresis`
 // widens the EXIT edge so an entity at the border doesn't flicker in and out
 // (enter at `radius`, leave at `radius + hysteresis`). Call any time: joiners
-// learn the stream routing from their welcome, and a MID-RUN flip re-declares
-// it to everyone already connected (SES_AOI) — without that, clients seated
-// before the flip kept broadcasting their owner streams unfiltered forever.
+// learn the host's filtering mode from their welcome, and a MID-RUN flip
+// re-declares it to everyone already connected (SES_AOI). Client streams route
+// through the host authority gateway in either mode.
 session_set_interest :: proc(s: ^Session, radius: f32, hysteresis: f32, user: rawptr, locator: Locator_Proc) {
 	context.allocator = ses_allocator(s) // the SES_AOI re-declare's writer is the session's, not the caller's frame's
 	was := interest_on(s)

@@ -229,8 +229,9 @@ then a second act joins by code through the relay; the
 ## Where to go next
 
 - A **verb** (an action the host must validate: loot, doors, purchases):
-  `@(gd_command)` + a `_then` half; see [net.md](net.md), or cavecrawl's
-  41-line `chest.odin`.
+  `@(gd_command)` is owner-only; add `any_seat` for shared world interactions,
+  plus a `_then` half for cross-entity consequences. See [net.md](net.md), or
+  cavecrawl's 41-line `chest.odin`.
 - A **reaction to state changing** (score flash, death jingle):
   a `<class>_<field>_edge` half; see [net.md](net.md#edges-class_field_edge--presenting-delta-lane-changes).
 - **Physics bodies** (a real RigidBody2D all peers see): `play.Puppet`,

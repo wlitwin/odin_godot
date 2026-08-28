@@ -34,7 +34,7 @@ host decides if it's true. The pipeline around that idea is generated.
 ## Writing a command
 
 ```odin
-@(gd_command = "predict")
+@(gd_command = "predict,any_seat") // this chest is a world interaction
 chest_take :: proc(self: ^Chest, slot: u8, count: u16, px, py: f32) -> bool {
 	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false}
 	taken := kitems.take(self.slots[:], int(slot), count)

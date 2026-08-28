@@ -548,11 +548,11 @@ Mechanics worth knowing:
 - **A peer with no focus yet receives everything**: filtering starts when
   you start saying where they are. Commands, stats, chat, and everything
   reliable-and-rare stay unfiltered.
-- **A mid-run flip takes.** Joiners learn the stream routing from their
-  welcome, and flipping interest on after clients are seated re-declares it to
-  everyone already connected (`SES_AOI`), so a client seated before the flip
-  stops broadcasting its owner streams unfiltered. Turn it on whenever the
-  world grows into needing it.
+- **A mid-run flip takes.** Joiners learn the host's filtering mode from their
+  welcome, and flipping interest after clients are seated re-declares it to
+  everyone already connected (`SES_AOI`). Client streams pass through the host
+  authority gateway in either mode; AOI changes whole-batch fanout into
+  per-recipient filtering.
 
 ## App messages
 
@@ -906,29 +906,31 @@ entry, and a feature that reaches for one should be able to name its row in a ta
 
 ## Internals and design notes
 
-### The trust model — friends, not forensics
+### The trust model — hardened admission, transport-dependent privacy
 
-**The session trusts its seats the way you trust people you invited.** ENet is plaintext
-UDP: anyone on the path can read the wire (WebRTC and Steam encrypt for free, the honest
-transport answer for anything public). Owner streams are the owner's word: the host never
-validates that a stream batch names only entities its sender owns. Nothing rate-limits a
-seated peer's reliable traffic: the untrusted-*input* bounds all exist (command caps,
+ENet is plaintext UDP: anyone on the path can read the wire (WebRTC and Steam encrypt for
+free, the honest transport answer for anything public). Client owner streams always route
+through the host authority gateway; it resolves the transport peer to a seated player,
+preflights the complete batch, verifies every row against current entity ownership and wire
+size, then relays it. Clients accept owner streams only from the host. Nothing yet rate-limits
+a seated peer's reliable traffic: the untrusted-*input* bounds all exist (command caps,
 input-window ceilings, the xfer payload cap, every length-checked decode), but they bound
 malformed and oversized, not malicious-and-well-formed. The fingerprint gate refuses
 *version skew*, not intent; the write guard catches *your own* bugs, not an attacker.
 
 What IS defended, today, by default: every decode is bounds-checked and every parse failure
-counted (`session_malformed`); commands are exactly-once, owner-gated, and dedup-windowed;
-sim inputs are validated and capped both ends; spectator seats are receive-only at four
+counted (`session_malformed`); reliable entity updates commit transactionally; co-op and sim
+commands are exactly-once, access-gated, and dedup-windowed; owner-stream senders are
+ownership-checked at the host; sim inputs are structurally checked, capped, and semantically
+validated when the game declares a validator; spectator seats are receive-only at four
 separate doors; the version door turns the worst failure mode into a sentence. That is the
 friendslop threat model covered in full: accidents, bugs, and version skew, not adversaries.
 
-A game outgrowing invited-friends play (public lobbies, strangers, stakes) wants the
-**hardening tier**: ride the encrypting transports; host-side stream *ownership* validation
-(the registry knows every owner; the check is an opt-in compare per named entity, the same
-door the spectator gate already shows in miniature); per-peer byte/message budgets on the
-reliable channel with a kick policy; and the state-hash probe for desync forensics. None of
-it is built yet; none of it is a redesign: every piece slots into doors that already exist.
+A game outgrowing invited-friends play (public lobbies, strangers, stakes) should still use
+an encrypting transport and the existing state-hash probe for desync forensics. The remaining
+framework gap is per-peer byte/message budgets on reliable and stream channels with a
+kick/report policy; those controls slot into the admission doors above rather than requiring
+a new replication model.
 
 ### Recipes over existing pieces
 
@@ -990,7 +992,7 @@ trade_seat :: proc(self: ^Trade, by: knet.Player_Id) -> (side: u8, seated: bool)
 // clears BOTH confirms in the same verb, so the switch-the-item-at-the-last-
 // second scam is structurally dead — a confirm racing an edit lands on
 // cleared state and the commit below refuses.
-@(gd_command = "predict")
+@(gd_command = "predict,any_seat")
 trade_offer :: proc(self: ^Trade, by: knet.Player_Id, slot: u8, item: u16, count: u16) -> bool {
 	if self.state != TRADE_OPEN {return false}
 	side, seated := trade_seat(self, by)
@@ -1001,7 +1003,7 @@ trade_offer :: proc(self: ^Trade, by: knet.Player_Id, slot: u8, item: u16, count
 	return true
 }
 
-@(gd_command = "predict")
+@(gd_command = "predict,any_seat")
 trade_confirm :: proc(self: ^Trade, by: knet.Player_Id) -> (ok: bool, sealed: bool) {
 	if self.state != TRADE_OPEN {return false, false}
 	side, seated := trade_seat(self, by)

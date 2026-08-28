@@ -27,12 +27,12 @@ package kit_sim
 //     timeout restores them, and the next reconcile scrubs the predicted
 //     half. The server's verdict rides the reliable channel.
 //
-// The rules, enforced both ends: a client may command entities it OWNS
-// (predicted-self — the shop buys YOUR boots), plus CONTESTED entities whose
-// verb declares `@(gd_command="any_seat")` — prediction scope and command
-// authority are separate questions, so marking a class contested (which
-// predict-world does to every avatar) never silently opens its verbs to
-// every seat; each verb opts in, and the predicate arbitrates the races.
+// The rules, enforced both ends: owner access is the default; a verb declaring
+// `any_seat` accepts any playing seat, and `authority` never crosses ingress.
+// Prediction scope and command authority are separate questions: a contested
+// open verb speculates, while a watched open verb is still issuable but waits
+// for authority state. Marking a class contested (which predict-world does to
+// every avatar) never silently opens its verbs to every seat.
 // Bursts chain per entity (cmd_settle re-executes survivors in seq order);
 // the per-player pending cap is an untrusted-input bound, not a rule.
 
@@ -75,12 +75,11 @@ Sim_Cmd :: struct {
 	id:    Cmd_Id,
 	exec:  Cmd_Exec,
 	apply: Cmd_Apply, // nil = patch mode (recorded post-bytes replay)
-	// `@(gd_command="any_seat")`: on a CONTESTED class, any seat may issue this
-	// verb (a grab on the ball — the predicate arbitrates same-tick races).
-	// Off by default so contested-for-PREDICTION (predict-world avatars) never
-	// silently widens who may command an entity: without it, verbs stay
-	// owner-only even on contested types.
-	any_seat: bool,
+	// The same access vocabulary as immediate co-op commands. Any_Seat does
+	// not require a contested entity: a watched object can accept the request
+	// without speculating locally; contested only decides whether this client
+	// has a prediction ledger on which it can show the action immediately.
+	access: knet.Command_Access,
 }
 
 // id → slot in the entity's command slice (-1 = unknown id: reject). Sets are
@@ -104,6 +103,11 @@ sim_cmd_find :: proc(cmds: []Sim_Cmd, id: Cmd_Id) -> int {
 // The most scheduled-but-unexecuted commands the host will hold per player
 // — an untrusted-input cap, far above any honest burst.
 CMD_HOST_CAP :: 16
+
+// Tick verbs are small intent tuples, not an upload channel. The generated
+// encoders normally emit a handful of scalar bytes; this generous ceiling
+// bounds the authority's clone/allocation even for hand-written commands.
+CMD_ARGS_MAX :: 4096
 
 // The internal ledger state of an issued verb — deliberately NOT knet's
 // Command_Outcome. That enum is the ISSUE WRAPPER'S game-facing return
@@ -228,6 +232,9 @@ cmd_tracked :: proc(l: ^Lane, id: knet.Net_Id) -> ^Tracked {
 // a return value (watch the fields, or the authority's `_then`).
 lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: Cmd_Id, args: []u8) -> bool {
 	context.allocator = l.allocator // the owned arg copies free under lane roots later
+	if len(args) > CMD_ARGS_MAX {
+		return false
+	}
 	tr := cmd_tracked(l, id)
 	if tr == nil || tr.cmds == nil {
 		return false
@@ -244,14 +251,17 @@ lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: Cmd_Id, args: []u8) -> bool
 		append(&l.cmd_in, Cmd_In{tick = l.ticker.tick + 1, from = l.ses.me, id = id, cmd = cmd, args = queued})
 		return true
 	}
-	// Predicted-HERE only: my own entities, and contested ones whose verb
-	// declares any_seat (on my prediction ledger by construction — a verb on
-	// the ball speculates exactly like a touch does). Watched entities can't
-	// speculate: their fields belong to the presenter; command them from the
-	// authority, or promote them to contested. A contested entity WITHOUT the
-	// verb's any_seat refuses HERE, same answer the host's gate would give —
-	// the dev discovers at the issue site, not as a silent drop.
-	if !l.anchored || tr.hist == nil || (tr.owner != l.ses.me && !(tr.contested && tr.cmds[slot].any_seat)) {
+	// Access and prediction are separate. Owner refuses a non-owner locally;
+	// Authority never crosses the wire; Any_Seat may target a watched object
+	// (it simply has no local ledger on which to speculate before truth lands).
+	if !l.anchored {
+		return false
+	}
+	switch tr.cmds[slot].access {
+	case .Any_Seat:
+	case .Owner:
+		if tr.owner != l.ses.me {return false}
+	case .Authority:
 		return false
 	}
 	pending := 0
@@ -262,6 +272,11 @@ lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: Cmd_Id, args: []u8) -> bool
 	}
 	if pending >= CMD_HOST_CAP {
 		return false // mirror the host's cap — an honest burst never queues this deep
+	}
+	if l.cmd_seq == Cmd_Seq(max(u32)) {
+		// Never wrap to zero or into the authority's replay window. Four billion
+		// commands is a session-lifetime boundary, not a sequence-reset protocol.
+		return false
 	}
 	owned := make([]u8, len(args))
 	copy(owned, args)
@@ -276,6 +291,48 @@ lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: Cmd_Id, args: []u8) -> bool
 	knet.write_bytes(w, args)
 	ksess.session_app_flush(l.ses, ksess.HOST_PEER) // reliable: verbs are one-shots
 	return true
+}
+
+@(private)
+cmd_send_verdict :: proc(l: ^Lane, to: knet.Player_Id, seq: Cmd_Seq, ok: bool) {
+	if to == l.ses.me {
+		return
+	}
+	if p, seated := ksess.session_player(l.ses, to); seated && p.connected && p.peer != ksess.NO_PEER {
+		w := ksess.session_app_begin(l.ses, l.tag)
+		knet.write_u8(w, SIM_VERDICT)
+		knet.write_u32(w, u32(seq))
+		knet.write_u8(w, ok ? 1 : 0)
+		ksess.session_app_flush(l.ses, p.peer)
+	}
+}
+
+@(private)
+cmd_refuse :: proc(l: ^Lane, from: knet.Player_Id, seq: Cmd_Seq) {
+	l.stat_cmd_rejected += 1
+	cmd_send_verdict(l, from, seq, false)
+}
+
+// Access is checked on arrival AND at execution: a reliable command may sit
+// queued while its issuer disconnects, becomes a spectator, or loses ownership.
+@(private)
+cmd_authorized :: proc(l: ^Lane, from: knet.Player_Id, tr: ^Tracked, slot: int) -> bool {
+	if from == l.ses.me {
+		return true // an authority-authored verb is already inside the trust boundary
+	}
+	p, seated := ksess.session_player(l.ses, from)
+	if !seated || !p.connected || p.spectator || slot < 0 || slot >= len(tr.cmds) {
+		return false
+	}
+	switch tr.cmds[slot].access {
+	case .Any_Seat:
+		return true
+	case .Owner:
+		return tr.owner == from
+	case .Authority:
+		return false // only the from == authority arm above may run it
+	}
+	return false
 }
 
 // Any tick-scheduled verb still in flight on this entity? The session's
@@ -299,32 +356,52 @@ cmd_handle :: proc(l: ^Lane, from: knet.Player_Id, r: ^knet.Reader) {
 	id := knet.read_net_id(r)
 	cmd := Cmd_Id(knet.read_u16(r))
 	args := knet.read_bytes(r)
-	if r.err {
+	if r.err || len(knet.reader_remaining(r)) != 0 {
 		return
 	}
-	// A watching seat issues nothing — the session's command gate already
-	// drops its coop verbs; this is the sim lane's same door.
-	if p, seated := ksess.session_player(l.ses, from); seated && p.spectator {
+	if seq == 0 {
+		// No honest client has a pending sequence zero, so replying only creates
+		// an amplification surface. Count and drop it like kit/net's dedup gate.
+		l.stat_cmd_rejected += 1
+		return
+	}
+	peer := lane_peer_ensure(l, from)
+	if !knet.dedup_accept(&peer.cmd_seen, knet.Intent_Seq(u32(seq))) {
+		// Reliable delivery means the original verdict is already in flight.
+		// Replayed and stale sequences do not execute and do not amplify replies.
+		l.stat_cmd_rejected += 1
+		return
+	}
+	if tick == 0 || len(args) > CMD_ARGS_MAX {
+		cmd_refuse(l, from, seq)
 		return
 	}
 	tr := cmd_tracked(l, id)
 	// An unknown id (version skew, a renamed verb) MISSES the lookup and drops
 	// cleanly — never dispatches to whatever lives at that position.
 	if tr == nil || tr.cmds == nil {
+		cmd_refuse(l, from, seq)
 		return
 	}
 	slot := sim_cmd_find(tr.cmds, cmd)
 	if slot < 0 {
+		cmd_refuse(l, from, seq)
 		return
 	}
-	// The cheat gate: your verbs move YOUR entities — or CONTESTED ones whose
-	// verb declares `@(gd_command="any_seat")`, where any seat's touch is
-	// legitimate and the predicate arbitrates (two grabs the same tick:
-	// arrival order runs them, one wins). Contested alone never widens
-	// command authority: predict-world marks every avatar contested for
-	// PREDICTION, and an opponent must not get its verbs for free.
-	open := tr.set != nil && tr.set.contested && tr.cmds[slot].any_seat
-	if tr.owner != from && !open {
+	// The cheat gate: access is declared per verb and checked independently of
+	// both contested prediction and the gameplay predicate. Two Any_Seat grabs
+	// in one tick are authorized asks; arrival order and the predicate decide
+	// which applies.
+	if !cmd_authorized(l, from, tr, slot) {
+		cmd_refuse(l, from, seq)
+		return
+	}
+	max_tick := max(u64)
+	if l.ticker.tick <= max(u64) - u64(l.lead_max) {
+		max_tick = l.ticker.tick + u64(l.lead_max)
+	}
+	if tick > max_tick {
+		cmd_refuse(l, from, seq)
 		return
 	}
 	held := 0
@@ -335,6 +412,7 @@ cmd_handle :: proc(l: ^Lane, from: knet.Player_Id, r: ^knet.Reader) {
 	}
 	if held >= CMD_HOST_CAP {
 		l.stat_cmd_capped += 1 // untrusted-input cap; an honest client never queues this deep — counted, never silent
+		cmd_refuse(l, from, seq)
 		return
 	}
 	queued := make([]u8, len(args))
@@ -373,24 +451,18 @@ run_cmds :: proc(l: ^Lane, t: u64) {
 				i += 1
 				continue
 			}
+			ok := false
 			if tr := cmd_tracked(l, c.id); tr != nil && tr.cmds != nil {
 				slot := sim_cmd_find(tr.cmds, c.cmd)
-				if slot < 0 {
-					delete(c.args)
-					ordered_remove(&l.cmd_in, i)
-					continue // untracked verb id since filing (can't happen same-build)
+				if slot >= 0 && cmd_authorized(l, c.from, tr, slot) {
+					ok = tr.cmds[slot].exec(tr.entity, c.args, l, c.from)
+				} else {
+					l.stat_cmd_rejected += 1
 				}
-				ok := tr.cmds[slot].exec(tr.entity, c.args, l, c.from)
-				if c.from != l.ses.me {
-					if p, seated := ksess.session_player(l.ses, c.from); seated && p.peer != ksess.NO_PEER {
-						w := ksess.session_app_begin(l.ses, l.tag)
-						knet.write_u8(w, SIM_VERDICT)
-						knet.write_u32(w, u32(c.seq)) // wire bytes unchanged
-						knet.write_u8(w, ok ? 1 : 0)
-						ksess.session_app_flush(l.ses, p.peer)
-					}
-				}
+			} else {
+				l.stat_cmd_rejected += 1
 			}
+			cmd_send_verdict(l, c.from, c.seq, ok)
 			delete(c.args)
 			ordered_remove(&l.cmd_in, i)
 		}
@@ -423,6 +495,40 @@ run_cmds :: proc(l: ^Lane, t: u64) {
 				cmd_patch_apply(tr.entity, tr.desc, c.mask, c.patch)
 			}
 		}
+	}
+}
+
+// Lifecycle cleanup for reliable commands whose packets outlive their target
+// or issuer. These are called by lane_untrack/lane_drop_player in lane.odin.
+@(private)
+cmd_forget_entity :: proc(l: ^Lane, id: knet.Net_Id) {
+	for i := 0; i < len(l.cmd_in); {
+		if l.cmd_in[i].id != id {
+			i += 1
+			continue
+		}
+		delete(l.cmd_in[i].args)
+		ordered_remove(&l.cmd_in, i)
+	}
+	for i := 0; i < len(l.cmd_out); {
+		if l.cmd_out[i].id != id {
+			i += 1
+			continue
+		}
+		cmd_out_free(&l.cmd_out[i])
+		ordered_remove(&l.cmd_out, i)
+	}
+}
+
+@(private)
+cmd_forget_player :: proc(l: ^Lane, player: knet.Player_Id) {
+	for i := 0; i < len(l.cmd_in); {
+		if l.cmd_in[i].from != player {
+			i += 1
+			continue
+		}
+		delete(l.cmd_in[i].args)
+		ordered_remove(&l.cmd_in, i)
 	}
 }
 

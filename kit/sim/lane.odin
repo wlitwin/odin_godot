@@ -96,6 +96,8 @@ Input_Class :: struct {
 	// after an innocent field add. nil = fall back to size (see class_for_type).
 	type:    typeid,
 	sample:  Sample_Proc,
+	validate: Input_Validate_Proc, // nil = structural checks only; generated
+	                              // lane wiring installs the typed semantic hook
 	ring:    Input_Ring, // client only: local inputs already fed to prediction
 	scratch: []u8,       // sample destination (size bytes)
 }
@@ -166,6 +168,8 @@ Lane_Config :: struct {
 	margin:      int, // target server-side input headroom in ticks (0 = 2)
 	redundancy:  int, // inputs per packet (0 = INPUT_REDUNDANCY)
 	rewind_max:  int, // lag-comp rewind bound in ticks (0 = hz/4 ≈ 250ms — the favor-the-shooter ceiling)
+	lead_max:    int, // furthest client-stamped input/verb tick accepted ahead of authority time
+	                  // (0 = max(margin + rewind_max + 2×snap_every, slots/2, 8)); must fit in slots
 	watch_delay: int, // how far behind the newest batch watched entities RENDER, in ticks (0 = 2×snap_every — almost always a bracketing pair)
 	smooth_halflife: f64, // reconcile-correction render error half-life, seconds (0 = 0.063 — the puppet constant)
 	smooth_cut: f32, // an error component past this is a deliberate cut and SNAPS, world units (0 = never cut)
@@ -186,13 +190,17 @@ Lane_Config :: struct {
 	                // past the line; discrete fields always compare exactly.
 }
 
-// Host-side per-player state, created on a player's first input packet.
-@(private = "file")
+// Host-side per-player state, created when the authority first snapshots or
+// receives traffic for the player.
+@(private)
 Lane_Peer :: struct {
 	bufs:  map[u16]^Input_Buffer, // one de-jitter buffer per input class this player drives
-	acked: u64, // newest snap tick they fully applied — their delta baseline
+	acked: u64, // newest VALID issued snap tick they fully applied — their delta baseline
 	tag:   u64, // the (ack<<8|off) rider of the input just popped — one packet feeds every
 	            // class, so every buffer's tag agrees; the rewind reads it here
+	snap_first: u64, // first snapshot tick issued while this seat state has existed
+	snap_last:  u64, // newest snapshot tick actually issued to this seat
+	cmd_seen:   knet.Dedup_Window, // exactly-once/replay window for tick verbs
 }
 
 @(private) // command.odin's scheduler walks the track list too
@@ -229,6 +237,7 @@ Lane :: struct {
 	margin:          int,
 	redundancy:      int,
 	rewind_max:      int,
+	lead_max:        int,
 	watch_delay:     int,
 	watch_clock:     f64, // watched-entity render position, in fractional ticks
 	presented:       bool, // the game has called lane_present at least once — until
@@ -284,7 +293,11 @@ Lane :: struct {
 	stat_facts_dropped: int, // world facts refused by a full queue — a moving count means the game presents too rarely (or FACT_QUEUE_CAP is honestly too small)
 	stat_render_sat:    int, // render_off8 hit the wire's 31.5-tick ceiling — the authority now rewinds LESS than this screen's true delay (lag comp judges shallow)
 	stat_input_drops:   int, // host: input windows dropped for an unknown class id — zero in a same-build session; a moving count is version skew or garbage on the port
+	stat_input_rejected: int, // host: malformed/future input windows rejected before they touched a de-jitter ring
+	stat_ack_rejected:   int, // host: snapshot acks rejected as unissued, regressing, misaligned, or implausibly old
 	stat_cmd_capped:    int, // host: verbs refused by the per-player CMD_HOST_CAP — an honest client never queues this deep; a moving count names the peer flooding you
+	stat_cmd_rejected:   int, // host: verbs refused by syntax, replay, bounds, access, or execution-time reauthorization
+	stat_echo_dropped:   int, // host: echo rows omitted at the u8 row ceiling
 	// host: rewound queries whose reconstructed view fell PAST rewind_max and got
 	// clamped to the floor (lane_rewind_view). The counter exists because the
 	// clamp was the one failure in this file with no voice at all: the deep-lead
@@ -434,15 +447,35 @@ FACT_QUEUE_CAP :: 256
 // every peer by construction (the same compiled struct).
 lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG, cfg := Lane_Config{}, allocator := context.allocator) {
 	assert(l.ses == nil, "lane_init on a live lane — lane_destroy first (re-init without teardown leaks every container and keeps a stale anchor)")
+	assert(cfg.hz >= 0 && cfg.snap_every >= 0 && cfg.slots >= 0 && cfg.margin >= 0 &&
+	       cfg.redundancy >= 0 && cfg.rewind_max >= 0 && cfg.lead_max >= 0 &&
+	       cfg.watch_delay >= 0 && cfg.smooth_halflife >= 0 && cfg.smooth_cut >= 0 && cfg.tolerance >= 0,
+		"Lane_Config uses zero for defaults; negative timing, size, and tolerance values are invalid")
+	assert(cfg.slots == 0 || cfg.slots >= 2, "Lane_Config.slots must hold at least two ticks")
 	l.allocator = allocator
 	l.ses = ses
 	l.tag = tag
 	hz := cfg.hz > 0 ? cfg.hz : DEFAULT_SIM_HZ
 	l.snap_every = cfg.snap_every > 0 ? cfg.snap_every : 3
-	l.slots = cfg.slots > 0 ? cfg.slots : 128
+	l.slots = max(cfg.slots > 0 ? cfg.slots : 128, 2)
+	assert(l.snap_every < l.slots, "Lane_Config.snap_every must fit inside the tick ring")
+	l.snap_every = clamp(l.snap_every, 1, l.slots - 1)
 	l.margin = cfg.margin > 0 ? cfg.margin : 2
 	l.redundancy = cfg.redundancy > 0 ? cfg.redundancy : INPUT_REDUNDANCY
 	l.rewind_max = cfg.rewind_max > 0 ? cfg.rewind_max : max(hz / 4, 1)
+	assert(l.margin < l.slots, "Lane_Config.margin must fit inside the tick ring")
+	assert(l.redundancy <= MAX_INPUT_REDUNDANCY, "Lane_Config.redundancy exceeds MAX_INPUT_REDUNDANCY")
+	assert(l.rewind_max < l.slots, "Lane_Config.rewind_max must fit inside the tick ring")
+	l.margin = clamp(l.margin, 1, l.slots - 1)
+	l.redundancy = clamp(l.redundancy, 1, min(MAX_INPUT_REDUNDANCY, l.slots))
+	l.rewind_max = clamp(l.rewind_max, 1, l.slots - 1)
+	// A cold client can temporarily jump deep while shedding clock surplus
+	// (especially before clock-sync RTT exists). Half the ring admits that
+	// recovery path without allowing a tick to lap the authority's current slot.
+	derived_lead_max := max(l.margin + l.rewind_max + 2 * l.snap_every, max(l.slots / 2, 8))
+	l.lead_max = cfg.lead_max > 0 ? cfg.lead_max : derived_lead_max
+	assert(l.lead_max < l.slots, "Lane_Config.lead_max must fit inside the tick ring")
+	l.lead_max = clamp(l.lead_max, 1, l.slots - 1)
 	l.watch_delay = cfg.watch_delay > 0 ? cfg.watch_delay : 2 * l.snap_every
 	// The render offset rides the wire in EIGHTHS of a tick in one byte
 	// (render_off8): 31 ticks is the most a screen can DECLARE. A config past
@@ -450,7 +483,8 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 	// looking, clamp where asserts are stripped (stat_render_sat still counts
 	// the saturation there).
 	assert(l.watch_delay <= 31, "Lane_Config.watch_delay exceeds the 31-tick render-offset wire ceiling (render_off8)")
-	l.watch_delay = min(l.watch_delay, 31)
+	assert(l.watch_delay < l.slots, "Lane_Config.watch_delay must fit inside the tick ring")
+	l.watch_delay = clamp(l.watch_delay, 1, min(31, l.slots - 1))
 	l.smooth_halflife = cfg.smooth_halflife > 0 ? cfg.smooth_halflife : 0.063
 	l.smooth_cut = cfg.smooth_cut
 	l.judge_live = cfg.judge_live
@@ -515,6 +549,14 @@ lane_class_set_type :: proc(l: ^Lane, id: u16, type: typeid) {
 	ic.type = type
 }
 
+// Install semantic admission for one input class. Generated lane wiring calls
+// this for `@(gd_sample="validate")`; hand-built lanes can use it directly.
+lane_class_set_validate :: proc(l: ^Lane, id: u16, validate: Input_Validate_Proc) {
+	ic := lane_class(l, id)
+	assert(ic != nil, "lane_class_set_validate: no input class with this id — register it first")
+	ic.validate = validate
+}
+
 @(private = "file")
 lane_class_add :: proc(l: ^Lane, id: u16, size: int, sample: Sample_Proc, allocator := mem.Allocator{}) {
 	// Zero allocator (the default at every layer) = the LANE'S — these
@@ -522,12 +564,47 @@ lane_class_add :: proc(l: ^Lane, id: u16, size: int, sample: Sample_Proc, alloca
 	// default here silently mismatched them for custom-allocator lanes.
 	allocator := allocator.procedure != nil ? allocator : l.allocator
 	assert(lane_class(l, id) == nil, "input class id registered twice")
+	assert(len(l.inputs) < int(max(u8)), "a sim lane can encode at most 255 input classes")
 	ic := Input_Class{id = id, size = size, sample = sample}
 	if size > 0 {
 		ic.ring = input_ring_make(size, l.slots, allocator)
 		ic.scratch = make([]u8, size, allocator)
 	}
 	append(&l.inputs, ic)
+}
+
+// The one constructor for host-side per-seat simulation state. Snapshot issue,
+// input admission, and command dedup must share its lifetime or a command sent
+// before the first input could bypass replay protection.
+@(private)
+lane_peer_ensure :: proc(l: ^Lane, player: knet.Player_Id) -> ^Lane_Peer {
+	if p, ok := l.peers[player]; ok {
+		return p
+	}
+	p := new(Lane_Peer, l.allocator)
+	p.bufs = make(map[u16]^Input_Buffer, l.allocator)
+	l.peers[player] = p
+	return p
+}
+
+// An acknowledgement is useful only if the authority actually issued that
+// batch during this seat lifetime. Keep a finite age too: an ancient but real
+// tick is safe as a delta baseline in theory, but accepting it lets a delayed or
+// hostile packet keep claiming evidence outside this lane's useful horizon.
+@(private = "file")
+peer_snap_ack_valid :: proc(l: ^Lane, p: ^Lane_Peer, ack: u64) -> bool {
+	if ack == 0 {
+		return p.acked == 0
+	}
+	if p.snap_first == 0 ||
+	   ack < p.snap_first ||
+	   ack > p.snap_last ||
+	   ack < p.acked ||
+	   ack % u64(l.snap_every) != 0 {
+		return false
+	}
+	max_age := u64(min(l.slots - 1, l.margin + 2 * l.rewind_max + 4 * l.snap_every))
+	return p.snap_last - ack <= max_age
 }
 
 @(private = "file")
@@ -673,6 +750,8 @@ lane_track :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, desc: ^knet.Entity
 	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	assert(!l.rewound, "lane_track inside a rewound block — the restore holds pointers into the track list; lane_rewound_end first")
 	assert(predict_size(desc) > 0, "lane_track: entity predicts nothing — tag fields gd:\"predict\"")
+	assert(predict_wire_size(desc) <= int(max(u16)),
+		"lane_track: predicted wire state exceeds the snapshot row's u16 length")
 	if l.ses.is_host {
 		hist := new(History, allocator)
 		hist^ = history_make(desc, l.slots, allocator)
@@ -830,6 +909,10 @@ lane_fact :: proc(l: ^Lane, entity: rawptr, args: []u8, kind: u16 = 0) {
 
 lane_untrack :: proc(l: ^Lane, id: knet.Net_Id) -> bool {
 	assert(!l.rewound, "lane_untrack inside a rewound block — the restore holds pointers into the track list; lane_rewound_end first")
+	// Reliable commands can arrive before a despawn/untrack event is drained.
+	// Retire both authority and prediction ledgers now; no queued verb may later
+	// execute against a recycled id or keep an owned argument buffer alive.
+	cmd_forget_entity(l, id)
 	if !l.ses.is_host {
 		snap_rx_remove(&l.rx, id)
 	}
@@ -922,6 +1005,8 @@ lane_set_owner :: proc(l: ^Lane, id: knet.Net_Id, owner: knet.Player_Id, allocat
 // moves); hand-driven sessions call it from their own handler — skipping it
 // leaks a few KB per departed seat and keeps popping their buffers per tick.
 lane_drop_player :: proc(l: ^Lane, player: knet.Player_Id) {
+	context.allocator = l.allocator
+	cmd_forget_player(l, player)
 	if p, ok := l.peers[player]; ok {
 		for _, buf in p.bufs {
 			input_buffer_destroy(buf)
@@ -1107,7 +1192,15 @@ run_tick :: proc(l: ^Lane, t: u64) {
 sample_inputs :: proc(l: ^Lane, t: u64) {
 	for &ic in l.inputs {
 		if ic.sample != nil && ic.size > 0 {
+			// A sampler commonly writes only active fields. Neutralize the whole
+			// POD first so an omitted button/axis never inherits its previous tick.
+			mem.zero(raw_data(ic.scratch), len(ic.scratch))
 			ic.sample(l.user, t, raw_data(ic.scratch))
+			if ic.validate != nil && !ic.validate(l.user, raw_data(ic.scratch)) {
+				// A bad local device sample predicts neutral and ships neutral. The
+				// authority applies the same validator to received bytes.
+				mem.zero(raw_data(ic.scratch), len(ic.scratch))
+			}
 			input_note(&ic.ring, t, raw_data(ic.scratch))
 		}
 	}
@@ -1129,9 +1222,9 @@ host_frame :: proc(l: ^Lane, dt: f64) -> int {
 				input_buffer_pop(buf, t) // sets buf.fresh
 				best = max(best, buf.tag)
 			}
-			if best != 0 {
-				p.tag = best
-			}
+			// Held buffers retain their old tag. A fresh input whose ack failed
+			// validation deliberately carries zero and must CLEAR the old evidence.
+			p.tag = best
 		}
 		run_tick(l, t)
 		note_all(l.entries[:], t)
@@ -1151,11 +1244,13 @@ snap_broadcast :: proc(l: ^Lane, tick: u64) {
 		if !p.connected || p.id == l.ses.me {
 			continue
 		}
-		acked, input_ack := u64(0), u64(0)
-		if lp, ok := l.peers[p.id]; ok {
-			acked = lp.acked
-			input_ack = peer_input_ack(lp)
+		lp := lane_peer_ensure(l, p.id)
+		if lp.snap_first == 0 {
+			lp.snap_first = tick
 		}
+		lp.snap_last = tick
+		acked := lp.acked
+		input_ack := peer_input_ack(lp)
 		w := ksess.session_app_begin(l.ses, l.tag)
 		knet.write_u8(w, SIM_SNAP)
 		snap_write(w, l.entries[:], tick, acked, input_ack)
@@ -1196,6 +1291,10 @@ echo_write :: proc(l: ^Lane, w: ^knet.Writer, tick: u64) {
 	for &ic in l.inputs {
 		if ic.sample != nil && ic.size > 0 {
 			if blob, ok := input_read(&ic.ring, tick); ok {
+				if count >= int(max(u8)) {
+					l.stat_echo_dropped += 1
+					continue
+				}
 				knet.write_player_id(w, l.ses.me)
 				knet.write_u16(w, ic.id)
 				append(&w.buf, ..blob)
@@ -1205,6 +1304,10 @@ echo_write :: proc(l: ^Lane, w: ^knet.Writer, tick: u64) {
 	}
 	for pid, p in l.peers {
 		for cid, buf in p.bufs {
+			if count >= int(max(u8)) {
+				l.stat_echo_dropped += 1
+				continue
+			}
 			knet.write_player_id(w, pid)
 			knet.write_u16(w, cid)
 			append(&w.buf, ..buf.held)
@@ -1251,8 +1354,9 @@ client_frame :: proc(l: ^Lane, dt: f64) -> int {
 		// lets a rewound query judge the view each input was AIMED with. The
 		// render offset beside it says WHERE INSIDE that view the watch clock
 		// was drawing (fractional ticks behind the ack, 1/8-tick fixed point):
-		// a bounded claim — the server clamps it inside the window the ack
-		// proves — that lets the rewind BLEND the same bracket the shooter's
+		// a bounded claim — the server accepts only a recent ack it actually
+		// issued, then clamps the offset and final rewind — that lets the rewind
+		// BLEND the same bracket the shooter's
 		// screen blended, instead of quantizing to a tick.
 		//
 		// Then one window PER CLASS this seat plays — a class count, then each
@@ -1273,6 +1377,7 @@ client_frame :: proc(l: ^Lane, dt: f64) -> int {
 				cnt += 1
 			}
 		}
+		assert(cnt <= int(max(u8)), "input class count exceeds its u8 wire field")
 		w.buf[count_at] = u8(cnt)
 		ksess.session_app_flush(l.ses, ksess.HOST_PEER, .Stream)
 	}
@@ -1487,19 +1592,18 @@ find_lane_entry :: proc(l: ^Lane, id: knet.Net_Id) -> ^Entry {
 // ---------------------------------------------------------------------------
 // Lag compensation: judge a shot where the SHOOTER saw the target.
 //
-// The rewind tick is DERIVED, never trusted: the shooter's newest snap ack is
-// a fact (they provably applied that batch — it is their delta baseline), and
-// what they rendered when they pressed fire is within a batch interval of it.
-// Clamped to rewind_max, the favor-the-shooter ceiling: past it, a laggy
-// shooter aims at the live world like everyone else.
+// The rewind tick is bounded, never trusted outright: the authority first
+// proves the ack names a batch it issued in this seat lifetime, then binds that
+// ack to the input packet. The claimed render offset is clamped, and the final
+// view is clamped again to rewind_max, the favor-the-shooter ceiling.
 
 // The view a rewound query for `shooter` reconstructs (host, inside a step):
 // the bracketing lower tick and the blend fraction toward the next — the
 // SAME pair-and-alpha shape their watch clock drew with. Sources, in trust
-// order: the ack bound to the INPUT BEING EXECUTED (a fact — it rode the
+// order: the validated issued ack bound to the INPUT BEING EXECUTED (it rode the
 // trigger's packet; the shooter's latest ack is a whole lead-plus-transit
 // fresher and describes a world they never saw), minus the render offset
-// that rode beside it (a claim, clamped inside the window the ack proves).
+// that rode beside it (a claim, clamped inside the issued/ring horizon).
 lane_rewind_view :: proc(l: ^Lane, shooter: knet.Player_Id) -> (lo: u64, alpha: f32) {
 	assert(l.ses.is_host, "lag compensation is the authority's job")
 	t := l.step_tick
@@ -1816,23 +1920,70 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 		if sp, seated := ksess.session_player(l.ses, from); seated && sp.spectator {
 			return
 		}
-		p, ok := l.peers[from]
-		if !ok {
-			p = new(Lane_Peer)
-			p.bufs = make(map[u16]^Input_Buffer)
-			l.peers[from] = p
-		}
+		p := lane_peer_ensure(l, from)
 		acked := snap_ack_read(r)
 		off8 := knet.read_u8(r)
+		ack_ok := !r.err && peer_snap_ack_valid(l, p, acked)
+		if !ack_ok {
+			l.stat_ack_rejected += 1
+		}
 		// One rider per input: the ack AND the render offset that traveled
-		// with it, packed (ticks fit 56 bits by ~38 million years).
-		tag := (acked << 8) | u64(off8)
+		// with it, packed (ticks fit 56 bits by ~38 million years). An invalid
+		// ack carries no rewind evidence; the input itself remains admissible.
+		tag := ack_ok && acked != 0 ? (acked << 8) | u64(off8) : 0
 		// One window per class the sender drives, into the matching per-player
 		// buffer (created on first sight, sized from the class the build
 		// registered). An unknown class can't be length-skipped safely, so it
 		// drops the packet's tail — every peer runs the same build regardless.
 		ccount := int(knet.read_u8(r))
 		if r.err {
+			return
+		}
+		expected := 0
+		for &ic in l.inputs {
+			if ic.size > 0 {
+				expected += 1
+			}
+		}
+		if ccount > expected {
+			l.stat_input_rejected += 1
+			r.err = true
+			return
+		}
+		max_input_tick := max(u64)
+		if l.ticker.tick <= max(u64) - u64(l.lead_max) {
+			max_input_tick = l.ticker.tick + u64(l.lead_max)
+		}
+		// First pass: validate the complete multi-class packet and reject
+		// duplicate/unknown classes before ANY de-jitter buffer is mutated.
+		probe := r^
+		seen := make([dynamic]u16, context.temp_allocator)
+		for _ in 0 ..< ccount {
+			cid := knet.read_u16(&probe)
+			ic := lane_class(l, cid)
+			if probe.err || ic == nil || ic.size == 0 {
+				l.stat_input_drops += 1
+				l.stat_input_rejected += 1
+				r.err = true
+				return
+			}
+			duplicate := false
+			for prev in seen {
+				if prev == cid {
+					duplicate = true
+					break
+				}
+			}
+			if duplicate || !input_window_validate(&probe, ic.size, max_input_tick, ic.validate, l.user) {
+				l.stat_input_rejected += 1
+				r.err = true
+				return
+			}
+			append(&seen, cid)
+		}
+		if len(knet.reader_remaining(&probe)) != 0 {
+			l.stat_input_rejected += 1
+			r.err = true
 			return
 		}
 		for _ in 0 ..< ccount {
@@ -1842,7 +1993,7 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 			}
 			ic := lane_class(l, cid)
 			if ic == nil || ic.size == 0 {
-				l.stat_input_drops += 1 // the tail can't be length-skipped; counted, never silent
+				l.stat_input_drops += 1 // preflight above should make this unreachable
 				return
 			}
 			buf, has := p.bufs[cid]
@@ -1851,10 +2002,14 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 				buf^ = input_buffer_make(ic.size, l.slots)
 				p.bufs[cid] = buf
 			}
-			input_buffer_apply(buf, r, tag = tag)
+			input_buffer_apply(buf, r, tag = tag, max_tick = max_input_tick)
 		}
-		if !r.err && acked > p.acked {
-			p.acked = acked // regressions are stale reordering, not truth
+		if r.err {
+			l.stat_input_rejected += 1
+			return
+		}
+		if ack_ok && acked > p.acked {
+			p.acked = acked
 		}
 	case SIM_CMD:
 		// Host only; the session already resolved the seat.

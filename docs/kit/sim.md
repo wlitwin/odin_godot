@@ -216,6 +216,13 @@ The game's own halves (the device read and the world pass) are typed and
 attributed the same way. `@(gd_sample)` marks the one place that touches
 hardware (never called during a resim); scriptgen pins its input struct to
 the ticks' at build time, so sampling into the wrong struct cannot compile.
+Add `@(gd_sample="validate")` to pair a typed
+`<sample>_validate(self, input) -> bool` sanitizer/admission hook, or name one explicitly with
+`validate=PROC`. It runs immediately after local sampling and over every
+received window on the authority before any de-jitter buffer changes. It may
+clamp or normalize through the pointer; returning false rejects the complete
+multi-class input packet. Use it for finite-float checks, axis ranges, enum
+membership, button masks, and game-specific input invariants.
 `@(gd_step)` is the world pass, run after entity ticks. There are two slots, and
 a class may fill one of each: a bare `@(gd_step)` runs EVERYWHERE (live and in
 every resim, on every peer, for pure-sim contact), and `@(gd_step="authority")`
@@ -224,10 +231,15 @@ game needing both keeps them SEPARATE rather than folding `if is_host` into one
 pass; the lane holds that role gate:
 
 ```odin
-@(gd_sample)
+@(gd_sample = "validate")
 game_sample :: proc(self: ^Game, tick: u64, input: ^Runner_Input) {
 	input.move = quantize_axes()
 	input.buttons = read_buttons()
+}
+
+game_sample_validate :: proc(self: ^Game, input: ^Runner_Input) -> bool {
+	input.move = clamp_axes(input.move) // canonical bytes on client and server
+	return finite_axes(input.move) && input.buttons & ~RUNNER_BUTTONS == 0
 }
 
 @(gd_step) // everywhere, live + resim: contact for the pairs this peer simulates
@@ -499,13 +511,14 @@ eat a new bullet), but it means a predicate like "was the target shielded when
 the shooter saw them" must keep its shield in the predict set, or it reads
 today's shield against yesterday's pose.
 
-The rewind view is **fact-anchored and interpolated**: every input arrives
+The rewind view is **issued-snapshot-anchored and interpolated**: every input arrives
 in a packet that also carries the sender's snapshot ack and its render
 offset, and the buffer tags each input with both, so when the server
-executes the input that pulled the trigger, it knows which batch the
-shooter held at aim time (a fact: it is literally their delta baseline) and
-where inside it their watch clock was drawing (a claim, clamped inside the
-window the ack proves). The rewound scope then BLENDS the same bracket pair
+executes the input that pulled the trigger, it first verifies that the ack
+names a recent, non-regressing batch actually issued to that seat. Applying
+the batch and the render offset remain client claims; the authority bounds
+both by its issued range, ring horizon, and `rewind_max`. The rewound scope
+then BLENDS the claimed bracket pair
 the shooter's screen blended (`predict_blend` over the truth ledger), not
 the shooter's freshest ack (which advances a whole lead-plus-transit
 between sampling and adjudication), and not a quantized single tick (which
@@ -516,6 +529,13 @@ the favor-the-shooter ceiling; past it, a laggy shooter aims at the live
 world like everyone else. The cost of the favor is the classic one: occasionally
 you are hit just after reaching cover. That is the trade this model makes;
 the coop model makes the opposite one.
+
+For adversarial competitive play, this is the safe baseline rather than a
+cryptographic proof of visibility: tighten the final rewind envelope with
+server-observed RTT/jitter and monitor `stat_ack_rejected` and
+`stat_rewind_clamped`. A client-controlled render offset is always a bounded
+hint; no ordinary snapshot acknowledgement can prove which frame a player
+actually looked at.
 
 ## Discrete verbs on the lane
 
@@ -550,16 +570,15 @@ after entity thunks, before the world pass) and answers with a verdict: a
 rejection unwinds the delta-lane writes on the spot and the next reconcile
 scrubs the predicted ones, the same glide as any mispredict.
 
-You may command entities you OWN, and CONTESTED ones whose verb opts in
-with **`@(gd_command = "any_seat")`**. A contested entity lives on your
-prediction ledger, so an open verb speculates exactly like a touch does, and
-two same-tick verbs run in execution order with the predicate arbitrating (a
-spike on the ball is the shape). Prediction scope is not command scope:
-predict-world marks every AVATAR contested too, so without `any_seat` a verb
-stays owner-only on both ends: the client refuses at the issue site, and the
-host's cheat gate refuses the wire. Marking your avatar contested never
-hands your taunt or reload to opponents. Watched entities can't speculate;
-command them from the authority, or promote them to contested. Bursts are
+Every verb declares the same access policy as the co-op lane: `owner` is the
+default, `any_seat` opens an interaction, and `authority` never crosses client
+ingress. A contested entity lives on your prediction ledger, so an open verb
+speculates exactly like a touch does, and two same-tick verbs run in execution
+order with the predicate arbitrating (a spike on the ball is the shape).
+Prediction scope is not command scope: predict-world marks every avatar
+contested too, but its verbs remain owner-only unless they opt in. A watched
+entity may still accept an `any_seat` command; it simply waits for authority
+state because this client has no prediction ledger for it. Bursts are
 fine: verbs QUEUE per entity, and a rejection unwinds the delta-lane
 speculation chain in order without disturbing the survivors. The wrapper
 returns whether it SCHEDULED; the verdict is state (watch the fields, or the
@@ -582,7 +601,7 @@ the verb keeps its hands off predicted fields: the predicate and the
 delta-lane writes stay execute-once.
 
 ```odin
-@(gd_command)
+@(gd_command = "any_seat")
 ball_spike :: proc(self: ^Ball, px, py: f32) -> bool {
 	return self.hold == 0 && in_reach(self, px, py) // verdict + (any) delta writes
 }
@@ -735,20 +754,28 @@ guide if you are deciding rather than migrating.
 
 `Lane_Config` (zero = the default): `hz` 60 · `snap_every` 3 (20 Hz batches)
 · `margin` 2 (target input headroom, ticks) · `slots` 128 (ledger depth) ·
-`redundancy` 8 · `rewind_max` hz/4 · `watch_delay` 2×snap_every ·
+`redundancy` 8 · `rewind_max` hz/4 · `lead_max`
+max(margin + rewind_max + 2×snap_every, slots/2, 8) (the furthest
+client-stamped input/verb tick accepted ahead of authority time) ·
+`watch_delay` 2×snap_every ·
 `smooth_halflife` 0.063 s · `smooth_cut` 0 (never cut; set it in world
 units for teleport-heavy games) · `tolerance` 0 (exact reconcile; set it in
 world units so continuous held-input drift under the line rides uncorrected,
-predict-world's anti-churn). Two guards at `lane_init`: `watch_delay`
-refuses values above 31 (the render offset rides the wire in eighths of a
-tick, in one byte), and `echo_inputs` with `tolerance` 0 warns once, since
+predict-world's anti-churn). `lane_init` validates the configuration as one
+set: negative values are invalid; cadence, margin, rewind, lead, and watch
+delay must fit the ring; redundancy cannot exceed the receiver cap; and
+`watch_delay` cannot exceed 31 (the render offset rides the wire in eighths
+of a tick, in one byte). `echo_inputs` with `tolerance` 0 warns once, since
 that pairing resims on nearly every batch; set the tolerance in world units.
 Running tallies for a netgraph:
 `lane.stat_reconciles`, `lane.stat_resims` (a resim burst is a latency
-event worth drawing), and the host-side skew/abuse pair:
+event worth drawing), and the host-side skew/abuse counters:
 `stat_input_drops` (input windows dropped for an unknown class id: the
-version-skew shape) and `stat_cmd_capped` (verbs refused by the per-player
-cap: names the peer flooding you).
+version-skew shape), `stat_input_rejected` (malformed or future windows),
+`stat_ack_rejected` (unissued, regressing, misaligned, or stale snapshot
+claims), `stat_cmd_capped` (verbs refused by the per-player cap),
+`stat_cmd_rejected` (replay/bounds/access refusals), and
+`stat_echo_dropped` (predict-world rows past the u8 batch ceiling).
 
 `stat_rewind_clamped` is the one to watch if you run lag comp: it counts
 rewound queries whose reconstructed view fell past `rewind_max` and got

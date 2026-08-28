@@ -22,7 +22,7 @@ Pickup :: struct {
 	count:  u16 `gd:"replicate"`,
 }
 
-@(gd_command = "predict")
+@(gd_command = "predict,any_seat")
 pickup_grab :: proc(self: ^Pickup, px: f32, py: f32) -> (ok: bool, grabbed: kitems.Slot) {
 	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false, {}}
 	if self.count == 0 {return false, {}}

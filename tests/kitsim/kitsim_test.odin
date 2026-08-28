@@ -222,13 +222,100 @@ input_malformed_is_safe :: proc(t: ^testing.T) {
 	testing.expect_value(t, ksim.input_buffer_apply(&buf, &r), 0)
 	testing.expect(t, r.err, "size mismatch is a malformed packet, not a buffer write")
 
-	// Truncated mid-blob: sticky err, partial fresh only.
+	// Truncated mid-blob: sticky err, and the packet is transactional.
 	full := knet.writer_bytes(&w)
 	r = knet.reader_make(full[:len(full) - 1])
 	buf2 := ksim.input_buffer_make(2, 8)
 	defer ksim.input_buffer_destroy(&buf2)
 	testing.expect_value(t, ksim.input_buffer_apply(&buf2, &r), 0)
 	testing.expect(t, r.err, "truncation sets the sticky error")
+}
+
+@(test)
+input_future_overflow_and_truncation_are_transactional :: proc(t: ^testing.T) {
+	buf := ksim.input_buffer_make(1, 16)
+	defer ksim.input_buffer_destroy(&buf)
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+
+	// A window beyond the authority-provided horizon is refused before it can
+	// stamp a future ring slot.
+	knet.write_u64(&w, 11)
+	knet.write_u8(&w, 1)
+	knet.write_u16(&w, 1)
+	knet.write_u8(&w, 7)
+	r := knet.reader_make(knet.writer_bytes(&w))
+	testing.expect_value(t, ksim.input_buffer_apply(&buf, &r, max_tick = 10), 0)
+	testing.expect(t, r.err, "future input is a policy/malformed rejection")
+	testing.expect_value(t, buf.newest, u64(0))
+
+	// first + count must not wrap u64 back into an apparently old tick.
+	knet.writer_reset(&w)
+	knet.write_u64(&w, max(u64))
+	knet.write_u8(&w, 2)
+	knet.write_u16(&w, 1)
+	knet.write_u8(&w, 1)
+	knet.write_u8(&w, 2)
+	r = knet.reader_make(knet.writer_bytes(&w))
+	testing.expect_value(t, ksim.input_buffer_apply(&buf, &r), 0)
+	testing.expect(t, r.err, "tick overflow is rejected")
+	testing.expect_value(t, buf.newest, u64(0))
+
+	// Two declared blobs with only one present: no prefix is committed.
+	knet.writer_reset(&w)
+	knet.write_u64(&w, 1)
+	knet.write_u8(&w, 2)
+	knet.write_u16(&w, 1)
+	knet.write_u8(&w, 9)
+	r = knet.reader_make(knet.writer_bytes(&w))
+	testing.expect_value(t, ksim.input_buffer_apply(&buf, &r), 0)
+	testing.expect(t, r.err, "truncated window is rejected")
+	testing.expect_value(t, buf.newest, u64(0))
+}
+
+semantic_input_validate :: proc(user: rawptr, input: rawptr) -> bool {
+	_ = user
+	v := cast(^[2]u8)input
+	v[0] = min(v[0], 1) // sanitizer: axis becomes canonical
+	return v[1] <= 1    // validator: only one declared button bit
+}
+
+@(test)
+input_semantic_validation_is_transactional :: proc(t: ^testing.T) {
+	buf := ksim.input_buffer_make(2, 8)
+	defer ksim.input_buffer_destroy(&buf)
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+
+	// The first row is sanitizable, the second is illegal. Semantic admission
+	// preflights the whole window, so neither reaches the de-jitter buffer.
+	knet.write_u64(&w, 1)
+	knet.write_u8(&w, 2)
+	knet.write_u16(&w, 2)
+	knet.write_u8(&w, 9)
+	knet.write_u8(&w, 1)
+	knet.write_u8(&w, 0)
+	knet.write_u8(&w, 2)
+	r := knet.reader_make(knet.writer_bytes(&w))
+	testing.expect_value(t, ksim.input_buffer_apply(&buf, &r, validate = semantic_input_validate), 0)
+	testing.expect(t, r.err, "semantic refusal marks and rejects the packet")
+	testing.expect_value(t, buf.newest, u64(0))
+
+	// A valid packet commits the validator's canonical bytes, not the hostile
+	// pre-sanitized axis value.
+	knet.writer_reset(&w)
+	knet.write_u64(&w, 1)
+	knet.write_u8(&w, 1)
+	knet.write_u16(&w, 2)
+	knet.write_u8(&w, 9)
+	knet.write_u8(&w, 1)
+	r = knet.reader_make(knet.writer_bytes(&w))
+	testing.expect_value(t, ksim.input_buffer_apply(&buf, &r, validate = semantic_input_validate), 1)
+	testing.expect(t, !r.err)
+	got, fresh := ksim.input_buffer_pop(&buf, 1)
+	testing.expect(t, fresh)
+	testing.expect_value(t, got[0], u8(1))
+	testing.expect_value(t, got[1], u8(1))
 }
 
 // ---- ticker + lead ---------------------------------------------------------------

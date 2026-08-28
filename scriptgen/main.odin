@@ -422,6 +422,12 @@ Command_Arg :: struct {
 	wire:      string,
 }
 
+Command_Access :: enum {
+	Owner,
+	Any_Seat,
+	Authority,
+}
+
 // One @(gd_command[="predict"]) proc — a host-authoritative action with optional
 // client-side optimistic execution (friendslop toolkit, kit/net command loop).
 Command_Info :: struct {
@@ -429,9 +435,8 @@ Command_Info :: struct {
 	name:      string, // entity-level command name: a direct command's stripped verb ("open"), or a
 	                   // COMPOSED one's "<path>_<verb>" ("gun_fire") — drives the index const + wrapper
 	predict:   bool,
-	any_seat:  bool, // @(gd_command="any_seat"), SIM lane only: on a CONTESTED class,
-	                 // any seat may issue this verb (prediction scope never implies
-	                 // command scope — each verb opts in)
+	access:    Command_Access, // owner (default), any_seat, or authority — the
+	                           // same declaration on coop and sim execution lanes
 	args:      [dynamic]Command_Arg,
 	// Verb-composition: a command whose proc lives on an EMBEDDED sub-struct field is hoisted
 	// onto the entity (the dual of a nested `gd:"replicate"` field). `path` is the access path
@@ -528,6 +533,7 @@ Sim_Proc_Info :: struct {
 	line:       int,
 	wants_tick: bool, // step only: declared the optional `tick: u64` param
 	input_type: string, // sample only: the `input: ^T` param's T
+	validate:   string, // sample only: typed semantic validator/sanitizer proc
 }
 
 // One input CLASS the lane carries — a distinct @(gd_tick) input struct type,
@@ -538,6 +544,7 @@ Input_Class_Info :: struct {
 	class_id:  int,
 	type_name: string,
 	sample:    string, // the @(gd_sample) proc filling it ("" = none: those entities coast)
+	validate:  string, // optional validator paired by @(gd_sample="validate[=PROC]")
 	line:      int,
 }
 
@@ -2646,7 +2653,7 @@ net_fingerprint :: proc(scripts: []^Script, sub_classes: []string, scripts_dir: 
 				if i > 0 {strings.write_string(&cb, ",")}
 				strings.write_string(&cb, a.wire)
 			}
-			strings.write_string(&cb, ")")
+			fmt.sbprintf(&cb, ") predict=%v access=%v", c.predict, c.access)
 			append(&cmds, strings.to_string(cb))
 		}
 		slice.sort(cmds[:]) // ids are name-hashed; declaration order is not wire

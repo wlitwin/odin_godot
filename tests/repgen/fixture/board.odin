@@ -62,15 +62,31 @@ board_embodied :: proc(self: ^Board, id: knet.Net_Id) {
 // emits the rawptr thunks and `board_lane_init` (input size from Pawn_Input,
 // each pass wired to its slot from the attribute token). Both passes here:
 // the everywhere contact pass and the host-only adjudication pass.
-@(gd_sample)
+@(gd_sample = "validate")
 board_sample :: proc(self: ^Board, tick: u64, input: ^Pawn_Input) {
+}
+
+// Frame-safe on both local sample scratch and received packet bytes: clamp is
+// sanitization, false is admission refusal. The bare `validate` token pairs
+// this `<sample>_validate` name automatically.
+board_sample_validate :: proc(self: ^Board, input: ^Pawn_Input) -> bool {
+	_ = self
+	input.move[0] = clamp(input.move[0], -1, 1)
+	input.move[1] = clamp(input.move[1], -1, 1)
+	return input.buttons & 0xf0 == 0
 }
 
 // The SECOND input class's device read — one @(gd_sample) per input TYPE. This
 // fills the turret's input; resolve_sim matches it to Turret's class by the
 // struct it writes, and board_lane_init registers it with lane_add_input_class.
-@(gd_sample)
+@(gd_sample = "validate=board_turret_input_validate")
 board_sample_turret :: proc(self: ^Board, tick: u64, input: ^Turret_Input) {
+}
+
+board_turret_input_validate :: proc(self: ^Board, input: ^Turret_Input) -> bool {
+	_ = self
+	return input.aim[0] >= -1000 && input.aim[0] <= 1000 &&
+	       input.aim[1] >= -1000 && input.aim[1] <= 1000
 }
 
 // Everywhere: runs live and in every resim, on every peer (pure-sim contact).

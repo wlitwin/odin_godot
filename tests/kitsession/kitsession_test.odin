@@ -389,7 +389,7 @@ bot_fields := [?]knet.Field_Desc{
 }
 bot_desc := knet.Entity_Desc{fields = bot_fields[:]}
 BOT_HIT :: knet.Cmd_Id(0x6232) // hash-sized like a generated id — the suite rides the production shape
-bot_cmds := [?]knet.Command_Desc{{name = "hit", id = BOT_HIT, predict = true, invoke = bot_cmd_hit}}
+bot_cmds := [?]knet.Command_Desc{{name = "hit", id = BOT_HIT, predict = true, access = .Any_Seat, invoke = bot_cmd_hit}}
 
 // The hp edge half, hand-built like generated code would be: cast, deref old,
 // record. Living on the SHARED set means every kitsession scenario (spawns,
@@ -1797,6 +1797,31 @@ ownership_transfer_hands_the_stream_over :: proc(t: ^testing.T) {
 	drain(&bob.s)
 	now := 100.0
 
+	// Bob forges a well-shaped owner stream for Alice's entity. The host has
+	// the authoritative peer→seat and entity→owner maps, so the whole batch is
+	// refused before its ring changes; Alice also refuses Bob's direct packet
+	// because clients accept owner state only after the host gateway relays it.
+	forged_value := Bot{x = 999}
+	blob := knet.writer_make(32, context.temp_allocator)
+	knet.stream_write(&blob, &forged_value, &bot_desc)
+	fw := knet.writer_make(64, context.temp_allocator)
+	knet.write_u8(&fw, ksess.SES_STREAM)
+	knet.write_f64(&fw, now)
+	knet.write_u16(&fw, 1)
+	knet.write_net_id(&fw, id)
+	knet.write_u8(&fw, 0)
+	knet.write_u16(&fw, u16(len(knet.writer_bytes(&blob))))
+	append(&fw.buf, ..knet.writer_bytes(&blob))
+	host_bad_before := ksess.session_malformed(&host.s)
+	hr := knet.reader_make(knet.writer_bytes(&fw))
+	ksess.session_handle_packet(&host.s, bob.peer, &hr)
+	testing.expect_value(t, ksess.session_malformed(&host.s), host_bad_before + 1)
+	testing.expect_value(t, host.s.reg.entries[id].stream.count, 0)
+	ar := knet.reader_make(knet.writer_bytes(&fw))
+	ksess.session_handle_packet(&alice.s, bob.peer, &ar)
+	testing.expect(t, !ar.err, "direct peer stream is a policy drop, not malformed bytes")
+	testing.expect_value(t, alice.s.reg.entries[id].stream.count, 0)
+
 	// Alice owns the streamed x: her writes reach the host AND bob.
 	abot.x = 10
 	step(boxes, &now)
@@ -2208,9 +2233,8 @@ interest_filters_deltas_and_resyncs_on_entry :: proc(t: ^testing.T) {
 	testing.expect_value(t, alice.bots[idf].hp, i32(22)) // exit edge holds her in
 }
 
-// Flipping interest ON mid-run must re-declare stream routing to clients
-// seated BEFORE the flip — their welcome said broadcast, and without SES_AOI
-// they kept broadcasting owner streams unfiltered forever.
+// Flipping interest ON mid-run re-declares host filtering to clients seated
+// before the flip. Streams already use the authority gateway in both modes.
 @(test)
 aoi_flip_mid_run_rewires_streams :: proc(t: ^testing.T) {
 	host, alice: Peer_Box
@@ -2224,7 +2248,7 @@ aoi_flip_mid_run_rewires_streams :: proc(t: ^testing.T) {
 	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
 	ksess.session_client_join(&alice.s)
 	pump(boxes)
-	testing.expect(t, !alice.s.aoi_client, "no interest at join: streams broadcast")
+	testing.expect(t, !alice.s.aoi_client, "no interest at join: host uses whole-batch fanout")
 
 	ksess.session_set_interest(&host.s, 300, 50, nil, bot_locate)
 	pump(boxes)

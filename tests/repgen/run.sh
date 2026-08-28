@@ -101,7 +101,7 @@ for needle in \
 	'_pawn_simcmd_hit :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool' \
 	'_a0 := knet.read_i32(&r)' \
 	'if r.err {return false}' \
-	'{name = "mark", id = PAWN_CMD_MARK, exec = _pawn_simcmd_mark}' \
+	'{name = "mark", id = PAWN_CMD_MARK, exec = _pawn_simcmd_mark, access = .Authority}' \
 	'pawn_command_set := knet.Command_Set{entity_desc = &pawn_net_desc' \
 	'pawn_hit_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, amount: i32) -> knet.Command_Outcome' \
 	'pawn_mark_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, label: string, who: knet.Player_Id) -> knet.Command_Outcome' \
@@ -114,7 +114,7 @@ for needle in \
 	'pawn_loot_then(self, by, _a0, _p0)' \
 	'if _ok {pawn_hit_apply(self, _a0)}' \
 	'_pawn_simcmd_hit_apply :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane)' \
-	'{name = "hit", id = PAWN_CMD_HIT, exec = _pawn_simcmd_hit, apply = _pawn_simcmd_hit_apply}' \
+	'{name = "hit", id = PAWN_CMD_HIT, exec = _pawn_simcmd_hit, apply = _pawn_simcmd_hit_apply, access = .Owner}' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
 		echo "REPGEN_FAIL: generated file is missing sim-command artifact: $needle"
@@ -148,8 +148,11 @@ for needle in \
 	'return .Rejected' \
 	'chest_seal_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Command_Outcome' \
 	'_ = knet.command_issue(ctx, self, &chest_command_set, CHEST_CMD_SEAL)' \
+	'chest_lockdown_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Command_Outcome' \
+	'return .Rejected // authority-only verbs never cross the ingress boundary' \
+	'id = CHEST_CMD_LOCKDOWN, predict = false, access = .Authority' \
 	'CHEST_CMD_OPEN :: knet.Cmd_Id(0x' \
-	'id = CHEST_CMD_OPEN, predict = true' \
+	'id = CHEST_CMD_OPEN, predict = true, access = .Any_Seat' \
 	'_ok := chest_claim(self, env.by)' \
 	'chest_claim_then(self, env.by)' \
 	'chest_claim_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Command_Outcome' \
@@ -344,6 +347,10 @@ for needle in \
 	'board_sample(cast(^Board)user, tick, cast(^Pawn_Input)dst)' \
 	'_board_lane_sample_1 :: proc(user: rawptr, tick: u64, dst: rawptr)' \
 	'board_sample_turret(cast(^Board)user, tick, cast(^Turret_Input)dst)' \
+	'_board_lane_validate_0 :: proc(user: rawptr, input: rawptr) -> bool' \
+	'board_sample_validate(cast(^Board)user, cast(^Pawn_Input)input)' \
+	'_board_lane_validate_1 :: proc(user: rawptr, input: rawptr) -> bool' \
+	'board_turret_input_validate(cast(^Board)user, cast(^Turret_Input)input)' \
 	'_board_lane_step :: proc(user: rawptr, tick: u64)' \
 	'board_contact(cast(^Board)user, tick)' \
 	'_board_lane_step_auth :: proc(user: rawptr, tick: u64)' \
@@ -352,6 +359,8 @@ for needle in \
 	'ksim.lane_init(l, ses, size_of(Pawn_Input), tag, cfg)' \
 	'ksim.lane_set_sim(l, self, _board_lane_sample_0, _board_lane_step, _board_lane_step_auth)' \
 	'ksim.lane_add_input_class(l, 1, size_of(Turret_Input), _board_lane_sample_1)' \
+	'ksim.lane_class_set_validate(l, 0, _board_lane_validate_0)' \
+	'ksim.lane_class_set_validate(l, 1, _board_lane_validate_1)' \
 ; do
 	if ! grep -qF "$needle" "$BGEN"; then
 		echo "REPGEN_FAIL: generated file is missing lane-wiring artifact: $needle"
@@ -743,7 +752,17 @@ if [ "$FP_BEFORE" != "$FP_BY" ]; then
 	echo "REPGEN_FAIL: declaring the issuer param moved the fingerprint (by never rides the wire): $FP_BEFORE vs $FP_BY"
 	exit 1
 fi
-echo "  ok  NET_FINGERPRINT: stable across comments and issuer-param declarations, moves on replicated-type and input-struct changes"
+FPA="$TMP/fpa"
+mkdir -p "$FPA"
+cp "$ROOT/tests/repgen/fixture/"*.odin "$FPA/"
+sed -i.bak 's/predict,any_seat/predict,owner/' "$FPA/chest.odin" && rm -f "$FPA/chest.odin.bak"
+run_scriptgen "$FPA"
+FP_ACCESS=$(grep 'NET_FINGERPRINT ::' "$FPA/odin_godot_guard.gen.odin")
+if [ "$FP_BEFORE" = "$FP_ACCESS" ]; then
+	echo "REPGEN_FAIL: a command access-policy change did NOT move the fingerprint"
+	exit 1
+fi
+echo "  ok  NET_FINGERPRINT: stable across comments and issuer-param declarations, moves on replicated/input types and command access"
 
 # ---- (3a): engine handle/heap types are a SCRIPTGEN-time error ----
 ENG="$TMP/eng"

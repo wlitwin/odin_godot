@@ -66,7 +66,7 @@ brawler_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Brawler, fx), size = size_of([2]kcombat.Effect)},
 }
 brawler_desc := knet.Entity_Desc{fields = brawler_fields[:]}
-brawler_cmds := [?]knet.Command_Desc{{name = "throw", predict = true, invoke = brawler_cmd_throw}}
+brawler_cmds := [?]knet.Command_Desc{{name = "throw", predict = true, access = .Any_Seat, invoke = brawler_cmd_throw}}
 brawler_set := knet.Command_Set{entity_desc = &brawler_desc, commands = brawler_cmds[:]}
 
 // ---- the peer harness ----------------------------------------------------------
