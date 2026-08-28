@@ -51,20 +51,18 @@ use → ship.**
   **script subpackages** (annotated classes in subfolders of one module) and **`res://shared/`**
   (read-only packages of types, constants and pure procs that every module may import).
 
-## Build multiplayer: the friendslop toolkit — and the server-authority companion
+## Build multiplayer with Kit
 
-- **[Multiplayer quickstart](kit/quickstart.md)**: zero to TWO WINDOWS in two small
-  files (`examples/hello_net` is its living copy); the [sim twin](kit/quickstart-sim.md)
-  then promotes the same game to server authority. Start multiplayer here.
+- **[Multiplayer quickstart](kit/quickstart.md)** builds the smallest two-peer
+  session in two source files (`examples/hello_net` is the maintained copy).
+  The [simulation quickstart](kit/quickstart-sim.md) then moves its fast state
+  to server authority.
 - **[kit/ overview](kit/index.md)** provides reusable multiplayer game systems (`godot:kit/*`):
-  host-authoritative sessions with reconnect identity, declarative replication with
-  client prediction, chat, items, combat, NPCs, save/resume, moderation, ENet + Steam
-  transports, for 2–8 player "you and your friends" games.
-- **[kit/sim](kit/sim.md)** is the OTHER netcode, used beside the coop kit rather than
-  instead of it, providing server-authoritative rollback/resimulation for contested,
-  cheat-resistant, twitch-fair games. Tag fields `predict`, write a `@(gd_tick)`, and
-  lag-compensated hitscan, client prediction, and reconcile come generated. It's per-FIELD
-  opt-in, so hybrid games can compose.
+  sessions, reconnect identity, declarative replication, commands, chat,
+  items, combat, NPC helpers, save/resume, moderation, and transport adapters.
+- **[kit/sim](kit/sim.md)** provides fixed-tick, server-authoritative prediction
+  and reconciliation for contested state. It composes with ordinary session
+  replication on a per-field basis and includes bounded lag-compensation tools.
 - **[Timelines: choosing a model](kit/timelines.md)** explains whose timeline each thing
   presents from and who arbitrates disagreement: the four shipped answers (coop,
   predict-self, contested-object, predict-world) with their worked games, and the
@@ -81,14 +79,14 @@ use → ship.**
 
 ## Learn from the examples
 
-- `examples/cavecrawl` is THE **co-op reference** (see [kit/](kit/index.md)): every
-  friendslop-toolkit package in one game, grown brick-by-brick with a latency-injected
-  multi-process integration test (`run.sh`) that doubles as the pattern to steal.
+- `examples/cavecrawl` is the **co-op reference** (see [kit/](kit/index.md)):
+  the main Kit packages in one game, covered by a latency-injected,
+  multi-process integration test (`run.sh`).
 - `examples/slopball` / `examples/slopball3d` are the **smallest complete kit games**: a
   physics co-op pitch (engine physics via `play.Puppet`), in 2D and 3D.
 - `examples/quickdraw` is the **server-authority reference** (kit/sim): a western duel
-  whose premise is lag compensation: hitscan is judged by where the shooter's screen aimed,
-  proven by an A/B acceptance test at 240 ms RTT.
+  that exercises lag-compensated hitscan with an A/B acceptance test at
+  240 ms RTT.
 - `examples/speedball` is **the contested object** (kit/sim): slopball's soccer premise
   on the other netcode, where every peer predicts the ball and touches resolve locally.
   Read the two side by side to pick a model.

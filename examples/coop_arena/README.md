@@ -1,6 +1,6 @@
 # Co-op Arena — the ENGINE-NATIVE multiplayer path, end to end
 
-> **Building a co-op game? Use the [friendslop toolkit](../../docs/kit/index.md)
+> **Building a co-op game? Use the [Kit multiplayer toolkit](../../docs/kit/index.md)
 > instead** — `examples/cavecrawl` and `examples/slopball` are its references.
 > This example predates the toolkit and is kept as the demonstration of the RAW
 > engine surface the toolkit absorbs: `MultiplayerSynchronizer`, `@(gd_rpc)`,

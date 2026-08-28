@@ -1,86 +1,129 @@
-# The friendslop toolkit
+# Kit multiplayer toolkit
 
-Reusable multiplayer game systems under `godot:kit/*`, for one shape of game:
-**you and your friends, one of you hosts, things go wrong together.** 2–8
-players, host-authoritative, drop-in join, reconnect, save/resume, ENet or
-Steam. `examples/cavecrawl` is the reference implementation. It grows with
-every package and doubles as the proof that they compose.
+Kit is a set of Odin packages for building multiplayer Godot games. It provides
+session management, replicated entities, reconnectable player identities,
+transport adapters, common gameplay systems, and integration-test support.
 
-## New here? Start in this order
+Kit is designed primarily for small, real-time sessions in which one process is
+the authority. A player can host the session, or the authority can run as a
+dedicated server. ENet, WebRTC, and Steam use the same session and replication
+layers; only the transport adapter changes.
 
-1. **Feel it in five minutes.** Run `examples/slopball` in two windows:
-   `bash build/build_scripts.sh examples/slopball`, then `$GODOT --path
-   examples/slopball` twice, with Host in one window and Join in the other.
-2. **Build your own.** The **[quickstart](quickstart.md)** goes
-   zero-to-two-windows in two small files (`examples/hello_net` is its living
-   copy).
-3. **Going competitive?** The **[sim quickstart](quickstart-sim.md)** promotes
-   that same game to server authority for competitive shapes.
-4. **Learn the whole surface.** The **[tutorial](build-a-game-in-a-day.md)**
-   tours every package in cavecrawl, linking each page below at the moment you
-   need it.
-5. **Look up a term.** The **[glossary](glossary.md)** is one paragraph per term
-   of art (halves, census, dress...).
+## Choose a replication model
 
-Platform note: macOS is verified end-to-end by the suite; Windows ships
-prebuilt cores with limited runtime verification so far; Linux is
-build-verified only ([status](../../README.md#platform-status)). Co-op
-means your friends' machines, so check before you promise a LAN party.
+Kit supports two complementary models. A game can use either one or combine them
+field by field.
 
-## Guarantees
-
-- **There are zero role branches in gameplay code.** Mutation procs look single-player;
-  the host runs them authoritatively, clients predict them, rejections carry
-  truth back. Where a role branch would creep in, there's a hook instead.
-- **Change a field and you're done.** `gd:"replicate"` fields ride a per-tick
-  shadow-delta walk; `owner_stream` fields interpolate on remote screens.
-- **A player IS a reconnect token.** Identity, stats, and owned entities
-  survive crashes, rejoins, re-hosts, and resumed saves.
-- **It never feels sloppy.** Predictions bite instantly under real latency; the
-  built-in shim (`wire_set_latency`) is how you prove it for YOUR game.
-
-## The packages
-
-| Page | Package | What it owns |
+| Model | Use it for | How state moves |
 | --- | --- | --- |
-| [boot](boot.md) | `kit/boot` | The first thirty lines of every game, written once: lobby/chat/score/wire attach, the frame pump, the generated entity factory |
-| [play](play.md) | `godot:play` | Drop-in gameplay blocks: Gun/Ability/Channel/Health/Telegraph verbs, FSM/edge/anim scratch, Puppet (engine physics with one simulator per body), and the `play/sim` shelf (Cool/Mover/Roller), the predicted twins that resim |
-| [net](net.md) | `kit/net` | The engine-free core: wire format, registry, deltas, owner streams, the intent→command→result pipeline |
-| [session](session.md) | `kit/session` | Identity, roster, events, spawn/despawn via factory, stats, moderation, backup hosting |
-| [netgd](netgd.md) | `kit/netgd` | The Godot transport binding: Session_Wire, channels, the latency shim, kick-socket handling |
-| [sim](sim.md) | `kit/sim` | The server-authority resim companion: inputs-only up, tick snapshots down, rollback reconcile, lag compensation, for the contested games the coop model isn't |
-| [timelines](timelines.md) | — | Choosing a timeline model: coop, predict-self, contested object, predict-world, lockstep, what each never-shows-you costs, and the eight laws the showcases encode |
-| [steamgd](steamgd.md) | `kit/steamgd` | Steam lobbies + invite overlay over GodotSteam, by name (same wire, different door) |
-| [comms](comms.md) | `kit/comms` | Chat, system lines, positional pings, drop-in catchup |
-| [xfer](xfer.md) | `kit/xfer` | Chunked large payloads (sprays, skins, level files), host-relayed, paced, web-safe; the ALBUM keeps the latest per (player, kind) and catches late joiners up |
-| [interact](interact.md) | `kit/interact` | Range/facing gates, candidate picking. Prompt and host gate share the same math |
-| [items](items.md) | `kit/items` | Item defs + stack-aware slot inventories that replicate as plain fields |
-| [combat](combat.md) | `kit/combat` | Health/damage, host-validated projectiles, abilities, predicted-hp display |
-| [ai](ai.md) | `kit/ai` | Host-ticked brains as a pattern, wave director, perception |
-| [nav](nav.md) | `kit/nav` | Thin adapters over the engine's NavigationServer |
-| [save](save.md) | `kit/save` | The versioned save envelope, one-call resume, persistent identity |
-| [ui](ui.md) | `kit/ui` | Stock-theme lobby, chat, scoreboard, HUD widgets |
-| [fx](fx.md) | `kit/fx` | Bursts, flashes, and the projectile tracer pool |
-| [testing](testing.md) | — | Integration-test your game: the shipped harness template and the conventions it encodes |
+| Session replication | Cooperative play and state that does not need rollback | The host writes `gd:"replicate"` fields. An entity owner writes `gd:"owner"` fields, which other peers interpolate. Player actions use validated commands. |
+| Simulation lane | Movement, aiming, physics, or other contested state | The authority simulates `gd:"predict"` fields at a fixed tick rate. The owning client predicts the same ticks and reconciles against snapshots from the authority. |
 
-## Beyond the basics
+The session layer is shared by both models, so identity, reconnects, chat,
+spawning, saves, and transports do not change when an entity moves to the
+simulation lane. See [Choosing a timeline model](timelines.md) for the tradeoffs
+and [the simulation quickstart](quickstart-sim.md) for a small conversion.
 
-These capabilities are in the kit, demonstrated by cavecrawl's integration-test
-acts: **ownership transfer** (`session_set_owner`: carry/mounts/possession; the
-relic), **downed/revive** (`spelunker_revive`: one predicted command, no
-hook), **host takeover** (`session_backup_parts` + `session_host_resume`:
-when the host drops, its run resumes under the backup holder, friends rejoin
-and reclaim themselves), **shared-seed procgen** (replicate the dice and grow
-the world locally, as in the cavecrawl scatter), **wire codecs** (`wire=f16` /
-custom fixed-size encodings; see [net](net.md)), and **entity blobs**
-(`session_set_blob`: variable-length state that rides joins, backups, and
-saves; see [session](session.md)).
+### Trust and security
 
-## Design notes
+The session-replication model trusts an entity owner to provide its streamed
+fields. The host still validates command access and relays owner streams only
+after checking the sender's current ownership, but owner-streamed movement is
+not suitable for adversarial play.
 
-This section is not on the learning path; it is for contributors and the curious:
+The simulation lane moves selected state to the authority, but a public or
+competitive game must also validate input values, set traffic limits appropriate
+to the game, and run the authority on a trusted machine. ENet traffic is not
+encrypted. WebRTC and Steam provide encrypted transports. The detailed boundary
+is documented under [Session: trust and admission](session.md#trust-and-admission),
+and remaining hardening work is tracked in the [Kit roadmap](TODO.md).
 
-- **[kit design notes and conventions](conventions.md)**: the house grammar
-  every package shares (events vs. callbacks, the four lifecycle verbs, the
-  one-grep API rule), and what the kit leaves out and where to reach instead
-  (voice, mobile, async correspondence, database persistence).
+## Start here
+
+1. Complete the main [Getting Started](../getting-started.md) guide so you can
+   build and run Odin scripts.
+2. Follow [Hello, multiplayer](quickstart.md). It builds
+   `examples/hello_net`, a two-player example using session replication.
+3. Read [Choosing a timeline model](timelines.md) before selecting authority and
+   prediction rules for your game.
+4. If the authority must simulate player state, continue with
+   [Server authority and client prediction](quickstart-sim.md), based on
+   `examples/hello_sim`.
+5. Use [Build a multiplayer game](build-a-game-in-a-day.md) for a longer tour,
+   then keep the package pages below as references.
+
+To see a complete project before writing one, build and open the 2D Slopball
+example in two windows:
+
+```sh
+bash build/build_scripts.sh examples/slopball
+$GODOT --path examples/slopball &
+$GODOT --path examples/slopball
+```
+
+Host in the first window and join from the second. `examples/cavecrawl` is the
+larger co-op reference; `examples/quickdraw` and `examples/speedball` demonstrate
+the simulation lane.
+
+## Architecture
+
+Most games use the packages in these layers:
+
+| Layer | Packages | Responsibility |
+| --- | --- | --- |
+| Game integration | [boot](boot.md) | Connects the stock lobby, transport, session, generated entity factory, and per-frame pump. |
+| Session | [session](session.md), [save](save.md), [comms](comms.md), [xfer](xfer.md) | Player identity and roster, reconnects, entity lifetime, app messages, saves, chat, and large payloads. |
+| Replication | [net](net.md), [sim](sim.md) | Field descriptors, deltas, owner streams, commands, fixed-tick simulation, prediction, reconciliation, and lag compensation. |
+| Transport | [netgd](netgd.md), [steamgd](steamgd.md) | Godot `MultiplayerPeer` integration, ENet/WebRTC setup, network simulation, join codes, and Steam lobbies. |
+| Gameplay and presentation | [play](play.md), [items](items.md), [combat](combat.md), [interact](interact.md), [ai](ai.md), [nav](nav.md), [ui](ui.md), [fx](fx.md) | Optional building blocks that use the session and replication layers. |
+
+`kit/net`, `kit/session`, and `kit/sim` do not import Godot and can be tested
+headlessly. `kit/netgd`, `kit/steamgd`, `kit/ui`, and `kit/fx` contain the
+engine-facing integration.
+
+## Package reference
+
+| Package | Purpose |
+| --- | --- |
+| [`godot:kit/boot`](boot.md) | Standard lobby-to-game lifecycle, frame pump, generated entity factory, transport forwarding, and host succession. |
+| [`godot:kit/net`](net.md) | Wire codecs, entity descriptors and registry, reliable deltas, owner streams, interpolation, and commands. |
+| [`godot:kit/session`](session.md) | Stable player identities, roster, replication scheduling, entity lifetime, stats, moderation, interest management, and backup state. |
+| [`godot:kit/netgd`](netgd.md) | Godot transport binding for ENet and WebRTC, including the latency/loss simulator and native join-code flow. |
+| [`godot:kit/sim`](sim.md) | Server-authoritative fixed-tick simulation, input delivery, snapshots, client prediction, reconciliation, watched interpolation, and lag compensation. |
+| [`godot:kit/steamgd`](steamgd.md) | Steam lobby and invite transport through GodotSteam. |
+| [`godot:kit/comms`](comms.md) | Ordered chat, system messages, positional pings, and late-join catch-up. |
+| [`godot:kit/xfer`](xfer.md) | Bounded, chunked transfer of payloads that are too large for replicated fields. |
+| [`godot:kit/save`](save.md) | Versioned session snapshots and persistent reconnect tokens. |
+| [`godot:play`](play.md) | Embeddable gameplay blocks such as health, weapons, abilities, channels, telegraphs, and owner-simulated Godot physics bodies. |
+| [`godot:play/sim`](sim.md#simulation-blocks-in-godotplaysim) | Simulation-lane blocks for cooldowns, movement, and rolling bodies. |
+| [`godot:kit/interact`](interact.md) | Dimension-independent range, facing, and target-selection helpers. |
+| [`godot:kit/items`](items.md) | Item definitions, stack-aware fixed-slot inventories, and grid-packing helpers. |
+| [`godot:kit/combat`](combat.md) | Co-op health, abilities, effects, projectile validation, and predicted-health presentation. |
+| [`godot:kit/ai`](ai.md) | Perception, steering, patrol, and wave-director helpers for authority-run NPC logic. |
+| [`godot:kit/nav`](nav.md) | Thin wrappers around Godot's navigation servers. |
+| [`godot:kit/ui`](ui.md) | Code-created lobby, chat, scoreboard, HUD, inventory, and network-health widgets. |
+| [`godot:kit/fx`](fx.md) | 2D bursts, flashes, floating text, screen shake, and projectile tracers. |
+
+The [testing guide](testing.md) documents the multi-process harness used by the
+examples. The [glossary](glossary.md) defines generated API terms such as
+*command half*, *census*, *edge*, and *watched entity*. The
+[conventions](conventions.md) page is intended for Kit contributors rather than
+as required reading for game authors.
+
+## Scope and current limitations
+
+- The default session size is eight players. Some lower-level session tests
+  cover 32 seats, but the shipped example games do not establish a production
+  performance envelope at that size.
+- Kit does not provide matchmaking, accounts, a persistent backend, voice chat,
+  server orchestration, or TURN for native ENet. WebRTC or Steam is the safer
+  choice when NAT traversal must work broadly.
+- `kit/fx` is currently 2D. The replication, session, combat, interaction, and
+  AI packages use dimension-independent data.
+- macOS is verified end to end. Windows has prebuilt cores with limited runtime
+  verification, and Linux is build-verified. See the repository
+  [platform status](../../README.md#platform-status) before choosing deployment
+  targets.
+- The framework bounds and validates malformed input at several layers, but
+  per-peer traffic budgets are still roadmap work. Treat invited co-op, a
+  listen server, and a public dedicated server as different trust profiles.

@@ -1,4 +1,4 @@
-# slopball — co-op physics soccer on the friendslop kit
+# slopball — co-op physics soccer with Kit
 
 The kit's **engine-physics** exercise: everything the other examples replicate is
 hand-rolled kinematics; slopball's ball is a real `RigidBody2D` and its players are real
@@ -54,10 +54,10 @@ fixed at the right layer. The short version, for the next physics game:
    refresh. `physics/common/physics_interpolation=true`, reset it at cuts,
    and never lerp an angle across the ±π wrap.
 
-## The acid
+## Automated tests
 
 - `run.sh` — solo gate (`SLOPBALL_SINGLE_OK`): the striker bot runs the whole loop
   headless. The repo's only exercise of the 2D physics *solver* under `--headless`.
-- `native_run.sh` — 3-peer proof (`SLOPBALL_NATIVE_OK`): host + striker + watcher. The
+- `native_run.sh` — 3-peer integration test (`SLOPBALL_NATIVE_OK`): host + striker + watcher. The
   seat transfer lands on all three screens, the striker's local solver scores, and the
   three screens agree on the ball within a few pixels at the same session tick.

@@ -1,80 +1,85 @@
-# kit/boot
+# kit/boot: standard game integration
 
-Every co-op (friendslop) project opens the same way: `ready()` builds a
-lobby/chat/scoreboard/stage/world/wire stack, and `process()` runs a
-pump-tick-drain preamble plus five stock event reactions, about a hundred
-lines of setup before any game code. `kit/boot` provides exactly that shared
-shell, and nothing game-shaped. Every widget and every reaction stays yours;
-boot owns only the boilerplate between them.
+`kit/boot` connects the common Godot-facing parts of a Kit game. It creates the
+stock lobby, chat, scoreboard, stage and world containers; attaches the
+transport, session, and comms packages; installs generated entity support; and
+provides the per-frame pump.
 
-Reach for boot when you want the standard friendslop lifecycle (menu →
-lobby → play, host/join, chat, roster, host migration) without hand-writing
-it. A game that prefers to drive `netgd`/`ksess` directly can still call
-`boot_pump` for the loop and read `boot_phase` for the lifecycle, taking only
-the pieces it uses.
+Use `Boot` when the standard menu → lobby → game lifecycle fits your project.
+Every component remains accessible as a public field, so a game can restyle,
+replace, reposition, or ignore individual widgets. Games with a custom shell
+can instead use `kit/netgd` and `kit/session` directly.
 
 ## Wiring boot
 
-`boot_attach` builds the stack in `ready()`; `boot_pump` runs the loop in
-`process()`.
+Call `boot_attach` once from `_ready`, then install the generated entity table.
+Call `boot_pump` once per active frame.
 
 ```odin
+import gd "godot:godot"
 import kboot "godot:kit/boot"
+import knet "godot:kit/net"
 
-// ready() — after installing your factory/hooks:
-kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{
-	title       = "P U T T P U T T",
-	status      = "Host a course, or join one at localhost",
-	legend      = "click: putt · Tab scores · Enter chat", // "" = no legend
-	msg_kind    = MSG_SESSION,
-	latency_env = "GOLF_LATENCY", // the injected-latency shim's env knob
-	methods     = {"on_host", "on_join", "on_start", "on_chat",
-	               "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
-})
+// _ready
+kboot.boot_attach(
+	&self.boot,
+	cast(gd.Node)self.owner,
+	&self.ses,
+	&self.comms,
+	kboot.Options{
+		title = "P U T T P U T T",
+		status = "Host a course, or join one at localhost",
+		legend = "Click: putt · Tab: scores · Enter: chat",
+		env = "GOLF",
+	},
+)
+my_game_entities(self, &self.boot)
 
-// process(): the whole loop, role-free — both procs are generated
-events, marks, ticks := kboot.boot_pump(&self.boot, delta, now_s())
-my_game_step(self, ticks)     // @(gd_step="authority") pass: host gate + edge pass inside (sim.md)
-my_game_events(self, events)  // session-event dispatch over the declared halves (session.md)
+// _process
+if kboot.boot_phase(&self.boot) != .Menu {
+	events, _, ticks := kboot.boot_pump(&self.boot, delta, knet.now_s())
+	my_game_step(self, ticks)    // generated for a co-op @(gd_step="authority")
+	my_game_events(self, events) // generated session-event dispatch
+}
 ```
 
 `boot_pump` returns three values: `events` (every session event this frame)
-and `marks` (the comms markers), both temp-allocated, plus `ticks` (how many
-fixed net ticks fired this frame). `my_game_step` and `my_game_events` are
-generated; the sections below cover each.
+and `marks` (the comms markers), both allocated from the temporary allocator,
+plus `ticks` (the number of session network ticks advanced this frame).
 
-## The eight signal methods
+`my_game_step` exists when a co-op game declares an
+`@(gd_step = "authority")` proc. A game with `kit/sim` attaches its lane with
+`boot_lane`; `boot_pump` then advances the simulation lane itself.
 
-The `methods` list names eight `@(gd_method)` procs declared in *your* script,
-because Godot signals must land on the game's class. Their bodies are
-one-liners; see either example game's `net.odin`. scriptgen validates every
-name in `methods` against the class's registered methods at build time, so a
-typo'd forward is a build error. An empty string `""` skips a signal.
+## Standard signal methods
 
-You write four of the eight: `on_host`, `on_join`, `on_start`, and `on_chat`.
-The other four, `on_packet`, `on_peer_left`, `on_net_up`, and `on_net_down`,
-are the transport forwards, and boot generates their bodies (see [Transport
-forwards](#transport-forwards)); `methods` still names them.
+`Options.methods` identifies four UI methods (`on_host`, `on_join`, `on_start`,
+and `on_chat`) and four transport-forwarding methods (`on_packet`,
+`on_peer_left`, `on_net_up`, and `on_net_down`). Its zero value selects those
+standard names.
+
+The game implements the UI methods because hosting, joining, starting, and chat
+policy are game-specific. Script generation supplies the four transport
+forwarders from the `boot: kboot.Boot` field. A hand-written method with the
+same name overrides a generated forward. Literal method names are checked at
+build time; use an empty string only when intentionally skipping a signal.
 
 ## Count time in net ticks, not frames
 
-Boot unthrottles desktop windows (see [Desktop unthrottle](#desktop-unthrottle)),
-so frame rate is 120 on one machine and whatever vsync reports on another. A
-"3-second" countdown counted in frames halves or doubles per screen. Count in
-net ticks instead: `boot_pump` returns `ticks`, the number of fixed net ticks
-that fired this frame, and that is the clock the host's simulation and every
-timer should use.
+Gameplay timers that must agree across peers should not count rendered frames.
+For a co-op authority loop, use the fixed network ticks returned by
+`boot_pump`. Presentation animations can continue to use frame `delta`.
 
 Declare the authority pass and hand it those ticks; the generated proc holds
 the role gate and the loop:
 
 ```odin
 @(gd_step = "authority")
-my_game_tick :: proc(self: ^MyGame) { /* timers decrement HERE */ }
+my_game_tick :: proc(self: ^MyGame) { /* decrement authority timers */ }
 
 // process():
 events, _, ticks := kboot.boot_pump(&self.boot, delta, now_s())
-my_game_step(self, ticks) // generated: host-only fixed steps + the same-frame edge pass
+my_game_step(self, ticks) // generated authority gate, loop, and edge pass
 ```
 
 ## Widgets and containers
@@ -97,31 +102,23 @@ in [ui.md's adopt contract](ui.md#adopting-your-own-scenes).
 ## The event loop
 
 `boot_pump` runs `wire_pump` and `session_tick`, walks every drained session
-event through the kit's forwarding table (`kit/boot/forward.odin`), and returns
-every session event plus the comms markers (temp-allocated). Your own reactions
-are your [declared event
-halves](session.md#event-halves-game_event): hand the
-stream to the generated `<snake>_events` and each half runs *after* boot's stock
-reaction, so a game-specific status line overwrites the stock one.
+event through Boot's forwarding table, and returns every session event plus
+positional comms markers. Pass the event slice to the generated
+`<game>_events` proc. Boot applies stock reactions first, then the generated
+dispatcher calls the game's declared [event halves](session.md#event-halves-and-generated-dispatch).
 
 ### The forwarding table
 
-`forward.odin` holds one switch over `ksess.Event`. It is not `#partial`: every
-variant is named, and the ones with no kit-side consequence carry an empty case
-labeled with the reason (`FACTORY`, `SIM WIRE`, `GAME-FACING`…). Adding a
-session event is therefore a compile error in `kit/boot` until you decide what
-the kit owes it.
-
-The table handles: roster and score repaints; the host's Start gating at
-`min_players`; `lane_set_owner` and `lane_drop_player`; the five arms of the
-host-migration handoff; the phase's world latch; and the status line plus
-restored Host/Join doors on every way a seat can end (failed, denied with the
-host's reason, kicked).
+The forwarding table refreshes roster and score widgets, controls the host's
+Start button from `min_players`, forwards ownership changes to an attached
+simulation lane, advances host succession, updates the world-seen latch, and
+restores the menu after failed, denied, or ended sessions. The switch is
+exhaustive, so adding a new `ksess.Event` requires an explicit Boot decision at
+compile time.
 
 ## Lifecycle: boot_phase
 
-`boot_phase(b)` returns the coarse lifecycle as a `Boot_Phase`, the
-`running`/`started` latch pair answered once:
+`boot_phase(b)` reports the coarse lifecycle as a `Boot_Phase`:
 
 - `.Menu`: no seat is held and none is coming; the Host/Join doors are showing.
 - `.Connecting`: a join is in flight (a code at the phonebook, or a survivor's
@@ -129,25 +126,15 @@ host's reason, kicked).
 - `.Lobby`: a seat is held; hosting counts as this phase too.
 - `.Playing`: the world reached this screen (first spawn, state, or resync).
 
-The phase is derived, not tracked. Each answer is read off the session (`ran` /
-`joined` / `join_waited`) plus boot's own rendezvous, so a game that ran the raw
-way (`netgd`/`ksess` by hand, `boot_pump` for everything after) still gets a
-truthful phase without touching a door.
+The phase is derived from the session's run, join, and timeout state plus Boot's
+join-code rendezvous. Boot stores only whether replicated world state has
+reached this screen. A failed or denied join and a kick return to `.Menu`. A
+host disconnect may remain in the current phase while succession attempts to
+re-seat the player.
 
-The one fact nothing below boot knows (the world reached this screen) is the
-single latch boot keeps, and `boot_pump` is its only writer: raised in the drain
-on the first spawn/state/resync, dropped at the top of any frame that finds no
-seat. (`boot_open_host` drops it too, for the one re-seat with no unseated
-frame: menu → Host again in a live process.) The consequences: a failed or
-denied join and a kick fall back to `.Menu`, because the session disarms its own
-join clock; a bare host loss stays put, because the seat outlives the socket and
-migration may re-seat it; a survivor's chase reads `.Connecting`, because the
-dial restarts the session as a client.
-
-`boot_phase` is a level. A swap that must happen exactly once (hide the lobby,
-print a receipt) wants the rising edge, and no bool is needed: `boot_pump` is
-the only place the phase rises, so read the phase before the pump and compare
-after. See `examples/hello_net`'s `process`.
+`boot_phase` is current state, not an event. To run work once when the world
+arrives, read the phase before `boot_pump` and compare it with the phase after
+the pump. See `examples/hello_net`.
 
 ## Teardown: boot_detach
 
@@ -177,17 +164,16 @@ gauge and shim containers. Nothing is freed twice.
 
 ## Desktop unthrottle
 
-On desktop, boot turns vsync off and caps at 120fps. Friendslop games get
-playtested as two windows on one laptop, and with vsync on, the OS pacing an
-occluded window's present makes the background instance *simulate* slow, not
-just draw slow. The whole main loop blocks on the compositor, and every
-timeline-synced screen stutters for it.
+In development builds on desktop, Boot disables vsync and caps rendering at 120
+fps. This prevents an occluded local test window from having its whole main loop
+paced by the compositor while two peers run on one machine.
 
 The unthrottle is dev-builds-only, keyed on the build flag `-disable-assert`
 (the release line every kit guardrail keys on). Headless and web runs are left
 untouched, and so is every release build: a shipped game never tears by default
-nor caps a 240 Hz display at 120. Set `Options.keep_vsync = true` for the
-dev-side opt-out, or set your own vsync/fps policy after `boot_attach`.
+nor caps a 240 Hz display at 120. Set `Options.keep_vsync = true` to retain the
+engine's normal vsync policy in development, or set `Options.max_fps` to choose
+a different development cap.
 
 ## Connecting: the doors
 
@@ -252,7 +238,7 @@ method-name lint holds), but their bodies are not yours to write.
 Set `Options.env = "MY"` and `boot_port(b, def)` / `boot_name(b, def)` /
 `boot_token(b)` read `MY_PORT` / `MY_NAME` / `MY_TOKEN` (the token is persisted
 in `user://my_token`). The whole [bad-link
-shim](netgd.md#wire_set_latency--link-simulation) then answers `MY_LATENCY` /
+shim](netgd.md#link-simulation) then answers `MY_LATENCY` /
 `MY_JITTER` / `MY_LOSS` without a separate `latency_env`, putting the whole
 per-game env family under one prefix.
 
@@ -298,83 +284,74 @@ inherits a stale signaling socket.
 
 ## The entity factory
 
-Tag each exported entity scene with what it embodies and its stable wire id,
-then install the generated factory with the generated `<game>_entities`. The
-make/free switches, the `TYPE` consts, the `spawn_scene` helper, and the
-id→node map are all generated, so none of them exist in your code:
+Tag each exported entity scene with its script type and stable wire ID, then
+install the generated factory with `<game>_entities`:
 
 ```odin
-// on the game struct — ordinary drag-drop exports, plus the declaration:
+// Game struct: assign this PackedScene in the Inspector.
 mob_scene: ^gd.Resource `gd:"entity=Mob:3"`,
 
-// ready(), after boot_attach (the factory parents under boot.world):
+// _ready, after boot_attach:
 scrapyard_entities(self, &self.boot)
 
-// the game-shaped half stays yours, as typed name-paired hooks (optional):
+// Optional bookkeeping hook. Spawn fields have not been applied yet.
 @(gd_half)
 mob_spawned :: proc(game: ^Scrapyard, self: ^Mob, id: knet.Net_Id, owner: knet.Player_Id) {
-	game.mobs[id] = self   // bookkeeping — fields NOT set yet; dress on Ev_Spawned
+	game.mobs[id] = self
 }
+
+// Optional presentation hook. Spawn fields are now available.
+@(gd_half)
+mob_born :: proc(game: ^Scrapyard, self: ^Mob, id: knet.Net_Id, owner: knet.Player_Id) {
+	gd.node2d_set_position(cast(gd.Node2d)self.owner, {self.x, self.y})
+}
+
+// Optional teardown hook. The struct and node are still alive here.
 @(gd_half)
 mob_freed :: proc(game: ^Scrapyard, self: ^Mob, id: knet.Net_Id) {
-	delete_key(&game.mobs, id) // node + fields still alive — death fx go here
+	delete_key(&game.mobs, id)
 }
 ```
 
-The id (`Mob:3`) is explicit and stable: it rides saves, rejoins, and migration
-backups, so entities are never auto-numbered across builds. scriptgen errors on
-duplicates, unknown structs, and mis-shaped hooks at build time.
+The tag generates the factory table, entity type constant, typed spawn and query
+procedures, node map, and hook dispatch. The numeric ID (`3` above) is part of
+the wire and save formats. Keep it stable across compatible builds. Script
+generation rejects duplicate IDs, unknown structs, and invalid hook signatures.
 
-**The kind's knobs ride the tag too**, as trailing entity tokens (export specs
-may still follow them):
+Entity-specific options follow the type declaration in the same tag:
 
 ```odin
 mob_scene:    ^gd.Resource `gd:"entity=Mob:3,stream_hz=30"`, // AI the eye reads through interp
 runner_scene: ^gd.Resource `gd:"entity=Runner:2,avatar"`,    // a SEAT'S body, not an NPC
 ```
 
-* `stream_hz=N` — the kind's owner-stream rate. It lands on the session as a
-  per-TYPE declaration (`session_set_type_stream_hz`), so every spawn of the
-  kind carries it on every peer — the host's own, a client's wire spawn, and
-  the heir's takeover rebuild. The per-id `session_set_stream_hz` it replaces
-  was a send-side hint each spawn site re-applied by hand and a takeover
-  silently lost (the heir streamed mobs at full rate). The per-id call still
-  exists for a one-off and wins by being later.
-* `avatar` — this kind is a player's BODY. The one place the session reads it
-  is a host takeover's orphan sweep: the dead host's NPCs are adopted by the
-  heir (so they keep living), but its avatar is PARKED with its seat —
-  owner unchanged, reclaimable by the token holder who dials back in — instead
-  of becoming the heir's. (Before the tag every orphan was adopted and each
-  game re-owned avatars back by hand from a spawn-time owner map.)
+- `stream_hz=N` sets the default owner-stream rate for every entity of this
+  type. `session_set_stream_hz` can still override an individual entity later.
+- `avatar` marks a player's body. During host succession, an absent host's NPCs
+  may move to the successor, while its avatar remains assigned to the absent
+  player's reclaimable seat.
 
-**Born at the send.** `<game>_entities` hands boot the kind table AND the
-class's generated event dispatcher, and the dispatcher is what makes the
-AUTHORITY's own spawns *born at the send*: `<game>_entity_spawned` runs inside
-`kboot.boot_spawn_send`, before it returns — the symmetric guarantee to a
-client's (whose make → fields → `Ev_Spawned` is one synchronous flow). So no
-render, physics step, or later `_process` can ever see the host's node parented
-but undressed, and the host's own `Ev_Spawned` is NOT in that frame's
-`boot_pump` batch. Two consequences worth knowing: `boot_phase` still rises
-only in `boot_pump` (the host's `entity_spawned` runs with the phase not yet
-risen — the latch is promoted at the next pump, so the `was`/`phase` edge
-idiom across the pump keeps working); and the raw door,
-`kboot.boot_entities(&self.boot, self, <table>[:], events)`, takes the
-dispatcher as an optional last argument — `nil` keeps the queue path for a
-hand-rolled game that drains the batch itself (nothing is ever lost silently).
+### Spawn timing and initial presentation
 
-**Where the first placement goes — and why `_process` alone is not it.** Godot
-runs no `_process` on a node added to the tree DURING the `_process` pass (the
-engine iterates a copy of the process list; a node added in `_physics_process`
-skips that physics step but does get `_process` the same render frame). Every
-host-step spawn is added during `_process`, so an entity that positions itself
-only in its own `_process` renders its spawn frame at the scene's default pose
-on the spawner's screen — no matter when `Ev_Spawned` fires. The contract is:
-`<game>_entity_spawned` is the initial-dress home (place the node from its
-fields there — it is same-frame on every role now), the entity's `_process`
-maintains from then on; or ship the scene hidden and reveal in the dress, as
-homestead does. The same first-frame gap exists for a client's PREDICTED spawn
-(`boot_spawn_predicted`, which has no `Ev_Spawned` until the authority's
-rekeys it) — dress at the fire site, or hide until first present.
+The generated `<entity>_spawned` hook runs when the factory creates and indexes
+the entity, before received spawn fields are applied. Use it for bookkeeping
+that only needs the ID and owner.
+
+The generated `<entity>_born` hook is dispatched from `Ev_Spawned` after fields
+are available. Use it for the first node position, tint, nameplate, and other
+presentation derived from replicated state. Godot may not call `_process` on a
+node added during the current process pass, so relying on `_process` alone can
+display one frame at the scene's default transform.
+
+On the authority, `boot_spawn_send` dispatches the born event synchronously
+before returning. On clients it is dispatched as the ordered spawn record is
+applied. In both cases the typed born hook sees initialized fields. The
+authority's synchronous event is not repeated in the next `boot_pump` event
+slice.
+
+A predicted client-side spawn has no authoritative `Ev_Spawned` until it is
+matched and rekeyed. Initialize its presentation at the prediction site or keep
+the scene hidden until the first authoritative presentation.
 
 `boot_node(b, id)` looks up an entity's node (the `nodes[id]` map).
 `boot_entities_wipe(b)` is the back-to-lobby / takeover wipe, and it is
@@ -398,10 +375,10 @@ for id in mob_ids(&self.boot) { ... }      // every live Mob (temp-alloc)
 owner := kboot.boot_entity_owner(&self.boot, id) // the owner_pid map
 ```
 
-With these, the spawn/free hooks above shrink to the genuinely game-shaped lines
-(a hot `me_*` pointer, death fx), or vanish. The owned/ids scans walk the type
-ledger, which is friendslop-sized; keep your own map in the rare game that makes
-them hot.
+These queries often remove the need for game-maintained mirrors. The owned/ID
+queries scan the type ledger; measure them before using repeated full scans in a
+hot loop, and keep a game-side index when the query is genuinely
+performance-critical.
 
 ## Host migration
 
@@ -412,13 +389,12 @@ kboot.boot_migration(&self.boot, self, <snake>_succ_hooks)
 ```
 
 The halves are `<game>_backup(self, w)`, `<game>_took_over(self, r)`,
-`<game>_wiped(self)`, and `<game>_migrating(self, step, target, try)`. The kit
-owns the handoff, the takeover/chase fork (run off the generated events tail, so
-word halves see the old world), the census-driven wipe, the retry caps, and the
-window latches. `boot_take_over` and `boot_chase` stay public for a manual
-Resume button, and a game that raises its own transports calls `boot_succ_config`
-once. The arm-by-arm word contract is in
+`<game>_wiped(self)`, and `<game>_migrating(self, step, target, try)`. Boot
+coordinates backup transfer, takeover or reconnect, entity cleanup, retries,
+and UI state. `boot_take_over` and `boot_chase` remain available for a manual
+Resume flow, and a game that creates its own transports calls `boot_succ_config`
+once. The detailed hook contract is in
 [session.md](session.md#backup-hosting-and-resume).
 
-Host migration is co-op-lane only: a sim lane's authority restarts, it does not
-migrate (asserted with a teaching message).
+Host migration is available for the session-replication model. A simulation
+lane authority restarts; it does not migrate its live rollback state.

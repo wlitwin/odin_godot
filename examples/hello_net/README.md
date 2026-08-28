@@ -16,4 +16,4 @@ $GODOT --path examples/hello_net            # window 2: press Join
 `bash examples/hello_net/run.sh` is the same scenario headless: two
 processes under latency, read through GENERATED probes
 (`probe_player_count` / `probe_my_player` / `probe_player_x`), one verdict —
-the smallest consumer of the acid harness and of scriptgen's probes.
+the smallest consumer of the integration harness and scriptgen's probes.

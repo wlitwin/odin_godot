@@ -10,9 +10,10 @@ confirmation, host-validated hits, `fire_announce`/tracers) are the coop lane's 
 [sim-lane](sim.md) game expresses the same ideas natively: hp as a `predict` field, hits
 as verbs judged under [lag comp](sim.md), fired shots as predicted spawns or declared
 facts (in the sim lane, projectile *entities* supersede tracers; see [sim.md](sim.md)).
-The pure math (range/cone checks, damage arithmetic) is sim-safe anywhere. Whether the
-`Cooldowns`/ability bundles can ride a sim snapshot descriptor is unverified today; don't
-assume it.
+The pure math (range/cone checks and damage arithmetic) is replay-safe. The
+`Cooldowns` and ability bundles have not been covered by
+simulation-descriptor tests; do not put them on the simulation lane without
+adding that coverage.
 
 ## Mental model
 
@@ -27,12 +28,12 @@ the *host's* sim deals damage. Visuals are peer-owned; hits are host-validated.
 ## Health and abilities
 
 ```odin
-// The scalar damage core — THE one corpse-guarded clamp, generic over the
+// The scalar damage core: a corpse-guarded clamp, generic over the
 // game's hp integer. `dealt` is what actually landed (0 on a corpse — hit
 // credit reads it); `died` reports the killing blow exactly once.
 hurt :: proc "contextless" (hp: ^$T, dmg: T) -> (dealt: T, died: bool)
 // Restore `amount`, clamped to `maximum`. Reviving a corpse is a heal from 0
-// — whether that is ALLOWED is policy, gated by the caller.
+// — whether that is allowed is policy, gated by the caller.
 heal :: proc "contextless" (hp: ^$T, maximum: T, amount: T)
 // The died-only i32 convenience over `hurt`: clamps at zero, no double kills,
 // no negative hp. hit and play.Health both delegate to the same `hurt` — one
@@ -60,7 +61,8 @@ Cooldowns :: struct($N: int) {
 ```
 
 Defs are code constants (cavecrawl's `ROCK_ABILITY` has `cooldown = 20`, one second at
-20 Hz). The predicted cast is one command proc with zero role branches (`spelunker.odin`):
+20 Hz). The predicted cast is one command proc; generated command policy runs
+it in the appropriate prediction and authority contexts (`spelunker.odin`):
 
 ```odin
 @(gd_command = "predict")

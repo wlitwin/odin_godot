@@ -1,7 +1,7 @@
 # cavecrawl — the co-op reference
 
-THE friendslop-toolkit reference game: a drop-in co-op cave crawler that
-exercises the widest kit surface of any example — sessions with reconnect
+This is the broadest co-op Kit example: a drop-in cave crawler that exercises
+sessions with reconnect
 identity, declarative replication, predicted commands with `_then`
 consequences, the generated entity factory, items and chests, host-validated
 combat, hostile AI, positional pings, quit-and-resume saves, host migration,
@@ -11,7 +11,7 @@ chat → lootable world → predicted combat → dwellers → saves), and
 that arc brick by brick — when a step there feels terse, the corresponding
 file here is the long answer.
 
-Honest scale: ~4,500 hand-written lines. This is deliberately the LARGEST
+The example contains about 4,500 hand-written lines and is deliberately the largest
 example — the place to see every pattern coexisting in one game. For the
 smallest complete kit game read [slopball](../slopball/) first; for the
 server-authority model read [quickdraw](../quickdraw/) and
@@ -48,15 +48,15 @@ One class, many files, split the way a real game is:
 bash build/build_scripts.sh examples/cavecrawl
 $GODOT --path examples/cavecrawl          # host, join from a second window
 
-bash examples/cavecrawl/run.sh            # the acid: multi-process, real ENet,
+bash examples/cavecrawl/run.sh            # integration test: multiple real ENet processes,
                                           # 120ms injected latency (CAVECRAWL_OK)
 ```
 
-The acid (`run.sh` + `cave_test.gd`) is the pattern to steal for your own
-game: real processes over real sockets, driving the `@(gd_method)` surface
-exactly like keys drive it in play, grepping log lines for proof — loot
+The integration test (`run.sh` + `cave_test.gd`) is a reusable pattern for
+testing a game: real processes over real sockets drive the `@(gd_method)`
+surface and assert against log lines. Loot
 races, predicted combat under latency, a kill mid-flight, quit-and-resume,
-and a host handover all run headless on every `tests/run_all.sh`.
+and a host handover all run headless from `tests/run_all.sh`.
 
 WASD walk · E use · click throw · Q drop · G set down · R heal · Tab scores
 · Enter chat. Env: `CAVE_PORT` · `CAVE_NAME` · `CAVE_TOKEN` (distinct

@@ -1,62 +1,57 @@
-# kit/sim — server-authoritative rollback netcode
+# `kit/sim`: server-authoritative fixed-tick simulation
 
-`kit/sim` is the second netcode model, a companion to the friendslop coop
-toolkit rather than a replacement: **one authority (the server), inputs-only
-up, tick-stamped snapshots down, rollback + resimulation on clients.** Reach
-for it when a game is contested, cheat-resistant, or twitch-fair, the cases
-the coop model does not cover. Movement no longer trusts the client's
-position; the server simulates everything from inputs, and your shots are
-judged where **you** saw the target (lag compensation).
+`kit/sim` adds an authority-run simulation lane to the normal Kit session. A
+client sends tick-stamped input windows; the authority advances final state and
+sends snapshots; the owning client predicts the same ticks and reconciles when
+its result differs.
 
-Like kit/net it is engine-free: every piece runs headless in
-`tests/kitsim`, including a two-session convergence test over an in-memory
-wire.
+Use the simulation lane for movement, aiming, projectiles, or shared objects
+whose state should be computed by a trusted authority. Reliable session state
+such as inventory, score, chat, entity lifetime, and saves remains on
+`kit/session` and `kit/net`.
+
+The package does not import Godot. Its input, snapshot, history,
+reconciliation, and lag-compensation paths run in headless tests under
+`tests/kitsim`.
 
 ## The mental model
 
-**A third lane, not a new world.** A field's tag picks its authority lane,
-and the lanes are disjoint at the mask level (`diff_mask` skips the other
-two):
+A field tag selects one of three disjoint replication lanes:
 
 | tag | authority | wire | applied by |
 | --- | --- | --- | --- |
 | `replicate` | host | reliable deltas | on arrival |
 | `owner` | owning peer | unreliable stream | interpolated in the past |
-| `predict` | server sim | tick-stamped snapshots | rollback + resim |
+| `predict` | authority simulation | tick-stamped snapshots | prediction, reconciliation, and resimulation |
 
-Everything the session gives you (identity, roster, reconnect, spawns,
-blobs, stats, chat, the command loop for discrete verbs) keeps working
-unchanged; this page assumes you know that surface. The
+Identity, roster, reconnects, spawns, blobs, stats, chat, and reliable commands
+remain session features. The
 [quickstart](quickstart.md) is the fast route into the coop model, and the
 [sim quickstart](quickstart-sim.md) is the fast route here (a coop hello
-promoted in four diffs). Only the contested fast state (movement,
+promoted in a small set of changes). Only contested fast state (movement,
 projectiles) opts into the sim lane, per field. A field's lane is the tag's
 first token, so a field lives on exactly one lane: `owner` and `predict`
 are alternatives, not flags you combine.
 
-**The tick IS the simulation.** Unlike the coop model (gameplay at frame
-rate, the net tick paces the wire), sim-lane gameplay lives in a fixed-rate
-step proc (default 60 Hz) that is a pure function of predicted fields +
-inputs. The server runs it authoritatively; clients run the SAME proc
-speculatively, a few ticks ahead of the server, so their own avatar answers
-the stick instantly.
+Simulation-lane gameplay runs in a fixed-rate step proc (60 Hz by default).
+The proc derives predicted fields from their previous values, the current
+input, and replayable tick data. The authority runs it for final state. The
+owning client runs it ahead for immediate control response.
 
-**Mispredictions self-heal; determinism is NOT required.** When
-authoritative state for tick T arrives, the client memcmps it against what
-it predicted at T. In the common case the two are equal and nothing
-happens: steady state costs only a memcmp. When they differ, the predicted
-set rewinds to truth and the step proc replays T+1..now from the input
-ledger. Because the server's word is final, approximate re-execution
-suffices, with no need for fixed-point math or cross-machine float
-concerns. The one rule is that **step procs may touch predicted fields,
-`lane_input`, and per-tick derivables, but never wall clocks, node state, or
-un-ledgered randomness.**
+When authoritative state for tick T arrives, the client compares it with its
+recorded prediction. If they differ, the client restores authority at T and
+replays later ticks from its input history. Bit-exact cross-machine determinism
+is not required because authority remains final, but replayed code must be
+stable enough to avoid constant correction.
 
-**The loss story is redundancy: nothing retransmits.** Every input packet
-carries the last ~8 unacked inputs; every snapshot batch supersedes the one
-before it. A genuinely lost input (a burst longer than the window) means the
-server briefly holds the player's last input and the client reconciles the
-difference away, a degradation rather than a desync.
+Step procs may read predicted state, declared inputs, `lane_input`, and values
+derived from the tick. They must not read wall clocks, device state, current
+scene-node transforms, or untracked randomness.
+
+Input packets include a configurable window of recent samples, and newer
+snapshot batches supersede older ones. If a loss burst exceeds the redundancy
+window, the authority temporarily holds the player's last accepted input. The
+client later reconciles to the resulting authority state.
 
 ## Defining a sim entity
 
@@ -91,31 +86,31 @@ runner_tick :: proc(self: ^Runner, input: Runner_Input) -> (fired: bool) {
 	return
 }
 
-// AUTHORITY only (never resims): the cross-entity consequence.
+// Authority only; not called during resimulation.
 @(gd_half)
 runner_tick_then :: proc(g: ^Game, self: ^Runner, by: knet.Player_Id, fired: bool) {
 	if fired { adjudicate_shot(g, self, by) } // lane_rewound lives here
 }
 
-// THIS PLAYER's live pass only (never a resim replay): presentation.
+// The owning player's live pass only; not called during resimulation.
 @(gd_half)
 runner_tick_fx :: proc(g: ^Game, self: ^Runner, fired: bool) {
 	if fired { muzzle_flash(self) } // answers the click NOW, at any latency
 }
 ```
 
-scriptgen emits the rawptr thunk (with the `is_host` / `mine` / `resimming`
-gates you never write), `runner_sim_set`, POD-asserts the input struct, and
-refuses mispaired halves or a tick without `predict` fields at build time.
+Script generation emits the raw-pointer thunk, role and resimulation checks,
+`runner_sim_set`, and POD assertions for the input struct. It rejects invalid
+half signatures and a tick proc whose entity has no `predict` fields.
 Tick shapes are `(self)`, `(self, input)`, `(self, lane)`, and
 `(self, input, lane)`: a pointer param is the lane, and a value param is
 the input. Both halves also accept game-less (self-first) shapes.
 
-**Presentation on every screen: the `mine` param.** The `_fx` above fires on
-the acting player's live pass only. Declare `mine: bool` right after `self`
-(by that name) and the SAME half fires on **every screen**, each at its own
-presentation time for the cause. One proc, and the framework holds the
-timing:
+### Presenting a fact on every screen
+
+The `_fx` above runs only for the acting player's live pass. To present the
+same fact on every screen, add `mine: bool` immediately after `self` (the
+parameter name is significant):
 
 ```odin
 @(gd_half)
@@ -127,19 +122,14 @@ runner_tick_fx :: proc(g: ^Game, self: ^Runner, mine: bool, fired: bool) {
 }
 ```
 
-- **The actor's screen** fires it inline from the live pass (`mine = true`),
-  instantly, at the same moment the owner-only form fires, and never as a
-  resim.
-- **The authority's screen** presents everyone else's facts as they execute
-  (`mine = false`); its view of the world is live truth.
-- **Every other screen** receives the fact tuple (a reliable `SIM_FACT`) and
-  fires when its **watch clock** reaches the fact's tick (`mine = false`): the
-  flash lands on the delayed barrel that fired it, not a render-delay early.
-  This is the replicated-counter-plus-`seen_*` edge, generated, and it is
-  stricter than a hand-rolled edge in two ways: two facts coalescing into one
-  batch can't eat a fire, and there is no edge scratch to re-seed on a resync.
-  quickdraw's tracer ships on it, and the duel acceptance test pins the
-  watcher path.
+- The actor presents the fact immediately with `mine = true`. Resimulation
+  does not present it again.
+- The authority presents facts from other actors as they execute, with
+  `mine = false`.
+- Other clients receive a reliable `SIM_FACT` and present it when their watch
+  clock reaches the fact's tick. This keeps an effect aligned with the delayed
+  entity that caused it. Facts are counted individually, so a batch cannot
+  collapse two occurrences into one.
 
 The `mine = true` skip **assumes the actor's own live pass fired the same fact
 from the same input**, which holds true unless the actor's input for that
@@ -151,11 +141,10 @@ regardless of loss, fire it from an **authority** world pass
 (`@(gd_step="authority")`) instead of the entity tick: an authority-minted
 fact includes the owner by construction.
 
-**World-pass facts: `@(gd_fact)`.** Some presentation is born outside any
-entity's tick: a cross-entity event that no single entity's tick can return.
-The world pass sees the foot meet the ball, and an authority half adjudicates
-a theft. Declare the presentation half and the event is a first-class fact,
-with the same rules and timing as tick facts and no hand-written gate:
+### Facts produced by a world pass
+
+Use `@(gd_fact)` for a presentation event discovered outside a single
+entity's tick, such as contact between a player and a ball:
 
 ```odin
 // The half you write — mine-form, anchored on the causer:
@@ -165,70 +154,47 @@ ball_kicked_fx :: proc(g: ^Game, k: ^Kicker, mine: bool, bvx, bvy: f32) {
 	if mine {kick_camera(g)}        // flavor, not a role branch
 }
 
-// The door scriptgen generates — call it where the sim DISCOVERS the event:
+// Scriptgen generates this helper. Call it where the sim discovers the event:
 if kicked {
 	ball_kicked(&g.lane, k, b.roll.vx, b.roll.vy)
 }
 ```
 
-The generated door holds every gate, for every audience: the **causer's** live
-pass fires instantly (`mine = true`; the anchor param's tracked owner is the
-causer), the **authority** broadcasts a reliable `SIM_FACT` and fires live, a
-**watcher** fires when its watch clock reaches the fact's tick (beside the
-delayed avatar that caused it), a **resim** replay never re-fires, and a screen
-with no part in the event stays silent at the announce and presents from the
-wire. Omit the anchor param and it is a **world fact**: the authority's own
-simulation is the causer (`mine = true` on its screen alone); every client
-presents on the watch clock, with no entity. Announce from wherever the sim
-discovers the event: the everywhere pass, the authority pass, or a `_then`
-half. Provenance is handled: a fact minted in an authority-only context reaches
-the causer's screen over the wire (they never ran that code), while the
-everywhere-pass form skips them (their own live pass already fired). The wire
-contracts match tick facts: args are wire primitives, the anchor must outlive
-the slowest watch clock (a despawn drops late facts, so dwell it), and a
-predicted announce the server never confirms can ghost-fire locally. An
-anchored door called on a **corpse** — an anchor the game already
-despawned/untracked — shows nowhere, consistently: nobody is told, so nobody
-presents it, the authority's own screen included (the door gates on
-`ksim.lane_tracks_entity` first). A fact meant to be seen is announced
-*before* the despawn; a host-only flash was the old symptom of getting that
-order wrong.
-speedball's kick is the worked example; its acceptance test pins the watcher
-presenting on the watch clock and the causer never double-firing.
+The generated helper applies the same live-pass, authority, watcher, and
+resimulation rules as a tick fact. The first entity parameter, when present,
+anchors the event to its owner. Without an anchor, the authority is the only
+local producer and every client presents the event on its watch clock.
+
+Fact arguments must be wire primitives. Announce an anchored fact before
+untracking or despawning the anchor; otherwise `lane_tracks_entity` rejects it
+and no peer presents it. A predicted fact that the authority never confirms
+may still appear locally. Speedball's kick is the worked example.
 
 For the rare inline probe that should not be a fact at all (a debug print in
 a tick body), gate on `ksim.lane_live(&lane)`: it reflects the live pass, not
 a resim replay. Never read `lane.resimming` raw.
 
-The wire imposes three contracts, each a build-time error when broken: the
-mine-form fires on **event ticks only** (any tick a bool fact is true), its
-facts must be **wire primitives** (they cross to watching screens), and **at
-least one fact must be a bool** (the event trigger). Two edges stay yours: a
-fact predicted by the owner that the server refuses can still ghost-fire
-locally, and a fact's entity must outlive the slowest watch clock: dwell the
-despawn, the same rule that edges outlive their observers wherever presentation
-runs late. Use the owner-only form (a plain `_fx` without `mine`) for
-continuous owner-only presentation (an engine hum, a strain shader) and for
-effects that must NOT run everywhere. The predicted-spawn `_fx` below spawns a
-client-local projectile, exactly the kind of half that stays owner-shaped.
+For a `mine`-form tick fact, at least one returned value must be `bool`; the
+half runs on ticks where any boolean fact is true. All returned facts must be
+wire primitives. Scriptgen reports either violation at build time. Use a plain
+owner-only `_fx` (without `mine`) for continuous local presentation such as an
+engine hum, or for an effect that should not appear on every screen.
 
 The game's own halves (the device read and the world pass) are typed and
 attributed the same way. `@(gd_sample)` marks the one place that touches
 hardware (never called during a resim); scriptgen pins its input struct to
 the ticks' at build time, so sampling into the wrong struct cannot compile.
 Add `@(gd_sample="validate")` to pair a typed
-`<sample>_validate(self, input) -> bool` sanitizer/admission hook, or name one explicitly with
-`validate=PROC`. It runs immediately after local sampling and over every
+`<sample>_validate(self, input) -> bool` sanitizer/admission hook, or name one
+explicitly with `validate=PROC`. It runs immediately after local sampling and over every
 received window on the authority before any de-jitter buffer changes. It may
 clamp or normalize through the pointer; returning false rejects the complete
 multi-class input packet. Use it for finite-float checks, axis ranges, enum
 membership, button masks, and game-specific input invariants.
-`@(gd_step)` is the world pass, run after entity ticks. There are two slots, and
-a class may fill one of each: a bare `@(gd_step)` runs EVERYWHERE (live and in
-every resim, on every peer, for pure-sim contact), and `@(gd_step="authority")`
-runs on the HOST alone, once per real tick (the authority never resims). A
-game needing both keeps them SEPARATE rather than folding `if is_host` into one
-pass; the lane holds that role gate:
+`@(gd_step)` is the world pass, run after entity ticks. A game may declare one
+of each kind: a bare `@(gd_step)` runs on every peer, including resimulation,
+while `@(gd_step="authority")` runs once per real tick on the authority. Keep
+the two procedures separate so the generator can apply the execution policy:
 
 ```odin
 @(gd_sample = "validate")
@@ -256,12 +222,14 @@ game_step :: proc(self: ^Game, tick: u64) {
 (The `tick: u64` param is optional in both slots; a pass that doesn't read
 the clock declares `proc(self: ^Game)`.)
 
-**The same attribute is the COOP game's host tick.** In a package with no
+### Using an authority step without a simulation lane
+
+In a package with no
 `@(gd_tick)` classes there is no lane, so `@(gd_step = "authority")` routes
 through the boot accumulator instead: scriptgen generates
 `<snake>_step(self, ticks)`: the role gate, the fixed-step loop, and the
-[same-frame edge pass](net.md#edges-class_field_edge--presenting-delta-lane-changes)
-in one proc the game calls with `boot_pump`'s ticks, role-free
+[same-frame edge pass](net.md#field-change-edges)
+in one proc the game calls with `boot_pump`'s ticks
 (cavecrawl's `cave_host_tick` is the worked example; there is no absolute
 tick in the coop loop, so this form is `proc(self)`; count ticks in your
 own `gd:"backup"` field). One declaration, two routings: promoting the game
@@ -318,7 +286,7 @@ re-init. The app route survives, but the anchor and ledgers do not follow a
 fresh authority. To reset, call `lane_destroy` then `lane_init` (destroy
 zeroes the lane); `lane_init` on a live lane asserts.
 
-## Predicted blocks — godot:play/sim
+## Simulation blocks in `godot:play/sim`
 
 Blocks compose on this lane the way `godot:play`'s compose on the coop one:
 embed a field and the entity gains the block's predicted state (its
@@ -709,10 +677,9 @@ orthogonally from one seat.
 
 ## Promoting a coop game
 
-Because `predict` is a lane per FIELD, a friendslop game that grows
-competitive ambitions migrates incrementally, with no rewrite and no fork. The
-worked diff is `examples/slopball` → `examples/speedball` (the same soccer
-game on the two models); the checklist, per contested entity:
+Because the lane is selected per field, a session-replication game can migrate
+one contested entity at a time. The worked comparison is
+`examples/slopball` → `examples/speedball`:
 
 1. **Touch nothing session-shaped.** Identity, roster, chat, stats, spawns,
    saves, the doors, the factory: all of it rides both models unchanged.
@@ -720,35 +687,37 @@ game on the two models); the checklist, per contested entity:
 2. **Retag the contested fast state.** `owner` (movement the peer
    owned) becomes `predict`: the field's writer changes from "its
    owner's stream" to "the server's simulation, predicted locally". Keep
-   `interp` on drawn floats. The retag is the whole wire migration.
+   `interp` on displayed floats.
 3. **Move its writes into a `@(gd_tick)`.** Frame-rate mutation becomes a
    fixed-rate pure step: (predicted fields, input) → predicted fields. This
    is the one honest rewrite, and it is where engine physics must become
    query-based kinematics (slopball's `play.Puppet` ball becomes speedball's
    forty lines of bounce arithmetic; see Gotchas).
-4. **Compose the input struct** from what the entity read off the
+4. **Declare and sample the input struct** from what the entity previously read from
    devices per frame, and sample it in `@(gd_sample)`, the one place that
    still touches hardware.
-5. **Sort the consequences.** Cross-entity outcomes move to `<tick>_then`
+5. **Validate received input.** Use `@(gd_sample = "validate")` and check
+   ranges, finite floats, enum values, button masks, and game-specific
+   invariants before an input window enters the authority buffer.
+6. **Sort the consequences.** Cross-entity outcomes move to `<tick>_then`
    (authority), local presentation to `<tick>_fx` (live pass). Discrete
    verbs on delta-lane state keep their `@(gd_command)`s.
-6. **Delete the authority workarounds.** Whatever arbitrated "who simulates
-   this" on the coop model is deleted wholesale: speedball's diff deletes
-   slopball's entire seat-grant machinery (host.odin's proximity
-   arbitration), since the server simulates everything, and `contested` +
-   `lane_claim` answer the feel questions the seat previously answered.
-7. **Wire once:** `<game>_lane_init(self, &self.lane, &self.ses, cfg)` +
-   `kboot.boot_lane(&self.boot, &self.lane)`, and cross entities off one at
-   a time; a hybrid game is a supported end state, not a transition. What
-   you do NOT touch: issue sites and spawn sites. `<verb>_cmd(&boot, …)`
+7. **Remove obsolete ownership arbitration.** Logic that chose which peer
+   simulates owner-streamed state may no longer apply after the authority takes
+   over. Keep presentation claims only where they are still needed for feel.
+8. **Wire once:** `<game>_lane_init(self, &self.lane, &self.ses, cfg)` +
+   `kboot.boot_lane(&self.boot, &self.lane)`, and migrate entities one at
+   a time. A hybrid game is a supported end state. Command and spawn call sites
+   retain their shape: `<verb>_cmd(&boot, …)`
    and `<entity>_spawn(&boot, …)` keep their exact shape on both models;
    the generated bodies re-route.
 
-What you buy: positions are no longer client-trusted (the cheat-resistance
-motive), and lag-compensated hit validation becomes available. What you pay:
-the fixed-tick authoring contract for exactly the entities you promote, and
-a server that simulates them. [Timelines](timelines.md) is the model-choice
-guide if you are deciding rather than migrating.
+After promotion, the authority derives the selected fields from admitted input
+instead of accepting client-written positions. This adds fixed-tick authoring,
+history, and server simulation cost. It also enables authoritative rewind
+queries. Input validation and a trusted authority remain necessary; the field
+tag alone is not a complete security policy. See [Timelines](timelines.md) for
+model selection.
 
 ## Tuning
 
@@ -840,20 +809,22 @@ needs a `predict` float. scriptgen rejects each on the wrong field, spelled out.
   or the Step_Proc, not after `lane_present`. The ledger is always the sim
   truth if you need it out-of-band.
 
-## Status
+## Implementation and test coverage
 
-The runtime and the authoring surface are complete and proven headless:
-input pipeline (single- or multi-class), ledgers, snapshots, reconcile, lane
-driver, lag comp, watched interp, render-error smoothing, possession, predicted
-spawns, every-screen tick facts (the mine-form `_fx`: `SIM_FACT` broadcast,
-watch-clock firing), declared world-pass facts (`@(gd_fact)` plus the generated
-announce doors, provenance-aware), the `@(gd_tick)`/`@(gd_sample)`/`predict`
-codegen, tick composition through embedded blocks (the `play/sim` shelf
-above), and two worked example games (quickdraw, speedball) with native duel
-acceptance tests. The kitsim tests (loss-and-blackout convergence tests, the
-per-class routing fingerprint, the glide-vs-snap assertion, the three-peer
-fact-timing pin, and the four-law declared-fact pin) plus the repgen contract
-pins hold all of it.
+The repository currently implements the input pipeline, ledgers, snapshots,
+reconciliation, lane driver, lag compensation, watched interpolation,
+render-error smoothing, possession, predicted spawns, tick and world facts,
+multiple input classes, generated authoring, and the `play/sim` blocks.
+
+`tests/kitsim` covers convergence under loss and blackout, input-class routing,
+glide versus snap behavior, and fact timing. `tests/repgen` covers generated
+contracts. Quickdraw and Speedball add multi-process acceptance tests for the
+main competitive paths.
+
+This is not a claim of production hardening at arbitrary scale. Declarative
+input constraints, traffic budgets, protocol-wide payload ceilings, broader
+fuzzing, interest management, and published scale envelopes remain roadmap
+work. See [the hardening roadmap](TODO.md) for the current status.
 
 See also: [net](net.md) (whose shared substrate layer of wire, descriptors,
 blend math, and tick this lane is built on), [session](session.md)

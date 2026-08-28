@@ -7,8 +7,8 @@ package hello_sim
 // docs/kit/sim.md's promotion checklist. The session half (lobby, doors,
 // spawns, drop-in, chat) matches hello_net minus the optional join-code
 // doors it has since grown, plus the `serve` door; the whole promotion is:
-// the retag in player.odin, the @(gd_tick), the @(gd_sample) below, and
-// TWO wiring lines in ready(). Clients are no longer trusted with positions;
+// the retag in player.odin, the @(gd_tick), the validated @(gd_sample) below,
+// and TWO wiring lines in ready(). Clients are no longer trusted with positions;
 // their own square still moves the instant a key goes down (prediction), and
 // remote squares render watched (interpolated, a breath in the past).
 //
@@ -36,8 +36,6 @@ HelloSim :: struct {
 	comms:   kcomms.Comms,
 	boot:    kboot.Boot,
 	lane:    ksim.Lane, // the sim lane: tick scheduling, prediction, reconcile
-	running: bool,
-	started: bool,
 
 	player_scene: ^gd.Resource `gd:"entity=Player:1"`,
 
@@ -75,18 +73,22 @@ hello_sim_ready :: proc(self: ^HelloSim) {
 }
 
 hello_sim_process :: proc(self: ^HelloSim, delta: f64) {
-	if !self.running {return}
+	was := kboot.boot_phase(&self.boot)
+	if was == .Menu {return}
 	// The coop hello drove `me` right here, at frame rate. Promoted, the
 	// device read lives in the @(gd_sample) below and the movement in
 	// player_tick — the frame loop only pumps.
 	events, _, _ := kboot.boot_pump(&self.boot, delta, now_s())
 	hello_sim_events(self, events)
+	if was != .Playing && kboot.boot_phase(&self.boot) == .Playing {
+		gd.print_str("HELLO_STARTED")
+	}
 }
 
 // The one place that still touches hardware (checklist step 4): fill my
 // input for tick T. The lane ships it, the server simulates it, my own
 // screen predicts it this frame.
-@(gd_sample)
+@(gd_sample = "validate")
 hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^Player_Input) {
 	_ = tick
 	input^ = {}
@@ -96,37 +98,43 @@ hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^Player_Input) {
 	if gd.is_action_pressed("ui_up") {input.move[1] -= 1}
 }
 
+// The authority validates every received input before it enters a player's
+// de-jitter buffer. This turns the sample's local -1/0/1 convention into a
+// network admission rule instead of trusting clients to follow the comment.
+hello_sample_validate :: proc(self: ^HelloSim, input: ^Player_Input) -> bool {
+	_ = self
+	return input.move[0] >= -1 && input.move[0] <= 1 &&
+	       input.move[1] >= -1 && input.move[1] <= 1
+}
+
 // ---- the doors (hello_net's plain host/join pair + the dedicated `serve`; ---
 //      hello_net has since grown optional relay/join-code paths this copy skips)
 
 @(gd_method)
 hello_sim_on_host :: proc(self: ^HelloSim) {
-	if self.running {return}
+	if kboot.boot_phase(&self.boot) != .Menu {return}
 	if !kboot.boot_host(&self.boot, kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_name(&self.boot, "player")) {return}
-	self.running = true
 	hello_sim_on_start(self)
 }
 
 @(gd_method)
 hello_sim_on_join :: proc(self: ^HelloSim) {
-	if self.running {return}
-	if !kboot.boot_join(&self.boot, "127.0.0.1", kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player")) {return}
-	self.running = true
+	if kboot.boot_phase(&self.boot) != .Menu {return}
+	kboot.boot_join(&self.boot, "127.0.0.1", kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_token(&self.boot), kboot.boot_name(&self.boot, "player"))
 }
 
 // The dedicated authority: referees and simulates, fields no square, and
 // never hands anyone the succession torch. This is "running the authority"
 // for a competitive game — a headless process on a machine you trust.
 hello_sim_on_serve :: proc(self: ^HelloSim) {
-	if self.running {return}
+	if kboot.boot_phase(&self.boot) != .Menu {return}
 	if !kboot.boot_serve(&self.boot, kboot.boot_port(&self.boot, DEFAULT_PORT), kboot.boot_name(&self.boot, "referee")) {return}
-	self.running = true
 	hello_sim_on_start(self)
 }
 
 @(gd_method)
 hello_sim_on_start :: proc(self: ^HelloSim) {
-	if !self.ses.is_host || self.started {return}
+	if !self.ses.is_host || self.ses.replicating {return}
 	for _, p in self.ses.players {
 		if p.connected && !p.dedicated {spawn_player(self, p.id)}
 	}
@@ -135,7 +143,7 @@ hello_sim_on_start :: proc(self: ^HelloSim) {
 
 @(gd_method)
 hello_sim_on_chat :: proc(self: ^HelloSim, text: gd.String) {
-	if self.running {kboot.boot_chat(&self.boot, text)}
+	if kboot.boot_phase(&self.boot) != .Menu {kboot.boot_chat(&self.boot, text)}
 }
 
 spawn_player :: proc(self: ^HelloSim, pid: knet.Player_Id) {
@@ -156,7 +164,7 @@ hello_sim_welcomed :: proc(self: ^HelloSim, me: knet.Player_Id) {
 
 @(gd_half)
 hello_sim_player_joined_then :: proc(self: ^HelloSim, id: knet.Player_Id, rejoin: bool) {
-	if self.started && !rejoin {
+	if self.ses.replicating && !rejoin {
 		spawn_player(self, id)
 	}
 }
@@ -170,9 +178,5 @@ hello_sim_entity_spawned :: proc(self: ^HelloSim, id: knet.Net_Id, type: ksess.E
 	if p, ok := player_of(&self.boot, id); ok {
 		gd.node2d_set_position(cast(gd.Node2d)p.owner, {p.x, p.y})
 	}
-	if !self.started {
-		self.started = true
-		gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
-		gd.print_str("HELLO_STARTED")
-	}
+	gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
 }

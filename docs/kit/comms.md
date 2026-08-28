@@ -20,7 +20,7 @@ line comes back with the broadcast rather than echoing locally, so what you see 
 everyone sees.
 
 The send half lives in
-[`ksess.Host_Relay`](session.md#the-host-relay-host_relay)
+[`ksess.Host_Relay`](session.md#host-relay)
 (stamp, spoof-drop, echo policy, addressed replay), and comms runs it with `echo = true` (that
 is the "comes back with the broadcast" behavior). What kit/comms adds on top is a payload
 codec (two message kinds) over a bounded log and the shared rider queue. `comms_say` writes

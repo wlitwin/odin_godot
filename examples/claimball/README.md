@@ -55,7 +55,7 @@ $GODOT --path examples/claimball                  # host, join from a second win
 CLB_LATENCY=120 $GODOT --path examples/claimball  # feel the touches at 240ms RTT
 
 bash examples/claimball/run.sh          # solo gate (CLAIMBALL_SINGLE_OK)
-bash examples/claimball/native_run.sh   # the claim-mode acid, three peers (CLAIMBALL_NATIVE_OK):
+bash examples/claimball/native_run.sh   # claim-mode integration test, three peers (CLAIMBALL_NATIVE_OK):
                                         # a striker drives + claims the ball to a goal (claim near 1),
                                         # an idle watcher sees the same ball watched (claim 0)
 ```

@@ -14,9 +14,9 @@ class, custom resources, autoloads, `@tool`/editor plugins, multiplayer RPCs, ho
 > and the Asset-Library drop-in layout), plus 7 browser-gated web tests that verify the WASM
 > export in a real headless Chrome when one is available. The headline examples are a pure-Odin coin-collector
 > (`tests/showcase/`), a complete top-down arena shooter (`examples/survivors/`), a
-> drop-in co-op cave crawler on the friendslop multiplayer toolkit
+> drop-in co-op cave crawler built with the Kit multiplayer toolkit
 > (`examples/cavecrawl/`), and a server-authoritative western duel with lag-compensated
-> hitscan on the kit/sim lane (`examples/quickdraw/`, A/B-proven at 240 ms RTT). All of
+> hitscan on the kit/sim lane (`examples/quickdraw/`, tested at 240 ms RTT). All of
 > them are built with **zero GDScript gameplay code**.
 
 ## What you can do (the 60-second tour)
@@ -61,7 +61,7 @@ matter:
 | **Methods** | `@(gd_method)`: callable from GDScript, as signal targets, and **typed cross-script** (`rt.script_of`) |
 | **Classes** | `extends` any engine class, global `class_name`, custom **resources** (`.tres`), **autoload** singletons |
 | **Editor** | `@tool` scripts, `gd.is_editor()`, custom icons, **EditorPlugin**, live error squiggles + autocomplete |
-| **Multiplayer** | TWO netcodes, one declarative surface. The [friendslop co-op toolkit](docs/kit/index.md): `gd:"replicate"` fields, predicted commands + `_then` consequences, generated entity factories, drop-in join, reconnect, host migration. And the [server-authority sim lane](docs/kit/sim.md) beside it for contested/competitive games: `gd:"predict"` fields + a `@(gd_tick)` proc buy rollback-resimulation, client prediction, and lag-compensated hitscan, opt-in per field so hybrid games compose ([choosing a model](docs/kit/timelines.md)). Plus `@(gd_rpc)` mirroring GDScript's `@rpc` for the engine-native path |
+| **Multiplayer** | Kit provides session replication with `gd:"replicate"` and `gd:"owner"` fields, commands, generated entity factories, drop-in join, reconnect, and host migration. Its [simulation lane](docs/kit/sim.md) adds `gd:"predict"`, fixed ticks, server authority, reconciliation, and bounded lag compensation for contested state. The lanes compose per field ([choosing a model](docs/kit/timelines.md)). `@(gd_rpc)` remains available for Godot's engine-native path. |
 | **Ship it** | hot reload on save, native desktop export, WebAssembly export |
 | **Scale it** | opt-in [script modules](docs/modules.md): one dll per `res://modules/<name>`, rebuilt + hot-swapped independently so save latency stays flat in large projects |
 
@@ -111,10 +111,10 @@ its **[sim twin](docs/kit/quickstart-sim.md)** promotes the same game to server 
 
 ## Examples
 
-**Building multiplayer? Start with the [friendslop toolkit](docs/kit/index.md).** These
+**Building multiplayer? Start with the [Kit overview](docs/kit/index.md).** These
 three are its references:
 
-- **`examples/cavecrawl/`** is THE co-op reference: a drop-in-join cave crawler exercising
+- **`examples/cavecrawl/`** is the co-op reference: a drop-in-join cave crawler exercising
   every toolkit package (replicated fields, predicted commands + `_then` consequences,
   generated entity factory, reconnect, save/resume, host migration, Steam), covered by a
   latency-injected integration test.

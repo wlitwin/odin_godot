@@ -10,7 +10,8 @@ package hello_sim
 //   step 3 — the writes moved out of the frame loop into @(gd_tick): a pure
 //            fixed-rate step (predicted fields, input) -> predicted fields;
 //   step 4 — what the frame loop used to read off the devices became the
-//            Player_Input struct (sampled in hello.odin's @(gd_sample)).
+//            Player_Input struct (sampled and validated in hello.odin's
+//            @(gd_sample)).
 // Everything else — the census hooks, the paint, the scene — carries over from
 // hello_net unchanged in shape.
 

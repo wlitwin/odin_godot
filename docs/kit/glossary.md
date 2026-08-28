@@ -1,92 +1,194 @@
-# Glossary
+# Kit glossary
 
-This page defines the kit's terms of art, one paragraph each. Every doc
-links here the first time it leans on one.
+This page defines terms used by Kit's generated APIs and reference
+documentation.
 
-**friendslop** is the co-op game shape the toolkit is tuned for: 2–8 people
-who know each other, one of whom hosts. Trust your friends, keep the host
-authoritative, and make joining trivial. The word names the *shape*, not the
-quality bar; "the co-op kit" and "the friendslop kit" are the same thing.
+## Authority
 
-**lane** identifies which machinery carries a replicated field, chosen per
-field by its tag. The **delta lane** (`replicate`) is host-authoritative
-reliable state; the **owner stream** (`owner`) is a peer's own
-unreliable-but-fresh pose; the **predict lane** (`predict`) is
-server-simulated state the owner predicts locally (the sim lane,
-[sim.md](sim.md)). The tags are the whole declaration, so the lanes never
-fight over a field.
+The process whose value is final for a piece of state. In session replication,
+the host is authoritative for `replicate` fields and commands, while an entity
+owner is authoritative for its `owner` stream. In `kit/sim`, the server is
+authoritative for `predict` fields.
 
-**half** is a plain proc the framework calls because its *name pairs* with a
-declaration, holding the game-shaped half of a mechanism whose plumbing is
-generated. Examples include `<verb>_then` (authority consequence), `<tick>_fx`
-(presentation), `<class>_<field>_edge` (react to a change),
-`<entity>_spawned`/`_freed` (census bookkeeping), and `<game>_<event>`
-(session events). Generated dispatch holds every role gate, so halves
-contain no `is_host` checks.
+A listen server is both an authority and a player. A dedicated server is an
+authority without a player avatar.
 
-**verb** is a player-issued action that can be *rejected*: a `@(gd_command)`
-proc whose body is the predicate-and-mutation, issued through its generated
-`<verb>_cmd` wrapper. It is predicted where legal, validated on the
-authority, and reverted on rejection; consequences ride the `_then` half.
+## Boot
 
-**fact** is a sim-lane event that *presents* on every screen at that screen's
-right time: it presents to the causer's live pass instantly (`mine=true`),
-to the authority live, to watchers when their watch clock reaches the fact's
-tick, and never to a resim. An entity tick's facts are its return values
-(the mine-form `_fx` half); a cross-entity event discovered in a world pass
-or an authority half is a *declared* fact, marked `@(gd_fact)` on the
-`<event>_fx` half and announced through the generated bare-name door
-([sim.md](sim.md)).
+`kboot.Boot` connects the common Godot-facing parts of a Kit game: lobby and HUD
+widgets, `netgd` transport, session, comms, generated entity factory, frame pump,
+and an optional simulation lane. `boot_attach` initializes the stack and
+`boot_pump` advances it.
 
-**census** is the framework's own ledger of live entities, queried back
-instead of hand-mirrored, via generated `<entity>_of(id)` / `my_<entity>()` /
-`<entity>_owned_by(player)` / `<entity>_ids()` per `entity=` tag. The
-`_spawned`/`_freed` **census hooks** fire at bookkeeping time (*before*
-spawn fields apply), so presentation belongs elsewhere (see *dress*).
+`boot_phase` reports `.Menu`, `.Connecting`, `.Lobby`, or `.Playing` from the
+current session state.
 
-**dress** is the presentation applied to an entity when it first appears on
-a screen: tinting by team, positioning the node, building the nameplate.
-Dress belongs on the `Ev_Spawned` event (fields are set there), never in the
-census hook (fields are not), and edge halves *don't* fire for first sight.
-A late joiner's 3–2 scoreboard is a baseline to dress, not three goals to
-celebrate.
+## Census
 
-**mine / watched** describes whose simulation a thing rides on this screen.
-*Mine* means my input drives it here, now (my avatar, my predicted
-projectile). *Watched* means someone else's truth, rendered a breath in the
-past, so interpolation always has two samples to stand between. The
-mine-form `_fx` halves and `session_present` exist to put each consequence
-on the right one of those two clocks.
+The generated index of live entities of each declared type. An
+`entity=Player:1` field generates typed queries such as `player_of`,
+`player_owned_by`, and `player_ids`. The census avoids maintaining a second game
+map that can drift from the session registry.
 
-**edge** is a change in replicated state, observed as a transition. The
-`<class>_<field>_edge(game, self, old, new)` half fires once per *net*
-change on every peer.
+The generated `<entity>_spawned` and `<entity>_freed` hooks run when census
+bookkeeping changes. Spawn fields are not yet the presentation baseline in the
+`_spawned` hook; use the later typed `<entity>_born` hook or the session's
+`<game>_entity_spawned` event when initialization depends on received fields.
 
-**door** is a proc that starts or joins a session: `boot_host`, `boot_join`,
-`boot_serve`, and the game's `on_host`/`on_join` methods the stock lobby's
-buttons press. "Enforced at the door" means at join time, before any state
-flows (bans, capacity, the version fingerprint).
+## Command
 
-**boot** is `kboot.Boot`, the game's one handle to the stock stack: lobby UI,
-chat, transport wire, entity factory, and (promoted games) the sim lane.
-`boot_attach` builds it; `boot_pump` drives it once per frame.
+A player-requested action declared with `@(gd_command)`. A generated
+`<verb>_cmd` proc uses the same call site on a client and on the authority.
+Generated access policy decides who may ask; the command body validates current
+game state and applies a single-entity mutation.
 
-**block** is a `play`-layer primitive a game composes by embedding: a struct
-carrying its own replicated fields and name-paired generated hooks, with
-defaults that encode a stance (`play.Gun`, `play.Health`, `psim.Roller`). A
-block delegates its work down to kit *mechanisms* (play → kit is the only
-arrow, never the reverse), so the layers cannot drift on what "ready" or "a
-death" means ([play.md](play.md)).
+An optimistic command runs locally before the authority replies. Confirmation
+keeps the predicted result; rejection replaces it with authoritative state.
+Commands on simulation-lane entities are scheduled on ticks and replay with the
+simulation.
 
-**mechanism** is a `kit`-layer proc, wire format, or descriptor table that a
-block or game calls (`kcombat.cast_gate`, `kcombat.hurt`). It is
-contextless, with no opinions about game feel and no replicated state of its
-own. The litmus for the split: a block *holds* replicated state and
-generates hooks; a mechanism is what it calls.
-[combat.md](combat.md#health-and-abilities) holds the two-layer rule.
+## Consequence (`_then`)
 
-**acceptance test** is a test that runs the *real* game, multi-process,
-headless, under an injected bad link, and asserts over printed receipts
-([testing.md](testing.md)). The codebase's shorthand for one is an *acid
-test*. If it is green at 240ms RTT, the feature works where your players
-actually live.
+The authority-only half paired with a command, tick, or generated event. A
+command body should mutate its target entity. Its `<verb>_then` consequence
+performs game-level work such as spawning another entity, crediting a player, or
+transferring ownership after the command succeeds.
+
+## Delta lane
+
+The reliable, host-authoritative replication path selected by
+`gd:"replicate"`. At each network tick, the registry compares fields with a
+shadow copy and encodes only changed values. A full entity record provides the
+baseline for spawning, late join, and resynchronization.
+
+## Edge
+
+A transition in a replicated field. A generated
+`<class>_<field>_edge(game, entity, old, new)` half runs when an applied network
+change crosses that field. Initial state and full resynchronization establish a
+baseline without replaying historical edge effects.
+
+## Entity
+
+A network-tracked struct with a `knet.Net_Id`, a stable wire type, an owner, and
+a generated descriptor. The session controls its network lifetime; the entity
+factory creates or frees the corresponding Odin script and Godot node on each
+peer.
+
+`Net_Id` identifies an entity within a session. It is not a Godot instance ID or
+a persistent save identity.
+
+## Fact
+
+A one-shot simulation-lane presentation event associated with a tick. A tick
+proc can return facts to a name-paired `_fx` half. Cross-entity or world events
+can declare a `@(gd_fact)` half and use the generated announce proc.
+
+Facts do not mutate authoritative state. Kit suppresses them during
+resimulation, presents local facts immediately, and schedules remote facts on
+the watched timeline.
+
+## Factory
+
+The mapping from a stable entity type number to the scene, descriptor, command
+set, simulation set, and create/free functions needed on every peer. A field tag
+such as ``gd:"entity=Player:1"`` lets script generation build this table and its
+typed spawn/query helpers.
+
+## Half
+
+A user-written proc whose name and signature pair with a generated mechanism.
+Script generation supplies routing and calls the game-specific half. Common
+examples are:
+
+- `<verb>_then` for an authority consequence;
+- `<tick>_fx` for simulation presentation;
+- `<class>_<field>_edge` for a replicated change;
+- `<entity>_spawned`, `_born`, and `_freed` for entity lifetime; and
+- `<game>_<event>` for session events.
+
+The term describes one side of generated code plus game code; it does not imply
+that the proc runs on every role.
+
+## Owner stream
+
+The unreliable, freshness-oriented replication path selected by `gd:"owner"`.
+The entity's current owner writes the fields. The host verifies the sender's
+ownership, relays accepted samples, and other peers interpolate them.
+
+An owner stream is suitable when occasional loss can be replaced by the next
+sample. It trusts the owner to supply the value and is therefore not a
+cheat-resistant position channel.
+
+## Player, peer, and seat
+
+`knet.Player_Id` is the stable identity used by gameplay. A reconnect token can
+reclaim the same player ID, stats, and owned entities after the transport
+connection changes.
+
+`ksess.Peer_Id` identifies the current transport connection and can change on
+reconnect. A *seat* is a player's current place in the session roster. Spectator
+and dedicated-server seats have restricted behavior.
+
+Keep player IDs in game state; use peer IDs only at transport/session boundaries.
+
+## Prediction, reconciliation, and resimulation
+
+Prediction runs an action locally before authoritative state arrives.
+
+Reconciliation compares an authoritative result with the corresponding local
+prediction and adopts authority when they differ.
+
+Resimulation restores authoritative state at an earlier tick and replays later
+ticks from stored inputs. A resimulated proc may run more than once, so it must
+not directly perform audio, particles, logging, node mutation, or other
+one-shot effects.
+
+## Session
+
+`ksess.Session` owns player identity, roster, entity lifetime, replication
+scheduling, commands, stats, moderation, application messages, and backup
+snapshots. It is transport-independent and does not import Godot.
+
+## Simulation lane
+
+The `kit/sim` fixed-tick path selected by `gd:"predict"`. Clients send input
+windows to one authority. The authority simulates and sends tick-stamped
+snapshots; owning clients predict and reconcile, while watching clients
+interpolate remote truth.
+
+## Tick
+
+A fixed simulation or network step. Session replication normally mutates
+gameplay at frame rate while the network tick schedules replication. Simulation
+lane gameplay mutates predicted fields inside fixed-rate `@(gd_tick)` procs.
+
+Use tick counts for replayable gameplay timers. Use frame `delta` only for
+presentation.
+
+## Transport
+
+The mechanism that carries Kit's byte messages between peers. `kit/netgd`
+adapts Godot `MultiplayerPeer` transports such as ENet and WebRTC;
+`kit/steamgd` adapts Steam. Session and replication code do not depend on which
+transport is installed.
+
+Transport choice affects encryption, NAT traversal, peer addressing, and host
+succession support. It does not change the replicated entity schema.
+
+## Watched entity
+
+A remote simulation-lane entity rendered from authoritative snapshots on a
+delayed clock. The delay normally provides two samples to interpolate between.
+The local predicted entity is often called *mine*; a remote interpolated entity
+is *watched*.
+
+Presentation events from watched entities should run when that entity reaches
+the event tick, not immediately when the packet arrives.
+
+## Wire fingerprint
+
+A generated identifier for the game's network schema. Peers with incompatible
+fingerprints are refused during the session handshake instead of interpreting
+the same bytes as different entity fields, commands, inputs, or messages. The
+fingerprint is a compatibility check, not authentication.

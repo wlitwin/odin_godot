@@ -23,7 +23,7 @@ lands in a single place.
 
 ## The flow
 
-This is the invite-via-overlay flow, the friendslop shape:
+The invite-via-overlay flow is:
 
 ```
 host:   init(APP_ID) -> create_lobby(max) -> [signal lobby_created] ->
@@ -59,8 +59,8 @@ four forwards, not the channel plan, not the session.
   - `on_lobby_joined(lobby_id: int, perms: int, locked: bool, response: int)`
   - `on_join_requested(lobby_id: int, friend_id: int)`: fires when the overlay's "Join Game" button is used
 - `create_lobby(max_members := 4, type := Lobby_Type.Friends_Only)`: the answer arrives on
-  `lobby_created`. `Lobby_Type` is Steam's ELobbyType: `Private`, `Friends_Only` (the
-  friendslop default), `Public`, `Invisible`.
+  `lobby_created`. `Lobby_Type` is Steam's ELobbyType: `Private`,
+  `Friends_Only` (the default), `Public`, or `Invisible`.
 - `join_lobby(lobby_id: u64)`: the answer arrives on `lobby_joined`.
 - `leave_lobby(lobby_id: u64)`: releases the one piece of Steam state that outlives the multiplayer
   peer. A replaced peer drops the connection; Steam keeps you *seated* in the lobby, still

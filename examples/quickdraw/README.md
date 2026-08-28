@@ -23,10 +23,10 @@ $GODOT --path examples/quickdraw            # host a duel, join from a second wi
 QD_LATENCY=120 $GODOT --path examples/quickdraw   # feel it under 240ms RTT
 
 bash examples/quickdraw/run.sh          # solo gate (headless, QUICKDRAW_SINGLE_OK)
-bash examples/quickdraw/native_run.sh   # the duel acid: rewound hits vs live misses, A/B
+bash examples/quickdraw/native_run.sh   # integration test: rewound hits vs live misses
 ```
 
 WASD move · mouse aim · click fire · space dash · tab scores · enter chat.
 Env: `QD_ROLE` (host/join/single/serve) · `QD_PORT` · `QD_NAME` · `QD_TOKEN` ·
 `QD_LATENCY` (ms, one-way) · `QD_BOT` (orbit/strafer/deadeye) · `QD_NOREWIND`
-(judge shots live — the acid's control arm; feel free to feel the difference).
+(judge shots live, providing the comparison case for the integration test).

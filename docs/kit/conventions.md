@@ -1,138 +1,154 @@
-# kit design notes and conventions
+# Kit API conventions
 
-This page is for contributors and the curious. It records the house grammar every package shares (so a new package feels familiar before you read its page) and the capabilities the kit leaves out, with where to reach instead.
+This page documents naming, event delivery, and ownership conventions used by
+Kit packages. It is primarily a contributor reference. Game authors do not need
+to memorize it before using the quickstarts.
 
-## The house grammar
+## Event delivery
 
-Three conventions run through every package.
+Kit chooses an event shape according to the lifetime of the data and whether the
+caller can wait until the next frame.
 
-### Events out; callbacks only for answers
+### Queued events
 
-Seven delivery mechanisms exist, and the choice among them is mechanical, not
-taste:
+Packages with several event types expose a tagged `Event` union and a poll proc:
 
-- A module with *many* event shapes drains a named `Event` union: `session_poll`,
-  `comms_poll`, `xfer_poll` loop until `ok = false`.
-- A module with *one* event shape polls a **bare tuple**: `album_poll` (which
-  `(player, kind)` landed), `fire_poll` (the next projectile to spawn). There is
-  no union for a queue of one thing.
-- A *value you read* rather than a queue you drain is a **state poll**:
-  `code_poll` (the rendezvous phase), `boot_phase` (where the game is).
-- A **synchronous callback** exists only where the kit needs an answer
-  mid-operation and cannot proceed without it: the factory's `make`/`free` (the
-  registry needs the pointer before a snapshot can apply), the interest
-  `Locator_Proc` (the session can't read your positions), sim's
-  `Sample_Proc`/`Step_Proc`, `Later_Proc`, the command hooks, fx's `On_Hit_Proc`.
-- The **`_then` suffix** is the authority-only half of a generated event pair:
-  the consequence, gated by the generated dispatch so the half never checks a role.
-- **`boot_pump`** forwards slices of the session and comms queues in one call:
-  the composed convenience over the two polls.
-- Engine-side wiring rides Godot signals through **`@(gd_connect)`**.
+```odin
+for {
+	event, ok := ksess.session_poll(&session)
+	if !ok {break}
+	// handle event
+}
+```
 
-The rule the seven collapse to: poll unions for multi-event, tuple-poll for
-single-event, synchronous callbacks only for the answer the kit cannot proceed
-without, and **everything else is an event.** Handlers file bytes; game code runs
-on the game's own stack in the pump, never in a callback into half-initialized
-script state.
+`session_poll`, `comms_poll`, and `xfer_poll` use this pattern. Events are queued
+so normal game reactions run from the game's frame loop, after Kit has completed
+the operation that produced them.
 
-One refinement the list compresses is spelled out in
-[session.md's three tiers](session.md#three-tiers-of-entry-into-your-code), because
-kit/session has the most entry points of any package: the synchronous half is
-really *two* kinds. A **pull callback** is the kit asking a question it cannot
-answer: the factory's `make`, the interest locator, the backup blob writer, sim's
-`Sample_Proc`/`Step_Proc`; you answer and return. An **atomic authority hook** runs
-inside an operation whose state does not survive it: the command hooks and
-`_then`, an app handler holding a live `^knet.Reader` into the receive buffer; you
-act, on the authority, and you do not re-enter. Everything remaining is tier three,
-and the derivation is mechanical: *if the same meaning survives being queued and
-drained next frame, it must be queued.* That is why `ksess.App_Queue` exists as a
-type. Every `SES_APP` rider follows the same file-and-drain discipline.
+When a package has one queue shape, the poll proc returns a tuple instead of a
+one-variant union. `album_poll` and `fire_poll` follow this rule.
 
-### Four verbs name a lifetime
+### Current state
 
-A type's constructor tells you who owns its memory, so nobody has to guess whether
-to free it:
+A proc such as `boot_phase` or `code_poll` reports current state rather than
+draining a history. Callers may read it whenever they need the latest value.
 
-- `_make` returns the value: the caller owns it (`chat_make`, `registry_make`,
-  `writer_make`).
-- `_init` initializes memory the caller already holds, in place (`session_init`,
-  `comms_init`, `lane_init`).
-- `_attach` binds to a Godot node whose lifetime the *scene* owns (`wire_attach`,
-  `boot_attach`).
-- **A zero value is ready to use**: every `*_Config` means the defaults at zero,
-  so a zero config is the out-of-the-box session.
+### Synchronous callbacks
 
-Teardown matches the constructor: `_destroy` frees exactly what the module
-allocated and **never a scene node** (the node tree belongs to the scene);
-`_clear` / `_reset` empty a container without freeing it (`chat_clear_input`,
-`tracers_clear`, `writer_reset`, `later_clear`); `_close` ends a connection
-(`code_close`, `web_close`). Match the teardown verb to the constructor and both
-leaks and double-frees become errors of habit rather than runtime surprises.
+A callback is synchronous only when Kit cannot finish an operation without an
+answer. Examples include:
 
-### A type's whole API is one grep
+- entity factory create/free procedures;
+- the interest-management locator;
+- backup blob serialization;
+- simulation sample and step procedures;
+- command hooks and application-message decoders; and
+- effect collision callbacks.
 
-The proc prefix is the type's snake-cased name (`registry_*` for `Registry`,
-`lane_*` for `Lane`, `chat_*` for `Chat`), with no exceptions, so `grep registry_`
-is the complete surface of `Registry` and nothing hides under a cleverer name.
-When following the rule would force an awkward call site, the type name gives way,
-not the prefix: kit/ui's widgets are `Hp_Bar` (`hp_*`) and `Abilities_Bar`
-(`abilities_*`), named for the nouns games already say (`hp`, beside `Inv` and
-`Score`) rather than a longer `health_bar_refresh` call.
+There are two useful categories:
 
-## What the kit leaves out
+- A **pull callback** supplies a value Kit cannot derive, such as an entity
+  position or serialized game blob.
+- An **atomic hook** runs while temporary operation state is valid, such as a
+  `^knet.Reader` over a received app message or an authority consequence that
+  must remain in the same transaction.
 
-A few capabilities are out of scope. Here is what the kit does not do, and where
-to reach instead.
+Do not retain pointers into temporary readers or re-enter the owning subsystem
+from an atomic hook unless that API explicitly permits it. If a game reaction
+can wait until the next frame, queue it instead. `ksess.App_Queue` provides this
+file-and-drain pattern for application messages.
 
-### Voice
+The full session-specific classification is in
+[Three tiers of entry into your code](session.md#three-tiers-of-entry-into-your-code).
 
-Voice is not in the toolkit. Friendslop groups already sit in a Discord call, so
-voice is a solved problem for the target audience. If you ship on Steam,
-GodotSteam exposes Steam voice as a near-free add-on ([steamgd](steamgd.md) gives
-you the singleton access pattern). The exception is PROXIMITY voice (the
-horror-co-op signature mechanic), which needs positional mixing that the
-toolkit's replicated positions make easy to drive; reach for it when a game needs
-it.
+### Generated halves
 
-### Recipes, not code
+A generated half is a name-paired proc containing game-specific behavior. The
+generator supplies routing and calls it from the appropriate role or timeline.
+For example, `<verb>_then` is the authority consequence of a command and
+`<tick>_fx` is presentation associated with a simulation tick.
 
-Character-portable saves, private per-player state, and player-to-player trade
-(the mediating-entity transaction) are documented as recipes in
-[session](session.md), not as code. See the design notes in the repository's
-knowledge base.
+Generated routing removes many repeated `is_host` checks, but it does not make
+authority-specific work disappear. Keep work in an explicit authority half or
+`@(gd_step = "authority")` when only the authority can perform it.
 
-### Mobile
+### Godot signals
 
-Nothing here is mobile-hostile (Godot exports to iOS/Android, the wire is bytes,
-ENet and WebRTC both run), but two mobile realities are unaddressed. A phone's
-link flaps (cell↔wifi handoff, backgrounding) far more than the "friends rejoin
-an evening session" model assumes, and touch input has no home in the examples'
-keyboard/mouse verbs. The reconnect machinery (tokens, host takeover) is exactly
-what a flappy link wants and carries over unchanged; the gap is a touch-control
-layer and a UI that reflows to a phone, both game-side. Reach for a worked mobile
-example when a game ships mobile, not as kit surface.
+Engine-side node signals use `@(gd_connect)` or explicit typed signal helpers.
+Transport signals terminate in the forwarding methods configured by
+`boot_attach`; standard names are generated when `Options.methods` is left at
+its zero value.
 
-### Async correspondence (turn-a-day, play-by-mail)
+## Lifetime and ownership suffixes
 
-This is out of scope, and honestly a different toolkit. Everything here assumes
-a LIVE session: a shared clock, interpolation timelines, presence, a host holding
-authority in RAM. An async game (chess-by-notification, a 4X you touch once a
-day) has no live clock and no host: its "wire" is a database row and a push
-notification, its "reconnect" is a fresh load of persisted state. The
-state-not-messages discipline still shapes a turn, but the transport, authority,
-and persistence models are wholly different. Build it on a backend plus Godot's
-HTTP client; the netcode kit has nothing to lend it but its taste in
-serialization.
+Constructor names indicate who supplies and owns storage:
 
-### Database persistence (accounts, ranked ladders, a world that outlives the session)
+- `_make` returns a new value whose Kit-owned allocations must later be released
+  with the matching `_destroy` proc. Examples: `registry_make`, `chat_make`.
+- `_init` initializes caller-owned storage in place. Examples: `session_init`,
+  `comms_init`, `lane_init`.
+- `_attach` binds state to a Godot node or engine object whose lifetime remains
+  owned by the scene. Examples: `wire_attach`, `boot_attach`.
 
-This is not in the kit, and the seam is clean. The kit persists a RUN
-([ksave](save.md) writes POD blobs to a local file, backups ride the wire,
-host-takeover resumes from them), but it does not persist a PLAYER across runs
-against a server store.
-That is a backend concern (Postgres/SQLite behind an auth'd API), and the kit
-stays agnostic: a game reads a profile from its backend at boot and hands the
-bytes to the session as ordinary replicated/blob state, then writes results back
-after the run through its own client. The dividing line is authority LIFETIME:
-the kit owns state for the length of a session; anything that must outlive every
-participant leaving lives in your database, not here.
+Teardown names distinguish operations:
+
+- `_destroy` releases allocations owned by the value. It does not free scene
+  nodes unless the API explicitly says otherwise.
+- `_clear` and `_reset` remove current contents while preserving reusable
+  storage.
+- `_close` ends a connection or external session.
+- `_detach` removes an attachment and disconnects its engine-facing state.
+
+Configuration structs use zero as the documented default for optional fields.
+Check the package reference before assuming that an arbitrary runtime value is
+valid as an uninitialized zero value; initialization procedures may still be
+required.
+
+## Procedure prefixes
+
+Public procedures normally use the snake-case type name as a prefix:
+
+- `Registry` → `registry_*`
+- `Lane` → `lane_*`
+- `Chat` → `chat_*`
+
+This makes `rg 'registry_' kit/net` a practical API index. Short UI types use the
+noun shown at call sites, such as `Hp_Bar` with `hp_*` and `Abilities_Bar` with
+`abilities_*`.
+
+Generated procedures instead use the declared game, entity, command, or event
+name. Their naming rules are documented in [kit/net](net.md),
+[kit/session](session.md), and [kit/sim](sim.md).
+
+## Package boundaries
+
+The dependency direction is intentional:
+
+- `kit/net`, `kit/session`, and `kit/sim` are engine-independent mechanisms.
+- `kit/netgd`, `kit/steamgd`, `kit/ui`, and `kit/fx` adapt those mechanisms to
+  Godot and external transports.
+- `godot:play` composes Kit mechanisms into optional gameplay blocks.
+- Game code owns genre rules, authored scenes, and backend integration.
+
+Avoid adding game policy to a mechanism package merely because one example
+needs it. Prefer a `play` block, a documented recipe, or game code when the rule
+does not apply across genres.
+
+## Out-of-scope systems
+
+Kit intentionally does not provide:
+
+- voice or proximity-voice capture and mixing;
+- mobile touch controls or responsive mobile UI;
+- asynchronous, turn-a-day session storage;
+- user accounts, authentication, ranked ladders, or a persistent database;
+- matchmaking and dedicated-server orchestration; or
+- a native ENet relay for symmetric NAT.
+
+Steam voice or a separate voice SDK can run beside Kit. Mobile controls and UI
+belong in the game layer. Asynchronous games and account-backed persistence need
+a backend whose authority outlives any one live session.
+
+Kit's save package persists a run and reconnect identity; it is not an account
+database. Recipes for character-portable data, private per-player messages, and
+player-to-player transactions are documented in [kit/session](session.md#recipes-over-existing-pieces).

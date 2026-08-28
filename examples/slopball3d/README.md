@@ -37,10 +37,10 @@ SLOP3_NAME=righty godot --path .    # Join
 WASD moves on the pitch plane, Space kicks (lofted), first to `SLOP3_GOALS` (default 3)
 takes the match. Odd seats defend the left goal, even the right.
 
-## The acid
+## Automated tests
 
 - `run.sh` — solo gate (`SLOPBALL3D_SINGLE_OK`): the striker bot runs the whole loop
   headless. The repo's only exercise of the 3D physics *solver* under `--headless`.
-- `native_run.sh` — 3-peer proof (`SLOPBALL3D_NATIVE_OK`): host + striker + watcher.
+- `native_run.sh` — 3-peer integration test (`SLOPBALL3D_NATIVE_OK`): host + striker + watcher.
   The seat transfers to the striker client, its local solver (gravity, tumble) scores,
   and the three screens agree on the ball within centimeters at the same session tick.

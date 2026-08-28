@@ -125,7 +125,7 @@ case and the names games already say; reach for the generic pair when the transp
 *variable* (a settings menu, a fallback chain, kit/boot's doors). See [Swapping
 transports](#swapping-transports).
 
-### Join codes for native ENet (code.odin)
+### Native ENet join codes
 
 "Send your friend a four-letter code" without Steam and without reading out an IP: the same
 relay the browser build already talks to (native room mode: `tests/webrtc/signal_server.mjs`
@@ -216,7 +216,7 @@ Every wire packet leads with the game's one message byte (the `kind` passed to `
 wire's, and the game routes those itself *before* calling `wire_receive`. This is how session
 traffic shares `peer_packet` with any other raw-bytes protocol the game runs.
 
-## wire_set_latency — link simulation
+## Link simulation
 
 ```odin
 wire_set_latency :: proc(wire: ^Session_Wire, ms: int, jitter_ms := 0, loss_pct := 0, burst := 1, bandwidth_bps := 0)
@@ -226,7 +226,7 @@ Injects one-way **receive** latency (0 disables): every packet this peer receive
 that long before the session sees it, buffered in the wire and delivered by `wire_pump`. The
 delay is app-side, above the transport, so ENet's acks and retransmits still flow at protocol
 level; what you are testing is your *game's* feel under real round trips, not the socket's.
-The toolkit's own integration tests run at 120ms so predictions are proven to bite instantly
+The toolkit's integration tests run at 120 ms to verify that prediction responds immediately
 while confirms measurably ride the slow wire.
 
 `jitter_ms` adds a uniform extra `[0, jitter)` per packet, with one constraint: delivery stays
@@ -379,7 +379,7 @@ through that door like everyone else. The neighboring features and their status:
   pair without it.
 - **Server browser** is not shipped, and it is not a weekend project: a browser needs a
   directory service, the join-code relay grown up into registration, listing, and
-  liveness. The code door is the friendslop-sized piece of that.
+  liveness. The join-code helper covers only the rendezvous step.
 - **Splitscreen** means one process, one seat. The session has one identity per process;
   two players on one couch sharing a screen is a game-side input/camera problem the
   toolkit doesn't model.

@@ -1,9 +1,10 @@
 # hello_sim — the sim quickstart's living copy
 
-`examples/hello_net`, promoted to the server-authority sim lane in four
-diffs (the [promotion checklist](../../docs/kit/sim.md#promoting-a-coop-game)
-in miniature): the retag (`owner` → `predict`), the `@(gd_tick)`, the
-`@(gd_sample)`, and two wiring lines. Walkthrough:
+`examples/hello_net`, promoted to the server-authority sim lane in five
+steps (the [promotion checklist](../../docs/kit/sim.md#promoting-a-coop-game)
+in miniature): retag the state (`owner` → `predict`), add `@(gd_tick)`, sample
+and validate input with `@(gd_sample = "validate")`, attach the lane, and remove
+frame-rate movement. Walkthrough:
 [docs/kit/quickstart-sim.md](../../docs/kit/quickstart-sim.md).
 
 ```sh

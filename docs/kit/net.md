@@ -1,109 +1,100 @@
-# kit/net — the replication core
+# `kit/net`: replication core
 
-`kit/net` is the friendslop toolkit's engine-free replication core: the wire format, the
-Net_Id registry, shadow-based delta replication, owner-authoritative streams with
-interpolation, and the intent→command→result pipeline with client prediction. It is pure
-Odin with no Godot imports, so all of it runs headless in unit tests. Games mostly consume
-[kit/session](session.md), which drives these walks for you; you touch `kit/net` directly
-for wire read/write in [app messages](session.md#app-messages), custom interpolation blend
-procs, `Clock_Sync`, `now_s`, and hand-built descriptors in tests. The engine-facing
-transport lives in [kit/netgd](netgd.md).
+`kit/net` implements Kit's engine-independent wire primitives, entity registry,
+field descriptors, reliable delta replication, owner streams, interpolation,
+and command prediction. It does not import Godot and is covered by headless
+tests.
+
+Most game code uses these mechanisms through [kit/session](session.md), which
+drives the registry and schedules messages. Import `kit/net` directly for types
+such as `Net_Id` and `Player_Id`, wire readers and writers, custom interpolation
+procedures, clocks, and low-level tests. [kit/netgd](netgd.md) provides the
+Godot transport adapter.
 
 ## The mental model
 
-**Two authorities, disjoint by construction.** This is a command + owned-streams hybrid,
-not tick-rollback netcode. When a game needs the tick-rollback kind (contested,
-cheat-resistant, twitch-fair), that is [kit/sim](sim.md), a third lane beside these two,
-chosen per field rather than a different library ([choosing a model](timelines.md)):
+Session replication has two field lanes:
 
-- **Owner-authoritative streams**: state with a personal owner (your movement, your aim)
-  is authoritative on its owner and *interpolated* by everyone else, host included. These
-  update as unreliable-sequenced snapshots with last-value semantics: a dropped packet is
-  superseded by the next one, so there is no loss story at all. There is nothing to
-  mispredict and nothing to resimulate.
-- **Host-authoritative deltas**: shared discrete state (chests, inventory, AI, damage)
-  mutates only on the host, and only through commands. Changes reach everyone via the
-  shadow-delta walk on the reliable channel.
+- **Reliable deltas** are selected by `gd:"replicate"`. The host writes shared
+  state such as inventory, health, score, and match phase. Changes are delivered
+  reliably.
+- **Owner streams** are selected by `gd:"owner"`. The current entity owner
+  writes freshness-oriented state such as movement and aim. The host checks the
+  sender's ownership and relays accepted samples; other peers interpolate them.
 
-Fields flagged `.Owner_Stream` are excluded from the delta diff at the mask level
-(`diff_mask` skips them), so streams and deltas can never fight over a field: full
-snapshots seed the initial values, streams own them from then on.
+The lanes are disjoint in the generated descriptor. A full spawn or resync record
+sets their initial values, after which only the selected lane updates each field.
+Owner streams trust the owner to provide their values. Use [kit/sim](sim.md) when
+the authority must derive contested state from inputs; see
+[Choosing an authority model](timelines.md).
 
-**The shadow-delta walk.** Each registered entity owns a shadow copy of its DELTA-LANE
-fields (owner-streamed and predicted fields carry their own baselines: the ring, the
-ledger). Every net tick the registry memcmps entity-vs-shadow, writes `[net_id][mask][dirty
-fields]` for just the dirty entities into one batched message, and commits the shadows.
-The mask's bits are delta-subset ordinals, the same mask law the sim codec speaks.
-Receivers apply the mask + fields straight into the entity struct. Idle entities cost one
-memcmp pass and zero bytes. Replicated fields are POD only (ints/floats/bools/enums/fixed
-arrays): raw bytes are compared and copied, and nothing follows pointers. Strings and
-dynamic data travel as explicit reliable messages, never as replicated fields.
+### Delta replication
 
-**Intent → command → result.** A command is a plain proc `proc(self: ^Cls, args…) -> bool`
-marked `@(gd_command)` or `@(gd_command="predict")` (optimistic). Commands are
-**owner-only by default**. Add `any_seat` for a world interaction that every seated
-player may ask for (`@(gd_command="predict,any_seat")`), or `authority` for a verb
-that must never cross client ingress. The author writes single-player-looking mutation
-code with zero role branches; scriptgen generates a
-decode thunk, a `Command_Desc` table, and a typed `<proc>_cmd` issue wrapper holding the
-*only* role branch: the authority runs the proc directly (deltas carry the change), a
-client serializes the args once, optionally re-runs the *same* proc from those bytes
-(prediction: client and host execute from byte-identical input), and ships the command to
-the host. Prediction needs no hand-written undo: the declared-field snapshot captured
-before the optimistic run is the automatic revert. The verb's cross-entity half (credit
-the looter, launch the projectile, hand off ownership) is a second plain proc named
-`<verb>_then` ([consequences](#consequences-verb_then), below), which fires on the
-authority only, right after the verb applies. Then:
+Each registered entity has a shadow copy of its reliable fields. At every
+network tick, the registry compares current values with that shadow, writes a
+field mask and the changed values for dirty entities, and advances the shadow.
+Unchanged entities emit no field data.
 
-- **Access before predicate**: the authority independently enforces the generated
-  `owner` / `any_seat` / `authority` policy before gameplay code runs. The predicate
-  still decides whether an authorized ask applies to current game state.
+Replicated fields must have a bounded, descriptor-supported wire shape. Scalars,
+enums, fixed arrays, nested POD values, and explicit codecs are the normal path.
+Pointers, strings, and dynamic containers do not belong in replicated fields;
+send variable-length data with application messages, entity blobs, or
+`kit/xfer`.
 
-- **Confirm**: header only, since the optimistic state already matches and nothing needs
-  to replay.
-- **Reject carries truth**: the result carries a full field snapshot of the entity, so a
-  stale client snaps to authoritative values instead of restoring a possibly-stale local
-  revert.
-- **Timeout**: a result that never arrives auto-reverts after `max_age_ticks`
-  (`registry_expire_pending`); a silent host must read as "no".
-- **Replay reconcile**: authoritative state landing on an entity with in-flight
-  predictions is applied as *unwind → apply → replay*: pending reverts are restored
-  newest-first, the authoritative delta/full/truth applies, then each pending command
-  re-runs oldest-first from its stored wire bytes, recapturing its revert against the
-  fresh baseline. A replay whose precondition no longer holds is dropped locally; the
-  host's in-flight result has the final word either way.
+### Commands
 
-**The wrapper: one surface on both models.** `<verb>_cmd(b: ^kboot.Boot,
-self, args…) -> knet.Command_Outcome` takes the boot as the game's one handle,
-and the generated body holds the routing: a coop class's verb rides the session's
-command loop, a ticking class's rides the sim lane (tick-scheduled), and
-promoting an entity between models leaves every issue site byte-identical.
-The return has the SAME meaning on every peer, so the call site needs no
-`is_host` branch: `.Applied` (the host accepted it, which is authoritative,
-for coop only; a sim verb executes at its stamped tick rather than inline, so
-even the authority's own issue reports `.Predicted`), `.Predicted` (in flight
-on my screen: optimistically applied if it predicts, otherwise just sent), or
-`.Rejected` (the predicate said no on this peer: final on the host, a
-reverted local apply on a client). "Did it show on my screen?" is
-`knet.command_ok(r)` (`r != .Rejected`); "is it authoritative?" is
-`r == .Applied`. (A game not using kit/boot issues through the raw layer below.)
+A command is a proc marked `@(gd_command)` whose return value says whether its
+mutation applied. `@(gd_command = "predict")` enables optimistic execution on
+the issuing client. Script generation creates the decoder, descriptor, stable
+command ID, and typed `<verb>_cmd` wrapper.
 
-**Command ids are stable name hashes, not positions.** The generated
-`<CLASS>_CMD_<VERB>` constants (and both command wires, coop and sim) carry an
-FNV-1a hash of the verb's name, so reordering, adding, or removing procs never
-renumbers the protocol. A version-skewed peer's unknown id MISSES the receiver's
-lookup and rejects cleanly instead of dispatching to whatever now lives at that
-position. A renamed verb is a new id: it IS a different verb, and stale clients
-get the correct refusal. Same-set collisions are a build error naming both verbs
-(rename one). Hand-built `Command_Desc`/`Sim_Cmd` sets pick their own ids, unique
-within the set (a single command's zero value is fine).
+Access policy is separate from the command predicate:
 
-**The tick paces the wire, not the sim.** The fixed net tick (default 20 Hz) is when
-deltas are diffed and streams are sent; gameplay runs at frame rate. Remote entities render
-`interp_delay` in the past (~2–3 send intervals) so there is almost always a bracketing
-sample pair to lerp between. Past the newest sample, the toolkit clamps and *holds*
-rather than extrapolating: a briefly frozen enemy beats one that rockets off on a stale
-velocity.
+- `owner` is the default: only the entity owner may issue the command;
+- `any_seat` allows any seated, non-spectating player; and
+- `authority` prevents client ingress and reserves the command for authority
+  code.
+
+The authority checks access before executing the game predicate. A successful
+command may invoke a name-paired `<verb>_then` half for authority-only
+cross-entity work such as spawning, crediting a player, or transferring
+ownership.
+
+For an optimistic command:
+
+- confirmation retains the optimistic mutation;
+- rejection includes authoritative entity state rather than restoring a possibly
+  stale local snapshot;
+- timeout reverts an action whose result never arrives; and
+- an intervening authoritative update unwinds pending predictions, applies truth,
+  and replays still-valid commands in issue order.
+
+The generated wrapper takes `^kboot.Boot` so the call site is the same for a
+session command and a tick-scheduled simulation command:
+
+```odin
+outcome := chest_take_cmd(&game.boot, chest, slot, px, py)
+if knet.command_ok(outcome) {show_local_take_feedback()}
+```
+
+`Command_Outcome` is `.Applied`, `.Predicted`, or `.Rejected`. For session
+replication, `.Applied` means the local authority accepted the command.
+`.Predicted` means an issue is in flight or scheduled. `.Rejected` means it did
+not apply locally. The eventual authority result remains final.
+
+Generated command IDs are stable hashes of command names, not declaration
+positions. Reordering procedures does not renumber the protocol. Renaming a
+command intentionally creates a new ID; collisions within a command set are a
+build error. The session's schema fingerprint provides the broader
+compatibility gate.
+
+### Network tick and interpolation
+
+For session replication, the fixed network tick (20 Hz by default) schedules
+deltas and streams; ordinary gameplay may still run at frame rate. Remote owner
+streams render at `interp_delay`, normally far enough behind the newest sample
+to interpolate between two values. If no newer sample exists, presentation
+holds the latest value instead of extrapolating indefinitely.
 
 ## Declaring a replicated entity
 
@@ -166,15 +157,13 @@ declared `` heading: f32 `gd:"owner,interp=angle"` ``; a raw lerp from `+3.1` to
 `Blend_Proc :: proc(dst, a, b: rawptr, alpha: f32)` (declared via
 `` tint: [3]f32 `gd:"owner,interp=blend_oklab"` ``).
 
-## Consequences (`<verb>_then`)
+## Command consequences
 
-A command proc may only mutate its **target**, which is what the predict/revert/
-reject-truth machinery protects. The verb's *other* half ("…and the items land
-in the looter's bag", "…and the rock launches") is host-side code, and it has a
-name-paired home: declare a plain proc named after the verb's wrapper plus
-`_then`, and scriptgen threads it the issuer, the verb's wire args, and the
-verb's returned **payload**, firing it on the AUTHORITY only, right after the
-verb applies. Two shapes, detected by the leading param:
+A command proc may mutate only its target entity, which is the state covered by
+prediction and reconciliation. Put cross-entity work in the name-paired
+`<verb>_then` half. Script generation passes it the issuer, command arguments,
+and any returned payload after the command applies on the authority. Two
+signatures are supported:
 
 ```odin
 @(gd_half) chest_take_then :: proc(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: i32, px: f32, py: f32, taken: kitems.Slot)
@@ -186,14 +175,14 @@ applied bool are in-process values handed straight to the `_then` (they never
 cross the wire). Payload types are unconstrained, since the generated call site
 lets the compiler hold the `_then` signature to them.
 
-**The verb can see the issuer too.** When the *predicate* needs WHO (a trade
+**Reading the issuer.** When the predicate needs the issuing player (a trade
 window arbitrating which seat is confirming, a first-come claim recording its
 claimant), declare `by: knet.Player_Id` right after the receiver (after the
 wielder param in a composed block) and the framework fills it: `ctx.me` on the
 issuing peer's optimistic run, the resolved sender on the host; these are the
-same values the `_then` gets. It never rides the wire, so it can't be forged:
+same values the `_then` gets. It does not ride the wire, so it cannot be forged:
 a hostile client can't hand you a `side: u8` it flipped to confirm the *other*
-party's half of a trade, because WHO is never a wire argument (the worked
+party's half of a trade, because the issuer is never a wire argument (the worked
 rewrite is the [trade recipe](session.md#recipes-over-existing-pieces)).
 The name is reserved: a wire arg called `by` is a build error. A player the
 verb merely *targets* stays ordinary wire data under any other name (`who`,
@@ -204,12 +193,12 @@ verb merely *targets* stays ordinary wire data under any other name (`who`,
 trade_confirm :: proc(self: ^Trade, by: knet.Player_Id) -> (ok: bool, sealed: bool)
 ```
 
-**The guarantees.** A consequence fires exactly once per applied command,
+**Delivery.** A consequence fires once per applied command,
 including on the host's own issues (the wrapper's authority branch), and never
 on a client's optimistic run, a registry replay, a rejection, or a deduped
 retransmit. It runs before the result ships and before the tick's delta diff,
 so its mutations reach every peer in the same batch as the verb's own. The
-`game` param is the session's one game pointer: the `user` you handed
+`game` parameter is the session game pointer installed through
 `session_set_factory`.
 
 **Composed verbs pair on the hoisted name.** A block's command
@@ -233,7 +222,7 @@ pairing was intended. Both a wrong prefix (`chest_taek_then`) and a wrong suffix
 never claimed to be a half is nothing special. A direct verb whose payload
 nobody consumes still warns. When something needs to react to commands
 *generically* (metrics, receipts, replays), the untyped
-[command hook](session.md#command-hooks-the-generic-layer-under-_then) remains
+[command hook](session.md#command-hooks) remains
 underneath: `_then` is generated dispatch over the same authority path.
 
 **Multi-target commands.** A command mutates one entity, not two (a trade
@@ -279,45 +268,24 @@ Runner :: struct {
 
 The entity's generated command is named by the **field path**, so two blocks of the same type
 never collide (`weapon: Gun` + `sidearm: Gun` → `runner_weapon_fire` + `runner_sidearm_fire`,
-distinct wire indices). Issue it exactly like a direct command
+distinct command IDs). Issue it exactly like a direct command
 (`runner_weapon_fire_cmd(&boot, self, dx, dy)`); the owner is passed for you, so only the wire
 args appear in the wrapper. Prediction reverts and reject-truth snapshots cover the block's
 replicated state for free (it's already in the entity's descriptor), and the block's
 cross-entity effects (spawning a projectile, applying damage) live in the game's
-`runner_weapon_fire_then` [consequence](#consequences-verb_then), exactly as a direct command's
+`runner_weapon_fire_then` [consequence](#command-consequences), exactly as a direct command's
 do: the block ships the verb, the game keeps the "and then".
 
 Owner threading is optional and detected by shape: write `^Runner` for a game-specific block, or
 `^$E` for a library block reused across entity types. A block imported from another `godot:`
 package works identically: the generated file imports and qualifies it (`play.gun_fire`).
 
-`godot:play` ships worked ones: **`play.Gun`** (mag + reload + jam, knob-configured by a
-`Gun_Def`, host-authoritative and client-predicted through its `gun_fire` verb: embed
-`weapon: play.Gun`, `gun_equip` it, pace the trigger, spawn the shot in your hook from the
-pull's aim + carried origin — `ox, oy` is the wielder's OWN muzzle, so an owner-streamed
-wielder's shot leaves where its screen saw it, not the host's lagged copy; leash it there with
-`kcombat.leash` before launching),
-**`play.Ability`** (a cooldown-gated cast, the slow lob/cone/buff: embed one per slot,
-`ability_arm` it, run the effect in your hook on `ok` from the cast's aim + carried origin,
-leashed like the gun's; the block owns its cooldown, since a
-slow ability's gate dwarfs the round-trip; for casts that spend a resource or slots indexed
-at runtime, drop down to `kcombat.Cooldowns`/`ability_try`, the layer underneath: see
-[kit/combat](combat.md#health-and-abilities)), and **`play.Channel`** (hold-to-progress, the
-revive/capture/cast-bar: OWNER-authored, its `target`/`pct` ride the owner stream so every
-screen draws the bar, and its composed plain `claim` carries the target as a wire arg for
-your hook to re-check and honor), and **`play.Health`** (hp + max + the per-peer damage
-edge, VERB-FREE, because damage is host-internal, never a client intent: a block doesn't
-need commands to be worth composing; `health_hurt` returns the dealt/died pair your credit
-and death-payout logic branch on, `health_step` drives damage numbers and death cues on
-every screen), and **`play.Telegraph`** (a wind-up that lands, the "get out of the circle"
-shape, also verb-free: `left` AND `wind` replicate so every peer draws the exact growth
-fraction even for a hastened wind-up, `telegraph_tick` lands the host payload once,
-`telegraph_step` erupts on every screen in lockstep, and a cancel goes quiet). There is one
-block per authority model (host-written command prediction, cooldown gate, owner stream),
-plus the verb-free state block. The state machine is the block's; the
-effect, the world-gates (alive? in reach?), and for the gun the cadence, stay yours.
-They're the reference for the pattern; read `play/gun.odin`, `play/ability.odin`,
-`play/channel.odin`, `play/health.odin`.
+`godot:play` provides composed `Gun`, `Ability`, `Channel`, `Health`, and
+`Telegraph` blocks. The block owns its replicated state and any declared
+command; the game owns cadence, world validation, presentation, and
+cross-entity effects where those cannot be generalized. See the
+[`godot:play` reference](play.md) and the source headers under `play/` for each
+block's exact contract.
 
 **Engine-facing procs compose the same way.** A block's `@(gd_method)` (or `@(gd_rpc)`) hoists
 onto the embedding entity's method table under the same path-prefixed name (`gear_level` on a
@@ -359,7 +327,7 @@ predictions micro-snap), and dirtiness is still diffed on struct bytes: a change
 smaller than the wire precision still sends, so pick a precision at least as fine
 as gameplay cares about.
 
-## Collections — the `[dynamic]` stance
+## Dynamic collections
 
 A `[dynamic]T`, slice, or map tagged `gd:"replicate"` is a **build error**. The
 delta walk's whole contract is flat POD cells: a shadow memcmp per field, one
@@ -373,7 +341,7 @@ each already has first-class machinery:
 - **Bounded** → a fixed array + count/sentinel: `bag: [6]kitems.Slot` with
   `ITEM_NONE` empties (cavecrawl). One field, one diff atom, edges and
   struct co-location work, prediction reverts are trivial. The cap is game
-  design: a friendslop game should own "six slots", not defer it.
+  design: a small-session game should choose and enforce its inventory bound.
 - **Rare-change, genuinely unbounded** (text, authored bytes) → an
   [entity blob](session.md#entity-blobs): author-dirtied, whole-value,
   reliable, and it rides every snapshot, so late joiners, backups, and saves
@@ -391,7 +359,7 @@ The build error spells this fork out at the field. (`gd:"backup"` still
 accepts `[dynamic]`/map: the backup codec restores whole values on one
 peer; it never diffs across the wire.)
 
-## Edges (`<class>_<field>_edge`) — presenting delta-lane changes
+## Field-change edges
 
 Deltas carry values; one-shot reactions (the hurt flash, the goal horn, the
 floor fanfare) need the TRANSITION. Declare a plain proc named for the field
@@ -432,11 +400,10 @@ The semantics:
   has outgrown edges: that's a `_then` consequence, a session event, a
   [Fire announcement](combat.md), or a sim-lane fact.
 - **First sight seeds; resync re-seeds silently.** Spawn values are a
-  baseline, not an edge; a wholesale catch-up (interest re-entry, a snapshot
-  over live state) is history, not gameplay. Initial dress (a late joiner's
-  3-2 scoreboard) rides `Ev_Spawned`: the event fires with the tuple's
-  fields SET; the census `_spawned` hook fires before they apply and is
-  bookkeeping only.
+  baseline, not an edge; a wholesale catch-up (interest re-entry or a full
+  snapshot) is history, not gameplay. Initial presentation belongs in a typed
+  `<entity>_born` hook or the `Ev_Spawned` event after fields are applied. The
+  census `_spawned` hook runs earlier and is for bookkeeping.
 - **The host's own mutations edge the same way**: the hurt flash needs no
   `is_host`, ever. (A host-side pulse within one net tick still never reaches
   clients: edges don't repeal "deltas carry state"; hold state a tick.)
@@ -533,7 +500,7 @@ the host may say no); and the host's per-peer `Dedup_Window` (64-command sliding
 over intent sequences) makes execution exactly-once through retransmits and reconnect
 replays.
 
-## Typed app-messages (`@(gd_message)`)
+## Typed app messages
 
 Almost everything is *state, not messages*: replicate a field, predict a
 [verb](#the-command-loop), broadcast a fact. But a few things are genuinely
@@ -588,7 +555,7 @@ input is untrusted by default. `read_string`/`read_bytes` return zero-copy views
 packet; clone anything you keep.
 
 ```odin
-now_s :: proc "contextless" () -> f64            // monotonic seconds — THE toolkit clock
+now_s :: proc "contextless" () -> f64            // monotonic seconds
 ticker_make :: proc(hz := DEFAULT_TICK_HZ) -> Ticker
 ticker_advance :: proc(t: ^Ticker, frame_dt: f64) -> int
 clock_sample :: proc(c: ^Clock_Sync, local_send, remote_time, local_recv: f64)
@@ -596,78 +563,66 @@ clock_remote_now :: proc(c: ^Clock_Sync, local_now: f64) -> f64
 interp_render_time :: proc(c: ^Clock_Sync, local_now: f64, delay: f64) -> f64
 ```
 
-`ticker_advance` returns how many net ticks fire this frame (capped at 8: a multi-second
-stall resumes cleanly instead of bursting a backlog; deltas are last-value, and nothing is
-lost). `Clock_Sync` is an EWMA over ping samples (friendslop-grade, no drift modeling)
-and feeds both interpolation timelines and the session's automatic ping stat. It also
-tracks `jitter` (smoothed |rtt − mean| deviation): the connection-QUALITY number. A
-steady 120ms link plays better than one wobbling 40..200ms. Read it per peer via
-`session_clock(s, peer)` and surface it however your game likes (a colored dot beats a
-number).
+`ticker_advance` returns the number of network ticks due this frame, capped at
+eight so a long stall does not produce an unbounded catch-up burst. `Clock_Sync`
+uses an exponentially weighted moving average over ping samples. It feeds owner
+stream interpolation and the session's ping stat; it does not model long-term
+clock drift. The clock also records smoothed RTT deviation as `jitter`. Read the
+per-peer value with `session_clock` for diagnostics or connection-quality UI.
 
 ## The two timelines (presenting consequences)
 
-A peer watching a remote simulation lives on two clocks, and mixing them up is
-the most common way a correct game looks wrong:
+A peer displaying a remote owner stream uses two timelines:
 
-- **The wire timeline.** Reliable state (deltas, spawns/despawns, command
-  results) applies the moment it arrives: ~one-way latency after it happened.
-- **The render timeline.** Remote-owned entities DRAW `interp_delay` in the
-  past; that buffer is what turns a 20 Hz stream into smooth motion.
+- **Wire time:** reliable deltas, entity lifetime, and command results apply
+  when their ordered messages arrive.
+- **Render time:** remote owner-streamed fields are displayed at
+  `interp_delay`, providing a buffer for interpolation.
 
-The skew between them is ~`interp_delay`, and it shows up whenever a
-consequence of someone else's simulation is applied on arrival: the gem
-vanishes before the rendered ball reaches it, the door opens before the
-rendered cart docks. This is the structural cost of interpolation netcode:
-resim engines collapse to one timeline by re-simulating the past, and pay in
-CPU, determinism requirements, and visible correction pops. This toolkit's
-model never mispredicts and never pops; in exchange, YOU choose the timeline
-each thing presents on. The discipline is three lines:
+This difference matters when reliable state is the consequence of remote
+movement. Applying a door-open animation immediately can make the door appear
+to open before the delayed remote player reaches it. Apply authoritative state
+immediately, but schedule spatial presentation with the cause when appropriate.
 
-1. **Your own simulation presents NOW**: the owner's screen is the truth
-   everyone else is waiting to see.
-2. **Consequences of remote simulations present on the render timeline**:
-   both the event and the stream crossed the same wire, so transit cancels:
-   delay the *presentation* (never the state) by the interp delay and it lands
-   within jitter of the rendered cause. `ksess.session_present` is the whole
-   discipline in one call: you state the one fact the kit can't derive
-   (did MY simulation cause this?), it presents now or queues for the render
-   clock, and one presentation proc holds the whole effect (no verb enums, no
-   drain switch, the same one-proc shape that makes `@(gd_command)` pleasant):
+`session_present` selects immediate or delayed presentation from a fact only the
+game knows: whether the local player's simulation caused the effect.
 
-   ```odin
-   // the taken-edge, ONE place, identical on every peer:
-   ksess.session_present(&g.ses, id == g.my_claim, g, present_gem_gone, id)
+```odin
+ksess.session_present(
+	&game.ses,
+	id == game.my_claim,
+	game,
+	present_gem_gone,
+	id,
+)
 
-   present_gem_gone :: proc(user: rawptr, id: knet.Net_Id, a: u64) { /* hide, burst, sound */ }
-   ```
+present_gem_gone :: proc(user: rawptr, id: knet.Net_Id, a: u64) {
+	// hide, burst, sound
+}
+```
 
-   (`knet.Later` underneath stays public for engine-free tests and custom
-   clocks.) For spatial events you can be exact instead of statistical: gate
-   the visual on the RENDERED entity reaching the spot.
-3. **Edges must outlive the slowest observer**: the authority keeps the
-   entity/state alive ≥ `interp_delay` past the event (a despawn dwell, a
-   sink dwell: `session_present(..., extra = 0.4)` with a reaper proc), or
-   there is nothing left on screen to present when the render clock gets
-   there.
+When `mine` is true, the callback runs immediately. Otherwise it runs on the
+remote render clock. `knet.Later` is the lower-level scheduler used by this
+helper.
+
+An entity or visual state needed by a delayed effect must remain available
+until the effect can run. Use a despawn dwell or `session_present`'s `extra`
+delay with a reaper callback when necessary.
 
 Every consequence classifies into one of five bins, each with an existing
 tool: when something looks mistimed, find its row:
 
 | The consequence's cause | Present it | The tool |
 |---|---|---|
-| **My own simulation** (I claimed it, I struck it) | now | `session_present(mine = true)`, or just do it |
+| **Local owner simulation** (a local claim or strike) | now | `session_present(mine = true)`, or present directly |
 | **A remote moving cause** (a streamed avatar/ball reaching a thing) | at the render clock | `session_present(mine = false)` |
 | **A per-peer local visual** (each screen flies its own projectile) | at *my* visual's moment | fx hooks ([kit/fx](fx.md) `On_Hit_Proc`) |
-| **No spatial cause** (scoreboards, inventories, objectives) | wire-fresh | a [`<field>_edge` half](#edges-class_field_edge--presenting-delta-lane-changes), *never* delay these |
+| **No spatial cause** (scoreboards, inventories, objectives) | on arrival | a [`<field>_edge` half](#field-change-edges) |
 | **A global transition** (the won byte, the hole index) | after a dwell | edge-outlives-observers: hold state ≥ `interp_delay` |
 
-The bins are per-CONSEQUENCE, not per-entity: one looted chest updates the
-looter's bag UI wire-fresh (row 4) while its lid swings open on the render
-clock (row 2). And the timing decision hangs on one fact only the game knows
-(*did my simulation cause this?*), which is why `session_present` takes it as
-a boolean instead of guessing (a wrong guess here is Unreal's RepNotify
-double-fire, imported).
+Classify each consequence independently. A looted chest can update the
+inventory UI immediately while delaying the lid animation to match a remote
+player's rendered interaction.
 
 Shrinking the gap globally (`interp_delay` down, `tick_hz` up via
 `session_configure`) trades smoothness under jitter for freshness: aligning
@@ -675,9 +630,9 @@ presentation is almost always the better spend. One `interp_delay` can't be
 right for both a LAN and a 120ms link, though: set it for the LAN and remote
 motion samples past the last packet on a real link; set it for the link and the
 LAN renders needlessly stale. `cfg.interp_adapt` (off by default) makes the
-delay *slew* to the worst active link's need (`rtt/2 + 2·jitter`, over the same
-ClockSync the ping stat reads), growing promptly for headroom and shrinking
-slowly and hysteretically so it never shrinks into a spike. A set `interp_delay`
+delay toward the worst active link's need (`rtt/2 + 2·jitter`, using the same
+clock data as the ping stat), growing promptly for headroom and shrinking
+slowly with hysteresis. A configured `interp_delay`
 becomes the floor; `session_interp_target` reads where the slew is headed.
 
 ### If you drew the cause yourself, you own its clock
@@ -689,17 +644,11 @@ interpolated stream**: the delay is what cancels the stream's transit so the
 effect lands on the rendered cause. That cancellation is only correct when the
 cause really is on the interpolated timeline.
 
-An entity your game **dead-reckons into the past itself** (a spawn-tuple
-projectile you draw at `now - interp_delay`) is *already* delayed. Route its
-consequence (a hit, a splash) through `session_present` and you delay it a
-*second* time: the effect lands `interp_delay` behind a cause that was already
-`interp_delay` behind. (Measured on the C# port: a hit routed through Present
-landed 71px off vs 19px for stamping the hit instant and killing on the stamp.)
-The rule: **if you drew the cause yourself, carry a timestamp and present on it;
-don't ask `session_present`.** Present is for consequences of the
-kit-interpolated stream (streamed avatars, owner-streamed balls), which is
-every row-2 case and most of what you write. Row 3 is the exception, and
-row 3 is where you own the clock.
+An entity the game already renders at `now - interp_delay` is already delayed.
+Passing its hit or splash through `session_present(mine = false)` delays the
+effect a second time. When the game owns the cause's clock, carry a timestamp
+and present the consequence on that clock. Use `session_present` for causes
+whose delayed rendering is owned by Kit's owner-stream interpolation.
 
 ### Projectiles: put a clock in the spawn tuple
 
@@ -785,7 +734,7 @@ distinct: don't conflate them.
   a replicated byte pulsed `1 → 0` *within* one tick equals its shadow when the diff runs
   and never ships. Put edge-triggered state on bytes that outlive a tick (cavecrawl's
   `level.won` stays 1 until the next run), or use an explicit reliable message. The
-  REACTION side is a [`<field>_edge` half](#edges-class_field_edge--presenting-delta-lane-changes):
+  REACTION side is a [`<field>_edge` half](#field-change-edges):
   the pulse caveat is about what the wire carries, not how you observe it.
 - **Owner-streamed fields are never written by network input on the owner's peer.**
   `registry_apply_streams` skips entities owned by `me`; reject-truth, prediction reverts,
@@ -801,7 +750,7 @@ distinct: don't conflate them.
   descriptor the peer doesn't have). The session guarantees both by putting results, state
   batches, and spawn/despawn on the same reliable ordered channel.
 - **POD only, 64 fields max.** Syntactic collections (`[dynamic]`, slices, maps) are a
-  scriptgen error with [the three-way stance](#collections--the-dynamic-stance) spelled
+  scriptgen error with [the three-way stance](#dynamic-collections) spelled
   out; deeper non-POD (a struct hiding a string) fails the generated `#assert` at the
   consumer compile, naming the field. Group past-64 field counts into sub-structs (a
   fixed array is one field).

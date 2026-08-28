@@ -23,7 +23,7 @@ sender. Every peer receives every payload exactly once, on any transport, and a
 spoofed cast from a non-host peer drops on the floor.
 
 xfer is a payload codec (chunking, assembly, supersede) layered over
-[`ksess.Host_Relay`](session.md#the-host-relay-host_relay),
+[`ksess.Host_Relay`](session.md#host-relay),
 which supplies the stamp, spoof-drop, echo policy, and addressed replay. xfer
 runs the relay with `echo = false`: you already hold the bytes you sent, so your
 own upload coming back around is dropped on both roles.
@@ -92,5 +92,5 @@ kxfer.album_welcome(&self.album, e.id)
 A re-put supersedes everywhere and cancels any in-flight catch-up of the stale
 copy, because two chunk streams for one key would tear the assembly. Decoded artifacts
 stay the game's cache; the album keeps BYTES and
-`album_poll` marks exactly when to re-decode. Headless-proven in
+`album_poll` marks exactly when to re-decode. Covered by the headless tests in
 `tests/kitxfer` (chunked convergence, supersede, the addressed catch-up).

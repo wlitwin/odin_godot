@@ -1,148 +1,201 @@
-# Choosing a timeline model
+# Choosing an authority and presentation model
 
-This toolkit ships four timeline models, each proven by a worked game. Every
-multiplayer bug you debug is the same question in different clothes: the ball
-that moves before the kicker arrives, the shot that misses a target you were
-dead-on, the avatar that rubber-bands when it stops. The question is always
-**whose timeline is each thing on screen presenting from, and who arbitrates
-when two screens disagree?** Pick the model by what your game contests.
+Multiplayer code has to answer two separate questions:
 
-## The four models
+1. Which process decides the authoritative value?
+2. Which point in time should each player see?
 
-| model | one screen shows | arbiter | never happens | structural cost | worked proof |
-| --- | --- | --- | --- | --- | --- |
-| **Coop** (kit/net + session) | my sim NOW, others `interp_delay` in the past | the host, via commands | mispredicts, correction pops | the two-timelines presentation discipline | cavecrawl, slopball |
-| **Predict-self** (kit/sim) | my avatar NOW, others watched (past) | the server, every tick | trusting anyone's position | lag comp for anything aimed | quickdraw |
-| **Contested object** (kit/sim, claim) | mine NOW, others past, the OBJECT claim-weighted | the server | round-trip waits on YOUR touches | the claim discipline (below) | the lane's claim machinery + kitsim |
-| **Predict-world** (kit/sim, echo) | EVERYTHING at my predicted now | the server | mixed-timeline artifacts, wholesale | constant small corrections on remotes; resim per batch | speedball |
+Kit offers several answers because no single choice is best for co-op movement,
+competitive hitscan, and shared physics. Select a model for each contested
+entity or field; the rest of the session can continue to use reliable
+replication.
 
-The budgets, per row, are these: the coop model's proven scale is 2–8 players
-(the session's default seat cap, the friendslop shape). Predict-self's worked
-example is duel-scale (quickdraw is a 1v1), though `boot_serve` accepts up to
-32 peers by default. Contested-object is proven at the same scale, headless
-(the kitsim acceptance tests run two-to-three peers over an in-memory wire).
-Predict-world's speedball is 1v1 too; larger sim seats, on every row of that
-half, are untested, not impossible.
+## Summary
 
-The session MACHINERY has numbers past the table size: the 32-seat unit
-proof (kitsession's `scale_32_seats`, real sessions over an in-memory
-wire, no engine) seats a 31-client join storm in ~4ms, broadcasts a
-32-entity world in ~5ms, and pays ~0.7ms per 20 Hz net tick for the
-worst case (every entity dirty every tick, per-peer interest collection)
-at ~40 bytes/tick/peer, with interest filtering the freshness down to
-each seat's neighborhood. That is the machinery, measured; what 32 REAL
-processes do to a frame budget is the engine-tier proof, which wants a
-quiet box and is not claimed here.
+| Model | Authoritative writer | Local presentation | Remote presentation | Typical use |
+| --- | --- | --- | --- | --- |
+| Session replication | Host for `replicate`; entity owner for `owner` | Owner-streamed state is immediate | Owner streams are interpolated in the past | Invited co-op, player movement that the host need not verify, owner-simulated Godot physics |
+| Predict self | Server simulation | The local player's state is predicted at the current tick | Other players are interpolated on a delayed watched clock | Competitive movement and aimed actions |
+| Contested object | Server simulation, with a temporary local presentation claim | The claimant predicts the object while its interaction is active | Other peers watch authoritative snapshots | A ball, vehicle, carried object, or other isolated shared object |
+| Predict world | Server simulation | The client predicts local and remote simulation from echoed inputs | Corrections are reconciled and visually smoothed | Games where current contact between several moving bodies must look coherent |
 
-**A fifth model, not shipped here, is deterministic lockstep** (the
-fighting-game answer, GGPO-style). It runs one timeline by CONSENSUS: every
-peer simulates every tick from everyone's inputs, rolling back on late
-arrivals. Contact is bit-exact every frame, which is why the genre that is
-nothing but contact lives there. The costs are why nobody ships a 16-player
-lockstep shooter: cross-machine determinism (a tax the server-authoritative
-models here avoid, since the server's word is final, so approximate
-re-execution self-heals), rollback cost that scales with peers, no referee
-(desyncs detect, aimbots see truth), and late-join that is nearly impossible.
-For a 1v1 game that is all contact, lockstep beats everything here; for
-everything else, one of the four above does.
+The first model is provided by `kit/net` and `kit/session`. The other three use
+`kit/sim`. All four share the same player identities, entity factory, reliable
+delta fields, chat, saves, and transports.
 
-## How to choose
+## Start with what players can contest
 
-Ask what is CONTESTED (fought over by players in real time):
+Use the least expensive model that gives the authority you need.
 
-- **Nothing, really** (co-op loot, building, exploration): the coop kit.
-  Friends don't cheat friends, owner streams never mispredict, and the
-  session's identity machinery (reconnect, migration, saves) is the actual
-  product. Read [net](net.md) and [session](session.md).
-- **Aim** (shots at moving targets): predict-self + `lane_rewound`. Targets
-  must render ACCURATELY (a delayed truth beats an extrapolated guess when
-  a hit is judged against it), so remotes stay watched, and the rewind
-  reconstructs the shooter's exact drawn view. Quickdraw's duel acceptance
-  test proves the shot that lands at 240ms RTT, A/B against the same duel
-  judged live.
-- **One object** (the ball, the flag, the crown): contested + claim, or go
-  straight to predict-world. The claim keeps remote players cheap
-  (watched) while YOUR touches resolve instantly; predict-world buys
-  timeline coherence for everyone at resim cost.
-- **Contact itself** (bodies, tackles, scrums): predict-world. Mixing a
-  predicted object with past-rendered players produces the artifact where the
-  ball moves before its kicker visibly arrives; predict-world removes it.
+### No adversarial fast state
 
-Hybrids are per-entity and per-field, not per-game: quickdraw's hp and
-score ride the coop delta lane inside sim-lane entities; speedball's match
-state does the same. One session carries all of it.
+For an invited co-op game, owner streams are usually the simplest option. Each
+player writes their own movement or aim; the host remains authoritative for
+shared state and commands. Remote peers interpolate streamed values, so normal
+packet loss does not require rollback or retransmission.
 
-## Rules
+This model does not make owner-streamed values cheat-resistant. Do not use a
+client's streamed position as trusted evidence in a public competitive game.
 
-Each rule below is pinned by a test in the suite.
+Read [kit/net](net.md), [kit/session](session.md), and the
+[session-replication quickstart](quickstart.md). `examples/slopball` shows
+owner-simulated Godot physics through `play.Puppet`.
 
-1. **Present consequences on the timeline of their cause.** The coop kit's
-   `session_present(mine?)` boolean and the sim lane's `lane_claim` enforce
-   the same law. A remote cause presents beside its remotely-rendered actor;
-   your cause presents now.
-2. **The claim follows the cause and releases when the cause ends**, never
-   on distance. Your kick's whole flight is your consequence; releasing a
-   claim on a fast object blends across `speed × timeline-skew` and pulls
-   your own kick backward mid-flight.
-3. **Judge what was DRAWN.** Lag comp rewinds to the view bound to the
-   very input that pulled the trigger (the ack that rode its packet, minus
-   the watch delay, blended to the exact bracket), never the shooter's
-   freshest ack, which advances a whole lead-plus-transit between aiming
-   and adjudication.
-4. **Extrapolation fails only at input changes**, so put INERTIA in the
-   movement model. A car can't stop instantly; that's not flavor, it's why
-   Rocket League's remotes look smooth. Instant-velocity avatars turn every
-   remote stop into a pull-back.
-5. **Contested entities must be self-simulating.** A ball integrates its
-   own flight, so every peer's between-batch prediction is good. An
-   input-driven entity coasts frozen without its inputs and fights
-   corrections forever.
-6. **Hand-rolled contact must be capped and soft, inside the sim.** Clamp
-   speeds in the tick (every peer clamps identically), separate overlaps
-   gradually along STABLE directions (center-to-center flips sign in deep
-   overlap), push along motion. Prediction quality and feel are the same
-   fix. (`psim.Roller` packages #5 and #6: embed it and both hold by
-   construction. Speedball's ball is the worked proof.)
-7. **Corrections are for divergence, not float noise.** Exact compares
-   resim on every batch of held-input drift; a float epsilon
-   (`Lane_Config.tolerance`) lets sub-pixel drift ride until it
-   accumulates. Discrete fields never get slack: a differing flag byte is
-   a real event.
-8. **Authority snaps; the eye glides.** Sim state adopts truth instantly,
-   the render error decays with a half-life, and a big-enough jump CUTS
-   (smoothing a teleport looks worse than the teleport). This holds
-   everywhere: the puppet, the lane's glide, and predict-world's remote
-   corrections.
+### A player's movement or aim
 
-## Reading order
+Use predict-self when the authority must derive a player's state from inputs.
+The owning client predicts at the current tick, while other entities remain on
+the delayed watched clock. This keeps local controls responsive without making
+every client simulate every remote player.
 
-Read [sim](sim.md) for the machinery, then `examples/quickdraw` and
-`examples/speedball` as the worked contrasts. Read speedball against
-[slopball](../../examples/slopball/README.md), the same game on the coop
-model, to feel what each arbiter buys. Deeper design notes live in the
-project's `server-authority-resim-companion` ledger.
+Aimed actions need lag compensation because the target was displayed in the
+past. `lane_rewound` reconstructs the authority's recorded state for the view
+associated with the shooter's input. The authority must bound that rewind and
+validate all client input used by the simulation.
 
-Already shipped on the coop model and outgrowing it? The choice is not
-all-or-nothing: sim.md's **"Promoting a coop game"** checklist migrates one
-contested entity at a time (slopball → speedball is the worked diff), and a
-hybrid is a supported end state.
+`examples/quickdraw` is the reference. Its native integration test compares a
+rewound shot with the same shot judged against the live server state.
 
-## Gameplay modules
+### One shared object
 
-The session layer is identical on both netcodes: identity, chat, transfers,
-saves, and the boot ride along untouched. The gameplay modules were grown on
-the coop model; each doc opens with its lane stance:
+A contested object can use a presentation claim. The server remains
+authoritative, but the client that initiated an interaction temporarily presents
+its predicted version of the object. Other peers continue to display delayed
+authoritative snapshots.
 
-| Module | Stance |
-|---|---|
-| comms, xfer, save, ui | **Lane-agnostic** — session-level, use as-is |
-| interact | Pure geometry, sim-safe; the prompt pattern is coop-shaped |
-| items | Slot math sim-safe; inventories ride the delta lane (hybrid per-field) |
-| combat | **Coop wire** — sim games use predict fields, verbs, and declared facts instead; math ports |
-| ai | Coop NPC shape; brains move to the authority pass, math ports |
-| fx | Presentation ports; the tracer pool is coop's projectile answer (sim projectiles are entities) |
-| nav | **Never in a resimulating pass** — coop host brains and the sim authority pass only |
+Claims are useful when round-trip delay on a kick, grab, or steering handoff is
+noticeable but predicting the whole world would be excessive. A claim should be
+tied to the interaction that caused it and released when that interaction ends,
+not simply when the object crosses an arbitrary distance.
 
-One question stays open: whether `Inventory($N)`/`Cooldowns` embed-bundles
-can sit under a sim snapshot descriptor. Until a game forces it, a hybrid
-keeps those fields on the delta lane.
+This model can still show mixed-time artifacts: a predicted ball may move before
+a delayed remote player visibly reaches it. If contact itself is central to the
+game, use predict-world instead.
+
+### Contact among several moving bodies
+
+Predict-world echoes players' latest inputs so that each client can advance the
+contested simulation on one local timeline. This avoids the most obvious
+mixed-time contact artifacts, but it increases simulation and reconciliation
+work. Remote inputs are necessarily estimates until the next batch arrives, so
+small corrections are normal.
+
+Movement with inertia predicts better than movement that can change velocity
+instantaneously. Simulated objects should integrate their own state between
+snapshots, and contact resolution must be replay-safe.
+
+`examples/speedball` demonstrates this model. Compare it with
+[`examples/slopball`](../../examples/slopball/README.md), which implements a
+similar game using owner-simulated physics.
+
+## Hybrid games are expected
+
+The choice is not global. A simulation-lane entity can still contain reliable
+delta fields:
+
+```odin
+Player :: struct {
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id,
+	x, y:   f32 `gd:"predict,interp"`, // fixed-tick simulated movement
+	hp:     i32 `gd:"replicate"`,      // reliable host-written state
+	team:   u8 `gd:"replicate"`,
+}
+```
+
+Quickdraw uses predicted movement beside reliable health and score. Chests,
+inventories, chat, match state, and save data generally do not benefit from
+rollback and should remain on the session layer.
+
+The [promotion checklist](sim.md#promoting-a-coop-game) moves one entity at a
+time from an owner stream to the simulation lane. A hybrid is a supported end
+state, not merely an intermediate step.
+
+## Presentation rules
+
+These rules apply across the models:
+
+1. **Present an effect on the same timeline as its cause.** A locally predicted
+   shot should flash immediately. A remote shot should flash when the watched
+   shooter reaches the corresponding tick.
+2. **Treat first sight as a baseline.** A newly spawned entity should be placed
+   from its received fields without replaying score flashes, damage reactions,
+   or other historical edges.
+3. **Judge the state that was displayed.** Lag-compensated queries should use
+   validated snapshot evidence tied to the input being adjudicated and should
+   clamp to a configured rewind window.
+4. **Keep replayed code free of presentation and engine state.** A resimulated
+   tick may run more than once. Audio, particles, node mutation, wall clocks,
+   and non-ledgered randomness do not belong in it.
+5. **Adopt truth immediately and smooth only the display.** Reconciliation must
+   update simulation state before replay. Render-error smoothing can hide small
+   corrections; intentional teleports should cross a configured cut threshold
+   and display immediately.
+6. **Resolve simulated contact from replayable data.** Query static level
+   geometry if needed, but test moving entities against their simulated fields,
+   not the physics server's current-frame transforms.
+
+`kit/net` exposes edge halves for reliable replicated changes. `kit/sim` exposes
+tick facts and declared facts so presentation can run once on the appropriate
+clock without firing during resimulation.
+
+## Authority is not the same as security
+
+A server-authoritative model means the authority computes the final state. It
+does not automatically make a game secure:
+
+- A listen server is controlled by the hosting player. Use a dedicated authority
+  when the host must not be able to alter outcomes.
+- Input structures need semantic validators. Structural decoding alone cannot
+  know that an axis is restricted to `-1`, `0`, or `1`.
+- Commands need the correct generated access mode and game-specific predicate.
+- Public sessions need an encrypted transport and application-specific traffic,
+  moderation, logging, and deployment policies.
+
+See [Session trust and admission](session.md#trust-and-admission)
+and [Kit roadmap](TODO.md) for the current boundary.
+
+## Scale and validation status
+
+The default co-op session cap is eight players. Unit tests cover lower-level
+session behavior at 32 seats, while the shipped real-process examples exercise
+smaller groups. Quickdraw and Speedball are duel-scale references. Treat those
+examples as correctness demonstrations, not published capacity targets for a
+production game.
+
+Measure CPU time, bandwidth, reconciliation frequency, and engine cost using
+your entity counts and network profile. `kit/ui` provides a netgraph, and the
+[testing harness](testing.md) can inject latency, jitter, loss, and bandwidth
+limits into multi-process scenarios.
+
+## What Kit does not implement
+
+Kit does not ship deterministic peer-to-peer lockstep. Lockstep can be a better
+fit for a small deterministic simulation in which every participant must run
+the same world and rollback the same inputs. It also requires cross-platform
+determinism, has a different late-join model, and does not provide a trusted
+referee by itself.
+
+Kit's simulation lane instead gives one authority the final state. Client
+prediction is allowed to be approximate because authoritative snapshots repair
+divergence.
+
+## Package compatibility
+
+| Package | Use with the simulation lane |
+| --- | --- |
+| `comms`, `xfer`, `save`, `ui` | Session-level; use unchanged. |
+| `items` | Inventory state normally remains on reliable deltas. Pure slot and packing helpers are usable anywhere replay-safe. |
+| `interact` | Geometry helpers are replay-safe. Prompt and command examples are written for session replication. |
+| `combat` | Its networked projectile and predicted-health flow targets session replication. Reuse pure geometry and policy helpers; implement sim combat with predicted fields, commands, and facts. |
+| `ai` | Perception and steering math can be reused. Run navigation and non-replayable decisions only in the authority pass. |
+| `nav` | Do not call Godot navigation queries from a resimulated tick. Call them from authority-only logic and feed replayable results into the simulation. |
+| `fx` | Presentation helpers are reusable. The tracer pool is the co-op projectile presentation path; sim projectiles are usually predicted entities. |
+
+## Recommended reading order
+
+1. [Session-replication quickstart](quickstart.md)
+2. [Simulation quickstart](quickstart-sim.md)
+3. [kit/sim reference](sim.md)
+4. `examples/quickdraw` for predict-self and lag compensation
+5. `examples/slopball` and `examples/speedball` as a side-by-side comparison

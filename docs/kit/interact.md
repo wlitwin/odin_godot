@@ -18,9 +18,9 @@ Interaction is two questions:
   that entity from where they stand. The command proc answers by calling
   `in_range`/`facing_ok` with the *same* numbers.
 
-Because the client and host use the same procs, the same constants, and zero role branches,
-the prompt the client shows and the validation the host runs cannot disagree about geometry.
-When the two positions differ in time, the host's positions are the truth.
+Using the same procedures and constants keeps the client prompt and authority
+validation geometrically consistent. They can still evaluate different
+snapshots of a moving world; the authority's result is final.
 
 The *use* itself is just a command on the target entity (open the door, loot slot 2);
 kit/interact never dispatches anything. See [items.md](items.md) for what a loot command

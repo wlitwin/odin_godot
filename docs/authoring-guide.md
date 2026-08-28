@@ -738,7 +738,7 @@ not name the same struct. Doing so would generate the whole census twice.
 > `MultiplayerSpawner`/`MultiplayerSynchronizer` interop it enables. It is the right
 > tool for GDScript parity, porting an existing RPC design, or talking to
 > non-Odin peers. **Building a co-op game from scratch? Use the
-> [friendslop toolkit](kit/index.md) instead**: replicated struct fields,
+> [Kit multiplayer toolkit](kit/index.md) instead**: replicated struct fields,
 > predicted commands with typed `_then` consequences, generated entity
 > factories, drop-in join, reconnect, and host migration, with zero RPCs to
 > design. The [tutorial](kit/build-a-game-in-a-day.md) builds a whole co-op
@@ -858,8 +858,8 @@ a client) connect over ENet and exchange `@(gd_rpc)` calls in both directions, a
 call executed on the *other* peer with the correct `get_remote_sender_id()`.
 
 **Launch parameters — who am I, from the outside.** A networked instance gets told its
-role/relay/room from outside the game: an env var natively (how launch scripts and the acid
-harness steer host/client instances), the page URL's query string on web (the
+role/relay/room from outside the game: an env var natively (how launch scripts and the
+integration harness steer host/client instances), the page URL's query string on web (the
 friend-clicks-a-link front door). `gd.launch_param` reads both in one call, env first:
 
 ```odin

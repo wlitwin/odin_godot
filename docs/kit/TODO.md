@@ -145,6 +145,6 @@ Status: `[ ]` pending, `[~]` in progress, `[x]` complete.
   - [ ] Traffic budgets.
 - [x] Scrapyard runs as the integration consumer for the unified API migration.
   - [x] Its 16 generated script classes compile against this working tree.
-  - [x] Its full 21-act multiplayer acid suite passes against this working tree
+  - [x] Its full 21-act multiplayer integration suite passes against this working tree
     at 120 ms injected one-way latency, including dedicated authority, host
     succession, lag compensation, streams, commands, and stress traffic.

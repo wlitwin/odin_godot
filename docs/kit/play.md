@@ -1,121 +1,187 @@
-# godot:play — drop-in gameplay blocks
+# `godot:play`: reusable gameplay blocks
 
-`godot:play` is the shelf of building blocks the kit games are assembled
-from: embed a struct field and the entity gains working, already-networked
-behavior. Its replicated state joins the entity's descriptor, and its verbs
-hoist onto the entity's command table through scriptgen's
-[composition](net.md#composing-verbs-from-embedded-blocks). There is one
-block per authority model, so picking a block IS picking where its state
-lives across the wire (see [recipes](../recipes.md) for the full pattern).
+`godot:play` contains small gameplay components and presentation helpers used by
+the Kit examples. Networked blocks are embedded in an entity struct. Script
+generation flattens their tagged fields into the entity descriptor and hoists
+their commands onto the entity's generated command table.
 
-| Block | Authority model | The shape it ships |
+The package provides policy and reusable state, not complete game features. A
+weapon block can decide whether a trigger pull fires; the game still decides
+what projectile to spawn, what it may hit, and how the result affects the world.
+
+## Networked blocks
+
+| Block | Replication model | Responsibility |
 | --- | --- | --- |
-| `play.Gun` | host-written, client-predicted verb | mag + reload + jam behind a `gun_fire` verb, knob-configured (`Gun_Def`) |
-| `play.Ability` | cooldown-gated verb | the slow cast (lob/cone/buff): the block owns its cooldown |
-| `play.Channel` | owner-streamed progress + plain claim verb | hold-to-progress: revive, capture, cast bar; every screen draws the fill |
-| `play.Health` | host-written state, VERB-FREE | hp + max + the damage policy (`hurt`'s killing-blow-once contract) |
-| `play.Telegraph` | host countdown, verb-free | the wind-up that lands; every screen grows the same warning ring |
-| `play.Puppet` / `Puppet3` | owner-simulated engine physics | a RigidBody every screen agrees about (below) |
+| `play.Gun` | Reliable host state with an optimistic command | Magazine, reload, jam, and clear state. `Gun_Def` supplies configuration. |
+| `play.Ability` | Reliable host state with an optimistic command | Cooldown-gated casts. The game supplies resource cost and effect policy. |
+| `play.Channel` | Owner stream plus a host command | Hold progress and target for revive, capture, hack, or cast-bar interactions. The host must validate the final claim. |
+| `play.Health` | Reliable host state | Hit points, maximum hit points, damage, heal, and death-transition helpers. It declares no player command. |
+| `play.Telegraph` | Reliable host state | A tick-based wind-up and landing test for warnings, traps, and enemy attacks. |
+| `play.Puppet` | Owner stream | A `RigidBody2D` simulated by one peer and displayed by all others. |
+| `play.Puppet3` | Owner stream | The corresponding `RigidBody3D` block, including quaternion rotation and angular velocity. |
 
-**A block never shadows a replicated field.** Its state diffs like any
-tagged field, so its PRESENTATION is the game's generated
-[`<field>_edge` half](net.md#edges-class_field_edge--presenting-delta-lane-changes)
-on the embedding entity: `mob_health_hp_edge` for the hit/death/revive
-cues, `runner_weapon_mode_edge` for the gun's jam/reload pops,
-`mob_tele_left_edge` (+ `play.telegraph_landed`, which holds the cancel
-contract) for the eruption. First sight and resyncs seed silently, so the
-blocks carry no birth guards or re-baseline rituals. (A replicated FSM is a
-plain enum field plus its edge half.)
+Example composition:
 
-Presentation-side blocks (never on the wire) include `play.Edge(T)` (fires
-once on a change of DERIVED or local state, such as a boolean computed from
-a replicated array or a persistence profile; a replicated field itself
-takes the generated half above), `play.Anim` clocks (tiny float eases),
-`play.Marker` (lazy world markers: rings, bars, beacons), `play.Pace` (the
-re-armed deadline every host tick loop re-spells), and `play.Trail` (an
-authority-side where-was-it-a-moment-ago ledger for host-only state —
-lag-compensated hitscan against streamed bodies reads the session's own
-history through `ksess.session_rewound` instead).
+```odin
+Runner :: struct {
+	owner:  gd.Node2d,
+	net_id: knet.Net_Id,
+	health: play.Health,
+	weapon: play.Gun,
+	lob:    play.Ability,
+}
+```
 
-PREDICTED blocks live on the sibling shelf, `godot:play/sim` (alias
-`psim`): `psim.Cool` (Pace's twin, with the same due/arm/ready verbs,
-counting itself down inside the sim), `psim.Mover` (momentum movement), and
-`psim.Roller` (the contested rolling body). These blocks share the same
-embedding but run on the other timeline: their `predict` fields resim, and
-their block ticks hoist onto the entity's. scriptgen polices the split both
-ways, so the shelf an import names IS the lane the state lives on; the
-block list and the contract live in [sim](sim.md#predicted-blocks--godotplaysim).
+This contributes the blocks' replicated fields to `Runner` and generates
+commands such as `runner_weapon_fire_cmd` and `runner_lob_cast_cmd`. See
+[Composing commands from embedded blocks](net.md#composing-verbs-from-embedded-blocks)
+for naming and override rules.
 
-A block's cross-entity effects stay YOURS, as the composed verb's
-[`_then` consequence](net.md#consequences-verb_then):
-`runner_weapon_fire_then` spawns the slug — from the pull's carried origin
-(the wielder's own muzzle, leashed against the host's copy with
-`kcombat.leash`); `play.Gun` only resolves the trigger. Blocks are the
-reference for writing your own; the pattern is
-documented on their source headers (`play/*.odin`), which remain the long
-answer to everything on this page.
+Use generated replicated-field edge halves for presentation:
 
-## play.Puppet — engine physics, one simulator per body
+```odin
+@(gd_half)
+runner_health_hp_edge :: proc(
+	game: ^Game,
+	self: ^Runner,
+	old_hp, new_hp: i32,
+) {
+	if new_hp < old_hp {show_damage(game, self, old_hp - new_hp)}
+	if old_hp > 0 && new_hp == 0 {show_death(game, self)}
+}
+```
 
-THE ENGINE TRAP this block exists to hide: Godot's solver cannot be rewound
-or reconciled, and a `RigidBody2D` IGNORES node-transform writes. Live ones
-are stomped by the physics server's next sync, and writes made while frozen
-vanish when the freeze lifts. So a shared dynamic body (the ball, the crate,
-the ragdoll) gets exactly ONE simulating peer, the entity's session OWNER,
-and every other screen freezes the body kinematic (still solid to the local
-scene) and glides it along the owner's interpolated stream. Every pose the
-puppet imposes goes through `PhysicsServer2D.body_set_state`, because that's
-the only write the solver honors.
+Initial state and full resynchronization establish a baseline without replaying
+historical edges.
+
+Cross-entity consequences remain in game code. For example,
+`runner_weapon_fire_then` checks `self.weapon.fired`, validates or leashes the
+client-provided origin, and spawns the authoritative projectile. The block does
+not know the entity's position or the rules of the target world.
+
+## Simulation-lane blocks
+
+Predicted blocks live in `godot:play/sim`, conventionally imported as `psim`:
+
+| Block | Responsibility |
+| --- | --- |
+| `psim.Cool` | Replayable tick cooldown with `due`, `arm`, and `ready` helpers. |
+| `psim.Mover` | Tick-driven 2D movement with acceleration and bounds. |
+| `psim.Roller` | Self-integrating rolling body with friction, speed cap, and wall bounce. |
+
+Their fields use `gd:"predict"` and their ticks compose with the embedding
+entity's tick. Do not mix a root `play` network block and a `play/sim` block
+without checking which replication lane its fields select. The complete
+contract is in [Simulation blocks](sim.md#simulation-blocks-in-godotplaysim).
+
+## Local helpers
+
+The package also includes state and procedures that do not cross the wire:
+
+| API | Use |
+| --- | --- |
+| `actions_install` | Idempotently install keyboard and mouse actions from `Key_Row` and `Mouse_Row` tables. |
+| `decay`, `ramp`, `advance`, `hold`, `pulse`, `pulse01` | Small frame-animation helpers over `f32` values. |
+| `show`, `follow`, `fill`, `depth` | Update simple 2D world markers. |
+| `every`, `latch` | Frame cadence and rising-edge helpers. |
+| `Pace(T)`, `Deadlines(K, T)` with `due`, `arm`, `ready` | Re-armable deadlines over a caller-selected clock. |
+| `Edge(T)` with `see`, `sync` | Detect changes in derived or local state that has no generated replicated-field edge. |
+| `Trail`, `trail_note`, `trail_read` | Authority-side position history for game-owned state. For streamed session entities, prefer `session_rewound`. |
+
+`Edge(T)` is not needed for a directly replicated field. Use it for a value
+derived from several fields or for local persistence state, and call `sync`
+after a full resynchronization when that jump should become the new baseline.
+
+`Pace` stores a deadline. It is suitable for authority scratch or local
+presentation cadence; simulation-lane cooldowns should use `psim.Cool` so their
+state participates in replay.
+
+## Owner-simulated physics with `play.Puppet`
+
+Godot's rigid-body solver cannot be rewound by Kit. A `Puppet` instead assigns
+one peer to simulate a shared `RigidBody2D`. That peer publishes pose and
+velocity through owner-streamed fields. Every other peer freezes the body in
+kinematic mode and moves it along the interpolated stream.
+
+This model is useful for a co-op ball, crate, vehicle, or physics prop when one
+simulator at a time is acceptable. It is not server-authoritative rollback
+physics: contacts are decided on the current owner's machine, and remote views
+are delayed by interpolation.
+
+### Declare and attach the block
 
 ```odin
 Ball :: struct {
 	owner:  gd.Rigid_Body2d,
 	net_id: knet.Net_Id,
-	puppet: play.Puppet, // pose + velocity replicate through the embed (wire=f16)
+	puppet: play.Puppet,
 }
 
-// spawn (every peer):    play.puppet_attach(&self.puppet, self.owner, x, y)
-// Ev_Spawned (born):     play.puppet_born(&b.puppet)   // the BODY onto the spawned fields, then the seat below
-// every frame:           play.puppet_frame(&self.puppet)
-// Ev_Owner_Changed:      play.puppet_seat(&b.puppet, e.owner == ses.me)
+ball_ready :: proc(self: ^Ball) {
+	play.puppet_attach(&self.puppet, self.owner, 0, 0)
+}
+
+ball_process :: proc(self: ^Ball, delta: f64) {
+	play.puppet_frame(&self.puppet, f32(delta))
+}
 ```
 
-`puppet_born` is the body's FIRST placement (the node's, for a puppet): call it
-from `<game>_entity_spawned`, before the seat. The scene instanced the body at
-its default pose, and a body born mid-frame (a host-step spawn, an arrival under
-an injected delay) gets no `puppet_frame` until the NEXT frame — one rendered
-frame in the corner, then a cut. See [boot.md](boot.md#the-entity-factory),
-"Where the first placement goes".
+Pass an optional visual child to `puppet_attach` when you want render-error
+smoothing. The rigid body moves immediately to authoritative state, while the
+visual child decays a small correction over time.
 
-WHO owns it is the game's call, made with `ksess.session_set_owner` from
-host code or a `_then`: last-toucher-owns (a ball), the carrier (a crate),
-the driver (a vehicle), or the host forever (world debris). The handoff
-carries momentum: the new simulator seeds its solver from the streamed pose
-AND velocity, so a rolling ball keeps rolling through the seam; remote
-screens snap across it (the `Ev_Owner_Changed` contract).
+### Initialize received state
 
-The feel ledger lives entirely inside the block:
+Call `puppet_born` from the typed born hook after spawn fields have arrived, then
+select whether this peer currently owns the body:
 
-- **Render-error smoothing**: authority snaps (a seat seed, a handoff
-  re-anchor) move the BODY instantly, but the drawn `skin` child holds its
-  ground and glides in over ~100ms. CUTS (kickoff teleports) past
-  `PUPPET_CUT` still snap outright; smoothing a teleport looks worse.
-- **Predicted possession** (`puppet_claim`) seizes the simulation ON SPEC
-  the frame YOUR screen sees the touch, without waiting for the grant round
-  trip. If confirmed, the provisional flight becomes canon seamlessly. If
-  denied or timed out, it freezes and glides back onto the real owner's
-  stream. Slopball's anticipatory ball seat is this call.
-- **Verbs for the simulator** include `puppet_place` (kickoff/round-reset
-  teleport; pair with `session_teleport` so remote interp snaps) and
-  `puppet_shove` (the impulse kick; a claimed possession kicks like a real
-  one).
+```odin
+@(gd_half)
+ball_born :: proc(
+	game: ^Game,
+	self: ^Ball,
+	id: knet.Net_Id,
+	owner: knet.Player_Id,
+) {
+	_ = id
+	play.puppet_born(&self.puppet)
+	play.puppet_seat(&self.puppet, owner == game.ses.me)
+}
+```
 
-`play.Puppet3` is the same contract for `RigidBody3D`; slopball3d is the
-proof that the model is dimension-blind. Character avatars DON'T need a
-puppet: each peer already `move_and_slide`s only its OWN body and streams
-x/y like any owner field; frozen-kinematic remote pucks stay solid to them.
+`puppet_born` places the physics body from its replicated fields during the
+spawn frame. This avoids displaying the scene's default transform before its
+first `_process` callback.
 
-Worked references: `examples/slopball` (2D, claim + handoffs + kickoffs),
-`examples/slopball3d` (3D). See also [net](net.md) for the stream/delta
-machinery underneath and [session](session.md#ownership-transfer) for the
-ownership contract.
+When `Ev_Owner_Changed` names this entity, call `puppet_seat` with whether the
+new owner is the local player. The new simulator is seeded from streamed pose
+and velocity so momentum crosses the handoff. Remote peers cut to the new
+ownership baseline before continuing interpolation.
+
+### Transfer and predict ownership
+
+The authority changes ownership with `session_set_owner`. The game decides the
+policy: last toucher, current carrier, current driver, or a permanent host
+owner.
+
+`puppet_claim` allows a client to begin simulating provisionally while it waits
+for an ownership command. If the authority grants ownership, the provisional
+flight continues. If the claim is denied or times out, the body freezes and the
+visual correction returns it to the actual owner's stream. Treat the claim as
+presentation prediction, not authority.
+
+`puppet_place` performs a reset or teleport. Pair it with `session_teleport` so
+remote interpolation cuts instead of blending through the discontinuity.
+`puppet_shove` applies an impulse on the current simulator.
+
+## `play.Puppet3`
+
+`Puppet3` applies the same ownership model to `RigidBody3D`. It streams position,
+quaternion rotation, linear velocity, and angular velocity. Its procedures use
+the `puppet3_*` prefix.
+
+See `examples/slopball` for the 2D integration and `examples/slopball3d` for the
+3D version. For state that must be simulated by a trusted authority and replayed
+on clients, use query-based integration with [kit/sim](sim.md) instead of a
+Godot rigid body.

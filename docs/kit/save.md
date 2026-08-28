@@ -45,7 +45,7 @@ their ids, stats, and owned entities back, exactly like any reconnect.
 The envelope is engine-free (bytes in, bytes out, unit-testable without Godot); the file
 helpers are thin FileAccess wrappers so `user://` paths work on every platform, web included.
 
-## Declaring the game blob — `gd:"backup"`
+## Declaring the game blob
 
 The game blob is the same host-local state host migration ships (see [session](session.md)),
 and you don't hand-serialize it. Tag the fields on your game class `gd:"backup"` and scriptgen

@@ -1,44 +1,59 @@
-# Quickstart: server authority and client prediction
+# Server authority and client prediction
 
-The [co-op quickstart](quickstart.md)'s game trusts its players: each peer
-writes its own square's position. A competitive game needs the opposite: the
-server owns positions, and clients can't lie about where they are. This page
-promotes the hello game to that model in **four small diffs**, following the
-[promotion checklist](sim.md#promoting-a-coop-game). The result is
-`examples/hello_sim/`: `examples/hello_net/` with these four diffs applied,
-plus the dedicated `serve` entry point (below) and without the optional
-join-code entry points.
+The [session-replication quickstart](quickstart.md) lets each client write its
+own position. This guide moves that position to Kit's simulation lane: the
+authority derives movement from validated inputs, while the owning client runs
+the same fixed-tick code locally for immediate response.
 
-You get: clients that can't lie about where they are, your own square still
-moving the *instant* a key goes down (client prediction), and remote squares
-rendering smoothly a breath in the past (the watched clock).
+The completed example is `examples/hello_sim`. Its session, lobby, entity
+factory, spawn flow, chat, and reconnect behavior are the same concepts used by
+`examples/hello_net`. The differences are limited to the state that needs server
+authority.
 
-The prerequisite is the co-op quickstart. The session half (lobby, doors, spawns,
-drop-in) carries over *unchanged* apart from the join-code doors, so this page
-only explains what moves.
+## What changes
 
-## Diff 1 — retag the position field
+The conversion has five parts:
+
+1. mark contested fields as predicted;
+2. move their mutation to a fixed-tick proc;
+3. sample and validate player input;
+4. attach a `ksim.Lane`; and
+5. remove the old frame-rate mutation.
+
+## 1. Change the field's replication lane
+
+In `Player`, replace the owner-stream tags on position:
 
 ```odin
-x, y: f32 `gd:"owner,interp,wire=f16"`   // coop: my stream, my truth
-x, y: f32 `gd:"predict,interp"`          // sim:  server truth, predicted here
+// Session replication: the entity owner writes position.
+x, y: f32 `gd:"owner,interp,wire=f16"`
+
+// Simulation lane: the authority writes position and the owner predicts it.
+x, y: f32 `gd:"predict,interp"`
 ```
 
-In the `Player` entity struct, one word changes. The field's writer moves from
-"its owner's stream" to "the server's simulation, predicted locally and
-reconciled".
+`interp` still controls presentation. For the local player, it smooths
+reconciliation error after authoritative snapshots arrive. For remote players,
+it interpolates between authoritative snapshots on the watched timeline.
 
-## Diff 2 — movement becomes a tick
+Fields that do not need rollback can remain on the reliable delta lane. The
+example's `pid` field is unchanged:
 
-Under server authority, movement is a pure fixed-rate step: the authority runs
-it for truth, the owner runs it as prediction, and every reconcile re-runs it.
+```odin
+pid: u8 `gd:"replicate"`
+```
+
+## 2. Move movement to a fixed tick
+
+Declare the input that drives a player and the deterministic step that updates
+predicted state:
 
 ```odin
 Player_Input :: struct {
-	move: [2]i8, // -1/0/1 per axis
+	move: [2]i8,
 }
 
-STEP :: f32(160.0 / 60.0) // px per tick at the lane's 60 Hz
+STEP :: f32(160.0 / 60.0)
 
 @(gd_tick)
 player_tick :: proc(self: ^Player, input: Player_Input) {
@@ -47,94 +62,167 @@ player_tick :: proc(self: ^Player, input: Player_Input) {
 }
 ```
 
-## Diff 3 — the device read becomes a sample
+The authority runs this proc to produce truth. The owning client runs it for
+prediction and may run it again during reconciliation. A tick proc therefore
+must use predicted fields, its input, and values derived from the tick. Do not
+read wall-clock time, input devices, scene-node transforms, or untracked random
+state from it.
 
-The one place that still touches hardware fills my input for tick T:
+This example assumes the default 60 Hz simulation rate. If the lane's `hz`
+changes, derive movement constants from the same configured rate.
+
+## 3. Sample and validate input
+
+Device access belongs in one `@(gd_sample)` proc on the game script:
 
 ```odin
-@(gd_sample)
+@(gd_sample = "validate")
 hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^Player_Input) {
+	_ = tick
 	input^ = {}
 	if gd.is_action_pressed("ui_right") {input.move[0] += 1}
-	if gd.is_action_pressed("ui_left") {input.move[0] -= 1}
-	if gd.is_action_pressed("ui_down") {input.move[1] += 1}
-	if gd.is_action_pressed("ui_up") {input.move[1] -= 1}
+	if gd.is_action_pressed("ui_left")  {input.move[0] -= 1}
+	if gd.is_action_pressed("ui_down")  {input.move[1] += 1}
+	if gd.is_action_pressed("ui_up")    {input.move[1] -= 1}
+}
+
+hello_sample_validate :: proc(self: ^HelloSim, input: ^Player_Input) -> bool {
+	_ = self
+	return input.move[0] >= -1 && input.move[0] <= 1 &&
+	       input.move[1] >= -1 && input.move[1] <= 1
 }
 ```
 
-## Diff 4 — add the lane, wire it in `ready()`, drop the per-frame move
+The `validate` token pairs the sample with `<sample>_validate`. Kit runs this
+validator after local sampling and on the authority for every received input
+before changing the de-jitter buffer. Returning `false` rejects the input
+packet. A validator may also normalize values through the pointer before
+returning `true`.
 
-Unlike the first three diffs, this one is not a free-standing declaration; it
-lands in specific places. First, the lane is a field on the *game* struct
-(`HelloSim`), beside the session and boot:
+Validate every assumption made by a tick proc: axis ranges, finite floating
+point values, enum membership, button masks, and game-specific invariants. A
+server-simulated field is not meaningful authority if arbitrary client input can
+still produce an impossible result.
 
-```odin
-lane: ksim.Lane, // the sim lane: tick scheduling, prediction, reconcile
-```
+Use `@(gd_sample = "validate=my_validator")` when the validator should not use
+the name-paired default.
 
-Two lines wire it, in `ready()` right after `boot_attach` and `<game>_entities`:
+## 4. Attach the simulation lane
 
-```odin
-hello_sim_lane_init(self, &self.lane, &self.ses) // generated: carries the tick/sample declarations
-kboot.boot_lane(&self.boot, &self.lane)          // the boot drives the lane from here on
-```
-
-Finally, delete the coop game's per-frame movement from `process()`. hello_net
-wrote its own square's position there every frame; that work now belongs to
-`player_tick` (Diff 2), fed by `hello_sample` (Diff 3). What remains in
-`process()` is only the pump, unchanged from the coop game:
+Add a lane beside the existing session components:
 
 ```odin
-events, _, _ := kboot.boot_pump(&self.boot, delta, now_s())
-hello_sim_events(self, events)
+HelloSim :: struct {
+	owner: gd.Node2d,
+	ses:   ksess.Session,
+	comms: kcomms.Comms,
+	boot:  kboot.Boot,
+	lane:  ksim.Lane,
+
+	player_scene: ^gd.Resource `gd:"entity=Player:1"`,
+	me: ^Player,
+}
 ```
 
-That is the full set of changes. Issue sites and spawn sites keep their exact
-shape on both models.
+After `boot_attach` and the generated entity-factory setup in `_ready`, call the
+generated lane initializer and give the lane to `Boot`:
 
-## Run it
+```odin
+hello_sim_entities(self, &self.boot)
+hello_sim_lane_init(self, &self.lane, &self.ses)
+kboot.boot_lane(&self.boot, &self.lane)
+```
+
+`hello_sim_lane_init` is generated from the `@(gd_tick)` and `@(gd_sample)`
+declarations. It registers the input type, validator, tick thunks, descriptors,
+and optional world passes. `boot_lane` makes `boot_pump` drive simulation and
+presentation each frame.
+
+Pass a `ksim.Lane_Config` to the generated initializer when the defaults are not
+appropriate:
+
+```odin
+hello_sim_lane_init(
+	self,
+	&self.lane,
+	&self.ses,
+	cfg = ksim.Lane_Config{
+		smooth_cut = 48,
+		rewind_max = 30,
+	},
+)
+```
+
+Start with the defaults and tune from measurements; the full configuration is
+documented under [Simulation tuning](sim.md#tuning).
+
+## 5. Remove frame-rate movement
+
+Delete the code that wrote the local player's position from `_process`.
+`boot_pump` now samples inputs, advances fixed ticks, reconciles snapshots, and
+writes presentation values before the entity's `_process` displays them:
+
+```odin
+hello_sim_process :: proc(self: ^HelloSim, delta: f64) {
+	if kboot.boot_phase(&self.boot) == .Menu {return}
+	events, _, _ := kboot.boot_pump(&self.boot, delta, knet.now_s())
+	hello_sim_events(self, events)
+}
+```
+
+Spawning and reliable state do not require a second code path. The generated
+factory tracks `Player` entities on the lane because their descriptor contains
+`predict` fields.
+
+## Run the example
 
 ```sh
 bash build/build_scripts.sh examples/hello_sim
-$GODOT --path examples/hello_sim &                        # window 1: Host
-HELLO_LATENCY=120 $GODOT --path examples/hello_sim        # window 2: Join
+$GODOT --path examples/hello_sim &
+HELLO_LATENCY=120 $GODOT --path examples/hello_sim
 ```
 
-**Checkpoint:** in the joined window, with under 120ms injected each way,
-your square still snaps to your keys with zero lag (prediction), while the host's
-square glides smoothly behind (watched). Remove the latency env and nothing
-about the code changes; the lane runs the same path with less latency to mask.
-`examples/hello_sim/run.sh` pins both receipts headless: the guest's own
-square moves within half a second of the press (an un-predicted square would
-still be waiting on the server's echo at 240ms RTT), and the host's walk
-arrives on the watched clock.
+Host in the first window and join in the second. In the joined window:
 
-## Running the authority
+- the local square should respond immediately because it is predicted; and
+- the host's square should move smoothly on the delayed watched timeline.
 
-A competitive game's trusted machine has three shapes, all the same code:
+The automated two-process test checks both behaviors under injected latency:
 
-- **Listen server.** This is the host window above: a player who is also the
-  authority. It is free and fine among friends, since the host has the
-  zero-latency seat.
-- **Dedicated, headless.** `HELLO_ROLE=serve $GODOT --headless --path
-  examples/hello_sim` runs `kboot.boot_serve`, an avatarless referee seat
-  that simulates, fields no square, and never migrates. A dead dedicated
-  server restarts rather than handing off; the host-migration handoff belongs
-  to the friends-host model. Run this on a VPS for a match that must be fair.
-- **Single.** This is the host with nobody joined; the same build is your
-  practice range.
+```sh
+bash examples/hello_sim/run.sh
+```
 
-## What the kit does not do
+## Run a dedicated authority
 
-The kit does not provide matchmaking services or server fleets. NAT traversal
-is half-solved: the
-[join-code relay](netgd.md#join-codes-for-native-enet-codeodin) hands the host
-each joiner's observed endpoint and the host punches a few UDP packets at it,
-so a plain-ENet join crosses LAN, port-forwarded, and the common
-port-preserving home NATs on a four-letter code. Symmetric NATs are an honest
-failure (there is no TURN for raw ENet), so the join reports why and offers
-the doors that always work: the browser build (WebRTC + TURN) and Steam.
+The example also exposes a headless server role:
 
-See [timelines](timelines.md) for choosing models and [sim.md](sim.md) for
-everything the lane can do: lag-compensated hitscan, contested objects,
-predicted spawns, and verbs on the tick timeline.
+```sh
+HELLO_ROLE=serve $GODOT --headless --path examples/hello_sim
+```
+
+`boot_serve` creates a dedicated infrastructure seat. The seat does not receive
+a player entity and does not participate in host succession. A production
+server still needs deployment, discovery, monitoring, restart, and abuse-control
+infrastructure; Kit does not provide a server fleet or matchmaking service.
+
+A listen server uses the same simulation code, but the hosting player controls
+the authority process. That is convenient for invited sessions, not a fair
+security boundary against the host.
+
+## What the simulation lane does not solve
+
+- Native ENet join codes provide discovery and limited UDP hole punching, not a
+  general relay. Symmetric NAT still requires WebRTC with TURN or Steam.
+- Prediction hides input latency; it does not make the authority's verdict
+  instantaneous. Rejected or divergent actions still reconcile.
+- Godot rigid-body physics cannot be replayed by Kit. Predicted physics must use
+  query-based, tick-driven integration over data stored in the simulation.
+- Public servers need an encrypted transport, semantic input validation,
+  application-specific rate policy, and operational controls. See
+  [Session trust and admission](session.md#trust-and-admission)
+  and the [hardening roadmap](TODO.md).
+
+Continue with [kit/sim](sim.md) for discrete commands, predicted spawns,
+contested objects, world passes, facts, lag compensation, and reconciliation
+tuning.

@@ -1,23 +1,19 @@
 # Build a multiplayer game in a day
 
-> This is the guided tour. It explains the whole surface in reading order,
-> using cavecrawl as the finished artifact; its snippets are excerpts, not a
-> follow-along. For the copy-paste-run path (empty folder → two windows in ten
-> minutes, every line compiled), do the **[quickstart](quickstart.md)** first;
-> terms of art live in the [glossary](glossary.md).
+This guided tour explains the co-op replication workflow by following the
+structure of `examples/cavecrawl`. Its snippets are excerpts, not a complete
+project. Start with the [session quickstart](quickstart.md) if you want the
+smallest buildable example first; use the [glossary](glossary.md) for Kit
+terminology.
 
-The friendslop toolkit is built for one shape of game: **you and your friends,
-one of you hosts, things go wrong together.** This tutorial builds that game,
-a small co-op cave crawler, the same way `examples/cavecrawl` is built, brick
-by brick. Cavecrawl is the finished version of everything below; when a step
-here feels terse, the corresponding file there is the long answer.
+The tutorial builds an invited-peer game in which one player hosts a small
+co-op cave crawler. Cavecrawl is the complete reference implementation for the
+features introduced below.
 
-The core guarantee: **gameplay code has zero role branches.** You write
-mutation code that looks single-player; the host runs it authoritatively,
-clients predict it, rejections revert it, and remote screens interpolate it,
-without you checking `is_host` in gameplay. Where a role branch would otherwise
-creep in, the toolkit hands you a name-paired proc instead (a verb's `_then`,
-an entity's `_spawned`).
+Generated wrappers handle routine authority, prediction, rejection, and
+presentation policy. Gameplay mutations can therefore remain direct and
+compact. Code that genuinely differs by role remains explicit in authority
+steps, command consequences, and presentation hooks.
 
 ## 0. The one struct
 
@@ -61,7 +57,7 @@ transport forwards (`on_packet`/`on_peer_left`/`on_net_up`/`on_net_down`) are
 drops (Alt-F4, crash, lost connection) is cleared from the roster
 automatically. Hand-write a same-named method to override one.
 
-You declare the four game-shaped doors: Host presses land on
+You declare the four game-facing methods: Host presses land on
 `kboot.boot_host(&self.boot, port, name)`, Join on
 `kboot.boot_join(&self.boot, addr, port, token, name)`. Each is just a guard,
 the boot call, and a flavor status line. Copy either example game's `net.odin`
@@ -77,7 +73,7 @@ In `process()`, one call pumps the wire, ticks the session, reacts to the five
 events every game handles identically (lobby/scoreboard repaints, the
 join-failed status line), and re-yields every event; two generated procs route
 the rest: your host tick (declared with `@(gd_step = "authority")`) and your
-[event halves](session.md#event-halves-game_event)
+[event halves](session.md#event-halves-and-generated-dispatch)
 (`my_game_player_joined`, `my_game_entity_spawned`, …):
 
 ```odin
@@ -86,9 +82,9 @@ my_game_step(self, ticks)    // hosts run the declared tick; clients no-op
 my_game_events(self, events) // dispatch to whichever halves you declared
 ```
 
-This is an events model, not callbacks, and it has no role branches: nothing
-calls into your half-initialized script, and the generated dispatch holds
-every `is_host`. The raw layer underneath (`wire_attach`/`wire_pump`,
+This is an events model, not an asynchronous callback model: game code runs
+while it drains `boot_pump`'s result. Generated dispatch applies each declared
+hook's execution policy. The raw layer underneath (`wire_attach`/`wire_pump`,
 `session_tick`/`session_poll`) stays public for games that want to drive it
 directly: [netgd](netgd.md), [session](session.md).
 
@@ -175,8 +171,8 @@ chest_take :: proc(self: ^Chest, slot: u8, count: u16, px, py: f32) -> (ok: bool
 }
 ```
 
-The code looks single-player and has zero role branches. The generated
-`chest_take_cmd` wrapper runs it authoritatively on the host and predictively
+The command body is ordinary mutation code. The generated `chest_take_cmd`
+wrapper runs it authoritatively on the host and predictively
 on clients; a false first return means no: state auto-reverts on every peer,
 and a rejection carries the authoritative truth back. Two players race the
 last item: both predict success, the host runs them in arrival order, the
@@ -184,7 +180,7 @@ loser reverts. Conflict resolution costs you nothing: it is the pipeline.
 
 A command may only mutate its target. The cross-entity half ("loot lands in my
 bag") is the verb's name-paired
-**[consequence](net.md#consequences-verb_then)**: results after the applied
+**[consequence](net.md#command-consequences)**: results after the applied
 bool are its payload, threaded into `<verb>_then` with the issuer and the wire
 args. It runs on the authority only (for client commands and the host's own)
 and never for a prediction:
@@ -259,7 +255,7 @@ never ships (the shadow diff sees no change). Edges must outlive a tick;
 anything genuinely event-shaped belongs in an explicit message
 ([comms](comms.md) or an app tag).
 
-Moderation matters too, because you are shipping this to the public internet.
+If strangers can join, add moderation and admission policy deliberately.
 The tools are `session_kick(player, ban)`, `session_set_locked`, and
 `Session_Config.max_players`, with `netgd.wire_drop` closing the kicked socket
 after the "you were kicked" message flushes. Returning identities pass lock and
@@ -340,7 +336,8 @@ over any MultiplayerPeer. Verify live with the Spacewar app id (480), a
 
 ## 11. Headless acceptance tests
 
-Every brick above lands with a **headless acceptance test**: two real
+The Cavecrawl example exercises these features with a headless acceptance test:
+two real
 processes, real ENet, 120ms injected latency, driving the real scene tree and
 grepping log lines (`examples/cavecrawl/run.sh` + `cave_test.gd`). When
 something feels wrong in play, reproduce it in the driver rather than in
@@ -348,15 +345,12 @@ playtests. The greps show you exactly what shipped. Steal the pattern: your
 game's `@(gd_method)` surface is drivable by a test script exactly like keys
 drive it in play.
 
-## 12. Server-authoritative games
+## 12. Moving contested state to the simulation lane
 
-This tutorial builds the friendslop shape: host-authoritative, friends-only,
-trust-your-peers. If the game you actually want is contested (a duel, a ranked
-ladder, anything where a client must not be trusted with its own position),
-the same declarative surface has a server-authoritative twin: tag fields
-`predict`, move their writes into a `@(gd_tick)`, and rollback-resimulation
-with lag compensation comes generated. It is chosen per field, so everything
-you built today (sessions, entities, verbs, chat, saves) carries over and the
-two models compose in one game. Read [timelines](timelines.md) to choose,
-[sim](sim.md) to build, including the "Promoting a coop game" checklist for
-exactly the game you just finished.
+This tutorial uses peer-owned movement, which is appropriate when the host
+trusts each owner to report its fast state. A duel, ranked game, or other
+contested design should derive movement from admitted input on the authority.
+Retag that state with `predict`, move its writes into `@(gd_tick)`, and attach
+the simulation lane. Session identity, entities, commands, chat, and saves can
+remain on their existing lanes. Read [Timelines](timelines.md) to choose a
+model and [kit/sim](sim.md#promoting-a-coop-game) for the migration checklist.
