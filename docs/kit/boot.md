@@ -10,46 +10,69 @@ Every component remains accessible as a public field, so a game can restyle,
 replace, reposition, or ignore individual widgets. Games with a custom shell
 can instead use `kit/netgd` and `kit/session` directly.
 
-## Wiring boot
+## The generated game-network facade
 
-Call `boot_attach` once from `_ready`, then install the generated entity table.
-Call `boot_pump` once per active frame.
+The normal game shell declares one direct `Boot`, `Session`, and `Comms` field.
+A simulation game also declares one direct `Lane`. From that shape, scriptgen
+generates `<game>_net_attach`, `<game>_net_pump`, and `<game>_net_detach`; no
+additional annotation is required.
 
 ```odin
 import gd "godot:godot"
 import kboot "godot:kit/boot"
+import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
+import ksess "godot:kit/session"
+
+My_Game :: struct {
+	owner: gd.Node2d,
+	boot:  kboot.Boot,
+	ses:   ksess.Session,
+	comms: kcomms.Comms,
+	// lane: ksim.Lane, // add for a game with @(gd_tick)
+}
 
 // _ready
-kboot.boot_attach(
-	&self.boot,
-	cast(gd.Node)self.owner,
-	&self.ses,
-	&self.comms,
+my_game_net_attach(
+	self,
 	kboot.Options{
 		title = "P U T T P U T T",
 		status = "Host a course, or join one at localhost",
 		legend = "Click: putt · Tab: scores · Enter: chat",
 		env = "GOLF",
 	},
+	kboot.network_profile(.Friends_Coop),
 )
-my_game_entities(self, &self.boot)
 
 // _process
 if kboot.boot_phase(&self.boot) != .Menu {
-	events, _, ticks := kboot.boot_pump(&self.boot, delta, knet.now_s())
-	my_game_step(self, ticks)    // generated for a co-op @(gd_step="authority")
-	my_game_events(self, events) // generated session-event dispatch
+	frame := my_game_net_pump(self, delta, knet.now_s())
+	my_game_step(self, frame.ticks) // generated for a co-op @(gd_step="authority")
 }
 ```
 
-`boot_pump` returns three values: `events` (every session event this frame)
-and `marks` (the comms markers), both allocated from the temporary allocator,
-plus `ticks` (the number of session network ticks advanced this frame).
+`my_game_net_attach` attaches Boot, installs the generated entity factory and
+typed message routes, arms declared migration hooks, and initializes/attaches
+the generated simulation lane when the class owns one. Its optional third
+argument is a complete `kboot.Network_Config`; zero selects `.Friends_Coop`.
+Start with `kboot.network_profile`, then override ordinary `session` or `lane`
+fields. The whole pair is validated before either layer starts. See
+[Network profiles](profiles.md).
+
+`my_game_net_pump` advances the network stack and dispatches every declared
+session-event half. It returns a `kboot.Net_Frame`: `marks` contains positional
+comms markers and `ticks` is the number of co-op network ticks advanced this
+frame. The marker slice is temporary and must be consumed this frame.
 
 `my_game_step` exists when a co-op game declares an
 `@(gd_step = "authority")` proc. A game with `kit/sim` attaches its lane with
-`boot_lane`; `boot_pump` then advances the simulation lane itself.
+the generated facade, and the pump advances that lane itself.
+
+The lower-level `boot_attach`, `<game>_entities`, `<game>_messages`,
+`<game>_lane_init`, `boot_lane`, `boot_pump`, and `<game>_events` procedures
+remain public. Use them when event dispatch or lane installation must occur at
+a custom point in the frame. A shell with multiple direct sessions or lanes is
+left on these explicit APIs because the generator cannot safely guess a graph.
 
 ## Standard signal methods
 
@@ -67,8 +90,9 @@ build time; use an empty string only when intentionally skipping a signal.
 ## Count time in net ticks, not frames
 
 Gameplay timers that must agree across peers should not count rendered frames.
-For a co-op authority loop, use the fixed network ticks returned by
-`boot_pump`. Presentation animations can continue to use frame `delta`.
+For a co-op authority loop, use the fixed network ticks returned by the
+generated network pump. Presentation animations can continue to use frame
+`delta`.
 
 Declare the authority pass and hand it those ticks; the generated proc holds
 the role gate and the loop:
@@ -78,8 +102,8 @@ the role gate and the loop:
 my_game_tick :: proc(self: ^MyGame) { /* decrement authority timers */ }
 
 // process():
-events, _, ticks := kboot.boot_pump(&self.boot, delta, now_s())
-my_game_step(self, ticks) // generated authority gate, loop, and edge pass
+frame := my_game_net_pump(self, delta, now_s())
+my_game_step(self, frame.ticks) // generated authority gate, loop, and edge pass
 ```
 
 ## Widgets and containers
@@ -101,11 +125,12 @@ in [ui.md's adopt contract](ui.md#adopting-your-own-scenes).
 
 ## The event loop
 
-`boot_pump` runs `wire_pump` and `session_tick`, walks every drained session
-event through Boot's forwarding table, and returns every session event plus
-positional comms markers. Pass the event slice to the generated
-`<game>_events` proc. Boot applies stock reactions first, then the generated
-dispatcher calls the game's declared [event halves](session.md#event-halves-and-generated-dispatch).
+`<game>_net_pump` runs `boot_pump`, then passes its event slice to the generated
+`<game>_events` dispatcher. Boot applies stock reactions first; the generated
+dispatcher then calls the game's declared [event
+halves](session.md#event-halves-and-generated-dispatch). The lower-level
+`boot_pump` returns `(events, marks, ticks)` when a game needs to choose exactly
+where that dispatch occurs.
 
 ### The forwarding table
 
@@ -133,25 +158,28 @@ host disconnect may remain in the current phase while succession attempts to
 re-seat the player.
 
 `boot_phase` is current state, not an event. To run work once when the world
-arrives, read the phase before `boot_pump` and compare it with the phase after
-the pump. See `examples/hello_net`.
+arrives, read the phase before `<game>_net_pump` and compare it with the phase
+after the pump. See `examples/hello_sim`.
 
-## Teardown: boot_detach
+## Teardown
 
-`boot_attach` builds a boot-owned stack; `boot_detach(b)` frees exactly what
-`boot_attach` and the doors allocated and zeroes the `Boot` back to its
-pre-attach state, so a fresh `boot_attach` rebuilds everything.
+Call the generated `<game>_net_detach(self)` when returning to a menu and later
+re-attaching in the same process. It destroys the simulation lane and comms
+routes first, releases Boot's wire/UI/entity state, then resets the session's
+live run and registry. Pre-start session wiring and configuration survive, so a
+fresh `<game>_net_attach` plus Host/Join starts from a clean run without losing
+the game's settings. The operation is idempotent.
 
-Call `boot_detach` on one flow: **back to menu, then re-host or re-join in the
-same live process.** It is the game's explicit verb, wired to no scene-exit
-hook: a game returning to its menu calls it. Skip it before a re-host in the
-same process and the previous run's tracking arrays, wire containers, and entity
-ledgers leak, and a second `ui_layer`/`stage`/`world` stacks onto the first. When
-the engine tears the whole node down it frees the same nodes anyway (boot lives
-as long as its node) and the Odin memory dies with the process, so there is
-nothing to hook.
-`boot_detach` is idempotent: it is safe to call on an already-detached
-(zeroed) `Boot`.
+The generated detach is an explicit game verb, not a scene-exit callback. When
+the engine tears the whole node down, it frees the node tree and the Odin
+process memory ends with it. Use detach for the flow that keeps the process
+alive across a complete network-stack reset.
+
+At the lower level, `boot_net_detach(b)` performs the same full ordered
+teardown using the session/comms/lane pointers retained by `Boot`.
+`boot_detach(b)` releases only the state created by `boot_attach` and the Boot
+doors; it deliberately leaves caller-owned lane, comms, and session values to
+their matching destroy procedures. All three forms are idempotent.
 
 **The ownership rule**, one line per layer: boot lives as long as its node;
 below boot, X destroys what X inits; node trees belong to the scene. Boot
@@ -258,9 +286,11 @@ submitting ENTER can't reopen the chat. `boot_keys_frame(b, "talk", "board",
 keyboard back from the chat — returning whether the keyboard was IN CHAT at
 frame start, which is the one gate your own hotkeys read
 (`kui.chat_typing(&b.chat)` is the raw predicate). `boot_net_stats(b)` returns
-the shared co-op [`kui.Net_Stats`](ui.md#netgraph) fill (rtt, link
-jitter/loss, malformed drops, bytes-by-kind); a sim-lane game lays its `sim` /
-lead / resim rows on the result before `netgraph_refresh`.
+the complete [`kui.Net_Stats`](ui.md#netgraph) fill: link quality,
+packet/byte rates, malformed/policy/rate drops, and bytes-by-kind. If
+`boot_lane` installed a simulation lane, the same call also fills lead/gaps,
+ack age, rewind/clamps, replay ticks/cost, command pressure, snapshot mix, and
+AOI pressure. Pass it directly to `netgraph_refresh`.
 
 ## The album (payload catch-up), registered
 
@@ -284,14 +314,15 @@ inherits a stale signaling socket.
 
 ## The entity factory
 
-Tag each exported entity scene with its script type and stable wire ID, then
-install the generated factory with `<game>_entities`:
+Tag each exported entity scene with its script type and stable wire ID. The
+generated network attach installs the factory automatically; `<game>_entities`
+is the lower-level installer for a custom shell:
 
 ```odin
 // Game struct: assign this PackedScene in the Inspector.
 mob_scene: ^gd.Resource `gd:"entity=Mob:3"`,
 
-// _ready, after boot_attach:
+// custom _ready, after boot_attach:
 scrapyard_entities(self, &self.boot)
 
 // Optional bookkeeping hook. Spawn fields have not been applied yet.
@@ -365,20 +396,39 @@ working, and `session_set_factory` remains the escape hatch for exotic creation.
 Every `entity=` tag also generates the typed queries that stand in for a
 hand-kept `map[Net_Id]^T` plus owner and `avatar_of` mirrors; they read the
 kit's own ledgers instead (the registry's entity and owner, the boot's type
-table):
+index):
 
 ```odin
 mob, ok := mob_of(&self.boot, id)          // the entity behind an id
 mine, ok := my_mob(&self.boot)             // this player's avatar
 theirs, ok := mob_owned_by(&self.boot, pid)
-for id in mob_ids(&self.boot) { ... }      // every live Mob (temp-alloc)
+ref := mob_ref(id)                         // knet.Net_Ref(Mob), not a raw pointer
+mob, ok = mob_of(&self.boot, ref)          // same lookup, type checked
+for tracked in mob_all(&self.boot) {       // one-pass, temp-allocated
+	tracked.entity.think()
+	remember(tracked.ref)
+	_ = tracked.id
+	_ = tracked.owner
+}
+for id in mob_ids(&self.boot) { ... }      // compatible ID-only view
 owner := kboot.boot_entity_owner(&self.boot, id) // the owner_pid map
 ```
 
-These queries often remove the need for game-maintained mirrors. The owned/ID
-queries scan the type ledger; measure them before using repeated full scans in a
-hot loop, and keep a game-side index when the query is genuinely
-performance-critical.
+`Net_Ref(T)` contains the stable `Net_Id`, not an entity pointer. Different
+entity types are different Odin types, and `*_of` checks the live type again
+when it resolves; a despawned or wrong-kind reference returns `(nil, false)`.
+This is the value to retain across frames or store as a replicated POD relation.
+The pointer in `Net_Entity(T)` is frame-local: retain `tracked.ref`, not
+`tracked.entity`, across a despawn boundary.
+
+The per-type index is sorted by `Net_Id`, so a query walks only that entity
+kind and cross-entity simulation passes have the same order on every peer.
+`*_all` resolves the pointer and current owner together instead of the old
+`*_ids` + `*_of` + owner triple lookup. ID-only access remains for compatibility.
+Client-predicted entities are included while they live under provisional IDs;
+Boot carries the provisional-to-authoritative alias when a predicted spawn is
+rekeyed, so a reference retained at fire time continues resolving. The alias is
+retired with the entity; the reference then resolves false like any despawn.
 
 ## Host migration
 

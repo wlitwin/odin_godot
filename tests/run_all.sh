@@ -67,7 +67,10 @@ TESTS=(
     "events|EVENTS_OK|tests/events/run.sh"
     # Golden test for scriptgen's nested replicated/tagged-field discovery (same-package,
     # imported bundles, and the loud plain-nesting guardrail) — drives the binary, no Godot.
-    "scriptgen|SCRIPTGEN_OK|tests/scriptgen/run.sh"
+	"scriptgen|SCRIPTGEN_OK|tests/scriptgen/run.sh"
+	# Recursive canonical wire ABI: one generated schema/fingerprint plus a raw
+	# byte vector accepted identically by native, wasm32, Linux, and Windows.
+	"wireabi|WIREABI_OK|tests/wireabi/run.sh"
     # THE WEB-TARGET COMPILE PIN: `odin check` of every godot:kit/* package plus
     # core/play/flowgd for freestanding_wasm32 — no Emscripten, no browser, under a
     # second. The browser-gated web suites below export toy projects that never link
@@ -81,12 +84,16 @@ TESTS=(
     # engine-free core (predict subset, history ledger, input pipeline + hold-last,
     # sim ticker/lead control, the compare -> rewind -> replay reconcile).
     "kitsim|KITSIM_OK|tests/kitsim/run.sh"
+    # Pure-Odin checks for the named complete-stack network profiles: resolved
+    # rates/history plus cross-field and dedicated-authority guardrails.
+    "kitnetcfg|KITNETCFG_OK|tests/kitnetcfg/run.sh"
     # Pure-Odin unit tests for kit/session — player identity (reconnect tokens ->
     # stable Player_Ids), join/leave/reconnect, roster sync, zombie takeover.
     "kitsession|KITSESSION_OK|tests/kitsession/run.sh"
-    # The kit's SCALE benchmark — delta walk / join snapshot / save-resume at
-    # 100/500/2000 entities. Correctness asserted hard; timings printed with
-    # loose O(n^2) tripwires only (see the STRESS table in the log).
+    # The kit's SCALE benchmark — delta/join/save CPU+bytes+memory at
+    # 100/500/2000 entities, per-recipient fanout at 2/4/8 players, and forced
+    # resimulation at 32/128/512 predicted entities. Timings use loose
+    # complexity tripwires (see STRESS/FANOUT/RESIM in the log).
     "kitstress|KITSTRESS_OK|tests/kitstress/run.sh"
     # Pure-Odin unit tests for kit/comms — host-ordered chat, positional
     # markers, system lines, late-join catchup, and SES_APP route gating.

@@ -61,7 +61,7 @@ matter:
 | **Methods** | `@(gd_method)`: callable from GDScript, as signal targets, and **typed cross-script** (`rt.script_of`) |
 | **Classes** | `extends` any engine class, global `class_name`, custom **resources** (`.tres`), **autoload** singletons |
 | **Editor** | `@tool` scripts, `gd.is_editor()`, custom icons, **EditorPlugin**, live error squiggles + autocomplete |
-| **Multiplayer** | Kit provides session replication with `gd:"replicate"` and `gd:"owner"` fields, commands, generated entity factories, drop-in join, reconnect, and host migration. Its [simulation lane](docs/kit/sim.md) adds `gd:"predict"`, fixed ticks, server authority, reconciliation, and bounded lag compensation for contested state. The lanes compose per field ([choosing a model](docs/kit/timelines.md)). `@(gd_rpc)` remains available for Godot's engine-native path. |
+| **Multiplayer** | Kit provides session replication with `gd:"replicate"` and `gd:"owner"` fields, commands, generated entity factories, drop-in join, reconnect, and host migration. Its [simulation lane](docs/kit/sim.md) adds `gd:"predict"`, fixed ticks, server authority, reconciliation, and bounded lag compensation for contested state. The lanes compose per field ([choosing a model](docs/kit/timelines.md)); [named profiles](docs/kit/profiles.md) validate coherent co-op, listen-server, or dedicated settings. `@(gd_rpc)` remains available for Godot's engine-native path. |
 | **Ship it** | hot reload on save, native desktop export, WebAssembly export |
 | **Scale it** | opt-in [script modules](docs/modules.md): one dll per `res://modules/<name>`, rebuilt + hot-swapped independently so save latency stays flat in large projects |
 
@@ -94,6 +94,7 @@ toolchain, wires the extension into a Godot project, and walks you through your 
 script from empty file to a moving node. Here for multiplayer? The
 **[quickstart](docs/kit/quickstart.md)** goes zero-to-two-windows in two small files, and
 its **[sim twin](docs/kit/quickstart-sim.md)** promotes the same game to server authority.
+Choose its trust and timing baseline from the **[network profiles](docs/kit/profiles.md)**.
 
 ## Documentation
 

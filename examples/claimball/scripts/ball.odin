@@ -108,7 +108,7 @@ ball_tick :: proc(self: ^Ball) -> (scored: u8) {
 // authority — without it this spike would be the ball owner's alone
 // (predict-world marks avatars contested too, and their verbs must not
 // open to opponents for free).
-@(gd_command = "any_seat")
+@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
 ball_spike :: proc(self: ^Ball, px, py: f32) -> bool {
 	if self.score.won != 0 || self.hold > 0 {return false}
 	dx := self.roll.x - px

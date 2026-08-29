@@ -34,7 +34,7 @@ host decides if it's true. The pipeline around that idea is generated.
 ## Writing a command
 
 ```odin
-@(gd_command = "predict,any_seat") // this chest is a world interaction
+@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED) // this chest is a world interaction
 chest_take :: proc(self: ^Chest, slot: u8, count: u16, px, py: f32) -> bool {
 	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false}
 	taken := kitems.take(self.slots[:], int(slot), count)
@@ -59,7 +59,9 @@ right thing wherever it's called:
 - **If the host says no** (out of range according to the host's truth, or the
   item is already gone), the client's predicted mutation **reverts
   automatically**, and the rejection carries the authoritative state back with
-  it.
+  it. A generated `<game>_command_rejected` half receives a typed reason such
+  as `.Predicate`, `.Stale`, or `.Timeout`; gameplay never decodes a reply or
+  guesses why silence happened.
 
 Run the race that broke the RPC version: two players grab the last item in the
 same instant. Both predict success, so both screens show the grab instantly. The

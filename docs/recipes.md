@@ -164,7 +164,7 @@ play.arm(&self.next_shot, now + f64(cd + 1) / hz)   // +1 tick of grace over the
 host from the same code:
 
 ```odin
-@(gd_command = "predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 runner_fire :: proc(self: ^Runner, dx, dy, ox, oy: f32) -> bool { ... }
 ```
 

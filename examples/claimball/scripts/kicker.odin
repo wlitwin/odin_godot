@@ -30,12 +30,14 @@ Kicker :: struct {
 	pid: u8 `gd:"replicate"`,
 
 	mine:    bool,
-	painted: bool,
+	painted: bool
 }
 
+@(gd_input)
+
 Kicker_Input :: struct {
-	move:    [2]i8,
-	buttons: u8,
+	move:    [2]i8 `gd:"range=-1:1"`,
+	buttons: u8 `gd:"mask=0x01"`
 }
 
 BTN_KICK :: u8(1)

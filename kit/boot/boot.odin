@@ -11,38 +11,31 @@ package kit_boot
 // game reacts to whatever it cares about, and Start/spawning/verbs remain
 // entirely yours.
 //
-//     // ready():
-//     kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{
+//     // ready(): the conventional Boot + Session + Comms fields generate this
+//     my_game_net_attach(self, kboot.Options{
 //         title    = "P U T T P U T T",
 //         status   = "Host a course, or join one at localhost",
 //         legend   = "click: putt · Tab scores · Enter chat",
 //         msg_kind = MSG_SESSION,
 //         latency_env = "GOLF_LATENCY",
-//         methods  = {"on_host", "on_join", "on_start", "on_chat",
-//                     "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 //     })
 //
-//     // process(): the whole loop, role-free — both procs are generated
-//     events, marks, ticks := kboot.boot_pump(&self.boot, delta, now_s())
-//     my_game_step(self, ticks)    // @(gd_step="authority"): host gate + edge pass inside
-//     my_game_events(self, events) // dispatch over the declared session event halves
+//     // process(): network pump + event dispatch in one generated call
+//     frame := my_game_net_pump(self, delta, now_s())
+//     my_game_step(self, frame.ticks) // @(gd_step="authority"): host gate + edge pass
 //
 // The eight @(gd_method) names stay the game's to declare — Godot signals
 // must land on the game's script class; their bodies are one-liners (see
 // either example game's net.odin).
 //
-// LIFECYCLE — boot_attach builds a boot-owned stack; boot_detach tears it all
-// down for a back-to-menu → re-host in one live process (the ONE flow that
-// crosses attach without freeing the game's node). THE OWNERSHIP RULE, one
-// line for every layer here: boot lives as long as its node; below boot, X
-// destroys what X inits; node trees belong to the scene. boot created the
-// container nodes (ui_layer/stage/world), so boot_detach queue-frees THOSE and
-// their subtrees ride down; the kui *_destroy calls free only their tracking
-// arrays; wire_detach frees the wire's own containers. See boot_detach.
+// LIFECYCLE — the generated `<game>_net_detach` tears down lane, comms, Boot,
+// and Session in dependency order for a back-to-menu → reattach in one live
+// process. The lower boot_detach owns only boot_attach's slice. See both procs.
 
 import gd "godot:godot"
 import "godot:gdext"
 import kcomms "godot:kit/comms"
+import kcfg "godot:kit/netcfg"
 import kxfer "godot:kit/xfer"
 import knet "godot:kit/net"
 import netgd "godot:kit/netgd"
@@ -52,6 +45,19 @@ import ksim "godot:kit/sim"
 import kui "godot:kit/ui"
 import "core:fmt"
 import "core:strings"
+
+// The generated facade exposes the complete-stack profiles through kboot so a
+// game needs no extra import. The implementation stays engine-free in
+// kit/netcfg, where its value and validation contract are unit tested.
+Network_Profile :: kcfg.Network_Profile
+Network_Config :: kcfg.Network_Config
+Network_Capabilities :: kcfg.Network_Capabilities
+Network_Config_Error :: kcfg.Network_Config_Error
+network_profile :: kcfg.network_profile
+network_config_resolve :: kcfg.network_config_resolve
+network_config_check :: kcfg.network_config_check
+network_config_error :: kcfg.network_config_error
+network_configure :: kcfg.network_configure
 
 // The eight signal landing pads, in one fixed order: host/join/start button
 // presses, chat submit, then the four transport forwards. A zero Methods
@@ -91,6 +97,15 @@ Boot_Phase :: enum u8 {
 	Connecting,
 	Lobby,
 	Playing,
+}
+
+// The game-facing residue of one generated `<game>_net_pump`: declared
+// session events have already reached their typed halves, while chat markers
+// and the co-op fixed-step count remain game-shaped work. Both slices are
+// frame-temporary, exactly like boot_pump's results; consume them this frame.
+Net_Frame :: struct {
+	marks: []kcomms.Ev_Marker,
+	ticks: int,
 }
 
 // WHERE THE BOOT STANDS — derived, not tracked.
@@ -246,6 +261,19 @@ Boot :: struct {
 	// kit/session's despawn contract and finding a second home for provisional
 	// ids; keeping it costs one map entry per live entity.
 	ent_types: map[knet.Net_Id]ksess.Entity_Type,
+	// Per-kind linked indexes over ent_types. The old census scanned EVERY
+	// entity to answer `<kind>_ids` / owner queries, then hot loops looked each
+	// id up again. Heads + links make a kind walk proportional to that kind and
+	// preserve one canonical ledger for authoritative and provisional ids.
+	// Links are sorted by Net_Id, which also makes cross-entity sim passes
+	// deterministic across peers instead of inheriting map iteration order.
+	ent_heads: map[ksess.Entity_Type]knet.Net_Id,
+	ent_next:  map[knet.Net_Id]knet.Net_Id,
+	ent_prev:  map[knet.Net_Id]knet.Net_Id,
+	// A predicted entity changes from its local provisional id to the
+	// authority's real id without changing identity. Keep that one local alias
+	// so a typed ref retained at fire time continues resolving after the match.
+	ent_alias: map[knet.Net_Id]knet.Net_Id,
 
 	// boot_migration's state (succession.odin): the rendezvous ceremony, the
 	// generated hook table, and the latches every migrating game hand-kept
@@ -423,11 +451,11 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 	}
 }
 
-// THE teardown verb — boot_attach's symmetric twin, for the ONE flow that
+// Boot's teardown verb — boot_attach's symmetric twin, for the ONE flow that
 // keeps the process alive across it: back to menu, then re-host/re-join in the
-// same run. boot_attach's whole stack is boot-owned, and without this it LEAKED
-// on every return (the widget tracking arrays, the wire's gauge + shim
-// containers, the entity ledgers, the succession clones) and DOUBLED on every
+// same run. boot_attach's slice is boot-owned, and without this it LEAKED on
+// every return (the widget tracking arrays, the wire's gauge + shim containers,
+// the entity ledgers, the succession clones) and DOUBLED on every
 // re-host (a second ui_layer/stage/world forest piled onto the first, Godot
 // auto-renaming the collisions). boot_detach frees exactly what boot_attach and
 // the doors allocated, queue-frees the container nodes boot itself created (see
@@ -435,12 +463,10 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 // boot_attach then rebuilds everything. Idempotent: safe on an already-detached
 // (zeroed) Boot, every free below no-ops on a nil container.
 //
-// NOT wired to any scene-exit hook, on purpose — it is the GAME's explicit verb
-// for "undo the attach and keep running". A game returning to its menu calls
-// it; the engine tearing the whole node down (scene change, quit) frees the
-// same nodes anyway — boot lives as long as its node — and the Odin memory dies
-// with the process, so there is nothing to hook. Call it when you mean to keep
-// the process, nowhere else.
+// NOT wired to any scene-exit hook, on purpose. The normal game calls its
+// generated `<game>_net_detach`, which wraps this and destroys the sibling
+// lane/comms/session too. A custom shell calls this only when it is separately
+// honoring those values' destroy contracts.
 //
 // THE OWNERSHIP RULE: boot lives as long as its node; below boot, X destroys
 // what X inits; node trees belong to the scene. boot CREATED the container
@@ -472,6 +498,10 @@ boot_detach :: proc(b: ^Boot) {
 	boot_entities_clear(b)
 	delete(b.ent_nodes)
 	delete(b.ent_types)
+	delete(b.ent_heads)
+	delete(b.ent_next)
+	delete(b.ent_prev)
+	delete(b.ent_alias)
 	// The boot-owned string clones the doors minted (callers passed temps;
 	// boot_succ_end may have pre-freed succ_room — delete("") is a no-op).
 	delete(b.web_room)
@@ -495,6 +525,31 @@ boot_detach :: proc(b: ^Boot) {
 	}
 	b^ = {} // back to pre-attach — the ses/comms/lane pointers included (a fresh
 	// boot_attach re-supplies them); env / ent_kinds were the game's, never ours.
+}
+
+// The whole network stack's symmetric teardown, used by the generated
+// `<game>_net_detach`. Boot owns the lifecycle even though the values remain
+// public sibling fields on the game struct: destroy riders before the Session
+// they are registered on, let boot release its wire/UI/entity slice while its
+// pointers are still live, then reset the Session run/registry. Its pre-start
+// configuration and generated wiring survive for a fresh attach + start.
+//
+// The pointers are captured before boot_detach zeroes Boot. Every destroy is
+// nil/zero-safe, so this is idempotent and a detached game can attach afresh.
+boot_net_detach :: proc(b: ^Boot) {
+	lane := b.lane
+	comms := b.comms
+	ses := b.ses
+	if lane != nil {
+		ksim.lane_destroy(lane)
+	}
+	if comms != nil {
+		kcomms.comms_destroy(comms)
+	}
+	boot_detach(b)
+	if ses != nil {
+		ksess.session_reset(ses)
+	}
 }
 
 // The frame preamble + the boilerplate half of the event drain. Pumps the
@@ -1012,27 +1067,59 @@ boot_code_pulse :: proc(b: ^Boot) {
 	}
 }
 
-// The COOP netgraph fill — the shared Net_Stats core both example games built
-// identically each frame: rtt off the replicated ping stat, the link's own
-// jitter/loss (netgd.wire_link_quality — clients read it about the host; the
-// host has no link to itself, so those stay 0 = "quiet"), the malformed-packet
-// drop count, and the wire's opaque bytes-by-kind line. A coop game passes the
-// result straight to kui.netgraph_refresh; a sim-lane game fills the `sim`/
-// lead/resim/recon rows on the returned value first (see quickdraw).
+// The complete netgraph fill. Co-op games get link, traffic, malformed, policy,
+// and rate telemetry; boot_lane adds the simulation lane's lead/gap/ack/rewind,
+// replay cost, command pressure, snapshot mix, and AOI pressure automatically.
 //
 // The traffic string is temp-allocated (netgd.wire_traffic's default), so it
 // only lives to the end of the frame — refresh the graph the same frame you
 // call this (every caller does).
 boot_net_stats :: proc(b: ^Boot) -> kui.Net_Stats {
+	rates := netgd.wire_rates(&b.wire)
+	ingress := ksess.session_authority_ingress_stats(b.ses)
 	ng := kui.Net_Stats {
 		rtt_ms     = kui.net_ping_ms(b.ses),
-		drops      = ksess.session_malformed(b.ses),
+		drops      = ksess.session_malformed(b.ses) + ingress.by_reason[int(knet.Action_Reject_Reason.Malformed)],
+		packets_in = rates.packets_in,
+		packets_out = rates.packets_out,
+		bytes_in   = rates.bytes_in,
+		bytes_out  = rates.bytes_out,
+		policy_drops = ingress.by_reason[int(knet.Action_Reject_Reason.Access)] + ingress.by_reason[int(knet.Action_Reject_Reason.Predicate)],
 		guard_hits = ksess.session_guard_hits(b.ses), // a client wrote a host-lane field (either model) — surface it beside drops
+		traffic_dropped = ksess.session_traffic_dropped(b.ses),
 		traffic    = netgd.wire_traffic(&b.wire),
 	}
 	if _, jit, loss, has := netgd.wire_link_quality(&b.wire, ksess.HOST_PEER); has {
 		ng.jitter_ms = jit
 		ng.loss_pct = loss
+	}
+	if b.lane != nil {
+		lane := ksim.lane_net_stats(b.lane)
+		ng.sim = true
+		ng.lead = lane.lead
+		ng.input_gaps = lane.input_gaps
+		ng.ack_age = lane.ack_age
+		ng.rewind_depth = lane.rewind_depth
+		ng.resims = lane.resim_ticks
+		ng.resim_seconds = lane.resim_seconds
+		ng.recons = b.lane.stat_reconciles
+		ng.command_queue = lane.command_queue
+		ng.fact_drops = b.lane.stat_facts_dropped
+		ng.snapshot_rows = lane.snapshot_rows
+		ng.snapshot_full = lane.snapshot_full
+		ng.snapshot_delta = lane.snapshot_delta
+		ng.snapshot_suppressed = lane.snapshot_suppressed
+		ng.snapshot_deferred = lane.snapshot_deferred
+		ng.snapshot_aoi_culled = lane.aoi_culled
+		ng.snapshot_bytes = lane.snapshot_bytes
+		ng.input_drops = b.lane.stat_input_drops
+		ng.input_rejected = b.lane.stat_input_rejected
+		ng.ack_rejected = b.lane.stat_ack_rejected
+		ng.cmd_capped = b.lane.stat_cmd_capped
+		ng.cmd_rate = b.lane.stat_cmd_rate_dropped
+		ng.cmd_rejected = b.lane.stat_cmd_rejected
+		ng.rewind_clamped = b.lane.stat_rewind_clamped
+		ng.echo_dropped = b.lane.stat_echo_dropped
 	}
 	return ng
 }

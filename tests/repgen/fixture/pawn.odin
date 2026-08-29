@@ -13,23 +13,23 @@ import ksim "godot:kit/sim"
 import psim "godot:play/sim"
 
 Pawn :: struct {
-	owner:  gd.Node2d,
-	net_id: knet.Net_Id, // command wire identity (assigned by the session layer)
-	hp:     i32 `gd:"replicate"`,
-	x, y:   f32 `gd:"owner,interp"`, // multi-name: one desc entry per name
-	rot:    gd.Quaternion `gd:"owner,interp"`, // classified to hemisphere-safe nlerp
-	aim:    f32 `gd:"owner,interp=pawn_blend_aim"`, // custom blend math
-	heat:   f32 `gd:"replicate,wire=f16"`, // stock half-float wire encoding
-	charge: i32 `gd:"replicate,wire=pawn_charge_codec"`, // custom fixed-size codec
-	px, py: f32 `gd:"predict,interp,slack=0.5,glide=0.1,cut=32"`, // kit/sim: per-field reconcile slack + render-error glide/cut
-	fuel:   u16 `gd:"predict"`, // predicted without interp: steps, never lerps
-	pace:   Pace, // TICK-COMPOSITION: the block's step hoists, runs after pawn_tick
-	chill:  psim.Cool, // IMPORTED-shelf tick block: the hoist crosses packages
-	warm:   psim.Cool `gd:"manual"`, // MANUAL: predict field still flattens, but the tick is NOT hoisted (the wielder drives it)
-	state:  u8 `gd:"replicate"`,
-	lap:    u8 `gd:"owner"`, // a DISCRETE owner field: an owner-local one-shot counter (dash/jump/emote) — it edges (no interp)
-	speed:  f64 `gd:"export,range=0:10"`, // exports and replicates coexist
-	local:  int, // untagged: never replicated
+	owner:     gd.Node2d,
+	net_id:    knet.Net_Id, // command wire identity (assigned by the session layer)
+	hp:        i32 `gd:"replicate"`,
+	x, y:      f32 `gd:"owner,interp"`, // multi-name: one desc entry per name
+	rot:       gd.Quaternion `gd:"owner,interp"`, // classified to hemisphere-safe nlerp
+	aim:       f32 `gd:"owner,interp=pawn_blend_aim"`, // custom blend math
+	heat:      f32 `gd:"replicate,wire=f16"`, // stock half-float wire encoding
+	charge:    i32 `gd:"replicate,wire=pawn_charge_codec"`, // custom fixed-size codec
+	px, py:    f32 `gd:"predict,interp,slack=0.5,glide=0.1,cut=32"`, // kit/sim: per-field reconcile slack + render-error glide/cut
+	fuel:      u16 `gd:"predict"`, // predicted without interp: steps, never lerps
+	pace:      Pace, // TICK-COMPOSITION: the block's step hoists, runs after pawn_tick
+	chill:     psim.Cool, // IMPORTED-shelf tick block: the hoist crosses packages
+	warm:      psim.Cool `gd:"manual"`, // MANUAL: predict field still flattens, but the tick is NOT hoisted (the wielder drives it)
+	state:     u8 `gd:"replicate"`,
+	lap:       u8 `gd:"owner"`, // a DISCRETE owner field: an owner-local one-shot counter (dash/jump/emote) — it edges (no interp)
+	speed:     f64 `gd:"export,range=0:10"`, // exports and replicates coexist
+	local:     int, // untagged: never replicated
 	// gd:"backup" — host-local migration/save state, all three kinds; the nested
 	// one (pace.beat) proves the walk rides `using`/embeds like replicate does.
 	save_seed: u32 `gd:"backup"`, // Pod: write_pod whole
@@ -45,9 +45,18 @@ pawn_blend_aim :: proc(dst, a, b: rawptr, alpha: f32) {
 
 // The sim-lane surface: a POD input struct (discovered from the tick proc's
 // signature — no tag) and the @(gd_tick) step, full shape (input + lane).
+Pawn_Mode :: enum u8 {
+	On_Foot,
+	Driving,
+}
+
+@(gd_input)
 Pawn_Input :: struct {
-	move:    [2]i8,
-	buttons: u8,
+	look:    [2]f32 `gd:"unit"`,
+	trigger: f32 `gd:"finite,range=0:1"`,
+	move:    [2]i8 `gd:"range=-1:1"`,
+	buttons: u8 `gd:"mask=0x0f"`,
+	mode:    Pawn_Mode `gd:"enum"`,
 }
 
 @(gd_tick)
@@ -95,7 +104,7 @@ pawn_tick_fx :: proc(self: ^Pawn, dashed: bool) {
 // The custom codec `charge` names — a knet.Wire_Codec: i32 charge (0..255)
 // ships as one byte. Same verbatim-splice contract as the blend proc.
 pawn_charge_codec :: knet.Wire_Codec {
-	size   = 1,
+	size = 1,
 	encode = proc(wire, field: rawptr) {(^u8)(wire)^ = u8(clamp((^i32)(field)^, 0, 255))},
 	decode = proc(field, wire: rawptr) {(^i32)(field)^ = i32((^u8)(wire)^)},
 }
@@ -106,7 +115,7 @@ pawn_ready :: proc(self: ^Pawn) {
 
 // Predicted command: single-player-looking mutation, runs on the host AND
 // optimistically on the issuing client (same proc, byte-identical args).
-@(gd_command = "predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 pawn_hit :: proc(self: ^Pawn, amount: i32) -> bool {
 	if self.hp <= 0 {return false}
 	self.hp -= amount
@@ -124,7 +133,7 @@ pawn_hit_apply :: proc(self: ^Pawn, amount: i32) {
 // Authority-only command: string + id args exercise the wider wire types.
 // `who` is a player the verb TARGETS — ordinary wire data, legal under any name
 // but the reserved `by`.
-@(gd_command = "authority")
+@(gd_command = knet.ACTION_AUTHORITY)
 pawn_mark :: proc(self: ^Pawn, label: string, who: knet.Player_Id) -> bool {
 	self.state = 1
 	return true
@@ -132,7 +141,7 @@ pawn_mark :: proc(self: ^Pawn, label: string, who: knet.Player_Id) -> bool {
 
 // The ISSUER param on a SIM-lane verb: `by` is the seat the lane resolved (me
 // speculating, the ledgered seat on the host), spliced before the wire args.
-@(gd_command)
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 pawn_salute :: proc(self: ^Pawn, by: knet.Player_Id, style: u8) -> bool {
 	if style == 0 {return false}
 	self.state = style
@@ -143,7 +152,7 @@ pawn_salute :: proc(self: ^Pawn, by: knet.Player_Id, style: u8) -> bool {
 // in-process facts threaded into `pawn_loot_then` — fired on the AUTHORITY
 // only, with the issuer and the verb's own wire args. Entity-local shape
 // (no leading game param); the game-threaded shape is proven by the examples.
-@(gd_command = "predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 pawn_loot :: proc(self: ^Pawn, slot: i32) -> (ok: bool, got: u8) {
 	if self.state != 0 {return false, 0}
 	self.state = 1

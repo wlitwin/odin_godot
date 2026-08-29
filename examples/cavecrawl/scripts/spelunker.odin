@@ -49,7 +49,7 @@ spelunker_hp_codec :: knet.Wire_Codec {
 
 // Drop a bag slot at my feet: my bag empties on my screen this frame; the
 // host's consequence below mints the Pickup entity everyone sees.
-@(gd_command = "predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 spelunker_drop :: proc(self: ^Spelunker, slot: i32) -> (ok: bool, dropped: kitems.Slot) {
 	if self.hp <= 0 {return false, {}} // the dead drop everything on their own
 	dropped = kitems.take(self.bag[:], int(slot), max(u16))
@@ -73,7 +73,7 @@ spelunker_drop_then :: proc(game: ^CaveLobby, self: ^Spelunker, by: knet.Player_
 // copy makes the authoritative rock fly a different line than the one the
 // shooter SAW hit. Leashed against our copy: honest latency offsets pass,
 // teleports don't (on the caster's own prediction ox,oy == x,y — no-op).
-@(gd_command = "predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 spelunker_throw :: proc(self: ^Spelunker, dx: f32, dy: f32, ox: f32, oy: f32) -> (ok: bool, fx: f32, fy: f32) {
 	if self.hp <= 0 {return false, 0, 0}
 	if dx == 0 && dy == 0 {return false, 0, 0}
@@ -96,7 +96,7 @@ spelunker_throw_then :: proc(game: ^CaveLobby, self: ^Spelunker, by: knet.Player
 // Add a channel timer on top if your game wants held-E revives.
 // PREDICTED: the friend is up on the reviver's screen this frame; a stale
 // revive (they bled out between screens) reverts through reject-truth.
-@(gd_command = "predict,any_seat")
+@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
 spelunker_revive :: proc(self: ^Spelunker, px: f32, py: f32) -> bool {
 	if self.hp > 0 {return false} // not down: nothing to revive
 	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false}
@@ -107,7 +107,7 @@ spelunker_revive :: proc(self: ^Spelunker, px: f32, py: f32) -> bool {
 // Bandage up: the second ability slot. Self-targeted, so this command IS
 // the whole effect — no host hook half at all: the same proc heals
 // instantly on the caster's screen and re-runs authoritatively on the host.
-@(gd_command = "predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 spelunker_heal :: proc(self: ^Spelunker) -> bool {
 	if self.hp <= 0 || self.hp >= MAX_HP {return false} // corpses and the hale need no bandage
 	if !kcombat.ability_try(self.cds[:], 1, HEAL_ABILITY, &self.stamina) {return false}

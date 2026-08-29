@@ -38,7 +38,7 @@ import "core:strings"
 // How a token is recognized. A Prefix token carries a value after its `=`.
 Match :: enum u8 {
 	Exact,
-	Prefix,
+	Prefix
 }
 
 // Where a token may appear inside the tag. FIRST tokens select the field's
@@ -55,7 +55,7 @@ Match :: enum u8 {
 // every true row is a First.
 Slot :: enum u8 {
 	First,
-	Spec,
+	Spec
 }
 
 // WHO consumes the token — the fact the runtime's skip list is a projection
@@ -106,7 +106,7 @@ Field_Token :: struct {
 	// How the token is spelled in an error message ("`onready=PATH`"), and the
 	// one-line gloss the docs table shows.
 	spelling:    string,
-	blurb:       string,
+	blurb:       string
 }
 
 // THE THREE LANES ARE THREE TOKENS. `owner` and `predict` used to be options
@@ -127,7 +127,7 @@ FIELD_TOKENS :: []Field_Token {
 	{"manual", .Exact, .First, .Scriptgen, false, "`manual`", "I call the generated thing myself"},
 	{"profile=", .Prefix, .First, .Scriptgen, true, "`profile=T`", "the per-player profile row type"},
 	{"entity=", .Prefix, .First, .Reflect, true, "`entity=Name:id`", "a spawnable entity type and its stable id (an exported PackedScene slot, synthesized)"},
-	{"args=", .Prefix, .Spec, .Reflect, false, "`args=a,b`", "a signal payload's parameter names"},
+	{"args=", .Prefix, .Spec, .Reflect, false, "`args=a,b`", "a signal payload's parameter names"}
 }
 
 // The three replication lanes, in the order the docs table reads. Each is a
@@ -248,7 +248,7 @@ Field_Policy :: struct {
 	// dispatch, so the same refusal can never again be worded two ways in two
 	// places — which is exactly how the two sites drifted apart. "" for Handle /
 	// Caller (the completeness check enforces the pairing both directions).
-	reason: string,
+	reason: string
 }
 
 // THE TABLE. One row per (FIELD_TOKENS token x Field_Site); scriptgen's
@@ -286,14 +286,14 @@ FIELD_POLICY :: []Field_Policy {
 		"profile=",
 		.Nested,
 		.Refuse,
-		"`profile=` declares on the class's OWN ksess.Session field — nested in an embed it silently never installs; move the declaration to the top level",
+		"`profile=` declares on the class's OWN ksess.Session field — nested in an embed it silently never installs; move the declaration to the top level"
 	},
 	{"entity=", .Top_Level, .Handle, ""},
 	{
 		"entity=",
 		.Nested,
 		.Refuse,
-		"`entity=` declares on the class's OWN scene field — nested in an embed the export registers but the factory/type row silently never exists; move the field to the top level",
+		"`entity=` declares on the class's OWN scene field — nested in an embed the export registers but the factory/type row silently never exists; move the field to the top level"
 	},
 	// `manual` opts an embed's tick out of auto-hoist. TOP LEVEL the caller
 	// (parse_script) consumes it — it recurses the embed and suppresses only the
@@ -305,12 +305,12 @@ FIELD_POLICY :: []Field_Policy {
 		"manual",
 		.Nested,
 		.Refuse,
-		"`gd:\"manual\"` only works on the class's OWN embed — nested one level down it silently skips the whole sub-block (no predict fields, no backups, no tick). Move the embed to the top level and tag it there",
+		"`gd:\"manual\"` only works on the class's OWN embed — nested one level down it silently skips the whole sub-block (no predict fields, no backups, no tick). Move the embed to the top level and tag it there"
 	},
 	// A signal payload's parameter NAMES: a Spec token (it rides behind a signal
 	// TYPE), so as a leading token it is the wrong slot at either site.
 	{"args=", .Top_Level, .Refuse, "`args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)"},
-	{"args=", .Nested, .Refuse, "`args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)"},
+	{"args=", .Nested, .Refuse, "`args=` is only valid on a signal field (gd.Signal0 … gd.Signal4)"}
 }
 
 // The policy for `token` (a FIELD_TOKENS name) at `site`. ok=false means the
@@ -362,7 +362,7 @@ Export_Spec :: struct {
 	// insisted on one or the other would refuse working tags.
 	bare:  bool, // legal as a bare token
 	value: bool, // legal as `name=VALUE`
-	blurb: string,
+	blurb: string
 }
 
 EXPORT_SPECS :: []Export_Spec {
@@ -380,7 +380,7 @@ EXPORT_SPECS :: []Export_Spec {
 	{"global_dir", .Hint, true, true, "a filesystem-wide directory picker"},
 	{"resource", .Hint, false, true, "`resource=Class` — a typed Resource slot"},
 	{"array", .Hint, false, true, "`array=ELEM` — a typed gd.Array"},
-	{"dict", .Hint, false, true, "`dict=KEY;VALUE` — a typed gd.Dictionary"},
+	{"dict", .Hint, false, true, "`dict=KEY;VALUE` — a typed gd.Dictionary"}
 }
 
 export_spec :: proc(name: string) -> (Export_Spec, bool) {
@@ -405,12 +405,12 @@ Entity_Spec :: struct {
 	name:  string,
 	bare:  bool, // legal as a bare token
 	value: bool, // legal as `name=VALUE`
-	blurb: string,
+	blurb: string
 }
 
 ENTITY_SPECS :: []Entity_Spec {
 	{"stream_hz", false, true, "`stream_hz=N` — the kind's owner-stream rate, applied to every spawn of the type on every peer"},
-	{"avatar", true, false, "`avatar` — this kind is a seat's body: a host takeover parks it with its seat instead of adopting it"},
+	{"avatar", true, false, "`avatar` — this kind is a seat's body: a host takeover parks it with its seat instead of adopting it"}
 }
 
 entity_spec :: proc(name: string) -> (Entity_Spec, bool) {
@@ -456,6 +456,7 @@ export_specs_list :: proc(allocator := context.allocator) -> string {
 // `gd_half` is the one member of Half, and pairing with nothing is its error.
 Attr_Family :: enum u8 {
 	Kit_Primary, // the toolkit verbs: the proc IS a command / tick / sample / step / fact door
+	Kit_Declaration, // a toolkit type declaration (currently @(gd_input) on an input struct)
 	Method, // engine-facing: it joins a method, rpc, or signal table
 	Half, // it pairs with a declaration made elsewhere
 }
@@ -463,7 +464,7 @@ Attr_Family :: enum u8 {
 Attr :: struct {
 	name:   string, // WITHOUT the `gd_` prefix stripped — the spelling Odin sees
 	family: Attr_Family,
-	blurb:  string,
+	blurb:  string
 }
 
 // THE ALLOWLIST. Odin refuses an unknown custom attribute outright, so every
@@ -478,11 +479,13 @@ ATTRS :: []Attr {
 	{"gd_rpc", .Method, "an engine RPC"},
 	{"gd_command", .Kit_Primary, "a kit/net command verb"},
 	{"gd_tick", .Kit_Primary, "a sim tick"},
+	{"gd_input", .Kit_Declaration, "a constrained simulation input struct"},
 	{"gd_sample", .Kit_Primary, "an input sample"},
 	{"gd_step", .Kit_Primary, "a sim step"},
-	{"gd_fact", .Kit_Primary, "a world-pass fact door (its bearer is named <event>_fx)"},
+	{"gd_cue", .Kit_Primary, "a presentation cue with an inferred or named entity anchor"},
+	{"gd_fact", .Kit_Primary, "the compatible earlier spelling for a presentation cue"},
 	{"gd_message", .Kit_Primary, "a typed app-message handler (kit/session app route)"},
-	{"gd_half", .Half, "a pairing half; the NAME says what it pairs with"},
+	{"gd_half", .Half, "a pairing half; the NAME says what it pairs with"}
 }
 
 attr :: proc(name: string) -> (Attr, bool) {

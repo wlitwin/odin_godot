@@ -122,8 +122,9 @@ These rules apply across the models:
    from its received fields without replaying score flashes, damage reactions,
    or other historical edges.
 3. **Judge the state that was displayed.** Lag-compensated queries should use
-   validated snapshot evidence tied to the input being adjudicated and should
-   clamp to a configured rewind window.
+   validated snapshot evidence tied to the input being adjudicated. Bound its
+   age with authority-observed RTT/jitter and the configured rewind window;
+   treat a client-reported render offset only as a capped hint.
 4. **Keep replayed code free of presentation and engine state.** A resimulated
    tick may run more than once. Audio, particles, node mutation, wall clocks,
    and non-ledgered randomness do not belong in it.
@@ -152,8 +153,9 @@ does not automatically make a game secure:
 - Public sessions need an encrypted transport and application-specific traffic,
   moderation, logging, and deployment policies.
 
-See [Session trust and admission](session.md#trust-and-admission)
-and [Kit roadmap](TODO.md) for the current boundary.
+See [Session trust and admission](session.md#trust-and-admission) and
+[Network profiles](profiles.md) for the concrete configuration and validation
+attached to each trust model.
 
 ## Scale and validation status
 

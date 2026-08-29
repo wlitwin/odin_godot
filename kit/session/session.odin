@@ -29,16 +29,16 @@ package kit_session
 // the game shows its "run over" screen). Backup-host snapshots (a later
 // brick) keep the door open.
 
-import knet "godot:kit/net"
 import "base:intrinsics"
 import "core:fmt"
 import "core:mem"
 import "core:strings"
+import knet "godot:kit/net"
 
 // Which wire the message rides — maps to kit/netgd's channel plan.
 Channel :: enum u8 {
 	Reliable, // commands, results, state batches, roster, pings
-	Stream,   // owner-stream snapshots: unreliable-ordered, last-value
+	Stream, // owner-stream snapshots: unreliable-ordered, last-value
 }
 
 // A TRANSPORT peer id — distinct from knet.Player_Id on purpose: peers are
@@ -51,6 +51,52 @@ Peer_Id :: distinct int
 // semantics belong to the game+netgd layer; the session never broadcasts —
 // it targets connected players individually).
 Send_Proc :: proc(user: rawptr, to_peer: Peer_Id, bytes: []u8, channel: Channel)
+
+// Optional transport half used by automatic traffic-policy kicks. The session
+// revokes the player seat; netgd installs a deferred socket close so SES_KICKED
+// can flush first. Hand-written transports may install the same hook.
+Drop_Peer_Proc :: proc(user: rawptr, peer: Peer_Id)
+
+// A fixed vocabulary from the transport boundary through the session event
+// queue. No remote text is admitted, so these records are safe to retain,
+// aggregate, or serialize in production.
+Disconnect_Reason :: enum u8 {
+	Unknown,
+	Graceful,
+	Transport_Lost,
+	Timeout,
+	Kicked,
+	Banned,
+	Traffic_Policy,
+	Protocol,
+}
+
+disconnect_reason_valid :: proc(reason: Disconnect_Reason) -> bool {
+	return reason >= .Unknown && reason <= .Protocol
+}
+
+Production_Log_Kind :: enum u8 {
+	Malformed_Packet,
+	Action_Rejected,
+	Traffic_Refused,
+	Disconnected,
+}
+
+Production_Log_Record :: struct {
+	kind:          Production_Log_Kind,
+	disconnect:    Disconnect_Reason,
+	action_reason: knet.Action_Reject_Reason,
+	action_model:  knet.Action_Model,
+	player:        knet.Player_Id,
+	peer:          Peer_Id,
+	stage:         Authority_Ingress_Stage,
+	class:         Traffic_Class,
+	bytes:         u32,
+	count:         u64,
+}
+
+Production_Log_Hook :: proc(user: rawptr, record: Production_Log_Record)
+PRODUCTION_LOG_EVENTS_PER_SECOND :: 16
 
 // ENet/SceneMultiplayer convention: the host is always transport peer 1.
 HOST_PEER :: Peer_Id(1)
@@ -97,15 +143,16 @@ Ev_Player_Joined :: struct {
 }
 
 Ev_Player_Left :: struct {
-	id: knet.Player_Id, // stays in the roster, disconnected (may reconnect)
+	id:     knet.Player_Id, // stays in the roster, disconnected (may reconnect)
+	reason: Disconnect_Reason,
 }
 
-Ev_Host_Left :: struct {} // (client) the host is gone. Alone it ends the run; with
+Ev_Host_Left :: struct {reason: Disconnect_Reason} // (client) the host is gone. Alone it ends the run; with
 // succession armed, Ev_Succession fires BESIDE it and the run survives — the
 // named bearer runs the takeover recipe, everyone else rejoins the successor
 // info (see "Backup hosting and resume" in session.md).
 
-Ev_Join_Failed :: struct {} // (client) no WELCOME within the join timeout — surface it, don't hang on "Joining..."
+Ev_Join_Failed :: struct {reason: Disconnect_Reason} // (client) no WELCOME within the join timeout — surface it, don't hang on "Joining..."
 
 // Why a join was refused — each reason is a different sentence to the player.
 Deny_Reason :: enum u8 {
@@ -121,7 +168,7 @@ Ev_Join_Denied :: struct {
 	reason: Deny_Reason, // (client) the host said no — deliberately
 }
 
-Ev_Kicked :: struct {} // (client) removed on purpose — distinct from Ev_Host_Left
+Ev_Kicked :: struct {reason: Disconnect_Reason} // (client) deliberate removal, including policy kicks/bans
 
 Ev_Backup_Target :: struct {
 	player: knet.Player_Id, // (host) the designated backup holder changed — compute and
@@ -184,19 +231,28 @@ Ev_Blob_Changed :: struct {
 }
 
 Ev_Command_Executed :: struct {
-	ok:     bool, // (host) a client command ran (or was rejected) authoritatively
+	ok:     bool, // compatibility mirror: reason == .None
+	reason: knet.Action_Reject_Reason,
+	model:  knet.Action_Model,
+	seq:    knet.Intent_Seq,
 	player: knet.Player_Id, // who issued it
 	entity: knet.Net_Id, // what it targeted
-	cmd:    u16, // which command in the target's set
+	cmd:    u16, // stable command id in the target's set
 }
 
 Ev_Command_Confirmed :: struct {
-	seq: knet.Intent_Seq, // (client) prediction stands
+	seq:    knet.Intent_Seq, // (client) prediction/scheduled issue stands
+	entity: knet.Net_Id,
+	cmd:    u16,
+	model:  knet.Action_Model,
 }
 
 Ev_Command_Rejected :: struct {
 	seq:    knet.Intent_Seq, // (client) truth applied (or revert fallback)
 	entity: knet.Net_Id,
+	cmd:    u16,
+	model:  knet.Action_Model,
+	reason: knet.Action_Reject_Reason,
 }
 
 Event :: union {
@@ -240,7 +296,15 @@ Entity_Type :: distinct u16
 // the one place the session CALLS INTO the game synchronously — the registry
 // needs the pointer before the snapshot can apply; react to the spawn itself
 // via Ev_Spawned, which fires right after.
-Make_Entity_Proc :: proc(user: rawptr, type: Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (entity: rawptr, set: ^knet.Command_Set)
+Make_Entity_Proc :: proc(
+	user: rawptr,
+	type: Entity_Type,
+	id: knet.Net_Id,
+	owner: knet.Player_Id,
+) -> (
+	entity: rawptr,
+	set: ^knet.Command_Set,
+)
 
 // Client-side: the entity was despawned and already removed from the registry
 // — free the node/struct.
@@ -282,9 +346,9 @@ SES_WELCOME :: u8(1) // host -> client  [your_id][count u16] x ([id][name][conne
 @(private)
 SES_UPSERT :: u8(2) // host -> others  [id][name][connected u8][rejoin u8]
 @(private)
-SES_LEFT :: u8(3) // host -> all     [id]
+SES_LEFT :: u8(3) // host -> all     [id][Disconnect_Reason u8]
 @(private)
-SES_BYE :: u8(4) // client -> host  graceful leave (no payload)
+SES_BYE :: u8(4) // client -> host  [Disconnect_Reason.Graceful u8]
 @(private)
 SES_STATE :: u8(5) // host -> all     registry delta batch, per net tick
 @(private)
@@ -317,7 +381,7 @@ SES_APP :: u8(16) // any -> any      [tag u8][payload] — routed to the registe
 @(private)
 SES_DENIED :: u8(17) // host -> joiner  [reason u8] — the join was refused (full/locked/banned)
 @(private)
-SES_KICKED :: u8(18) // host -> one     you were removed on purpose (not a host crash)
+SES_KICKED :: u8(18) // host -> one     [Disconnect_Reason u8]
 @(private)
 SES_SETOWNER :: u8(19) // host -> all   [id][owner] — ownership transfer (carry/mount/possess)
 @(private)
@@ -340,31 +404,31 @@ SES_KIND_COUNT :: 25
 // adds its constant, bumps SES_KIND_COUNT, and names itself here; a missing
 // name renders "" in the traffic line — visible, never another row's label.
 SES_KIND_NAMES := [SES_KIND_COUNT]string {
-	int(SES_JOIN)      = "join",
-	int(SES_WELCOME)   = "welcome",
-	int(SES_UPSERT)    = "upsert",
-	int(SES_LEFT)      = "left",
-	int(SES_BYE)       = "bye",
-	int(SES_STATE)     = "state",
-	int(SES_CMD)       = "cmd",
-	int(SES_RESULT)    = "result",
-	int(SES_STREAM)    = "stream",
-	int(SES_PING)      = "ping",
-	int(SES_PONG)      = "pong",
-	int(SES_SPAWN)     = "spawn",
-	int(SES_DESPAWN)   = "despawn",
-	int(SES_WORLD)     = "world",
-	int(SES_STATS)     = "stats",
-	int(SES_BACKUP)    = "backup",
-	int(SES_APP)       = "app",
-	int(SES_DENIED)    = "denied",
-	int(SES_KICKED)    = "kicked",
-	int(SES_SETOWNER)  = "setowner",
+	int(SES_JOIN) = "join",
+	int(SES_WELCOME) = "welcome",
+	int(SES_UPSERT) = "upsert",
+	int(SES_LEFT) = "left",
+	int(SES_BYE) = "bye",
+	int(SES_STATE) = "state",
+	int(SES_CMD) = "cmd",
+	int(SES_RESULT) = "result",
+	int(SES_STREAM) = "stream",
+	int(SES_PING) = "ping",
+	int(SES_PONG) = "pong",
+	int(SES_SPAWN) = "spawn",
+	int(SES_DESPAWN) = "despawn",
+	int(SES_WORLD) = "world",
+	int(SES_STATS) = "stats",
+	int(SES_BACKUP) = "backup",
+	int(SES_APP) = "app",
+	int(SES_DENIED) = "denied",
+	int(SES_KICKED) = "kicked",
+	int(SES_SETOWNER) = "setowner",
 	int(SES_SUCCESSOR) = "successor",
-	int(SES_BLOB)      = "blob",
-	int(SES_DECLARE)   = "declare",
-	int(SES_PROFILES)  = "profiles",
-	int(SES_AOI)       = "aoi",
+	int(SES_BLOB) = "blob",
+	int(SES_DECLARE) = "declare",
+	int(SES_PROFILES) = "profiles",
+	int(SES_AOI) = "aoi",
 }
 
 // ---- app messages: the extension point for sibling kit packages ---------------
@@ -378,6 +442,12 @@ SES_KIND_NAMES := [SES_KIND_COUNT]string {
 // handler checks from_peer == HOST_PEER when authority matters.
 
 MAX_APP_TAGS :: 8
+
+// Raw/typed app messages are gameplay messages, not bulk transfer. This still
+// leaves ample room for composed sim snapshots; larger assets use kit/xfer.
+APP_MESSAGE_MAX_BYTES :: 256 * 1024
+PLAYER_NAME_MAX_BYTES :: 256
+RECORDING_MAX_BYTES :: 64 * 1024 * 1024
 
 App_Handler :: proc(user: rawptr, from: knet.Player_Id, from_peer: Peer_Id, r: ^knet.Reader)
 
@@ -401,7 +471,10 @@ session_app_route :: proc(s: ^Session, tag: u8, user: rawptr, handler: App_Handl
 		handler == nil || prev.handler == nil || prev.handler == handler,
 		"session_app_route: tag already routed to a different handler — pick distinct tag bytes",
 	)
-	s.app[tag] = App_Route{user = user, handler = handler}
+	s.app[tag] = App_Route {
+		user    = user,
+		handler = handler,
+	}
 }
 
 // Start an app message under `tag`: returns the session's scratch writer with
@@ -426,19 +499,25 @@ session_app_begin :: proc(s: ^Session, tag: u8) -> ^knet.Writer {
 // side routes both channels identically, but nothing re-delivers a dropped
 // .Stream message and nothing orders it against the reliable lane.
 session_app_flush :: proc(s: ^Session, to_peer: Peer_Id, channel: Channel = .Reliable) {
-	s.send(s.send_user, to_peer, knet.writer_bytes(&s.app_w), channel)
+	bytes := knet.writer_bytes(&s.app_w)
+	assert(
+		len(bytes) >= 2 && len(bytes) - 2 <= APP_MESSAGE_MAX_BYTES,
+		"app message exceeds APP_MESSAGE_MAX_BYTES — use kit/xfer for bulk payloads",
+	)
+	session_send_packet(s, to_peer, bytes, channel)
 }
 
-// ---- typed app messages: a POD payload, decoded for you --------------------
+// ---- typed app messages: a fixed-shape payload, decoded for you ------------
 //
 // The bare route (session_app_route) hands the receiver a raw Reader to parse by
 // hand — the rawptr surface every game re-wrote a read loop against. A TYPED
-// route carries a POD payload struct: session_app_send frames it, and the
+// route carries a raw fixed-shape payload struct: session_app_send frames it, and the
 // receiver's handler is called with the decoded value, no read code. The game
 // owns the route record (like kcombat.Fire_Route), so the kit keeps no per-route
-// heap or globals — parallel sessions never collide. POD only (the #assert
-// refuses a pointer or slice, whose bytes a raw copy would carry as a dangling
-// address); for text or variable-length data, frame it yourself on a bare route.
+// heap or globals — parallel sessions never collide. The runtime #assert refuses
+// direct pointer shapes; generated routes additionally require the recursive
+// canonical ABI (fixed widths, bounded values, no hidden padding). For text or
+// variable-length data, frame it yourself on a bare route.
 Typed_Route :: struct($T: typeid) {
 	handler: proc(user: rawptr, from: knet.Player_Id, msg: T),
 	user:    rawptr,
@@ -456,9 +535,12 @@ session_app_listen :: proc(
 	handler: proc(user: rawptr, from: knet.Player_Id, msg: T),
 ) {
 	#assert(
-		intrinsics.type_is_nearly_simple_compare(T) && !intrinsics.type_is_pointer(T) && !intrinsics.type_is_multi_pointer(T),
+		intrinsics.type_is_nearly_simple_compare(T) &&
+		!intrinsics.type_is_pointer(T) &&
+		!intrinsics.type_is_multi_pointer(T),
 		"session_app_listen: the payload T must be POD (no strings, slices, maps, or pointers — frame those yourself on a bare session_app_route)",
 	)
+	#assert(size_of(T) <= APP_MESSAGE_MAX_BYTES, "typed app payload exceeds APP_MESSAGE_MAX_BYTES")
 	route.handler = handler
 	route.user = user
 	session_app_route(s, tag, route, app_typed_dispatch(T))
@@ -470,24 +552,34 @@ session_app_listen :: proc(
 @(private = "file")
 app_typed_dispatch :: proc($T: typeid) -> App_Handler {
 	return proc(user: rawptr, from: knet.Player_Id, from_peer: Peer_Id, r: ^knet.Reader) {
-		route := cast(^Typed_Route(T))user
-		if r.err || r.off + size_of(T) > len(r.data) {
-			return // a short/garbled payload never reaches the handler
+			route := cast(^Typed_Route(T))user
+			if r.err || len(knet.reader_remaining(r)) != size_of(T) {
+				r.err = true
+				return // a short/trailing/garbled payload never reaches the handler
+			}
+			msg: T
+			mem.copy(&msg, &r.data[r.off], size_of(T))
+			r.off += size_of(T)
+			route.handler(route.user, from, msg)
 		}
-		msg: T
-		mem.copy(&msg, &r.data[r.off], size_of(T))
-		r.off += size_of(T)
-		route.handler(route.user, from, msg)
-	}
 }
 
 // Send a TYPED payload under `tag` to `to_peer`. The POD bytes are framed once
 // (no build-a-writer dance) and decoded by the matching session_app_listen.
-session_app_send_typed :: proc(s: ^Session, tag: u8, msg: $T, to_peer: Peer_Id, channel: Channel = .Reliable) {
+session_app_send_typed :: proc(
+	s: ^Session,
+	tag: u8,
+	msg: $T,
+	to_peer: Peer_Id,
+	channel: Channel = .Reliable,
+) {
 	#assert(
-		intrinsics.type_is_nearly_simple_compare(T) && !intrinsics.type_is_pointer(T) && !intrinsics.type_is_multi_pointer(T),
+		intrinsics.type_is_nearly_simple_compare(T) &&
+		!intrinsics.type_is_pointer(T) &&
+		!intrinsics.type_is_multi_pointer(T),
 		"session_app_send: the payload T must be POD (no strings, slices, maps, or pointers)",
 	)
+	#assert(size_of(T) <= APP_MESSAGE_MAX_BYTES, "typed app payload exceeds APP_MESSAGE_MAX_BYTES")
 	m := msg
 	w := session_app_begin(s, tag)
 	append(&w.buf, ..(cast([^]u8)&m)[:size_of(T)])
@@ -499,11 +591,20 @@ session_app_send_typed :: proc(s: ^Session, tag: u8, msg: $T, to_peer: Peer_Id, 
 // session_app_send_to), for a directed message: a whisper, a private reply.
 // Host-only; a disconnected target or the host itself (no transport loopback) is
 // dropped silently.
-session_app_send_typed_to :: proc(s: ^Session, player: knet.Player_Id, tag: u8, msg: $T, channel: Channel = .Reliable) {
+session_app_send_typed_to :: proc(
+	s: ^Session,
+	player: knet.Player_Id,
+	tag: u8,
+	msg: $T,
+	channel: Channel = .Reliable,
+) {
 	#assert(
-		intrinsics.type_is_nearly_simple_compare(T) && !intrinsics.type_is_pointer(T) && !intrinsics.type_is_multi_pointer(T),
+		intrinsics.type_is_nearly_simple_compare(T) &&
+		!intrinsics.type_is_pointer(T) &&
+		!intrinsics.type_is_multi_pointer(T),
 		"session_app_send_typed_to: the payload T must be POD (no strings, slices, maps, or pointers)",
 	)
+	#assert(size_of(T) <= APP_MESSAGE_MAX_BYTES, "typed app payload exceeds APP_MESSAGE_MAX_BYTES")
 	assert(s.is_host, "player-addressed sends resolve seats on the authority")
 	p, ok := s.players[player]
 	if !ok || !p.connected || p.id == s.me {
@@ -518,7 +619,13 @@ session_app_send_typed_to :: proc(s: ^Session, player: knet.Player_Id, tag: u8, 
 // Ship app payload bytes under `tag` — the one-call form when the payload
 // already exists as a slice (begin/flush avoids the extra copy when you are
 // building it anyway). Same channel rule as session_app_flush.
-session_app_send :: proc(s: ^Session, to_peer: Peer_Id, tag: u8, bytes: []u8, channel: Channel = .Reliable) {
+session_app_send :: proc(
+	s: ^Session,
+	to_peer: Peer_Id,
+	tag: u8,
+	bytes: []u8,
+	channel: Channel = .Reliable,
+) {
 	w := session_app_begin(s, tag)
 	append(&w.buf, ..bytes)
 	session_app_flush(s, to_peer, channel)
@@ -571,8 +678,8 @@ DEFAULT_MAX_PLAYERS :: 8
 // out-of-the-box session. All durations are SECONDS; the session converts to
 // ticks itself, so changing tick_hz never silently rescales your timeouts.
 Session_Config :: struct {
-	tick_hz:         int, // net ticks per second (0 = knet.DEFAULT_TICK_HZ, 20)
-	interp_delay:    f64, // how far in the past remote entities render
+	tick_hz:          int, // net ticks per second (0 = knet.DEFAULT_TICK_HZ, 20)
+	interp_delay:     f64, // how far in the past remote entities render
 	// Adaptive interp delay (OFF by default — a set/default interp_delay keeps
 	// meaning exactly what it does). When on, interp_delay SLEWS to track the
 	// worst active link's need (rtt/2 + 2*jitter + margin) instead of holding one
@@ -581,13 +688,13 @@ Session_Config :: struct {
 	// into a latency spike (see interp.odin). interp_delay above becomes the FLOOR
 	// (adapting never renders fresher than you asked, and starts there);
 	// interp_delay_max is the ceiling (0 = a generous kit default).
-	interp_adapt:    bool,
+	interp_adapt:     bool,
 	interp_delay_max: f64, // adaptive ceiling, seconds (0 = DEFAULT_INTERP_MAX_TICKS / hz)
-	command_timeout: f64, // prediction auto-revert horizon
-	join_timeout:    f64, // client_start -> Ev_Join_Failed horizon
-	backup_interval: f64, // backup-host snapshot refresh cadence
-	max_players:     int, // NEW joins refused past this many present people (0 = DEFAULT_MAX_PLAYERS, 8; negative = unlimited on purpose; rejoins always reclaim their seat)
-	change_events:   bool, // emit Ev_Entity_Changed per dirty entity per tick (repaint THAT, not everything). Off by default: at friendslop scale repaint-everything is usually fine
+	command_timeout:  f64, // prediction auto-revert horizon
+	join_timeout:     f64, // client_start -> Ev_Join_Failed horizon
+	backup_interval:  f64, // backup-host snapshot refresh cadence
+	max_players:      int, // NEW joins refused past this many present people (0 = DEFAULT_MAX_PLAYERS, 8; negative = unlimited on purpose; rejoins always reclaim their seat)
+	change_events:    bool, // emit Ev_Entity_Changed per dirty entity per tick (repaint THAT, not everything). Off by default: at friendslop scale repaint-everything is usually fine
 	// Per-peer STREAM bandwidth cap, bytes per tick (0 = unlimited, the default).
 	// When set, each peer receives only the highest-priority owner-stream updates
 	// that fit — priority is STALENESS (ticks since that peer last got that
@@ -595,8 +702,13 @@ Session_Config :: struct {
 	// The lever the O(entities x peers) send needs at scale; requires interest
 	// management (session_set_interest) since only the per-peer routing it turns
 	// on can budget a peer at all — a broadcast fans out through the relay whole.
-	stream_budget:   int,
-	fingerprint:     u64, // the build's WIRE CONTRACT hash. 0 (the default) =
+	stream_budget:    int,
+	// Authority-ingress token buckets. The reliable/stream limits apply to the
+	// whole channel per transport peer; actions is the narrower per-player
+	// command budget shared by co-op and simulation verbs. Zero disables a
+	// dimension; named network profiles install bounded defaults.
+	traffic:          Traffic_Config,
+	fingerprint:      u64, // the build's WIRE CONTRACT hash. 0 (the default) =
 	// use the generated NET_FINGERPRINT — scriptgen's guard file registers it
 	// at load (default_net_fingerprint), so the version gate is ON without any
 	// wiring. Set explicitly only to override (a hand-rolled multi-module
@@ -684,31 +796,37 @@ Session_Wiring :: struct {
 	// while context.allocator was IDENTICAL at init, at every packet, and at
 	// destroy, the precise assumption kit/sim's Lane fix had to abandon (a
 	// handler-side alloc and its teardown free rode different allocators).
-	allocator: mem.Allocator,
-	send:      Send_Proc,
-	send_user: rawptr,
-	cfg:       Session_Config, // resolved into Session_Run at *_start
+	allocator:         mem.Allocator,
+	send:              Send_Proc,
+	send_user:         rawptr,
+	drop_peer:         Drop_Peer_Proc,
+	drop_peer_user:    rawptr,
+	cfg:               Session_Config, // resolved into Session_Run at *_start
+	traffic_hook:      Traffic_Hook,
+	traffic_hook_user: rawptr,
+	log_hook:          Production_Log_Hook,
+	log_hook_user:     rawptr,
 
 	// entity factory + command hooks
-	factory_user:  rawptr,
-	factory_make:  Make_Entity_Proc,
-	factory_free:  Free_Entity_Proc,
-	game_user:     rawptr, // session_set_game's explicit override (nil = the factory user)
-	born_user:     rawptr,
-	born:          Born_Proc, // host: its own spawns delivered at the send (nil = queued like every other peer's)
-	cmd_hook_user: rawptr,
-	cmd_hook:      Command_Hook, // host: the cross-entity half of commands (the catch-all)
-	type_hooks:    map[Entity_Type]Type_Hook_Entry, // host: per-type routing (wins over the catch-all)
+	factory_user:      rawptr,
+	factory_make:      Make_Entity_Proc,
+	factory_free:      Free_Entity_Proc,
+	game_user:         rawptr, // session_set_game's explicit override (nil = the factory user)
+	born_user:         rawptr,
+	born:              Born_Proc, // host: its own spawns delivered at the send (nil = queued like every other peer's)
+	cmd_hook_user:     rawptr,
+	cmd_hook:          Command_Hook, // host: the cross-entity half of commands (the catch-all)
+	type_hooks:        map[Entity_Type]Type_Hook_Entry, // host: per-type routing (wins over the catch-all)
 	// Per-TYPE owner-stream rate (session_set_type_stream_hz): applied to
 	// every insert of that type — the host's own spawn, a client's wire spawn,
 	// the heir's resume rebuild — so the hint is a declaration, not a chore
 	// each spawn site (and every takeover) has to remember. 0/absent = full rate.
-	type_stream_hz: map[Entity_Type]int,
+	type_stream_hz:    map[Entity_Type]int,
 	// Which entity TYPES are seats' bodies (session_set_avatar_type, from the
 	// `entity=Runner:2,avatar` tag via kboot): the one fact a host takeover
 	// needs to tell a PLAYER's parked body from the dead host's NPCs — see the
 	// RE-OWN THE ORPHANS sweep in backup.odin.
-	avatar_types: map[Entity_Type]bool,
+	avatar_types:      map[Entity_Type]bool,
 
 	// The write guard's extra exemption (session_set_guard_exempt): "this
 	// entity's delta-lane divergence is legal right now". kboot.boot_lane
@@ -717,45 +835,45 @@ Session_Wiring :: struct {
 	guard_exempt_user: rawptr,
 
 	// pre-start wiring: the game's blob writer rides every backup
-	backup_blob_user: rawptr,
-	backup_blob:      Backup_Blob_Proc,
+	backup_blob_user:  rawptr,
+	backup_blob:       Backup_Blob_Proc,
 
 	// app-message routes (kit/comms and friends)
-	app:   [MAX_APP_TAGS]App_Route,
-	app_w: knet.Writer, // scratch for session_app_begin/flush (reused per message)
+	app:               [MAX_APP_TAGS]App_Route,
+	app_w:             knet.Writer, // scratch for session_app_begin/flush (reused per message)
 
 	// interest management (interest.odin) — off until session_set_interest
-	interest_r:    f32,
-	interest_hys:  f32,
-	interest_user: rawptr,
-	locator:       Locator_Proc,
+	interest_r:        f32,
+	interest_hys:      f32,
+	interest_user:     rawptr,
+	locator:           Locator_Proc,
 
 	// The profile table's WIRING half (profile.odin): the installed row size.
 	// The rows themselves are run state — session_init re-seeds prof.size
 	// from this after the wipe.
-	prof_size: int,
+	prof_size:         int,
 	// MY row as written BEFORE I held a seat (session_profile_mine while
 	// unseated — a lobby pick before hosting/joining): parked here, outside
 	// the run, and moved under my seat id at host_start / welcome (prof_seat).
-	prof_pending: []u8,
+	prof_pending:      []u8,
 
 	// our reconnect secret (the game persists it across runs; every *_start
 	// reassigns it, and a resumed host relies on it surviving the re-init)
-	token: u64,
+	token:             u64,
 }
 
 // Everything one RUN creates. Reset is wholesale — run_destroy frees the owned
 // containers, then `s.run = {}` zeroes every field at once, so a new field
 // can never leak stale state across a rehost by being missed in a list.
 Session_Run :: struct {
-	is_host:   bool,
-	dedicated: bool, // this authority is a DEDICATED SERVER: its seat is
+	is_host:         bool,
+	dedicated:       bool, // this authority is a DEDICATED SERVER: its seat is
 	// infrastructure (see Player.dedicated) and succession never arms — a
 	// dead server restarts, it does not migrate (the token/backup machinery
 	// belongs to the friends-host-for-friends peer model).
-	me:        knet.Player_Id,
-	players:   map[knet.Player_Id]Player,
-	events:    [dynamic]Event,
+	me:              knet.Player_Id,
+	players:         map[knet.Player_Id]Player,
+	events:          [dynamic]Event,
 
 	// resolved from cfg at *_start (read these, not cfg, mid-run)
 	tick_hz:         int,
@@ -767,24 +885,32 @@ Session_Run :: struct {
 	backup_every:    u64, // net ticks between backup refreshes (default 100 = 5s)
 
 	// the replicated world (kit/net): the session drives the per-tick walks
-	reg:          knet.Registry,
-	ctx:          knet.Command_Ctx,
-	ticker:       knet.Ticker,
-	clocks:       map[Peer_Id]knet.Clock_Sync, // per transport peer, fed by ping/pong
-	pongs:        int, // pong samples applied (games gate "clock is warm" on this)
-	malformed:    u64, // session packets dropped mid-parse (truncation, corruption, a foreign build past the fingerprint) — counted, never silent; netgraph's `drop` reads it
+	reg:             knet.Registry,
+	ctx:             knet.Command_Ctx,
+	ticker:          knet.Ticker,
+	clocks:          map[Peer_Id]knet.Clock_Sync, // per transport peer, fed by ping/pong
+	pongs:           int, // pong samples applied (games gate "clock is warm" on this)
+	malformed:       u64, // session packets dropped mid-parse (truncation, corruption, a foreign build past the fingerprint) — counted, never silent; netgraph's `drop` reads it
 	// The write guard's RELEASE voice (see session_tick): where -disable-assert
 	// strips the teaching assert, rogue client writes count here and log ONCE
 	// instead of going dark. Stays zero in dev builds — the assert fires first.
-	guard_hits:   u64,
-	guard_logged: bool,
-	now:          f64, // the game's monotonic seconds, updated each session_tick
-	replicating:  bool, // host: the world is LIVE (deltas flow; joiners get SES_WORLD)
-	later:        knet.Later, // session_present's queue — drained every session_tick
+	guard_hits:      u64,
+	guard_logged:    bool,
+	traffic:         map[knet.Player_Id]Traffic_Seat,
+	traffic_dropped: u64,
+	authority_action_seen: map[Authority_Action_Key]knet.Dedup_Window,
+	authority_ingress:     Authority_Ingress_Stats,
+	log_window:            f64,
+	log_emitted:           int,
+	log_dropped:           u64,
+	log_ready:             bool,
+	now:             f64, // the game's monotonic seconds, updated each session_tick
+	replicating:     bool, // host: the world is LIVE (deltas flow; joiners get SES_WORLD)
+	later:           knet.Later, // session_present's queue — drained every session_tick
 
 	// entity types
-	types:  map[knet.Net_Id]Entity_Type, // host: for (re-)announcing spawns
-	unsent: map[knet.Net_Id]u64, // host: spawn_make'd, spawn_send still owed (tick-stamped)
+	types:           map[knet.Net_Id]Entity_Type, // host: for (re-)announcing spawns
+	unsent:          map[knet.Net_Id]u64, // host: spawn_make'd, spawn_send still owed (tick-stamped)
 
 	// The per-player PROFILE table (profile.odin): one POD row per seat,
 	// owner-authored, host-relayed. Run state — a rehost must not relay a
@@ -792,50 +918,50 @@ Session_Run :: struct {
 	// shadow would keep an unchanged client's row invisible to a NEW host.
 	// The ONE keeper is session_host_resume (keep_profiles): the heir's
 	// table IS the resumed lobby.
-	prof: Profile_Table,
+	prof:            Profile_Table,
 
 	// the stat registry (host accumulates; everyone reads)
-	stat_names:  [dynamic]string, // owned; index = column
-	stats:       map[knet.Player_Id][MAX_STAT_COLS]i64,
-	stats_dirty: bool, // host: snapshot goes out on the next low-rate tick
+	stat_names:      [dynamic]string, // owned; index = column
+	stats:           map[knet.Player_Id][MAX_STAT_COLS]i64,
+	stats_dirty:     bool, // host: snapshot goes out on the next low-rate tick
 
 	// backup hosting (migration-readiness): the host periodically ships a
 	// complete re-hostable snapshot to the ELDEST connected client
-	backup_tick:   u64, // host: when the last one shipped
-	backup_target: knet.Player_Id, // host: who holds it
-	backup:        []u8, // client: the latest payload (opaque; owned; split via session_backup_parts)
-	backup_at:     f64, // client: when it arrived (session now)
+	backup_tick:     u64, // host: when the last one shipped
+	backup_target:   knet.Player_Id, // host: who holds it
+	backup:          []u8, // client: the latest payload (opaque; owned; split via session_backup_parts)
+	backup_at:       f64, // client: when it arrived (session now)
 
 	// SUCCESSION (live migration): the host names the backup holder and how
 	// to reach them BEFORE dying; every peer holds the answer when the
 	// lights go out.
-	succ_info:      []u8, // host: the game's transport rendezvous blob (owned)
-	successor:      knet.Player_Id, // client: who carries the torch
-	successor_info: []u8, // client: how to find them (owned; see session_successor)
+	succ_info:       []u8, // host: the game's transport rendezvous blob (owned)
+	successor:       knet.Player_Id, // client: who carries the torch
+	successor_info:  []u8, // client: how to find them (owned; see session_successor)
 
 	// host bookkeeping
-	next_player: knet.Player_Id,
-	tokens:      map[u64]knet.Player_Id, // reconnect identity, forever
-	by_peer:     map[Peer_Id]knet.Player_Id,
-	denied:      map[u64]knet.Player_Id, // banned token hashes -> who they were (run-scoped)
-	locked:      bool, // host: new joins refused (rejoins still reclaim their seat)
+	next_player:     knet.Player_Id,
+	tokens:          map[u64]knet.Player_Id, // reconnect identity, forever
+	by_peer:         map[Peer_Id]knet.Player_Id,
+	denied:          map[u64]knet.Player_Id, // banned token hashes -> who they were (run-scoped)
+	locked:          bool, // host: new joins refused (rejoins still reclaim their seat)
 
 	// client bookkeeping
-	spectate:    bool, // client: this seat joins to WATCH (session_client_start's flag; rides SES_JOIN)
-	name:        string, // owned; the name we asked for
-	joined:      bool, // WELCOME received
-	join_waited: int, // ticks since client_start without a WELCOME (-1 = not waiting; session_init disarms)
+	spectate:        bool, // client: this seat joins to WATCH (session_client_start's flag; rides SES_JOIN)
+	name:            string, // owned; the name we asked for
+	joined:          bool, // WELCOME received
+	join_waited:     int, // ticks since client_start without a WELCOME (-1 = not waiting; session_init disarms)
 
 	// interest run state (interest.odin)
-	focus:      map[knet.Player_Id][3]f32, // host: each peer's eyes (z = 0 for 2D games)
-	interest:   map[Interest_Key]bool, // host: (player, entity) pairs currently near
+	focus:           map[knet.Player_Id][3]f32, // host: each peer's eyes (z = 0 for 2D games)
+	interest:        map[Interest_Key]bool, // host: (player, entity) pairs currently near
 	// bandwidth budget (interest.odin): the tick each (peer, entity) last had a
 	// stream update sent, and its distance² from that peer's focus — the two
 	// inputs the per-peer stream budget prioritizes by (staleness, then near).
-	stream_sent: map[Interest_Key]u64,
-	interest_d2: map[Interest_Key]f32,
-	aoi_client:  bool, // client: the host declared AOI filtering (all client
-	                  // streams route through the host authority gateway)
+	stream_sent:     map[Interest_Key]u64,
+	interest_d2:     map[Interest_Key]f32,
+	aoi_client:      bool, // client: the host declared AOI filtering (all client
+	// streams route through the host authority gateway)
 }
 
 Session :: struct {
@@ -878,6 +1004,8 @@ run_destroy :: proc(run: ^Session_Run) {
 	delete(run.events)
 	delete(run.tokens)
 	delete(run.by_peer)
+	delete(run.traffic)
+	delete(run.authority_action_seen)
 	delete(run.denied)
 	delete(run.clocks)
 	delete(run.types)
@@ -919,6 +1047,10 @@ session_init :: proc(s: ^Session, keep_profiles := false) {
 	if s.allocator.procedure == nil {
 		s.allocator = context.allocator
 	}
+	assert(
+		traffic_config_valid(s.cfg.traffic),
+		"Session_Config.traffic packet rates, byte rates, and burst_seconds cannot be negative",
+	)
 	context.allocator = s.allocator
 	knet.later_clear(&s.later)
 	// `ran` (not a side effect like stat_names) gates the teardown: a FAILED
@@ -956,16 +1088,23 @@ session_init :: proc(s: ^Session, keep_profiles := false) {
 	// controller is never stepped and interp_delay stays exactly this constant.
 	s.interp_adapt = s.cfg.interp_adapt
 	if s.interp_adapt {
-		ceiling := s.cfg.interp_delay_max > 0 ? s.cfg.interp_delay_max : DEFAULT_INTERP_MAX_TICKS / hz
+		ceiling :=
+			s.cfg.interp_delay_max > 0 ? s.cfg.interp_delay_max : DEFAULT_INTERP_MAX_TICKS / hz
 		interp_adapt_reset(&s.adapt, s.interp_delay, ceiling)
 	}
-	s.pending_max_age = u64((s.cfg.command_timeout > 0 ? s.cfg.command_timeout : DEFAULT_COMMAND_TIMEOUT) * hz)
+	s.pending_max_age = u64(
+		(s.cfg.command_timeout > 0 ? s.cfg.command_timeout : DEFAULT_COMMAND_TIMEOUT) * hz,
+	)
 	s.join_timeout = int((s.cfg.join_timeout > 0 ? s.cfg.join_timeout : DEFAULT_JOIN_TIMEOUT) * hz)
-	s.backup_every = u64((s.cfg.backup_interval > 0 ? s.cfg.backup_interval : DEFAULT_BACKUP_INTERVAL) * hz)
+	s.backup_every = u64(
+		(s.cfg.backup_interval > 0 ? s.cfg.backup_interval : DEFAULT_BACKUP_INTERVAL) * hz,
+	)
 
 	s.reg = knet.registry_make()
 	s.ctx = knet.command_ctx_make()
 	s.ticker = knet.ticker_make(s.tick_hz)
+	s.traffic = make(map[knet.Player_Id]Traffic_Seat)
+	s.authority_action_seen = make(map[Authority_Action_Key]knet.Dedup_Window)
 	s.ran = true
 	if s.app_w.buf == nil {
 		s.app_w = knet.writer_make()
@@ -997,9 +1136,23 @@ token_hash :: proc(token: u64) -> u64 {
 	return z ~ (z >> 31)
 }
 
+// End the current run while retaining the pre-start wiring: transport/factory
+// hooks, action routes, profiles, configuration, and the resolved allocator.
+// This is the back-to-menu reset used by the generated game-network facade.
+// The next host/client start rebuilds a fresh run and registry from that wiring.
+// Idempotent; unlike session_destroy, this Session remains reusable.
+session_reset :: proc(s: ^Session) {
+	context.allocator = ses_allocator(s)
+	run_destroy(&s.run)
+	s.run = {}
+	s.join_waited = -1
+	s.prof.size = s.prof_size
+	s.ran = false
+}
+
 session_destroy :: proc(s: ^Session) {
 	context.allocator = ses_allocator(s) // free every run + wiring container under what built it
-	run_destroy(&s.run)
+	session_reset(s)
 	// The wiring's own two containers (everything else there is procs,
 	// pointers, and plain values):
 	delete(s.type_hooks)
@@ -1079,7 +1232,15 @@ session_interp_target :: proc(s: ^Session) -> f64 {
 // slowest observer's showing — the edge-outlives-observers rule). The queue
 // drains inside session_tick; a *_start/resume drops whatever was pending
 // (those effects were about the old run's world).
-session_present :: proc(s: ^Session, mine: bool, user: rawptr, cb: knet.Later_Proc, id := knet.NET_ID_INVALID, a := u64(0), extra := 0.0) {
+session_present :: proc(
+	s: ^Session,
+	mine: bool,
+	user: rawptr,
+	cb: knet.Later_Proc,
+	id := knet.NET_ID_INVALID,
+	a := u64(0),
+	extra := 0.0,
+) {
 	context.allocator = ses_allocator(s) // the later queue is the session's (guarded: a pre-start present rides ambient, dropped at init)
 	if mine && extra == 0 {
 		cb(user, id, a)
@@ -1097,6 +1258,48 @@ session_set_transport :: proc(s: ^Session, user: rawptr, send: Send_Proc) {
 	s.send_user = user
 }
 
+// Install the transport half of an automatic traffic-policy kick. netgd uses
+// a deferred close so the target receives SES_KICKED before its socket dies.
+// A custom transport may omit this: the seat is still revoked immediately.
+session_set_peer_drop :: proc(s: ^Session, user: rawptr, drop: Drop_Peer_Proc) {
+	s.drop_peer = drop
+	s.drop_peer_user = user
+}
+
+// Install a production-safe structured log sink. Records contain only fixed
+// enums, ids, sizes, and counters; the kit emits at most 16 per second per
+// session and counts the rest instead of allocating or forwarding remote text.
+session_set_production_log_hook :: proc(
+	s: ^Session,
+	user: rawptr,
+	hook: Production_Log_Hook,
+) {
+	s.log_hook_user = user
+	s.log_hook = hook
+}
+
+session_production_log_dropped :: proc(s: ^Session) -> u64 {
+	return s.log_dropped
+}
+
+@(private)
+session_production_log :: proc(s: ^Session, record: Production_Log_Record) {
+	if s.log_hook == nil {
+		return
+	}
+	if !s.log_ready || s.now < s.log_window || s.now - s.log_window >= 1.0 {
+		s.log_window = s.now
+		s.log_emitted = 0
+		s.log_ready = true
+	}
+	if s.log_emitted >= PRODUCTION_LOG_EVENTS_PER_SECOND {
+		s.log_dropped += 1
+		return
+	}
+	s.log_emitted += 1
+	s.log_hook(s.log_hook_user, record)
+}
+
 // Install the write guard's extra exemption (see registry_write_guard) —
 // pre-start wiring like the transport/factory installers. kboot.boot_lane
 // installs the sim lane's ("a tick-scheduled verb is in flight on this
@@ -1111,7 +1314,12 @@ session_set_guard_exempt :: proc(s: ^Session, user: rawptr, exempt: knet.Guard_E
 // proc receives as its game param — unless session_set_game named a different
 // one (kboot's boot_entities does: its factory user is the Boot, so it names
 // the game explicitly). Survives starts via session_init's re-install.
-session_set_factory :: proc(s: ^Session, user: rawptr, make_entity: Make_Entity_Proc, free_entity: Free_Entity_Proc) {
+session_set_factory :: proc(
+	s: ^Session,
+	user: rawptr,
+	make_entity: Make_Entity_Proc,
+	free_entity: Free_Entity_Proc,
+) {
 	s.factory_user = user
 	s.factory_make = make_entity
 	s.factory_free = free_entity
@@ -1183,7 +1391,10 @@ session_set_type_hook :: proc(s: ^Session, type: Entity_Type, user: rawptr, hook
 	// falls back to ambient until session_init resolves one), which is exactly
 	// why it costs nothing to be right.
 	context.allocator = ses_allocator(s)
-	s.type_hooks[type] = Type_Hook_Entry{user = user, hook = hook}
+	s.type_hooks[type] = Type_Hook_Entry {
+		user = user,
+		hook = hook,
+	}
 	s.ctx.hook = ctx_hook_dispatch
 	s.ctx.hook_user = s
 }
@@ -1191,7 +1402,13 @@ session_set_type_hook :: proc(s: ^Session, type: Entity_Type, user: rawptr, hook
 // The one place every executed command's hook fires — the host's own local
 // issues (via ctx) and the clients' (the SES_CMD handler) both land here.
 @(private = "file")
-session_dispatch_hook :: proc(s: ^Session, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
+session_dispatch_hook :: proc(
+	s: ^Session,
+	player: knet.Player_Id,
+	entity: knet.Net_Id,
+	cmd: u16,
+	ok: bool,
+) {
 	if t, known := s.types[entity]; known {
 		if th, routed := s.type_hooks[t]; routed {
 			th.hook(th.user, player, entity, cmd, ok)
@@ -1204,8 +1421,74 @@ session_dispatch_hook :: proc(s: ^Session, player: knet.Player_Id, entity: knet.
 }
 
 @(private = "file")
-ctx_hook_dispatch :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
+ctx_hook_dispatch :: proc(
+	user: rawptr,
+	player: knet.Player_Id,
+	entity: knet.Net_Id,
+	cmd: u16,
+	ok: bool,
+) {
 	session_dispatch_hook(cast(^Session)user, player, entity, cmd, ok)
+}
+
+// One game-facing result vocabulary for immediate and scheduled actions.
+// kit/sim calls these after its frame-safe settle; the immediate session loop
+// calls them after truth/revert application. Games consume the ordinary
+// generated `_command_confirmed` / `_command_rejected` halves and never need to
+// know which packet lane carried the action.
+session_action_executed :: proc(
+	s: ^Session,
+	model: knet.Action_Model,
+	seq: u32,
+	player: knet.Player_Id,
+	entity: knet.Net_Id,
+	cmd: u16,
+	reason: knet.Action_Reject_Reason,
+) {
+	append(
+		&s.events,
+		Ev_Command_Executed {
+			ok = reason == .None,
+			reason = reason,
+			model = model,
+			seq = knet.Intent_Seq(seq),
+			player = player,
+			entity = entity,
+			cmd = cmd,
+		},
+	)
+}
+
+session_action_resolved :: proc(
+	s: ^Session,
+	model: knet.Action_Model,
+	seq: u32,
+	entity: knet.Net_Id,
+	cmd: u16,
+	reason: knet.Action_Reject_Reason,
+) {
+	if reason == .None {
+		append(
+			&s.events,
+			Ev_Command_Confirmed {
+				seq = knet.Intent_Seq(seq),
+				entity = entity,
+				cmd = cmd,
+				model = model,
+			},
+		)
+		return
+	}
+	append(
+		&s.events,
+		Ev_Command_Rejected {
+			seq = knet.Intent_Seq(seq),
+			entity = entity,
+			cmd = cmd,
+			model = model,
+			reason = reason,
+		},
+	)
 }
 
 // The Command_Ctx send hook: wrap raw command bytes in session framing and
@@ -1218,7 +1501,7 @@ ctx_send_command :: proc(user: rawptr, bytes: []u8) {
 	defer knet.writer_destroy(&w)
 	knet.write_u8(&w, SES_CMD)
 	append(&w.buf, ..bytes)
-	s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
+	session_send_packet(s, HOST_PEER, knet.writer_bytes(&w), .Reliable)
 }
 
 // ---- the replicated world ----------------------------------------------------
@@ -1231,7 +1514,13 @@ ctx_send_command :: proc(user: rawptr, bytes: []u8) {
 // session_spawn_make / session_spawn_send pair, which routes the host's own
 // creation through the SAME factory clients use — this one remains for
 // games that build entities by hand.)
-session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet.Command_Set, owner := knet.PLAYER_ID_INVALID) -> knet.Net_Id {
+session_spawn :: proc(
+	s: ^Session,
+	type: Entity_Type,
+	entity: rawptr,
+	set: ^knet.Command_Set,
+	owner := knet.PLAYER_ID_INVALID,
+) -> knet.Net_Id {
 	assert(s.is_host, "only the authority spawns; clients create via the factory")
 	context.allocator = ses_allocator(s) // the registry's per-entity shadows free in run_destroy — allocate them there too (a spawn from a lane tick runs under l.allocator otherwise)
 	id := knet.registry_spawn(&s.reg, entity, set, owner)
@@ -1255,7 +1544,14 @@ session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet
 // Ev_Spawned fires (the entity is BORN once its fields are set; an event at
 // make time would hand the game an empty shell). Fires INTO the born hook
 // when one is installed (session_set_born), queued otherwise.
-session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_ID_INVALID) -> (entity: rawptr, id: knet.Net_Id) {
+session_spawn_make :: proc(
+	s: ^Session,
+	type: Entity_Type,
+	owner := knet.PLAYER_ID_INVALID,
+) -> (
+	entity: rawptr,
+	id: knet.Net_Id,
+) {
 	assert(s.is_host, "only the authority spawns; clients create via the factory")
 	assert(s.factory_make != nil, "session_spawn_make needs session_set_factory")
 	context.allocator = ses_allocator(s) // registry_insert's shadow/edge_shadow ride the stored allocator (see session_spawn)
@@ -1459,6 +1755,10 @@ session_predicting_owner :: proc(s: ^Session, id: knet.Net_Id) -> bool {
 // a NEW observer must be able to see.
 session_set_blob :: proc(s: ^Session, id: knet.Net_Id, data: []u8) {
 	assert(s.is_host, "blobs are host truth; clients ask via commands or app messages")
+	assert(
+		len(data) <= knet.ENTITY_BLOB_MAX_BYTES,
+		"entity blob exceeds ENTITY_BLOB_MAX_BYTES — use kit/xfer for bulk payloads",
+	)
 	context.allocator = ses_allocator(s) // the blob copy frees in registry_remove/destroy under the stored allocator — make it there
 	if !knet.registry_set_blob(&s.reg, id, data) {
 		return
@@ -1543,10 +1843,11 @@ write_spawn_tuple :: proc(s: ^Session, w: ^knet.Writer, id: knet.Net_Id) {
 	knet.write_net_id(w, id)
 	knet.write_player_id(w, e.owner)
 	n := knet.desc_wire_size(e.set.entity_desc)
-	assert(n <= int(max(u16)))
+	assert(n <= knet.MAX_REPLICATED_ENTITY_BYTES)
 	knet.write_u16(w, u16(n))
 	knet.write_full(w, e.entity, e.set.entity_desc)
 	knet.write_u32(w, e.blob_ver)
+	assert(len(e.blob) <= knet.ENTITY_BLOB_MAX_BYTES)
 	knet.write_u32(w, u32(len(e.blob)))
 	append(&w.buf, ..e.blob)
 }
@@ -1557,11 +1858,33 @@ send_world :: proc(s: ^Session, peer: Peer_Id) {
 	defer knet.writer_destroy(&w)
 	knet.write_u8(&w, SES_WORLD)
 	assert(knet.registry_count(&s.reg) <= int(max(u16)))
+	assert(knet.registry_count(&s.reg) <= knet.MAX_CONTAINER_ITEMS)
 	knet.write_u16(&w, u16(knet.registry_count(&s.reg)))
 	for id in s.types {
 		write_spawn_tuple(s, &w, id)
 	}
-	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
+	session_send_packet(s, peer, knet.writer_bytes(&w), .Reliable)
+}
+
+@(private)
+spawn_tuple_probe :: proc(r: ^knet.Reader) -> bool {
+	_ = knet.read_u16(r) // type
+	_ = knet.read_net_id(r)
+	_ = knet.read_player_id(r)
+	n := int(knet.read_u16(r))
+	if r.err || n > knet.MAX_REPLICATED_ENTITY_BYTES {
+		r.err = true
+		return false
+	}
+	_ = knet.reader_view(r, n)
+	_ = knet.read_u32(r) // blob version
+	blob_n := int(knet.read_u32(r))
+	if r.err || blob_n < 0 || blob_n > knet.ENTITY_BLOB_MAX_BYTES {
+		r.err = true
+		return false
+	}
+	_ = knet.reader_view(r, blob_n)
+	return !r.err
 }
 
 // Client: one incoming spawn tuple — factory-create (or reconcile onto an
@@ -1573,25 +1896,28 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 	id := knet.read_net_id(r)
 	owner := knet.read_player_id(r)
 	n := int(knet.read_u16(r))
-	if r.err || r.off + n > len(r.data) {
+	if r.err || n > knet.MAX_REPLICATED_ENTITY_BYTES {
 		r.err = true
 		return
 	}
-	body := knet.reader_make(r.data[r.off:r.off + n])
-	r.off += n
+	body_bytes := knet.reader_view(r, n)
+	body := knet.reader_make(body_bytes)
 
 	// The blob section is consumed up front — every early-out below (already
 	// known, no factory, unknown type) must leave the reader past this tuple.
 	blob_ver := knet.read_u32(r)
 	blob_n := int(knet.read_u32(r))
-	if r.err || blob_n < 0 || r.off + blob_n > len(r.data) { // <0: 32-bit wrap on hostile lengths
+	if r.err || blob_n < 0 || blob_n > knet.ENTITY_BLOB_MAX_BYTES { 	// <0: 32-bit wrap on hostile lengths
 		r.err = true
 		return
 	}
-	blob := r.data[r.off:r.off + blob_n]
-	r.off += blob_n
+	blob := knet.reader_view(r, blob_n)
 
 	if e, exists := knet.registry_get(&s.reg, id); exists {
+		if n != knet.desc_wire_size(e.set.entity_desc) {
+			r.err = true
+			return
+		}
 		knet.apply_full(&body, e.entity, e.set.entity_desc)
 		knet.registry_bless(&s.reg, id) // the resync is framework truth (write guard)
 		// A known entity caught up wholesale (interest re-entry, snapshot
@@ -1612,6 +1938,13 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 	entity, set := s.factory_make(s.factory_user, type, id, owner)
 	if entity == nil || set == nil {
 		return // unknown type: skipped whole, by length
+	}
+	if n != knet.desc_wire_size(set.entity_desc) {
+		if s.factory_free != nil {
+			s.factory_free(s.factory_user, id, entity)
+		}
+		r.err = true
+		return
 	}
 	knet.registry_insert(&s.reg, id, entity, set, owner)
 	s.types[id] = type
@@ -1664,7 +1997,12 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 	// build re-opening the exact divergence class this guard was built to
 	// kill is worse than the walk it saves.
 	if ticks > 0 && !s.is_host {
-		if cls, field, id, found := knet.registry_write_guard(&s.reg, &s.ctx, s.guard_exempt, s.guard_exempt_user); found {
+		if cls, field, id, found := knet.registry_write_guard(
+			&s.reg,
+			&s.ctx,
+			s.guard_exempt,
+			s.guard_exempt_user,
+		); found {
 			when !ODIN_DISABLE_ASSERT {
 				assert(
 					false,
@@ -1673,7 +2011,9 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 						"host-lane replicated fields are the authority's to write; a client's local write never replicates (it silently diverges). " +
 						"Route the change through a verb (`<verb>_cmd`) or compute it on the authority (`_then` / an authority step); " +
 						"presentation belongs in halves, not in replicated fields.",
-						cls, field, u32(id),
+						cls,
+						field,
+						u32(id),
 					),
 				)
 			} else {
@@ -1685,7 +2025,9 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 					when ODIN_OS != .Freestanding {
 						fmt.printfln(
 							"kit/session WRITE GUARD: %s.%s (net id %d) changed on a client outside the framework — logged once; session_guard_hits counts from here",
-							cls, field, u32(id),
+							cls,
+							field,
+							u32(id),
 						)
 					}
 				}
@@ -1732,7 +2074,11 @@ net_tick :: proc(s: ^Session) {
 		if t > made + 1 {
 			assert(
 				false,
-				fmt.tprintf("entity %d (type %d) was session_spawn_make'd but never session_spawn_send'd — the pair is make, set fields, send (same frame)", u32(id), u16(s.types[id])),
+				fmt.tprintf(
+					"entity %d (type %d) was session_spawn_make'd but never session_spawn_send'd — the pair is make, set fields, send (same frame)",
+					u32(id),
+					u16(s.types[id]),
+				),
 			)
 		}
 	}
@@ -1741,7 +2087,10 @@ net_tick :: proc(s: ^Session) {
 		s.join_waited += 1
 		if s.join_waited > s.join_timeout {
 			s.join_waited = -1
-			append(&s.events, Ev_Join_Failed{})
+			append(&s.events, Ev_Join_Failed{reason = .Timeout})
+			session_production_log(s, Production_Log_Record {
+				kind = .Disconnected, disconnect = .Timeout, peer = HOST_PEER,
+			})
 		}
 	}
 
@@ -1800,7 +2149,7 @@ net_tick :: proc(s: ^Session) {
 			if interest_on(s) {
 				interest_route_streams(s, knet.writer_bytes(&w)[1:], 0, t)
 			} else if !s.is_host {
-				s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Stream)
+				session_send_packet(s, HOST_PEER, knet.writer_bytes(&w), .Stream)
 			} else {
 				broadcast(s, knet.writer_bytes(&w), .Stream)
 			}
@@ -1818,11 +2167,11 @@ net_tick :: proc(s: ^Session) {
 		if s.is_host {
 			for _, p in s.players {
 				if p.connected && p.id != s.me {
-					s.send(s.send_user, p.peer, knet.writer_bytes(&w), .Reliable)
+					session_send_packet(s, p.peer, knet.writer_bytes(&w), .Reliable)
 				}
 			}
 		} else {
-			s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
+			session_send_packet(s, HOST_PEER, knet.writer_bytes(&w), .Reliable)
 		}
 	}
 
@@ -1863,7 +2212,7 @@ net_tick :: proc(s: ^Session) {
 	expired := make([dynamic]knet.Expired_Command, context.temp_allocator)
 	if knet.registry_expire_pending(&s.reg, &s.ctx, s.pending_max_age, s.me, &expired) > 0 {
 		for x in expired {
-			append(&s.events, Ev_Command_Rejected{seq = x.seq, entity = x.entity})
+			session_action_resolved(s, .Immediate, u32(x.seq), x.entity, x.cmd, .Timeout)
 		}
 	}
 }
@@ -1879,9 +2228,21 @@ net_tick :: proc(s: ^Session) {
 // DROPS a NO_PEER send as the upstream mistake it is.
 BROADCAST_PEER :: Peer_Id(-1)
 
+// The one transport egress door. A producer that exceeds the same ceiling the
+// receiver enforces fails locally before committing a shadow or announcing a
+// state transition that no peer could accept.
+@(private)
+session_send_packet :: proc(s: ^Session, to_peer: Peer_Id, bytes: []u8, channel: Channel) {
+	assert(
+		len(bytes) <= knet.MAX_PACKET_BYTES,
+		"session packet exceeds MAX_PACKET_BYTES — split/chunk the payload",
+	)
+	s.send(s.send_user, to_peer, bytes, channel)
+}
+
 @(private) // interest.odin composes per-peer sends beside this
 broadcast :: proc(s: ^Session, bytes: []u8, channel: Channel) {
-	s.send(s.send_user, BROADCAST_PEER, bytes, channel)
+	session_send_packet(s, BROADCAST_PEER, bytes, channel)
 }
 
 // This peer's clock estimate for `peer` (zero value until a pong lands).
@@ -2034,6 +2395,39 @@ session_owner_of :: proc(s: ^Session, id: knet.Net_Id) -> knet.Player_Id {
 	return knet.PLAYER_ID_INVALID
 }
 
+// Local feedback for generated action wrappers. A fully-started session can
+// distinguish a stale target from denied access before encoding or sending.
+// A transport-only Session shell retains the low-level escape hatch used by
+// embedders: it has no registry/roster to consult, so only the policy/known
+// owner check applies. This is an ergonomic fast-fail, never the trust root.
+session_action_rejection :: proc(
+	s: ^Session,
+	id: knet.Net_Id,
+	policy: knet.Action_Policy,
+) -> knet.Action_Reject_Reason {
+	if !s.ran {
+		if s.is_host || knet.action_access_allows(policy, s.me, session_owner_of(s, id), false) {
+			return .None
+		}
+		return .Access
+	}
+	if !s.joined {
+		return .Access
+	}
+	e, found := knet.registry_get(&s.reg, id)
+	if !found {
+		return .Stale
+	}
+	if s.is_host || knet.action_access_allows(policy, s.me, e.owner, false) {
+		return .None
+	}
+	return .Access
+}
+
+session_action_allowed :: proc(s: ^Session, id: knet.Net_Id, policy: knet.Action_Policy) -> bool {
+	return session_action_rejection(s, id, policy) == .None
+}
+
 // A single number over the whole replicated world — two peers that agree on it
 // agree on their authoritative state, and a mismatch is the cheapest desync
 // forensic there is. Print it each act and `expect_same` across the peer logs,
@@ -2093,11 +2487,14 @@ session_replay :: proc(s: ^Session, recording: []u8) -> int {
 		_ = knet.read_f64(&r) // arrival time — carried for paced playback, unused here
 		from := Peer_Id(knet.read_i64(&r))
 		size := int(knet.read_u32(&r))
-		if r.err || size < 0 || r.off + size > len(r.data) {
+		if r.err || size < 0 || size > knet.MAX_PACKET_BYTES {
 			break // truncated recording — stop at the last whole packet
 		}
-		pr := knet.reader_make(r.data[r.off:r.off + size])
-		r.off += size
+		packet := knet.reader_view(&r, size)
+		if r.err {
+			break
+		}
+		pr := knet.reader_make(packet)
 		session_handle_packet(s, from, &pr)
 		n += 1
 	}
@@ -2127,7 +2524,12 @@ session_replay :: proc(s: ^Session, recording: []u8) -> int {
 // clock; until its first pong lands the rewind is interp only — conservative,
 // behind the truth, never ahead) and the known interp delay. Games that judge
 // by hand read the same number from session_rewind_secs.
-session_rewound :: proc(s: ^Session, shooter: knet.Player_Id, user: rawptr, query: knet.Rewound_Query) {
+session_rewound :: proc(
+	s: ^Session,
+	shooter: knet.Player_Id,
+	user: rawptr,
+	query: knet.Rewound_Query,
+) {
 	assert(s.is_host, "lag compensation is the authority's job")
 	if shooter == s.me {
 		query(user) // the host's own screen IS the live world
@@ -2189,6 +2591,7 @@ session_count :: proc(s: ^Session, connected_only := true, players_only := true)
 // server restarts, it does not migrate. The friends-host-for-friends model
 // is untouched; this is the always-on/public-hosting escape hatch.
 session_host_start :: proc(s: ^Session, name: string, token: u64 = 0, dedicated := false) {
+	assert(len(name) <= PLAYER_NAME_MAX_BYTES, "player name exceeds PLAYER_NAME_MAX_BYTES")
 	session_init(s) // resolves + stores s.allocator (first start adopts the ambient)
 	context.allocator = ses_allocator(s) // the host's own roster name clone rides it too
 	s.is_host = true
@@ -2230,8 +2633,21 @@ session_set_locked :: proc(s: ^Session, locked: bool) {
 // Returns the seat the player held so the game can also drop the transport
 // connection (netgd.drop_peer) — without that the kicked client still holds
 // a socket it can talk on, even though the session ignores unseated peers.
-session_kick :: proc(s: ^Session, player: knet.Player_Id, ban := false) -> (was: Peer_Id, ok: bool) {
+session_kick :: proc(
+	s: ^Session,
+	player: knet.Player_Id,
+	ban := false,
+	reason := Disconnect_Reason.Kicked,
+) -> (
+	was: Peer_Id,
+	ok: bool,
+) {
 	assert(s.is_host, "the authority moderates")
+	assert(
+		disconnect_reason_valid(reason) && reason != .Unknown &&
+		(reason == .Kicked || reason == .Banned || reason == .Traffic_Policy),
+		"session_kick reason must describe a deliberate removal",
+	)
 	context.allocator = ses_allocator(s) // two writers and the ban table's inserts — all the session's
 	p, exists := s.players[player]
 	if !exists || !p.connected || player == s.me {
@@ -2247,15 +2663,21 @@ session_kick :: proc(s: ^Session, player: knet.Player_Id, ban := false) -> (was:
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_u8(&w, SES_KICKED)
-	s.send(s.send_user, p.peer, knet.writer_bytes(&w), .Reliable)
+	disconnect_reason := reason
+	if ban && reason == .Kicked {
+		disconnect_reason = .Banned
+	}
+	knet.write_u8(&w, u8(disconnect_reason))
+	session_send_packet(s, p.peer, knet.writer_bytes(&w), .Reliable)
 
 	was = p.peer
 	delete_key(&s.by_peer, p.peer)
-	mark_left(s, player)
+	mark_left(s, player, disconnect_reason)
 	left := knet.writer_make()
 	defer knet.writer_destroy(&left)
 	knet.write_u8(&left, SES_LEFT)
 	knet.write_player_id(&left, player)
+	knet.write_u8(&left, u8(disconnect_reason))
 	host_broadcast(s, knet.writer_bytes(&left), except = player)
 	return was, true
 }
@@ -2263,11 +2685,19 @@ session_kick :: proc(s: ^Session, player: knet.Player_Id, ban := false) -> (was:
 // The transport told us a peer vanished. A peer that never joined is nobody;
 // a player's departure is broadcast and the roster keeps them (disconnected)
 // so the same token can reclaim the identity later.
-session_peer_disconnected :: proc(s: ^Session, peer: Peer_Id) {
+session_peer_disconnected :: proc(
+	s: ^Session,
+	peer: Peer_Id,
+	reason := Disconnect_Reason.Transport_Lost,
+) {
 	context.allocator = ses_allocator(s) // the SES_LEFT writer; this root is called from transport callbacks, whose ambient is nobody's guess
+	assert(disconnect_reason_valid(reason) && reason != .Unknown)
 	if !s.is_host {
 		if peer == HOST_PEER {
-			append(&s.events, Ev_Host_Left{})
+			append(&s.events, Ev_Host_Left{reason = reason})
+			session_production_log(s, Production_Log_Record {
+				kind = .Disconnected, disconnect = reason, peer = peer,
+			})
 			if s.successor != knet.PLAYER_ID_INVALID {
 				// LIVE MIGRATION: everyone already knows who carries the
 				// torch. Fires again on every failed reconnect — the retry
@@ -2282,17 +2712,19 @@ session_peer_disconnected :: proc(s: ^Session, peer: Peer_Id) {
 		return
 	}
 	delete_key(&s.by_peer, peer)
-	mark_left(s, id)
+	mark_left(s, id, reason)
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_u8(&w, SES_LEFT)
 	knet.write_player_id(&w, id)
+	knet.write_u8(&w, u8(reason))
 	host_broadcast(s, knet.writer_bytes(&w), except = id)
 }
 
 @(private = "file")
-mark_left :: proc(s: ^Session, id: knet.Player_Id) {
+mark_left :: proc(s: ^Session, id: knet.Player_Id, reason: Disconnect_Reason) {
 	p := s.players[id]
+	was_peer := p.peer
 	p.connected = false
 	p.peer = NO_PEER
 	s.players[id] = p
@@ -2306,7 +2738,10 @@ mark_left :: proc(s: ^Session, id: knet.Player_Id) {
 	// interest tick (the welcome world already re-seeds everything visible);
 	// left in place they only keep the locator scanning for absent eyes.
 	interest_forget_player(s, id)
-	append(&s.events, Ev_Player_Left{id = id})
+	append(&s.events, Ev_Player_Left{id = id, reason = reason})
+	session_production_log(s, Production_Log_Record {
+		kind = .Disconnected, disconnect = reason, player = id, peer = was_peer,
+	})
 }
 
 @(private = "file")
@@ -2320,7 +2755,7 @@ host_broadcast :: proc(
 		if !p.connected || p.id == s.me || p.id == except {
 			continue
 		}
-		s.send(s.send_user, p.peer, bytes, channel)
+		session_send_packet(s, p.peer, bytes, channel)
 	}
 }
 
@@ -2330,13 +2765,13 @@ deny_join :: proc(s: ^Session, peer: Peer_Id, reason: Deny_Reason) {
 	defer knet.writer_destroy(&w)
 	knet.write_u8(&w, SES_DENIED)
 	knet.write_u8(&w, u8(reason))
-	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
+	session_send_packet(s, peer, knet.writer_bytes(&w), .Reliable)
 }
 
 @(private = "file")
 host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 	token := knet.read_u64(r)
-	name := knet.read_string(r)
+	name := knet.read_string_limited(r, PLAYER_NAME_MAX_BYTES)
 	if r.err {
 		return
 	}
@@ -2357,7 +2792,8 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 	// at the spectate flag): kept only if it is exactly one row of the
 	// installed type — the fingerprint below already refuses a foreign shape.
 	hello_row: []u8
-	if n := int(knet.read_u16(r)); !r.err && n > 0 && n == s.prof.size && r.off + n <= len(r.data) {
+	if n := int(knet.read_u16(r));
+	   !r.err && n > 0 && n == s.prof.size && r.off + n <= len(r.data) {
 		hello_row = r.data[r.off:r.off + n]
 		r.off += n
 	}
@@ -2405,13 +2841,19 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 			deny_join(s, peer, .Locked)
 			return
 		}
+		if len(s.players) >= knet.MAX_CONTAINER_ITEMS {
+			deny_join(s, peer, .Full) // protocol table ceiling, including spectators
+			return
+		}
 		// max_players caps PEOPLE — a dedicated server's own seat never eats
 		// one, and a SPECTATOR bypasses the cap outright (a full room can be
 		// watched; the seat plays nobody). Zero config = DEFAULT_MAX_PLAYERS;
 		// going unbounded is spelled max_players = -1, a declaration, not a
 		// forgotten field.
 		limit := s.cfg.max_players == 0 ? DEFAULT_MAX_PLAYERS : s.cfg.max_players
-		if !spectate && limit > 0 && session_count(s, connected_only = true, players_only = true) >= limit {
+		if !spectate &&
+		   limit > 0 &&
+		   session_count(s, connected_only = true, players_only = true) >= limit {
 			deny_join(s, peer, .Full)
 			return
 		}
@@ -2456,6 +2898,7 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 	knet.write_u8(&w, SES_WELCOME)
 	knet.write_player_id(&w, id)
 	assert(len(s.players) <= int(max(u16)))
+	assert(len(s.players) <= knet.MAX_CONTAINER_ITEMS)
 	knet.write_u16(&w, u16(len(s.players)))
 	for _, p in s.players {
 		knet.write_player_id(&w, p.id)
@@ -2465,7 +2908,7 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 		knet.write_bool(&w, p.spectator) // ...and the watching seats do too
 	}
 	knet.write_bool(&w, s.interest_r > 0 && s.locator != nil) // stream routing (interest.odin)
-	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
+	session_send_packet(s, peer, knet.writer_bytes(&w), .Reliable)
 
 	// Everyone else learns about (or re-learns) the joiner.
 	up := knet.writer_make()
@@ -2503,6 +2946,7 @@ host_handle_join :: proc(s: ^Session, peer: Peer_Id, r: ^knet.Reader) {
 // watched). Promotion to a playing seat is deliberately NOT a flag flip —
 // leave and rejoin as a player.
 session_client_start :: proc(s: ^Session, token: u64, name: string, spectate := false) {
+	assert(len(name) <= PLAYER_NAME_MAX_BYTES, "player name exceeds PLAYER_NAME_MAX_BYTES")
 	session_init(s) // resolves + stores s.allocator (first start adopts the ambient)
 	context.allocator = ses_allocator(s) // the requested-name clone below rides it
 	s.is_host = false
@@ -2539,7 +2983,7 @@ session_client_join :: proc(s: ^Session) {
 	} else {
 		knet.write_u16(&w, 0)
 	}
-	s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
+	session_send_packet(s, HOST_PEER, knet.writer_bytes(&w), .Reliable)
 }
 
 // The SESSION's own wire revision — this package's messages and codecs ONLY.
@@ -2549,7 +2993,7 @@ session_client_join :: proc(s: ^Session) {
 // same commit. (This log used to register the whole kit's changes: its rev 3
 // and 8 were netgd's, rev 4 was kit/sim's — a convention that held only by
 // engineers remembering a constant in a package they weren't editing.)
-PROTOCOL_REV :: u64(11) // 1: pre-fingerprint kit · 2: SES_JOIN carries a fingerprint · 3: (moved: netgd rev 2) · 4: (moved: kit/sim rev 2) · 5: the re-hostable snapshot carries the door (locked + denied) · 6: SES_AOI re-declares stream filtering mid-run · 7: spectator seats (SES_JOIN intent + roster rows carry the flag) · 8: (moved: netgd rev 3) · 9: SES_APP riders carry the host-relay envelope ([RELAY_UP|RELAY_CAST][author]) — relay.odin · 10: SES_JOIN carries the joiner's pre-seat profile row ([size u16][row]; 0 = none) · 11: every client owner stream enters through the host ownership gateway before relay
+PROTOCOL_REV :: u64(13) // 13: leave/bye/kick carry structured disconnect reasons
 
 // Wire revisions of the packages ABOVE the session (kit/sim's lane wire,
 // netgd's frame) — the session cannot import upward, so they register at
@@ -2604,11 +3048,20 @@ session_client_leave :: proc(s: ^Session) {
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_u8(&w, SES_BYE)
-	s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
+	knet.write_u8(&w, u8(Disconnect_Reason.Graceful))
+	session_send_packet(s, HOST_PEER, knet.writer_bytes(&w), .Reliable)
 }
 
 @(private = "file")
-roster_upsert :: proc(s: ^Session, id: knet.Player_Id, name: string, connected: bool, peer := NO_PEER, dedicated := false, spectator := false) {
+roster_upsert :: proc(
+	s: ^Session,
+	id: knet.Player_Id,
+	name: string,
+	connected: bool,
+	peer := NO_PEER,
+	dedicated := false,
+	spectator := false,
+) {
 	if old, had := s.players[id]; had {
 		delete(old.name)
 	}
@@ -2626,17 +3079,30 @@ roster_upsert :: proc(s: ^Session, id: knet.Player_Id, name: string, connected: 
 client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 	me := knet.read_player_id(r)
 	count := int(knet.read_u16(r))
-	if r.err {
+	if !knet.reader_admit_count(r, count, 13) {
+		return
+	}
+	probe := r^
+	for _ in 0 ..< count {
+		_ = knet.read_player_id(&probe)
+		_ = knet.read_string_limited(&probe, PLAYER_NAME_MAX_BYTES)
+		_ = knet.read_bool(&probe)
+		_ = knet.read_bool(&probe)
+		_ = knet.read_bool(&probe)
+	}
+	// AOI is the one backwards-compatible optional trailing byte.
+	if probe.err || len(knet.reader_remaining(&probe)) > 1 {
+		r.err = true
 		return
 	}
 	for _ in 0 ..< count {
 		id := knet.read_player_id(r)
-		name := knet.read_string(r)
+		name := knet.read_string_limited(r, PLAYER_NAME_MAX_BYTES)
 		connected := knet.read_bool(r)
 		dedicated := knet.read_bool(r)
 		spectator := knet.read_bool(r)
 		if r.err {
-			return // partial roster is fine: entries already applied are valid
+			return // preflight above makes this unreachable
 		}
 		roster_upsert(s, id, name, connected, dedicated = dedicated, spectator = spectator)
 	}
@@ -2644,7 +3110,10 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 	s.ctx.me = me
 	// Interest routing (older hosts simply end the payload here: read_bool
 	// on an exhausted reader yields false — broadcast, the old behavior).
-	s.aoi_client = knet.read_bool(r)
+	s.aoi_client = false
+	if len(knet.reader_remaining(r)) == 1 {
+		s.aoi_client = knet.read_bool(r)
+	}
 	s.joined = true
 	s.join_waited = -1 // the join-timeout clock disarms
 	prof_seat(s) // a row written before the seat existed lands under it now (and wins over the table's old copy of me)
@@ -2657,16 +3126,45 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 // The game routes its session kind byte here with the rest of the packet.
 // `from_peer` is the transport sender (hosts route by it; clients only ever
 // hear from the host — except streams, which any owning peer may broadcast).
-session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
+session_handle_packet :: proc(
+	s: ^Session,
+	from_peer: Peer_Id,
+	r: ^knet.Reader,
+	channel := Channel.Reliable,
+) {
 	context.allocator = ses_allocator(s) // every receive-path clone/make/free (names, rows, stat names, backup blobs, registry slices) rides the stored allocator
+	if !knet.reader_admit_packet(r) {
+		s.malformed += 1
+		session_production_log(s, Production_Log_Record {
+			kind = .Malformed_Packet, peer = from_peer,
+			bytes = u32(len(r.data)), count = s.malformed,
+		})
+		return
+	}
 	if s.recording {
 		// Tap the raw packet BEFORE it is parsed: arrival time, peer, and the whole
 		// byte string (r.off is 0 at entry — this is the transport's delivery). The
 		// replay feeds these back through this same proc, in order.
-		knet.write_f64(&s.record, s.now)
-		knet.write_i64(&s.record, i64(from_peer))
-		knet.write_u32(&s.record, u32(len(r.data)))
-		append(&s.record.buf, ..r.data)
+		frame_bytes := 8 + 8 + 4 + len(r.data)
+		if frame_bytes <= RECORDING_MAX_BYTES - len(s.record.buf) {
+			knet.write_f64(&s.record, s.now)
+			knet.write_i64(&s.record, i64(from_peer))
+			knet.write_u32(&s.record, u32(len(r.data)))
+			append(&s.record.buf, ..r.data)
+		} else {
+			s.recording = false // a diagnostic tap must never become an unbounded remote allocation
+		}
+	}
+	// One shared channel gate before any routed decoder or application handler
+	// runs. Pre-seat traffic has no stable player yet and stays under the join
+	// door's own bounds; every seated peer, spectators included, is accountable.
+	if s.is_host {
+		if player, seated := s.by_peer[from_peer]; seated {
+			class := channel == .Stream ? Traffic_Class.Stream : Traffic_Class.Reliable
+			if !session_admit_traffic(s, player, from_peer, class, len(r.data)) {
+				return
+			}
+		}
 	}
 	handle_packet_inner(s, from_peer, r)
 	if r.err {
@@ -2674,6 +3172,10 @@ session_handle_packet :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) 
 		// drop is COUNTED here no matter which of the ~30 read sites refused
 		// it. (Role-gate returns leave r.err clear: discipline, not damage.)
 		s.malformed += 1
+		session_production_log(s, Production_Log_Record {
+			kind = .Malformed_Packet, peer = from_peer,
+			bytes = u32(len(r.data)), count = s.malformed,
+		})
 	}
 }
 
@@ -2706,7 +3208,12 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		}
 	case SES_BYE:
 		if s.is_host {
-			session_peer_disconnected(s, from_peer)
+			reason := Disconnect_Reason(knet.read_u8(r))
+			if r.err || !disconnect_reason_valid(reason) || reason != .Graceful {
+				r.err = true
+				return
+			}
+			session_peer_disconnected(s, from_peer, reason)
 		}
 	case SES_AOI:
 		// Host-side stream FILTERING flipped mid-run (all client streams route
@@ -2737,14 +3244,23 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		// the host) and tell the game — it shows its "you're out" screen and
 		// tears the transport down. The host will also drop the socket;
 		// whichever lands first, Ev_Kicked already explained it.
+		reason := Disconnect_Reason(knet.read_u8(r))
+		if r.err || !disconnect_reason_valid(reason) ||
+		   (reason != .Kicked && reason != .Banned && reason != .Traffic_Policy) {
+			r.err = true
+			return
+		}
 		s.joined = false
-		append(&s.events, Ev_Kicked{})
+		append(&s.events, Ev_Kicked{reason = reason})
+		session_production_log(s, Production_Log_Record {
+			kind = .Disconnected, disconnect = reason, player = s.me, peer = HOST_PEER,
+		})
 	case SES_UPSERT:
 		if s.is_host {
 			return
 		}
 		id := knet.read_player_id(r)
-		name := knet.read_string(r)
+		name := knet.read_string_limited(r, PLAYER_NAME_MAX_BYTES)
 		connected := knet.read_bool(r)
 		rejoin := knet.read_bool(r)
 		spectator := knet.read_bool(r)
@@ -2758,14 +3274,19 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 			return
 		}
 		id := knet.read_player_id(r)
-		if r.err {
+		reason := Disconnect_Reason(knet.read_u8(r))
+		if r.err || !disconnect_reason_valid(reason) {
+			r.err = true
 			return
 		}
 		if p, had := s.players[id]; had {
 			p.connected = false
 			p.peer = NO_PEER
 			s.players[id] = p
-			append(&s.events, Ev_Player_Left{id = id})
+			append(&s.events, Ev_Player_Left{id = id, reason = reason})
+			session_production_log(s, Production_Log_Record {
+				kind = .Disconnected, disconnect = reason, player = id,
+			})
 		}
 
 	// ---- the replicated world (clients ignore it all until SEATED: a spawn
@@ -2776,6 +3297,20 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 			return
 		}
 		count := int(knet.read_u16(r))
+		if !knet.reader_admit_count(r, count, 24) {
+			return
+		}
+		probe := r^
+		for _ in 0 ..< count {
+			if !spawn_tuple_probe(&probe) {
+				r.err = true
+				return
+			}
+		}
+		if len(knet.reader_remaining(&probe)) != 0 {
+			r.err = true
+			return
+		}
 		for _ in 0 ..< count {
 			apply_spawn_tuple(s, r)
 			if r.err {
@@ -2785,6 +3320,11 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		knet.registry_commit_shadows(&s.reg)
 	case SES_SPAWN:
 		if s.is_host || !s.joined {
+			return
+		}
+		probe := r^
+		if !spawn_tuple_probe(&probe) || len(knet.reader_remaining(&probe)) != 0 {
+			r.err = true
 			return
 		}
 		apply_spawn_tuple(s, r)
@@ -2817,10 +3357,16 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		id := knet.read_net_id(r)
 		ver := knet.read_u32(r)
 		n := int(knet.read_u32(r))
-		if r.err || n < 0 || r.off + n > len(r.data) { // <0: 32-bit wrap on hostile lengths
+		if r.err || n < 0 || n > knet.ENTITY_BLOB_MAX_BYTES { 	// <0: 32-bit wrap on hostile lengths
+			r.err = true
 			return
 		}
-		if knet.registry_apply_blob(&s.reg, id, ver, r.data[r.off:r.off + n]) {
+		blob := knet.reader_view(r, n)
+		if r.err || len(knet.reader_remaining(r)) != 0 {
+			r.err = true
+			return
+		}
+		if knet.registry_apply_blob(&s.reg, id, ver, blob) {
 			append(&s.events, Ev_Blob_Changed{id = id, size = n})
 		}
 	case SES_DESPAWN:
@@ -2895,22 +3441,83 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		if !seated {
 			return
 		}
-		p, has := s.players[pid]
-		if !has || !p.connected || p.spectator {
-			return // a departed/watching seat issues nothing past the join
+		h := knet.command_read_header(r)
+		e, target_exists := knet.registry_get(&s.reg, h.entity)
+		cmd: ^knet.Command_Desc
+		owner := knet.PLAYER_ID_INVALID
+		if target_exists {
+			owner = e.owner
+			cmd = knet.command_find(e.set, h.cmd)
+		}
+		args_bytes := len(knet.reader_remaining(r))
+		policy := knet.Action_Policy{}
+		if cmd != nil {
+			policy = cmd.policy
+		}
+		decision := session_authority_action_admit(
+			s,
+			Authority_Action_Request {
+				model = .Immediate,
+				player = pid,
+				peer = from_peer,
+				seq = u32(h.seq),
+				entity = h.entity,
+				action = h.cmd,
+				packet_bytes = len(r.data),
+				payload_valid = !r.err,
+				target_exists = target_exists,
+				action_exists = cmd != nil,
+				owner = owner,
+				policy = policy,
+				args_bytes = args_bytes,
+				args_valid = cmd != nil && knet.action_args_allowed(policy, args_bytes),
+			},
+		)
+		if !decision.respond {
+			if h.seq != 0 {
+				session_action_executed(s, .Immediate, u32(h.seq), pid, h.entity, h.cmd, decision.reason)
+			}
+			return
 		}
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
 		knet.write_u8(&w, SES_RESULT)
-		responded, ok, h := knet.registry_host_command(&s.reg, &s.ctx, pid, r, &w)
-		if !responded {
+		result := knet.registry_host_command_checked(
+			&s.reg,
+			&s.ctx,
+			pid,
+			r,
+			&w,
+			decision.reason,
+			&h,
+			false,
+		)
+		if result.header.seq != 0 {
+			session_action_executed(
+				s,
+				.Immediate,
+				u32(result.header.seq),
+				pid,
+				result.header.entity,
+				result.header.cmd,
+				result.reason,
+			)
+		}
+		if !result.responded {
 			return
 		}
-		s.send(s.send_user, from_peer, knet.writer_bytes(&w), .Reliable)
+		session_send_packet(s, from_peer, knet.writer_bytes(&w), .Reliable)
 		// The hook runs BEFORE the result ships onward in game terms: scratch
 		// state the proc left on the entity is still exactly this command's.
-		session_dispatch_hook(s, pid, h.entity, h.cmd, ok)
-		append(&s.events, Ev_Command_Executed{ok = ok, player = pid, entity = h.entity, cmd = h.cmd})
+		if result.reason != .Stale {
+			session_dispatch_hook(
+				s,
+				pid,
+				result.header.entity,
+				result.header.cmd,
+				result.reason == .None,
+			)
+		}
 	case SES_RESULT:
 		if s.is_host {
 			return
@@ -2919,13 +3526,9 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		if res.seq == 0 {
 			return // truncated header: not a result at all (seqs start at 1)
 		}
-		if res.ok {
-			append(&s.events, Ev_Command_Confirmed{seq = res.seq})
-		} else {
-			// A truncated truth snapshot already fell back to the local revert
-			// inside command_reject — the rejection event holds either way.
-			append(&s.events, Ev_Command_Rejected{seq = res.seq, entity = res.entity})
-		}
+		// A truncated truth snapshot already fell back to the local revert
+		// inside command_reject — the typed rejection callback holds either way.
+		session_action_resolved(s, .Immediate, u32(res.seq), res.entity, res.cmd, res.reason)
 	case SES_STREAM:
 		if !s.joined {
 			return
@@ -2969,6 +3572,10 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		if r.err || int(tag) >= MAX_APP_TAGS {
 			return
 		}
+		if len(knet.reader_remaining(r)) > APP_MESSAGE_MAX_BYTES {
+			r.err = true
+			return
+		}
 		route := s.app[tag]
 		if route.handler == nil {
 			return
@@ -2991,7 +3598,7 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		knet.write_u8(&w, SES_PONG)
 		knet.ping_answer(r, &w, s.now)
 		if !r.err {
-			s.send(s.send_user, from_peer, knet.writer_bytes(&w), .Reliable)
+			session_send_packet(s, from_peer, knet.writer_bytes(&w), .Reliable)
 		}
 	case SES_PONG:
 		c := s.clocks[from_peer]

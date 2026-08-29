@@ -9,11 +9,17 @@ package repgen_fixture
 
 import gd "godot:godot"
 import kboot "godot:kit/boot"
+import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
+import ksess "godot:kit/session"
+import ksim "godot:kit/sim"
 
 Board :: struct {
 	owner:       gd.Node2d,
-	boot:        kboot.Boot, // declares the four standard transport forwards
+	boot:        kboot.Boot, // with the three fields below: generated net facade
+	ses:         ksess.Session,
+	comms:       kcomms.Comms,
+	lane:        ksim.Lane,
 	// The pawn is a SEAT'S BODY (`avatar`): a host takeover parks it with its
 	// seat instead of adopting it — the knob rides the tag, onto the kinds row.
 	pawn_scene:  ^gd.Resource `gd:"entity=Pawn:7,avatar"`,
@@ -23,7 +29,7 @@ Board :: struct {
 	// DECLARED at 20 Hz (`stream_hz=`), so every spawn of the kind — on every
 	// peer, the heir's rebuild included — carries the rate; an export spec may
 	// still trail behind the entity's own tokens.
-	chest_scene: ^gd.Resource `gd:"entity=Chest:8,stream_hz=20,group=Loot"`,
+	chest_scene: ^gd.Resource `gd:"entity=Chest:8,stream_hz=20,group=Loot"`
 }
 
 // Hand-written wins, name by name: this suppresses the generated on_net_down
@@ -66,27 +72,18 @@ board_embodied :: proc(self: ^Board, id: knet.Net_Id) {
 board_sample :: proc(self: ^Board, tick: u64, input: ^Pawn_Input) {
 }
 
-// Frame-safe on both local sample scratch and received packet bytes: clamp is
-// sanitization, false is admission refusal. The bare `validate` token pairs
-// this `<sample>_validate` name automatically.
+// Generated field constraints run first. This optional hook remains for
+// cross-field/game predicates; the bare `validate` token pairs the name.
 board_sample_validate :: proc(self: ^Board, input: ^Pawn_Input) -> bool {
 	_ = self
-	input.move[0] = clamp(input.move[0], -1, 1)
-	input.move[1] = clamp(input.move[1], -1, 1)
-	return input.buttons & 0xf0 == 0
+	return input.trigger == 0 || input.buttons != 0
 }
 
 // The SECOND input class's device read — one @(gd_sample) per input TYPE. This
 // fills the turret's input; resolve_sim matches it to Turret's class by the
 // struct it writes, and board_lane_init registers it with lane_add_input_class.
-@(gd_sample = "validate=board_turret_input_validate")
+@(gd_sample)
 board_sample_turret :: proc(self: ^Board, tick: u64, input: ^Turret_Input) {
-}
-
-board_turret_input_validate :: proc(self: ^Board, input: ^Turret_Input) -> bool {
-	_ = self
-	return input.aim[0] >= -1000 && input.aim[0] <= 1000 &&
-	       input.aim[1] >= -1000 && input.aim[1] <= 1000
 }
 
 // Everywhere: runs live and in every resim, on every peer (pure-sim contact).
@@ -99,21 +96,50 @@ board_contact :: proc(self: ^Board, tick: u64) {
 board_step :: proc(self: ^Board, tick: u64) {
 }
 
-// Declared WORLD-PASS facts (@(gd_fact)): the author writes the presentation
-// half (`<event>_fx`, mine-form); scriptgen generates the announce door under
-// the bare event name, holding every gate. ANCHORED on the pawn — its tracked
-// owner derives `mine`, watchers fire on the watch clock, its despawn drops
-// late facts:
-@(gd_fact)
+// Declared presentation cue: one entity parameter makes the anchor unambiguous,
+// so the author does not name it in the attribute. The generated bare door
+// holds every network/timeline gate.
+@(gd_cue)
 pawn_bumped_fx :: proc(g: ^Board, p: ^Pawn, mine: bool, force: f32) {
 }
 
-// ...and ANCHORLESS — a world fact: the authority's own simulation is the
-// causer (mine=true on its screen alone); every client presents at the watch
-// clock with no entity.
+// With several entity parameters, the attribute names the PARAMETER that owns
+// the presentation timeline. The other pointer crosses the wire as its Net_Id
+// and is resolved before the cue is presented.
+@(gd_cue = "anchor=scout")
+pawn_spotted_fx :: proc(g: ^Board, p: ^Pawn, scout: ^Scout, mine: bool, strength: u8) {
+}
+
+// `anchor=none` deliberately chooses the authority/world clock even though a
+// typed entity is part of the presentation. Its pointer is still sent safely
+// as a stable Net_Id and resolved on each peer.
+@(gd_cue = "anchor=none")
+pawn_echoed_fx :: proc(g: ^Board, p: ^Pawn, mine: bool) {
+}
+
+// The old spelling remains source- and wire-compatible. No entity parameters
+// means an anchorless world cue: the authority is the local causer.
 @(gd_fact)
 board_horn_fx :: proc(g: ^Board, mine: bool, side: u8) {
 }
 
 board_ready :: proc(self: ^Board) {
+}
+
+// Compile-time exercise for the generated census surface: both overloads
+// resolve to the same typed pointer, and iteration promotes ref.id onto the
+// row while carrying owner + entity without a second lookup.
+census_typecheck :: proc(self: ^Board, id: knet.Net_Id) {
+	ref := pawn_ref(id)
+	if pawn, ok := pawn_of(&self.boot, ref); ok {
+		_ = pawn
+	}
+	if pawn, ok := pawn_of(&self.boot, id); ok {
+		_ = pawn
+	}
+	for tracked in pawn_all(&self.boot) {
+		_ = tracked.id
+		_ = tracked.owner
+		_ = tracked.entity
+	}
 }

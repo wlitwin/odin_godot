@@ -135,7 +135,7 @@ interest_tick :: proc(s: ^Session) {
 					defer knet.writer_destroy(&w)
 					knet.write_u8(&w, SES_SPAWN)
 					write_spawn_tuple(s, &w, id)
-					s.send(s.send_user, p.peer, knet.writer_bytes(&w), .Reliable)
+					session_send_packet(s, p.peer, knet.writer_bytes(&w), .Reliable)
 				}
 			} else if in_set {
 				delete_key(&s.interest, key)
@@ -152,6 +152,29 @@ interest_has :: proc(s: ^Session, player: knet.Player_Id, id: knet.Net_Id) -> bo
 		return true
 	}
 	return s.interest[ikey(player, id)]
+}
+
+// Shared freshness query for higher-level lanes (notably kit/sim snapshots).
+// With no focus/AOI configured it returns true, preserving the old broadcast
+// behavior. Existence remains global; this only decides whether a per-tick
+// state row is useful to this recipient now.
+session_interest_contains :: proc(s: ^Session, player: knet.Player_Id, id: knet.Net_Id) -> bool {
+	return interest_has(s, player, id)
+}
+
+session_interest_distance_sq :: proc(
+	s: ^Session,
+	player: knet.Player_Id,
+	id: knet.Net_Id,
+) -> (
+	distance_sq: f32,
+	known: bool,
+) {
+	if _, focused := s.focus[player]; !focused {
+		return 0, false
+	}
+	distance_sq, known = s.interest_d2[ikey(player, id)]
+	return
 }
 
 // Host: the interest-aware SES_STATE send — one collection (one shadow
@@ -186,7 +209,7 @@ interest_send_state :: proc(s: ^Session, changed: ^[dynamic]knet.Net_Id) -> int 
 		}
 		w.buf[count_at] = u8(count)
 		w.buf[count_at + 1] = u8(count >> 8)
-		s.send(s.send_user, p.peer, knet.writer_bytes(&w), .Reliable)
+		session_send_packet(s, p.peer, knet.writer_bytes(&w), .Reliable)
 	}
 	return dirty
 }
@@ -248,7 +271,7 @@ interest_route_streams :: proc(s: ^Session, raw: []u8, exclude: Peer_Id, tick: u
 		}
 		assert(n <= int(max(u16)))
 		knet.writer_patch_u16(&w, count_at, u16(n))
-		s.send(s.send_user, p.peer, knet.writer_bytes(&w), .Stream)
+		session_send_packet(s, p.peer, knet.writer_bytes(&w), .Stream)
 	}
 }
 

@@ -92,6 +92,8 @@ WIRE_KINDS :: ksess.SES_KIND_COUNT + 1
 Wire_Gauge :: struct {
 	in_acc, out_acc:           [WIRE_KINDS]int, // current window, bytes (frame byte included)
 	in_rate, out_rate:         [WIRE_KINDS]int, // last completed window, bytes/second
+	packets_in_acc, packets_out_acc:   int,
+	packets_in_rate, packets_out_rate: int,
 	app_in_acc, app_out_acc:   map[u8]int, // SES_APP, split by tag
 	app_in_rate, app_out_rate: map[u8]int,
 	window:                    f64, // when the current window opened (0 = not yet)
@@ -103,9 +105,11 @@ gauge_count :: proc(g: ^Wire_Gauge, out: bool, ses_kind: u8, app_tag: u8, size: 
 	if k >= WIRE_KINDS {k = WIRE_KINDS - 1}
 	if out {
 		g.out_acc[k] += size
+		g.packets_out_acc += 1
 		if ses_kind == ksess.SES_APP {g.app_out_acc[app_tag] += size}
 	} else {
 		g.in_acc[k] += size
+		g.packets_in_acc += 1
 		if ses_kind == ksess.SES_APP {g.app_in_acc[app_tag] += size}
 	}
 }
@@ -126,6 +130,10 @@ gauge_roll :: proc(g: ^Wire_Gauge, now: f64) {
 		g.in_acc[k] = 0
 		g.out_acc[k] = 0
 	}
+	g.packets_in_rate = int(f64(g.packets_in_acc) / dt)
+	g.packets_out_rate = int(f64(g.packets_out_acc) / dt)
+	g.packets_in_acc = 0
+	g.packets_out_acc = 0
 	clear(&g.app_in_rate)
 	for tag, bytes in g.app_in_acc {g.app_in_rate[tag] = int(f64(bytes) / dt)}
 	clear(&g.app_in_acc)
@@ -135,10 +143,31 @@ gauge_roll :: proc(g: ^Wire_Gauge, now: f64) {
 	g.window = now
 }
 
+// Numeric totals for dashboards and production telemetry. `wire_traffic`
+// remains the compact bytes-by-kind rendering; this exposes the same completed
+// one-second window without forcing callers to parse presentation text.
+Wire_Rates :: struct {
+	packets_in, packets_out: int,
+	bytes_in, bytes_out:     int,
+}
+
+wire_rates :: proc(wire: ^Session_Wire) -> Wire_Rates {
+	rates := Wire_Rates {
+		packets_in  = wire.gauge.packets_in_rate,
+		packets_out = wire.gauge.packets_out_rate,
+	}
+	for k in 0 ..< WIRE_KINDS {
+		rates.bytes_in += wire.gauge.in_rate[k]
+		rates.bytes_out += wire.gauge.out_rate[k]
+	}
+	return rates
+}
+
 Wire_Delayed :: struct {
-	due:  f64,
-	from: ksess.Peer_Id,
-	data: []u8,
+	due:     f64,
+	from:    ksess.Peer_Id,
+	channel: ksess.Channel,
+	data:    []u8,
 }
 
 Wire_Drop :: struct {
@@ -154,12 +183,18 @@ wire_attach :: proc(wire: ^Session_Wire, node: gd.Node, ses: ^ksess.Session, kin
 	wire.ses = ses
 	wire.kind = kind
 	ksess.session_set_transport(ses, wire, wire_send)
+	ksess.session_set_peer_drop(ses, wire, wire_policy_drop)
 	// WEB: core:time is stuck inside the wasm module — every knet pacer and
 	// ticker freezes on it. Swap the toolkit clock for the engine's before
 	// anything reads it (native keeps the core:time path untouched).
 	when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 		knet.set_clock(web_clock)
 	}
+}
+
+@(private = "file")
+wire_policy_drop :: proc(user: rawptr, peer: ksess.Peer_Id) {
+	wire_drop(cast(^Session_Wire)user, peer)
 }
 
 when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
@@ -371,11 +406,13 @@ wire_receive :: proc(wire: ^Session_Wire, id: gd.Int, packet: gd.Packed_Byte_Arr
 		}
 		data := make([]u8, len(view) - 1)
 		copy(data, view[1:])
-		append(&wire.delayed, Wire_Delayed{due = due, from = from, data = data})
+		channel := streamed ? ksess.Channel.Stream : ksess.Channel.Reliable
+		append(&wire.delayed, Wire_Delayed{due = due, from = from, channel = channel, data = data})
 		return
 	}
 	r := knet.reader_make(view[1:])
-	ksess.session_handle_packet(wire.ses, ksess.Peer_Id(id), &r)
+	channel := streamed ? ksess.Channel.Stream : ksess.Channel.Reliable
+	ksess.session_handle_packet(wire.ses, ksess.Peer_Id(id), &r, channel)
 }
 
 // The shim's own dice — xorshift64*, seeded from the clock on first use. A
@@ -410,7 +447,7 @@ wire_pump :: proc(wire: ^Session_Wire, now: f64) {
 		pkt := wire.delayed[i]
 		ordered_remove(&wire.delayed, i)
 		r := knet.reader_make(pkt.data)
-		ksess.session_handle_packet(wire.ses, pkt.from, &r)
+		ksess.session_handle_packet(wire.ses, pkt.from, &r, pkt.channel)
 		delete(pkt.data)
 	}
 	for i := 0; i < len(wire.dropping); {

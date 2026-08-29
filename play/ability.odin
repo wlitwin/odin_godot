@@ -74,7 +74,7 @@ ability_arm :: proc(a: ^Ability, def: kcombat.Ability_Def) {
 // command hook (`ok`) to run the effect from the aim and origin. `dx,dy` is the aim/target and
 // `ox,oy` the caster's OWN position at the cast (the owner-carried origin — see the header: leash it
 // in the hook), both stashed for the hook.
-@(gd_command = "predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 ability_cast :: proc(a: ^Ability, dx, dy: f32, ox, oy: f32) -> bool {
 	if !kcombat.cast_gate(&a.cd, a.cooldown) {
 		return false // on cooldown — a rejection, revert the optimistic state

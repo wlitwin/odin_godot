@@ -18,8 +18,11 @@ package kit_session
 // are the SAME snapshot contract — kit/save wraps session_snapshot in a
 // versioned envelope.
 
-import knet "godot:kit/net"
 import "core:strings"
+import knet "godot:kit/net"
+
+BACKUP_GAME_BLOB_MAX_BYTES :: 256 * 1024
+SUCCESSOR_INFO_MAX_BYTES :: 4096
 
 // The eldest connected client (lowest Player_Id) — deterministic, stable
 // across everything except that player leaving.
@@ -94,6 +97,7 @@ session_snapshot :: proc(s: ^Session, w: ^knet.Writer) {
 		knet.write_string(w, n)
 	}
 	assert(len(s.players) <= int(max(u16)))
+	assert(len(s.players) <= knet.MAX_CONTAINER_ITEMS)
 	knet.write_u16(w, u16(len(s.players)))
 	for _, p in s.players {
 		knet.write_player_id(w, p.id)
@@ -115,6 +119,7 @@ session_snapshot :: proc(s: ^Session, w: ^knet.Writer) {
 	// kicked-with-ban player just waits for the migration and walks back in.
 	knet.write_bool(w, s.locked)
 	assert(len(s.denied) <= int(max(u16)))
+	assert(len(s.denied) <= knet.MAX_CONTAINER_ITEMS)
 	knet.write_u16(w, u16(len(s.denied)))
 	for h, id in s.denied {
 		knet.write_u64(w, h)
@@ -122,6 +127,7 @@ session_snapshot :: proc(s: ^Session, w: ^knet.Writer) {
 	}
 	knet.write_u32(w, u32(s.reg.next_id))
 	assert(knet.registry_count(&s.reg) <= int(max(u16)))
+	assert(knet.registry_count(&s.reg) <= knet.MAX_CONTAINER_ITEMS)
 	knet.write_u16(w, u16(knet.registry_count(&s.reg)))
 	for id in s.types {
 		write_spawn_tuple(s, w, id)
@@ -148,13 +154,24 @@ session_set_backup_blob :: proc(s: ^Session, user: rawptr, write: Backup_Blob_Pr
 // Returns COPIES (temp-allocated by default) on purpose: the resume you are
 // about to run RE-INITS the session, which frees the stored payload —
 // slices into it would dangle exactly when you need them.
-session_backup_parts :: proc(s: ^Session, allocator := context.temp_allocator) -> (game_blob: []u8, snapshot: []u8, ok: bool) {
+session_backup_parts :: proc(
+	s: ^Session,
+	allocator := context.temp_allocator,
+) -> (
+	game_blob: []u8,
+	snapshot: []u8,
+	ok: bool,
+) {
 	if len(s.backup) < 4 {
 		return nil, nil, false
 	}
 	r := knet.reader_make(s.backup)
 	n := int(knet.read_u32(&r))
-	if r.err || n < 0 || r.off + n > len(s.backup) { // <0: 32-bit wrap on hostile lengths
+	if r.err ||
+	   n < 0 ||
+	   n > BACKUP_GAME_BLOB_MAX_BYTES ||
+	   r.off > len(s.backup) ||
+	   n > len(s.backup) - r.off { 	// <0: 32-bit wrap on hostile lengths
 		return nil, nil, false
 	}
 	game_blob = make([]u8, n, allocator)
@@ -171,6 +188,10 @@ session_backup_parts :: proc(s: ^Session, allocator := context.temp_allocator) -
 // info set, host loss stays v1-shaped: Ev_Host_Left, run over, no auto arc.
 session_set_successor_info :: proc(s: ^Session, info: []u8) {
 	assert(s.is_host)
+	assert(
+		len(info) <= SUCCESSOR_INFO_MAX_BYTES,
+		"successor rendezvous exceeds SUCCESSOR_INFO_MAX_BYTES",
+	)
 	context.allocator = ses_allocator(s) // succ_info is owned run state, freed in run_destroy — copy it under the stored allocator
 	delete(s.succ_info)
 	s.succ_info = make([]u8, len(info))
@@ -222,7 +243,7 @@ send_successor :: proc(s: ^Session, to: Peer_Id) {
 	if to == BROADCAST_PEER {
 		broadcast(s, knet.writer_bytes(&w), .Reliable)
 	} else {
-		s.send(s.send_user, to, knet.writer_bytes(&w), .Reliable)
+		session_send_packet(s, to, knet.writer_bytes(&w), .Reliable)
 	}
 }
 
@@ -237,10 +258,14 @@ send_backup :: proc(s: ^Session, peer: Peer_Id) {
 	if s.backup_blob != nil {
 		s.backup_blob(s.backup_blob_user, &blob)
 	}
+	assert(
+		len(knet.writer_bytes(&blob)) <= BACKUP_GAME_BLOB_MAX_BYTES,
+		"backup game blob exceeds BACKUP_GAME_BLOB_MAX_BYTES",
+	)
 	knet.write_u32(&w, u32(len(knet.writer_bytes(&blob))))
 	append(&w.buf, ..knet.writer_bytes(&blob))
 	session_snapshot(s, &w)
-	s.send(s.send_user, peer, knet.writer_bytes(&w), .Reliable)
+	session_send_packet(s, peer, knet.writer_bytes(&w), .Reliable)
 }
 
 // Client: the designated backup host keeps the blob, opaque, replacing any
@@ -261,8 +286,9 @@ backup_recv :: proc(s: ^Session, r: ^knet.Reader) {
 @(private)
 successor_recv :: proc(s: ^Session, r: ^knet.Reader) {
 	succ := knet.read_player_id(r)
-	info := knet.read_bytes(r)
-	if r.err {
+	info := knet.read_bytes_limited(r, SUCCESSOR_INFO_MAX_BYTES)
+	if r.err || len(knet.reader_remaining(r)) != 0 {
+		r.err = true
 		return
 	}
 	s.successor = succ
@@ -294,7 +320,60 @@ successor_recv :: proc(s: ^Session, r: ^knet.Reader) {
 // at all must handle Ev_Owner_Changed.)
 // Returns false on a corrupt blob (destroy the session and start clean).
 session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backup: []u8) -> bool {
-	assert(s.factory_make != nil, "resume recreates entities through the factory — install it first")
+	assert(
+		s.factory_make != nil,
+		"resume recreates entities through the factory — install it first",
+	)
+	assert(len(name) <= PLAYER_NAME_MAX_BYTES, "player name exceeds PLAYER_NAME_MAX_BYTES")
+	// Pure structural pass before session_init wipes the current run or any
+	// factory/map allocation occurs. A malformed persistence blob is a no-op.
+	probe := knet.reader_make(backup)
+	if !knet.reader_admit_packet(&probe) {
+		return false
+	}
+	_ = knet.read_u64(&probe)
+	_ = knet.read_u64(&probe)
+	pcols := int(knet.read_u8(&probe))
+	if probe.err || pcols == 0 || pcols > MAX_STAT_COLS {
+		return false
+	}
+	for _ in 0 ..< pcols {
+		_ = knet.read_string_limited(&probe, STAT_NAME_MAX_BYTES)
+	}
+	pplayers := int(knet.read_u16(&probe))
+	if !knet.reader_admit_count(&probe, pplayers, 18 + pcols * 8) {
+		return false
+	}
+	for _ in 0 ..< pplayers {
+		_ = knet.read_player_id(&probe)
+		_ = knet.read_string_limited(&probe, PLAYER_NAME_MAX_BYTES)
+		_ = knet.read_u64(&probe)
+		for _ in 0 ..< pcols {
+			_ = knet.read_i64(&probe)
+		}
+	}
+	_ = knet.read_bool(&probe)
+	pdenied := int(knet.read_u16(&probe))
+	if !knet.reader_admit_count(&probe, pdenied, 16) {
+		return false
+	}
+	for _ in 0 ..< pdenied {
+		_ = knet.read_u64(&probe)
+		_ = knet.read_player_id(&probe)
+	}
+	_ = knet.read_u32(&probe)
+	pentities := int(knet.read_u16(&probe))
+	if !knet.reader_admit_count(&probe, pentities, 24) {
+		return false
+	}
+	for _ in 0 ..< pentities {
+		if !spawn_tuple_probe(&probe) {
+			return false
+		}
+	}
+	if probe.err || len(knet.reader_remaining(&probe)) != 0 {
+		return false
+	}
 	// The heir carries every player's profile row into the resumed run —
 	// keep_profiles=true lifts the table over the run wipe (see session_init).
 	session_init(s, true) // resolves + stores s.allocator (a fresh session's first start)
@@ -309,15 +388,15 @@ session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backu
 	s.next_player = knet.Player_Id(knet.read_u64(&r))
 	old_host := knet.Player_Id(knet.read_u64(&r)) // who wrote this backup; its entities re-own to us
 	cols := int(knet.read_u8(&r))
-	if r.err || cols == 0 || cols > MAX_STAT_COLS { // 0: even a fresh run has "ping"
+	if r.err || cols == 0 || cols > MAX_STAT_COLS { 	// 0: even a fresh run has "ping"
 		return false
 	}
-	for n in s.stat_names { // replace the init-time default schema wholesale
+	for n in s.stat_names { 	// replace the init-time default schema wholesale
 		delete(n)
 	}
 	clear(&s.stat_names)
 	for _ in 0 ..< cols {
-		append(&s.stat_names, strings.clone(knet.read_string(&r)))
+		append(&s.stat_names, strings.clone(knet.read_string_limited(&r, STAT_NAME_MAX_BYTES)))
 	}
 	players := int(knet.read_u16(&r))
 	if r.err {
@@ -325,7 +404,7 @@ session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backu
 	}
 	for _ in 0 ..< players {
 		id := knet.read_player_id(&r)
-		pname := knet.read_string(&r)
+		pname := knet.read_string_limited(&r, PLAYER_NAME_MAX_BYTES)
 		hash := knet.read_u64(&r)
 		row: [MAX_STAT_COLS]i64
 		for i in 0 ..< cols {
@@ -365,6 +444,7 @@ session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backu
 	for _ in 0 ..< entities {
 		apply_spawn_tuple(s, &r)
 		if r.err {
+			session_init(s, true)
 			return false
 		}
 	}

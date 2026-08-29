@@ -290,8 +290,8 @@ FP_WIRE="$(fp fpwire)"   || fail "the wire-change fingerprint fixture did not ge
 # (i) A FLAT module hashes to exactly what it always did. This literal was produced by the
 # scriptgen that shipped BEFORE subpackage names folded in; if it moves, every already-
 # released build of every flat game stops being able to join the next one.
-if [ "$FP_FLAT" != "0xa1ca871fefa68985" ]; then
-    fail "the FLAT fingerprint changed ($FP_FLAT, expected 0xa1ca871fefa68985) — every shipped flat build would now be refused at the join door (Deny_Reason.Version). Only a deliberate wire-contract change may edit this literal."
+if [ "$FP_FLAT" != "0x7b40b20d96a35e4b" ]; then
+    fail "the FLAT fingerprint changed ($FP_FLAT, expected 0x7b40b20d96a35e4b) — every shipped flat build would now be refused at the join door (Deny_Reason.Version). Only a deliberate wire-contract change may edit this literal."
 fi
 echo "  ok  fingerprint: a flat module still hashes to $FP_FLAT"
 

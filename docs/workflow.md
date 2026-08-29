@@ -41,8 +41,8 @@ for CI, headless builds, or working from the source repo.
    silently compiling stale descriptors,
 3. builds the scripts dll (`odin build <scriptsdir> -build-mode:dll` with
    `-custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc
-   -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_sample
-   -custom-attribute:gd_step -custom-attribute:gd_fact -custom-attribute:gd_half
+   -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_input -custom-attribute:gd_sample
+   -custom-attribute:gd_step -custom-attribute:gd_cue -custom-attribute:gd_fact -custom-attribute:gd_half
    -custom-attribute:gd_message`, which let
    the Odin compiler accept the marker attributes), and
 4. builds the core dll.

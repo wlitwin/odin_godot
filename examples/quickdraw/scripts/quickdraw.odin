@@ -37,15 +37,14 @@ Respawn :: struct {
 }
 
 Quickdraw :: struct {
-	owner:   gd.Node2d,
-	ses:     ksess.Session,
-	comms:   kcomms.Comms,
-	boot:    kboot.Boot,
-	lane:    ksim.Lane,
-	netgraph: kui.Netgraph, // the drop-in net-health overlay (rtt + resim spikes)
-	running: bool,
-	started: bool,
-
+	owner:        gd.Node2d,
+	ses:          ksess.Session,
+	comms:        kcomms.Comms,
+	boot:         kboot.Boot,
+	lane:         ksim.Lane,
+	netgraph:     kui.Netgraph, // the drop-in net-health overlay (rtt + resim spikes)
+	running:      bool,
+	started:      bool,
 	gunner_scene: ^gd.Resource `gd:"entity=Gunner:1"`,
 	bullet_scene: ^gd.Resource `gd:"entity=Bullet:2"`,
 	drone_scene:  ^gd.Resource `gd:"entity=Drone:3"`,
@@ -53,62 +52,76 @@ Quickdraw :: struct {
 	// The census is GENERATED (gunner_of / my_gunner / gunner_owned_by /
 	// gunner_ids read the kit's own ledgers) — the only bookkeeping left is
 	// the hot my-avatar pointer the sample and bots poke every tick.
-	me_gun: ^Gunner,
+	me_gun:       ^Gunner,
 
 	// Host scratch.
-	kills_col:  ksess.Stat_Col,
-	deaths_col: ksess.Stat_Col,
-	respawns:   [dynamic]Respawn,
+	kills_col:    ksess.Stat_Col,
+	deaths_col:   ksess.Stat_Col,
+	respawns:     [dynamic]Respawn,
 
 	// Env roles + the acid's probes.
-	auto_peers: int,
-	bot:        string, // QD_BOT: "" | "orbit" | "strafer" | "deadeye"
-	shot_count: int,
-	gear_seen:  u8, // my avatar's last shown gear — the local-flip edge the acid times
+	auto_peers:   int,
+	bot:          string, // QD_BOT: "" | "orbit" | "strafer" | "deadeye"
+	shot_count:   int,
+	gear_seen:    u8, // my avatar's last shown gear — the local-flip edge the acid times
 
 	// THE EDGE-ORDERING PROBE (the acid's QD_EDGE receipt). `frame` counts
 	// _process calls; the authority stamps it onto a gunner whenever it writes
 	// hp from inside a tick, and gunner_hp_edge reads it back to say whether
 	// the edge pass saw that write on the frame it happened or a frame later.
 	// See gunner_hp_edge for the bug this exists to catch.
-	frame:      u64,
-	edge_same:  int, // hp edges the authority saw on the writing frame
-	edge_late:  int, // hp edges it saw a frame (or more) behind — the bug
-
-	lead_ticks: int, // client-side frame counter for the once-a-second QD_LEAD trace
+	frame:        u64,
+	edge_same:    int, // hp edges the authority saw on the writing frame
+	edge_late:    int, // hp edges it saw a frame (or more) behind — the bug
+	lead_ticks:   int, // client-side frame counter for the once-a-second QD_LEAD trace
 }
 
 now_s :: knet.now_s
 
 quickdraw_ready :: proc(self: ^Quickdraw) {
+	net_cfg := kboot.network_profile(.Listen_Server_Action)
+	// A generous half-second ABSOLUTE ceiling is quickdraw's favor-the-shooter
+	// rule; each seat's actual credit is tighter, derived from authority-observed
+	// RTT/jitter and lane timing. Large respawn jumps cut instead of gliding.
+	// These are validated overrides on top of the named complete-stack profile.
+	net_cfg.lane.smooth_cut = 48
+	net_cfg.lane.rewind_max = 30
+	net_cfg.lane.judge_live = gd.env_int("QD_NOREWIND", 0) != 0
+
 	// The build's wire contract (generated): a version-skewed join is refused
 	// at the door (Deny_Reason.Version) instead of misparsing deltas.
-	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
-		title = "Q U I C K D R A W",
-		status = "Host a duel, or join one at localhost",
-		legend = "WASD move · Mouse aim · Click fire · Space dash · Tab scores · Enter chat",
-		msg_kind = MSG_SESSION,
-		env = "QD", // QD_PORT/_NAME/_TOKEN identity + the QD_LATENCY shim
-		min_players = 1,
-		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
-	})
-	quickdraw_entities(self, &self.boot)
+	quickdraw_net_attach(
+		self,
+		kboot.Options {
+			title       = "Q U I C K D R A W",
+			status      = "Host a duel, or join one at localhost",
+			legend      = "WASD move · Mouse aim · Click fire · Space dash · Tab scores · Enter chat",
+			msg_kind    = MSG_SESSION,
+			env         = "QD", // QD_PORT/_NAME/_TOKEN identity + the QD_LATENCY shim
+			min_players = 1,
+			methods     = {
+				"on_host",
+				"on_join",
+				"on_start",
+				"on_chat",
+				"on_packet",
+				"on_peer_left",
+				"on_net_up",
+				"on_net_down",
+			},
+		},
+		net_cfg,
+	)
 
-	// The sim lane beside the session — the wiring is GENERATED from the
+	// The sim lane beside the session is wired by that generated attach from the
 	// @(gd_sample)/@(gd_step) attributes (typed procs, input size, and the
-	// step's authority gate all come from the declarations). Config: 60 Hz
-	// ticks, snapshots every 3 (20 Hz), respawn teleports big enough to CUT
-	// instead of glide, and a GENEROUS half-second rewind ceiling — a
+	// step's authority gate all come from the declarations). The listen-action
+	// profile supplies 60 Hz ticks and 20 Hz snapshots. Its half-second rewind
+	// override covers a
 	// shooter's view is transit + lead + watch-delay old (~400ms at the
 	// acid's 240ms RTT), and a quickdraw favors the shooter by premise.
 	// Competitive games tighten this knob. judge_live is the acid's control
 	// arm — feel free to feel the difference.
-	quickdraw_lane_init(self, &self.lane, &self.ses, cfg = ksim.Lane_Config{
-		smooth_cut = 48,
-		rewind_max = 30,
-		judge_live = gd.env_int("QD_NOREWIND", 0) != 0,
-	})
-	kboot.boot_lane(&self.boot, &self.lane) // the boot drives the lane from here on
 
 	// The net-health overlay — a kit/ui drop-in, left on. Its resim sparkline
 	// is the visible proof of the promise: flat when the wire is calm, spiking
@@ -142,7 +155,8 @@ quickdraw_ready :: proc(self: ^Quickdraw) {
 
 quickdraw_try_start :: proc(self: ^Quickdraw) {
 	if self.started || self.auto_peers <= 0 {return}
-	if ksess.session_count(&self.ses, connected_only = true, players_only = true) >= self.auto_peers {
+	if ksess.session_count(&self.ses, connected_only = true, players_only = true) >=
+	   self.auto_peers {
 		quickdraw_on_start(self) // self-gating: non-hosts and re-calls no-op
 	}
 }
@@ -155,25 +169,9 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 	// (predict/simulate, then present) — before this returns.
 	events, _, _ := kboot.boot_pump(&self.boot, delta, now_s())
 
-	// Fill the net-health overlay: the shared coop core (rtt, link jitter/loss,
-	// malformed drops, bytes-by-kind) from boot, then this game's own sim rows —
-	// lead + the lane's resim/reconcile/fact-drop counters — laid on top.
+	// Boot sees boot_lane and projects the complete link + simulation pipeline:
+	// rates, drops, lead/gaps, ack/rewind, replay cost, commands, snapshots, AOI.
 	ng := kboot.boot_net_stats(&self.boot)
-	ng.sim = true
-	ng.lead = ksim.lane_lead(&self.lane)
-	ng.resims = self.lane.stat_resims
-	ng.recons = self.lane.stat_reconciles
-	ng.fact_drops = self.lane.stat_facts_dropped
-	// The sim lane's silent-failure counters (guard_hits rides in from boot). The
-	// rewind clamp is the one this game's own regression hid in: a host-side lag-comp
-	// rewind pinned to the buffer horizon leaves no other trace than this number.
-	ng.input_drops = self.lane.stat_input_drops
-	ng.input_rejected = self.lane.stat_input_rejected
-	ng.ack_rejected = self.lane.stat_ack_rejected
-	ng.cmd_capped = self.lane.stat_cmd_capped
-	ng.cmd_rejected = self.lane.stat_cmd_rejected
-	ng.rewind_clamped = self.lane.stat_rewind_clamped
-	ng.echo_dropped = self.lane.stat_echo_dropped
 	kui.netgraph_refresh(&self.netgraph, ng)
 
 	// THE LEAD TRACE (a diagnostic, not a game rule — it prints and asserts
@@ -188,10 +186,15 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 	if !ksim.lane_is_authority(&self.lane) {
 		self.lead_ticks += 1
 		if self.lead_ticks % 60 == 0 {
-			gd.print_str(fmt.tprintf(
-				"QD_LEAD tick=%d lead=%d resims=%d rendersat=%d",
-				ksim.lane_now(&self.lane), ng.lead, self.lane.stat_resims, self.lane.stat_render_sat,
-			))
+			gd.print_str(
+				fmt.tprintf(
+					"QD_LEAD tick=%d lead=%d resims=%d rendersat=%d",
+					ksim.lane_now(&self.lane),
+					ng.lead,
+					self.lane.stat_resims,
+					self.lane.stat_render_sat,
+				),
+			)
 		}
 	}
 
@@ -202,14 +205,21 @@ quickdraw_process :: proc(self: ^Quickdraw, delta: f64) {
 	// wears the boots — ~15 ticks before truth can possibly return at the
 	// acid's 240ms RTT.
 	if self.me_gun != nil {
-		buy := gd.is_action_just_pressed("qd_buy") ||
+		buy :=
+			gd.is_action_just_pressed("qd_buy") ||
 			(self.bot != "" && self.me_gun.gear == 0 && self.me_gun.gold >= BOOTS_PRICE)
 		if buy && knet.command_ok(gunner_buy_cmd(&self.boot, self.me_gun, GEAR_BOOTS)) {
 			gd.print_str(fmt.tprintf("QD_BUY_SENT tick=%d", ksim.lane_now(&self.lane)))
 		}
 		if self.me_gun.gear != self.gear_seen {
 			self.gear_seen = self.me_gun.gear
-			gd.print_str(fmt.tprintf("QD_GEAR_LOCAL gear=%d tick=%d", self.me_gun.gear, ksim.lane_now(&self.lane)))
+			gd.print_str(
+				fmt.tprintf(
+					"QD_GEAR_LOCAL gear=%d tick=%d",
+					self.me_gun.gear,
+					ksim.lane_now(&self.lane),
+				),
+			)
 		}
 	}
 
@@ -231,7 +241,12 @@ quickdraw_welcomed :: proc(self: ^Quickdraw, me: knet.Player_Id) {
 @(gd_half)
 quickdraw_player_joined_then :: proc(self: ^Quickdraw, id: knet.Player_Id, rejoin: bool) {
 	if p, ok := ksess.session_player(&self.ses, id); ok {
-		kcomms.comms_welcome(&self.comms, id, rejoin, fmt.tprintf("%s steps into the dust", p.name))
+		kcomms.comms_welcome(
+			&self.comms,
+			id,
+			rejoin,
+			fmt.tprintf("%s steps into the dust", p.name),
+		)
 	}
 	if self.started && !rejoin {
 		spawn_gunner(self, id)
@@ -246,7 +261,12 @@ quickdraw_host_left :: proc(self: ^Quickdraw) {
 }
 
 @(gd_half)
-quickdraw_entity_spawned :: proc(self: ^Quickdraw, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
+quickdraw_entity_spawned :: proc(
+	self: ^Quickdraw,
+	id: knet.Net_Id,
+	type: ksess.Entity_Type,
+	owner: knet.Player_Id,
+) {
 	_ = owner
 	// BORN = the fields are set: the node's FIRST placement, here — not in the
 	// entity's _process (Godot runs no _process on a node added mid-_process:
@@ -257,11 +277,14 @@ quickdraw_entity_spawned :: proc(self: ^Quickdraw, id: knet.Net_Id, type: ksess.
 	if node, has := kboot.boot_node(&self.boot, id); has {
 		switch type {
 		case GUNNER_TYPE:
-			if e, ok := gunner_of(&self.boot, id); ok {gd.node2d_set_position(cast(gd.Node2d)node, {e.x, e.y})}
+			if e, ok := gunner_of(&self.boot, id);
+			   ok {gd.node2d_set_position(cast(gd.Node2d)node, {e.x, e.y})}
 		case DRONE_TYPE:
-			if e, ok := drone_of(&self.boot, id); ok {gd.node2d_set_position(cast(gd.Node2d)node, {e.x, e.y})}
+			if e, ok := drone_of(&self.boot, id);
+			   ok {gd.node2d_set_position(cast(gd.Node2d)node, {e.x, e.y})}
 		case BULLET_TYPE:
-			if e, ok := bullet_of(&self.boot, id); ok {gd.node2d_set_position(cast(gd.Node2d)node, {e.x, e.y})}
+			if e, ok := bullet_of(&self.boot, id);
+			   ok {gd.node2d_set_position(cast(gd.Node2d)node, {e.x, e.y})}
 		}
 	}
 	if !self.started {
@@ -400,8 +423,8 @@ bot_sample :: proc(g: ^Quickdraw, tick: u64, input: ^Gunner_Input) {
 	aim := f32(0)
 	if g.me_gun != nil {
 		best := f32(1e9)
-		for id in gunner_ids(&g.boot) {
-			gun, _ := gunner_of(&g.boot, id)
+		for tracked in gunner_all(&g.boot) {
+			gun := tracked.entity
 			if gun == g.me_gun || gun.hp <= 0 {continue}
 			dx := gun.x - g.me_gun.x // presentation truth: where MY SCREEN shows them
 			dy := gun.y - g.me_gun.y
@@ -428,7 +451,13 @@ bot_sample :: proc(g: ^Quickdraw, tick: u64, input: ^Gunner_Input) {
 // bullet — a real net id, announced to every peer — at the same tick the client
 // already predicted its own.
 @(gd_half)
-gunner_tick_then :: proc(g: ^Quickdraw, self: ^Gunner, by: knet.Player_Id, fired: bool, lobbed: bool) {
+gunner_tick_then :: proc(
+	g: ^Quickdraw,
+	self: ^Gunner,
+	by: knet.Player_Id,
+	fired: bool,
+	lobbed: bool,
+) {
 	if fired {
 		adjudicate_shot(g, self.net_id, self, by, self.aim, ksim.lane_now(&g.lane))
 	}
@@ -492,7 +521,9 @@ lob_bullet :: proc(g: ^Quickdraw, gun: ^Gunner, owner: knet.Player_Id) {
 // receipt every screen can trust (the acid greps it on the marshal).
 @(gd_half)
 gunner_buy_then :: proc(g: ^Quickdraw, self: ^Gunner, by: knet.Player_Id, item: u8) {
-	gd.print_str(fmt.tprintf("QD_BUY by=%d item=%d tick=%d", u64(by), item, ksim.lane_now(&g.lane)))
+	gd.print_str(
+		fmt.tprintf("QD_BUY by=%d item=%d tick=%d", u64(by), item, ksim.lane_now(&g.lane)),
+	)
 }
 
 // The world pass keeps only genuinely WORLD-shaped authority work: respawns
@@ -502,21 +533,48 @@ gunner_buy_then :: proc(g: ^Quickdraw, self: ^Gunner, by: knet.Player_Id, item: 
 qd_step :: proc(self: ^Quickdraw, tick: u64) {
 	run_respawns(self, tick)
 	if tick % 60 == 0 {
-		for id in gunner_ids(&self.boot) {
-			gun, _ := gunner_of(&self.boot, id)
-			gd.print_str(fmt.tprintf("QD_POS tick=%d id=%d x=%.1f y=%.1f hp=%d gear=%d gold=%d", tick, u32(id), gun.x, gun.y, gun.hp, gun.gear, gun.gold))
+		for tracked in gunner_all(&self.boot) {
+			gun := tracked.entity
+			gd.print_str(
+				fmt.tprintf(
+					"QD_POS tick=%d id=%d x=%.1f y=%.1f hp=%d gear=%d gold=%d",
+					tick,
+					u32(tracked.id),
+					gun.x,
+					gun.y,
+					gun.hp,
+					gun.gear,
+					gun.gold,
+				),
+			)
 		}
 		// The drones' authoritative track — the SECOND input class landing
 		// server-side. Each swept its own steer (horizontal, steady y), never
 		// its owner's gunner input.
-		for id in drone_ids(&self.boot) {
-			d, _ := drone_of(&self.boot, id)
-			gd.print_str(fmt.tprintf("QD_DRONE tick=%d id=%d pid=%d x=%.1f y=%.1f", tick, u32(id), d.pid, d.x, d.y))
+		for tracked in drone_all(&self.boot) {
+			d := tracked.entity
+			gd.print_str(
+				fmt.tprintf(
+					"QD_DRONE tick=%d id=%d pid=%d x=%.1f y=%.1f",
+					tick,
+					u32(tracked.id),
+					d.pid,
+					d.x,
+					d.y,
+				),
+			)
 		}
 	}
 }
 
-adjudicate_shot :: proc(g: ^Quickdraw, shooter_id: knet.Net_Id, gun: ^Gunner, pid: knet.Player_Id, a: f32, tick: u64) {
+adjudicate_shot :: proc(
+	g: ^Quickdraw,
+	shooter_id: knet.Net_Id,
+	gun: ^Gunner,
+	pid: knet.Player_Id,
+	a: f32,
+	tick: u64,
+) {
 	sx, sy := gun.x, gun.y // the shooter's own pose stays live either way
 	dx, dy := math.cos(a), math.sin(a)
 	best := shot_wall_limit(sx, sy, a)
@@ -527,13 +585,13 @@ adjudicate_shot :: proc(g: ^Quickdraw, shooter_id: knet.Net_Id, gun: ^Gunner, pi
 	// struct across a rawptr. judge_live (the QD_NOREWIND acid knob) lives
 	// in Lane_Config — one call, no fork, on or off.
 	judged := ksim.lane_rewound_begin(&g.lane, pid)
-	for id in gunner_ids(&g.boot) {
-		target, _ := gunner_of(&g.boot, id)
-		if id == shooter_id || target.hp <= 0 {continue}
+	for tracked in gunner_all(&g.boot) {
+		target := tracked.entity
+		if tracked.id == shooter_id || target.hp <= 0 {continue}
 		t := ray_body(sx, sy, dx, dy, target.x, target.y, best)
 		if t < best {
 			best = t
-			victim = id
+			victim = tracked.id
 		}
 	}
 	ksim.lane_rewound_end(&g.lane)
@@ -542,14 +600,20 @@ adjudicate_shot :: proc(g: ^Quickdraw, shooter_id: knet.Net_Id, gun: ^Gunner, pi
 	// tracer already rode the tick's `fired` fact (the mine-form fx above).
 	g.shot_count += 1
 	// `depth` is how far back this shot was actually judged; `clamped` is the
-	// lane's running count of queries that fell PAST rewind_max and got pinned
-	// to the floor. A shot whose depth equals the window AND whose clamp count
-	// just moved is lag comp failing quietly — the exact signature the deep-lead
-	// bug produced in the sibling port (rewound=0 on every shot, nothing logged).
-	gd.print_str(fmt.tprintf(
-		"QD_SHOT by=%d tick=%d judged=%d depth=%d clamped=%d",
-		u64(pid), tick, judged, tick - judged, g.lane.stat_rewind_clamped,
-	))
+	// lane's running count of queries pinned by its authority-observed link,
+	// render-hint, or absolute rewind ceiling. A shot at the envelope floor whose
+	// count just moved is lag comp losing claimed history — the exact signature
+	// the old deep-lead bug produced (rewound=0 on every shot, nothing logged).
+	gd.print_str(
+		fmt.tprintf(
+			"QD_SHOT by=%d tick=%d judged=%d depth=%d clamped=%d",
+			u64(pid),
+			tick,
+			judged,
+			tick - judged,
+			g.lane.stat_rewind_clamped,
+		),
+	)
 
 	if victim == 0 {return}
 	hit, _ := gunner_of(&g.boot, victim)

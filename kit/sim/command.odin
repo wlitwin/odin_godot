@@ -45,6 +45,16 @@ import ksess "godot:kit/session"
 // the verb's verdict.
 Cmd_Exec :: proc(entity: rawptr, args: []u8, lane: ^Lane, by: knet.Player_Id) -> bool
 
+// Generated verbs use the detailed form so decode failures stay distinct from
+// gameplay predicate failures. `exec` above remains for hand-built tables; the
+// runtime maps its false result to Predicate.
+Cmd_Exec_Checked :: proc(
+	entity: rawptr,
+	args: []u8,
+	lane: ^Lane,
+	by: knet.Player_Id,
+) -> knet.Action_Reject_Reason
+
 // The verb's PREDICTED-EFFECT half, when the game declares `<verb>_apply`:
 // pure (ledgered args, predicted fields), re-run by every resim with the
 // CORRECTED pre-state — which makes relative effects (an impulse) exact
@@ -67,19 +77,29 @@ Cmd_Id :: distinct u16
 Cmd_Seq :: distinct u32
 
 Sim_Cmd :: struct {
-	name:  string, // stripped verb name — diagnostics only (mirrors knet.Command_Desc.name)
-	// The verb's STABLE wire id — what lane_command ships and every deref looks
-	// up (never an array position). The id LAW is knet.Command_Desc.id's; this
-	// field mirrors it. Hand-built sets pick any values unique within the set (a
-	// single command's zero value is fine).
-	id:    Cmd_Id,
-	exec:  Cmd_Exec,
-	apply: Cmd_Apply, // nil = patch mode (recorded post-bytes replay)
-	// The same access vocabulary as immediate co-op commands. Any_Seat does
-	// not require a contested entity: a watched object can accept the request
-	// without speculating locally; contested only decides whether this client
-	// has a prediction ledger on which it can show the action immediately.
-	access: knet.Command_Access,
+	// The same callback-free descriptor embedded by knet.Command_Desc. Only the
+	// execution callbacks below differ between the two models.
+	using action: knet.Action_Desc(Cmd_Id),
+	exec:         Cmd_Exec, // compatibility bool thunk (nil when exec_checked is generated)
+	exec_checked: Cmd_Exec_Checked,
+	apply:        Cmd_Apply, // nil = patch mode (recorded post-bytes replay)
+}
+
+@(private)
+sim_cmd_execute :: proc(
+	cmd: ^Sim_Cmd,
+	entity: rawptr,
+	args: []u8,
+	lane: ^Lane,
+	by: knet.Player_Id,
+) -> knet.Action_Reject_Reason {
+	if cmd.exec_checked != nil {
+		return cmd.exec_checked(entity, args, lane, by)
+	}
+	if cmd.exec == nil {
+		return .Malformed
+	}
+	return cmd.exec(entity, args, lane, by) ? .None : .Predicate
 }
 
 // id → slot in the entity's command slice (-1 = unknown id: reject). Sets are
@@ -107,16 +127,17 @@ CMD_HOST_CAP :: 16
 // Tick verbs are small intent tuples, not an upload channel. The generated
 // encoders normally emit a handful of scalar bytes; this generous ceiling
 // bounds the authority's clone/allocation even for hand-written commands.
-CMD_ARGS_MAX :: 4096
+CMD_ARGS_MAX :: knet.ACTION_ARGS_DEFAULT
 
 // The internal ledger state of an issued verb — deliberately NOT knet's
-// Command_Outcome. That enum is the ISSUE WRAPPER'S game-facing return
+// Action_Outcome. Its state is the ISSUE WRAPPER'S game-facing return
 // (Rejected/Predicted/Applied); this is a Cmd_Out's private in-flight state
 // (Pending until the host answers). The member sets differ and don't merge —
 // notably a sim verb NEVER returns .Applied (even the host's own issue runs at
 // the stamped tick, never inline: ".Applied is a coop-loop word"), so the two
 // vocabularies name different things at different layers. Neither crosses the
-// wire: SIM_VERDICT ships a bool, decoded into .Accepted/.Rejected here.
+// wire: SIM_VERDICT ships an Action_Reject_Reason, decoded into the private
+// Accepted/Rejected state here.
 Cmd_Verdict :: enum u8 {
 	Pending,
 	Accepted,
@@ -126,17 +147,20 @@ Cmd_Verdict :: enum u8 {
 // A client's issued command: the ledger entry resims replay from.
 @(private)
 Cmd_Out :: struct {
-	seq:      Cmd_Seq,
-	tick:     u64, // local execution tick
-	id:       knet.Net_Id,
-	cmd:      Cmd_Id, // the verb's stable wire id (Sim_Cmd.id — resolved by lookup, never a position)
-	args:     []u8, // owned
-	executed: bool,
-	ok:       bool, // the LOCAL predicate's verdict (apply-mode resims gate on it)
-	mask:     u64, // predict-subset ordinals the verb changed
-	patch:    []u8, // their post-exec bytes, packed (owned)
-	revert:   []u8, // delta-subset capture from before the exec (owned)
-	verdict:  Cmd_Verdict,
+	seq:          Cmd_Seq,
+	tick:         u64, // local execution tick
+	issued_clock: u64, // lane-frame clock; keeps timeout moving when sim ticks stall
+	id:           knet.Net_Id,
+	cmd:          Cmd_Id, // the verb's stable wire id (Sim_Cmd.id — resolved by lookup, never a position)
+	args:         []u8, // owned
+	executed:     bool,
+	ok:           bool, // the LOCAL predicate's verdict (apply-mode resims gate on it)
+	mask:         u64, // predict-subset ordinals the verb changed
+	patch:        []u8, // their post-exec bytes, packed (owned)
+	revert:       []u8, // delta-subset capture from before the exec (owned)
+	verdict:      Cmd_Verdict,
+	reason:       knet.Action_Reject_Reason,
+	notified:     bool,
 }
 
 // A host-side scheduled command, executed at `tick` inside run_tick.
@@ -177,7 +201,15 @@ delta_lane_restore :: proc(entity: rawptr, desc: ^knet.Entity_Desc, src: []u8) {
 // Diff the entity's live predict set against `pre` (its capture from before
 // the exec). Returns the mask and the packed changed bytes' length; `dst`
 // is caller-sized to predict_size.
-cmd_patch_diff :: proc(dst: []u8, pre: []u8, entity: rawptr, desc: ^knet.Entity_Desc) -> (mask: u64, n: int) {
+cmd_patch_diff :: proc(
+	dst: []u8,
+	pre: []u8,
+	entity: rawptr,
+	desc: ^knet.Entity_Desc,
+) -> (
+	mask: u64,
+	n: int,
+) {
 	v := knet.subset_view(desc, .Predicted)
 	for e, ord in v.entries {
 		f := v.fields[e.field]
@@ -224,45 +256,52 @@ cmd_tracked :: proc(l: ^Lane, id: knet.Net_Id) -> ^Tracked {
 	return nil
 }
 
-// Issue verb `cmd` (its stable wire id) of entity `id` with encoded `args` —
-// the generated `<verb>_cmd` wrapper's target; games never call this raw.
-// Schedules the execution at the next local tick (host and client alike —
-// live and replay must agree on WHEN), ships it tick-stamped on the reliable
-// channel, and returns whether it was scheduled: the VERDICT is state, not
-// a return value (watch the fields, or the authority's `_then`).
-lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: Cmd_Id, args: []u8) -> bool {
+Lane_Command_Result :: struct {
+	scheduled: bool,
+	reason:    knet.Action_Reject_Reason,
+	seq:       Cmd_Seq,
+}
+
+// Detailed issue result for generated wrappers. The final authority verdict is
+// delivered through the same session command callbacks as co-op actions.
+lane_command_checked :: proc(
+	l: ^Lane,
+	id: knet.Net_Id,
+	cmd: Cmd_Id,
+	args: []u8,
+) -> Lane_Command_Result {
 	context.allocator = l.allocator // the owned arg copies free under lane roots later
-	if len(args) > CMD_ARGS_MAX {
-		return false
-	}
 	tr := cmd_tracked(l, id)
 	if tr == nil || tr.cmds == nil {
-		return false
+		return {reason = .Stale}
 	}
 	slot := sim_cmd_find(tr.cmds, cmd)
 	if slot < 0 {
-		return false
+		return {reason = .Malformed}
+	}
+	policy := tr.cmds[slot].policy
+	if !knet.action_args_allowed(policy, len(args)) {
+		return {reason = .Malformed}
 	}
 	if l.ses.is_host {
 		// The authority's own verb: schedule at the next tick, no wire, no
 		// speculation — its execution IS the truth.
 		queued := make([]u8, len(args))
 		copy(queued, args)
-		append(&l.cmd_in, Cmd_In{tick = l.ticker.tick + 1, from = l.ses.me, id = id, cmd = cmd, args = queued})
-		return true
+		append(
+			&l.cmd_in,
+			Cmd_In{tick = l.ticker.tick + 1, from = l.ses.me, id = id, cmd = cmd, args = queued},
+		)
+		return {scheduled = true}
 	}
 	// Access and prediction are separate. Owner refuses a non-owner locally;
 	// Authority never crosses the wire; Any_Seat may target a watched object
 	// (it simply has no local ledger on which to speculate before truth lands).
 	if !l.anchored {
-		return false
+		return {reason = .Stale}
 	}
-	switch tr.cmds[slot].access {
-	case .Any_Seat:
-	case .Owner:
-		if tr.owner != l.ses.me {return false}
-	case .Authority:
-		return false
+	if !knet.action_access_allows(policy, l.ses.me, tr.owner, false) {
+		return {reason = .Access}
 	}
 	pending := 0
 	for c in l.cmd_out {
@@ -271,17 +310,27 @@ lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: Cmd_Id, args: []u8) -> bool
 		}
 	}
 	if pending >= CMD_HOST_CAP {
-		return false // mirror the host's cap — an honest burst never queues this deep
+		return {reason = .Rate} // mirror the host's cap — an honest burst never queues this deep
 	}
 	if l.cmd_seq == Cmd_Seq(max(u32)) {
 		// Never wrap to zero or into the authority's replay window. Four billion
 		// commands is a session-lifetime boundary, not a sequence-reset protocol.
-		return false
+		return {reason = .Stale}
 	}
 	owned := make([]u8, len(args))
 	copy(owned, args)
 	l.cmd_seq += 1
-	append(&l.cmd_out, Cmd_Out{seq = l.cmd_seq, tick = l.ticker.tick + 1, id = id, cmd = cmd, args = owned})
+	append(
+		&l.cmd_out,
+		Cmd_Out {
+			seq = l.cmd_seq,
+			tick = l.ticker.tick + 1,
+			issued_clock = l.cmd_clock,
+			id = id,
+			cmd = cmd,
+			args = owned,
+		},
+	)
 	w := ksess.session_app_begin(l.ses, l.tag)
 	knet.write_u8(w, SIM_CMD)
 	knet.write_u32(w, u32(l.cmd_seq)) // wire bytes unchanged: seq crosses as a plain u32
@@ -290,27 +339,47 @@ lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: Cmd_Id, args: []u8) -> bool
 	knet.write_u16(w, u16(cmd)) // wire bytes unchanged: the id crosses as a plain u16
 	knet.write_bytes(w, args)
 	ksess.session_app_flush(l.ses, ksess.HOST_PEER) // reliable: verbs are one-shots
-	return true
+	return {scheduled = true, seq = l.cmd_seq}
+}
+
+// Compatibility escape hatch for hand-written callers.
+lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: Cmd_Id, args: []u8) -> bool {
+	return lane_command_checked(l, id, cmd, args).scheduled
 }
 
 @(private)
-cmd_send_verdict :: proc(l: ^Lane, to: knet.Player_Id, seq: Cmd_Seq, ok: bool) {
+cmd_send_verdict :: proc(
+	l: ^Lane,
+	to: knet.Player_Id,
+	seq: Cmd_Seq,
+	reason: knet.Action_Reject_Reason,
+) {
 	if to == l.ses.me {
 		return
 	}
-	if p, seated := ksess.session_player(l.ses, to); seated && p.connected && p.peer != ksess.NO_PEER {
+	if p, seated := ksess.session_player(l.ses, to);
+	   seated && p.connected && p.peer != ksess.NO_PEER {
 		w := ksess.session_app_begin(l.ses, l.tag)
 		knet.write_u8(w, SIM_VERDICT)
 		knet.write_u32(w, u32(seq))
-		knet.write_u8(w, ok ? 1 : 0)
+		knet.write_u8(w, u8(reason))
 		ksess.session_app_flush(l.ses, p.peer)
 	}
 }
 
 @(private)
-cmd_refuse :: proc(l: ^Lane, from: knet.Player_Id, seq: Cmd_Seq) {
+cmd_refuse :: proc(
+	l: ^Lane,
+	from: knet.Player_Id,
+	seq: Cmd_Seq,
+	reason: knet.Action_Reject_Reason,
+	id: knet.Net_Id,
+	cmd: Cmd_Id,
+) {
+	assert(reason != .None)
 	l.stat_cmd_rejected += 1
-	cmd_send_verdict(l, from, seq, false)
+	cmd_send_verdict(l, from, seq, reason)
+	ksess.session_action_executed(l.ses, .Scheduled, u32(seq), from, id, u16(cmd), reason)
 }
 
 // Access is checked on arrival AND at execution: a reliable command may sit
@@ -324,15 +393,7 @@ cmd_authorized :: proc(l: ^Lane, from: knet.Player_Id, tr: ^Tracked, slot: int) 
 	if !seated || !p.connected || p.spectator || slot < 0 || slot >= len(tr.cmds) {
 		return false
 	}
-	switch tr.cmds[slot].access {
-	case .Any_Seat:
-		return true
-	case .Owner:
-		return tr.owner == from
-	case .Authority:
-		return false // only the from == authority arm above may run it
-	}
-	return false
+	return knet.action_access_allows(tr.cmds[slot].policy, from, tr.owner, false)
 }
 
 // Any tick-scheduled verb still in flight on this entity? The session's
@@ -350,59 +411,21 @@ lane_cmd_inflight :: proc(l: ^Lane, id: knet.Net_Id) -> bool {
 
 // Host: file an arriving SIM_CMD (handler discipline — no game code here).
 @(private)
-cmd_handle :: proc(l: ^Lane, from: knet.Player_Id, r: ^knet.Reader) {
+cmd_handle :: proc(l: ^Lane, from: knet.Player_Id, from_peer: ksess.Peer_Id, r: ^knet.Reader) {
 	seq := Cmd_Seq(knet.read_u32(r))
 	tick := knet.read_u64(r)
 	id := knet.read_net_id(r)
 	cmd := Cmd_Id(knet.read_u16(r))
-	args := knet.read_bytes(r)
-	if r.err || len(knet.reader_remaining(r)) != 0 {
-		return
-	}
-	if seq == 0 {
-		// No honest client has a pending sequence zero, so replying only creates
-		// an amplification surface. Count and drop it like kit/net's dedup gate.
-		l.stat_cmd_rejected += 1
-		return
-	}
-	peer := lane_peer_ensure(l, from)
-	if !knet.dedup_accept(&peer.cmd_seen, knet.Intent_Seq(u32(seq))) {
-		// Reliable delivery means the original verdict is already in flight.
-		// Replayed and stale sequences do not execute and do not amplify replies.
-		l.stat_cmd_rejected += 1
-		return
-	}
-	if tick == 0 || len(args) > CMD_ARGS_MAX {
-		cmd_refuse(l, from, seq)
-		return
-	}
+	args := knet.read_bytes_limited(r, knet.ACTION_ARGS_MAX)
 	tr := cmd_tracked(l, id)
-	// An unknown id (version skew, a renamed verb) MISSES the lookup and drops
-	// cleanly — never dispatches to whatever lives at that position.
-	if tr == nil || tr.cmds == nil {
-		cmd_refuse(l, from, seq)
-		return
-	}
-	slot := sim_cmd_find(tr.cmds, cmd)
-	if slot < 0 {
-		cmd_refuse(l, from, seq)
-		return
-	}
-	// The cheat gate: access is declared per verb and checked independently of
-	// both contested prediction and the gameplay predicate. Two Any_Seat grabs
-	// in one tick are authorized asks; arrival order and the predicate decide
-	// which applies.
-	if !cmd_authorized(l, from, tr, slot) {
-		cmd_refuse(l, from, seq)
-		return
-	}
-	max_tick := max(u64)
-	if l.ticker.tick <= max(u64) - u64(l.lead_max) {
-		max_tick = l.ticker.tick + u64(l.lead_max)
-	}
-	if tick > max_tick {
-		cmd_refuse(l, from, seq)
-		return
+	slot := tr != nil && tr.cmds != nil ? sim_cmd_find(tr.cmds, cmd) : -1
+	policy := knet.Action_Policy{}
+	owner := knet.PLAYER_ID_INVALID
+	if tr != nil {
+		owner = tr.owner
+		if slot >= 0 {
+			policy = tr.cmds[slot].policy
+		}
 	}
 	held := 0
 	for c in l.cmd_in {
@@ -410,9 +433,42 @@ cmd_handle :: proc(l: ^Lane, from: knet.Player_Id, r: ^knet.Reader) {
 			held += 1
 		}
 	}
-	if held >= CMD_HOST_CAP {
-		l.stat_cmd_capped += 1 // untrusted-input cap; an honest client never queues this deep — counted, never silent
-		cmd_refuse(l, from, seq)
+	decision := ksess.session_authority_action_admit(
+		l.ses,
+		ksess.Authority_Action_Request {
+			model = .Scheduled,
+			player = from,
+			peer = from_peer,
+			seq = u32(seq),
+			entity = id,
+			action = u16(cmd),
+			packet_bytes = len(r.data),
+			payload_valid = !r.err && len(knet.reader_remaining(r)) == 0,
+			target_exists = tr != nil,
+			action_exists = slot >= 0,
+			owner = owner,
+			policy = policy,
+			args_bytes = len(args),
+			args_valid = slot >= 0 && knet.action_args_allowed(policy, len(args)),
+			has_tick = true,
+			tick = tick,
+			authority_tick = l.ticker.tick,
+			max_future_tick = u64(l.lead_max),
+			queue_depth = held,
+			queue_limit = CMD_HOST_CAP,
+		},
+	)
+	if !decision.admitted {
+		if decision.stage == .Budget {
+			l.stat_cmd_rate_dropped += 1
+		} else if decision.stage == .Queue {
+			l.stat_cmd_capped += 1
+		}
+		if decision.respond {
+			cmd_refuse(l, from, seq, decision.reason, id, cmd)
+		} else {
+			l.stat_cmd_rejected += 1
+		}
 		return
 	}
 	queued := make([]u8, len(args))
@@ -428,13 +484,15 @@ cmd_handle :: proc(l: ^Lane, from: knet.Player_Id, r: ^knet.Reader) {
 @(private)
 cmd_handle_verdict :: proc(l: ^Lane, r: ^knet.Reader) {
 	seq := Cmd_Seq(knet.read_u32(r))
-	ok := knet.read_u8(r)
-	if r.err {
+	reason := knet.Action_Reject_Reason(knet.read_u8(r))
+	if r.err || !knet.action_reject_reason_valid(reason) || len(knet.reader_remaining(r)) != 0 {
+		r.err = true
 		return
 	}
 	for &c in l.cmd_out {
 		if c.seq == seq && c.verdict == .Pending {
-			c.verdict = ok != 0 ? Cmd_Verdict.Accepted : Cmd_Verdict.Rejected
+			c.reason = reason
+			c.verdict = reason == .None ? Cmd_Verdict.Accepted : Cmd_Verdict.Rejected
 			return
 		}
 	}
@@ -451,18 +509,30 @@ run_cmds :: proc(l: ^Lane, t: u64) {
 				i += 1
 				continue
 			}
-			ok := false
+			reason := knet.Action_Reject_Reason.Stale
 			if tr := cmd_tracked(l, c.id); tr != nil && tr.cmds != nil {
 				slot := sim_cmd_find(tr.cmds, c.cmd)
-				if slot >= 0 && cmd_authorized(l, c.from, tr, slot) {
-					ok = tr.cmds[slot].exec(tr.entity, c.args, l, c.from)
+				if slot < 0 {
+					reason = .Malformed
+				} else if cmd_authorized(l, c.from, tr, slot) {
+					reason = sim_cmd_execute(&tr.cmds[slot], tr.entity, c.args, l, c.from)
 				} else {
-					l.stat_cmd_rejected += 1
+					reason = .Access
 				}
-			} else {
+			}
+			if reason != .None {
 				l.stat_cmd_rejected += 1
 			}
-			cmd_send_verdict(l, c.from, c.seq, ok)
+			cmd_send_verdict(l, c.from, c.seq, reason)
+			ksess.session_action_executed(
+				l.ses,
+				.Scheduled,
+				u32(c.seq),
+				c.from,
+				c.id,
+				u16(c.cmd),
+				reason,
+			)
 			delete(c.args)
 			ordered_remove(&l.cmd_in, i)
 		}
@@ -476,6 +546,10 @@ run_cmds :: proc(l: ^Lane, t: u64) {
 		if tr == nil || tr.hist == nil {
 			continue // untracked (or demoted) since issue: nothing to patch
 		}
+		slot := sim_cmd_find(tr.cmds, c.cmd)
+		if slot < 0 || !knet.action_predicts(tr.cmds[slot].policy) {
+			continue // scheduled without local execution; authority state lands normally
+		}
 		if !l.resimming && !c.executed {
 			// The live pass: run the verb ONCE, bracketed by captures — the
 			// delta-lane revert for a rejection, the predicted-field patch
@@ -483,10 +557,6 @@ run_cmds :: proc(l: ^Lane, t: u64) {
 			c.executed = true
 			cmd_exec_local(l, &c, tr, l.ses.me)
 		} else if l.resimming && c.executed && c.verdict != .Rejected {
-			slot := sim_cmd_find(tr.cmds, c.cmd)
-			if slot < 0 {
-				continue
-			}
 			if ap := tr.cmds[slot].apply; ap != nil {
 				if c.ok {
 					ap(tr.entity, c.args, l) // exact: re-run with corrected pre-state
@@ -515,6 +585,10 @@ cmd_forget_entity :: proc(l: ^Lane, id: knet.Net_Id) {
 			i += 1
 			continue
 		}
+		l.cmd_out[i].verdict = .Rejected
+		l.cmd_out[i].reason = .Stale
+		l.cmd_out[i].executed = false // target is gone; there is nothing left to unwind
+		cmd_notify_resolved(l, &l.cmd_out[i])
 		cmd_out_free(&l.cmd_out[i])
 		ordered_remove(&l.cmd_out, i)
 	}
@@ -527,6 +601,15 @@ cmd_forget_player :: proc(l: ^Lane, player: knet.Player_Id) {
 			i += 1
 			continue
 		}
+		ksess.session_action_executed(
+			l.ses,
+			.Scheduled,
+			u32(l.cmd_in[i].seq),
+			player,
+			l.cmd_in[i].id,
+			u16(l.cmd_in[i].cmd),
+			.Stale,
+		)
 		delete(l.cmd_in[i].args)
 		ordered_remove(&l.cmd_in, i)
 	}
@@ -560,7 +643,8 @@ cmd_exec_local :: proc(l: ^Lane, c: ^Cmd_Out, tr: ^Tracked, me: knet.Player_Id, 
 	delete(c.patch)
 	c.patch = nil
 	l.cmd_exec_seq = u32(c.seq) // a predicted spawn inside this verb tags itself with the seq (spawn keys are raw u32)
-	c.ok = cmds[idx].exec(entity, c.args, l, me)
+	local_reason := sim_cmd_execute(&cmds[idx], entity, c.args, l, me)
+	c.ok = local_reason == .None
 	l.cmd_exec_seq = 0
 	if c.ok && cmds[idx].apply == nil {
 		scratch := make([]u8, hist.size, context.temp_allocator)
@@ -591,13 +675,37 @@ cmd_exec_local :: proc(l: ^Lane, c: ^Cmd_Out, tr: ^Tracked, me: knet.Player_Id, 
 // order (fresh reverts, fresh patches; predicted writes discarded — the
 // resim rebuilds them).
 @(private)
+cmd_notify_resolved :: proc(l: ^Lane, c: ^Cmd_Out) {
+	if c.notified || c.verdict == .Pending {
+		return
+	}
+	reason := c.reason
+	if c.verdict == .Accepted {
+		reason = .None
+	} else if reason == .None {
+		reason = .Predicate
+	}
+	ksess.session_action_resolved(l.ses, .Scheduled, u32(c.seq), c.id, u16(c.cmd), reason)
+	c.notified = true
+}
+
+@(private)
 cmd_settle :: proc(l: ^Lane) {
 	for i := 0; i < len(l.cmd_out); i += 1 {
 		c := &l.cmd_out[i]
-		if c.verdict == .Pending && c.executed && l.ticker.tick > c.tick + u64(l.slots) {
+		if c.verdict == .Pending && l.cmd_clock > c.issued_clock + u64(l.slots) {
 			c.verdict = .Rejected // silence past the horizon = a lost seat or a dead host
+			c.reason = .Timeout
 		}
-		if c.verdict != .Rejected || !c.executed {
+		if c.verdict == .Accepted {
+			cmd_notify_resolved(l, c)
+			continue
+		}
+		if c.verdict != .Rejected {
+			continue
+		}
+		if !c.executed {
+			cmd_notify_resolved(l, c)
 			continue
 		}
 		// A refused fire despawns the projectile it predicted (no-op if it
@@ -608,6 +716,7 @@ cmd_settle :: proc(l: ^Lane) {
 		if tr == nil || tr.hist == nil {
 			c.executed = false
 			c.mask = 0
+			cmd_notify_resolved(l, c)
 			continue // untracked since issue: nothing to unwind into
 		}
 		// Survivors: executed entries for the SAME entity issued after this
@@ -639,6 +748,7 @@ cmd_settle :: proc(l: ^Lane) {
 			}
 			cmd_exec_local(l, o, tr, l.ses.me, re = true)
 		}
+		cmd_notify_resolved(l, c)
 	}
 }
 

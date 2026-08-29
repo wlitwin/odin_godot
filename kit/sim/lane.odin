@@ -45,6 +45,7 @@ package kit_sim
 
 import "core:fmt"
 import "core:mem"
+import "core:slice"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
@@ -56,7 +57,7 @@ SIM_TAG :: u8(3) // default SES_APP tag (comms holds 0, xfer holds 2)
 // snap batches, verbs, facts). Registered into the session's fingerprint
 // salt at load (the session sits below and cannot import upward); a lane
 // wire change bumps THIS constant, in the same commit.
-WIRE_REV :: u64(2) // 1: the lane's first wire · 2: SIM_FACT carries a fact kind
+WIRE_REV :: u64(4) // 4: ack-safe sparse/AOI snapshot batches
 
 @(init, private = "file")
 register_wire_rev :: proc "contextless" () {
@@ -87,19 +88,19 @@ Sample_Proc :: proc(user: rawptr, tick: u64, dst: rawptr)
 // one of these; a game driving two entity kinds holds one per kind, each
 // riding its own window on the packet and its own de-jitter buffer per player.
 Input_Class :: struct {
-	id:      u16,
-	size:    int,
+	id:       u16,
+	size:     int,
 	// The input struct's typeid, when the registrar knew it (the generated
 	// <game>_lane_init always does; a hand-built lane may leave it nil). It is a
 	// LOCAL resolver key only — never on the wire — so lane_input_of can name its
 	// class by TYPE instead of by size, which two input kinds can collide on
 	// after an innocent field add. nil = fall back to size (see class_for_type).
-	type:    typeid,
-	sample:  Sample_Proc,
+	type:     typeid,
+	sample:   Sample_Proc,
 	validate: Input_Validate_Proc, // nil = structural checks only; generated
-	                              // lane wiring installs the typed semantic hook
-	ring:    Input_Ring, // client only: local inputs already fed to prediction
-	scratch: []u8,       // sample destination (size bytes)
+	// lane wiring installs the typed semantic hook
+	ring:     Input_Ring, // client only: local inputs already fed to prediction
+	scratch:  []u8, // sample destination (size bytes)
 }
 
 // Echo (predict-world) keys last-known inputs by (player, class): a remote
@@ -145,13 +146,13 @@ Sim_Set :: struct {
 	tick:        Tick_Thunk,
 	input_size:  int, // size of the tick proc's input struct (0 = inputless)
 	input_class: u16, // WHICH input the tick reads — its class id on the wire. One
-	                  // per distinct @(gd_tick) input TYPE in the package (scriptgen
-	                  // assigns; the primary is 0). A lane ships one window per class
-	                  // a seat drives, so a player controlling two entity KINDS (a
-	                  // walker + a turret) sends both their inputs each tick.
+	// per distinct @(gd_tick) input TYPE in the package (scriptgen
+	// assigns; the primary is 0). A lane ships one window per class
+	// a seat drives, so a player controlling two entity KINDS (a
+	// walker + a turret) sends both their inputs each tick.
 	commands:    []Sim_Cmd, // the class's @(gd_command) verbs, tick-scheduled (command.odin)
 	fx:          Fx_Thunk, // the mine-form `_fx` decode thunk (nil = the class declares
-	                       // none): what a watcher fires when a filed SIM_FACT comes of age
+	// none): what a watcher fires when a filed SIM_FACT comes of age
 	// @(gd_tick="contested"): EVERY peer predicts this entity, owner or not —
 	// the predict-the-contested-object pattern (the ball, the crown, the
 	// flag). Contact with it resolves on YOUR timeline instantly; the
@@ -162,19 +163,19 @@ Sim_Set :: struct {
 }
 
 Lane_Config :: struct {
-	hz:          int, // sim ticks per second (0 = DEFAULT_SIM_HZ, 60)
-	snap_every:  int, // ticks between snapshot batches (0 = 3 → 20 Hz at 60)
-	slots:       int, // ledger/ring depth in ticks (0 = 128 — covers ~2s of lead, resim, and ack round trips)
-	margin:      int, // target server-side input headroom in ticks (0 = 2)
-	redundancy:  int, // inputs per packet (0 = INPUT_REDUNDANCY)
-	rewind_max:  int, // lag-comp rewind bound in ticks (0 = hz/4 ≈ 250ms — the favor-the-shooter ceiling)
-	lead_max:    int, // furthest client-stamped input/verb tick accepted ahead of authority time
-	                  // (0 = max(margin + rewind_max + 2×snap_every, slots/2, 8)); must fit in slots
-	watch_delay: int, // how far behind the newest batch watched entities RENDER, in ticks (0 = 2×snap_every — almost always a bracketing pair)
+	hz:              int, // sim ticks per second (0 = DEFAULT_SIM_HZ, 60)
+	snap_every:      int, // ticks between snapshot batches (0 = 3 → 20 Hz at 60)
+	slots:           int, // ledger/ring depth in ticks (0 = 128 — covers ~2s of lead, resim, and ack round trips)
+	margin:          int, // target server-side input headroom in ticks (0 = 2)
+	redundancy:      int, // inputs per packet (0 = INPUT_REDUNDANCY)
+	rewind_max:      int, // lag-comp rewind bound in ticks (0 = hz/4 ≈ 250ms — the favor-the-shooter ceiling)
+	lead_max:        int, // furthest client-stamped input/verb tick accepted ahead of authority time
+	// (0 = max(margin + rewind_max + 2×snap_every, slots/2, 8)); must fit in slots
+	watch_delay:     int, // how far behind the newest batch watched entities RENDER, in ticks (0 = 2×snap_every — almost always a bracketing pair)
 	smooth_halflife: f64, // reconcile-correction render error half-life, seconds (0 = 0.063 — the puppet constant)
-	smooth_cut: f32, // an error component past this is a deliberate cut and SNAPS, world units (0 = never cut)
-	judge_live: bool, // A/B knob: lane_rewound queries the LIVE world instead of rewinding —
-	                  // feel lag comp by turning it off; never a game-code fork
+	smooth_cut:      f32, // an error component past this is a deliberate cut and SNAPS, world units (0 = never cut)
+	judge_live:      bool, // A/B knob: lane_rewound queries the LIVE world instead of rewinding —
+	// feel lag comp by turning it off; never a game-code fork
 	// PREDICT-WORLD (the Rocket League model): batches echo every player's
 	// last-known input, and clients tick contested entities owned by REMOTE
 	// players with those held inputs — one timeline for everything, no claim
@@ -183,42 +184,44 @@ Lane_Config :: struct {
 	// Costs: resim on nearly every batch (held inputs drift), a few bytes of
 	// echo per player per batch. Compile-time config: every peer of a game
 	// agrees by construction.
-	echo_inputs: bool,
-	tolerance: f32, // reconcile slack for FLOAT predicted fields, world units
-	                // (0 = exact). Predict-world's anti-churn: held-input
-	                // drift below this rides uncorrected until it accumulates
-	                // past the line; discrete fields always compare exactly.
+	echo_inputs:     bool,
+	tolerance:       f32, // reconcile slack for FLOAT predicted fields, world units
+	// (0 = exact). Predict-world's anti-churn: held-input
+	// drift below this rides uncorrected until it accumulates
+	// past the line; discrete fields always compare exactly.
+	snapshot_budget: int, // max snapshot body bytes per recipient/batch (header + rows;
+	// 0 = unlimited). AOI and unchanged-row suppression still apply at zero.
 }
 
 // Host-side per-player state, created when the authority first snapshots or
 // receives traffic for the player.
 @(private)
 Lane_Peer :: struct {
-	bufs:  map[u16]^Input_Buffer, // one de-jitter buffer per input class this player drives
-	acked: u64, // newest VALID issued snap tick they fully applied — their delta baseline
-	tag:   u64, // the (ack<<8|off) rider of the input just popped — one packet feeds every
-	            // class, so every buffer's tag agrees; the rewind reads it here
+	bufs:       map[u16]^Input_Buffer, // one de-jitter buffer per input class this player drives
+	acked:      u64, // newest VALID issued snap tick they fully applied — their delta baseline
+	tag:        u64, // the (ack<<8|off) rider of the input just popped — one packet feeds every
+	// class, so every buffer's tag agrees; the rewind reads it here
 	snap_first: u64, // first snapshot tick issued while this seat state has existed
 	snap_last:  u64, // newest snapshot tick actually issued to this seat
-	cmd_seen:   knet.Dedup_Window, // exactly-once/replay window for tick verbs
+	snap_sent:  map[knet.Net_Id]u64, // entity -> exact batch tick represented for this peer
 }
 
 @(private) // command.odin's scheduler walks the track list too
 Tracked :: struct {
-	id:      knet.Net_Id,
-	entity:  rawptr,
-	desc:    ^knet.Entity_Desc,
-	owner:   knet.Player_Id, // whose inputs drive it (rewound queries spare the shooter's own)
-	hist:    ^History, // truth (host) / prediction (client-owned); nil = watched
-	watched: bool, // client-side remote-owned: truth applies directly, no resim
-	tick:    Tick_Thunk, // nil = the game's Step_Proc moves this entity
-	has_in:  bool, // the thunk wants its owner's input (Sim_Set.input_size > 0)
-	in_class: u16, // which input class drives it (Sim_Set.input_class) — the ring/buffer key
-	cmds:    []Sim_Cmd, // tick-scheduled verbs (nil = the class declares none)
-	set:     ^Sim_Set, // the class's set (lane_track_set) — nil for hand-tracked entities
-	err:     []u8, // render-error blob (predict-subset layout), alloc'd on the first correction
-	contested: bool, // predicted here but NOT mine: presentation follows `claim`
-	claim:     f32, // 1 = my sim drives it (present predicted), decaying to 0 (present the watched view)
+	id:          knet.Net_Id,
+	entity:      rawptr,
+	desc:        ^knet.Entity_Desc,
+	owner:       knet.Player_Id, // whose inputs drive it (rewound queries spare the shooter's own)
+	hist:        ^History, // truth (host) / prediction (client-owned); nil = watched
+	watched:     bool, // client-side remote-owned: truth applies directly, no resim
+	tick:        Tick_Thunk, // nil = the game's Step_Proc moves this entity
+	has_in:      bool, // the thunk wants its owner's input (Sim_Set.input_size > 0)
+	in_class:    u16, // which input class drives it (Sim_Set.input_class) — the ring/buffer key
+	cmds:        []Sim_Cmd, // tick-scheduled verbs (nil = the class declares none)
+	set:         ^Sim_Set, // the class's set (lane_track_set) — nil for hand-tracked entities
+	err:         []u8, // render-error blob (predict-subset layout), alloc'd on the first correction
+	contested:   bool, // predicted here but NOT mine: presentation follows `claim`
+	claim:       f32, // 1 = my sim drives it (present predicted), decaying to 0 (present the watched view)
 	// Predicted-spawn bookkeeping (a client-fired projectile, command.odin's
 	// lane_spawn_predicted). born = the spawn tick, so ticks before it are
 	// gated out of the ledger/rewind/resim (Entry.born). A provisional entity is
@@ -230,109 +233,118 @@ Tracked :: struct {
 }
 
 Lane :: struct {
-	ses:             ^ksess.Session,
-	tag:             u8,
-	snap_every:      int,
-	slots:           int,
-	margin:          int,
-	redundancy:      int,
-	rewind_max:      int,
-	lead_max:        int,
-	watch_delay:     int,
-	watch_clock:     f64, // watched-entity render position, in fractional ticks
-	presented:       bool, // the game has called lane_present at least once — until
-	                       // then ingest keeps painting watched truth directly (a
-	                       // hand-driven client that never presents must never freeze)
-	smooth_halflife: f64,
-	smooth_cut:      f32,
-	judge_live:      bool,
-	tolerance:       f32,
-	echo_on:         bool,
-	echo:            map[Echo_Key][]u8, // last-known input per REMOTE (player, class) (predict-world)
-	ticker:          Sim_Ticker,
-
-	user:            rawptr,
+	ses:                   ^ksess.Session,
+	tag:                   u8,
+	snap_every:            int,
+	slots:                 int,
+	margin:                int,
+	redundancy:            int,
+	rewind_max:            int,
+	lead_max:              int,
+	watch_delay:           int,
+	watch_clock:           f64, // watched-entity render position, in fractional ticks
+	presented:             bool, // the game has called lane_present at least once — until
+	// then ingest keeps painting watched truth directly (a
+	// hand-driven client that never presents must never freeze)
+	smooth_halflife:       f64,
+	smooth_cut:            f32,
+	judge_live:            bool,
+	tolerance:             f32,
+	snapshot_budget:       int,
+	echo_on:               bool,
+	echo:                  map[Echo_Key][]u8, // last-known input per REMOTE (player, class) (predict-world)
+	ticker:                Sim_Ticker,
+	user:                  rawptr,
 	// The allocator lane_init was given. EVERY lane entry point installs it
 	// as context.allocator, so a handler-side alloc and its frame-side free
 	// can never ride different allocators — the param used to cover only the
 	// init-time containers, a half-promise a custom-allocator lane paid for
 	// in mismatched frees.
-	allocator:       mem.Allocator,
+	allocator:             mem.Allocator,
 	// One input class per distinct @(gd_tick) input TYPE. Single-input games
 	// hold exactly one (id 0, its sample from lane_set_sim); a game driving two
 	// entity kinds registers the extras with lane_add_input_class. The client
 	// samples and ships a window for every class here that has a sample; the
 	// host de-jitters each into the matching per-player buffer.
-	inputs:          [dynamic]Input_Class,
-	step:            Step_Proc, // the world pass that runs EVERYWHERE (live + resim): pure-sim contact
-	step_auth:       Step_Proc, // the host-only world pass: adjudication, respawns (the authority never resims)
-
-	tracked:         [dynamic]Tracked,
-	entries:         [dynamic]Entry, // ledgered subset of tracked (host: all; client: mine)
+	inputs:                [dynamic]Input_Class,
+	step:                  Step_Proc, // the world pass that runs EVERYWHERE (live + resim): pure-sim contact
+	step_auth:             Step_Proc, // the host-only world pass: adjudication, respawns (the authority never resims)
+	tracked:               [dynamic]Tracked,
+	entries:               [dynamic]Entry, // ledgered subset of tracked (host: all; client: mine)
 
 	// client
-	rx:              Snap_Rx,
-	pending:         [dynamic]u8, // newest unprocessed batch (copied out of the handler)
-	pending_tick:    u64,
-	input_ack:       u64, // newest input tick the server confirmed (batch header)
-	anchored:        bool,
+	rx:                    Snap_Rx,
+	pending:               [dynamic]u8, // newest unprocessed batch (copied out of the handler)
+	pending_tick:          u64,
+	input_ack:             u64, // newest input tick the server confirmed (batch header)
+	anchored:              bool,
 
 	// host
-	peers:           map[knet.Player_Id]^Lane_Peer,
-
-	step_tick:       u64, // the tick being stepped/resimmed — lane_input reads it
+	peers:                 map[knet.Player_Id]^Lane_Peer,
+	step_tick:             u64, // the tick being stepped/resimmed — lane_input reads it
 	// True while a reconcile replay is re-running ticks. Gate PRESENTATION
 	// side effects on it (muzzle flashes, sounds, screen shake fire once, on
 	// the live pass) — sim mutations must NEVER branch on it, or prediction
 	// and replay diverge by construction.
-	resimming:       bool,
+	resimming:             bool,
 
 	// running tallies, game-readable (a resim burst is a netgraph datum)
-	stat_resims:     int,
-	stat_reconciles: int,
-	stat_facts_dropped: int, // world facts refused by a full queue — a moving count means the game presents too rarely (or FACT_QUEUE_CAP is honestly too small)
-	stat_render_sat:    int, // render_off8 hit the wire's 31.5-tick ceiling — the authority now rewinds LESS than this screen's true delay (lag comp judges shallow)
-	stat_input_drops:   int, // host: input windows dropped for an unknown class id — zero in a same-build session; a moving count is version skew or garbage on the port
-	stat_input_rejected: int, // host: malformed/future input windows rejected before they touched a de-jitter ring
-	stat_ack_rejected:   int, // host: snapshot acks rejected as unissued, regressing, misaligned, or implausibly old
-	stat_cmd_capped:    int, // host: verbs refused by the per-player CMD_HOST_CAP — an honest client never queues this deep; a moving count names the peer flooding you
-	stat_cmd_rejected:   int, // host: verbs refused by syntax, replay, bounds, access, or execution-time reauthorization
-	stat_echo_dropped:   int, // host: echo rows omitted at the u8 row ceiling
-	// host: rewound queries whose reconstructed view fell PAST rewind_max and got
-	// clamped to the floor (lane_rewind_view). The counter exists because the
+	stat_resims:           int,
+	stat_resim_seconds:    f64, // cumulative wall time spent replaying reconciliation ticks
+	stat_reconciles:       int,
+	stat_facts_dropped:    int, // world facts refused by a full queue — a moving count means the game presents too rarely (or FACT_QUEUE_CAP is honestly too small)
+	stat_render_sat:       int, // render_off8 hit the wire's 31.5-tick ceiling — the authority now rewinds LESS than this screen's true delay (lag comp judges shallow)
+	stat_input_drops:      int, // host: input windows dropped for an unknown class id — zero in a same-build session; a moving count is version skew or garbage on the port
+	stat_input_rejected:   int, // host: malformed/future input windows rejected before they touched a de-jitter ring
+	stat_ack_rejected:     int, // host: snapshot acks rejected as unissued, regressing, misaligned, or implausibly old
+	stat_cmd_capped:       int, // host: verbs refused by the per-player CMD_HOST_CAP — an honest client never queues this deep; a moving count names the peer flooding you
+	stat_cmd_rate_dropped: int, // host: otherwise-valid verbs refused by the shared per-player action token bucket
+	stat_cmd_rejected:     int, // host: verbs refused by syntax, replay, bounds, access, or execution-time reauthorization
+	stat_echo_dropped:     int, // host: echo rows omitted at the u8 row ceiling
+	stat_snap_rows:        int,
+	stat_snap_full:        int,
+	stat_snap_delta:       int,
+	stat_snap_suppressed:  int, // unchanged rows represented by ack-safe carry-forward
+	stat_snap_deferred:    int, // interested rows postponed by the recipient byte budget
+	stat_snap_aoi_culled:  int, // rows omitted because this recipient is outside AOI
+	stat_snap_bytes:       int, // snapshot body bytes sent (header + rows; excludes app/echo framing)
+	// host: rewound queries whose reconstructed view exceeded the authority's
+	// observed-link or configured rewind envelope and got clamped to its floor
+	// (lane_rewind_view). The counter exists because the
 	// clamp was the one failure in this file with no voice at all: the deep-lead
 	// surplus bug killed lag comp by pushing every query past this ceiling, the
 	// authority judged a half-second-old world, hit nothing, and NOTHING recorded
 	// it — the pathology was found in a sibling port's engine acid, not here.
 	// Counts QUERIES, not shots: a game that also calls lane_rewind_tick for
 	// diagnostics on the same trigger tallies both. A moving count means this
-	// shooter's view is older than the window can honor — either their lead is
-	// mispaced (the controller's job) or rewind_max is genuinely too small for
-	// the link you are serving.
-	stat_rewind_clamped: int,
+	// shooter's claim is older than the authority can substantiate — either the
+	// clock is still cold, their lead is mispaced, their render hint exceeds the
+	// configured watch delay, or rewind_max is genuinely too small for the link.
+	stat_rewind_clamped:   int,
 
 	// active inline rewind (lane_rewound_begin/end) — live captures to restore
-	wound:           [dynamic]Wound,
-	rewound:         bool,
+	wound:                 [dynamic]Wound,
+	rewound:               bool,
 
 	// tick-scheduled verbs (command.odin): the client's issued ledger and
 	// the host's arrival queue
-	cmd_seq:         Cmd_Seq, // the client's issued-command counter (command.odin)
-	cmd_out:         [dynamic]Cmd_Out,
-	cmd_in:          [dynamic]Cmd_In,
-	cmd_exec_seq:    u32, // the command whose exec is running RIGHT NOW (0 = none) —
-	                      // lane_spawn_predicted tags its projectile with it, so a
-	                      // rejected fire despawns exactly the projectile it spawned
+	cmd_seq:               Cmd_Seq, // the client's issued-command counter (command.odin)
+	cmd_clock:             u64, // client frame clock: action timeouts advance even when authority loss stalls sim ticks
+	cmd_out:               [dynamic]Cmd_Out,
+	cmd_in:                [dynamic]Cmd_In,
+	cmd_exec_seq:          u32, // the command whose exec is running RIGHT NOW (0 = none) —
+	// lane_spawn_predicted tags its projectile with it, so a
+	// rejected fire despawns exactly the projectile it spawned
 
 	// every-screen tick facts (mine-form _fx): the authority broadcasts one
 	// SIM_FACT per event tick; a client files them here and fires the set's
 	// fx thunk when the watch clock reaches the fact's tick (lane_present).
-	facts:           [dynamic]Fact_In,
+	facts:                 [dynamic]Fact_In,
 
-	// declared world-pass facts (@(gd_fact)): the package's fact table, id →
+	// declared cues (@(gd_cue), or compatible @(gd_fact)): the package's fact table, id →
 	// decode thunk, installed by the generated <snake>_lane_init. Kind 0 is
 	// reserved for entity-tick facts (routed through the anchor's Sim_Set.fx).
-	fact_set:        []Fact_Desc,
+	fact_set:              []Fact_Desc,
 
 	// True while an AUTHORITY-ONLY context is running: the step_auth pass
 	// (run_tick sets it) and every generated `_then` half (the tick and verb
@@ -342,13 +354,13 @@ Lane :: struct {
 	// context's fact must INCLUDE them — their screen never ran the code that
 	// announced it, and skipping them would orphan the fact on exactly the
 	// screen it is most about.
-	in_auth:         bool,
+	in_auth:               bool,
 
 	// predicted spawns (spawn.odin): a client's own fired projectiles, tracked
 	// under provisional ids until the authority's spawn arrives and rekeys them
-	spawn_next:      u32, // provisional id counter (client-local, high-bit tagged)
-	spawn_free:      Spawn_Free_Proc, // engine layer frees the node on despawn (nil on the core)
-	spawn_free_user: rawptr,
+	spawn_next:            u32, // provisional id counter (client-local, high-bit tagged)
+	spawn_free:            Spawn_Free_Proc, // engine layer frees the node on despawn (nil on the core)
+	spawn_free_user:       rawptr,
 
 	// A watched entity becomes PRESENTABLE the tick the delayed watch clock
 	// reaches its first ledgered pose — the moment a remote muzzle's projectile
@@ -356,8 +368,8 @@ Lane :: struct {
 	// not the earlier moment its spawn packet merely landed. The engine layer
 	// hides the node until then, so a fresh watched spawn is revealed on cue
 	// instead of sitting frozen at the muzzle through the render delay.
-	present_ready:      Present_Ready_Proc, // nil on the core
-	present_ready_user: rawptr,
+	present_ready:         Present_Ready_Proc, // nil on the core
+	present_ready_user:    rawptr,
 }
 
 // Fired once per watched entity, the tick it first becomes presentable (the
@@ -374,13 +386,13 @@ Fact_In :: struct {
 	args: []u8, // owned — the fact tuple, wire-encoded
 }
 
-// One declared world-pass fact (@(gd_fact)): its stable wire id (an FNV-1a
+// One declared cue (@(gd_cue), or compatible @(gd_fact)): its stable wire id (an FNV-1a
 // hash of the event name — the command-id law: reordering declarations never
 // renumbers the wire) and its decode thunk. scriptgen emits the package's
 // table; the generated lane_init installs it.
 Fact_Desc :: struct {
-	id: u16,       // never 0 — kind 0 on the wire means "the anchor set's tick fx"
-	fx: Fx_Thunk,  // entity = the anchor (nil for an anchorless world fact)
+	id: u16, // never 0 — kind 0 on the wire means "the anchor set's tick fx"
+	fx: Fx_Thunk, // entity = the anchor (nil for an anchorless world fact)
 }
 
 // Install the package's declared-fact table — generated wiring, alongside
@@ -434,10 +446,33 @@ lane_tracks_entity :: proc(l: ^Lane, entity: rawptr) -> bool {
 	return false
 }
 
+// Resolve between the two stable identities a generated cue needs. The
+// anchor itself rides SIM_FACT's header; any additional typed entity
+// parameters ride as Net_Id values in the cue tuple and are resolved again
+// when the receiving screen's watch clock presents the cue.
+lane_entity_id :: proc(l: ^Lane, entity: rawptr) -> (knet.Net_Id, bool) {
+	for &tr in l.tracked {
+		if tr.entity == entity {
+			return tr.id, true
+		}
+	}
+	return knet.NET_ID_INVALID, false
+}
+
+lane_entity :: proc(l: ^Lane, id: knet.Net_Id) -> (rawptr, bool) {
+	for &tr in l.tracked {
+		if tr.id == id {
+			return tr.entity, true
+		}
+	}
+	return nil, false
+}
+
 // The most unfired facts a client holds — an untrusted-input bound far above
 // any honest burst (the watch clock drains the queue within a watch_delay).
 @(private = "file")
 FACT_QUEUE_CAP :: 256
+FACT_ARGS_MAX_BYTES :: 4096
 
 // Bind to a session (host or client, before or after it starts). The app
 // ROUTE survives session re-init like every pre-start hookup — but lane
@@ -445,12 +480,33 @@ FACT_QUEUE_CAP :: 256
 // authority (new ticks, new anchor) takes lane_destroy → lane_init, the
 // reset story. `input_size` is the game's input struct size, identical on
 // every peer by construction (the same compiled struct).
-lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG, cfg := Lane_Config{}, allocator := context.allocator) {
-	assert(l.ses == nil, "lane_init on a live lane — lane_destroy first (re-init without teardown leaks every container and keeps a stale anchor)")
-	assert(cfg.hz >= 0 && cfg.snap_every >= 0 && cfg.slots >= 0 && cfg.margin >= 0 &&
-	       cfg.redundancy >= 0 && cfg.rewind_max >= 0 && cfg.lead_max >= 0 &&
-	       cfg.watch_delay >= 0 && cfg.smooth_halflife >= 0 && cfg.smooth_cut >= 0 && cfg.tolerance >= 0,
-		"Lane_Config uses zero for defaults; negative timing, size, and tolerance values are invalid")
+lane_init :: proc(
+	l: ^Lane,
+	ses: ^ksess.Session,
+	input_size: int,
+	tag := SIM_TAG,
+	cfg := Lane_Config{},
+	allocator := context.allocator,
+) {
+	assert(
+		l.ses == nil,
+		"lane_init on a live lane — lane_destroy first (re-init without teardown leaks every container and keeps a stale anchor)",
+	)
+	assert(
+		cfg.hz >= 0 &&
+		cfg.snap_every >= 0 &&
+		cfg.slots >= 0 &&
+		cfg.margin >= 0 &&
+		cfg.redundancy >= 0 &&
+		cfg.rewind_max >= 0 &&
+		cfg.lead_max >= 0 &&
+		cfg.watch_delay >= 0 &&
+		cfg.smooth_halflife >= 0 &&
+		cfg.smooth_cut >= 0 &&
+		cfg.tolerance >= 0 &&
+		cfg.snapshot_budget >= 0,
+		"Lane_Config uses zero for defaults; negative timing, size, and tolerance values are invalid",
+	)
 	assert(cfg.slots == 0 || cfg.slots >= 2, "Lane_Config.slots must hold at least two ticks")
 	l.allocator = allocator
 	l.ses = ses
@@ -464,7 +520,10 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 	l.redundancy = cfg.redundancy > 0 ? cfg.redundancy : INPUT_REDUNDANCY
 	l.rewind_max = cfg.rewind_max > 0 ? cfg.rewind_max : max(hz / 4, 1)
 	assert(l.margin < l.slots, "Lane_Config.margin must fit inside the tick ring")
-	assert(l.redundancy <= MAX_INPUT_REDUNDANCY, "Lane_Config.redundancy exceeds MAX_INPUT_REDUNDANCY")
+	assert(
+		l.redundancy <= MAX_INPUT_REDUNDANCY,
+		"Lane_Config.redundancy exceeds MAX_INPUT_REDUNDANCY",
+	)
 	assert(l.rewind_max < l.slots, "Lane_Config.rewind_max must fit inside the tick ring")
 	l.margin = clamp(l.margin, 1, l.slots - 1)
 	l.redundancy = clamp(l.redundancy, 1, min(MAX_INPUT_REDUNDANCY, l.slots))
@@ -482,7 +541,10 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 	// it would make every rewind judge shallow — refuse while a dev is
 	// looking, clamp where asserts are stripped (stat_render_sat still counts
 	// the saturation there).
-	assert(l.watch_delay <= 31, "Lane_Config.watch_delay exceeds the 31-tick render-offset wire ceiling (render_off8)")
+	assert(
+		l.watch_delay <= 31,
+		"Lane_Config.watch_delay exceeds the 31-tick render-offset wire ceiling (render_off8)",
+	)
 	assert(l.watch_delay < l.slots, "Lane_Config.watch_delay must fit inside the tick ring")
 	l.watch_delay = clamp(l.watch_delay, 1, min(31, l.slots - 1))
 	l.smooth_halflife = cfg.smooth_halflife > 0 ? cfg.smooth_halflife : 0.063
@@ -491,6 +553,11 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 	l.echo_on = cfg.echo_inputs
 	l.echo = make(map[Echo_Key][]u8, allocator)
 	l.tolerance = cfg.tolerance
+	l.snapshot_budget = cfg.snapshot_budget
+	assert(
+		l.snapshot_budget == 0 || l.snapshot_budget >= SNAP_HEADER_BYTES,
+		"Lane_Config.snapshot_budget must fit the fixed snapshot header",
+	)
 	if l.echo_on && l.tolerance == 0 {
 		// Predict-world without slack: every held-input drift mismatches the
 		// exact compare and buys a full resim — nearly every batch. Legal but
@@ -498,7 +565,9 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 		// (Native only: the wasm fmt has no stdio — println doesn't exist
 		// there, and this line broke the whole web build once.)
 		when ODIN_OS != .Freestanding {
-			fmt.println("kit/sim: echo_inputs with tolerance=0 resims on nearly every batch — set Lane_Config.tolerance (world units of acceptable held-input drift)")
+			fmt.println(
+				"kit/sim: echo_inputs with tolerance=0 resims on nearly every batch — set Lane_Config.tolerance (world units of acceptable held-input drift)",
+			)
 		}
 	}
 	l.ticker = sim_ticker_make(hz)
@@ -526,7 +595,13 @@ lane_init :: proc(l: ^Lane, ses: ^ksess.Session, input_size: int, tag := SIM_TAG
 // generated <class>_lane_init emits one per extra @(gd_tick) input type; a
 // hand-built lane calls it right after lane_init. `id` must be unique and
 // agree with the Sim_Set.input_class the tracked entities of that kind carry.
-lane_add_input_class :: proc(l: ^Lane, id: u16, size: int, sample: Sample_Proc, allocator := mem.Allocator{}) {
+lane_add_input_class :: proc(
+	l: ^Lane,
+	id: u16,
+	size: int,
+	sample: Sample_Proc,
+	allocator := mem.Allocator{},
+) {
 	assert(id != 0, "class 0 is lane_init's primary input — pass its size to lane_init")
 	assert(size > 0, "an input class needs a non-zero size (inputless entities take no class)")
 	lane_class_add(l, id, size, sample, allocator)
@@ -545,7 +620,10 @@ lane_class_set_type :: proc(l: ^Lane, id: u16, type: typeid) {
 	// Two classes claiming one type is no better a key than the size it replaced
 	// (distinct types of the same SIZE are exactly what this resolves).
 	other := class_for_type_exact(l, type)
-	assert(other == nil || other == ic, "two input classes share an input struct type — each kind needs its own")
+	assert(
+		other == nil || other == ic,
+		"two input classes share an input struct type — each kind needs its own",
+	)
 	ic.type = type
 }
 
@@ -558,19 +636,55 @@ lane_class_set_validate :: proc(l: ^Lane, id: u16, validate: Input_Validate_Proc
 }
 
 @(private = "file")
-lane_class_add :: proc(l: ^Lane, id: u16, size: int, sample: Sample_Proc, allocator := mem.Allocator{}) {
+lane_class_add :: proc(
+	l: ^Lane,
+	id: u16,
+	size: int,
+	sample: Sample_Proc,
+	allocator := mem.Allocator{},
+) {
 	// Zero allocator (the default at every layer) = the LANE'S — these
 	// containers free in lane_destroy under l.allocator, and an ambient
 	// default here silently mismatched them for custom-allocator lanes.
 	allocator := allocator.procedure != nil ? allocator : l.allocator
 	assert(lane_class(l, id) == nil, "input class id registered twice")
-	assert(len(l.inputs) < int(max(u8)), "a sim lane can encode at most 255 input classes")
-	ic := Input_Class{id = id, size = size, sample = sample}
+	assert(
+		len(l.inputs) < MAX_INPUT_CLASSES_PER_SEAT,
+		"a sim lane exceeds MAX_INPUT_CLASSES_PER_SEAT — combine related intent into one @(gd_input) struct",
+	)
+	ic := Input_Class {
+		id     = id,
+		size   = size,
+		sample = sample,
+	}
 	if size > 0 {
 		ic.ring = input_ring_make(size, l.slots, allocator)
 		ic.scratch = make([]u8, size, allocator)
 	}
 	append(&l.inputs, ic)
+	lane_assert_input_packet_bound(l)
+}
+
+// Exact worst-case size of the client→host SIM_INPUT payload for the classes
+// this build samples: kind + snap ack + render offset + class count, then each
+// class id + fixed window header + `redundancy` blobs.
+@(private = "file")
+lane_input_packet_bound :: proc(l: ^Lane) -> int {
+	n := 1 + 8 + 1 + 1
+	for &ic in l.inputs {
+		if ic.sample != nil && ic.size > 0 {
+			n += 2 + 8 + 1 + 2 + l.redundancy * ic.size
+		}
+	}
+	return n
+}
+
+@(private = "file")
+lane_assert_input_packet_bound :: proc(l: ^Lane) {
+	assert(
+		lane_input_packet_bound(l) <= MAX_INPUT_PACKET_BYTES,
+		"sampled input classes exceed MAX_INPUT_PACKET_BYTES at this redundancy — reduce fields/classes or Lane_Config.redundancy",
+	)
 }
 
 // The one constructor for host-side per-seat simulation state. Snapshot issue,
@@ -583,6 +697,7 @@ lane_peer_ensure :: proc(l: ^Lane, player: knet.Player_Id) -> ^Lane_Peer {
 	}
 	p := new(Lane_Peer, l.allocator)
 	p.bufs = make(map[u16]^Input_Buffer, l.allocator)
+	p.snap_sent = make(map[knet.Net_Id]u64, l.allocator)
 	l.peers[player] = p
 	return p
 }
@@ -650,7 +765,10 @@ class_for_type :: proc(l: ^Lane, type: typeid, size: int) -> u16 {
 			n += 1
 		}
 	}
-	assert(n == 1, "lane_input_of: input size ambiguous across classes and no type recorded — use lane_input with an explicit class id, or register the class with its type (the generated lane_init does)")
+	assert(
+		n == 1,
+		"lane_input_of: input size ambiguous across classes and no type recorded — use lane_input with an explicit class id, or register the class with its type (the generated lane_init does)",
+	)
 	return id
 }
 
@@ -685,6 +803,7 @@ lane_destroy :: proc(l: ^Lane) {
 			free(buf)
 		}
 		delete(p.bufs)
+		delete(p.snap_sent)
 		free(p)
 	}
 	delete(l.peers)
@@ -725,7 +844,13 @@ lane_destroy :: proc(l: ^Lane) {
 //               to open with by hand. The host never resims, so it fires once
 //               per real tick. A game needing both keeps them separate instead
 //               of folding `if lane_is_authority()` into one pass.
-lane_set_sim :: proc(l: ^Lane, user: rawptr, sample: Sample_Proc, step: Step_Proc = nil, step_auth: Step_Proc = nil) {
+lane_set_sim :: proc(
+	l: ^Lane,
+	user: rawptr,
+	sample: Sample_Proc,
+	step: Step_Proc = nil,
+	step_auth: Step_Proc = nil,
+) {
 	l.user = user
 	l.step = step
 	l.step_auth = step_auth
@@ -734,8 +859,12 @@ lane_set_sim :: proc(l: ^Lane, user: rawptr, sample: Sample_Proc, step: Step_Pro
 		// kinds passes their samples through lane_add_input_class.
 		if ic := lane_class(l, 0); ic != nil {
 			ic.sample = sample
+			lane_assert_input_packet_bound(l)
 		} else {
-			assert(false, "lane_set_sim: a sample needs an input class — pass input_size > 0 to lane_init")
+			assert(
+				false,
+				"lane_set_sim: a sample needs an input class — pass input_size > 0 to lane_init",
+			)
 		}
 	}
 }
@@ -746,16 +875,39 @@ lane_set_sim :: proc(l: ^Lane, user: rawptr, sample: Sample_Proc, step: Step_Pro
 // everyone; a client ledgers predictions for its OWN entities and merely
 // watches the rest (their truth lands from batches; lane_present draws them
 // on the delayed watch clock, blending bracketing batches per field).
-lane_track :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, desc: ^knet.Entity_Desc, owner: knet.Player_Id, allocator := mem.Allocator{}) {
+lane_track :: proc(
+	l: ^Lane,
+	id: knet.Net_Id,
+	entity: rawptr,
+	desc: ^knet.Entity_Desc,
+	owner: knet.Player_Id,
+	allocator := mem.Allocator{},
+) {
 	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
-	assert(!l.rewound, "lane_track inside a rewound block — the restore holds pointers into the track list; lane_rewound_end first")
-	assert(predict_size(desc) > 0, "lane_track: entity predicts nothing — tag fields gd:\"predict\"")
-	assert(predict_wire_size(desc) <= int(max(u16)),
-		"lane_track: predicted wire state exceeds the snapshot row's u16 length")
+	assert(
+		!l.rewound,
+		"lane_track inside a rewound block — the restore holds pointers into the track list; lane_rewound_end first",
+	)
+	assert(
+		predict_size(desc) > 0,
+		"lane_track: entity predicts nothing — tag fields gd:\"predict\"",
+	)
+	assert(
+		predict_wire_size(desc) <= int(max(u16)),
+		"lane_track: predicted wire state exceeds the snapshot row's u16 length",
+	)
+	assert(
+		l.snapshot_budget == 0 ||
+		SNAP_HEADER_BYTES + SNAP_ROW_HEADER_BYTES + predict_wire_size(desc) <= l.snapshot_budget,
+		"lane_track: Lane_Config.snapshot_budget cannot fit one full row for this entity type",
+	)
 	if l.ses.is_host {
 		hist := new(History, allocator)
 		hist^ = history_make(desc, l.slots, allocator)
-		append(&l.tracked, Tracked{id = id, entity = entity, desc = desc, owner = owner, hist = hist})
+		append(
+			&l.tracked,
+			Tracked{id = id, entity = entity, desc = desc, owner = owner, hist = hist},
+		)
 		append(&l.entries, Entry{id = id, entity = entity, hist = hist})
 		return
 	}
@@ -763,10 +915,16 @@ lane_track :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, desc: ^knet.Entity
 	if owner == l.ses.me {
 		hist := new(History, allocator)
 		hist^ = history_make(desc, l.slots, allocator)
-		append(&l.tracked, Tracked{id = id, entity = entity, desc = desc, owner = owner, hist = hist})
+		append(
+			&l.tracked,
+			Tracked{id = id, entity = entity, desc = desc, owner = owner, hist = hist},
+		)
 		append(&l.entries, Entry{id = id, entity = entity, hist = hist})
 	} else {
-		append(&l.tracked, Tracked{id = id, entity = entity, desc = desc, owner = owner, watched = true})
+		append(
+			&l.tracked,
+			Tracked{id = id, entity = entity, desc = desc, owner = owner, watched = true},
+		)
 	}
 }
 
@@ -781,13 +939,33 @@ lane_track :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, desc: ^knet.Entity
 // its window rides on the wire. That class must be registered (lane_init's
 // primary or a lane_add_input_class extra) and agree on size; a player driving
 // two entity KINDS ships one window per class each tick.
-lane_track_set :: proc(l: ^Lane, id: knet.Net_Id, entity: rawptr, set: ^Sim_Set, owner: knet.Player_Id, allocator := mem.Allocator{}) {
+lane_track_set :: proc(
+	l: ^Lane,
+	id: knet.Net_Id,
+	entity: rawptr,
+	set: ^Sim_Set,
+	owner: knet.Player_Id,
+	allocator := mem.Allocator{},
+) {
 	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	assert(set.tick != nil, "lane_track_set: a Sim_Set carries the tick entry point")
 	if set.input_size > 0 {
 		ic := lane_class(l, set.input_class)
-		assert(ic != nil && ic.size == set.input_size,
-			"lane_track_set: this set's input class is unregistered or its size disagrees — register it with lane_init/lane_add_input_class")
+		assert(
+			ic != nil && ic.size == set.input_size,
+			"lane_track_set: this set's input class is unregistered or its size disagrees — register it with lane_init/lane_add_input_class",
+		)
+	}
+	for &cmd in set.commands {
+		// Sim_Cmd itself fixes the execution model. Stamp it here as well so
+		// hand-built legacy literals (whose promoted Action_Desc.model omitted to
+		// the zero value) gain accurate shared metadata without a migration edit.
+		cmd.action.model = .Scheduled
+		assert(knet.action_desc_valid(cmd.action, .Scheduled), "lane_track_set: invalid scheduled action descriptor")
+		assert(
+			(cmd.exec != nil) != (cmd.exec_checked != nil),
+			"lane_track_set: each action needs exactly one bool or checked exec thunk",
+		)
 	}
 	lane_track(l, id, entity, set.entity_desc, owner, allocator)
 	tr := &l.tracked[len(l.tracked) - 1]
@@ -842,8 +1020,8 @@ lane_claimed :: proc(l: ^Lane, id: knet.Net_Id) -> f32 {
 }
 
 // Broadcast a fact to every screen that didn't simulate it live — the
-// generated thunks (an entity tick's mine-form `_fx`, a declared @(gd_fact)
-// door) call this on the authority. Reliable (facts are one-shots, like
+// generated thunks (an entity tick's mine-form `_fx`, a declared @(gd_cue)
+// door, or its compatible @(gd_fact) spelling) call this on the authority. Reliable (facts are one-shots, like
 // verdicts). Receivers file it and fire the matching fx thunk when their
 // watch clock reaches `l.step_tick` — beside the delayed avatar that caused
 // it. `kind` 0 = an entity-tick fact (routed to the anchor set's fx); a
@@ -872,7 +1050,14 @@ lane_claimed :: proc(l: ^Lane, id: knet.Net_Id) -> f32 {
 // AUTHORITY pass instead of the everywhere pass — l.in_auth includes them by the
 // rule above. That is the knob, not a flag on this call.
 lane_fact :: proc(l: ^Lane, entity: rawptr, args: []u8, kind: u16 = 0) {
-	assert(l.ses.is_host, "facts broadcast from the authority — the generated thunk holds this gate")
+	assert(
+		l.ses.is_host,
+		"facts broadcast from the authority — the generated thunk holds this gate",
+	)
+	assert(
+		len(args) <= FACT_ARGS_MAX_BYTES,
+		"fact payload exceeds FACT_ARGS_MAX_BYTES — facts are presentation tuples, not bulk messages",
+	)
 	id := knet.NET_ID_INVALID
 	owner := knet.PLAYER_ID_INVALID
 	if entity != nil {
@@ -890,7 +1075,10 @@ lane_fact :: proc(l: ^Lane, entity: rawptr, args: []u8, kind: u16 = 0) {
 			return
 		}
 	} else {
-		assert(kind != 0, "an entity-tick fact always has its entity — nil anchors belong to declared @(gd_fact) doors")
+		assert(
+			kind != 0,
+			"an entity-tick fact always has its entity — nil anchors belong to declared @(gd_fact) doors",
+		)
 	}
 	skip := l.in_auth ? knet.PLAYER_ID_INVALID : owner
 	for p in ksess.session_roster(l.ses) {
@@ -908,11 +1096,17 @@ lane_fact :: proc(l: ^Lane, entity: rawptr, args: []u8, kind: u16 = 0) {
 }
 
 lane_untrack :: proc(l: ^Lane, id: knet.Net_Id) -> bool {
-	assert(!l.rewound, "lane_untrack inside a rewound block — the restore holds pointers into the track list; lane_rewound_end first")
+	assert(
+		!l.rewound,
+		"lane_untrack inside a rewound block — the restore holds pointers into the track list; lane_rewound_end first",
+	)
 	// Reliable commands can arrive before a despawn/untrack event is drained.
 	// Retire both authority and prediction ledgers now; no queued verb may later
 	// execute against a recycled id or keep an owned argument buffer alive.
 	cmd_forget_entity(l, id)
+	for _, peer in l.peers {
+		delete_key(&peer.snap_sent, id)
+	}
 	if !l.ses.is_host {
 		snap_rx_remove(&l.rx, id)
 	}
@@ -945,7 +1139,12 @@ lane_untrack :: proc(l: ^Lane, id: knet.Net_Id) -> bool {
 // received truth (predictions begin next tick — a one-lead-deep resim later
 // corrects the seam); losing it drops the ledger and the entity becomes
 // watched, presented from batches like everyone else's.
-lane_set_owner :: proc(l: ^Lane, id: knet.Net_Id, owner: knet.Player_Id, allocator := mem.Allocator{}) -> bool {
+lane_set_owner :: proc(
+	l: ^Lane,
+	id: knet.Net_Id,
+	owner: knet.Player_Id,
+	allocator := mem.Allocator{},
+) -> bool {
 	allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
 	for &tr, i in l.tracked {
 		if tr.id != id {
@@ -1013,6 +1212,7 @@ lane_drop_player :: proc(l: ^Lane, player: knet.Player_Id) {
 			free(buf)
 		}
 		delete(p.bufs)
+		delete(p.snap_sent)
 		free(p)
 		delete_key(&l.peers, player)
 	}
@@ -1103,6 +1303,58 @@ lane_lead :: proc(l: ^Lane) -> int {
 		return 0
 	}
 	return int(l.ticker.tick) - int(l.input_ack)
+}
+
+// One stable operational read for dashboards, logs, and benchmark harnesses.
+// It deliberately aggregates private per-seat rings here so applications do
+// not need to understand Lane_Peer or duplicate host/client interpretations.
+Lane_Net_Stats :: struct {
+	lead:              int,
+	input_gaps:        u64,
+	ack_age:           int,
+	rewind_depth:      int,
+	resim_ticks:       int,
+	resim_seconds:     f64,
+	command_queue:     int,
+	command_rejected:  int,
+	snapshot_rows:     int,
+	snapshot_full:     int,
+	snapshot_delta:    int,
+	snapshot_suppressed: int,
+	snapshot_deferred: int,
+	aoi_culled:        int,
+	snapshot_bytes:    int,
+}
+
+lane_net_stats :: proc(l: ^Lane) -> Lane_Net_Stats {
+	stats := Lane_Net_Stats {
+		lead                = lane_lead(l),
+		resim_ticks         = l.stat_resims,
+		resim_seconds       = l.stat_resim_seconds,
+		command_queue       = len(l.cmd_in) + len(l.cmd_out),
+		command_rejected    = l.stat_cmd_rejected + l.stat_cmd_capped + l.stat_cmd_rate_dropped,
+		snapshot_rows       = l.stat_snap_rows,
+		snapshot_full       = l.stat_snap_full,
+		snapshot_delta      = l.stat_snap_delta,
+		snapshot_suppressed = l.stat_snap_suppressed,
+		snapshot_deferred   = l.stat_snap_deferred,
+		aoi_culled          = l.stat_snap_aoi_culled,
+		snapshot_bytes      = l.stat_snap_bytes,
+	}
+	if l.ses.is_host {
+		for player, p in l.peers {
+			for _, buf in p.bufs {
+				stats.input_gaps += buf.held_count
+			}
+			if p.snap_last >= p.acked {
+				stats.ack_age = max(stats.ack_age, int(p.snap_last - p.acked))
+			}
+			stats.rewind_depth = max(stats.rewind_depth, lane_rewind_envelope(l, player))
+		}
+	} else if l.rx.newest >= l.rx.acked {
+		stats.ack_age = int(l.rx.newest - l.rx.acked)
+	}
+	return stats
 }
 
 // lane_live — is this the LIVE pass, whose side effects should fire ONCE
@@ -1251,9 +1503,56 @@ snap_broadcast :: proc(l: ^Lane, tick: u64) {
 		lp.snap_last = tick
 		acked := lp.acked
 		input_ack := peer_input_ack(lp)
+		Snap_Pick :: struct {
+			entry: Entry,
+			owned: bool,
+			stale: u64,
+			d2:    f32,
+		}
+		picks := make([dynamic]Snap_Pick, 0, len(l.entries), context.temp_allocator)
+		for e in l.entries {
+			tr := cmd_tracked(l, e.id)
+			owned := tr != nil && tr.owner == p.id
+			if !owned && !ksess.session_interest_contains(l.ses, p.id, e.id) {
+				l.stat_snap_aoi_culled += 1
+				continue
+			}
+			last, sent := lp.snap_sent[e.id]
+			stale := sent ? tick - last : max(u64)
+			d2, distance_known := ksess.session_interest_distance_sq(l.ses, p.id, e.id)
+			if !distance_known {
+				d2 = 0
+			}
+			append(&picks, Snap_Pick{entry = e, owned = owned, stale = stale, d2 = d2})
+		}
+		if l.snapshot_budget > 0 && len(picks) > 1 {
+			slice.stable_sort_by(picks[:], proc(a, b: Snap_Pick) -> bool {
+				if a.owned != b.owned {return a.owned}
+				if a.stale != b.stale {return a.stale > b.stale}
+				return a.d2 < b.d2
+			})
+		}
+		entries := make([]Entry, len(picks), context.temp_allocator)
+		for pick, i in picks {
+			entries[i] = pick.entry
+		}
 		w := ksess.session_app_begin(l.ses, l.tag)
 		knet.write_u8(w, SIM_SNAP)
-		snap_write(w, l.entries[:], tick, acked, input_ack)
+		stats := snap_write_recipient(
+			w,
+			entries,
+			tick,
+			acked,
+			input_ack,
+			l.snapshot_budget,
+			&lp.snap_sent,
+		)
+		l.stat_snap_rows += stats.rows
+		l.stat_snap_full += stats.full
+		l.stat_snap_delta += stats.delta
+		l.stat_snap_suppressed += stats.suppressed
+		l.stat_snap_deferred += stats.deferred
+		l.stat_snap_bytes += stats.bytes
 		if l.echo_on {
 			echo_write(l, w, tick)
 		}
@@ -1323,6 +1622,9 @@ client_frame :: proc(l: ^Lane, dt: f64) -> int {
 	if !l.anchored {
 		return 0
 	}
+	if l.cmd_clock < max(u64) {
+		l.cmd_clock += 1
+	}
 	cmd_settle(l) // land verdicts/timeouts on the frame, not in a handler
 	lane_spawn_sweep(l) // reap lost predicted spawns (a fire no authority spawn claimed)
 	n := sim_ticker_advance(&l.ticker, dt)
@@ -1364,6 +1666,7 @@ client_frame :: proc(l: ^Lane, dt: f64) -> int {
 		// count 1; a player driving two kinds writes both. Every ring trims by
 		// the same min ack (l.input_ack), the conservative floor.
 		w := ksess.session_app_begin(l.ses, l.tag)
+		payload_at := len(w.buf)
 		knet.write_u8(w, SIM_INPUT)
 		snap_ack_write(w, &l.rx)
 		knet.write_u8(w, render_off8(l))
@@ -1379,6 +1682,12 @@ client_frame :: proc(l: ^Lane, dt: f64) -> int {
 		}
 		assert(cnt <= int(max(u8)), "input class count exceeds its u8 wire field")
 		w.buf[count_at] = u8(cnt)
+		if len(w.buf) - payload_at > MAX_INPUT_PACKET_BYTES {
+			// Registration catches this while developing. Keep stripped builds
+			// bounded too if a hand-built lane mutates its config/classes later.
+			l.stat_input_drops += 1
+			return n
+		}
 		ksess.session_app_flush(l.ses, ksess.HOST_PEER, .Stream)
 	}
 	return n
@@ -1492,7 +1801,18 @@ client_ingest :: proc(l: ^Lane) {
 	}
 	mism := make([dynamic]knet.Net_Id, context.temp_allocator)
 	l.resimming = true
-	l.stat_resims += reconcile(l.entries[:], truths[:], tick, l.ticker.tick, l, client_resim, &mism, l.tolerance)
+	resim_started := knet.now_s()
+	l.stat_resims += reconcile(
+		l.entries[:],
+		truths[:],
+		tick,
+		l.ticker.tick,
+		l,
+		client_resim,
+		&mism,
+		l.tolerance,
+	)
+	l.stat_resim_seconds += max(knet.now_s() - resim_started, 0)
 	l.resimming = false
 	cmd_retire(l, tick) // ticks at or before the truth are settled history
 	for id in mism {
@@ -1594,8 +1914,54 @@ find_lane_entry :: proc(l: ^Lane, id: knet.Net_Id) -> ^Entry {
 //
 // The rewind tick is bounded, never trusted outright: the authority first
 // proves the ack names a batch it issued in this seat lifetime, then binds that
-// ack to the input packet. The claimed render offset is clamped, and the final
-// view is clamped again to rewind_max, the favor-the-shooter ceiling.
+// ack to the input packet. Visibility credit additionally requires the
+// authority's own RTT sample. Ack age is capped by RTT + 2*jitter, input margin,
+// and one snapshot cadence; the client render offset is only a hint, capped at
+// the configured watch delay plus one cadence of interpolation phase. rewind_max
+// remains the absolute ceiling.
+
+REWIND_JITTER_MULT :: 2.0
+
+// Maximum credible age of an issued snapshot acknowledgement when the input
+// carrying it is finally executed. A healthy input may legitimately arrive one
+// round trip after the snapshot, wait in the authority's input margin, and name
+// the preceding snapshot cadence. Anything older is still safe as a DELTA
+// baseline (peer_snap_ack_valid owns that question), but it is not evidence that
+// earns an older hit-test world.
+@(private = "file")
+lane_rewind_ack_age :: proc(l: ^Lane, shooter: knet.Player_Id) -> (ticks: int, observed: bool) {
+	p, seated := ksess.session_player(l.ses, shooter)
+	if !seated || !p.connected || p.peer == ksess.NO_PEER {
+		return 0, false
+	}
+	c := ksess.session_clock(l.ses, p.peer)
+	if !c.initialized || c.rtt < 0 || c.jitter < 0 || c.rtt != c.rtt || c.jitter != c.jitter {
+		return 0, false
+	}
+	// Cap in seconds before converting to int: even a deliberately delayed pong
+	// cannot overflow conversion or expand credit past the configured ceiling.
+	max_seconds := f64(l.rewind_max) * l.ticker.dt
+	seconds := min(c.rtt + c.jitter * REWIND_JITTER_MULT, max_seconds)
+	network_ticks := int((seconds + l.ticker.dt - 1e-9) / l.ticker.dt)
+	ticks = min(network_ticks + l.margin + l.snap_every, l.rewind_max)
+	return max(ticks, 0), true
+}
+
+// The authority-derived maximum rewind for this shooter right now, in ticks.
+// Zero means the authority has no warm link observation and judges live. This
+// is useful beside stat_rewind_clamped in a netgraph or adjudication trace.
+lane_rewind_envelope :: proc(l: ^Lane, shooter: knet.Player_Id) -> int {
+	assert(l.ses.is_host, "lag compensation is the authority's job")
+	if shooter == l.ses.me {
+		return 0
+	}
+	ack_age, observed := lane_rewind_ack_age(l, shooter)
+	if !observed {
+		return 0
+	}
+	render_cap := min(l.watch_delay + l.snap_every, 31)
+	return min(ack_age + render_cap, l.rewind_max)
+}
 
 // The view a rewound query for `shooter` reconstructs (host, inside a step):
 // the bracketing lower tick and the blend fraction toward the next — the
@@ -1618,12 +1984,40 @@ lane_rewind_view :: proc(l: ^Lane, shooter: knet.Player_Id) -> (lo: u64, alpha: 
 	if ack == 0 || ack >= t {
 		return t, 0 // no confirmed view yet: judge live
 	}
-	off := clamp(f64(tag & 0xFF) / 8, 0, min(f64(2 * l.watch_delay + 4), 31.5))
-	view := f64(ack) - off
+	ack_age, observed := lane_rewind_ack_age(l, shooter)
+	if !observed {
+		// An issued ack remains a valid replication baseline, but until a pong
+		// gives the authority its own link observation it earns no rewind credit.
+		l.stat_rewind_clamped += 1
+		return t, 0
+	}
+	clamped := false
+	claimed_off := f64(tag & 0xFF) / 8
+	// The target is watch_delay, but its correction breathes around batches.
+	// One server-known cadence admits that honest interpolation phase without
+	// turning a client-reported stall into deeper hit-test credit.
+	render_cap := min(l.watch_delay + l.snap_every, 31)
+	off := min(claimed_off, f64(render_cap))
+	if off < claimed_off {
+		clamped = true
+	}
+	ack_floor := t > u64(ack_age) ? t - u64(ack_age) : 1
+	credible_ack := ack
+	if credible_ack < ack_floor {
+		credible_ack = ack_floor
+		clamped = true
+	}
+	view := f64(credible_ack) - off
 	floor_ := t > u64(l.rewind_max) ? t - u64(l.rewind_max) : 1
 	if view <= f64(floor_) {
+		view = f64(floor_)
+		clamped = true
+	}
+	if clamped {
 		l.stat_rewind_clamped += 1
-		return floor_, 0 // the favor-the-shooter ceiling
+	}
+	if view == f64(floor_) {
+		return floor_, 0
 	}
 	lo = u64(view)
 	return lo, f32(view - f64(lo))
@@ -1655,7 +2049,12 @@ Wound :: struct {
 // This is exactly lane_rewound_begin + query + lane_rewound_end — take the
 // inline pair when a context struct just to cross the rawptr boundary would
 // outweigh the hit test itself.
-lane_rewound :: proc(l: ^Lane, shooter: knet.Player_Id, user: rawptr, query: Rewound_Query) -> u64 {
+lane_rewound :: proc(
+	l: ^Lane,
+	shooter: knet.Player_Id,
+	user: rawptr,
+	query: Rewound_Query,
+) -> u64 {
 	judged := lane_rewound_begin(l, shooter)
 	query(user)
 	lane_rewound_end(l)
@@ -1675,7 +2074,10 @@ lane_rewound :: proc(l: ^Lane, shooter: knet.Player_Id, user: rawptr, query: Rew
 // the temp allocator), never nest, and nothing may track/untrack lane
 // entities in between (the restore holds pointers into the track list).
 lane_rewound_begin :: proc(l: ^Lane, shooter: knet.Player_Id) -> u64 {
-	assert(!l.rewound, "lane_rewound_begin: the world is already rewound — pair every begin with lane_rewound_end")
+	assert(
+		!l.rewound,
+		"lane_rewound_begin: the world is already rewound — pair every begin with lane_rewound_end",
+	)
 	l.rewound = true
 	lo, alpha := lane_rewind_view(l, shooter)
 	if l.judge_live {
@@ -1902,7 +2304,12 @@ fire_facts :: proc(l: ^Lane) {
 // The receive side: bytes into lane state, game code never re-entered here.
 
 @(private = "file")
-lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id, r: ^knet.Reader) {
+lane_handle :: proc(
+	user: rawptr,
+	from: knet.Player_Id,
+	from_peer: ksess.Peer_Id,
+	r: ^knet.Reader,
+) {
 	l := cast(^Lane)user
 	context.allocator = l.allocator // handler-side allocs must free under the same allocator later
 	kind := knet.read_u8(r)
@@ -1911,6 +2318,11 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 	}
 	switch kind {
 	case SIM_INPUT:
+		if 1 + len(knet.reader_remaining(r)) > MAX_INPUT_PACKET_BYTES {
+			l.stat_input_rejected += 1
+			r.err = true
+			return
+		}
 		// Host only; the session already resolved the seat (unseated peers
 		// never reach a handler with a valid `from`). A watching seat drives
 		// nobody — its windows are refused before a buffer ever exists.
@@ -1945,7 +2357,7 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 				expected += 1
 			}
 		}
-		if ccount > expected {
+		if ccount > MAX_INPUT_CLASSES_PER_SEAT || ccount > expected {
 			l.stat_input_rejected += 1
 			r.err = true
 			return
@@ -1974,7 +2386,8 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 					break
 				}
 			}
-			if duplicate || !input_window_validate(&probe, ic.size, max_input_tick, ic.validate, l.user) {
+			if duplicate ||
+			   !input_window_validate(&probe, ic.size, max_input_tick, ic.validate, l.user) {
 				l.stat_input_rejected += 1
 				r.err = true
 				return
@@ -2016,7 +2429,7 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 		if !l.ses.is_host || from == knet.PLAYER_ID_INVALID {
 			return
 		}
-		cmd_handle(l, from, r)
+		cmd_handle(l, from, from_peer, r)
 	case SIM_VERDICT:
 		// Client only, and only the authority's word counts.
 		if l.ses.is_host || from_peer != ksess.HOST_PEER {
@@ -2033,8 +2446,9 @@ lane_handle :: proc(user: rawptr, from: knet.Player_Id, from_peer: ksess.Peer_Id
 		tick := knet.read_u64(r)
 		id := knet.read_net_id(r)
 		kind := knet.read_u16(r)
-		blob := knet.read_bytes(r)
-		if r.err {
+		blob := knet.read_bytes_limited(r, FACT_ARGS_MAX_BYTES)
+		if r.err || len(knet.reader_remaining(r)) != 0 {
+			r.err = true
 			return
 		}
 		if len(l.facts) >= FACT_QUEUE_CAP {

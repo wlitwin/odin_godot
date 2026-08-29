@@ -117,7 +117,10 @@ pickup_cmd_grab :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env)
 	if r.err {return false}
 	if !kinter.in_range({px, py, 0}, {p.x, p.y, 0}, REACH) {return false}
 	if p.count == 0 {return false}
-	p.last_grab = kitems.Slot{item = p.item, count = p.count}
+	p.last_grab = kitems.Slot {
+		item  = p.item,
+		count = p.count,
+	}
 	p.item = kitems.ITEM_NONE
 	p.count = 0
 	return true
@@ -129,18 +132,42 @@ chest_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Chest, y), size = size_of(f32)},
 	{offset = offset_of(Chest, slots), size = size_of([4]kitems.Slot)},
 }
-chest_desc := knet.Entity_Desc{fields = chest_fields[:]}
-chest_cmds := [?]knet.Command_Desc{{name = "take", predict = true, access = .Any_Seat, invoke = chest_cmd_take}}
-chest_set := knet.Command_Set{entity_desc = &chest_desc, commands = chest_cmds[:]}
+chest_desc := knet.Entity_Desc {
+	fields = chest_fields[:],
+}
+chest_cmds := [?]knet.Command_Desc {
+	{name = "take", policy = knet.ACTION_ANY_SEAT_PREDICTED, invoke = chest_cmd_take},
+}
+chest_set := knet.Command_Set {
+	entity_desc = &chest_desc,
+	commands    = chest_cmds[:],
+}
 
 spel_fields := [?]knet.Field_Desc {
-	{offset = offset_of(Spelunker, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32},
-	{offset = offset_of(Spelunker, y), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32},
+	{
+		offset = offset_of(Spelunker, x),
+		size = size_of(f32),
+		flags = {.Interp, .Owner_Stream},
+		lerp = .F32,
+	},
+	{
+		offset = offset_of(Spelunker, y),
+		size = size_of(f32),
+		flags = {.Interp, .Owner_Stream},
+		lerp = .F32,
+	},
 	{offset = offset_of(Spelunker, bag), size = size_of([4]kitems.Slot)},
 }
-spel_desc := knet.Entity_Desc{fields = spel_fields[:]}
-spel_cmds := [?]knet.Command_Desc{{name = "drop", predict = true, access = .Any_Seat, invoke = spel_cmd_drop}}
-spel_set := knet.Command_Set{entity_desc = &spel_desc, commands = spel_cmds[:]}
+spel_desc := knet.Entity_Desc {
+	fields = spel_fields[:],
+}
+spel_cmds := [?]knet.Command_Desc {
+	{name = "drop", policy = knet.ACTION_ANY_SEAT_PREDICTED, invoke = spel_cmd_drop},
+}
+spel_set := knet.Command_Set {
+	entity_desc = &spel_desc,
+	commands    = spel_cmds[:],
+}
 
 pickup_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Pickup, x), size = size_of(f32)},
@@ -148,18 +175,32 @@ pickup_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Pickup, item), size = size_of(kitems.Item_Id)},
 	{offset = offset_of(Pickup, count), size = size_of(u16)},
 }
-pickup_desc := knet.Entity_Desc{fields = pickup_fields[:]}
-pickup_cmds := [?]knet.Command_Desc{{name = "grab", predict = true, access = .Any_Seat, invoke = pickup_cmd_grab}}
-pickup_set := knet.Command_Set{entity_desc = &pickup_desc, commands = pickup_cmds[:]}
+pickup_desc := knet.Entity_Desc {
+	fields = pickup_fields[:],
+}
+pickup_cmds := [?]knet.Command_Desc {
+	{name = "grab", policy = knet.ACTION_ANY_SEAT_PREDICTED, invoke = pickup_cmd_grab},
+}
+pickup_set := knet.Command_Set {
+	entity_desc = &pickup_desc,
+	commands    = pickup_cmds[:],
+}
 
 door_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Door, x), size = size_of(f32)},
 	{offset = offset_of(Door, y), size = size_of(f32)},
 	{offset = offset_of(Door, open), size = size_of(bool)},
 }
-door_desc := knet.Entity_Desc{fields = door_fields[:]}
-door_cmds := [?]knet.Command_Desc{{name = "toggle", predict = true, access = .Any_Seat, invoke = door_cmd_toggle}}
-door_set := knet.Command_Set{entity_desc = &door_desc, commands = door_cmds[:]}
+door_desc := knet.Entity_Desc {
+	fields = door_fields[:],
+}
+door_cmds := [?]knet.Command_Desc {
+	{name = "toggle", policy = knet.ACTION_ANY_SEAT_PREDICTED, invoke = door_cmd_toggle},
+}
+door_set := knet.Command_Set {
+	entity_desc = &door_desc,
+	commands    = door_cmds[:],
+}
 
 CHEST_TYPE :: ksess.Entity_Type(1)
 SPEL_TYPE :: ksess.Entity_Type(2)
@@ -193,7 +234,15 @@ box_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: kse
 	append(&b.out, Envelope{to = to_peer, data = cloned})
 }
 
-box_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (rawptr, ^knet.Command_Set) {
+box_make_entity :: proc(
+	user: rawptr,
+	type: ksess.Entity_Type,
+	id: knet.Net_Id,
+	owner: knet.Player_Id,
+) -> (
+	rawptr,
+	^knet.Command_Set,
+) {
 	b := cast(^Peer_Box)user
 	switch type {
 	case CHEST_TYPE:
@@ -680,28 +729,21 @@ grab_race_despawns_exactly_once :: proc(t: ^testing.T) {
 	testing.expect_value(t, cv.alice.freed, 1)
 	testing.expect_value(t, cv.bob.freed, 1)
 
-	// Bob's grab named an entity the host had already despawned — no result
-	// can carry truth for a missing entity, so his pending rides the EXPIRY
-	// safety net (the despawn already cleaned his screen; this is pure
-	// bookkeeping). It must time out into a loud auto-revert, not linger.
-	testing.expect_value(t, knet.pending_count(&cv.bob.s.ctx.pending), 1)
-	_ = drain(&cv.bob.s)
-	for _ in 0 ..< 61 {
-		step(cv.boxes, &cv.now)
-	}
+	// Bob's grab named an entity the host had already despawned. The authority
+	// can still answer the addressed request without a truth snapshot, so the
+	// pending retires immediately as Stale instead of masquerading as Timeout.
 	testing.expect_value(t, knet.pending_count(&cv.bob.s.ctx.pending), 0)
-	expired := false
+	stale := false
 	for ev in drain(&cv.bob.s) {
 		if rej, is_rej := ev.(ksess.Ev_Command_Rejected); is_rej {
-			expired = true
-			// The timeout rejection is ADDRESSED like an explicit one: it
-			// names the real seq and the entity the doomed grab targeted —
-			// UI keyed on either matches both rejection paths.
-			testing.expect(t, rej.seq != 0, "expiry carries the pending's real seq")
+			stale = true
+			testing.expect(t, rej.seq != 0, "stale result carries the pending's real seq")
 			testing.expect_value(t, rej.entity, pickup_id)
+			testing.expect_value(t, rej.reason, knet.Action_Reject_Reason.Stale)
+			testing.expect_value(t, rej.model, knet.Action_Model.Immediate)
 		}
 	}
-	testing.expect(t, expired, "expiry announces itself — silence means no")
+	testing.expect(t, stale, "known stale targets receive an immediate typed rejection")
 }
 
 @(test)
@@ -727,7 +769,10 @@ the_host_loots_like_anyone :: proc(t: ^testing.T) {
 	knet.write_f32(&w, 0)
 	knet.write_f32(&w, 0)
 	r := knet.reader_make(knet.writer_bytes(&w))
-	env := knet.Command_Env{authority = true, by = cv.host.s.me}
+	env := knet.Command_Env {
+		authority = true,
+		by        = cv.host.s.me,
+	}
 	testing.expect(t, chest_cmd_take(chest, &r, &env))
 	loot_hook(&cv.host, cv.host.s.me, cv.chest_id, CHEST_TAKE, true)
 

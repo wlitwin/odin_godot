@@ -2,13 +2,14 @@ package kit_session
 
 // THE PLAYER PROFILE — the typed per-player record every lobby rebuilt on
 // stat columns and app channels: picks, loadout, cosmetics, ready lamps,
-// declared meta. One POD struct per seat, with the ownership rule the rest
-// of the kit already taught: EVERY ROW HAS ONE WRITER, its player.
+// declared meta. In scriptgen games, one recursively validated canonical raw
+// struct per seat, with the ownership rule the rest of the kit already taught:
+// EVERY ROW HAS ONE WRITER, its player.
 //
 //   Pick :: struct { look, iron: u8, ready: bool }
 //
 //   // THE DECLARATION (scriptgen games): tag the Session field — the install
-//   // generates into the ready thunk and the row's shape folds into the wire
+//   // generates into the ready thunk and the row's canonical shape folds into the wire
 //   // fingerprint, so a drifted Pick refuses the join at the version door:
 //   ses: ksess.Session `gd:"profile=Pick"`
 //
@@ -78,9 +79,18 @@ Profile_Table :: struct {
 // SAME-SIZE layout drift misreads rows silently; the declaration form is
 // how that gets caught.
 session_profile_install :: proc(s: ^Session, $T: typeid) {
-	#assert(size_of(T) <= PROFILE_MAX_SIZE, "a profile row is a loadout, not an inventory dump — shrink it or blob it")
-	#assert(intrinsics.type_is_nearly_simple_compare(T) && !intrinsics.type_is_pointer(T), "profile rows are POD — no strings, slices, maps, or pointers (the row IS the wire bytes)")
-	assert(s.prof_size == 0 || s.prof_size == size_of(T), "session_profile_install called twice with different types")
+	#assert(
+		size_of(T) <= PROFILE_MAX_SIZE,
+		"a profile row is a loadout, not an inventory dump — shrink it or blob it",
+	)
+	#assert(
+		intrinsics.type_is_nearly_simple_compare(T) && !intrinsics.type_is_pointer(T),
+		"profile rows are POD — no strings, slices, maps, or pointers (the row IS the wire bytes)",
+	)
+	assert(
+		s.prof_size == 0 || s.prof_size == size_of(T),
+		"session_profile_install called twice with different types",
+	)
 	// prof_size is the WIRING half (survives re-init; session_init re-seeds
 	// the table from it after each run wipe); prof.size is the live copy the
 	// table's own procs read.
@@ -113,7 +123,10 @@ prof_row :: proc(s: ^Session, pid: knet.Player_Id, make_missing: bool) -> []u8 {
 // with that run like every other row — keep persistent meta in your own
 // record and declare it from the `_seated` half.
 session_profile_mine :: proc(s: ^Session, $T: typeid) -> ^T {
-	assert(s.prof.size == size_of(T), "session_profile_mine before session_profile_install (or with a different T)")
+	assert(
+		s.prof.size == size_of(T),
+		"session_profile_mine before session_profile_install (or with a different T)",
+	)
 	context.allocator = ses_allocator(s) // a first read MAKES my row (prof_row) — owned run state, freed in prof_destroy
 	if s.me == knet.PLAYER_ID_INVALID || !s.joined {
 		if s.prof_pending == nil {
@@ -214,7 +227,7 @@ prof_tick :: proc(s: ^Session) {
 	knet.write_u8(&w, SES_DECLARE)
 	knet.write_u16(&w, u16(s.prof.size))
 	append(&w.buf, ..row)
-	s.send(s.send_user, HOST_PEER, knet.writer_bytes(&w), .Reliable)
+	session_send_packet(s, HOST_PEER, knet.writer_bytes(&w), .Reliable)
 }
 
 // Host: a declare landed — the row is its player's word, verbatim. A size
@@ -223,13 +236,17 @@ prof_tick :: proc(s: ^Session) {
 @(private)
 prof_handle_declare :: proc(s: ^Session, from: knet.Player_Id, r: ^knet.Reader) {
 	n := int(knet.read_u16(r))
-	if r.err || s.prof.size == 0 || n != s.prof.size || r.off + n > len(r.data) {
+	if r.err || s.prof.size == 0 || n > PROFILE_MAX_SIZE || n != s.prof.size {
+		r.err = true
+		return
+	}
+	bytes := knet.reader_view(r, n)
+	if r.err || len(knet.reader_remaining(r)) != 0 {
 		r.err = true
 		return
 	}
 	row := prof_row(s, from, true)
-	copy(row, r.data[r.off:r.off + n])
-	r.off += n
+	copy(row, bytes)
 	s.prof.dirty = true
 	append(&s.events, Ev_Profile_Changed{player = from})
 }
@@ -247,6 +264,7 @@ prof_send :: proc(s: ^Session, to_peer := BROADCAST_PEER) {
 	knet.write_u8(&w, SES_PROFILES)
 	knet.write_u16(&w, u16(s.prof.size))
 	assert(len(s.prof.rows) <= int(max(u16)))
+	assert(len(s.prof.rows) <= knet.MAX_CONTAINER_ITEMS)
 	knet.write_u16(&w, u16(len(s.prof.rows)))
 	for pid, row in s.prof.rows {
 		knet.write_player_id(&w, pid)
@@ -255,7 +273,7 @@ prof_send :: proc(s: ^Session, to_peer := BROADCAST_PEER) {
 	if to_peer == BROADCAST_PEER {
 		broadcast(s, knet.writer_bytes(&w), .Reliable)
 	} else {
-		s.send(s.send_user, to_peer, knet.writer_bytes(&w), .Reliable)
+		session_send_packet(s, to_peer, knet.writer_bytes(&w), .Reliable)
 	}
 }
 
@@ -265,18 +283,27 @@ prof_send :: proc(s: ^Session, to_peer := BROADCAST_PEER) {
 prof_handle_table :: proc(s: ^Session, r: ^knet.Reader) {
 	n := int(knet.read_u16(r))
 	count := int(knet.read_u16(r))
-	if r.err || s.prof.size == 0 || n != s.prof.size {
+	if r.err ||
+	   s.prof.size == 0 ||
+	   n > PROFILE_MAX_SIZE ||
+	   n != s.prof.size ||
+	   !knet.reader_admit_count(r, count, 8 + n) {
+		r.err = true
+		return
+	}
+	// Validate the complete table before creating/replacing any row.
+	probe := r^
+	for _ in 0 ..< count {
+		_ = knet.read_player_id(&probe)
+		_ = knet.reader_view(&probe, n)
+	}
+	if probe.err || len(knet.reader_remaining(&probe)) != 0 {
 		r.err = true
 		return
 	}
 	for _ in 0 ..< count {
 		pid := knet.read_player_id(r)
-		if r.err || r.off + n > len(r.data) {
-			r.err = true
-			return
-		}
-		bytes := r.data[r.off:r.off + n]
-		r.off += n
+		bytes := knet.reader_view(r, n)
 		if pid == s.me {
 			continue
 		}

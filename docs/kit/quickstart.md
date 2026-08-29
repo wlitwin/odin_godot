@@ -111,7 +111,9 @@ HelloNet :: struct {
 The `entity=Player:1` tag associates wire type `1` with `Player` and generates:
 
 - `hello_net_entities`, which installs the entity factory;
-- `player_spawn`, `player_of`, `player_owned_by`, and `player_ids`;
+- `player_spawn`, `player_of`, `player_owned_by`, and `my_player`;
+- typed `player_ref` handles plus one-pass `player_all` iteration
+  (`player_ids` remains available for ID-only code);
 - spawn/free bookkeeping hooks; and
 - scalar probes used by the integration-test harness.
 
@@ -124,11 +126,8 @@ Set up Kit from the game's `_ready` proc:
 
 ```odin
 hello_net_ready :: proc(self: ^HelloNet) {
-	kboot.boot_attach(
-		&self.boot,
-		cast(gd.Node)self.owner,
-		&self.ses,
-		&self.comms,
+	hello_net_attach(
+		self,
 		kboot.Options{
 			title = "HELLO, MULTIPLAYER",
 			status = "Host a room, or join one at localhost",
@@ -136,19 +135,26 @@ hello_net_ready :: proc(self: ^HelloNet) {
 			env = "HELLO",
 			min_players = 1,
 		},
+		kboot.network_profile(.Friends_Coop),
 	)
-	hello_net_entities(self, &self.boot)
 }
 ```
 
-`boot_attach` creates the stock UI, initializes the Godot transport adapter,
-wires the session and chat packages, and connects the standard signal methods.
+Because the struct has one direct `Boot`, `Session`, and `Comms`, scriptgen
+creates this game-network facade automatically. `hello_net_attach` creates
+the stock UI, initializes the Godot transport adapter, wires session and chat,
+installs `hello_net_entities`, and connects the standard signal methods.
 `Options.env = "HELLO"` also defines the prefix for settings such as
 `HELLO_PORT`, `HELLO_NAME`, `HELLO_TOKEN`, and the link simulator variables used
-later in this guide.
+later in this guide. `.Friends_Coop` states the trust model: players may author
+their owner-streamed movement, while the host owns reliable shared state and
+validates commands. Omitting the third argument selects the same profile, but
+naming it makes the game's intent visible.
 
-Call the generated `hello_net_entities` after `boot_attach`. It connects the
-entity scenes and generated event dispatch to the initialized `Boot` value.
+The individual `boot_attach` and `hello_net_entities` calls remain available
+for a custom shell, but the common path does not need to order them by hand.
+Read [Network profiles](profiles.md) before promoting fast state to a
+server-authoritative simulation or deploying a dedicated authority.
 
 ## 4. Host, join, and start
 
@@ -286,16 +292,16 @@ At this point the spawn fields have been applied on every peer.
 
 ## 7. Pump the session and move the local player
 
-`boot_pump` must run once per active frame. It advances the transport, session,
-replication clocks, chat, and any attached simulation lane, then returns the
-events generated during that work.
+The generated network pump must run once per active frame. It advances the
+transport, session, replication clocks, chat, and any attached simulation lane,
+then forwards declared session events to their typed halves.
 
 ```odin
 hello_net_process :: proc(self: ^HelloNet, delta: f64) {
 	was := kboot.boot_phase(&self.boot)
 	if was == .Menu {return}
 
-	events, _, _ := kboot.boot_pump(&self.boot, delta, knet.now_s())
+	_ = hello_net_pump(self, delta, knet.now_s())
 	if self.me != nil {
 		dx, dy: f32
 		if gd.is_action_pressed("ui_right") {dx += 1}
@@ -305,8 +311,6 @@ hello_net_process :: proc(self: ^HelloNet, delta: f64) {
 		self.me.x = clamp(self.me.x + dx * 160 * f32(delta), 8, 632)
 		self.me.y = clamp(self.me.y + dy * 160 * f32(delta), 8, 352)
 	}
-	hello_net_events(self, events)
-
 	if was != .Playing && kboot.boot_phase(&self.boot) == .Playing {
 		gd.print_str("HELLO_STARTED")
 	}
@@ -316,6 +320,11 @@ hello_net_process :: proc(self: ^HelloNet, delta: f64) {
 `boot_phase` is derived from session state. Read it before and after the pump
 when you need the frame on which a phase changes; do not maintain a second
 `started` flag for the same state.
+
+`hello_net_pump` returns a `kboot.Net_Frame` when you need comms markers or
+the co-op fixed-step count. Use the lower-level `boot_pump` plus
+`hello_net_events` only when event dispatch must occur at a custom point in the
+frame.
 
 This movement model is intentionally owner-authoritative: a client writes its
 own position directly. It is appropriate for cooperative play among invited

@@ -17,41 +17,41 @@ Lane_Parcel :: struct {
 }
 
 Lane_Box :: struct {
-	peer:   ksess.Peer_Id,
-	s:      ksess.Session,
-	lane:   ksim.Lane,
-	out:    [dynamic]Lane_Parcel,
-	movers: map[knet.Net_Id]^Mover,
-	owners: map[knet.Net_Id]knet.Player_Id,
-	ax:     i8, // the local player's current intent
+	peer:            ksess.Peer_Id,
+	s:               ksess.Session,
+	lane:            ksim.Lane,
+	out:             [dynamic]Lane_Parcel,
+	movers:          map[knet.Net_Id]^Mover,
+	owners:          map[knet.Net_Id]knet.Player_Id,
+	ax:              i8, // the local player's current intent
 
 	// (a) input-class-by-TYPE probe: what lane_input_of resolved for two
 	// same-size, distinct-type classes (see lane_input_of_routes_by_type_not_size)
-	two_steer: i16,
-	two_aim:   i16,
+	two_steer:       i16,
+	two_aim:         i16,
 
 	// two-step-slot probe: how often each world pass ran on this peer
-	step_calls: int, // the EVERYWHERE pass (live + resim)
-	auth_calls: int, // the AUTHORITY pass (host only, live only)
+	step_calls:      int, // the EVERYWHERE pass (live + resim)
+	auth_calls:      int, // the AUTHORITY pass (host only, live only)
 
 	// predicted-spawn (projectile) probe
-	proj_set:     ^ksim.Sim_Set,
-	cli_proj:     ^Mover, // this client's predicted projectile
-	cli_proj_id:  knet.Net_Id, // its provisional id
-	host_proj:    ^Mover, // the authority's projectile
-	host_proj_id: knet.Net_Id,
-	proj_ids:     int, // authoritative projectile id counter (host)
+	proj_set:        ^ksim.Sim_Set,
+	cli_proj:        ^Mover, // this client's predicted projectile
+	cli_proj_id:     knet.Net_Id, // its provisional id
+	host_proj:       ^Mover, // the authority's projectile
+	host_proj_id:    knet.Net_Id,
+	proj_ids:        int, // authoritative projectile id counter (host)
 
 	// lag-comp probe (host): at step `fire_at`, judge `probe_id` through a
 	// rewound query for `shooter` and record what both worlds showed.
-	fire_at:      u64,
-	shooter:      knet.Player_Id,
-	probe_id:     knet.Net_Id,
-	fired:        bool,
-	rewound_to:   u64,
-	saw_live:     f32,
-	saw_past:     f32,
-	saw_restored: f32,
+	fire_at:         u64,
+	shooter:         knet.Player_Id,
+	probe_id:        knet.Net_Id,
+	fired:           bool,
+	rewound_to:      u64,
+	saw_live:        f32,
+	saw_past:        f32,
+	saw_restored:    f32,
 
 	// the same judgment through the inline pair — must agree to the byte
 	inline_to:       u64,
@@ -59,19 +59,19 @@ Lane_Box :: struct {
 	inline_restored: f32,
 
 	// every-screen fact probe (mine-form _fx): what fired here, and when
-	fx_calls:  int,
-	fx_mine:   bool,
-	fx_x:      f32, // the fact's wire-decoded payload
+	fx_calls:        int,
+	fx_mine:         bool,
+	fx_x:            f32, // the fact's wire-decoded payload
 
 	// declared world-pass fact probe (@(gd_fact) doors): one recorder slot
 	// per kind under test — calls, the mine bit, the watch clock at fire,
 	// and whether the thunk saw a nil entity (the anchorless form)
-	df_calls: [5]int,
-	df_mine:  [5]bool,
-	df_clock: [5]f64,
-	df_nil:   [5]bool,
-	fx_clock:  f64, // lane.watch_clock at the fire (0 on a live-pass fire)
-	fx_newest: u64, // rx.newest at the fire — proves the watcher fired BEHIND the wire
+	df_calls:        [5]int,
+	df_mine:         [5]bool,
+	df_clock:        [5]f64,
+	df_nil:          [5]bool,
+	fx_clock:        f64, // lane.watch_clock at the fire (0 on a live-pass fire)
+	fx_newest:       u64, // rx.newest at the fire — proves the watcher fired BEHIND the wire
 }
 
 lbox_probe :: proc(user: rawptr) {
@@ -127,6 +127,46 @@ lane_pump :: proc(boxes: []^Lane_Box) {
 			}
 		}
 	}
+}
+
+lane_saw_rejection :: proc(
+	s: ^ksess.Session,
+	reason: knet.Action_Reject_Reason,
+	entity: knet.Net_Id,
+) -> bool {
+	found := false
+	for {
+		ev, ok := ksess.session_poll(s)
+		if !ok {break}
+		if rejected, is_rejected := ev.(ksess.Ev_Command_Rejected);
+		   is_rejected &&
+		   rejected.model == .Scheduled &&
+		   rejected.reason == reason &&
+		   rejected.entity == entity {
+			found = true
+		}
+	}
+	return found
+}
+
+lane_saw_execution :: proc(
+	s: ^ksess.Session,
+	reason: knet.Action_Reject_Reason,
+	entity: knet.Net_Id,
+) -> bool {
+	found := false
+	for {
+		ev, ok := ksess.session_poll(s)
+		if !ok {break}
+		if executed, is_executed := ev.(ksess.Ev_Command_Executed);
+		   is_executed &&
+		   executed.model == .Scheduled &&
+		   executed.reason == reason &&
+		   executed.entity == entity {
+			found = true
+		}
+	}
+	return found
 }
 
 // Adversarial app-message helpers: these deliberately bypass lane_command and
@@ -241,7 +281,11 @@ lane_two_peers_converge :: proc(t: ^testing.T) {
 	lane_pump(boxes)
 	testing.expect_value(t, alice.s.me, knet.Player_Id(2))
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	ksim.lane_set_sim(&host.lane, &host, lbox_sample, lbox_step)
@@ -256,6 +300,18 @@ lane_two_peers_converge :: proc(t: ^testing.T) {
 	lbox_track(&host, ALICE, 2, &desc)
 	lbox_track(&alice, HOSTY, 1, &desc)
 	lbox_track(&alice, ALICE, 2, &desc)
+
+	// Generated multi-entity cues translate secondary typed refs through the
+	// lane's stable identity in both directions.
+	alice_id, alice_id_ok := ksim.lane_entity_id(&alice.lane, alice.movers[ALICE])
+	testing.expect(t, alice_id_ok, "a tracked cue ref resolves to a Net_Id")
+	testing.expect_value(t, alice_id, ALICE)
+	alice_entity, alice_entity_ok := ksim.lane_entity(&alice.lane, ALICE)
+	testing.expect(t, alice_entity_ok, "a cue Net_Id resolves to the peer's local entity")
+	testing.expect(t, alice_entity == rawptr(alice.movers[ALICE]), "cue identity round-trips")
+	_, absent_id_ok := ksim.lane_entity_id(&alice.lane, nil)
+	_, absent_entity_ok := ksim.lane_entity(&alice.lane, knet.NET_ID_INVALID)
+	testing.expect(t, !absent_id_ok && !absent_entity_ok, "unknown cue refs do not resolve")
 
 	DT :: 1.0 / 60.0
 	for i in 1 ..= 240 {
@@ -288,7 +344,11 @@ lane_two_peers_converge :: proc(t: ^testing.T) {
 
 	// The clock only ever bends, never jumps.
 	nudged := abs(alice.lane.ticker.scale - 1.0)
-	testing.expect(t, nudged <= ksim.SCALE_NUDGE_MAX + 1e-12, "lead corrections stay inside the nudge")
+	testing.expect(
+		t,
+		nudged <= ksim.SCALE_NUDGE_MAX + 1e-12,
+		"lead corrections stay inside the nudge",
+	)
 
 	// Frozen world, byte-equal on both screens: alice's own avatar through
 	// prediction + reconcile, the host's avatar through watched truth.
@@ -309,7 +369,11 @@ lane_pair :: proc(host: ^Lane_Box, alice: ^Lane_Box, desc: ^knet.Entity_Desc) {
 	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	ksim.lane_set_sim(&host.lane, host, lbox_sample, lbox_step)
@@ -318,6 +382,62 @@ lane_pair :: proc(host: ^Lane_Box, alice: ^Lane_Box, desc: ^knet.Entity_Desc) {
 	lbox_track(host, 20, 2, desc)
 	lbox_track(alice, 10, 1, desc)
 	lbox_track(alice, 20, 2, desc)
+}
+
+lane_mover_locate :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y, z: f32, always: bool) {
+	return (cast(^Mover)entity).x, 0, 0, false
+}
+
+@(test)
+simulation_snapshots_reuse_session_aoi_and_full_on_reentry :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	host, alice: Lane_Box
+	lane_pair(&host, &alice, &desc)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+	set := knet.Command_Set{entity_desc = &desc}
+	for id in ([]knet.Net_Id{10, 20}) {
+		knet.registry_insert(&host.s.reg, id, host.movers[id], &set, host.owners[id])
+		host.s.types[id] = ksess.Entity_Type(1)
+	}
+	host.movers[10].x = 1000 // host-owned remote body
+	host.movers[20].x = 0 // alice's own body
+	ksess.session_set_interest(&host.s, 100, 0, nil, lane_mover_locate)
+	ksess.session_set_focus(&host.s, alice.s.me, 0, 0)
+	ksess.session_start_replicating(&host.s)
+	_, _ = ksess.session_tick(&host.s, 0.05, 1.0) // materialize the AOI pairs
+	// This test is about SIM_SNAP; discard session-lane re-entry/state packets.
+	for p in host.out {delete(p.data)}
+	clear(&host.out)
+	testing.expect(t, !ksess.session_interest_contains(&host.s, alice.s.me, 10))
+	testing.expect(t, ksess.session_interest_contains(&host.s, alice.s.me, 20))
+
+	DT :: 1.0 / 60.0
+	for _ in 0 ..< 6 {
+		ksim.lane_frame(&host.lane, DT)
+		lane_pump(boxes)
+		ksim.lane_frame(&alice.lane, DT)
+		lane_pump(boxes)
+	}
+	testing.expect(t, host.lane.stat_snap_aoi_culled > 0)
+	full_before := host.lane.stat_snap_full
+
+	// Alice moves her focus to the host body. The global snapshot ack has
+	// advanced without that row, so its first re-entry representation must be
+	// FULL rather than a delta against state she never received.
+	ksess.session_set_focus(&host.s, alice.s.me, 1000, 0)
+	_, _ = ksess.session_tick(&host.s, 0.05, 2.0)
+	for p in host.out {delete(p.data)}
+	clear(&host.out)
+	testing.expect(t, ksess.session_interest_contains(&host.s, alice.s.me, 10))
+	for _ in 0 ..< 4 {
+		ksim.lane_frame(&host.lane, DT)
+		lane_pump(boxes)
+		ksim.lane_frame(&alice.lane, DT)
+		lane_pump(boxes)
+	}
+	testing.expect(t, host.lane.stat_snap_full > full_before, "AOI re-entry forces a full row")
 }
 
 // The hand-built stand-in for what scriptgen emits from @(gd_tick): cast,
@@ -338,8 +458,16 @@ mover_tick_thunk :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner:
 @(test)
 lane_watched_fresh_spawn_holds_at_muzzle :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	av_set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1}
-	fly_set := ksim.Sim_Set{entity_desc = &desc, tick = proj_fly_thunk, input_size = 0}
+	av_set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+	}
+	fly_set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = proj_fly_thunk,
+		input_size  = 0,
+	}
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
 	lbox_make(&alice, 100)
@@ -352,7 +480,11 @@ lane_watched_fresh_spawn_holds_at_muzzle :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	for b in boxes {
 		ksim.lane_init(&b.lane, &b.s, 1, cfg = cfg)
 		ksim.lane_set_sim(&b.lane, b, lbox_sample, nil)
@@ -367,7 +499,7 @@ lane_watched_fresh_spawn_holds_at_muzzle :: proc(t: ^testing.T) {
 
 	DT :: 1.0 / 60.0
 	alice.ax = 0
-	for i in 1 ..= 60 { // warm up: batches + watch_clock established
+	for i in 1 ..= 60 { 	// warm up: batches + watch_clock established
 		for b in boxes {ksim.lane_frame(&b.lane, DT)}
 		ksim.lane_present(&alice.lane, DT)
 		lane_pump(boxes)
@@ -395,11 +527,15 @@ lane_watched_fresh_spawn_holds_at_muzzle :: proc(t: ^testing.T) {
 	// distance at the reveal: it must be well past the muzzle, proving the node
 	// was kept hidden through the hold rather than shown early.
 	reveal_hostx := f32(-1)
-	ksim.lane_set_present_ready(&alice.lane, &reveal_hostx, proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
-		if (cast(^f32)user)^ < 0 {
-			(cast(^f32)user)^ = 0 // marker: fired (host.x filled in by the loop)
-		}
-	})
+	ksim.lane_set_present_ready(
+		&alice.lane,
+		&reveal_hostx,
+		proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
+			if (cast(^f32)user)^ < 0 {
+				(cast(^f32)user)^ = 0 // marker: fired (host.x filled in by the loop)
+			}
+		},
+	)
 
 	// The muzzle-hold signature the fix produces and the bug cannot: at some
 	// frame the observer presents the flyer NEAR THE MUZZLE while the host has
@@ -421,19 +557,34 @@ lane_watched_fresh_spawn_holds_at_muzzle :: proc(t: ^testing.T) {
 		// The observer must NEVER present a flown-ahead ghost: once it shows
 		// anything, it is between the muzzle and the host's truth.
 		if ax != 0 {
-			testing.expectf(t, ax >= MUZZLE - 1 && ax <= hx + 0.5,
-				"frame %d: observer presented %v outside [muzzle, truth]=[%v, %v] — a stale or ahead ghost", i, ax, MUZZLE, hx)
+			testing.expectf(
+				t,
+				ax >= MUZZLE - 1 && ax <= hx + 0.5,
+				"frame %d: observer presented %v outside [muzzle, truth]=[%v, %v] — a stale or ahead ghost",
+				i,
+				ax,
+				MUZZLE,
+				hx,
+			)
 		}
 		if ax >= MUZZLE - 1 && ax <= MUZZLE + 12 && hx > MUZZLE + 18 {
 			held_at_muzzle = true // held at the muzzle while the shot is well downrange
 		}
 	}
-	testing.expect(t, held_at_muzzle,
-		"the observer never held the fresh watched projectile at the muzzle — it popped in a watch_delay late off the barrel")
+	testing.expect(
+		t,
+		held_at_muzzle,
+		"the observer never held the fresh watched projectile at the muzzle — it popped in a watch_delay late off the barrel",
+	)
 	// The reveal fired, and it fired a render delay LATE — the host had already
 	// carried the shot well past the muzzle by the time the node was uncovered.
-	testing.expectf(t, reveal_frame_hostx > MUZZLE + 10,
-		"present_ready fired too early (host at %v, muzzle %v) — the node would appear before the delayed barrel fired it", reveal_frame_hostx, MUZZLE)
+	testing.expectf(
+		t,
+		reveal_frame_hostx > MUZZLE + 10,
+		"present_ready fired too early (host at %v, muzzle %v) — the node would appear before the delayed barrel fired it",
+		reveal_frame_hostx,
+		MUZZLE,
+	)
 }
 
 // The reveal-gate's edge: if a possession hands a still-HIDDEN fresh watched
@@ -443,8 +594,16 @@ lane_watched_fresh_spawn_holds_at_muzzle :: proc(t: ^testing.T) {
 @(test)
 lane_gaining_a_hidden_spawn_reveals_it :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	av_set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1}
-	fly_set := ksim.Sim_Set{entity_desc = &desc, tick = proj_fly_thunk, input_size = 0}
+	av_set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+	}
+	fly_set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = proj_fly_thunk,
+		input_size  = 0,
+	}
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
 	lbox_make(&alice, 100)
@@ -457,7 +616,11 @@ lane_gaining_a_hidden_spawn_reveals_it :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	for b in boxes {
 		ksim.lane_init(&b.lane, &b.s, 1, cfg = cfg)
 		ksim.lane_set_sim(&b.lane, b, lbox_sample, nil)
@@ -479,9 +642,13 @@ lane_gaining_a_hidden_spawn_reveals_it :: proc(t: ^testing.T) {
 
 	// Record which ids the reveal hook fires for.
 	revealed_fly := false
-	ksim.lane_set_present_ready(&alice.lane, &revealed_fly, proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
-		if id == 50 {(cast(^bool)user)^ = true}
-	})
+	ksim.lane_set_present_ready(
+		&alice.lane,
+		&revealed_fly,
+		proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
+			if id == 50 {(cast(^bool)user)^ = true}
+		},
+	)
 
 	// A host-owned flyer spawns (watched + hidden on alice). Hand it to alice
 	// BEFORE any present could uncover it — the reveal must come from the gain.
@@ -493,10 +660,17 @@ lane_gaining_a_hidden_spawn_reveals_it :: proc(t: ^testing.T) {
 		b.owners[FLY] = 1
 		ksim.lane_track_set(&b.lane, FLY, m, &fly_set, 1)
 	}
-	testing.expect(t, !revealed_fly, "the flyer revealed before it was even owned — the setup is wrong")
+	testing.expect(
+		t,
+		!revealed_fly,
+		"the flyer revealed before it was even owned — the setup is wrong",
+	)
 	ksim.lane_set_owner(&alice.lane, FLY, 2) // alice gains it, still hidden
-	testing.expect(t, revealed_fly,
-		"gaining a hidden fresh spawn didn't reveal it — a possession during its first render delay would leave it invisible")
+	testing.expect(
+		t,
+		revealed_fly,
+		"gaining a hidden fresh spawn didn't reveal it — a possession during its first render delay would leave it invisible",
+	)
 }
 
 // The active-intent window sits AFTER join startup (~5 ticks of neutral held
@@ -526,7 +700,12 @@ mc_sample1 :: proc(user: rawptr, tick: u64, dst: rawptr) {
 	(cast(^i16)dst)^ = v
 }
 
-mover16_tick_thunk :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner: knet.Player_Id) {
+mover16_tick_thunk :: proc(
+	entity: rawptr,
+	input: rawptr,
+	lane: ^ksim.Lane,
+	owner: knet.Player_Id,
+) {
 	if input == nil {
 		return
 	}
@@ -544,8 +723,18 @@ mover16_tick_thunk :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owne
 @(test)
 lane_two_input_classes_route_per_entity :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	set0 := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, input_class = 0}
-	set1 := ksim.Sim_Set{entity_desc = &desc, tick = mover16_tick_thunk, input_size = 2, input_class = 1}
+	set0 := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+		input_class = 0,
+	}
+	set1 := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover16_tick_thunk,
+		input_size  = 2,
+		input_class = 1,
+	}
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
 	lbox_make(&alice, 100)
@@ -559,7 +748,11 @@ lane_two_input_classes_route_per_entity :: proc(t: ^testing.T) {
 	lane_pump(boxes)
 	testing.expect_value(t, alice.s.me, knet.Player_Id(2))
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	for b in boxes {
 		ksim.lane_init(&b.lane, &b.s, 1, cfg = cfg) // primary class 0 (i8)
 		ksim.lane_add_input_class(&b.lane, 1, 2, mc_sample1) // class 1 (i16)
@@ -590,8 +783,14 @@ lane_two_input_classes_route_per_entity :: proc(t: ^testing.T) {
 	for id in ([?]knet.Net_Id{A, B}) {
 		ha := host.movers[id]
 		al := alice.movers[id]
-		testing.expectf(t, abs(ha.x - al.x) < 0.001,
-			"entity %d disagrees: host x=%v alice x=%v", id, ha.x, al.x)
+		testing.expectf(
+			t,
+			abs(ha.x - al.x) < 0.001,
+			"entity %d disagrees: host x=%v alice x=%v",
+			id,
+			ha.x,
+			al.x,
+		)
 	}
 
 	// The fingerprint: class 1's entity moved ONLY by its i16 intent (−5 over
@@ -599,12 +798,22 @@ lane_two_input_classes_route_per_entity :: proc(t: ^testing.T) {
 	// input could not land here — class 0's +6/tick would drive B strongly
 	// POSITIVE instead of to its own net-negative spot.
 	want_b := f32(-5) * (MC_FLIP - MC_LO + 1) + f32(4) * (MC_HI - MC_FLIP)
-	testing.expectf(t, abs(host.movers[B].x - want_b) < 0.001,
-		"class-1 entity should sit at its own i16 fingerprint %v, got %v (input crossed classes?)", want_b, host.movers[B].x)
+	testing.expectf(
+		t,
+		abs(host.movers[B].x - want_b) < 0.001,
+		"class-1 entity should sit at its own i16 fingerprint %v, got %v (input crossed classes?)",
+		want_b,
+		host.movers[B].x,
+	)
 	// Class 0's entity likewise sits at its i8 ×2 fingerprint over [40,180].
 	want_a := f32(3) * 2 * (MC_HI - MC_LO + 1)
-	testing.expectf(t, abs(host.movers[A].x - want_a) < 0.001,
-		"class-0 entity should sit at its own i8 fingerprint %v, got %v", want_a, host.movers[A].x)
+	testing.expectf(
+		t,
+		abs(host.movers[A].x - want_a) < 0.001,
+		"class-0 entity should sit at its own i8 fingerprint %v, got %v",
+		want_a,
+		host.movers[A].x,
+	)
 }
 
 // (a) lane_input_of resolves the input class by TYPE, not by struct SIZE.
@@ -636,7 +845,11 @@ lane_input_of_routes_by_type_not_size :: proc(t: ^testing.T) {
 	defer lbox_destroy(&box)
 	ksess.session_host_start(&box.s, "hosty")
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&box.lane, &box.s, size_of(Steer_In), cfg = cfg) // primary class 0
 	ksim.lane_add_input_class(&box.lane, 1, size_of(Aim_In), two_aim_sample) // class 1, SAME size
 	// The stamps that make type the resolver key. Remove these two lines and the
@@ -650,14 +863,29 @@ lane_input_of_routes_by_type_not_size :: proc(t: ^testing.T) {
 		ksim.lane_frame(&box.lane, DT)
 	}
 	// Each type resolved to ITS class's sampled value — no cross, no assert.
-	testing.expectf(t, box.two_steer == 7, "Steer_In must resolve to class 0's input (got %v, want 7)", box.two_steer)
-	testing.expectf(t, box.two_aim == 9, "Aim_In must resolve to class 1's input (got %v, want 9) — size resolution could not tell these apart", box.two_aim)
+	testing.expectf(
+		t,
+		box.two_steer == 7,
+		"Steer_In must resolve to class 0's input (got %v, want 7)",
+		box.two_steer,
+	)
+	testing.expectf(
+		t,
+		box.two_aim == 9,
+		"Aim_In must resolve to class 1's input (got %v, want 9) — size resolution could not tell these apart",
+		box.two_aim,
+	)
 }
 
 // The surge verb — the full tick-command shape in one proc: rejectable
 // (an empty purse says no), cross-lane (hp is the delta-lane purse), with
 // a predicted effect (x jumps). Check-then-mutate, the verb contract.
-mover_surge_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool {
+mover_surge_exec :: proc(
+	entity: rawptr,
+	args: []u8,
+	lane: ^ksim.Lane,
+	by: knet.Player_Id,
+) -> bool {
 	m := cast(^Mover)entity
 	if m.hp <= 0 {return false}
 	m.hp -= 1
@@ -668,7 +896,9 @@ mover_surge_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.
 @(test)
 lane_rejects_replayed_bounded_and_stale_authority_traffic :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	cmds := [?]ksim.Sim_Cmd{{id = 0, exec = mover_surge_exec}}
+	cmds := [?]ksim.Sim_Cmd {
+		{id = 0, exec = mover_surge_exec, policy = {prediction = .Optimistic, max_args_bytes = 8}},
+	}
 	set := ksim.Sim_Set {
 		entity_desc = &desc,
 		tick        = mover_tick_thunk,
@@ -747,7 +977,7 @@ lane_rejects_replayed_bounded_and_stale_authority_traffic :: proc(t: ^testing.T)
 	// receive rejection and never occupy the scheduled-command cap.
 	before_rejected := host.lane.stat_cmd_rejected
 	lane_raw_command(&alice, host.lane.tag, 0, host.lane.ticker.tick + 1, 20, 0)
-	too_big := make([]u8, ksim.CMD_ARGS_MAX + 1)
+	too_big := make([]u8, 9) // this verb's Action_Policy limit, below the framework default
 	lane_raw_command(&alice, host.lane.tag, 2, host.lane.ticker.tick + 1, 20, 0, too_big)
 	delete(too_big)
 	lane_raw_command(
@@ -809,10 +1039,165 @@ lane_rejects_replayed_bounded_and_stale_authority_traffic :: proc(t: ^testing.T)
 }
 
 @(test)
+lane_rewind_envelope_uses_authority_link_evidence :: proc(t: ^testing.T) {
+	host, alice: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	boxes := []^Lane_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	lane_pump(boxes)
+	shooter := alice.s.me
+	testing.expect_value(t, shooter, knet.Player_Id(2))
+
+	cfg := ksim.Lane_Config {
+		hz          = 60,
+		snap_every  = 2,
+		margin      = 2,
+		watch_delay = 4,
+		rewind_max  = 15,
+	}
+	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
+
+	DT :: 1.0 / 60.0
+	for _ in 1 ..= 20 {
+		ksim.lane_frame(&host.lane, DT)
+		lane_pump(boxes)
+	}
+	// Tick 10 is a real issued snapshot, but deliberately much older than a
+	// low-latency seat could plausibly have been drawing when input 21 ran.
+	lane_raw_input(&alice, host.lane.tag, 10, 21, render_off = max(u8))
+	lane_pump(boxes)
+	ksim.lane_frame(&host.lane, DT)
+	testing.expect_value(t, host.lane.step_tick, u64(21))
+
+	// A valid issued ack is safe as a delta baseline but earns NO competitive
+	// rewind until the authority has measured this peer itself.
+	testing.expect_value(t, ksim.lane_rewind_envelope(&host.lane, shooter), 0)
+	testing.expect_value(t, ksim.lane_rewind_tick(&host.lane, shooter), u64(21))
+
+	// Authority-observed 20ms RTT + 5ms jitter becomes two network ticks:
+	// ceil((20 + 2*5)ms * 60), plus margin 2, ack cadence 2, and the configured
+	// watch 4 + interpolation cadence 2 = a twelve-tick envelope. The ancient
+	// ack and forged max
+	// render offset are pinned to that derived floor, not rewind_max (15).
+	host.s.clocks[alice.peer] = knet.Clock_Sync {
+		rtt         = 0.020,
+		jitter      = 0.005,
+		initialized = true,
+	}
+	testing.expect_value(t, ksim.lane_rewind_envelope(&host.lane, shooter), 12)
+	testing.expect_value(t, ksim.lane_rewind_tick(&host.lane, shooter), u64(9))
+
+	// Even an enormous observed value cannot expand authority past the game's
+	// explicit favor-the-shooter ceiling.
+	host.s.clocks[alice.peer] = knet.Clock_Sync {
+		rtt         = 0.500,
+		jitter      = 0.100,
+		initialized = true,
+	}
+	testing.expect_value(t, ksim.lane_rewind_envelope(&host.lane, shooter), 15)
+	testing.expect_value(t, ksim.lane_rewind_tick(&host.lane, shooter), u64(6))
+	testing.expect(t, host.lane.stat_rewind_clamped >= 3)
+}
+
+@(test)
+lane_action_byte_budget_is_per_seat_and_refills :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	cmds := [?]ksim.Sim_Cmd {
+		{id = 0, exec = mover_surge_exec, policy = knet.ACTION_ANY_SEAT_PREDICTED},
+	}
+	set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+		commands    = cmds[:],
+	}
+	host, alice, bob: Lane_Box
+	lbox_make(&host, 1)
+	lbox_make(&alice, 100)
+	lbox_make(&bob, 101)
+	defer lbox_destroy(&host)
+	defer lbox_destroy(&alice)
+	defer lbox_destroy(&bob)
+	boxes := []^Lane_Box{&host, &alice, &bob}
+
+	// A no-arg SIM_CMD is 25 session bytes. Thirty bytes admits one per player
+	// immediately, then refills at 30 B/s; the packet rate is deliberately high
+	// so this test isolates the action BYTE budget.
+	ksess.session_configure(
+		&host.s,
+		{
+			traffic = {
+				actions = {packets_per_second = 10, bytes_per_second = 30, burst_seconds = 1},
+			},
+		},
+	)
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
+	ksess.session_client_join(&alice.s)
+	ksess.session_client_start(&bob.s, 0xB0B, "bob")
+	ksess.session_client_join(&bob.s)
+	lane_pump(boxes)
+
+	ksim.lane_init(&host.lane, &host.s, 1)
+	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
+	m := new(Mover)
+	m.hp = 10
+	host.movers[20] = m
+	host.owners[20] = alice.s.me
+	ksim.lane_track_set(&host.lane, 20, m, &set, alice.s.me)
+
+	at := host.lane.ticker.tick + 1
+	lane_raw_command(&alice, host.lane.tag, 1, at, 20, 0)
+	lane_raw_command(&alice, host.lane.tag, 2, at, 20, 0) // same seat: over bytes
+	lane_raw_command(&bob, host.lane.tag, 1, at, 20, 0) // other seat: independent
+	lane_pump(boxes)
+	ksim.lane_frame(&host.lane, 1.0 / 60.0)
+	testing.expect_value(t, m.x, f32(100))
+	testing.expect_value(t, m.hp, i32(8))
+	testing.expect_value(t, host.lane.stat_cmd_rate_dropped, 1)
+	testing.expect(
+		t,
+		lane_saw_execution(&host.s, .Rate, 20),
+		"shared action budget refusal is typed in authority diagnostics",
+	)
+
+	alice_stats, alice_ok := ksess.session_traffic_stats(&host.s, alice.s.me)
+	bob_stats, bob_ok := ksess.session_traffic_stats(&host.s, bob.s.me)
+	testing.expect(t, alice_ok && bob_ok)
+	testing.expect_value(t, alice_stats.actions.packets, u64(1))
+	testing.expect_value(t, alice_stats.actions.dropped, u64(1))
+	testing.expect_value(t, bob_stats.actions.packets, u64(1))
+	testing.expect_value(t, bob_stats.actions.dropped, u64(0))
+
+	// Refill the shared primitive through session time, then Alice can act again.
+	_, _ = ksess.session_tick(&host.s, 1.0, 1.0)
+	lane_raw_command(&alice, host.lane.tag, 3, host.lane.ticker.tick + 1, 20, 0)
+	lane_pump(boxes)
+	ksim.lane_frame(&host.lane, 1.0 / 60.0)
+	testing.expect_value(t, m.x, f32(150))
+	testing.expect_value(t, m.hp, i32(7))
+}
+
+@(test)
 lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	cmds := [?]ksim.Sim_Cmd{{exec = mover_surge_exec}}
-	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds[:]}
+	cmds := [?]ksim.Sim_Cmd {
+		{id = 0, exec = mover_surge_exec, policy = knet.ACTION_OWNER_PREDICTED},
+		{id = 1, exec = mover_surge_exec, policy = knet.ACTION_OWNER},
+	}
+	set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+		commands    = cmds[:],
+	}
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
 	lbox_make(&alice, 100)
@@ -825,7 +1210,11 @@ lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
@@ -876,10 +1265,24 @@ lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 	testing.expect_value(t, alice.movers[20].hp, i32(0))
 
 	// 2) HONEST REJECTION: an empty purse says no on both timelines; nothing moves.
-	testing.expect(t, ksim.lane_command(&alice.lane, 20, 0, nil), "a rejectable verb still schedules")
+	testing.expect(
+		t,
+		ksim.lane_command(&alice.lane, 20, 0, nil),
+		"a rejectable verb still schedules",
+	)
 	settle(boxes, 90)
 	testing.expect(t, near(alice.movers[20].x, 50), "an empty purse moved nothing")
 	testing.expect_value(t, host.movers[20].x, f32(50))
+	testing.expect(
+		t,
+		lane_saw_rejection(&alice.s, .Predicate, 20),
+		"scheduled predicate rejection reaches the ordinary typed callback",
+	)
+	testing.expect(
+		t,
+		lane_saw_execution(&host.s, .Predicate, 20),
+		"authority diagnostics carry the same scheduled reason",
+	)
 
 	// 3) DIVERGENT REJECTION — the revert path: alice's stale purse says yes,
 	// the authority's truth says no. Her speculation applies, the verdict
@@ -902,6 +1305,40 @@ lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 	settle(boxes, 90)
 	testing.expect_value(t, host.movers[10].x, f32(50))
 	testing.expect(t, near(alice.movers[10].x, 50), "the watched view carried the verb") // blended
+
+	// 5) Prediction is ACTION policy, not an accidental property of every sim
+	// verb. The same contested owner can schedule a non-predicted action; its
+	// local state waits untouched until the authority's snapshot arrives.
+	host.movers[20].hp = 1
+	alice.movers[20].hp = 1
+	before := alice.movers[20].x
+	testing.expect(
+		t,
+		ksim.lane_command(&alice.lane, 20, 1, nil),
+		"the non-predicted verb schedules",
+	)
+	ksim.lane_frame(&alice.lane, DT)
+	testing.expect(t, near(alice.movers[20].x, before), "policy .None does not speculate")
+	testing.expect_value(t, alice.movers[20].hp, i32(1))
+	lane_pump(boxes)
+	settle(boxes, 90)
+	testing.expect_value(t, host.movers[20].x, f32(100))
+	testing.expect(t, near(alice.movers[20].x, 100), "authority state lands normally")
+
+	// 6) A silent authority is a distinct timeout, not a predicate guess. Hold
+	// the pipe beyond the lane horizon and inspect the same callback surface.
+	host.movers[20].hp = 1
+	alice.movers[20].hp = 1
+	issue := ksim.lane_command_checked(&alice.lane, 20, 1, nil)
+	testing.expect(t, issue.scheduled && issue.reason == .None && issue.seq != 0)
+	for _ in 0 ..< alice.lane.slots + 4 {
+		ksim.lane_frame(&alice.lane, DT)
+	}
+	testing.expect(
+		t,
+		lane_saw_rejection(&alice.s, .Timeout, 20),
+		"scheduled silence surfaces as Timeout",
+	)
 }
 
 // Patch-mode, ungated: a relative nudge (chain-test filler).
@@ -915,7 +1352,12 @@ mover_dash_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.P
 // once); the apply half carries the RELATIVE predicted effect and is what
 // resims re-run. The exec calls the apply on success — the generated
 // thunks' contract, mimicked by hand here.
-mover_boost_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool {
+mover_boost_exec :: proc(
+	entity: rawptr,
+	args: []u8,
+	lane: ^ksim.Lane,
+	by: knet.Player_Id,
+) -> bool {
 	m := cast(^Mover)entity
 	if m.hp <= 0 {return false}
 	m.hp -= 1
@@ -930,17 +1372,31 @@ mover_boost_apply :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane) {
 @(test)
 lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	cmds := [?]ksim.Sim_Cmd{{id = 0, exec = mover_surge_exec}, {id = 1, exec = mover_dash_exec}}
-	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds[:]}
+	cmds := [?]ksim.Sim_Cmd {
+		{id = 0, exec = mover_surge_exec, policy = knet.ACTION_OWNER_PREDICTED},
+		{id = 1, exec = mover_dash_exec, policy = knet.ACTION_OWNER_PREDICTED},
+	}
+	set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+		commands    = cmds[:],
+	}
 	// The contested table opts its verbs in (`any_seat`) — contested widens
 	// PREDICTION to every seat, never command authority; id 2 stays closed to
 	// pin the split.
-	cmds_c := [?]ksim.Sim_Cmd{
-		{id = 0, exec = mover_surge_exec, access = .Any_Seat},
-		{id = 1, exec = mover_dash_exec, access = .Any_Seat},
-		{id = 2, exec = mover_surge_exec},
+	cmds_c := [?]ksim.Sim_Cmd {
+		{id = 0, exec = mover_surge_exec, policy = knet.ACTION_ANY_SEAT_PREDICTED},
+		{id = 1, exec = mover_dash_exec, policy = knet.ACTION_ANY_SEAT_PREDICTED},
+		{id = 2, exec = mover_surge_exec, policy = knet.ACTION_OWNER_PREDICTED},
 	}
-	set_c := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds_c[:], contested = true}
+	set_c := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+		commands    = cmds_c[:],
+		contested   = true,
+	}
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
 	lbox_make(&alice, 100)
@@ -953,7 +1409,11 @@ lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
@@ -981,17 +1441,29 @@ lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 	settle(boxes, 60)
 
 	// Not contested, not mine: the gate holds.
-	testing.expect(t, !ksim.lane_command(&alice.lane, 10, 0, nil), "a host-owned entity refuses a client's verb")
+	denied := ksim.lane_command_checked(&alice.lane, 10, 0, nil)
+	testing.expect(t, !denied.scheduled, "a host-owned entity refuses a client's verb")
+	testing.expect_value(t, denied.reason, knet.Action_Reject_Reason.Access)
 
 	// Contested but the verb never opted in: prediction scope is not command
 	// scope — predict-world marks avatars contested, and their verbs must not
 	// open to every seat for free.
-	testing.expect(t, !ksim.lane_command(&alice.lane, 30, 2, nil), "a contested entity's closed verb still refuses a non-owner")
+	denied = ksim.lane_command_checked(&alice.lane, 30, 2, nil)
+	testing.expect(
+		t,
+		!denied.scheduled,
+		"a contested entity's closed verb still refuses a non-owner",
+	)
+	testing.expect_value(t, denied.reason, knet.Action_Reject_Reason.Access)
 
 	// CONTESTED: any seat's verb speculates on its own predicted timeline.
 	host.movers[30].hp = 1
 	alice.movers[30].hp = 1
-	testing.expect(t, ksim.lane_command(&alice.lane, 30, 0, nil), "a contested entity takes any seat's verb")
+	testing.expect(
+		t,
+		ksim.lane_command(&alice.lane, 30, 0, nil),
+		"a contested entity takes any seat's verb",
+	)
 	ksim.lane_frame(&alice.lane, DT)
 	testing.expect_value(t, alice.movers[30].x, f32(50)) // before any round trip
 	testing.expect_value(t, host.movers[30].x, f32(0))
@@ -1012,15 +1484,26 @@ lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 	settle(boxes, 90)
 	testing.expect_value(t, host.movers[30].x, f32(75)) // truth: dash only
 	testing.expect_value(t, host.movers[30].hp, i32(0))
-	testing.expect(t, near(alice.movers[30].x, 75), "the rejected surge scrubbed; the dash survived")
+	testing.expect(
+		t,
+		near(alice.movers[30].x, 75),
+		"the rejected surge scrubbed; the dash survived",
+	)
 	testing.expect_value(t, alice.movers[30].hp, i32(1)) // the unwound stale purse
 }
 
 @(test)
 lane_apply_verbs_ride_resims :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	cmds := [?]ksim.Sim_Cmd{{exec = mover_boost_exec, apply = mover_boost_apply}}
-	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds[:]}
+	cmds := [?]ksim.Sim_Cmd {
+		{exec = mover_boost_exec, apply = mover_boost_apply, policy = knet.ACTION_OWNER_PREDICTED},
+	}
+	set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+		commands    = cmds[:],
+	}
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
 	lbox_make(&alice, 100)
@@ -1033,7 +1516,11 @@ lane_apply_verbs_ride_resims :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
@@ -1080,12 +1567,20 @@ lane_apply_verbs_ride_resims :: proc(t: ^testing.T) {
 		lane_pump(boxes)
 	}
 	testing.expect_value(t, host.movers[20].hp, i32(0))
-	testing.expect(t, near(alice.movers[20].x, host.movers[20].x), "the relative apply converged exactly through the blackout")
+	testing.expect(
+		t,
+		near(alice.movers[20].x, host.movers[20].x),
+		"the relative apply converged exactly through the blackout",
+	)
 	testing.expect(t, host.movers[20].x >= 50, "the boost is in the truth")
 
 	// An empty purse says no on both timelines — apply never fires.
 	before := host.movers[20].x
-	testing.expect(t, ksim.lane_command(&alice.lane, 20, 0, nil), "a rejectable boost still schedules")
+	testing.expect(
+		t,
+		ksim.lane_command(&alice.lane, 20, 0, nil),
+		"a rejectable boost still schedules",
+	)
 	for _ in 0 ..< 90 {
 		ksim.lane_frame(&host.lane, DT)
 		lane_pump(boxes)
@@ -1100,7 +1595,11 @@ lane_apply_verbs_ride_resims :: proc(t: ^testing.T) {
 @(test)
 lane_auto_tick_drives_entities :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1}
+	set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+	}
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
 	lbox_make(&alice, 100)
@@ -1113,7 +1612,11 @@ lane_auto_tick_drives_entities :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	// NO step proc: the entities drive themselves through their Sim_Set.
@@ -1176,7 +1679,11 @@ lane_two_step_slots_split_by_role :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	// Both slots wired: lbox_step everywhere, lbox_step_auth on the authority.
@@ -1216,7 +1723,11 @@ lane_two_step_slots_split_by_role :: proc(t: ^testing.T) {
 	// The client resimmed, and the everywhere pass re-ran through those resims
 	// (step_calls = live ticks + every resimmed tick > the resim count alone).
 	testing.expect(t, alice.lane.stat_resims > 0, "the blackout forced resims")
-	testing.expect(t, alice.step_calls > alice.lane.stat_resims, "the everywhere pass rode the resims")
+	testing.expect(
+		t,
+		alice.step_calls > alice.lane.stat_resims,
+		"the everywhere pass rode the resims",
+	)
 }
 
 @(test)
@@ -1227,6 +1738,13 @@ lane_rewound_judges_the_shooters_view :: proc(t: ^testing.T) {
 	defer lbox_destroy(&alice)
 	lane_pair(&host, &alice, &desc)
 	boxes := []^Lane_Box{&host, &alice}
+	// Lag compensation is intentionally cold-safe: a valid issued ack earns no
+	// rewind until the authority has its own RTT observation for this seat.
+	host.s.clocks[alice.peer] = knet.Clock_Sync {
+		rtt         = 0.100,
+		jitter      = 0.010,
+		initialized = true,
+	}
 
 	// Alice fires at the host's avatar, which moves +2/tick the whole time —
 	// so truth at any ledger tick k is exactly x = 2k, and the rewound view
@@ -1249,13 +1767,21 @@ lane_rewound_judges_the_shooters_view :: proc(t: ^testing.T) {
 	// The rewind view is alice's bound ack minus her render offset:
 	// confirmed, recent, and bounded.
 	testing.expect(t, host.rewound_to < 100, "a remote shooter's view is in the past")
-	testing.expect(t, host.rewound_to >= 100 - u64(host.lane.rewind_max), "clamped to the rewind ceiling")
+	testing.expect(
+		t,
+		host.rewound_to >= 100 - u64(host.lane.rewind_max),
+		"clamped to the rewind ceiling",
+	)
 	// The rewound world showed the ledgered truth AT the view — interpolated
 	// rewind blends toward the next tick, so allow one blended tick (the
 	// mover moves 2/tick).
 	diff := host.saw_live - host.saw_past
 	expected := f32(2 * (100 - host.rewound_to))
-	testing.expect(t, abs(diff - expected) <= 2.0, "rewound pose within one blended tick of the ledger")
+	testing.expect(
+		t,
+		abs(diff - expected) <= 2.0,
+		"rewound pose within one blended tick of the ledger",
+	)
 	// ...and the live world came back untouched.
 	testing.expect_value(t, host.saw_restored, host.saw_live)
 	// The inline begin/end pair is the identical judgment: same tick, same
@@ -1285,7 +1811,10 @@ predict_error_blob_math :: proc(t: ^testing.T) {
 	ksim.predict_error_decay(err, &desc, 1.0, 1.0) // dt == half-life → k = 0.5
 	testing.expect_value(t, (^f32)(rawptr(&err[0]))^, 5)
 
-	m := Mover{x = 5, vx = 1}
+	m := Mover {
+		x  = 5,
+		vx = 1,
+	}
 	ksim.predict_error_apply(&m, &desc, err)
 	testing.expect_value(t, m.x, 10) // truth + decayed error
 	testing.expect_value(t, m.vx, 1)
@@ -1306,7 +1835,7 @@ QBox :: struct {
 }
 
 quat_desc :: proc() -> knet.Entity_Desc {
-	@(static) fields := [?]knet.Field_Desc{
+	@(static) fields := [?]knet.Field_Desc {
 		{offset = offset_of(QBox, rot), size = 16, flags = {.Predicted, .Interp}, lerp = .Quat},
 	}
 	return knet.Entity_Desc{fields = fields[:]}
@@ -1320,47 +1849,78 @@ predicted_quat_glides_its_correction :: proc(t: ^testing.T) {
 	// truth = identity, shown = 90° about Z. err must be that 90° rotation.
 	truth := []u8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	shown := []u8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-	err := make([]u8, 16);defer delete(err)
+	err := make([]u8, 16); defer delete(err)
 	(^f32)(rawptr(&truth[12]))^ = 1 // identity w
 	(^f32)(rawptr(&shown[8]))^ = S // z
 	(^f32)(rawptr(&shown[12]))^ = S // w
 
 	// The error is the full 90° turn from truth to shown.
 	ksim.predict_error(err, shown, truth, &desc, 0)
-	testing.expectf(t, abs(knet.quat_angle(([^]f32)(&err[0])) - HALF_PI) < 0.01,
-		"quat error should be the 90° turn, got %v rad", knet.quat_angle(([^]f32)(&err[0])))
+	testing.expectf(
+		t,
+		abs(knet.quat_angle(([^]f32)(&err[0])) - HALF_PI) < 0.01,
+		"quat error should be the 90° turn, got %v rad",
+		knet.quat_angle(([^]f32)(&err[0])),
+	)
 
 	// Applied with NO decay onto the truth pose: the drawn orientation is the OLD
 	// shown pose, not truth — a glide starts where the eye already was (no jump).
 	// This is the line that would fail if .Quat snapped.
-	q := QBox{rot = {0, 0, 0, 1}} // truth restored, as the presenter does each frame
+	q := QBox {
+		rot = {0, 0, 0, 1},
+	} // truth restored, as the presenter does each frame
 	ksim.predict_error_apply(&q, &desc, err)
-	testing.expectf(t, abs(knet.quat_angle(([^]f32)(&q.rot[0])) - HALF_PI) < 0.01,
-		"first present must draw the OLD pose (90° off truth), not snap to truth — got %v rad", knet.quat_angle(([^]f32)(&q.rot[0])))
+	testing.expectf(
+		t,
+		abs(knet.quat_angle(([^]f32)(&q.rot[0])) - HALF_PI) < 0.01,
+		"first present must draw the OLD pose (90° off truth), not snap to truth — got %v rad",
+		knet.quat_angle(([^]f32)(&q.rot[0])),
+	)
 
 	// One half-life of decay eases the error strictly toward truth (0 < a < 90°).
 	ksim.predict_error_decay(err, &desc, 1.0, 1.0) // dt == half-life
 	a1 := knet.quat_angle(([^]f32)(&err[0]))
-	testing.expectf(t, a1 > 0.05 && a1 < HALF_PI - 0.05,
-		"one half-life should ease the rotation error partway (0<a<90°), got %v rad", a1)
-	q = QBox{rot = {0, 0, 0, 1}}
+	testing.expectf(
+		t,
+		a1 > 0.05 && a1 < HALF_PI - 0.05,
+		"one half-life should ease the rotation error partway (0<a<90°), got %v rad",
+		a1,
+	)
+	q = QBox {
+		rot = {0, 0, 0, 1},
+	}
 	ksim.predict_error_apply(&q, &desc, err)
-	testing.expectf(t, abs(knet.quat_angle(([^]f32)(&q.rot[0])) - a1) < 0.01,
-		"the drawn pose eases with the error, got %v want %v", knet.quat_angle(([^]f32)(&q.rot[0])), a1)
+	testing.expectf(
+		t,
+		abs(knet.quat_angle(([^]f32)(&q.rot[0])) - a1) < 0.01,
+		"the drawn pose eases with the error, got %v want %v",
+		knet.quat_angle(([^]f32)(&q.rot[0])),
+		a1,
+	)
 
 	// Several more half-lives: the error all but vanishes — the pose has glided
 	// home to truth.
 	for _ in 0 ..< 6 {ksim.predict_error_decay(err, &desc, 1.0, 1.0)}
-	testing.expectf(t, knet.quat_angle(([^]f32)(&err[0])) < 0.05,
-		"the rotation error should decay to ~0 (glided home), got %v rad", knet.quat_angle(([^]f32)(&err[0])))
+	testing.expectf(
+		t,
+		knet.quat_angle(([^]f32)(&err[0])) < 0.05,
+		"the rotation error should decay to ~0 (glided home), got %v rad",
+		knet.quat_angle(([^]f32)(&err[0])),
+	)
 
 	// The SNAP path: a cut below the turn zeroes the error — the pose stays at
 	// truth (a snapped quat error reads as identity, not garbage).
 	ksim.predict_error(err, shown, truth, &desc, 0.7854) // cut 45° < the 90° turn
-	q = QBox{rot = {0, 0, 0, 1}}
+	q = QBox {
+		rot = {0, 0, 0, 1},
+	}
 	ksim.predict_error_apply(&q, &desc, err)
-	testing.expectf(t, knet.quat_angle(([^]f32)(&q.rot[0])) < 0.001,
-		"past the cut the pose snaps to truth (error zeroed → identity), got %v rad", knet.quat_angle(([^]f32)(&q.rot[0])))
+	testing.expectf(
+		t,
+		knet.quat_angle(([^]f32)(&q.rot[0])) < 0.001,
+		"past the cut the pose snaps to truth (error zeroed → identity), got %v rad",
+		knet.quat_angle(([^]f32)(&q.rot[0])),
+	)
 }
 
 // Per-field glide + cut: with the lane default in play, one field decays at its
@@ -1370,11 +1930,25 @@ predicted_quat_glides_its_correction :: proc(t: ^testing.T) {
 @(test)
 predict_error_per_field_glide_and_cut :: proc(t: ^testing.T) {
 	// Two interp float fields (x fast-gliding + a low cut, vx on the lane default).
-	@(static) fields := [?]knet.Field_Desc{
-		{offset = offset_of(Mover, x), size = size_of(f32), flags = {.Predicted, .Interp}, lerp = .F32, glide = 0.5, cut = 5},
-		{offset = offset_of(Mover, vx), size = size_of(f32), flags = {.Predicted, .Interp}, lerp = .F32},
+	@(static) fields := [?]knet.Field_Desc {
+		{
+			offset = offset_of(Mover, x),
+			size = size_of(f32),
+			flags = {.Predicted, .Interp},
+			lerp = .F32,
+			glide = 0.5,
+			cut = 5,
+		},
+		{
+			offset = offset_of(Mover, vx),
+			size = size_of(f32),
+			flags = {.Predicted, .Interp},
+			lerp = .F32,
+		},
 	}
-	desc := knet.Entity_Desc{fields = fields[:]}
+	desc := knet.Entity_Desc {
+		fields = fields[:],
+	}
 	shown := []u8{0, 0, 0, 0, 0, 0, 0, 0}
 	truth := []u8{0, 0, 0, 0, 0, 0, 0, 0}
 	err := []u8{0, 0, 0, 0, 0, 0, 0, 0}
@@ -1404,7 +1978,11 @@ predict_error_per_field_glide_and_cut :: proc(t: ^testing.T) {
 @(test)
 lane_smoothing_glides_reconcile_corrections :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1}
+	set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+	}
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
 	lbox_make(&alice, 100)
@@ -1415,7 +1993,11 @@ lane_smoothing_glides_reconcile_corrections :: proc(t: ^testing.T) {
 	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
@@ -1473,13 +2055,21 @@ lane_smoothing_glides_reconcile_corrections :: proc(t: ^testing.T) {
 	testing.expect(t, max_draw_d < max_sim_d, "the eye saw a smaller jump than the sim took")
 	testing.expect(t, max_draw_d < 10, "drawn motion stays bounded through corrections")
 	// Quiet tail: the error has decayed away — drawn equals sim again.
-	testing.expect(t, abs(alice.movers[20].x - host.movers[20].x) < 0.01, "presentation converged to truth")
+	testing.expect(
+		t,
+		abs(alice.movers[20].x - host.movers[20].x) < 0.01,
+		"presentation converged to truth",
+	)
 }
 
 @(test)
 lane_possession_switches_the_driver :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1}
+	set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+	}
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
 	lbox_make(&alice, 100)
@@ -1490,7 +2080,11 @@ lane_possession_switches_the_driver :: proc(t: ^testing.T) {
 	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
@@ -1515,7 +2109,11 @@ lane_possession_switches_the_driver :: proc(t: ^testing.T) {
 		alice.ax = i <= 120 ? 1 : (i <= 180 ? -2 : 0)
 		if i == 100 {
 			testing.expect(t, ksim.lane_set_owner(&host.lane, 10, 2), "host applies the transfer")
-			testing.expect(t, ksim.lane_set_owner(&alice.lane, 10, 2), "client applies the transfer")
+			testing.expect(
+				t,
+				ksim.lane_set_owner(&alice.lane, 10, 2),
+				"client applies the transfer",
+			)
 			for b in boxes {
 				b.owners[10] = 2
 			}
@@ -1557,7 +2155,12 @@ glide_thunk :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner: knet
 @(test)
 lane_contested_presents_on_the_claim :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	set_c := ksim.Sim_Set{entity_desc = &desc, tick = glide_thunk, input_size = 0, contested = true}
+	set_c := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = glide_thunk,
+		input_size  = 0,
+		contested   = true,
+	}
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
 	lbox_make(&alice, 100)
@@ -1568,7 +2171,11 @@ lane_contested_presents_on_the_claim :: proc(t: ^testing.T) {
 	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
@@ -1603,10 +2210,18 @@ lane_contested_presents_on_the_claim :: proc(t: ^testing.T) {
 	}
 
 	// Unclaimed: the watched view, a real render delay behind the live world.
-	testing.expect(t, gap_unclaimed >= 6, "unclaimed contested pose rides the delayed watched view")
+	testing.expect(
+		t,
+		gap_unclaimed >= 6,
+		"unclaimed contested pose rides the delayed watched view",
+	)
 	// Claimed: the predicted timeline — decisively fresher, and allowed to
 	// front-run the server's live pose (the client runs AHEAD by its lead).
-	testing.expect(t, gap_claimed <= gap_unclaimed - 4, "a claim pulls presentation onto the predicted timeline")
+	testing.expect(
+		t,
+		gap_claimed <= gap_unclaimed - 4,
+		"a claim pulls presentation onto the predicted timeline",
+	)
 	testing.expect(t, gap_claimed >= -30, "bounded by the lead, not runaway")
 }
 
@@ -1617,7 +2232,12 @@ lane_contested_presents_on_the_claim :: proc(t: ^testing.T) {
 @(test)
 lane_echo_extrapolates_remote_avatars :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	set_c := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, contested = true}
+	set_c := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+		contested   = true,
+	}
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
 	lbox_make(&alice, 100)
@@ -1628,7 +2248,12 @@ lane_echo_extrapolates_remote_avatars :: proc(t: ^testing.T) {
 	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2, echo_inputs = true}
+	cfg := ksim.Lane_Config {
+		hz          = 60,
+		snap_every  = 2,
+		margin      = 2,
+		echo_inputs = true,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
@@ -1663,7 +2288,11 @@ lane_echo_extrapolates_remote_avatars :: proc(t: ^testing.T) {
 
 	// Extrapolation, not batch-stepping: the remote avatar advances nearly
 	// every frame on alice's screen...
-	testing.expect(t, moved_frames > 55, "held-input extrapolation moves the remote avatar per-frame")
+	testing.expect(
+		t,
+		moved_frames > 55,
+		"held-input extrapolation moves the remote avatar per-frame",
+	)
 	// ...on the PREDICTED timeline: at or ahead of the server's live pose,
 	// never trailing a watched view.
 	testing.expect(t, gap <= 4, "echo-mode presentation front-runs or matches the live world")
@@ -1695,7 +2324,7 @@ lane_present_smooths_watched_motion :: proc(t: ^testing.T) {
 		lane_pump(boxes)
 		ksim.lane_present(&alice.lane, DT)
 
-		if i > 60 { // judge only the settled window
+		if i > 60 { 	// judge only the settled window
 			x := alice.movers[10].x
 			d := x - prev_x
 			testing.expect(t, d >= 0, "watched motion never runs backwards")
@@ -1719,7 +2348,11 @@ lane_present_smooths_watched_motion :: proc(t: ^testing.T) {
 	testing.expect_value(t, jumps, 0)
 	// Rendered a bounded few ticks in the past: the price of the bracket.
 	testing.expect(t, max_deficit > 0, "watched view trails the live world")
-	testing.expect(t, max_deficit < 2 * f32(host.lane.watch_delay + 8), "but only by the watch delay plus transit slack")
+	testing.expect(
+		t,
+		max_deficit < 2 * f32(host.lane.watch_delay + 8),
+		"but only by the watch delay plus transit slack",
+	)
 }
 
 // ---- predicted spawns: a fired projectile ---------------------------------------
@@ -1743,10 +2376,15 @@ proj_fly_thunk :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner: k
 // the host (a real id, lane_track_set), predicted on the client (a provisional
 // id, lane_spawn_predicted). A real game hides this role branch behind a boot
 // helper; the test spells it out. The projectile's Sim_Set rides the Lane_Box.
-shooter_fire_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool {
+shooter_fire_exec :: proc(
+	entity: rawptr,
+	args: []u8,
+	lane: ^ksim.Lane,
+	by: knet.Player_Id,
+) -> bool {
 	b := cast(^Lane_Box)ksim.lane_game(lane)
 	shooter := cast(^Mover)entity
-	if shooter.hp <= 0 {return false} // out of ammo — the authority may refuse a stale-purse fire
+	if shooter.hp <= 0 {return false} 	// out of ammo — the authority may refuse a stale-purse fire
 	shooter.hp -= 1
 	p := new(Mover)
 	p.x = shooter.x
@@ -1770,9 +2408,18 @@ shooter_fire_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet
 @(test)
 lane_predicted_projectile :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	proj_set := ksim.Sim_Set{entity_desc = &desc, tick = proj_fly_thunk, input_size = 0}
-	fire := [?]ksim.Sim_Cmd{{exec = shooter_fire_exec}}
-	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = fire[:]}
+	proj_set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = proj_fly_thunk,
+		input_size  = 0,
+	}
+	fire := [?]ksim.Sim_Cmd{{exec = shooter_fire_exec, policy = knet.ACTION_OWNER_PREDICTED}}
+	set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+		commands    = fire[:],
+	}
 
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
@@ -1788,7 +2435,11 @@ lane_predicted_projectile :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
@@ -1823,7 +2474,11 @@ lane_predicted_projectile :: proc(t: ^testing.T) {
 	ksim.lane_frame(&alice.lane, DT) // executes at her next tick
 	born := alice.lane.ticker.tick
 	testing.expect(t, alice.cli_proj != nil, "alice's projectile exists the instant she fires")
-	testing.expect(t, ksim.lane_id_provisional(knet.Net_Id(0x8000_0001)), "provisional ids are high-bit tagged")
+	testing.expect(
+		t,
+		ksim.lane_id_provisional(knet.Net_Id(0x8000_0001)),
+		"provisional ids are high-bit tagged",
+	)
 	testing.expect(t, host.host_proj == nil, "the authority hasn't seen the fire yet")
 	spawn_x := alice.cli_proj.x
 	lane_pump(boxes) // the reliable fire reaches the host
@@ -1847,22 +2502,39 @@ lane_predicted_projectile :: proc(t: ^testing.T) {
 	// MATCH — the authority's spawn arrives (a real game fires this on Ev_Spawned).
 	entity, _, matched := ksim.lane_spawn_match(&alice.lane, host.host_proj_id, 2, PROJ_TYPE)
 	testing.expect(t, matched, "the authority's spawn matched alice's prediction")
-	testing.expect(t, entity == rawptr(alice.cli_proj), "and it rekeyed the very projectile she predicted")
+	testing.expect(
+		t,
+		entity == rawptr(alice.cli_proj),
+		"and it rekeyed the very projectile she predicted",
+	)
 
 	// After the match the projectile reconciles against the authority, and both
 	// land at the wall — a clean quiescent convergence.
 	settle(boxes, 160)
 	near :: proc(a, b: f32) -> bool {return abs(a - b) < 0.01}
 	testing.expect_value(t, host.host_proj.x, PROJ_LAND)
-	testing.expect(t, near(alice.cli_proj.x, PROJ_LAND), "alice's projectile converged on the authority's")
+	testing.expect(
+		t,
+		near(alice.cli_proj.x, PROJ_LAND),
+		"alice's projectile converged on the authority's",
+	)
 }
 
 @(test)
 lane_predicted_projectile_rejected :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	proj_set := ksim.Sim_Set{entity_desc = &desc, tick = proj_fly_thunk, input_size = 0}
-	fire := [?]ksim.Sim_Cmd{{exec = shooter_fire_exec}}
-	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = fire[:]}
+	proj_set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = proj_fly_thunk,
+		input_size  = 0,
+	}
+	fire := [?]ksim.Sim_Cmd{{exec = shooter_fire_exec, policy = knet.ACTION_OWNER_PREDICTED}}
+	set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+		commands    = fire[:],
+	}
 
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
@@ -1878,7 +2550,11 @@ lane_predicted_projectile_rejected :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
@@ -1909,15 +2585,27 @@ lane_predicted_projectile_rejected :: proc(t: ^testing.T) {
 	// the magazine is empty (delta-lane state, seeded by hand here).
 	alice.movers[SHOOTER].hp = 1
 	host.movers[SHOOTER].hp = 0
-	testing.expect(t, ksim.lane_command(&alice.lane, SHOOTER, 0, nil), "the fire schedules on stale ammo")
+	testing.expect(
+		t,
+		ksim.lane_command(&alice.lane, SHOOTER, 0, nil),
+		"the fire schedules on stale ammo",
+	)
 	ksim.lane_frame(&alice.lane, DT) // client speculates the spawn
 	testing.expect(t, alice.cli_proj != nil, "the shot leaves alice's screen optimistically")
-	testing.expect(t, ksim.lane_tracks(&alice.lane, alice.cli_proj_id), "and it's tracked, flying, provisional")
+	testing.expect(
+		t,
+		ksim.lane_tracks(&alice.lane, alice.cli_proj_id),
+		"and it's tracked, flying, provisional",
+	)
 
 	// The authority refuses (empty magazine); the verdict despawns the projectile.
 	lane_pump(boxes)
 	settle(boxes, 90)
-	testing.expect(t, !ksim.lane_tracks(&alice.lane, alice.cli_proj_id), "the refused fire culled its projectile")
+	testing.expect(
+		t,
+		!ksim.lane_tracks(&alice.lane, alice.cli_proj_id),
+		"the refused fire culled its projectile",
+	)
 	testing.expect(t, host.host_proj == nil, "and the authority never spawned one")
 }
 
@@ -1975,9 +2663,21 @@ chain_fire_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.P
 @(test)
 lane_reject_chain_keeps_one_projectile :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	proj_set := ksim.Sim_Set{entity_desc = &desc, tick = proj_fly_thunk, input_size = 0}
-	cmds := [?]ksim.Sim_Cmd{{id = 1, exec = chain_gate_exec}, {id = 2, exec = chain_fire_exec}}
-	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1, commands = cmds[:]}
+	proj_set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = proj_fly_thunk,
+		input_size  = 0,
+	}
+	cmds := [?]ksim.Sim_Cmd {
+		{id = 1, exec = chain_gate_exec, policy = knet.ACTION_OWNER_PREDICTED},
+		{id = 2, exec = chain_fire_exec, policy = knet.ACTION_OWNER_PREDICTED},
+	}
+	set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+		commands    = cmds[:],
+	}
 
 	host, alice: Lane_Box
 	lbox_make(&host, 1)
@@ -1993,7 +2693,11 @@ lane_reject_chain_keeps_one_projectile :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	lane_pump(boxes)
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
@@ -2025,7 +2729,11 @@ lane_reject_chain_keeps_one_projectile :: proc(t: ^testing.T) {
 	alice.movers[SHOOTER].hp = 1
 	host.movers[SHOOTER].hp = 0
 	testing.expect(t, ksim.lane_command(&alice.lane, SHOOTER, 1, nil), "the gate schedules")
-	testing.expect(t, ksim.lane_command(&alice.lane, SHOOTER, 2, nil), "the fire schedules behind it")
+	testing.expect(
+		t,
+		ksim.lane_command(&alice.lane, SHOOTER, 2, nil),
+		"the fire schedules behind it",
+	)
 	ksim.lane_frame(&alice.lane, DT) // both speculate; the fire spawns ONE provisional
 	testing.expect(t, alice.cli_proj != nil, "the shot left her screen this tick")
 	first_id := alice.cli_proj_id
@@ -2044,7 +2752,11 @@ lane_reject_chain_keeps_one_projectile :: proc(t: ^testing.T) {
 	// The reject lands; cmd_settle unwinds the gate and RE-EXECUTES the fire.
 	settle(boxes, 90)
 	testing.expect_value(t, prov_count(&alice.lane), 1) // reused, never a ghost
-	testing.expect(t, ksim.lane_tracks(&alice.lane, first_id), "the original projectile still flies")
+	testing.expect(
+		t,
+		ksim.lane_tracks(&alice.lane, first_id),
+		"the original projectile still flies",
+	)
 	testing.expect_value(t, alice.cli_proj_id, first_id) // the re-exec handed back the same spawn
 	// Truth healed the purse: the refused gate never spent on the authority.
 	testing.expect_value(t, host.movers[SHOOTER].hp, i32(0))
@@ -2124,8 +2836,17 @@ lane_facts_reach_every_screen_on_time :: proc(t: ^testing.T) {
 	testing.expect_value(t, alice.s.me, knet.Player_Id(2))
 	testing.expect_value(t, bob.s.me, knet.Player_Id(3))
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
-	fact_set := ksim.Sim_Set{entity_desc = &desc, tick = fact_tick_thunk, input_size = 1, fx = box_fact_fx}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
+	fact_set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = fact_tick_thunk,
+		input_size  = 1,
+		fx          = box_fact_fx,
+	}
 	pairs := [?]struct {
 		id:    knet.Net_Id,
 		owner: knet.Player_Id,
@@ -2170,7 +2891,11 @@ lane_facts_reach_every_screen_on_time :: proc(t: ^testing.T) {
 	testing.expect(t, !bob.fx_mine, "a watcher's fact is never mine")
 	testing.expect(t, bob.fx_clock >= f64(FACT_AT), "fires once the watch clock reaches the fact")
 	testing.expect(t, bob.fx_clock <= f64(FACT_AT) + 3, "and not meaningfully later")
-	testing.expect(t, f64(bob.fx_newest) > bob.fx_clock, "the fire happened behind the newest batch — delayed, not on arrival")
+	testing.expect(
+		t,
+		f64(bob.fx_newest) > bob.fx_clock,
+		"the fire happened behind the newest batch — delayed, not on arrival",
+	)
 
 	// The payload crossed intact: every screen decoded the authoritative x.
 	testing.expect_value(t, host.fx_x, alice.fx_x) // prediction matched truth (no loss)
@@ -2218,13 +2943,38 @@ df_record :: proc(slot: int, entity: rawptr, lane: ^ksim.Lane, mine: bool) {
 	b.df_nil[slot] = entity == nil
 }
 
-df_fx_bump :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(0, entity, lane, mine)}
-df_fx_adju :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(1, entity, lane, mine)}
-df_fx_horn :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(2, entity, lane, mine)}
-df_fx_late :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(3, entity, lane, mine)}
-df_fx_dead :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(4, entity, lane, mine)}
+df_fx_bump :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(
+		0,
+		entity,
+		lane,
+		mine,
+	)}
+df_fx_adju :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(
+		1,
+		entity,
+		lane,
+		mine,
+	)}
+df_fx_horn :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(
+		2,
+		entity,
+		lane,
+		mine,
+	)}
+df_fx_late :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(
+		3,
+		entity,
+		lane,
+		mine,
+	)}
+df_fx_dead :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(
+		4,
+		entity,
+		lane,
+		mine,
+	)}
 
-df_table := [?]ksim.Fact_Desc{
+df_table := [?]ksim.Fact_Desc {
 	{id = DF_BUMP, fx = df_fx_bump},
 	{id = DF_ADJU, fx = df_fx_adju},
 	{id = DF_HORN, fx = df_fx_horn},
@@ -2319,8 +3069,16 @@ lane_declared_facts_world_pass :: proc(t: ^testing.T) {
 	testing.expect_value(t, alice.s.me, knet.Player_Id(2))
 	testing.expect_value(t, bob.s.me, knet.Player_Id(3))
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = 2}
-	set := ksim.Sim_Set{entity_desc = &desc, tick = mover_tick_thunk, input_size = 1}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = 2,
+	}
+	set := ksim.Sim_Set {
+		entity_desc = &desc,
+		tick        = mover_tick_thunk,
+		input_size  = 1,
+	}
 	pairs := [?]struct {
 		id:    knet.Net_Id,
 		owner: knet.Player_Id,
@@ -2364,7 +3122,11 @@ lane_declared_facts_world_pass :: proc(t: ^testing.T) {
 	testing.expect(t, !host.df_mine[0], "the authority presents a remote bump")
 	testing.expect_value(t, bob.df_calls[0], 1)
 	testing.expect(t, !bob.df_mine[0], "a watcher's bump is never mine")
-	testing.expect(t, bob.df_clock[0] >= f64(DF_BUMP_AT), "bob fires once the watch clock reaches the bump")
+	testing.expect(
+		t,
+		bob.df_clock[0] >= f64(DF_BUMP_AT),
+		"bob fires once the watch clock reaches the bump",
+	)
 	testing.expect(t, bob.df_clock[0] <= f64(DF_BUMP_AT) + 3, "and not meaningfully later")
 
 	// (2) PROVENANCE: the adjudication fact was minted in the authority pass —
@@ -2372,7 +3134,11 @@ lane_declared_facts_world_pass :: proc(t: ^testing.T) {
 	// is the wire copy, at her watch clock, mine=false. (The tick-fact skip
 	// here would have orphaned it on exactly the screen it is most about.)
 	testing.expect_value(t, host.df_calls[1], 1)
-	testing.expect(t, !host.df_mine[1], "the authority's adjudication is not mine (alice's avatar)")
+	testing.expect(
+		t,
+		!host.df_mine[1],
+		"the authority's adjudication is not mine (alice's avatar)",
+	)
 	testing.expect_value(t, alice.df_calls[1], 1)
 	testing.expect(t, !alice.df_mine[1], "alice presents the authority's word, not a prediction")
 	testing.expect(t, alice.df_clock[1] >= f64(DF_ADJU_AT), "on her watch clock")
@@ -2456,7 +3222,10 @@ wire_step :: proc(w: ^Lane_Wire, boxes: []^Lane_Box) {
 		for len(b.out) > 0 {
 			p := b.out[0]
 			ordered_remove(&b.out, 0)
-			append(&w.flight, Wire_Parcel{from = b.peer, to = p.to, data = p.data, due = w.frame + w.hold})
+			append(
+				&w.flight,
+				Wire_Parcel{from = b.peer, to = p.to, data = p.data, due = w.frame + w.hold},
+			)
 		}
 	}
 	for i := 0; i < len(w.flight); {
@@ -2491,8 +3260,8 @@ wire_step :: proc(w: ^Lane_Wire, boxes: []^Lane_Box) {
 // harness measures 34 ticks still standing at frame 480 and 24 at frame 900,
 // i.e. half a minute parked over target. (It also catches a rung that is merely
 // too GENTLE: at the 8% first tried it reads 16 here, still bleeding.) That is
-// not just latency — every lane_rewound query clamps to rewind_max while it
-// lasts, so the authority
+// not just latency — every lane_rewound query clamps to the authority's
+// effective envelope while it lasts, so the authority
 // judges hitscan against a world half a second stale and lands nothing,
 // silently, with no error anywhere.
 //
@@ -2524,12 +3293,16 @@ lane_deep_surplus_sheds_cold_start :: proc(t: ^testing.T) {
 	ksess.session_host_start(&host.s, "hosty")
 	ksess.session_client_start(&alice.s, 0xA11CE, "alice")
 	ksess.session_client_join(&alice.s)
-	for _ in 0 ..< 40 { // the join handshake, at 7 frames a hop
+	for _ in 0 ..< 40 { 	// the join handshake, at 7 frames a hop
 		wire_step(&w, boxes)
 	}
 	testing.expect_value(t, alice.s.me, knet.Player_Id(2))
 
-	cfg := ksim.Lane_Config{hz = 60, snap_every = 2, margin = MARGIN}
+	cfg := ksim.Lane_Config {
+		hz         = 60,
+		snap_every = 2,
+		margin     = MARGIN,
+	}
 	ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
 	ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
 	ksim.lane_set_sim(&host.lane, &host, lbox_sample, lbox_step)
@@ -2569,21 +3342,40 @@ lane_deep_surplus_sheds_cold_start :: proc(t: ^testing.T) {
 
 	// (1) The harness genuinely built the hole. Without this the rest is
 	// vacuous — exactly the failure mode of the to-quiet pump.
-	testing.expectf(t, peak >= 2 * TARGET,
-		"the delayed wire must reproduce the cold-start overshoot — peak lead %d against target %d", peak, TARGET)
+	testing.expectf(
+		t,
+		peak >= 2 * TARGET,
+		"the delayed wire must reproduce the cold-start overshoot — peak lead %d against target %d",
+		peak,
+		TARGET,
+	)
 
 	// (2) And the client CAME DOWN out of it, to target, and stayed. The
 	// broken controller is still 33 ticks up at this frame, so a bound anywhere
 	// near TARGET discriminates by a mile; these are the measured settled
 	// values (a flat 10) with a tick of slack either side.
-	testing.expectf(t, settled_hi <= TARGET + 3,
-		"the deep surplus must be shed, not bled: settled lead %d (peak %d) against target %d", settled_hi, peak, TARGET)
-	testing.expectf(t, settled_lo >= TARGET - 2,
-		"and not overshot the other way: settled lead %d against target %d", settled_lo, TARGET)
+	testing.expectf(
+		t,
+		settled_hi <= TARGET + 3,
+		"the deep surplus must be shed, not bled: settled lead %d (peak %d) against target %d",
+		settled_hi,
+		peak,
+		TARGET,
+	)
+	testing.expectf(
+		t,
+		settled_lo >= TARGET - 2,
+		"and not overshot the other way: settled lead %d against target %d",
+		settled_lo,
+		TARGET,
+	)
 
 	// (3) The deep rung HANDS BACK. Once inside LEAD_DEEP_TICKS the fine bend
 	// owns the clock again — a rung that stayed engaged would leave the scale
 	// parked at 0.75 and the whole session in slow motion.
-	testing.expect(t, abs(alice.lane.ticker.scale - 1.0) <= ksim.SCALE_NUDGE_MAX + 1e-12,
-		"a settled client is back on the fine bend, not stuck in the deep rung")
+	testing.expect(
+		t,
+		abs(alice.lane.ticker.scale - 1.0) <= ksim.SCALE_NUDGE_MAX + 1e-12,
+		"a settled client is back on the fine bend, not stuck in the deep rung",
+	)
 }

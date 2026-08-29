@@ -13,13 +13,14 @@ import gd "godot:godot"
 
 Turret :: struct {
 	owner:      gd.Node2d,
-	aimx, aimy: f32 `gd:"predict,interp"`,
+	aimx, aimy: f32 `gd:"predict,interp"`
 }
 
 // Distinct from Pawn_Input (a different width, a different intent) — the whole
 // point of a second class is that the two inputs never share a window.
+@(gd_input)
 Turret_Input :: struct {
-	aim: [2]i16,
+	aim: [2]i16 `gd:"range=-1000:1000"`
 }
 
 @(gd_tick)

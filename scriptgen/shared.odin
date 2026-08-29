@@ -160,7 +160,7 @@ verify_shared_pkg :: proc(dir: string, from: Loc, queue: ^[dynamic]string) {
 		error_at(
 			from,
 			"shared import resolves to %q, which holds no authored .odin sources — a shared package is an ordinary Odin package under the project's shared/ tree",
-			dir,
+			dir
 		)
 	}
 }
@@ -184,7 +184,7 @@ verify_shared_file :: proc(path, src: string, queue: ^[dynamic]string) {
 			error_at(
 				Loc{path, line},
 				"the shared package file %s carries the script marker %q — an attachable script class belongs to a MODULE (res://scripts or res://modules/<name>), never to res://shared/, which is engine-agnostic vocabulary every module links",
-				rel, t,
+				rel, t
 			)
 			shared_why()
 			break // one per file is enough to make the point
@@ -203,7 +203,7 @@ verify_shared_file :: proc(path, src: string, queue: ^[dynamic]string) {
 			error_at(
 				Loc{path, line},
 				"the shared package file %s declares an @(static) local — that is package STATE with a proc-local spelling, and every module that links this package gets its own copy",
-				rel,
+				rel
 			)
 			shared_why()
 			break
@@ -212,7 +212,7 @@ verify_shared_file :: proc(path, src: string, queue: ^[dynamic]string) {
 
 	file := ast.File {
 		fullpath = path,
-		src      = src,
+		src      = src
 	}
 	p := parser.default_parser()
 	p.err = silent_shared_diag
@@ -231,7 +231,7 @@ verify_shared_file :: proc(path, src: string, queue: ^[dynamic]string) {
 			error_at(
 				loc,
 				"the shared package file %s imports the absolute path %q — a shared package may import collections (godot:/core:/base:/vendor:) and other packages under the shared tree (%s) only",
-				rel, ipath, g_shared_root,
+				rel, ipath, g_shared_root
 			)
 			shared_why()
 			continue
@@ -245,7 +245,7 @@ verify_shared_file :: proc(path, src: string, queue: ^[dynamic]string) {
 		error_at(
 			loc,
 			"the shared package file %s imports %q, which resolves to %q OUTSIDE the shared tree (%s) — if that is a script module, this is the forked-globals hazard verbatim: the module's package would be linked into every dll that imports this shared package, duplicating its globals. A shared package may import collections (godot:/core:/base:/vendor:) and other shared packages only",
-			rel, ipath, resolved, g_shared_root,
+			rel, ipath, resolved, g_shared_root
 		)
 		shared_why()
 	}
@@ -266,7 +266,7 @@ verify_shared_file :: proc(path, src: string, queue: ^[dynamic]string) {
 			error_at(
 				Loc{path, line},
 				"the shared package file %s declares the file-scope variable %q — every module that links this package gets its OWN copy of it, so writes from one module never reach the other and the state silently forks. Constants (%s :: …), types and pure procs are fine here",
-				rel, name, name,
+				rel, name, name
 			)
 			shared_why()
 			continue
@@ -276,7 +276,7 @@ verify_shared_file :: proc(path, src: string, queue: ^[dynamic]string) {
 			error_at(
 				Loc{path, line},
 				"the shared package file %s declares the @(%s) proc %q — it would run ONCE PER DLL (every module that links this package runs it again, over that dll's own copy of the package). Initialization belongs to the module that owns the state",
-				rel, a, name,
+				rel, a, name
 			)
 			shared_why()
 		}
@@ -285,7 +285,7 @@ verify_shared_file :: proc(path, src: string, queue: ^[dynamic]string) {
 			error_at(
 				Loc{path, line},
 				"the shared package file %s declares the @(%s) proc %q — the @(gd_*) surface is a script module's contract with the engine (and, for the kit attributes, with the wire); res://shared/ is engine-agnostic vocabulary every module links. Move the proc into the module, keeping the types and constants it needs here",
-				rel, a, name,
+				rel, a, name
 			)
 			shared_why()
 			break
@@ -308,11 +308,13 @@ GD_ATTRS := [?]string {
 	"gd_rpc",
 	"gd_command",
 	"gd_tick",
+	"gd_input",
 	"gd_sample",
 	"gd_step",
+	"gd_cue",
 	"gd_fact",
 	"gd_half",
-	"gd_message",
+	"gd_message"
 }
 
 // Path of a shared source relative to the shared tree root (`ids/ids.odin`) — the

@@ -35,36 +35,141 @@ network tick, the registry compares current values with that shadow, writes a
 field mask and the changed values for dirty entities, and advances the shadow.
 Unchanged entities emit no field data.
 
-Replicated fields must have a bounded, descriptor-supported wire shape. Scalars,
-enums, fixed arrays, nested POD values, and explicit codecs are the normal path.
-Pointers, strings, and dynamic containers do not belong in replicated fields;
-send variable-length data with application messages, entity blobs, or
-`kit/xfer`.
+Replicated fields must have a bounded, target-independent wire shape. The normal
+building blocks are fixed-width scalars (`i32`, not `int`), explicitly based
+enums (`enum u8`, not bare `enum`; explicit member values are integer literals),
+literal-sized arrays, and recursively valid structs. A raw struct may contain no
+compiler-owned interior or tail padding;
+reorder its fields, add explicit reserved bytes, or deliberately use
+`struct #packed`. Pointers, strings, and dynamic containers do not belong in
+replicated fields; send variable-length data with application messages, entity
+blobs, or `kit/xfer`.
+
+### Canonical wire ABI
+
+scriptgen recursively validates every Kit-owned raw network value: replicated,
+owner-streamed, and predicted fields; input records; player profiles; and typed
+app-message payloads. It follows fixed arrays, aliases, distinct types, explicit
+enums, nested structs, imported package types, and composed blocks all the way
+to their leaves. It rejects `int`, `uint`, `uintptr`, implicit-width enums,
+pointers, strings, dynamic or fixed-capacity containers, unresolved types, and
+implicit struct padding. Custom field codecs still require a recursively valid
+in-memory value and a literal fixed codec size.
+
+The generated guard exposes the canonical contract, its hashes, and one
+structured package-level projection:
+
+```odin
+NET_SCHEMA_CANONICAL  // readable, deterministic wire metadata
+NET_ABI_FINGERPRINT   // hash of that metadata alone
+NET_FINGERPRINT       // complete session contract, including the ABI
+NET_SCHEMA            // knet.Net_Schema: structured, allocation-free metadata
+```
+
+The canonical schema records full field paths, wire kinds, struct and packet
+widths, array and protocol bounds, enum bases and values, input-class ids and
+admission constraints, message tags, and each action's access, prediction,
+argument ceiling, and immediate/tick scheduling. Generated `size_of`,
+`align_of`, and field-layout
+assertions then pin those expectations in every target compile. The raw ABI is
+little-endian; a target with a different layout cannot retain the same accepted
+fingerprint.
+
+`NET_SCHEMA` is the tooling/debugging view of that same walk. It contains flat
+static tables for entity kinds, recursive type nodes, replicated fields, input
+classes and constraints, actions, presentation facts, argument layouts,
+outcome layouts, profiles, and typed messages. Each action carries its resolved
+`Action_Policy`, `.Immediate`/`.Scheduled` model, argument/outcome spans, and
+named consequence metadata; each fact carries its named anchor and watch-clock
+schedule. The schema also carries both fingerprints and the exact canonical
+string that produced `NET_ABI_FINGERPRINT`.
+
+Rows with children use `knet.Net_Schema_Span` indexes into the schema's backing
+tables, so inspection allocates nothing. Common lookups have helpers:
+
+```odin
+assert(knet.net_schema_valid(&NET_SCHEMA))
+field, ok := knet.net_schema_field(&NET_SCHEMA, "Runner", "position")
+action, ok := knet.net_schema_action(&NET_SCHEMA, "Chest", "open")
+if ok {
+	args := knet.net_schema_action_args(&NET_SCHEMA, action)
+	outcomes := knet.net_schema_action_outcomes(&NET_SCHEMA, action)
+	// policy, model, args/outcomes, consequence, widths, and bounds are authoritative.
+}
+```
+
+Treat generated schema tables as read-only. Executable callbacks and live
+entity pointers stay in the runtime descriptors; `NET_SCHEMA` contains stable
+protocol facts only, so it is safe to expose to diagnostics, compatibility
+tools, and future admission/configuration APIs without creating another
+registry.
+
+Use explicit bytes when alignment would otherwise create a hole:
+
+```odin
+Stage :: struct {
+	run:      u16,
+	level:    u8,
+	reserved: u8, // protocol data, unlike invisible tail padding
+}
+```
+
+Formatting and comments do not move the fingerprint. A wire type, bound,
+policy, schedule, or codec name/size does. If a custom codec's *meaning* changes
+without changing its declared name or size, rename/version it or mix a semantic
+contract with `session_mix_fingerprint`; code bodies are not schema data.
 
 ### Commands
 
 A command is a proc marked `@(gd_command)` whose return value says whether its
-mutation applied. `@(gd_command = "predict")` enables optimistic execution on
-the issuing client. Script generation creates the decoder, descriptor, stable
-command ID, and typed `<verb>_cmd` wrapper.
+mutation applied. The bare marker is owner-only and waits for authority state.
+A typed `Action_Policy` preset enables prediction or widens access. Script
+generation creates the decoder, policy descriptor, stable command ID, and typed
+`<verb>_cmd` wrapper.
 
-Access policy is separate from the command predicate:
+The common policies are:
 
-- `owner` is the default: only the entity owner may issue the command;
-- `any_seat` allows any seated, non-spectating player; and
-- `authority` prevents client ingress and reserves the command for authority
-  code.
+| Declaration | Access | Client execution |
+| --- | --- | --- |
+| `@(gd_command)` or `knet.ACTION_OWNER` | owner | waits for authority state |
+| `knet.ACTION_OWNER_PREDICTED` | owner | optimistic |
+| `knet.ACTION_ANY_SEAT` | any playing seat | waits for authority state |
+| `knet.ACTION_ANY_SEAT_PREDICTED` | any playing seat | optimistic when that peer has a prediction ledger |
+| `knet.ACTION_AUTHORITY` | authority only | never crosses client ingress |
 
-The authority checks access before executing the game predicate. A successful
-command may invoke a name-paired `<verb>_then` half for authority-only
-cross-entity work such as spawning, crediting a player, or transferring
-ownership.
+Access and prediction are independent of the command predicate. The authority
+checks the playing seat and access rule before executing gameplay code. Co-op
+and sim actions consume one generated `Action_Desc(Id)` containing the stable
+id, execution model, policy, typed argument/outcome metadata, and consequence
+metadata. Only the callback differs: `Command_Desc` adds immediate invocation,
+while `Sim_Cmd` adds scheduled exec/apply thunks. Moving a verb between models
+does not duplicate or reinterpret its declaration.
+
+For a tighter encoded-argument envelope, use the typed literal form. Zero uses
+the 4096-byte default; a positive value is enforced before client send and
+again at authority ingress:
+
+```odin
+@(gd_command = knet.Action_Policy {
+	access         = .Any_Seat,
+	prediction     = .Optimistic,
+	max_args_bytes = 64,
+})
+```
+
+The old comma strings remain accepted for migration, but new code should use
+the typed presets or literal so Odin can catch misspelled policy members.
+
+A successful command may invoke a name-paired `<verb>_then` half for
+authority-only cross-entity work such as spawning, crediting a player, or
+transferring ownership.
 
 For an optimistic command:
 
 - confirmation retains the optimistic mutation;
-- rejection includes authoritative entity state rather than restoring a possibly
-  stale local snapshot;
+- predicate rejection includes authoritative entity state rather than restoring
+  a possibly stale local snapshot; admission failures are compact and restore
+  the local capture while the ordinary state lane supplies newer truth;
 - timeout reverts an action whose result never arrives; and
 - an intervening authoritative update unwinds pending predictions, applies truth,
   and replays still-valid commands in issue order.
@@ -75,12 +180,67 @@ session command and a tick-scheduled simulation command:
 ```odin
 outcome := chest_take_cmd(&game.boot, chest, slot, px, py)
 if knet.command_ok(outcome) {show_local_take_feedback()}
+if outcome.reason == .Access {show_locked_feedback()}
 ```
 
-`Command_Outcome` is `.Applied`, `.Predicted`, or `.Rejected`. For session
-replication, `.Applied` means the local authority accepted the command.
-`.Predicted` means an issue is in flight or scheduled. `.Rejected` means it did
-not apply locally. The eventual authority result remains final.
+The wrapper returns `Action_Outcome`:
+
+```odin
+Action_Outcome :: struct {
+	state:  Command_Outcome,       // Applied, Predicted, or Rejected
+	reason: Action_Reject_Reason,  // None unless this call refused locally
+	seq:    u32,                   // correlates the final callback
+	model:  Action_Model,          // Immediate or Scheduled
+}
+```
+
+For session replication, `.Applied` means the local authority accepted the
+command. `.Predicted` means an issue is in flight or scheduled. `.Rejected`
+means it did not apply locally. `command_ok` accepts the detailed outcome, so
+ordinary call sites remain one condition. Inspect `reason` only where the UI
+cares why a synchronous refusal occurred.
+
+The authority's eventual answer is delivered through the generated session
+halves. Both immediate and tick-scheduled actions use these same callbacks:
+
+```odin
+@(gd_half)
+game_command_rejected :: proc(
+	self: ^Game,
+	seq: knet.Intent_Seq,
+	entity: knet.Net_Id,
+	cmd: u16,
+	reason: knet.Action_Reject_Reason,
+	model: knet.Action_Model,
+) {
+	switch reason {
+	case .Access:    show_locked_feedback()
+	case .Rate:      show_slow_down_feedback()
+	case .Predicate: show_no_longer_available()
+	case .Timeout:   show_connection_feedback()
+	case:            // Malformed/Stale are normally logged, not player choices.
+	}
+}
+```
+
+`Action_Reject_Reason` is deliberately gameplay-sized:
+
+| Reason | Meaning |
+| --- | --- |
+| `Access` | The seat or action policy did not allow the request. |
+| `Rate` | The shared traffic budget or scheduled-action queue refused it. |
+| `Malformed` | Unknown action, invalid/trailing encoding, or argument envelope failure. |
+| `Stale` | The target, sequence, or requested scheduling window is no longer current. |
+| `Predicate` | The authored command proc returned `false`. |
+| `Timeout` | No final authority result arrived before the safety horizon. |
+
+`game_command_confirmed` receives `(seq, entity, cmd, model)`. On the authority,
+`game_command_executed` receives `(ok, player, entity, cmd, reason, seq, model)`
+for both execution models. These are generated callbacks: gameplay code never
+parses a verdict packet or maintains a sequence map. `model` disambiguates the
+two sequence/id namespaces when a game uses both. Non-predicted actions keep a
+receipt-only entry, so they confirm, reject, and time out through exactly the
+same callback path without gaining speculative write privileges.
 
 Generated command IDs are stable hashes of command names, not declaration
 positions. Reordering procedures does not renumber the protocol. Renaming a
@@ -109,7 +269,7 @@ Chest :: struct {
 	slots:  [8]kitems.Slot `gd:"replicate"`,
 }
 
-@(gd_command = "predict,any_seat")
+@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
 chest_take :: proc(self: ^Chest, slot: i32, px: f32, py: f32) -> (ok: bool, taken: kitems.Slot) {
 	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false, {}}
 	taken = kitems.take(self.slots[:], int(slot), 99) // the whole stack
@@ -140,6 +300,27 @@ Field_Desc :: struct {
 
 Entity_Desc :: struct {
 	fields: []Field_Desc,
+}
+
+Action_Policy :: struct {
+	access:         Action_Access,
+	prediction:     Action_Prediction,
+	max_args_bytes: int,
+}
+
+Action_Desc :: struct($Id: typeid) {
+	name:        string,
+	id:          Id,
+	model:       Action_Model,
+	policy:      Action_Policy,
+	arguments:   []Action_Argument_Desc,
+	outcomes:    []Action_Outcome_Value_Desc,
+	consequence: Action_Consequence_Desc,
+}
+
+Command_Desc :: struct {
+	using action: Action_Desc(Cmd_Id),
+	invoke:       Command_Proc,
 }
 
 Command_Set :: struct {
@@ -189,7 +370,7 @@ verb merely *targets* stays ordinary wire data under any other name (`who`,
 `target`).
 
 ```odin
-@(gd_command = "predict,any_seat")
+@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
 trade_confirm :: proc(self: ^Trade, by: knet.Player_Id) -> (ok: bool, sealed: bool)
 ```
 
@@ -256,7 +437,7 @@ Gun :: struct {
 // WIELDER — scriptgen fills it with the embedding entity, so the block can read/write its holder
 // (stats, cooldowns) while staying reusable. A pointer can't ride the wire, so it is never a
 // wire arg; the args after it are.
-@(gd_command = "predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 gun_fire :: proc(g: ^Gun, owner: ^Runner, dx, dy: f32) -> bool { ... }
 
 Runner :: struct {
@@ -390,7 +571,8 @@ The semantics:
   nothing, and "reset to level 1 *from* level 1" changes no bytes at all; an
   edge cannot fire on a non-change. When you catch yourself wanting one to,
   the field is under-modeled: give the event bytes. The house form is a
-  **generation counter co-located in the diff atom**: `stage: struct { level: u8, run: u16 }`,
+  **generation counter co-located in the diff atom**:
+  `stage: struct { run: u16, level: u8, reserved: u8 }`,
   where a reset bumps `run`, so same-level resets and within-frame round trips both
   land as real transitions (`old.run != new.run` is the cleanup branch), and a
   late joiner's silent seed correctly replays *zero* of them (they see
@@ -449,6 +631,15 @@ a discontinuity in the entity's streamed fields: the warp counter rides every sn
 and receivers snap to the far side of the jump instead of interpolating a slide across the
 map.
 
+Game code normally keeps `Net_Ref(T)`, a generic POD wrapper around `Net_Id`,
+instead of a raw pointer. The generated census constructs it with `<entity>_ref`
+and accepts it in `<entity>_of`; the resolver checks liveness and the declared
+entity kind before returning `^T`. A replicated field such as
+`target: knet.Net_Ref(Player) \`gd:"replicate"\`` therefore carries only the ID
+while preventing a Chest reference from being passed to a Player lookup at
+compile time. See [Boot entity queries](boot.md#entity-queries) for typed owner
+queries and indexed iteration.
+
 ## The per-tick walks
 
 Host deltas (reliable channel), and full snapshots for joins/backups:
@@ -483,9 +674,11 @@ rather than abandoning the batch: the next tick supersedes everything anyway.
 
 ```odin
 command_ctx_make :: proc(allocator := context.allocator) -> Command_Ctx
-command_begin :: proc(ctx: ^Command_Ctx, entity: Net_Id, cmd: u16)
-command_issue :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd: u16) -> bool
+command_begin :: proc(ctx: ^Command_Ctx, entity: Net_Id, cmd: Cmd_Id)
+command_issue :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd: Cmd_Id) -> bool
+command_issue_checked :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd: Cmd_Id) -> Command_Issue_Result
 registry_host_command :: proc(reg: ^Registry, ctx: ^Command_Ctx, peer_key: u64, r: ^Reader, out: ^Writer) -> (responded: bool, ok: bool, h: Command_Header)
+registry_host_command_checked :: proc(reg: ^Registry, ctx: ^Command_Ctx, by: Player_Id, r: ^Reader, out: ^Writer, admission := Action_Reject_Reason.None) -> Registry_Command_Outcome
 registry_client_result :: proc(reg: ^Registry, ctx: ^Command_Ctx, r: ^Reader, me := PLAYER_ID_INVALID) -> Command_Result
 registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks: u64, me := PLAYER_ID_INVALID, out: ^[dynamic]Expired_Command = nil) -> int
 ```
@@ -512,7 +705,7 @@ form. Annotate a handler with the `SES_APP` [tag](session.md#app-messages) it
 rides (the game owns its tag budget: the kit holds comms 0, xfer 2, sim 3):
 
 ```odin
-Whisper :: struct { emote: u8, spice: u16 }   // a POD payload
+Whisper :: struct { spice: u16, emote, reserved: u8 } // canonical 4-byte payload
 TAG_WHISPER :: u8(4)
 
 @(gd_message = "TAG_WHISPER")
@@ -532,11 +725,14 @@ game_whisper_send_to(&ses, player, msg)         // to a PLAYER (seat resolved on
 
 It is pure sugar over the runtime typed-route API
 ([`session_app_send_typed`](session.md#app-messages) / `session_app_listen`),
-which stays available for hand-rolled routing. The payload is **POD** (the raw
-bytes cross the wire: no strings, slices, or pointers; frame those yourself on a
-bare `session_app_route`), and its **field layout folds into `NET_FINGERPRINT`**,
-so a build that drifts the payload shape is refused at the join door like any
-other wire-contract skew. cavecrawl's arrival greeting is the worked example.
+which stays available for hand-rolled routing. The generated payload has a
+**canonical raw ABI**: fixed-width, recursively validated, padding-free bytes;
+frame strings and other variable data yourself on a bare `session_app_route`.
+Its full field layout folds into `NET_FINGERPRINT`, so a build that drifts the
+payload shape is refused at the join door like any other wire-contract skew.
+The declared tag must resolve to a package-level byte literal such as
+`TAG_WHISPER :: u8(4)`; its numeric route, not only the identifier, enters the
+schema. cavecrawl's arrival greeting is the worked example.
 
 The counter-rule, because it is the tempting mistake: **don't send state as a
 message.** "Player X's score is now 5" shipped as a message is lost to a peer who
@@ -553,6 +749,27 @@ sets a sticky `err` and returns zero values from then on, so callers check `r.er
 after a decode block. A malformed packet can never read out of bounds or panic, since remote
 input is untrusted by default. `read_string`/`read_bytes` return zero-copy views into the
 packet; clone anything you keep.
+
+The integer prefix is not the allocation policy. Admission happens before a
+decoder loops, clones, or calls game code:
+
+| Envelope | Ceiling |
+|---|---:|
+| Session packet (`MAX_PACKET_BYTES`) | 1 MiB |
+| One length-prefixed string/byte field (`MAX_FIELD_BYTES`) | 65,535 B |
+| One counted container (`MAX_CONTAINER_ITEMS`) | 4,096 rows, within the packet ceiling |
+| One replicated field / complete entity row | 65,535 B |
+| Command arguments | 4 KiB by default; at most 65,535 B with an explicit policy |
+| Profile row | 256 B |
+| App message / entity blob | 256 KiB |
+| Simulation fact tuple | 4 KiB |
+
+Outgoing session packets pass the same door, so the authority cannot announce
+a packet every receiver would reject. Delta and stream batches stop before the
+packet ceiling and leave unsent shadows dirty for a later tick. Use `kit/xfer`
+for bulk assets; its 8 KiB chunks remain ordinary bounded messages.
+`read_string_limited` and `read_bytes_limited` let a subsystem choose a tighter
+semantic bound than the shared field maximum.
 
 ```odin
 now_s :: proc "contextless" () -> f64            // monotonic seconds
@@ -749,11 +966,11 @@ distinct: don't conflate them.
   peer hasn't seen spawn (an unknown id abandons the batch: field sizes come from the
   descriptor the peer doesn't have). The session guarantees both by putting results, state
   batches, and spawn/despawn on the same reliable ordered channel.
-- **POD only, 64 fields max.** Syntactic collections (`[dynamic]`, slices, maps) are a
-  scriptgen error with [the three-way stance](#dynamic-collections) spelled
-  out; deeper non-POD (a struct hiding a string) fails the generated `#assert` at the
-  consumer compile, naming the field. Group past-64 field counts into sub-structs (a
-  fixed array is one field).
+- **Canonical fixed-shape values only, 64 fields max.** scriptgen recursively
+  rejects platform-width leaves, implicit enum widths, pointers, unsupported
+  containers, and hidden interior or tail padding, naming the complete field
+  path. Generated target-side layout assertions are a second check. Group
+  past-64 field counts into sub-structs (a fixed array is one field).
 - **`Intent_Seq` wraparound is not handled**: u32 gives ~4 billion commands per peer per
   session.
 

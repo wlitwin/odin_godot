@@ -56,8 +56,8 @@ now_s :: knet.now_s
 
 hello_net_ready :: proc(self: ^HelloNet) {
 	// The stock stack: a lobby with Host/Join buttons, chat, a scoreboard,
-	// the wire, and the four transport forwards — attached, not written.
-	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
+	// the wire, entity factory, and transport forwards — one generated attach.
+	hello_net_attach(self, kboot.Options{
 		title = "HELLO, MULTIPLAYER",
 		status = "Host a room, or join one at localhost",
 		legend = "Arrows move · Enter chat",
@@ -65,10 +65,7 @@ hello_net_ready :: proc(self: ^HelloNet) {
 		min_players = 1,
 		// (Options.methods defaulted: the on_host/on_join/... procs below are
 		// the standard eight names, and scriptgen still validates they exist.)
-	})
-	// The factory, written by nobody — the entity tag above IS the table.
-	hello_net_entities(self, &self.boot)
-
+	}, kboot.network_profile(.Friends_Coop))
 	// With a relay configured, the lobby grows its join-code field — a human
 	// types a friend's code and presses Join (see on_join).
 	if gd.env_string("HELLO_RELAY", "") != "" {
@@ -103,7 +100,7 @@ hello_net_process :: proc(self: ^HelloNet, delta: f64) {
 	// existed to detect (see the swap at the bottom).
 	was := kboot.boot_phase(&self.boot)
 	if was == .Menu {return}
-	events, _, _ := kboot.boot_pump(&self.boot, delta, now_s())
+	_ = hello_net_pump(self, delta, now_s())
 	// The minted code is a FACT to poll, not a callback: show it when it lands
 	// (the stock lobby status already carries it; this is the headless receipt).
 	if !self.minted {
@@ -123,9 +120,8 @@ hello_net_process :: proc(self: ^HelloNet, delta: f64) {
 		self.me.x = clamp(self.me.x + dx * SPEED * f32(delta), 8, 632)
 		self.me.y = clamp(self.me.y + dy * SPEED * f32(delta), 8, 352)
 	}
-	// Reactions live in the name-paired halves below; the generated
-	// hello_net_events holds the switch and every role gate.
-	hello_net_events(self, events)
+	// Reactions live in the name-paired halves below; hello_net_pump forwards
+	// them through the generated switch and role gates.
 
 	// The world ARRIVED this frame — the once-only receipt. boot_phase is a
 	// LEVEL and the halves below fire per spawn, so the edge is computed here,

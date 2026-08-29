@@ -27,11 +27,11 @@ import knet "godot:kit/net"
 import psim "godot:play/sim"
 
 Gunner :: struct {
-	owner:  gd.Node2d,
-	skin:   gd.Polygon2d `gd:"onready=Skin"`,
-	gun:    gd.Polygon2d `gd:"onready=Gun"`,
-	beam:   gd.Polygon2d `gd:"onready=Beam"`,
-	net_id: knet.Net_Id,
+	owner:     gd.Node2d,
+	skin:      gd.Polygon2d `gd:"onready=Skin"`,
+	gun:       gd.Polygon2d `gd:"onready=Gun"`,
+	beam:      gd.Polygon2d `gd:"onready=Beam"`,
+	net_id:    knet.Net_Id,
 
 	// The sim lane (server-simulated, client-predicted, reconciled). The
 	// TRIGGER lives here too: the cadence is a psim.Cool tagged `gd:"manual"`,
@@ -41,24 +41,24 @@ Gunner :: struct {
 	// `manual` a block COULD now run mid-pipeline, but the dash is a locked-
 	// velocity impulse, not psim.Mover's momentum intent — bespoke movement is
 	// the honest fit here, a design choice, not a shelf limitation.
-	x, y:    f32 `gd:"predict,interp"`,
-	vx, vy:  f32 `gd:"predict"`,
+	x, y:      f32 `gd:"predict,interp"`,
+	vx, vy:    f32 `gd:"predict"`,
 	// interp=angle: watched gunners' aim GLIDES the short arc across ±π —
 	// bare predict used to snap it per tick (the "stepped aim" that existed
 	// only because a raw f32 lerp sweeps the long way around the circle).
-	aim:     f32 `gd:"predict,interp=angle"`,
-	dash_cd: u16 `gd:"predict"`,
-	fire:    psim.Cool `gd:"manual"`, // driven below — so a dead gunner freezes it by not ticking it
-	lob:     psim.Cool `gd:"manual"`, // the slow projectile's cadence (predicted, like the trigger)
+	aim:       f32 `gd:"predict,interp=angle"`,
+	dash_cd:   u16 `gd:"predict"`,
+	fire:      psim.Cool `gd:"manual"`, // driven below — so a dead gunner freezes it by not ticking it
+	lob:       psim.Cool `gd:"manual"`, // the slow projectile's cadence (predicted, like the trigger)
 
 	// The delta lane, beside it (host-authoritative, never resimmed).
-	hp:   i32 `gd:"replicate"`,
-	pid:  u8 `gd:"replicate"`,
-	gold: u8 `gd:"replicate"`, // kill bounty — the shop's purse
+	hp:        i32 `gd:"replicate"`,
+	pid:       u8 `gd:"replicate"`,
+	gold:      u8 `gd:"replicate"`, // kill bounty — the shop's purse
 
 	// The shop's effect: PREDICTED, so your boots answer the buy at your
 	// next tick, not a round trip later. The buy itself is the verb below.
-	gear: u8 `gd:"predict"`,
+	gear:      u8 `gd:"predict"`,
 
 	// Local scratch — never on the wire.
 	mine:      bool, // set by the census hook: my avatar
@@ -104,16 +104,20 @@ gunner_hp_edge :: proc(g: ^Quickdraw, self: ^Gunner, old, new: i32) {
 	} else {
 		g.edge_late += 1
 	}
-	gd.print_str(fmt.tprintf("QD_EDGE hp=%d lag=%d same=%d late=%d", new, lag, g.edge_same, g.edge_late))
+	gd.print_str(
+		fmt.tprintf("QD_EDGE hp=%d lag=%d same=%d late=%d", new, lag, g.edge_same, g.edge_late),
+	)
 }
 
 // Sampled once per predicted tick (quickdraw.odin's qd_sample); discovered by
 // scriptgen from the tick proc's signature. POD, ~6 bytes, redundant on the
 // wire — the whole upstream bandwidth of a player.
+@(gd_input)
 Gunner_Input :: struct {
-	move:    [2]i8, // -1/0/1 per axis
-	aim:     u16, // turn fraction (util.odin angle codecs)
-	buttons: u8,
+	move:           [2]i8 `gd:"range=-1:1"`,
+	aim:            u16, // turn fraction (util.odin angle codecs)
+	buttons:        u8 `gd:"mask=0x07"`,
+	_wire_reserved: u8, // explicit protocol byte; no compiler-owned tail padding
 }
 
 BTN_FIRE :: u8(1)
@@ -206,7 +210,7 @@ gunner_tick :: proc(self: ^Gunner, input: Gunner_Input) -> (fired: bool, lobbed:
 GEAR_BOOTS :: u8(1)
 BOOTS_PRICE :: u8(1)
 
-@(gd_command)
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 gunner_buy :: proc(self: ^Gunner, item: u8) -> bool {
 	if item != GEAR_BOOTS || self.gear == item {return false}
 	if self.gold < BOOTS_PRICE {return false}

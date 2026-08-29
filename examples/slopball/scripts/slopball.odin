@@ -108,19 +108,18 @@ slopball_ready :: proc(self: ^Slopball) {
 	// dungeon crawl, mud for a ball you dribble). SLOP_HZ/SLOP_INTERP_MS
 	// keep the acid's A/B knobs.
 	hz := gd.env_int("SLOP_HZ", 60)
-	ksess.session_configure(&self.ses, {
-		tick_hz = hz,
-		// Default the interp window to ~3 keyframes of the chosen rate (50ms
-		// at 60Hz, 25ms at 120) — SLOP_INTERP_MS overrides for A/B feel tests.
-		interp_delay = f64(gd.env_int("SLOP_INTERP_MS", max(3000 / hz, 16))) / 1000.0,
-		// The wire-contract version gate needs no wiring: the generated guard
-		// file registers NET_FINGERPRINT as the session default at load.
-	})
+	net_cfg := kboot.network_profile(.Friends_Coop)
+	net_cfg.session.tick_hz = hz
+	// Default the interp window to ~3 keyframes of the chosen rate (50ms
+	// at 60Hz, 25ms at 120) — SLOP_INTERP_MS overrides for A/B feel tests.
+	net_cfg.session.interp_delay = f64(gd.env_int("SLOP_INTERP_MS", max(3000 / hz, 16))) / 1000.0
+	// The wire-contract version gate needs no wiring: the generated guard
+	// file registers NET_FINGERPRINT as the session default at load.
 	// The net rate is only honest if the SOLVER steps at it too: a 120Hz
 	// session over 60Hz physics just streams duplicate poses.
 	gd.engine_set_physics_ticks_per_second(gd.singleton_engine(), gd.Int(hz))
 
-	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
+	slopball_net_attach(self, kboot.Options{
 		title = "S L O P B A L L",
 		status = "Host a pitch, or join one at localhost",
 		legend = "WASD move · Space kick · Tab scores · Enter chat",
@@ -128,12 +127,10 @@ slopball_ready :: proc(self: ^Slopball) {
 		env = "SLOP", // SLOP_PORT/_NAME/_TOKEN identity + the SLOP_LATENCY shim
 		min_players = 1, // a lone host may start and kick the ball around
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
-	})
+	}, net_cfg)
 	// The factory, written by nobody: the generated table (from the entity=
 	// tags above) makes/frees under boot.world; world.odin's *_spawned/
 	// *_freed hooks keep the kicker/ball census.
-	slopball_entities(self, &self.boot)
-
 	self.goals_to = gd.env_int("SLOP_GOALS", 3)
 	self.bot = gd.env_string("SLOP_BOT", "")
 	self.netgraph = kui.netgraph_make(cast(gd.Node)self.owner)
@@ -362,6 +359,6 @@ ball_report :: proc(self: ^Slopball) {
 	bp := gd.node2d_get_position(cast(gd.Node2d)self.ball.owner)
 	gd.print_str(fmt.tprintf(
 		"SB_BALL tick=%d x=%.0f y=%.0f kick=%d own=%d warp=%d ring=%d mine=%v body=%.0f,%.0f",
-		t, self.ball.puppet.x, self.ball.puppet.y, len(kicker_ids(&self.boot)), own, warp, ring, self.ball.puppet.mine, bp.x, bp.y,
+		t, self.ball.puppet.x, self.ball.puppet.y, len(kicker_all(&self.boot)), own, warp, ring, self.ball.puppet.mine, bp.x, bp.y,
 	))
 }

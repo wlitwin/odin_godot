@@ -266,11 +266,14 @@ not lumped), windowed per second. Two reads:
 ```odin
 netgd.wire_traffic(&wire) -> string
 // "rx 3.2k state 2.1 stream 0.8 app16 0.2 · tx 0.4k cmd 0.3"
+netgd.wire_rates(&wire) -> Wire_Rates // packets/s and bytes/s, in/out
 netgd.wire_link_quality(&wire, peer) -> (rtt_ms, jitter_ms, loss_pct, ok)
 ```
 
-`wire_traffic` is the [netgraph](ui.md)'s traffic row. Fill `Net_Stats.traffic` with it and
-you can watch a chatty field's bytes move as you tune `wire=f16`, stream rates, or interest.
+`wire_traffic` is the [netgraph](ui.md)'s traffic row; `wire_rates` is the same
+completed one-second gauge as numeric aggregate packet/byte rates. Boot fills
+both automatically. You can watch a chatty field's bytes move as you tune
+`wire=f16`, stream rates, or interest.
 `wire_link_quality` reads ENet's own per-peer statistics (smoothed rtt, rtt variance, packet
 loss ×`PACKET_LOSS_SCALE`), the transport's view, meaningful on clients about the host
 (`ksess.HOST_PEER`); a host asks per client peer. quickdraw's netgraph fill is the worked

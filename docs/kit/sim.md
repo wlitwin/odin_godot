@@ -100,8 +100,9 @@ runner_tick_fx :: proc(g: ^Game, self: ^Runner, fired: bool) {
 ```
 
 Script generation emits the raw-pointer thunk, role and resimulation checks,
-`runner_sim_set`, and POD assertions for the input struct. It rejects invalid
-half signatures and a tick proc whose entity has no `predict` fields.
+`runner_sim_set`, and recursive canonical-ABI plus target-layout checks for the
+input struct. It rejects invalid halves, platform-sensitive or padded inputs,
+and a tick proc whose entity has no `predict` fields.
 Tick shapes are `(self)`, `(self, input)`, `(self, lane)`, and
 `(self, input, lane)`: a pointer param is the lane, and a value param is
 the input. Both halves also accept game-less (self-first) shapes.
@@ -141,14 +142,14 @@ regardless of loss, fire it from an **authority** world pass
 (`@(gd_step="authority")`) instead of the entity tick: an authority-minted
 fact includes the owner by construction.
 
-### Facts produced by a world pass
+### Cues produced by a world pass
 
-Use `@(gd_fact)` for a presentation event discovered outside a single
-entity's tick, such as contact between a player and a ball:
+Use `@(gd_cue)` for a presentation event discovered outside a single entity's
+tick, such as contact between a player and a ball:
 
 ```odin
-// The half you write — mine-form, anchored on the causer:
-@(gd_fact)
+// The presentation proc you write. `k` is the only entity, so it is the anchor.
+@(gd_cue)
 ball_kicked_fx :: proc(g: ^Game, k: ^Kicker, mine: bool, bvx, bvy: f32) {
 	kick_sound(bvx, bvy)            // every screen, at its right time
 	if mine {kick_camera(g)}        // flavor, not a role branch
@@ -161,14 +162,32 @@ if kicked {
 ```
 
 The generated helper applies the same live-pass, authority, watcher, and
-resimulation rules as a tick fact. The first entity parameter, when present,
-anchors the event to its owner. Without an anchor, the authority is the only
-local producer and every client presents the event on its watch clock.
+resimulation rules as a tick fact. The anchor chooses the entity timeline used
+for presentation and the owner used to derive `mine`; it is a particular proc
+parameter, not a class or category. If a game has hundreds of `Enemy`
+instances, `anchor=enemy` means "use the `enemy` pointer passed to this call."
 
-Fact arguments must be wire primitives. Announce an anchored fact before
-untracking or despawning the anchor; otherwise `lane_tracks_entity` rejects it
-and no peer presents it. A predicted fact that the authority never confirms
-may still appear locally. Speedball's kick is the worked example.
+Anchor selection is intentionally small:
+
+- No entity parameters means a world cue. The authority is its local producer.
+- One entity parameter is the inferred anchor; write plain `@(gd_cue)`.
+- With two or more entity parameters, name one parameter explicitly, such as
+  `@(gd_cue="anchor=target")`.
+- Use `anchor=none` only when the authority/world clock is intentional despite
+  carrying entity references.
+
+Put all typed entity parameters between the game and `mine`. They must be
+lane-tracked script classes. The anchor travels in the fact header; every other
+entity reference travels as a `Net_Id` and is resolved to that peer's local
+pointer before presentation. Arguments after `mine` must be wire primitives.
+Scriptgen rejects ambiguous anchors, names that are not entity parameters, and
+untracked entity types at build time.
+
+Announce an anchored cue before untracking or despawning its anchor; otherwise
+the generated corpse gate rejects it and no peer presents it. A predicted cue
+that the authority never confirms may still appear locally. Speedball's kick is
+the worked example. `@(gd_fact)` remains available for source compatibility,
+but new code should use `@(gd_cue)`.
 
 For the rare inline probe that should not be a fact at all (a debug print in
 a tick body), gate on `ksim.lane_live(&lane)`: it reflects the live pass, not
@@ -182,15 +201,40 @@ engine hum, or for an effect that should not appear on every screen.
 
 The game's own halves (the device read and the world pass) are typed and
 attributed the same way. `@(gd_sample)` marks the one place that touches
-hardware (never called during a resim); scriptgen pins its input struct to
-the ticks' at build time, so sampling into the wrong struct cannot compile.
-Add `@(gd_sample="validate")` to pair a typed
-`<sample>_validate(self, input) -> bool` sanitizer/admission hook, or name one
-explicitly with `validate=PROC`. It runs immediately after local sampling and over every
-received window on the authority before any de-jitter buffer changes. It may
-clamp or normalize through the pointer; returning false rejects the complete
-multi-class input packet. Use it for finite-float checks, axis ranges, enum
-membership, button masks, and game-specific input invariants.
+hardware (never called during a resim); scriptgen pins its input struct to the
+ticks' at build time, so sampling into the wrong struct cannot compile.
+
+Put the ordinary admission rules on the input itself:
+
+```odin
+Move_Mode :: enum u8 {On_Foot, Driving}
+
+@(gd_input)
+Runner_Input :: struct {
+	aim:     [2]f32 `gd:"unit"`,
+	trigger: f32    `gd:"finite,range=0:1"`,
+	move:    [2]i8  `gd:"range=-1:1"`,
+	mode:    Move_Mode `gd:"enum"`,
+	buttons: u8     `gd:"mask=0x07"`,
+}
+```
+
+`range` clamps each scalar/array component. `unit` rejects non-finite vector
+components and scales only magnitudes above one, preserving analog strength.
+`finite`, `enum`, and `mask` reject values that have no legal authored meaning.
+The generated sanitizer runs after local sampling and transactionally over
+every received window before any authority buffer changes.
+
+Admission is bounded at both levels: each window keeps its size/redundancy
+limits, and a seat may send at most 16 input classes in a 32 KiB `SIM_INPUT`
+payload. Generated and hand-built lanes assert the same aggregate envelope at
+registration, and the authority rejects an oversized packet before creating
+per-class buffers.
+
+For cross-field or game-state rules, add `@(gd_sample="validate")` and the typed
+`<sample>_validate(self, input) -> bool` hook (or name one with
+`validate=PROC`). It runs after the generated field rules; returning false
+rejects the complete multi-class packet.
 `@(gd_step)` is the world pass, run after entity ticks. A game may declare one
 of each kind: a bare `@(gd_step)` runs on every peer, including resimulation,
 while `@(gd_step="authority")` runs once per real tick on the authority. Keep
@@ -204,8 +248,9 @@ game_sample :: proc(self: ^Game, tick: u64, input: ^Runner_Input) {
 }
 
 game_sample_validate :: proc(self: ^Game, input: ^Runner_Input) -> bool {
-	input.move = clamp_axes(input.move) // canonical bytes on client and server
-	return finite_axes(input.move) && input.buttons & ~RUNNER_BUTTONS == 0
+	// Field ranges/masks are already canonical here. Keep only relationships
+	// that cannot be expressed one field at a time.
+	return input.trigger == 0 || input.buttons & BTN_FIRE != 0
 }
 
 @(gd_step) // everywhere, live + resim: contact for the pairs this peer simulates
@@ -235,17 +280,21 @@ tick in the coop loop, so this form is `proc(self)`; count ticks in your
 own `gd:"backup"` field). One declaration, two routings: promoting the game
 to the sim lane re-routes it without touching the attribute.
 
-The wiring left to the game, all of it, is `<class>_lane_init`, which is
-generated, carrying the input size, the typed procs, and each pass wired to
-its slot:
+For a conventional shell with one Boot, Session, Comms, and Lane field, the
+generated game-network facade owns this wiring too. Pass a named complete-stack
+profile while attaching, then override its lane fields when measurements call
+for it:
 
 ```odin
-// ready(), beside boot_attach + <game>_entities:
-game_lane_init(self, &self.lane, &self.ses) // cfg = ksim.Lane_Config{...} to tune
-kboot.boot_lane(&self.boot, &self.lane)
+// ready(): Boot + entities + lane in one generated call
+cfg := kboot.network_profile(.Listen_Server_Action)
+cfg.lane.smooth_cut = 48
+game_net_attach(self, kboot.Options{/* ... */}, cfg)
 ```
 
-`boot_lane` makes the boot drive everything: the generated entity table
+Underneath, `<class>_lane_init` carries the input size, typed procs, and each
+pass wired to its slot; `boot_lane` makes Boot drive everything. Both remain
+public for a custom shell. The generated entity table
 carries each ticking class's `Sim_Set`, so the factory tracks and untracks
 entities on the lane itself; `boot_pump` runs `lane_frame` + `lane_present`
 every frame and forwards `Ev_Owner_Changed`.
@@ -484,26 +533,32 @@ in a packet that also carries the sender's snapshot ack and its render
 offset, and the buffer tags each input with both, so when the server
 executes the input that pulled the trigger, it first verifies that the ack
 names a recent, non-regressing batch actually issued to that seat. Applying
-the batch and the render offset remain client claims; the authority bounds
-both by its issued range, ring horizon, and `rewind_max`. The rewound scope
-then BLENDS the claimed bracket pair
+the batch remains a client claim, so validity as a replication baseline does
+not automatically make it visibility evidence. The authority caps credible
+ack age at
+`ceil((observed RTT + 2·jitter) / tick_dt) + margin + snap_every` and caps the
+reported render offset at its own configured `watch_delay + snap_every`. That
+extra cadence admits the normal interpolation phase around the watch target,
+not a client-reported stall. Their sum, capped again by `rewind_max`, is the
+seat's current competitive rewind envelope.
+`lane_rewind_envelope(l, shooter)` exposes that derived limit in ticks. Before
+the authority has a pong sample for the seat the envelope is zero and queries
+judge live.
+
+Within that envelope the rewound scope BLENDS the claimed bracket pair
 the shooter's screen blended (`predict_blend` over the truth ledger), not
 the shooter's freshest ack (which advances a whole lead-plus-transit
 between sampling and adjudication), and not a quantized single tick (which
 costs near-tangent shots against the watch clock's interpolation).
 quickdraw's duel acceptance test measures the result: most aimable shots
-land at 240 ms RTT. The rewind is clamped to `rewind_max` (default ~250 ms),
-the favor-the-shooter ceiling; past it, a laggy shooter aims at the live
-world like everyone else. The cost of the favor is the classic one: occasionally
-you are hit just after reaching cover. That is the trade this model makes;
-the coop model makes the opposite one.
-
-For adversarial competitive play, this is the safe baseline rather than a
-cryptographic proof of visibility: tighten the final rewind envelope with
-server-observed RTT/jitter and monitor `stat_ack_rejected` and
-`stat_rewind_clamped`. A client-controlled render offset is always a bounded
-hint; no ordinary snapshot acknowledgement can prove which frame a player
-actually looked at.
+land at 240 ms RTT. `rewind_max` (default ~250 ms) is still the absolute
+favor-the-shooter ceiling. The client cannot earn that whole window merely by
+replaying an older issued ack, reporting a stalled render clock, or inflating a
+field: the observed-link envelope pins the reconstructed view to the newest
+credible floor. The cost of any favor remains the classic one: occasionally
+you are hit just after reaching cover. No ordinary snapshot acknowledgement
+can prove which frame a player actually looked at; the render offset is a
+bounded hint, not proof.
 
 ## Discrete verbs on the lane
 
@@ -513,7 +568,7 @@ exact coop authoring shape (predicate-then-mutate, name-paired `_then` on
 the authority) but executes INSIDE the tick pipeline:
 
 ```odin
-@(gd_command)
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 gunner_buy :: proc(self: ^Gunner, item: u8) -> bool {
 	if self.gold < price_of(item) {return false}
 	self.gold -= price_of(item) // delta lane: reverted on rejection
@@ -522,9 +577,10 @@ gunner_buy :: proc(self: ^Gunner, item: u8) -> bool {
 }
 
 // anywhere with the boot in reach (a key edge, a bot) — the same handle and
-// the same knet.Command_Outcome as a coop verb, so promoting a class never
+// the same knet.Action_Outcome as a coop verb, so promoting a class never
 // touches an issue site:
-gunner_buy_cmd(&g.boot, g.me_gun, ITEM_BOOTS)
+outcome := gunner_buy_cmd(&g.boot, g.me_gun, ITEM_BOOTS)
+if outcome.reason == .Rate {show_slow_down_feedback()}
 ```
 
 The generated wrapper schedules the verb at your next tick and ships it
@@ -538,19 +594,29 @@ after entity thunks, before the world pass) and answers with a verdict: a
 rejection unwinds the delta-lane writes on the spot and the next reconcile
 scrubs the predicted ones, the same glide as any mispredict.
 
-Every verb declares the same access policy as the co-op lane: `owner` is the
-default, `any_seat` opens an interaction, and `authority` never crosses client
-ingress. A contested entity lives on your prediction ledger, so an open verb
-speculates exactly like a touch does, and two same-tick verbs run in execution
-order with the predicate arbitrating (a spike on the ball is the shape).
-Prediction scope is not command scope: predict-world marks every avatar
-contested too, but its verbs remain owner-only unless they opt in. A watched
-entity may still accept an `any_seat` command; it simply waits for authority
-state because this client has no prediction ledger for it. Bursts are
+Every verb declares the same typed policy as the co-op lane. Bare
+`@(gd_command)` is owner-only and non-predicted;
+`knet.ACTION_OWNER_PREDICTED` opts into owner speculation,
+`knet.ACTION_ANY_SEAT` opens a world interaction, and
+`knet.ACTION_AUTHORITY` never crosses client ingress. Prediction requires both
+an optimistic action policy and a prediction ledger: marking an entity
+contested does not silently predict every verb, and choosing a predicted policy
+does not make a watched entity predictable. Two same-tick verbs run in
+execution order with the predicate arbitrating (a spike on the ball is the
+shape). Bursts are
 fine: verbs QUEUE per entity, and a rejection unwinds the delta-lane
 speculation chain in order without disturbing the survivors. The wrapper
-returns whether it SCHEDULED; the verdict is state (watch the fields, or the
-authority's `_then`).
+returns the same `Action_Outcome` as co-op: `.state` says whether it scheduled,
+`.reason` names a local access/rate/malformed/stale refusal, `.seq` correlates
+the final callback, and `.model` is `.Scheduled`.
+
+The authority verdict reaches the ordinary generated session callbacks. A
+client's `<game>_command_rejected` half receives the addressed command and an
+`Action_Reject_Reason`; the host's `<game>_command_executed` half receives the
+same reason for diagnostics. Predicate failure and timeout are therefore
+distinct without a lane-specific event API. Scheduled timeouts use an
+independent lane-frame clock, so authority loss still expires actions when the
+simulation clock itself has stopped waiting for snapshots.
 
 When the predicate needs WHO, declare the issuer: `by: knet.Player_Id`
 right after the receiver, and the lane fills it with the seat that issued
@@ -569,7 +635,7 @@ the verb keeps its hands off predicted fields: the predicate and the
 delta-lane writes stay execute-once.
 
 ```odin
-@(gd_command = "any_seat")
+@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
 ball_spike :: proc(self: ^Ball, px, py: f32) -> bool {
 	return self.hold == 0 && in_reach(self, px, py) // verdict + (any) delta writes
 }
@@ -693,21 +759,23 @@ one contested entity at a time. The worked comparison is
    is the one honest rewrite, and it is where engine physics must become
    query-based kinematics (slopball's `play.Puppet` ball becomes speedball's
    forty lines of bounce arithmetic; see Gotchas).
-4. **Declare and sample the input struct** from what the entity previously read from
-   devices per frame, and sample it in `@(gd_sample)`, the one place that
-   still touches hardware.
-5. **Validate received input.** Use `@(gd_sample = "validate")` and check
-   ranges, finite floats, enum values, button masks, and game-specific
-   invariants before an input window enters the authority buffer.
+4. **Declare and sample the input struct.** Mark it `@(gd_input)`, put field
+   ranges/finite/unit/enum/mask rules beside the fields, and sample it in
+   `@(gd_sample)`, the one place that still touches hardware.
+5. **Add only game predicates by hand.** Use
+   `@(gd_sample = "validate")` for cross-field or game-state invariants; the
+   generated field sanitizer already runs locally and at authority admission.
 6. **Sort the consequences.** Cross-entity outcomes move to `<tick>_then`
    (authority), local presentation to `<tick>_fx` (live pass). Discrete
    verbs on delta-lane state keep their `@(gd_command)`s.
 7. **Remove obsolete ownership arbitration.** Logic that chose which peer
    simulates owner-streamed state may no longer apply after the authority takes
    over. Keep presentation claims only where they are still needed for feel.
-8. **Wire once:** `<game>_lane_init(self, &self.lane, &self.ses, cfg)` +
-   `kboot.boot_lane(&self.boot, &self.lane)`, and migrate entities one at
-   a time. A hybrid game is a supported end state. Command and spawn call sites
+8. **Wire once:** let `<game>_net_attach(self, options, cfg)` validate a
+   [named network profile](profiles.md), install the
+   generated lane, and migrate entities one at a time. A hybrid game is a
+   supported end state. A custom shell can call `<game>_lane_init` +
+   `boot_lane` directly. Command and spawn call sites
    retain their shape: `<verb>_cmd(&boot, …)`
    and `<entity>_spawn(&boot, …)` keep their exact shape on both models;
    the generated bodies re-route.
@@ -730,7 +798,8 @@ client-stamped input/verb tick accepted ahead of authority time) ·
 `smooth_halflife` 0.063 s · `smooth_cut` 0 (never cut; set it in world
 units for teleport-heavy games) · `tolerance` 0 (exact reconcile; set it in
 world units so continuous held-input drift under the line rides uncorrected,
-predict-world's anti-churn). `lane_init` validates the configuration as one
+predict-world's anti-churn) · `snapshot_budget` 0 (unlimited at the low-level;
+named profiles install a measured per-recipient ceiling). `lane_init` validates the configuration as one
 set: negative values are invalid; cadence, margin, rewind, lead, and watch
 delay must fit the ring; redundancy cannot exceed the receiver cap; and
 `watch_delay` cannot exceed 31 (the render offset rides the wire in eighths
@@ -743,16 +812,38 @@ event worth drawing), and the host-side skew/abuse counters:
 version-skew shape), `stat_input_rejected` (malformed or future windows),
 `stat_ack_rejected` (unissued, regressing, misaligned, or stale snapshot
 claims), `stat_cmd_capped` (verbs refused by the per-player cap),
+`stat_cmd_rate_dropped` (verbs refused by the shared action token bucket),
 `stat_cmd_rejected` (replay/bounds/access refusals), and
-`stat_echo_dropped` (predict-world rows past the u8 batch ceiling).
+`stat_echo_dropped` (predict-world rows past the u8 batch ceiling). Snapshot
+telemetry is `stat_snap_full`, `stat_snap_delta`, `stat_snap_suppressed`,
+`stat_snap_deferred`, `stat_snap_aoi_culled`, and `stat_snap_bytes`.
+`lane_net_stats` collects these with input gaps, ack age, current command queue,
+rewind depth, resimulated ticks, and measured replay seconds. Normal booted
+games do not copy any of them: `kboot.boot_net_stats` reads the installed lane.
+
+### Snapshot AOI, budgets, and sparse recovery
+
+Simulation snapshots reuse `session_set_interest` and `session_set_focus`.
+An entity owned by the recipient is always eligible; other predicted entities
+must be in that recipient's session AOI. When `snapshot_budget` is nonzero, the
+authority sends owned entities first, then the stalest eligible rows, with
+distance as the tie-break. Work that does not fit is deferred rather than
+growing the packet.
+
+Unchanged entities emit no row. The authority records that their acknowledged
+value was represented at the new batch tick, and the receiver carries the same
+value into its baseline history. AOI-culled and budget-deferred entities are
+not marked represented. If one later re-enters after the global acknowledgement
+advanced, its first row is full, so a global batch ack can never authorize a
+delta against state that recipient did not receive. This is why sparse batches
+do not need a keyframe-request protocol.
 
 `stat_rewind_clamped` is the one to watch if you run lag comp: it counts
-rewound queries whose reconstructed view fell past `rewind_max` and got
-pinned to the floor. That clamp is silent: the authority judges an older
-world than the shooter saw, shots stop landing, and nothing else in the lane
-says so. A clamp or two at cold start is normal (the lead controller has not
-settled yet); a count that keeps moving means either this client's lead is
-mispaced or `rewind_max` is too small for the link you are serving.
+rewound queries adjusted by the authority's observed-link envelope, configured
+render-hint cap, or absolute `rewind_max`. A clamp or two while the clock is
+cold is normal; a count that keeps moving means the client keeps claiming an
+older view than its measured link and lane configuration substantiate, its
+lead is mispaced, or the configured ceiling is too small for the link served.
 quickdraw's duel acceptance test asserts on exactly this number, because the
 hit count alone does not catch a client silently judging its shots at the
 floor.
@@ -821,10 +912,15 @@ glide versus snap behavior, and fact timing. `tests/repgen` covers generated
 contracts. Quickdraw and Speedball add multi-process acceptance tests for the
 main competitive paths.
 
-This is not a claim of production hardening at arbitrary scale. Declarative
-input constraints, traffic budgets, protocol-wide payload ceilings, broader
-fuzzing, interest management, and published scale envelopes remain roadmap
-work. See [the hardening roadmap](TODO.md) for the current status.
+This is not a claim of arbitrary scale. Declarative input constraints, unified
+traffic budgets and authority ingress, protocol-wide payload ceilings,
+decoder/property corpora, per-recipient snapshot budgets, AOI, and ack-safe
+sparse snapshots are implemented. Facts are capped at
+4 KiB, command arguments at the action-policy bound, input packets at 32 KiB,
+and every sim rider remains inside the session's 256 KiB app-message / 1 MiB
+packet envelope. The benchmark-backed supported starting points are published
+by `network_profile_envelope` and documented in [profiles](profiles.md); measure
+your game logic and engine work before raising them.
 
 See also: [net](net.md) (whose shared substrate layer of wire, descriptors,
 blend math, and tick this lane is built on), [session](session.md)

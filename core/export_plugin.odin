@@ -54,18 +54,18 @@ editor_plugin_virtuals: [dynamic]Virtual_Entry
 odin_editor_plugin_object: gdext.ObjectPtr
 
 OdinExportPlugin :: struct {
-    object: gdext.ObjectPtr,
+    object: gdext.ObjectPtr
 }
 
 OdinEditorPlugin :: struct {
-    object: gdext.ObjectPtr,
+    object: gdext.ObjectPtr
 }
 
 @(private = "file")
 export_binding_callbacks := gdext.InstanceBindingCallbacks {
     create    = nil,
     free      = nil,
-    reference = nil,
+    reference = nil
 }
 
 // ---- OdinExportPlugin instance plumbing ----
@@ -155,7 +155,7 @@ make_menu_callable :: proc(fn: gdext.ExtensionCallableCustomCall) -> godot.Calla
         token                   = gdext.library,
         call_func               = fn,
         is_valid_func           = menu_callable_is_valid,
-        get_argument_count_func = menu_callable_argc,
+        get_argument_count_func = menu_callable_argc
     }
     cb: godot.Callable
     gdext.callable_custom_create2(cast(gdext.TypePtr)&cb, &info)
@@ -252,8 +252,8 @@ setup_scripts_from_template :: proc() {
         editor_msg_error(
             fmt.tprintf(
                 "odin_godot: template not found at %s (nor under build/template/scripts) — is the addon intact?",
-                src,
-            ),
+                src
+            )
         )
         return
     }
@@ -275,8 +275,8 @@ setup_scripts_from_template :: proc() {
     godot.print_str(
         fmt.tprintf(
             "odin_godot: created res://scripts/ (%d file(s)) from the template. Next: Project > Tools > Build Odin Scripts, then Play.",
-            copied,
-        ),
+            copied
+        )
     )
 }
 
@@ -287,7 +287,7 @@ pl_enter_tree :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]g
     ep_object := gdext.classdb_construct_object(&odin_export_class_name)
     godot.editor_plugin_add_export_plugin(
         cast(godot.Editor_Plugin)self.object,
-        cast(godot.Editor_Export_Plugin)ep_object,
+        cast(godot.Editor_Export_Plugin)ep_object
     )
     // Project > Tools items, so a new user never has to leave Godot:
     //   * "Set Up Odin Scripts" — copy the bundled template into res://scripts/ (the template
@@ -419,7 +419,7 @@ ols_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i6
         "    \"enable_snippets\": true,\n" +
         "    \"enable_hover\": true,\n" +
         "    \"enable_semantic_tokens\": true,\n" +
-        "    \"checker_args\": \"-no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_sample -custom-attribute:gd_step -custom-attribute:gd_fact -custom-attribute:gd_message\"\n}\n",
+		"    \"checker_args\": \"-no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_input -custom-attribute:gd_sample -custom-attribute:gd_step -custom-attribute:gd_cue -custom-attribute:gd_fact -custom-attribute:gd_half -custom-attribute:gd_message\"\n}\n"
     )
     if werr := os.write_entire_file(path, transmute([]byte)strings.to_string(b)); werr != nil {
         editor_msg_error(fmt.tprintf("odin_godot: couldn't write %s.", path))
@@ -428,8 +428,8 @@ ols_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i6
     godot.print_str(
         fmt.tprintf(
             "odin_godot: wrote %s — ols-based editors pick it up automatically; in JetBrains IDEs right-click it and choose the Odin plugin's import action.",
-            path,
-        ),
+            path
+        )
     )
 }
 
@@ -512,8 +512,8 @@ export_opt_level :: proc() -> string {
                 fmt.tprintf(
                     "odin export: ignoring invalid odin_godot/export_optimization=%q " +
                     "(use none|minimal|size|speed|aggressive) — using speed",
-                    cand,
-                ),
+                    cand
+                )
             )
         }
     }
@@ -543,7 +543,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
     if root == "" {
         export_error(
             "odin export: couldn't locate the odin_godot collection — set the " +
-            "`odin_godot/root` project setting to the addon/checkout path, then retry.",
+            "`odin_godot/root` project setting to the addon/checkout path, then retry."
         )
         return
     }
@@ -566,7 +566,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
             export_error(
                 "odin export: `odin` not found — cannot build the web wasm. Set the " +
                 "`odin_godot/odin_bin` project setting to your odin binary (absolute path), " +
-                "or launch the editor from a shell where `odin` is on PATH.",
+                "or launch the editor from a shell where `odin` is on PATH."
             )
             return
         }
@@ -577,7 +577,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
                 "odin export: Emscripten `emcc` not found — required for web export. Install " +
                 "the Emscripten SDK (emsdk; activate 4.0.20 to match Godot 4.6's web " +
                 "templates), then set the `odin_godot/emcc_bin` project setting to its `emcc` " +
-                "(absolute path) or put it on the editor's PATH. See docs/exporting.md.",
+                "(absolute path) or put it on the editor's PATH. See docs/exporting.md."
             )
             return
         }
@@ -598,7 +598,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
             shell_quote(opt, context.temp_allocator),
             shell_quote(root, context.temp_allocator),
             shell_quote(root, context.temp_allocator),
-            shell_quote(proj, context.temp_allocator),
+            shell_quote(proj, context.temp_allocator)
         )
         export_log(fmt.tprintf("odin export: building web SIDE_MODULE wasm (-o:%s) -> %s", opt, outwasm))
         rc := libc.system(cmd)
@@ -613,8 +613,8 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
                     emcc_bin,
                     root,
                     root,
-                    proj,
-                ),
+                    proj
+                )
             )
             return
         }
@@ -625,8 +625,8 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         export_log(
             fmt.tprintf(
                 "odin export: built web SIDE_MODULE %s (bundled automatically via the .gdextension web.*.wasm32 entry)",
-                outwasm,
-            ),
+                outwasm
+            )
         )
         return
     }
@@ -638,7 +638,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         export_error(
             "odin export: `odin` not found — cannot compile scripts. Set the " +
             "`odin_godot/odin_bin` project setting to your odin binary (absolute path), or " +
-            "launch the editor from a shell where `odin` is on PATH.",
+            "launch the editor from a shell where `odin` is on PATH."
         )
         return
     }
@@ -659,7 +659,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         shell_quote(root, context.temp_allocator),
         shell_quote(proj, context.temp_allocator),
         shell_quote(target, context.temp_allocator),
-        shell_quote(outdll, context.temp_allocator),
+        shell_quote(outdll, context.temp_allocator)
     )
     export_log(fmt.tprintf("odin export: compiling scripts for %s (-o:%s) -> %s", target, opt, outdll))
     rc := libc.system(cmd)
@@ -682,7 +682,7 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         cast(godot.Editor_Export_Plugin)self.object,
         path,
         tags,
-        tgt,
+        tgt
     )
     export_log(fmt.tprintf("odin export: bundled %s", outdll))
 
@@ -705,7 +705,7 @@ bundle_export_modules :: proc(self: ^OdinExportPlugin, proj: string, ext: string
     if os.get_env("BUILD_MODULES", context.temp_allocator) == "0" {
         export_log(
             "odin export: BUILD_MODULES=0 — script modules NOT built or bundled; " +
-            "the exported game will only have the main res://scripts classes",
+            "the exported game will only have the main res://scripts classes"
         )
         return
     }
@@ -730,8 +730,8 @@ bundle_export_modules :: proc(self: ^OdinExportPlugin, proj: string, ext: string
                     "odin export: script module '%s' has a dot in its name — the runtime only " +
                     "discovers dot-free libodinscripts_<name>%s dlls, so its classes would be " +
                     "silently absent from the exported game. Rename res://modules/%s.",
-                    name, ext, name,
-                ),
+                    name, ext, name
+                )
             )
             continue
         }
@@ -741,8 +741,8 @@ bundle_export_modules :: proc(self: ^OdinExportPlugin, proj: string, ext: string
                 fmt.tprintf(
                     "odin export: script module '%s' dll missing (%s) — the exported game " +
                     "would ship WITHOUT this module's classes",
-                    name, dll,
-                ),
+                    name, dll
+                )
             )
             continue
         }
@@ -753,7 +753,7 @@ bundle_export_modules :: proc(self: ^OdinExportPlugin, proj: string, ext: string
             cast(godot.Editor_Export_Plugin)self.object,
             path,
             tags,
-            tgt,
+            tgt
         )
         export_log(fmt.tprintf("odin export: bundled module '%s' (%s)", name, dll))
     }
@@ -796,13 +796,13 @@ odin_export_register :: proc() {
         free_instance_func          = export_free_instance,
         get_virtual_call_data_func  = export_get_virtual_call_data,
         call_virtual_with_data_func = call_virtual_with_data,
-        class_userdata              = nil,
+        class_userdata              = nil
     }
     register_extension_class(
         &odin_export_class_name,
         godot.editor_export_plugin_name_ref(),
         &export_info,
-        level = .Editor,
+        level = .Editor
     )
 
     // OdinEditorPlugin (host that registers the export plugin).
@@ -821,13 +821,13 @@ odin_export_register :: proc() {
         free_instance_func          = editor_plugin_free_instance,
         get_virtual_call_data_func  = editor_plugin_get_virtual_call_data,
         call_virtual_with_data_func = call_virtual_with_data,
-        class_userdata              = nil,
+        class_userdata              = nil
     }
     register_extension_class(
         &odin_editor_plugin_class_name,
         godot.editor_plugin_name_ref(),
         &plugin_info,
-        level = .Editor,
+        level = .Editor
     )
 
     // Hand the editor plugin to the editor by class name; Godot instantiates it and

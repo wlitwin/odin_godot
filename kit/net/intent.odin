@@ -25,7 +25,9 @@ Pending :: struct {
 	seq:         Intent_Seq,
 	entity:      Net_Id,
 	cmd:         u16, // command index — with `args`, enough to RE-RUN the prediction
-	args:        []u8, // the command's serialized args (owned copy; nil = not replayable)
+	args:        []u8, // the command's serialized args (owned copy; may be empty)
+	predicted:   bool, // owns speculative state/revert; false = receipt-only action
+	replayable:  bool, // explicit because a valid no-arg command also has empty bytes
 	revert:      []u8, // fields_capture buffer (shadow layout); freed via pending_dispose
 	issued_tick: u64,
 }
@@ -60,7 +62,7 @@ pending_table_destroy :: proc(t: ^Pending_Table) {
 pending_add :: proc(t: ^Pending_Table, entity: Net_Id, revert: []u8, now_tick: u64) -> Intent_Seq {
 	seq := t.next_seq
 	t.next_seq += 1
-	pending_record(t, seq, entity, 0, nil, revert, now_tick)
+	pending_record(t, seq, entity, 0, nil, revert, now_tick, replayable = false)
 	return seq
 }
 
@@ -69,8 +71,43 @@ pending_add :: proc(t: ^Pending_Table, entity: Net_Id, revert: []u8, now_tick: u
 // records the pending entry if the predicted run actually applied. `args` (an
 // owned copy of the serialized command args) is what makes the prediction
 // REPLAYABLE when authoritative state lands on top of it mid-flight.
-pending_record :: proc(t: ^Pending_Table, seq: Intent_Seq, entity: Net_Id, cmd: u16, args: []u8, revert: []u8, now_tick: u64) {
-	append(&t.entries, Pending{seq = seq, entity = entity, cmd = cmd, args = args, revert = revert, issued_tick = now_tick})
+pending_record :: proc(
+	t: ^Pending_Table,
+	seq: Intent_Seq,
+	entity: Net_Id,
+	cmd: u16,
+	args: []u8,
+	revert: []u8,
+	now_tick: u64,
+	predicted := true,
+	replayable := true,
+) {
+	append(
+		&t.entries,
+		Pending {
+			seq = seq,
+			entity = entity,
+			cmd = cmd,
+			args = args,
+			predicted = predicted,
+			replayable = replayable,
+			revert = revert,
+			issued_tick = now_tick,
+		},
+	)
+}
+
+// Track a sent, non-predicted action so confirmation/rejection/timeout remains
+// observable. It owns no gameplay snapshot and never participates in replay or
+// the client write-guard exemption.
+pending_record_receipt :: proc(
+	t: ^Pending_Table,
+	seq: Intent_Seq,
+	entity: Net_Id,
+	cmd: u16,
+	now_tick: u64,
+) {
+	pending_record(t, seq, entity, cmd, nil, nil, now_tick, predicted = false, replayable = false)
 }
 
 @(private = "file")
@@ -106,7 +143,12 @@ pending_reject :: proc(t: ^Pending_Table, seq: Intent_Seq) -> (p: Pending, ok: b
 // Pop every entry older than `max_age_ticks` into `expired` (appended). The caller
 // reverts each exactly like a rejection — a result that never arrives must behave
 // as a loud "no". Entries are returned oldest-first.
-pending_expire :: proc(t: ^Pending_Table, now_tick: u64, max_age_ticks: u64, expired: ^[dynamic]Pending) {
+pending_expire :: proc(
+	t: ^Pending_Table,
+	now_tick: u64,
+	max_age_ticks: u64,
+	expired: ^[dynamic]Pending,
+) {
 	for i := 0; i < len(t.entries); {
 		if now_tick - t.entries[i].issued_tick >= max_age_ticks {
 			append(expired, t.entries[i])
@@ -118,6 +160,15 @@ pending_expire :: proc(t: ^Pending_Table, now_tick: u64, max_age_ticks: u64, exp
 }
 
 pending_count :: proc(t: ^Pending_Table) -> int {
+	n := 0
+	for &entry in t.entries {
+		if entry.predicted {n += 1}
+	}
+	return n
+}
+
+// All authority results still owed, including non-predicted actions.
+pending_action_count :: proc(t: ^Pending_Table) -> int {
 	return len(t.entries)
 }
 
@@ -129,7 +180,7 @@ pending_count :: proc(t: ^Pending_Table) -> int {
 
 Dedup_Window :: struct {
 	latest: Intent_Seq, // highest seq accepted so far (0 = none yet)
-	window: u64,        // bit i = (latest - i) was seen, bit 0 = latest itself
+	window: u64, // bit i = (latest - i) was seen, bit 0 = latest itself
 }
 
 dedup_accept :: proc(d: ^Dedup_Window, seq: Intent_Seq) -> bool {

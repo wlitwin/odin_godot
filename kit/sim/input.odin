@@ -22,6 +22,8 @@ package kit_sim
 // far its inputs ran ahead of the server's sim and bends its clock
 // (lane.odin's ingest + tick.odin's lead_control); nothing extra is shipped.
 
+import "base:intrinsics"
+import "core:math"
 import knet "godot:kit/net"
 
 // How many trailing inputs ride every packet. 8 at 60 Hz ≈ 133ms of loss
@@ -33,11 +35,72 @@ INPUT_REDUNDANCY :: 8
 MAX_INPUT_REDUNDANCY :: 64
 MAX_INPUT_SIZE :: 256
 
+// Aggregate admission limits. Per-window bounds alone still let a seat fan a
+// packet out over hundreds of registered classes, or combine several legal
+// windows into one oversized message. These caps cover the whole SIM_INPUT
+// payload (kind byte included) before the host allocates a per-seat buffer.
+MAX_INPUT_CLASSES_PER_SEAT :: 16
+MAX_INPUT_PACKET_BYTES :: 32 * 1024
+
 // Frame-safe semantic admission for one typed input blob. scriptgen wraps an
 // authored `@(gd_sample="validate")` pair in this raw runtime shape. The proc
 // may clamp/normalize through `input` and returns whether the result is legal;
 // it must not retain the pointer (packet/sample scratch lifetime only).
 Input_Validate_Proc :: proc(user: rawptr, input: rawptr) -> bool
+
+// Small typed building blocks used by scriptgen's @(gd_input) sanitizers. They
+// live here so generated game code needs no math/reflection imports of its own.
+input_finite_f16 :: proc(x: f16) -> bool {return !math.is_nan(x) && !math.is_inf(x)}
+input_finite_f32 :: proc(x: f32) -> bool {return !math.is_nan(x) && !math.is_inf(x)}
+input_finite_f64 :: proc(x: f64) -> bool {return !math.is_nan(x) && !math.is_inf(x)}
+input_finite :: proc {
+	input_finite_f16,
+	input_finite_f32,
+	input_finite_f64
+}
+
+input_unit_f32 :: proc(v: ^[$N]f32) -> bool {
+	len2: f32
+	for x in v^ {
+		if !input_finite(x) {return false}
+		len2 += x * x
+	}
+	if !input_finite(len2) {return false}
+	if len2 > 1 {
+		scale := 1 / math.sqrt(len2)
+		for &x in v^ {x *= scale}
+	}
+	return true
+}
+
+input_unit_f64 :: proc(v: ^[$N]f64) -> bool {
+	len2: f64
+	for x in v^ {
+		if !input_finite(x) {return false}
+		len2 += x * x
+	}
+	if !input_finite(len2) {return false}
+	if len2 > 1 {
+		scale := 1 / math.sqrt(len2)
+		for &x in v^ {x *= scale}
+	}
+	return true
+}
+
+input_unit :: proc {
+	input_unit_f32,
+	input_unit_f64
+}
+
+// Raw packet bytes can contain an enum's underlying integer even when no enum
+// member owns that value. Iterating an enum visits its declared values, including
+// sparse enums; this does not mistake min..max for membership.
+input_enum_valid :: proc(value: $T) -> bool where intrinsics.type_is_enum(T) {
+	for valid in T {
+		if value == valid {return true}
+	}
+	return false
+}
 
 // Raw fixed-size blob append/view — the packet layout carries the size once
 // in its header, so per-input length prefixes would be dead bytes. The view
@@ -164,7 +227,7 @@ input_buffer_make :: proc(size: int, slots: int, allocator := context.allocator)
 	return Input_Buffer {
 		ring = tick_ring_make(size, slots, allocator),
 		tags = make([]u64, slots, allocator),
-		held = make([]u8, size, allocator),
+		held = make([]u8, size, allocator)
 	}
 }
 
@@ -185,7 +248,7 @@ input_buffer_destroy :: proc(b: ^Input_Buffer) {
 Input_Window_Header :: struct {
 	first: u64,
 	count: int,
-	size:  int,
+	size:  int
 }
 
 // Read and preflight one window without consuming its blob bytes. lane_handle
@@ -197,7 +260,7 @@ input_window_header :: proc(r: ^knet.Reader, expected_size: int, max_tick: u64) 
 	h := Input_Window_Header{
 		first = knet.read_u64(r),
 		count = int(knet.read_u8(r)),
-		size  = int(knet.read_u16(r)),
+		size  = int(knet.read_u16(r))
 	}
 	if r.err || h.count > MAX_INPUT_REDUNDANCY || h.size != expected_size {
 		r.err = true
@@ -225,7 +288,7 @@ input_window_validate :: proc(
 	expected_size: int,
 	max_tick := max(u64),
 	validate: Input_Validate_Proc = nil,
-	user: rawptr = nil,
+	user: rawptr = nil
 ) -> bool {
 	h := input_window_header(r, expected_size, max_tick)
 	if r.err {
@@ -247,7 +310,7 @@ input_buffer_apply :: proc(
 	tag: u64 = 0,
 	max_tick := max(u64),
 	validate: Input_Validate_Proc = nil,
-	user: rawptr = nil,
+	user: rawptr = nil
 ) -> int {
 	// Direct callers get the same all-before-any semantic gate as lane_handle.
 	// The probe's blob views alias the packet, so a sanitizer's clamped bytes

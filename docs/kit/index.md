@@ -24,6 +24,18 @@ spawning, saves, and transports do not change when an entity moves to the
 simulation lane. See [Choosing a timeline model](timelines.md) for the tradeoffs
 and [the simulation quickstart](quickstart-sim.md) for a small conversion.
 
+Both models share one generated canonical wire ABI. scriptgen recursively
+checks every raw network value for fixed widths, explicit enum storage, bounded
+containers, and padding-free layout, then hashes the readable schema into the
+session fingerprint. Incompatible builds are refused during JOIN instead of
+discovering the mismatch by corrupting state.
+
+The root scripts package also receives `NET_SCHEMA`, an allocation-free
+`knet.Net_Schema` projection of that same ABI walk. It exposes entity fields,
+inputs and constraints, immediate/tick actions and policies, facts and anchors,
+profiles, messages, recursive type nodes, and both fingerprints for tooling and
+diagnostics.
+
 ### Trust and security
 
 The session-replication model trusts an entity owner to provide its streamed
@@ -32,11 +44,18 @@ after checking the sender's current ownership, but owner-streamed movement is
 not suitable for adversarial play.
 
 The simulation lane moves selected state to the authority, but a public or
-competitive game must also validate input values, set traffic limits appropriate
-to the game, and run the authority on a trusted machine. ENet traffic is not
+competitive game must also declare input constraints with `@(gd_input)`, keep
+any game-specific predicates in the sample validator hook, and run the authority
+on a trusted machine. Kit bounds input classes, aggregate input packet bytes,
+and per-seat reliable/stream/action rates and bytes; games should tune the
+named profile defaults against legitimate peaks and install a moderation hook.
+ENet traffic is not
 encrypted. WebRTC and Steam provide encrypted transports. The detailed boundary
-is documented under [Session: trust and admission](session.md#trust-and-admission),
-and remaining hardening work is tracked in the [Kit roadmap](TODO.md).
+is documented under [Session: trust and admission](session.md#trust-and-admission).
+[Named network profiles](profiles.md) turn the three common trust models into
+coherent, validated defaults plus benchmark-backed starting envelopes. The
+test suites described in [Testing multiplayer](testing.md) cover the hardening
+and operations gates.
 
 ## Start here
 
@@ -71,7 +90,7 @@ Most games use the packages in these layers:
 
 | Layer | Packages | Responsibility |
 | --- | --- | --- |
-| Game integration | [boot](boot.md) | Connects the stock lobby, transport, session, generated entity factory, and per-frame pump. |
+| Game integration | [boot](boot.md), [network profiles](profiles.md) | Connects the stock lobby, validated network configuration, transport, session, generated entity factory, and per-frame pump. |
 | Session | [session](session.md), [save](save.md), [comms](comms.md), [xfer](xfer.md) | Player identity and roster, reconnects, entity lifetime, app messages, saves, chat, and large payloads. |
 | Replication | [net](net.md), [sim](sim.md) | Field descriptors, deltas, owner streams, commands, fixed-tick simulation, prediction, reconciliation, and lag compensation. |
 | Transport | [netgd](netgd.md), [steamgd](steamgd.md) | Godot `MultiplayerPeer` integration, ENet/WebRTC setup, network simulation, join codes, and Steam lobbies. |
@@ -86,6 +105,7 @@ engine-facing integration.
 | Package | Purpose |
 | --- | --- |
 | [`godot:kit/boot`](boot.md) | Standard lobby-to-game lifecycle, frame pump, generated entity factory, transport forwarding, and host succession. |
+| [`godot:kit/netcfg`](profiles.md) | Engine-free named session/lane profiles and complete-stack validation; re-exported through `kboot`. |
 | [`godot:kit/net`](net.md) | Wire codecs, entity descriptors and registry, reliable deltas, owner streams, interpolation, and commands. |
 | [`godot:kit/session`](session.md) | Stable player identities, roster, replication scheduling, entity lifetime, stats, moderation, interest management, and backup state. |
 | [`godot:kit/netgd`](netgd.md) | Godot transport binding for ENet and WebRTC, including the latency/loss simulator and native join-code flow. |
@@ -124,6 +144,8 @@ as required reading for game authors.
   verification, and Linux is build-verified. See the repository
   [platform status](../../README.md#platform-status) before choosing deployment
   targets.
-- The framework bounds and validates malformed input at several layers, but
-  per-peer traffic budgets are still roadmap work. Treat invited co-op, a
-  listen server, and a public dedicated server as different trust profiles.
+- The framework bounds malformed input and per-peer traffic with protocol-wide
+  packet, field, container, and item ceilings. Deterministic decoder fuzz and
+  property tests cover truncation, mutation, atomic rejection, and replay
+  invariants. Treat invited co-op, a listen server, and a public dedicated server
+  as different [network profiles](profiles.md).

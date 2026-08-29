@@ -17,8 +17,8 @@ package kit_session
 // like everything else. Column 0 is always "ping": the host pings its clients
 // and feeds each player's measured RTT (ms) in automatically.
 
-import knet "godot:kit/net"
 import "core:strings"
+import knet "godot:kit/net"
 
 // A column HANDLE, 1-based on purpose: the zero value is INVALID and every
 // read/write asserts on it. Why: `session_stat_column` registers on the HOST
@@ -30,6 +30,7 @@ import "core:strings"
 Stat_Col :: distinct u8
 
 MAX_STAT_COLS :: 16
+STAT_NAME_MAX_BYTES :: 64
 
 STAT_COL_INVALID :: Stat_Col(0) // the zero value: never a real column
 
@@ -45,6 +46,7 @@ session_stat_column :: proc(s: ^Session, name: string) -> Stat_Col {
 		return col
 	}
 	assert(len(s.stat_names) < MAX_STAT_COLS, "too many stat columns")
+	assert(len(name) <= STAT_NAME_MAX_BYTES, "stat name exceeds STAT_NAME_MAX_BYTES")
 	append(&s.stat_names, strings.clone(name))
 	s.stats_dirty = true
 	return Stat_Col(len(s.stat_names)) // 1-based handle (index + 1)
@@ -123,6 +125,7 @@ send_stats :: proc(s: ^Session, to_peer := BROADCAST_PEER) {
 		knet.write_string(&w, n)
 	}
 	assert(len(s.players) <= int(max(u16)))
+	assert(len(s.players) <= knet.MAX_CONTAINER_ITEMS)
 	knet.write_u16(&w, u16(len(s.players)))
 	for _, p in s.players {
 		knet.write_player_id(&w, p.id)
@@ -140,7 +143,7 @@ send_stats :: proc(s: ^Session, to_peer := BROADCAST_PEER) {
 		// of refreshing at show time; now the event fires everywhere).
 		append(&s.events, Ev_Stats_Updated{})
 	} else {
-		s.send(s.send_user, to_peer, knet.writer_bytes(&w), .Reliable)
+		session_send_packet(s, to_peer, knet.writer_bytes(&w), .Reliable)
 	}
 }
 
@@ -150,14 +153,36 @@ send_stats :: proc(s: ^Session, to_peer := BROADCAST_PEER) {
 stats_recv :: proc(s: ^Session, r: ^knet.Reader) {
 	cols := int(knet.read_u8(r))
 	if r.err || cols > MAX_STAT_COLS {
+		r.err = true
+		return
+	}
+	// Structural pass first: a torn schema/row packet commits neither names nor
+	// stats, and hostile counts cannot make this loop exceed the packet budget.
+	probe := r^
+	for _ in 0 ..< cols {
+		_ = knet.read_string_limited(&probe, STAT_NAME_MAX_BYTES)
+	}
+	players := int(knet.read_u16(&probe))
+	if !knet.reader_admit_count(&probe, players, 8 + cols * 8) {
+		r.err = true
+		return
+	}
+	for _ in 0 ..< players {
+		_ = knet.read_player_id(&probe)
+		for _ in 0 ..< cols {
+			_ = knet.read_i64(&probe)
+		}
+	}
+	if probe.err || len(knet.reader_remaining(&probe)) != 0 {
+		r.err = true
 		return
 	}
 	// Schema first (the host may declare columns mid-run): rebuild ours.
 	names: [MAX_STAT_COLS]string
 	for i in 0 ..< cols {
-		names[i] = knet.read_string(r)
+		names[i] = knet.read_string_limited(r, STAT_NAME_MAX_BYTES)
 	}
-	players := int(knet.read_u16(r))
+	players = int(knet.read_u16(r))
 	if r.err {
 		return
 	}

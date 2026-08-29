@@ -147,8 +147,8 @@ just a helper package as before, and gets no generated file at all.
 
 **What must stay in the module root.** Every **kit** declaration: `gd:"replicate"`,
 `gd:"owner"`, `gd:"predict"`, `gd:"backup"` and `gd:"profile="` field tags, `entity=` scene
-fields, a `net_id` field, `@(gd_command)`, `@(gd_tick)`, `@(gd_sample)`, `@(gd_step)`,
-`@(gd_message)`, `@(gd_fact)`, session and succession halves, the sim lane's input class, and
+fields, a `net_id` field, `@(gd_command)`, `@(gd_tick)`, `@(gd_input)`, `@(gd_sample)`, `@(gd_step)`,
+`@(gd_message)`, `@(gd_cue)` (and legacy `@(gd_fact)`), session and succession halves, the sim lane's input class, and
 a `kboot.Boot` field. The reason is the wire contract: a module's kit surface (replicated
 field order, verb ids, entity type ids, the one tick input struct, the fact tuples) folds
 into `NET_FINGERPRINT`, which two peers compare at the join door, and it is resolved

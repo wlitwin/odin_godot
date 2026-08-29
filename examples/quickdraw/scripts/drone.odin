@@ -34,14 +34,15 @@ Drone :: struct {
 	mine:    bool, // set by the census hook: my drone
 	painted: bool,
 	home_x:  f32, // first-shown x, for the acid's moved-under-its-own-input edge
-	moved:   bool,
+	moved:   bool
 }
 
 // The SECOND input class — distinct from Gunner_Input (a different struct, a
 // different width). Just a steer direction; the drone hovers where you point
 // it, on its own window on the wire.
+@(gd_input)
 Drone_Input :: struct {
-	steer: [2]i8, // -1/0/1 per axis
+	steer: [2]i8 `gd:"range=-1:1"`
 }
 
 // Pure predicted state driven by the drone's OWN input — never the gunner's.

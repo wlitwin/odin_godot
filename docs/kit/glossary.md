@@ -17,8 +17,9 @@ authority without a player avatar.
 
 `kboot.Boot` connects the common Godot-facing parts of a Kit game: lobby and HUD
 widgets, `netgd` transport, session, comms, generated entity factory, frame pump,
-and an optional simulation lane. `boot_attach` initializes the stack and
-`boot_pump` advances it.
+and an optional simulation lane. For the conventional direct-field shell,
+scriptgen emits `<game>_net_attach`, `<game>_net_pump`, and
+`<game>_net_detach`; the component-level `boot_*` procedures remain available.
 
 `boot_phase` reports `.Menu`, `.Connecting`, `.Lobby`, or `.Playing` from the
 current session state.
@@ -27,8 +28,11 @@ current session state.
 
 The generated index of live entities of each declared type. An
 `entity=Player:1` field generates typed queries such as `player_of`,
-`player_owned_by`, and `player_ids`. The census avoids maintaining a second game
-map that can drift from the session registry.
+`player_owned_by`, `player_ref`, and `player_all` (`player_ids` remains the
+ID-only view). `Net_Ref(Player)` is the pointer-free value to retain;
+`Net_Entity(Player)` is a temporary iteration row carrying its live typed
+pointer, owner, and ID. The census avoids maintaining a second game map that can
+drift from the session registry.
 
 The generated `<entity>_spawned` and `<entity>_freed` hooks run when census
 bookkeeping changes. Spawn fields are not yet the presentation baseline in the
@@ -39,13 +43,21 @@ bookkeeping changes. Spawn fields are not yet the presentation baseline in the
 
 A player-requested action declared with `@(gd_command)`. A generated
 `<verb>_cmd` proc uses the same call site on a client and on the authority.
-Generated access policy decides who may ask; the command body validates current
+Its typed `Action_Policy` decides who may ask, whether the issuing client may
+predict, and the encoded argument limit. The command body validates current
 game state and applies a single-entity mutation.
 
 An optimistic command runs locally before the authority replies. Confirmation
 keeps the predicted result; rejection replaces it with authoritative state.
 Commands on simulation-lane entities are scheduled on ticks and replay with the
 simulation.
+
+The generated call returns `Action_Outcome`: its state is
+`Applied`/`Predicted`/`Rejected`, its optional rejection reason is typed, and
+its sequence correlates the later callback. Immediate and scheduled actions
+share `Action_Reject_Reason` (`Access`, `Rate`, `Malformed`, `Stale`,
+`Predicate`, `Timeout`) and the session's command-confirmed/rejected/executed
+halves.
 
 ## Consequence (`_then`)
 
@@ -78,11 +90,23 @@ peer.
 `Net_Id` identifies an entity within a session. It is not a Godot instance ID or
 a persistent save identity.
 
+## Cue
+
+A one-shot presentation event declared with `@(gd_cue)`. Scriptgen generates a
+plain announce proc from its `_fx` declaration. Its entity anchor selects the
+presentation timeline and supplies `mine`; with one entity parameter the anchor
+is inferred, while several require `anchor=PARAM`. The name is a parameter name,
+so each call still identifies one concrete entity instance.
+
+Cues do not mutate authoritative state. Kit suppresses them during
+resimulation, presents local cues immediately, and schedules remote cues on the
+anchor's watched timeline. `@(gd_fact)` is the compatible earlier spelling.
+
 ## Fact
 
 A one-shot simulation-lane presentation event associated with a tick. A tick
-proc can return facts to a name-paired `_fx` half. Cross-entity or world events
-can declare a `@(gd_fact)` half and use the generated announce proc.
+proc can return facts to a name-paired `_fx` half. A cue uses the same runtime
+fact channel for cross-entity or world presentation.
 
 Facts do not mutate authoritative state. Kit suppresses them during
 resimulation, presents local facts immediately, and schedules remote facts on
@@ -119,6 +143,15 @@ ownership, relays accepted samples, and other peers interpolate them.
 An owner stream is suitable when occasional loss can be replaced by the next
 sample. It trusts the owner to supply the value and is therefore not a
 cheat-resistant position channel.
+
+## Network profile
+
+A named, fully materialized `Session_Config` and `Lane_Config` pair selected
+with `kboot.network_profile`: `.Friends_Coop`, `.Listen_Server_Action`, or
+`.Dedicated_Competitive`. The generated `<game>_net_attach` validates the pair
+and installs both halves before the stack starts. A profile records timing and
+trust assumptions; only the actual authority deployment creates the trust
+boundary.
 
 ## Player, peer, and seat
 
@@ -185,6 +218,15 @@ is *watched*.
 
 Presentation events from watched entities should run when that entity reaches
 the event tick, not immediately when the packet arrives.
+
+## Net schema
+
+The generated package-level `NET_SCHEMA` value: structured, allocation-free
+metadata for the same canonical wire contract hashed into the session
+fingerprint. It lists entity kinds and fields, recursive types, input classes
+and constraints, actions and policies, facts, profiles, and messages. Runtime
+callbacks remain in their execution descriptors; the net schema is the stable
+read-only view for diagnostics and tooling.
 
 ## Wire fingerprint
 

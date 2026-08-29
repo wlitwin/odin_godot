@@ -62,9 +62,13 @@ Speedball :: struct {
 now_s :: knet.now_s
 
 speedball_ready :: proc(self: ^Speedball) {
+	net_cfg := kboot.network_profile(.Listen_Server_Action)
+	net_cfg.lane.smooth_cut = 60
+	net_cfg.lane.echo_inputs = true
+	net_cfg.lane.tolerance = 0.5
 	// (The wire-contract version gate is on by default — the generated guard
 	// file registers NET_FINGERPRINT as the session default at load.)
-	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
+	speedball_net_attach(self, kboot.Options{
 		title = "S P E E D B A L L",
 		status = "Host a pitch, or join one at localhost — the contested twin",
 		legend = "WASD move · Space kick · Tab scores · Enter chat",
@@ -72,8 +76,7 @@ speedball_ready :: proc(self: ^Speedball) {
 		env = "SPB", // SPB_PORT/_NAME/_TOKEN identity + the SPB_LATENCY shim
 		min_players = 1,
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
-	})
-	speedball_entities(self, &self.boot)
+	}, net_cfg)
 
 	// PREDICT-WORLD: batches echo every player's held input, every peer ticks
 	// every kicker AND the ball — one timeline for the whole pitch (the
@@ -81,9 +84,6 @@ speedball_ready :: proc(self: ^Speedball) {
 	// on remote avatars instead of delayed-but-accurate ones.
 	// tolerance: sub-half-pixel held-input drift rides uncorrected — the
 	// reconcile fires on real divergence, not float noise.
-	speedball_lane_init(self, &self.lane, &self.ses, cfg = ksim.Lane_Config{smooth_cut = 60, echo_inputs = true, tolerance = 0.5})
-	kboot.boot_lane(&self.boot, &self.lane)
-
 	install_controls()
 	self.bot = gd.env_string("SPB_BOT", "")
 	self.goals_to = u8(gd.env_int("SPB_GOALS", 3))
@@ -364,9 +364,9 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 
 	if b.score.won != 0 || b.hold > 0 {return}
 
-	for id in kicker_ids(&g.boot) {
-		k, _ := kicker_of(&g.boot, id)
-		input, drives := ksim.lane_input_of(&g.lane, kboot.boot_entity_owner(&g.boot, id), Kicker_Input)
+	for tracked in kicker_all(&g.boot) {
+		k := tracked.entity
+		input, drives := ksim.lane_input_of(&g.lane, tracked.owner, Kicker_Input)
 		if !drives {continue} // a pair this peer doesn't simulate
 
 		dx := b.roll.x - k.run.x
@@ -411,7 +411,7 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 			b.roll.vx += aim.x * KICK_POWER
 			b.roll.vy += aim.y * KICK_POWER
 			// The kick moves ANOTHER entity (the ball), so it can't ride the
-			// kicker's own tick channel — it is a WORLD-PASS fact. The door
+			// kicker's own tick channel — it is a cross-entity cue. The door
 			// holds every gate: this call is role-free.
 			ball_kicked(&g.lane, k, b.roll.vx, b.roll.vy)
 		}
@@ -419,15 +419,16 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 
 }
 
-// ---- the kick's presentation: a declared world-pass fact ------------------------
+// ---- the kick's presentation: a declared cue ------------------------------------
 
-// @(gd_fact) — the step discovers the kick (foot meets ball, cross-entity)
-// and announces it through the generated `ball_kicked` door; this half fires
+// @(gd_cue) — the step discovers the kick (foot meets ball, cross-entity)
+// and announces it through the generated `ball_kicked` door. `k` is the only
+// entity parameter, so scriptgen infers it as the anchor. This proc fires
 // on EVERY screen at its right time: the striker's live pass immediately
 // (mine=true — the touch resolved locally, that tick), the authority live,
 // and watchers when their watch clock reaches the kick's tick, beside the
 // delayed avatar that kicked. A resim replay never re-fires it.
-@(gd_fact)
+@(gd_cue)
 ball_kicked_fx :: proc(g: ^Speedball, k: ^Kicker, mine: bool, bvx, bvy: f32) {
 	if mine {
 		gd.print_str(fmt.tprintf("SPB_KICK tick=%d bvx=%.1f bvy=%.1f", ksim.lane_now(&g.lane), bvx, bvy))

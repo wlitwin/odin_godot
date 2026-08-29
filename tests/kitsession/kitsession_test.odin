@@ -32,27 +32,37 @@ _test_default_fingerprint :: proc "contextless" () {
 }
 
 Envelope :: struct {
-	to:   ksess.Peer_Id,
-	data: []u8,
+	to:      ksess.Peer_Id,
+	channel: ksess.Channel,
+	data:    []u8,
 }
 
 Peer_Box :: struct {
-	peer:  ksess.Peer_Id,
-	s:     ksess.Session,
-	sent:  int, // bytes this box handed the transport (the scale test's receipt)
-	out:   [dynamic]Envelope,
-	bots:  map[knet.Net_Id]^Bot, // factory-created entities (clients)
-	laps:  map[knet.Net_Id]^Lapper, // the owner-lane edge probe's bodies
-	freed: int, // factory frees observed
+	peer:       ksess.Peer_Id,
+	s:          ksess.Session,
+	sent:       int, // bytes this box handed the transport (the scale test's receipt)
+	out:        [dynamic]Envelope,
+	bots:       map[knet.Net_Id]^Bot, // factory-created entities (clients)
+	laps:       map[knet.Net_Id]^Lapper, // the owner-lane edge probe's bodies
+	freed:      int, // factory frees observed
 
 	// the `<field>_edge` probe: what the hp edge half saw on this peer
 	edge_fires: int,
 	edge_old:   i32,
 	edge_new:   i32,
 	// the OWNER-lane edge probe (Lapper.lap, a discrete owner-streamed counter)
-	lap_fires: int,
-	lap_old:   u8,
-	lap_new:   u8,
+	lap_fires:  int,
+	lap_old:    u8,
+	lap_new:    u8,
+}
+
+Log_Probe :: struct {
+	records: [dynamic]ksess.Production_Log_Record,
+}
+
+log_probe :: proc(user: rawptr, record: ksess.Production_Log_Record) {
+	p := cast(^Log_Probe)user
+	append(&p.records, record)
 }
 
 box_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
@@ -60,7 +70,7 @@ box_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: kse
 	b.sent += len(bytes)
 	cloned := make([]u8, len(bytes))
 	copy(cloned, bytes)
-	append(&b.out, Envelope{to = to_peer, data = cloned})
+	append(&b.out, Envelope{to = to_peer, channel = channel, data = cloned})
 }
 
 box_make :: proc(b: ^Peer_Box, peer: ksess.Peer_Id) {
@@ -102,7 +112,7 @@ pump :: proc(boxes: []^Peer_Box) {
 					}
 					if e.to == ksess.BROADCAST_PEER || dst.peer == e.to {
 						r := knet.reader_make(e.data)
-						ksess.session_handle_packet(&dst.s, b.peer, &r)
+						ksess.session_handle_packet(&dst.s, b.peer, &r, e.channel)
 					}
 				}
 				delete(e.data)
@@ -124,6 +134,41 @@ drain :: proc(s: ^ksess.Session) -> [dynamic]ksess.Event {
 
 TOKEN_ALICE :: u64(0xA11CE)
 TOKEN_BOB :: u64(0xB0B)
+
+@(test)
+session_reset_clears_the_run_but_preserves_wiring :: proc(t: ^testing.T) {
+	Loadout :: struct {
+		color: u8,
+	}
+	host: Peer_Box
+	box_make(&host, 1)
+	defer box_destroy(&host)
+
+	ksess.session_configure(&host.s, {max_players = 7, tick_hz = 30})
+	ksess.session_profile_install(&host.s, Loadout)
+	ksess.session_set_type_stream_hz(&host.s, BOT_TYPE, 12)
+	ksess.session_host_start(&host.s, "first")
+	testing.expect(t, host.s.ran)
+	testing.expect_value(t, ksess.session_count(&host.s), 1)
+
+	ksess.session_reset(&host.s)
+	ksess.session_reset(&host.s) // the facade's detach is idempotent
+	testing.expect(t, !host.s.ran)
+	testing.expect_value(t, ksess.session_count(&host.s), 0)
+	testing.expect_value(t, host.s.cfg.max_players, 7)
+	testing.expect_value(t, host.s.cfg.tick_hz, 30)
+
+	// A fresh start resolves the retained config and profile type. The type
+	// stream row is pre-start wiring too; reaching the typed profile accessor
+	// without an assertion proves session_destroy was not used by reset.
+	ksess.session_host_start(&host.s, "second")
+	testing.expect_value(t, ksess.session_tick_hz(&host.s), 30)
+	mine := ksess.session_profile_mine(&host.s, Loadout)
+	mine.color = 4
+	got, ok := ksess.session_profile_of(&host.s, host.s.me, Loadout)
+	testing.expect(t, ok)
+	testing.expect_value(t, got.color, u8(4))
+}
 
 @(test)
 join_builds_the_roster_everywhere :: proc(t: ^testing.T) {
@@ -377,19 +422,28 @@ bot_cmd_hit :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> 
 	b := cast(^Bot)entity
 	amount := knet.read_i32(r)
 	if r.err {return false}
-	if b.hp <= amount {return false} // can't drop to/below zero: reject
+	if b.hp <= amount {return false} 	// can't drop to/below zero: reject
 	b.hp -= amount
 	return true
 }
 
 // File-scope like generated code: the registry and factories keep pointers.
-bot_fields := [?]knet.Field_Desc{
+bot_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Bot, hp), size = size_of(i32)},
-	{offset = offset_of(Bot, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32},
+	{
+		offset = offset_of(Bot, x),
+		size = size_of(f32),
+		flags = {.Interp, .Owner_Stream},
+		lerp = .F32,
+	},
 }
-bot_desc := knet.Entity_Desc{fields = bot_fields[:]}
+bot_desc := knet.Entity_Desc {
+	fields = bot_fields[:],
+}
 BOT_HIT :: knet.Cmd_Id(0x6232) // hash-sized like a generated id — the suite rides the production shape
-bot_cmds := [?]knet.Command_Desc{{name = "hit", id = BOT_HIT, predict = true, access = .Any_Seat, invoke = bot_cmd_hit}}
+bot_cmds := [?]knet.Command_Desc {
+	{name = "hit", id = BOT_HIT, policy = knet.ACTION_ANY_SEAT_PREDICTED, invoke = bot_cmd_hit},
+}
 
 // The hp edge half, hand-built like generated code would be: cast, deref old,
 // record. Living on the SHARED set means every kitsession scenario (spawns,
@@ -402,7 +456,11 @@ bot_hp_edge_thunk :: proc(entity: rawptr, game: rawptr, old: rawptr) {
 }
 
 bot_edges := [?]knet.Edge_Desc{{field = 0, fire = bot_hp_edge_thunk}}
-bot_command_set := knet.Command_Set{entity_desc = &bot_desc, commands = bot_cmds[:], edges = bot_edges[:]}
+bot_command_set := knet.Command_Set {
+	entity_desc = &bot_desc,
+	commands    = bot_cmds[:],
+	edges       = bot_edges[:],
+}
 
 BOT_TYPE :: ksess.Entity_Type(7)
 UNKNOWN_TYPE :: ksess.Entity_Type(99)
@@ -417,14 +475,22 @@ Lapper :: struct {
 	x:   f32,
 }
 
-lapper_fields := [?]knet.Field_Desc{
+lapper_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Lapper, lap), size = size_of(u8), flags = {.Owner_Stream}},
 	// x ships as a HALF FLOAT (scrapyard's runners do): the wire bytes are not the
 	// struct bytes, so any history that stores wire bytes in a struct-layout ring
 	// trips here (the bounds trap the lance act caught).
-	{offset = offset_of(Lapper, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32, wire = .F16},
+	{
+		offset = offset_of(Lapper, x),
+		size = size_of(f32),
+		flags = {.Interp, .Owner_Stream},
+		lerp = .F32,
+		wire = .F16,
+	},
 }
-lapper_desc := knet.Entity_Desc{fields = lapper_fields[:]}
+lapper_desc := knet.Entity_Desc {
+	fields = lapper_fields[:],
+}
 
 lapper_lap_edge_thunk :: proc(entity: rawptr, game: rawptr, old: rawptr) {
 	b := cast(^Peer_Box)game
@@ -434,11 +500,22 @@ lapper_lap_edge_thunk :: proc(entity: rawptr, game: rawptr, old: rawptr) {
 }
 
 lapper_edges := [?]knet.Edge_Desc{{field = 0, fire = lapper_lap_edge_thunk}}
-lapper_command_set := knet.Command_Set{entity_desc = &lapper_desc, edges = lapper_edges[:]}
+lapper_command_set := knet.Command_Set {
+	entity_desc = &lapper_desc,
+	edges       = lapper_edges[:],
+}
 LAP_TYPE :: ksess.Entity_Type(11)
 
 // The client-side factory: heap-allocate a Bot for BOT_TYPE, refuse the rest.
-box_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (rawptr, ^knet.Command_Set) {
+box_make_entity :: proc(
+	user: rawptr,
+	type: ksess.Entity_Type,
+	id: knet.Net_Id,
+	owner: knet.Player_Id,
+) -> (
+	rawptr,
+	^knet.Command_Set,
+) {
 	b := cast(^Peer_Box)user
 	if type == LAP_TYPE {
 		l := new(Lapper)
@@ -509,7 +586,10 @@ world_over_the_session :: proc(t: ^testing.T) {
 
 	// World setup: the host spawns its own entity; going live ships SES_WORLD
 	// and alice's FACTORY creates her copy. Alice owns the bot's streamed x.
-	hbot := Bot{hp = 10, x = 1}
+	hbot := Bot {
+		hp = 10,
+		x  = 1,
+	}
 	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set, owner = alice.s.me)
 	ksess.session_start_replicating(&host.s)
 	pump(boxes)
@@ -574,6 +654,9 @@ world_over_the_session :: proc(t: ^testing.T) {
 	rejected := false
 	for ev in aev3 {
 		if rj, ok := ev.(ksess.Ev_Command_Rejected); ok && rj.entity == id {
+			testing.expect_value(t, rj.reason, knet.Action_Reject_Reason.Predicate)
+			testing.expect_value(t, rj.cmd, u16(BOT_HIT))
+			testing.expect_value(t, rj.model, knet.Action_Model.Immediate)
 			rejected = true
 		}
 	}
@@ -606,7 +689,7 @@ world_over_the_session :: proc(t: ^testing.T) {
 	}
 
 	// CLOCK: alice pings ~1/s once seated; the host answers; the estimate warms.
-	for _ in 0 ..< 25 { // > one ping interval of net ticks
+	for _ in 0 ..< 25 { 	// > one ping interval of net ticks
 		step(boxes, &now)
 	}
 	testing.expect(t, alice.s.pongs > 0, "ping/pong must feed the client clock")
@@ -621,7 +704,9 @@ commands_from_unseated_peers_are_dropped :: proc(t: ^testing.T) {
 	defer box_destroy(&host)
 	ksess.session_host_start(&host.s, "hosty")
 
-	hbot := Bot{hp = 10}
+	hbot := Bot {
+		hp = 10,
+	}
 	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
 	drain(&host.s) // the host hears its own spawn (Ev_Spawned = born, every peer)
 
@@ -659,7 +744,10 @@ spawn_and_despawn_via_factory :: proc(t: ^testing.T) {
 	drain(&alice.s)
 
 	// Pre-live spawn travels via SES_WORLD at go-live.
-	b1 := Bot{hp = 30, x = 3}
+	b1 := Bot {
+		hp = 30,
+		x  = 3,
+	}
 	id1 := ksess.session_spawn(&host.s, BOT_TYPE, &b1, &bot_command_set)
 	ksess.session_start_replicating(&host.s)
 	pump(boxes)
@@ -667,7 +755,10 @@ spawn_and_despawn_via_factory :: proc(t: ^testing.T) {
 	testing.expect_value(t, alice.bots[id1].hp, i32(30))
 
 	// LIVE spawn: announced immediately (SES_SPAWN), snapshot included.
-	b2 := Bot{hp = 55, x = 5}
+	b2 := Bot {
+		hp = 55,
+		x  = 5,
+	}
 	id2 := ksess.session_spawn(&host.s, BOT_TYPE, &b2, &bot_command_set)
 	pump(boxes)
 	testing.expect(t, alice.bots[id2] != nil)
@@ -711,8 +802,12 @@ drop_in_join_gets_the_world :: proc(t: ^testing.T) {
 
 	// The run is ALREADY going: world spawned, live, and mutated — deltas have
 	// been broadcast (to nobody) and shadows committed.
-	b1 := Bot{hp = 30}
-	b2 := Bot{hp = 55}
+	b1 := Bot {
+		hp = 30,
+	}
+	b2 := Bot {
+		hp = 55,
+	}
 	id1 := ksess.session_spawn(&host.s, BOT_TYPE, &b1, &bot_command_set)
 	id2 := ksess.session_spawn(&host.s, BOT_TYPE, &b2, &bot_command_set)
 	ksess.session_start_replicating(&host.s)
@@ -755,7 +850,10 @@ reconnect_reclaims_owned_entities :: proc(t: ^testing.T) {
 	pump(boxes)
 
 	// Alice's pawn: host-spawned, owned by her — she streams its x.
-	pawn := Bot{hp = 10, x = 1}
+	pawn := Bot {
+		hp = 10,
+		x  = 1,
+	}
 	id := ksess.session_spawn(&host.s, BOT_TYPE, &pawn, &bot_command_set, owner = alice.s.me)
 	ksess.session_start_replicating(&host.s)
 	pump(boxes)
@@ -810,8 +908,12 @@ unknown_entity_type_is_skipped :: proc(t: ^testing.T) {
 
 	// One knowable bot, one type alice's factory refuses: the WORLD parse must
 	// skip the stranger by length and still deliver the bot.
-	known := Bot{hp = 30}
-	strange := Bot{hp = 66}
+	known := Bot {
+		hp = 30,
+	}
+	strange := Bot {
+		hp = 66,
+	}
 	kid := ksess.session_spawn(&host.s, BOT_TYPE, &known, &bot_command_set)
 	_ = ksess.session_spawn(&host.s, UNKNOWN_TYPE, &strange, &bot_command_set)
 	ksess.session_start_replicating(&host.s)
@@ -899,7 +1001,7 @@ ping_stat_auto_feeds :: proc(t: ^testing.T) {
 	// time (simulated latency), then deliver — the measured rtt must be the
 	// gap the pong actually took on the host's clock.
 	now := 50.0
-	for _ in 0 ..< 5 { // host ticks 1..5; ping goes out at tick 5
+	for _ in 0 ..< 5 { 	// host ticks 1..5; ping goes out at tick 5
 		now += 0.05
 		_, _ = ksess.session_tick(&host.s, 0.05, now)
 	}
@@ -917,7 +1019,11 @@ ping_stat_auto_feeds :: proc(t: ^testing.T) {
 	}
 	ping, found := ksess.session_stat_find(&alice.s, "ping")
 	testing.expect(t, found)
-	testing.expect(t, ksess.session_stat(&alice.s, alice.s.me, ping) >= 290, "alice sees her own measured ping")
+	testing.expect(
+		t,
+		ksess.session_stat(&alice.s, alice.s.me, ping) >= 290,
+		"alice sees her own measured ping",
+	)
 }
 
 @(test)
@@ -1030,7 +1136,11 @@ dedicated_server_seat :: proc(t: ^testing.T) {
 
 	// Player gates skip it: three seats on the wire, two players in the game
 	// (the wire's view now spells players_only=false; the bare call IS the gate).
-	testing.expect_value(t, ksess.session_count(&host.s, connected_only = true, players_only = false), 3)
+	testing.expect_value(
+		t,
+		ksess.session_count(&host.s, connected_only = true, players_only = false),
+		3,
+	)
 	testing.expect_value(t, ksess.session_count(&host.s), 2)
 
 	// SUCCESSION NEVER ARMS: replicate and run well past the first backup
@@ -1068,9 +1178,15 @@ resume_run_from_backup :: proc(t: ^testing.T) {
 	ksess.session_client_join(&bob.s)
 	pump(boxes)
 
-	world_bot := Bot{hp = 30, x = 3}
+	world_bot := Bot {
+		hp = 30,
+		x  = 3,
+	}
 	wid := ksess.session_spawn(&host.s, BOT_TYPE, &world_bot, &bot_command_set)
-	pawn := Bot{hp = 10, x = 1}
+	pawn := Bot {
+		hp = 10,
+		x  = 1,
+	}
 	pid := ksess.session_spawn(&host.s, BOT_TYPE, &pawn, &bot_command_set, owner = bob.s.me)
 	ksess.session_start_replicating(&host.s)
 
@@ -1103,7 +1219,11 @@ resume_run_from_backup :: proc(t: ^testing.T) {
 
 	// The roster survived: 3 players, only alice connected; identity table
 	// intact for everyone who ever JOINed (the dead host has no token — v1).
-	testing.expect_value(t, ksess.session_count(&host2.s, connected_only = false, players_only = false), 3)
+	testing.expect_value(
+		t,
+		ksess.session_count(&host2.s, connected_only = false, players_only = false),
+		3,
+	)
 	testing.expect_value(t, ksess.session_count(&host2.s, connected_only = true), 1)
 	me, _ := ksess.session_player(&host2.s, old_me)
 	testing.expect(t, me.connected && me.peer == ksess.HOST_PEER)
@@ -1144,7 +1264,9 @@ resume_run_from_backup :: proc(t: ^testing.T) {
 	testing.expect_value(t, rpawn.x, f32(42)) // owner streams flow to the NEW host
 
 	// Allocation cursors came through: nothing collides.
-	fresh := Bot{hp = 1}
+	fresh := Bot {
+		hp = 1,
+	}
 	nid := ksess.session_spawn(&host2.s, BOT_TYPE, &fresh, &bot_command_set)
 	testing.expect(t, nid != wid && nid != pid)
 	testing.expect(t, host2.s.next_player > bob.s.me)
@@ -1171,11 +1293,17 @@ resume_reowns_the_dead_hosts_entities :: proc(t: ^testing.T) {
 	pump(boxes)
 
 	// Three owners, the three cases the re-own must tell apart:
-	world := Bot{hp = 5} // PLAYER_ID_INVALID: host-authoritative, survives via is_host
+	world := Bot {
+		hp = 5,
+	} // PLAYER_ID_INVALID: host-authoritative, survives via is_host
 	world_id := ksess.session_spawn(&host.s, BOT_TYPE, &world, &bot_command_set)
-	pet := Bot{hp = 7} // owned by the HOST's player id: the freeze case
+	pet := Bot {
+		hp = 7,
+	} // owned by the HOST's player id: the freeze case
 	pet_id := ksess.session_spawn(&host.s, BOT_TYPE, &pet, &bot_command_set, owner = host.s.me)
-	mine := Bot{hp = 9} // owned by alice (the heir): already hers, must not move
+	mine := Bot {
+		hp = 9,
+	} // owned by alice (the heir): already hers, must not move
 	mine_id := ksess.session_spawn(&host.s, BOT_TYPE, &mine, &bot_command_set, owner = alice.s.me)
 	ksess.session_start_replicating(&host.s)
 
@@ -1243,7 +1371,9 @@ resume_parks_avatars_with_their_seat :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	pump(boxes)
 
-	pet := Bot{hp = 7} // the host's NPC: adopted by the heir
+	pet := Bot {
+		hp = 7,
+	} // the host's NPC: adopted by the heir
 	pet_id := ksess.session_spawn(&host.s, BOT_TYPE, &pet, &bot_command_set, owner = host.s.me)
 	_, body_id := ksess.session_spawn_make(&host.s, LAP_TYPE, host.s.me) // the host's BODY: parked
 	ksess.session_spawn_send(&host.s, body_id)
@@ -1303,7 +1433,9 @@ type_stream_hz_rides_every_insert :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	pump(boxes)
 
-	pet := Bot{hp = 7}
+	pet := Bot {
+		hp = 7,
+	}
 	pet_id := ksess.session_spawn(&host.s, BOT_TYPE, &pet, &bot_command_set, owner = host.s.me)
 	ksess.session_start_replicating(&host.s)
 	now := 50.0
@@ -1337,7 +1469,9 @@ type_stream_hz_rides_every_insert :: proc(t: ^testing.T) {
 
 	// Undeclared (0) clears: a fresh spawn streams at full rate again.
 	ksess.session_set_type_stream_hz(&host.s, BOT_TYPE, 0)
-	full := Bot{hp = 1}
+	full := Bot {
+		hp = 1,
+	}
 	full_id := ksess.session_spawn(&host.s, BOT_TYPE, &full, &bot_command_set, owner = host.s.me)
 	fe, _ := knet.registry_get(&host.s.reg, full_id)
 	testing.expect(t, fe.tier <= 1, "an undeclared type streams every tick")
@@ -1363,7 +1497,10 @@ state_hash_parts_on_a_delta_divergence :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	pump(boxes)
 
-	hbot := Bot{hp = 10, x = 3}
+	hbot := Bot {
+		hp = 10,
+		x  = 3,
+	}
 	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
 	ksess.session_start_replicating(&host.s)
 	now := 50.0
@@ -1381,7 +1518,11 @@ state_hash_parts_on_a_delta_divergence :: proc(t: ^testing.T) {
 
 	// A DELTA field diverging DOES part them — the desync the probe exists to see.
 	alice.bots[id].hp = 99
-	testing.expect(t, ksess.session_state_hash(&alice.s) != ksess.session_state_hash(&host.s), "a delta-lane divergence must change the hash")
+	testing.expect(
+		t,
+		ksess.session_state_hash(&alice.s) != ksess.session_state_hash(&host.s),
+		"a delta-lane divergence must change the hash",
+	)
 }
 
 // session_rewound — coop lag comp at the session layer. It derives the rewind
@@ -1402,13 +1543,22 @@ session_rewound_judges_at_the_shooter_view :: proc(t: ^testing.T) {
 	ksess.session_host_start(&host.s, "hosty")
 
 	// A target owned by another player, with stream history x=0 @1s, x=10 @2s.
-	target := Bot{hp = 50, x = 10}
-	tid := ksess.session_spawn(&host.s, BOT_TYPE, &target, &bot_command_set, owner = knet.Player_Id(5))
+	target := Bot {
+		hp = 50,
+		x  = 10,
+	}
+	tid := ksess.session_spawn(
+		&host.s,
+		BOT_TYPE,
+		&target,
+		&bot_command_set,
+		owner = knet.Player_Id(5),
+	)
 	te, _ := knet.registry_get(&host.s.reg, tid)
-	w := knet.writer_make();defer knet.writer_destroy(&w)
-	target.x = 0;knet.stream_write(&w, &target, &bot_desc)
+	w := knet.writer_make(); defer knet.writer_destroy(&w)
+	target.x = 0; knet.stream_write(&w, &target, &bot_desc)
 	knet.stream_ring_push(&te.stream, 1.0, knet.writer_bytes(&w))
-	target.x = 10;knet.writer_reset(&w);knet.stream_write(&w, &target, &bot_desc)
+	target.x = 10; knet.writer_reset(&w); knet.stream_write(&w, &target, &bot_desc)
 	knet.stream_ring_push(&te.stream, 2.0, knet.writer_bytes(&w))
 	target.x = 10 // live
 
@@ -1417,7 +1567,9 @@ session_rewound_judges_at_the_shooter_view :: proc(t: ^testing.T) {
 	// shooter isn't a real peer, so its rtt is 0.
 	host.s.now = 1.5 + ksess.session_interp_delay(&host.s)
 
-	probe := Rewound_Session_Probe{target = &target}
+	probe := Rewound_Session_Probe {
+		target = &target,
+	}
 	ksess.session_rewound(&host.s, knet.Player_Id(7), &probe, proc(user: rawptr) {
 		p := cast(^Rewound_Session_Probe)user
 		p.saw_x = p.target.x
@@ -1451,7 +1603,10 @@ session_rewound_covers_host_owned_streams_at_full_rtt :: proc(t: ^testing.T) {
 	pump(boxes)
 
 	// A host-OWNED streamed body (a mob), marching one unit per tick.
-	mob := Bot{hp = 9, x = 0}
+	mob := Bot {
+		hp = 9,
+		x  = 0,
+	}
 	mid := ksess.session_spawn(&host.s, BOT_TYPE, &mob, &bot_command_set, owner = host.s.me)
 	ksess.session_start_replicating(&host.s)
 	now := 10.0
@@ -1464,12 +1619,21 @@ session_rewound_covers_host_owned_streams_at_full_rtt :: proc(t: ^testing.T) {
 
 	// Alice's measured round trip: 2 ticks (0.1 s). interp_delay is 3 ticks.
 	ap, _ := ksess.session_player(&host.s, alice.s.me)
-	host.s.clocks[ap.peer] = knet.Clock_Sync{rtt = 0.1, initialized = true}
+	host.s.clocks[ap.peer] = knet.Clock_Sync {
+		rtt         = 0.1,
+		initialized = true,
+	}
 	secs := ksess.session_rewind_secs(&host.s, alice.s.me)
-	testing.expect(t, abs(secs - (0.1 + ksess.session_interp_delay(&host.s))) < 1e-9, "rewind = RTT + interp, the full round trip")
+	testing.expect(
+		t,
+		abs(secs - (0.1 + ksess.session_interp_delay(&host.s))) < 1e-9,
+		"rewind = RTT + interp, the full round trip",
+	)
 
 	// Judged as alice saw it: 5 ticks ago (2 RTT + 3 interp) → x = 12 - 5 = 7.
-	probe := Rewound_Session_Probe{target = &mob}
+	probe := Rewound_Session_Probe {
+		target = &mob,
+	}
 	ksess.session_rewound(&host.s, alice.s.me, &probe, proc(user: rawptr) {
 		p := cast(^Rewound_Session_Probe)user
 		p.saw_x = p.target.x
@@ -1500,7 +1664,9 @@ session_rewound_covers_host_owned_streams_at_full_rtt :: proc(t: ^testing.T) {
 		target: ^Lapper,
 		saw_x:  f32,
 	}
-	lprobe := Lap_Probe{target = lp}
+	lprobe := Lap_Probe {
+		target = lp,
+	}
 	ksess.session_rewound(&host.s, alice.s.me, &lprobe, proc(user: rawptr) {
 		p := cast(^Lap_Probe)user
 		p.saw_x = p.target.x
@@ -1554,7 +1720,10 @@ fire_lane_reaches_every_screen_once :: proc(t: ^testing.T) {
 	// ALICE's predicted rock (her screen drew it at cast): the host confirms
 	// and announces. Everyone but alice draws it — the host from its own
 	// loopback, bob from the wire — and the ability id rides `arg`, not vel.
-	kcombat.fire_announce(&host.s, kcombat.Fire{shooter = alice.s.me, kind = 1, arg = 7, predicted = true})
+	kcombat.fire_announce(
+		&host.s,
+		kcombat.Fire{shooter = alice.s.me, kind = 1, arg = 7, predicted = true},
+	)
 	pump(boxes)
 	hf := drain_fires(&routes[0])
 	testing.expect_value(t, len(hf), 1) // the loopback: the host's screen draws from the SAME drain
@@ -1617,12 +1786,16 @@ kick_with_ban_shuts_the_door :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(bev), 1)
 	_, kicked := bev[0].(ksess.Ev_Kicked)
 	testing.expect(t, kicked, "the target hears a deliberate removal, not a mystery")
+	if kicked_ev, yes := bev[0].(ksess.Ev_Kicked); yes {
+		testing.expect_value(t, kicked_ev.reason, ksess.Disconnect_Reason.Banned)
+	}
 	testing.expect(t, !bob.s.joined)
 
 	aev := drain(&alice.s)
 	testing.expect_value(t, len(aev), 1)
 	l, _ := aev[0].(ksess.Ev_Player_Left)
 	testing.expect_value(t, l.id, knet.Player_Id(3))
+	testing.expect_value(t, l.reason, ksess.Disconnect_Reason.Banned)
 	testing.expect_value(t, ksess.session_count(&host.s, connected_only = true), 2)
 
 	// The banned token bounces — NEW process, NEW peer, same identity.
@@ -1647,6 +1820,30 @@ kick_with_ban_shuts_the_door :: proc(t: ^testing.T) {
 	testing.expect(t, !again)
 	_, self_kick := ksess.session_kick(&host.s, 1)
 	testing.expect(t, !self_kick)
+}
+
+@(test)
+production_log_records_are_structured_and_rate_bounded :: proc(t: ^testing.T) {
+	host: Peer_Box
+	box_make(&host, 1)
+	defer box_destroy(&host)
+	probe: Log_Probe
+	defer delete(probe.records)
+	ksess.session_set_production_log_hook(&host.s, &probe, log_probe)
+	ksess.session_host_start(&host.s, "hosty")
+
+	// Same session time window: only the fixed cap reaches the sink. The rest
+	// becomes a bounded counter and no attacker-controlled string exists.
+	for i in 0 ..< ksess.PRODUCTION_LOG_EVENTS_PER_SECOND + 7 {
+		r := knet.reader_make([]u8{})
+		ksess.session_handle_packet(&host.s, ksess.Peer_Id(100 + i), &r)
+	}
+	testing.expect_value(t, len(probe.records), ksess.PRODUCTION_LOG_EVENTS_PER_SECOND)
+	testing.expect_value(t, ksess.session_production_log_dropped(&host.s), u64(7))
+	for record in probe.records {
+		testing.expect_value(t, record.kind, ksess.Production_Log_Kind.Malformed_Packet)
+		testing.expect_value(t, record.bytes, u32(0))
+	}
 }
 
 // The DOOR survives a takeover: bans and the lock ride the re-hostable
@@ -1786,7 +1983,10 @@ ownership_transfer_hands_the_stream_over :: proc(t: ^testing.T) {
 	drain(&alice.s)
 	drain(&bob.s)
 
-	hbot := Bot{hp = 10, x = 1}
+	hbot := Bot {
+		hp = 10,
+		x  = 1,
+	}
 	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set, owner = alice.s.me)
 	ksess.session_start_replicating(&host.s)
 	pump(boxes)
@@ -1801,7 +2001,9 @@ ownership_transfer_hands_the_stream_over :: proc(t: ^testing.T) {
 	// the authoritative peer→seat and entity→owner maps, so the whole batch is
 	// refused before its ring changes; Alice also refuses Bob's direct packet
 	// because clients accept owner state only after the host gateway relays it.
-	forged_value := Bot{x = 999}
+	forged_value := Bot {
+		x = 999,
+	}
 	blob := knet.writer_make(32, context.temp_allocator)
 	knet.stream_write(&blob, &forged_value, &bot_desc)
 	fw := knet.writer_make(64, context.temp_allocator)
@@ -1897,11 +2099,13 @@ succession_names_the_torch_bearer_ahead_of_need :: proc(t: ^testing.T) {
 	ksess.session_client_join(&bob.s)
 	pump(boxes)
 
-	hbot := Bot{hp = 10}
+	hbot := Bot {
+		hp = 10,
+	}
 	_ = ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
 	ksess.session_start_replicating(&host.s)
 	now := 50.0
-	for _ in 0 ..< 12 { // let a backup ship and the target event fire
+	for _ in 0 ..< 12 { 	// let a backup ship and the target event fire
 		step(boxes, &now)
 	}
 
@@ -1962,8 +2166,12 @@ change_events_name_the_dirty_entity :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	pump(boxes)
 
-	hbot := Bot{hp = 10}
-	quiet := Bot{hp = 5}
+	hbot := Bot {
+		hp = 10,
+	}
+	quiet := Bot {
+		hp = 5,
+	}
 	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
 	_ = ksess.session_spawn(&host.s, BOT_TYPE, &quiet, &bot_command_set)
 	ksess.session_start_replicating(&host.s)
@@ -2013,7 +2221,7 @@ world_time_is_the_hosts_clock_everywhere :: proc(t: ^testing.T) {
 	pump(boxes)
 
 	now := 100.0
-	for _ in 0 ..< 30 { // let pings and pongs flow both ways
+	for _ in 0 ..< 30 { 	// let pings and pongs flow both ways
 		step(boxes, &now)
 	}
 	testing.expect(t, alice.s.pongs > 0, "the clock must be warm")
@@ -2035,7 +2243,9 @@ entity_blobs_ride_change_join_and_backup :: proc(t: ^testing.T) {
 	boxes := []^Peer_Box{&host, &alice}
 
 	ksess.session_host_start(&host.s, "hosty")
-	hbot := Bot{hp = 10}
+	hbot := Bot {
+		hp = 10,
+	}
 	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
 
 	// Set before the world goes live: the host hears its own event...
@@ -2064,7 +2274,11 @@ entity_blobs_ride_change_join_and_backup :: proc(t: ^testing.T) {
 			if e.id == id {blob_at = i}
 		}
 	}
-	testing.expect(t, spawn_at >= 0 && blob_at > spawn_at, "join carry: blob event lands after the spawn")
+	testing.expect(
+		t,
+		spawn_at >= 0 && blob_at > spawn_at,
+		"join carry: blob event lands after the spawn",
+	)
 	testing.expect_value(t, string(ksess.session_blob(&alice.s, id)), "rune-1")
 
 	// A mid-run change ships reliably on its own.
@@ -2184,8 +2398,14 @@ interest_filters_deltas_and_resyncs_on_entry :: proc(t: ^testing.T) {
 	pump(boxes)
 	ksess.session_start_replicating(&host.s)
 
-	near := Bot{hp = 10, x = 100}
-	far := Bot{hp = 20, x = 1000}
+	near := Bot {
+		hp = 10,
+		x  = 100,
+	}
+	far := Bot {
+		hp = 20,
+		x  = 1000,
+	}
 	idn := ksess.session_spawn(&host.s, BOT_TYPE, &near, &bot_command_set)
 	idf := ksess.session_spawn(&host.s, BOT_TYPE, &far, &bot_command_set)
 	pump(boxes)
@@ -2282,7 +2502,10 @@ interest_streams_route_via_host_and_filter :: proc(t: ^testing.T) {
 	ksess.session_start_replicating(&host.s)
 
 	// Alice owns a streaming bot at the origin; bob watches from far away.
-	pawn := Bot{hp = 5, x = 0}
+	pawn := Bot {
+		hp = 5,
+		x  = 0,
+	}
 	id := ksess.session_spawn(&host.s, BOT_TYPE, &pawn, &bot_command_set, owner = alice.s.me)
 	pump(boxes)
 	abot := alice.bots[id]
@@ -2297,7 +2520,11 @@ interest_streams_route_via_host_and_filter :: proc(t: ^testing.T) {
 		abot.x += 3
 		step(boxes, &now)
 	}
-	testing.expect(t, host.s.reg.entries[id].entity != nil && (cast(^Bot)host.s.reg.entries[id].entity).x > 0, "the host heard the stream")
+	testing.expect(
+		t,
+		host.s.reg.entries[id].entity != nil && (cast(^Bot)host.s.reg.entries[id].entity).x > 0,
+		"the host heard the stream",
+	)
 	testing.expect_value(t, bbot.x, f32(0)) // filtered: not one sample
 
 	// Bob wanders over: the resync snaps the pawn to truth and the stream
@@ -2344,9 +2571,13 @@ type_hooks_route_and_catch_all_falls_back :: proc(t: ^testing.T) {
 	pump(boxes)
 	ksess.session_start_replicating(&host.s)
 
-	bot := Bot{hp = 10}
+	bot := Bot {
+		hp = 10,
+	}
 	id := ksess.session_spawn(&host.s, BOT_TYPE, &bot, &bot_command_set)
-	stranger := Bot{hp = 10}
+	stranger := Bot {
+		hp = 10,
+	}
 	sid := ksess.session_spawn(&host.s, UNKNOWN_TYPE, &stranger, &bot_command_set)
 	pump(boxes)
 
@@ -2366,7 +2597,10 @@ type_hooks_route_and_catch_all_falls_back :: proc(t: ^testing.T) {
 	_ = hbot
 	// (games use the generated wrapper; the raw authority path is invoke+hook)
 	r := knet.reader_make([]u8{3, 0, 0, 0})
-	env := knet.Command_Env{authority = true, by = host.s.me}
+	env := knet.Command_Env {
+		authority = true,
+		by        = host.s.me,
+	}
 	_ = bot_cmd_hit(host.s.reg.entries[id].entity, &r, &env)
 	knet.command_hook_local(&host.s.ctx, id, BOT_HIT, true)
 	testing.expect_value(t, len(typed.calls), 2)
@@ -2414,7 +2648,14 @@ fire_listen_routes_to_other_screens_only :: proc(t: ^testing.T) {
 	// `predicted` says so); the HOST draws it from its own loopback, the same
 	// drain every peer uses. Nothing fires mid-pump — the queue holds until
 	// each game's own drain.
-	f := kcombat.Fire{shooter = 2, origin = {10, 20, 0}, vel = {3, 0, 0}, ttl = 30, kind = 1, predicted = true}
+	f := kcombat.Fire {
+		shooter   = 2,
+		origin    = {10, 20, 0},
+		vel       = {3, 0, 0},
+		ttl       = 30,
+		kind      = 1,
+		predicted = true,
+	}
 	kcombat.fire_announce(&host.s, f, TAG)
 	pump(boxes)
 	bf, drew := kcombat.fire_poll(&broute)
@@ -2483,7 +2724,12 @@ fire_announce_to_addresses_one_peer :: proc(t: ^testing.T) {
 	// Catch ONLY bob up on a standing event (shooter = host, so no caster-drop
 	// muddies the point). Alice, the other peer, must never hear it.
 	bp, _ := ksess.session_player(&host.s, bob.s.me)
-	f := kcombat.Fire{shooter = 1, origin = {5, 5, 0}, ttl = 10, kind = 2}
+	f := kcombat.Fire {
+		shooter = 1,
+		origin  = {5, 5, 0},
+		ttl     = 10,
+		kind    = 2,
+	}
 	kcombat.fire_announce_to(&host.s, bp.peer, f, TAG)
 	pump(boxes)
 
@@ -2554,6 +2800,43 @@ version_skew_is_denied_at_the_door :: proc(t: ^testing.T) {
 
 	// The roster never grew past the matching build.
 	testing.expect_value(t, ksess.session_count(&host.s), 2)
+}
+
+// Values pinned by tests/wireabi's generated guard: the first is the canonical
+// 12-byte nested fixture, the second changes its raw u32 stamp to u64. This
+// closes the generator-to-session loop: equal generated contracts seat; an ABI
+// drift reaches the real JOIN packet and is refused as .Version.
+@(test)
+canonical_wire_abi_fingerprint_gates_the_handshake :: proc(t: ^testing.T) {
+	WIRE_FIXTURE_FINGERPRINT :: u64(0xfc3f66e9fcd2414b)
+	WIRE_FIXTURE_U64_FINGERPRINT :: u64(0x72a0945e37810e4e)
+
+	host, same, drifted: Peer_Box
+	box_make(&host, 1)
+	box_make(&same, 100)
+	box_make(&drifted, 200)
+	defer box_destroy(&host)
+	defer box_destroy(&same)
+	defer box_destroy(&drifted)
+
+	ksess.session_configure(&host.s, {fingerprint = WIRE_FIXTURE_FINGERPRINT})
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_configure(&same.s, {fingerprint = WIRE_FIXTURE_FINGERPRINT})
+	ksess.session_client_start(&same.s, TOKEN_ALICE, "same")
+	ksess.session_client_join(&same.s)
+	pump([]^Peer_Box{&host, &same})
+	testing.expect(t, same.s.joined, "equal canonical wire fingerprints must seat")
+
+	ksess.session_configure(&drifted.s, {fingerprint = WIRE_FIXTURE_U64_FINGERPRINT})
+	ksess.session_client_start(&drifted.s, TOKEN_BOB, "drifted")
+	ksess.session_client_join(&drifted.s)
+	pump([]^Peer_Box{&host, &same, &drifted})
+	events := drain(&drifted.s)
+	testing.expect_value(t, len(events), 1)
+	denied, ok := events[0].(ksess.Ev_Join_Denied)
+	testing.expect(t, ok)
+	testing.expect_value(t, denied.reason, ksess.Deny_Reason.Version)
+	testing.expect(t, !drifted.s.joined)
 }
 
 @(test)
@@ -2759,7 +3042,11 @@ seated_fires_every_role_and_preseat_rows_land :: proc(t: ^testing.T) {
 		}
 	}
 	testing.expect(t, seated_at >= 0, "a client hears Ev_Seated at its welcome")
-	testing.expect(t, welcomed_at > seated_at, "Ev_Seated comes first, Ev_Welcomed right behind it")
+	testing.expect(
+		t,
+		welcomed_at > seated_at,
+		"Ev_Seated comes first, Ev_Welcomed right behind it",
+	)
 	testing.expect_value(t, ksess.session_profile_mine(&alice.s, Pick).look, u8(9))
 
 	// THE ROW RODE THE HELLO: the host holds alice's word the instant it seated
@@ -2779,7 +3066,11 @@ seated_fires_every_role_and_preseat_rows_land :: proc(t: ^testing.T) {
 			if e.id == alice.s.me && saw_row {joined_after_row = true}
 		}
 	}
-	testing.expect(t, joined_after_row, "the host's profile_changed for the joiner precedes its player_joined")
+	testing.expect(
+		t,
+		joined_after_row,
+		"the host's profile_changed for the joiner precedes its player_joined",
+	)
 
 	// Both pre-seat rows SHIP from under their seats: bob sees them.
 	now := 100.0
@@ -2868,7 +3159,10 @@ write_guard_names_a_client_rogue_write :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	pump(boxes)
 
-	hbot := Bot{hp = 10, x = 1}
+	hbot := Bot {
+		hp = 10,
+		x  = 1,
+	}
 	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set, owner = alice.s.me)
 	ksess.session_start_replicating(&host.s)
 	pump(boxes)
@@ -2901,7 +3195,7 @@ write_guard_names_a_client_rogue_write :: proc(t: ^testing.T) {
 
 	// Owner-stream fields on the OWNER are never the guard's business.
 	abot.hp -= 5 // undo the rogue write
-	abot.x = 42  // alice owns the stream
+	abot.x = 42 // alice owns the stream
 	_, _, _, dirty = knet.registry_write_guard(&alice.s.reg, &alice.s.ctx)
 	testing.expect(t, !dirty, "owner-stream fields are the owner's to write")
 }
@@ -2926,7 +3220,9 @@ edge_halves_fire_on_net_change :: proc(t: ^testing.T) {
 	ksess.session_client_join(&alice.s)
 	pump(boxes)
 
-	hbot := Bot{hp = 10}
+	hbot := Bot {
+		hp = 10,
+	}
 	id := ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
 	ksess.session_start_replicating(&host.s)
 	now := 0.0
@@ -3055,7 +3351,9 @@ edge_pass_is_idempotent_and_callable :: proc(t: ^testing.T) {
 	defer box_destroy(&host)
 
 	ksess.session_host_start(&host.s, "hosty")
-	hbot := Bot{hp = 10}
+	hbot := Bot {
+		hp = 10,
+	}
 	_ = ksess.session_spawn(&host.s, BOT_TYPE, &hbot, &bot_command_set)
 	ksess.session_start_replicating(&host.s)
 	ksess.session_run_edges(&host.s) // first sight: seeds silently
@@ -3160,7 +3458,8 @@ scale_32_seats :: proc(t: ^testing.T) {
 
 	fmt.printf(
 		"SCALE32 join_ms=%.1f world_ms=%.1f steady_ms=%.2f per_tick_us=%.0f host_tx_bytes=%d per_tick_per_peer_bytes=%d\n",
-		join_ms, world_ms,
+		join_ms,
+		world_ms,
 		time.duration_milliseconds(steady),
 		time.duration_microseconds(steady) / TICKS,
 		host_bytes,
@@ -3209,7 +3508,11 @@ spectator_watches_and_is_nobody :: proc(t: ^testing.T) {
 
 	// Counts: present PEOPLE is 2 everywhere; the roster holds 3 seats.
 	testing.expect_value(t, ksess.session_count(&host.s), 2)
-	testing.expect_value(t, ksess.session_count(&host.s, connected_only = false, players_only = false), 3)
+	testing.expect_value(
+		t,
+		ksess.session_count(&host.s, connected_only = false, players_only = false),
+		3,
+	)
 	wp, has := ksess.session_player(&alice.s, watcher.s.me)
 	testing.expect(t, has && wp.spectator, "every roster reads the watching flag")
 
@@ -3329,7 +3632,14 @@ host_relay_stamps_spoof_drops_and_echoes :: proc(t: ^testing.T) {
 			p:   ^Relay_Probe,
 			ses: ^ksess.Session,
 		}{{&hq, &host.s}, {&aq, &alice.s}, {&bq, &bob.s}}) {
-		ksess.relay_route(&pair.p.relay, pair.ses, QUIET, pair.p, relay_probe_deliver_quiet, echo = false)
+		ksess.relay_route(
+			&pair.p.relay,
+			pair.ses,
+			QUIET,
+			pair.p,
+			relay_probe_deliver_quiet,
+			echo = false,
+		)
 	}
 
 	ksess.session_host_start(&host.s, "hosty")
@@ -3344,7 +3654,11 @@ host_relay_stamps_spoof_drops_and_echoes :: proc(t: ^testing.T) {
 	// because this relay echoes — reads the same author.
 	relay_probe_say(&al, 111)
 	pump(boxes)
-	for got in ([][]Relay_Note{relay_probe_drain(&hl), relay_probe_drain(&al), relay_probe_drain(&bl)}) {
+	for got in ([][]Relay_Note {
+			relay_probe_drain(&hl),
+			relay_probe_drain(&al),
+			relay_probe_drain(&bl),
+		}) {
 		testing.expect_value(t, len(got), 1)
 		if len(got) == 1 {
 			testing.expect_value(t, got[0].author, alice.s.me)
@@ -3356,7 +3670,11 @@ host_relay_stamps_spoof_drops_and_echoes :: proc(t: ^testing.T) {
 	// one code path per side, not a role branch per package.
 	relay_probe_say(&hl, 222)
 	pump(boxes)
-	for got in ([][]Relay_Note{relay_probe_drain(&hl), relay_probe_drain(&al), relay_probe_drain(&bl)}) {
+	for got in ([][]Relay_Note {
+			relay_probe_drain(&hl),
+			relay_probe_drain(&al),
+			relay_probe_drain(&bl),
+		}) {
 		testing.expect_value(t, len(got), 1)
 		if len(got) == 1 {
 			testing.expect_value(t, got[0].author, host.s.me)
@@ -3522,7 +3840,15 @@ pin_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: kse
 	append(&p.out, Envelope{to = to_peer, data = cloned})
 }
 
-pin_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (rawptr, ^knet.Command_Set) {
+pin_make_entity :: proc(
+	user: rawptr,
+	type: ksess.Entity_Type,
+	id: knet.Net_Id,
+	owner: knet.Player_Id,
+) -> (
+	rawptr,
+	^knet.Command_Set,
+) {
 	p := cast(^Pin_Peer)user
 	if type != BOT_TYPE {
 		return nil, nil
@@ -3602,7 +3928,13 @@ pin_step :: proc(peers: []^Pin_Peer, now: ^f64) {
 
 // A do-nothing type hook: the pin installs one only to make the wiring root
 // that creates s.type_hooks run inside the watch. It is never fired.
-pin_type_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
+pin_type_hook :: proc(
+	user: rawptr,
+	player: knet.Player_Id,
+	entity: knet.Net_Id,
+	cmd: u16,
+	ok: bool,
+) {
 }
 
 @(test)
@@ -3617,7 +3949,9 @@ the_session_never_spends_the_ambient_allocator :: proc(t: ^testing.T) {
 	// take the rest of the teardown with it.
 	owned.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
 
-	watch := Foreign_Watch{backing = harness}
+	watch := Foreign_Watch {
+		backing = harness,
+	}
 	watch.hits = make([dynamic]Foreign_Hit, 0, 16, harness)
 	defer delete(watch.hits)
 
@@ -3651,7 +3985,10 @@ the_session_never_spends_the_ambient_allocator :: proc(t: ^testing.T) {
 	// Both creation paths: one entity built BY HAND (the game owns the memory,
 	// the session owns only the registry shadow) and one through the factory
 	// pair. They allocate different things and rebind at different roots.
-	b1 := Bot{hp = 30, x = 3}
+	b1 := Bot {
+		hp = 30,
+		x  = 3,
+	}
 	id1 := ksess.session_spawn(&host.s, BOT_TYPE, &b1, &bot_command_set)
 	ksess.session_start_replicating(&host.s)
 	pin_pump(peers)
@@ -3741,12 +4078,26 @@ the_session_never_spends_the_ambient_allocator :: proc(t: ^testing.T) {
 	)
 
 	for b in owned.bad_free_array {
-		testing.expectf(t, false, "kit/session bad free @ %p at %s:%d", b.memory, b.location.file_path, b.location.line)
+		testing.expectf(
+			t,
+			false,
+			"kit/session bad free @ %p at %s:%d",
+			b.memory,
+			b.location.file_path,
+			b.location.line,
+		)
 	}
 	testing.expect_value(t, len(owned.bad_free_array), 0)
 
 	for _, e in owned.allocation_map {
-		testing.expectf(t, false, "kit/session leaked %d bytes from %s:%d", e.size, e.location.file_path, e.location.line)
+		testing.expectf(
+			t,
+			false,
+			"kit/session leaked %d bytes from %s:%d",
+			e.size,
+			e.location.file_path,
+			e.location.line,
+		)
 	}
 	testing.expect_value(t, len(owned.allocation_map), 0)
 }
@@ -3770,9 +4121,14 @@ replay_reconstructs_the_recorded_world :: proc(t: ^testing.T) {
 	pump(boxes) // welcome + world land in the tape
 
 	// A run: two entities (one alice's), host state mutated into deltas.
-	b1 := Bot{hp = 30, x = 3}
+	b1 := Bot {
+		hp = 30,
+		x  = 3,
+	}
 	id1 := ksess.session_spawn(&host.s, BOT_TYPE, &b1, &bot_command_set)
-	b2 := Bot{hp = 10}
+	b2 := Bot {
+		hp = 10,
+	}
 	id2 := ksess.session_spawn(&host.s, BOT_TYPE, &b2, &bot_command_set, owner = alice.s.me)
 	ksess.session_start_replicating(&host.s)
 	now := 50.0
@@ -3784,7 +4140,7 @@ replay_reconstructs_the_recorded_world :: proc(t: ^testing.T) {
 	// Copy the tape (a slice into alice's buffer), then rebuild from it alone.
 	src := ksess.session_recording(&alice.s)
 	testing.expect(t, len(src) > 0, "alice recorded packets")
-	rec := make([]u8, len(src));defer delete(rec)
+	rec := make([]u8, len(src)); defer delete(rec)
 	copy(rec, src)
 
 	replay: Peer_Box
@@ -3795,8 +4151,16 @@ replay_reconstructs_the_recorded_world :: proc(t: ^testing.T) {
 	testing.expect(t, fed > 0, "packets replayed")
 
 	// Byte-for-byte the same world — the state hash is the proof.
-	testing.expect_value(t, ksess.session_state_hash(&replay.s), ksess.session_state_hash(&alice.s))
-	testing.expect(t, replay.bots[id1] != nil && replay.bots[id2] != nil, "entities rebuilt from the tape")
+	testing.expect_value(
+		t,
+		ksess.session_state_hash(&replay.s),
+		ksess.session_state_hash(&alice.s),
+	)
+	testing.expect(
+		t,
+		replay.bots[id1] != nil && replay.bots[id2] != nil,
+		"entities rebuilt from the tape",
+	)
 	testing.expect_value(t, replay.bots[id1].hp, i32(22)) // 30 - 8, through the replayed deltas
 
 	// Teeth: half the tape rebuilds less, so the hashes must part.
@@ -3805,7 +4169,11 @@ replay_reconstructs_the_recorded_world :: proc(t: ^testing.T) {
 	defer box_destroy(&replay2)
 	ksess.session_client_start(&replay2.s, TOKEN_ALICE, "alice")
 	ksess.session_replay(&replay2.s, rec[:len(rec) / 2])
-	testing.expect(t, ksess.session_state_hash(&replay2.s) != ksess.session_state_hash(&alice.s), "a partial replay is not the full world")
+	testing.expect(
+		t,
+		ksess.session_state_hash(&replay2.s) != ksess.session_state_hash(&alice.s),
+		"a partial replay is not the full world",
+	)
 }
 
 // BANDWIDTH BUDGET: a per-peer stream cap sends only the highest-priority updates
@@ -3838,8 +4206,17 @@ stream_budget_bounds_and_rotates :: proc(t: ^testing.T) {
 	bots: [N]Bot
 	ids: [N]knet.Net_Id
 	for i in 0 ..< N {
-		bots[i] = Bot{hp = 1, x = f32(100 + i)}
-		ids[i] = ksess.session_spawn(&host.s, BOT_TYPE, &bots[i], &bot_command_set, owner = host.s.me)
+		bots[i] = Bot {
+			hp = 1,
+			x  = f32(100 + i),
+		}
+		ids[i] = ksess.session_spawn(
+			&host.s,
+			BOT_TYPE,
+			&bots[i],
+			&bot_command_set,
+			owner = host.s.me,
+		)
 	}
 
 	// One tick: the budget sends SOME but not ALL — bounded below the full set.
@@ -3891,11 +4268,17 @@ typed_app_route_decodes_the_payload :: proc(t: ^testing.T) {
 	TAG :: u8(5)
 	route: ksess.Typed_Route(Ping_Msg)
 	probe: Ping_Probe
-	ksess.session_app_listen(&alice.s, TAG, &route, &probe, proc(user: rawptr, from: knet.Player_Id, msg: Ping_Msg) {
-		p := cast(^Ping_Probe)user
-		p.got = msg
-		p.calls += 1
-	})
+	ksess.session_app_listen(
+		&alice.s,
+		TAG,
+		&route,
+		&probe,
+		proc(user: rawptr, from: knet.Player_Id, msg: Ping_Msg) {
+			p := cast(^Ping_Probe)user
+			p.got = msg
+			p.calls += 1
+		},
+	)
 
 	ksess.session_host_start(&host.s, "hosty")
 	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
@@ -3916,6 +4299,236 @@ typed_app_route_decodes_the_payload :: proc(t: ^testing.T) {
 	ksess.session_app_flush(&host.s, ap.peer)
 	pump(boxes)
 	testing.expect_value(t, probe.calls, 1) // still 1 — the short one was dropped
+}
+
+Traffic_Probe :: struct {
+	calls:      int,
+	violations: int,
+	last:       ksess.Traffic_Violation,
+	response:   ksess.Traffic_Response,
+}
+
+traffic_probe_message :: proc(
+	user: rawptr,
+	from: knet.Player_Id,
+	from_peer: ksess.Peer_Id,
+	r: ^knet.Reader,
+) {
+	(cast(^Traffic_Probe)user).calls += 1
+}
+
+traffic_probe_hook :: proc(
+	user: rawptr,
+	violation: ksess.Traffic_Violation,
+) -> ksess.Traffic_Response {
+	p := cast(^Traffic_Probe)user
+	p.violations += 1
+	p.last = violation
+	return p.response
+}
+
+@(test)
+traffic_budgets_are_channel_specific_and_refill :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_configure(
+		&host.s,
+		{
+			traffic = {
+				reliable = {packets_per_second = 2, bytes_per_second = 8, burst_seconds = 1},
+				stream = {packets_per_second = 1, bytes_per_second = 4, burst_seconds = 1},
+			},
+		},
+	)
+	reliable, stream: Traffic_Probe
+	ksess.session_app_route(&host.s, 4, &reliable, traffic_probe_message)
+	ksess.session_app_route(&host.s, 5, &stream, traffic_probe_message)
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	// Each frame is four session bytes: [SES_APP][tag][u16 payload]. The
+	// reliable bucket admits exactly two; the stream bucket exactly one.
+	for _ in 0 ..< 3 {
+		w := ksess.session_app_begin(&alice.s, 4)
+		knet.write_u16(w, 7)
+		ksess.session_app_flush(&alice.s, ksess.HOST_PEER)
+	}
+	for _ in 0 ..< 2 {
+		w := ksess.session_app_begin(&alice.s, 5)
+		knet.write_u16(w, 9)
+		ksess.session_app_flush(&alice.s, ksess.HOST_PEER, .Stream)
+	}
+	pump(boxes)
+	testing.expect_value(t, reliable.calls, 2)
+	testing.expect_value(t, stream.calls, 1)
+
+	stats, ok := ksess.session_traffic_stats(&host.s, alice.s.me)
+	testing.expect(t, ok)
+	testing.expect_value(t, stats.reliable.packets, u64(2))
+	testing.expect_value(t, stats.reliable.bytes, u64(8))
+	testing.expect_value(t, stats.reliable.dropped, u64(1))
+	testing.expect_value(t, stats.stream.packets, u64(1))
+	testing.expect_value(t, stats.stream.bytes, u64(4))
+	testing.expect_value(t, stats.stream.dropped, u64(1))
+	testing.expect_value(t, ksess.session_traffic_dropped(&host.s), u64(2))
+
+	// One second restores one full bucket; the two channels refill independently.
+	_, _ = ksess.session_tick(&host.s, 1.0, 1.0)
+	w := ksess.session_app_begin(&alice.s, 4)
+	knet.write_u16(w, 7)
+	ksess.session_app_flush(&alice.s, ksess.HOST_PEER)
+	w = ksess.session_app_begin(&alice.s, 5)
+	knet.write_u16(w, 9)
+	ksess.session_app_flush(&alice.s, ksess.HOST_PEER, .Stream)
+	pump(boxes)
+	testing.expect_value(t, reliable.calls, 3)
+	testing.expect_value(t, stream.calls, 2)
+}
+
+@(test)
+authority_action_ingress_is_one_ordered_pipeline_for_both_models :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+
+	base := ksess.Authority_Action_Request {
+		player = alice.s.me,
+		peer = alice.peer,
+		seq = 1,
+		entity = 44,
+		action = 7,
+		packet_bytes = 24,
+		payload_valid = true,
+		target_exists = true,
+		action_exists = true,
+		owner = alice.s.me,
+		policy = knet.ACTION_OWNER,
+		args_valid = true,
+	}
+
+	immediate := ksess.session_authority_action_admit(&host.s, base)
+	testing.expect(t, immediate.admitted && immediate.reason == .None)
+
+	duplicate := ksess.session_authority_action_admit(&host.s, base)
+	testing.expect(t, !duplicate.admitted && !duplicate.respond)
+	testing.expect_value(t, duplicate.stage, ksess.Authority_Ingress_Stage.Dedup)
+
+	// Sequence spaces are model-qualified: a scheduled action may carry the
+	// same raw sequence without aliasing the immediate action above.
+	scheduled := base
+	scheduled.model = .Scheduled
+	scheduled.has_tick = true
+	scheduled.tick = 11
+	scheduled.authority_tick = 10
+	scheduled.max_future_tick = 2
+	scheduled_decision := ksess.session_authority_action_admit(&host.s, scheduled)
+	testing.expect(t, scheduled_decision.admitted)
+
+	future := scheduled
+	future.seq = 2
+	future.tick = 13
+	future_decision := ksess.session_authority_action_admit(&host.s, future)
+	testing.expect_value(t, future_decision.reason, knet.Action_Reject_Reason.Stale)
+	testing.expect_value(t, future_decision.stage, ksess.Authority_Ingress_Stage.Tick)
+
+	bad_args := base
+	bad_args.seq = 2
+	bad_args.args_valid = false
+	bad_args_decision := ksess.session_authority_action_admit(&host.s, bad_args)
+	testing.expect_value(t, bad_args_decision.reason, knet.Action_Reject_Reason.Malformed)
+	testing.expect_value(t, bad_args_decision.stage, ksess.Authority_Ingress_Stage.Arguments)
+
+	seat, _ := ksess.session_player(&host.s, alice.s.me)
+	seat.spectator = true
+	host.s.players[alice.s.me] = seat
+	spectator := base
+	spectator.seq = 3
+	spectator_decision := ksess.session_authority_action_admit(&host.s, spectator)
+	testing.expect_value(t, spectator_decision.reason, knet.Action_Reject_Reason.Access)
+	testing.expect_value(t, spectator_decision.stage, ksess.Authority_Ingress_Stage.Seat)
+
+	stats := ksess.session_authority_ingress_stats(&host.s)
+	testing.expect_value(t, stats.admitted, u64(2))
+	testing.expect_value(t, stats.rejected, u64(4))
+	testing.expect_value(t, stats.duplicate, u64(1))
+	testing.expect_value(t, stats.by_model[int(knet.Action_Model.Immediate)], u64(1))
+	testing.expect_value(t, stats.by_model[int(knet.Action_Model.Scheduled)], u64(1))
+}
+
+@(test)
+traffic_hook_can_escalate_a_drop_to_a_run_ban :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_configure(
+		&host.s,
+		{
+			traffic = {
+				reliable = {packets_per_second = 1, bytes_per_second = 1024, burst_seconds = 1},
+			},
+		},
+	)
+	probe := Traffic_Probe {
+		response = .Ban,
+	}
+	ksess.session_app_route(&host.s, 4, &probe, traffic_probe_message)
+	ksess.session_set_traffic_hook(&host.s, &probe, traffic_probe_hook)
+	ksess.session_host_start(&host.s, "hosty")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	drain(&host.s)
+	drain(&alice.s)
+
+	// First packet spends the token; the next is refused before its handler and
+	// the hook turns that typed violation into the ordinary kick+ban lifecycle.
+	for _ in 0 ..< 2 {
+		ksess.session_app_send(&alice.s, ksess.HOST_PEER, 4, {})
+	}
+	pump(boxes)
+	testing.expect_value(t, probe.calls, 1)
+	testing.expect_value(t, probe.violations, 1)
+	testing.expect_value(t, probe.last.player, alice.s.me)
+	testing.expect_value(t, probe.last.peer, alice.peer)
+	testing.expect_value(t, probe.last.class, ksess.Traffic_Class.Reliable)
+	testing.expect_value(t, probe.last.strikes, u64(1))
+	p, seated := ksess.session_player(&host.s, alice.s.me)
+	testing.expect(t, seated)
+	testing.expect(t, !p.connected, "automatic escalation revokes the seat")
+	kicked := false
+	for ev in drain(&alice.s) {
+		if _, ok := ev.(ksess.Ev_Kicked); ok {kicked = true}
+	}
+	testing.expect(t, kicked, "the target receives the deliberate kick reason")
+
+	// Ban is the existing run-scoped token denial, not a second moderation path.
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	denied := false
+	for ev in drain(&alice.s) {
+		if e, ok := ev.(ksess.Ev_Join_Denied); ok && e.reason == .Banned {denied = true}
+	}
+	testing.expect(t, denied)
 }
 
 // MUSTER: the staging-room decision — who's ready, and whether the host may
@@ -3949,21 +4562,33 @@ muster_gates_start_on_everyone_ready :: proc(t: ^testing.T) {
 	tal := ksess.muster_tally(&host.s, muster_is_ready)
 	testing.expect_value(t, tal.present, 3)
 	testing.expect_value(t, tal.ready, 0)
-	testing.expect(t, !ksess.muster_can_start(&host.s, 2, muster_is_ready), "no start with nobody ready")
+	testing.expect(
+		t,
+		!ksess.muster_can_start(&host.s, 2, muster_is_ready),
+		"no start with nobody ready",
+	)
 
 	// Two of three ready: still gated (all present must be ready).
 	muster_ready_set[host.s.me] = true
 	muster_ready_set[alice.s.me] = true
 	tal = ksess.muster_tally(&host.s, muster_is_ready)
 	testing.expect_value(t, tal.ready, 2)
-	testing.expect(t, !ksess.muster_can_start(&host.s, 2, muster_is_ready), "not everyone ready yet")
+	testing.expect(
+		t,
+		!ksess.muster_can_start(&host.s, 2, muster_is_ready),
+		"not everyone ready yet",
+	)
 
 	// All three ready and >= min: the host may start.
 	muster_ready_set[bob.s.me] = true
 	testing.expect(t, ksess.muster_can_start(&host.s, 2, muster_is_ready), "all ready, min met")
 
 	// A CLIENT never gets to start, no matter the room.
-	testing.expect(t, !ksess.muster_can_start(&alice.s, 2, muster_is_ready), "starting is the host's")
+	testing.expect(
+		t,
+		!ksess.muster_can_start(&alice.s, 2, muster_is_ready),
+		"starting is the host's",
+	)
 }
 
 // ── adaptive interp delay (interp.odin) ──────────────────────────────────────
@@ -4017,7 +4642,11 @@ interp_adapt_shrinks_slow_and_hysteretic :: proc(t: ^testing.T) {
 	// Converge high first (want 0.30 -> target 0.31).
 	for _ in 0 ..< 300 {ksess.interp_adapt_update(&a, 0.30, dt)}
 	high := a.delay
-	testing.expect(t, abs(high - (0.30 + ksess.INTERP_MARGIN)) < 1e-6, "converged to the high target")
+	testing.expect(
+		t,
+		abs(high - (0.30 + ksess.INTERP_MARGIN)) < 1e-6,
+		"converged to the high target",
+	)
 
 	// The link improves (want 0.05). For nearly SHRINK_HOLD seconds: nothing.
 	held := 0.0
@@ -4028,7 +4657,7 @@ interp_adapt_shrinks_slow_and_hysteretic :: proc(t: ^testing.T) {
 	testing.expect(t, abs(a.delay - high) < 1e-6, "no shrink until the hold elapses (hysteresis)")
 
 	// Past the hold it begins to shrink — but SLOWLY (~0.02/s, not a snap).
-	for _ in 0 ..< 60 {ksess.interp_adapt_update(&a, 0.05, dt)} // ~1s past the hold
+	for _ in 0 ..< 60 {ksess.interp_adapt_update(&a, 0.05, dt)} 	// ~1s past the hold
 	dropped := high - a.delay
 	testing.expect(t, dropped > 0, "shrinks once the hold has elapsed")
 	testing.expect(t, dropped < 0.05, "and shrinks slowly — ~0.02/s, far under the 0.25/s grow")
@@ -4039,7 +4668,7 @@ interp_adapt_clamps_to_the_ceiling :: proc(t: ^testing.T) {
 	a: ksess.Interp_Adapt
 	ksess.interp_adapt_reset(&a, 0.05, 0.20) // 200ms ceiling
 	dt := 1.0 / 60.0
-	for _ in 0 ..< 600 {ksess.interp_adapt_update(&a, 0.50, dt)} // a brutal link wants 0.5s
+	for _ in 0 ..< 600 {ksess.interp_adapt_update(&a, 0.50, dt)} 	// a brutal link wants 0.5s
 	testing.expect(t, a.delay <= 0.20 + 1e-9, "never exceeds the ceiling")
 	testing.expect(t, abs(a.delay - 0.20) < 1e-6, "pins at the ceiling under a brutal link")
 	testing.expect(t, abs(a.target - 0.20) < 1e-6, "the target is clamped too")
@@ -4072,7 +4701,9 @@ born_hook_delivers_the_hosts_own_spawns_at_the_send :: proc(t: ^testing.T) {
 	defer box_destroy(&alice)
 	boxes := []^Peer_Box{&host, &alice}
 
-	probe := Born_Probe{s = &host.s}
+	probe := Born_Probe {
+		s = &host.s,
+	}
 	defer delete(probe.got)
 	ksess.session_set_born(&host.s, &probe, born_probe_hook) // pre-start wiring: survives the start
 
@@ -4108,7 +4739,9 @@ born_hook_delivers_the_hosts_own_spawns_at_the_send :: proc(t: ^testing.T) {
 	}
 
 	// The by-hand door (session_spawn, pre-filled entity) is born at the call.
-	hand := Bot{hp = 3}
+	hand := Bot {
+		hp = 3,
+	}
 	id2 := ksess.session_spawn(&host.s, BOT_TYPE, &hand, &bot_command_set)
 	testing.expect_value(t, len(probe.got), 2)
 	testing.expect_value(t, probe.got[1].id, id2)
@@ -4131,7 +4764,9 @@ born_hook_delivers_the_hosts_own_spawns_at_the_send :: proc(t: ^testing.T) {
 
 	// nil restores the queue: the host's next spawn is polled like before.
 	ksess.session_set_born(&host.s, nil, nil)
-	late := Bot{hp = 1}
+	late := Bot {
+		hp = 1,
+	}
 	id3 := ksess.session_spawn(&host.s, BOT_TYPE, &late, &bot_command_set)
 	testing.expect_value(t, len(probe.got), 2)
 	polled := false

@@ -11,6 +11,32 @@ The reference consumer is `examples/cavecrawl/run.sh`, a four-act test
 covering the story, save/resume, match flow plus moderation, and host
 migration under `kill -9`. All of its plumbing is the harness.
 
+For framework contributors, `tests/wireabi/run.sh` is the protocol-layout
+fixture. It generates one nested schema, executes its exact raw byte vector
+natively, and compiles the same fingerprint/layout assertions for web, Linux,
+and Windows targets. The native pass queries the generated `NET_SCHEMA` field,
+action, argument, type, and message tables; a profile-only package pins that
+projection too, while `tests/repgen` covers inputs, constraints, entity ids,
+scheduled actions, and facts. The fixture also proves a schema drift is denied by the real JOIN
+handshake and pins recursive diagnostics across replicated fields, input
+records, profiles, and typed messages, including platform-width integers,
+implicit enums, pointers, hidden padding, and unsupported containers.
+
+`tests/kitstress/run.sh` is the optimized scale/operations gate. It prints
+three receipts:
+
+- `STRESS`: delta CPU at 0/10/100% dirty, join/world/snapshot bytes, apply and
+  resume CPU, and session resident/peak allocation for 100/500/2,000 entities.
+- `FANOUT`: per-recipient AOI composition CPU and authority egress at
+  2/100, 4/500, and 8/2,000 player/entity shapes.
+- `RESIM`: forced eight-tick replay CPU and prediction-history bytes for
+  32/128/512 predicted entities.
+
+The generous timing assertions detect complexity regressions, not machine
+speed. The supported starting values derived from these fixtures live in
+`network_profile_envelope`; [profiles](profiles.md) explains what they do and
+do not guarantee.
+
 ## The test shape
 
 Launch N *real* headless processes of your *real* main scene under an

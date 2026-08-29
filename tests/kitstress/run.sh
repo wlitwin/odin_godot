@@ -8,5 +8,5 @@ set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
-"${ODIN:-odin}" test "$ROOT/tests/kitstress" -collection:godot="$ROOT" -o:speed
+"${ODIN:-odin}" test "$ROOT/tests/kitstress" -collection:godot="$ROOT" -o:speed -define:ODIN_TEST_THREADS=1
 echo "KITSTRESS_OK"

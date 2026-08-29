@@ -19,10 +19,13 @@ package kit_stress_test
 //   odin test tests/kitstress -collection:godot=$PWD
 
 import "core:fmt"
+import "core:mem"
 import "core:testing"
 import "core:time"
+import "base:runtime"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
+import ksim "godot:kit/sim"
 
 // ---- the in-memory pipe (the kitsession pattern, trimmed) ----------------------
 
@@ -36,32 +39,45 @@ Peer_Box :: struct {
 	s:     ksess.Session,
 	out:   [dynamic]Envelope,
 	props: map[knet.Net_Id]^Prop, // factory-created (clients + resumed hosts)
+	harness: mem.Allocator, // transport/factory scaffolding, excluded from session memory
+	sent: int,
 }
 
 box_send :: proc(user: rawptr, to_peer: ksess.Peer_Id, bytes: []u8, channel: ksess.Channel) {
 	b := cast(^Peer_Box)user
-	cloned := make([]u8, len(bytes))
+	b.sent += len(bytes)
+	cloned := make([]u8, len(bytes), b.harness)
 	copy(cloned, bytes)
 	append(&b.out, Envelope{to = to_peer, data = cloned})
 }
 
-box_make :: proc(b: ^Peer_Box, peer: ksess.Peer_Id) {
+box_make :: proc(
+	b: ^Peer_Box,
+	peer: ksess.Peer_Id,
+	session_allocator := mem.Allocator{},
+) {
 	b.peer = peer
+	b.harness = context.allocator
+	b.out = make([dynamic]Envelope, b.harness)
+	b.props = make(map[knet.Net_Id]^Prop, b.harness)
+	if session_allocator.procedure != nil {
+		b.s.allocator = session_allocator
+	}
 	b.s.send = box_send
 	b.s.send_user = b
 	ksess.session_set_factory(&b.s, b, box_make_entity, box_free_entity)
 }
 
 box_destroy :: proc(b: ^Peer_Box) {
-	for e in b.out {delete(e.data)}
+	for e in b.out {delete(e.data, b.harness)}
 	delete(b.out)
-	for _, p in b.props {free(p)}
+	for _, p in b.props {free(p, b.harness)}
 	delete(b.props)
 	ksess.session_destroy(&b.s)
 }
 
 box_clear_out :: proc(b: ^Peer_Box) {
-	for e in b.out {delete(e.data)}
+	for e in b.out {delete(e.data, b.harness)}
 	clear(&b.out)
 }
 
@@ -75,6 +91,27 @@ deliver :: proc(from, to: ^Peer_Box) {
 			ksess.session_handle_packet(&to.s, from.peer, &r)
 		}
 		delete(e.data)
+	}
+}
+
+pump_all :: proc(boxes: []^Peer_Box) {
+	for progress := true; progress; {
+		progress = false
+		for from in boxes {
+			for len(from.out) > 0 {
+				e := from.out[0]
+				ordered_remove(&from.out, 0)
+				for to in boxes {
+					if to == from {continue}
+					if e.to == ksess.BROADCAST_PEER || e.to == to.peer {
+						r := knet.reader_make(e.data)
+						ksess.session_handle_packet(&to.s, from.peer, &r)
+					}
+				}
+				delete(e.data, from.harness)
+				progress = true
+			}
+		}
 	}
 }
 
@@ -113,7 +150,7 @@ PROP_TYPE :: ksess.Entity_Type(11)
 box_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (rawptr, ^knet.Command_Set) {
 	b := cast(^Peer_Box)user
 	if type != PROP_TYPE {return nil, nil}
-	p := new(Prop)
+	p := new(Prop, b.harness)
 	b.props[id] = p
 	return p, &prop_command_set
 }
@@ -121,7 +158,50 @@ box_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, 
 box_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 	b := cast(^Peer_Box)user
 	delete_key(&b.props, id)
-	free(entity)
+	free(entity, b.harness)
+}
+
+prop_locate :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) -> (x, y, z: f32, always: bool) {
+	p := cast(^Prop)entity
+	return p.x, p.y, 0, false
+}
+
+Counting_Allocator :: struct {
+	backing: mem.Allocator,
+	current, peak, total: int,
+}
+
+counting_allocator_proc :: proc(
+	data: rawptr,
+	mode: mem.Allocator_Mode,
+	size, alignment: int,
+	old_memory: rawptr,
+	old_size: int,
+	loc := #caller_location,
+) -> ([]byte, mem.Allocator_Error) {
+	c := cast(^Counting_Allocator)data
+	bytes, err := c.backing.procedure(c.backing.data, mode, size, alignment, old_memory, old_size, loc)
+	if err != nil {
+		return bytes, err
+	}
+	#partial switch mode {
+	case .Alloc, .Alloc_Non_Zeroed:
+		c.current += size
+		c.total += size
+	case .Resize, .Resize_Non_Zeroed:
+		c.current += size - old_size
+		if size > old_size {c.total += size - old_size}
+	case .Free:
+		if old_memory != nil {c.current -= old_size}
+	case .Free_All:
+		c.current = 0
+	}
+	c.peak = max(c.peak, c.current)
+	return bytes, err
+}
+
+counting_allocator :: proc(c: ^Counting_Allocator) -> mem.Allocator {
+	return {procedure = counting_allocator_proc, data = c}
 }
 
 // ---- measurement helpers --------------------------------------------------------
@@ -156,6 +236,7 @@ Row :: struct {
 	join_apply_ms:                      f64, // client materializes the world
 	snap_bytes:                         int,
 	snap_write_ms, resume_ms:           f64,
+	session_bytes, session_peak_bytes:  int,
 }
 
 measure :: proc(t: ^testing.T, n: int) -> Row {
@@ -164,8 +245,9 @@ measure :: proc(t: ^testing.T, n: int) -> Row {
 	}
 	now := f64(1000)
 
+	host_mem := Counting_Allocator{backing = context.allocator}
 	host: Peer_Box
-	box_make(&host, 1)
+	box_make(&host, 1, counting_allocator(&host_mem))
 	defer box_destroy(&host)
 	ksess.session_host_start(&host.s, "hosty")
 	ksess.session_start_replicating(&host.s) // go live: spawns broadcast, joiners get SES_WORLD
@@ -200,6 +282,8 @@ measure :: proc(t: ^testing.T, n: int) -> Row {
 	total = 0
 	for _ in 0 ..< TICKS {total += dirty_tick(&host, props, 1, &now)}
 	row.tick100_ms = ms(total) / TICKS
+	row.session_bytes = host_mem.current
+	row.session_peak_bytes = host_mem.peak
 
 	// -- a client joins INTO the standing world --
 	client: Peer_Box
@@ -251,14 +335,15 @@ measure :: proc(t: ^testing.T, n: int) -> Row {
 @(test)
 scale_numbers :: proc(t: ^testing.T) {
 	fmt.println("")
-	fmt.println("STRESS      N   spawn   tick0%  tick10% tick100%     join    world    apply     snap    write   resume")
+	fmt.println("STRESS      N   spawn   tick0%  tick10% tick100%     join    world    apply     snap    write   resume   session     peak")
 	for n in ([]int{100, 500, 2000}) {
 		r := measure(t, n)
 		fmt.printfln(
-			"STRESS %6d %6.2fms %7.3fms %7.3fms %7.3fms %7dB %7dB %7.2fms %7dB %7.2fms %7.2fms",
+			"STRESS %6d %6.2fms %7.3fms %7.3fms %7.3fms %7dB %7dB %7.2fms %7dB %7.2fms %7.2fms %8dB %8dB",
 			r.n, r.spawn_ms, r.tick0_ms, r.tick10_ms, r.tick100_ms,
 			r.join_bytes, r.world_bytes, r.join_apply_ms,
 			r.snap_bytes, r.snap_write_ms, r.resume_ms,
+			r.session_bytes, r.session_peak_bytes,
 		)
 
 		// The O(n^2) tripwires — ceilings are ~10x a healthy laptop run, NOT
@@ -266,5 +351,147 @@ scale_numbers :: proc(t: ^testing.T) {
 		testing.expect(t, r.tick100_ms < 25, "delta walk blew its complexity budget")
 		testing.expect(t, r.join_apply_ms < 250, "join apply blew its complexity budget")
 		testing.expect(t, r.resume_ms < 250, "resume blew its complexity budget")
+	}
+}
+
+@(test)
+server_fanout_envelope_by_players_and_entities :: proc(t: ^testing.T) {
+	fmt.println("")
+	fmt.println("FANOUT players entities  tick cpu    authority tx   session memory")
+	for shape in ([3][2]int{{2, 100}, {4, 500}, {8, 2000}}) {
+		players, entities := shape[0], shape[1]
+		host_mem := Counting_Allocator{backing = context.allocator}
+		store := make([]Peer_Box, players)
+		boxes := make([]^Peer_Box, players)
+		for i in 0 ..< players {
+			boxes[i] = &store[i]
+			box_make(boxes[i], ksess.Peer_Id(i + 1), i == 0 ? counting_allocator(&host_mem) : mem.Allocator{})
+		}
+		ksess.session_configure(&boxes[0].s, {max_players = players})
+		ksess.session_host_start(&boxes[0].s, "hosty")
+		for i in 1 ..< players {
+			ksess.session_client_start(&boxes[i].s, u64(0xB000 + i), fmt.tprintf("p%d", i))
+			ksess.session_client_join(&boxes[i].s)
+		}
+		pump_all(boxes)
+		// Force the scale-sensitive per-recipient path while keeping every
+		// entity relevant. This measures AOI composition + actual fanout, not
+		// the transport's single broadcast shortcut.
+		ksess.session_set_interest(&boxes[0].s, 1_000_000, 0, nil, prop_locate)
+		for i in 1 ..< players {
+			ksess.session_set_focus(&boxes[0].s, boxes[i].s.me, 0, 0)
+		}
+		ksess.session_start_replicating(&boxes[0].s)
+		for i in 0 ..< entities {
+			p := new(Prop, boxes[0].harness)
+			p.hp = 100
+			p.aux = u32(i)
+			id := ksess.session_spawn(&boxes[0].s, PROP_TYPE, p, &prop_command_set)
+			boxes[0].props[id] = p
+		}
+		pump_all(boxes)
+		base_sent := boxes[0].sent
+		for _, p in boxes[0].props {p.hp -= 1}
+		start := time.tick_now()
+		_, _ = ksess.session_tick(&boxes[0].s, 0.05, 1000.0)
+		tick_ms := ms(time.tick_since(start))
+		tx := boxes[0].sent - base_sent
+		fmt.printfln(
+			"FANOUT %7d %8d %8.3fms %12dB %16dB",
+			players, entities, tick_ms, tx, host_mem.current,
+		)
+		testing.expect(t, tick_ms < 25, "server fanout exceeded the supported benchmark tripwire")
+		for b in boxes {box_destroy(b)}
+		delete(boxes)
+		delete(store)
+	}
+}
+
+// ---- resimulation envelope --------------------------------------------------
+
+Bench_Body :: struct {x, vx: f32}
+
+bench_body_desc :: proc() -> knet.Entity_Desc {
+	@(static) fields := [?]knet.Field_Desc {
+		{offset = offset_of(Bench_Body, x), size = size_of(f32), flags = {.Predicted}},
+		{offset = offset_of(Bench_Body, vx), size = size_of(f32), flags = {.Predicted}},
+	}
+	return {fields = fields[:]}
+}
+
+Resim_World :: struct {
+	bodies:  []Bench_Body,
+	entries: []ksim.Entry,
+}
+
+bench_resim :: proc(user: rawptr, tick: u64) {
+	w := cast(^Resim_World)user
+	for &body, i in w.bodies {
+		body.vx += f32((i % 3) - 1)
+		body.x += body.vx
+	}
+}
+
+@(test)
+resimulation_cpu_and_memory_envelope :: proc(t: ^testing.T) {
+	DESC := bench_body_desc()
+	SLOTS :: 32
+	AUTH :: u64(8)
+	HEAD :: u64(16)
+	RUNS :: 25
+	fmt.println("")
+	fmt.println("RESIM       N   ticks    avg/run  per entity-tick   history")
+	for n in ([]int{32, 128, 512}) {
+		ledger_mem := Counting_Allocator{backing = context.allocator}
+		alloc := counting_allocator(&ledger_mem)
+		bodies := make([]Bench_Body, n)
+		entries := make([]ksim.Entry, n)
+		histories := make([]ksim.History, n)
+		truth_bytes := make([]u8, n * 8)
+		truths := make([]ksim.Truth, n)
+		for i in 0 ..< n {
+			bodies[i] = {x = f32(i), vx = f32(i % 5)}
+			histories[i] = ksim.history_make(&DESC, SLOTS, alloc)
+			entries[i] = {id = knet.Net_Id(i + 1), entity = &bodies[i], hist = &histories[i]}
+			truths[i] = {id = knet.Net_Id(i + 1), blob = truth_bytes[i * 8:(i + 1) * 8]}
+		}
+		world := Resim_World{bodies = bodies, entries = entries}
+		for tick in u64(1) ..= HEAD {
+			bench_resim(&world, tick)
+			ksim.note_all(entries, tick)
+		}
+		for &truth, i in truths {
+			blob, _ := ksim.history_read(&histories[i], AUTH)
+			copy(truth.blob, blob)
+		}
+
+		start := time.tick_now()
+		resim_ticks := 0
+		for run in 0 ..< RUNS {
+			// Alternate a real authoritative correction so every run exercises
+			// rewind + replay, not the memcmp-only clean path.
+			truth_body := Bench_Body{x = run % 2 == 0 ? -1000 : 1000, vx = 0}
+			ksim.predict_capture(truths[0].blob, &truth_body, &DESC)
+			resim_ticks += ksim.reconcile(entries, truths, AUTH, HEAD, &world, bench_resim)
+		}
+		elapsed_ms := ms(time.tick_since(start)) / RUNS
+		entity_ticks := n * int(HEAD - AUTH)
+		fmt.printfln(
+			"RESIM %6d %7d %9.3fms %12.3fus %9dB",
+			n,
+			int(HEAD - AUTH),
+			elapsed_ms,
+			elapsed_ms * 1000.0 / f64(entity_ticks),
+			ledger_mem.current,
+		)
+		testing.expect_value(t, resim_ticks, RUNS * int(HEAD - AUTH))
+		testing.expect(t, elapsed_ms < 50, "resimulation exceeded the supported benchmark tripwire")
+
+		for &history in histories {ksim.history_destroy(&history)}
+		delete(truths)
+		delete(truth_bytes)
+		delete(histories)
+		delete(entries)
+		delete(bodies)
 	}
 }

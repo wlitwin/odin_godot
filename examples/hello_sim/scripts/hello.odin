@@ -39,13 +39,25 @@ HelloSim :: struct {
 
 	player_scene: ^gd.Resource `gd:"entity=Player:1"`,
 
-	me: ^Player,
+	me: ^Player
 }
 
 now_s :: knet.now_s
 
 hello_sim_ready :: proc(self: ^HelloSim) {
-	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
+	role := gd.env_string("HELLO_ROLE", "")
+	profile :=
+	kboot.Network_Profile.Listen_Server_Action
+	if role == "serve" {
+		// The same game binary can host from a player's machine or run as an
+		// avatarless authority. The dedicated profile tightens admission and
+		// history bounds; boot_serve below is what supplies the trust boundary.
+		profile = .Dedicated_Competitive
+	}
+	// One generated attach owns the routine stack: boot + entity factory +
+	// simulation lane. The named profile installs a coherent session+lane pair,
+	// and scriptgen verifies the dedicated form has the validator below.
+	hello_sim_net_attach(self, kboot.Options{
 		title = "HELLO, SERVER AUTHORITY",
 		status = "Host a room, or join one at localhost",
 		legend = "Arrows move · Enter chat",
@@ -53,16 +65,10 @@ hello_sim_ready :: proc(self: ^HelloSim) {
 		min_players = 1,
 		// methods omitted = kboot.STANDARD_METHODS — the eight names above
 		// were the list every game wrote anyway
-	})
-	hello_sim_entities(self, &self.boot)
+	},
+	kboot.network_profile(profile))
 
-	// The promotion's ENTIRE wiring (checklist step 7): the generated
-	// lane_init carries the tick/sample declarations; the boot drives the
-	// lane — tracking, possession, presentation — from here on.
-	hello_sim_lane_init(self, &self.lane, &self.ses)
-	kboot.boot_lane(&self.boot, &self.lane)
-
-	switch gd.env_string("HELLO_ROLE", "") {
+	switch role {
 	case "host":
 		hello_sim_on_host(self)
 	case "join":
@@ -77,9 +83,9 @@ hello_sim_process :: proc(self: ^HelloSim, delta: f64) {
 	if was == .Menu {return}
 	// The coop hello drove `me` right here, at frame rate. Promoted, the
 	// device read lives in the @(gd_sample) below and the movement in
-	// player_tick — the frame loop only pumps.
-	events, _, _ := kboot.boot_pump(&self.boot, delta, now_s())
-	hello_sim_events(self, events)
+	// player_tick — the frame loop only pumps. Declared event halves are
+	// forwarded inside this generated call too.
+ _ = hello_sim_net_pump(self, delta, now_s())
 	if was != .Playing && kboot.boot_phase(&self.boot) == .Playing {
 		gd.print_str("HELLO_STARTED")
 	}
@@ -88,7 +94,7 @@ hello_sim_process :: proc(self: ^HelloSim, delta: f64) {
 // The one place that still touches hardware (checklist step 4): fill my
 // input for tick T. The lane ships it, the server simulates it, my own
 // screen predicts it this frame.
-@(gd_sample = "validate")
+@(gd_sample)
 hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^Player_Input) {
 	_ = tick
 	input^ = {}
@@ -96,15 +102,6 @@ hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^Player_Input) {
 	if gd.is_action_pressed("ui_left") {input.move[0] -= 1}
 	if gd.is_action_pressed("ui_down") {input.move[1] += 1}
 	if gd.is_action_pressed("ui_up") {input.move[1] -= 1}
-}
-
-// The authority validates every received input before it enters a player's
-// de-jitter buffer. This turns the sample's local -1/0/1 convention into a
-// network admission rule instead of trusting clients to follow the comment.
-hello_sample_validate :: proc(self: ^HelloSim, input: ^Player_Input) -> bool {
-	_ = self
-	return input.move[0] >= -1 && input.move[0] <= 1 &&
-	       input.move[1] >= -1 && input.move[1] <= 1
 }
 
 // ---- the doors (hello_net's plain host/join pair + the dedicated `serve`; ---

@@ -7,7 +7,7 @@
 #   STATE:    gd:"replicate" tag -> scriptgen's generated Entity_Desc -> kit/net
 #             shadow diff / full snapshot -> kit/netgd send_bytes -> ENet ->
 #             peer_packet -> kit/net apply -> verified fields on the remote peer.
-#   COMMANDS: @(gd_command="predict") -> generated `<proc>_cmd` wrapper (the only
+#   COMMANDS: typed predicted @(gd_command) -> generated `<proc>_cmd` wrapper (the only
 #             role branch lives in generated code) -> optimistic local run ->
 #             wire -> host dedup + authoritative execute -> CONFIRM (prediction
 #             stands, pending drains) and, against silently-diverged host state,

@@ -633,7 +633,8 @@ whole set.
 | first param `self: ^<Class>` | every bound proc | THE receiver: it is how scriptgen knows the proc belongs to this class at all | the proc is not bound; nothing generates, no diagnostic |
 | a pointer param **immediately after the receiver** | `@(gd_command)` / `@(gd_method)` on an *embedded block* | the WIELDER: scriptgen fills it with `self`, so the block can touch the entity that carries it. Never a wire arg (a pointer can't cross the wire) | a pointer there on a *direct* command is a build error ("un-wire-able arg") |
 | `by: knet.Player_Id` (after the receiver/wielder) | `@(gd_command)` | the ISSUER, framework-filled with the true sender, so a predicate can arbitrate on WHO without trusting a client-claimed argument | `by` under any other name is an ordinary wire arg, i.e. client-controlled. The name **and** the type together are the declaration; a wire arg *named* `by` is refused outright |
-| `mine: bool` | an `@(gd_fact)` door's `_fx` bearer, and a tick's `_fx` half | the every-screen law: `true` on the screen whose live simulation caused the event, `false` on watchers replaying it off their watch clock | position and name are both checked; the error names the slot |
+| typed entity params before `mine` | an `@(gd_cue)` `_fx` proc | concrete lane-tracked entities used by the presentation; one is the inferred anchor, while several require `anchor=PARAM` | an unknown/non-entity anchor, ambiguous list, or untracked type is a build error |
+| `mine: bool` | an `@(gd_cue)` door's `_fx` bearer, and a tick's `_fx` half | the every-screen law: `true` on the screen whose live simulation caused the event, `false` on watchers replaying it off their watch clock | position and name are both checked; the error names the slot |
 | `tick: u64` | `@(gd_sample)` (required, second), `@(gd_step)` (optional, second) | the lane's tick number | on a sample, a build error; on a step, the param is simply not passed |
 | `l: ^ksim.Lane` | reserved *against* you: a generated fact door already names its lane param `l` | — | an author arg named `l` is refused, because the door's own binding would shadow it |
 | a `kit/boot` `Boot` field on the script struct | the game shell | declares the four standard transport forwards (`on_packet` / `on_peer_left` / `on_net_up` / `on_net_down`) | see the note below |
@@ -651,7 +652,7 @@ no magic path.
 
 | Generated | Yields to a hand-written… |
 | --- | --- |
-| census accessors: `<entity>_of`, `<entity>_owned_by`, `my_<entity>`, `<entity>_ids`, `<entity>_spawn` | proc of that name |
+| census accessors: `<entity>_ref`, `<entity>_of`, `<entity>_owned_by`, `my_<entity>`, `<entity>_ids`, `<entity>_all`, `<entity>_spawn` | proc of that name |
 | acceptance-test probes: `probe_<entity>_count`, `probe_my_<entity>`, `probe_<entity>_<field>` | proc (or `@(gd_method)`) of that name |
 | the four standard transport forwards | `@(gd_method)` of that name |
 
@@ -665,8 +666,8 @@ That line confirms an intended override took effect and, when you didn't intend 
 tells you something in your package is already wearing a generated name. Check it if a proc
 you meant to override (`runner_of` where the entity is `Runner_Bot`) seems to do nothing.
 
-**The one exception: `@(gd_fact)` announce doors refuse.** Write a proc with a declared
-fact's door name and it is a build error, not a yield. The door is not a convenience you
+**The one exception: `@(gd_cue)` announce doors refuse.** Write a proc with a declared
+cue's door name and it is a build error, not a yield. The door is not a convenience you
 could re-implement: its generated body holds four gates game code has no way to reproduce:
 it broadcasts the tuple only on the authority, fires the `_fx` half on the causer's *live*
 pass with `mine=true`, fires it on every watching screen when that screen's watch clock
@@ -687,11 +688,20 @@ Three naming formulas produce identifiers you are expected to *call*, and one pr
 name you are expected to *write*. They are not interchangeable, and two of them are one
 letter apart.
 
-**Command policy tokens.** `@(gd_command)` is owner-only by default. Add `predict` for
-optimistic local execution, `any_seat` for a shared interaction, or `authority` for a verb
-that must never enter from a client; combine independent tokens with a comma, for example
-`@(gd_command = "predict,any_seat")`. The same vocabulary applies whether the class uses
-co-op replication or the sim lane, and access is enforced before the verb predicate.
+**Action policies.** `@(gd_command)` is owner-only and non-predicted by default. Use
+`knet.ACTION_OWNER_PREDICTED`, `knet.ACTION_ANY_SEAT`,
+`knet.ACTION_ANY_SEAT_PREDICTED`, or `knet.ACTION_AUTHORITY` when the verb differs.
+Both co-op and sim descriptors carry the same typed `knet.Action_Policy`, and access is
+enforced before the verb predicate. A `knet.Action_Policy{...}` literal can additionally
+set `max_args_bytes`; old comma-string annotations remain accepted only for migration.
+
+Every generated command wrapper returns `knet.Action_Outcome`. Most call sites use
+`knet.command_ok(outcome)` and stay single-player-shaped. UI that cares about an immediate
+refusal can inspect `outcome.reason`; the generated game-shell
+`<game>_command_rejected` half receives the final authority reason (`Access`, `Rate`,
+`Malformed`, `Stale`, `Predicate`, or `Timeout`) for both co-op and tick-scheduled verbs.
+Its `model` parameter distinguishes `.Immediate` from `.Scheduled`; no packet or pending
+table is part of the author surface.
 
 **Command wrappers: two formulas.** A verb declared directly on the entity keeps its own
 proc name; a verb hoisted out of an embedded block is renamed after the PATH it was reached
@@ -1111,15 +1121,16 @@ Practical rules for what runs where and who owns which allocation:
 3. builds the scripts dll with `odin build <scriptsdir> -build-mode:dll
    -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc
    -custom-attribute:gd_command -custom-attribute:gd_tick
-   -custom-attribute:gd_sample -custom-attribute:gd_step
-   -custom-attribute:gd_fact -custom-attribute:gd_half
+   -custom-attribute:gd_input -custom-attribute:gd_sample -custom-attribute:gd_step
+   -custom-attribute:gd_cue -custom-attribute:gd_fact -custom-attribute:gd_half
    -custom-attribute:gd_message`
    (the `.gen.odin` are in the same package and compile together),
 4. builds the core dll.
 
-The ten `-custom-attribute:` flags are required so the Odin compiler accepts the
+The twelve `-custom-attribute:` flags are required so the Odin compiler accepts the
 `@(gd_method)` / `@(gd_connect)` / `@(gd_rpc)` / `@(gd_command)` / `@(gd_tick)` /
-`@(gd_sample)` / `@(gd_step)` / `@(gd_fact)` / `@(gd_half)` / `@(gd_message)` marker attributes; the
+`@(gd_input)` / `@(gd_sample)` / `@(gd_step)` / `@(gd_cue)` / `@(gd_fact)` / `@(gd_half)` /
+`@(gd_message)` marker attributes; the
 build script passes them for you. The set lives in `decl/decl.odin`'s `ATTRS`, and
 tests/scriptgen asserts the build scripts against it: Odin refuses an unknown custom
 attribute outright, so a name the schema grew and a build script did not would be a

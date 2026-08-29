@@ -27,12 +27,17 @@ package kit_net
 import "core:fmt"
 import "core:slice"
 
+// Entity blobs are replicated state, not an upload lane. Bigger assets use
+// kit/xfer so they are chunked and paced instead of blocking world/state
+// traffic behind one reliable packet.
+ENTITY_BLOB_MAX_BYTES :: 256 * 1024
+
 Registry_Entry :: struct {
-	id:     Net_Id,
-	entity: rawptr,
-	set:    ^Command_Set, // commands + Entity_Desc (desc-only entities use an empty command table)
-	shadow: []u8,
-	owner:  Player_Id, // PLAYER_ID_INVALID = host-owned
+	id:            Net_Id,
+	entity:        rawptr,
+	set:           ^Command_Set, // commands + Entity_Desc (desc-only entities use an empty command table)
+	shadow:        []u8,
+	owner:         Player_Id, // PLAYER_ID_INVALID = host-owned
 	// LOCAL prediction: this peer expects to own the entity (a transfer it just
 	// requested) and is writing its owner-streamed fields NOW, before the host
 	// confirms. While set, registry_sample_streams leaves it alone — the write
@@ -41,21 +46,21 @@ Registry_Entry :: struct {
 	// by registry_set_owner when the real transfer lands. Per-peer, never on the
 	// wire — the host and other peers never see it.
 	predict_owner: bool,
-	stream: Stream_Ring, // remote-owned entities: buffered owner-stream snapshots
-	warp:   u8, // owner side: bumped by registry_teleport; rides every stream snapshot
-	tier:   u8, // owner side: stream every Nth tick (0/1 = every tick). A frequency
-	            // tier — cheap far/AI entities at 30Hz while players stay 60Hz.
-	            // Streams are unreliable last-value, so a skipped tick reads like a
-	            // dropped packet; interp smooths the sparser keyframes (keep the tier
-	            // PERIOD under interp_delay or remote motion stutters). Send-side
-	            // local hint, NOT replicated — a new authority re-applies it.
-	blob:     []u8, // the entity's opaque payload (registry_set_blob) — nil = never set
-	blob_ver: u32, // bumped per set; receivers use it to drop re-received duplicates
+	stream:        Stream_Ring, // remote-owned entities: buffered owner-stream snapshots
+	warp:          u8, // owner side: bumped by registry_teleport; rides every stream snapshot
+	tier:          u8, // owner side: stream every Nth tick (0/1 = every tick). A frequency
+	// tier — cheap far/AI entities at 30Hz while players stay 60Hz.
+	// Streams are unreliable last-value, so a skipped tick reads like a
+	// dropped packet; interp smooths the sparser keyframes (keep the tier
+	// PERIOD under interp_delay or remote motion stutters). Send-side
+	// local hint, NOT replicated — a new authority re-applies it.
+	blob:          []u8, // the entity's opaque payload (registry_set_blob) — nil = never set
+	blob_ver:      u32, // bumped per set; receivers use it to drop re-received duplicates
 	// The edge mirror (edge.odin): last-presented bytes of the class's
 	// edge-declared fields. nil for classes without edge halves; seeded on
 	// first sight and on resync — silently, both times.
-	edge_shadow: []u8,
-	edge_seeded: bool,
+	edge_shadow:   []u8,
+	edge_seeded:   bool,
 }
 
 Registry :: struct {
@@ -98,7 +103,12 @@ registry_reserve_ids :: proc(reg: ^Registry, floor: Net_Id) {
 // Authority-side registration: allocates the id. The fresh shadow is zeroed,
 // so the entity's first delta walk marks every non-zero field dirty — exactly
 // the initial send a newly spawned entity needs.
-registry_spawn :: proc(reg: ^Registry, entity: rawptr, set: ^Command_Set, owner := PLAYER_ID_INVALID) -> Net_Id {
+registry_spawn :: proc(
+	reg: ^Registry,
+	entity: rawptr,
+	set: ^Command_Set,
+	owner := PLAYER_ID_INVALID,
+) -> Net_Id {
 	id := registry_alloc_id(reg)
 	registry_insert(reg, id, entity, set, owner)
 	return id
@@ -107,14 +117,30 @@ registry_spawn :: proc(reg: ^Registry, entity: rawptr, set: ^Command_Set, owner 
 // Remote-side registration under an id received from the wire. Keeps next_id
 // ahead of everything seen so a session that later BECOMES the authority
 // (host migration) can keep allocating without collisions.
-registry_insert :: proc(reg: ^Registry, id: Net_Id, entity: rawptr, set: ^Command_Set, owner := PLAYER_ID_INVALID) {
+registry_insert :: proc(
+	reg: ^Registry,
+	id: Net_Id,
+	entity: rawptr,
+	set: ^Command_Set,
+	owner := PLAYER_ID_INVALID,
+) {
 	assert(id != NET_ID_INVALID)
-	assert(u32(id) & PROVISIONAL_BIT == 0, "provisional (high-bit) ids are lane-local and never enter the registry")
+	assert(
+		u32(id) & PROVISIONAL_BIT == 0,
+		"provisional (high-bit) ids are lane-local and never enter the registry",
+	)
+	for cmd in set.commands {
+		assert(action_desc_valid(cmd.action, .Immediate), "registry_insert: invalid immediate action descriptor")
+	}
 	// Comma-ok, NOT a bare missing-key index: indexing a map by an absent key
 	// of a large value type faults in the current compiler (see the stats-map
 	// note in kit/session) — and absent is this assert's NORMAL path.
 	_, exists := reg.entries[id]
 	assert(!exists, "net id registered twice")
+	assert(
+		len(reg.entries) < MAX_CONTAINER_ITEMS,
+		"registry exceeds MAX_CONTAINER_ITEMS — partition the world/interest domain",
+	)
 	if set.net_id_offset > 0 {
 		(cast(^Net_Id)(uintptr(entity) + uintptr(set.net_id_offset)))^ = id
 	}
@@ -178,13 +204,25 @@ registry_write_deltas :: proc(w: ^Writer, reg: ^Registry, changed: ^[dynamic]Net
 	write_u16(w, 0) // patched below
 	count := 0
 	for _, &e in reg.entries {
-		mask_at := len(w.buf)
-		write_net_id(w, e.id)
-		mask := write_delta(w, e.entity, e.shadow, e.set.entity_desc)
+		if count >= MAX_CONTAINER_ITEMS {
+			break
+		}
+		v := subset_view(e.set.entity_desc, .Delta)
+		mask := diff_mask(e.entity, e.shadow, e.set.entity_desc)
 		if mask == 0 {
-			resize(&w.buf, mask_at) // idle: drop the id we speculatively wrote
 			continue
 		}
+		row_bytes := 4 + v.mask_bytes
+		for entry, ord in v.entries {
+			if mask & (u64(1) << u64(ord)) != 0 {
+				row_bytes += int(entry.wire_size)
+			}
+		}
+		if row_bytes > MAX_PACKET_BYTES - len(w.buf) {
+			continue // shadow stays dirty; a later packet can carry it
+		}
+		write_net_id(w, e.id)
+		_ = write_delta(w, e.entity, e.shadow, e.set.entity_desc)
 		if changed != nil {
 			append(changed, e.id)
 		}
@@ -210,15 +248,33 @@ Delta_Seg :: struct {
 // is recorded so the caller can compose PER-RECIPIENT batches (kit/session's
 // interest management). Segments carry no count header — the composer writes
 // its own per batch.
-registry_collect_deltas :: proc(scratch: ^Writer, reg: ^Registry, segs: ^[dynamic]Delta_Seg, changed: ^[dynamic]Net_Id = nil) -> int {
+registry_collect_deltas :: proc(
+	scratch: ^Writer,
+	reg: ^Registry,
+	segs: ^[dynamic]Delta_Seg,
+	changed: ^[dynamic]Net_Id = nil,
+) -> int {
 	for _, &e in reg.entries {
-		start := len(scratch.buf)
-		write_net_id(scratch, e.id)
-		mask := write_delta(scratch, e.entity, e.shadow, e.set.entity_desc)
+		if len(segs) >= MAX_CONTAINER_ITEMS {
+			break
+		}
+		v := subset_view(e.set.entity_desc, .Delta)
+		mask := diff_mask(e.entity, e.shadow, e.set.entity_desc)
 		if mask == 0 {
-			resize(&scratch.buf, start)
 			continue
 		}
+		row_bytes := 4 + v.mask_bytes
+		for entry, ord in v.entries {
+			if mask & (u64(1) << u64(ord)) != 0 {
+				row_bytes += int(entry.wire_size)
+			}
+		}
+		if row_bytes > MAX_PACKET_BYTES - len(scratch.buf) {
+			continue
+		}
+		start := len(scratch.buf)
+		write_net_id(scratch, e.id)
+		_ = write_delta(scratch, e.entity, e.shadow, e.set.entity_desc)
 		if changed != nil {
 			append(changed, e.id)
 		}
@@ -253,15 +309,16 @@ registry_collect_deltas :: proc(scratch: ^Writer, reg: ^Registry, segs: ^[dynami
 // ordered channel (one more reason for that channel plan).
 
 // A pending takes part in reconcile iff it can replay: unwind and replay must
-// use the SAME predicate or the pair corrupts state. "Can replay" is having
-// recorded wire args — the verb itself is resolved by STABLE id at replay
+// use the SAME predicate or the pair corrupts state. "Can replay" is the
+// explicit Pending.replayable bit (zero-arg commands have empty bytes too) —
+// the verb itself is resolved by STABLE id at replay
 // time (command_find; a miss restores and drops). Never compare p.cmd against
 // the set's length: ids are FNV hashes, not array positions, and that stale
 // index check silently disabled reconcile for every generated command (the
 // confirm-2 acid signature — a delta stomping an in-flight prediction).
 @(private = "file")
 pending_reconciles :: proc(p: Pending, e: ^Registry_Entry) -> bool {
-	return p.entity == e.id && p.args != nil
+	return p.entity == e.id && p.replayable
 }
 
 @(private = "file")
@@ -278,7 +335,11 @@ unwind_pending :: proc(ctx: ^Command_Ctx, e: ^Registry_Entry) {
 replay_pending :: proc(ctx: ^Command_Ctx, e: ^Registry_Entry) {
 	// Replays are re-predictions, never authoritative: the env keeps each
 	// re-run's `_then` consequence quiet, exactly like the original prediction.
-	env := Command_Env{authority = false, user = ctx.game_user, by = ctx.me}
+	env := Command_Env {
+		authority = false,
+		user      = ctx.game_user,
+		by        = ctx.me,
+	}
 	for &p in ctx.pending.entries {
 		if !pending_reconciles(p, e) {
 			continue
@@ -301,11 +362,49 @@ has_pending_for :: proc(ctx: ^Command_Ctx, id: Net_Id) -> bool {
 		return false
 	}
 	for &p in ctx.pending.entries {
-		if p.entity == id {
+		if p.entity == id && p.predicted {
 			return true
 		}
 	}
 	return false
+}
+
+@(private = "file")
+registry_preflight_deltas :: proc(r: ^Reader, reg: ^Registry) -> bool {
+	count := int(read_u16(r))
+	if !reader_admit_count(r, count, 4) {
+		return false
+	}
+	for _ in 0 ..< count {
+		id := read_net_id(r)
+		e, ok := &reg.entries[id]
+		if r.err || !ok {
+			r.err = true
+			return false
+		}
+		v := subset_view(e.set.entity_desc, .Delta)
+		mask: u64
+		for i in 0 ..< v.mask_bytes {
+			mask |= u64(read_u8(r)) << (u64(i) * 8)
+		}
+		if r.err || (len(v.entries) < 64 && mask >> u64(len(v.entries)) != 0) {
+			r.err = true
+			return false
+		}
+		for entry, ord in v.entries {
+			if mask & (u64(1) << u64(ord)) != 0 {
+				_ = reader_view(r, int(entry.wire_size))
+			}
+		}
+		if r.err {
+			return false
+		}
+	}
+	if len(reader_remaining(r)) != 0 {
+		r.err = true
+		return false
+	}
+	return true
 }
 
 // Apply a delta batch. Pass the client's ctx so entities with in-flight
@@ -319,7 +418,17 @@ has_pending_for :: proc(ctx: ^Command_Ctx, id: Net_Id) -> bool {
 // messages ride the same reliable ordered channel as these batches, so a peer
 // always knows every id a batch can name. That ordering contract is THE reason
 // state batches go on the reliable channel rather than the stream one.
-registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = nil, changed: ^[dynamic]Net_Id = nil) -> int {
+registry_apply_deltas :: proc(
+	r: ^Reader,
+	reg: ^Registry,
+	ctx: ^Command_Ctx = nil,
+	changed: ^[dynamic]Net_Id = nil,
+) -> int {
+	probe := r^
+	if !registry_preflight_deltas(&probe, reg) {
+		r.err = true
+		return 0
+	}
 	count := int(read_u16(r))
 	applied := 0
 	for _ in 0 ..< count {
@@ -371,6 +480,7 @@ registry_apply_deltas :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = ni
 // Same [count][net_id][fields] shape, no masks.
 registry_write_fulls :: proc(w: ^Writer, reg: ^Registry) -> int {
 	assert(len(reg.entries) <= int(max(u16)))
+	assert(len(reg.entries) <= MAX_CONTAINER_ITEMS)
 	write_u16(w, u16(len(reg.entries)))
 	for _, &e in reg.entries {
 		write_net_id(w, e.id)
@@ -386,7 +496,35 @@ registry_write_fulls :: proc(w: ^Writer, reg: ^Registry) -> int {
 // are blessed inline, symmetric with registry_apply_deltas; the separate
 // registry_commit_shadows stays for the resume path (which applies spawn
 // tuples, not this batch).
-registry_apply_fulls :: proc(r: ^Reader, reg: ^Registry, ctx: ^Command_Ctx = nil, me := PLAYER_ID_INVALID) -> int {
+registry_apply_fulls :: proc(
+	r: ^Reader,
+	reg: ^Registry,
+	ctx: ^Command_Ctx = nil,
+	me := PLAYER_ID_INVALID,
+) -> int {
+	probe := r^
+	probe_count := int(read_u16(&probe))
+	if !reader_admit_count(&probe, probe_count, 4) {
+		r.err = true
+		return 0
+	}
+	for _ in 0 ..< probe_count {
+		id := read_net_id(&probe)
+		e, ok := &reg.entries[id]
+		if probe.err || !ok {
+			r.err = true
+			return 0
+		}
+		_ = reader_view(&probe, desc_wire_size(e.set.entity_desc))
+		if probe.err {
+			r.err = true
+			return 0
+		}
+	}
+	if len(reader_remaining(&probe)) != 0 {
+		r.err = true
+		return 0
+	}
 	count := int(read_u16(r))
 	applied := 0
 	for _ in 0 ..< count {
@@ -447,6 +585,9 @@ registry_commit_shadows :: proc(reg: ^Registry) {
 // Authority side: replace the entity's blob (bytes are copied; empty clears it).
 // Bumps the version so receivers can drop re-received duplicates.
 registry_set_blob :: proc(reg: ^Registry, id: Net_Id, data: []u8) -> bool {
+	if len(data) > ENTITY_BLOB_MAX_BYTES {
+		return false
+	}
 	e, ok := &reg.entries[id]
 	if !ok {
 		return false
@@ -465,6 +606,9 @@ registry_set_blob :: proc(reg: ^Registry, id: Net_Id, data: []u8) -> bool {
 // snapshot). Returns false when this version is already held — the caller
 // skips its change notification (a rejoin re-receives the world).
 registry_apply_blob :: proc(reg: ^Registry, id: Net_Id, ver: u32, data: []u8) -> bool {
+	if len(data) > ENTITY_BLOB_MAX_BYTES {
+		return false
+	}
 	e, ok := &reg.entries[id]
 	if !ok || ver == e.blob_ver {
 		return false
@@ -527,7 +671,13 @@ registry_teleport :: proc(reg: ^Registry, id: Net_Id) {
 // field values — used when this peer's own predicted-ownership write is the one
 // becoming real (its fields already hold the truth; flushing a stale buffered
 // sample over them would stomp the very prediction the transfer confirmed).
-registry_set_owner :: proc(reg: ^Registry, id: Net_Id, owner: Player_Id, now: f64 = -1, keep_fields := false) -> bool {
+registry_set_owner :: proc(
+	reg: ^Registry,
+	id: Net_Id,
+	owner: Player_Id,
+	now: f64 = -1,
+	keep_fields := false,
+) -> bool {
 	e, ok := &reg.entries[id]
 	if !ok {
 		return false
@@ -592,12 +742,22 @@ registry_set_stream_tier :: proc(reg: ^Registry, id: Net_Id, tier: u8) {
 // streams). Without it the host's own entities had no history and were
 // judged LIVE for a lagged shooter — the one hole coop lag comp left, which
 // every game with host-brained targets re-ledgered by hand.
-registry_write_streams :: proc(w: ^Writer, reg: ^Registry, me: Player_Id, sender_now: f64, tick: u64 = 0, keep_history := false) -> int {
+registry_write_streams :: proc(
+	w: ^Writer,
+	reg: ^Registry,
+	me: Player_Id,
+	sender_now: f64,
+	tick: u64 = 0,
+	keep_history := false,
+) -> int {
 	write_f64(w, sender_now)
 	count_at := len(w.buf)
 	write_u16(w, 0) // patched below
 	count := 0
 	for _, &e in reg.entries {
+		if count >= MAX_CONTAINER_ITEMS {
+			break
+		}
 		if e.owner != me {
 			continue
 		}
@@ -606,6 +766,9 @@ registry_write_streams :: proc(w: ^Writer, reg: ^Registry, me: Player_Id, sender
 		}
 		n := stream_wire_size(e.set.entity_desc)
 		if n == 0 {
+			continue
+		}
+		if 7 + n > MAX_PACKET_BYTES - len(w.buf) {
 			continue
 		}
 		assert(n <= int(max(u16)))
@@ -642,11 +805,17 @@ registry_stream_time :: proc(r: ^Reader) -> f64 {
 // verbatim. ok=false = torn batch, forward nothing (the next tick
 // supersedes). The stream batch layout is written by registry_write_streams
 // and parsed by apply_streams and HERE — never outside this file.
-registry_collect_stream_segs :: proc(raw: []u8, segs: ^[dynamic]Delta_Seg) -> (sender_now: f64, ok: bool) {
+registry_collect_stream_segs :: proc(
+	raw: []u8,
+	segs: ^[dynamic]Delta_Seg,
+) -> (
+	sender_now: f64,
+	ok: bool,
+) {
 	r := reader_make(raw)
 	sender_now = read_f64(&r)
 	count := int(read_u16(&r))
-	if r.err {
+	if !reader_admit_count(&r, count, 7) {
 		return 0, false
 	}
 	for _ in 0 ..< count {
@@ -659,6 +828,9 @@ registry_collect_stream_segs :: proc(raw: []u8, segs: ^[dynamic]Delta_Seg) -> (s
 			return 0, false
 		}
 		append(segs, Delta_Seg{id = id, from = start, to = r.off})
+	}
+	if len(reader_remaining(&r)) != 0 {
+		return 0, false
 	}
 	return sender_now, true
 }
@@ -683,7 +855,7 @@ registry_apply_streams :: proc(
 	// With a resolved sender this is also the ownership admission pass.
 	probe := r^
 	probe_count := int(read_u16(&probe))
-	if probe.err {
+	if !reader_admit_count(&probe, probe_count, 7) {
 		r.err = true
 		return 0
 	}
@@ -761,50 +933,133 @@ registry_sample_streams :: proc(reg: ^Registry, t: f64, me: Player_Id) -> int {
 // can tell its game WHAT ran (the session's command hook rides on it).
 // Unknown entities produce NO result (the client's pending expiry is the
 // safety net — we can't write truth for an entity we don't have).
-registry_host_command :: proc(reg: ^Registry, ctx: ^Command_Ctx, by: Player_Id, r: ^Reader, out: ^Writer) -> (responded: bool, ok: bool, h: Command_Header) {
-	h = command_read_header(r)
-	if r.err || !command_dedup(ctx, u64(by), h.seq) {
-		return false, false, h
+Registry_Command_Outcome :: struct {
+	responded: bool,
+	reason:    Action_Reject_Reason,
+	header:    Command_Header,
+}
+
+// Detailed authority ingress. `admission` lets the session name a refusal it
+// owns (seat/rate) after this layer has parsed the addressed command. A valid
+// header always receives a compact verdict, even when its entity went stale;
+// malformed headers and replayed sequences remain silent because they cannot
+// be correlated safely and replying would amplify garbage.
+registry_host_command_checked :: proc(
+	reg: ^Registry,
+	ctx: ^Command_Ctx,
+	by: Player_Id,
+	r: ^Reader,
+	out: ^Writer,
+	admission := Action_Reject_Reason.None,
+	preparsed: ^Command_Header = nil,
+	deduplicate := true,
+) -> Registry_Command_Outcome {
+	h: Command_Header
+	if preparsed != nil {
+		h = preparsed^
+	} else {
+		h = command_read_header(r)
+	}
+	result := Registry_Command_Outcome {
+		reason = .Malformed,
+		header = h,
+	}
+	if h.seq == 0 || (r.err && preparsed == nil) {
+		return result
+	}
+	if deduplicate && !command_dedup(ctx, u64(by), h.seq) {
+		result.reason = .Stale
+		return result
+	}
+	if admission != .None {
+		assert(action_reject_reason_valid(admission))
+		command_result_write_reason(out, h, admission)
+		result.responded = true
+		result.reason = admission
+		return result
 	}
 	e, found := &reg.entries[h.entity]
 	if !found {
-		return false, false, h
+		command_result_write_reason(out, h, .Stale)
+		result.responded = true
+		result.reason = .Stale
+		return result
 	}
 	// Access is descriptor policy, not gameplay predicate policy. Reject it
-	// with authoritative truth like any other refused command so a predicting
-	// client retires immediately instead of waiting for timeout.
+	// explicitly so a predicting client retires immediately instead of waiting
+	// for timeout.
 	c := command_find(e.set, h.cmd)
 	if c == nil {
-		command_result_write(out, h, false, e.entity, e.set)
-		return true, false, h
+		command_result_write_reason(out, h, .Malformed)
+		result.responded = true
+		result.reason = .Malformed
+		return result
 	}
-	switch c.access {
-	case .Any_Seat:
-	case .Owner:
-		if e.owner != by {
-			command_result_write(out, h, false, e.entity, e.set)
-			return true, false, h
-		}
-	case .Authority:
-		// registry_host_command is the REMOTE ingress. Authority-authored calls
-		// run through their generated local wrapper and never arrive here.
-		command_result_write(out, h, false, e.entity, e.set)
-		return true, false, h
+	// registry_host_command is the REMOTE ingress. Authority-authored calls run
+	// through their generated local wrapper and never arrive here.
+	if !action_access_allows(c.policy, by, e.owner, false) {
+		command_result_write_reason(out, h, .Access)
+		result.responded = true
+		result.reason = .Access
+		return result
+	}
+	if !action_args_allowed(c.policy, len(reader_remaining(r))) {
+		command_result_write_reason(out, h, .Malformed)
+		result.responded = true
+		result.reason = .Malformed
+		return result
 	}
 	// THE authoritative run: the verb's `_then` consequence fires inside the
 	// thunk. `by` is the ISSUER'S Player_Id — it keys the dedup window AND
 	// rides the env (the old param said "peer_key: any stable per-sender key",
 	// which stopped being true the day env.by was born from it).
-	env := Command_Env{authority = true, user = ctx.game_user, by = by}
-	ok = command_execute(e.entity, e.set, h.cmd, r, &env)
-	command_result_write(out, h, ok, e.entity, e.set)
-	return true, ok, h
+	env := Command_Env {
+		authority = true,
+		user      = ctx.game_user,
+		by        = by,
+	}
+	result.reason = command_execute_reason(e.entity, e.set, h.cmd, r, &env)
+	// Predicate races need the authority's current truth. Admission/syntax
+	// refusals never ran gameplay and stay header-only.
+	command_result_write_reason(
+		out,
+		h,
+		result.reason,
+		e.entity,
+		e.set,
+		truth = result.reason == .Predicate,
+	)
+	result.responded = true
+	return result
+}
+
+// Compatibility result for low-level callers that only distinguish accepted
+// from refused. New session code consumes registry_host_command_checked so it
+// can surface the typed reason.
+registry_host_command :: proc(
+	reg: ^Registry,
+	ctx: ^Command_Ctx,
+	by: Player_Id,
+	r: ^Reader,
+	out: ^Writer,
+) -> (
+	responded: bool,
+	ok: bool,
+	h: Command_Header,
+) {
+	result := registry_host_command_checked(reg, ctx, by, r, out)
+	return result.responded, result.responded && result.reason == .None, result.header
 }
 
 // Client side: route a received result to its entity. Unknown entity (it
 // despawned while the command was in flight): the pending entry is popped and
 // its revert freed — there is nothing to revert into.
-registry_client_result :: proc(reg: ^Registry, ctx: ^Command_Ctx, r: ^Reader, me := PLAYER_ID_INVALID) -> Command_Result {
+registry_client_result :: proc(
+	reg: ^Registry,
+	ctx: ^Command_Ctx,
+	r: ^Reader,
+	me := PLAYER_ID_INVALID,
+) -> Command_Result {
 	res := command_result_read(r)
 	if r.err {
 		return res
@@ -846,18 +1101,26 @@ Expired_Command :: struct {
 	cmd:    u16,
 }
 
-registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks: u64, me := PLAYER_ID_INVALID, out: ^[dynamic]Expired_Command = nil) -> int {
+registry_expire_pending :: proc(
+	reg: ^Registry,
+	ctx: ^Command_Ctx,
+	max_age_ticks: u64,
+	me := PLAYER_ID_INVALID,
+	out: ^[dynamic]Expired_Command = nil,
+) -> int {
 	expired := make([dynamic]Pending, context.temp_allocator)
 	pending_expire(&ctx.pending, ctx.now_tick, max_age_ticks, &expired)
 	for p in expired {
-		if e, found := &reg.entries[p.entity]; found {
-			owned_here := me != PLAYER_ID_INVALID && e.owner == me
-			skip := Subset_Skips{.Predicted}
-			if owned_here {
-				skip += {.Owner}
+		if p.predicted {
+			if e, found := &reg.entries[p.entity]; found {
+				owned_here := me != PLAYER_ID_INVALID && e.owner == me
+				skip := Subset_Skips{.Predicted}
+				if owned_here {
+					skip += {.Owner}
+				}
+				fields_restore(e.entity, e.set.entity_desc, p.revert, skip)
+				shadow_capture(e.entity, e.shadow, e.set.entity_desc) // bless: the revert is framework truth now
 			}
-			fields_restore(e.entity, e.set.entity_desc, p.revert, skip)
-			shadow_capture(e.entity, e.shadow, e.set.entity_desc) // bless: the revert is framework truth now
 		}
 		if out != nil {
 			append(out, Expired_Command{seq = p.seq, entity = p.entity, cmd = p.cmd})
@@ -909,7 +1172,16 @@ Guard_Exempt_Proc :: proc(user: rawptr, id: Net_Id) -> bool
 // verdict (sim speculation) are skipped whole. Returns found = false when the
 // invariant holds; the session layer turns a finding into the teaching assert
 // (split so tests can pin the detection without dying on it).
-registry_write_guard :: proc(reg: ^Registry, ctx: ^Command_Ctx, exempt: Guard_Exempt_Proc = nil, exempt_user: rawptr = nil) -> (cls, field: string, id: Net_Id, found: bool) {
+registry_write_guard :: proc(
+	reg: ^Registry,
+	ctx: ^Command_Ctx,
+	exempt: Guard_Exempt_Proc = nil,
+	exempt_user: rawptr = nil,
+) -> (
+	cls, field: string,
+	id: Net_Id,
+	found: bool,
+) {
 	for eid, &e in reg.entries {
 		if has_pending_for(ctx, eid) {
 			continue
@@ -1014,7 +1286,13 @@ registry_state_hash :: proc(reg: ^Registry) -> u64 {
 // rewound.
 Rewound_Query :: proc(user: rawptr)
 
-registry_rewound :: proc(reg: ^Registry, t: f64, shooter: Player_Id, user: rawptr, query: Rewound_Query) {
+registry_rewound :: proc(
+	reg: ^Registry,
+	t: f64,
+	shooter: Player_Id,
+	user: rawptr,
+	query: Rewound_Query,
+) {
 	Wound :: struct {
 		id:   Net_Id,
 		view: ^Subset_View,

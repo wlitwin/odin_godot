@@ -24,6 +24,7 @@ package cavecrawl_scripts
 //     plain procs. That is the entire multiplayer author surface.
 // ----------------------------------------------------------------------------
 
+import "core:fmt"
 import gd "godot:godot"
 import kai "godot:kit/ai"
 import kboot "godot:kit/boot"
@@ -32,11 +33,10 @@ import kcomms "godot:kit/comms"
 import kfx "godot:kit/fx"
 import kitems "godot:kit/items"
 import knet "godot:kit/net"
+import netgd "godot:kit/netgd"
 import ksess "godot:kit/session"
 import steamgd "godot:kit/steamgd"
 import kui "godot:kit/ui"
-import netgd "godot:kit/netgd"
-import "core:fmt"
 
 DEFAULT_PORT :: 4242
 MSG_SESSION :: u8(0) // all kit/session traffic under one game byte
@@ -58,8 +58,16 @@ WALK_SPEED :: f32(120) // px/s
 
 MAX_HP :: i32(100)
 MAX_STAMINA :: i32(10)
-ROCK_ABILITY :: kcombat.Ability_Def{name = "rock", cooldown = 20, cost = 3} // 1s at 20 Hz
-HEAL_ABILITY :: kcombat.Ability_Def{name = "bandage", cooldown = 60, cost = 5} // 3s
+ROCK_ABILITY :: kcombat.Ability_Def {
+	name     = "rock",
+	cooldown = 20,
+	cost     = 3,
+} // 1s at 20 Hz
+HEAL_ABILITY :: kcombat.Ability_Def {
+	name     = "bandage",
+	cooldown = 60,
+	cost     = 5,
+} // 3s
 HEAL_AMOUNT :: i32(25)
 ROCK_DMG :: i32(35)
 ROCK_SPEED :: f32(12) // px per net tick
@@ -114,11 +122,11 @@ Cave_Rock :: struct {
 }
 
 CaveLobby :: struct {
-	owner:     gd.Node,
-	ses:       ksess.Session,
-	comms:     kcomms.Comms,
-	boot:      kboot.Boot, // lobby/chat/score/legend/wire/stage/world — kit-built, game-owned
-	running:   bool, // hosting or joining (transport is up)
+	owner:           gd.Node,
+	ses:             ksess.Session,
+	comms:           kcomms.Comms,
+	boot:            kboot.Boot, // lobby/chat/score/legend/wire/stage/world — kit-built, game-owned
+	running:         bool, // hosting or joining (transport is up)
 
 	// The authored entity scenes, assigned in cave.tscn's inspector. Each
 	// tag's `entity=Name:id` IS the factory declaration: the struct this
@@ -136,72 +144,71 @@ CaveLobby :: struct {
 
 	// The campaign: one CaveLevelDef data asset per floor (scene + loot +
 	// waves), authored in the inspector.
-	floor1_def: ^gd.Resource `gd:"export,resource=CaveLevelDef"`,
-	floor2_def: ^gd.Resource `gd:"export,resource=CaveLevelDef"`,
+	floor1_def:      ^gd.Resource `gd:"export,resource=CaveLevelDef"`,
+	floor2_def:      ^gd.Resource `gd:"export,resource=CaveLevelDef"`,
 
 	// The current floor, as loaded on THIS peer: the scene instance under
 	// `stage`, plus the host-side caches read from its def + markers.
-	scenery:       gd.Node, // the loaded level_N.tscn instance (nil pre-game)
-	scenery_depth: u8, // which depth `scenery` shows
-	dens:          [2][3]f32, // host: den positions, from the floor's markers
-	waves:         [MAX_WAVES]kai.Wave, // host: the floor's wave plan
-	waves_n:       int,
+	scenery:         gd.Node, // the loaded level_N.tscn instance (nil pre-game)
+	scenery_depth:   u8, // which depth `scenery` shows
+	dens:            [2][3]f32, // host: den positions, from the floor's markers
+	waves:           [MAX_WAVES]kai.Wave, // host: the floor's wave plan
+	waves_n:         int,
 
 	// ---- the world (phase 3) ----
-	table:       kitems.Table,
-	prompt:      kui.Prompt,
-	inv:         kui.Inv,
-	spelunkers:  map[knet.Net_Id]^Spelunker,
-	chests:      map[knet.Net_Id]^Chest,
-	doors:       map[knet.Net_Id]^Door,
-	pickups:     map[knet.Net_Id]^Pickup,
-	dwellers:    map[knet.Net_Id]^Dweller,
-	avatar_of:   map[knet.Player_Id]knet.Net_Id,
-	me_spel:     ^Spelunker, // my avatar (nil until spawned)
-	level:       ^Level, // the run's depth marker (nil until spawned)
-	floors_n:    int, // how deep the cave goes (CAVE_FLOORS env shrinks it for tests)
-	kicked_out:  bool, // we were removed on purpose — mutes the host-left line that follows
-	steam_on:    bool, // GodotSteam present + initialized (kit/steamgd)
-	relic:       ^Relic, // the carryable (ownership-transfer demo); nil pre-world
-	relic_id:    knet.Net_Id,
-	steam_lobby: u64, // the Steam lobby we host or sit in (invite target)
-	deny_reason: int, // last Ev_Join_Denied reason (-1 = none); drivers read it
-	started:     bool, // the world is live
-	walking:     bool, // headless drivers steer via walk_to
-	walk_target: gd.Vector2,
-	target_id:   knet.Net_Id, // what the prompt points at right now
-	target_kind: int, // 0 none, 1 chest, 2 door, 3 pickup
+	table:           kitems.Table,
+	prompt:          kui.Prompt,
+	inv:             kui.Inv,
+	spelunkers:      map[knet.Net_Id]^Spelunker,
+	chests:          map[knet.Net_Id]^Chest,
+	doors:           map[knet.Net_Id]^Door,
+	pickups:         map[knet.Net_Id]^Pickup,
+	dwellers:        map[knet.Net_Id]^Dweller,
+	avatar_of:       map[knet.Player_Id]knet.Net_Id,
+	me_spel:         ^Spelunker, // my avatar (nil until spawned)
+	level:           ^Level, // the run's depth marker (nil until spawned)
+	floors_n:        int, // how deep the cave goes (CAVE_FLOORS env shrinks it for tests)
+	kicked_out:      bool, // we were removed on purpose — mutes the host-left line that follows
+	steam_on:        bool, // GodotSteam present + initialized (kit/steamgd)
+	relic:           ^Relic, // the carryable (ownership-transfer demo); nil pre-world
+	relic_id:        knet.Net_Id,
+	steam_lobby:     u64, // the Steam lobby we host or sit in (invite target)
+	deny_reason:     int, // last Ev_Join_Denied reason (-1 = none); drivers read it
+	started:         bool, // the world is live
+	walking:         bool, // headless drivers steer via walk_to
+	walk_target:     gd.Vector2,
+	target_id:       knet.Net_Id, // what the prompt points at right now
+	target_kind:     int, // 0 none, 1 chest, 2 door, 3 pickup
 
 	// ---- combat (phase 4) ----
-	cols:       kcombat.Combat_Cols, // host: the auto-published ledger columns
-	flying:     [dynamic]Cave_Rock, // host: the authoritative rock sim
-	tracers:    kfx.Tracers, // every peer: the rocks on THIS screen (px/tick -> px/s, see rocks.odin)
-	fires:      kcombat.Fire_Route, // the announcement listener's registration
-	fx:         kfx.Bursts, // every peer: live particle bursts (fx.odin narrates, kit/fx reaps)
-	respawn_at: map[knet.Net_Id]int `gd:"backup"`, // host: resurrection clocks
+	cols:            kcombat.Combat_Cols, // host: the auto-published ledger columns
+	flying:          [dynamic]Cave_Rock, // host: the authoritative rock sim
+	tracers:         kfx.Tracers, // every peer: the rocks on THIS screen (px/tick -> px/s, see rocks.odin)
+	fires:           kcombat.Fire_Route, // the announcement listener's registration
+	fx:              kfx.Bursts, // every peer: live particle bursts (fx.odin narrates, kit/fx reaps)
+	respawn_at:      map[knet.Net_Id]int `gd:"backup"`, // host: resurrection clocks
 
 	// ---- dwellers (phase 5, host-side) ----
 	// The host-local campaign state a takeover (and a save) must carry — TAGGED,
 	// not hand-serialized: scriptgen emits the versioned cave_lobby_backup_write/
 	// _read pair over exactly these fields (see save.odin). Maps ride whole.
-	brains:    map[knet.Net_Id]Dweller_Brain `gd:"backup"`,
-	director:  kai.Director `gd:"backup"`,
-	slain_col: ksess.Stat_Col, // the game's own scoreboard column
+	brains:          map[knet.Net_Id]Dweller_Brain `gd:"backup"`,
+	director:        kai.Director `gd:"backup"`,
+	slain_col:       ksess.Stat_Col, // the game's own scoreboard column
 	// UNTAGGED on purpose: a print latch, not campaign state. A successor host
 	// re-earns it on its first bent path (host.odin's CAVE_NAV_BENT receipt) —
 	// backing it up would only teach the new host to stay quiet.
-	nav_bent:  bool,
-	dens_used: int `gd:"backup"`, // round-robin den picker
-	last_wave: int `gd:"backup"`, // wave-announcement edge
-	host_ticks: int `gd:"backup"`, // host: game ticks elapsed
-	hud_hp:     kui.Hp_Bar,
-	hud_ab:     kui.Abilities_Bar,
-	chat_sent:  bool, // the Enter that submitted a line must not also re-open chat
-	host_gone:  bool, // the driver's poll mirror (the KIT holds the mechanics latch now)
-	greeted:    bool, // @(gd_message) dogfood: the one-time greeting fired (not on migration re-welcomes)
-	succ_seen:  int, // Ev_Succession count (latched; drivers poll it — host_gone flips back within a frame)
-	issue_at:   f64, // when my last command left (confirm latency proof)
-
+	nav_bent:        bool,
+	dens_used:       int `gd:"backup"`, // round-robin den picker
+	last_wave:       int `gd:"backup"`, // wave-announcement edge
+	host_ticks:      int `gd:"backup"`, // host: game ticks elapsed
+	hud_hp:          kui.Hp_Bar,
+	hud_ab:          kui.Abilities_Bar,
+	chat_sent:       bool, // the Enter that submitted a line must not also re-open chat
+	host_gone:       bool, // the driver's poll mirror (the KIT holds the mechanics latch now)
+	greeted:         bool, // @(gd_message) dogfood: the one-time greeting fired (not on migration re-welcomes)
+	succ_seen:       int, // Ev_Succession count (latched; drivers poll it — host_gone flips back within a frame)
+	issue_at:        f64, // when my last command left (confirm latency proof)
 }
 
 now_s :: knet.now_s // the toolkit's monotonic clock, under the game's short name
@@ -210,7 +217,13 @@ refresh_hud :: proc(self: ^CaveLobby) {
 	if self.me_spel == nil {return}
 	kui.hp_refresh(&self.hud_hp, hp_view(self.me_spel), MAX_HP)
 	defs := [?]kcombat.Ability_Def{ROCK_ABILITY, HEAL_ABILITY}
-	kui.abilities_refresh(&self.hud_ab, defs[:], self.me_spel.cds[:], self.me_spel.stamina, ksess.session_tick_hz(&self.ses))
+	kui.abilities_refresh(
+		&self.hud_ab,
+		defs[:],
+		self.me_spel.cds[:],
+		self.me_spel.stamina,
+		ksess.session_tick_hz(&self.ses),
+	)
 	// The bag too: hosts get no state events, and a verb-only repaint left
 	// the host's grid showing loot its death had long since spilled.
 	kui.inv_refresh(&self.inv, self.me_spel.bag[:], &self.table)
@@ -230,36 +243,46 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 	// Slot layout, passes the door, and then reads a replicated `item=1` as the
 	// wrong thing. Fold the table's contract onto the shape hash so that skew is
 	// refused at the door instead (see kitems.items_contract / session_mix_fingerprint).
-	ksess.session_configure(&self.ses, ksess.Session_Config{
-		fingerprint = ksess.session_mix_fingerprint(0, kitems.items_contract(&self.table)),
-	})
+	net_cfg := kboot.network_profile(.Friends_Coop)
+	net_cfg.session.fingerprint = ksess.session_mix_fingerprint(
+		0,
+		kitems.items_contract(&self.table),
+	)
 
 	// The stock stack — lobby, chat+comms, scoreboard, stage/world, wire,
 	// legend — is kit/boot's. Everything below is what makes this CAVECRAWL.
-	// The stock stack — lobby, chat+comms, scoreboard, stage/world, wire,
-	// legend — is kit/boot's. Everything below is what makes this CAVECRAWL.
-	kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{
-		title = "C A V E C R A W L",
-		status = "Host a cave, or join one at localhost",
-		legend = "WASD walk · E use · click throw · Q drop · G set down · R heal · Tab scores · Enter chat",
-		msg_kind = MSG_SESSION,
-		env         = "CAVE", // the CAVE_* env family — including the shim's _JITTER/_LOSS knobs
-		latency_env = "CAVE_LATENCY",
-		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
-	})
+	cave_lobby_net_attach(
+		self,
+		kboot.Options {
+			title       = "C A V E C R A W L",
+			status      = "Host a cave, or join one at localhost",
+			legend      = "WASD walk · E use · click throw · Q drop · G set down · R heal · Tab scores · Enter chat",
+			msg_kind    = MSG_SESSION,
+			env         = "CAVE", // the CAVE_* env family — including the shim's _JITTER/_LOSS knobs
+			latency_env = "CAVE_LATENCY",
+			methods     = {
+				"on_host",
+				"on_join",
+				"on_start",
+				"on_chat",
+				"on_packet",
+				"on_peer_left",
+				"on_net_up",
+				"on_net_down",
+			},
+		},
+		net_cfg,
+	)
 	// The factory, written by nobody: the generated table (from the scene
 	// fields' entity= tags) instantiates/frees under boot.world; the typed
 	// *_spawned/*_freed hooks in world.odin keep the census. `self` is also
 	// what every `<verb>_then` consequence receives as its game param.
-	cave_lobby_entities(self, &self.boot)
 	// The migration dance, danced by the kit: the torch, the takeover/chase
 	// fork, the census-driven wipe, the caps. The game's four seams ride the
 	// generated table (backup/took_over/wiped/migrating halves, save.odin +
 	// net.odin) — words and bytes, never mechanics.
-	kboot.boot_migration(&self.boot, self, cave_lobby_succ_hooks)
 	// @(gd_message): register the typed app-message routes (the emote greeting
 	// below). One line, like fire_listen — routes survive *_start, so once is enough.
-	cave_lobby_messages(self, &self.ses)
 
 	self.prompt = kui.prompt_make(self.owner)
 	self.inv = kui.inv_make(self.owner, 6)
@@ -299,7 +322,6 @@ enter_the_cave :: proc(self: ^CaveLobby) {
 }
 
 
-
 cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 	if !self.running {return}
 
@@ -314,7 +336,8 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 		cave_visual_frame(self, delta) // every peer flies its own screen's rocks
 		// CARRYING: if the relic is mine, it rides my shoulder — my writes
 		// stream to everyone (the same machinery that streams me).
-		if self.relic != nil && self.me_spel != nil &&
+		if self.relic != nil &&
+		   self.me_spel != nil &&
 		   ksess.session_owner_of(&self.ses, self.relic_id) == self.ses.me {
 			self.relic.x = self.me_spel.x + 10
 			self.relic.y = self.me_spel.y - 12
@@ -339,7 +362,9 @@ cave_lobby_process :: proc(self: ^CaveLobby, delta: f64) {
 	cave_lobby_events(self, events)
 	for m in marks {
 		// No world yet to draw it in — phase 3 gives markers a cave wall.
-		gd.print_str(fmt.tprintf("CAVE_MARK player=%d kind=%d x=%.1f", u64(m.player), m.kind, m.pos.x))
+		gd.print_str(
+			fmt.tprintf("CAVE_MARK player=%d kind=%d x=%.1f", u64(m.player), m.kind, m.pos.x),
+		)
 	}
 
 	if self.started {
@@ -386,8 +411,9 @@ cave_lobby_welcomed :: proc(self: ^CaveLobby, me: knet.Player_Id) {
 // right behavior. One message type; `kind` tells a greeting from its ack so the
 // host's reply can't loop back into another reply.
 Emote :: struct {
-	kind:  u8, // GREET (guest→host) or GREET_ACK (host→guest)
-	spice: u16, // an arbitrary value, echoed +1 in the ack — proves the payload decoded intact
+	spice:          u16, // an arbitrary value, echoed +1 in the ack — proves the payload decoded intact
+	kind:           u8, // GREET (guest→host) or GREET_ACK (host→guest)
+	_wire_reserved: u8, // explicit protocol byte; no compiler-owned tail padding
 }
 TAG_EMOTE :: u8(4) // a free SES_APP tag (kit holds comms 0, xfer 2, sim 3; the game's fire is 1)
 GREET :: u8(7)
@@ -395,7 +421,9 @@ GREET_ACK :: u8(8)
 
 @(gd_message = "TAG_EMOTE")
 cave_lobby_emote :: proc(self: ^CaveLobby, from: knet.Player_Id, msg: Emote) {
-	gd.print_str(fmt.tprintf("CAVE_WHISPER from=%d kind=%d spice=%d", u64(from), msg.kind, msg.spice))
+	gd.print_str(
+		fmt.tprintf("CAVE_WHISPER from=%d kind=%d spice=%d", u64(from), msg.kind, msg.spice),
+	)
 	// The host answers a greeting with a directed, seat-addressed reply
 	// (cave_lobby_emote_send_to → the authority resolves `from`'s peer). The ack
 	// carries GREET_ACK, so the guest presents it and never greets back.
@@ -408,7 +436,9 @@ cave_lobby_emote :: proc(self: ^CaveLobby, from: knet.Player_Id, msg: Emote) {
 cave_lobby_player_joined :: proc(self: ^CaveLobby, id: knet.Player_Id, rejoin: bool) {
 	_ = id
 	_ = rejoin
-	gd.print_str(fmt.tprintf("CAVE_PLAYERS n=%d", ksess.session_count(&self.ses, connected_only = true)))
+	gd.print_str(
+		fmt.tprintf("CAVE_PLAYERS n=%d", ksess.session_count(&self.ses, connected_only = true)),
+	)
 }
 
 // The host words the flavor lines; comms ships them. Catchup goes FIRST so a
@@ -425,7 +455,9 @@ cave_lobby_player_joined_then :: proc(self: ^CaveLobby, id: knet.Player_Id, rejo
 @(gd_half)
 cave_lobby_player_left :: proc(self: ^CaveLobby, id: knet.Player_Id) {
 	_ = id
-	gd.print_str(fmt.tprintf("CAVE_PLAYERS n=%d", ksess.session_count(&self.ses, connected_only = true)))
+	gd.print_str(
+		fmt.tprintf("CAVE_PLAYERS n=%d", ksess.session_count(&self.ses, connected_only = true)),
+	)
 }
 
 @(gd_half)
@@ -438,11 +470,14 @@ cave_lobby_player_left_then :: proc(self: ^CaveLobby, id: knet.Player_Id) {
 @(gd_half)
 cave_lobby_host_left :: proc(self: ^CaveLobby) {
 	self.host_gone = true
-	if !self.kicked_out { // the kick already explained this teardown
+	if !self.kicked_out { 	// the kick already explained this teardown
 		// The designated backup holder can carry the torch; everyone else
 		// rejoins whoever does (cave_lobby_succession / on_rejoin).
 		_, _, held := ksess.session_backup_parts(&self.ses)
-		kui.lobby_set_status(&self.boot.ui, held ? "The host left — you hold the backup. Resume?" : "The host left — this run is over")
+		kui.lobby_set_status(
+			&self.boot.ui,
+			held ? "The host left — you hold the backup. Resume?" : "The host left — this run is over",
+		)
 		gd.print_str("CAVE_HOST_LEFT")
 	}
 }
@@ -458,7 +493,9 @@ cave_lobby_backup_target :: proc(self: ^CaveLobby, player: knet.Player_Id) {
 	// blob's type refuses that now, and succession_words is what it points at.)
 	_, info := ksess.session_successor(&self.ses)
 	rv, _ := netgd.succession_decode(info)
-	gd.print_str(fmt.tprintf("CAVE_TORCH_NAMED player=%d addr=%s", u64(player), netgd.succession_words(rv)))
+	gd.print_str(
+		fmt.tprintf("CAVE_TORCH_NAMED player=%d addr=%s", u64(player), netgd.succession_words(rv)),
+	)
 }
 
 // LIVE MIGRATION, everyone else's half: WORDS ONLY — the kit runs the
@@ -516,7 +553,12 @@ cave_lobby_join_failed :: proc(self: ^CaveLobby) {
 // only), and the edge halves seed silently on first sight (a baseline, not
 // an edge).
 @(gd_half)
-cave_lobby_entity_spawned :: proc(self: ^CaveLobby, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
+cave_lobby_entity_spawned :: proc(
+	self: ^CaveLobby,
+	id: knet.Net_Id,
+	type: ksess.Entity_Type,
+	owner: knet.Player_Id,
+) {
 	cave_place(self, id, type) // the node's FIRST placement — world.odin
 	if !self.started {
 		enter_the_cave(self)
@@ -534,7 +576,12 @@ cave_lobby_entity_spawned :: proc(self: ^CaveLobby, id: knet.Net_Id, type: ksess
 // starts moving it (no role branch, no carrier map: ownership IS the
 // carrier record).
 @(gd_half)
-cave_lobby_owner_changed :: proc(self: ^CaveLobby, id: knet.Net_Id, owner: knet.Player_Id, prev: knet.Player_Id) {
+cave_lobby_owner_changed :: proc(
+	self: ^CaveLobby,
+	id: knet.Net_Id,
+	owner: knet.Player_Id,
+	prev: knet.Player_Id,
+) {
 	_ = prev
 	if id == self.relic_id {
 		gd.print_str(fmt.tprintf("CAVE_RELIC owner=%d", u64(owner)))
@@ -543,7 +590,12 @@ cave_lobby_owner_changed :: proc(self: ^CaveLobby, id: knet.Net_Id, owner: knet.
 
 // The host words the handoff for every chat pane.
 @(gd_half)
-cave_lobby_owner_changed_then :: proc(self: ^CaveLobby, id: knet.Net_Id, owner: knet.Player_Id, prev: knet.Player_Id) {
+cave_lobby_owner_changed_then :: proc(
+	self: ^CaveLobby,
+	id: knet.Net_Id,
+	owner: knet.Player_Id,
+	prev: knet.Player_Id,
+) {
 	_ = prev
 	if id == self.relic_id {
 		line := "the relic rests"
@@ -575,22 +627,46 @@ cave_lobby_state_applied :: proc(self: ^CaveLobby, entities: int) {
 }
 
 @(gd_half)
-cave_lobby_command_executed :: proc(self: ^CaveLobby, ok: bool, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16) {
-	_ = player
-	gd.print_str(fmt.tprintf("CAVE_EXEC ok=%v entity=%d cmd=%d", ok, u32(entity), cmd))
+cave_lobby_command_executed :: proc(
+	self: ^CaveLobby,
+	ok: bool,
+	player: knet.Player_Id,
+	entity: knet.Net_Id,
+	cmd: u16,
+	reason: knet.Action_Reject_Reason,
+	seq: knet.Intent_Seq,
+	model: knet.Action_Model,
+) {
+	_, _, _ = player, seq, model
+	gd.print_str(
+		fmt.tprintf("CAVE_EXEC ok=%v reason=%v entity=%d cmd=%d", ok, reason, u32(entity), cmd),
+	)
 }
 
 @(gd_half)
-cave_lobby_command_confirmed :: proc(self: ^CaveLobby, seq: knet.Intent_Seq) {
-	_ = seq
+cave_lobby_command_confirmed :: proc(
+	self: ^CaveLobby,
+	seq: knet.Intent_Seq,
+	entity: knet.Net_Id,
+	cmd: u16,
+	model: knet.Action_Model,
+) {
+	_, _, _, _ = seq, entity, cmd, model
 	dt_ms := self.issue_at > 0 ? int((now_s() - self.issue_at) * 1000) : 0
 	gd.print_str(fmt.tprintf("CAVE_CONFIRM dt_ms=%d", dt_ms))
 }
 
 @(gd_half)
-cave_lobby_command_rejected :: proc(self: ^CaveLobby, seq: knet.Intent_Seq, entity: knet.Net_Id) {
-	_ = seq
-	gd.print_str(fmt.tprintf("CAVE_REJECT entity=%d", u32(entity)))
+cave_lobby_command_rejected :: proc(
+	self: ^CaveLobby,
+	seq: knet.Intent_Seq,
+	entity: knet.Net_Id,
+	cmd: u16,
+	reason: knet.Action_Reject_Reason,
+	model: knet.Action_Model,
+) {
+	_, _, _ = seq, cmd, model
+	gd.print_str(fmt.tprintf("CAVE_REJECT reason=%v entity=%d", reason, u32(entity)))
 }
 
 // THE FLOOR EDGE — the descent, minus the seen_depth mirror: the replicated

@@ -1,8 +1,5 @@
 # Odin/Godot integration follow-up
 
-Kit's multiplayer-specific review and implementation plan lives in
-[`docs/kit/TODO.md`](docs/kit/TODO.md).
-
 This backlog turns the integration review into verifiable work. Items are ordered by
 correctness risk first, then developer ergonomics and build/runtime efficiency.
 

@@ -77,6 +77,101 @@ snap_full_then_delta_roundtrip :: proc(t: ^testing.T) {
 }
 
 @(test)
+sparse_budgeted_snapshots_preserve_per_entity_ack_baselines :: proc(t: ^testing.T) {
+	desc := mover_desc()
+	s1 := Mover{x = 10, vx = 1}
+	s2 := Mover{x = 20, vx = 2}
+	h1 := ksim.history_make(&desc, 16)
+	defer ksim.history_destroy(&h1)
+	h2 := ksim.history_make(&desc, 16)
+	defer ksim.history_destroy(&h2)
+	e1 := ksim.Entry{id = 1, entity = &s1, hist = &h1}
+	e2 := ksim.Entry{id = 2, entity = &s2, hist = &h2}
+	entries := []ksim.Entry{e1, e2}
+	sent := make(map[knet.Net_Id]u64)
+	defer delete(sent)
+	budget := ksim.SNAP_HEADER_BYTES + ksim.SNAP_ROW_HEADER_BYTES + ksim.predict_wire_size(&desc)
+
+	rx := ksim.snap_rx_make(16)
+	defer ksim.snap_rx_destroy(&rx)
+	ksim.snap_rx_add(&rx, 1, &desc)
+	ksim.snap_rx_add(&rx, 2, &desc)
+	truths := make([dynamic]ksim.Truth)
+	defer delete(truths)
+	w := knet.writer_make()
+	defer knet.writer_destroy(&w)
+
+	// Tick 1 can carry only one full row. The omitted entity does not prevent
+	// the batch ack; its sent ledger remains absent, so it cannot delta from 1.
+	ksim.note_all(entries, 1)
+	stats := ksim.snap_write_recipient(&w, entries, 1, 0, 0, budget, &sent)
+	testing.expect_value(t, stats.rows, 1)
+	testing.expect_value(t, stats.full, 1)
+	testing.expect_value(t, stats.deferred, 1)
+	testing.expect(t, stats.bytes <= budget)
+	r := knet.reader_make(knet.writer_bytes(&w))
+	tick, _, _ := ksim.snap_rx_apply(&rx, &r, &truths)
+	testing.expect_value(t, tick, u64(1))
+	testing.expect_value(t, rx.acked, u64(1))
+
+	// Prioritize entity 2 next. Its row MUST be full (it was not represented
+	// in baseline 1); unchanged entity 1 is represented by zero-byte carry.
+	s2.x = 21
+	ksim.note_all(entries, 2)
+	knet.writer_reset(&w)
+	clear(&truths)
+	stats = ksim.snap_write_recipient(&w, []ksim.Entry{e2, e1}, 2, rx.acked, 0, budget, &sent)
+	testing.expect_value(t, stats.full, 1)
+	testing.expect_value(t, stats.suppressed, 1)
+	r = knet.reader_make(knet.writer_bytes(&w))
+	tick, _, _ = ksim.snap_rx_apply(&rx, &r, &truths)
+	testing.expect_value(t, tick, u64(2))
+	testing.expect_value(t, rx.acked, u64(2))
+	testing.expect_value(t, len(truths), 2) // explicit full + carried unchanged truth
+
+	// Both change at tick 3, but only entity 1 fits. Entity 2 carries old truth
+	// on the client and is deliberately NOT represented in sent[2] at tick 3.
+	s1.x = 11
+	s2.x = 22
+	ksim.note_all(entries, 3)
+	knet.writer_reset(&w)
+	clear(&truths)
+	stats = ksim.snap_write_recipient(&w, entries, 3, rx.acked, 0, budget, &sent)
+	testing.expect_value(t, stats.rows, 1)
+	testing.expect_value(t, stats.delta, 1)
+	testing.expect_value(t, stats.deferred, 1)
+	r = knet.reader_make(knet.writer_bytes(&w))
+	_, _, _ = ksim.snap_rx_apply(&rx, &r, &truths)
+	testing.expect_value(t, rx.acked, u64(3))
+
+	// Re-entry at tick 4 cannot use global baseline 3 for entity 2: its
+	// per-entity sent tick is still 2, so recovery is a full row immediately.
+	ksim.note_all(entries, 4)
+	knet.writer_reset(&w)
+	clear(&truths)
+	stats = ksim.snap_write_recipient(&w, []ksim.Entry{e2, e1}, 4, rx.acked, 0, budget, &sent)
+	testing.expect_value(t, stats.full, 1)
+	testing.expect_value(t, stats.suppressed, 1)
+	r = knet.reader_make(knet.writer_bytes(&w))
+	_, _, _ = ksim.snap_rx_apply(&rx, &r, &truths)
+	testing.expect_value(t, rx.acked, u64(4))
+
+	// With both entities now represented at baseline 4, an unchanged batch is
+	// header-only and still advances the exact carry-forward baseline.
+	ksim.note_all(entries, 5)
+	knet.writer_reset(&w)
+	clear(&truths)
+	stats = ksim.snap_write_recipient(&w, entries, 5, rx.acked, 0, budget, &sent)
+	testing.expect_value(t, stats.rows, 0)
+	testing.expect_value(t, stats.suppressed, 2)
+	testing.expect_value(t, stats.bytes, ksim.SNAP_HEADER_BYTES)
+	r = knet.reader_make(knet.writer_bytes(&w))
+	_, _, _ = ksim.snap_rx_apply(&rx, &r, &truths)
+	testing.expect_value(t, rx.acked, u64(5))
+	testing.expect_value(t, len(truths), 2)
+}
+
+@(test)
 snap_unknown_id_stalls_ack :: proc(t: ^testing.T) {
 	desc := mover_desc()
 	s1 := Mover{x = 1}

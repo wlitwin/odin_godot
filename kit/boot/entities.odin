@@ -136,36 +136,63 @@ boot_node :: proc(b: ^Boot, id: knet.Net_Id) -> (gd.Node, bool) {
 }
 
 // ---------------------------------------------------------------------------
-// The census, without the maps. Every game kept `map[Net_Id]^T` + an
+// The census, without game-side maps. Every game kept `map[Net_Id]^T` + an
 // owner mirror + an avatar_of mirror beside the factory — bookkeeping of
 // state the kit already holds (the registry's entity + owner, this ledger's
 // type). These queries read it back; scriptgen wraps them per `entity=` tag
-// as typed `<snake>_of` / `my_<snake>` / `<snake>_owned_by` / `<snake>_ids`,
-// so the census hooks shrink to the genuinely game-shaped bookkeeping (or
-// vanish). Lookups are map hits; the owned/ids scans walk the type ledger —
-// friendslop-sized, cache it yourself if a game ever makes it hot.
+// as typed `<snake>_of` / `my_<snake>` / `<snake>_owned_by` /
+// `<snake>_all`, so census hooks shrink to genuinely game-shaped
+// bookkeeping (or vanish). A per-type linked index makes a kind query walk
+// only that kind; generated iteration resolves entity + owner in one pass.
+
+// Resolve the entity and owner together. Authoritative ids live in the
+// session registry; client-predicted spawns live only on the sim lane until
+// their real spawn arrives and rekeys them. The type ledger gates BOTH before
+// the cast, so an id of another kind can never be mis-cast.
+@(private = "file")
+boot_entity_canonical :: proc(b: ^Boot, id: knet.Net_Id) -> knet.Net_Id {
+	if to, rekeyed := b.ent_alias[id]; rekeyed {
+		return to
+	}
+	return id
+}
+
+@(private = "file")
+boot_entity_raw :: proc(b: ^Boot, id: knet.Net_Id, type: ksess.Entity_Type) -> (entity: rawptr, owner: knet.Player_Id, ok: bool) {
+	cid := boot_entity_canonical(b, id)
+	t, tracked := b.ent_types[cid]
+	if !tracked || t != type {
+		return nil, knet.PLAYER_ID_INVALID, false
+	}
+	if b.ses != nil {
+		if e, found := knet.registry_get(&b.ses.reg, cid); found {
+			return e.entity, e.owner, true
+		}
+	}
+	if b.lane != nil {
+		if e, found := ksim.lane_entity(b.lane, cid); found {
+			return e, ksim.lane_owner_of(b.lane, e), true
+		}
+	}
+	return nil, knet.PLAYER_ID_INVALID, false
+}
 
 // The entity behind an id, IF it is of `type` (a stale id or a different
 // kind returns false rather than a mis-cast).
 boot_entity :: proc(b: ^Boot, id: knet.Net_Id, type: ksess.Entity_Type) -> (rawptr, bool) {
-	t, tracked := b.ent_types[id]
-	if !tracked || t != type || b.ses == nil {
-		return nil, false
-	}
-	if e, ok := knet.registry_get(&b.ses.reg, id); ok {
-		return e.entity, true
-	}
-	return nil, false
+	e, _, ok := boot_entity_raw(b, id, type)
+	return e, ok
 }
 
 // Who owns an entity (PLAYER_ID_INVALID = host-owned / unknown id) — the
 // `owner_pid` map every world pass hand-kept.
 boot_entity_owner :: proc(b: ^Boot, id: knet.Net_Id) -> knet.Player_Id {
-	if b.ses == nil {
-		return knet.PLAYER_ID_INVALID
-	}
-	if e, ok := knet.registry_get(&b.ses.reg, id); ok {
-		return e.owner
+	cid := boot_entity_canonical(b, id)
+	if type, tracked := b.ent_types[cid]; tracked {
+		_, owner, ok := boot_entity_raw(b, cid, type)
+		if ok {
+			return owner
+		}
 	}
 	return knet.PLAYER_ID_INVALID
 }
@@ -173,30 +200,121 @@ boot_entity_owner :: proc(b: ^Boot, id: knet.Net_Id) -> knet.Player_Id {
 // A player's entity of `type` — the `avatar_of` map. First match wins (one
 // avatar per player per type is the friendslop shape).
 boot_owned_entity :: proc(b: ^Boot, type: ksess.Entity_Type, owner: knet.Player_Id) -> (entity: rawptr, id: knet.Net_Id, ok: bool) {
-	if b.ses == nil || owner == knet.PLAYER_ID_INVALID {
+	if owner == knet.PLAYER_ID_INVALID {
 		return nil, 0, false
 	}
-	for eid, t in b.ent_types {
-		if t != type {
-			continue
-		}
-		if e, found := knet.registry_get(&b.ses.reg, eid); found && e.owner == owner {
-			return e.entity, eid, true
+	for eid := b.ent_heads[type]; eid != knet.NET_ID_INVALID; eid = b.ent_next[eid] {
+		if e, found_owner, live := boot_entity_raw(b, eid, type); live && found_owner == owner {
+			return e, eid, true
 		}
 	}
 	return nil, 0, false
 }
 
-// Every live id of `type`, temp-allocated by default — range it and resolve
-// each through the typed `<snake>_of`.
+// Every live id of `type`, temp-allocated by default. Kept for compatibility;
+// new loops prefer generated `<snake>_all`, which resolves the typed
+// entity and owner in this same pass.
 boot_entity_ids :: proc(b: ^Boot, type: ksess.Entity_Type, allocator := context.temp_allocator) -> []knet.Net_Id {
 	ids := make([dynamic]knet.Net_Id, allocator)
-	for eid, t in b.ent_types {
-		if t == type {
+	for eid := b.ent_heads[type]; eid != knet.NET_ID_INVALID; eid = b.ent_next[eid] {
+		if _, _, live := boot_entity_raw(b, eid, type); live {
 			append(&ids, eid)
 		}
 	}
 	return ids[:]
+}
+
+// The typed, one-pass census behind generated `<snake>_all`. T is named
+// by the entity= tag at generation time; boot_entity_raw still checks the
+// runtime kind before any cast. Rows are a temp snapshot: retain `.ref`, not
+// `.entity`, if the value must cross a despawn boundary.
+boot_entity_rows :: proc(
+	b: ^Boot,
+	type: ksess.Entity_Type,
+	$T: typeid,
+	allocator := context.temp_allocator,
+) -> []knet.Net_Entity(T) {
+	rows := make([dynamic]knet.Net_Entity(T), allocator)
+	for eid := b.ent_heads[type]; eid != knet.NET_ID_INVALID; eid = b.ent_next[eid] {
+		if e, owner, live := boot_entity_raw(b, eid, type); live {
+			append(&rows, knet.Net_Entity(T) {
+				ref = {id = eid},
+				entity = cast(^T)e,
+				owner = owner,
+			})
+		}
+	}
+	return rows[:]
+}
+
+// Maintain the sorted per-kind linked index and the lifetime/type ledger as
+// one operation. Net_Id zero is the end sentinel; authority ids are positive
+// and provisional ids reserve the high bit, so every live id is representable.
+@(private = "file")
+boot_entity_track :: proc(b: ^Boot, type: ksess.Entity_Type, id: knet.Net_Id) {
+	assert(id != knet.NET_ID_INVALID)
+	_, exists := b.ent_types[id]
+	assert(!exists, "boot entity tracked twice")
+
+	prev := knet.NET_ID_INVALID
+	next := b.ent_heads[type]
+	for next != knet.NET_ID_INVALID && next < id {
+		prev = next
+		next = b.ent_next[next]
+	}
+	b.ent_types[id] = type
+	b.ent_prev[id] = prev
+	b.ent_next[id] = next
+	if prev == knet.NET_ID_INVALID {
+		b.ent_heads[type] = id
+	} else {
+		b.ent_next[prev] = id
+	}
+	if next != knet.NET_ID_INVALID {
+		b.ent_prev[next] = id
+	}
+}
+
+@(private = "file")
+boot_entity_forget :: proc(b: ^Boot, id: knet.Net_Id) -> bool {
+	cid := boot_entity_canonical(b, id)
+	type, tracked := b.ent_types[cid]
+	if !tracked {
+		return false
+	}
+	prev := b.ent_prev[cid]
+	next := b.ent_next[cid]
+	if prev == knet.NET_ID_INVALID {
+		if next == knet.NET_ID_INVALID {
+			delete_key(&b.ent_heads, type)
+		} else {
+			b.ent_heads[type] = next
+		}
+	} else {
+		b.ent_next[prev] = next
+	}
+	if next != knet.NET_ID_INVALID {
+		b.ent_prev[next] = prev
+	}
+	delete_key(&b.ent_prev, cid)
+	delete_key(&b.ent_next, cid)
+	delete_key(&b.ent_types, cid)
+	// A real despawn retires every provisional handle that was rekeyed to it.
+	for from, to in b.ent_alias {
+		if to == cid {
+			delete_key(&b.ent_alias, from)
+		}
+	}
+	return true
+}
+
+@(private = "file")
+boot_entity_rekey :: proc(b: ^Boot, from, to: knet.Net_Id) {
+	type, tracked := b.ent_types[from]
+	assert(tracked, "boot entity rekey source is not tracked")
+	assert(boot_entity_forget(b, from))
+	boot_entity_track(b, type, to)
+	b.ent_alias[from] = to
 }
 
 // Free every entity node and forget the ledger — the back-to-lobby / host-
@@ -208,6 +326,10 @@ boot_entities_clear :: proc(b: ^Boot) {
 	}
 	clear(&b.ent_nodes)
 	clear(&b.ent_types)
+	clear(&b.ent_heads)
+	clear(&b.ent_next)
+	clear(&b.ent_prev)
+	clear(&b.ent_alias)
 }
 
 @(private = "file")
@@ -225,8 +347,7 @@ boot_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 					b.ent_nodes[id] = node
 					delete_key(&b.ent_nodes, from)
 				}
-				b.ent_types[id] = type
-				delete_key(&b.ent_types, from)
+				boot_entity_rekey(b, from, id)
 				return entity, k.set
 			}
 		}
@@ -243,7 +364,7 @@ boot_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id,
 		)
 		gd.add_child(b.world, node)
 		b.ent_nodes[id] = node
-		b.ent_types[id] = type
+		boot_entity_track(b, type, id)
 		if k.spawned != nil {
 			// Bookkeeping-time, like the hand factories were: the entity exists
 			// but its spawn-time FIELDS are not set yet — track it, don't dress
@@ -303,7 +424,7 @@ boot_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 		gd.node_queue_free(node)
 		delete_key(&b.ent_nodes, id)
 	}
-	delete_key(&b.ent_types, id)
+	_ = boot_entity_forget(b, id)
 }
 
 // ---------------------------------------------------------------------------
@@ -358,7 +479,7 @@ boot_spawn_predicted :: proc(b: ^Boot, type: ksess.Entity_Type, owner: knet.Play
 		gd.add_child(b.world, node)
 		id = ksim.lane_spawn_predicted(b.lane, entity, k.sim_set, owner, type)
 		b.ent_nodes[id] = node
-		b.ent_types[id] = type
+		boot_entity_track(b, type, id)
 		if k.spawned != nil {
 			k.spawned(b.ent_game, entity, id, owner)
 		}
@@ -375,7 +496,7 @@ boot_free_predicted :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
 		gd.node_queue_free(node)
 		delete_key(&b.ent_nodes, id)
 	}
-	delete_key(&b.ent_types, id)
+	_ = boot_entity_forget(b, id)
 }
 
 // The lane's reveal hook (installed by boot_lane): a watched entity hidden at

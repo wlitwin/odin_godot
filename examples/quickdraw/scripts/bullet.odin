@@ -13,7 +13,6 @@ package quickdraw
 
 import "core:fmt"
 import gd "godot:godot"
-import kboot "godot:kit/boot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import ksim "godot:kit/sim"
@@ -58,9 +57,9 @@ bullet_tick :: proc(self: ^Bullet) -> (landed: bool) {
 bullet_tick_then :: proc(g: ^Quickdraw, self: ^Bullet, by: knet.Player_Id, landed: bool) {
 	if !landed {return}
 	gd.print_str(fmt.tprintf("QD_LOB_LAND by=%d tick=%d x=%.1f y=%.1f", u64(by), ksim.lane_now(&g.lane), self.x, self.y))
-	for id in gunner_ids(&g.boot) {
-		gun, _ := gunner_of(&g.boot, id)
-		vpid := kboot.boot_entity_owner(&g.boot, id)
+	for tracked in gunner_all(&g.boot) {
+		gun := tracked.entity
+		vpid := tracked.owner
 		if gun.hp <= 0 || u8(vpid) == self.pid {continue}
 		dx := gun.x - self.x
 		dy := gun.y - self.y
@@ -70,7 +69,7 @@ bullet_tick_then :: proc(g: ^Quickdraw, self: ^Bullet, by: knet.Player_Id, lande
 		if gun.hp <= 0 {
 			ksess.session_stat_add(&g.ses, by, g.kills_col, 1)
 			ksess.session_stat_add(&g.ses, vpid, g.deaths_col, 1)
-			append(&g.respawns, Respawn{id = id, at = ksim.lane_now(&g.lane) + RESPAWN_TICKS})
+			append(&g.respawns, Respawn{id = tracked.id, at = ksim.lane_now(&g.lane) + RESPAWN_TICKS})
 			gd.print_str(fmt.tprintf("QD_LOB_KILL by=%d on=%d", u64(by), u64(vpid)))
 		}
 	}

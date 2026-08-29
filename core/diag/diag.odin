@@ -136,7 +136,7 @@ MAX_MODULE_DEPTH :: 8
 // editor features, one overlay shape.
 overlay_setup_cmd :: proc(
     work, pkgdir: string,
-    allocator := context.allocator,
+    allocator := context.allocator
 ) -> (cmd: string, overlay_dir: string) {
     mroot := module_root_of(pkgdir)
     rel := pkgdir[min(len(mroot) + 1, len(pkgdir)):] // "" | "ui" | "ui/widgets"
@@ -157,7 +157,7 @@ overlay_setup_cmd :: proc(
     fmt.sbprintf(
         &b,
         "rm -rf %s && mkdir -p %s && cp %s/*.odin %s/ 2>/dev/null",
-        q(work), q(ov), q(pkgdir), q(ov),
+        q(work), q(ov), q(pkgdir), q(ov)
     )
     // The levels ABOVE the module root exist as real directories already (the `mkdir -p`
     // above made the whole chain). They need exactly two links, and deliberately no more:
@@ -176,7 +176,7 @@ overlay_setup_cmd :: proc(
                 &b,
                 strings.concatenate({top, "/shared"}, context.temp_allocator),
                 strings.concatenate({work, "/shared"}, context.temp_allocator),
-                c2 >= 0 ? rest[:c2] : rest,
+                c2 >= 0 ? rest[:c2] : rest
             )
         }
     }
@@ -256,7 +256,7 @@ link_one :: proc(b: ^strings.Builder, target, into, name: string) {
         b,
         " ; ln -s %s %s 2>/dev/null",
         shell_quote(target, context.temp_allocator),
-        shell_quote(strings.concatenate({into, "/", name}, context.temp_allocator), context.temp_allocator),
+        shell_quote(strings.concatenate({into, "/", name}, context.temp_allocator), context.temp_allocator)
     )
 }
 
@@ -318,7 +318,7 @@ link_dirs :: proc(b: ^strings.Builder, from, into, except: string) {
             b,
             " ; ln -s %s %s 2>/dev/null",
             shell_quote(fi.fullpath, context.temp_allocator),
-            shell_quote(strings.concatenate({into, "/", fi.name}, context.temp_allocator), context.temp_allocator),
+            shell_quote(strings.concatenate({into, "/", fi.name}, context.temp_allocator), context.temp_allocator)
         )
     }
 }
@@ -386,7 +386,7 @@ run_check_overlay :: proc(
     abs_path: string,
     root: string,
     odin_bin := "odin",
-    allocator := context.allocator,
+    allocator := context.allocator
 ) -> [dynamic]Diagnostic {
     empty := make([dynamic]Diagnostic, allocator)
 
@@ -439,11 +439,11 @@ run_check_overlay :: proc(
     // diagnostic silently filters out and validate reports a broken buffer
     // CLEAN. The parser wants machine-readable output; ask for it.
     check := fmt.ctprintf(
-        "NO_COLOR=1 %s check %s -collection:godot=%s -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_sample -custom-attribute:gd_step -custom-attribute:gd_fact -custom-attribute:gd_message > %s 2>&1",
+		"NO_COLOR=1 %s check %s -collection:godot=%s -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_input -custom-attribute:gd_sample -custom-attribute:gd_step -custom-attribute:gd_cue -custom-attribute:gd_fact -custom-attribute:gd_half -custom-attribute:gd_message > %s 2>&1",
         shell_quote(odin_bin, context.temp_allocator),
         q_pkg_ov,
         shell_quote(root, context.temp_allocator),
-        shell_quote(out_file, context.temp_allocator),
+        shell_quote(out_file, context.temp_allocator)
     )
     libc.system(check) // rc ignored: diagnostics are read from the captured output
 

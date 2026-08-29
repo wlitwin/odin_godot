@@ -18,8 +18,10 @@ package hello_sim
 import gd "godot:godot"
 import knet "godot:kit/net"
 
+@(gd_input)
+
 Player_Input :: struct {
-	move: [2]i8, // -1/0/1 per axis
+	move: [2]i8 `gd:"range=-1:1"`
 }
 
 Player :: struct {
@@ -29,7 +31,7 @@ Player :: struct {
 	x, y:   f32 `gd:"predict,interp"`,
 	pid:    u8 `gd:"replicate"`, // delta lane, untouched by the promotion
 	mine:   bool,
-	tinted: bool,
+	tinted: bool
 }
 
 STEP :: f32(160.0 / 60.0) // px per tick at the lane's 60 Hz

@@ -22,7 +22,7 @@ Chest :: struct {
 	slots:  [8]kitems.Slot `gd:"replicate"`,
 }
 
-@(gd_command = "predict,any_seat")
+@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
 chest_take :: proc(self: ^Chest, slot: i32, px: f32, py: f32) -> (ok: bool, taken: kitems.Slot) {
 	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false, {}}
 	taken = kitems.take(self.slots[:], int(slot), 99) // the whole stack

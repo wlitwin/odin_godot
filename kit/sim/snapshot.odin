@@ -33,11 +33,13 @@ package kit_sim
 // no keyframe request message, no retransmit.
 //
 // Rows ride length-prefixed like stream batches (an unknown id is skipped by
-// length, never abandons the batch) and EVERY registered entity rides every
-// batch — an unchanged entity costs its header + an all-zero mask (~10 bytes).
-// Absence therefore never carries meaning, which is what makes the carry-
-// forward story trivial; per-recipient interest filtering can reintroduce
-// absence later, the way registry_collect_deltas composes today.
+// length, never abandons the batch). The lane composes them PER RECIPIENT:
+// owner first, then stalest/nearest interested entities within the byte budget.
+// An unchanged entity costs zero row bytes: both ends carry its acknowledged
+// value forward to this batch tick. AOI/budget omissions are different — the
+// server does not mark them represented, so a later re-entry is forced FULL.
+// Thus absence saves bytes without ever pretending the client holds a baseline
+// it did not receive.
 //
 // Batch layout:
 //   [tick u64][baseline u64][input_ack u64][count u16]
@@ -50,9 +52,21 @@ package kit_sim
 // per-client (the baseline is per-client) — the input ring's trim signal
 // costs eight bytes in a message that was going to that client anyway.
 
+import "core:mem"
 import knet "godot:kit/net"
 
 SNAP_FULL: u8 : 1 << 0 // row flag: payload is the whole subset, no baseline needed
+SNAP_HEADER_BYTES :: 8 + 8 + 8 + 2
+SNAP_ROW_HEADER_BYTES :: 4 + 1 + 2
+
+Snap_Write_Stats :: struct {
+	rows:       int,
+	full:       int,
+	delta:      int,
+	suppressed: int,
+	deferred:   int,
+	bytes:      int,
+}
 
 // Byte size of one predict-set snapshot ON THE WIRE (Wire_Kind encodings
 // applied) — what a full row's payload occupies. The stream_wire_size of
@@ -71,14 +85,45 @@ predict_wire_size :: proc(desc: ^knet.Entity_Desc) -> int {
 // entities that predict nothing are skipped. `baseline` is the target
 // client's newest fully-applied tick (0 = nothing acked yet → all fulls).
 // Returns the row count.
-snap_write :: proc(w: ^knet.Writer, entries: []Entry, tick: u64, baseline: u64, input_ack: u64) -> int {
+snap_write :: proc(
+	w: ^knet.Writer,
+	entries: []Entry,
+	tick: u64,
+	baseline: u64,
+	input_ack: u64,
+) -> int {
+	stats := snap_write_recipient(w, entries, tick, baseline, input_ack, 0, nil, false)
+	return stats.rows
+}
+
+// Per-recipient writer used by Lane. `budget` is the maximum snapshot body
+// size (header + rows; zero is unlimited). `sent` records the exact batch tick
+// in which each entity was represented for this peer. A delta is legal only
+// when that row was represented in the peer's ACKED baseline batch; otherwise
+// re-entry/deferred work is a full row. Unchanged rows advance `sent` without
+// bytes because the receiver carries its baseline bytes forward to `tick`.
+snap_write_recipient :: proc(
+	w: ^knet.Writer,
+	entries: []Entry,
+	tick: u64,
+	baseline: u64,
+	input_ack: u64,
+	budget: int,
+	sent: ^map[knet.Net_Id]u64,
+	suppress_unchanged := true,
+) -> Snap_Write_Stats {
 	assert(len(entries) <= int(max(u16)), "snapshot entity count exceeds its u16 wire field")
+	assert(
+		len(entries) <= knet.MAX_CONTAINER_ITEMS,
+		"snapshot entity count exceeds MAX_CONTAINER_ITEMS",
+	)
+	start := len(w.buf)
 	knet.write_u64(w, tick)
 	knet.write_u64(w, baseline)
 	knet.write_u64(w, input_ack)
 	count_at := len(w.buf)
 	knet.write_u16(w, 0) // patched below
-	count := 0
+	stats: Snap_Write_Stats
 	for &e in entries {
 		desc := e.hist.desc
 		if e.hist.size == 0 {
@@ -87,31 +132,61 @@ snap_write :: proc(w: ^knet.Writer, entries: []Entry, tick: u64, baseline: u64, 
 		now, have_now := history_read(e.hist, tick)
 		assert(have_now, "snap_write ships ledgered ticks: note_all before snapping")
 		base, have_base := history_read(e.hist, baseline)
+		if sent != nil && have_base {
+			last, represented := sent^[e.id]
+			have_base = represented && last == baseline
+		}
 
 		pred := knet.subset_view(desc, .Predicted)
-		assert(pred.wire_bytes <= int(max(u16)), "full snapshot row exceeds its u16 wire length")
-		knet.write_net_id(w, e.id)
-		if !have_base {
-			// New entity or lapped baseline: the full row that needs nothing.
-			knet.write_u8(w, SNAP_FULL)
-			knet.write_u16(w, u16(pred.wire_bytes))
-			knet.subset_write_blob(w, pred, now)
-			count += 1
+		assert(
+			pred.wire_bytes <= knet.MAX_REPLICATED_ENTITY_BYTES,
+			"full snapshot row exceeds MAX_REPLICATED_ENTITY_BYTES",
+		)
+		if have_base && suppress_unchanged && mem.compare(now, base) == 0 {
+			stats.suppressed += 1
+			if sent != nil {
+				sent^[e.id] = tick
+			}
 			continue
 		}
-		knet.write_u8(w, 0)
-		len_at := len(w.buf)
-		knet.write_u16(w, 0) // patched below
-		payload_from := len(w.buf)
-		knet.subset_delta_write(w, pred, now, base)
-		payload := len(w.buf) - payload_from
-		assert(payload <= int(max(u16)))
-		knet.writer_patch_u16(w, len_at, u16(payload))
-		count += 1
+		row := knet.writer_make(SNAP_ROW_HEADER_BYTES + pred.wire_bytes, context.temp_allocator)
+		knet.write_net_id(&row, e.id)
+		if !have_base {
+			// New entity or lapped baseline: the full row that needs nothing.
+			knet.write_u8(&row, SNAP_FULL)
+			knet.write_u16(&row, u16(pred.wire_bytes))
+			knet.subset_write_blob(&row, pred, now)
+			stats.full += 1
+		} else {
+			knet.write_u8(&row, 0)
+			len_at := len(row.buf)
+			knet.write_u16(&row, 0) // patched below
+			payload_from := len(row.buf)
+			knet.subset_delta_write(&row, pred, now, base)
+			payload := len(row.buf) - payload_from
+			assert(payload <= int(max(u16)))
+			knet.writer_patch_u16(&row, len_at, u16(payload))
+			stats.delta += 1
+		}
+		if budget > 0 && len(w.buf) - start + len(row.buf) > budget {
+			stats.deferred += 1
+			if have_base {
+				stats.delta -= 1
+			} else {
+				stats.full -= 1
+			}
+			continue
+		}
+		append(&w.buf, ..row.buf[:])
+		stats.rows += 1
+		if sent != nil {
+			sent^[e.id] = tick
+		}
 	}
-	assert(count <= int(max(u16)))
-	knet.writer_patch_u16(w, count_at, u16(count))
-	return count
+	assert(stats.rows <= int(max(u16)))
+	knet.writer_patch_u16(w, count_at, u16(stats.rows))
+	stats.bytes = len(w.buf) - start
+	return stats
 }
 
 // ---------------------------------------------------------------------------
@@ -123,14 +198,14 @@ snap_write :: proc(w: ^knet.Writer, entries: []Entry, tick: u64, baseline: u64, 
 // decode baseline.
 
 Rx_Entry :: struct {
-	id:    knet.Net_Id,
-	hist:  History, // received truth, owned by the Snap_Rx
-	first: u64, // the first tick this entity was ever ledgered here (0 = none yet) —
-	            // a fresh watched spawn has no truth before it, so the presenter holds
-	            // it at this pose (the muzzle) until the delayed watch clock arrives,
-	            // instead of leaving the node at its stale/default value
+	id:       knet.Net_Id,
+	hist:     History, // received truth, owned by the Snap_Rx
+	first:    u64, // the first tick this entity was ever ledgered here (0 = none yet) —
+	// a fresh watched spawn has no truth before it, so the presenter holds
+	// it at this pose (the muzzle) until the delayed watch clock arrives,
+	// instead of leaving the node at its stale/default value
 	revealed: bool, // has the present_ready hook fired (the watch clock reached `first`) —
-	                // the engine layer reveals the hidden node exactly once, on cue
+	// the engine layer reveals the hidden node exactly once, on cue
 }
 
 // How many recent batch ticks the receiver remembers for bracket lookups
@@ -140,10 +215,10 @@ Rx_Entry :: struct {
 SNAP_APPLIED_CAP :: knet.INTERP_CAP
 
 Snap_Rx :: struct {
-	entries: [dynamic]Rx_Entry,
-	slots:   int, // ledger depth for entities added later
-	newest:  u64, // newest batch tick applied (stale/duplicate gate)
-	acked:   u64, // newest FULLY-applied batch tick — THE ack to send
+	entries:       [dynamic]Rx_Entry,
+	slots:         int, // ledger depth for entities added later
+	newest:        u64, // newest batch tick applied (stale/duplicate gate)
+	acked:         u64, // newest FULLY-applied batch tick — THE ack to send
 	// Ring of applied batch ticks, oldest first — batches apply in tick
 	// order (stale ones drop), so this is sorted by construction.
 	applied:       [SNAP_APPLIED_CAP]u64,
@@ -167,7 +242,12 @@ snap_rx_destroy :: proc(rx: ^Snap_Rx) {
 // Track an entity (at spawn, from the reliable lane). Rows for ids nobody
 // tracks are skipped by length — and stall the ack, which is the mechanism
 // that keeps the server's baselines honest while this call is in flight.
-snap_rx_add :: proc(rx: ^Snap_Rx, id: knet.Net_Id, desc: ^knet.Entity_Desc, allocator := context.allocator) {
+snap_rx_add :: proc(
+	rx: ^Snap_Rx,
+	id: knet.Net_Id,
+	desc: ^knet.Entity_Desc,
+	allocator := context.allocator,
+) {
 	assert(find_rx(rx, id) == nil, "snap_rx_add: id tracked twice")
 	append(&rx.entries, Rx_Entry{id = id, hist = history_make(desc, rx.slots, allocator)})
 }
@@ -188,7 +268,42 @@ snap_rx_remove :: proc(rx: ^Snap_Rx, id: knet.Net_Id) -> bool {
 // input_write), and how many rows applied. Truth rows for the applied
 // entities are appended to `truths` — blobs are views into the received
 // ledger, valid until the next apply; hand them straight to reconcile.
-snap_rx_apply :: proc(rx: ^Snap_Rx, r: ^knet.Reader, truths: ^[dynamic]Truth) -> (tick: u64, input_ack: u64, applied: int) {
+snap_rx_apply :: proc(
+	rx: ^Snap_Rx,
+	r: ^knet.Reader,
+	truths: ^[dynamic]Truth,
+) -> (
+	tick: u64,
+	input_ack: u64,
+	applied: int,
+) {
+	// Validate the entire batch before noting any history row. This keeps a
+	// truncated/malformed suffix from leaving phantom tick state behind.
+	probe := r^
+	probe_tick := knet.read_u64(&probe)
+	_ = knet.read_u64(&probe)
+	_ = knet.read_u64(&probe)
+	probe_count := int(knet.read_u16(&probe))
+	if probe.err || probe_tick <= rx.newest || !knet.reader_admit_count(&probe, probe_count, 7) {
+		if probe.err {
+			r.err = true
+		}
+		return 0, 0, 0
+	}
+	for _ in 0 ..< probe_count {
+		_ = knet.read_net_id(&probe)
+		flags := knet.read_u8(&probe)
+		n := int(knet.read_u16(&probe))
+		if flags & ~SNAP_FULL != 0 || n > knet.MAX_REPLICATED_ENTITY_BYTES {
+			probe.err = true
+			break
+		}
+		_ = knet.reader_view(&probe, n)
+	}
+	if probe.err {
+		r.err = true
+		return 0, 0, 0
+	}
 	tick = knet.read_u64(r)
 	baseline := knet.read_u64(r)
 	input_ack = knet.read_u64(r)
@@ -203,12 +318,6 @@ snap_rx_apply :: proc(rx: ^Snap_Rx, r: ^knet.Reader, truths: ^[dynamic]Truth) ->
 		n := int(knet.read_u16(r))
 		payload := knet.reader_view(r, n)
 		if r.err {
-			// Truncated mid-batch: drop it all, the next one supersedes. Rows
-			// ALREADY noted into the rx ledger this loop stay there, harmlessly:
-			// this tick is never acked (the server never names it as a baseline)
-			// and never enters the applied ring (the presenter never brackets
-			// it), and a ring lap re-stamps the slot before any read could
-			// alias it — phantom truth with no reader.
 			return 0, 0, 0
 		}
 
@@ -246,6 +355,20 @@ snap_rx_apply :: proc(rx: ^Snap_Rx, r: ^knet.Reader, truths: ^[dynamic]Truth) ->
 	}
 	rx.newest = tick
 	if skipped == 0 {
+		// A recipient batch may omit rows because they are unchanged, outside
+		// AOI, or over budget. Carry the acknowledged baseline forward locally;
+		// the server's per-entity sent ledger decides whether that carry is exact
+		// (eligible for a future delta) or stale (must receive a full on re-entry).
+		for &e in rx.entries {
+			if _, have_tick := history_read(&e.hist, tick); have_tick {
+				continue
+			}
+			if base, have_base := history_read(&e.hist, baseline); have_base {
+				history_note_bytes(&e.hist, tick, base)
+				carried, _ := history_read(&e.hist, tick)
+				append(truths, Truth{id = e.id, blob = carried})
+			}
+		}
 		rx.acked = tick // every row landed: this tick is a valid future baseline
 	}
 	if rx.applied_count < SNAP_APPLIED_CAP {

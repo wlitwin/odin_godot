@@ -57,25 +57,26 @@ Gun_Mode :: enum u8 {
 // changes, so it's near-free on the wire via delta compression) so both peers resolve the
 // deterministic jam identically and every screen's HUD reads the same numbers.
 Gun_Def :: struct {
-	mag:           u16, // rounds per magazine
-	reload_ticks:  u16, // reload dwell, in NET ticks
-	jam_per_mille: u16, // per-shot jam chance in ‰ (0 = never jams)
-	jam_taps:      u8,  // trigger-pulls to clear a jam
+	mag:            u16, // rounds per magazine
+	reload_ticks:   u16, // reload dwell, in NET ticks
+	jam_per_mille:  u16, // per-shot jam chance in ‰ (0 = never jams)
+	jam_taps:       u8, // trigger-pulls to clear a jam
+	_wire_reserved: u8, // explicit protocol byte; prevents target-owned tail padding
 }
 
 Gun :: struct {
-	def:          Gun_Def `gd:"replicate"`, // the knobs (POD blob; host-assigned at equip)
-	ammo:         u16 `gd:"replicate"`,      // rounds left in the mag
-	mode:         Gun_Mode `gd:"replicate"`, // Ready / Reloading / Jammed — host-written, every screen reads
-	reload_cd:    u16 `gd:"replicate"`,      // host countdown to reload done (0 = not reloading)
-	taps:         u8 `gd:"replicate"`,       // clear-taps left on a jam (replicated so the mash reads on every screen)
-	salt:         u32 `gd:"replicate"`,      // jam-seed context the game sets (floor/run/player); 0 is fine
-	spent:        u32 `gd:"replicate"`,      // lifetime rounds consumed since equip — the jam roll's never-repeating half
-	aim_x, aim_y: f32,                       // scratch: the last pull's aim, for the game's effect hook (host-side)
-	origin_x, origin_y: f32,                 // scratch: the last pull's CLAIMED origin (the wielder's own muzzle) — leash it in the hook
-	fired:        bool,                      // scratch: did the last pull send a live round — the game's EFFECT signal
-	pull:         Gun_Pull,                  // scratch: WHICH arm of the FSM the last pull ran — receipts/sfx read it
-	                                         // instead of reverse-engineering the transition from post-state
+	def:                Gun_Def `gd:"replicate"`, // the knobs (POD blob; host-assigned at equip)
+	ammo:               u16 `gd:"replicate"`, // rounds left in the mag
+	mode:               Gun_Mode `gd:"replicate"`, // Ready / Reloading / Jammed — host-written, every screen reads
+	reload_cd:          u16 `gd:"replicate"`, // host countdown to reload done (0 = not reloading)
+	taps:               u8 `gd:"replicate"`, // clear-taps left on a jam (replicated so the mash reads on every screen)
+	salt:               u32 `gd:"replicate"`, // jam-seed context the game sets (floor/run/player); 0 is fine
+	spent:              u32 `gd:"replicate"`, // lifetime rounds consumed since equip — the jam roll's never-repeating half
+	aim_x, aim_y:       f32, // scratch: the last pull's aim, for the game's effect hook (host-side)
+	origin_x, origin_y: f32, // scratch: the last pull's CLAIMED origin (the wielder's own muzzle) — leash it in the hook
+	fired:              bool, // scratch: did the last pull send a live round — the game's EFFECT signal
+	pull:               Gun_Pull, // scratch: WHICH arm of the FSM the last pull ran — receipts/sfx read it
+	// instead of reverse-engineering the transition from post-state
 }
 
 // What one trigger pull actually did — the outcome `fired` compresses to a
@@ -83,12 +84,12 @@ Gun :: struct {
 // as taps == def.jam_taps, an unjam as Ready-and-not-fired), which is exactly
 // the kind of fragile archaeology a scratch enum deletes.
 Gun_Pull :: enum u8 {
-	Held,      // reloading: the pull was absorbed (the pacer usually prevents it)
-	Fired,     // a live round left the barrel (fired = true)
-	Jammed,    // the round was a dud — ejected, the mash begins
-	Empty,     // dry click: the reload begins
+	Held, // reloading: the pull was absorbed (the pacer usually prevents it)
+	Fired, // a live round left the barrel (fired = true)
+	Jammed, // the round was a dud — ejected, the mash begins
+	Empty, // dry click: the reload begins
 	Clear_Tap, // a mash pull chipped a tap (still jammed)
-	Cleared,   // the LAST tap — Ready again, no round yet
+	Cleared, // the LAST tap — Ready again, no round yet
 }
 
 // gun_equip — host-only, at spawn or on a weapon swap: stamp the knobs, top off the mag, go
@@ -115,7 +116,7 @@ gun_equip :: proc(g: ^Gun, def: Gun_Def, salt: u32 = 0) {
 // shot). `dx,dy` is the aim and `ox,oy` the wielder's OWN muzzle position at the pull (the
 // owner-carried origin — see the header: leash it in the hook), both stashed for that hook —
 // the gun itself is aim- and position-agnostic.
-@(gd_command = "predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 gun_fire :: proc(g: ^Gun, dx, dy: f32, ox, oy: f32) -> bool {
 	g.aim_x, g.aim_y = dx, dy
 	g.origin_x, g.origin_y = ox, oy

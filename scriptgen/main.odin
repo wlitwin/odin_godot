@@ -54,6 +54,7 @@ import "core:odin/parser"
 import "core:odin/tokenizer"
 import "core:os"
 import "core:slice"
+import "core:strconv"
 import "core:strings"
 import decl "godot:decl"
 
@@ -91,7 +92,8 @@ map_variant :: proc(type_text: string) -> (Variant_Info, bool) {
 	if strings.has_prefix(t, "^") {
 		pointee := strings.trim_space(t[1:])
 		if strings.contains(pointee, ".") &&
-		   !strings.has_prefix(pointee, "gd.") && !strings.has_prefix(pointee, "godot.") {
+		   !strings.has_prefix(pointee, "gd.") &&
+		   !strings.has_prefix(pointee, "godot.") {
 			return {}, false
 		}
 		return Variant_Info{".Object", "rawptr", .Other}, true
@@ -125,7 +127,12 @@ map_variant :: proc(type_text: string) -> (Variant_Info, bool) {
 	}
 	// A whole-struct/handle Variant: enum member ".X", native binding type "gd.X".
 	other :: proc(name: string) -> (Variant_Info, bool) {
-		return Variant_Info{strings.concatenate({".", name}), strings.concatenate({"gd.", name}), .Other}, true
+		return Variant_Info {
+				strings.concatenate({".", name}),
+				strings.concatenate({"gd.", name}),
+				.Other,
+			},
+			true
 	}
 	switch base {
 	// ---- scalar atoms (narrowed to the field's real width via `size`) ----
@@ -218,7 +225,9 @@ map_variant :: proc(type_text: string) -> (Variant_Info, bool) {
 		// PARAMETRIC spelling (contains '(', e.g. a `gd.Signal1(int)` marker used as a
 		// method arg) is not a class handle either.
 		if (strings.has_prefix(t, "gd.") || strings.has_prefix(t, "godot.")) &&
-		   len(base) > 0 && base[0] >= 'A' && base[0] <= 'Z' &&
+		   len(base) > 0 &&
+		   base[0] >= 'A' &&
+		   base[0] <= 'Z' &&
 		   !strings.contains_rune(base, '(') {
 			return Variant_Info{".Object", "rawptr", .Other}, true
 		}
@@ -226,7 +235,14 @@ map_variant :: proc(type_text: string) -> (Variant_Info, bool) {
 	return {}, false
 }
 
-LIFECYCLE_KEYWORDS := [?]string{"physics_process", "process", "ready", "enter_tree", "exit_tree", "reload"}
+LIFECYCLE_KEYWORDS := [?]string {
+	"physics_process",
+	"process",
+	"ready",
+	"enter_tree",
+	"exit_tree",
+	"reload",
+}
 
 // ---- parsed model ------------------------------------------------------------
 
@@ -338,7 +354,7 @@ Connection_Info :: struct {
 	signal:  string, // the signal name on the emitter
 	method:  string, // the GDScript-exposed method name (the @(gd_method) gd_name)
 	path:    string, // emitter node path ("" = the owner itself)
-	indexed: bool,   // path holds one `%d`: probe 0,1,2,… and bind each index (trailing arg)
+	indexed: bool, // path holds one `%d`: probe 0,1,2,… and bind each index (trailing arg)
 }
 
 // `MultiplayerAPI.RPCMode` int values (extension_api.json: MultiplayerAPI.RPCMode).
@@ -365,34 +381,38 @@ Rpc_Info :: struct {
 // or `gd:"predict"` (kit/sim), each with its own option set. The LANE is the first
 // token — `owner`/`predict` are not options, they select which of the three writers
 // owns the field's bytes, and `owner`/`predict` below are that choice resolved.
-// scriptgen records only name + options; the generated knet.Entity_Desc uses
-// offset_of/size_of, and a generated #assert enforces the POD-only contract at the
-// consumer's compile, naming the offending field.
+// scriptgen records name, options, and declaring type context. The canonical ABI
+// walk resolves the field recursively before generation; target-side size/alignment
+// assertions then pin that result in the consumer compiler.
 Replicate_Info :: struct {
-	field:  string, // leaf field name (diagnostics/display)
-	type_text: string, // the field's declared type (subst-applied for block fields) —
-	                   // the wire-layout proxy the NET_FINGERPRINT hashes: a changed
-	                   // type is a changed wire even when the name stayed put
+	field:        string, // leaf field name (diagnostics/display)
+	loc:          Loc, // declaration site for recursive wire-ABI diagnostics
+	type_text:    string, // the field's declared type (subst-applied for block fields) —
+	type_dir:     string, // package context in which type_text resolves
+	type_imports: map[string]string,
 	// Access segments from the entity-struct root to this field, e.g. {"hp"} for a
 	// top-level field, {"move","x"} for a field reached through a `using`/embedded
 	// sub-struct. generate.odin turns this into the offset/size/POD expressions
 	// (nested-replicate-fields KB doc). Always at least length 1.
-	path:   []string,
-	interp: bool, // remote peers interpolate this field
-	owner:  bool, // part of the owner-authoritative unreliable stream
-	predict: bool, // kit/sim lane: server-sim-authoritative, client-predicted + reconciled
-	lerp:   string, // knet.Lerp_Kind literal (".F32"/".F64"/".Quat"/".Custom"); "" = Snap
-	blend:  string, // `interp=NAME`: the author's knet.Blend_Proc, spliced verbatim
-	wire:   string, // knet.Wire_Kind literal (".F16"/".Custom"); "" = raw struct bytes
-	codec:  string, // `wire=NAME`: the author's knet.Wire_Codec, spliced verbatim
-	slack:  string, // `slack=N`: per-field kit/sim reconcile tolerance, the numeric literal
-	                // spliced as f32 ("" = inherit the lane default). predict floats only.
-	glide:  string, // `glide=N`: per-field render-error half-life (seconds). predict+interp floats.
-	cut:    string, // `cut=N`: per-field snap threshold (world units). predict+interp floats.
+	path:         []string,
+	interp:       bool, // remote peers interpolate this field
+	owner:        bool, // part of the owner-authoritative unreliable stream
+	predict:      bool, // kit/sim lane: server-sim-authoritative, client-predicted + reconciled
+	lerp:         string, // knet.Lerp_Kind literal (".F32"/".F64"/".Quat"/".Custom"); "" = Snap
+	blend:        string, // `interp=NAME`: the author's knet.Blend_Proc, spliced verbatim
+	wire:         string, // knet.Wire_Kind literal (".F16"/".Custom"); "" = raw struct bytes
+	codec:        string, // `wire=NAME`: the author's knet.Wire_Codec, spliced verbatim
+	abi_size:     int, // recursively validated struct-side byte width
+	abi_align:    int, // canonical target-independent alignment (compile-time asserted)
+	wire_size:    int, // resolved packet width (raw/F16/custom)
+	slack:        string, // `slack=N`: per-field kit/sim reconcile tolerance, the numeric literal
+	// spliced as f32 ("" = inherit the lane default). predict floats only.
+	glide:        string, // `glide=N`: per-field render-error half-life (seconds). predict+interp floats.
+	cut:          string, // `cut=N`: per-field snap threshold (world units). predict+interp floats.
 	// The field's `<class>_<path>_edge` half (resolve_edges): delta-lane
 	// change presentation — the PROC is the subscription, no tag. "" = none.
-	edge_proc: string,
-	edge_game: string, // its optional leading game param type ("" = self-first)
+	edge_proc:    string,
+	edge_game:    string, // its optional leading game param type ("" = self-first)
 }
 
 // A `gd:"backup"` field — HOST-LOCAL state that rides host migration and
@@ -422,22 +442,32 @@ Command_Arg :: struct {
 	wire:      string,
 }
 
-Command_Access :: enum {
-	Owner,
-	Any_Seat,
-	Authority,
+Command_Outcome :: struct {
+	name:      string,
+	type_text: string,
 }
 
-// One @(gd_command[="predict"]) proc — a host-authoritative action with optional
-// client-side optimistic execution (friendslop toolkit, kit/net command loop).
+// The value carried by @(gd_command=...). Bare attributes resolve to the secure
+// owner-only default. New declarations carry a typed knet.Action_Policy
+// expression; `legacy` retains the old comma-string reader as a migration path.
+Command_Config :: struct {
+	policy_expr: string,
+	legacy:      string,
+}
+
+// One @(gd_command[=POLICY]) proc — a host-authoritative action with a typed
+// access/prediction/argument policy shared by both execution models.
 Command_Info :: struct {
-	proc_name: string, // author proc (chest_open / gun_fire) — names the decode thunk (+ a direct command's wrapper)
-	name:      string, // entity-level command name: a direct command's stripped verb ("open"), or a
-	                   // COMPOSED one's "<path>_<verb>" ("gun_fire") — drives the index const + wrapper
-	predict:   bool,
-	access:    Command_Access, // owner (default), any_seat, or authority — the
-	                           // same declaration on coop and sim execution lanes
-	args:      [dynamic]Command_Arg,
+	proc_name:       string, // author proc (chest_open / gun_fire) — names the decode thunk (+ a direct command's wrapper)
+	loc:             Loc,
+	name:            string, // entity-level command name: a direct command's stripped verb ("open"), or a
+	// COMPOSED one's "<path>_<verb>" ("gun_fire") — drives the index const + wrapper
+	policy_expr:     string, // generated knet.Action_Policy expression (default/preset/literal)
+	policy_access:   string, // canonical wire ABI value: owner / any-seat / authority
+	policy_predict:  bool, // canonical wire ABI value: optimistic vs authority-confirmed
+	policy_max_args: int, // resolved byte ceiling (0 never survives parsing; default = 4096)
+	args:            [dynamic]Command_Arg,
+	outcomes:        [dynamic]Command_Outcome, // in-process values returned after the applied bool
 	// Verb-composition: a command whose proc lives on an EMBEDDED sub-struct field is hoisted
 	// onto the entity (the dual of a nested `gd:"replicate"` field). `path` is the access path
 	// from the entity root to that field ({"gun"} or {"loadout","primary"}); nil/empty = a
@@ -446,16 +476,16 @@ Command_Info :: struct {
 	// which scriptgen fills with `self` so the block can read/write its wielder. pkg_alias /
 	// pkg_path qualify + import the sub-proc's package into the generated file ("" = the
 	// entity's own package: no qualifier, no import).
-	path:      []string,
-	owner:     bool,
+	path:            []string,
+	owner:           bool,
 	// The verb declared the ISSUER param — `by: knet.Player_Id` right after the
 	// receiver (after the wielder for a composed block). Framework-filled, never
 	// a wire arg: the predicate learns WHO unforgeably (ctx.me on the issuing
 	// peer, the resolved sender on the host — the same values its `_then` gets),
 	// so "which side am I" can't be a client-claimed argument.
-	wants_by:  bool,
-	pkg_alias: string,
-	pkg_path:  string,
+	wants_by:        bool,
+	pkg_alias:       string,
+	pkg_path:        string,
 	// Consequence pairing (`<wrapper>_then`): a verb may return `(bool, payload…)`
 	// and the game may declare a name-paired consequence proc — the typed,
 	// authority-only "and then…" that replaces scratch fields + the untyped hook
@@ -464,13 +494,13 @@ Command_Info :: struct {
 	// the authoritative verb). `then_proc` = "" means no consequence declared;
 	// `then_game` is the leading game param's pointee ("Scrapyard", "" = the
 	// entity-local form) — generated code casts ctx.game_user/env.user to it.
-	payload_count: int,
-	then_proc:     string,
-	then_game:     string,
+	payload_count:   int, // mirrors len(outcomes); retained for compact generation loops
+	then_proc:       string,
+	then_game:       string,
 	// `<proc>_apply` (SIM-lane verbs only): the predicted-effect half resims
 	// RE-RUN with the ledgered wire args — exact relative effects where the
 	// recorded-bytes patch would re-pin stale absolutes. "" = patch mode.
-	apply_proc:    string,
+	apply_proc:      string,
 }
 
 // An `entity=Name:id` declaration on an exported PackedScene field — one row
@@ -487,7 +517,7 @@ Command_Info :: struct {
 Probe_Form :: enum {
 	Field, // probe_<kind>_<field>(id) — 0 = my entity of that kind
 	Count, // probe_<kind>_count()
-	My,    // probe_my_<kind>() — my entity's net id, 0 = none
+	My, // probe_my_<kind>() — my entity's net id, 0 = none
 }
 
 Probe_Info :: struct {
@@ -496,30 +526,30 @@ Probe_Info :: struct {
 	tsnake:  string, // entity kind, snaked ("kicker")
 	target:  string, // the entity struct ("Kicker")
 	access:  string, // Field only: the access path on the entity ("score.l")
-	float:   bool,   // Field only: gd.Float return (f32/f64); else gd.Int
-	boolish: bool,   // Field only: bool field — returns 1/0
+	float:   bool, // Field only: gd.Float return (f32/f64); else gd.Int
+	boolish: bool, // Field only: bool field — returns 1/0
 }
 
 Entity_Tag :: struct {
-	field:   string, // the scene field (offset_of target on the game struct)
-	target:  string, // the entity struct the scene bodies ("Mob")
-	type_id: int,    // the stable ksess.Entity_Type value
-	line:    int,
+	field:                                                string, // the scene field (offset_of target on the game struct)
+	target:                                               string, // the entity struct the scene bodies ("Mob")
+	type_id:                                              int, // the stable ksess.Entity_Type value
+	line:                                                 int,
 	// The tag's trailing ENTITY tokens (not export specs): the kind's declared
 	// knobs, emitted on its kboot.Entity_Kind row.
-	stream_hz: int,  // `stream_hz=N` — owner-stream rate, per type, every peer
-	avatar:    bool, // `avatar` — this kind is a seat's body (host takeover parks it)
+	stream_hz:                                            int, // `stream_hz=N` — owner-stream rate, per type, every peer
+	avatar:                                               bool, // `avatar` — this kind is a seat's body (host takeover parks it)
 	// Resolved by resolve_entities (module-wide): the optional name-paired
 	// typed hooks ("" = not declared).
-	spawned: string, // <target_snake>_spawned — MAKE time (fields unset; bookkeeping)
-	freed:   string, // <target_snake>_freed
-	born:    string, // <target_snake>_born — Ev_Spawned time (fields SET; the dress),
-	                 // dispatched typed from the generated <game>_events
-	has_tick:  bool, // the target declares @(gd_tick) — the kinds row carries its Sim_Set
-	gen_spawn: bool, // emit the typed `<entity>_spawn` helper (hand-written name wins)
+	spawned:                                              string, // <target_snake>_spawned — MAKE time (fields unset; bookkeeping)
+	freed:                                                string, // <target_snake>_freed
+	born:                                                 string, // <target_snake>_born — Ev_Spawned time (fields SET; the dress),
+	// dispatched typed from the generated <game>_events
+	has_tick:                                             bool, // the target declares @(gd_tick) — the kinds row carries its Sim_Set
+	gen_spawn:                                            bool, // emit the typed `<entity>_spawn` helper (hand-written name wins)
 	// Which census accessors to emit (resolve_census): a hand-written proc
 	// of the same name suppresses that one, keeping its meaning.
-	gen_of, gen_owned, gen_my, gen_ids: bool,
+	gen_ref, gen_of, gen_owned, gen_my, gen_ids, gen_all: bool,
 }
 
 // The class's @(gd_sample)/@(gd_step) procs — the lane's GAME half (kit/sim).
@@ -541,40 +571,62 @@ Sim_Proc_Info :: struct {
 // primary is 0), and the @(gd_sample) that fills it. A single-input game has
 // one of these; a game driving two entity kinds has one per kind.
 Input_Class_Info :: struct {
-	class_id:  int,
-	type_name: string,
-	sample:    string, // the @(gd_sample) proc filling it ("" = none: those entities coast)
-	validate:  string, // optional validator paired by @(gd_sample="validate[=PROC]")
-	line:      int,
+	class_id:    int,
+	type_name:   string,
+	sample:      string, // the @(gd_sample) proc filling it ("" = none: those entities coast)
+	validate:    string, // optional game predicate paired by @(gd_sample="validate[=PROC]")
+	constraints: []Input_Field_Constraint, // generated @(gd_input) field sanitizer/checks
+	line:        int,
+	abi_size:    int,
+	abi_align:   int,
+}
+
+// One declarative rule from a field of an @(gd_input) struct. The generator
+// deliberately keeps these as source literals: the script package's compiler
+// remains the final authority on the field type while scriptgen supplies an
+// early, field-named diagnostic for invalid combinations.
+Input_Field_Constraint :: struct {
+	field:      string,
+	type_text:  string,
+	array_len:  int, // 0 = scalar; positive = fixed array (the generated loop bound)
+	range_min:  string,
+	range_max:  string,
+	mask:       string,
+	finite:     bool,
+	unit:       bool,
+	enum_check: bool,
 }
 
 // The one @(gd_tick) proc a class may declare — its sim-lane step (kit/sim).
 // scriptgen generates the rawptr thunk and the `<snake>_sim_set` the game
 // hands to ksim.lane_track_set.
 Tick_Info :: struct {
-	proc_name:     string,
-	input_type:    string, // the input param's type text, spliced verbatim ("" = inputless)
-	input_class:   int, // resolved package-wide (resolve_sim): the wire class its input rides
-	wants_lane:    bool, // trailing `lane: ^ksim.Lane` param — threaded by the thunk
-	line:          int,
-	contested:     bool, // @(gd_tick="contested"): every peer predicts this entity
-	payload_count: int, // results = FACTS the tick learned (fired, dashed, landed) —
-	                    // threaded to the name-paired halves below
-	payload_types: [dynamic]string, // each fact's declared type text, in result order
-	then_proc:     string, // `<proc>_then`: AUTHORITY-only consequence ("" = none)
-	then_game:     string, // its optional leading game param type ("" = self-first shape)
-	fx_proc:       string, // `<proc>_fx`: presentation ("" = none). Without `mine` it fires
-	                       // on the owning peer's LIVE pass only; with it, on EVERY screen.
-	fx_game:       string,
-	fx_mine:       bool, // the _fx declares `mine: bool` after self: every-screen
-	                     // presentation — event ticks broadcast the fact tuple (SIM_FACT),
-	                     // watchers fire on the watch clock, the live pass fires inline
-	payload_wires: [dynamic]string, // wire suffix per fact (filled iff fx_mine — facts
-	                                // cross the wire, so they must be wire primitives)
+	proc_name:       string,
+	input_type:      string, // the input param's type text, spliced verbatim ("" = inputless)
+	input_class:     int, // resolved package-wide (resolve_sim): the wire class its input rides
+	input_abi_size:  int, // recursive canonical width (target-side asserted before emission)
+	input_abi_align: int,
+	wants_lane:      bool, // trailing `lane: ^ksim.Lane` param — threaded by the thunk
+	line:            int,
+	contested:       bool, // @(gd_tick="contested"): every peer predicts this entity
+	payload_count:   int, // results = FACTS the tick learned (fired, dashed, landed) —
+	// threaded to the name-paired halves below
+	payload_types:   [dynamic]string, // each fact's declared type text, in result order
+	then_proc:       string, // `<proc>_then`: AUTHORITY-only consequence ("" = none)
+	then_game:       string, // its optional leading game param type ("" = self-first shape)
+	fx_proc:         string, // `<proc>_fx`: presentation ("" = none). Without `mine` it fires
+	// on the owning peer's LIVE pass only; with it, on EVERY screen.
+	fx_game:         string,
+	fx_mine:         bool, // the _fx declares `mine: bool` after self: every-screen
+	// presentation — event ticks broadcast the fact tuple (SIM_FACT),
+	// watchers fire on the watch clock, the live pass fires inline
+	payload_wires:   [dynamic]string, // wire suffix per fact (filled iff fx_mine — facts
+	// cross the wire, so they must be wire primitives)
 }
 
-// One declared world-pass fact — `@(gd_fact)` on a `<event>_fx` presentation
-// half. scriptgen generates the announce DOOR under the bare event name: the
+// One declared presentation cue — preferably `@(gd_cue)`, with `@(gd_fact)`
+// retained as the original compatible spelling — on a `<event>_fx` proc.
+// scriptgen generates the announce DOOR under the bare event name: the
 // step (or an authority half) calls `<event>(l, anchor?, args…)` and the door
 // holds every gate — the authority broadcasts (SIM_FACT, watchers fire on the
 // watch clock), the causer's live pass fires now (mine=true), a resim replay
@@ -586,6 +638,10 @@ Fact_Info :: struct {
 	game:         string, // the leading game param's struct name (the lane owner)
 	anchor:       string, // the anchor param's struct name ("" = anchorless world fact)
 	anchor_param: string, // the author's name for the anchor param (the door mirrors it)
+	anchor_index: int, // index in entity_* (-1 = no entity anchor)
+	entity_names: [dynamic]string, // typed entity refs before `mine`, in author order
+	entity_types: [dynamic]string, // struct name per entity ref; the anchor rides the header,
+	// other refs ride as Net_Id values in the cue tuple
 	arg_names:    [dynamic]string, // wire args after `mine`, author-named
 	arg_types:    [dynamic]string, // declared type text per arg (spliced into the door)
 	arg_wires:    [dynamic]string, // wire suffix per arg
@@ -598,7 +654,8 @@ Fact_Info :: struct {
 // game-owned Typed_Route(T) storage, a `<class>_messages` registration proc (the
 // game calls it once in ready()), and `<proc>_send` / `<proc>_send_to` doors over
 // the runtime typed-route API (session_app_listen / session_app_send_typed). A
-// POD payload decoded for the handler; the tag is the game's SES_APP tag byte.
+// recursively validated canonical raw payload is decoded for the handler; the
+// tag is the game's SES_APP tag byte.
 Message_Info :: struct {
 	proc_name:    string, // the author's handler proc (drives the route var + send wrappers)
 	name:         string, // struct-prefix-stripped (the diagnostic / fingerprint name)
@@ -607,63 +664,81 @@ Message_Info :: struct {
 	tag_ident:    string, // the declared SES_APP tag constant, spliced verbatim (e.g. TAG_WHISPER)
 	line:         int,
 	path:         string,
+	abi_size:     int,
+	abi_align:    int,
 }
 
 Script :: struct {
-	path:        string, // source file path (diagnostics)
-	godot_alias: string, // the file's `godot:godot` import alias ("" = not imported)
-	pkg:         string,
-	struct_name: string,
-	class_name:  string,
-	base:        string,
-	base_line:   int, // 1-based line of the `//gd:extends` marker (0 = none written; base was DERIVED from the owner handle)
-	doc:         string, // `///` doc comment above the script struct (class description)
-	marked:      bool, // saw at least one valid `//gd:` marker (intent signal for diagnostics)
-	tool:        bool,
-	icon:        string, // `//gd:icon <res-path>` — custom class icon (""=none)
-	groups:      [dynamic]string, // `//gd:group a b` — joined on READY by the core
-	exports:     [dynamic]Export_Info,
-	onready_scripts: [dynamic]Onready_Script_Ref, // `^ScriptStruct` onready fields, validated module-wide (resolve_onready_scripts)
-	lifecycles:  [dynamic]Lifecycle_Info,
-	methods:     [dynamic]Method_Info,
-	signals:     [dynamic]Signal_Info,
-	connections: [dynamic]Connection_Info,
-	rpcs:        [dynamic]Rpc_Info,
-	replicates:  [dynamic]Replicate_Info,
-	backups:     [dynamic]Backup_Info, // gd:"backup" host-local migration/save state
-	commands:    [dynamic]Command_Info,
-	entities:    [dynamic]Entity_Tag, // entity=Name:id scene fields (the kboot table)
-	net_id_type: string, // type text of a `net_id` field ("" = none) — commands require knet.Net_Id
-	tick:        Tick_Info, // proc_name == "" = the class doesn't tick
-	block_ticks: [dynamic]Hoisted_Tick, // embedded blocks' ticks, entity-tick-first order
-	samples:     [dynamic]Sim_Proc_Info, // @(gd_sample): the lane's device reads — one per input class
-	step:        Sim_Proc_Info, // @(gd_step): the EVERYWHERE world pass (live + resim)
-	step_auth:   Sim_Proc_Info, // @(gd_step="authority"): the host-only world pass
+	path:              string, // source file path (diagnostics)
+	imports:           map[string]string, // declaring file imports (canonical wire-type resolution)
+	godot_alias:       string, // the file's `godot:godot` import alias ("" = not imported)
+	pkg:               string,
+	struct_name:       string,
+	class_name:        string,
+	base:              string,
+	base_line:         int, // 1-based line of the `//gd:extends` marker (0 = none written; base was DERIVED from the owner handle)
+	doc:               string, // `///` doc comment above the script struct (class description)
+	marked:            bool, // saw at least one valid `//gd:` marker (intent signal for diagnostics)
+	tool:              bool,
+	icon:              string, // `//gd:icon <res-path>` — custom class icon (""=none)
+	groups:            [dynamic]string, // `//gd:group a b` — joined on READY by the core
+	exports:           [dynamic]Export_Info,
+	onready_scripts:   [dynamic]Onready_Script_Ref, // `^ScriptStruct` onready fields, validated module-wide (resolve_onready_scripts)
+	lifecycles:        [dynamic]Lifecycle_Info,
+	methods:           [dynamic]Method_Info,
+	signals:           [dynamic]Signal_Info,
+	connections:       [dynamic]Connection_Info,
+	rpcs:              [dynamic]Rpc_Info,
+	replicates:        [dynamic]Replicate_Info,
+	backups:           [dynamic]Backup_Info, // gd:"backup" host-local migration/save state
+	commands:          [dynamic]Command_Info,
+	entities:          [dynamic]Entity_Tag, // entity=Name:id scene fields (the kboot table)
+	net_id_type:       string, // type text of a `net_id` field ("" = none) — commands require knet.Net_Id
+	tick:              Tick_Info, // proc_name == "" = the class doesn't tick
+	block_ticks:       [dynamic]Hoisted_Tick, // embedded blocks' ticks, entity-tick-first order
+	samples:           [dynamic]Sim_Proc_Info, // @(gd_sample): the lane's device reads — one per input class
+	step:              Sim_Proc_Info, // @(gd_step): the EVERYWHERE world pass (live + resim)
+	step_auth:         Sim_Proc_Info, // @(gd_step="authority"): the host-only world pass
 	// The authority pass is BOOT-routed (resolve_sim): a tickless package has no
 	// lane, so `<snake>_step(self, ticks)` is generated instead of lane wiring —
 	// the coop game's fixed step, role-gated, with the same-frame edge pass inside.
-	step_boot:   bool,
-	input_classes: [dynamic]Input_Class_Info, // resolved package-wide (resolve_sim), on the lane OWNER: every input class, sorted by id (0 = primary)
-	facts:        [dynamic]Fact_Info, // declared world-pass facts (resolve_facts), on the lane OWNER — doors + decode thunks + the fact table ride its gen file
-	messages:     [dynamic]Message_Info, // declared typed app-messages (@(gd_message)) — route storage + a `_messages` registration proc + send doors ride this class's gen file
-	boot_field:  string, // the kboot.Boot field's name ("" = none) — generates the standard transport forwards
-	std_forwards: [dynamic]string, // which standard forwards were synthesized (bodies emitted by generate)
-	probes:       [dynamic]Probe_Info, // generated acid probes (resolve_probes; bodies emitted by generate)
-	event_halves: [dynamic]Event_Half, // session-event halves (resolve_session_events) — the generated `<snake>_events` dispatch
-	embodied:     string, // `<snake>_embodied(self, id)` — MY avatar-kind entity was born (resolve_entities; needs an `avatar` kind)
+	step_boot:         bool,
+	input_classes:     [dynamic]Input_Class_Info, // resolved package-wide (resolve_sim), on the lane OWNER: every input class, sorted by id (0 = primary)
+	facts:             [dynamic]Fact_Info, // declared presentation cues (resolve_facts), on the lane OWNER — doors + decode thunks + the fact table ride its gen file
+	messages:          [dynamic]Message_Info, // declared typed app-messages (@(gd_message)) — route storage + a `_messages` registration proc + send doors ride this class's gen file
+	boot_field:        string, // the kboot.Boot field's name ("" = none) — generates the standard transport forwards
+	boot_fields:       int, // direct Boot fields (the net facade needs exactly one)
+	session_field:     string, // the direct ksess.Session field, when unique
+	session_fields:    int,
+	comms_field:       string, // the direct kcomms.Comms field, when unique
+	comms_fields:      int,
+	lane_field:        string, // the direct ksim.Lane field, when unique
+	lane_fields:       int,
+	// A conventional Boot + Session + Comms shell gets the three generated
+	// lifecycle doors. A lane owner additionally needs one direct Lane. Each
+	// bool yields independently to a hand-written proc of the same name.
+	net_attach:        bool,
+	net_pump:          bool,
+	net_detach:        bool,
+	std_forwards:      [dynamic]string, // which standard forwards were synthesized (bodies emitted by generate)
+	probes:            [dynamic]Probe_Info, // generated acid probes (resolve_probes; bodies emitted by generate)
+	event_halves:      [dynamic]Event_Half, // session-event halves (resolve_session_events) — the generated `<snake>_events` dispatch
+	embodied:          string, // `<snake>_embodied(self, id)` — MY avatar-kind entity was born (resolve_entities; needs an `avatar` kind)
 
 	// Migration halves (resolve_migration): the host-migration dance's four
 	// name-paired seams — kboot.boot_migration's generated hook table. "" =
 	// undeclared; any declared = the table + the events-tail drain are emitted.
-	succ_backup:    string, // `<snake>_backup(self, w)` — host: the campaign blob
-	succ_took_over: string, // `<snake>_took_over(self, r)` — heir: read blob + mend
-	succ_wiped:     string, // `<snake>_wiped(self)` — non-entity pools, post-wipe
-	succ_migrating: string, // `<snake>_migrating(self, step, target, try)` — the words
+	succ_backup:       string, // `<snake>_backup(self, w)` — host: the campaign blob
+	succ_took_over:    string, // `<snake>_took_over(self, r)` — heir: read blob + mend
+	succ_wiped:        string, // `<snake>_wiped(self)` — non-entity pools, post-wipe
+	succ_migrating:    string, // `<snake>_migrating(self, step, target, try)` — the words
 
 	// `gd:"profile=Type"` on the ksess.Session field: the session-profile
 	// row type — folded into NET_FINGERPRINT, installed in the ready thunk.
-	profile_type: string, // the row struct's name ("" = none declared)
-	profile_ses:  string, // the Session field the install targets
+	profile_type:      string, // the row struct's name ("" = none declared)
+	profile_ses:       string, // the Session field the install targets
+	profile_abi_size:  int,
+	profile_abi_align: int,
 }
 
 // A SCRIPT-RESOLVING onready field (`hud: ^hud `gd:"onready=Path"``): the pointee names
@@ -680,15 +755,15 @@ Onready_Script_Ref :: struct {
 // AUTHORITY alone — the generated dispatch holds the role gate, so no
 // event-drain switch (or is_host inside it) survives in game code.
 Event_Half :: struct {
-	ev:        int,    // index into SESSION_EVENTS
+	ev:        int, // index into SESSION_EVENTS
 	bare:      string, // "" = undeclared
 	then_proc: string, // "" = undeclared (legal only on .Every events)
 }
 
 Session_Ev_Role :: enum u8 {
-	Every,  // both roles hear it — `_then` narrows to the authority
+	Every, // both roles hear it — `_then` narrows to the authority
 	Client, // never reaches the authority — a `_then` could never fire
-	Host,   // already authority-only — a `_then` would be redundant
+	Host, // already authority-only — a `_then` would be redundant
 }
 
 Session_Ev_Param :: struct {
@@ -736,29 +811,155 @@ Session_Ev :: struct {
 // the variant says whether a client alone hears it — so a NEW row's role is a
 // judgement, and the test only guarantees somebody had to make it.
 SESSION_EVENTS := [?]Session_Ev {
-	{suffix = "seated", variant = "Ev_Seated", role = .Every, params = {{"me", "knet.Player_Id", "e.me"}}},
-	{suffix = "welcomed", variant = "Ev_Welcomed", role = .Client, params = {{"me", "knet.Player_Id", "e.me"}}},
-	{suffix = "player_joined", variant = "Ev_Player_Joined", role = .Every, params = {{"id", "knet.Player_Id", "e.id"}, {"rejoin", "bool", "e.rejoin"}}},
-	{suffix = "player_left", variant = "Ev_Player_Left", role = .Every, params = {{"id", "knet.Player_Id", "e.id"}}},
+	{
+		suffix = "seated",
+		variant = "Ev_Seated",
+		role = .Every,
+		params = {{"me", "knet.Player_Id", "e.me"}},
+	},
+	{
+		suffix = "welcomed",
+		variant = "Ev_Welcomed",
+		role = .Client,
+		params = {{"me", "knet.Player_Id", "e.me"}},
+	},
+	{
+		suffix = "player_joined",
+		variant = "Ev_Player_Joined",
+		role = .Every,
+		params = {{"id", "knet.Player_Id", "e.id"}, {"rejoin", "bool", "e.rejoin"}},
+	},
+	{
+		suffix = "player_left",
+		variant = "Ev_Player_Left",
+		role = .Every,
+		params = {{"id", "knet.Player_Id", "e.id"}},
+	},
 	{suffix = "host_left", variant = "Ev_Host_Left", role = .Client, params = {}},
 	{suffix = "join_failed", variant = "Ev_Join_Failed", role = .Client, params = {}},
-	{suffix = "join_denied", variant = "Ev_Join_Denied", role = .Client, params = {{"reason", "ksess.Deny_Reason", "e.reason"}}},
+	{
+		suffix = "join_denied",
+		variant = "Ev_Join_Denied",
+		role = .Client,
+		params = {{"reason", "ksess.Deny_Reason", "e.reason"}},
+	},
 	{suffix = "kicked", variant = "Ev_Kicked", role = .Client, params = {}},
-	{suffix = "backup_target", variant = "Ev_Backup_Target", role = .Host, params = {{"player", "knet.Player_Id", "e.player"}}},
-	{suffix = "succession", variant = "Ev_Succession", role = .Client, params = {{"successor", "knet.Player_Id", "e.successor"}}},
-	{suffix = "backup_received", variant = "Ev_Backup_Received", role = .Client, params = {{"size", "int", "e.size"}}},
-	{suffix = "entity_spawned", variant = "Ev_Spawned", role = .Every, params = {{"id", "knet.Net_Id", "e.id"}, {"type", "ksess.Entity_Type", "e.type"}, {"owner", "knet.Player_Id", "e.owner"}}},
-	{suffix = "entity_resynced", variant = "Ev_Resynced", role = .Client, params = {{"id", "knet.Net_Id", "e.id"}, {"type", "ksess.Entity_Type", "e.type"}, {"owner", "knet.Player_Id", "e.owner"}}},
-	{suffix = "entity_despawned", variant = "Ev_Despawned", role = .Client, params = {{"id", "knet.Net_Id", "e.id"}}},
-	{suffix = "entity_changed", variant = "Ev_Entity_Changed", role = .Client, params = {{"id", "knet.Net_Id", "e.id"}}},
-	{suffix = "owner_changed", variant = "Ev_Owner_Changed", role = .Every, params = {{"id", "knet.Net_Id", "e.id"}, {"owner", "knet.Player_Id", "e.owner"}, {"prev", "knet.Player_Id", "e.prev"}}},
+	{
+		suffix = "backup_target",
+		variant = "Ev_Backup_Target",
+		role = .Host,
+		params = {{"player", "knet.Player_Id", "e.player"}},
+	},
+	{
+		suffix = "succession",
+		variant = "Ev_Succession",
+		role = .Client,
+		params = {{"successor", "knet.Player_Id", "e.successor"}},
+	},
+	{
+		suffix = "backup_received",
+		variant = "Ev_Backup_Received",
+		role = .Client,
+		params = {{"size", "int", "e.size"}},
+	},
+	{
+		suffix = "entity_spawned",
+		variant = "Ev_Spawned",
+		role = .Every,
+		params = {
+			{"id", "knet.Net_Id", "e.id"},
+			{"type", "ksess.Entity_Type", "e.type"},
+			{"owner", "knet.Player_Id", "e.owner"},
+		},
+	},
+	{
+		suffix = "entity_resynced",
+		variant = "Ev_Resynced",
+		role = .Client,
+		params = {
+			{"id", "knet.Net_Id", "e.id"},
+			{"type", "ksess.Entity_Type", "e.type"},
+			{"owner", "knet.Player_Id", "e.owner"},
+		},
+	},
+	{
+		suffix = "entity_despawned",
+		variant = "Ev_Despawned",
+		role = .Client,
+		params = {{"id", "knet.Net_Id", "e.id"}},
+	},
+	{
+		suffix = "entity_changed",
+		variant = "Ev_Entity_Changed",
+		role = .Client,
+		params = {{"id", "knet.Net_Id", "e.id"}},
+	},
+	{
+		suffix = "owner_changed",
+		variant = "Ev_Owner_Changed",
+		role = .Every,
+		params = {
+			{"id", "knet.Net_Id", "e.id"},
+			{"owner", "knet.Player_Id", "e.owner"},
+			{"prev", "knet.Player_Id", "e.prev"},
+		},
+	},
 	{suffix = "stats_updated", variant = "Ev_Stats_Updated", role = .Client, params = {}},
-	{suffix = "profile_changed", variant = "Ev_Profile_Changed", role = .Every, params = {{"player", "knet.Player_Id", "e.player"}}},
-	{suffix = "state_applied", variant = "Ev_State_Applied", role = .Client, params = {{"entities", "int", "e.entities"}}},
-	{suffix = "blob_changed", variant = "Ev_Blob_Changed", role = .Every, params = {{"id", "knet.Net_Id", "e.id"}, {"size", "int", "e.size"}}},
-	{suffix = "command_executed", variant = "Ev_Command_Executed", role = .Host, params = {{"ok", "bool", "e.ok"}, {"player", "knet.Player_Id", "e.player"}, {"entity", "knet.Net_Id", "e.entity"}, {"cmd", "u16", "e.cmd"}}},
-	{suffix = "command_confirmed", variant = "Ev_Command_Confirmed", role = .Client, params = {{"seq", "knet.Intent_Seq", "e.seq"}}},
-	{suffix = "command_rejected", variant = "Ev_Command_Rejected", role = .Client, params = {{"seq", "knet.Intent_Seq", "e.seq"}, {"entity", "knet.Net_Id", "e.entity"}}},
+	{
+		suffix = "profile_changed",
+		variant = "Ev_Profile_Changed",
+		role = .Every,
+		params = {{"player", "knet.Player_Id", "e.player"}},
+	},
+	{
+		suffix = "state_applied",
+		variant = "Ev_State_Applied",
+		role = .Client,
+		params = {{"entities", "int", "e.entities"}},
+	},
+	{
+		suffix = "blob_changed",
+		variant = "Ev_Blob_Changed",
+		role = .Every,
+		params = {{"id", "knet.Net_Id", "e.id"}, {"size", "int", "e.size"}},
+	},
+	{
+		suffix = "command_executed",
+		variant = "Ev_Command_Executed",
+		role = .Host,
+		params = {
+			{"ok", "bool", "e.ok"},
+			{"player", "knet.Player_Id", "e.player"},
+			{"entity", "knet.Net_Id", "e.entity"},
+			{"cmd", "u16", "e.cmd"},
+			{"reason", "knet.Action_Reject_Reason", "e.reason"},
+			{"seq", "knet.Intent_Seq", "e.seq"},
+			{"model", "knet.Action_Model", "e.model"},
+		},
+	},
+	{
+		suffix = "command_confirmed",
+		variant = "Ev_Command_Confirmed",
+		role = .Client,
+		params = {
+			{"seq", "knet.Intent_Seq", "e.seq"},
+			{"entity", "knet.Net_Id", "e.entity"},
+			{"cmd", "u16", "e.cmd"},
+			{"model", "knet.Action_Model", "e.model"},
+		},
+	},
+	{
+		suffix = "command_rejected",
+		variant = "Ev_Command_Rejected",
+		role = .Client,
+		params = {
+			{"seq", "knet.Intent_Seq", "e.seq"},
+			{"entity", "knet.Net_Id", "e.entity"},
+			{"cmd", "u16", "e.cmd"},
+			{"reason", "knet.Action_Reject_Reason", "e.reason"},
+			{"model", "knet.Action_Model", "e.model"},
+		},
+	},
 }
 
 // The host-migration halves — kboot.boot_migration's seams, pairable like
@@ -771,10 +972,30 @@ Migration_Half_Spec :: struct {
 }
 
 MIGRATION_HALVES := [?]Migration_Half_Spec {
-	{suffix = "backup", params = {{"w", "^knet.Writer", ""}}, what = "the HOST writes the campaign blob it rides on every backup refresh"},
-	{suffix = "took_over", params = {{"r", "^knet.Reader", ""}}, what = "the HEIR reads the blob back and mends, after the kit resumed the run"},
-	{suffix = "wiped", params = {}, what = "the non-entity pools clear, after the kit's census-driven wipe"},
-	{suffix = "migrating", params = {{"step", "kboot.Migrate_Step", ""}, {"target", "string", ""}, {"try", "int", ""}}, what = "the dance's words — one call per arm, mechanics already ran"},
+	{
+		suffix = "backup",
+		params = {{"w", "^knet.Writer", ""}},
+		what = "the HOST writes the campaign blob it rides on every backup refresh",
+	},
+	{
+		suffix = "took_over",
+		params = {{"r", "^knet.Reader", ""}},
+		what = "the HEIR reads the blob back and mends, after the kit resumed the run",
+	},
+	{
+		suffix = "wiped",
+		params = {},
+		what = "the non-entity pools clear, after the kit's census-driven wipe",
+	},
+	{
+		suffix = "migrating",
+		params = {
+			{"step", "kboot.Migrate_Step", ""},
+			{"target", "string", ""},
+			{"try", "int", ""},
+		},
+		what = "the dance's words — one call per arm, mechanics already ran",
+	},
 }
 
 had_error: bool
@@ -843,7 +1064,7 @@ warn_at :: proc(loc: Loc, format: string, args: ..any) {
 // `scriptgen: wrote …` lines because a yield is part of what the run PRODUCED,
 // not a complaint about it.
 //
-// (The `@(gd_fact)` announce door is the one exception, and it refuses instead of
+// (A declared cue's announce door is the one exception, and it refuses instead of
 // yielding — see resolve_facts, where the reason is written down.)
 @(private = "file")
 g_yielded: map[string]bool
@@ -854,7 +1075,11 @@ g_yielded: map[string]bool
 note_yield :: proc(what, name: string) {
 	if g_yielded[name] {return}
 	g_yielded[strings.clone(name)] = true // callers pass tprintf'd names; the set outlives the temp frame
-	fmt.printfln("scriptgen: yielded: %s (%s — the hand-written proc of that name wins)", name, what)
+	fmt.printfln(
+		"scriptgen: yielded: %s (%s — the hand-written proc of that name wins)",
+		name,
+		what,
+	)
 }
 
 // ---- struct index + cross-package resolver (nested-replicate-fields) ----------
@@ -877,21 +1102,53 @@ Struct_Field :: struct {
 }
 
 Struct_Def :: struct {
-	id:          string, // "<dir>|<name>" — stable identity for cycle detection
-	dir:         string, // the package dir this struct lives in (bare-name resolution)
-	fields:      []Struct_Field,
-	imports:     map[string]string, // defining file's EXPLICIT-alias imports (alias -> "godot:kit/combat")
-	poly_params: []string, // generic parameter names ("$S" stripped to "S"), in order; nil = not generic
+	id:           string, // "<dir>|<name>" — stable identity for cycle detection
+	dir:          string, // the package dir this struct lives in (bare-name resolution)
+	name:         string,
+	loc:          Loc,
+	packed:       bool, // `struct #packed`: no implicit ABI padding between raw wire fields
+	custom_align: bool, // #align/#min_field_align/#max_field_align are target-layout policy
+	input_decl:   bool, // @(gd_input): its gd field tags are input admission rules
+	input_config: string, // retained so a valued marker gets a precise diagnostic
+	input_loc:    Loc,
+	fields:       []Struct_Field,
+	imports:      map[string]string, // defining file's EXPLICIT-alias imports (alias -> "godot:kit/combat")
+	poly_params:  []string, // generic parameter names ("$S" stripped to "S"), in order; nil = not generic
 	// @(gd_command) procs whose FIRST param is `^<this struct>` (verb-composition), and
 	// @(gd_method)/@(gd_rpc) procs likewise (method-composition). An entity that embeds this struct
 	// hoists these onto its own command / method tables (recurse_into). Collected on demand by
 	// index_pkg_dir alongside the fields. nil for a struct with none.
-	commands:    []Command_Info,
-	methods:     []Method_Info,
+	commands:     []Command_Info,
+	methods:      []Method_Info,
 	// The block's @(gd_tick), if declared (tick-composition): INPUTLESS by
 	// contract — intent flows through fields the wielder's tick writes — and
 	// hoisted to run AFTER the entity's own tick, in field order.
-	tick:        Block_Tick,
+	tick:         Block_Tick,
+}
+
+// Named non-struct types needed by the recursive wire-ABI walk. Structs retain
+// their richer Struct_Def index above; this companion index supplies enum base
+// widths, enum member order, distinct-type underlyings, and ordinary aliases.
+Wire_Named_Kind :: enum u8 {
+	Alias,
+	Distinct,
+	Enum,
+}
+
+Wire_Enum_Member :: struct {
+	name:  string,
+	value: string, // "" = implicit successor; explicit values are canonicalized text
+}
+
+Wire_Named_Def :: struct {
+	id:         string,
+	dir:        string,
+	name:       string,
+	kind:       Wire_Named_Kind,
+	underlying: string, // enum base ("" = forbidden implicit width), alias/distinct target
+	members:    []Wire_Enum_Member,
+	imports:    map[string]string,
+	loc:        Loc,
 }
 
 // A block's @(gd_tick): `proc(b: ^Block)`, optionally +owner pointer
@@ -924,6 +1181,8 @@ Hoisted_Tick :: struct {
 // dir -> (bare struct name -> def). The scripts package, plus any imported packages
 // pulled in on demand for nested-bundle resolution.
 g_pkgs: map[string]map[string]Struct_Def
+g_wire_named: map[string]map[string]Wire_Named_Def
+g_wire_codec_sizes: map[string]map[string]int
 g_pkg_loaded: map[string]bool // dirs already parsed (incl. unreadable, so we never retry)
 g_godot_root: string // the `godot:` collection root (-godot: flag / ODIN_GODOT_ROOT); "" disables imported bundles
 
@@ -936,7 +1195,13 @@ index_pkg_dir :: proc(dir: string) {
 	// header copied by value — inserting into a local after storing it would leave the
 	// stored copy stale once the backing grows; so we store the final header via defer.)
 	pkg := make(map[string]Struct_Def)
-	defer g_pkgs[dir] = pkg
+	named := make(map[string]Wire_Named_Def)
+	codecs := make(map[string]int)
+	defer {
+		g_pkgs[dir] = pkg
+		g_wire_named[dir] = named
+		g_wire_codec_sizes[dir] = codecs
+	}
 	dir_fh, oerr := os.open(dir)
 	if oerr != nil {return}
 	files, rderr := os.read_dir(dir_fh, -1, context.allocator)
@@ -969,11 +1234,89 @@ index_pkg_dir :: proc(dir: string) {
 			vd, ok := decl.derived.(^ast.Value_Decl)
 			if !ok {continue}
 			if len(vd.names) != 1 || len(vd.values) != 1 {continue}
-			if st, is_struct := vd.values[0].derived.(^ast.Struct_Type); is_struct && st.fields != nil {
+			if st, is_struct := vd.values[0].derived.(^ast.Struct_Type);
+			   is_struct && st.fields != nil {
 				name_ident, _ := vd.names[0].derived.(^ast.Ident)
 				if name_ident == nil {continue}
-				pkg[name_ident.name] = build_struct_def(dir, fi.fullpath, name_ident.name, st, src, alias, imports)
+				input_config, _ := attr_value(vd, "gd_input")
+				pkg[name_ident.name] = build_struct_def(
+					dir,
+					fi.fullpath,
+					name_ident.name,
+					st,
+					src,
+					alias,
+					imports,
+					has_attr(vd, "gd_input"),
+					input_config,
+					name_ident.pos.line,
+				)
 				continue
+			}
+			name_ident, _ := vd.names[0].derived.(^ast.Ident)
+			if name_ident == nil {continue}
+			loc := Loc{fi.fullpath, name_ident.pos.line}
+			if et, is_enum := vd.values[0].derived.(^ast.Enum_Type); is_enum {
+				members := make([dynamic]Wire_Enum_Member)
+				for elem in et.fields {
+					if fv, valued := elem.derived.(^ast.Field_Value); valued {
+						append(
+							&members,
+							Wire_Enum_Member {
+								name = strings.trim_space(node_text(src, fv.field)),
+								value = wire_compact_expr(node_text(src, fv.value)),
+							},
+						)
+					} else {
+						append(
+							&members,
+							Wire_Enum_Member{name = strings.trim_space(node_text(src, elem))},
+						)
+					}
+				}
+				base := ""
+				if et.base_type != nil {
+					base = normalize_godot_qualifier(node_text(src, et.base_type), alias)
+				}
+				named[name_ident.name] = Wire_Named_Def {
+					id         = strings.concatenate({dir, "|", name_ident.name}),
+					dir        = dir,
+					name       = name_ident.name,
+					kind       = .Enum,
+					underlying = base,
+					members    = members[:],
+					imports    = imports,
+					loc        = loc,
+				}
+				continue
+			}
+			if dt, is_distinct := vd.values[0].derived.(^ast.Distinct_Type); is_distinct {
+				named[name_ident.name] = Wire_Named_Def {
+					id         = strings.concatenate({dir, "|", name_ident.name}),
+					dir        = dir,
+					name       = name_ident.name,
+					kind       = .Distinct,
+					underlying = normalize_godot_qualifier(node_text(src, dt.type), alias),
+					imports    = imports,
+					loc        = loc,
+				}
+				continue
+			}
+			if lit, is_lit := vd.values[0].derived.(^ast.Comp_Lit); is_lit && lit.type != nil {
+				lt := strings.trim_space(node_text(src, lit.type))
+				if strings.has_suffix(lt, ".Wire_Codec") || lt == "Wire_Codec" {
+					for elem in lit.elems {
+						fv, valued := elem.derived.(^ast.Field_Value)
+						if !valued ||
+						   strings.trim_space(node_text(src, fv.field)) != "size" {continue}
+						if n, nok := strconv.parse_int(
+							strings.trim_space(node_text(src, fv.value)),
+						); nok && n > 0 {
+							codecs[name_ident.name] = n
+						}
+					}
+					continue
+				}
 			}
 			// verb-/method-composition: a bound proc on a struct in THIS package (first param
 			// `^Name`, or `^Name($S)` for a generic block) — index it under that struct so an
@@ -981,19 +1324,39 @@ index_pkg_dir :: proc(dir: string) {
 			// build_* report contract violations loudly, so a block's verbs/methods are validated
 			// when a game first imports the package.
 			pl, is_proc := vd.values[0].derived.(^ast.Proc_Lit)
-			if !is_proc {continue}
+			if !is_proc {
+				// Ordinary aliases are resolved only if a network declaration reaches
+				// them. Indexing a same-shaped constant is harmless: using it as a type
+				// will fail recursively with the declaration path that reached it.
+				named[name_ident.name] = Wire_Named_Def {
+					id         = strings.concatenate({dir, "|", name_ident.name}),
+					dir        = dir,
+					name       = name_ident.name,
+					kind       = .Alias,
+					underlying = normalize_godot_qualifier(node_text(src, vd.values[0]), alias),
+					imports    = imports,
+					loc        = loc,
+				}
+				continue
+			}
 			pt := pl.type
 			if pt == nil || pt.params == nil || len(pt.params.list) == 0 {continue}
 			recv := strings.trim_space(node_text(src, pt.params.list[0].type))
 			if !strings.has_prefix(recv, "^") {continue}
 			base := strings.trim_space(recv[1:])
-			if paren := strings.index_byte(base, '('); paren >= 0 {base = strings.trim_space(base[:paren])}
-			name_ident, _ := vd.names[0].derived.(^ast.Ident)
-			if name_ident == nil {continue}
-			loc := Loc{fi.fullpath, name_ident.pos.line}
+			if paren := strings.index_byte(base, '(');
+			   paren >= 0 {base = strings.trim_space(base[:paren])}
 			if has_attr(vd, "gd_command") {
-				config, _ := attr_value(vd, "gd_command")
-				if ci, cok := build_command_info(src, pt, loc, name_ident.name, base, config, true); cok {
+				config := command_config(vd, src)
+				if ci, cok := build_command_info(
+					src,
+					pt,
+					loc,
+					name_ident.name,
+					base,
+					config,
+					true,
+				); cok {
 					arr := cmds[base]
 					append(&arr, ci)
 					cmds[base] = arr
@@ -1004,7 +1367,11 @@ index_pkg_dir :: proc(dir: string) {
 				config, _ := attr_value(vd, "gd_tick")
 				bt := build_block_tick(src, pt, name_ident.name, config)
 				if prev, dup := ticks[base]; dup {
-					bt.bad = fmt.tprintf("declares two @(gd_tick) procs (%s and %s) — one tick per block", prev.proc_name, name_ident.name)
+					bt.bad = fmt.tprintf(
+						"declares two @(gd_tick) procs (%s and %s) — one tick per block",
+						prev.proc_name,
+						name_ident.name,
+					)
 				}
 				ticks[base] = bt
 				continue
@@ -1054,14 +1421,27 @@ index_pkg_dir :: proc(dir: string) {
 // `self`), then optionally `lane: ^ksim.Lane` last. A violation is recorded
 // in `bad`, NOT errored — the same dir holds entity ticks, and their richer
 // shapes only become violations if something embeds them.
-build_block_tick :: proc(src: string, pt: ^ast.Proc_Type, proc_name, config: string) -> Block_Tick {
-	bt := Block_Tick{proc_name = proc_name}
+build_block_tick :: proc(
+	src: string,
+	pt: ^ast.Proc_Type,
+	proc_name, config: string,
+) -> Block_Tick {
+	bt := Block_Tick {
+		proc_name = proc_name,
+	}
 	if strings.trim_space(config) != "" {
-		bt.bad = fmt.tprintf("%s declares config %q — `contested` (and any future config) is the EMBEDDING entity's declaration, not the block's", proc_name, config)
+		bt.bad = fmt.tprintf(
+			"%s declares config %q — `contested` (and any future config) is the EMBEDDING entity's declaration, not the block's",
+			proc_name,
+			config,
+		)
 		return bt
 	}
 	if pt.results != nil && len(pt.results.list) > 0 {
-		bt.bad = fmt.tprintf("%s returns a value — payloads and their _then/_fx halves belong to the entity's own tick", proc_name)
+		bt.bad = fmt.tprintf(
+			"%s returns a value — payloads and their _then/_fx halves belong to the entity's own tick",
+			proc_name,
+		)
 		return bt
 	}
 	types := make([dynamic]string, context.temp_allocator)
@@ -1073,7 +1453,11 @@ build_block_tick :: proc(src: string, pt: ^ast.Proc_Type, proc_name, config: str
 	}
 	for text, i in types {
 		if !strings.has_prefix(text, "^") {
-			bt.bad = fmt.tprintf("%s takes value param %q — block ticks are INPUTLESS; intent flows through fields the wielder's tick writes", proc_name, text)
+			bt.bad = fmt.tprintf(
+				"%s takes value param %q — block ticks are INPUTLESS; intent flows through fields the wielder's tick writes",
+				proc_name,
+				text,
+			)
 			return bt
 		}
 		base := text[1:]
@@ -1086,7 +1470,11 @@ build_block_tick :: proc(src: string, pt: ^ast.Proc_Type, proc_name, config: str
 			bt.wants_lane = true
 		} else {
 			if bt.wants_owner || bt.wants_lane {
-				bt.bad = fmt.tprintf("%s: unsupported param %q — the composable shape is (block[, owner][, lane: ^ksim.Lane])", proc_name, text)
+				bt.bad = fmt.tprintf(
+					"%s: unsupported param %q — the composable shape is (block[, owner][, lane: ^ksim.Lane])",
+					proc_name,
+					text,
+				)
 				return bt
 			}
 			bt.wants_owner = true
@@ -1096,7 +1484,15 @@ build_block_tick :: proc(src: string, pt: ^ast.Proc_Type, proc_name, config: str
 }
 
 @(private = "file")
-build_struct_def :: proc(dir, path, name: string, st: ^ast.Struct_Type, src, alias: string, imports: map[string]string) -> Struct_Def {
+build_struct_def :: proc(
+	dir, path, name: string,
+	st: ^ast.Struct_Type,
+	src, alias: string,
+	imports: map[string]string,
+	input_decl: bool,
+	input_config: string,
+	input_line: int,
+) -> Struct_Def {
 	fields := make([dynamic]Struct_Field)
 	for f in st.fields.list {
 		type_text := normalize_godot_qualifier(node_text(src, f.type), alias)
@@ -1133,6 +1529,13 @@ build_struct_def :: proc(dir, path, name: string, st: ^ast.Struct_Type, src, ali
 	return Struct_Def {
 		id = strings.concatenate({dir, "|", name}),
 		dir = dir,
+		name = name,
+		loc = Loc{path, input_line},
+		packed = st.is_packed,
+		custom_align = st.align != nil || st.min_field_align != nil || st.max_field_align != nil,
+		input_decl = input_decl,
+		input_config = input_config,
+		input_loc = Loc{path, input_line},
 		fields = fields[:],
 		imports = imports,
 		poly_params = poly[:],
@@ -1254,13 +1657,31 @@ lookup_struct :: proc(from: Struct_Def, type_text: string) -> (Struct_Def, bool)
 	return {}, false
 }
 
+// Resolve an indexed type import. The normal collection form goes through the
+// configured godot: root; relative imports are admitted only for the verified
+// read-only shared vocabulary tree (collect_file_imports records those).
+resolve_index_import_dir :: proc(from_dir, imp: string) -> (string, bool) {
+	if dir, ok := resolve_import_dir(imp); ok {return dir, true}
+	if strings.contains_rune(imp, ':') {return "", false}
+	dir := resolve_lexical(from_dir, imp)
+	if under_shared(dir) {return dir, true}
+	return "", false
+}
+
 // resolve_type resolves a field's type text (seen inside `from`, and already substituted
 // for any outer generic params) to a struct def, plus a substitution map for its OWN
 // generic parameters. A generic instantiation `Machine(Gun_State)` resolves the base
 // `Machine` and zips its params to the args (`{S = "Gun_State"}`); a plain name resolves
 // via lookup_struct with an empty substitution. ok=false for non-structs / pointers /
 // arrays / unresolved names — the caller skips recursion (nested-replicate-fields generics).
-resolve_type :: proc(from: Struct_Def, type_text: string) -> (Struct_Def, map[string]string, bool) {
+resolve_type :: proc(
+	from: Struct_Def,
+	type_text: string,
+) -> (
+	Struct_Def,
+	map[string]string,
+	bool,
+) {
 	t := strings.trim_space(type_text)
 	if len(t) == 0 || t[0] == '^' || strings.has_prefix(t, "[") {
 		return {}, nil, false
@@ -1412,7 +1833,16 @@ main :: proc() {
 		dir := strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\")
 		guard_path := strings.concatenate({dir, "/odin_godot_guard.gen.odin"})
 		ctx.owned_gen[norm_path(guard_path)] = true
-		guard := gen_guard(ctx.root_pkg, ctx.tree_files[:], ctx.fingerprint, ctx.kit_wire, ctx.sub_imports[:])
+		guard := gen_guard(
+			ctx.root_pkg,
+			ctx.tree_files[:],
+			ctx.fingerprint,
+			ctx.abi_fingerprint,
+			ctx.abi_schema,
+			&ctx.abi_metadata,
+			ctx.kit_wire,
+			ctx.sub_imports[:],
+		)
 		if werr := os.write_entire_file(guard_path, transmute([]byte)guard); werr != nil {
 			errorf("cannot write %q", guard_path)
 		} else {
@@ -1428,7 +1858,8 @@ main :: proc() {
 		dir := strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\")
 		boot_path := strings.concatenate({dir, "/odin_godot_boot.gen.odin"})
 		ctx.owned_gen[norm_path(boot_path)] = true
-		if werr := os.write_entire_file(boot_path, transmute([]byte)gen_boot(ctx.root_pkg)); werr != nil {
+		if werr := os.write_entire_file(boot_path, transmute([]byte)gen_boot(ctx.root_pkg));
+		   werr != nil {
 			errorf("cannot write %q", boot_path)
 		} else {
 			fmt.printfln("scriptgen: wrote %s (boot shim)", boot_path)
@@ -1461,30 +1892,33 @@ main :: proc() {
 // Cross-package state for ONE module: what the per-dir pipeline contributes upward and
 // what the tree-wide artifacts (guard, boot, orphan sweep) read back down.
 Module_Ctx :: struct {
-	root:         string, // absolute module root dir (res://scripts or res://modules/<name>)
-	root_pkg:     string, // the ROOT package's `package` name — guard + boot are emitted in it
-	has_boot:     bool, // the module hand-writes `odin_scripts_boot` — don't generate one
-	emitted:      int, // script sections written across the whole tree
-	fingerprint:  u64, // the module's wire contract hash (root scripts; kit lives there)
-	kit_wire:     bool, // the root declares a kit wire surface — register the fingerprint
+	root:            string, // absolute module root dir (res://scripts or res://modules/<name>)
+	root_pkg:        string, // the ROOT package's `package` name — guard + boot are emitted in it
+	has_boot:        bool, // the module hand-writes `odin_scripts_boot` — don't generate one
+	emitted:         int, // script sections written across the whole tree
+	fingerprint:     u64, // the module's wire contract hash (root scripts; kit lives there)
+	abi_fingerprint: u64, // hash of abi_schema alone (diagnostics/fixtures)
+	abi_schema:      string, // canonical recursive metadata emitted into the root guard
+	abi_metadata:    Wire_ABI_Metadata, // same walk, structured for generated NET_SCHEMA
+	kit_wire:        bool, // the root declares a kit wire surface — register the fingerprint
 	// //gd:class name -> declaring file, MODULE-WIDE. The runtime registry is keyed by
 	// name alone and keeps the first registration, so a root class and a subpackage class
 	// of the same name would silently drop one.
-	seen_classes: map[string]string,
+	seen_classes:    map[string]string,
 	// package name -> declaring dir, MODULE-WIDE. Web export links every package into ONE
 	// wasm side module, where package name IS the symbol prefix.
-	pkg_names:    map[string]string,
+	pkg_names:       map[string]string,
 	// Root-relative dirs of the ANNOTATED subpackages, in discovery (sorted) order — the
 	// guard's import manifest.
-	sub_imports:  [dynamic]string,
+	sub_imports:     [dynamic]string,
 	// One entry per package dir with annotated scripts, held until the whole tree has
 	// validated (see the write phase in main).
-	outputs:      [dynamic]Pkg_Output,
+	outputs:         [dynamic]Pkg_Output,
 	// Every authored source in the tree, path-relative to the root: the guard hashes all
 	// of them, so an edit in a subpackage is just as staleness-checked as one in the root.
-	tree_files:   [dynamic]Helper,
+	tree_files:      [dynamic]Helper,
 	// Every gen file this run owns, tree-wide, keyed by NORMALIZED absolute path.
-	owned_gen:    map[string]bool,
+	owned_gen:       map[string]bool,
 }
 
 // One package dir's pending artifact: everything needed to write its consolidated
@@ -1545,7 +1979,7 @@ walk_pkg_dirs :: proc(dir: string, out: ^[dynamic]string) {
 	if rderr != nil {return}
 	for fi in files {
 		if fi.type != .Directory {continue}
-		if strings.has_prefix(fi.name, ".") {continue} // .godot and friends
+		if strings.has_prefix(fi.name, ".") {continue} 	// .godot and friends
 		if has_authored_odin(fi.fullpath) {
 			append(out, norm_path(fi.fullpath))
 		}
@@ -1656,7 +2090,12 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 		// bookkeeping runs BEFORE the had_error skip below so dup detection keeps working
 		// across the remaining files even after an unrelated error.
 		if prev, dup := ctx.seen_classes[script.class_name]; dup {
-			error_at(Loc{path = path}, "duplicate //gd:class %q (also declared in %q)", script.class_name, prev)
+			error_at(
+				Loc{path = path},
+				"duplicate //gd:class %q (also declared in %q)",
+				script.class_name,
+				prev,
+			)
 		} else {
 			ctx.seen_classes[script.class_name] = path
 		}
@@ -1671,7 +2110,9 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 		if prev, dup := ctx.pkg_names[pkg]; dup {
 			errorf(
 				"duplicate package name %q — declared in both %q and %q; every package in a module tree needs its OWN name (on web export they all link into one wasm side module, where the package name is the symbol prefix)",
-				pkg, prev, scripts_dir,
+				pkg,
+				prev,
+				scripts_dir,
 			)
 		} else {
 			ctx.pkg_names[pkg] = scripts_dir
@@ -1683,7 +2124,9 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 	} else if has_boot {
 		errorf(
 			"%s: `odin_scripts_boot` is declared in the subpackage %q — the boot export is ONE per dll and every subpackage links into the module's; move it to the module root (%s)",
-			rel, rel, ctx.root,
+			rel,
+			rel,
+			ctx.root,
 		)
 	}
 	// The guard hashes every authored source in the TREE, named by its root-relative path.
@@ -1812,6 +2255,12 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 		// Declared world-pass facts land on the lane owner resolve_sim just
 		// settled.
 		resolve_facts(all[:], fact_decls[:], by_struct, proc_names)
+		// With the lane owner now known, conventional game shells get the
+		// generated attach/pump/detach facade. (A multi-session shell stays on
+		// the explicit lower-level API; there is no safe field to guess.)
+		for s in all {
+			resolve_net_facade(s, proc_names)
+		}
 		// Last, with every pass's claims in: the halves that paired with
 		// nothing. Needs the whole script list, not just by_struct — the fix
 		// it prints is each target class's real pairing surface, and an
@@ -1835,8 +2284,10 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 		if len(fact_decls) > 0 {
 			error_at(
 				Loc{path = fact_decls[0].path},
-				"@(gd_fact) in the script subpackage %q — %s",
-				rel, subpkg_kit_fix(rel, ctx.root),
+				"@(%s) in the script subpackage %q — %s",
+				fact_decls[0].attr,
+				rel,
+				subpkg_kit_fix(rel, ctx.root),
 			)
 			return
 		}
@@ -1861,12 +2312,18 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 		// not written: main writes every package's artifact once the tree has validated.
 		sections := make([dynamic]Gen_Section, 0, len(pending))
 		for &pend in pending {
-			append(&sections, Gen_Section{src_name = path_base(pend.script.path), script = &pend.script})
+			append(
+				&sections,
+				Gen_Section{src_name = path_base(pend.script.path), script = &pend.script},
+			)
 		}
-		slice.sort_by(sections[:], proc(a, b: Gen_Section) -> bool {return a.src_name < b.src_name})
+		slice.sort_by(
+			sections[:],
+			proc(a, b: Gen_Section) -> bool {return a.src_name < b.src_name},
+		)
 		append(
 			&ctx.outputs,
-			Pkg_Output{
+			Pkg_Output {
 				dir = scripts_dir,
 				rel = rel,
 				pkg = pending[0].script.pkg,
@@ -1907,13 +2364,21 @@ module_fingerprint :: proc(ctx: ^Module_Ctx) {
 		}
 	}
 	root := strings.trim_suffix(strings.trim_suffix(ctx.root, "/"), "\\")
-	ctx.fingerprint = net_fingerprint(root_scripts[:], sub_classes[:], root)
+	ctx.abi_metadata = canonical_wire_abi(root_scripts[:], root)
+	ctx.abi_schema = ctx.abi_metadata.canonical
+	ctx.abi_fingerprint = fnv1a64(ctx.abi_schema)
+	ctx.fingerprint = net_fingerprint(root_scripts[:], sub_classes[:], root, ctx.abi_schema)
 	// A module with a kit wire surface registers its fingerprint as the
 	// session default (guard file @(init)) — the version gate is on
 	// without any game wiring. Engine-native-only modules (@(gd_rpc),
 	// plain exports) skip it: no kit import, no session to gate.
 	for s in root_scripts {
-		if len(s.replicates) > 0 || len(s.commands) > 0 || len(s.entities) > 0 || s.tick.proc_name != "" || s.profile_type != "" || len(s.messages) > 0 {
+		if len(s.replicates) > 0 ||
+		   len(s.commands) > 0 ||
+		   len(s.entities) > 0 ||
+		   s.tick.proc_name != "" ||
+		   s.profile_type != "" ||
+		   len(s.messages) > 0 {
 			ctx.kit_wire = true
 			break
 		}
@@ -2023,13 +2488,13 @@ check_tree :: proc(scripts_dir: string) {
 
 check_tree_dir :: proc(dir, root: string, is_top: bool) {
 	dir_fh, oerr := os.open(dir)
-	if oerr != nil {return} // unreadable dirs are surfaced by the emit loop / odin build
+	if oerr != nil {return} 	// unreadable dirs are surfaced by the emit loop / odin build
 	files, rderr := os.read_dir(dir_fh, -1, context.allocator)
 	os.close(dir_fh)
 	if rderr != nil {return}
 	for fi in files {
 		if fi.type == .Directory {
-			if strings.has_prefix(fi.name, ".") {continue} // .godot and friends
+			if strings.has_prefix(fi.name, ".") {continue} 	// .godot and friends
 			check_tree_dir(fi.fullpath, root, false)
 			continue
 		}
@@ -2055,7 +2520,7 @@ check_file :: proc(path, root: string, is_top: bool) {
 	p := parser.default_parser()
 	p.err = silent_parse_diag
 	p.warn = silent_parse_diag
-	if !parser.parse_file(&p, &file) {return} // unparseable — odin build reports it
+	if !parser.parse_file(&p, &file) {return} 	// unparseable — odin build reports it
 	file_dir := norm_path(path)
 	if i := strings.last_index(file_dir, "/"); i >= 0 {
 		file_dir = file_dir[:i]
@@ -2074,9 +2539,13 @@ explain_isolation :: proc() {
 	fmt.eprintln("  duplicates its globals per dll (shared state would silently fork). Talk to")
 	fmt.eprintln("  other modules through the engine (signals / methods / autoloads) instead,")
 	fmt.eprintln("  or move the shared state into exactly one module.")
-	fmt.eprintln("  For types, constants and pure procs — a vocabulary with no state to fork —")
+	fmt.eprintln(
+		"  For types, constants and pure procs — a vocabulary with no state to fork —",
+	)
 	fmt.eprintln("  put the package under res://shared/ instead: any module may import it")
-	fmt.eprintln("  (`import \"../shared/<pkg>\"` from res://scripts, `\"../../shared/<pkg>\"` from")
+	fmt.eprintln(
+		"  (`import \"../shared/<pkg>\"` from res://scripts, `\"../../shared/<pkg>\"` from",
+	)
 	fmt.eprintln("  res://modules/<name>), and scriptgen verifies that tree stays state-free.")
 }
 
@@ -2091,7 +2560,11 @@ check_import :: proc(root, file_dir, path: string, imp: ^ast.Import_Decl, is_top
 	// build's own error). Collection imports never cross module boundaries.
 	if strings.contains_rune(ipath, ':') {return}
 	if strings.has_prefix(ipath, "/") || strings.has_prefix(ipath, "\\") {
-		error_at(loc, "ILLEGAL cross-module import %q — absolute import paths are not allowed in a script module; import collections (godot:/core:/base:/vendor:) or packages inside this module's directory", ipath)
+		error_at(
+			loc,
+			"ILLEGAL cross-module import %q — absolute import paths are not allowed in a script module; import collections (godot:/core:/base:/vendor:) or packages inside this module's directory",
+			ipath,
+		)
 		explain_isolation()
 		return
 	}
@@ -2106,7 +2579,13 @@ check_import :: proc(root, file_dir, path: string, imp: ^ast.Import_Decl, is_top
 		return
 	}
 	if resolved != nroot && !strings.has_prefix(resolved, strings.concatenate({nroot, "/"})) {
-		error_at(loc, "ILLEGAL cross-module import %q — resolves to %q, outside this script module's directory (%s)", ipath, resolved, nroot)
+		error_at(
+			loc,
+			"ILLEGAL cross-module import %q — resolves to %q, outside this script module's directory (%s)",
+			ipath,
+			resolved,
+			nroot,
+		)
 		explain_isolation()
 		return
 	}
@@ -2116,12 +2595,21 @@ check_import :: proc(root, file_dir, path: string, imp: ^ast.Import_Decl, is_top
 		error_at(
 			loc,
 			"a subfolder script package cannot import the module root (%q resolves to %s) — the root's generated import manifest already imports every script subpackage, so this is an import CYCLE",
-			ipath, nroot,
+			ipath,
+			nroot,
 		)
-		fmt.eprintln("  Subfolders hold engine-native script classes and helpers; they are LEAVES of the")
-		fmt.eprintln("  module. Anything that needs the module root's types or state is game-coupled and")
-		fmt.eprintln("  belongs in the module root itself. To share the other way, move the shared code")
-		fmt.eprintln("  DOWN into a subpackage both the root and the subfolder import (sibling subpackage")
+		fmt.eprintln(
+			"  Subfolders hold engine-native script classes and helpers; they are LEAVES of the",
+		)
+		fmt.eprintln(
+			"  module. Anything that needs the module root's types or state is game-coupled and",
+		)
+		fmt.eprintln(
+			"  belongs in the module root itself. To share the other way, move the shared code",
+		)
+		fmt.eprintln(
+			"  DOWN into a subpackage both the root and the subfolder import (sibling subpackage",
+		)
 		fmt.eprintln("  imports are legal), or pass what it needs in as an argument.")
 	}
 }
@@ -2130,7 +2618,10 @@ check_import :: proc(root, file_dir, path: string, imp: ^ast.Import_Decl, is_top
 // lexically (no filesystem access — symlink dodges are not a concern here, the rule is
 // about what the COMPILER will resolve, and odin resolves imports lexically too).
 resolve_lexical :: proc(base_dir, rel: string) -> string {
-	joined := strings.concatenate({norm_path(base_dir), "/", norm_path(rel)}, context.temp_allocator)
+	joined := strings.concatenate(
+		{norm_path(base_dir), "/", norm_path(rel)},
+		context.temp_allocator,
+	)
 	parts := strings.split(joined, "/", context.temp_allocator)
 	stack := make([dynamic]string, context.temp_allocator)
 	for part in parts {
@@ -2182,9 +2673,17 @@ Subpkg_Kit_Feature :: struct {
 }
 
 SUBPKG_KIT_FEATURES := [?]Subpkg_Kit_Feature {
-	{"a gd:\"replicate\" field tag", true, proc(s: ^Script) -> bool {return len(s.replicates) > 0}},
+	{
+		"a gd:\"replicate\" field tag",
+		true,
+		proc(s: ^Script) -> bool {return len(s.replicates) > 0},
+	},
 	{"a gd:\"backup\" field tag", true, proc(s: ^Script) -> bool {return len(s.backups) > 0}},
-	{"an `entity=` scene field (the entity table)", true, proc(s: ^Script) -> bool {return len(s.entities) > 0}},
+	{
+		"an `entity=` scene field (the entity table)",
+		true,
+		proc(s: ^Script) -> bool {return len(s.entities) > 0},
+	},
 	{"a `net_id` field", true, proc(s: ^Script) -> bool {return s.net_id_type != ""}},
 	{"a gd:\"profile=\" field tag", true, proc(s: ^Script) -> bool {return s.profile_type != ""}},
 	{"a @(gd_command) proc", true, proc(s: ^Script) -> bool {return len(s.commands) > 0}},
@@ -2196,21 +2695,35 @@ SUBPKG_KIT_FEATURES := [?]Subpkg_Kit_Feature {
 			return s.step.proc_name != "" || s.step_auth.proc_name != ""
 		}},
 	{"a @(gd_message) handler", true, proc(s: ^Script) -> bool {return len(s.messages) > 0}},
-	{"a kboot.Boot field (the standard transport forwards)", true, proc(s: ^Script) -> bool {return s.boot_field != ""}},
+	{
+		"a kboot.Boot field (the standard transport forwards)",
+		true,
+		proc(s: ^Script) -> bool {return s.boot_field != ""},
+	},
 	// Name-paired: these exist only once the resolve passes have run.
 	{"a session-event half", false, proc(s: ^Script) -> bool {return len(s.event_halves) > 0}},
 	{"a host-migration (succession) half", false, proc(s: ^Script) -> bool {
-			return s.succ_backup != "" || s.succ_took_over != "" || s.succ_wiped != "" || s.succ_migrating != ""
+			return(
+				s.succ_backup != "" ||
+				s.succ_took_over != "" ||
+				s.succ_wiped != "" ||
+				s.succ_migrating != "" \
+			)
 		}},
-	{"a declared @(gd_fact) world-pass fact", false, proc(s: ^Script) -> bool {return len(s.facts) > 0}},
-	{"an input class (the sim lane's wire input)", false, proc(s: ^Script) -> bool {return len(s.input_classes) > 0}},
+	{"a declared presentation cue", false, proc(s: ^Script) -> bool {return len(s.facts) > 0}},
+	{
+		"an input class (the sim lane's wire input)",
+		false,
+		proc(s: ^Script) -> bool {return len(s.input_classes) > 0},
+	},
 }
 
 // The one sentence every kit-in-a-subpackage error ends with.
 subpkg_kit_fix :: proc(rel, root: string) -> string {
 	return fmt.tprintf(
 		"kit wiring is part of the MODULE's wire contract (fingerprint, lanes, input struct) and is game-coupled; move this file to the module root (%s). Subfolders like %s/ hold engine-native script classes: extends/class, methods, signals, exports, onready, rpc",
-		root, rel,
+		root,
+		rel,
 	)
 }
 
@@ -2222,7 +2735,10 @@ check_subpkg_kit :: proc(s: ^Script, rel, root: string, early: bool) -> bool {
 		error_at(
 			Loc{path = s.path},
 			"%s declares %s in the script subpackage %q — %s",
-			s.struct_name, f.what, rel, subpkg_kit_fix(rel, root),
+			s.struct_name,
+			f.what,
+			rel,
+			subpkg_kit_fix(rel, root),
 		)
 		fired = true
 	}
@@ -2236,7 +2752,9 @@ check_subpkg_kit :: proc(s: ^Script, rel, root: string, early: bool) -> bool {
 			error_at(
 				Loc{path = s.path},
 				"%s needs a kit import in the script subpackage %q, but no kit declaration was named — %s (scriptgen bug: SUBPKG_KIT_FEATURES is missing a row)",
-				s.struct_name, rel, subpkg_kit_fix(rel, root),
+				s.struct_name,
+				rel,
+				subpkg_kit_fix(rel, root),
 			)
 			fired = true
 		}
@@ -2278,7 +2796,7 @@ g_subpkg_structs: map[string]string
 prescan_subpkg_kit :: proc(root: string, pkg_dirs: []string) {
 	fired := false
 	for d, i in pkg_dirs {
-		if i == 0 {continue} // the module root: kit belongs there
+		if i == 0 {continue} 	// the module root: kit belongs there
 		rel := rel_to_root(root, d)
 		for s in prescan_pkg_scripts(d) {
 			g_subpkg_structs[s.struct_name] = rel
@@ -2387,10 +2905,9 @@ fnv1a64 :: proc(s: string) -> u64 {
 }
 
 // The package's WIRE CONTRACT, hashed: everything two builds must agree on to
-// parse each other's packets — replicated field order/types/lanes and wire
-// encodings, verbs and their arg shapes, entity type ids, tick input structs
-// FIELD BY FIELD (the input blob memcpys: its layout IS the wire), input
-// classes, broadcast fact tuples, and @(gd_rpc) signatures. Deliberately
+// parse each other's packets — the recursive canonical ABI (paths, exact
+// representations, widths, bounds, policies, and scheduling), entity type ids,
+// broadcast fact tuples, and @(gd_rpc) signatures. Deliberately
 // EXCLUDED (local behavior, not wire): interp/lerp/blend, slack/glide/cut,
 // gd:"backup" (host-local saves), methods/signals/exports, world passes.
 // Field NAMES are hashed too — a rename over-refuses a join (annoying,
@@ -2412,7 +2929,9 @@ resolve_profile :: proc(s: ^Script, scripts_dir: string) {
 	if !has_ready {
 		errorf(
 			"%s: gd:\"profile=%s\" needs a `%s_ready` — the generated session_profile_install is wired into the ready thunk",
-			s.struct_name, s.profile_type, to_snake(s.struct_name),
+			s.struct_name,
+			s.profile_type,
+			to_snake(s.struct_name),
 		)
 	}
 	dir := strings.trim_suffix(strings.trim_suffix(scripts_dir, "/"), "\\")
@@ -2421,7 +2940,9 @@ resolve_profile :: proc(s: ^Script, scripts_dir: string) {
 		if _, has := pkg[s.profile_type]; !has {
 			errorf(
 				"%s: gd:\"profile=%s\" — no struct %q in this package (the row type lives beside the game; it is POD, ≤ ksess.PROFILE_MAX_SIZE)",
-				s.struct_name, s.profile_type, s.profile_type,
+				s.struct_name,
+				s.profile_type,
+				s.profile_type,
 			)
 		}
 	}
@@ -2445,18 +2966,29 @@ check_field_policy :: proc() {
 			if !has {
 				errorf(
 					"decl.FIELD_TOKENS has `%s` and decl.FIELD_POLICY has no row for it at site %v — add one saying whether the shared dispatch handles, refuses, or defers-to-caller a leading `%s` there (a hole would assert at parse time on the first field that uses it)",
-					t.name, site, t.name,
+					t.name,
+					site,
+					t.name,
 				)
 				continue
 			}
 			switch pol.action {
 			case .Refuse:
 				if pol.reason == "" {
-					errorf("decl.FIELD_POLICY refuses `%s` at %v but gives no reason — the dispatch prints it verbatim, so an empty one is a blank error", t.name, site)
+					errorf(
+						"decl.FIELD_POLICY refuses `%s` at %v but gives no reason — the dispatch prints it verbatim, so an empty one is a blank error",
+						t.name,
+						site,
+					)
 				}
 			case .Handle, .Caller:
 				if pol.reason != "" {
-					errorf("decl.FIELD_POLICY row for `%s` at %v is %v but carries a reason string — reasons are for Refuse only (a refusal someone wrote and the action forgot?)", t.name, site, pol.action)
+					errorf(
+						"decl.FIELD_POLICY row for `%s` at %v is %v but carries a reason string — reasons are for Refuse only (a refusal someone wrote and the action forgot?)",
+						t.name,
+						site,
+						pol.action,
+					)
 				}
 			}
 		}
@@ -2591,7 +3123,8 @@ check_fingerprint_contrib :: proc(scripts: []^Script, scripts_dir: string, text:
 		if declared && !strings.contains(text, row.marker) {
 			errorf(
 				"this build declares `%s` and net_fingerprint wrote no %q line for it — the declaration crosses the wire and would not be checked at the join door",
-				t.name, row.marker,
+				t.name,
+				row.marker,
 			)
 		}
 	}
@@ -2601,7 +3134,11 @@ check_fingerprint_contrib :: proc(scripts: []^Script, scripts_dir: string, text:
 // the only ones that can carry wire surface — and `sub_classes` the struct names declared
 // in SCRIPT SUBPACKAGES, which contribute their name and nothing else (see
 // module_fingerprint for why they contribute it at all).
-net_fingerprint :: proc(scripts: []^Script, sub_classes: []string, scripts_dir: string) -> u64 {
+net_fingerprint :: proc(
+	scripts: []^Script,
+	sub_classes: []string,
+	scripts_dir, abi_schema: string,
+) -> u64 {
 	b: strings.Builder
 	strings.builder_init(&b, context.temp_allocator)
 
@@ -2638,9 +3175,14 @@ net_fingerprint :: proc(scripts: []^Script, sub_classes: []string, scripts_dir: 
 		// Declaration order is the descriptor order is the mask order: keep it.
 		for r in s.replicates {
 			fmt.sbprintf(
-				&b, "rep %s:%s owner=%v predict=%v wire=%s/%s\n",
-				strings.join(r.path, ".", context.temp_allocator), r.type_text,
-				r.owner, r.predict, r.wire, r.codec,
+				&b,
+				"rep %s:%s owner=%v predict=%v wire=%s/%s\n",
+				strings.join(r.path, ".", context.temp_allocator),
+				r.type_text,
+				r.owner,
+				r.predict,
+				r.wire,
+				r.codec,
 			)
 		}
 
@@ -2653,7 +3195,15 @@ net_fingerprint :: proc(scripts: []^Script, sub_classes: []string, scripts_dir: 
 				if i > 0 {strings.write_string(&cb, ",")}
 				strings.write_string(&cb, a.wire)
 			}
-			fmt.sbprintf(&cb, ") predict=%v access=%v", c.predict, c.access)
+			schedule := (s.tick.proc_name != "" || len(s.block_ticks) > 0) ? "tick" : "immediate"
+			fmt.sbprintf(
+				&cb,
+				") access=%s prediction=%v max_args=%d schedule=%s",
+				c.policy_access,
+				c.policy_predict,
+				c.policy_max_args,
+				schedule,
+			)
 			append(&cmds, strings.to_string(cb))
 		}
 		slice.sort(cmds[:]) // ids are name-hashed; declaration order is not wire
@@ -2668,9 +3218,17 @@ net_fingerprint :: proc(scripts: []^Script, sub_classes: []string, scripts_dir: 
 			fb: strings.Builder
 			strings.builder_init(&fb, context.temp_allocator)
 			fmt.sbprintf(&fb, "fact %s(", f.name)
-			for wr, i in f.arg_wires {
-				if i > 0 {strings.write_string(&fb, ",")}
+			first_wire := true
+			for entity_type, i in f.entity_types {
+				if i == f.anchor_index {continue}
+				if !first_wire {strings.write_string(&fb, ",")}
+				fmt.sbprintf(&fb, "ref:%s", entity_type)
+				first_wire = false
+			}
+			for wr in f.arg_wires {
+				if !first_wire {strings.write_string(&fb, ",")}
 				strings.write_string(&fb, wr)
+				first_wire = false
 			}
 			fmt.sbprintf(&fb, ") anchor=%s", f.anchor)
 			append(&fcts, strings.to_string(fb))
@@ -2685,7 +3243,10 @@ net_fingerprint :: proc(scripts: []^Script, sub_classes: []string, scripts_dir: 
 		// rows), so a drifted payload struct refuses at the join door too.
 		msgs := make([dynamic]string, context.temp_allocator)
 		for m in s.messages {
-			append(&msgs, fmt.tprintf("msg %s tag=%s payload=%s", m.name, m.tag_ident, m.payload_type))
+			append(
+				&msgs,
+				fmt.tprintf("msg %s tag=%s payload=%s", m.name, m.tag_ident, m.payload_type),
+			)
 		}
 		slice.sort(msgs[:]) // registration order is not wire
 		for m in msgs {
@@ -2693,7 +3254,13 @@ net_fingerprint :: proc(scripts: []^Script, sub_classes: []string, scripts_dir: 
 		}
 
 		if s.tick.proc_name != "" {
-			fmt.sbprintf(&b, "tick input=%s class=%d contested=%v", s.tick.input_type, s.tick.input_class, s.tick.contested)
+			fmt.sbprintf(
+				&b,
+				"tick input=%s class=%d contested=%v",
+				s.tick.input_type,
+				s.tick.input_class,
+				s.tick.contested,
+			)
 			if s.tick.fx_mine {
 				strings.write_string(&b, " facts=")
 				for wr, i in s.tick.payload_wires {
@@ -2736,8 +3303,13 @@ net_fingerprint :: proc(scripts: []^Script, sub_classes: []string, scripts_dir: 
 	if pkg, ok := g_pkgs[scripts_dir]; ok {
 		for name in inputs {
 			if def, has := pkg[name]; has {
+				fmt.sbprintf(&b, "input-decl %s constrained=%v\n", name, def.input_decl)
 				for f in def.fields {
-					fmt.sbprintf(&b, "in %s.%s:%s\n", name, f.name, f.type_text)
+					rules := ""
+					if def.input_decl {
+						rules, _ = tag_gd_value(f.tag)
+					}
+					fmt.sbprintf(&b, "in %s.%s:%s rules=%s\n", name, f.name, f.type_text, rules)
 				}
 			}
 		}
@@ -2781,13 +3353,252 @@ net_fingerprint :: proc(scripts: []^Script, sub_classes: []string, scripts_dir: 
 	}
 	text := strings.to_string(b)
 	check_fingerprint_contrib(scripts, scripts_dir, text)
-	return fnv1a64(text)
+	return fnv1a64(
+		strings.concatenate({text, "canonical-abi\n", abi_schema}, context.temp_allocator),
+	)
 }
 
 @(private = "file")
 Guard_Entry :: struct {
 	name: string,
 	crc:  u32,
+}
+
+schema_lane_expr :: proc(lane: string) -> string {
+	switch lane {
+	case "owner": return ".Owner"
+	case "predict": return ".Predict"
+	}
+	return ".Delta"
+}
+
+schema_access_expr :: proc(access: string) -> string {
+	switch access {
+	case "any-seat": return ".Any_Seat"
+	case "authority": return ".Authority"
+	}
+	return ".Owner"
+}
+
+// Emit the public, package-level structured projection of the recursive ABI.
+// The Wire_ABI_Metadata rows were collected while the canonical text was
+// written; this function only renders those rows as Odin literals. It never
+// re-parses declarations or the canonical string, which keeps one source of
+// truth for introspection and fingerprinting.
+gen_net_schema :: proc(b: ^strings.Builder, meta: ^Wire_ABI_Metadata) {
+	w :: strings.write_string
+	w(b, "// Structured projection of NET_SCHEMA_CANONICAL. Tables are flat/static;\n")
+	w(b, "// spans link related rows without allocation or a second runtime registry.\n")
+
+	w(b, "@(private = \"file\")\n_net_schema_entities := [?]_guard_knet.Net_Entity_Schema {\n")
+	for e in meta.entities {
+		fmt.sbprintf(
+			b,
+			"\t{{name = %q, wire_id = %d, stream_hz = %d, avatar = %v}},\n",
+			e.name,
+			e.wire_id,
+			e.stream_hz,
+			e.avatar,
+		)
+	}
+	w(b, "}\n\n")
+
+	w(b, "@(private = \"file\")\n_net_schema_types := [?]_guard_knet.Net_Type_Schema {\n")
+	for t in meta.types {
+		fmt.sbprintf(
+			b,
+			"\t{{path = %q, kind = %q, width = %d, align = %d, detail = %q}},\n",
+			t.path,
+			t.kind,
+			t.width,
+			t.align,
+			t.detail,
+		)
+	}
+	w(b, "}\n\n")
+
+	w(b, "@(private = \"file\")\n_net_schema_fields := [?]_guard_knet.Net_Field_Schema {\n")
+	for f in meta.fields {
+		fmt.sbprintf(
+			b,
+			"\t{{path = %q, entity = %q, name = %q, lane = %s, encoding = %q, struct_width = %d, wire_width = %d, bound = %d, types = {{first = %d, count = %d}}}},\n",
+			f.path,
+			f.entity,
+			f.name,
+			schema_lane_expr(f.lane),
+			f.encoding,
+			f.struct_width,
+			f.wire_width,
+			f.bound,
+			f.types.first,
+			f.types.count,
+		)
+	}
+	w(b, "}\n\n")
+
+	w(b, "@(private = \"file\")\n_net_schema_constraints := [?]_guard_knet.Net_Input_Constraint_Schema {\n")
+	for c in meta.constraints {
+		fmt.sbprintf(
+			b,
+			"\t{{field = %q, range = %q, mask = %q, finite = %v, unit = %v, enum_check = %v}},\n",
+			c.field,
+			c.range,
+			c.mask,
+			c.finite,
+			c.unit,
+			c.enum_check,
+		)
+	}
+	w(b, "}\n\n")
+
+	w(b, "@(private = \"file\")\n_net_schema_inputs := [?]_guard_knet.Net_Input_Schema {\n")
+	for input in meta.inputs {
+		fmt.sbprintf(
+			b,
+			"\t{{path = %q, type_name = %q, class_id = %d, encoding = %q, width = %d, bound = %d, types = {{first = %d, count = %d}}, constraints = {{first = %d, count = %d}}}},\n",
+			input.path,
+			input.type_name,
+			input.class_id,
+			input.encoding,
+			input.width,
+			input.bound,
+			input.types.first,
+			input.types.count,
+			input.constraints.first,
+			input.constraints.count,
+		)
+	}
+	w(b, "}\n\n")
+
+	w(b, "@(private = \"file\")\n_net_schema_arguments := [?]_guard_knet.Net_Argument_Schema {\n")
+	for a in meta.arguments {
+		fmt.sbprintf(
+			b,
+			"\t{{owner = %q, name = %q, kind = %q, target = %q, width = %d, bound = %d, variable = %v}},\n",
+			a.owner,
+			a.name,
+			a.kind,
+			a.target,
+			a.width,
+			a.bound,
+			a.variable,
+		)
+	}
+	w(b, "}\n\n")
+
+	w(b, "@(private = \"file\")\n_net_schema_action_outcomes := [?]_guard_knet.Net_Action_Outcome_Schema {\n")
+	for outcome in meta.outcomes {
+		fmt.sbprintf(
+			b,
+			"\t{{owner = %q, name = %q, type_name = %q}},\n",
+			outcome.owner,
+			outcome.name,
+			outcome.type_name,
+		)
+	}
+	w(b, "}\n\n")
+
+	w(b, "@(private = \"file\")\n_net_schema_actions := [?]_guard_knet.Net_Action_Schema {\n")
+	for a in meta.actions {
+		fmt.sbprintf(
+			b,
+			"\t{{path = %q, entity = %q, name = %q, id = %d, policy = {{access = %s, prediction = %s, max_args_bytes = %d}}, model = %s, args = {{first = %d, count = %d}}, outcomes = {{first = %d, count = %d}}",
+			a.path,
+			a.entity,
+			a.name,
+			a.id,
+			schema_access_expr(a.access),
+			a.prediction == "optimistic" ? ".Optimistic" : ".None",
+			a.max_args,
+			a.schedule == "tick" ? ".Scheduled" : ".Immediate",
+			a.args.first,
+			a.args.count,
+			a.outcomes.first,
+			a.outcomes.count,
+		)
+		if a.consequence != "" {
+			fmt.sbprintf(
+				b,
+				", consequence = {{name = %q, authority_only = true, takes_game = %v}}",
+				a.consequence,
+				a.takes_game,
+			)
+		}
+		w(b, "},\n")
+	}
+	w(b, "}\n\n")
+
+	w(b, "@(private = \"file\")\n_net_schema_facts := [?]_guard_knet.Net_Fact_Schema {\n")
+	for f in meta.facts {
+		fmt.sbprintf(
+			b,
+			"\t{{path = %q, entity = %q, name = %q, id = %d, anchor = %q, schedule = .Watch, source = %s, args = {{first = %d, count = %d}}}},\n",
+			f.path,
+			f.entity,
+			f.name,
+			f.id,
+			f.anchor,
+			f.source == "tick" ? ".Tick" : ".Declared",
+			f.args.first,
+			f.args.count,
+		)
+	}
+	w(b, "}\n\n")
+
+	w(b, "@(private = \"file\")\n_net_schema_profiles := [?]_guard_knet.Net_Profile_Schema {\n")
+	for p in meta.profiles {
+		fmt.sbprintf(
+			b,
+			"\t{{path = %q, type_name = %q, encoding = %q, width = %d, bound = %d, types = {{first = %d, count = %d}}}},\n",
+			p.path,
+			p.type_name,
+			p.encoding,
+			p.width,
+			p.bound,
+			p.types.first,
+			p.types.count,
+		)
+	}
+	w(b, "}\n\n")
+
+	w(b, "@(private = \"file\")\n_net_schema_messages := [?]_guard_knet.Net_Message_Schema {\n")
+	for m in meta.messages {
+		fmt.sbprintf(
+			b,
+			"\t{{path = %q, entity = %q, name = %q, payload_type = %q, tag = %d, tag_name = %q, encoding = %q, width = %d, bound = %d, types = {{first = %d, count = %d}}}},\n",
+			m.path,
+			m.entity,
+			m.name,
+			m.payload_type,
+			m.tag,
+			m.tag_name,
+			m.encoding,
+			m.width,
+			m.bound,
+			m.types.first,
+			m.types.count,
+		)
+	}
+	w(b, "}\n\n")
+
+	w(b, "NET_SCHEMA := _guard_knet.Net_Schema {\n")
+	fmt.sbprintf(b, "\tabi_version = %d,\n", WIRE_ABI_VERSION)
+	w(b, "\tendian = .Little,\n")
+	w(b, "\tabi_fingerprint = NET_ABI_FINGERPRINT,\n")
+	w(b, "\tfingerprint = NET_FINGERPRINT,\n")
+	w(b, "\tcanonical = NET_SCHEMA_CANONICAL,\n")
+	w(b, "\tentities = _net_schema_entities[:],\n")
+	w(b, "\ttypes = _net_schema_types[:],\n")
+	w(b, "\tfields = _net_schema_fields[:],\n")
+	w(b, "\tinputs = _net_schema_inputs[:],\n")
+	w(b, "\tconstraints = _net_schema_constraints[:],\n")
+	w(b, "\tactions = _net_schema_actions[:],\n")
+	w(b, "\taction_outcomes = _net_schema_action_outcomes[:],\n")
+	w(b, "\tfacts = _net_schema_facts[:],\n")
+	w(b, "\targuments = _net_schema_arguments[:],\n")
+	w(b, "\tprofiles = _net_schema_profiles[:],\n")
+	w(b, "\tmessages = _net_schema_messages[:],\n")
+	w(b, "}\n\n")
 }
 
 // The generated STALENESS GUARD: `#load_hash` re-hashes each authored source
@@ -2811,10 +3622,22 @@ Guard_Entry :: struct {
 // compile, register nothing, and attach as placeholders. Blank side-effect imports keep
 // the manifest from touching the root's namespace; `@(init)` procs of an imported package
 // run regardless of whether anything references the package.
-gen_guard :: proc(pkg: string, files: []Helper, fingerprint: u64, kit_wire: bool, sub_imports: []string) -> string {
+gen_guard :: proc(
+	pkg: string,
+	files: []Helper,
+	fingerprint: u64,
+	abi_fingerprint: u64,
+	abi_schema: string,
+	abi_metadata: ^Wire_ABI_Metadata,
+	kit_wire: bool,
+	sub_imports: []string,
+) -> string {
 	entries := make([dynamic]Guard_Entry, 0, len(files), context.temp_allocator)
 	for f in files {
-		append(&entries, Guard_Entry{name = norm_path(f.path), crc = hash.crc32(transmute([]u8)f.src)})
+		append(
+			&entries,
+			Guard_Entry{name = norm_path(f.path), crc = hash.crc32(transmute([]u8)f.src)},
+		)
 	}
 	// Deterministic output whatever order the directory listed in.
 	slice.sort_by(entries[:], proc(a, b: Guard_Entry) -> bool {return a.name < b.name})
@@ -2824,6 +3647,7 @@ gen_guard :: proc(pkg: string, files: []Helper, fingerprint: u64, kit_wire: bool
 	w :: strings.write_string
 	fmt.sbprintf(&b, "package %s\n\n", pkg)
 	if kit_wire {
+		w(&b, "import _guard_knet \"godot:kit/net\"\n")
 		w(&b, "import _guard_ksess \"godot:kit/session\"\n\n")
 	}
 	if len(sub_imports) > 0 {
@@ -2842,14 +3666,17 @@ gen_guard :: proc(pkg: string, files: []Helper, fingerprint: u64, kit_wire: bool
 	w(&b, "// package's *.gen.odin predates the source it claims to mirror — the build\n")
 	w(&b, "// path skipped scriptgen. Build via build_scripts.sh (it re-runs scriptgen),\n")
 	w(&b, "// or re-run scriptgen over this directory by hand.\n\n")
-	w(&b, "// The package's WIRE CONTRACT, hashed — replicated field order/types/lanes,\n")
-	w(&b, "// verbs, entity ids, input structs, fact tuples, rpcs. Registered as the\n")
-	w(&b, "// session's default fingerprint below, so a version-skewed build is refused\n")
+	w(&b, "// The package's WIRE CONTRACT, hashed — recursive canonical field layouts,\n")
+	w(&b, "// bounds, action policies/schedules, entity ids, fact tuples, and rpcs. It is\n")
+	w(&b, "// registered as the session's default fingerprint, so a skewed build is refused\n")
 	w(&b, "// AT THE DOOR (Deny_Reason.Version) instead of misparsing every delta into\n")
 	w(&b, "// garbage fields — no wiring needed. Session_Config.fingerprint overrides\n")
 	w(&b, "// (ksess.FINGERPRINT_NONE disables the gate on purpose).\n")
+	fmt.sbprintf(&b, "NET_ABI_FINGERPRINT :: u64(0x%016x)\n", abi_fingerprint)
+	fmt.sbprintf(&b, "NET_SCHEMA_CANONICAL :: `%s`\n", abi_schema)
 	fmt.sbprintf(&b, "NET_FINGERPRINT :: u64(0x%016x)\n\n", fingerprint)
 	if kit_wire {
+		gen_net_schema(&b, abi_metadata)
 		w(&b, "@(init)\n_register_net_fingerprint :: proc \"contextless\" () {\n")
 		w(&b, "\t_guard_ksess.default_net_fingerprint = NET_FINGERPRINT\n")
 		w(&b, "}\n\n")
@@ -2858,7 +3685,9 @@ gen_guard :: proc(pkg: string, files: []Helper, fingerprint: u64, kit_wire: bool
 		fmt.sbprintf(
 			&b,
 			"#assert(\n\t#load_hash(%q, \"crc32\") == 0x%08x,\n\t\"%s changed after scriptgen ran — *.gen.odin is STALE; build via build_scripts.sh (it re-runs scriptgen), or re-run scriptgen over this dir\",\n)\n",
-			e.name, e.crc, e.name,
+			e.name,
+			e.crc,
+			e.name,
 		)
 	}
 	return strings.to_string(b)
@@ -2877,9 +3706,15 @@ gen_boot :: proc(pkg: string) -> string {
 	fmt.sbprintf(&b, "#+build darwin, linux, windows\npackage %s\n\n", pkg)
 	w :: strings.write_string
 	w(&b, "// GENERATED by scriptgen — do not edit. The odin_godot CORE dll calls\n")
-	w(&b, "// `odin_scripts_boot` immediately after it dlopens this compiled scripts dll, so the\n")
+	w(
+		&b,
+		"// `odin_scripts_boot` immediately after it dlopens this compiled scripts dll, so the\n",
+	)
 	w(&b, "// dll can initialize its OWN gdext/godot package globals before any of your script\n")
-	w(&b, "// procs run. Define your own `odin_scripts_boot` in a hand-written file to opt out.\n\n")
+	w(
+		&b,
+		"// procs run. Define your own `odin_scripts_boot` in a hand-written file to opt out.\n\n",
+	)
 	w(&b, "import \"godot:gdext\"\n")
 	w(&b, "import \"godot:godot\"\n\n")
 	w(&b, "@(export)\n")

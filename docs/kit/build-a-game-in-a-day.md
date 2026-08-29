@@ -40,14 +40,14 @@ you may restyle or ignore.
 In `ready()`:
 
 ```odin
-kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{
+my_game_net_attach(self, kboot.Options{
 	title    = "MY GAME",
 	status   = "Host a cave, or join one at localhost",
 	msg_kind = MSG_SESSION, // MSG_SESSION :: u8(0) — all kit/session traffic under one game byte
 	env      = "MY", // MY_PORT/_NAME/_TOKEN identity + the MY_LATENCY shim
 	methods  = {"on_host", "on_join", "on_start", "on_chat",
 	            "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
-})
+}, kboot.network_profile(.Friends_Coop))
 ```
 
 That is a hosted, joinable lobby: title, status line, player list, Host/Join/
@@ -56,6 +56,11 @@ transport forwards (`on_packet`/`on_peer_left`/`on_net_up`/`on_net_down`) are
 **generated**: your `boot: kboot.Boot` field declares them, and a peer that
 drops (Alt-F4, crash, lost connection) is cleared from the roster
 automatically. Hand-write a same-named method to override one.
+
+`.Friends_Coop` records that invited entity owners may author their streamed
+movement. Choose `.Listen_Server_Action` when clients send validated inputs to
+a player-hosted simulation, or `.Dedicated_Competitive` when that authority
+runs on trusted infrastructure. See [Network profiles](profiles.md).
 
 You declare the four game-facing methods: Host presses land on
 `kboot.boot_host(&self.boot, port, name)`, Join on
@@ -69,24 +74,24 @@ tests pick distinct seats). Presenting the same token later (after a crash, a
 quit, a resumed save) reclaims the same identity, stats, and entities. Persist
 it; never regenerate it. See [session](session.md).
 
-In `process()`, one call pumps the wire, ticks the session, reacts to the five
-events every game handles identically (lobby/scoreboard repaints, the
-join-failed status line), and re-yields every event; two generated procs route
-the rest: your host tick (declared with `@(gd_step = "authority")`) and your
-[event halves](session.md#event-halves-and-generated-dispatch)
-(`my_game_player_joined`, `my_game_entity_spawned`, …):
+The attach call is generated from the shell's direct Boot, Session, and Comms
+fields. It also installs generated entity/message/migration wiring. In
+`process()`, one generated call pumps the wire, ticks the session, applies the
+stock reactions, and dispatches your [event
+halves](session.md#event-halves-and-generated-dispatch). A co-op authority step
+remains an explicit game decision because it commonly runs only while playing:
 
 ```odin
-events, _, ticks := kboot.boot_pump(&self.boot, delta, now_s())
-my_game_step(self, ticks)    // hosts run the declared tick; clients no-op
-my_game_events(self, events) // dispatch to whichever halves you declared
+frame := my_game_net_pump(self, delta, now_s())
+my_game_step(self, frame.ticks) // hosts run the declared tick; clients no-op
 ```
 
-This is an events model, not an asynchronous callback model: game code runs
-while it drains `boot_pump`'s result. Generated dispatch applies each declared
-hook's execution policy. The raw layer underneath (`wire_attach`/`wire_pump`,
-`session_tick`/`session_poll`) stays public for games that want to drive it
-directly: [netgd](netgd.md), [session](session.md).
+This is an events model, not an asynchronous callback model: generated dispatch
+runs synchronously inside `my_game_net_pump` and applies each hook's execution
+policy. The component calls (`boot_attach`/`boot_pump`/`my_game_events`) and raw
+layer underneath (`wire_attach`/`wire_pump`, `session_tick`/`session_poll`) stay
+public for games that need custom ordering: [boot](boot.md), [netgd](netgd.md),
+[session](session.md).
 
 ## 2. Your first replicated entity (30 minutes)
 
@@ -113,11 +118,11 @@ embodies and its stable wire id:
 chest_scene: ^gd.Resource `gd:"entity=Chest:2"`,
 ```
 
-`cave_lobby_entities(self, &self.boot)` (one call
-in `ready()`, after `boot_attach`) installs the generated table: every peer,
-the host included, builds a spawn the same way (instantiate under `boot.world`,
-free on despawn, id→node ledger). Your bookkeeping is a typed, name-paired
-hook:
+The generated `cave_lobby_net_attach` installs `cave_lobby_entities` as part of
+the standard stack. Every peer, the host included, builds a spawn the same way
+(instantiate under `boot.world`, free on despawn, id→node ledger). A custom
+shell may call the entity installer directly. Your bookkeeping is a typed,
+name-paired hook:
 
 ```odin
 @(gd_half)
@@ -163,7 +168,7 @@ past, staying smooth through jitter and drops. Two contracts to respect:
 A verb is a plain proc on the entity it mutates:
 
 ```odin
-@(gd_command = "predict,any_seat")
+@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
 chest_take :: proc(self: ^Chest, slot: u8, count: u16, px, py: f32) -> (ok: bool, taken: kitems.Slot) {
 	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false, {}}
 	taken = kitems.take(self.slots[:], int(slot), count)

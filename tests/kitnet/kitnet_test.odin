@@ -13,6 +13,34 @@ import knet "godot:kit/net"
 
 // ---- wire ------------------------------------------------------------------
 
+Ref_Mob :: struct {
+	hp: i32,
+}
+
+@(test)
+typed_entity_refs_are_pointer_free :: proc(t: ^testing.T) {
+	#assert(size_of(knet.Net_Ref(Ref_Mob)) == size_of(knet.Net_Id))
+	ref := knet.Net_Ref(Ref_Mob) {
+		id = knet.Net_Id(77),
+	}
+	testing.expect(t, knet.net_ref_valid(ref))
+	testing.expect_value(t, knet.net_ref_id(ref), knet.Net_Id(77))
+	testing.expect(t, !knet.net_ref_valid(knet.Net_Ref(Ref_Mob){}))
+
+	mob := Ref_Mob {
+		hp = 3,
+	}
+	row := knet.Net_Entity(Ref_Mob) {
+		ref    = ref,
+		entity = &mob,
+		owner  = knet.Player_Id(9),
+	}
+	// `using ref` promotes id for iteration ergonomics without duplicating it.
+	testing.expect_value(t, row.id, knet.Net_Id(77))
+	testing.expect_value(t, row.owner, knet.Player_Id(9))
+	testing.expect_value(t, row.entity.hp, i32(3))
+}
+
 @(test)
 wire_roundtrip :: proc(t: ^testing.T) {
 	w := knet.writer_make()
@@ -75,17 +103,17 @@ wire_truncated_is_safe :: proc(t: ^testing.T) {
 // ---- delta -----------------------------------------------------------------
 
 Probe :: struct {
-	hp:    i32,
-	x:     f32,
-	y:     f32,
-	state: u8,
+	hp:         i32,
+	x:          f32,
+	y:          f32,
+	state:      u8,
 	local_only: int, // NOT in the descriptor — must never be touched
 }
 
 // All-host-state fixture (no stream flags — owner streams have their own Mover
 // fixture below; .Owner_Stream fields are excluded from deltas by design).
 probe_desc :: proc() -> knet.Entity_Desc {
-	@(static) fields := [?]knet.Field_Desc{
+	@(static) fields := [?]knet.Field_Desc {
 		{offset = offset_of(Probe, hp), size = size_of(i32)},
 		{offset = offset_of(Probe, x), size = size_of(f32), flags = {.Interp}},
 		{offset = offset_of(Probe, y), size = size_of(f32), flags = {.Interp}},
@@ -97,7 +125,13 @@ probe_desc :: proc() -> knet.Entity_Desc {
 @(test)
 delta_initial_and_idle :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	e := Probe{hp = 10, x = 1, y = 2, state = 3, local_only = 99}
+	e := Probe {
+		hp         = 10,
+		x          = 1,
+		y          = 2,
+		state      = 3,
+		local_only = 99,
+	}
 	shadow := knet.shadow_make(&desc)
 	defer delete(shadow)
 
@@ -118,7 +152,12 @@ delta_initial_and_idle :: proc(t: ^testing.T) {
 @(test)
 delta_partial_roundtrip :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	sender := Probe{hp = 10, x = 1, y = 2, state = 3}
+	sender := Probe {
+		hp    = 10,
+		x     = 1,
+		y     = 2,
+		state = 3,
+	}
 	shadow := knet.shadow_make(&desc)
 	defer delete(shadow)
 	knet.shadow_capture(&sender, shadow, &desc) // baseline in sync
@@ -127,7 +166,7 @@ delta_partial_roundtrip :: proc(t: ^testing.T) {
 	receiver.local_only = 55 // receiver-side private state
 
 	sender.hp = 7 // only field 0 changes
-	sender.y = 9  // and field 2
+	sender.y = 9 // and field 2
 
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
@@ -150,7 +189,12 @@ delta_partial_roundtrip :: proc(t: ^testing.T) {
 @(test)
 delta_truncated_sets_err :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	sender := Probe{hp = 1, x = 2, y = 3, state = 4}
+	sender := Probe {
+		hp    = 1,
+		x     = 2,
+		y     = 3,
+		state = 4,
+	}
 	shadow := knet.shadow_make(&desc)
 	defer delete(shadow)
 
@@ -168,13 +212,20 @@ delta_truncated_sets_err :: proc(t: ^testing.T) {
 @(test)
 full_snapshot_and_revert :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	src := Probe{hp = 42, x = -1, y = 8, state = 2}
+	src := Probe {
+		hp    = 42,
+		x     = -1,
+		y     = 8,
+		state = 2,
+	}
 
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_full(&w, &src, &desc)
 
-	dst := Probe{local_only = 7}
+	dst := Probe {
+		local_only = 7,
+	}
 	r := knet.reader_make(knet.writer_bytes(&w))
 	knet.apply_full(&r, &dst, &desc)
 	testing.expect(t, !r.err)
@@ -224,10 +275,28 @@ Nested_Entity :: struct {
 nested_desc :: proc() -> knet.Entity_Desc {
 	@(static) fields := [?]knet.Field_Desc {
 		{offset = offset_of(Nested_Entity, hp), size = size_of(i32)},
-		{offset = offset_of(Nested_Entity, m) + offset_of(type_of(Nested_Entity{}.m), x), size = size_of(f32), flags = {.Interp}, lerp = .F32},
-		{offset = offset_of(Nested_Entity, m) + offset_of(type_of(Nested_Entity{}.m), vx), size = size_of(f32)},
-		{offset = offset_of(Nested_Entity, d) + offset_of(type_of(Nested_Entity{}.d), inner) + offset_of(type_of(Nested_Entity{}.d.inner), x), size = size_of(f32), flags = {.Interp}, lerp = .F32},
-		{offset = offset_of(Nested_Entity, d) + offset_of(type_of(Nested_Entity{}.d), flag), size = size_of(u8)},
+		{
+			offset = offset_of(Nested_Entity, m) + offset_of(type_of(Nested_Entity{}.m), x),
+			size = size_of(f32),
+			flags = {.Interp},
+			lerp = .F32,
+		},
+		{
+			offset = offset_of(Nested_Entity, m) + offset_of(type_of(Nested_Entity{}.m), vx),
+			size = size_of(f32),
+		},
+		{
+			offset = offset_of(Nested_Entity, d) +
+			offset_of(type_of(Nested_Entity{}.d), inner) +
+			offset_of(type_of(Nested_Entity{}.d.inner), x),
+			size = size_of(f32),
+			flags = {.Interp},
+			lerp = .F32,
+		},
+		{
+			offset = offset_of(Nested_Entity, d) + offset_of(type_of(Nested_Entity{}.d), flag),
+			size = size_of(u8),
+		},
 		{offset = offset_of(Nested_Entity, tint), size = size_of(u8)},
 	}
 	return knet.Entity_Desc{fields = fields[:]}
@@ -249,9 +318,12 @@ nested_composed_offsets_match_layout :: proc(t: ^testing.T) {
 @(test)
 nested_full_snapshot_roundtrip :: proc(t: ^testing.T) {
 	desc := nested_desc()
-	src := Nested_Entity{hp = 42, tint = 9}
-	src.x = 3.5;src.y = 1.0;src.vx = -2.0 // through `using m`
-	src.d.inner.x = 7.25;src.d.flag = 200 // deep plain path
+	src := Nested_Entity {
+		hp   = 42,
+		tint = 9,
+	}
+	src.x = 3.5; src.y = 1.0; src.vx = -2.0 // through `using m`
+	src.d.inner.x = 7.25; src.d.flag = 200 // deep plain path
 
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
@@ -273,7 +345,10 @@ nested_full_snapshot_roundtrip :: proc(t: ^testing.T) {
 @(test)
 nested_delta_roundtrip :: proc(t: ^testing.T) {
 	desc := nested_desc()
-	sender := Nested_Entity{hp = 42, tint = 9}
+	sender := Nested_Entity {
+		hp   = 42,
+		tint = 9,
+	}
 	sender.d.inner.x = 7.25
 	shadow := knet.shadow_make(&desc)
 	defer delete(shadow)
@@ -301,7 +376,9 @@ nested_delta_roundtrip :: proc(t: ^testing.T) {
 @(test)
 pending_confirm_reject_expire :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	e := Probe{hp = 5}
+	e := Probe {
+		hp = 5,
+	}
 	tbl := knet.pending_table_make()
 	defer knet.pending_table_destroy(&tbl)
 
@@ -381,7 +458,11 @@ clock_sync_converges :: proc(t: ^testing.T) {
 		local += 0.5
 	}
 	est := knet.clock_remote_now(&c, local) - local
-	testing.expect(t, abs(est - TRUE_OFFSET) < 0.001, "offset should converge under symmetric latency")
+	testing.expect(
+		t,
+		abs(est - TRUE_OFFSET) < 0.001,
+		"offset should converge under symmetric latency",
+	)
 	testing.expect(t, abs(c.rtt - RTT) < 0.001)
 
 	// A negative-rtt nonsense sample is dropped, not blended.
@@ -414,7 +495,11 @@ ping_pong_feeds_clock :: proc(t: ^testing.T) {
 		local += 1.0
 	}
 	est := knet.clock_remote_now(&c, local) - local
-	testing.expect(t, abs(est - TRUE_OFFSET) < 0.001, "wire ping/pong must converge on the true offset")
+	testing.expect(
+		t,
+		abs(est - TRUE_OFFSET) < 0.001,
+		"wire ping/pong must converge on the true offset",
+	)
 
 	// Truncated pong: nothing sampled, no error escapes.
 	before := c.offset
@@ -463,9 +548,14 @@ probe_cmd_mark :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) 
 probe_commands := [?]knet.Command_Desc {
 	// Hand-built sets pick their own STABLE wire ids (Command_Desc.id) —
 	// lookup is by id now, never by array position.
-	{name = "add", id = CMD_ADD, predict = true, access = .Any_Seat, invoke = probe_cmd_add},
-	{name = "torn", id = CMD_TORN, predict = true, access = .Any_Seat, invoke = probe_cmd_torn},
-	{name = "mark", id = CMD_MARK, predict = false, access = .Any_Seat, invoke = probe_cmd_mark},
+	{name = "add", id = CMD_ADD, policy = knet.ACTION_ANY_SEAT_PREDICTED, invoke = probe_cmd_add},
+	{
+		name = "torn",
+		id = CMD_TORN,
+		policy = knet.ACTION_ANY_SEAT_PREDICTED,
+		invoke = probe_cmd_torn,
+	},
+	{name = "mark", id = CMD_MARK, policy = knet.ACTION_ANY_SEAT, invoke = probe_cmd_mark},
 }
 
 Capture :: struct {
@@ -486,20 +576,38 @@ capture_destroy :: proc(c: ^Capture) {
 
 // Host side of the loop: dedup → execute → result bytes (what the session layer
 // will do per received command message).
-host_handle :: proc(host: ^Probe, set: ^knet.Command_Set, hctx: ^knet.Command_Ctx, peer: u64, msg: []u8, result: ^knet.Writer) -> (executed: bool) {
+host_handle :: proc(
+	host: ^Probe,
+	set: ^knet.Command_Set,
+	hctx: ^knet.Command_Ctx,
+	peer: u64,
+	msg: []u8,
+	result: ^knet.Writer,
+) -> (
+	executed: bool,
+) {
 	r := knet.reader_make(msg)
 	h := knet.command_read_header(&r)
 	if !knet.command_dedup(hctx, peer, h.seq) {
 		return false
 	}
-	env := knet.Command_Env{authority = true, user = hctx.game_user, by = knet.Player_Id(peer)}
+	env := knet.Command_Env {
+		authority = true,
+		user      = hctx.game_user,
+		by        = knet.Player_Id(peer),
+	}
 	ok := knet.command_execute(host, set, h.cmd, &r, &env)
 	knet.command_result_write(result, h, ok, host, set)
 	return true
 }
 
 // Client side: read the result, confirm or reject(+truth).
-client_handle_result :: proc(cctx: ^knet.Command_Ctx, client: ^Probe, set: ^knet.Command_Set, bytes: []u8) {
+client_handle_result :: proc(
+	cctx: ^knet.Command_Ctx,
+	client: ^Probe,
+	set: ^knet.Command_Set,
+	bytes: []u8,
+) {
 	r := knet.reader_make(bytes)
 	res := knet.command_result_read(&r)
 	if res.ok {
@@ -512,10 +620,17 @@ client_handle_result :: proc(cctx: ^knet.Command_Ctx, client: ^Probe, set: ^knet
 @(test)
 command_predict_confirm :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+		commands    = probe_commands[:],
+	}
 
-	client := Probe{hp = 10}
-	host := Probe{hp = 10}
+	client := Probe {
+		hp = 10,
+	}
+	host := Probe {
+		hp = 10,
+	}
 
 	cap := Capture{}
 	defer capture_destroy(&cap)
@@ -548,15 +663,97 @@ command_predict_confirm :: proc(t: ^testing.T) {
 }
 
 @(test)
+action_policy_bounds_before_send_and_rejects_trailing_args :: proc(t: ^testing.T) {
+	desc := probe_desc()
+	cmds := [?]knet.Command_Desc {
+		{
+			name = "add",
+			id = CMD_ADD,
+			policy = {access = .Any_Seat, prediction = .Optimistic, max_args_bytes = 3},
+			invoke = probe_cmd_add,
+		},
+	}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+		commands    = cmds[:],
+	}
+	client := Probe {
+		hp = 10,
+	}
+	cap := Capture{}
+	defer capture_destroy(&cap)
+	ctx := knet.command_ctx_make()
+	defer knet.command_ctx_destroy(&ctx)
+	ctx.send = capture_send
+	ctx.send_user = &cap
+
+	// i32 needs four encoded bytes: the action-specific envelope refuses it
+	// before prediction and before transport.
+	knet.command_begin(&ctx, 1, CMD_ADD)
+	knet.write_i32(&ctx.msg, 5)
+	issue := knet.command_issue_checked(&ctx, &client, &set, CMD_ADD)
+	testing.expect(t, !issue.sent && !issue.prediction_attempted)
+	testing.expect_value(t, issue.reason, knet.Action_Reject_Reason.Malformed)
+	testing.expect_value(t, client.hp, i32(10))
+	testing.expect_value(t, len(cap.msgs), 0)
+
+	// The exact bound admits the same typed action and exposes both parts of the
+	// generated wrapper's decision.
+	cmds[0].policy.max_args_bytes = 4
+	knet.command_begin(&ctx, 1, CMD_ADD)
+	knet.write_i32(&ctx.msg, 5)
+	issue = knet.command_issue_checked(&ctx, &client, &set, CMD_ADD)
+	testing.expect(t, issue.sent && issue.prediction_attempted && issue.prediction_applied)
+	testing.expect_value(t, issue.reason, knet.Action_Reject_Reason.None)
+	testing.expect(t, issue.seq != 0)
+	testing.expect_value(t, client.hp, i32(15))
+	testing.expect_value(t, len(cap.msgs), 1)
+
+	// Even a policy wide enough for the bytes does not permit an ignored tail:
+	// the authoritative transaction restores the mutation and rejects.
+	cmds[0].policy.max_args_bytes = 5
+	host := Probe {
+		hp = 20,
+	}
+	w := knet.writer_make(8, context.temp_allocator)
+	knet.write_i32(&w, 7)
+	knet.write_u8(&w, 99)
+	r := knet.reader_make(knet.writer_bytes(&w))
+	env := knet.Command_Env {
+		authority = true,
+		by        = 2,
+	}
+	testing.expect_value(
+		t,
+		knet.command_execute_reason(&host, &set, u16(CMD_ADD), &r, &env),
+		knet.Action_Reject_Reason.Malformed,
+	)
+	testing.expect_value(t, host.hp, i32(20))
+
+	testing.expect_value(t, knet.action_args_max(knet.ACTION_OWNER), knet.ACTION_ARGS_DEFAULT)
+	testing.expect(t, knet.action_access_allows(knet.ACTION_ANY_SEAT, 2, 1, false))
+	testing.expect(t, !knet.action_access_allows(knet.ACTION_AUTHORITY, 2, 1, false))
+	testing.expect(t, knet.action_access_allows(knet.ACTION_AUTHORITY, 2, 1, true))
+}
+
+@(test)
 command_predict_reject_carries_truth :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+		commands    = probe_commands[:],
+	}
 
 	// The client is STALE: the host has moved on (hp 100, locked) but no delta
 	// arrived yet. The prediction applies locally, the host rejects, and the
 	// reject's embedded truth must win over the client's local revert (10).
-	client := Probe{hp = 10}
-	host := Probe{hp = 100, state = 9}
+	client := Probe {
+		hp = 10,
+	}
+	host := Probe {
+		hp    = 100,
+		state = 9,
+	}
 
 	cap := Capture{}
 	defer capture_destroy(&cap)
@@ -586,9 +783,15 @@ command_predict_reject_carries_truth :: proc(t: ^testing.T) {
 @(test)
 command_local_reject_restores_and_still_sends :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+		commands    = probe_commands[:],
+	}
 
-	client := Probe{hp = 10, state = 9} // locked locally: prediction rejects
+	client := Probe {
+		hp    = 10,
+		state = 9,
+	} // locked locally: prediction rejects
 	cap := Capture{}
 	defer capture_destroy(&cap)
 	cctx := knet.command_ctx_make()
@@ -598,7 +801,9 @@ command_local_reject_restores_and_still_sends :: proc(t: ^testing.T) {
 
 	knet.command_begin(&cctx, knet.Net_Id(1), CMD_ADD)
 	knet.write_i32(&cctx.msg, 5)
-	testing.expect(t, !knet.command_issue(&cctx, &client, &set, CMD_ADD))
+	issue := knet.command_issue_checked(&cctx, &client, &set, CMD_ADD)
+	testing.expect(t, issue.sent && issue.prediction_attempted && !issue.prediction_applied)
+	testing.expect_value(t, issue.reason, knet.Action_Reject_Reason.Predicate)
 	testing.expect_value(t, client.hp, i32(10)) // restored
 	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
 	// Still sent: the local copy may be stale — only the host may say no.
@@ -608,20 +813,31 @@ command_local_reject_restores_and_still_sends :: proc(t: ^testing.T) {
 @(test)
 command_execute_restores_torn_state :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+		commands    = probe_commands[:],
+	}
 
 	// Host side: a proc that mutates then returns false must leave no trace.
-	host := Probe{hp = 42, x = 1}
+	host := Probe {
+		hp = 42,
+		x  = 1,
+	}
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	r := knet.reader_make(knet.writer_bytes(&w)) // no args
-	env := knet.Command_Env{authority = true}
+	env := knet.Command_Env {
+		authority = true,
+	}
 	testing.expect(t, !knet.command_execute(&host, &set, u16(CMD_TORN), &r, &env)) // receive path: the raw wire id
 	testing.expect_value(t, host.hp, i32(42))
 	testing.expect_value(t, host.x, f32(1))
 
 	// Client side: the predicted run of the same proc is restored the same way.
-	client := Probe{hp = 42, x = 1}
+	client := Probe {
+		hp = 42,
+		x  = 1,
+	}
 	cctx := knet.command_ctx_make()
 	defer knet.command_ctx_destroy(&cctx)
 	knet.command_begin(&cctx, knet.Net_Id(1), CMD_TORN)
@@ -633,9 +849,14 @@ command_execute_restores_torn_state :: proc(t: ^testing.T) {
 @(test)
 command_dedup_replay_executes_once :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+		commands    = probe_commands[:],
+	}
 
-	host := Probe{hp = 10}
+	host := Probe {
+		hp = 10,
+	}
 	cap := Capture{}
 	defer capture_destroy(&cap)
 	cctx := knet.command_ctx_make()
@@ -645,17 +866,27 @@ command_dedup_replay_executes_once :: proc(t: ^testing.T) {
 	hctx := knet.command_ctx_make()
 	defer knet.command_ctx_destroy(&hctx)
 
-	client := Probe{hp = 10}
+	client := Probe {
+		hp = 10,
+	}
 	knet.command_begin(&cctx, knet.Net_Id(1), CMD_ADD)
 	knet.write_i32(&cctx.msg, 5)
 	_ = knet.command_issue(&cctx, &client, &set, CMD_ADD)
 
 	result := knet.writer_make()
 	defer knet.writer_destroy(&result)
-	testing.expect(t, host_handle(&host, &set, &hctx, 7, cap.msgs[0], &result), "first delivery executes")
+	testing.expect(
+		t,
+		host_handle(&host, &set, &hctx, 7, cap.msgs[0], &result),
+		"first delivery executes",
+	)
 	testing.expect_value(t, host.hp, i32(15))
 	// Replay of the exact same bytes (retransmit / reconnect replay): dropped.
-	testing.expect(t, !host_handle(&host, &set, &hctx, 7, cap.msgs[0], &result), "replay must be dropped")
+	testing.expect(
+		t,
+		!host_handle(&host, &set, &hctx, 7, cap.msgs[0], &result),
+		"replay must be dropped",
+	)
 	testing.expect_value(t, host.hp, i32(15))
 	// Same seq from a DIFFERENT peer is a different command: executes.
 	testing.expect(t, host_handle(&host, &set, &hctx, 8, cap.msgs[0], &result))
@@ -675,7 +906,13 @@ Then_Log :: struct {
 	got:   i32,
 }
 
-probe_loot_then :: proc(game: ^Then_Log, self: ^Probe, by: knet.Player_Id, amount: i32, total: i32) {
+probe_loot_then :: proc(
+	game: ^Then_Log,
+	self: ^Probe,
+	by: knet.Player_Id,
+	amount: i32,
+	total: i32,
+) {
 	game.fires += 1
 	game.by = by
 	game.got = total
@@ -702,12 +939,26 @@ probe_cmd_loot :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) 
 command_then_fires_on_authority_only :: proc(t: ^testing.T) {
 	LOOT :: knet.Cmd_Id(0xc57) // hash-sized like a generated id, unique within the set
 	desc := probe_desc()
-	cmds := [?]knet.Command_Desc{{name = "loot", id = LOOT, predict = true, access = .Any_Seat, invoke = probe_cmd_loot}}
-	set := knet.Command_Set{entity_desc = &desc, commands = cmds[:]}
+	cmds := [?]knet.Command_Desc {
+		{
+			name = "loot",
+			id = LOOT,
+			policy = knet.ACTION_ANY_SEAT_PREDICTED,
+			invoke = probe_cmd_loot,
+		},
+	}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+		commands    = cmds[:],
+	}
 
 	log := Then_Log{}
-	host := Probe{hp = 10}
-	client := Probe{hp = 10}
+	host := Probe {
+		hp = 10,
+	}
+	client := Probe {
+		hp = 10,
+	}
 	cap := Capture{}
 	defer capture_destroy(&cap)
 	cctx := knet.command_ctx_make()
@@ -742,15 +993,22 @@ command_then_fires_on_authority_only :: proc(t: ^testing.T) {
 @(test)
 command_malformed_input_rejects :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
-	host := Probe{hp = 10}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+		commands    = probe_commands[:],
+	}
+	host := Probe {
+		hp = 10,
+	}
 
 	// Truncated args: the thunk sees r.err before calling the proc.
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_u16(&w, 0xFF) // 2 bytes where read_i32 wants 4
 	r := knet.reader_make(knet.writer_bytes(&w))
-	env := knet.Command_Env{authority = true}
+	env := knet.Command_Env {
+		authority = true,
+	}
 	testing.expect(t, !knet.command_execute(&host, &set, u16(CMD_ADD), &r, &env)) // receive path: the raw wire id
 	testing.expect_value(t, host.hp, i32(10))
 
@@ -765,15 +1023,20 @@ command_access_is_enforced_before_predicate :: proc(t: ^testing.T) {
 	OPEN :: knet.Cmd_Id(0x102)
 	AUTH :: knet.Cmd_Id(0x103)
 	desc := probe_desc()
-	cmds := [?]knet.Command_Desc{
-		{name = "owner", id = OWNER, access = .Owner, invoke = probe_cmd_mark},
-		{name = "open", id = OPEN, access = .Any_Seat, invoke = probe_cmd_mark},
-		{name = "authority", id = AUTH, access = .Authority, invoke = probe_cmd_mark},
+	cmds := [?]knet.Command_Desc {
+		{name = "owner", id = OWNER, policy = knet.ACTION_OWNER, invoke = probe_cmd_mark},
+		{name = "open", id = OPEN, policy = knet.ACTION_ANY_SEAT, invoke = probe_cmd_mark},
+		{name = "authority", id = AUTH, policy = knet.ACTION_AUTHORITY, invoke = probe_cmd_mark},
 	}
-	set := knet.Command_Set{entity_desc = &desc, commands = cmds[:]}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+		commands    = cmds[:],
+	}
 	reg := knet.registry_make()
 	defer knet.registry_destroy(&reg)
-	host := Probe{state = 1}
+	host := Probe {
+		state = 1,
+	}
 	id := knet.registry_spawn(&reg, &host, &set, knet.Player_Id(7))
 	ctx := knet.command_ctx_make()
 	defer knet.command_ctx_destroy(&ctx)
@@ -786,7 +1049,10 @@ command_access_is_enforced_before_predicate :: proc(t: ^testing.T) {
 		cmd: knet.Cmd_Id,
 		seq: u32,
 		value: u8,
-	) -> (responded, ok: bool) {
+	) -> (
+		responded, ok: bool,
+		reason: knet.Action_Reject_Reason,
+	) {
 		w := knet.writer_make(16, context.temp_allocator)
 		knet.write_net_id(&w, id)
 		knet.write_u16(&w, u16(cmd))
@@ -794,20 +1060,26 @@ command_access_is_enforced_before_predicate :: proc(t: ^testing.T) {
 		knet.write_u8(&w, value)
 		r := knet.reader_make(knet.writer_bytes(&w))
 		out := knet.writer_make(32, context.temp_allocator)
-		responded, ok, _ = knet.registry_host_command(reg, ctx, by, &r, &out)
+		result := knet.registry_host_command_checked(reg, ctx, by, &r, &out)
+		responded = result.responded
+		reason = result.reason
+		ok = reason == .None
 		return
 	}
 
-	responded, ok := issue(&reg, &ctx, 8, id, OWNER, 1, 2)
+	responded, ok, reason := issue(&reg, &ctx, 8, id, OWNER, 1, 2)
 	testing.expect(t, responded && !ok, "non-owner gets an explicit rejection")
+	testing.expect_value(t, reason, knet.Action_Reject_Reason.Access)
 	testing.expect_value(t, host.state, u8(1)) // predicate never ran
-	responded, ok = issue(&reg, &ctx, 8, id, AUTH, 2, 3)
+	responded, ok, reason = issue(&reg, &ctx, 8, id, AUTH, 2, 3)
 	testing.expect(t, responded && !ok, "remote authority-only command rejected")
+	testing.expect_value(t, reason, knet.Action_Reject_Reason.Access)
 	testing.expect_value(t, host.state, u8(1))
-	responded, ok = issue(&reg, &ctx, 8, id, OPEN, 3, 4)
+	responded, ok, reason = issue(&reg, &ctx, 8, id, OPEN, 3, 4)
 	testing.expect(t, responded && ok, "any seated issuer may ask")
+	testing.expect_value(t, reason, knet.Action_Reject_Reason.None)
 	testing.expect_value(t, host.state, u8(4))
-	responded, ok = issue(&reg, &ctx, 7, id, OWNER, 1, 5)
+	responded, ok, reason = issue(&reg, &ctx, 7, id, OWNER, 1, 5)
 	testing.expect(t, responded && ok, "the authoritative owner may ask")
 	testing.expect_value(t, host.state, u8(5))
 }
@@ -815,9 +1087,14 @@ command_access_is_enforced_before_predicate :: proc(t: ^testing.T) {
 @(test)
 command_non_predicted_defers_to_host :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+		commands    = probe_commands[:],
+	}
 
-	client := Probe{state = 1}
+	client := Probe {
+		state = 1,
+	}
 	cap := Capture{}
 	defer capture_destroy(&cap)
 	cctx := knet.command_ctx_make()
@@ -830,15 +1107,35 @@ command_non_predicted_defers_to_host :: proc(t: ^testing.T) {
 	testing.expect(t, !knet.command_issue(&cctx, &client, &set, CMD_MARK))
 	testing.expect_value(t, client.state, u8(1)) // untouched: no prediction declared
 	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
+	testing.expect_value(t, knet.pending_action_count(&cctx.pending), 1)
 	testing.expect_value(t, len(cap.msgs), 1) // but the intent went to the host
 
-	host := Probe{state = 1}
+	host := Probe {
+		state = 1,
+	}
 	hctx := knet.command_ctx_make()
 	defer knet.command_ctx_destroy(&hctx)
 	result := knet.writer_make()
 	defer knet.writer_destroy(&result)
 	_ = host_handle(&host, &set, &hctx, 7, cap.msgs[0], &result)
 	testing.expect_value(t, host.state, u8(4))
+	client_handle_result(&cctx, &client, &set, knet.writer_bytes(&result))
+	testing.expect_value(t, knet.pending_action_count(&cctx.pending), 0)
+
+	// A second non-predicted issue disappears into a silent transport. It owns
+	// no revert, but its addressed receipt still expires for a Timeout callback.
+	cctx.now_tick = 100
+	knet.command_begin(&cctx, knet.Net_Id(1), CMD_MARK)
+	knet.write_u8(&cctx.msg, 5)
+	_ = knet.command_issue_checked(&cctx, &client, &set, CMD_MARK)
+	creg := knet.registry_make()
+	defer knet.registry_destroy(&creg)
+	expired := make([dynamic]knet.Expired_Command)
+	defer delete(expired)
+	cctx.now_tick = 200
+	testing.expect_value(t, knet.registry_expire_pending(&creg, &cctx, 50, out = &expired), 1)
+	testing.expect_value(t, expired[0].cmd, u16(CMD_MARK))
+	testing.expect_value(t, knet.pending_action_count(&cctx.pending), 0)
 }
 
 // ---- registry ------------------------------------------------------------
@@ -859,16 +1156,26 @@ dot_desc :: proc() -> knet.Entity_Desc {
 @(test)
 registry_batched_deltas :: proc(t: ^testing.T) {
 	pdesc := probe_desc()
-	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+	pset := knet.Command_Set {
+		entity_desc = &pdesc,
+		commands    = probe_commands[:],
+	}
 	ddesc := dot_desc()
-	dset := knet.Command_Set{entity_desc = &ddesc} // desc-only: no commands
+	dset := knet.Command_Set {
+		entity_desc = &ddesc,
+	} // desc-only: no commands
 
 	// Authority side: spawn allocates ids; fresh shadows make the first walk
 	// the initial full send.
 	sreg := knet.registry_make()
 	defer knet.registry_destroy(&sreg)
-	sprobe := Probe{hp = 10, x = 1}
-	sdot := Dot{v = 7}
+	sprobe := Probe {
+		hp = 10,
+		x  = 1,
+	}
+	sdot := Dot {
+		v = 7,
+	}
 	pid := knet.registry_spawn(&sreg, &sprobe, &pset)
 	did := knet.registry_spawn(&sreg, &sdot, &dset)
 	testing.expect(t, pid != did)
@@ -876,8 +1183,12 @@ registry_batched_deltas :: proc(t: ^testing.T) {
 	// Remote side mirrors under the wire ids.
 	creg := knet.registry_make()
 	defer knet.registry_destroy(&creg)
-	cprobe := Probe{local_only = 5}
-	cdot := Dot{hidden = 5}
+	cprobe := Probe {
+		local_only = 5,
+	}
+	cdot := Dot {
+		hidden = 5,
+	}
 	knet.registry_insert(&creg, pid, &cprobe, &pset)
 	knet.registry_insert(&creg, did, &cdot, &dset)
 
@@ -909,16 +1220,30 @@ registry_batched_deltas :: proc(t: ^testing.T) {
 @(test)
 registry_malformed_entity_updates_commit_nothing :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	set := knet.Command_Set{entity_desc = &desc, commands = probe_commands[:]}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+		commands    = probe_commands[:],
+	}
 
 	sreg := knet.registry_make()
 	defer knet.registry_destroy(&sreg)
-	host := Probe{hp = 44, x = 12, y = 23, state = 7}
+	host := Probe {
+		hp    = 44,
+		x     = 12,
+		y     = 23,
+		state = 7,
+	}
 	id := knet.registry_spawn(&sreg, &host, &set)
 
 	creg := knet.registry_make()
 	defer knet.registry_destroy(&creg)
-	client := Probe{hp = 5, x = 6, y = 7, state = 8, local_only = 99}
+	client := Probe {
+		hp         = 5,
+		x          = 6,
+		y          = 7,
+		state      = 8,
+		local_only = 99,
+	}
 	knet.registry_insert(&creg, id, &client, &set)
 
 	// All replicated fields are dirty. Truncating the LAST one proves fields
@@ -950,7 +1275,13 @@ registry_malformed_entity_updates_commit_nothing :: proc(t: ^testing.T) {
 	testing.expect_value(t, client.state, host.state)
 
 	// Full join/resync rows have the same all-or-nothing contract.
-	client = Probe{hp = -5, x = -6, y = -7, state = 2, local_only = 101}
+	client = Probe {
+		hp         = -5,
+		x          = -6,
+		y          = -7,
+		state      = 2,
+		local_only = 101,
+	}
 	fw := knet.writer_make()
 	defer knet.writer_destroy(&fw)
 	_ = knet.registry_write_fulls(&fw, &sreg)
@@ -968,12 +1299,19 @@ registry_malformed_entity_updates_commit_nothing :: proc(t: ^testing.T) {
 @(test)
 registry_unknown_id_abandons_batch :: proc(t: ^testing.T) {
 	pdesc := probe_desc()
-	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+	pset := knet.Command_Set {
+		entity_desc = &pdesc,
+		commands    = probe_commands[:],
+	}
 
 	sreg := knet.registry_make()
 	defer knet.registry_destroy(&sreg)
-	a := Probe{hp = 1}
-	b := Probe{hp = 2}
+	a := Probe {
+		hp = 1,
+	}
+	b := Probe {
+		hp = 2,
+	}
 	_ = knet.registry_spawn(&sreg, &a, &pset)
 	bid := knet.registry_spawn(&sreg, &b, &pset)
 
@@ -995,12 +1333,21 @@ registry_unknown_id_abandons_batch :: proc(t: ^testing.T) {
 @(test)
 registry_full_snapshot_roundtrip :: proc(t: ^testing.T) {
 	pdesc := probe_desc()
-	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+	pset := knet.Command_Set {
+		entity_desc = &pdesc,
+		commands    = probe_commands[:],
+	}
 
 	sreg := knet.registry_make()
 	defer knet.registry_destroy(&sreg)
-	s1 := Probe{hp = 11, x = 2, state = 3}
-	s2 := Probe{hp = 22}
+	s1 := Probe {
+		hp    = 11,
+		x     = 2,
+		state = 3,
+	}
+	s2 := Probe {
+		hp = 22,
+	}
 	id1 := knet.registry_spawn(&sreg, &s1, &pset)
 	id2 := knet.registry_spawn(&sreg, &s2, &pset)
 
@@ -1044,16 +1391,23 @@ registry_full_snapshot_roundtrip :: proc(t: ^testing.T) {
 @(test)
 registry_delta_replays_pending_prediction :: proc(t: ^testing.T) {
 	pdesc := probe_desc()
-	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+	pset := knet.Command_Set {
+		entity_desc = &pdesc,
+		commands    = probe_commands[:],
+	}
 
 	sreg := knet.registry_make()
 	defer knet.registry_destroy(&sreg)
-	host := Probe{hp = 10}
+	host := Probe {
+		hp = 10,
+	}
 	id := knet.registry_spawn(&sreg, &host, &pset)
 
 	creg := knet.registry_make()
 	defer knet.registry_destroy(&creg)
-	client := Probe{hp = 10}
+	client := Probe {
+		hp = 10,
+	}
 	knet.registry_insert(&creg, id, &client, &pset)
 	knet.registry_commit_shadows(&sreg) // baseline delivered (join snapshot)
 
@@ -1083,7 +1437,7 @@ registry_delta_replays_pending_prediction :: proc(t: ^testing.T) {
 	res1 := knet.writer_make()
 	defer knet.writer_destroy(&res1)
 	rr := knet.reader_make(cap.msgs[0])
-	responded, ok, _ := knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7),&rr, &res1)
+	responded, ok, _ := knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7), &rr, &res1)
 	testing.expect(t, responded && ok)
 	testing.expect_value(t, host.hp, i32(15))
 	cr1 := knet.reader_make(knet.writer_bytes(&res1))
@@ -1106,7 +1460,7 @@ registry_delta_replays_pending_prediction :: proc(t: ^testing.T) {
 	res2 := knet.writer_make()
 	defer knet.writer_destroy(&res2)
 	rr2 := knet.reader_make(cap.msgs[1])
-	responded, ok, _ = knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7),&rr2, &res2)
+	responded, ok, _ = knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7), &rr2, &res2)
 	testing.expect(t, responded && ok)
 	cr2 := knet.reader_make(knet.writer_bytes(&res2))
 	_ = knet.registry_client_result(&creg, &cctx, &cr2)
@@ -1121,16 +1475,23 @@ registry_delta_replays_pending_prediction :: proc(t: ^testing.T) {
 @(test)
 registry_truncated_delta_is_transactional :: proc(t: ^testing.T) {
 	pdesc := probe_desc()
-	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+	pset := knet.Command_Set {
+		entity_desc = &pdesc,
+		commands    = probe_commands[:],
+	}
 
 	sreg := knet.registry_make()
 	defer knet.registry_destroy(&sreg)
-	host := Probe{hp = 10}
+	host := Probe {
+		hp = 10,
+	}
 	id := knet.registry_spawn(&sreg, &host, &pset)
 
 	creg := knet.registry_make()
 	defer knet.registry_destroy(&creg)
-	client := Probe{hp = 10}
+	client := Probe {
+		hp = 10,
+	}
 	knet.registry_insert(&creg, id, &client, &pset)
 	knet.registry_commit_shadows(&sreg)
 
@@ -1178,16 +1539,25 @@ registry_truncated_delta_is_transactional :: proc(t: ^testing.T) {
 @(test)
 registry_delta_untouched_fields_do_not_double_apply :: proc(t: ^testing.T) {
 	pdesc := probe_desc()
-	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+	pset := knet.Command_Set {
+		entity_desc = &pdesc,
+		commands    = probe_commands[:],
+	}
 
 	sreg := knet.registry_make()
 	defer knet.registry_destroy(&sreg)
-	host := Probe{hp = 10, state = 1}
+	host := Probe {
+		hp    = 10,
+		state = 1,
+	}
 	id := knet.registry_spawn(&sreg, &host, &pset)
 
 	creg := knet.registry_make()
 	defer knet.registry_destroy(&creg)
-	client := Probe{hp = 10, state = 1}
+	client := Probe {
+		hp    = 10,
+		state = 1,
+	}
 	knet.registry_insert(&creg, id, &client, &pset)
 	knet.registry_commit_shadows(&sreg)
 
@@ -1216,16 +1586,25 @@ registry_delta_untouched_fields_do_not_double_apply :: proc(t: ^testing.T) {
 @(test)
 registry_replay_precondition_failure_drops_prediction :: proc(t: ^testing.T) {
 	pdesc := probe_desc()
-	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+	pset := knet.Command_Set {
+		entity_desc = &pdesc,
+		commands    = probe_commands[:],
+	}
 
 	sreg := knet.registry_make()
 	defer knet.registry_destroy(&sreg)
-	host := Probe{hp = 10, state = 1}
+	host := Probe {
+		hp    = 10,
+		state = 1,
+	}
 	id := knet.registry_spawn(&sreg, &host, &pset)
 
 	creg := knet.registry_make()
 	defer knet.registry_destroy(&creg)
-	client := Probe{hp = 10, state = 1}
+	client := Probe {
+		hp    = 10,
+		state = 1,
+	}
 	knet.registry_insert(&creg, id, &client, &pset)
 	knet.registry_commit_shadows(&sreg)
 
@@ -1254,16 +1633,23 @@ registry_replay_precondition_failure_drops_prediction :: proc(t: ^testing.T) {
 @(test)
 registry_command_routing :: proc(t: ^testing.T) {
 	pdesc := probe_desc()
-	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+	pset := knet.Command_Set {
+		entity_desc = &pdesc,
+		commands    = probe_commands[:],
+	}
 
 	sreg := knet.registry_make()
 	defer knet.registry_destroy(&sreg)
-	host := Probe{hp = 10}
+	host := Probe {
+		hp = 10,
+	}
 	hid := knet.registry_spawn(&sreg, &host, &pset)
 
 	creg := knet.registry_make()
 	defer knet.registry_destroy(&creg)
-	client := Probe{hp = 10}
+	client := Probe {
+		hp = 10,
+	}
 	knet.registry_insert(&creg, hid, &client, &pset)
 
 	cap := Capture{}
@@ -1282,36 +1668,52 @@ registry_command_routing :: proc(t: ^testing.T) {
 	result := knet.writer_make()
 	defer knet.writer_destroy(&result)
 	rr := knet.reader_make(cap.msgs[0])
-	responded, ok, h := knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7),&rr, &result)
+	responded, ok, h := knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7), &rr, &result)
 	testing.expect(t, responded && ok)
 	testing.expect_value(t, host.hp, i32(15))
-	testing.expect(t, h.entity == hid && h.cmd == u16(CMD_ADD), "the header comes back for command hooks")
+	testing.expect(
+		t,
+		h.entity == hid && h.cmd == u16(CMD_ADD),
+		"the header comes back for command hooks",
+	)
 	res_r := knet.reader_make(knet.writer_bytes(&result))
 	res := knet.registry_client_result(&creg, &cctx, &res_r)
 	testing.expect(t, res.ok)
 	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
 
-	// A command naming an entity the host doesn't have: NO response (expiry is
-	// the client's safety net), nothing executes.
+	// A command naming an entity the host no longer has receives an addressed,
+	// header-only Stale result: the client can retire now instead of disguising
+	// this known failure as a timeout.
 	knet.command_begin(&cctx, knet.Net_Id(999), CMD_ADD)
 	knet.write_i32(&cctx.msg, 5)
 	_ = knet.command_issue(&cctx, &client, &pset, CMD_ADD) // predicts against the local copy
 	knet.writer_reset(&result)
 	rr2 := knet.reader_make(cap.msgs[1])
-	responded2, _, _ := knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7),&rr2, &result)
-	testing.expect(t, !responded2)
-	testing.expect_value(t, len(knet.writer_bytes(&result)), 0)
+	stale := knet.registry_host_command_checked(&sreg, &hctx, knet.Player_Id(7), &rr2, &result)
+	testing.expect(t, stale.responded)
+	testing.expect_value(t, stale.reason, knet.Action_Reject_Reason.Stale)
+	stale_r := knet.reader_make(knet.writer_bytes(&result))
+	stale_res := knet.registry_client_result(&creg, &cctx, &stale_r)
+	testing.expect_value(t, stale_res.reason, knet.Action_Reject_Reason.Stale)
+	testing.expect(t, !stale_res.has_truth)
 }
 
 @(test)
 registry_expire_reverts_lost_predictions :: proc(t: ^testing.T) {
 	pdesc := probe_desc()
-	pset := knet.Command_Set{entity_desc = &pdesc, commands = probe_commands[:]}
+	pset := knet.Command_Set {
+		entity_desc = &pdesc,
+		commands    = probe_commands[:],
+	}
 
 	creg := knet.registry_make()
 	defer knet.registry_destroy(&creg)
-	alive := Probe{hp = 10}
-	doomed := Probe{hp = 10}
+	alive := Probe {
+		hp = 10,
+	}
+	doomed := Probe {
+		hp = 10,
+	}
 	aid := knet.Net_Id(1)
 	did := knet.Net_Id(2)
 	knet.registry_insert(&creg, aid, &alive, &pset)
@@ -1357,10 +1759,20 @@ Mover :: struct {
 }
 
 mover_desc :: proc() -> knet.Entity_Desc {
-	@(static) fields := [?]knet.Field_Desc{
+	@(static) fields := [?]knet.Field_Desc {
 		{offset = offset_of(Mover, hp), size = size_of(i32)},
-		{offset = offset_of(Mover, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32},
-		{offset = offset_of(Mover, y), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32},
+		{
+			offset = offset_of(Mover, x),
+			size = size_of(f32),
+			flags = {.Interp, .Owner_Stream},
+			lerp = .F32,
+		},
+		{
+			offset = offset_of(Mover, y),
+			size = size_of(f32),
+			flags = {.Interp, .Owner_Stream},
+			lerp = .F32,
+		},
 		{offset = offset_of(Mover, face), size = size_of(u8), flags = {.Owner_Stream}},
 	}
 	return knet.Entity_Desc{fields = fields[:]}
@@ -1371,7 +1783,12 @@ stream_ring_lerps_and_snaps :: proc(t: ^testing.T) {
 	desc := mover_desc()
 	testing.expect_value(t, knet.stream_data_size(&desc), 9) // x + y + face
 
-	owner := Mover{hp = 77, x = 0, y = 10, face = 1}
+	owner := Mover {
+		hp   = 77,
+		x    = 0,
+		y    = 10,
+		face = 1,
+	}
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.stream_write(&w, &owner, &desc)
@@ -1388,7 +1805,10 @@ stream_ring_lerps_and_snaps :: proc(t: ^testing.T) {
 	knet.stream_write(&w, &owner, &desc)
 	knet.stream_ring_push(&ring, 2.0, knet.writer_bytes(&w))
 
-	remote := Mover{hp = 5, local = 9}
+	remote := Mover {
+		hp    = 5,
+		local = 9,
+	}
 	// Midpoint: floats lerp, the snap field HOLDS the earlier sample.
 	testing.expect(t, knet.stream_ring_sample(&ring, 1.5, &remote, &desc))
 	testing.expect_value(t, remote.x, f32(5))
@@ -1427,7 +1847,9 @@ Rewind_Probe :: struct {
 @(test)
 registry_rewound_winds_streams_to_the_shooter_view :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	set := knet.Command_Set{entity_desc = &desc}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+	}
 	reg := knet.registry_make()
 	defer knet.registry_destroy(&reg)
 
@@ -1435,17 +1857,21 @@ registry_rewound_winds_streams_to_the_shooter_view :: proc(t: ^testing.T) {
 	TARGET_OWNER :: knet.Player_Id(3)
 
 	// A target owned by another player, streamed; and the shooter's own entity.
-	target := Mover{x = 10} // live pose = the newest sample
+	target := Mover {
+		x = 10,
+	} // live pose = the newest sample
 	knet.registry_insert(&reg, 1, &target, &set, TARGET_OWNER)
-	own := Mover{x = 100}
+	own := Mover {
+		x = 100,
+	}
 	knet.registry_insert(&reg, 2, &own, &set, SHOOTER)
 
 	// The target's stream history: x=0 at t=1, x=10 at t=2 (so t=1.5 → x=5).
 	te, _ := knet.registry_get(&reg, 1)
-	w := knet.writer_make();defer knet.writer_destroy(&w)
-	target.x = 0;knet.stream_write(&w, &target, &desc)
+	w := knet.writer_make(); defer knet.writer_destroy(&w)
+	target.x = 0; knet.stream_write(&w, &target, &desc)
 	knet.stream_ring_push(&te.stream, 1.0, knet.writer_bytes(&w))
-	target.x = 10;knet.writer_reset(&w);knet.stream_write(&w, &target, &desc)
+	target.x = 10; knet.writer_reset(&w); knet.stream_write(&w, &target, &desc)
 	knet.stream_ring_push(&te.stream, 2.0, knet.writer_bytes(&w))
 	target.x = 10 // live, as the host holds it now
 
@@ -1453,14 +1879,17 @@ registry_rewound_winds_streams_to_the_shooter_view :: proc(t: ^testing.T) {
 	// the exclusion is a real test: rewound to 1.5 it would read 75, but the
 	// shooter sees themselves live, so it must stay 100.
 	oe, _ := knet.registry_get(&reg, 2)
-	own.x = 50;knet.writer_reset(&w);knet.stream_write(&w, &own, &desc)
+	own.x = 50; knet.writer_reset(&w); knet.stream_write(&w, &own, &desc)
 	knet.stream_ring_push(&oe.stream, 1.0, knet.writer_bytes(&w))
-	own.x = 100;knet.writer_reset(&w);knet.stream_write(&w, &own, &desc)
+	own.x = 100; knet.writer_reset(&w); knet.stream_write(&w, &own, &desc)
 	knet.stream_ring_push(&oe.stream, 2.0, knet.writer_bytes(&w))
 	own.x = 100
 
 	// Judge at t=1.5 — the moment the shooter's screen was drawing.
-	probe := Rewind_Probe{target = &target, own = &own}
+	probe := Rewind_Probe {
+		target = &target,
+		own    = &own,
+	}
 	knet.registry_rewound(&reg, 1.5, SHOOTER, &probe, proc(user: rawptr) {
 		p := cast(^Rewind_Probe)user
 		p.saw_target_x = p.target.x
@@ -1483,18 +1912,22 @@ registry_rewound_winds_streams_to_the_shooter_view :: proc(t: ^testing.T) {
 @(test)
 registry_predict_owner_holds_local_writes :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	set := knet.Command_Set{entity_desc = &desc}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+	}
 	reg := knet.registry_make()
 	defer knet.registry_destroy(&reg)
 
 	ME :: knet.Player_Id(2)
 	OTHER :: knet.Player_Id(3)
-	ball := Mover{x = 5}
+	ball := Mover {
+		x = 5,
+	}
 	knet.registry_insert(&reg, 1, &ball, &set, OTHER) // owned by another player
 	e, _ := knet.registry_get(&reg, 1)
-	w := knet.writer_make();defer knet.writer_destroy(&w)
-	ball.x = 0;knet.stream_write(&w, &ball, &desc);knet.stream_ring_push(&e.stream, 1.0, knet.writer_bytes(&w))
-	ball.x = 10;knet.writer_reset(&w);knet.stream_write(&w, &ball, &desc);knet.stream_ring_push(&e.stream, 2.0, knet.writer_bytes(&w))
+	w := knet.writer_make(); defer knet.writer_destroy(&w)
+	ball.x = 0; knet.stream_write(&w, &ball, &desc); knet.stream_ring_push(&e.stream, 1.0, knet.writer_bytes(&w))
+	ball.x = 10; knet.writer_reset(&w); knet.stream_write(&w, &ball, &desc); knet.stream_ring_push(&e.stream, 2.0, knet.writer_bytes(&w))
 
 	// A non-owner write WITHOUT prediction: sampling stomps it to the stream.
 	ball.x = 99
@@ -1516,11 +1949,13 @@ registry_predict_owner_holds_local_writes :: proc(t: ^testing.T) {
 
 	// Contrast — a NON-predicted transfer flushes the newest sample (10) over the
 	// local field: this is the stomp keep_fields exists to skip.
-	ball2 := Mover{x = 99}
+	ball2 := Mover {
+		x = 99,
+	}
 	knet.registry_insert(&reg, 2, &ball2, &set, OTHER)
 	e2, _ := knet.registry_get(&reg, 2)
-	ball2.x = 0;knet.writer_reset(&w);knet.stream_write(&w, &ball2, &desc);knet.stream_ring_push(&e2.stream, 1.0, knet.writer_bytes(&w))
-	ball2.x = 10;knet.writer_reset(&w);knet.stream_write(&w, &ball2, &desc);knet.stream_ring_push(&e2.stream, 2.0, knet.writer_bytes(&w))
+	ball2.x = 0; knet.writer_reset(&w); knet.stream_write(&w, &ball2, &desc); knet.stream_ring_push(&e2.stream, 1.0, knet.writer_bytes(&w))
+	ball2.x = 10; knet.writer_reset(&w); knet.stream_write(&w, &ball2, &desc); knet.stream_ring_push(&e2.stream, 2.0, knet.writer_bytes(&w))
 	ball2.x = 99
 	knet.registry_set_owner(&reg, 2, ME, 3.0) // keep_fields = false
 	testing.expect_value(t, ball2.x, f32(10)) // flushed to newest, the local 99 gone
@@ -1529,7 +1964,12 @@ registry_predict_owner_holds_local_writes :: proc(t: ^testing.T) {
 @(test)
 delta_excludes_owner_stream_fields :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	e := Mover{hp = 1, x = 100, y = 200, face = 3}
+	e := Mover {
+		hp   = 1,
+		x    = 100,
+		y    = 200,
+		face = 3,
+	}
 	shadow := knet.shadow_make(&desc)
 	defer delete(shadow)
 	knet.shadow_capture(&e, shadow, &desc)
@@ -1561,7 +2001,9 @@ delta_excludes_owner_stream_fields :: proc(t: ^testing.T) {
 @(test)
 registry_streams_end_to_end :: proc(t: ^testing.T) {
 	mdesc := mover_desc()
-	mset := knet.Command_Set{entity_desc = &mdesc}
+	mset := knet.Command_Set {
+		entity_desc = &mdesc,
+	}
 	ME :: knet.Player_Id(2)
 	OTHER :: knet.Player_Id(3)
 
@@ -1569,9 +2011,19 @@ registry_streams_end_to_end :: proc(t: ^testing.T) {
 	// be streamed by this peer).
 	oreg := knet.registry_make()
 	defer knet.registry_destroy(&oreg)
-	m1 := Mover{x = 0, y = 10, face = 1}
-	m2 := Mover{x = 100, y = 0, face = 7}
-	other := Mover{x = -5}
+	m1 := Mover {
+		x    = 0,
+		y    = 10,
+		face = 1,
+	}
+	m2 := Mover {
+		x    = 100,
+		y    = 0,
+		face = 7,
+	}
+	other := Mover {
+		x = -5,
+	}
 	id1 := knet.registry_spawn(&oreg, &m1, &mset, ME)
 	id2 := knet.registry_spawn(&oreg, &m2, &mset, ME)
 	_ = knet.registry_spawn(&oreg, &other, &mset, OTHER)
@@ -1580,7 +2032,9 @@ registry_streams_end_to_end :: proc(t: ^testing.T) {
 	// unknown ids by LENGTH instead of abandoning, unlike delta batches).
 	rreg := knet.registry_make()
 	defer knet.registry_destroy(&rreg)
-	r1 := Mover{hp = 42}
+	r1 := Mover {
+		hp = 42,
+	}
 	knet.registry_insert(&rreg, id1, &r1, &mset, ME)
 	_ = id2
 
@@ -1629,13 +2083,19 @@ registry_streams_end_to_end :: proc(t: ^testing.T) {
 @(test)
 stream_frequency_tier_skips_off_phase_ticks :: proc(t: ^testing.T) {
 	mdesc := mover_desc()
-	mset := knet.Command_Set{entity_desc = &mdesc}
+	mset := knet.Command_Set {
+		entity_desc = &mdesc,
+	}
 	ME :: knet.Player_Id(2)
 
 	oreg := knet.registry_make()
 	defer knet.registry_destroy(&oreg)
-	full := Mover{x = 1}
-	tiered := Mover{x = 2}
+	full := Mover {
+		x = 1,
+	}
+	tiered := Mover {
+		x = 2,
+	}
 	id_full := knet.registry_spawn(&oreg, &full, &mset, ME)
 	id_tier := knet.registry_spawn(&oreg, &tiered, &mset, ME)
 	knet.registry_set_stream_tier(&oreg, id_tier, 2) // 30Hz at a 60Hz base
@@ -1650,8 +2110,16 @@ stream_frequency_tier_skips_off_phase_ticks :: proc(t: ^testing.T) {
 	a := knet.registry_write_streams(&w, &oreg, ME, 1.0, 10)
 	knet.writer_reset(&w)
 	b := knet.registry_write_streams(&w, &oreg, ME, 1.0, 11)
-	testing.expect(t, a + b == 3, "over two ticks the tiered entity streams once, the untiered twice")
-	testing.expect(t, a == 1 || a == 2, "each tick carries the untiered entity plus maybe the tiered one")
+	testing.expect(
+		t,
+		a + b == 3,
+		"over two ticks the tiered entity streams once, the untiered twice",
+	)
+	testing.expect(
+		t,
+		a == 1 || a == 2,
+		"each tick carries the untiered entity plus maybe the tiered one",
+	)
 
 	// The untiered entity is ALWAYS present (tier 0 = every tick).
 	for tick in u64(100) ..< 106 {
@@ -1683,9 +2151,20 @@ blend_heading :: proc(dst, a, b: rawptr, alpha: f32) {
 }
 
 turret_desc :: proc() -> knet.Entity_Desc {
-	@(static) fields := [?]knet.Field_Desc{
-		{offset = offset_of(Turret, rot), size = size_of([4]f32), flags = {.Interp, .Owner_Stream}, lerp = .Quat},
-		{offset = offset_of(Turret, heading), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .Custom, blend = blend_heading},
+	@(static) fields := [?]knet.Field_Desc {
+		{
+			offset = offset_of(Turret, rot),
+			size = size_of([4]f32),
+			flags = {.Interp, .Owner_Stream},
+			lerp = .Quat,
+		},
+		{
+			offset = offset_of(Turret, heading),
+			size = size_of(f32),
+			flags = {.Interp, .Owner_Stream},
+			lerp = .Custom,
+			blend = blend_heading,
+		},
 	}
 	return knet.Entity_Desc{fields = fields[:]}
 }
@@ -1698,7 +2177,10 @@ stream_quat_and_custom_blend :: proc(t: ^testing.T) {
 	// Sample A: identity rotation, heading 350°. Sample B: 90° about X — but
 	// streamed as the NEGATED quaternion (-q == q as a rotation): the exact
 	// input that collapses a raw componentwise lerp through zero.
-	owner := Turret{rot = {0, 0, 0, 1}, heading = 350}
+	owner := Turret {
+		rot     = {0, 0, 0, 1},
+		heading = 350,
+	}
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.stream_write(&w, &owner, &desc)
@@ -1722,7 +2204,11 @@ stream_quat_and_custom_blend :: proc(t: ^testing.T) {
 	testing.expect(t, near(remote.rot[0], SIN22_5), "quat x: hemisphere flip + nlerp")
 	testing.expect(t, near(remote.rot[1], 0) && near(remote.rot[2], 0))
 	testing.expect(t, near(remote.rot[3], COS22_5), "quat w")
-	len2 := remote.rot[0] * remote.rot[0] + remote.rot[1] * remote.rot[1] + remote.rot[2] * remote.rot[2] + remote.rot[3] * remote.rot[3]
+	len2 :=
+		remote.rot[0] * remote.rot[0] +
+		remote.rot[1] * remote.rot[1] +
+		remote.rot[2] * remote.rot[2] +
+		remote.rot[3] * remote.rot[3]
 	testing.expect(t, near(len2, 1), "nlerp renormalizes")
 	testing.expect(t, near(remote.heading, 0), "custom blend takes the shortest arc across 360")
 
@@ -1734,7 +2220,11 @@ stream_quat_and_custom_blend :: proc(t: ^testing.T) {
 @(test)
 stream_ring_snaps_across_teleport_warp :: proc(t: ^testing.T) {
 	desc := mover_desc()
-	owner := Mover{x = 0, y = 0, face = 1}
+	owner := Mover {
+		x    = 0,
+		y    = 0,
+		face = 1,
+	}
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	ring := knet.Stream_Ring{}
@@ -1821,13 +2311,23 @@ truth_and_revert_spare_owner_fields_on_the_owner :: proc(t: ^testing.T) {
 	desc := mover_desc()
 	// The host's "truth" snapshot of the OWNER's entity: its streamed x/y
 	// are a lagged echo (the owner kept moving while the command flew).
-	stale := Mover{hp = 40, x = 100, y = 100, face = 1}
+	stale := Mover {
+		hp   = 40,
+		x    = 100,
+		y    = 100,
+		face = 1,
+	}
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_full(&w, &stale, &desc)
 
 	// The owner, meanwhile, is HERE.
-	me := Mover{hp = 65, x = 300, y = 250, face = 2}
+	me := Mover {
+		hp   = 65,
+		x    = 300,
+		y    = 250,
+		face = 2,
+	}
 	r := knet.reader_make(knet.writer_bytes(&w))
 	knet.apply_full(&r, &me, &desc, {.Owner})
 	testing.expect_value(t, me.hp, i32(40)) // host state: truth applies
@@ -1858,7 +2358,7 @@ heading_table :: proc(i: u8) -> f32 {
 
 @(private = "file")
 heading_codec :: knet.Wire_Codec {
-	size   = 1,
+	size = 1,
 	encode = proc(wire, field: rawptr) {
 		deg := (^f32)(field)^
 		(^u8)(wire)^ = u8(int(deg / (360.0 / 32.0) + 0.5) % 32)
@@ -1876,11 +2376,16 @@ Scout :: struct {
 }
 
 scout_desc :: proc() -> knet.Entity_Desc {
-	@(static) fields := [?]knet.Field_Desc{
+	@(static) fields := [?]knet.Field_Desc {
 		{offset = offset_of(Scout, hp), size = size_of(i32)},
 		{offset = offset_of(Scout, px), size = size_of(f32), wire = .F16},
 		{offset = offset_of(Scout, py), size = size_of(f32), wire = .F16},
-		{offset = offset_of(Scout, heading), size = size_of(f32), wire = .Custom, codec = heading_codec},
+		{
+			offset = offset_of(Scout, heading),
+			size = size_of(f32),
+			wire = .Custom,
+			codec = heading_codec,
+		},
 	}
 	return knet.Entity_Desc{fields = fields[:]}
 }
@@ -1892,7 +2397,12 @@ wire_sizes_and_delta_roundtrip :: proc(t: ^testing.T) {
 	testing.expect_value(t, knet.desc_wire_size(&desc), 9) // wire: 4+2+2+1
 	testing.expect(t, knet.desc_has_wire(&desc))
 
-	sender := Scout{hp = 42, px = 640.5, py = 128.25, heading = 90}
+	sender := Scout {
+		hp      = 42,
+		px      = 640.5,
+		py      = 128.25,
+		heading = 90,
+	}
 	shadow := knet.shadow_make(&desc)
 	defer delete(shadow)
 
@@ -1903,7 +2413,9 @@ wire_sizes_and_delta_roundtrip :: proc(t: ^testing.T) {
 	// 1 mask byte + the WIRE bytes, not the struct bytes.
 	testing.expect_value(t, len(knet.writer_bytes(&w)), 1 + 9)
 
-	receiver := Scout{local = 7}
+	receiver := Scout {
+		local = 7,
+	}
 	r := knet.reader_make(knet.writer_bytes(&w))
 	applied := knet.apply_delta(&r, &receiver, &desc)
 	testing.expect(t, !r.err)
@@ -1924,7 +2436,12 @@ wire_sizes_and_delta_roundtrip :: proc(t: ^testing.T) {
 @(test)
 wire_full_snapshot_roundtrip :: proc(t: ^testing.T) {
 	desc := scout_desc()
-	src := Scout{hp = 9, px = 33, py = -12.5, heading = 180}
+	src := Scout {
+		hp      = 9,
+		px      = 33,
+		py      = -12.5,
+		heading = 180,
+	}
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_full(&w, &src, &desc)
@@ -1948,9 +2465,21 @@ Glider :: struct {
 }
 
 glider_desc :: proc() -> knet.Entity_Desc {
-	@(static) fields := [?]knet.Field_Desc{
-		{offset = offset_of(Glider, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32, wire = .F16},
-		{offset = offset_of(Glider, y), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32, wire = .F16},
+	@(static) fields := [?]knet.Field_Desc {
+		{
+			offset = offset_of(Glider, x),
+			size = size_of(f32),
+			flags = {.Interp, .Owner_Stream},
+			lerp = .F32,
+			wire = .F16,
+		},
+		{
+			offset = offset_of(Glider, y),
+			size = size_of(f32),
+			flags = {.Interp, .Owner_Stream},
+			lerp = .F32,
+			wire = .F16,
+		},
 	}
 	return knet.Entity_Desc{fields = fields[:]}
 }
@@ -1961,7 +2490,9 @@ wire_streams_decode_at_the_packet_edge :: proc(t: ^testing.T) {
 	testing.expect_value(t, knet.stream_data_size(&desc), 8) // ring blobs: struct layout
 	testing.expect_value(t, knet.stream_wire_size(&desc), 4) // packets: half floats
 
-	set := knet.Command_Set{entity_desc = &desc}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+	}
 	owner_side := knet.registry_make()
 	defer knet.registry_destroy(&owner_side)
 	remote_side := knet.registry_make()
@@ -1969,9 +2500,14 @@ wire_streams_decode_at_the_packet_edge :: proc(t: ^testing.T) {
 
 	me := knet.Player_Id(2)
 	viewer := knet.Player_Id(3)
-	mine := Glider{x = 100, y = 200}
+	mine := Glider {
+		x = 100,
+		y = 200,
+	}
 	id := knet.registry_spawn(&owner_side, &mine, &set, me)
-	theirs := Glider{local = 5}
+	theirs := Glider {
+		local = 5,
+	}
 	knet.registry_insert(&remote_side, id, &theirs, &set, me)
 
 	// Two ticks of owner motion, shipped as two stream batches.
@@ -2002,11 +2538,15 @@ wire_streams_decode_at_the_packet_edge :: proc(t: ^testing.T) {
 @(test)
 blob_set_apply_and_dedup :: proc(t: ^testing.T) {
 	desc := probe_desc()
-	set := knet.Command_Set{entity_desc = &desc}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+	}
 	reg := knet.registry_make()
 	defer knet.registry_destroy(&reg)
 
-	e := Probe{hp = 1}
+	e := Probe {
+		hp = 1,
+	}
 	id := knet.registry_spawn(&reg, &e, &set)
 
 	data, ver := knet.registry_blob(&reg, id)
@@ -2026,7 +2566,11 @@ blob_set_apply_and_dedup :: proc(t: ^testing.T) {
 	e2 := Probe{}
 	knet.registry_insert(&reg2, id, &e2, &set)
 	testing.expect(t, knet.registry_apply_blob(&reg2, id, ver, data))
-	testing.expect(t, !knet.registry_apply_blob(&reg2, id, ver, data), "duplicate version must be dropped")
+	testing.expect(
+		t,
+		!knet.registry_apply_blob(&reg2, id, ver, data),
+		"duplicate version must be dropped",
+	)
 	got, gv := knet.registry_blob(&reg2, id)
 	testing.expect_value(t, gv, u32(1))
 	testing.expect_value(t, got[1], u8(0xFE))
@@ -2090,7 +2634,7 @@ Mixed :: struct {
 }
 
 mixed_desc :: proc() -> knet.Entity_Desc {
-	@(static) fields := [?]knet.Field_Desc{
+	@(static) fields := [?]knet.Field_Desc {
 		{offset = offset_of(Mixed, hp), size = size_of(i32)},
 		{offset = offset_of(Mixed, px), size = size_of(f32), flags = {.Predicted}},
 	}
@@ -2100,18 +2644,38 @@ mixed_desc :: proc() -> knet.Entity_Desc {
 @(test)
 reject_truth_spares_the_sim_lane :: proc(t: ^testing.T) {
 	desc := mixed_desc()
-	set := knet.Command_Set{entity_desc = &desc}
+	set := knet.Command_Set {
+		entity_desc = &desc,
+	}
 	ctx := knet.command_ctx_make()
 	defer knet.command_ctx_destroy(&ctx)
 
-	truth := Mixed{hp = 99, px = 111} // the host's full snapshot in the reject
+	truth := Mixed {
+		hp = 99,
+		px = 111,
+	} // the host's full snapshot in the reject
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	knet.write_full(&w, &truth, &desc)
 
-	live := Mixed{hp = 5, px = 42} // px = the client's CURRENT sim-lane state
+	live := Mixed {
+		hp = 5,
+		px = 42,
+	} // px = the client's CURRENT sim-lane state
 	r := knet.reader_make(knet.writer_bytes(&w))
-	knet.command_reject(&ctx, knet.Command_Result{seq = 1, entity = 1, ok = false}, &r, &live, &set)
+	knet.command_reject(
+		&ctx,
+		knet.Command_Result {
+			seq = 1,
+			entity = 1,
+			ok = false,
+			reason = .Predicate,
+			has_truth = true,
+		},
+		&r,
+		&live,
+		&set,
+	)
 
 	testing.expect_value(t, live.hp, 99) // truth landed on the delta lane...
 	testing.expect_value(t, live.px, 42) // ...and the sim lane was spared
@@ -2147,9 +2711,14 @@ Trio :: struct {
 }
 
 trio_desc :: proc() -> knet.Entity_Desc {
-	@(static) fields := [?]knet.Field_Desc{
+	@(static) fields := [?]knet.Field_Desc {
 		{offset = offset_of(Trio, score), size = size_of(i32)},
-		{offset = offset_of(Trio, px), size = size_of(f32), flags = {.Owner_Stream, .Interp}, wire = .F16},
+		{
+			offset = offset_of(Trio, px),
+			size = size_of(f32),
+			flags = {.Owner_Stream, .Interp},
+			wire = .F16,
+		},
 		{offset = offset_of(Trio, py), size = size_of(f32), flags = {.Owner_Stream}},
 		{offset = offset_of(Trio, vx), size = size_of(f32), flags = {.Predicted}, wire = .F16},
 		{offset = offset_of(Trio, vy), size = size_of(f32), flags = {.Predicted}},
@@ -2195,10 +2764,18 @@ subset_view_offsets_sizes_and_cache :: proc(t: ^testing.T) {
 	// The cache keys on the FIELDS BACKING: a second by-value wrapper over the
 	// same @(static) array yields the SAME view pointer.
 	desc2 := trio_desc()
-	testing.expect(t, knet.subset_view(&desc2, .Owner) == owner, "cache keys on the fields backing, not the wrapper")
+	testing.expect(
+		t,
+		knet.subset_view(&desc2, .Owner) == owner,
+		"cache keys on the fields backing, not the wrapper",
+	)
 
 	// Capture -> restore round trip + equality, owner lane.
-	src := Trio{px = 1.5, py = 2.5, score = 9}
+	src := Trio {
+		px    = 1.5,
+		py    = 2.5,
+		score = 9,
+	}
 	blob := make([]u8, owner.struct_bytes)
 	defer delete(blob)
 	knet.subset_capture(owner, &src, blob)
@@ -2221,7 +2798,10 @@ subset_delta_codec_roundtrip :: proc(t: ^testing.T) {
 	defer delete(base)
 	now := make([]u8, pred.struct_bytes)
 	defer delete(now)
-	src := Trio{vx = 100.5, vy = 0}
+	src := Trio {
+		vx = 100.5,
+		vy = 0,
+	}
 	knet.subset_capture(pred, &src, now)
 
 	w := knet.writer_make()
@@ -2258,7 +2838,11 @@ subset_delta_codec_roundtrip :: proc(t: ^testing.T) {
 	out2 := make([]u8, pred.struct_bytes)
 	defer delete(out2)
 	testing.expect(t, knet.subset_decode_full(pred, out2, knet.writer_bytes(&w2)))
-	testing.expect(t, !knet.subset_decode_full(pred, out2, knet.writer_bytes(&w2)[:3]), "short full row refused")
+	testing.expect(
+		t,
+		!knet.subset_decode_full(pred, out2, knet.writer_bytes(&w2)[:3]),
+		"short full row refused",
+	)
 }
 
 // The ordinal-mask law, WITNESSED: a delta-lane field that sits AFTER a
@@ -2272,17 +2856,22 @@ Flipped :: struct {
 
 @(test)
 delta_mask_is_subset_ordinal :: proc(t: ^testing.T) {
-	@(static) fields := [?]knet.Field_Desc{
+	@(static) fields := [?]knet.Field_Desc {
 		{offset = offset_of(Flipped, px), size = size_of(f32), flags = {.Owner_Stream}},
 		{offset = offset_of(Flipped, score), size = size_of(i32)},
 	}
-	desc := knet.Entity_Desc{fields = fields[:]}
+	desc := knet.Entity_Desc {
+		fields = fields[:],
+	}
 
 	shadow := knet.shadow_make(&desc)
 	defer delete(shadow)
 	testing.expect_value(t, len(shadow), 4) // delta-packed: score only
 
-	src := Flipped{px = 9.5, score = 7}
+	src := Flipped {
+		px    = 9.5,
+		score = 7,
+	}
 	w := knet.writer_make()
 	defer knet.writer_destroy(&w)
 	mask := knet.write_delta(&w, &src, shadow, &desc)
@@ -2313,20 +2902,37 @@ quat_algebra :: proc(t: ^testing.T) {
 	q := [4]f32{0, 0, S, S}
 	c: [4]f32
 	knet.quat_conj(raw_data(c[:]), raw_data(q[:]))
-	testing.expect(t, near(c[0], 0) && near(c[1], 0) && near(c[2], -S) && near(c[3], S), "conj negates the vector part only")
+	testing.expect(
+		t,
+		near(c[0], 0) && near(c[1], 0) && near(c[2], -S) && near(c[3], S),
+		"conj negates the vector part only",
+	)
 	id: [4]f32
 	knet.quat_mul(raw_data(id[:]), raw_data(q[:]), raw_data(c[:]))
-	testing.expect(t, near(id[0], 0) && near(id[1], 0) && near(id[2], 0) && near(id[3], 1), "q ⊗ conj(q) is identity")
+	testing.expect(
+		t,
+		near(id[0], 0) && near(id[1], 0) && near(id[2], 0) && near(id[3], 1),
+		"q ⊗ conj(q) is identity",
+	)
 
 	// Composing two 45°-about-Z turns makes one 90° turn.
 	h := [4]f32{0, 0, f32(0.38268343), f32(0.92387953)} // 45° about Z
 	comp: [4]f32
 	knet.quat_mul(raw_data(comp[:]), raw_data(h[:]), raw_data(h[:]))
-	testing.expectf(t, near(knet.quat_angle(raw_data(comp[:])), 1.5707963), "45° ⊗ 45° = 90°, got %v rad", knet.quat_angle(raw_data(comp[:])))
+	testing.expectf(
+		t,
+		near(knet.quat_angle(raw_data(comp[:])), 1.5707963),
+		"45° ⊗ 45° = 90°, got %v rad",
+		knet.quat_angle(raw_data(comp[:])),
+	)
 
 	// quat_angle is the short arc: q and -q are one rotation.
 	neg := [4]f32{0, 0, -S, -S}
-	testing.expect(t, near(knet.quat_angle(raw_data(neg[:])), knet.quat_angle(raw_data(q[:]))), "quat_angle(q) == quat_angle(-q)")
+	testing.expect(
+		t,
+		near(knet.quat_angle(raw_data(neg[:])), knet.quat_angle(raw_data(q[:]))),
+		"quat_angle(q) == quat_angle(-q)",
+	)
 
 	// quat_normalize rescales to unit; a zero quat becomes identity (the
 	// "no correction" the glide's snap path relies on).

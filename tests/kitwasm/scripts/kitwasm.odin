@@ -24,6 +24,7 @@ package kitwasm_pin
 @(require) import _ "godot:kit/items"
 @(require) import _ "godot:kit/nav"
 @(require) import _ "godot:kit/net"
+@(require) import _ "godot:kit/netcfg"
 @(require) import _ "godot:kit/netgd"
 @(require) import _ "godot:kit/save"
 @(require) import _ "godot:kit/session"

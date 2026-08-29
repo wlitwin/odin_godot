@@ -221,33 +221,40 @@ the link goes bad:
 
 ```
 net  42ms  jit 6ms  loss 1.2%  ok
+rate rx 120p/s 3.2k/s · tx 48p/s 0.4k/s
 rx 3.2k state 2.1 stream 0.8 app16 0.2 · tx 0.4k cmd 0.3
-sim  lead 4t  resim ▁▁▂▁▇▁▁…  rec 128
+sim  lead 4t  resim ▁▁▂▁▇▁▁…  rec 128  gap 2  ack 3t  rw 12t  cpu 0.42ms  cq 0
+snap full 2% delta 98% rows 428 quiet 2100 defer 3 aoi 900 18.2k
 warn  rclamp 3▲
 ```
 
 Row 1 is the link: rtt off the replicated ping stat (`net_ping_ms`), jitter
 and loss off [ENet's own per-peer statistics](netgd.md#traffic-and-link-stats)
 (`netgd.wire_link_quality`; clients fill it about the host), and a quality
-word that rates loss first, then jitter, then raw rtt. Row 2 is the wire's
-bytes-by-kind (`Net_Stats.traffic = netgd.wire_traffic(&boot.wire)` is an
-opaque pre-formatted string, so this package never imports the transport).
-Row 3 is the sim lane, and the RESIM SPARKLINE is the point: a steady sim
+word that rates loss first, then jitter, then raw rtt. The rate row is the
+completed one-second packet/byte window. The next row is the wire's
+bytes-by-kind (`Net_Stats.traffic = netgd.wire_traffic(&boot.wire)` stays
+opaque, so this package never imports the transport). The sim row includes
+input lead/gaps, fully-applied snapshot ack age, the authority's rewind
+envelope, replay cost since the previous refresh, and command queue pressure. The snapshot row
+shows full/delta mix, zero-byte unchanged suppression, budget deferral, AOI
+culling, and bytes. The RESIM SPARKLINE remains the point: a steady sim
 draws a flat baseline; a lost input or a contested mispredict makes the
 client rewind, and that burst (invisible in a headless log) is exactly
 what you can SEE here. Every field is optional (coop games leave `sim`
-false); quickdraw's fill is the worked example. Booted games skip the
-hand-fill entirely: [`kboot.boot_net_stats(&boot)`](boot.md) returns the coop
-core (rtt, link jitter/loss, malformed drops, traffic); a sim game lays its
-lane rows on the result.
+false). Booted games skip the hand-fill entirely:
+[`kboot.boot_net_stats(&boot)`](boot.md) returns the complete co-op view and,
+when `boot_lane` is installed, automatically projects the simulation view too.
 
 The `warn` row (last, and only when something has fired) surfaces the
 **silent-failure counters**, the tallies for failures that leave no other
 trace: `guard_hits` (a client wrote a host-lane field), `input_drops` /
 `cmd_capped` (host: sim inputs dropped, verbs refused by the per-player cap),
-`rewind_clamped` (a lag-comp rewind pinned to the buffer horizon).
-`boot_net_stats` fills `guard_hits` for every game; a sim game adds the lane
-three. Each draws its number only when non-zero, and a **▲** flags one that
+`rewind_clamped` (lag comp pinned by its observed-link, render-hint, or absolute
+configuration envelope).
+`boot_net_stats` fills malformed, access/predicate, traffic-budget, and guard
+counters for every game; an installed lane adds the simulation counters. Each
+draws its number only when non-zero, and a **▲** flags one that
 *moved this refresh*. A lone cold-start clamp is normal, but a count still
 climbing a minute in is the bug, and the raw number alone can't tell them
 apart.

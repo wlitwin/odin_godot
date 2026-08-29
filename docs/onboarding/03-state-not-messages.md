@@ -75,23 +75,21 @@ and load-game are already handled.
 
 ```odin
 golf_ready :: proc(self: ^Golf) {
-	kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, kboot.Options{
+	golf_net_attach(self, kboot.Options{
 		title    = "P U T T P U T T",
 		status   = "Host a course, or join one at localhost",
 		msg_kind = MSG_SESSION,
 		methods  = {"on_host", "on_join", "on_start", "on_chat",
 		            "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
 	})
-	golf_entities(self, &self.boot) // the generated factory
 }
 
 @(gd_step = "authority") // the host's fixed step — the gate and loop are generated
 golf_host_tick :: proc(self: ^Golf) { run_the_course(self) }
 
 golf_process :: proc(self: ^Golf, delta: f64) {
-	events, _, ticks := kboot.boot_pump(&self.boot, delta, now_s())
-	golf_step(self, ticks)     // generated: hosts step, clients no-op
-	golf_events(self, events)  // generated: dispatch to the event halves you declared
+	frame := golf_net_pump(self, delta, now_s())
+	golf_step(self, frame.ticks) // generated: hosts step, clients no-op
 }
 ```
 
@@ -100,8 +98,9 @@ That is a hosted, joinable game: lobby UI, chat, scoreboard, host/join buttons
 drives it all. Your game reacts by declaring **event halves**: plain procs
 named for the event (`golf_player_joined`, `golf_entity_spawned`, an
 authority-only `golf_player_joined_then` for consequences) that the generated
-`golf_events` dispatches to. There are no callbacks into a half-initialized
-script, and no role branch of your own to write.
+`golf_net_pump` dispatches to synchronously. There are no callbacks into a
+half-initialized script, and no role branch of your own to write. The component
+calls remain available when a game needs custom dispatch ordering.
 
 One concept in the join call pays off for the rest of the series: a player
 joins with a **reconnect token** (`ksave.token`, an env var, or a small file

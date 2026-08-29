@@ -24,7 +24,7 @@ Mover :: struct {
 	x, vx:      f32, // predicted
 	hp:         i32, // host delta lane
 	aim:        f32, // owner stream lane
-	local_only: int,
+	local_only: int
 }
 
 mover_desc :: proc() -> knet.Entity_Desc {
@@ -32,7 +32,7 @@ mover_desc :: proc() -> knet.Entity_Desc {
 		{offset = offset_of(Mover, x), size = size_of(f32), flags = {.Predicted, .Interp}, lerp = .F32},
 		{offset = offset_of(Mover, vx), size = size_of(f32), flags = {.Predicted}},
 		{offset = offset_of(Mover, hp), size = size_of(i32)},
-		{offset = offset_of(Mover, aim), size = size_of(f32), flags = {.Owner_Stream}},
+		{offset = offset_of(Mover, aim), size = size_of(f32), flags = {.Owner_Stream}}
 	}
 	return knet.Entity_Desc{fields = fields[:]}
 }
@@ -318,6 +318,34 @@ input_semantic_validation_is_transactional :: proc(t: ^testing.T) {
 	testing.expect_value(t, got[1], u8(1))
 }
 
+Input_Mode :: enum u8 {
+	Idle    = 0,
+	Driving = 3
+}
+
+@(test)
+input_constraint_helpers_are_safe :: proc(t: ^testing.T) {
+	testing.expect(t, ksim.input_finite(f32(1)))
+	nan := transmute(f32)u32(0x7fc00000)
+	inf := transmute(f32)u32(0x7f800000)
+	testing.expect(t, !ksim.input_finite(nan), "NaN is not legal input")
+	testing.expect(t, !ksim.input_finite(inf), "infinity is not legal input")
+
+	v := [2]f32{3, 4}
+	testing.expect(t, ksim.input_unit(&v))
+	testing.expect(
+		t,
+		abs(v[0] - 0.6) < 0.0001 && abs(v[1] - 0.8) < 0.0001,
+		"unit sanitizer preserves direction while clamping magnitude"
+	)
+	bad_v := [2]f32{nan, 0}
+	testing.expect(t, !ksim.input_unit(&bad_v), "unit vectors reject non-finite components")
+
+	testing.expect(t, ksim.input_enum_valid(Input_Mode.Driving))
+	invalid := transmute(Input_Mode)u8(2)
+	testing.expect(t, !ksim.input_enum_valid(invalid), "sparse enum holes are rejected")
+}
+
 // ---- ticker + lead ---------------------------------------------------------------
 
 @(test)
@@ -379,7 +407,7 @@ lead_targets_and_control :: proc(t: ^testing.T) {
 	testing.expect(
 		t,
 		ksim.SCALE_NUDGE_DEEP > ksim.SCALE_NUDGE_MAX,
-		"the deep rung must shed faster than the bend it takes over from, or it is not a rung",
+		"the deep rung must shed faster than the bend it takes over from, or it is not a rung"
 	)
 	// A cheap FLOOR, and honest about being one: lane_deep_surplus_sheds_cold_start
 	// is the real pin — it drives a delayed wire and measures the lead actually
@@ -393,7 +421,7 @@ lead_targets_and_control :: proc(t: ^testing.T) {
 	testing.expect(
 		t,
 		ksim.SCALE_NUDGE_DEEP * 60 >= 10,
-		"the deep rung must clear a cold-start overshoot in seconds, not tens of seconds",
+		"the deep rung must clear a cold-start overshoot in seconds, not tens of seconds"
 	)
 	// It hands back to the fine bend at the SAME threshold its mirror does —
 	// share the number or the two rungs fight over the handoff.
@@ -407,7 +435,7 @@ lead_targets_and_control :: proc(t: ^testing.T) {
 Test_World :: struct {
 	mover: ^Mover,
 	ring:  ^ksim.Input_Ring,
-	calls: int,
+	calls: int
 }
 
 world_resim :: proc(user: rawptr, tick: u64) {
@@ -587,7 +615,7 @@ predict_within_per_field_slack :: proc(t: ^testing.T) {
 @(test)
 history_within_uses_field_slack :: proc(t: ^testing.T) {
 	@(static) fields := [?]knet.Field_Desc{
-		{offset = offset_of(Mover, x), size = size_of(f32), flags = {.Predicted}, lerp = .F32, slack = 0.5},
+		{offset = offset_of(Mover, x), size = size_of(f32), flags = {.Predicted}, lerp = .F32, slack = 0.5}
 	}
 	desc := knet.Entity_Desc{fields = fields[:]}
 	h := ksim.history_make(&desc, 8)

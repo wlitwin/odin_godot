@@ -65,7 +65,7 @@ Defs are code constants (cavecrawl's `ROCK_ABILITY` has `cooldown = 20`, one sec
 it in the appropriate prediction and authority contexts (`spelunker.odin`):
 
 ```odin
-@(gd_command = "predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 spelunker_heal :: proc(self: ^Spelunker) -> bool {
 	if self.hp <= 0 || self.hp >= MAX_HP {return false} // corpses and the hale need no bandage
 	if !kcombat.ability_try(self.cds[:], 1, HEAL_ABILITY, &self.stamina) {return false}

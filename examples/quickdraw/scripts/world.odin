@@ -47,7 +47,7 @@ drone_freed :: proc(game: ^Quickdraw, self: ^Drone, id: knet.Net_Id) {
 
 // Host: the duel fills — one gunner per seated player, corners first.
 spawn_world :: proc(self: ^Quickdraw) {
-	if len(gunner_ids(&self.boot)) > 0 {return}
+	if len(gunner_all(&self.boot)) > 0 {return}
 	self.kills_col = ksess.session_stat_column(&self.ses, "kills")
 	self.deaths_col = ksess.session_stat_column(&self.ses, "deaths")
 	for _, p in self.ses.players {

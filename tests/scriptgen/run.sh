@@ -259,8 +259,9 @@ grep -q "RUNNER_CMD_PRIMARY_RELOAD :: knet.Cmd_Id" "$vgen" || fail "plain compos
 grep -q "return gun_fire(&self.primary, self, _a0)" "$vgen" || fail "decode thunk must route into &self.primary and pass self (owner)"
 grep -q "return gun_reload(&self.secondary)" "$vgen" || fail "plain composed thunk must route into &self.secondary with no owner/args"
 grep -q "runner_secondary_fire_cmd :: proc" "$vgen" || fail "issue wrapper must be named per-entity (runner_secondary_fire_cmd)"
-grep -q '{name = "primary_fire", id = RUNNER_CMD_PRIMARY_FIRE, predict = true' "$vgen" || fail "composed predict flag (and stable wire id) not carried"
-grep -q '{name = "primary_reload", id = RUNNER_CMD_PRIMARY_RELOAD, predict = false' "$vgen" || fail "plain composed command must have predict = false"
+grep -q 'RUNNER_POLICY_PRIMARY_FIRE :: knet.ACTION_OWNER_PREDICTED' "$vgen" || fail "composed predicted policy not carried"
+grep -q '{name = "primary_fire", id = RUNNER_CMD_PRIMARY_FIRE, policy = RUNNER_POLICY_PRIMARY_FIRE' "$vgen" || fail "composed predicted descriptor (and stable wire id) not carried"
+grep -q 'RUNNER_POLICY_PRIMARY_RELOAD :: knet.ACTION_OWNER' "$vgen" || fail "plain composed command must get the owner/non-predicted policy"
 grep -q "offset_of(Runner, primary) + offset_of(type_of(Runner{}.primary), ammo)" "$vgen" || fail "the block's replicated state must compose upward beside its verbs"
 
 # ---- fixture 8: VERB composition — IMPORTED block (qualifier + import) --------
@@ -422,7 +423,7 @@ grep -q 'offset_of(type_of(HeroC{}.rev), target).*flags = {.Owner_Stream}' "$cge
 grep -q 'offset_of(type_of(HeroC{}.rev), pct).*flags = {.Owner_Stream}' "$cgen" || fail "rev.pct must be owner-streamed through the embed"
 grep -q "HERO_C_CMD_REV_CLAIM :: knet.Cmd_Id" "$cgen" || fail "the channel's claim must hoist as HERO_C_CMD_REV_CLAIM"
 grep -q "return play.channel_claim(&self.rev, _a0)" "$cgen" || fail "claim thunk must route into &self.rev with the wire target"
-grep -q '{name = "rev_claim", id = HERO_C_CMD_REV_CLAIM, predict = false' "$cgen" || fail "the claim must be a PLAIN command (no prediction)"
+grep -q 'HERO_C_POLICY_REV_CLAIM :: knet.ACTION_OWNER' "$cgen" || fail "the claim must use the plain owner policy (no prediction)"
 
 # ---- fixture 13: play.Health — a VERB-FREE block composes state only ----------
 # Health ships no @(gd_command) (damage is host-internal, not client intent): its hp/max must
@@ -668,7 +669,8 @@ rc=$?
 echo "$out" | grep -q "direct call skips the framework" || fail "raw-verb call must error pointing at the _cmd wrapper"
 echo "$out" | grep -q 'namespace "gs" is not' || fail "the gs: namespace typo must be named"
 
-# any_seat on a class that doesn't tick: a sim-lane declaration misused.
+# `any_seat` is shared by co-op and sim commands: a co-op world interaction
+# accepts it and emits the same explicit access policy.
 as="$work/anyseat"
 mkdir -p "$as"
 cat >"$as/door.odin" <<'ODIN'
@@ -690,8 +692,10 @@ door_toggle :: proc(self: ^Door) -> bool {
 	return true
 }
 ODIN
-if "$SGEN" "$as" -godot:"$ROOT" >"$as/out.log" 2>&1; then fail "any_seat on a coop class must FAIL the build"; fi
-grep -q "sim-lane declaration" "$as/out.log" || fail "the any_seat misuse must say it is a sim-lane declaration"
+"$SGEN" "$as" -godot:"$ROOT" >"$as/out.log" 2>&1 \
+	|| fail "any_seat on a co-op world interaction must build"
+grep -q 'DOOR_POLICY_TOGGLE :: knet.ACTION_ANY_SEAT' "$as/odin_godot_scripts.gen.odin" \
+	|| fail "a legacy co-op any_seat annotation must migrate to the typed Any_Seat policy"
 
 # ---- fixture: generated acid probes — per entity kind, count/my/field
 # @(gd_method)s the test driver reads replicated state through; a

@@ -15,6 +15,10 @@ slopball are the coop kit's:
 - **hp, score, chat, roster** ride the coop kit's delta lane beside it,
   unchanged — one game, both netcodes.
 
+The generated attach starts from `.Listen_Server_Action` and overrides only
+Quickdraw's deliberate half-second favor-the-shooter rewind and teleport cut.
+This makes the timing policy visible without hand-assembling a lane config.
+
 Run it:
 
 ```sh

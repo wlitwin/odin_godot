@@ -22,14 +22,14 @@ package kitacid_scripts
 // before routing, which is a test-driver concern, not a session one.
 // ----------------------------------------------------------------------------
 
-import gd "godot:godot"
-import rt "godot:runtime"
-import kboot "godot:kit/boot"
-import knet "godot:kit/net"
-import ksess "godot:kit/session"
-import netgd "godot:kit/netgd"
 import "core:fmt"
 import "core:time"
+import gd "godot:godot"
+import kboot "godot:kit/boot"
+import knet "godot:kit/net"
+import netgd "godot:kit/netgd"
+import ksess "godot:kit/session"
+import rt "godot:runtime"
 
 MSG_SESSION :: u8(0) // ALL kit/session traffic rides this one game byte
 MSG_DONE :: u8(2) // client scenario finished       client -> host
@@ -46,17 +46,17 @@ Delayed_Packet :: struct {
 }
 
 AcidSession :: struct {
-	owner:   gd.Node,
-	orb:     ^Orb,
-	ses:     ksess.Session,
+	owner:          gd.Node,
+	orb:            ^Orb,
+	ses:            ksess.Session,
 	// The generated wrapper's handle — a bare Boot whose one live pointer is
 	// set at start (this phase-0 acid predates kit/boot and hand-rolls the
 	// wiring; the wrapper's coop route only reads b.ses.ctx).
-	boot:    kboot.Boot,
-	delayed: [dynamic]Delayed_Packet,
-	latency: f64, // injected one-way receive delay, seconds
-	min_rtt: f64, // proof threshold: measured round trips must exceed this
-	started: bool,
+	boot:           kboot.Boot,
+	delayed:        [dynamic]Delayed_Packet,
+	latency:        f64, // injected one-way receive delay, seconds
+	min_rtt:        f64, // proof threshold: measured round trips must exceed this
+	started:        bool,
 
 	// scenario bookkeeping (drivers poll; sentinels grep)
 	got:            int, // client milestones: spawn + each command result
@@ -67,20 +67,20 @@ AcidSession :: struct {
 	clock_reported: bool,
 
 	// stat-registry scenario
-	strikes_col: ksess.Stat_Col, // host: successful strikes, credited to the owner
-	owner_pid:   knet.Player_Id, // host: who owns the orb (found by name)
-	stats_seen:  int, // client: scoreboard verified (driver gates DONE on it)
-	ping_ok:     int, // host: both clients' ping stats reflect the injected latency
+	strikes_col:    ksess.Stat_Col, // host: successful strikes, credited to the owner
+	owner_pid:      knet.Player_Id, // host: who owns the orb (found by name)
+	stats_seen:     int, // client: scoreboard verified (driver gates DONE on it)
+	ping_ok:        int, // host: both clients' ping stats reflect the injected latency
 
 	// owner-stream scenario
-	moving:       bool, // owner only
-	move_start:   f64,
-	last_x:       f32,
-	samples:      int,
-	incs:         int,
-	big_steps:    int,
-	mono_bad:     int,
-	stream_state: int, // 0 unverified, 1 ok, -1 failed (driver polls)
+	moving:         bool, // owner only
+	move_start:     f64,
+	last_x:         f32,
+	samples:        int,
+	incs:           int,
+	big_steps:      int,
+	mono_bad:       int,
+	stream_state:   int, // 0 unverified, 1 ok, -1 failed (driver polls)
 }
 
 @(private = "file")
@@ -197,7 +197,13 @@ acid_session_announce_world :: proc(self: ^AcidSession) {
 	self.owner_pid = owner_pid
 	self.orb.hp = 100
 	self.orb.stamina = 10
-	self.orb.net_id = ksess.session_spawn(&self.ses, ORB_TYPE, self.orb, &orb_command_set, owner_pid)
+	self.orb.net_id = ksess.session_spawn(
+		&self.ses,
+		ORB_TYPE,
+		self.orb,
+		&orb_command_set,
+		owner_pid,
+	)
 	ksess.session_start_replicating(&self.ses)
 	gd.print_str(
 		fmt.tprintf(
@@ -212,7 +218,15 @@ acid_session_announce_world :: proc(self: ^AcidSession) {
 // hand it to the session under the announced id. A real game instantiates a
 // scene per type here.
 @(private = "file")
-acid_make_entity :: proc(user: rawptr, type: ksess.Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (rawptr, ^knet.Command_Set) {
+acid_make_entity :: proc(
+	user: rawptr,
+	type: ksess.Entity_Type,
+	id: knet.Net_Id,
+	owner: knet.Player_Id,
+) -> (
+	rawptr,
+	^knet.Command_Set,
+) {
 	self := cast(^AcidSession)user
 	if type != ORB_TYPE {
 		return nil, nil
@@ -271,7 +285,12 @@ acid_session_tick :: proc(self: ^AcidSession, dt: gd.Float) {
 		c := ksess.session_clock(&self.ses, ksess.HOST_PEER)
 		ok := c.rtt >= self.min_rtt && abs(c.offset) < 0.1
 		gd.print_str(
-			fmt.tprintf("ACID_CLOCK ok=%v rtt_ms=%d off_ms=%d", ok, int(c.rtt * 1000), int(c.offset * 1000)),
+			fmt.tprintf(
+				"ACID_CLOCK ok=%v rtt_ms=%d off_ms=%d",
+				ok,
+				int(c.rtt * 1000),
+				int(c.offset * 1000),
+			),
 		)
 	}
 }
@@ -289,7 +308,10 @@ drain_events :: proc(self: ^AcidSession, now: f64) {
 			gd.print_str(
 				fmt.tprintf(
 					"ACID_SPAWN ok=true id=%d mine=%v hp=%d st=%d",
-					u32(e.id), e.owner == self.ses.me, self.orb.hp, self.orb.stamina,
+					u32(e.id),
+					e.owner == self.ses.me,
+					self.orb.hp,
+					self.orb.stamina,
 				),
 			)
 		case ksess.Ev_Despawned:
@@ -315,7 +337,9 @@ drain_events :: proc(self: ^AcidSession, now: f64) {
 			// wait for one that carries BOTH proofs: the strike tally and our
 			// own host-measured ping reflecting the injected latency.
 			if n >= 2 && f64(my_ping) >= self.min_rtt * 1000 {
-				gd.print_str(fmt.tprintf("ACID_STATS strikes=%d ping_ok=true ping_ms=%d", n, my_ping))
+				gd.print_str(
+					fmt.tprintf("ACID_STATS strikes=%d ping_ok=true ping_ms=%d", n, my_ping),
+				)
 				self.stats_seen = 1
 			}
 		case ksess.Ev_Player_Joined:
@@ -327,7 +351,12 @@ drain_events :: proc(self: ^AcidSession, now: f64) {
 			gd.print_str("ACID_HOST_LEFT")
 		case ksess.Ev_State_Applied:
 			gd.print_str(
-				fmt.tprintf("ACID_DELTA ok=true n=%d hp=%d st=%d", e.entities, self.orb.hp, self.orb.stamina),
+				fmt.tprintf(
+					"ACID_DELTA ok=true n=%d hp=%d st=%d",
+					e.entities,
+					self.orb.hp,
+					self.orb.stamina,
+				),
 			)
 		case ksess.Ev_Command_Executed:
 			self.cmds += 1
@@ -335,16 +364,21 @@ drain_events :: proc(self: ^AcidSession, now: f64) {
 				// The gameplay hook for the stat registry: credit the striker.
 				ksess.session_stat_add(&self.ses, self.owner_pid, self.strikes_col, 1)
 			}
-			gd.print_str(fmt.tprintf("ACID_EXEC ok=%v hp=%d st=%d", e.ok, self.orb.hp, self.orb.stamina))
+			gd.print_str(
+				fmt.tprintf("ACID_EXEC ok=%v hp=%d st=%d", e.ok, self.orb.hp, self.orb.stamina),
+			)
 		case ksess.Ev_Command_Confirmed:
 			self.got += 1
 			dt_ms := int((now - self.issue_at) * 1000)
 			gd.print_str(
 				fmt.tprintf(
 					"ACID_CONFIRM n=%d ok=true hp=%d st=%d pending=%d lat_ok=%v dt_ms=%d",
-					self.issues, self.orb.hp, self.orb.stamina,
+					self.issues,
+					self.orb.hp,
+					self.orb.stamina,
 					knet.pending_count(&self.ses.ctx.pending),
-					now - self.issue_at >= self.min_rtt, dt_ms,
+					now - self.issue_at >= self.min_rtt,
+					dt_ms,
 				),
 			)
 		case ksess.Ev_Command_Rejected:
@@ -357,9 +391,12 @@ drain_events :: proc(self: ^AcidSession, now: f64) {
 			gd.print_str(
 				fmt.tprintf(
 					"ACID_REJECT n=%d ok=true hp=%d st=%d pending=%d lat_ok=%v dt_ms=%d",
-					self.issues, self.orb.hp, self.orb.stamina,
+					self.issues,
+					self.orb.hp,
+					self.orb.stamina,
 					knet.pending_count(&self.ses.ctx.pending),
-					now - self.issue_at >= self.min_rtt, dt_ms,
+					now - self.issue_at >= self.min_rtt,
+					dt_ms,
 				),
 			)
 		}
@@ -386,11 +423,20 @@ stream_stats :: proc(self: ^AcidSession) {
 	self.samples += 1
 	if self.stream_state == 0 && x >= 30 {
 		y_ok := abs(self.orb.y + 0.5 * self.orb.x) < 0.01
-		ok := self.mono_bad == 0 && self.incs >= 25 && f64(self.big_steps) < 0.5 * f64(self.incs) && y_ok
+		ok :=
+			self.mono_bad == 0 &&
+			self.incs >= 25 &&
+			f64(self.big_steps) < 0.5 * f64(self.incs) &&
+			y_ok
 		gd.print_str(
 			fmt.tprintf(
 				"ACID_STREAM ok=%v x=%.1f incs=%d big=%d mono_bad=%d y_ok=%v",
-				ok, x, self.incs, self.big_steps, self.mono_bad, y_ok,
+				ok,
+				x,
+				self.incs,
+				self.big_steps,
+				self.mono_bad,
+				y_ok,
 			),
 		)
 		self.stream_state = ok ? 1 : -1
@@ -404,7 +450,10 @@ acid_session_on_packet :: proc(self: ^AcidSession, id: gd.Int, packet: gd.Packed
 	view := netgd.pba_view(&packet)
 	data := make([]u8, len(view))
 	copy(data, view)
-	append(&self.delayed, Delayed_Packet{due = now_s() + self.latency, from = int(id), data = data})
+	append(
+		&self.delayed,
+		Delayed_Packet{due = now_s() + self.latency, from = int(id), data = data},
+	)
 }
 
 @(private = "file")
@@ -429,7 +478,10 @@ acid_session_issue_strike :: proc(self: ^AcidSession, cost: gd.Int) {
 	gd.print_str(
 		fmt.tprintf(
 			"ACID_ISSUE n=%d predicted=%v hp=%d st=%d pending=%d",
-			self.issues, applied, self.orb.hp, self.orb.stamina,
+			self.issues,
+			applied.state,
+			self.orb.hp,
+			self.orb.stamina,
 			knet.pending_count(&self.ses.ctx.pending),
 		),
 	)

@@ -76,6 +76,12 @@ session_set_command_hook :: proc(s: ^Session, user: rawptr, hook: Command_Hook)
 session_app_route :: proc(s: ^Session, tag: u8, user: rawptr, handler: App_Handler)
 ```
 
+`session_reset(s)` ends the live run and frees its roster, registry, queues,
+profiles, and snapshots while retaining this pre-start wiring and configuration.
+The generated game-network detach uses it for back-to-menu → reattach.
+`session_destroy(s)` additionally releases the wiring and is the terminal
+teardown for a session value.
+
 `Session_Config` holds every tunable; zero-valued fields mean the defaults (a zero config
 is the out-of-the-box session). All durations are **seconds**: the session bakes them to
 tick counts itself, so changing `tick_hz` never silently rescales your timeouts:
@@ -92,6 +98,7 @@ Session_Config :: struct {
 	max_players:     int, // NEW joins refused past this many present people (0 = DEFAULT_MAX_PLAYERS, 8; rejoins always reclaim their seat)
 	change_events:   bool, // emit Ev_Entity_Changed per dirty entity per tick (repaint THAT, not everything)
 	stream_budget:   int, // per-peer owner-stream bytes per tick (0 = unlimited; requires interest management)
+	traffic:         Traffic_Config, // authority ingress: reliable, stream, and action token buckets
 	fingerprint:     u64, // wire-contract hash override (0 = the generated default) — see below
 }
 ```
@@ -106,17 +113,40 @@ requires interest management because per-peer routing is what makes individual
 budgets possible. Updates are prioritized by staleness, with distance as a
 tiebreaker.
 
-**Schema compatibility (on by default).** Descriptors are positional, so two builds whose
-replicated declarations disagree do not get an error. A skewed peer misparses every delta
-into the wrong fields. Script generation prevents that without extra wiring: it hashes the
-package's whole wire contract (replicated field order/types/lanes, verbs, entity ids, input
-structs field-by-field, fact tuples, rpcs) into the generated `NET_FINGERPRINT`, and the
-guard file registers it as the session default at load. The join carries it: a mismatch is
-refused as `Ev_Join_Denied{.Version}` ("your build and the host's disagree"), and a checked
-host also refuses fingerprint-less clients (pre-check builds). Comment edits and formatting
-do not change the hash; a renamed field does. Rebuild both peers after a schema change.
-The session folds its own `PROTOCOL_REV` in, so a kit upgrade that changes the wire refuses
-skewed peers even when the game's declarations did not move.
+`traffic` bounds what each seated client may send *to* the authority. Reliable
+and stream limits are per transport peer; `actions` is a narrower per-player
+budget shared by immediate co-op commands and tick-scheduled simulation verbs.
+Each `Traffic_Limit` has `packets_per_second`, `bytes_per_second`, and
+`burst_seconds` (zero burst means one second). A zero rate leaves that dimension
+unlimited; the named profiles install complete bounded values. This is separate
+from outbound `stream_budget`, which prioritizes what the authority sends to
+each observer and therefore requires interest management.
+
+For a new game, prefer a named complete-stack configuration over filling this
+struct directly: `kboot.network_profile(.Friends_Coop)`,
+`.Listen_Server_Action`, or `.Dedicated_Competitive`. The profiles materialize
+and validate `Session_Config` together with the matching `ksim.Lane_Config`,
+while still allowing ordinary field overrides. See
+[Network profiles](profiles.md).
+
+**Schema compatibility (on by default).** Descriptors are positional, so a
+skewed peer could otherwise interpret valid bytes as the wrong fields. Before
+writing generated code, scriptgen recursively validates the raw wire roots and
+emits `NET_SCHEMA_CANONICAL`: field paths, wire kinds and widths, enum storage,
+fixed bounds, input classes and constraints, message tags, and action access, prediction,
+argument limits, and scheduling. Platform-width integers, implicit-width enums,
+pointers, unsupported containers, unresolved nested types, and structs with
+hidden padding are build errors. Generated target-side size/alignment assertions
+close the loop between scriptgen's view and the compiler that builds the game.
+
+`NET_ABI_FINGERPRINT` hashes that readable schema. The complete generated
+`NET_FINGERPRINT` also covers entity ids, facts, RPC signatures, and the
+session's `PROTOCOL_REV`; the guard registers it as the session default at load.
+JOIN carries it, so equal contracts seat normally while a mismatch is refused as
+`Ev_Join_Denied{.Version}`. A checked host also refuses fingerprint-less clients
+from pre-check builds. Comments and formatting do not change the hash; changing
+a path, representation, bound, policy, or schedule does. Rebuild both peers
+after a schema change.
 
 `Session_Config.fingerprint` is the override: leave it 0 (the default) to use the generated
 value, set it for a hand-rolled multi-module contract, or set `ksess.FINGERPRINT_NONE` to
@@ -236,8 +266,10 @@ low-level integrations may install it before starting the session.
 ### Event halves and generated dispatch
 
 A [kit/boot](boot.md) game can replace the manual event switch with generated
-event halves. Each declared proc pairs by name with a session event, and script
-generation creates `<game>_events(self, events)`. Undeclared events are ignored.
+event halves. Each declared proc pairs by name with a session event. The
+generated `<game>_net_pump` forwards them automatically; the lower-level
+`<game>_events(self, events)` remains available for custom frame ordering.
+Undeclared events are ignored.
 
 ```odin
 @(gd_half)
@@ -250,9 +282,8 @@ cave_lobby_player_joined :: proc(self: ^CaveLobby, id: knet.Player_Id, rejoin: b
 cave_lobby_player_joined_then :: proc(self: ^CaveLobby, id: knet.Player_Id, rejoin: bool) { ... }
 
 // _process
-events, _, ticks := kboot.boot_pump(&self.boot, delta, now_s())
-cave_lobby_step(self, ticks)      // generated co-op authority step, if declared
-cave_lobby_events(self, events)
+frame := cave_lobby_net_pump(self, delta, now_s())
+cave_lobby_step(self, frame.ticks) // generated co-op authority step, if declared
 ```
 
 The half names are the event names (`_seated`, `_welcomed`, `_player_joined`,
@@ -298,8 +329,19 @@ detection, which re-seeds here or presents the missed changes as fresh events),
 `Ev_Despawned`, `Ev_Owner_Changed`,
 `Ev_Blob_Changed`, `Ev_Stats_Updated`, `Ev_Profile_Changed`, `Ev_Backup_Received`, `Ev_State_Applied`,
 `Ev_Entity_Changed` (opt-in), `Ev_Command_Executed` (host),
-`Ev_Command_Confirmed` / `Ev_Command_Rejected` (client; timeouts surface as rejections
-with the real seq/entity).
+`Ev_Command_Confirmed` / `Ev_Command_Rejected` (client). The command events
+cover both immediate co-op and tick-scheduled actions:
+
+- confirmed: `seq`, `entity`, `cmd`, `model`;
+- rejected: those fields plus typed `reason`; and
+- executed: `ok`, `player`, the addressed fields, `reason`, `seq`, and `model`.
+
+The generated `_command_confirmed`, `_command_rejected`, and
+`_command_executed` halves receive those fields positionally. Reasons are
+`Access`, `Rate`, `Malformed`, `Stale`, `Predicate`, or `Timeout`; timeout
+callbacks retain the real sequence, entity, and command. `model` is
+`.Immediate` or `.Scheduled`, so a game using both lanes never has to infer the
+source from raw ids.
 
 ## The replicated world
 
@@ -373,6 +415,10 @@ full snapshot, so late joiners, backup hosts, and saves carry it with **zero
 catch-up code**. Cavecrawl carves a per-floor inscription into the level
 entity this way; a rejoiner reads it off the same event as everyone else.
 
+A blob is capped at 256 KiB and still has to fit the 1 MiB session packet that
+carries its update or world snapshot. Larger one-shot data belongs in
+`kit/xfer`, which chunks and paces it instead of blocking reliable state.
+
 Use per-tick replicated fields for simulation state, app messages for
 event-shaped things, and a blob for variable-length state a *new observer*
 must be able to see. `session_blob` returns a view (copy it if you keep it),
@@ -387,7 +433,9 @@ session_roster :: proc(s: ^Session, allocator := context.temp_allocator) -> []Pl
 session_host :: proc(s: ^Session) -> knet.Player_Id
 session_count :: proc(s: ^Session, connected_only := true, players_only := true) -> int
 session_set_locked :: proc(s: ^Session, locked: bool)
-session_kick :: proc(s: ^Session, player: knet.Player_Id, ban := false) -> (was: Peer_Id, ok: bool)
+session_kick :: proc(s: ^Session, player: knet.Player_Id, ban := false, reason := Disconnect_Reason.Kicked) -> (was: Peer_Id, ok: bool)
+session_set_traffic_hook :: proc(s: ^Session, user: rawptr, hook: Traffic_Hook)
+session_set_production_log_hook :: proc(s: ^Session, user: rawptr, hook: Production_Log_Hook)
 ```
 
 `session_count`'s bare call counts PRESENT PEOPLE (connected, non-dedicated), which is what
@@ -402,6 +450,49 @@ joins are refused with `.Locked`, while players already in the roster still reco
 `ban` the token bounces off future joins with `.Banned` for the rest of the run (bans are
 run-scoped but ride the [backup snapshot](#backup-hosting-and-resume), so a takeover does not
 launder them; persist them yourself if forever matters).
+
+Traffic refusals are observable without writing packet plumbing. The hook gets
+a typed `Traffic_Violation` containing player, transport peer, class
+(`Reliable`, `Stream`, or `Action`), attempted bytes, and that class's strike
+count. Return `.Drop` to report only, `.Kick` to revoke the seat, or `.Ban` to
+also deny its reconnect token for this run:
+
+```odin
+traffic_policy :: proc(user: rawptr, v: ksess.Traffic_Violation) -> ksess.Traffic_Response {
+	log_traffic(v)
+	return v.strikes >= 3 ? .Kick : .Drop
+}
+
+ksess.session_set_traffic_hook(&self.ses, self, traffic_policy)
+```
+
+With the generated/netgd transport, Kick and Ban also schedule the socket close
+after `Ev_Kicked` flushes. `session_traffic_stats` exposes admitted packets,
+bytes, and drops per player and class; `session_traffic_dropped` is the one-line
+netgraph total.
+
+Disconnect events carry a fixed `Disconnect_Reason`: `Graceful`,
+`Transport_Lost`, `Timeout`, `Kicked`, `Banned`, `Traffic_Policy`, or
+`Protocol` (`Unknown` is the zero value). The reason crosses `SES_BYE`,
+`SES_LEFT`, and `SES_KICKED`, so `Ev_Player_Left`, `Ev_Host_Left`,
+`Ev_Join_Failed`, and `Ev_Kicked` report the same structured cause rather than
+forcing games to infer it from timing.
+
+For production diagnostics, install `session_set_production_log_hook`. It
+receives `Production_Log_Record`, a fixed-size record of enums, player/peer ids,
+byte counts, ingress stage, and running count for malformed packets, rejected
+actions, traffic refusals, and disconnects. It contains no attacker-controlled
+text. Kit delivers at most `PRODUCTION_LOG_EVENTS_PER_SECOND` (16) per session
+second and increments `session_production_log_dropped` for the remainder, so a
+hostile peer cannot turn the logger into unbounded allocation or output work.
+
+```odin
+net_log :: proc(user: rawptr, record: ksess.Production_Log_Record) {
+	metrics_count(record.kind, record.action_reason, record.disconnect)
+}
+
+ksess.session_set_production_log_hook(&self.ses, self, net_log)
+```
 
 **Spectators.** `session_client_start(..., spectate = true)` joins to WATCH: the seat
 receives the whole world (spawns, deltas, streams, stats, chat) and is nobody. It
@@ -436,14 +527,14 @@ auto-fed ping). On any peer that did not register the column, resolve BY NAME wi
 
 Stats are the *host's* ledger about players; the **profile** is each player's
 own word about themselves: picks, loadout, ready lamp, declared cosmetics.
-One POD struct per seat, one writer per row (its player), host-relayed to
-every screen:
+One canonical fixed-shape struct per seat, one writer per row (its player),
+host-relayed to every screen:
 
 ```odin
 Pick :: struct { look, iron: u8, ready: bool }
 
 // THE DECLARATION — tag the Session field; the install generates into the
-// ready thunk, and Pick's field-by-field shape folds into the wire
+// ready thunk, and Pick's recursive canonical shape folds into the wire
 // fingerprint (a build whose Pick drifted — even at the SAME size — is
 // refused at the join door, not scrambled silently):
 ses: ksess.Session `gd:"profile=Pick"`
@@ -717,8 +808,9 @@ the caps:
 @(gd_half) my_game_wiped     :: proc(self: ^G)                   // every peer: the never-entity pools
 @(gd_half) my_game_migrating :: proc(self: ^G, step: kboot.Migrate_Step, target: string, try: int)
 
-// ready(), after boot_attach:
-kboot.boot_migration(&self.boot, self, my_game_succ_hooks)  // the generated table
+// The generated my_game_net_attach installs my_game_succ_hooks.
+// A custom shell may call this after boot_attach:
+kboot.boot_migration(&self.boot, self, my_game_succ_hooks)
 ```
 
 On `Ev_Backup_Target` the kit computes and broadcasts the rendezvous
@@ -918,26 +1010,37 @@ privacy matters. Client owner streams always route
 through the host authority gateway; it resolves the transport peer to a seated player,
 preflights the complete batch, verifies every row against current entity ownership and wire
 size, then relays it. Clients accept owner streams only from the host. `stream_budget`
-can limit per-peer owner-stream bytes when interest management is enabled. Nothing yet
-rate-limits a seated peer's reliable traffic: the untrusted-*input* bounds all exist (command caps,
-input-window ceilings, the xfer payload cap, every length-checked decode), but they bound
-malformed and oversized, not malicious-and-well-formed. The fingerprint gate refuses
-*version skew*, not intent; the write guard catches application bugs, not an attacker.
+can limit outbound per-peer owner-stream bytes when interest management is enabled.
+`Session_Config.traffic` independently token-buckets every seated peer's reliable and
+stream ingress, and the shared action bucket covers both command execution models.
+Immediate and tick-scheduled client actions enter one
+`session_authority_action_admit` pipeline after their model-specific header is
+decoded: authenticated playing seat, model-qualified dedup window, structural
+payload/target/descriptor, declared access, argument policy, tick plausibility,
+shared byte/rate budget, and bounded model queue. `Authority_Ingress_Stats`
+counts admissions and refusals by model, reason, and stage; execution callbacks
+remain model-specific after this door.
+The fingerprint gate refuses *version skew*, not intent; the write guard catches
+application bugs, not an attacker.
 
 Current default defenses include bounds-checked decoding and parse failures
 counted by `session_malformed`; reliable entity updates commit transactionally; co-op and sim
 commands are exactly-once, access-gated, and dedup-windowed; owner-stream senders are
 ownership-checked at the host; sim inputs are structurally checked, capped, and semantically
 validated when the game declares a validator; spectator seats are receive-only at four
-separate admission points; and schema mismatch is rejected during the join.
+separate admission points; malicious-but-well-formed traffic is rate/byte bounded by
+the named profiles; packet, field, message, profile, fact, command, blob, and
+replication containers are admitted against semantic ceilings before allocation;
+and schema mismatch is rejected during the join.
 These defenses cover malformed traffic, application mistakes, and version skew;
 they are not a complete adversarial-server policy.
 
 A game outgrowing invited-friends play (public lobbies, strangers, stakes) should still use
-an encrypting transport and the existing state-hash probe for desync forensics. The remaining
-framework gap is per-peer byte/message budgets on reliable and stream channels with a
-kick/report policy; those controls slot into the admission doors above rather than requiring
-a new replication model.
+an encrypting transport, tune the profile budgets against measured legitimate peaks, install
+a traffic hook for moderation plus the bounded structured production-log hook, and use the existing state-hash
+probe for desync forensics. These controls bound admitted work; they are not account identity,
+DDoS protection before the transport, or a substitute for application-level
+validation of well-shaped player intent.
 
 ### Recipes over existing pieces
 
@@ -999,7 +1102,7 @@ trade_seat :: proc(self: ^Trade, by: knet.Player_Id) -> (side: u8, seated: bool)
 // clears BOTH confirms in the same verb, so the switch-the-item-at-the-last-
 // second scam is structurally dead — a confirm racing an edit lands on
 // cleared state and the commit below refuses.
-@(gd_command = "predict,any_seat")
+@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
 trade_offer :: proc(self: ^Trade, by: knet.Player_Id, slot: u8, item: u16, count: u16) -> bool {
 	if self.state != TRADE_OPEN {return false}
 	side, seated := trade_seat(self, by)
@@ -1010,7 +1113,7 @@ trade_offer :: proc(self: ^Trade, by: knet.Player_Id, slot: u8, item: u16, count
 	return true
 }
 
-@(gd_command = "predict,any_seat")
+@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
 trade_confirm :: proc(self: ^Trade, by: knet.Player_Id) -> (ok: bool, sealed: bool) {
 	if self.state != TRADE_OPEN {return false, false}
 	side, seated := trade_seat(self, by)

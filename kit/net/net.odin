@@ -77,13 +77,47 @@ package kit_net
 // change here bumps a constant HERE, in the same commit. The coop delta
 // mask's move to subset-ordinal bits (the phase-2 codec unification) will be
 // rev 2.
-WIRE_REV :: u64(2) // 1: the fingerprint-era wire as committed · 2: delta masks are subset-ordinal (delta-lane members only — one mask law with the sim codec; masks narrowed, bits renumbered on mixed-lane entities)
+WIRE_REV :: u64(3) // 1: fingerprint-era wire · 2: subset-ordinal delta masks · 3: protocol packet/field/container admission ceilings
 
 // Stable identity of a replicated entity across the session. Allocated by the host
 // (authority) — never reused within a session. 0 is the invalid id.
 Net_Id :: distinct u32
 
 NET_ID_INVALID :: Net_Id(0)
+
+// A typed, pointer-free reference to a replicated entity. T is part of the
+// TYPE, so a Net_Ref(Player) cannot be passed where Net_Ref(Chest) is wanted;
+// the value on the wire/storage side stays the entity's stable id. Resolving
+// belongs to the generated entity census because that is where T's
+// Entity_Type is known. A stale/despawned reference resolves to (nil, false) —
+// never keep a raw entity pointer when the lifetime can cross a despawn.
+Net_Ref :: struct($T: typeid) {
+	id: Net_Id,
+}
+
+net_ref_id :: proc(ref: Net_Ref($T)) -> Net_Id {
+	return ref.id
+}
+
+net_ref_valid :: proc(ref: Net_Ref($T)) -> bool {
+	return ref.id != NET_ID_INVALID
+}
+
+// One frame-local row from a generated `<entity>_all` query. `using ref`
+// promotes `.id`, so the common loop reads like ordinary game objects:
+//
+//     for mob in mob_all(&game.boot) {
+//         mob.entity.think(mob.owner)
+//         remember(mob.ref) // the pointer-free part may outlive this pass
+//     }
+//
+// The row's pointer is valid only while that entity remains live; retain ref,
+// not the row or entity pointer, across a despawn boundary.
+Net_Entity :: struct($T: typeid) {
+	using ref: Net_Ref(T),
+	entity:    ^T,
+	owner:     Player_Id,
+}
 
 // The high bit of the id space is RESERVED for kit/sim's client-local
 // provisional spawns. Authority ids increment from 1 and never reach it;
@@ -104,4 +138,3 @@ PLAYER_ID_INVALID :: Player_Id(0)
 // integer. `u64(player) << 32 | id` silently truncated a u64 Player_Id twice
 // (the session's interest pairs, xfer's assembly inbox) before the rule was
 // written down — struct keys make the mistake unrepresentable.
-

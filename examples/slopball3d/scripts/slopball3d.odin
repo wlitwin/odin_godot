@@ -29,7 +29,6 @@ import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import kui "godot:kit/ui"
-import netgd "godot:kit/netgd"
 import play "godot:play"
 
 MSG_SESSION :: u8(0) // all kit/session traffic under one game byte
@@ -101,13 +100,12 @@ slopball3_ready :: proc(self: ^Slopball3) {
 	// window, and the SOLVER stepped at the net rate (a 120Hz session over
 	// 60Hz physics just streams duplicate poses).
 	hz := gd.env_int("SLOP3_HZ", 60)
-	ksess.session_configure(&self.ses, {
-		tick_hz = hz,
-		interp_delay = f64(gd.env_int("SLOP3_INTERP_MS", max(3000 / hz, 16))) / 1000.0,
-	})
+	net_cfg := kboot.network_profile(.Friends_Coop)
+	net_cfg.session.tick_hz = hz
+	net_cfg.session.interp_delay = f64(gd.env_int("SLOP3_INTERP_MS", max(3000 / hz, 16))) / 1000.0
 	gd.engine_set_physics_ticks_per_second(gd.singleton_engine(), gd.Int(hz))
 
-	kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, kboot.Options{
+	slopball3_net_attach(self, kboot.Options{
 		title = "S L O P B A L L  3 D",
 		status = "Host a pitch, or join one at localhost",
 		legend = "WASD move · Space kick · Tab scores · Enter chat",
@@ -116,12 +114,10 @@ slopball3_ready :: proc(self: ^Slopball3) {
 		min_players = 1, // a lone host may start and kick the ball around
 		spatial = true, // 3D game: Node3D stage/world containers
 		methods = {"on_host", "on_join", "on_start", "on_chat", "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
-	})
+	}, net_cfg)
 	// The factory, written by nobody: the generated table (from the entity=
 	// tags above) makes/frees under boot.world; world.odin's *_spawned/
 	// *_freed hooks keep the kicker/ball census.
-	slopball3_entities(self, &self.boot)
-
 	self.goals_to = gd.env_int("SLOP3_GOALS", 3)
 	self.bot = gd.env_string("SLOP3_BOT", "")
 	self.netgraph = kui.netgraph_make(cast(gd.Node)self.owner)
@@ -169,18 +165,8 @@ slopball3_process :: proc(self: ^Slopball3, delta: f64) {
 		ball_report(self)
 	}
 
-	// The "is it healthy?" overlay: rtt off the replicated ping stat, the
-	// LINK's own truth (ENet loss + rtt variance — clients only), and the
-	// wire's bytes-by-kind row. Coop form: `sim` stays false.
-	ng := kui.Net_Stats{
-		rtt_ms  = kui.net_ping_ms(&self.ses),
-		traffic = netgd.wire_traffic(&self.boot.wire),
-	}
-	if _, jit, loss, has := netgd.wire_link_quality(&self.boot.wire, ksess.HOST_PEER); has {
-		ng.jitter_ms = jit
-		ng.loss_pct = loss
-	}
-	kui.netgraph_refresh(&self.netgraph, ng)
+	// Complete co-op link, traffic, malformed, policy, and rate telemetry.
+	kui.netgraph_refresh(&self.netgraph, kboot.boot_net_stats(&self.boot))
 
 	// The game's event reactions are the name-paired halves below; the
 	// generated slopball3_events holds the switch and every role gate.

@@ -132,8 +132,8 @@ for port in 4189 4196; do
         fi
 
         # THE LAG-COMP HEADROOM RECEIPT. Lag comp dies SILENTLY: when a
-        # shooter's reconstructed view falls past rewind_max the query is
-        # clamped to the floor, the authority judges a half-second-old world,
+        # shooter's reconstructed view falls past the authority-observed or
+        # absolute rewind envelope the query is clamped to the floor,
         # nothing lands, and until kit/sim grew stat_rewind_clamped nothing
         # anywhere recorded it. That is exactly how the deep-lead-surplus bug
         # hid — and this acid could not have caught it: with the deep rung
@@ -150,7 +150,7 @@ for port in 4189 4196; do
         DEEPEST=$(grep -o "depth=[0-9]*" "$MLOG" | cut -d= -f2 | sort -n | tail -1)
         echo "lag-comp headroom on the marshal: clamped $CLAMPED, deepest judged view $DEEPEST ticks"
         if ((CLAMPED > 4)); then
-            echo "lag comp is being clamped repeatedly (clamped=$CLAMPED) — the shooter's view is older than rewind_max can honor, so the authority is judging a stale world and landing nothing. Suspect the sim lead controller (a deep surplus parks the client ahead and every rewound query hits the floor), or a rewind_max too small for this link"; exit 1
+            echo "lag comp is being clamped repeatedly (clamped=$CLAMPED) — the shooter's claim is older than the authority-observed/configured envelope can honor. Suspect a deep lead surplus, excess render delay, or a rewind_max too small for this link"; exit 1
         fi
 
         # THE SHOP, mid-duel: the kill's bounty reaches the deadeye as delta

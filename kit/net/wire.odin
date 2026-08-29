@@ -19,6 +19,15 @@ import "core:mem"
 // HERE, at compile time, instead of decoding every field as garbage.
 #assert(ODIN_ENDIAN == .Little)
 
+// Protocol-wide admission ceilings. These are deliberately below the integer
+// widths used by the framing: a u32 length is a representation, not permission
+// to make a multi-gigabyte allocation. Large application assets belong in
+// kit/xfer, whose chunks each pass through this packet/field envelope.
+MAX_PACKET_BYTES :: 1024 * 1024
+MAX_FIELD_BYTES :: 64 * 1024 - 1
+MAX_CONTAINER_BYTES :: MAX_PACKET_BYTES
+MAX_CONTAINER_ITEMS :: 4096
+
 Writer :: struct {
 	buf: [dynamic]u8,
 }
@@ -94,7 +103,7 @@ write_player_id :: proc(w: ^Writer, v: Player_Id) {write_u64(w, u64(v))}
 // (join snapshots) are chunked ABOVE this layer, not smuggled through strings.
 write_string :: proc(w: ^Writer, s: string) {
 	n := len(s)
-	assert(n <= int(max(u16)), "wire string exceeds u16 length prefix")
+	assert(n <= MAX_FIELD_BYTES, "wire string exceeds MAX_FIELD_BYTES")
 	write_u16(w, u16(n))
 	if n > 0 {
 		write_raw(w, raw_data(s), n)
@@ -103,7 +112,10 @@ write_string :: proc(w: ^Writer, s: string) {
 
 write_bytes :: proc(w: ^Writer, b: []u8) {
 	n := len(b)
-	assert(u64(n) <= u64(max(u32))) // u64 compare: `int(max(u32))` overflows a 32-bit int (wasm)
+	assert(
+		n <= MAX_FIELD_BYTES,
+		"wire byte field exceeds MAX_FIELD_BYTES — use chunked kit/xfer for large payloads",
+	)
 	write_u32(w, u32(n))
 	if n > 0 {
 		write_raw(w, raw_data(b), n)
@@ -122,9 +134,24 @@ reader_make :: proc(data: []u8) -> Reader {
 	return Reader{data = data}
 }
 
+// Refuse an envelope before any decoder can loop, clone, or allocate from it.
+// Kept explicit rather than baked into reader_make: readers also decode bounded
+// subviews and local persistence records that are not transport packets.
+reader_admit_packet :: proc(r: ^Reader, max_bytes := MAX_PACKET_BYTES) -> bool {
+	if r.err ||
+	   max_bytes < 0 ||
+	   r.off < 0 ||
+	   r.off > len(r.data) ||
+	   len(r.data) - r.off > max_bytes {
+		r.err = true
+		return false
+	}
+	return true
+}
+
 @(private = "file")
 read_raw :: proc(r: ^Reader, out: rawptr, n: int) -> bool {
-	if r.err || r.off + n > len(r.data) {
+	if r.err || n < 0 || r.off < 0 || r.off > len(r.data) || n > len(r.data) - r.off {
 		r.err = true
 		return false
 	}
@@ -169,9 +196,9 @@ read_player_id :: proc(r: ^Reader) -> Player_Id {return Player_Id(read_u64(r))}
 
 // Returns a view INTO the reader's buffer (zero-copy). Callers that keep the
 // string beyond the packet's lifetime must clone it.
-read_string :: proc(r: ^Reader) -> string {
+read_string_limited :: proc(r: ^Reader, max_bytes: int) -> string {
 	n := int(read_u16(r))
-	if r.err || r.off + n > len(r.data) {
+	if r.err || max_bytes < 0 || n > max_bytes || r.off > len(r.data) || n > len(r.data) - r.off {
 		r.err = true
 		return ""
 	}
@@ -180,19 +207,32 @@ read_string :: proc(r: ^Reader) -> string {
 	return s
 }
 
+read_string :: proc(r: ^Reader) -> string {
+	return read_string_limited(r, MAX_FIELD_BYTES)
+}
+
 // Zero-copy view, same lifetime rule as read_string.
-read_bytes :: proc(r: ^Reader) -> []u8 {
+read_bytes_limited :: proc(r: ^Reader, max_bytes: int) -> []u8 {
 	n := int(read_u32(r))
 	// n < 0: on 32-bit targets (wasm32) a hostile length wraps negative and
 	// the off+n bound fails to catch it — the slice below would panic.
 	// Malformed input must set err, never crash the reader.
-	if r.err || n < 0 || r.off + n > len(r.data) {
+	if r.err ||
+	   max_bytes < 0 ||
+	   n < 0 ||
+	   n > max_bytes ||
+	   r.off > len(r.data) ||
+	   n > len(r.data) - r.off {
 		r.err = true
 		return nil
 	}
 	b := r.data[r.off:r.off + n]
 	r.off += n
 	return b
+}
+
+read_bytes :: proc(r: ^Reader) -> []u8 {
+	return read_bytes_limited(r, MAX_FIELD_BYTES)
 }
 
 // The undecoded tail, zero-copy — for handing a reader's remainder to
@@ -212,7 +252,7 @@ reader_remaining :: proc(r: ^Reader) -> []u8 {
 // the `r.err ||` half, and one forgot before this existed. nil on truncation
 // (r.err set), like every other read past the end.
 reader_view :: proc(r: ^Reader, n: int) -> []u8 {
-	if r.err || n < 0 || r.off + n > len(r.data) {
+	if r.err || n < 0 || r.off < 0 || r.off > len(r.data) || n > len(r.data) - r.off {
 		r.err = true
 		return nil
 	}
@@ -221,20 +261,56 @@ reader_view :: proc(r: ^Reader, n: int) -> []u8 {
 	return view
 }
 
+// Validate a counted container before entering its loop. `min_item_bytes`
+// need only be the fixed framing every row must carry; the remaining variable
+// bytes are checked by the row decoder. This turns hostile u16 counts into an
+// O(packet-size) bound and rejects impossible counts without partial mutation.
+reader_admit_count :: proc(
+	r: ^Reader,
+	count, min_item_bytes: int,
+	max_items := MAX_CONTAINER_ITEMS,
+	max_bytes := MAX_CONTAINER_BYTES,
+) -> bool {
+	if r.err ||
+	   count < 0 ||
+	   min_item_bytes < 0 ||
+	   max_items < 0 ||
+	   max_bytes < 0 ||
+	   count > max_items ||
+	   r.off < 0 ||
+	   r.off > len(r.data) {
+		r.err = true
+		return false
+	}
+	remaining := len(r.data) - r.off
+	if remaining > max_bytes || (min_item_bytes > 0 && count > remaining / min_item_bytes) {
+		r.err = true
+		return false
+	}
+	return true
+}
+
 // ---------------------------------------------------------------------------
 // write_pod / read_pod — a whole POD value as its raw little-endian bytes. The
 // primitive under generated `gd:"backup"` codecs, and the house idiom for any
 // fixed-shape state not worth a hand-written field list (backup/save blobs).
 // T must be SELF-CONTAINED — no pointers, slices, maps, or strings — so its
 // bytes ARE its value; the `where` guard rejects a non-POD T at the call site.
-// Every target is little-endian, so this is a copy, symmetric with the scalar
-// codecs above (a fixed [N]T or a nested POD struct rides in one call).
+// Every supported target is little-endian, so this is a copy, symmetric with
+// the scalar codecs above. Generated network declarations add the stronger
+// canonical-ABI checks (fixed widths and no implicit padding); direct callers
+// remain responsible for those properties.
 write_pod :: proc(w: ^Writer, v: $T) where intrinsics.type_is_nearly_simple_compare(T) {
 	v := v
 	write_raw(w, &v, size_of(T))
 }
 
-read_pod :: proc(r: ^Reader, $T: typeid) -> (v: T) where intrinsics.type_is_nearly_simple_compare(T) {
+read_pod :: proc(
+	r: ^Reader,
+	$T: typeid,
+) -> (
+	v: T,
+) where intrinsics.type_is_nearly_simple_compare(T) {
 	_ = read_raw(r, &v, size_of(T))
 	return
 }

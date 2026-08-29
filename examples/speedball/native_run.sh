@@ -10,7 +10,8 @@
 #     post-impulse velocity — the touch resolved locally, that tick, at
 #     240ms RTT. That is the pattern: the contested object lives on every
 #     peer's predicted timeline.
-#   - the kick is a DECLARED WORLD-PASS FACT (@(gd_fact) ball_kicked_fx; the
+#   - the kick is a DECLARED CUE (@(gd_cue) ball_kicked_fx; the sole entity
+#     parameter is its inferred anchor, and the
 #     step announces through the generated ball_kicked door): the WATCHER,
 #     who never simulated the striker's press, presents SPB_KICK_SEEN from
 #     the authority's broadcast on its watch clock — and the striker's own

@@ -31,7 +31,7 @@ bot_fields := [?]knet.Field_Desc {
 	{offset = offset_of(Bot, x), size = size_of(f32), flags = {.Interp, .Owner_Stream}, lerp = .F32},
 }
 bot_desc := knet.Entity_Desc{fields = bot_fields[:]}
-bot_cmds := [?]knet.Command_Desc{{name = "poke", predict = true, access = .Any_Seat, invoke = bot_cmd_poke}}
+bot_cmds := [?]knet.Command_Desc{{name = "poke", policy = knet.ACTION_ANY_SEAT_PREDICTED, invoke = bot_cmd_poke}}
 bot_set := knet.Command_Set{entity_desc = &bot_desc, commands = bot_cmds[:]}
 
 BOT_TYPE :: ksess.Entity_Type(7)

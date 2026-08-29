@@ -6,7 +6,7 @@
 #   (1) scriptgen turns `gd:"replicate[,interp][,owner]"` fields into a
 #       knet.Entity_Desc table + public `<snake>_net_desc` in odin_godot_scripts.gen.odin,
 #       with multi-name fields expanded and option flags carried — AND turns
-#       @(gd_command[="predict"]) procs into decode thunks, a Command_Desc
+#       @(gd_command[=Action_Policy]) procs into decode thunks, a Command_Desc
 #       table + `<snake>_command_set`, and typed `<proc>_cmd` issue wrappers
 #       (the generated wrapper holds the only role branch).
 #   (2) The generated package COMPILES (odin check) — descriptor, command set,
@@ -51,10 +51,13 @@ run_scriptgen "$GOOD"
 
 GEN="$GOOD/odin_godot_scripts.gen.odin"
 [ -f "$GEN" ] || { echo "REPGEN_FAIL: scriptgen produced no odin_godot_scripts.gen.odin"; exit 1; }
+GUARD="$GOOD/odin_godot_guard.gen.odin"
+[ -f "$GUARD" ] || { echo "REPGEN_FAIL: scriptgen produced no odin_godot_guard.gen.odin"; exit 1; }
 # Per-class sections, for the absence claims below.
 PAWN_SEC="$TMP/pawn.section"; section "$GEN" pawn.odin >"$PAWN_SEC"
 SCOUT_SEC="$TMP/scout.section"; section "$GEN" scout.odin >"$SCOUT_SEC"
-[ -s "$PAWN_SEC" ] && [ -s "$SCOUT_SEC" ] \
+BOARD_SEC="$TMP/board.section"; section "$GEN" board.odin >"$BOARD_SEC"
+[ -s "$PAWN_SEC" ] && [ -s "$SCOUT_SEC" ] && [ -s "$BOARD_SEC" ] \
 	|| { echo "REPGEN_FAIL: the consolidated artifact has no per-source section banners"; exit 1; }
 for needle in \
 	'import knet "godot:kit/net"' \
@@ -78,6 +81,7 @@ for needle in \
 	'glide = 0.1' \
 	'cut = 32' \
 	'pawn_net_desc := knet.Entity_Desc' \
+	'offset_of(Chest, target)' \
 	'intrinsics.type_is_nearly_simple_compare' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
@@ -90,7 +94,37 @@ if grep -qF 'offset_of(Pawn, local)' "$GEN"; then
 	echo "REPGEN_FAIL: untagged field leaked into the descriptor"
 	exit 1
 fi
-echo "  ok  descriptor generated (fields, multi-name expansion, flags, POD asserts)"
+echo "  ok  descriptor generated (fields, multi-name expansion, flags, canonical layout asserts)"
+
+for needle in \
+	'NET_SCHEMA_CANONICAL :: `wire-abi v=1 endian=little' \
+	'input input.Pawn_Input class=0 encoding=raw width=16 bound=256' \
+	'constraint input.Pawn_Input.look range=none mask=none finite=false unit=true enum=false' \
+	'constraint input.Pawn_Input.trigger range=0:1 mask=none finite=true unit=false enum=false' \
+	'action entity.Pawn.hit id=' \
+	'access=owner prediction=optimistic schedule=tick args-bound=4096' \
+; do
+	if ! grep -qF "$needle" "$GUARD"; then
+		echo "REPGEN_FAIL: canonical schema is missing: $needle"
+		exit 1
+	fi
+done
+echo "  ok  canonical schema carries input bounds/constraints and tick action policy"
+
+for needle in \
+	'NET_SCHEMA := _guard_knet.Net_Schema {' \
+	'{name = "Pawn", wire_id = 7, stream_hz = 0, avatar = true}' \
+	'{field = "look", range = "", mask = "", finite = false, unit = true, enum_check = false}' \
+	'{path = "input.Pawn_Input", type_name = "Pawn_Input", class_id = 0, encoding = "raw", width = 16, bound = 256' \
+	'{path = "entity.Pawn.hit", entity = "Pawn", name = "hit", id = 47736, policy = {access = .Owner, prediction = .Optimistic, max_args_bytes = 4096}, model = .Scheduled' \
+	'{path = "entity.Board.pawn_bumped", entity = "Board", name = "pawn_bumped", id = 48390, anchor = "Pawn", schedule = .Watch, source = .Declared' \
+; do
+	if ! grep -qF "$needle" "$GUARD"; then
+		echo "REPGEN_FAIL: structured NET_SCHEMA is missing: $needle"
+		exit 1
+	fi
+done
+echo "  ok  structured NET_SCHEMA carries entity ids, inputs, constraints, scheduled actions, and facts"
 
 # @(gd_command) artifacts on a TICKING class: the verbs route through the sim
 # lane (tick-scheduled — kit/sim command.odin), not the knet command loop.
@@ -98,23 +132,32 @@ echo "  ok  descriptor generated (fields, multi-name expansion, flags, POD asser
 # wrappers take the lane and schedule via lane_command; the knet set stays
 # desc-only (the two replay mechanisms never share a baseline).
 for needle in \
-	'_pawn_simcmd_hit :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool' \
+	'_pawn_simcmd_hit :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> knet.Action_Reject_Reason' \
 	'_a0 := knet.read_i32(&r)' \
-	'if r.err {return false}' \
-	'{name = "mark", id = PAWN_CMD_MARK, exec = _pawn_simcmd_mark, access = .Authority}' \
+	'if r.err || len(knet.reader_remaining(&r)) != 0 {return .Malformed}' \
+	'PAWN_POLICY_MARK :: knet.ACTION_AUTHORITY' \
+	'{action = {name = "mark", id = PAWN_CMD_MARK, model = .Scheduled, policy = PAWN_POLICY_MARK' \
+	'exec_checked = _pawn_simcmd_mark}' \
+	'_pawn_action_hit_args := [?]knet.Action_Argument_Desc' \
+	'{name = "amount", type_name = "i32", wire_kind = "i32"}' \
+	'_pawn_action_loot_outcomes := [?]knet.Action_Outcome_Value_Desc' \
+	'{name = "got", type_name = "u8"}' \
+	'consequence = {name = "pawn_loot_then", authority_only = true, takes_game = false}' \
 	'pawn_command_set := knet.Command_Set{entity_desc = &pawn_net_desc' \
-	'pawn_hit_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, amount: i32) -> knet.Command_Outcome' \
-	'pawn_mark_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, label: string, who: knet.Player_Id) -> knet.Command_Outcome' \
+	'pawn_hit_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, amount: i32) -> knet.Action_Outcome' \
+	'pawn_mark_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, label: string, who: knet.Player_Id) -> knet.Action_Outcome' \
 	'_ok := pawn_salute(self, by, _a0)' \
-	'pawn_salute_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, style: u8) -> knet.Command_Outcome' \
+	'pawn_salute_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, style: u8) -> knet.Action_Outcome' \
 	'knet.write_player_id(&_w, who)' \
-	'if ksim.lane_command(b.lane, self.net_id, PAWN_CMD_HIT, knet.writer_bytes(&_w)) {return .Predicted}' \
+	'_issue := ksim.lane_command_checked(b.lane, self.net_id, PAWN_CMD_HIT, knet.writer_bytes(&_w))' \
 	'_ok, _p0 := pawn_loot(self, _a0)' \
 	'if _ok && ksim.lane_is_authority(lane) {' \
 	'pawn_loot_then(self, by, _a0, _p0)' \
 	'if _ok {pawn_hit_apply(self, _a0)}' \
 	'_pawn_simcmd_hit_apply :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane)' \
-	'{name = "hit", id = PAWN_CMD_HIT, exec = _pawn_simcmd_hit, apply = _pawn_simcmd_hit_apply, access = .Owner}' \
+	'PAWN_POLICY_HIT :: knet.ACTION_OWNER_PREDICTED' \
+	'{action = {name = "hit", id = PAWN_CMD_HIT, model = .Scheduled, policy = PAWN_POLICY_HIT' \
+	'exec_checked = _pawn_simcmd_hit, apply = _pawn_simcmd_hit_apply}' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
 		echo "REPGEN_FAIL: generated file is missing sim-command artifact: $needle"
@@ -135,36 +178,63 @@ if grep -qF '_pawn_m_hit' "$GEN"; then
 fi
 echo "  ok  sim-command thunks, table, lane wrappers generated; knet loop skipped"
 
+# A conventional shell (one Boot + Session + Comms, and one Lane because this
+# package declares simulation) gets the lifecycle facade. It owns all generated
+# wiring at attach, forwards declared events during pump, and delegates ordered,
+# idempotent teardown to kit/boot. The lower-level helpers above still exist.
+for needle in \
+	'board_net_attach :: proc(self: ^Board, opts: kboot.Options, net_cfg := kboot.Network_Config{})' \
+	'cfg := kboot.network_configure(&self.ses, net_cfg, kboot.Network_Capabilities{has_lane = true, all_inputs_validated = true})' \
+	'kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, opts)' \
+	'board_entities(self, &self.boot)' \
+	'board_lane_init(self, &self.lane, &self.ses, cfg = cfg.lane)' \
+	'kboot.boot_lane(&self.boot, &self.lane)' \
+	'board_net_pump :: proc(self: ^Board, delta: f64, now: f64) -> kboot.Net_Frame' \
+	'board_events(self, events)' \
+	'board_net_detach :: proc(self: ^Board)' \
+	'kboot.boot_net_detach(&self.boot)' \
+; do
+	if ! grep -qF "$needle" "$BOARD_SEC"; then
+		echo "REPGEN_FAIL: generated network facade is missing: $needle"
+		exit 1
+	fi
+done
+echo "  ok  conventional game shell gets generated attach/pump/detach facade"
+
 # A coop @(gd_command) on a NON-ticking class (chest.odin): its wrapper returns a
-# knet.Command_Outcome — .Applied (host accept) / .Predicted (client in-flight) /
-# .Rejected (predicate said no) — the SAME meaning on every peer, replacing the
-# old role-ambiguous bool. (Pawn/Turret tick, so theirs are sim-scheduled bools.)
+# knet.Action_Outcome keeps the familiar state and adds the typed synchronous
+# reason + correlation sequence. Ticking verbs return the same shape.
 CGEN="$GEN" # chest.odin rides the same consolidated artifact
 for needle in \
-	'chest_open_cmd :: proc(b: ^kboot.Boot, self: ^Chest, amount: i32) -> knet.Command_Outcome' \
+	'chest_open_cmd :: proc(b: ^kboot.Boot, self: ^Chest, amount: i32) -> knet.Action_Outcome' \
 	'ctx := &b.ses.ctx' \
-	'if _ok {return .Applied}' \
-	'if knet.command_issue(ctx, self, &chest_command_set, CHEST_CMD_OPEN) {return .Predicted}' \
-	'return .Rejected' \
-	'chest_seal_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Command_Outcome' \
-	'_ = knet.command_issue(ctx, self, &chest_command_set, CHEST_CMD_SEAL)' \
-	'chest_lockdown_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Command_Outcome' \
-	'return .Rejected // authority-only verbs never cross the ingress boundary' \
-	'id = CHEST_CMD_LOCKDOWN, predict = false, access = .Authority' \
+	'if _ok {return knet.action_outcome(.Applied)}' \
+	'_issue := knet.command_issue_checked(ctx, self, &chest_command_set, CHEST_CMD_OPEN)' \
+	'if !_issue.sent || (_issue.prediction_attempted && !_issue.prediction_applied) {return knet.action_outcome(.Rejected, _issue.reason, u32(_issue.seq))}' \
+	'return knet.action_outcome(.Predicted, seq = u32(_issue.seq))' \
+	'chest_seal_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Action_Outcome' \
+	'_issue := knet.command_issue_checked(ctx, self, &chest_command_set, CHEST_CMD_SEAL)' \
+	'chest_lockdown_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Action_Outcome' \
+	'session_action_rejection(b.ses, self.net_id, CHEST_POLICY_LOCKDOWN)' \
+	'CHEST_POLICY_LOCKDOWN :: knet.ACTION_AUTHORITY' \
+	'action = {name = "lockdown", id = CHEST_CMD_LOCKDOWN, model = .Immediate, policy = CHEST_POLICY_LOCKDOWN' \
 	'CHEST_CMD_OPEN :: knet.Cmd_Id(0x' \
-	'id = CHEST_CMD_OPEN, predict = true, access = .Any_Seat' \
+	'CHEST_POLICY_OPEN :: knet.ACTION_ANY_SEAT_PREDICTED' \
+	'action = {name = "open", id = CHEST_CMD_OPEN, model = .Immediate, policy = CHEST_POLICY_OPEN' \
+	'CHEST_POLICY_CLAIM :: knet.Action_Policy {' \
+	'max_args_bytes = 32' \
 	'_ok := chest_claim(self, env.by)' \
 	'chest_claim_then(self, env.by)' \
-	'chest_claim_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Command_Outcome' \
+	'chest_claim_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Action_Outcome' \
 	'_ok := chest_claim(self, ctx.me)' \
 	'chest_claim_then(self, ctx.me)' \
 ; do
 	if ! grep -qF "$needle" "$CGEN"; then
-		echo "REPGEN_FAIL: coop command wrapper missing Command_Outcome artifact: $needle"
+		echo "REPGEN_FAIL: coop command wrapper missing Action_Outcome artifact: $needle"
 		exit 1
 	fi
 done
-echo "  ok  coop @(gd_command) wrapper returns knet.Command_Outcome; issuer param framework-filled (env.by in the thunk, ctx.me on the host's own issue, absent from the wrapper signature)"
+echo "  ok  coop @(gd_command) wrapper returns knet.Action_Outcome; issuer param framework-filled (env.by in the thunk, ctx.me on the host's own issue, absent from the wrapper signature)"
 
 # @(gd_tick) artifacts: the ksim import, the input POD assert, the rawptr
 # thunk (nil input coasts; the author call stays typed), and the Sim_Set the
@@ -321,10 +391,14 @@ for needle in \
 	'avatar = true},' \
 	'stream_hz = 20},' \
 	'return rt.script_of(node, Pawn)' \
-	'pawn_of :: proc(b: ^kboot.Boot, id: knet.Net_Id) -> (^Pawn, bool)' \
+	'pawn_ref :: proc(id: knet.Net_Id) -> knet.Net_Ref(Pawn)' \
+	'_pawn_of_ref :: proc(b: ^kboot.Boot, ref: knet.Net_Ref(Pawn)) -> (^Pawn, bool)' \
+	'pawn_of :: proc {_pawn_of_id, _pawn_of_ref}' \
 	'pawn_owned_by :: proc(b: ^kboot.Boot, owner: knet.Player_Id) -> (^Pawn, bool)' \
 	'my_pawn :: proc(b: ^kboot.Boot) -> (^Pawn, bool)' \
 	'pawn_ids :: proc(b: ^kboot.Boot, allocator := context.temp_allocator) -> []knet.Net_Id' \
+	'pawn_all :: proc(b: ^kboot.Boot, allocator := context.temp_allocator) -> []knet.Net_Entity(Pawn)' \
+	'kboot.boot_entity_rows(b, PAWN_TYPE, Pawn, allocator)' \
 	'pawn_spawn :: proc(b: ^kboot.Boot, owner := knet.PLAYER_ID_INVALID) -> (^Pawn, knet.Net_Id)' \
 	'kboot.boot_fire_spawn(b, PAWN_TYPE, owner)' \
 	'chest_spawn :: proc(b: ^kboot.Boot, owner := knet.PLAYER_ID_INVALID) -> (^Chest, knet.Net_Id)' \
@@ -348,9 +422,17 @@ for needle in \
 	'_board_lane_sample_1 :: proc(user: rawptr, tick: u64, dst: rawptr)' \
 	'board_sample_turret(cast(^Board)user, tick, cast(^Turret_Input)dst)' \
 	'_board_lane_validate_0 :: proc(user: rawptr, input: rawptr) -> bool' \
-	'board_sample_validate(cast(^Board)user, cast(^Pawn_Input)input)' \
+	'value := cast(^Pawn_Input)input' \
+	'for &component in value.move {component = clamp(component, -1, 1)}' \
+	'if value.buttons & ~u8(0x0f) != 0 {return false}' \
+	'if !ksim.input_unit(&value.look) {return false}' \
+	'if !ksim.input_finite(value.trigger) {return false}' \
+	'value.trigger = clamp(value.trigger, 0, 1)' \
+	'if !ksim.input_enum_valid(value.mode) {return false}' \
+	'board_sample_validate(cast(^Board)user, value)' \
 	'_board_lane_validate_1 :: proc(user: rawptr, input: rawptr) -> bool' \
-	'board_turret_input_validate(cast(^Board)user, cast(^Turret_Input)input)' \
+	'value := cast(^Turret_Input)input' \
+	'for &component in value.aim {component = clamp(component, -1000, 1000)}' \
 	'_board_lane_step :: proc(user: rawptr, tick: u64)' \
 	'board_contact(cast(^Board)user, tick)' \
 	'_board_lane_step_auth :: proc(user: rawptr, tick: u64)' \
@@ -361,6 +443,7 @@ for needle in \
 	'ksim.lane_add_input_class(l, 1, size_of(Turret_Input), _board_lane_sample_1)' \
 	'ksim.lane_class_set_validate(l, 0, _board_lane_validate_0)' \
 	'ksim.lane_class_set_validate(l, 1, _board_lane_validate_1)' \
+	'#assert(2 <= ksim.MAX_INPUT_CLASSES_PER_SEAT, "generated input classes exceed kit/sim' \
 ; do
 	if ! grep -qF "$needle" "$BGEN"; then
 		echo "REPGEN_FAIL: generated file is missing lane-wiring artifact: $needle"
@@ -369,25 +452,35 @@ for needle in \
 done
 echo "  ok  lane wiring generated (per-class typed samples, primary + lane_add_input_class, board_lane_init)"
 
-# @(gd_fact) artifacts (the declared world-pass facts): a stable FNV id const
-# per event, the announce DOOR under the bare event name holding every gate
+# @(gd_cue) artifacts (plus the compatible @(gd_fact) spelling): a stable FNV
+# id const per event, the announce DOOR under the bare event name holding every gate
 # (authority broadcast via lane_fact with the kind; anchored = owner-derived
 # `mine` on the live pass; anchorless = the authority's live pass alone), the
 # decode thunk per event, the package fact table, and its install inside
 # board_lane_init. The doors compile with the package (the odin check above).
 for needle in \
 	'FACT_PAWN_BUMPED :: u16(0x' \
+	'FACT_PAWN_SPOTTED :: u16(0x' \
+	'FACT_PAWN_ECHOED :: u16(0x' \
 	'FACT_BOARD_HORN :: u16(0x' \
 	'pawn_bumped :: proc(l: ^ksim.Lane, p: ^Pawn, force: f32)' \
+	'pawn_spotted :: proc(l: ^ksim.Lane, p: ^Pawn, scout: ^Scout, strength: u8)' \
 	'if !ksim.lane_tracks_entity(l, p) {' \
 	'board_horn :: proc(l: ^ksim.Lane, side: u8)' \
 	'ksim.lane_fact(l, p, knet.writer_bytes(&_fw), FACT_PAWN_BUMPED)' \
+	'_entity_id0, _entity_ok0 := ksim.lane_entity_id(l, p)' \
+	'ksim.lane_fact(l, scout, knet.writer_bytes(&_fw), FACT_PAWN_SPOTTED)' \
+	'pawn_echoed :: proc(l: ^ksim.Lane, p: ^Pawn)' \
+	'ksim.lane_fact(l, nil, knet.writer_bytes(&_fw), FACT_PAWN_ECHOED)' \
 	'ksim.lane_fact(l, nil, knet.writer_bytes(&_fw), FACT_BOARD_HORN)' \
 	'_owner := ksim.lane_owner_of(l, p)' \
 	'_mine := _owner != knet.PLAYER_ID_INVALID && _owner == ksim.lane_me(l)' \
 	'if ksim.lane_is_authority(l) && ksim.lane_live(l) {' \
 	'_board_fact_pawn_bumped :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8)' \
 	'pawn_bumped_fx(cast(^Board)ksim.lane_game(lane), cast(^Pawn)entity, mine, _a0)' \
+	'_entity_id0 := knet.read_net_id(&r)' \
+	'_entity0, _entity_ok0 := ksim.lane_entity(lane, _entity_id0)' \
+	'pawn_spotted_fx(cast(^Board)ksim.lane_game(lane), cast(^Pawn)_entity0, cast(^Scout)entity, mine, _a0)' \
 	'_board_fact_table := [?]ksim.Fact_Desc{' \
 	'ksim.lane_set_facts(l, _board_fact_table[:])' \
 ; do
@@ -402,13 +495,13 @@ if ! grep -qF 'lane.in_auth = true' "$GEN"; then
 	echo "REPGEN_FAIL: the tick _then wrap is missing the in_auth provenance mark"
 	exit 1
 fi
-# The corpse gate is the ANCHORED door's alone — an anchorless fact has no
-# body to outlive; exactly one gate (pawn_bumped), none keyed on nil.
-if [ "$(grep -cF 'ksim.lane_tracks_entity(l, ' "$BGEN")" != "1" ] || grep -qF 'lane_tracks_entity(l, nil' "$BGEN"; then
-	echo "REPGEN_FAIL: the corpse gate must appear once (the anchored door) and never on the anchorless one"
+# The corpse gate belongs only to anchored doors (pawn_bumped and
+# pawn_spotted), never the anchorless legacy declaration.
+if [ "$(grep -cF 'ksim.lane_tracks_entity(l, ' "$BGEN")" != "2" ] || grep -qF 'lane_tracks_entity(l, nil' "$BGEN"; then
+	echo "REPGEN_FAIL: the corpse gate must appear on both anchored doors and never on the anchorless one"
 	exit 1
 fi
-echo "  ok  fact doors generated (FNV ids, gates incl. the corpse gate, decode thunks, table installed in lane_init)"
+echo "  ok  cue doors generated (inferred/named/no anchor, typed entity refs, legacy fact, decode table)"
 
 # ---- @(gd_fact) contract violations are scriptgen-time errors ----
 # Five misuses in one lane-carrying package, plus the no-lane package: each
@@ -485,10 +578,10 @@ if [ "$FBAD_RC" -eq 0 ]; then
 	exit 1
 fi
 for want in \
-	"a declared fact IS a presentation half" \
-	"the every-screen law" \
+	"a declared cue is presentation" \
+	'`mine: bool` comes after' \
 	"not a wire primitive" \
-	"a fact presents, it decides nothing" \
+	"a cue presents, it decides nothing" \
 	"GENERATED announce door's name" \
 ; do
 	if ! echo "$FBAD_OUT" | grep -qF "$want"; then
@@ -525,6 +618,96 @@ if [ "$FNOLANE_RC" -eq 0 ] || ! echo "$FNOLANE_OUT" | grep -qF "this package has
 	exit 1
 fi
 echo "  ok  fact misuses rejected: bad name, no mine, non-wire arg, results, taken door, laneless package"
+
+# ---- @(gd_cue) anchor contract violations are scriptgen-time errors ----
+CUEBAD="$TMP/cuebad"
+mkdir -p "$CUEBAD"
+cat > "$CUEBAD/cgame.odin" <<'EOF'
+//gd:extends Node
+//gd:class CGame
+package repgen_cuebad
+
+import gd "godot:godot"
+
+CGame :: struct {owner: gd.Node}
+C_In :: struct {axis: i8}
+
+@(gd_sample)
+cgame_sample :: proc(self: ^CGame, tick: u64, input: ^C_In) {}
+
+@(gd_cue)
+c_ambiguous_fx :: proc(g: ^CGame, source: ^CPawn, target: ^CPawn, mine: bool) {}
+
+@(gd_cue = "anchor=missing")
+c_missing_fx :: proc(g: ^CGame, source: ^CPawn, mine: bool) {}
+
+@(gd_cue = "anchor=power")
+c_primitive_fx :: proc(g: ^CGame, source: ^CPawn, mine: bool, power: u8) {}
+
+@(gd_cue = "anchor=")
+c_empty_fx :: proc(g: ^CGame, source: ^CPawn, mine: bool) {}
+
+@(gd_cue = "audience=owner")
+c_config_fx :: proc(g: ^CGame, source: ^CPawn, mine: bool) {}
+
+@(gd_cue)
+c_untracked_fx :: proc(g: ^CGame, prop: ^CProp, mine: bool) {}
+
+@(gd_cue)
+@(gd_fact)
+c_both_fx :: proc(g: ^CGame, source: ^CPawn, mine: bool) {}
+EOF
+cat > "$CUEBAD/cpawn.odin" <<'EOF'
+//gd:extends Node2D
+//gd:class CPawn
+package repgen_cuebad
+
+import gd "godot:godot"
+
+CPawn :: struct {
+	owner: gd.Node2d,
+	x: f32 `gd:"predict"`,
+}
+
+@(gd_tick)
+cpawn_tick :: proc(self: ^CPawn, input: C_In) {}
+EOF
+cat > "$CUEBAD/cprop.odin" <<'EOF'
+//gd:extends Node2D
+//gd:class CProp
+package repgen_cuebad
+
+import gd "godot:godot"
+
+CProp :: struct {
+	owner: gd.Node2d,
+	x: f32 `gd:"predict"`,
+}
+EOF
+set +e
+CUEBAD_OUT="$(run_scriptgen "$CUEBAD" 2>&1)"
+CUEBAD_RC=$?
+set -e
+if [ "$CUEBAD_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: the @(gd_cue) misuse package was accepted by scriptgen"
+	exit 1
+fi
+for want in \
+	"the cue has 2 entity parameters" \
+	'`anchor=missing` does not name one of the cue' \
+	'`anchor=power` does not name one of the cue' \
+	'`anchor=` needs an entity parameter name' \
+	'unknown cue config token "audience=owner"' \
+	'is not tracked by the simulation lane' \
+	'@(gd_cue) replaces @(gd_fact)' \
+; do
+	if ! echo "$CUEBAD_OUT" | grep -qF "$want"; then
+		echo "REPGEN_FAIL: cue misuse error missing: $want"
+		echo "$CUEBAD_OUT" | tail -30
+		exit 1
+	fi
+done
+echo "  ok  cue misuses rejected: ambiguous/missing/non-entity anchors, bad config, untracked ref, duplicate declaration"
 
 # ---- the silent paths, closed: each of these compiled and silently never
 # ---- worked before — now each is a build error naming the fix ----
@@ -707,7 +890,7 @@ echo "  ok  staleness guard: drifted source fails the compile by name; scriptgen
 # ---- NET_FINGERPRINT: the wire contract, hashed — comment-blind, type-aware ----
 # The drift above was a COMMENT: the wire didn't change, so the fingerprint
 # must not move (a comment edit refusing joins would be over-refusal). A
-# replicated field's TYPE changing (i32 -> i64: a different wire) must move
+# replicated field's TYPE changing (u8 -> u16: a different wire) must move
 # it — that under-refusal is the silent-garbage disaster the check prevents.
 FP_AFTER=$(grep 'NET_FINGERPRINT ::' "$GUARD")
 if [ "$FP_BEFORE" != "$FP_AFTER" ]; then
@@ -719,7 +902,11 @@ mkdir -p "$FPW"
 cp "$ROOT/tests/repgen/fixture/"*.odin "$FPW/"
 # state, not hp: hp carries an _edge half whose (old, new) types would then
 # mismatch — a different (also-correct) failure that would mask this one.
-sed -i.bak 's/state:  u8 `gd:"replicate"`,/state:  u16 `gd:"replicate"`,/' "$FPW/pawn.odin" && rm -f "$FPW/pawn.odin.bak"
+sed -E -i.bak 's/(state:)[[:space:]]+u8([[:space:]]+`gd:"replicate"`)/\1 u16\2/' "$FPW/pawn.odin" && rm -f "$FPW/pawn.odin.bak"
+grep -q 'state: u16 `gd:"replicate"`' "$FPW/pawn.odin" || {
+	echo "REPGEN_FAIL: replicated-type mutation was a no-op"
+	exit 1
+}
 run_scriptgen "$FPW"
 FP_TYPED=$(grep 'NET_FINGERPRINT ::' "$FPW/odin_godot_guard.gen.odin")
 if [ "$FP_BEFORE" = "$FP_TYPED" ]; then
@@ -729,7 +916,7 @@ fi
 FPI="$TMP/fpi"
 mkdir -p "$FPI"
 cp "$ROOT/tests/repgen/fixture/"*.odin "$FPI/"
-sed -i.bak 's/buttons: u8,/buttons: u16,/' "$FPI/pawn.odin" && rm -f "$FPI/pawn.odin.bak"
+sed -i.bak 's/look:    \[2\]f32 `gd:"unit"`,/look:    [3]f32 `gd:"unit"`,/' "$FPI/pawn.odin" && rm -f "$FPI/pawn.odin.bak"
 run_scriptgen "$FPI"
 FP_INPUT=$(grep 'NET_FINGERPRINT ::' "$FPI/odin_godot_guard.gen.odin")
 if [ "$FP_BEFORE" = "$FP_INPUT" ]; then
@@ -755,7 +942,7 @@ fi
 FPA="$TMP/fpa"
 mkdir -p "$FPA"
 cp "$ROOT/tests/repgen/fixture/"*.odin "$FPA/"
-sed -i.bak 's/predict,any_seat/predict,owner/' "$FPA/chest.odin" && rm -f "$FPA/chest.odin.bak"
+sed -i.bak 's/knet.ACTION_ANY_SEAT_PREDICTED/knet.ACTION_OWNER_PREDICTED/' "$FPA/chest.odin" && rm -f "$FPA/chest.odin.bak"
 run_scriptgen "$FPA"
 FP_ACCESS=$(grep 'NET_FINGERPRINT ::' "$FPA/odin_godot_guard.gen.odin")
 if [ "$FP_BEFORE" = "$FP_ACCESS" ]; then
@@ -835,9 +1022,8 @@ for want in "Hoard.loot" "Hoard.view" "Hoard.tally" "the registry is the diffed 
 done
 echo "  ok  collections stance held at scriptgen time: [dynamic]/slice/map rejected with the three-way fork spelled out"
 
-# ---- (3b2): a DEEP non-POD type scriptgen can't judge fails the CONSUMER
-# compile — the syntactic gate above can't see inside a named struct, so the
-# generated #assert stays the backstop, naming the field.
+# ---- (3b2): a DEEP non-canonical type is followed and rejected by scriptgen;
+# the complete field path identifies both the network root and hidden leaf.
 BAD="$TMP/bad"
 mkdir -p "$BAD"
 cat > "$BAD/chatty.odin" <<'EOF'
@@ -853,26 +1039,25 @@ Notes :: struct {
 
 Chatty :: struct {
 	owner: gd.Node,
-	data:  Notes `gd:"replicate"`, // scriptgen sees "Notes"; only the #assert can judge it
+	data:  Notes `gd:"replicate"`,
 }
 
 chatty_ready :: proc(self: ^Chatty) {}
 EOF
-run_scriptgen "$BAD" # scriptgen succeeds — the deep type check is the consumer compiler's
 set +e
-CHECK_OUT="$("$ODIN" check "$BAD" -collection:godot="$ROOT" -no-entry-point 2>&1)"
+CHECK_OUT="$(run_scriptgen "$BAD" 2>&1)"
 CHECK_RC=$?
 set -e
 if [ "$CHECK_RC" -eq 0 ]; then
-	echo "REPGEN_FAIL: a replicated string-bearing struct COMPILED — the POD assert is not enforcing"
+	echo "REPGEN_FAIL: a replicated string-bearing nested struct passed recursive ABI validation"
 	exit 1
 fi
-if ! echo "$CHECK_OUT" | grep -q "Chatty.data"; then
-	echo "REPGEN_FAIL: the POD failure does not name the offending field (Chatty.data):"
+if ! echo "$CHECK_OUT" | grep -q "entity.Chatty.data.text"; then
+	echo "REPGEN_FAIL: the recursive ABI failure does not name entity.Chatty.data.text:"
 	echo "$CHECK_OUT" | tail -5
 	exit 1
 fi
-echo "  ok  deep non-POD replicate field fails the build, naming Chatty.data"
+echo "  ok  recursive ABI rejects a hidden string at entity.Chatty.data.text"
 
 # ---- (4): unknown option is a scriptgen-time error ----
 OPT="$TMP/opt"
@@ -1808,6 +1993,47 @@ if ! echo "$DUP_OUT" | grep -q "one sample per input TYPE"; then
 	echo "$DUP_OUT" | tail -3
 	exit 1
 fi
+
+# @(gd_input) owns a small, closed field vocabulary. A typo must fail in
+# scriptgen with the field named; silently skipping it would turn a safety
+# declaration into a comment.
+ICON="$TMP/input_constraint"
+mkdir -p "$ICON"
+cat > "$ICON/driver.odin" <<'EOF'
+//gd:extends Node
+//gd:class Driver
+package repgen_input_constraint
+
+import gd "godot:godot"
+
+Driver :: struct {
+	owner: gd.Node,
+	x: f32 `gd:"predict"`,
+}
+
+@(gd_input)
+Driver_Input :: struct {
+	move: [2]i8 `gd:"rang=-1:1"`,
+}
+
+@(gd_tick)
+driver_tick :: proc(self: ^Driver, input: Driver_Input) {
+	self.x += f32(input.move[0])
+}
+
+@(gd_sample)
+driver_sample :: proc(self: ^Driver, tick: u64, input: ^Driver_Input) {}
+EOF
+set +e
+ICON_OUT="$(run_scriptgen "$ICON" 2>&1)"
+ICON_RC=$?
+set -e
+if [ "$ICON_RC" -eq 0 ] || ! echo "$ICON_OUT" | grep -q 'Driver_Input.move: unknown @(gd_input) rule'; then
+	echo "REPGEN_FAIL: a misspelled @(gd_input) field rule was not rejected by field name"
+	echo "$ICON_OUT" | tail -3
+	exit 1
+fi
+echo "  ok  @(gd_input) field rules generate typed sanitizers and reject unknown constraints"
 
 STK="$TMP/stk"
 mkdir -p "$STK"

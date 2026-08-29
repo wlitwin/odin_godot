@@ -27,7 +27,7 @@ Orb :: struct {
 // client, replicated to everyone else — the SAME proc everywhere. Results after
 // the applied bool are the verb's PAYLOAD: in-process facts handed to the
 // consequence below, never wire bytes.
-@(gd_command = "predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 orb_strike :: proc(self: ^Orb, cost: i32) -> (ok: bool, dealt: i32) {
 	if self.stamina < cost {return false, 0}
 	self.stamina -= cost

@@ -49,8 +49,9 @@ Declare the input that drives a player and the deterministic step that updates
 predicted state:
 
 ```odin
+@(gd_input)
 Player_Input :: struct {
-	move: [2]i8,
+	move: [2]i8 `gd:"range=-1:1"`,
 }
 
 STEP :: f32(160.0 / 60.0)
@@ -71,12 +72,12 @@ state from it.
 This example assumes the default 60 Hz simulation rate. If the lane's `hz`
 changes, derive movement constants from the same configured rate.
 
-## 3. Sample and validate input
+## 3. Sample input
 
 Device access belongs in one `@(gd_sample)` proc on the game script:
 
 ```odin
-@(gd_sample = "validate")
+@(gd_sample)
 hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^Player_Input) {
 	_ = tick
 	input^ = {}
@@ -85,27 +86,23 @@ hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^Player_Input) {
 	if gd.is_action_pressed("ui_down")  {input.move[1] += 1}
 	if gd.is_action_pressed("ui_up")    {input.move[1] -= 1}
 }
-
-hello_sample_validate :: proc(self: ^HelloSim, input: ^Player_Input) -> bool {
-	_ = self
-	return input.move[0] >= -1 && input.move[0] <= 1 &&
-	       input.move[1] >= -1 && input.move[1] <= 1
-}
 ```
 
-The `validate` token pairs the sample with `<sample>_validate`. Kit runs this
-validator after local sampling and on the authority for every received input
-before changing the de-jitter buffer. Returning `false` rejects the input
-packet. A validator may also normalize values through the pointer before
-returning `true`.
+`@(gd_input)` turns the struct's field tags into the validator. Kit clamps the
+axis after local sampling and applies the same sanitizer to every received input
+before changing the authority's de-jitter buffer. The tick therefore sees the
+same legal values on both sides.
 
-Validate every assumption made by a tick proc: axis ranges, finite floating
-point values, enum membership, button masks, and game-specific invariants. A
-server-simulated field is not meaningful authority if arbitrary client input can
-still produce an impossible result.
+Available rules are `range=min:max`, `finite`, `unit` (a `[2]..[4]f32/f64`
+vector whose magnitude is clamped to one), `enum`, and `mask=bits`. Rules are
+part of the generated network fingerprint, so peers with different input
+languages refuse the join instead of disagreeing during play.
 
-Use `@(gd_sample = "validate=my_validator")` when the validator should not use
-the name-paired default.
+For a predicate involving several fields or game state, keep the generated
+rules and add `@(gd_sample = "validate")` plus
+`<sample>_validate(self, input) -> bool`. The generated sanitizer runs first;
+returning `false` then rejects the complete multi-class packet. Use
+`validate=my_validator` to name the hook explicitly.
 
 ## 4. Attach the simulation lane
 
@@ -124,49 +121,56 @@ HelloSim :: struct {
 }
 ```
 
-After `boot_attach` and the generated entity-factory setup in `_ready`, call the
-generated lane initializer and give the lane to `Boot`:
+That conventional field layout makes the generated facade lane-aware. One call
+from `_ready` attaches Boot, installs the entity factory, initializes the lane,
+and gives it to Boot:
 
 ```odin
-hello_sim_entities(self, &self.boot)
-hello_sim_lane_init(self, &self.lane, &self.ses)
-kboot.boot_lane(&self.boot, &self.lane)
+hello_sim_net_attach(self, kboot.Options{
+	title = "HELLO, SERVER AUTHORITY",
+	env = "HELLO",
+}, kboot.network_profile(.Listen_Server_Action))
 ```
 
-`hello_sim_lane_init` is generated from the `@(gd_tick)` and `@(gd_sample)`
-declarations. It registers the input type, validator, tick thunks, descriptors,
-and optional world passes. `boot_lane` makes `boot_pump` drive simulation and
-presentation each frame.
+Under that call, `hello_sim_lane_init` is generated from the `@(gd_tick)` and
+`@(gd_sample)` declarations. It registers the input type, validator, tick
+thunks, descriptors, and optional world passes. `boot_lane` makes the network
+pump drive simulation and presentation each frame.
 
-Pass a `ksim.Lane_Config` to the generated initializer when the defaults are not
-appropriate:
+The third argument configures the session and lane together. Override fields on
+the materialized profile when the game's measured needs differ:
 
 ```odin
-hello_sim_lane_init(
+hello_sim_net_attach(
 	self,
-	&self.lane,
-	&self.ses,
-	cfg = ksim.Lane_Config{
-		smooth_cut = 48,
-		rewind_max = 30,
-	},
+	kboot.Options{/* ... */},
+	config,
 )
 ```
 
-Start with the defaults and tune from measurements; the full configuration is
-documented under [Simulation tuning](sim.md#tuning).
+where `config` was prepared as ordinary data:
+
+```odin
+config := kboot.network_profile(.Listen_Server_Action)
+config.lane.smooth_cut = 48
+config.lane.rewind_max = 30
+```
+
+The generated attach validates the full pair before starting. Start with a
+named profile and tune from measurements; see [Network profiles](profiles.md)
+and [Simulation tuning](sim.md#tuning).
 
 ## 5. Remove frame-rate movement
 
 Delete the code that wrote the local player's position from `_process`.
-`boot_pump` now samples inputs, advances fixed ticks, reconciles snapshots, and
-writes presentation values before the entity's `_process` displays them:
+The generated network pump now samples inputs, advances fixed ticks, reconciles
+snapshots, writes presentation values, and forwards declared events before the
+entity's `_process` displays them:
 
 ```odin
 hello_sim_process :: proc(self: ^HelloSim, delta: f64) {
 	if kboot.boot_phase(&self.boot) == .Menu {return}
-	events, _, _ := kboot.boot_pump(&self.boot, delta, knet.now_s())
-	hello_sim_events(self, events)
+	_ = hello_sim_net_pump(self, delta, knet.now_s())
 }
 ```
 
@@ -202,7 +206,10 @@ HELLO_ROLE=serve $GODOT --headless --path examples/hello_sim
 ```
 
 `boot_serve` creates a dedicated infrastructure seat. The seat does not receive
-a player entity and does not participate in host succession. A production
+a player entity and does not participate in host succession. `hello_sim_ready`
+selects `.Dedicated_Competitive` for this role, while ordinary Host uses
+`.Listen_Server_Action`; the dedicated profile also verifies that every input
+class has a semantic validator. A production
 server still needs deployment, discovery, monitoring, restart, and abuse-control
 infrastructure; Kit does not provide a server fleet or matchmaking service.
 
@@ -220,8 +227,7 @@ security boundary against the host.
   query-based, tick-driven integration over data stored in the simulation.
 - Public servers need an encrypted transport, semantic input validation,
   application-specific rate policy, and operational controls. See
-  [Session trust and admission](session.md#trust-and-admission)
-  and the [hardening roadmap](TODO.md).
+  [Session trust and admission](session.md#trust-and-admission).
 
 Continue with [kit/sim](sim.md) for discrete commands, predicted spawns,
 contested objects, world passes, facts, lag compensation, and reconciliation
