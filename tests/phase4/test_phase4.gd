@@ -51,6 +51,14 @@ func _run() -> void:
 	if victim_script == null:
 		_fail("reload_victim.odin failed to load")
 		return
+	var removed_script = load("res://scripts/removed_class.odin")
+	if removed_script == null:
+		_fail("removed_class.odin failed to load")
+		return
+	var proc_holder_script = load("res://scripts/proc_holder.odin")
+	if proc_holder_script == null:
+		_fail("proc_holder.odin failed to load")
+		return
 
 	# ---- build the live instance ----
 	var node := Node.new()
@@ -62,11 +70,17 @@ func _run() -> void:
 	var victim := Node.new()
 	victim.set_script(victim_script)
 	root.add_child(victim)
+	var removed := Node.new()
+	removed.set_script(removed_script)
+	root.add_child(removed)
 
 	# ===== 1. assert v1 behavior =====
 	var step_v1 = node.call("get_step")
 	if int(step_v1) != 10:
 		_fail("v1 get_step()=%s, expected 10" % str(step_v1))
+		return
+	if int(node.call("get_cached_step")) != 10:
+		_fail("v1 cached procedure did not return 10")
 		return
 
 	# let `process` tick a few frames
@@ -139,6 +153,9 @@ func _run() -> void:
 	if int(toggle.call("get_mode")) != 2:
 		_fail("lifecycle fixture did not rebind to process-only v2")
 		return
+	if int(node.call("get_cached_step")) != 100:
+		_fail("reload hook did not refresh the cached procedure to v2")
+		return
 
 	# ===== 5b. state preserved across the reload (no tick since the swap) =====
 	var preserved = int(node.get("position"))
@@ -167,6 +184,58 @@ func _run() -> void:
 	if int(toggle.get("physics_ticks")) != physics_at_swap:
 		_fail("reload removed _physics_process but left it enabled on the live node")
 		return
+
+	# ===== 6. a second generation: removed class + unacknowledged proc state =====
+	# Instantiate the no-reload-hook callback holder from v2. It must remain callable
+	# on v2 after v3 arrives instead of being rebound with a stale proc pointer.
+	var proc_holder := Node.new()
+	proc_holder.set_script(proc_holder_script)
+	root.add_child(proc_holder)
+	if int(proc_holder.call("cached_value")) != 200:
+		_fail("v2 proc holder did not initialize its cached callback")
+		return
+
+	var out_v3 := []
+	var code_v3 := OS.execute("bash", [ProjectSettings.globalize_path("res://rebuild_v3_remove.sh")], out_v3, true)
+	if code_v3 != 0:
+		_fail("v3/remove rebuild failed (exit %d): %s" % [code_v3, "\n".join(out_v3)])
+		return
+	var err_v3 = script.reload(true)
+	if err_v3 != OK:
+		_fail("second script.reload(true) returned error %s" % str(err_v3))
+		return
+
+	# The acknowledged callback state moved to v3 and was refreshed by its hook.
+	if int(node.call("get_step")) != 1000 or int(node.call("get_cached_step")) != 1000:
+		_fail("reload-safe callback state did not move to v3")
+		return
+	# The deleted class still runs from v2 while its live instance owns that image.
+	if int(removed.call("value")) != 4242:
+		_fail("removed live class lost its owning generation")
+		return
+	# No reload hook means no rebind: both method and cached callback stay coherently v2.
+	if int(proc_holder.call("compiled_value")) != 200 or int(proc_holder.call("cached_value")) != 200:
+		_fail("callback-bearing class without reload hook did not remain coherently on v2")
+		return
+
+	var native_ext := ".dylib"
+	if OS.get_name() == "Windows":
+		native_ext = ".dll"
+	elif OS.get_name() == "Linux":
+		native_ext = ".so"
+	var v2_copy := ProjectSettings.globalize_path("res://bin/libodinscripts%s.r1%s" % [native_ext, native_ext])
+	if not FileAccess.file_exists(v2_copy):
+		_fail("v2 reload copy disappeared while removed/callback instances still owned it")
+		return
+
+	# Releasing the final two v2 owners collects the retired image immediately at the
+	# execution writer gate and removes its unique on-disk copy.
+	removed.free()
+	proc_holder.free()
+	if FileAccess.file_exists(v2_copy):
+		_fail("v2 reload copy remained after its final generation owners were freed")
+		return
+	print("RELOAD_GENERATION_OWNERSHIP_OK")
 
 	print("PHASE4_OK")
 	done = true

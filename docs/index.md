@@ -119,6 +119,8 @@ verified, for contributors:
   `ScriptLanguageExtension` / `ScriptExtension` / instance-vtable surface, method by method.
 - [design/export-internals.md](design/export-internals.md): how the export plugin compiles +
   bundles scripts per platform.
+- [design/native-boundary.md](design/native-boundary.md): the core↔scripts ABI fingerprint,
+  compiler compatibility rule, allocator ownership, and why it adds no dispatch cost.
 - [design/web-internals.md](design/web-internals.md): the `when WEB` split, the five wasm
   blockers found and fixed, in-browser verification.
 - [design/wasm-spike.md](design/wasm-spike.md): the original Odin → Emscripten SIDE_MODULE

@@ -1127,10 +1127,6 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 		}
 		return s, false
 	}
-	if s.class_name == "" {
-		s.class_name = s.struct_name
-	}
-
 	// ---- the base class, and the pair that used to be allowed to disagree ----
 	//
 	// `//gd:extends Node2D` and `owner: gd.Node2d` state the same fact twice, and

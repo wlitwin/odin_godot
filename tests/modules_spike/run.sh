@@ -123,11 +123,13 @@ if ! grep -q "COLLISION_PHASE_OK" "$CLOG"; then
     echo "MODULES_SPIKE_FAIL: collision phase (main Player did not survive the colliding module)"
     exit 1
 fi
-if ! grep -q "is defined in BOTH script module" "$CLOG"; then
-    echo "MODULES_SPIKE_FAIL: the collision was not surfaced with an error naming both modules"
+if ! grep -q "duplicate explicit //gd:class 'Player'" "$CLOG" \
+   || ! grep -q "res://scripts/player.odin" "$CLOG" \
+   || ! grep -q "res://modules/rogue/rogue.odin" "$CLOG"; then
+    echo "MODULES_SPIKE_FAIL: the collision did not name the alias and both source paths"
     exit 1
 fi
-echo "  ok  class collision rejected loudly, naming both modules"
+echo "  ok  explicit global-class collision rejected loudly, naming both source paths"
 rm -rf "$PROJ/modules/rogue" "$PROJ/bin/libodinscripts_rogue".*
 
 # ---- phase 3: cross-module import is a build error ----

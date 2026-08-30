@@ -130,7 +130,7 @@ every frame, built only from constructs verified in the showcase and survivors e
 
 ```odin
 //gd:extends Node2D       // the Godot base class this script extends
-//gd:class Mover          // the global class_name (defaults to the struct name)
+//gd:class Mover          // optional global class alias; path identity works without it
 package my_game_scripts
 
 import gd "godot:godot"

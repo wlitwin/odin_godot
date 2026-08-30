@@ -127,7 +127,7 @@ lint_visit :: proc(node: ^ast.Node) -> bool {
 
 
 // THE METHOD TRAP, made loud. A class's proc scan covers its OWN home file
-// plus HEADERLESS helper files — so an attributed (or lifecycle-named) proc
+// plus non-script helper files — so an attributed (or lifecycle-named) proc
 // whose receiver is a DIFFERENT script struct, written inside some class's
 // home file, binds to NOTHING: the home's scan rejects the receiver, and the
 // receiver's scan never visits another class's home. It compiles, connects,
@@ -166,7 +166,7 @@ lint_misplaced :: proc(path, src, own: string, script_structs: map[string]bool) 
 		if !attributed && !is_lc {continue}
 		error_at(
 			Loc{path = path, line = name_ident.pos.line},
-			"%s takes ^%s but lives in %s's home file — it binds to NOTHING there (a class's scan covers its own file + headerless helpers only); move it to a headerless file",
+			"%s takes ^%s but lives in %s's home file — it binds to NOTHING there (a class's scan covers its own file + non-script helpers only); move it to a helper file without an owner-first script struct",
 			name_ident.name,
 			recv,
 			own,

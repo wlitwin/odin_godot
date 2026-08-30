@@ -50,7 +50,7 @@ Suggested description (edit to taste):
 > GDScript, but the code is compiled, AOT-native code. It ships prebuilt core libraries
 > (macOS / Windows / Linux), an in-editor build pipeline (save-to-reload), native + HTML5/WASM
 > export, typed access to the whole engine API, and a starter template. It requires the Odin
-> compiler (the bundled README names the exact pinned release). macOS is fully verified;
+> compiler (the bundled README names the tested release). macOS is fully verified;
 > Windows/Linux are early, and reports are welcome.
 
 ## Releasing an update
@@ -74,6 +74,6 @@ git push origin main release --tags
 - **`godot --import` exit code**: with any GDExtension, headless `--import` can crash *at
   exit, after a successful import* (an engine bug; see the known-quirk note in
   [distribution.md](distribution.md)). If a user's CI gates on it, point them at that note.
-- The addon's prebuilt core pins the consumer's **Odin compiler release** (the core↔scripts
-  ABI handshake); the addon README states the exact version. Expect "which Odin do I
-  install" to be the most common first question.
+- The addon README names the **tested Odin compiler release**, but compatible releases are
+  admitted by the pre-boot core↔scripts ABI fingerprint rather than exact version-string
+  lockstep. Recommend the tested release when helping users, especially before Odin 1.0.

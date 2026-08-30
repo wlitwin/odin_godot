@@ -18,7 +18,7 @@ the multiplayer toolkit in posts 3–6 relies on.
 | The GDScript reflex | The Odin form |
 | --- | --- |
 | `extends CharacterBody2D` | `//gd:extends CharacterBody2D` marker; `owner: gd.Character_Body2d` first field |
-| `class_name Enemy` | `//gd:class Enemy` (defaults to the struct name) |
+| `class_name Enemy` | Optional `//gd:class Enemy`; omit it when no global alias is needed |
 | `@export var speed := 120.0` | ``speed: f32 `gd:"export,default=120"` `` |
 | `@export_range(0, 100) var hp` | ``hp: f32 `gd:"export,range=0:100"` `` |
 | `@onready var sprite = $Sprite` | ``sprite: gd.Node2d `gd:"onready=Sprite"` `` |

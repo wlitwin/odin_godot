@@ -10,9 +10,11 @@ PROJ="$ROOT/tests/phase4"
 # The live test swaps this authored fixture to v2. Always start at v1, and restore both
 # source + generated artifacts on exit so repeated/local test runs leave a coherent tree.
 cp "$PROJ/fixtures/lifecycle_toggle_v1.odin" "$PROJ/scripts/lifecycle_toggle.odin"
+cp "$PROJ/fixtures/removed_class.odin" "$PROJ/scripts/removed_class.odin"
 LOG=""
 restore_v1() {
     cp "$PROJ/fixtures/lifecycle_toggle_v1.odin" "$PROJ/scripts/lifecycle_toggle.odin"
+    cp "$PROJ/fixtures/removed_class.odin" "$PROJ/scripts/removed_class.odin"
     SKIP_CORE=1 bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null 2>&1 || true
     if [ -n "$LOG" ]; then
         rm -f "$LOG"
@@ -54,8 +56,16 @@ if ! grep -q "RELOAD_SNAPSHOT_FREE_SAFE" "$LOG"; then
     exit 1
 fi
 echo "  ok  reload drained an in-flight script call and survived re-entrant instance free"
-if ! grep -q "ODIN_RELOAD_GENERATIONS_RETAINED" "$LOG"; then
-    echo "PHASE4_FAIL: retained DLL generation warning was not surfaced"
+if ! grep -q "ODIN_RELOAD_REMOVED_CLASS_PINNED" "$LOG"; then
+    echo "PHASE4_FAIL: removed-class generation ownership was not surfaced"
     exit 1
 fi
-echo "  ok  retained DLL generation cost surfaced with a restart recommendation"
+if ! grep -q "ODIN_RELOAD_PROC_STATE_PINNED" "$LOG"; then
+    echo "PHASE4_FAIL: callback-bearing state without a reload hook was not pinned safely"
+    exit 1
+fi
+if [ "$(grep -c "ODIN_RELOAD_GENERATION_UNLOADED" "$LOG")" -lt 2 ]; then
+    echo "PHASE4_FAIL: retired DLL generations were not unloaded at the writer gate"
+    exit 1
+fi
+echo "  ok  removed/callback-bearing instances pin exactly their owner; releasable generations unload"

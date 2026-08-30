@@ -33,10 +33,11 @@ package events
 // that means `<class>_exit_tree` (which also covers queue_free). The publisher's
 // event should be destroy()ed in its own exit_tree.
 //
-// HOT RELOAD (same trap as `flow`, same fix): subscriptions cache raw proc pointers
-// into the scripts dll, so after a hot reload they point at STALE code — and after a
-// CHANGED-LAYOUT reload the ctx pointers dangle too (structs are reallocated; the
-// publisher's list is also reset by migration). The self-healing pattern is for every
+// HOT RELOAD (same trap as `flow`, same fix): subscriptions carry procedure-bound state,
+// so the runtime keeps an instance on its old DLL generation unless a reload hook provides
+// the explicit refresh boundary. After a CHANGED-LAYOUT reload the ctx pointers would dangle
+// too (structs are reallocated; the publisher's list is also reset by migration). The
+// self-healing pattern is for every
 // SUBSCRIBER to resubscribe in its `<class>_reload` hook, tagged with its own engine
 // instance id as `owner`:
 //

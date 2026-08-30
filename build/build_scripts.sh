@@ -6,7 +6,7 @@
 #   4. build the core ScriptLanguageExtension dll
 #
 # SINGLE-FILE: the authored `res://scripts/*.odin` are themselves the resources attached
-# to nodes (the loader binds them via their `//gd:class` marker); no resource stubs.
+# to nodes (the loader binds them by canonical source path); no resource stubs.
 #
 # Generalizes build/build_phase3.sh. Run inside the Nix dev shell, e.g.:
 #   nix develop --command bash -c 'bash build/build_scripts.sh'
@@ -88,7 +88,7 @@ build_one_scripts_dir() {
     for attempt in 1 2 3; do
         before="$(authored_sources_fingerprint "$dir" 2>/dev/null || true)"
         gen_rc=0
-        run_scriptgen "$dir" || gen_rc=$?
+        run_scriptgen "$dir" "$PROJ" || gen_rc=$?
         build_rc="$gen_rc"
         if [[ "$gen_rc" == "0" ]]; then
             atomic_odin_dll "$dir" "$out" \

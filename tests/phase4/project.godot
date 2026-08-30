@@ -6,7 +6,3 @@ config/name="OdinGodotPhase4"
 config/features=PackedStringArray("4.6")
 
 [headless]
-
-[odin_godot]
-
-reload_generation_warning_count=1

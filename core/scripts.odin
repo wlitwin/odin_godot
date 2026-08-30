@@ -19,8 +19,8 @@ import "core:strings"
 //     calling `rt.odin_scripts_manifest()` directly after `web_startup` has run the
 //     scripts' `@(init)` self-registration.
 //
-// Either way the result is the same: a `scripts_classes` map the rest of the core uses
-// to bind a `.odin` file to a registered Class_Desc.
+// Either way the result is the same: a path-keyed descriptor map plus a separate map
+// for optional explicit Godot global-class aliases.
 // ----------------------------------------------------------------------------
 
 // Saved at the core's entry point. NATIVE forwards it to the scripts dll's boot (that
@@ -28,15 +28,25 @@ import "core:strings"
 @(private)
 saved_get_proc_address: gdext.ExtensionInterfaceGetProcAddress
 
-// class name -> its registered descriptor. The `name`/`base` cstrings are static for
-// the module's lifetime (native: in the scripts dll; web: in this module). The map
-// keys are heap-cloned by index_scripts_manifest.
+// Canonical `res://` source identity -> descriptor. This is the primary binding and
+// hot-reload index; struct names and engine base types never participate.
 @(private)
 scripts_classes: map[string]rt.Class_Desc
 
 @(private)
-scripts_find_class :: proc(name: string) -> (rt.Class_Desc, bool) {
-	desc, ok := scripts_classes[name]
+scripts_find_path :: proc(path: string) -> (rt.Class_Desc, bool) {
+	desc, ok := scripts_classes[path]
+	return desc, ok
+}
+
+// Optional explicit `//gd:class` alias -> descriptor. Kept separate so marker-less
+// scripts with identical struct/base names remain unambiguous by path.
+@(private)
+scripts_global_classes: map[string]rt.Class_Desc
+
+@(private)
+scripts_find_global_class :: proc(name: string) -> (rt.Class_Desc, bool) {
+	desc, ok := scripts_global_classes[name]
 	return desc, ok
 }
 
@@ -56,16 +66,48 @@ scripts_module_for_res_path :: proc(path: string) -> string {
 	return ""
 }
 
-// Build the class-name -> Class_Desc map from a manifest (descs/count). Uses the core
-// allocator (alignment-correct for maps). Shared by both the native and web loaders.
+// Build the source-path and optional global-alias indexes from a manifest. Uses the
+// core allocator (alignment-correct for maps). On web every script module contributes
+// to one manifest, so alias conflicts are diagnosed here with both source paths while
+// both path identities remain usable.
 @(private)
 index_scripts_manifest :: proc(descs: [^]rt.Class_Desc, n: int) {
 	context.allocator = core_allocator()
 	scripts_classes = make(map[string]rt.Class_Desc)
+	scripts_global_classes = make(map[string]rt.Class_Desc)
 	for i in 0 ..< n {
 		d := descs[i]
-		name := strings.clone(string(d.name))
-		scripts_classes[name] = d
+		identity_ptr := rt.desc_identity(d)
+		if identity_ptr == nil {continue}
+		identity := string(identity_ptr)
+		if prev, dup := scripts_classes[identity]; dup {
+			msg := fmt.aprintf(
+				"odin_godot: duplicate script source identity '%s' (%s and %s); the later descriptor was ignored.",
+				identity,
+				prev.path != nil ? string(prev.path) : string(prev.name),
+				d.path != nil ? string(d.path) : string(d.name),
+			)
+			scripts_note_error(msg)
+			delete(msg)
+			continue
+		}
+		path_key := strings.clone(identity)
+		scripts_classes[path_key] = d
+		if d.global_name == nil || string(d.global_name) == "" {continue}
+		alias := string(d.global_name)
+		if prev, dup := scripts_global_classes[alias]; dup {
+			msg := fmt.aprintf(
+				"odin_godot: duplicate explicit //gd:class '%s' in '%s' and '%s'; both scripts remain path-addressable, but the global alias is ambiguous.",
+				alias,
+				prev.path != nil ? string(prev.path) : string(prev.name),
+				d.path != nil ? string(d.path) : string(d.name),
+			)
+			scripts_note_error(msg)
+			delete(msg)
+			continue
+		}
+		alias_key := strings.clone(alias)
+		scripts_global_classes[alias_key] = d
 	}
 }
 

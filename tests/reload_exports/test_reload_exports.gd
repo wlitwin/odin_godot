@@ -21,6 +21,7 @@ extends SceneTree
 const SRC := "res://scripts/widget.odin"
 const MARKER := "//NEW_FIELD_HERE"
 const NEW_FIELD_DECL := "new_field: gd.Int `gd:\"export\"`,"
+const COMPAT_FIELD_DECL := "compat_field: gd.Int `gd:\"export\"`,"
 
 var done := false
 var original_src := ""
@@ -242,7 +243,8 @@ GunProbe :: struct {
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(gunsrc))
 
 	# QUIESCE before the skew phase: the deletion above triggers one more probe rebuild;
-	# phase 8 needs an idle pipeline so ITS request bakes the skew root (an in-flight
+	# the compatibility phases need an idle pipeline so THEIR request bakes the selected
+	# collection root (an in-flight
 	# build could otherwise swallow the request into a real-root rerun). Wait for the
 	# sweep's gen rewrite, then settle so its dll swap lands too.
 	var probe_swept := false
@@ -256,8 +258,32 @@ GunProbe :: struct {
 	for i in range(600):
 		await process_frame
 
-	# ===== 8. ABI-SKEW REFUSAL IS LOUD: rebuild against a doctored addon checkout (one
-	# boundary struct grown -> different ABI hash — run.sh prepares it). The deferred
+	# ===== 8. COMPILER IDENTITY IS NOT LOCKSTEP: run.sh doctored only the version string
+	# returned by an otherwise identical runtime. Its complete ABI fingerprint still matches,
+	# so the new code must publish. This keeps compiler provenance visible without rejecting a
+	# compatible scripts DLL merely because Odin moved releases.
+	var compatroot := OS.get_environment("ODIN_GODOT_COMPAT_ROOT")
+	if compatroot == "":
+		_fail("ODIN_GODOT_COMPAT_ROOT not set (run via run.sh)"); return
+	ProjectSettings.set_setting("odin_godot/root", compatroot)
+	_write_src(original_src.replace(MARKER, COMPAT_FIELD_DECL))
+	var compat_err = script.reload(true)
+	if compat_err != OK:
+		ProjectSettings.set_setting("odin_godot/root", null)
+		_fail("compiler-compat reload kick returned %s" % str(compat_err)); return
+	var compat_loaded := false
+	for i in range(4800):
+		await process_frame
+		if _has_export(node, "compat_field"):
+			compat_loaded = true
+			break
+	if not compat_loaded:
+		ProjectSettings.set_setting("odin_godot/root", null)
+		_fail("matching ABI was rejected only because the reported compiler version differed"); return
+	print("COMPILER_SKEW_ABI_COMPATIBLE")
+
+	# ===== 9. ABI-SKEW REFUSAL IS LOUD: rebuild against a doctored addon checkout (one
+	# boundary struct grown -> different ABI fingerprint — run.sh prepares it). The deferred
 	# swap must REFUSE the dll (old code kept, no crash) and the refusal must surface
 	# as an editor error with the restart-the-editor diagnosis; run.sh asserts the
 	# message text in this process's stderr. This pins the 3-day silent failure mode:
@@ -281,7 +307,7 @@ GunProbe :: struct {
 	var t0 := Time.get_ticks_msec()
 	while Time.get_ticks_msec() - t0 < 20000:
 		await process_frame
-	if not _has_export(node, "speed"):
+	if not _has_export(node, "compat_field"):
 		ProjectSettings.set_setting("odin_godot/root", null)
 		_fail("old code was NOT kept after the refused skew swap"); return
 	print("SKEW_SWAP_REFUSED_OLD_CODE_KEPT")

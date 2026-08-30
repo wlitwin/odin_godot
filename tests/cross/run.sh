@@ -72,6 +72,7 @@ run_target() {
     RAN=1
     check_obj "$out/libodin_godot$ext"  "$fre" "odin_godot_init"   "core $target"
     check_obj "$out/libodinscripts$ext" "$fre" "odin_scripts_boot" "scripts $target"
+    check_obj "$out/libodinscripts$ext" "$fre" "odin_scripts_abi_fingerprint" "scripts ABI handshake $target"
 }
 
 echo "cross-build smoke  (root: $ROOT)"

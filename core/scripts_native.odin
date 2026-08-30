@@ -11,6 +11,7 @@ import "core:fmt"
 import "core:os"
 import "core:slice"
 import "core:strings"
+import "core:sync"
 
 // ----------------------------------------------------------------------------
 // NATIVE scripts-dll loading + the manifest/boot handshake (and Phase 4 hot reload).
@@ -22,7 +23,7 @@ import "core:strings"
 //   2. calls `odin_scripts_boot(gpa, lib)` so the scripts dll initializes ITS OWN
 //      copy of the gdext/godot globals (it cannot share ours — see scripts/boot.odin),
 //   3. calls `odin_scripts_manifest()` to learn which classes it provides,
-//   4. indexes them by class name (index_scripts_manifest).
+//   4. indexes them by canonical source path plus optional global alias.
 // ----------------------------------------------------------------------------
 
 // On WEB, the runtime startup is run explicitly (see scripts_web.odin); on native the
@@ -55,10 +56,11 @@ Scripts_Dll :: struct {
 	// before reading the manifest to reject a scripts dll built against a different addon
 	// version. Absent (nil) on a dll built before this handshake existed — also a mismatch.
 	odin_scripts_abi_version: proc "c" () -> u32,
-	// ODIN_VERSION of the compiler that built the scripts dll (see rt.odin_scripts_odin_version).
-	// Same struct sizes across Odin releases do not guarantee the same layout/calling
-	// conventions, so a compiler mismatch is rejected like an ABI mismatch. Absent (nil) on an
-	// older dll — also treated as a mismatch, never a crash.
+	// Complete size/alignment/named-offset fingerprint for every ABI-visible descriptor.
+	// This is the compatibility decision that safely replaces exact compiler lockstep.
+	odin_scripts_abi_fingerprint: proc "c" () -> u64,
+	// ODIN_VERSION of the compiler that built the scripts dll. Retained as provenance and
+	// diagnostics; a different release is accepted only when the full ABI contract matches.
 	odin_scripts_odin_version: proc "c" () -> cstring,
 	// Problems the dll's runtime reflection walk recorded while building its member tables
 	// at `@(init)` (see runtime/register_class.odin). Pulled after the manifest and surfaced
@@ -71,8 +73,9 @@ Scripts_Dll :: struct {
 // into different compatibility rules.
 @(private = "file")
 Scripts_Dll_Contract :: struct {
-	abi:  u32,
-	odin: string,
+	abi:         u32,
+	fingerprint: u64,
+	odin:        string,
 }
 
 @(private = "file")
@@ -95,6 +98,9 @@ scripts_dll_contract :: proc "contextless" (dll: ^Scripts_Dll) -> Scripts_Dll_Co
 	if dll.odin_scripts_abi_version != nil {
 		contract.abi = dll.odin_scripts_abi_version()
 	}
+	if dll.odin_scripts_abi_fingerprint != nil {
+		contract.fingerprint = dll.odin_scripts_abi_fingerprint()
+	}
 	if dll.odin_scripts_odin_version != nil {
 		if version := dll.odin_scripts_odin_version(); version != nil {
 			contract.odin = string(version)
@@ -104,8 +110,8 @@ scripts_dll_contract :: proc "contextless" (dll: ^Scripts_Dll) -> Scripts_Dll_Co
 }
 
 // Rejected candidates have published no descriptors or proc pointers, so they are safe
-// to unload immediately. Successful generations deliberately remain mapped until the
-// generation-ownership work in TODO.md makes their retirement provably safe.
+// to unload immediately. Published generations go through Script_Generation retirement
+// below so live instances, removed classes, and reload-safe callback state are respected.
 @(private = "file")
 scripts_dll_discard :: proc(dll: ^Scripts_Dll) {
 	if dll == nil {
@@ -122,39 +128,50 @@ scripts_dll_discard :: proc(dll: ^Scripts_Dll) {
 // (res://scripts -> libodinscripts.<ext>, always present, exactly the pre-spike single
 // dll) plus optional extra modules (res://modules/<name> -> libodinscripts_<name>.<ext>).
 // Each module is its own Odin package with its OWN dll, its own boot handshake, and its
-// own runtime registry; the core merges every module's manifest into the ONE shared
-// `scripts_classes` map (class names must be unique across modules — a collision is a
-// load error naming both modules). A single-module project is simply a g_modules table
+// own runtime registry; the core merges every module's manifest into one path map plus
+// an optional global-alias map (explicit alias collisions name both sources). A single-module project is simply a g_modules table
 // of length one, so the pre-spike path is unchanged.
 // ----------------------------------------------------------------------------
 
 @(private)
 Scripts_Module :: struct {
-	name:      string, // "" == the MAIN module. Heap-owned clone otherwise.
-	path:      string, // heap-owned dll base path (the published, non-unique-copy path)
-	dll:       Scripts_Dll,
-	dll_bytes: int, // approximate mapped bytes; used for the retained-generation warning
-	// Class names this module currently provides. Each entry is ONE heap clone shared
-	// with the `scripts_classes` map key (so a per-module reload can delete the key and
-	// free the clone exactly once).
+	name:       string, // "" == the MAIN module. Heap-owned clone otherwise.
+	path:       string, // heap-owned dll base path (the published, non-unique-copy path)
+	generation: ^Script_Generation,
+	// Source identities this module currently provides. Each entry is ONE heap clone shared
+	// with the path-identity map key (so reload can delete/free it exactly once).
 	classes: [dynamic]string,
+	// Explicit `//gd:class` aliases, separately owned because they are optional and
+	// never serve as runtime identity.
+	global_classes: [dynamic]string,
 }
 
 @(private)
 g_modules: [dynamic]Scripts_Module
 
-// Successful hot reloads deliberately keep the previous image mapped: removed classes,
-// returned property metadata, and user-cached raw proc pointers do not yet have explicit
-// generation ownership. Track that cost and tell long-running editor sessions when a restart
-// is sensible instead of letting the safe retention policy look like an unexplained leak.
+// One mapped scripts-DLL image. The module owns the current generation; once replaced,
+// live Odin_Instance leases are the only reason an old generation remains mapped.
+// `reload_path` is a unique `.rN` copy and is deleted immediately after the handle unloads.
 @(private)
-g_retained_reload_generations: int
-@(private)
-g_retained_reload_bytes: int
-@(private)
-g_retained_last_warning: int
+Script_Generation :: struct {
+	dll:          Scripts_Dll,
+	module_name:  string,
+	reload_path:  string,
+	bytes:        int,
+	serial:       int,
+	instance_refs: int,
+	retired:      bool,
+	desc_tokens:  [dynamic]uintptr,
+}
 
-RETAINED_GENERATION_WARNING_DEFAULT :: 24
+@(private)
+g_script_generations: [dynamic]^Script_Generation
+@(private)
+g_desc_generations: map[uintptr]^Script_Generation
+@(private)
+g_script_generation_lock: sync.Mutex
+@(private)
+g_script_generation_collection_pending: bool
 
 @(private = "file")
 scripts_dll_file_size :: proc(path: string) -> int {
@@ -166,49 +183,153 @@ scripts_dll_file_size :: proc(path: string) -> int {
 }
 
 @(private = "file")
-retained_generation_warning_limit :: proc() -> int {
-	ps := godot.singleton_project_settings()
-	key := godot.new_string_cstring("odin_godot/reload_generation_warning_count")
-	defer godot.free_string(key)
-	if !bool(godot.project_settings_has_setting(ps, key)) {
-		return RETAINED_GENERATION_WARNING_DEFAULT
-	}
-	default_value: godot.Int = RETAINED_GENERATION_WARNING_DEFAULT
-	def := godot.variant_from_int(&default_value)
-	defer godot.variant_destroy(&def)
-	v := godot.project_settings_get_setting(ps, key, def)
-	defer godot.variant_destroy(&v)
-	return int(godot.variant_to_int(&v))
+script_generation_token :: proc "contextless" (desc: rt.Class_Desc) -> uintptr {
+	identity := rt.desc_identity(desc)
+	if identity == nil {return 0}
+	return uintptr(cast(rawptr)identity)
 }
 
 @(private = "file")
-note_retained_reload_generation :: proc(bytes: int) {
-	g_retained_reload_generations += 1
-	if bytes > 0 {
-		g_retained_reload_bytes += bytes
-	}
+script_generation_create :: proc(dll: Scripts_Dll, module_name: string, bytes: int, reload_path := "") -> ^Script_Generation {
+	context.allocator = core_allocator()
+	gen := new(Script_Generation)
+	gen.dll = dll
+	gen.module_name = strings.clone(module_name)
+	gen.reload_path = strings.clone(reload_path)
+	gen.bytes = bytes
+	gen.serial = reload_counter
+	append(&g_script_generations, gen)
+	return gen
+}
 
-	limit := retained_generation_warning_limit()
-	if limit <= 0 || g_retained_reload_generations < limit {
-		return
+@(private = "file")
+script_generation_register_manifest :: proc(gen: ^Script_Generation, descs: [^]rt.Class_Desc, n: int) {
+	if gen == nil {return}
+	context.allocator = core_allocator()
+	if g_desc_generations == nil {
+		g_desc_generations = make(map[uintptr]^Script_Generation)
 	}
-	if g_retained_last_warning > 0 &&
-	   g_retained_reload_generations - g_retained_last_warning < limit {
-		return
+	for i in 0 ..< n {
+		token := script_generation_token(descs[i])
+		if token == 0 {continue}
+		g_desc_generations[token] = gen
+		append(&gen.desc_tokens, token)
 	}
-	g_retained_last_warning = g_retained_reload_generations
+}
 
-	message := fmt.tprintf(
-		"ODIN_RELOAD_GENERATIONS_RETAINED: odin_godot has retained %d old scripts DLL " +
-			"generation(s) (~%.1f MiB) so existing native references stay valid. Restart the " +
-			"editor to release them. Set odin_godot/reload_generation_warning_count to change " +
-			"this interval, or 0 to disable the warning.",
-		g_retained_reload_generations,
-		f64(g_retained_reload_bytes) / (1024.0 * 1024.0),
-	)
-	gdext_print("odin reload: retained old DLL generations", message)
-	msg := godot.new_string_odin(message)
-	godot.gd_push_warning(godot.variant_from_string(&msg))
+// Shared instance.odin hook. The descriptor's identity cstring lives in exactly one
+// mapped image, making its address a stable generation token even when path bytes match.
+@(private)
+script_generation_for_desc :: proc "contextless" (desc: rt.Class_Desc) -> rawptr {
+	token := script_generation_token(desc)
+	if token == 0 || g_desc_generations == nil {return nil}
+	return g_desc_generations[token]
+}
+
+@(private)
+script_generation_retain :: proc "contextless" (opaque: rawptr) {
+	gen := cast(^Script_Generation)opaque
+	if gen == nil {return}
+	sync.lock(&g_script_generation_lock)
+	gen.instance_refs += 1
+	sync.unlock(&g_script_generation_lock)
+}
+
+@(private)
+script_generation_release :: proc "contextless" (opaque: rawptr) {
+	gen := cast(^Script_Generation)opaque
+	if gen == nil {return}
+	sync.lock(&g_script_generation_lock)
+	if gen.instance_refs > 0 {
+		gen.instance_refs -= 1
+	}
+	if gen.retired && gen.instance_refs == 0 {
+		g_script_generation_collection_pending = true
+	}
+	sync.unlock(&g_script_generation_lock)
+}
+
+@(private = "file")
+script_generation_retire :: proc(gen: ^Script_Generation) {
+	if gen == nil {return}
+	sync.lock(&g_script_generation_lock)
+	gen.retired = true
+	g_script_generation_collection_pending = true
+	sync.unlock(&g_script_generation_lock)
+}
+
+// Writer-gate-only collector. A zero-ref retired image has no executing trampoline
+// (the gate drained those), no live descriptor/cache/user tuple, and no unacknowledged
+// proc-bearing state. Property lists point only into separately-owned core caches.
+@(private = "file")
+script_generations_collect_at_gate :: proc() {
+	context.allocator = core_allocator()
+	sync.lock(&g_script_generation_lock)
+	g_script_generation_collection_pending = false
+	for i := len(g_script_generations) - 1; i >= 0; i -= 1 {
+		gen := g_script_generations[i]
+		if gen == nil || !gen.retired || gen.instance_refs != 0 {continue}
+		reload_path := strings.clone(gen.reload_path, context.temp_allocator)
+		module_name := strings.clone(gen.module_name, context.temp_allocator)
+		serial := gen.serial
+		bytes := gen.bytes
+
+		// Keep the ownership lock from spanning platform loader/finalizer code. The
+		// execution writer gate prevents a descriptor lookup while the lock is open.
+		dll := gen.dll
+		sync.unlock(&g_script_generation_lock)
+		unloaded := dll.__handle == nil || dynlib.unload_library(dll.__handle)
+		if !unloaded {
+			gdext_print(
+				"ODIN_RELOAD_GENERATION_UNLOAD_FAILED",
+				fmt.tprintf(
+					"module=%s generation=%d; will retry: %s",
+					module_display(module_name),
+					serial,
+					dynlib.last_error(),
+				),
+			)
+		}
+		sync.lock(&g_script_generation_lock)
+		if !unloaded {
+			g_script_generation_collection_pending = true
+			continue
+		}
+
+		for token in gen.desc_tokens {
+			if current, ok := g_desc_generations[token]; ok && current == gen {
+				delete_key(&g_desc_generations, token)
+			}
+		}
+		delete(gen.desc_tokens)
+		delete(gen.module_name)
+		delete(gen.reload_path)
+		free(gen)
+		unordered_remove(&g_script_generations, i)
+
+		// Filesystem work and logging likewise need no ownership lock.
+		sync.unlock(&g_script_generation_lock)
+		if reload_path != "" {os.remove(reload_path)}
+		gdext_print(
+			"ODIN_RELOAD_GENERATION_UNLOADED",
+			fmt.tprintf("module=%s generation=%d bytes=%d", module_display(module_name), serial, bytes),
+		)
+		sync.lock(&g_script_generation_lock)
+	}
+	sync.unlock(&g_script_generation_lock)
+}
+
+// Called after an ordinary instance free. It takes the writer gate itself so the last
+// removed/blocked instance can retire its image without waiting for another reload.
+@(private)
+script_generations_collect_pending :: proc() {
+	sync.lock(&g_script_generation_lock)
+	pending := g_script_generation_collection_pending
+	sync.unlock(&g_script_generation_lock)
+	if !pending || !script_reload_can_begin() {return}
+	script_reload_begin()
+	script_generations_collect_at_gate()
+	script_reload_end()
 }
 
 // Human-readable module name for error messages.
@@ -227,14 +348,24 @@ module_index :: proc(name: string) -> int {
 	return -1
 }
 
-// Index of the module currently providing `class`, or -1. Linear over a tiny table.
+// Index of the module currently providing an explicit global alias, or -1.
 @(private = "file")
 module_owning_class :: proc(class: string) -> int {
 	for m, i in g_modules {
-		for c in m.classes {
+		for c in m.global_classes {
 			if c == class {
 				return i
 			}
+		}
+	}
+	return -1
+}
+
+@(private = "file")
+module_owning_identity :: proc(identity: string) -> int {
+	for m, i in g_modules {
+		for p in m.classes {
+			if p == identity {return i}
 		}
 	}
 	return -1
@@ -248,20 +379,17 @@ g_scripts_missing: bool
 @(private)
 g_scripts_missing_warned: bool
 
-// Set when the scripts dll loaded but its ABI version didn't match the core's (a version skew).
+// Set when the scripts dll's semantic ABI version or full layout fingerprint didn't match.
 @(private)
 g_scripts_abi_skew: bool
 @(private)
 g_abi_core: u32
 @(private)
 g_abi_scripts: u32
-
-// Set when the scripts dll was built by a different Odin compiler than the core (compiler skew:
-// same struct sizes do not guarantee the same layout/ABI across compiler releases).
 @(private)
-g_scripts_odin_skew: bool
+g_abi_core_fingerprint: u64
 @(private)
-g_odin_scripts: string // compiler version reported by the rejected dll (heap-owned clone)
+g_abi_scripts_fingerprint: u64
 
 // surface_load_failure_runtime — in a SHIPPED GAME (NOT the editor), a missing or incompatible
 // scripts dll means the game runs with zero Odin scripts. Push a visible error to the game log
@@ -300,7 +428,7 @@ surface_load_failure_runtime :: proc(detail: string) {
 // must never nag a player. Tells the user this is the normal first-run state and how to fix.
 @(private)
 scripts_surface_missing_warning :: proc() {
-	if !g_scripts_missing && !g_scripts_abi_skew && !g_scripts_odin_skew {
+	if !g_scripts_missing && !g_scripts_abi_skew {
 		return
 	}
 	if g_scripts_missing_warned {
@@ -311,33 +439,18 @@ scripts_surface_missing_warning :: proc() {
 		return
 	}
 	g_scripts_missing_warned = true
-	if g_scripts_odin_skew {
-		// Loaded, but compiled by a different Odin than the core. Rebuilding is only half
-		// the fix: the core is usually PREBUILT, so the user must build with the exact
-		// Odin release it pins — name it.
-		msg := godot.new_string_odin(
-			fmt.tprintf(
-				"odin_godot: your scripts dll was built with Odin %s, but this core requires " +
-				"Odin %s — install that exact release (odin-lang.org), then rebuild scripts " +
-				"(Project > Tools > Build Odin Scripts). Your scripts won't load until the " +
-				"versions match.",
-				g_odin_scripts,
-				ODIN_VERSION,
-			),
-		)
-		godot.gd_push_error(godot.variant_from_string(&msg))
-		return
-	}
 	if g_scripts_abi_skew {
 		// Loaded, but built against a different odin_godot version — a clear "rebuild" message,
 		// not the fresh-install one.
 		msg := godot.new_string_odin(
 			fmt.tprintf(
-				"odin_godot: your scripts dll was built against a different addon version " +
-				"(core ABI v%d, scripts v%d). Rebuild it: addons/odin_godot/build/build_scripts.sh " +
-				"(your scripts won't load until you do).",
+				"odin_godot: your scripts dll has an incompatible native contract " +
+					"(core ABI v%d/fp=%016x, scripts v%d/fp=%016x). Rebuild it: addons/odin_godot/build/build_scripts.sh " +
+					"(your scripts won't load until you do).",
 				g_abi_core,
+				g_abi_core_fingerprint,
 				g_abi_scripts,
+				g_abi_scripts_fingerprint,
 			),
 		)
 		godot.gd_push_error(godot.variant_from_string(&msg))
@@ -474,7 +587,8 @@ scripts_dll_path :: proc() -> string {
 }
 
 // Load ONE scripts dll at `path` and run the FULL handshake: symbol resolution, ABI
-// version, compiler version, boot, typed-cross-script core-api handoff. `main` selects
+// semantic version, layout fingerprint, compiler provenance, boot, and typed-cross-script
+// core-api handoff. `main` selects
 // the main-module failure surfacing (the fresh-install warning flags + shipped-game
 // errors — exactly the pre-spike behavior); an extra module's failure is surfaced via
 // scripts_note_error (frame-pump push_error) instead, and never flips the main flags.
@@ -502,23 +616,33 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 		return {}, false
 	}
 
-	// ABI handshake FIRST, before boot: refuse a scripts dll built against a different
-	// odin_godot version (its Class_Desc layout would differ -> reading at wrong offsets ->
+	// ABI handshake FIRST, before boot: refuse a scripts dll with a different semantic
+	// generation OR complete layout fingerprint (reading the wrong Class_Desc offsets ->
 	// heap corruption / garbage proc ptrs). The version procs are PURE DATA (they return
 	// constants), so they are safe to call pre-boot — and booting a mismatched dll (letting
 	// it initialize its gdext/godot globals against this core) is exactly what must not
 	// happen. nil symbol = built before this handshake existed = also a mismatch. The fix is
 	// always "rebuild your scripts dll".
 	contract := scripts_dll_contract(&dll)
-	if contract.abi != rt.ABI_VERSION {
+	core_fingerprint := rt.abi_layout_fingerprint()
+	if contract.abi != rt.ABI_VERSION || contract.fingerprint != core_fingerprint {
 		gdext_print(
 			"odin: scripts dll ABI mismatch (rebuild your scripts: build/build_scripts.sh) — core wants",
-			fmt.tprintf("v%d, scripts dll is v%d (%s)", rt.ABI_VERSION, contract.abi, path),
+			fmt.tprintf(
+				"v%d/fp=%016x, scripts dll is v%d/fp=%016x (%s)",
+				rt.ABI_VERSION,
+				core_fingerprint,
+				contract.abi,
+				contract.fingerprint,
+				path,
+			),
 		)
 		if main {
 			g_scripts_abi_skew = true
 			g_abi_core = rt.ABI_VERSION
 			g_abi_scripts = contract.abi
+			g_abi_core_fingerprint = core_fingerprint
+			g_abi_scripts_fingerprint = contract.fingerprint
 		} else {
 			scripts_note_error(
 				fmt.tprintf(
@@ -529,52 +653,33 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, ok: boo
 				),
 			)
 		}
-		surface_load_failure_runtime(fmt.tprintf("ABI mismatch: core v%d, scripts v%d", rt.ABI_VERSION, contract.abi))
+		surface_load_failure_runtime(
+			fmt.tprintf(
+				"ABI mismatch: core v%d/fp=%016x, scripts v%d/fp=%016x",
+				rt.ABI_VERSION,
+				core_fingerprint,
+				contract.abi,
+				contract.fingerprint,
+			),
+		)
 		scripts_dll_discard(&dll)
 		return {}, false
 	}
 
-	// Compiler-skew handshake (also pre-boot, also pure data): matching struct SIZES across
-	// different Odin compiler releases do not guarantee the same layout/calling conventions.
-	// A missing symbol (a dll built before this handshake) is a mismatch too — never a crash.
+	// Compiler identity is provenance, not a blanket lock. Every cross-DLL callback uses the C
+	// convention and the complete metadata layout matched above; allocators never cross. Keep
+	// this line grep-able so a compatibility report still names both toolchains.
 	if contract.odin != ODIN_VERSION {
-		// The fix depends on which side is "wrong", and for an ADDON consumer it is
-		// almost always their compiler: the core ships PREBUILT, so "rebuild scripts"
-		// with their (different) Odin can never converge on a match. Name the exact
-		// release the core requires — installing it is the actionable step.
 		gdext_print(
-			"odin: scripts dll compiler mismatch",
+			"ODIN_COMPILER_SKEW_ABI_COMPATIBLE",
 			fmt.tprintf(
-				"scripts dll built with Odin %s, but this odin_godot core requires Odin %s — " +
-				"install that exact release (odin-lang.org), then rebuild scripts " +
-				"(Project > Tools > Build Odin Scripts). A prebuilt core pins the Odin " +
-				"version; building the core from source with your Odin also works.",
+				"scripts Odin %s differs from core Odin %s; ABI v%d/fp=%016x matches, loading safely",
 				contract.odin,
 				ODIN_VERSION,
+				rt.ABI_VERSION,
+				core_fingerprint,
 			),
 		)
-		if main {
-			g_scripts_odin_skew = true
-			g_odin_scripts = strings.clone(contract.odin)
-		} else {
-			scripts_note_error(
-				fmt.tprintf(
-					"odin_godot: script module dll %s was built with Odin %s, but the core requires %s — install that Odin release and rebuild",
-					path,
-					contract.odin,
-					ODIN_VERSION,
-				),
-			)
-		}
-		surface_load_failure_runtime(
-			fmt.tprintf(
-				"scripts dll built with Odin %s, but this core requires Odin %s — install that release, then rebuild scripts",
-				contract.odin,
-				ODIN_VERSION,
-			),
-		)
-		scripts_dll_discard(&dll)
-		return {}, false
 	}
 
 	// Handshakes passed: boot so the scripts dll's gdext/godot globals are live, THEN the
@@ -613,25 +718,44 @@ script_panic_report :: proc "c" (msg: cstring) {
 	godot.error(msg)
 }
 
-// Merge a booted module's manifest into the shared class map. A class-name collision with
-// ANOTHER module is a LOAD ERROR naming both modules, and rejects this module's WHOLE
-// class set (no partial indexing): duplicated names would make scripts_classes lookups —
-// and name-based cross-module access — silently ambiguous.
+// Merge a booted module's manifest into the path-identity and optional-global-alias maps.
+// Source paths are primary and unique. An explicit alias collision with another module
+// rejects the later module as an authoring error, naming both source files.
 @(private = "file")
 index_module_manifest :: proc(mod: ^Scripts_Module, descs: [^]rt.Class_Desc, n: int) -> bool {
 	context.allocator = core_allocator()
 	for i in 0 ..< n {
-		name := string(descs[i].name)
-		if other := module_owning_class(name); other >= 0 {
+		d := descs[i]
+		identity_ptr := rt.desc_identity(d)
+		if identity_ptr == nil {continue}
+		identity := string(identity_ptr)
+		if prev, dup := scripts_classes[identity]; dup {
 			msg := fmt.aprintf(
-				"odin_godot: script class '%s' is defined in BOTH script module '%s' and script module '%s' — " +
-				"class names must be unique across modules; module '%s' was NOT loaded.",
-				name,
+				"odin_godot: script source path '%s' is present in both '%s' and '%s'; module '%s' was NOT loaded.",
+				identity,
+				prev.path != nil ? string(prev.path) : string(prev.name),
+				d.path != nil ? string(d.path) : string(d.name),
+				module_display(mod.name),
+			)
+			gdext_print("odin: script module path collision", msg)
+			scripts_note_error(msg)
+			delete(msg)
+			return false
+		}
+		if d.global_name == nil || string(d.global_name) == "" {continue}
+		alias := string(d.global_name)
+		if other := module_owning_class(alias); other >= 0 {
+			prev := scripts_global_classes[alias]
+			msg := fmt.aprintf(
+				"odin_godot: duplicate explicit //gd:class '%s' in '%s' and '%s' (script modules '%s' and '%s'); module '%s' was NOT loaded.",
+				alias,
+				prev.path != nil ? string(prev.path) : string(prev.name),
+				d.path != nil ? string(d.path) : string(d.name),
 				module_display(g_modules[other].name),
 				module_display(mod.name),
 				module_display(mod.name),
 			)
-			gdext_print("odin: script module class collision", msg)
+			gdext_print("odin: script module global-class collision", msg)
 			scripts_note_error(msg)
 			delete(msg)
 			return false
@@ -639,9 +763,16 @@ index_module_manifest :: proc(mod: ^Scripts_Module, descs: [^]rt.Class_Desc, n: 
 	}
 	for i in 0 ..< n {
 		d := descs[i]
-		name := strings.clone(string(d.name))
-		scripts_classes[name] = d
-		append(&mod.classes, name)
+		identity_ptr := rt.desc_identity(d)
+		if identity_ptr == nil {continue}
+		identity := strings.clone(string(identity_ptr))
+		scripts_classes[identity] = d
+		append(&mod.classes, identity)
+		if d.global_name != nil && string(d.global_name) != "" {
+			alias := strings.clone(string(d.global_name))
+			scripts_global_classes[alias] = d
+			append(&mod.global_classes, alias)
+		}
 	}
 	return true
 }
@@ -706,15 +837,24 @@ load_extra_modules :: proc(main_dll_path: string) {
 			Scripts_Module{
 				name = strings.clone(f.name),
 				path = strings.clone(f.path),
-				dll = dll,
-				dll_bytes = scripts_dll_file_size(f.path),
 			},
 		)
 		mod := &g_modules[len(g_modules) - 1]
 		n: i32
 		descs := dll.odin_scripts_manifest(&n)
-		_ = index_module_manifest(mod, descs, int(n)) // collision already surfaced; dll stays mapped, classless
 		note_dll_registration_errors(dll.odin_scripts_registration_errors)
+		if index_module_manifest(mod, descs, int(n)) {
+			gen := script_generation_create(dll, f.name, scripts_dll_file_size(f.path))
+			script_generation_register_manifest(gen, descs, int(n))
+			mod.generation = gen
+		} else {
+			// The pre-pass publishes nothing on failure, so this rejected module has no
+			// generation owners and can be unloaded immediately.
+			delete(mod.name)
+			delete(mod.path)
+			unordered_remove(&g_modules, len(g_modules) - 1)
+			scripts_dll_discard(&dll)
+		}
 	}
 }
 
@@ -726,6 +866,7 @@ odin_scripts_load :: proc() {
 	// values, so we only override `allocator`, not `temp_allocator`.
 	context.allocator = core_allocator()
 	scripts_classes = make(map[string]rt.Class_Desc)
+	scripts_global_classes = make(map[string]rt.Class_Desc)
 
 	path := scripts_dll_path()
 	defer delete(path)
@@ -741,14 +882,15 @@ odin_scripts_load :: proc() {
 			Scripts_Module{
 				name = "",
 				path = strings.clone(path),
-				dll = dll,
-				dll_bytes = scripts_dll_file_size(path),
 			},
 		)
 		mod := &g_modules[len(g_modules) - 1]
 		n: i32
 		descs := dll.odin_scripts_manifest(&n)
 		_ = index_module_manifest(mod, descs, int(n)) // main loads first — cannot collide
+		gen := script_generation_create(dll, "", scripts_dll_file_size(path))
+		script_generation_register_manifest(gen, descs, int(n))
+		mod.generation = gen
 		note_dll_registration_errors(dll.odin_scripts_registration_errors)
 	}
 
@@ -801,11 +943,11 @@ note_dll_registration_errors :: proc(errors_proc: proc "c" (out_count: ^i32) -> 
 //      a unique path is required to guarantee the new code is mapped.
 //   2. dlopen the unique path; `odin_scripts_boot` it so the NEW dll initializes its
 //      OWN gdext/godot globals (same first-load handshake); pull its manifest.
-//   3. Rebuild the class map; invalidate the per-class caches.
+//   3. Rebuild the identity map; invalidate the per-script caches.
 //   4. Re-bind every live instance to the new descriptors (same-layout keeps state in
 //      place; changed-layout migrates exports — see rebind_all_instances).
-// The OLD handle is deliberately kept mapped (not dlclose'd): lingering cstrings/proc
-// ptrs stay valid, and after the re-bind no live instance dispatches into it.
+//   5. Retire the old image. Instance leases keep removed or callback-bearing state safe;
+//      once its last lease is released, the image unloads at the closed execution gate.
 // ----------------------------------------------------------------------------
 
 @(private)
@@ -889,10 +1031,17 @@ odin_scripts_reload :: proc(module := "") -> bool {
 		return false
 	}
 	contract := scripts_dll_contract(&new_dll)
-	if contract.abi != rt.ABI_VERSION {
+	core_fingerprint := rt.abi_layout_fingerprint()
+	if contract.abi != rt.ABI_VERSION || contract.fingerprint != core_fingerprint {
 		gdext_print(
 			"odin reload: new scripts dll ABI mismatch — keeping old code",
-			fmt.tprintf("(core v%d, new dll v%d)", rt.ABI_VERSION, contract.abi),
+			fmt.tprintf(
+				"(core v%d/fp=%016x, new dll v%d/fp=%016x)",
+				rt.ABI_VERSION,
+				core_fingerprint,
+				contract.abi,
+				contract.fingerprint,
+			),
 		)
 		// Say it WHERE THE USER LOOKS, with the RIGHT fix. This runs on the main
 		// thread with the engine fully up (deferred swap / Script.reload), so
@@ -906,13 +1055,15 @@ odin_scripts_reload :: proc(module := "") -> bool {
 		// but the real cause.
 		msg := godot.new_string_odin(
 			fmt.tprintf(
-				"odin_godot: reload REJECTED — your freshly-built scripts (ABI v%d) don't match " +
-					"the odin_godot core this session loaded at startup (v%d). The addon was " +
+				"odin_godot: reload REJECTED — your freshly-built scripts (ABI v%d/fp=%016x) don't match " +
+					"the odin_godot core this session loaded at startup (v%d/fp=%016x). The addon was " +
 					"updated while the editor was running: RESTART THE EDITOR to load the new " +
 					"core. Until then the previously-loaded scripts stay active in the editor " +
 					"(Play runs are unaffected — they load fresh).",
 				contract.abi,
+				contract.fingerprint,
 				rt.ABI_VERSION,
+				core_fingerprint,
 			),
 		)
 		godot.gd_push_error(godot.variant_from_string(&msg))
@@ -922,22 +1073,15 @@ odin_scripts_reload :: proc(module := "") -> bool {
 	}
 	if contract.odin != ODIN_VERSION {
 		gdext_print(
-			"odin reload: new scripts dll compiler mismatch — keeping old code",
-			fmt.tprintf("(core Odin %s, new dll Odin %s)", ODIN_VERSION, contract.odin),
-		)
-		msg := godot.new_string_odin(
+			"ODIN_COMPILER_SKEW_ABI_COMPATIBLE",
 			fmt.tprintf(
-				"odin_godot: reload REJECTED — your freshly-built scripts use Odin %s, but " +
-					"the loaded core requires Odin %s. Install that exact compiler release and " +
-					"rebuild; the previously-loaded scripts remain active.",
+				"reload scripts Odin %s differs from core Odin %s; ABI v%d/fp=%016x matches, accepting",
 				contract.odin,
 				ODIN_VERSION,
+				rt.ABI_VERSION,
+				core_fingerprint,
 			),
 		)
-		godot.gd_push_error(godot.variant_from_string(&msg))
-		scripts_dll_discard(&new_dll)
-		os.remove(unique)
-		return false
 	}
 
 	// The candidate is valid and no user code has run from it yet. Close the execution
@@ -965,19 +1109,39 @@ odin_scripts_reload :: proc(module := "") -> bool {
 	// frame — the engine is fully up during a reload).
 	note_dll_registration_errors(new_dll.odin_scripts_registration_errors)
 
-	// 3. Collision pre-pass against the OTHER modules: a class name the new manifest
-	//    shares with a different module would fork name-based lookups — refuse the whole
-	//    swap and keep the old code (nothing was mutated yet).
+	// 3. Collision pre-pass against the OTHER modules. Paths are primary identities;
+	//    explicit global aliases are optional but must still be project-unique.
 	for i in 0 ..< int(n) {
-		name := string(descs[i].name)
-		if other := module_owning_class(name); other >= 0 && other != mi {
+		d := descs[i]
+		identity_ptr := rt.desc_identity(d)
+		if identity_ptr != nil {
+			identity := string(identity_ptr)
+			if other := module_owning_identity(identity); other >= 0 && other != mi {
+				msg := fmt.aprintf(
+					"odin_godot: reload rejected — source path '%s' is already provided by script module '%s' (old code kept).",
+					identity,
+					module_display(g_modules[other].name),
+				)
+				gdext_print("odin reload: module path collision", msg)
+				scripts_note_error(msg)
+				delete(msg)
+				scripts_dll_discard(&new_dll)
+				os.remove(unique)
+				return false
+			}
+		}
+		if d.global_name == nil || string(d.global_name) == "" {continue}
+		alias := string(d.global_name)
+		if other := module_owning_class(alias); other >= 0 && other != mi {
+			prev := scripts_global_classes[alias]
 			msg := fmt.aprintf(
-				"odin_godot: reload rejected — class '%s' in script module '%s' collides with script module '%s' (old code kept).",
-				name,
-				module_display(module),
+				"odin_godot: reload rejected — explicit //gd:class '%s' in '%s' collides with '%s' from script module '%s' (old code kept).",
+				alias,
+				d.path != nil ? string(d.path) : string(d.name),
+				prev.path != nil ? string(prev.path) : string(prev.name),
 				module_display(g_modules[other].name),
 			)
-			gdext_print("odin reload: module class collision", msg)
+			gdext_print("odin reload: module global-class collision", msg)
 			scripts_note_error(msg)
 			delete(msg)
 			scripts_dll_discard(&new_dll)
@@ -986,29 +1150,41 @@ odin_scripts_reload :: proc(module := "") -> bool {
 		}
 	}
 
-	// 4. Re-index THIS module's class set (other modules' entries untouched). The
-	//    `affected` set (old ∪ new names) scopes the cache invalidation + rebind below.
+	// 4. Re-index THIS module's script set (other modules' entries untouched). The
+	//    `affected` set (old ∪ new identities) scopes cache invalidation + rebind below.
 	mod := &g_modules[mi]
+	new_generation := script_generation_create(new_dll, module, len(data), unique)
+	script_generation_register_manifest(new_generation, descs, int(n))
 	affected := make(map[string]bool, context.temp_allocator)
 	for old in mod.classes {
 		affected[strings.clone(old, context.temp_allocator)] = true
 		delete_key(&scripts_classes, old)
-		// Invalidate the per-class cache (rebuilt lazily by ensure_class_cache during
-		// rebind). The old cache struct is leaked — a small, documented per-reload cost
-		// acceptable for a dev loop (same policy as the pre-spike full clear).
-		if class_caches != nil {
-			delete_key(&class_caches, old)
-		}
+		// Retire the old core-owned cache. Instance and returned-metadata leases keep it
+		// alive exactly as long as needed. Only live instances can execute its copied
+		// callback slots; a metadata-only cache is inert and does not pin the DLL image.
+		retire_class_cache(old)
 		delete(old) // the ONE shared clone backing both mod.classes and the map key
 	}
 	clear(&mod.classes)
+	for alias in mod.global_classes {
+		delete_key(&scripts_global_classes, alias)
+		delete(alias)
+	}
+	clear(&mod.global_classes)
 	for i in 0 ..< int(n) {
 		d := descs[i]
-		name := strings.clone(string(d.name))
-		scripts_classes[name] = d
-		append(&mod.classes, name)
-		if !(name in affected) {
-			affected[strings.clone(name, context.temp_allocator)] = true
+		identity_ptr := rt.desc_identity(d)
+		if identity_ptr == nil {continue}
+		identity := strings.clone(string(identity_ptr))
+		scripts_classes[identity] = d
+		append(&mod.classes, identity)
+		if !(identity in affected) {
+			affected[strings.clone(identity, context.temp_allocator)] = true
+		}
+		if d.global_name != nil && string(d.global_name) != "" {
+			alias := strings.clone(string(d.global_name))
+			scripts_global_classes[alias] = d
+			append(&mod.global_classes, alias)
 		}
 	}
 
@@ -1016,13 +1192,10 @@ odin_scripts_reload :: proc(module := "") -> bool {
 	//    may run after). Instances of other modules are skipped — untouched by design.
 	rebind_all_instances(affected)
 
-	old_bytes := mod.dll_bytes
-	if old_bytes <= 0 {
-		old_bytes = len(data)
-	}
-	mod.dll = new_dll
-	mod.dll_bytes = len(data)
-	note_retained_reload_generation(old_bytes)
+	old_generation := mod.generation
+	mod.generation = new_generation
+	script_generation_retire(old_generation)
+	script_generations_collect_at_gate()
 	return true
 }
 

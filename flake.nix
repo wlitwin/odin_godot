@@ -110,6 +110,14 @@
           '';
         };
 
+        # Focused build-helper contract gate. PowerShell is intentionally kept out of
+        # the default shell (~200 MiB installed): this shell lets CI/maintainers execute
+        # the real Windows helper policy on any host without taxing normal iteration.
+        devShells.build-parity = pkgs.mkShell {
+          name = "odin_godot-build-parity";
+          packages = with pkgs; [ bash coreutils powershell ];
+        };
+
         # ----------------------------------------------------------------------
         # `nix build` → the reproducible drop-in addon `addons/odin_godot/`.
         #

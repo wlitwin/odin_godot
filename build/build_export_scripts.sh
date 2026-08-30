@@ -73,7 +73,7 @@ build_scriptgen
 build_one_export_dir() {
     local dir="$1" out="$2"
     check_module_isolation "$dir"
-    run_scriptgen "$dir"
+    run_scriptgen "$dir" "$PROJ"
     atomic_odin_dll "$dir" "$out" \
         -o:"$OPT" \
         ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \

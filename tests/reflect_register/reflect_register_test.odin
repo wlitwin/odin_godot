@@ -924,7 +924,7 @@ duplicate_class_names :: proc(t: ^testing.T) {
 		testing.expect(t, errs[0].field == nil, "duplicate is a class-level error (no field)")
 		testing.expect(
 			t,
-			errs[0].msg != nil && strings.contains(string(errs[0].msg), "duplicate class registration"),
+			errs[0].msg != nil && strings.contains(string(errs[0].msg), "duplicate script source identity"),
 			"error message names the problem",
 		)
 	}
@@ -935,35 +935,46 @@ duplicate_class_names :: proc(t: ^testing.T) {
 	testing.expect_value(t, int(n), 2)
 	testing.expect_value(t, string(descs[0].name), "Duped")
 	testing.expect_value(t, descs[0].size, size_of(Basics)) // the first registration won
-	testing.expect_value(t, descs[0].id, typeid_of(Basics))
+	testing.expect_value(t, descs[0].id, transmute(u64)typeid_of(Basics))
 	testing.expect_value(t, string(descs[1].name), "Distinct")
 
 	rt.reflect_register_reset_for_tests()
 }
 
 @(test)
-class_registry_overflow_is_loud :: proc(t: ^testing.T) {
-	// A fixed allocation-free registry is intentional during dll init, but hitting its
-	// bound must never make a valid script disappear without an author-facing error.
+path_identity_allows_same_struct_and_base_names :: proc(t: ^testing.T) {
+	// Names are descriptive, not identity. Separate source files can use the same
+	// struct/base spelling (especially across Odin subpackages) and still register.
 	rt.reflect_register_reset_for_tests()
-	for _ in 0 ..< rt.MAX_CLASSES + 1 {
+	rt.register(rt.Class_Desc{name = "Pawn", path = "res://scripts/player/pawn.odin", base = "Node2D"})
+	rt.register(rt.Class_Desc{name = "Pawn", path = "res://scripts/enemies/pawn.odin", base = "Node2D"})
+
+	n: i32
+	descs := rt.odin_scripts_manifest(&n)
+	testing.expect_value(t, int(n), 2)
+	testing.expect_value(t, string(rt.desc_identity(descs[0])), "res://scripts/player/pawn.odin")
+	testing.expect_value(t, string(rt.desc_identity(descs[1])), "res://scripts/enemies/pawn.odin")
+	testing.expect_value(t, len(rt.registration_errors()), 0)
+	rt.reflect_register_reset_for_tests()
+}
+
+@(test)
+class_registry_grows_past_former_limit :: proc(t: ^testing.T) {
+	// The registry used to drop class 257. Exercise several growth steps past that old
+	// boundary so large projects cannot silently lose otherwise valid script classes.
+	rt.reflect_register_reset_for_tests()
+	CLASS_COUNT :: 1025
+	before := len(rt.registration_errors())
+	for _ in 0 ..< CLASS_COUNT {
 		// nil names deliberately bypass duplicate-name detection; this test targets only
-		// the storage bound and needs no dynamically allocated cstrings.
+		// registry storage and needs no dynamically allocated cstrings.
 		rt.register(rt.Class_Desc{})
 	}
 
 	n: i32
 	_ = rt.odin_scripts_manifest(&n)
-	testing.expect_value(t, int(n), rt.MAX_CLASSES)
-	errs := rt.registration_errors()
-	testing.expect_value(t, len(errs), 1)
-	if len(errs) == 1 {
-		testing.expect(
-			t,
-			errs[0].msg != nil && strings.contains(string(errs[0].msg), "registry is full"),
-			"overflow must explain why the class was dropped",
-		)
-	}
+	testing.expect_value(t, int(n), CLASS_COUNT)
+	testing.expect_value(t, len(rt.registration_errors()), before)
 
 	rt.reflect_register_reset_for_tests()
 }
@@ -997,11 +1008,11 @@ walk_classifies_script_onready :: proc(t: ^testing.T) {
 	testing.expect_value(t, ors[0].offset, offset_of(Script_Refs, buddy))
 	testing.expect_value(t, string(ors[0].path), "Allies/Buddy")
 	testing.expect_value(t, string(ors[0].field), "buddy")
-	testing.expect_value(t, ors[0].script_id, typeid_of(Ally))
+	testing.expect_value(t, ors[0].script_id, transmute(u64)typeid_of(Ally))
 	testing.expect(t, ors[0].script_class == nil, "class name resolves at fixup, not mid-walk")
 	// The plain handle rides beside it, script-free.
 	testing.expect_value(t, ors[1].offset, offset_of(Script_Refs, node_ref))
-	testing.expect(t, ors[1].script_id == nil, "a handle field must not classify as a script ref")
+	testing.expect(t, ors[1].script_id == 0, "a handle field must not classify as a script ref")
 }
 
 @(test)
@@ -1015,11 +1026,11 @@ walk_classifies_onready_arrays :: proc(t: ^testing.T) {
 	testing.expect_value(t, ors[0].offset, offset_of(Squadron, cards))
 	testing.expect_value(t, string(ors[0].path), "Deck/Card%d")
 	testing.expect_value(t, int(ors[0].count), 4)
-	testing.expect(t, ors[0].script_id == nil, "handle array must not classify as script")
+	testing.expect(t, ors[0].script_id == 0, "handle array must not classify as script")
 	// [2]^Ally: a script array — ELEMENT classification (pointee typeid), count 2.
 	testing.expect_value(t, ors[1].offset, offset_of(Squadron, allies))
 	testing.expect_value(t, int(ors[1].count), 2)
-	testing.expect_value(t, ors[1].script_id, typeid_of(Ally))
+	testing.expect_value(t, ors[1].script_id, transmute(u64)typeid_of(Ally))
 
 	// The template contract is enforced both ways: array without %d, %d on a scalar.
 	before2 := len(rt.registration_errors())
@@ -1250,4 +1261,58 @@ nested_plain_name_collision_is_loud :: proc(t: ^testing.T) {
 		if e.field != nil && string(e.field) == "a_x" {dup = true}
 	}
 	testing.expect(t, dup, "a colliding nested member name must be reported, not silently last-wins")
+}
+
+// ---- hot-reload generation-bound state --------------------------------------
+
+Callback_Entry :: struct {
+	fn: proc(ctx: rawptr),
+}
+
+Callback_State :: union {
+	bool,
+	[]Callback_Entry,
+}
+
+Has_Callback_State :: struct {
+	owner: gd.Node,
+	state: Callback_State,
+}
+
+Has_Opaque_State :: struct {
+	owner: gd.Node,
+	userdata: rawptr,
+}
+
+Opaque_Alias :: distinct rawptr
+
+Has_Aliased_Opaque_State :: struct {
+	owner: gd.Node,
+	userdata: Opaque_Alias,
+}
+
+Has_Proc_Pointer_State :: struct {
+	owner: gd.Node,
+	callback: ^proc(),
+}
+
+Engine_Only_State :: struct {
+	owner: gd.Node,
+	target: gd.Node2d,
+	position: gd.Vector2,
+}
+
+@(test)
+generation_bound_state_is_detected_recursively :: proc(t: ^testing.T) {
+	callbacks := rt.reflect_class_desc(Has_Callback_State, info("Has_Callback_State"))
+	opaque := rt.reflect_class_desc(Has_Opaque_State, info("Has_Opaque_State"))
+	aliased_opaque := rt.reflect_class_desc(Has_Aliased_Opaque_State, info("Has_Aliased_Opaque_State"))
+	proc_pointer := rt.reflect_class_desc(Has_Proc_Pointer_State, info("Has_Proc_Pointer_State"))
+	engine_only := rt.reflect_class_desc(Engine_Only_State, info("Engine_Only_State"))
+
+	testing.expect(t, bool(callbacks.generation_bound_state), "a proc nested through union/slice/struct state must pin its DLL generation")
+	testing.expect(t, bool(opaque.generation_bound_state), "opaque rawptr state is conservatively generation-bound")
+	testing.expect(t, bool(aliased_opaque.generation_bound_state), "a distinct rawptr alias must not bypass generation ownership")
+	testing.expect(t, bool(proc_pointer.generation_bound_state), "a pointer directly to a procedure must retain its code generation")
+	testing.expect(t, !engine_only.generation_bound_state, "ordinary Godot handles and Variant values must not block reload")
 }

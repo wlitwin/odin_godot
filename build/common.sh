@@ -44,6 +44,25 @@ _odin_gd_do_cleanup() {
 }
 trap _odin_gd_do_cleanup EXIT
 
+# Remove staging directories abandoned by a process that no longer exists. Every helper
+# names its stages `.<base>.build.<pid>.*`; a live producer is never touched, while an
+# editor/compiler killed too abruptly to run EXIT cleanup does not leak artifacts forever.
+odin_gd_prune_stale_stages() {
+    local dir="$1" base="$2" stage tail pid
+    for stage in "$dir/.$base.build."*; do
+        [[ -d "$stage" ]] || continue
+        tail="${stage##*/.$base.build.}"
+        pid="${tail%%.*}"
+        case "$pid" in
+            ''|*[!0-9]*) continue ;;
+        esac
+        if kill -0 "$pid" 2>/dev/null; then
+            continue
+        fi
+        rm -rf "$stage"
+    done
+}
+
 # ----------------------------------------------------------------------------
 # odin_build_filtered <odin build args...> — run `odin build`, and on SUCCESS strip
 # the wall of benign dsymutil warnings that otherwise makes every first macOS build
@@ -60,6 +79,7 @@ trap _odin_gd_do_cleanup EXIT
 odin_build_filtered() {
     local errf rc=0
     errf="$(mktemp)"
+    odin_gd_cleanup_on_exit "$errf"
     "$ODIN" build "$@" 2>"$errf" || rc=$?
     if [[ "$rc" != "0" ]]; then
         cat "$errf" >&2
@@ -99,7 +119,7 @@ build_scriptgen() {
         return 0
     fi
 
-    local compiler_path compiler_version key cache_base cache_dir candidate src rel
+    local compiler_path compiler_version key cache_base cache_dir candidate_dir candidate src rel
     compiler_path="$(command -v "$ODIN" 2>/dev/null || true)"
     [[ -n "$compiler_path" ]] || compiler_path="$ODIN"
     compiler_version="$("$ODIN" version 2>&1)"
@@ -150,28 +170,44 @@ build_scriptgen() {
 
     mkdir -p "$cache_dir"
     chmod 700 "$cache_dir" 2>/dev/null || true
-    candidate="$cache_dir/.scriptgen.tmp.$$"
-    odin_gd_cleanup_on_exit "$candidate" "$candidate.dSYM"
+    odin_gd_prune_stale_stages "$cache_dir" "scriptgen"
+    candidate_dir="$(mktemp -d "$cache_dir/.scriptgen.build.$$.XXXXXX")"
+    candidate="$candidate_dir/scriptgen"
+    odin_gd_cleanup_on_exit "$candidate_dir"
     # -debug is cheap for a small host tool and makes a scriptgen crash debuggable.
+    local build_rc=0
     odin_build_filtered "$ROOT/scriptgen" \
         -collection:godot="$ROOT" \
         -out:"$candidate" \
-        -debug
+        -debug || build_rc=$?
+    if [[ "$build_rc" != "0" ]]; then
+        rm -rf "$candidate_dir"
+        return "$build_rc"
+    fi
+    # Publish the primary artifact first. If that move cannot replace the cache entry,
+    # its matching old symbols remain untouched too.
+    mv -f "$candidate" "$SGEN"
+    # A successful build which emitted no symbols invalidates an older cached sidecar.
+    rm -rf "$SGEN.dSYM"
     if [[ -d "$candidate.dSYM" ]]; then
-        rm -rf "$SGEN.dSYM"
         mv -f "$candidate.dSYM" "$SGEN.dSYM"
     fi
-    mv -f "$candidate" "$SGEN"
     chmod 700 "$SGEN"
+    rm -rf "$candidate_dir"
     echo "common.sh: cached scriptgen ($key)"
 }
 
-# run_scriptgen <scripts_dir> — emit the one odin_godot_scripts.gen.odin (plus the guard
-# and boot shims) beside the authored sources.
+# run_scriptgen <scripts_dir> [project_dir] — emit the one odin_godot_scripts.gen.odin
+# (plus the guard and boot shims) beside the authored sources. The optional project root
+# gives every generated class its canonical res:// source identity.
 # -godot:<root> lets scriptgen resolve nested `using` bundles imported from godot:kit/*
 # (nested-replicate-fields Phase 2) — the same collection root the binding compiles against.
 run_scriptgen() {
-    "$SGEN" "$1" -godot:"$ROOT"
+    if [[ $# -ge 2 && -n "$2" ]]; then
+        "$SGEN" "$1" -godot:"$ROOT" -project:"$2"
+    else
+        "$SGEN" "$1" -godot:"$ROOT"
+    fi
 }
 
 # authored_sources_fingerprint <scripts_dir> — a deterministic, path-aware digest of
@@ -295,8 +331,8 @@ EOF
 # ----------------------------------------------------------------------------
 # atomic_odin_dll <pkg_dir> <out_lib> [extra odin flags...]
 #
-# Build a shared library with `odin build -build-mode:dll` to a TEMP path beside
-# <out_lib>, then atomically `mv -f` it into place (+ the matching .dSYM on macOS
+# Build a shared library with `odin build -build-mode:dll` in a unique TEMP directory
+# beside <out_lib>, then atomically `mv -f` it into place (+ the matching .dSYM on macOS
 # -debug builds). Why not build straight to <out_lib>:
 #   - `odin build -out:X` is NOT atomic — it truncates/creates X up front and writes
 #     over several seconds. The editor's reload-on-save coordinator (core/reload.odin)
@@ -305,8 +341,9 @@ EOF
 #     next load prints "failed to load scripts dll" / "No loader found". temp+mv means
 #     an interrupted/failed build simply leaves the previously-built dll alone.
 #   - a stale intermediate `.o` built against an OLD runtime layout can survive an
-#     incremental `-out:` build and crash at extension init; the temp path is scrubbed
-#     before AND after, so every publish is a clean build.
+#     incremental `-out:` build and crash at extension init; every invocation gets an
+#     isolated staging directory which is removed on success, failure, or shell exit.
+#     Concurrent editor/CLI builds therefore cannot delete each other's intermediates.
 # (Mirrored in build/build_scripts.ps1 BuildDll — keep them in sync.)
 #
 # The install_name / .dSYM handling keys off the OUTPUT extension: .dylib gets
@@ -316,23 +353,25 @@ EOF
 # ----------------------------------------------------------------------------
 atomic_odin_dll() {
     local pkg="$1" out="$2"; shift 2
-    local dir leaf base ext tmp
+    local dir leaf base ext stage tmp
     dir="$(dirname "$out")"
     leaf="$(basename "$out")"
     ext="${leaf##*.}"
     base="${leaf%.*}"
-    # PID-scoped temp: the EDITOR's reload builds and a CLI gate build race on
-    # the same output dir constantly (a live playtest plus an agent gate is
-    # the normal state of this project) — fixed temp names made each one eat
-    # the other's intermediates mid-link.
-    tmp="$dir/.$base.tmp.$$.$ext"
+    mkdir -p "$dir"
+    # A directory (rather than only a unique output leaf) contains every compiler
+    # sidecar too. mktemp creates it on the destination filesystem, so the final move
+    # stays atomic; the EXIT registry is the interruption fallback.
+    odin_gd_prune_stale_stages "$dir" "$base"
+    stage="$(mktemp -d "$dir/.$base.build.$$.XXXXXX")"
+    tmp="$stage/$leaf"
+    odin_gd_cleanup_on_exit "$stage"
 
     local link_flags=()
     if [[ "$ext" == "dylib" ]]; then
         link_flags=(-extra-linker-flags:"-Wl,-install_name,$out")
     fi
 
-    rm -f "$tmp" "$dir/.$base.tmp.$$"*.o
     # -use-single-module: REQUIRED for usable debug info on macOS. Odin's default for
     # -o:none/-o:minimal is separate modules (one .o per package), and ld then emits a
     # broken one-entry debug map (a single N_OSO stab pointing at one arbitrary .o), so
@@ -352,15 +391,16 @@ atomic_odin_dll() {
         ${link_flags[@]+"${link_flags[@]}"} \
         "$@" || build_rc=$?
     if [[ "$build_rc" != "0" ]]; then
+        rm -rf "$stage"
         return "$build_rc"         # caller runs under set -e — abort exactly as before
     fi
-    # Reached only if the build succeeded (callers run under set -e). Publish the .dSYM
-    # first (rm the old one even if the new build emitted none — no stale symbols), then
-    # the library itself, then scrub the temp intermediates.
+    # Reached only if the build succeeded (callers run under set -e). Publish the primary
+    # library first, then replace/remove its .dSYM so stale symbols never survive a
+    # successful build, then scrub the isolated stage.
+    mv -f "$tmp" "$out"
     rm -rf "$out.dSYM"
     if [[ -d "$tmp.dSYM" ]]; then
         mv -f "$tmp.dSYM" "$out.dSYM"
     fi
-    mv -f "$tmp" "$out"
-    rm -f "$dir/.$base.tmp.$$"*.o
+    rm -rf "$stage"
 }

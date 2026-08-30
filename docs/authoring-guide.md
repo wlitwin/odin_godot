@@ -17,7 +17,8 @@ and get the full typed dispatch for free.
 There is exactly **one file per script**: the `.odin` you write is also the resource
 you attach to a node. Put your scripts under the project (e.g. `res://scripts/foo.odin`)
 and attach `res://scripts/foo.odin` directly in the scene. The loader reads its
-`//gd:class` marker and binds it to the compiled class. There is no separate
+canonical resource path and binds it to the descriptor generated for that exact file.
+`//gd:class` is optional and only adds a Godot global-class alias. There is no separate
 "resource stub" file to keep in sync.
 
 The generated code lands in **one `odin_godot_scripts.gen.odin` per scripts directory**,
@@ -30,7 +31,7 @@ attachable script, and the editor hides these files from the FileSystem dock by 
 
 ```odin
 //gd:extends Node          // base Godot class. Optional — derived from `owner` when omitted.
-//gd:class Ping            // optional class-name override (defaults to struct name)
+//gd:class Ping            // optional: opt into Godot's global class namespace
 //gd:tool                  // optional: registers as a @tool script
 package my_scripts
 
@@ -79,14 +80,15 @@ ping_emit_ping :: proc(self: ^Ping, value: int) {
 | Marker | Meaning |
 | --- | --- |
 | `//gd:extends <Class>` | The Godot base class. **Optional**: when omitted, it is derived from the `owner` field's type. |
-| `//gd:class <Name>` | Class name override. Defaults to the struct name. |
+| `//gd:class <Name>` | Optional Godot global-class alias, like GDScript `class_name`. Runtime attachment does not need it. |
 | `//gd:tool` | Registers the class as a `@tool` script (`is_tool() == true`) and runs in the editor. |
 | `//gd:icon res://path.svg` | Custom class icon (Scene dock, Create Node/Resource dialog). |
 | `//gd:group a b` | Declarative group membership: every instance joins the named groups on READY (space-separated, repeatable). Replaces `gd.add_to_group` boilerplate in `_ready`; pairs with the typed group queries (`rt.scripts_in_group` & co.). |
 
-These are the marker comments the engine's resource loader reads to bind the
-authored `res://scripts/<x>.odin` resource (the same file you compile) to its
-compiled class, so the convention is uniform.
+The authored `res://scripts/<x>.odin` path is the runtime identity. Markers add
+engine metadata and behavior; they do not decide which compiled descriptor attaches.
+That means several scripts may share a base type—or even a struct name across separate
+Odin packages—without annotations or ambiguous inference.
 
 `//gd:extends` and the `owner` field state the same fact twice, so scriptgen
 cross-checks them: **the owner handle must be the declared base or one of its
@@ -464,10 +466,9 @@ Both are plain Odin procs whose first parameter is `^<Struct>`:
 scripts dll (editor save-on-rebuild, or an explicit `script.reload(true)` in a running game),
 with the **new** code. You rarely need it: a same-layout reload preserves your struct in place
 and re-points all engine entry points (`_process`, methods, signals) to the new code
-automatically. The one thing the swap *can't* fix is a **raw proc pointer you cached into your
-own struct**, such as a callback/dispatch table, or a behaviour-tree node like `flow.Action`'s
-`Call.fn`. On a same-layout reload those bytes are preserved untouched, so they still point at
-the *old* (still-mapped, now stale) code. Rebuild that state in `reload`:
+automatically. Procedure values are different: a callback/dispatch table, an `events.Event`,
+or a behaviour-tree node like `flow.Action.Call.fn` contains addresses in one DLL generation.
+Reflection detects that state recursively. Rebuild it in `reload`:
 
 ```odin
 boss_reload :: proc(self: ^Boss) {
@@ -475,9 +476,22 @@ boss_reload :: proc(self: ^Boss) {
 }
 ```
 
-This only matters for scripts that (a) run in the editor (i.e. `//gd:tool`) or are explicitly
-reloaded at runtime, *and* (b) cache proc pointers in their state. Ordinary gameplay scripts
-never hit it (a running game doesn't hot-reload itself).
+The reload hook is an explicit ownership promise: after it returns, no state or external
+registration may call the previous generation. The core then releases this instance's lease
+and unloads the image as soon as no other live instance owns it.
+If detected procedure-bearing or opaque `rawptr` state has no hook, the instance is **not**
+rebound—it stays safely and coherently on its old code, pins only that one generation, and a
+warning tells you which script needs the hook. Other instances and intermediate generations
+continue reloading normally.
+
+Reflection cannot see a callback erased inside an engine `Callable`/Variant container or
+registered with an external library without being stored in the struct. Those cases carry the
+same contract: define `reload`, remove/replace the old registration there, and never allow the
+old callback to survive the hook.
+
+This only matters for scripts that run in the editor (`//gd:tool`) or are explicitly reloaded
+at runtime and retain callbacks. Ordinary gameplay scripts never hit it because a running game
+does not hot-reload itself.
 
 Codegen wraps each in the `proc "c"` form the runtime expects, establishing a
 heap-backed default context before calling your proc, so your proc body can use
@@ -1239,6 +1253,12 @@ item_data_item_total :: proc(self: ^ItemData) -> int {
 Every `//gd:class <Name>` is registered as a **global class**, a first-class engine
 type, exactly like a GDScript `class_name`. No extra annotation is needed; the class
 name you already declare becomes the global name.
+
+The marker is optional. Without it, the script still attaches, instantiates, reloads,
+and supports typed `rt.script_of` access through its source-path identity; it simply does
+not reserve a project-wide global type name. Use it when another editor surface needs a
+named type (for example a custom `Resource` picker), not as routine binding boilerplate.
+The editor's new-script template therefore leaves it out by default.
 
 - `Script.get_global_name()` returns `<Name>` (this is `ScriptExtension._get_global_name`,
   the virtual the editor's filesystem scan reads).

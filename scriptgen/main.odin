@@ -30,8 +30,9 @@ package scriptgen
 // the staleness guard (which hashes the WHOLE tree), and every KIT annotation (wire
 // contract, lanes, input struct — see check_subpkg_kit).
 //
-// SINGLE-FILE AUTHORING: the authored `.odin` is the file the user attaches to a node
-// (the loader reads its `//gd:class` marker to bind it to the compiled class). scriptgen
+// SINGLE-FILE AUTHORING: the authored `.odin` is the file the user attaches to a node.
+// scriptgen publishes its canonical `res://` path as runtime identity; `//gd:class` is
+// only an optional Godot global alias. scriptgen
 // emits only build artifacts beside the sources; there is no separate resource stub.
 // The `.gen.odin` suffix is what makes the loader ignore them as attachable scripts.
 //
@@ -670,11 +671,12 @@ Message_Info :: struct {
 
 Script :: struct {
 	path:              string, // source file path (diagnostics)
+	resource_path:     string, // canonical Godot identity (`res://...`), generated from project-relative path
 	imports:           map[string]string, // declaring file imports (canonical wire-type resolution)
 	godot_alias:       string, // the file's `godot:godot` import alias ("" = not imported)
 	pkg:               string,
 	struct_name:       string,
-	class_name:        string,
+	class_name:        string, // optional explicit `//gd:class` global alias; "" means path-only
 	base:              string,
 	base_line:         int, // 1-based line of the `//gd:extends` marker (0 = none written; base was DERIVED from the owner handle)
 	doc:               string, // `///` doc comment above the script struct (class description)
@@ -1185,6 +1187,7 @@ g_wire_named: map[string]map[string]Wire_Named_Def
 g_wire_codec_sizes: map[string]map[string]int
 g_pkg_loaded: map[string]bool // dirs already parsed (incl. unreadable, so we never retry)
 g_godot_root: string // the `godot:` collection root (-godot: flag / ODIN_GODOT_ROOT); "" disables imported bundles
+g_project_root: string // Godot project root (-project: flag); source identities are relative to this
 
 // Parse every .odin in `dir` (idempotent) and record its struct decls. Parser diagnostics
 // stay silent — the emit loop / `odin build` report parse errors properly.
@@ -1733,6 +1736,12 @@ main :: proc() {
 			g_godot_root = a[len("-godot:"):]
 			continue
 		}
+		// `-project:<path>` supplies the Godot project root used to turn authored
+		// files into stable `res://...` runtime identities.
+		if strings.has_prefix(a, "-project:") {
+			g_project_root = a[len("-project:"):]
+			continue
+		}
 		scripts_dir = a
 	}
 	// Fallback to the env every test/build already exports; "" leaves imported bundles
@@ -1754,6 +1763,23 @@ main :: proc() {
 		scripts_dir = abs
 	} else {
 		fmt.eprintfln("scriptgen: cannot resolve dir %q", scripts_dir)
+		os.exit(1)
+	}
+	if g_project_root == "" {
+		// Standard module roots are `<project>/scripts` and
+		// `<project>/modules/<name>`. Direct generator fixtures fall back to treating
+		// the package's parent as their project root.
+		parent := dir_of(scripts_dir)
+		if path_base(parent) == "modules" {
+			g_project_root = dir_of(parent)
+		} else {
+			g_project_root = parent
+		}
+	}
+	if abs, aerr := os.get_absolute_path(g_project_root, context.allocator); aerr == nil {
+		g_project_root = norm_path(abs)
+	} else {
+		fmt.eprintfln("scriptgen: cannot resolve project root %q", g_project_root)
 		os.exit(1)
 	}
 
@@ -1797,6 +1823,7 @@ main :: proc() {
 
 	ctx := Module_Ctx {
 		root         = scripts_dir,
+		project_root = g_project_root,
 		seen_classes = make(map[string]string),
 		pkg_names    = make(map[string]string),
 		owned_gen    = make(map[string]bool),
@@ -1893,6 +1920,7 @@ main :: proc() {
 // what the tree-wide artifacts (guard, boot, orphan sweep) read back down.
 Module_Ctx :: struct {
 	root:            string, // absolute module root dir (res://scripts or res://modules/<name>)
+	project_root:    string, // absolute Godot project root; descriptor paths are relative to it
 	root_pkg:        string, // the ROOT package's `package` name — guard + boot are emitted in it
 	has_boot:        bool, // the module hand-writes `odin_scripts_boot` — don't generate one
 	emitted:         int, // script sections written across the whole tree
@@ -1901,9 +1929,8 @@ Module_Ctx :: struct {
 	abi_schema:      string, // canonical recursive metadata emitted into the root guard
 	abi_metadata:    Wire_ABI_Metadata, // same walk, structured for generated NET_SCHEMA
 	kit_wire:        bool, // the root declares a kit wire surface — register the fingerprint
-	// //gd:class name -> declaring file, MODULE-WIDE. The runtime registry is keyed by
-	// name alone and keeps the first registration, so a root class and a subpackage class
-	// of the same name would silently drop one.
+	// Explicit //gd:class alias -> declaring file, MODULE-WIDE. Path-only scripts do not
+	// participate: their canonical res:// identities are unique by construction.
 	seen_classes:    map[string]string,
 	// package name -> declaring dir, MODULE-WIDE. Web export links every package into ONE
 	// wasm side module, where package name IS the symbol prefix.
@@ -2082,22 +2109,32 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 			append(&helpers, Helper{path = path, src = src})
 			continue
 		}
-
-		// Duplicate //gd:class across files: the core's name->desc map would silently let the
-		// last-loaded win and mis-bind the other. Catch it here with both file paths. The map
-		// is MODULE-WIDE, so a subpackage class colliding with a root one is caught too (the
-		// runtime registry is keyed by name alone and keeps the first registration). This
-		// bookkeeping runs BEFORE the had_error skip below so dup detection keeps working
-		// across the remaining files even after an unrelated error.
-		if prev, dup := ctx.seen_classes[script.class_name]; dup {
+		rel_path := rel_to_root(ctx.project_root, path)
+		if rel_path == norm_path(path) || rel_path == "" {
 			error_at(
 				Loc{path = path},
-				"duplicate //gd:class %q (also declared in %q)",
-				script.class_name,
-				prev,
+				"script is outside the Godot project root %q; pass the correct -project:<dir> so it can receive a stable res:// identity",
+				ctx.project_root,
 			)
 		} else {
-			ctx.seen_classes[script.class_name] = path
+			script.resource_path = strings.concatenate({"res://", rel_path})
+		}
+
+		// `//gd:class` is an optional GLOBAL alias, so only explicit declarations
+		// participate in alias collision checks. Every script's primary identity is its
+		// resource path and never needs a class/base-name uniqueness rule.
+		if script.class_name != "" {
+			if prev, dup := ctx.seen_classes[script.class_name]; dup {
+				error_at(
+					Loc{path = path},
+					"duplicate explicit //gd:class %q in %q and %q",
+					script.class_name,
+					prev,
+					path,
+				)
+			} else {
+				ctx.seen_classes[script.class_name] = path
+			}
 		}
 
 		append(&pending, Pending{script = script})

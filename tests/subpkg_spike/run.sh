@@ -234,7 +234,7 @@ package neg_cls_ui
 import gd "godot:godot"
 Hud :: struct { owner: gd.Node }
 EOF
-neg clsname 'duplicate //gd:class "Game"'
+neg clsname 'duplicate explicit //gd:class "Game"'
 
 # ---- phase 4: NET_FINGERPRINT survives a pure layout move ----
 # The fingerprint is the join door: two builds whose hashes differ refuse each other with

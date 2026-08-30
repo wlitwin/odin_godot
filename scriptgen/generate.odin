@@ -441,7 +441,8 @@ generate_all :: proc(pkg: string, sections: []Gen_Section) -> string {
 	for sec in sections {
 		// The editor's deletion probe (core/reload.odin SECTION_BANNER) parses this
 		// exact banner to find sections whose authored source is gone — keep in sync.
-		fmt.sbprintf(&b, "// ==== %s (class %s) ====\n\n", sec.src_name, sec.script.class_name)
+		label := sec.script.class_name != "" ? sec.script.class_name : sec.script.struct_name
+		fmt.sbprintf(&b, "// ==== %s (class %s) ====\n\n", sec.src_name, label)
 		emit_script(&b, sec.script)
 	}
 	return strings.to_string(b)
@@ -3117,7 +3118,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	fmt.sbprintf(b, "@(init)\n_register_%s :: proc \"contextless\" () {{\n", snake)
 	fmt.sbprintf(b, "\trt.register_class(\n\t\t%s,\n", cls)
 	w(b, "\t\trt.Class_Info {\n")
-	fmt.sbprintf(b, "\t\t\tname = %q,\n", s.class_name)
+	fmt.sbprintf(b, "\t\t\tname = %q,\n", s.struct_name)
+	fmt.sbprintf(b, "\t\t\tpath = %q,\n", s.resource_path)
+	if s.class_name != "" {
+		fmt.sbprintf(b, "\t\t\tglobal_name = %q,\n", s.class_name)
+	}
 	fmt.sbprintf(b, "\t\t\tbase = %q,\n", s.base)
 	if len(s.lifecycles) > 0 {
 		fmt.sbprintf(b, "\t\t\tlifecycle = %s,\n", strings.to_string(lc_lit))

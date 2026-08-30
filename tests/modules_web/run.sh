@@ -8,9 +8,8 @@
 #   * a MODULE's class runs (Enemy _ready -> MODWEB_MODULE_RAN),
 #   * a CROSS-MODULE engine call works (Player.attack -> Enemy.take_hit by name ->
 #     MODWEB_CROSS_OK + MODWEB_DRIVER_OK),
-#   * the DELIBERATE duplicate-class collision (class "Contested" declared by BOTH
-#     modules — silent last-write-wins before the runtime's duplicate detection) surfaces
-#     a LOUD duplicate-registration error on the JS console (keep-first semantics).
+#   * the DELIBERATE duplicate explicit alias ("Contested" in both modules) surfaces
+#     a LOUD error naming both canonical source paths; path identity stays unambiguous.
 #
 # Prints MODULES_WEB_OK on a verified in-browser run (GREEN), or MODULES_WEB_BUNDLED if
 # the build+export succeeded but the browser step was skipped (YELLOW — run it manually,

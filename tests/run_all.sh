@@ -68,6 +68,10 @@ TESTS=(
     # Golden test for scriptgen's nested replicated/tagged-field discovery (same-package,
     # imported bundles, and the loud plain-nesting guardrail) — drives the binary, no Godot.
 	"scriptgen|SCRIPTGEN_OK|tests/scriptgen/run.sh"
+	# Cross-platform build policy: cache invalidation, isolated/atomic publication,
+	# failure + stale cleanup, and concurrent builds. Bash always runs; PowerShell runs
+	# when available (the dedicated .#build-parity shell supplies it).
+	"buildhelpers|BUILD_HELPERS_OK|tests/build_helpers/run.sh"
 	# Recursive canonical wire ABI: one generated schema/fingerprint plus a raw
 	# byte vector accepted identically by native, wasm32, Linux, and Windows.
 	"wireabi|WIREABI_OK|tests/wireabi/run.sh"

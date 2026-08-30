@@ -95,6 +95,7 @@ scr   .so: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically l
   T odin_godot_init               (libodin_godot.so  — dynsym)
   T odin_scripts_boot             (libodinscripts.so — dynsym)
   T odin_scripts_manifest
+  T odin_scripts_abi_fingerprint
   T odin_scripts_set_core_api
   NEEDED libdl.so.2 libm.so.6 libpthread.so.0 libgcc_s.so.1 libc.so.6 ld-linux-x86-64.so.2
 
@@ -104,6 +105,7 @@ scr   .dll: PE32+ executable (DLL) x86-64, for MS Windows, 11 sections
   Export: odin_godot_init          (libodin_godot.dll  — PE export table)
   Export: odin_scripts_boot        (libodinscripts.dll — PE export table)
   Export: odin_scripts_manifest
+  Export: odin_scripts_abi_fingerprint
   Export: odin_scripts_set_core_api
   Imports: ADVAPI32.dll KERNEL32.dll bcrypt.dll msvcrt.dll ntdll.dll   (system DLLs only —
            libgcc + mcfgthreads statically linked, so the DLL is self-contained)
@@ -127,7 +129,9 @@ scr   .dll: PE32+ executable (DLL) x86-64, for MS Windows, 11 sections
    whenever you change a script (the editor's reload-on-save does it automatically in-repo).
 
 You need an `odin` compiler on `PATH` to compile scripts. That is the one host tool a
-consumer project needs.
+consumer project needs. The bundled release is recommended, not required by string identity:
+the native loader admits another compiler release only when its semantic ABI generation and
+complete layout fingerprint match. See [Native core ↔ scripts boundary](design/native-boundary.md).
 
 This **split layout** (core dll inside `addons/odin_godot/bin/<platform>/`, scripts dll at
 `res://bin/`) is exactly what the suite's `splitaddon` test pins (macOS, where dlopen
@@ -192,6 +196,8 @@ previously-built dll. If scripts fail to load, rebuild the dll once with the bun
 ```sh
 nix develop --command bash tests/run_all.sh                 # native + web suite (macOS)
 nix develop .#cross --command bash tests/cross/run.sh       # cross BUILD smoke -> CROSS_OK
+nix develop .#build-parity --command bash tests/build_helpers/run.sh
+                                                            # Bash + PowerShell helper contract
 nix build                                                   # macOS addon
 nix build .#dist-cross                                      # + Linux/Windows cores
 ```

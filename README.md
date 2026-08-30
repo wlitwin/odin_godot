@@ -162,7 +162,8 @@ The distributable is a **drop-in addon**: `addons/odin_godot/` with prebuilt cor
 docs, the build scripts, and a starter template. Get it from the `release` branch (what the
 Godot Asset Library entry points at) or build it yourself with `nix build .#release`, then
 follow [Distribution → Install into a Godot project](docs/distribution.md). The one host
-tool you need is the `odin` compiler (the addon README names the exact pinned release).
+tool you need is the `odin` compiler (the addon README names the tested release and explains
+the ABI-fingerprint compatibility check).
 
 ## Platform status
 

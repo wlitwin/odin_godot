@@ -1,14 +1,13 @@
 //gd:extends Node
-//gd:class Hello
 package scripts
 
 // A minimal odin_godot script — your starting point. Once the scripts dll is built,
 // `Hello` shows up in Godot's "Attach Script" list; attach it to a Node, press Play,
 // and watch the Output panel.
 //
-// The two `//gd:` markers are required:
-//   //gd:extends Node   — the engine base class this script derives from
-//   //gd:class Hello    — the class name Godot registers it under
+// The authored `res://scripts/hello.odin` path is this script's identity. The base can
+// also derive from `owner`; it is explicit here for readability. Add `//gd:class Hello`
+// only if you want an optional project-wide Godot global-class alias.
 // `hello_ready` is the `_ready` lifecycle hook — odin_godot calls `<class>_ready(self)`
 // when the node enters the scene tree. (Other hooks: `<class>_process(self, delta)`, etc.
 // — see the authoring guide.)

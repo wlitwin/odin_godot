@@ -105,8 +105,8 @@ game_process :: proc(self: ^Game, delta: f64) {
 <div class="cols"><div>
 <h3>Header markers <span class="d">(above <code>package</code>; module root or a script subpackage)</span></h3>
 <table>
-<tr><td class="k"><b>//gd:extends</b> Node2D</td><td>REQUIRED for a script file — Godot base class</td></tr>
-<tr><td class="k"><b>//gd:class</b> Name</td><td>class name the loader binds (default: struct name); unique across the whole module tree (root + subpackages), and across modules</td></tr>
+<tr><td class="k"><b>//gd:extends</b> Node2D</td><td>optional Godot base override; otherwise derived from the first <code>owner</code> field</td></tr>
+<tr><td class="k"><b>//gd:class</b> Name</td><td>optional Godot global-class alias; attachment uses the canonical <code>res://</code> source path, while explicit aliases must be unique project-wide</td></tr>
 <tr><td class="k"><b>//gd:tool</b></td><td>runs in editor too (pair with <code>gd.is_editor()</code>)</td></tr>
 <tr><td class="k"><b>//gd:icon</b> res://p.svg</td><td>class icon</td></tr>
 <tr><td class="k"><b>//gd:group</b> a b</td><td>join groups at READY (space-separated, repeatable) — no add_to_group ready code</td></tr>
@@ -129,7 +129,7 @@ player_enter_tree / _exit_tree / _reload   // reload = re-capture cached ptrs af
 <tr><td class="k"><b>@(gd_command=knet.ACTION_OWNER_PREDICTED)</b></td><td>typed owner policy; client applies optimistically, reject/timeout auto-reverts; final callback reason = Access / Rate / Malformed / Stale / Predicate / Timeout</td></tr>
 <tr><td class="k"><b>@(gd_connect="signal")</b></td><td>auto-connect owner.signal → this method at ready (must be gd_method). <b>"Path/To/Node:signal"</b>: another node's signal — path resolved like onready= at ready; missing node/signal skips soft + loud. <b>"Bank/Btn%d:sig"</b>: probes 0,1,2,… and wires EACH with the index BOUND as the handler's trailing arg (one handler per bank; index 0 required). Scene-unique emitters work: <b>"%SavePanel:saved"</b>, <b>"%Inv/Slot%d:pressed"</b></td></tr>
 </table>
-<div class="warn"><b>THE METHOD TRAP (now a build error):</b> a class's proc scan covers its OWN file + HEADERLESS helper files only — an attributed or lifecycle-named <code>^Game</code> proc written in a file that declares <code>//gd:class Other</code> binds to nothing, so scriptgen refuses the build and tells you to move it to a headerless file. Plain cross-class helper procs stay legal. (Marker-less files are HELPERS — no class identity; any number of classes may extend plain <code>Node</code>.)</div>
+<div class="warn"><b>THE METHOD TRAP (now a build error):</b> a class's proc scan covers its OWN file + non-script helper files only — an attributed or lifecycle-named <code>^Game</code> proc written in another script struct's home file binds to nothing, so scriptgen refuses the build and tells you to move it to a helper file. Plain cross-class helper procs stay legal. A marker-less file with an owner-first struct is still a path-identified script.</div>
 </div><div>
 <h3>Field tags <span class="d">(gd:"…" — first token selects kind)</span></h3>
 <table>
@@ -468,7 +468,7 @@ fslp_verdict MYGAME</pre>
 <li>Control anchors bind to a Control parent or the viewport under a CanvasLayer; under a plain Node they bind NOTHING (top-left hug). Containers overrule set_size — custom_minimum_size is the contract.</li>
 <li>TextureRect default expand_mode grows the control to its texture — set expand_mode=1 for fixed panes. Labels auto-grow to min size.</li>
 <li>Scene sample text is for the EDITOR — ship such nodes visible=false; the frame feed shows them.</li>
-<li>Marker-less files are HELPERS — no class identity (pre-2026-07 loaders bound them to THE Node class, forcing one-Node-class packages). Verify editor-facing work with <code>godot --headless --editor --quit</code> (catches warnings the game run never shows).</li>
+<li>An owner-first struct makes a file a path-identified script; <code>//gd:class</code> only opts into a global alias. Files without an owner-first script struct are helpers. Verify editor-facing work with <code>godot --headless --editor --quit</code> (catches warnings the game run never shows).</li>
 <li>CanvasLayer children draw above world z-index — UI on a layer, never trust entity z against it.</li>
 </ul>
 </div><div>

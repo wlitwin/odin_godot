@@ -117,7 +117,7 @@ build_scriptgen
 #    AND each optional res://modules/<name> script module (multi-module spike). On web all
 #    modules link into this ONE side module: the compose file below @(require)-imports each
 #    module package, and web_startup's @(init) chain runs their registrations too.
-run_scriptgen "$SCRIPTS"
+run_scriptgen "$SCRIPTS" "$PROJ"
 MODULE_IMPORT_LINES=""
 if [ -d "$PROJ/modules" ]; then
     if [ "$SCRIPTS" != "$PROJ/scripts" ]; then
@@ -127,7 +127,7 @@ if [ -d "$PROJ/modules" ]; then
             mdir="${mdir%/}"
             mname="$(basename "$mdir")"
             [ -z "$(ls "$mdir"/*.odin 2>/dev/null)" ] && continue
-            run_scriptgen "$mdir"
+            run_scriptgen "$mdir" "$PROJ"
             MODULE_IMPORT_LINES="$MODULE_IMPORT_LINES@(require) import mod_$mname \"../modules/$mname\"
 "
         done
@@ -177,16 +177,20 @@ ODIN_OBJ="$OBJ_DIR/$(basename "${OUT%.wasm}").wasm.o"
 
 # 5. Object -> Emscripten SIDE_MODULE. -sSUPPORT_LONGJMP=wasm matches the binding's
 #    setjmp/longjmp -> invoke_* ABI. The entry symbol odin_godot_init is exported via
-#    its Odin @(export) attribute. Link to a temp beside $OUT, then publish atomically
-#    (same invariant as atomic_odin_dll: the live wasm is never missing/half-written).
-TMP_WASM="$(dirname "$OUT")/.$(basename "$OUT").tmp"
-odin_gd_cleanup_on_exit "$TMP_WASM"
+#    its Odin @(export) attribute. Link in a unique staging directory beside $OUT, then
+#    publish atomically (same invariant/cleanup contract as atomic_odin_dll).
+WASM_BASE="$(basename "${OUT%.wasm}")"
+odin_gd_prune_stale_stages "$(dirname "$OUT")" "$WASM_BASE"
+WASM_STAGE="$(mktemp -d "$(dirname "$OUT")/.$WASM_BASE.build.$$.XXXXXX")"
+TMP_WASM="$WASM_STAGE/$(basename "$OUT")"
+odin_gd_cleanup_on_exit "$WASM_STAGE"
 "$EMCC" "$ODIN_OBJ" \
     -sSIDE_MODULE=1 \
     -sSUPPORT_LONGJMP=wasm \
     -O2 \
     -o "$TMP_WASM"
 mv -f "$TMP_WASM" "$OUT"
+rm -rf "$WASM_STAGE"
 
 echo "build_web.sh: built $OUT"
 file "$OUT" || true

@@ -167,8 +167,10 @@ lv_create_script :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
 
 // `_make_template(template, class_name, base_class_name) -> Script`. The editor calls this
 // when you create/attach a new script. Returns a script pre-filled with a COMPILING starter —
-// `//gd:` markers, the `owner`-first struct, and `_ready`/`_process` stubs — instead of the
+// the base marker, the `owner`-first struct, and `_ready`/`_process` stubs — instead of the
 // empty buffer it used to (which forced the user to type all the boilerplate from memory).
+// It deliberately does not emit `//gd:class`: ordinary scripts bind by resource path, just
+// like ordinary GDScript files do not opt into `class_name` unless the author asks for it.
 @(private = "file")
 lv_make_template :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
@@ -193,7 +195,7 @@ make_odin_template :: proc(class_name, base: string) -> string {
     snake := core_to_snake(class_name)
     defer delete(snake)
     b := strings.builder_make()
-    fmt.sbprintf(&b, "//gd:extends %s\n//gd:class %s\npackage scripts\n\n", base, class_name)
+    fmt.sbprintf(&b, "//gd:extends %s\npackage scripts\n\n", base)
     strings.write_string(&b, "import gd \"godot:godot\"\n\n")
     fmt.sbprintf(
         &b,

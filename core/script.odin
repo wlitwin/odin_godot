@@ -24,9 +24,9 @@ OdinScript :: struct {
     object:           gdext.ObjectPtr,
     source_utf8:      []u8, // owned copy of the `.odin` source
     base_type:        string, // owned copy of the parsed `extends` base ("" = no marker; edges read "" as "Node")
-    class_name:       string, // owned copy of the parsed `//gd:class <Name>` (default "")
+    class_name:       string, // optional parsed `//gd:class <Name>` global alias (default "")
     icon:             string, // owned copy of the parsed `//gd:icon <res-path>` (default "")
-    warned_ambiguous: bool, // one-shot: ambiguous base-type class resolution already warned
+    warned_missing:   bool, // one-shot: a marked script path had no compiled descriptor
 }
 
 @(private = "file")
@@ -59,9 +59,9 @@ parse_base_type :: proc(source: string) -> string {
     return ""
 }
 
-// Parse the Phase-2 class-binding convention: a marker comment `//gd:class <Name>`.
-// This is how a `.odin` file is matched to a Class_Desc registered by the scripts dll.
-// Falls back to "" when absent (then base-type matching is attempted at instance time).
+// Parse the optional global-class convention: a marker comment `//gd:class <Name>`.
+// Runtime binding is path-based; this name only opts the script into Godot's global
+// class namespace. Falls back to "" when absent.
 // Package-visible: the global-class virtuals (language.odin `_get_global_class_name`)
 // reparse a `.odin` file's markers straight from its path.
 @(private)
@@ -150,61 +150,36 @@ odin_script_free_strings :: proc(self: ^OdinScript) {
     }
 }
 
-// Resolve the Class_Desc this script binds to: by `//gd:class` name first, else by base-type
-// match — but only when EXACTLY ONE registered class extends that base. With several
-// candidates the old "first match" bound to whichever class the map iteration happened to
-// yield (nondeterministic across runs), so instead we warn once (naming the candidates) and
-// resolve nothing — the caller falls back to a harmless placeholder.
+// Resolve the descriptor by the resource's canonical `res://` path. Class/struct names
+// and engine base types are deliberately irrelevant: two marker-less scripts may share
+// either without ambiguity. An unsaved in-memory script has no resource path; its explicit
+// global alias is a narrow editor-only fallback until the resource is saved.
 odin_script_resolve_desc :: proc(self: ^OdinScript) -> (rt.Class_Desc, bool) {
 	script_access_enter()
 	defer script_access_leave()
     if self == nil {
         return {}, false
     }
-    if self.class_name != "" {
-        if desc, ok := scripts_find_class(self.class_name); ok {
+    gpath := godot.resource_get_path(cast(godot.Resource)self.object)
+    path := string_to_odin(gpath, context.temp_allocator)
+    if path != "" {
+        if desc, ok := scripts_find_path(path); ok {
+            return desc, true
+        }
+    } else if self.class_name != "" {
+        if desc, ok := scripts_find_global_class(self.class_name); ok {
             return desc, true
         }
     }
-    // NO markers at all = a package HELPER, not a script — it has no class to bind
-    // and never did; the placeholder is its correct identity, silently. (This used
-    // to fall through to the "Node" default below, which bound every helper file to
-    // THE class extending plain Node — and a second Node class then sprayed one
-    // ambiguity warning per helper per editor scan. Attachable scripts declare
-    // `//gd:extends`; the repo attaches no marker-less file, and the docs agree.)
-    if self.base_type == "" {
-        return {}, false
-    }
-    base := self.base_type
-    found: rt.Class_Desc
-    count := 0
-    for _, desc in scripts_classes {
-        if string(desc.base) == base {
-            if count == 0 {found = desc}
-            count += 1
-        }
-    }
-    if count == 1 {
-        return found, true
-    }
-    if count > 1 && !self.warned_ambiguous {
-        self.warned_ambiguous = true
-        names := strings.builder_make(context.temp_allocator)
-        for _, desc in scripts_classes {
-            if string(desc.base) == base {
-                if strings.builder_len(names) > 0 {strings.write_string(&names, ", ")}
-                strings.write_string(&names, string(desc.name))
-            }
-        }
-        gpath := godot.resource_get_path(cast(godot.Resource)self.object)
-        path := string_to_odin(gpath, context.temp_allocator)
+    // Marker-less helper files are valid `.odin` resources during the editor scan and
+    // intentionally have no descriptor. A marked resource missing from the manifest is
+    // actionable (usually stale generated output), so surface it once.
+    if !self.warned_missing && (self.base_type != "" || self.class_name != "") {
+        self.warned_missing = true
         msg := godot.new_string_odin(
             fmt.tprintf(
-                "odin_godot: script %s has no //gd:class marker and multiple registered classes " +
-                "extend %s (%s) — add `//gd:class <Name>` to pick one (using a placeholder for now).",
-                path,
-                base,
-                strings.to_string(names),
+                "odin_godot: no compiled script descriptor for %s — rebuild scripts so scriptgen can publish this source path (using a placeholder for now).",
+                path != "" ? path : "<unsaved OdinScript>",
             ),
         )
         godot.gd_push_warning(godot.variant_from_string(&msg))
@@ -317,7 +292,7 @@ v_can_instantiate :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: 
     self := cast(^OdinScript)instance
     is_tool := false
     if desc, ok := odin_script_resolve_desc(self); ok {
-        is_tool = desc.tool
+        is_tool = bool(desc.tool)
     }
     editor_hint := bool(godot.engine_is_editor_hint(godot.singleton_engine()))
     ret_bool(ret, !editor_hint || is_tool)
@@ -331,7 +306,7 @@ v_is_tool :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext
     self := cast(^OdinScript)instance
     is_tool := false
     if desc, ok := odin_script_resolve_desc(self); ok {
-        is_tool = desc.tool
+        is_tool = bool(desc.tool)
     }
     ret_bool(ret, is_tool)
 }
@@ -627,7 +602,8 @@ v_get_documentation :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args
     arr := godot.new_array_default()
     if desc, ok := odin_script_resolve_desc(self); ok {
         cd := godot.new_dictionary_default()
-        dict_set(&cd, "name", v_str(desc.name))
+		doc_name := desc.global_name != nil ? desc.global_name : desc.name
+        dict_set(&cd, "name", v_str(doc_name))
         if desc.base != nil {
             dict_set(&cd, "inherits", v_str(desc.base))
         }
@@ -784,7 +760,7 @@ v_get_rpc_config :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
             cfg := godot.new_dictionary_default()
             dict_set(&cfg, "rpc_mode", v_i64(r.mode))
             dict_set(&cfg, "transfer_mode", v_i64(r.transfer))
-            dict_set(&cfg, "call_local", v_bool(r.call_local))
+            dict_set(&cfg, "call_local", v_bool(bool(r.call_local)))
             dict_set(&cfg, "channel", v_i64(r.channel))
 
             // Outer key MUST be a StringName (engine requirement).
@@ -841,22 +817,15 @@ v_get_base_script :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: 
     ret_object(ret, nil)
 }
 
-// `Script.get_global_name()` routes here. Returning the script's `//gd:class <Name>`
-// makes the engine treat that name as a GLOBAL CLASS: the editor's filesystem scan reads
-// this (alongside OdinLanguage._get_global_class_name) to register `<Name>` as a usable
-// type. Prefer the parsed `class_name`; fall back to the resolved Class_Desc name.
+// `Script.get_global_name()` routes here. Only an explicit `//gd:class <Name>` opts
+// into Godot's global class namespace; path-only scripts correctly return empty.
 @(private = "file")
 v_get_global_name :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
     context = gdext.godot_context()
 	script_access_enter()
 	defer script_access_leave()
     self := cast(^OdinScript)instance
-    name := ""
-    if self != nil && self.class_name != "" {
-        name = self.class_name
-    } else if desc, ok := odin_script_resolve_desc(self); ok {
-        name = string(desc.name)
-    }
+    name := self != nil ? self.class_name : ""
     ret_string_name(ret, godot.new_string_name_odin(name))
 }
 

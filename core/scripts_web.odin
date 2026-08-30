@@ -174,6 +174,17 @@ odin_scripts_reload :: proc(module := "") -> bool {
 	return false
 }
 
+// Shared instance bookkeeping uses native generation leases. Web has one permanently
+// linked image and no dlopen/reload, so the same hooks compile to inert tokens.
+@(private)
+script_generation_for_desc :: proc "contextless" (desc: rt.Class_Desc) -> rawptr {return nil}
+@(private)
+script_generation_retain :: proc "contextless" (generation: rawptr) {}
+@(private)
+script_generation_release :: proc "contextless" (generation: rawptr) {}
+@(private)
+script_generations_collect_pending :: proc() {}
+
 // No editor / compiler / filesystem in the browser, so the rebuild-on-save coordinator
 // (native core/reload.odin) does not exist here. `OdinScript._reload` references this on
 // all platforms; on web it is a no-op (the editor-hint branch is never taken anyway).

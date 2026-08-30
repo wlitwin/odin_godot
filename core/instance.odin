@@ -37,7 +37,8 @@ Odin_Instance :: struct {
 	desc:       rt.Class_Desc,
 	user:       rawptr, // the allocated script struct (owner ptr at offset 0)
 	cache:      ^Class_Cache, // interned names + cached Variant constructors (per class)
-	class_name: string, // OWNED (heap) copy of desc.name — survives a dll swap (Phase 4)
+	script_identity: string, // OWNED desc_identity copy (normally res:// path); survives dll swaps
+	generation: rawptr, // native ^Script_Generation lease; nil on web
 	// Reload snapshots pin the bookkeeping object so a synchronous Godot re-entry can
 	// free an instance during lifecycle.reload without invalidating the walk. The retired
 	// flag means Godot called free and the instance is no longer discoverable; destruction
@@ -212,6 +213,9 @@ Class_Cache :: struct {
 	method_index:      map[uintptr]int,
 	empty_string:      godot.String,
 	empty_string_name: godot.String_Name,
+	instance_refs:     int,
+	metadata_refs:     int,
+	retired:           bool,
 }
 
 // A String_Name's raw bits as a map key. StringNames are engine-interned: equal names
@@ -222,7 +226,7 @@ sn_bits :: #force_inline proc "contextless" (n: godot.String_Name) -> uintptr {
 	return transmute(uintptr)n
 }
 
-// class name -> its built cache. Keyed by the Class_Desc.name cstring (string view).
+// Canonical script identity -> its built cache. Generated descriptors use `res://` paths.
 @(private)
 class_caches: map[string]^Class_Cache
 
@@ -231,6 +235,98 @@ class_caches: map[string]^Class_Cache
 // the normal reader/reader creation case without serializing hot set/get/call paths.
 @(private)
 class_cache_lock: sync.Mutex
+
+// Returned PropertyInfo arrays may outlive the ScriptInstance call that produced
+// them—and may be freed after a reload replaced the instance's cache. Map the raw list
+// pointer to its exact cache so free_property_list releases the right metadata lease.
+@(private)
+property_list_caches: map[rawptr]^Class_Cache
+
+@(private)
+destroy_class_cache :: proc(cache: ^Class_Cache) {
+	if cache == nil {return}
+	context.allocator = core_allocator()
+	for &ex in cache.exports {
+		godot.free_string(ex.hint_string)
+		if ex.elem_class != cache.empty_string_name {
+			godot.free_string_name(ex.elem_class)
+		}
+		if ex.key_class != cache.empty_string_name {
+			godot.free_string_name(ex.key_class)
+		}
+		gdext.variant_destroy(cast(gdext.VariantPtr)&ex.default)
+	}
+	// Export/method/group names and empty_string_name were interned with
+	// `static=true`; Godot owns them for the process lifetime and rejects unref.
+	delete(cache.export_index)
+	delete(cache.method_index)
+	delete(cache.exports)
+	delete(cache.method_names)
+	godot.free_string(cache.empty_string)
+	free(cache)
+}
+
+@(private)
+class_cache_retain_instance :: proc "contextless" (cache: ^Class_Cache) {
+	if cache == nil {return}
+	sync.lock(&class_cache_lock)
+	cache.instance_refs += 1
+	sync.unlock(&class_cache_lock)
+}
+
+@(private)
+class_cache_release_instance :: proc(cache: ^Class_Cache) {
+	if cache == nil {return}
+	sync.lock(&class_cache_lock)
+	if cache.instance_refs > 0 {cache.instance_refs -= 1}
+	destroy := cache.retired && cache.instance_refs == 0 && cache.metadata_refs == 0
+	sync.unlock(&class_cache_lock)
+	if destroy {destroy_class_cache(cache)}
+}
+
+// Remove a cache from the current identity map. Existing instances and outstanding
+// metadata lists keep explicit leases; the last release destroys all copied Godot data.
+@(private)
+retire_class_cache :: proc(identity: string) {
+	if class_caches == nil {return}
+	sync.lock(&class_cache_lock)
+	cache, ok := class_caches[identity]
+	if ok {
+		delete_key(&class_caches, identity)
+		cache.retired = true
+	}
+	destroy := ok && cache.instance_refs == 0 && cache.metadata_refs == 0
+	sync.unlock(&class_cache_lock)
+	if destroy {destroy_class_cache(cache)}
+}
+
+@(private)
+class_cache_retain_metadata :: proc "contextless" (cache: ^Class_Cache, list: rawptr) {
+	if cache == nil || list == nil {return}
+	sync.lock(&class_cache_lock)
+	if property_list_caches == nil {
+		context = runtime.default_context()
+		context.allocator = core_allocator()
+		property_list_caches = make(map[rawptr]^Class_Cache)
+	}
+	cache.metadata_refs += 1
+	property_list_caches[list] = cache
+	sync.unlock(&class_cache_lock)
+}
+
+@(private)
+class_cache_release_metadata :: proc(list: rawptr) {
+	if list == nil {return}
+	sync.lock(&class_cache_lock)
+	cache, ok := property_list_caches[list]
+	if ok {
+		delete_key(&property_list_caches, list)
+		if cache.metadata_refs > 0 {cache.metadata_refs -= 1}
+	}
+	destroy := ok && cache.retired && cache.instance_refs == 0 && cache.metadata_refs == 0
+	sync.unlock(&class_cache_lock)
+	if destroy {destroy_class_cache(cache)}
+}
 
 @(private)
 ensure_class_cache :: proc(desc: rt.Class_Desc) -> ^Class_Cache {
@@ -243,7 +339,7 @@ ensure_class_cache :: proc(desc: rt.Class_Desc) -> ^Class_Cache {
 	if class_caches == nil {
 		class_caches = make(map[string]^Class_Cache)
 	}
-	key := string(desc.name)
+	key := string(rt.desc_identity(desc))
 	if existing, ok := class_caches[key]; ok {
 		return existing
 	}
@@ -259,7 +355,7 @@ ensure_class_cache :: proc(desc: rt.Class_Desc) -> ^Class_Cache {
 			name        = godot.new_string_name_cstring(ex.name, true),
 			type        = ex.type,
 			offset      = ex.offset,
-			size        = ex.size,
+			size        = int(ex.size),
 			hint        = ex.hint,
 			hint_string = godot.new_string_cstring(ex.hint_string == nil ? "" : ex.hint_string),
 			to_type     = gdext.get_variant_to_type_constructor(ex.type),
@@ -269,7 +365,7 @@ ensure_class_cache :: proc(desc: rt.Class_Desc) -> ^Class_Cache {
 			group        = godot.new_string_name_cstring(ex.group == nil ? "" : ex.group, true),
 			has_subgroup = ex.subgroup != nil,
 			subgroup     = godot.new_string_name_cstring(ex.subgroup == nil ? "" : ex.subgroup, true),
-			has_default  = ex.has_default,
+			has_default  = bool(ex.has_default),
 			default      = export_default_variant(ex),
 			getter       = ex.getter,
 			setter       = ex.setter,
@@ -417,16 +513,16 @@ ensure_instance_globals :: proc() {
 // instance registry, so a placeholder / stale / foreign ptr can never be dereferenced as
 // an `Odin_Instance` (returns nil instead of handing back garbage).
 //
-// `want_class` is the class the CALLER expects (`rt.script_of(obj, T)` passes T's registered
-// class name). We return `oi.user` ONLY when the live instance's class actually matches —
+// `want_identity` is what the CALLER expects (`rt.script_of(obj, T)` passes T's registered
+// source identity). We return `oi.user` ONLY when the live instance actually matches —
 // otherwise nil. This is the type-safety check: every Odin script struct lives in one dll and
 // shares a namespace, so without verifying the class we would hand back the WRONG struct cast
 // to `^T` (e.g. a Bullet returned as a non-nil `^Enemy`), defeating the caller's nil guard and
-// corrupting memory. The compare is by VALUE (`oi.class_name` is a heap copy that survives dll
-// swaps; `want_class` is the scripts dll's static name cstring), and cheap — both are short
-// class-name strings on a hot path called every shot/frame.
+// corrupting memory. The compare is by VALUE (`oi.script_identity` is a heap copy that survives
+// dll swaps; `want_identity` is the scripts dll's static cstring), and cheap — both are short
+// identity strings on a hot path called every shot/frame.
 @(export)
-odin_script_struct :: proc "c" (obj: gdext.ObjectPtr, want_class: cstring) -> rawptr {
+odin_script_struct :: proc "c" (obj: gdext.ObjectPtr, want_identity: cstring) -> rawptr {
 	context = gdext.godot_context()
 	script_access_enter()
 	defer script_access_leave()
@@ -442,7 +538,7 @@ odin_script_struct :: proc "c" (obj: gdext.ObjectPtr, want_class: cstring) -> ra
 	defer sync.unlock(&live_lock)
 	if x, ok := live_by_owner[obj]; ok && x == oi {
 		// Type check: only hand back the struct if its class is the one requested.
-		if want_class != nil && oi.class_name == string(want_class) {
+		if want_identity != nil && oi.script_identity == string(want_identity) {
 			return oi.user
 		}
 	}
@@ -454,15 +550,15 @@ odin_script_struct :: proc "c" (obj: gdext.ObjectPtr, want_class: cstring) -> ra
 // writing the instance's name (ptr + len of the core's heap copy — not NUL-terminated,
 // valid while the instance lives) and returning the struct pointer. The type-safety that
 // odin_script_struct gets from its compare is not lost, just relocated: the scripts dll
-// resolves the reported name against ITS OWN registry to a typeid, so a class the calling
+// resolves the reported identity against ITS OWN registry to a typeid, so a class the calling
 // dll never registered (a foreign module's instance) resolves to nil there, and a struct
 // can never be handed out under a wrong layout.
 @(export)
-odin_script_struct_any :: proc "c" (obj: gdext.ObjectPtr, class_ptr: ^[^]u8, class_len: ^int) -> rawptr {
+odin_script_struct_any :: proc "c" (obj: gdext.ObjectPtr, identity_ptr: ^[^]u8, identity_len: ^uintptr) -> rawptr {
 	context = gdext.godot_context()
 	script_access_enter()
 	defer script_access_leave()
-	if obj == nil || odin_language_object == nil || class_ptr == nil || class_len == nil {
+	if obj == nil || odin_language_object == nil || identity_ptr == nil || identity_len == nil {
 		return nil
 	}
 	data := gdext.object_get_script_instance(obj, odin_language_object)
@@ -473,8 +569,8 @@ odin_script_struct_any :: proc "c" (obj: gdext.ObjectPtr, class_ptr: ^[^]u8, cla
 	sync.lock(&live_lock)
 	defer sync.unlock(&live_lock)
 	if x, ok := live_by_owner[obj]; ok && x == oi {
-		class_ptr^ = raw_data(oi.class_name)
-		class_len^ = len(oi.class_name)
+		identity_ptr^ = raw_data(oi.script_identity)
+		identity_len^ = uintptr(len(oi.script_identity))
 		return oi.user
 	}
 	return nil
@@ -599,7 +695,10 @@ odin_make_script_instance :: proc(script: gdext.ObjectPtr, owner: gdext.ObjectPt
 	oi.script = script
 	oi.desc = desc
 	oi.cache = ensure_class_cache(desc)
-	oi.class_name = heap_clone(string(desc.name))
+	class_cache_retain_instance(oi.cache)
+	oi.script_identity = heap_clone(string(rt.desc_identity(desc)))
+	oi.generation = script_generation_for_desc(desc)
+	script_generation_retain(oi.generation)
 	track_live_instance(oi)
 
 	// Hold a STRONG reference to the OdinScript for as long as this instance lives.
@@ -616,9 +715,9 @@ odin_make_script_instance :: proc(script: gdext.ObjectPtr, owner: gdext.ObjectPt
 	// gdext's godot allocator zeroes on `.Alloc` (see gdext/context.odin) — the explicit
 	// mem.zero here is belt-and-braces so a future allocator change can't reintroduce
 	// garbage in non-`owner` fields.
-	user, err := mem.alloc(desc.size, desc.align, user_struct_allocator(desc.align))
+	user, err := mem.alloc(int(desc.size), int(desc.align), user_struct_allocator(int(desc.align)))
 	if err == nil && user != nil {
-		mem.zero(user, desc.size)
+		mem.zero(user, int(desc.size))
 		(cast(^gdext.ObjectPtr)user)^ = owner
 
 		// Seed Array/Dictionary exports with valid empty containers, then apply
@@ -763,7 +862,7 @@ resolve_onready_refs :: proc "contextless" (oi: ^Odin_Instance, pass := Onready_
 		if di < 0 {
 			// Unreachable via the walk (it refuses template-less array paths); guards
 			// hand-authored descs from substituting into a unique-name marker.
-			godot.error_str(fmt.tprintf("%s.%s: onready array path %q has no `%%d` template — nothing resolved", oi.class_name, string(o.field), tmpl))
+			godot.error_str(fmt.tprintf("%s.%s: onready array path %q has no `%%d` template — nothing resolved", oi.script_identity, string(o.field), tmpl))
 			continue
 		}
 		for i in 0 ..< int(o.count) {
@@ -790,7 +889,7 @@ wire_indexed_connection :: proc "contextless" (oi: ^Odin_Instance, c: rt.Connect
 	if di < 0 {
 		// Unreachable via scriptgen (indexed is only set when a template exists);
 		// guards hand-authored descs from substituting into a unique-name marker.
-		godot.error_str(fmt.tprintf("%s.%s: indexed @(gd_connect) path %q has no `%%d` template — nothing wired", oi.class_name, string(c.method), tmpl))
+		godot.error_str(fmt.tprintf("%s.%s: indexed @(gd_connect) path %q has no `%%d` template — nothing wired", oi.script_identity, string(c.method), tmpl))
 		return
 	}
 	wired := 0
@@ -809,7 +908,7 @@ wire_indexed_connection :: proc "contextless" (oi: ^Odin_Instance, c: rt.Connect
 		godot.error_str(
 			fmt.tprintf(
 				"%s.%s: @(gd_connect=\"%s:%s\") matched no node at index 0 — nothing wired",
-				oi.class_name,
+				oi.script_identity,
 				string(c.method),
 				tmpl,
 				string(c.signal),
@@ -837,7 +936,7 @@ resolve_onready_slot :: proc "contextless" (oi: ^Odin_Instance, o: rt.Onready, p
 		godot.error_str(
 			fmt.tprintf(
 				"%s.%s: onready script ref %q found the node, but it carries no %s Odin script — field left nil",
-				oi.class_name,
+				oi.script_identity,
 				string(o.field),
 				string(path),
 				string(o.script_class),
@@ -891,7 +990,7 @@ inst_notification :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, w
 				godot.error_str(
 					fmt.tprintf(
 						"%s.%s: @(gd_connect=\"%s:%s\") found no node at %q — connection skipped",
-						oi.class_name,
+						oi.script_identity,
 						string(c.method),
 						string(c.path),
 						string(c.signal),
@@ -1033,18 +1132,23 @@ destroy_odin_instance :: proc(oi: ^Odin_Instance) {
 			destruct_export_field(oi.user, &ex)
 		}
 	}
-	heap_delete_string(oi.class_name)
+	heap_delete_string(oi.script_identity)
 	if oi.user != nil {
-		mem.free(oi.user, user_struct_allocator(oi.desc.align))
+		mem.free(oi.user, user_struct_allocator(int(oi.desc.align)))
 	}
+	class_cache_release_instance(oi.cache)
+	script_generation_release(oi.generation)
 	free(oi)
 }
 
 @(private)
 inst_free :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) {
-	script_access_enter()
-	defer script_access_leave()
 	context = gdext.godot_context()
+	script_access_enter()
+	// LIFO: leave the reader lease first, then let the last removed/blocked instance
+	// acquire the writer gate and collect its retired generation immediately.
+	defer script_generations_collect_pending()
+	defer script_access_leave()
 	oi := cast(^Odin_Instance)instance
 	if oi == nil {
 		return
@@ -1262,7 +1366,9 @@ inst_get_property_list :: proc "c" (instance: gdext.ExtensionScriptInstanceDataP
 		})
 	}
 	if count != nil {count^ = u32(len(list))}
-	return raw_data(list)
+	data := raw_data(list)
+	class_cache_retain_metadata(oi.cache, cast(rawptr)data)
+	return data
 }
 
 @(private)
@@ -1276,6 +1382,7 @@ inst_free_property_list :: proc "c" (instance: gdext.ExtensionScriptInstanceData
 		// here would need inst_get_property_list to shrink-to-fit (or pass the capacity).
 		s := transmute([]gdext.PropertyInfo)runtime.Raw_Slice{data = list, len = int(count)}
 		delete(s)
+		class_cache_release_metadata(cast(rawptr)list)
 	}
 }
 
@@ -1376,7 +1483,7 @@ inst_is_placeholder :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr)
 //     documented limitation; GDScript has the same reload caveat).
 // ----------------------------------------------------------------------------
 
-// `only` scopes the rebind to instances of the given class names (multi-module spike:
+// `only` scopes the rebind to instances of the given source identities (multi-module spike:
 // a per-module swap must leave OTHER modules' instances — descs, caches, struct bytes —
 // completely untouched). nil == rebind everything (the single-module behavior).
 @(private)
@@ -1387,18 +1494,45 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
 	// by one of those re-entrant calls on this thread.
 	snapshot := pin_live_instance_snapshot()
 	defer release_live_instance_snapshot(snapshot)
+	warned_removed := make(map[string]bool, context.temp_allocator)
+	warned_proc_state := make(map[string]bool, context.temp_allocator)
 
 	for oi in snapshot {
 		if !snapshot_instance_is_live(oi) {
 			continue
 		}
-		if only != nil && !(oi.class_name in only) {
+		if only != nil && !(oi.script_identity in only) {
 			continue // another module's instance — must survive the swap untouched
 		}
-		new_desc, ok := scripts_classes[oi.class_name]
+		new_desc, ok := scripts_classes[oi.script_identity]
 		if !ok {
-			// Class no longer provided by the new dll: leave the instance bound to its
-			// old (still-mapped) desc so nothing dangles. It simply won't update.
+			// A removed class remains fully operational on its owning generation until
+			// its last live instance dies; other retired generations can still unload.
+			if !(oi.script_identity in warned_removed) {
+				warned_removed[oi.script_identity] = true
+				message := fmt.tprintf(
+					"ODIN_RELOAD_REMOVED_CLASS_PINNED: %s is no longer compiled, but a live instance still uses it; that instance keeps only its owning DLL generation mapped until it is freed.",
+					oi.script_identity,
+				)
+				msg := godot.new_string_odin(message)
+				godot.gd_push_warning(godot.variant_from_string(&msg))
+			}
+			continue
+		}
+		if (oi.desc.generation_bound_state || new_desc.generation_bound_state) && new_desc.lifecycle.reload == nil {
+			// Typed proc/rawptr-bearing state may still call the old image. The explicit
+			// ownership boundary is `<struct>_reload`: without it, keep this instance on
+			// exactly one old generation instead of either crashing or retaining every
+			// intermediate generation forever.
+			if !(oi.script_identity in warned_proc_state) {
+				warned_proc_state[oi.script_identity] = true
+				message := fmt.tprintf(
+					"ODIN_RELOAD_PROC_STATE_PINNED: %s contains procedure-bearing or opaque pointer state but defines no reload hook; its live instance stays on the old code. Add `<struct>_reload` and rebuild cached callbacks there to make future generations unloadable.",
+					oi.script_identity,
+				)
+				msg := godot.new_string_odin(message)
+				godot.gd_push_warning(godot.variant_from_string(&msg))
+			}
 			continue
 		}
 		had_process := oi.desc.lifecycle.process != nil
@@ -1406,12 +1540,18 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
 		needs_process := new_desc.lifecycle.process != nil
 		needs_physics_process := new_desc.lifecycle.physics_process != nil
 		new_cache := ensure_class_cache(new_desc)
+		class_cache_retain_instance(new_cache)
+		old_cache := oi.cache
+		old_generation := oi.generation
+		new_generation := script_generation_for_desc(new_desc)
+		script_generation_retain(new_generation)
 		if layout_compatible(oi.desc, new_desc) {
 			oi.desc = new_desc
 			oi.cache = new_cache
 		} else {
 			migrate_instance(oi, new_desc, new_cache)
 		}
+		oi.generation = new_generation
 		// Godot's process flags live on the owner Node; swapping the descriptor alone
 		// cannot add/remove callbacks for an already-live instance. Mirror fresh instance
 		// creation whenever the new generation changes either lifecycle entry point.
@@ -1425,6 +1565,8 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
 		// pin keeps the bookkeeping memory valid, but a retired instance must not receive
 		// a user reload hook.
 		if !snapshot_instance_is_live(oi) {
+			class_cache_release_instance(old_cache)
+			script_generation_release(old_generation)
 			continue
 		}
 		// Hot-reload hook: the instance is now bound to the NEW desc + (preserved or
@@ -1435,6 +1577,8 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
 		if oi.desc.lifecycle.reload != nil {
 			oi.desc.lifecycle.reload(oi.user)
 		}
+		class_cache_release_instance(old_cache)
+		script_generation_release(old_generation)
 	}
 
 	// SECOND PASS — script-onready refs (`hud: ^hud`). They point into OTHER instances'
@@ -1449,7 +1593,7 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
 		if !snapshot_instance_is_live(oi) || oi.desc.onready_count == 0 {
 			continue
 		}
-		if only != nil && !(oi.class_name in only) {
+		if only != nil && !(oi.script_identity in only) {
 			continue
 		}
 		has_script := false
@@ -1580,8 +1724,8 @@ migrate_instance :: proc(oi: ^Odin_Instance, new_desc: rt.Class_Desc, new_cache:
 	for &ex in oi.cache.exports {
 		destruct_export_field(oi.user, &ex)
 	}
-	mem.free(oi.user, user_struct_allocator(oi.desc.align))
-	user, _ := mem.alloc(new_desc.size, new_desc.align, user_struct_allocator(new_desc.align))
+	mem.free(oi.user, user_struct_allocator(int(oi.desc.align)))
+	user, _ := mem.alloc(int(new_desc.size), int(new_desc.align), user_struct_allocator(int(new_desc.align)))
 	if user != nil {
 		(cast(^gdext.ObjectPtr)user)^ = oi.owner
 	}

@@ -130,16 +130,17 @@ stdenvNoCC.mkDerivation ({
     mkdir -p $A/docs
     cp build/addon-docs/getting-started.md build/addon-docs/index.md $A/docs/
     cp docs/authoring-guide.md docs/workflow.md docs/exporting.md docs/debugging.md docs/modules.md docs/events.md docs/recipes.md $A/docs/
+    mkdir -p $A/docs/design
+    cp docs/design/native-boundary.md $A/docs/design/
     # The friendslop toolkit's pages ride along — the kit/ collection is in the
     # addon, so its documentation must be too (one page per package + tutorial).
     cp -r docs/kit $A/docs/kit
 
-    # Stamp the EXACT Odin release the bundled core was just built with into the docs'
-    # @ODIN_VERSION@ placeholders (README prerequisites + getting-started). The core<->
-    # scripts handshake requires an identical ODIN_VERSION string, so the prebuilt core
-    # PINS the consumer's compiler — the docs must name that release, and hardcoding it
-    # would rot on every toolchain bump. Guard: an unstamped placeholder or a failed
-    # version probe must fail THIS build, not confuse a consumer.
+    # Stamp the TESTED Odin release used to build the bundled core into the docs'
+    # @ODIN_VERSION@ placeholders. Compatible releases may pass the complete native ABI
+    # fingerprint, but naming the tested toolchain gives consumers a known-good default and
+    # must not rot on a toolchain bump. Guard: an unstamped placeholder or failed version
+    # probe must fail THIS build, not confuse a consumer.
     ODIN_VER="$(odin version | awk '{print $NF}')"
     if [ -z "$ODIN_VER" ]; then
       echo "dist.nix: could not determine the odin version for the doc stamp" >&2

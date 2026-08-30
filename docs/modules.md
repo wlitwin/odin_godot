@@ -57,7 +57,8 @@ your_project/
   `libodinscripts_<name>.<ext>` siblings of the main scripts dll and skips any `<name>`
   containing a dot (dots mark hot-reload copies). A dotted `res://modules/<name>` is an
   export error telling you to rename it.
-- **Class names must be unique across all modules** (see [Collisions](#class-name-collisions)).
+- **Authored source paths are runtime identity.** Only explicit `//gd:class` global aliases
+  must be unique across modules (see [Collisions](#global-class-alias-collisions)).
 - **A module is a tree of packages, not one flat directory.** Every subdirectory holding
   authored `.odin` sources is its own Odin package, and an engine-native script class may
   live there and be attached from there (`res://scripts/ui/hud.odin`). Kit-coupled
@@ -179,17 +180,18 @@ script subpackage, so this is an import CYCLE
 
 **Uniqueness.** Every package in a module tree needs its own `package` name (on web export
 they all link into one wasm side module, where the package name is the symbol prefix), and
-`//gd:class` names must be unique across the whole tree, since the runtime registry is keyed
-by name alone and keeps the first registration. Both are build-time errors naming both
-declaring locations:
+explicit `//gd:class` aliases must be unique across the whole tree because they opt into
+Godot's project-wide global type namespace. Marker-less scripts are keyed by their
+`res://` paths and need no name uniqueness. Both package-name and explicit-alias conflicts
+are build-time errors naming both declaring locations:
 
 ```
 scriptgen: error: duplicate package name "game_main" — declared in both ".../scripts" and
 ".../scripts/ui"; every package in a module tree needs its OWN name (on web export they all
 link into one wasm side module, where the package name is the symbol prefix)
 
-scriptgen: error: .../scripts/ui/hud.odin: duplicate //gd:class "Game" (also declared in
-".../scripts/game.odin")
+scriptgen: error: .../scripts/ui/hud.odin: duplicate explicit //gd:class "Game" in
+".../scripts/game.odin" and ".../scripts/ui/hud.odin"
 ```
 
 **Typed access still works inside the module.** All the packages of one module share a dll,
@@ -447,39 +449,37 @@ In a running game, `load("res://modules/enemies/enemy.odin").reload(true)` swaps
 module owning that script (the path decides: `res://modules/<name>/…` → that module,
 anything else → the main module).
 
-## Class-name collisions
+## Global-class alias collisions
 
-Class names (`//gd:class`) must be unique across the whole project: the class map, script
-attachment, and name-based calls all key on them. Collisions are never silent:
+Script attachment, typed access, and reload key on canonical `res://` paths, so ordinary
+scripts do not need globally unique names. An explicit `//gd:class` opts into Godot's
+project-wide global type namespace and therefore must be unique. Collisions are never silent:
 
 - **Within one module (build time):** `scriptgen` refuses two identical `//gd:class` names
   anywhere in a module's tree, root and subpackages together, naming both files:
-  `scriptgen: error: …/ui/hud.odin: duplicate //gd:class "Game" (also declared in
-  ".../scripts/game.odin")`.
+  `scriptgen: error: …/ui/hud.odin: duplicate explicit //gd:class "Game" in
+  ".../scripts/game.odin" and ".../scripts/ui/hud.odin"`.
 - **Native, module vs. module:** the colliding module is **rejected at load** with an error
   naming both sides, and the first module's class keeps working:
 
   ```
-  odin_godot: script class 'Player' is defined in BOTH script module 'main (res://scripts)'
-  and script module 'rogue' — class names must be unique across modules; module 'rogue' was
-  NOT loaded.
+  odin_godot: duplicate explicit //gd:class 'Player' in 'res://scripts/player.odin' and
+  'res://modules/rogue/rogue.odin' (script modules 'main (res://scripts)' and 'rogue');
+  module 'rogue' was NOT loaded.
   ```
 
   A reload that would *introduce* a collision is refused the same way, keeping the old code:
-  `odin_godot: reload rejected — class 'X' in script module 'a' collides with script module
-  'b' (old code kept).`
+  `odin_godot: reload rejected — explicit //gd:class 'X' in 'res://modules/a/x.odin'
+  collides with 'res://modules/b/x.odin' from script module 'b' (old code kept).`
 
-- **Within one registry (all targets):** a duplicate registration keeps the **first** and
-  drops the later one, with a loud error naming the class. On **web** (where every module
-  links into one wasm and shares one registry), this check *is* the cross-module check. The
-  error can't attribute modules there (registration runs before module identity exists), so
-  it points you at the places to look:
+- **Web composed manifest:** all modules share one manifest. Both descriptors remain
+  independently path-addressable, but the duplicate global alias is refused with both
+  canonical paths:
 
   ```
-  duplicate class registration — this class name is already registered; the LATER
-  registration is DROPPED (first wins). In one module this means two structs claim the same
-  class name; on web (all script modules share one registry) it can also be a cross-module
-  collision (module names are not known here — check scripts/ and each modules/<name>/)
+  odin_godot: duplicate explicit //gd:class 'Contested' in
+  'res://modules/enemies/contested.odin' and 'res://scripts/contested.odin'; both scripts
+  remain path-addressable, but the global alias is ambiguous.
   ```
 
 ## Exporting with modules
@@ -529,7 +529,7 @@ Verified means the code path has actually been run on that platform:
 | macOS | ✅ **Runtime-verified**: native run, cross-module calls, per-module reload, and export all asserted headless (`tests/modules_spike/`); script subpackages (`tests/subpkg_spike/`) and the shared tree, including the rebuild-every-module edit (`tests/shared_spike/`), likewise |
 | Web | ✅ **Browser-verified**: multi-module wasm composition, cross-module call, and the keep-first collision error asserted in headless Chrome (`tests/modules_web/`) |
 | Linux | Expected working (the same POSIX build/runtime code path as macOS) but **not runtime-verified** on a Linux host |
-| Windows | Build + per-module reload support is present (`build/build_scripts.ps1` mirrors the bash pipeline step for step) but **unverified on Windows**: the dev machine has no PowerShell to run it |
+| Windows | Build + per-module reload support is present. `tests/build_helpers/` executes the real PowerShell pipeline and verifies parity with Bash for modules, cache invalidation, cleanup, failure recovery, flags, and concurrent publication; native MSVC/runtime execution still needs a Windows host |
 
 ## Troubleshooting
 
@@ -541,14 +541,14 @@ The messages you'll actually see, and what they mean:
 | `scriptgen: error: …: <Class> declares <what> in the script subpackage "<dir>" — kit wiring is part of the MODULE's wire contract …` | A kit declaration (a lane tag, `@(gd_command)`, `@(gd_tick)`, an `entity=` field, a half, …) sits in a subfolder. Move that file to the module root; subfolders hold engine-native classes only. |
 | `scriptgen: error: …: a subfolder script package cannot import the module root (…) — … this is an import CYCLE` | A script subpackage imports `..`. Move the shared code down into a subpackage both sides import (sibling imports are legal), or pass what it needs in as an argument. |
 | `scriptgen: error: duplicate package name "X" — declared in both "…" and "…"` | Two directories in one module tree declare the same `package` name. Give each its own. |
-| `scriptgen: error: …: duplicate //gd:class "X" (also declared in "…")` | Two scripts in one module tree claim one class name (the root and a subpackage count as one tree). Rename one. |
+| `scriptgen: error: …: duplicate explicit //gd:class "X" in "…" and "…"` | Two scripts in one module tree claim one optional global alias. Rename or remove one marker; both scripts otherwise bind by path. |
 | `scriptgen: error: …: the shared package file <f> declares the file-scope variable "x" …` (also `@(static)`, `@(init)`/`@(fini)`, a `//gd:` marker, an `@(gd_*)` proc) | A package under `res://shared/` carries state or a script. Keep state in exactly one module or an autoload; `shared/` is types, constants and pure procs. See [`res://shared/`](#shared). |
 | `scriptgen: error: …: the shared package file <f> imports "…", which resolves to "…" OUTSIDE the shared tree (…)` | A shared package imports a module (or any other outside package). It may import collections and other `shared/` packages only. |
 | `scriptgen: error: …: X.y: "…" comes from the SHARED package "…" — … scriptgen does not resolve gd:"…"-tagged BUNDLES across it` | A `gd:`-tagged struct was embedded from `shared/`. Move the tagged bundle into the module (or a `godot:` collection package); untagged plain data from `shared/` is fine. |
 | `scriptgen: error: …: odin_scripts_boot is declared in the subpackage "…" — the boot export is ONE per dll …` | A hand-written boot shim ended up in a subfolder. Move it to the module root. |
-| `odin_godot: script class 'X' is defined in BOTH script module '…' and script module '…' — … module '…' was NOT loaded.` | Class-name collision at load; the later module was rejected whole. Rename one `//gd:class`. |
-| `odin_godot: reload rejected — class 'X' in script module '…' collides with script module '…' (old code kept).` | A rebuild introduced a collision; the swap was refused and the old code stays live. |
-| `… duplicate class registration — … the LATER registration is DROPPED (first wins) …` | Two structs claim one class name in a single registry: same module on any target, or cross-module on web (check `scripts/` and each `modules/<name>/`). |
+| `odin_godot: duplicate explicit //gd:class 'X' in 'res://…' and 'res://…' — … module '…' was NOT loaded.` | Global-alias collision at native module load; the later module was rejected whole. Rename or remove one marker. |
+| `odin_godot: reload rejected — explicit //gd:class 'X' in 'res://…' collides with 'res://…' …` | A rebuild introduced a global-alias collision; the swap was refused and old code stays live. |
+| `… duplicate explicit //gd:class 'X' in 'res://…' and 'res://…'; both scripts remain path-addressable …` | Web found an ambiguous global alias. Both path identities work; rename or remove one marker. |
 | `odin export: script module 'X' has a dot in its name — …` | Rename `res://modules/<X>` dot-free; the runtime only discovers dot-free module dlls. |
 | `odin export: script module 'X' dll missing (…) — the exported game would ship WITHOUT this module's classes` | The module's export build failed or was skipped. Check the export log above it for the compile error. |
 | `odin export: BUILD_MODULES=0 — script modules NOT built or bundled; …` | You (or a script) set `BUILD_MODULES=0`; unset it to ship modules. |

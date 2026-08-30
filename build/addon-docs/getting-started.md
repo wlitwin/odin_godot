@@ -13,12 +13,12 @@ the end you'll have a `Node2D` that prints on `_ready` and moves every frame.
 You need three things on your machine (the addon already provides the prebuilt engine core):
 
 1. **Godot 4.6+** — <https://godotengine.org>
-2. **The Odin compiler, release `@ODIN_VERSION@` exactly** —
-   <https://github.com/odin-lang/Odin/releases>. After installing, confirm `odin version`
-   prints `@ODIN_VERSION@` from a terminal. The exact release matters: the addon's
-   prebuilt core only loads script libraries built by the same Odin release it was
-   (compiler releases don't guarantee a stable ABI between them); a mismatch fails
-   safely with an error naming the required version.
+2. **The Odin compiler — release `@ODIN_VERSION@` tested/recommended** —
+   <https://github.com/odin-lang/Odin/releases>. The bundled prebuilt core validates a
+   scripts library's complete native ABI fingerprint before boot. Another compiler release
+   is accepted when it can compile the bundled sources and produces the same boundary layout;
+   a real ABI mismatch fails safely before user code runs. The tested release remains the
+   lowest-risk choice, especially before Odin 1.0.
 3. **A C linker Odin can drive:**
    - **macOS:** Xcode Command Line Tools — `xcode-select --install`
    - **Linux:** `gcc` or `clang` from your package manager
@@ -77,7 +77,7 @@ Replace `scripts/hello.odin` with `scripts/mover.odin` — a `Node2D` that print
 
 ```odin
 //gd:extends Node2D       // the Godot base class this script extends
-//gd:class Mover          // the global class_name (defaults to the struct name)
+//gd:class Mover          // optional global class alias; path identity works without it
 package scripts
 
 import gd "godot:godot"

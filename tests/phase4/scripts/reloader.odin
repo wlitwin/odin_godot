@@ -21,16 +21,25 @@ import gd "godot:godot"
 
 RELOAD_V :: #config(RELOAD_V, 1)
 
-when RELOAD_V == 2 {
+when RELOAD_V == 3 {
+	STEP :: 1000
+} else when RELOAD_V == 2 {
 	STEP :: 100
 } else {
 	STEP :: 10
 }
 
+reload_step :: proc() -> int {return STEP}
+
 // First field MUST be the owner Object pointer (core writes it at offset 0).
 Reloader :: struct {
 	owner:    gd.Node,
 	position: gd.Int `gd:"export"`,
+	callback: proc() -> int,
+}
+
+reloader_ready :: proc(self: ^Reloader) {
+	self.callback = reload_step
 }
 
 // Lifecycle: bumps the exported position by STEP each frame (codegen wraps this as
@@ -46,6 +55,11 @@ reloader_get_step :: proc(self: ^Reloader) -> int {
 	return STEP
 }
 
+@(gd_method)
+reloader_get_cached_step :: proc(self: ^Reloader) -> int {
+	return self.callback != nil ? self.callback() : -1
+}
+
 // Concurrency probe: the Phase 4 harness invokes this method on a Godot Thread, then
 // reloads synchronously on the main thread. The core must wait for this old-generation
 // trampoline to return before it mutates descriptors or instance state.
@@ -59,5 +73,6 @@ reloader_hold_reload_reader :: proc(self: ^Reloader, milliseconds: int) {
 // prove the `<class>_reload` lifecycle fired on the swap. (A proc, not a field — no layout
 // change, so the reload still takes the same-layout fast path the rest of this test asserts.)
 reloader_reload :: proc(self: ^Reloader) {
+	self.callback = reload_step
 	gd.print("RELOAD_HOOK_FIRED")
 }

@@ -34,14 +34,15 @@ That means:
 | Need | Where |
 |------|-------|
 | **Godot 4.7+** | <https://godotengine.org> |
-| **Odin compiler — release `@ODIN_VERSION@`, exactly** (`odin` on your PATH) | <https://github.com/odin-lang/Odin/releases> |
+| **Odin compiler — `@ODIN_VERSION@` tested/recommended** (`odin` on your PATH) | <https://github.com/odin-lang/Odin/releases> |
 | **A C linker** Odin can drive | macOS: Xcode Command Line Tools (`xcode-select --install`) · Linux: `gcc`/`clang` · Windows: Visual Studio Build Tools (run builds from a *"x64 Native Tools Command Prompt for VS"*) |
 
-> **Why an exact Odin release:** this addon ships a **prebuilt** core library, and Odin
-> makes no layout/calling-convention guarantees across compiler releases, so the core
-> only loads script libraries built by the *same* release it was (`odin version` must
-> print `@ODIN_VERSION@`). A different release fails safely, with an error naming the
-> required version. If the editor can't find `odin` (common when launched from
+> **Compiler compatibility:** this addon ships a **prebuilt** core library. `@ODIN_VERSION@`
+> is the release used by the addon and remains the safest choice, especially before Odin 1.0.
+> It is not an artificial lockstep requirement: before boot, the core verifies a complete ABI
+> fingerprint (every boundary size, alignment, and field offset), so another release that
+> compiles the bundled sources to the same contract loads safely. An actual ABI mismatch fails
+> before user code runs and tells you to rebuild/update. If the editor can't find `odin` (common when launched from
 > Finder/Steam, which don't inherit your shell PATH), set the **`odin_godot/odin_bin`**
 > project setting to the absolute path of your `odin` binary.
 

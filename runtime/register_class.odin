@@ -20,7 +20,7 @@ import decl "godot:decl"
 // metadata (source line, `///` doc, getter/setter proc pointers) keyed by field name.
 // Class_Info NEVER crosses the core<->scripts dll boundary — only the Class_Desc built
 // here does, so adding it does not touch the ABI contract (Registration_Error does
-// cross, and is folded into ABI_VERSION in runtime.odin).
+// cross, and is folded into abi_layout_fingerprint in runtime.odin).
 //
 // Like `register`, everything here runs from `@(init)` — contextless, no allocator,
 // no engine. Table entries and every string that must outlive the walk (field names,
@@ -56,6 +56,8 @@ Field_Meta :: struct {
 // longer emits a signal table. A table passed here is folded in after the walked ones.
 Class_Info :: struct {
 	name:              cstring,
+	path:              cstring,
+	global_name:       cstring,
 	base:              cstring,
 	lifecycle:         Lifecycle,
 	methods:           [^]Method,
@@ -92,6 +94,80 @@ register_class :: proc "contextless" ($T: typeid, info: Class_Info) {
 	register(reflect_class_desc(T, info))
 }
 
+// Does a script struct contain state that can point back into the DLL generation?
+// Typed procedure values are the direct case. Containers recurse into their element
+// types, which catches flow.Action unions and events.Event subscriber slices without
+// either package needing special treatment. A rawptr is conservative: reflection
+// cannot distinguish an engine/userdata pointer from a procedure erased to rawptr.
+//
+// Godot Variant/handle types are stable engine values, not scripts-DLL addresses, and
+// stop recursion. Typed pointers likewise represent borrowed object/script references;
+// the pointed-to instance owns its own generation lease. The fixed visited set makes
+// recursive types finite and treats an unusually deep graph conservatively.
+@(private = "file")
+type_has_generation_bound_state :: proc "contextless" (ti: ^runtime.Type_Info, seen: ^[128]^runtime.Type_Info, seen_count: ^int) -> bool {
+	if ti == nil {return false}
+	if ti.id == typeid_of(rawptr) {return true}
+	// Godot class handles alias gd.Object's distinct rawptr type. Keep that known
+	// engine handle out of the conservative distinct-rawptr branch below.
+	if ti.id == typeid_of(gd.Object) {return false}
+
+	base := runtime.type_info_base(ti)
+	if p, ok := base.variant.(runtime.Type_Info_Pointer); ok {
+		// `distinct rawptr` reaches this branch with a nil element. A pointer directly
+		// to a procedure can likewise preserve an old entry point; ordinary typed
+		// pointers are borrowed data/script references whose target owns its lease.
+		if p.elem == nil {return true}
+		_, points_to_proc := runtime.type_info_base(p.elem).variant.(runtime.Type_Info_Procedure)
+		return points_to_proc
+	}
+	if p, ok := base.variant.(runtime.Type_Info_Multi_Pointer); ok {
+		if p.elem == nil {return true}
+		_, points_to_proc := runtime.type_info_base(p.elem).variant.(runtime.Type_Info_Procedure)
+		return points_to_proc
+	}
+	if _, is_engine_value := variant_type_for(ti.id); is_engine_value {return false}
+	for i in 0 ..< seen_count^ {
+		if seen[i] == base {return false}
+	}
+	if seen_count^ >= len(seen) {return true}
+	seen[seen_count^] = base
+	seen_count^ += 1
+
+	if _, ok := base.variant.(runtime.Type_Info_Procedure); ok {return true}
+	if a, ok := base.variant.(runtime.Type_Info_Array); ok {
+		return type_has_generation_bound_state(a.elem, seen, seen_count)
+	}
+	if a, ok := base.variant.(runtime.Type_Info_Enumerated_Array); ok {
+		return type_has_generation_bound_state(a.elem, seen, seen_count)
+	}
+	if a, ok := base.variant.(runtime.Type_Info_Dynamic_Array); ok {
+		return type_has_generation_bound_state(a.elem, seen, seen_count)
+	}
+	if a, ok := base.variant.(runtime.Type_Info_Fixed_Capacity_Dynamic_Array); ok {
+		return type_has_generation_bound_state(a.elem, seen, seen_count)
+	}
+	if s, ok := base.variant.(runtime.Type_Info_Slice); ok {
+		return type_has_generation_bound_state(s.elem, seen, seen_count)
+	}
+	if m, ok := base.variant.(runtime.Type_Info_Map); ok {
+		return type_has_generation_bound_state(m.key, seen, seen_count) ||
+		       type_has_generation_bound_state(m.value, seen, seen_count)
+	}
+	if st, ok := base.variant.(runtime.Type_Info_Struct); ok {
+		for i in 0 ..< int(st.field_count) {
+			if type_has_generation_bound_state(st.types[i], seen, seen_count) {return true}
+		}
+		return false
+	}
+	if u, ok := base.variant.(runtime.Type_Info_Union); ok {
+		for v in u.variants {
+			if type_has_generation_bound_state(v, seen, seen_count) {return true}
+		}
+	}
+	return false
+}
+
 // The non-parametric walk (register_class minus the registry append) — also the unit
 // test surface (tests/reflect_register). Contextless signature; internally installs
 // the default context for the pure (never-allocating) core:strings/strconv/reflect
@@ -100,8 +176,10 @@ reflect_class_desc :: proc "contextless" (id: typeid, info: Class_Info) -> Class
 	context = runtime.default_context()
 	desc := Class_Desc {
 		name              = info.name,
+		path              = info.path,
+		global_name       = info.global_name,
 		base              = info.base,
-		id                = id,
+		id                = transmute(u64)id,
 		lifecycle         = info.lifecycle,
 		methods           = info.methods,
 		methods_count     = info.methods_count,
@@ -113,13 +191,16 @@ reflect_class_desc :: proc "contextless" (id: typeid, info: Class_Info) -> Class
 		groups_count      = info.groups_count,
 		rpcs              = info.rpcs,
 		rpcs_count        = info.rpcs_count,
-		tool              = info.tool,
+		tool              = b8(info.tool),
 		icon              = info.icon,
 		doc               = info.doc,
 	}
 	ti := type_info_of(id)
-	desc.size = ti.size
-	desc.align = ti.align
+	desc.size = uintptr(ti.size)
+	desc.align = uintptr(ti.align)
+	seen: [128]^runtime.Type_Info
+	seen_count := 0
+	desc.generation_bound_state = b8(type_has_generation_bound_state(ti, &seen, &seen_count))
 	st, is_struct := runtime.type_info_base(ti).variant.(runtime.Type_Info_Struct)
 	if !is_struct {
 		record_error(info.name, nil, "registered type is not a struct")
@@ -344,7 +425,7 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 			record_error(cls, name_c, "registration name pool exhausted — field dropped")
 			return
 		}
-		onready_pool[onready_pool_count] = Onready{offset = offset, path = path_c, field = name_c, script_id = script_id, count = i32(count)}
+		onready_pool[onready_pool_count] = Onready{offset = offset, path = path_c, field = name_c, script_id = transmute(u64)script_id, count = i32(count)}
 		onready_pool_count += 1
 		return
 	}
@@ -393,7 +474,7 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 		name        = name_c,
 		type        = vt,
 		offset      = offset,
-		size        = fti.size,
+		size        = uintptr(fti.size),
 		hint_string = "",
 	}
 
@@ -1390,13 +1471,13 @@ registration_errors :: proc "contextless" () -> []Registration_Error {
 // be writing a raw node pointer into a typed struct field, the exact confusion the
 // structural classification exists to kill.
 fixup_onready_script_targets :: proc "contextless" () {
-	for i in 0 ..< registry_count {
+	for i in 0 ..< len(registry) {
 		for &o in desc_onready(registry[i]) {
-			if o.script_id == nil || o.script_class != nil {
+			if o.script_id == 0 || o.script_class != nil {
 				continue
 			}
-			if name := class_name_for_typeid(o.script_id); name != nil {
-				o.script_class = name
+			if identity := identity_for_typeid(transmute(typeid)o.script_id); identity != nil {
+				o.script_class = identity
 			} else {
 				record_error(
 					registry[i].name,
@@ -1420,7 +1501,7 @@ reflect_register_reset_for_tests :: proc "contextless" () {
 	signal_pool_count = 0
 	signal_arg_pool_count = 0
 	reg_error_count = 0
-	registry_count = 0
+	clear(&registry)
 	onready_fixup_done = false
 }
 

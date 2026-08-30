@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Rebuild ONLY the Phase 4 scripts dll as v2 (STEP 10 -> 100), simulating a dev's
-# edit-save + recompile. Invoked by test_phase4.gd via OS.execute mid-test (the godot
-# process is launched inside the nix dev shell, so `odin` is on PATH here).
+# Build a third scripts generation after deleting one authored class. ProcHolder is
+# still compiled but intentionally lacks a reload hook; both cases must pin only v2.
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+rm -f "$ROOT/tests/phase4/scripts/removed_class.odin"
 cp "$ROOT/tests/phase4/fixtures/lifecycle_toggle_v2.odin" \
    "$ROOT/tests/phase4/scripts/lifecycle_toggle.odin"
-export SCRIPT_BUILD_FLAGS="-define:RELOAD_V=2"
+export SCRIPT_BUILD_FLAGS="-define:RELOAD_V=3"
 export SKIP_CORE=1
 bash "$ROOT/build/build_scripts.sh" "$ROOT/tests/phase4"

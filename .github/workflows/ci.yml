@@ -37,6 +37,9 @@ jobs:
       - name: Dump engine API (extension_api.json is gitignored)
         run: nix develop --command make api-dump
 
+      - name: Verify Bash and PowerShell build-helper parity
+        run: nix develop .#build-parity --command bash tests/build_helpers/run.sh
+
       - name: Run the suite
         run: SKIP_WEB=1 nix develop --command bash tests/run_all.sh
 

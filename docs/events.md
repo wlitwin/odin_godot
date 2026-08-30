@@ -75,9 +75,10 @@ The publisher frees its list in its own `exit_tree` with `events.destroy`.
 
 ## Hot reload
 
-Subscriptions cache raw proc pointers into the scripts dll, so a hot reload leaves them
-pointing at stale code; a changed-layout reload also reallocates structs and dangles the
-ctx pointers. Resubscribe in the `<class>_reload` hook, tagged by owner so it stays
+Subscriptions contain procedure-bearing state, so the core requires a reload hook before it
+will move a live publisher/subscriber instance to a new DLL generation. Without one, that
+instance stays safely on its old code and warns. A changed-layout reload also reallocates
+structs and can dangle ctx pointers. Resubscribe in the `<class>_reload` hook, tagged by owner so it stays
 idempotent and order-independent across the reload's rebind loop (the same pattern
 [flow](workflow.md)'s `Action` trees use):
 
@@ -93,6 +94,9 @@ enemy_subscribe_slow :: proc(self: ^Enemy) {
 enemy_ready  :: proc(self: ^Enemy) { /* ... */ enemy_subscribe_slow(self) }
 enemy_reload :: proc(self: ^Enemy) { enemy_subscribe_slow(self) }
 ```
+
+After every affected reload hook returns, the old generation is eligible to unload. Treat the
+hook as the boundary after which no subscription may retain its previous fn or ctx pointer.
 
 (Ordinary game scripts never hot-reload mid-run. This matters for `//gd:tool` scripts
 and editor-driven reloads.)

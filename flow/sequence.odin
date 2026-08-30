@@ -18,10 +18,10 @@ package flow
 // HOT RELOAD: an `Action` tree stored in a script's struct caches raw proc pointers
 // (`Call.fn`, `Custom.on_tick`, `Wait_Until.pred`) — and a `wait_flag` holds a raw `^bool`,
 // which additionally dangles after a CHANGED-layout reload (the struct is reallocated).
-// A same-layout hot reload preserves the
-// struct in place, so those pointers survive pointing at the OLD (stale) code. This only
-// bites a script that runs in the editor (`//gd:tool`) or is reloaded at runtime; if that's
-// you, rebuild the tree in the `<class>_reload` hook so it re-captures fresh pointers:
+// A same-layout hot reload preserves the struct in place. The runtime detects this
+// procedure-bearing state and will keep the instance coherently on its old DLL generation
+// unless it defines the explicit refresh boundary below. Rebuild the tree in the
+// `<class>_reload` hook so it re-captures fresh pointers and lets the old image unload:
 //     boss_reload :: proc(self: ^Boss) { self.script = build_boss_sequence() }
 // (Ordinary gameplay scripts never hot-reload themselves, so this is a non-issue for them.)
 //

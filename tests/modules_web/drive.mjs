@@ -6,10 +6,9 @@
 //   * MODWEB_CROSS_OK     — a cross-module engine call (Player.attack -> Enemy.take_hit
 //                           by name) worked,
 //   * MODWEB_DRIVER_OK    — the in-scene driver's full pass,
-//   * the DELIBERATE duplicate-class collision (class "Contested", declared by BOTH
-//     modules) surfaced a LOUD duplicate-registration error on the console: on web all
-//     modules share one registry, so the runtime keeps the first registration, records a
-//     Registration_Error, and the core's error drain push_error's it (-> console.error).
+//   * the DELIBERATE duplicate explicit global alias ("Contested", declared by BOTH
+//     modules) surfaced a LOUD error naming both canonical source paths. The scripts
+//     remain independently path-addressable; only the ambiguous global alias is refused.
 //   * and NO MODWEB_FAIL line.
 //
 // Requires: puppeteer-core (npm i puppeteer-core) + a local Chrome/Chromium. Override
@@ -59,10 +58,7 @@ page.on('console', async msg => {
 page.on('pageerror', err => record('pageerror', err.stack || err.message));
 
 const has = (re) => lines.some(l => re.test(l));
-// The duplicate-class error the runtime records for the Contested collision, as the core's
-// drain formats it ("odin_godot: Contested: duplicate class registration — ...") and
-// push_error forwards it to the browser console.
-const dupRe = /odin_godot: Contested: duplicate class registration/;
+const dupRe = /duplicate explicit \/\/gd:class 'Contested'(?=[^\n]*res:\/\/scripts\/contested\.odin)(?=[^\n]*res:\/\/modules\/enemies\/contested\.odin)/;
 
 await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
 

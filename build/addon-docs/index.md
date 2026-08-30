@@ -35,3 +35,5 @@ Write Godot scripts in compiled Odin. New here? Start at the addon
 - **[Exporting](exporting.md)** — compiling and bundling scripts for desktop and web exports.
 - **[Debugging](debugging.md)** — `gd.print`/`gd.error` logging, native `lldb`, and reading
   crash backtraces with Odin proc names.
+- **[Native boundary](design/native-boundary.md)** — compiler compatibility, the pre-boot ABI
+  fingerprint, ownership, and performance characteristics of the core↔scripts split.

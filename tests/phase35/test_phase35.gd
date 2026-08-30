@@ -13,6 +13,7 @@ extends SceneTree
 #   4. extends    : a non-Node2D base (RefCounted) constructs + calls.
 #   5. @tool      : a //gd:tool script reports is_tool() == true.
 #   6. lifecycle  : a Node2D `process` proc (codegen-wrapped) runs each frame.
+#   7. path identity: two marker-less Node scripts bind independently, with no global alias.
 #
 # Prints PHASE35_OK on success, or PHASE35_FAIL: <reason>.
 
@@ -45,7 +46,9 @@ func _run() -> void:
 	var counter_script = load("res://scripts/counter.odin")
 	var tool_script = load("res://scripts/tool_probe.odin")
 	var mover_script = load("res://scripts/mover.odin")
-	if ping_script == null or counter_script == null or tool_script == null or mover_script == null:
+	var alpha_script = load("res://scripts/path_alpha.odin")
+	var beta_script = load("res://scripts/path_beta.odin")
+	if ping_script == null or counter_script == null or tool_script == null or mover_script == null or alpha_script == null or beta_script == null:
 		_fail("a script resource failed to load")
 		return
 
@@ -136,6 +139,23 @@ func _run() -> void:
 	await process_frame
 	if int(mover.get("ticks")) < 1:
 		_fail("Node2D `process` lifecycle did not run: ticks=%s" % str(mover.get("ticks")))
+		return
+
+	# ===== 7. marker-less, same-base scripts bind by authored path =====
+	if alpha_script.get_global_name() != &"" or beta_script.get_global_name() != &"":
+		_fail("marker-less scripts unexpectedly entered the global class namespace")
+		return
+	var alpha := Node.new()
+	alpha.set_script(alpha_script)
+	root.add_child(alpha)
+	var beta := Node.new()
+	beta.set_script(beta_script)
+	root.add_child(beta)
+	if int(alpha.call("identity")) != 101:
+		_fail("path_alpha.odin bound to the wrong descriptor")
+		return
+	if int(beta.call("identity")) != 202:
+		_fail("path_beta.odin bound to the wrong descriptor")
 		return
 
 	print("PHASE35_OK")

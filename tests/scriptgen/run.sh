@@ -260,7 +260,7 @@ grep -q "return gun_fire(&self.primary, self, _a0)" "$vgen" || fail "decode thun
 grep -q "return gun_reload(&self.secondary)" "$vgen" || fail "plain composed thunk must route into &self.secondary with no owner/args"
 grep -q "runner_secondary_fire_cmd :: proc" "$vgen" || fail "issue wrapper must be named per-entity (runner_secondary_fire_cmd)"
 grep -q 'RUNNER_POLICY_PRIMARY_FIRE :: knet.ACTION_OWNER_PREDICTED' "$vgen" || fail "composed predicted policy not carried"
-grep -q '{name = "primary_fire", id = RUNNER_CMD_PRIMARY_FIRE, policy = RUNNER_POLICY_PRIMARY_FIRE' "$vgen" || fail "composed predicted descriptor (and stable wire id) not carried"
+grep -q 'action = {name = "primary_fire", id = RUNNER_CMD_PRIMARY_FIRE, model = .Immediate, policy = RUNNER_POLICY_PRIMARY_FIRE' "$vgen" || fail "composed predicted descriptor (and stable wire id) not carried"
 grep -q 'RUNNER_POLICY_PRIMARY_RELOAD :: knet.ACTION_OWNER' "$vgen" || fail "plain composed command must get the owner/non-predicted policy"
 grep -q "offset_of(Runner, primary) + offset_of(type_of(Runner{}.primary), ammo)" "$vgen" || fail "the block's replicated state must compose upward beside its verbs"
 
@@ -482,7 +482,7 @@ Panel :: struct {
 game_on_click :: proc(self: ^Game) {} // ^Game method in Panel's home = the trap
 ODIN
 if "$SGEN" "$mt" -godot:"$ROOT" >"$mt/out.log" 2>&1; then fail "a ^Game @(gd_method) in Panel's home file must FAIL the build"; fi
-grep -q "binds to NOTHING" "$mt/out.log" || fail "the method-trap error must name the fix (move to a headerless file)"
+grep -q "binds to NOTHING" "$mt/out.log" || fail "the method-trap error must name the fix (move to a non-script helper file)"
 
 # ---- fixture 15: HOST MIGRATION halves -> kboot.boot_migration's table ---------
 # The four seams pair on the shell by exact name: thunks + the Succ_Hooks table

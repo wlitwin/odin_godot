@@ -25,13 +25,13 @@ import "godot:gdext"
 
 // The core's `obj -> Odin script struct pointer` resolver. Returns nil when `obj` has no
 // OUR-language Odin script instance attached (foreign language / placeholder / no script) OR
-// when the attached instance's class is NOT `want_class`. The CLASS CHECK is essential: every
+// when the attached instance's identity is NOT `want_identity`. The check is essential: every
 // Odin script shares one struct namespace in this dll, so without verifying the class the core
 // would blindly hand back WHATEVER struct is attached, reinterpreted as `^T` — a type confusion
 // that defeats the caller's `if x == nil` guard (e.g. a Bullet returned as a non-nil `^Enemy`).
-// `want_class` is the registered class name (a static cstring owned by the scripts dll); the
-// core compares it by VALUE against the instance's class name, so it is robust across dll swaps.
-Script_Struct_Proc :: proc "c" (obj: gdext.ObjectPtr, want_class: cstring) -> rawptr
+// `want_identity` is the registered source identity (a static cstring owned by the scripts dll);
+// the core compares it by VALUE against the instance identity, so it survives dll swaps.
+Script_Struct_Proc :: proc "c" (obj: gdext.ObjectPtr, want_identity: cstring) -> rawptr
 
 @(private)
 core_script_struct: Script_Struct_Proc
@@ -53,8 +53,8 @@ odin_scripts_set_core_api :: proc "c" (script_struct: Script_Struct_Proc) {
 // (core/instance.odin `live_lock`), but the POINTER you get back is not: from a spawned
 // thread it can be freed under you by a main-thread instance teardown the moment the
 // resolver returns. The class check is what makes this TYPE-SAFE:
-// `T` is resolved to its registered class name (via the runtime registry's typeid->name map),
-// and the core only returns the struct pointer when the live instance's class matches. Without
+// `T` is resolved to its registered source identity (via the runtime registry's typeid map),
+// and the core only returns the struct pointer when the live instance identity matches. Without
 // it, `script_of(a_bullet, Enemy)` would return the Bullet struct cast to `^Enemy` (non-nil
 // garbage). Because every script lives in one dll, `T` is the real script struct type, so a
 // matching `script_of(node, Enemy).hp` is a direct field access — no Variant marshaling.
@@ -62,7 +62,7 @@ script_of :: proc "contextless" (obj: gdext.ObjectPtr, $T: typeid) -> ^T {
 	if core_script_struct == nil || obj == nil {
 		return nil
 	}
-	want := class_name_for_typeid(typeid_of(T))
+	want := identity_for_typeid(typeid_of(T))
 	if want == nil {
 		return nil
 	}
@@ -73,9 +73,9 @@ script_of :: proc "contextless" (obj: gdext.ObjectPtr, $T: typeid) -> ^T {
 
 // The core's `obj -> (script struct, class identity)` resolver — Script_Struct_Proc's
 // sibling for when the caller does NOT know the class: instead of verifying a requested
-// name, the core REPORTS the instance's class (ptr + len of its heap-copy name — not
+// identity, the core REPORTS the instance's identity (ptr + len of its heap copy — not
 // NUL-terminated, valid while the instance lives) and returns the struct pointer.
-Script_Struct_Any_Proc :: proc "c" (obj: gdext.ObjectPtr, class_ptr: ^[^]u8, class_len: ^int) -> rawptr
+Script_Struct_Any_Proc :: proc "c" (obj: gdext.ObjectPtr, identity_ptr: ^[^]u8, identity_len: ^uintptr) -> rawptr
 
 @(private)
 core_script_struct_any: Script_Struct_Any_Proc
@@ -91,7 +91,7 @@ odin_scripts_set_core_api2 :: proc "c" (script_struct_any: Script_Struct_Any_Pro
 // script_any resolves a live Godot object to its Odin script struct WITHOUT naming the
 // class: `(pointer, typeid)`, or `(nil, nil)` when `obj` is nil, carries no Odin script,
 // or carries a class THIS dll didn't register. That last clause is the type-safety story
-// (script_of's class compare, relocated): the reported name is resolved against this
+// (script_of's identity compare, relocated): the reported identity is resolved against this
 // dll's own registry, so another module's instance misses and can never be handed out
 // under a wrong layout.
 //
@@ -108,13 +108,13 @@ script_any :: proc "contextless" (obj: gdext.ObjectPtr) -> (ptr: rawptr, id: typ
 	if core_script_struct_any == nil || obj == nil {
 		return nil, nil
 	}
-	name_ptr: [^]u8
-	name_len: int
-	p := core_script_struct_any(obj, &name_ptr, &name_len)
-	if p == nil || name_ptr == nil || name_len <= 0 {
+	identity_ptr: [^]u8
+	identity_len: uintptr
+	p := core_script_struct_any(obj, &identity_ptr, &identity_len)
+	if p == nil || identity_ptr == nil || identity_len <= 0 {
 		return nil, nil
 	}
-	id = typeid_for_class_name(string(name_ptr[:name_len]))
+	id = typeid_for_identity(string(identity_ptr[:int(identity_len)]))
 	if id == nil {
 		return nil, nil
 	}
