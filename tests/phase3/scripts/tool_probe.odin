@@ -20,6 +20,8 @@ _register_tool_probe :: proc "contextless" () {
 	rt.register(
 		rt.Class_Desc {
 			name = "ToolProbe",
+			path = "res://scripts/tool_probe.odin",
+			global_name = "ToolProbe",
 			base = "Node",
 			size = size_of(ToolProbe),
 			align = align_of(ToolProbe),

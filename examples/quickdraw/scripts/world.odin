@@ -13,7 +13,7 @@ import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
 // The census hooks, down to the genuinely game-shaped lines: the generated
-// queries (gunner_of / my_gunner / gunner_ids) answer everything the old
+// queries (gunner_of / gunner_mine / gunner_ids) answer everything the old
 // three maps did, straight from the kit's own ledgers. (The sim lane tracks
 // this spawn ITSELF: the generated kinds row carries gunner_sim_set, and
 // boot_lane's factory does the rest.)

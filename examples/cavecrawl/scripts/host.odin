@@ -79,7 +79,7 @@ cave_slay_dweller :: proc(self: ^CaveLobby, id: knet.Net_Id, slayer: knet.Player
 	if slayer != knet.PLAYER_ID_INVALID {
 		ksess.session_stat_add(&self.ses, slayer, self.slain_col, 1)
 	}
-	ksess.session_despawn(&self.ses, id)
+	_ = dweller_despawn(&self.boot, id)
 	kai.director_note_death(&self.director, u64(self.host_ticks), self.waves[:self.waves_n])
 	gd.print_str(fmt.tprintf("CAVE_SLAIN left=%d", len(self.dwellers)))
 }
@@ -228,7 +228,7 @@ cave_settle_grab :: proc(self: ^CaveLobby, player: knet.Player_Id, id: knet.Net_
 		sp := self.spelunkers[av]
 		_ = kitems.add(&self.table, sp.bag[:], grabbed.item, grabbed.count)
 	}
-	ksess.session_despawn(&self.ses, id) // the free proc handles node + maps, every role
+	_ = pickup_despawn(&self.boot, id) // the free proc handles node + maps, every role
 }
 
 // (Client commands used to land in a command hook here — a switch over

@@ -85,7 +85,7 @@ hello_sim_process :: proc(self: ^HelloSim, delta: f64) {
 	// device read lives in the @(gd_sample) below and the movement in
 	// player_tick — the frame loop only pumps. Declared event halves are
 	// forwarded inside this generated call too.
- _ = hello_sim_net_pump(self, delta, now_s())
+ _ = hello_sim_net_frame(self, delta, now_s())
 	if was != .Playing && kboot.boot_phase(&self.boot) == .Playing {
 		gd.print_str("HELLO_STARTED")
 	}

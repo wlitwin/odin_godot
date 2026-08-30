@@ -370,6 +370,12 @@ sp.hp = MAX_HP
 kboot.boot_spawn_send(&self.boot, sid) // authority born hooks run before this returns
 ```
 
+If validation or dressing fails inside that configuration window, call
+`kboot.boot_spawn_cancel(&boot, id)`. It removes only an unsent authority draft
+or a client-provisional predicted spawn; it cannot delete a committed entity.
+This gives complex factories explicit rollback without forcing ordinary Odin
+callers through a non-capturing callback API.
+
 (For a TICKING entity the same helper routes through `boot_fire_spawn`: the
 host mints the real entity, a client a predicted one, as in sim.md's fired
 projectile.) The raw `session_spawn_make`/`session_spawn_send` pair stays
@@ -951,7 +957,7 @@ whole, on the game's own stack. That is the property that matters: not whether y
 it or the kit handed it to you.
 
 - **Drained**: `session_poll`'s `Event` union and the generated [event halves](#event-halves-and-generated-dispatch); the SES_APP riders' polls (`comms_poll`, `xfer_poll`, `fire_poll`, `album_poll`), all now the same [`App_Queue`](#the-riders-queue-appq).
-- **Kit-driven**: the generated [`<field>_edge` halves](net.md#field-change-edges) (fired by the presentation pass inside `session_tick`) and `session_present`'s `Later_Proc` (drained on the same clock, interp-delayed).
+- **Kit-driven**: generated [`@(gd_event)` presentation](net.md#reliable-presentation-events), generated [`<field>_edge` halves](net.md#field-change-edges) (fired by the presentation pass inside `session_tick`), and `session_present`'s `Later_Proc` (drained on the same clock, interp-delayed).
 
 **So: a new feature is tier 3 unless it answers a question the session is blocked on (tier
 1) or reads state the operation destroys (tier 2).** Nothing else earns a synchronous

@@ -17,7 +17,7 @@
 #     presents from the striker's predicted timeline (CLB_CVIEW claim near 1);
 #     the idle watcher never drives it, so the same ball presents WATCHED there
 #     (claim 0). One ball, two timelines, one screen each — claimball's point.
-#   - the kick is a DECLARED CUE (@(gd_cue) ball_kicked_fx; the sole entity
+#   - the kick is a DECLARED EVENT (@(gd_event) ball_kicked_fx; the sole entity
 #     parameter is its inferred anchor, and the
 #     step announces through the generated ball_kicked door): the WATCHER,
 #     who never simulated the striker's press, presents CLB_KICK_SEEN from

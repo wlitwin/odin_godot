@@ -123,6 +123,29 @@ pawn_echoed_fx :: proc(g: ^Board, p: ^Pawn, mine: bool) {
 board_horn_fx :: proc(g: ^Board, mine: bool, side: u8) {
 }
 
+// The unified event declaration chooses an existing runtime from its anchor.
+// Chest is an owner+interp cooperative entity, so Auto lowers onto the session
+// presentation clock and the generated suffix-free door takes ^Boot.
+@(gd_event = "audience=everyone,timing=auto")
+chest_spark_fx :: proc(g: ^Board, chest: ^Chest, mine: bool, strength: f32) {
+	_ = g; _ = chest; _ = mine; _ = strength
+}
+
+// Pawn is sim-tracked, so the same declaration lowers onto SIM_FACT/watch
+// timing. Observers excludes its owner; the door still takes ^Boot.
+@(gd_event = "audience=observers,timing=auto")
+pawn_cheered_fx :: proc(g: ^Board, pawn: ^Pawn, mine: bool, style: u8) {
+	_ = g; _ = pawn; _ = mine; _ = style
+}
+
+// A static world occurrence has no clock to infer. The explicit immediate
+// policy is the honest declaration; observers means every screen except the
+// announcing authority.
+@(gd_event = "audience=observers,timing=immediate,anchor=none")
+board_blast_fx :: proc(g: ^Board, mine: bool, x, y: f32) {
+	_ = g; _ = mine; _ = x; _ = y
+}
+
 board_ready :: proc(self: ^Board) {
 }
 

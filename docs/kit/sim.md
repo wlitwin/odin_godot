@@ -144,12 +144,13 @@ fact includes the owner by construction.
 
 ### Cues produced by a world pass
 
-Use `@(gd_cue)` for a presentation event discovered outside a single entity's
-tick, such as contact between a player and a ball:
+Use `@(gd_event)` for a presentation event discovered outside a single
+entity's tick, such as contact between a player and a ball. A sim-tracked
+anchor lowers the declaration onto this lane's existing fact/watch clock:
 
 ```odin
 // The presentation proc you write. `k` is the only entity, so it is the anchor.
-@(gd_cue)
+@(gd_event = "audience=everyone,timing=auto")
 ball_kicked_fx :: proc(g: ^Game, k: ^Kicker, mine: bool, bvx, bvy: f32) {
 	kick_sound(bvx, bvy)            // every screen, at its right time
 	if mine {kick_camera(g)}        // flavor, not a role branch
@@ -157,7 +158,7 @@ ball_kicked_fx :: proc(g: ^Game, k: ^Kicker, mine: bool, bvx, bvy: f32) {
 
 // Scriptgen generates this helper. Call it where the sim discovers the event:
 if kicked {
-	ball_kicked(&g.lane, k, b.roll.vx, b.roll.vy)
+	ball_kicked(&g.boot, k, b.roll.vx, b.roll.vy)
 }
 ```
 
@@ -170,9 +171,9 @@ instances, `anchor=enemy` means "use the `enemy` pointer passed to this call."
 Anchor selection is intentionally small:
 
 - No entity parameters means a world cue. The authority is its local producer.
-- One entity parameter is the inferred anchor; write plain `@(gd_cue)`.
+- One entity parameter is the inferred anchor.
 - With two or more entity parameters, name one parameter explicitly, such as
-  `@(gd_cue="anchor=target")`.
+  `@(gd_event="anchor=target,timing=auto")`.
 - Use `anchor=none` only when the authority/world clock is intentional despite
   carrying entity references.
 
@@ -186,8 +187,9 @@ untracked entity types at build time.
 Announce an anchored cue before untracking or despawning its anchor; otherwise
 the generated corpse gate rejects it and no peer presents it. A predicted cue
 that the authority never confirms may still appear locally. Speedball's kick is
-the worked example. `@(gd_fact)` remains available for source compatibility,
-but new code should use `@(gd_cue)`.
+the worked example. `@(gd_cue)` and `@(gd_fact)` remain source-compatible
+sim-only spellings with their older `^Lane` announcement door; new
+cross-model presentation uses `@(gd_event)` and `^Boot`.
 
 For the rare inline probe that should not be a fact at all (a debug print in
 a tick body), gate on `ksim.lane_live(&lane)`: it reflects the live pass, not

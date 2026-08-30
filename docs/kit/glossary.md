@@ -18,7 +18,7 @@ authority without a player avatar.
 `kboot.Boot` connects the common Godot-facing parts of a Kit game: lobby and HUD
 widgets, `netgd` transport, session, comms, generated entity factory, frame pump,
 and an optional simulation lane. For the conventional direct-field shell,
-scriptgen emits `<game>_net_attach`, `<game>_net_pump`, and
+scriptgen emits `<game>_net_attach`, `<game>_net_pump`, `<game>_net_frame`, and
 `<game>_net_detach`; the component-level `boot_*` procedures remain available.
 
 `boot_phase` reports `.Menu`, `.Connecting`, `.Lobby`, or `.Playing` from the
@@ -90,17 +90,19 @@ peer.
 `Net_Id` identifies an entity within a session. It is not a Godot instance ID or
 a persistent save identity.
 
-## Cue
+## Event and cue
 
-A one-shot presentation event declared with `@(gd_cue)`. Scriptgen generates a
-plain announce proc from its `_fx` declaration. Its entity anchor selects the
-presentation timeline and supplies `mine`; with one entity parameter the anchor
-is inferred, while several require `anchor=PARAM`. The name is a parameter name,
-so each call still identifies one concrete entity instance.
+A one-shot presentation occurrence declared with `@(gd_event)`. Scriptgen
+generates a suffix-free `^Boot` announce proc from its `_fx` declaration. Its
+entity anchor selects the existing session or simulation presentation timeline,
+supplies `mine`, and supports `everyone`, `owner`, or `observers` audiences.
+With one entity parameter the anchor is inferred; several require
+`anchor=PARAM`.
 
-Cues do not mutate authoritative state. Kit suppresses them during
-resimulation, presents local cues immediately, and schedules remote cues on the
-anchor's watched timeline. `@(gd_fact)` is the compatible earlier spelling.
+Events do not mutate authoritative state and are not replayed to joiners. Kit
+suppresses sim events during resimulation, presents live/owning screens without
+another interpolation delay, and schedules observers on the anchor's clock.
+`@(gd_cue)` and `@(gd_fact)` are compatible sim-only spellings.
 
 ## Fact
 

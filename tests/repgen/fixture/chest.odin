@@ -17,6 +17,7 @@ Chest :: struct {
 	gold:   i32 `gd:"replicate"`,
 	sealed: bool `gd:"replicate"`,
 	claim:  u64 `gd:"replicate"`, // who claimed it — written from the ISSUER param below
+	x, y:   f32 `gd:"owner"`, // cooperative moving anchor for @(gd_event)
 	target: knet.Net_Ref(Pawn) `gd:"replicate"`, // typed entity relation stays a POD id on the wire
 }
 

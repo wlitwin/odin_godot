@@ -49,6 +49,8 @@ _register_counter :: proc "contextless" () {
 	rt.register(
 		rt.Class_Desc {
 			name = "Counter",
+			path = "res://scripts/counter.odin",
+			global_name = "Counter",
 			base = "RefCounted",
 			size = size_of(Counter),
 			align = align_of(Counter),

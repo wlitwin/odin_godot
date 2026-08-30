@@ -110,6 +110,6 @@ reset_kickoff :: proc(self: ^Slopball) {
 	ksess.session_set_owner(&self.ses, self.ball_id, self.ses.me)
 	seat_ball(self, self.ses.me)
 	play.puppet_place(&self.ball.puppet, PITCH_W/2, PITCH_H/2)
-	ksess.session_teleport(&self.ses, self.ball_id)
+	_ = ball_teleport(&self.boot, self.ball_id)
 	self.kickoff_at = now_s() + KICKOFF_HOLD
 }

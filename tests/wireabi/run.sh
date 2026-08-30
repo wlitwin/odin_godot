@@ -17,7 +17,7 @@ ATTRS=(
 	-custom-attribute:gd_rpc -custom-attribute:gd_command
 	-custom-attribute:gd_tick -custom-attribute:gd_input
 	-custom-attribute:gd_sample -custom-attribute:gd_step
-	-custom-attribute:gd_cue -custom-attribute:gd_fact
+	-custom-attribute:gd_event -custom-attribute:gd_cue -custom-attribute:gd_fact
 	-custom-attribute:gd_half -custom-attribute:gd_message
 )
 

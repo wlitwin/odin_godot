@@ -391,8 +391,9 @@ Fact_In :: struct {
 // renumbers the wire) and its decode thunk. scriptgen emits the package's
 // table; the generated lane_init installs it.
 Fact_Desc :: struct {
-	id: u16, // never 0 — kind 0 on the wire means "the anchor set's tick fx"
-	fx: Fx_Thunk, // entity = the anchor (nil for an anchorless world fact)
+	id:       u16, // never 0 — kind 0 on the wire means "the anchor set's tick fx"
+	audience: ksess.Net_Event_Audience, // zero = Everyone (legacy gd_cue/gd_fact)
+	fx:       Fx_Thunk, // entity = the anchor (nil for an anchorless world fact)
 }
 
 // Install the package's declared-fact table — generated wiring, alongside
@@ -1081,10 +1082,32 @@ lane_fact :: proc(l: ^Lane, entity: rawptr, args: []u8, kind: u16 = 0) {
 		)
 	}
 	skip := l.in_auth ? knet.PLAYER_ID_INVALID : owner
+	audience := ksess.Net_Event_Audience.Everyone
+	if kind != 0 {
+		for d in l.fact_set {
+			if d.id == kind {
+				audience = d.audience
+				break
+			}
+		}
+	}
 	for p in ksess.session_roster(l.ses) {
-		if !p.connected || p.id == l.ses.me || (skip != knet.PLAYER_ID_INVALID && p.id == skip) {
+		if !p.connected || p.id == l.ses.me {
 			continue
 		}
+		is_owner := owner != knet.PLAYER_ID_INVALID && p.id == owner
+		include := false
+		switch audience {
+		case .Everyone:
+			include = skip == knet.PLAYER_ID_INVALID || p.id != skip
+		case .Owner:
+			// An everywhere-pass event already fired on the owner's live
+			// simulation. Authority-pass events did not, so include it there.
+			include = is_owner && l.in_auth
+		case .Observers:
+			include = !is_owner
+		}
+		if !include {continue}
 		w := ksess.session_app_begin(l.ses, l.tag)
 		knet.write_u8(w, SIM_FACT)
 		knet.write_u64(w, l.step_tick)

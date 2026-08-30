@@ -419,7 +419,7 @@ ols_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i6
         "    \"enable_snippets\": true,\n" +
         "    \"enable_hover\": true,\n" +
         "    \"enable_semantic_tokens\": true,\n" +
-		"    \"checker_args\": \"-no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_input -custom-attribute:gd_sample -custom-attribute:gd_step -custom-attribute:gd_cue -custom-attribute:gd_fact -custom-attribute:gd_half -custom-attribute:gd_message\"\n}\n"
+		"    \"checker_args\": \"-no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_input -custom-attribute:gd_sample -custom-attribute:gd_step -custom-attribute:gd_event -custom-attribute:gd_cue -custom-attribute:gd_fact -custom-attribute:gd_half -custom-attribute:gd_message\"\n}\n"
     )
     if werr := os.write_entire_file(path, transmute([]byte)strings.to_string(b)); werr != nil {
         editor_msg_error(fmt.tprintf("odin_godot: couldn't write %s.", path))

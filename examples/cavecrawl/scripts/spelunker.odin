@@ -26,7 +26,7 @@ Spelunker :: struct {
 	glyph:     gd.Label `gd:"onready=Glyph"`,
 	pyre:      gd.Cpu_Particles2d `gd:"onready=Pyre"`, // authored death burst
 	net_id:    knet.Net_Id, // assigned by the session at spawn
-	x, y:      f32 `gd:"owner,interp,wire=f16"`, // half floats on the wire — cave
+	x, y:      f32 `gd:"owner,wire=f16"`, // half floats on the wire — cave
 	// coordinates fit f16 to sub-pixel; the struct (and everything local: shadows,
 	// prediction, ring blobs) stays full f32
 	bag:       [6]kitems.Slot `gd:"replicate"`,
@@ -146,7 +146,7 @@ spelunker_hp_edge :: proc(g: ^CaveLobby, self: ^Spelunker, old, new: i32) {
 			// BLED OUT and back: a fresh body at the spawn point.
 			self.x = SPAWN_X
 			self.y = SPAWN_Y
-			ksess.session_teleport(&g.ses, self.net_id) // out of the grave in one step, on every screen
+			_ = spelunker_teleport(&g.boot, self) // out of the grave in one step, on every screen
 			gd.print_str("CAVE_RESPAWNED")
 		} else {
 			// REVIVED where I fell — a friend got there before the clock.

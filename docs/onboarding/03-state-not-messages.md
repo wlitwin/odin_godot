@@ -88,8 +88,7 @@ golf_ready :: proc(self: ^Golf) {
 golf_host_tick :: proc(self: ^Golf) { run_the_course(self) }
 
 golf_process :: proc(self: ^Golf, delta: f64) {
-	frame := golf_net_pump(self, delta, now_s())
-	golf_step(self, frame.ticks) // generated: hosts step, clients no-op
+	frame := golf_net_frame(self, delta, now_s())
 }
 ```
 
@@ -98,7 +97,7 @@ That is a hosted, joinable game: lobby UI, chat, scoreboard, host/join buttons
 drives it all. Your game reacts by declaring **event halves**: plain procs
 named for the event (`golf_player_joined`, `golf_entity_spawned`, an
 authority-only `golf_player_joined_then` for consequences) that the generated
-`golf_net_pump` dispatches to synchronously. There are no callbacks into a
+`golf_net_frame` dispatches to synchronously. There are no callbacks into a
 half-initialized script, and no role branch of your own to write. The component
 calls remain available when a game needs custom dispatch ordering.
 
@@ -115,7 +114,7 @@ with every keypress waiting on a round trip. So there is one other flavor of
 replication: fields the entity's **owner** writes,
 
 ```odin
-x, y: f32 `gd:"owner,interp"`,
+x, y: f32 `gd:"owner"`, // continuous owner fields interpolate by default
 ```
 
 streamed unreliably at tick rate, and rendered by everyone else through a short

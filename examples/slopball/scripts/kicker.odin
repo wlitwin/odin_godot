@@ -18,7 +18,7 @@ Kicker :: struct {
 	skin:    gd.Polygon2d `gd:"onready=Skin"`,
 	tag:     gd.Label `gd:"onready=Tag"`,
 	net_id:  knet.Net_Id,
-	x, y:    f32 `gd:"owner,interp,wire=f16"`,
+	x, y:    f32 `gd:"owner,wire=f16"`,
 	pid:     u8 `gd:"replicate"`, // the seat this avatar belongs to (color + team)
 	mine:    bool, // set by the factory: this peer drives (and streams) this body
 	hx, hy:  f32, // HOST grant-loop scratch: last sampled pose (intent = displacement)

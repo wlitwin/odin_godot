@@ -26,7 +26,7 @@ In `Player`, replace the owner-stream tags on position:
 
 ```odin
 // Session replication: the entity owner writes position.
-x, y: f32 `gd:"owner,interp,wire=f16"`
+x, y: f32 `gd:"owner,wire=f16"` // owner float fields interpolate by default
 
 // Simulation lane: the authority writes position and the owner predicts it.
 x, y: f32 `gd:"predict,interp"`
@@ -170,7 +170,7 @@ entity's `_process` displays them:
 ```odin
 hello_sim_process :: proc(self: ^HelloSim, delta: f64) {
 	if kboot.boot_phase(&self.boot) == .Menu {return}
-	_ = hello_sim_net_pump(self, delta, knet.now_s())
+	_ = hello_sim_net_frame(self, delta, knet.now_s())
 }
 ```
 

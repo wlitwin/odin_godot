@@ -40,7 +40,7 @@ HelloNet :: struct {
 
 	// THE declaration: this exported scene bodies a replicated entity. The
 	// tag mints the wire id, the factory, typed player_spawn(), the census
-	// (my_player / player_of / player_ids), and the acid probes.
+	// (player_mine / player_of / player_ids), and the acid probes.
 	player_scene: ^gd.Resource `gd:"entity=Player:1"`,
 
 	me: ^Player, // my avatar (set by the census hook in player.odin)
@@ -100,7 +100,7 @@ hello_net_process :: proc(self: ^HelloNet, delta: f64) {
 	// existed to detect (see the swap at the bottom).
 	was := kboot.boot_phase(&self.boot)
 	if was == .Menu {return}
-	_ = hello_net_pump(self, delta, now_s())
+	_ = hello_net_frame(self, delta, now_s())
 	// The minted code is a FACT to poll, not a callback: show it when it lands
 	// (the stock lobby status already carries it; this is the headless receipt).
 	if !self.minted {

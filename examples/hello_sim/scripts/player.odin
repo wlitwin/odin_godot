@@ -4,7 +4,7 @@ package hello_sim
 
 // hello_net's Player, PROMOTED to the server-authority sim lane. The diff
 // from the coop file is the promotion checklist (sim.md) in miniature:
-//   step 2 — the retag: `owner,interp` became `predict,interp`
+//   step 2 — the retag: `owner` (auto-interpolated) became `predict,interp`
 //            (the field's writer is now the server's simulation, predicted
 //            locally — that one word is the whole wire migration);
 //   step 3 — the writes moved out of the frame loop into @(gd_tick): a pure

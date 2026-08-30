@@ -66,10 +66,10 @@ Lane_Box :: struct {
 	// declared world-pass fact probe (@(gd_fact) doors): one recorder slot
 	// per kind under test — calls, the mine bit, the watch clock at fire,
 	// and whether the thunk saw a nil entity (the anchorless form)
-	df_calls:        [5]int,
-	df_mine:         [5]bool,
-	df_clock:        [5]f64,
-	df_nil:          [5]bool,
+	df_calls:        [6]int,
+	df_mine:         [6]bool,
+	df_clock:        [6]f64,
+	df_nil:          [6]bool,
 	fx_clock:        f64, // lane.watch_clock at the fire (0 on a live-pass fire)
 	fx_newest:       u64, // rx.newest at the fire — proves the watcher fired BEHIND the wire
 }
@@ -2928,12 +2928,14 @@ DF_ADJU :: u16(0x1002) // slot 1: authority-context anchored (provenance)
 DF_HORN :: u16(0x1003) // slot 2: anchorless
 DF_LATE :: u16(0x1004) // slot 3: despawn-drop (must never fire)
 DF_DEAD :: u16(0x1005) // slot 4: corpse announce (must fire NOWHERE)
+DF_OBSERVERS :: u16(0x1006) // slot 5: every screen except the anchor owner
 
 DF_BUMP_AT :: u64(60)
 DF_ADJU_AT :: u64(120)
 DF_HORN_AT :: u64(150)
 DF_LATE_AT :: u64(180)
 DF_DEAD_AT :: u64(240)
+DF_OBSERVERS_AT :: u64(90)
 
 df_record :: proc(slot: int, entity: rawptr, lane: ^ksim.Lane, mine: bool) {
 	b := cast(^Lane_Box)ksim.lane_game(lane)
@@ -2973,6 +2975,12 @@ df_fx_dead :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df
 		lane,
 		mine,
 	)}
+df_fx_observers :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {df_record(
+		5,
+		entity,
+		lane,
+		mine,
+	)}
 
 df_table := [?]ksim.Fact_Desc {
 	{id = DF_BUMP, fx = df_fx_bump},
@@ -2980,6 +2988,7 @@ df_table := [?]ksim.Fact_Desc {
 	{id = DF_HORN, fx = df_fx_horn},
 	{id = DF_LATE, fx = df_fx_late},
 	{id = DF_DEAD, fx = df_fx_dead},
+	{id = DF_OBSERVERS, audience = .Observers, fx = df_fx_observers},
 }
 
 // Mirrors the generated ANCHORED door: the corpse gate first, then the
@@ -3012,6 +3021,22 @@ df_door_horn :: proc(l: ^ksim.Lane) {
 	}
 }
 
+// The generated observers policy: the owner never presents and is not sent
+// an echo; the authority and every other watcher use the watch-clock fact.
+df_door_observers :: proc(l: ^ksim.Lane, entity: rawptr) {
+	if !ksim.lane_tracks_entity(l, entity) {return}
+	if ksim.lane_is_authority(l) {
+		ksim.lane_fact(l, entity, {}, DF_OBSERVERS)
+	}
+	if ksim.lane_live(l) {
+		owner := ksim.lane_owner_of(l, entity)
+		mine := owner != knet.PLAYER_ID_INVALID && owner == ksim.lane_me(l)
+		if !mine && ksim.lane_is_authority(l) {
+			df_record(5, entity, l, mine)
+		}
+	}
+}
+
 // The EVERYWHERE pass: every peer announces the bump at its tick — the door's
 // gates sort the screens (that is the whole point of the channel).
 df_step :: proc(user: rawptr, tick: u64) {
@@ -3019,6 +3044,9 @@ df_step :: proc(user: rawptr, tick: u64) {
 	if tick == DF_BUMP_AT {
 		m := b.movers[20] // alice's avatar — she caused it
 		df_door(&b.lane, m, DF_BUMP, 0)
+	}
+	if tick == DF_OBSERVERS_AT {
+		df_door_observers(&b.lane, b.movers[20])
 	}
 }
 
@@ -3169,6 +3197,14 @@ lane_declared_facts_world_pass :: proc(t: ^testing.T) {
 	testing.expect_value(t, host.df_calls[4], 0)
 	testing.expect_value(t, alice.df_calls[4], 0)
 	testing.expect_value(t, bob.df_calls[4], 0)
+
+	// (6) Declarative observers: Alice owns the anchor and sees nothing;
+	// authority + Bob each present once, with Bob held to the watch clock.
+	testing.expect_value(t, alice.df_calls[5], 0)
+	testing.expect_value(t, host.df_calls[5], 1)
+	testing.expect(t, !host.df_mine[5])
+	testing.expect_value(t, bob.df_calls[5], 1)
+	testing.expect(t, bob.df_clock[5] >= f64(DF_OBSERVERS_AT))
 }
 
 // ---------------------------------------------------------------------------

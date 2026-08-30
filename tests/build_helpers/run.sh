@@ -11,6 +11,10 @@ fail() { echo "BUILD_HELPERS_FAIL: $*" >&2; exit 1; }
 
 # common.sh owns the one Bash EXIT trap. Register the whole fixture after sourcing it.
 source "$REPO_ROOT/build/common.sh"
+# This suite exercises build_scriptgen's own cache/invalidation path. The full
+# runner exports a suite-wide prebuilt SGEN_BIN for every other test; retaining
+# it here would bypass the subject and make the fake compiler log stay absent.
+unset SGEN_BIN
 odin_gd_cleanup_on_exit "$WORK"
 
 FIXTURE_ROOT="$WORK/root"

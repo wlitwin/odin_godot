@@ -281,6 +281,57 @@ Event :: union {
 	Ev_Profile_Changed,
 }
 
+// Optional, pollable authority verdicts for transaction/UI flows. Commands
+// still return Action_Outcome immediately and durable gameplay truth still
+// lives in replicated state; a receipt is only the "did the authority accept
+// this particular ask?" answer that C# can express with await. Odin keeps it
+// on the game's frame loop instead: issue, retain this small value, poll.
+Action_Verdict_State :: enum u8 {
+	Pending,
+	Accepted,
+	Rejected,
+	Unavailable,
+}
+
+Action_Verdict :: struct {
+	state:  Action_Verdict_State,
+	reason: knet.Action_Reject_Reason, // meaningful when state == .Rejected
+}
+
+// Opaque-by-contract even though Odin exposes the fields: construct through
+// session_action_receipt. `epoch` prevents a reset/rehost from resolving an
+// old receipt with a recycled sequence; `model` keeps immediate and scheduled
+// sequence namespaces distinct. A negative slot is a verdict already known at
+// issue time (authority-local Applied or a final local refusal).
+Action_Receipt :: struct {
+	epoch:   u32,
+	model:   knet.Action_Model,
+	seq:     u32,
+	slot:    i16,
+	token:   u32,
+	settled: Action_Verdict,
+}
+
+MAX_ACTION_RECEIPTS :: 64
+ACTION_RESULT_CACHE_CAP :: 64
+
+@(private = "file")
+Action_Receipt_Slot :: struct {
+	used:    bool,
+	token:   u32,
+	model:   knet.Action_Model,
+	seq:     u32,
+	verdict: Action_Verdict,
+}
+
+@(private = "file")
+Action_Result_Cache_Entry :: struct {
+	valid:   bool,
+	model:   knet.Action_Model,
+	seq:     u32,
+	verdict: Action_Verdict,
+}
+
 // ---- the stat registry: stats.odin -------------------------------------------
 // ---- backup hosting + succession: backup.odin --------------------------------
 
@@ -392,11 +443,12 @@ SES_BLOB :: u8(21) // host -> all  [id][ver u32][len u32][bytes] — an entity b
 SES_DECLARE :: u8(22) // client -> host  [size u16][row bytes] — my profile row (profile.odin)
 SES_PROFILES :: u8(23) // host -> all    [size u16][players u16] x ([id][row]) — the profile table
 SES_AOI :: u8(24) // host -> all    [aoi bool] — stream filtering changed MID-RUN (session_set_interest after clients joined; the welcome covers everyone later)
+SES_NET_EVENT :: u8(25) // host -> recipients [event id u16][anchor Net_Id][args bytes] — reliable, non-durable presentation
 
 // One past the highest SES_* id — the ONE number a new wire kind bumps,
 // right here beside its constant. netgd's per-kind gauge derives its table
 // size from this, so a new kind can never alias onto another row's tally.
-SES_KIND_COUNT :: 25
+SES_KIND_COUNT :: 26
 
 // The kinds' display names, indexed by the constants above — id and label
 // live in ONE file, a screen apart (netgd's gauge copies these rows at load;
@@ -429,6 +481,7 @@ SES_KIND_NAMES := [SES_KIND_COUNT]string {
 	int(SES_DECLARE) = "declare",
 	int(SES_PROFILES) = "profiles",
 	int(SES_AOI) = "aoi",
+	int(SES_NET_EVENT) = "event",
 }
 
 // ---- app messages: the extension point for sibling kit packages ---------------
@@ -841,6 +894,11 @@ Session_Wiring :: struct {
 	// app-message routes (kit/comms and friends)
 	app:               [MAX_APP_TAGS]App_Route,
 	app_w:             knet.Writer, // scratch for session_app_begin/flush (reused per message)
+	// Generated reliable presentation-event routes. The descriptor slice is
+	// static generated data; the game pointer is what its typed decode thunks
+	// receive. Both survive starts like app routes and the entity factory.
+	net_event_user: rawptr,
+	net_event_set:  []Net_Event_Desc,
 
 	// interest management (interest.odin) — off until session_set_interest
 	interest_r:        f32,
@@ -874,6 +932,17 @@ Session_Run :: struct {
 	me:              knet.Player_Id,
 	players:         map[knet.Player_Id]Player,
 	events:          [dynamic]Event,
+	net_event_in:      [dynamic]Net_Event_In,
+	net_event_due:    [dynamic]Net_Event_In,
+	net_event_dropped: u64,
+	// Receipts are opt-in: at most 64 UI/transaction asks may be watched at
+	// once. The result cache is not a second truth ledger; it only closes the
+	// issue -> register race for a synchronous in-memory transport and permits
+	// a receipt to be made just after its SES_RESULT was handled.
+	action_receipts:       [MAX_ACTION_RECEIPTS]Action_Receipt_Slot,
+	action_receipt_serial: u32,
+	action_results:        [ACTION_RESULT_CACHE_CAP]Action_Result_Cache_Entry,
+	action_result_next:    int,
 
 	// resolved from cfg at *_start (read these, not cfg, mid-run)
 	tick_hz:         int,
@@ -968,6 +1037,7 @@ Session :: struct {
 	using wiring: Session_Wiring,
 	using run:    Session_Run,
 	ran:          bool, // session_init completed at least once — gates the re-entrant teardown
+	action_epoch: u32, // increments at every *_start/resume; receipts never cross runs
 	// REPLAY recording (session_record_start): every packet this session HANDLES,
 	// framed with its arrival time and peer, appended here. A direct Session field
 	// (not run-scoped) because the game drives it explicitly across a run's life —
@@ -1002,6 +1072,14 @@ run_destroy :: proc(run: ^Session_Run) {
 	}
 	delete(run.players)
 	delete(run.events)
+	for &event in run.net_event_in {
+		delete(event.args)
+	}
+	for &event in run.net_event_due {
+		delete(event.args)
+	}
+	delete(run.net_event_in)
+	delete(run.net_event_due)
 	delete(run.tokens)
 	delete(run.by_peer)
 	delete(run.traffic)
@@ -1074,6 +1152,12 @@ session_init :: proc(s: ^Session, keep_profiles := false) {
 			s.prof = kept
 			s.prof.dirty = true
 		}
+	}
+	// A receipt belongs to exactly one run. Increment after the old run is
+	// gone, including resume, and keep zero reserved for "never started".
+	s.action_epoch += 1
+	if s.action_epoch == 0 {
+		s.action_epoch = 1
 	}
 	// Non-zero ground state the wholesale wipe can't express:
 	s.join_waited = -1 // the join-timeout clock is DISARMED (0 would be armed-at-tick-0)
@@ -1436,6 +1520,165 @@ ctx_hook_dispatch :: proc(
 // calls them after truth/revert application. Games consume the ordinary
 // generated `_command_confirmed` / `_command_rejected` halves and never need to
 // know which packet lane carried the action.
+@(private = "file")
+action_verdict_from_reason :: proc(reason: knet.Action_Reject_Reason) -> Action_Verdict {
+	if reason == .None {
+		return {state = .Accepted}
+	}
+	return {state = .Rejected, reason = reason}
+}
+
+@(private = "file")
+action_result_remember :: proc(
+	s: ^Session,
+	model: knet.Action_Model,
+	seq: u32,
+	verdict: Action_Verdict,
+) {
+	if seq == 0 {
+		return
+	}
+	// A duplicate result (a defensive replay) updates in place and does not
+	// consume another race-cache slot.
+	for &cached in s.action_results {
+		if cached.valid && cached.model == model && cached.seq == seq {
+			cached.verdict = verdict
+			return
+		}
+	}
+	idx := s.action_result_next % len(s.action_results)
+	s.action_results[idx] = {
+		valid = true,
+		model = model,
+		seq = seq,
+		verdict = verdict,
+	}
+	s.action_result_next = (idx + 1) % len(s.action_results)
+}
+
+@(private = "file")
+action_result_cached :: proc(
+	s: ^Session,
+	model: knet.Action_Model,
+	seq: u32,
+) -> (Action_Verdict, bool) {
+	for &cached in s.action_results {
+		if cached.valid && cached.model == model && cached.seq == seq {
+			return cached.verdict, true
+		}
+	}
+	return {}, false
+}
+
+// Convert the synchronous issue answer into an optional future verdict. Call
+// this immediately after the generated `<verb>_cmd` wrapper when a UI or
+// transaction actually cares about acceptance. Ordinary gameplay should keep
+// reacting to replicated state and pays no receipt slot.
+//
+// A final local answer (authority Applied or a refusal that never shipped) is
+// embedded in the returned value and consumes no slot. A sent/scheduled action
+// reserves one of MAX_ACTION_RECEIPTS run-scoped slots. Exhaustion answers
+// Unavailable rather than silently dropping or aliasing a different action.
+session_action_receipt :: proc(s: ^Session, outcome: knet.Action_Outcome) -> Action_Receipt {
+	receipt := Action_Receipt {
+		epoch = s.action_epoch,
+		model = outcome.model,
+		seq = outcome.seq,
+		slot = -1,
+	}
+	if outcome.seq == 0 {
+		switch outcome.state {
+		case .Applied:
+			receipt.settled = {state = .Accepted}
+		case .Rejected:
+			receipt.settled = {state = .Rejected, reason = outcome.reason}
+		case .Predicted:
+			// A predicted/scheduled answer without a correlation sequence is a
+			// malformed hand-built outcome, never a generated wrapper result.
+			receipt.settled = {state = .Unavailable}
+		}
+		return receipt
+	}
+	if !s.ran || s.action_epoch == 0 {
+		receipt.settled = {state = .Unavailable}
+		return receipt
+	}
+	// The result may already have landed through a synchronous in-memory
+	// transport between issue and this call. The bounded cache closes that
+	// race without retaining every command result for the whole run.
+	if verdict, ready := action_result_cached(s, outcome.model, outcome.seq); ready {
+		receipt.settled = verdict
+		return receipt
+	}
+	for i in 0 ..< len(s.action_receipts) {
+		slot := &s.action_receipts[i]
+		if slot.used {
+			continue
+		}
+		s.action_receipt_serial += 1
+		if s.action_receipt_serial == 0 {
+			s.action_receipt_serial = 1
+		}
+		slot^ = {
+			used = true,
+			token = s.action_receipt_serial,
+			model = outcome.model,
+			seq = outcome.seq,
+			verdict = {state = .Pending},
+		}
+		receipt.slot = i16(i)
+		receipt.token = slot.token
+		receipt.settled = {state = .Pending}
+		return receipt
+	}
+	receipt.settled = {state = .Unavailable}
+	return receipt
+}
+
+// Poll one receipt from the game's frame loop. A terminal watched verdict is
+// consumed and frees its bounded slot; Pending is non-consuming. A receipt
+// from a reset/rehosted run, a forgotten/consumed receipt, or capacity failure
+// answers Unavailable. Immediate local verdicts are embedded and repeatable.
+session_action_poll :: proc(s: ^Session, receipt: Action_Receipt) -> (verdict: Action_Verdict, ready: bool) {
+	if receipt.settled.state != .Pending {
+		return receipt.settled, true
+	}
+	if !s.ran || receipt.epoch == 0 || receipt.epoch != s.action_epoch {
+		return {state = .Unavailable}, true
+	}
+	idx := int(receipt.slot)
+	if idx < 0 || idx >= len(s.action_receipts) {
+		return {state = .Unavailable}, true
+	}
+	slot := &s.action_receipts[idx]
+	if !slot.used || slot.token != receipt.token {
+		return {state = .Unavailable}, true
+	}
+	if slot.verdict.state == .Pending {
+		return {state = .Pending}, false
+	}
+	resolved := slot.verdict
+	slot^ = {}
+	return resolved, true
+}
+
+// Release a pending receipt when its UI/lifetime disappears before a verdict.
+// The command itself is unaffected; its ordinary state/event resolution still
+// runs. Safe to call after a receipt already settled or was consumed.
+session_action_forget :: proc(s: ^Session, receipt: Action_Receipt) {
+	if receipt.settled.state != .Pending || receipt.epoch != s.action_epoch {
+		return
+	}
+	idx := int(receipt.slot)
+	if idx < 0 || idx >= len(s.action_receipts) {
+		return
+	}
+	slot := &s.action_receipts[idx]
+	if slot.used && slot.token == receipt.token {
+		slot^ = {}
+	}
+}
+
 session_action_executed :: proc(
 	s: ^Session,
 	model: knet.Action_Model,
@@ -1467,6 +1710,17 @@ session_action_resolved :: proc(
 	cmd: u16,
 	reason: knet.Action_Reject_Reason,
 ) {
+	verdict := action_verdict_from_reason(reason)
+	action_result_remember(s, model, seq, verdict)
+	// Receipts are opt-in and bounded, so a 64-row scan is cheaper and safer
+	// than a second allocation-heavy result protocol. Normally exactly one row
+	// matches; allowing several makes copying a receipt before resolution
+	// deterministic rather than first-watcher-wins.
+	for &slot in s.action_receipts {
+		if slot.used && slot.model == model && slot.seq == seq {
+			slot.verdict = verdict
+		}
+	}
 	if reason == .None {
 		append(
 			&s.events,
@@ -1590,6 +1844,13 @@ session_spawn_send :: proc(s: ^Session, id: knet.Net_Id) {
 		// without one it queues for the poll like any peer's.
 		born_or_queued(s, Ev_Spawned{id = id, type = s.types[id], owner = e.owner})
 	}
+}
+
+// Is `id` still in the make/configure window, before session_spawn_send?
+// Exposed for kboot.boot_spawn_cancel's transactional early-return path.
+session_spawn_pending :: proc(s: ^Session, id: knet.Net_Id) -> bool {
+	_, pending := s.unsent[id]
+	return pending
 }
 
 // TELEPORT: the OWNER of `id` declares a discontinuity in its streamed
@@ -2037,6 +2298,7 @@ session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: in
 	// Presentations whose render time has come (session_present) fire here,
 	// AFTER sampling — the rendered world they align with is current.
 	knet.later_drain(&s.later, now)
+	net_event_drain(s, now)
 	// The `<field>_edge` halves: NET delta-lane changes since last frame —
 	// this frame's applies, reverts, and the host's own mutations alike (one
 	// pass, zero role branches). Runs on the game's stack like everything
@@ -3222,6 +3484,13 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 			return
 		}
 		s.aoi_client = knet.read_bool(r)
+	case SES_NET_EVENT:
+		// Reliable presentation is authority-minted and never accepted before
+		// this peer has a seat/world context to resolve anchors against.
+		if s.is_host || !s.joined || from_peer != HOST_PEER {
+			return
+		}
+		net_event_receive(s, r)
 	case SES_WELCOME:
 		if !s.is_host {
 			client_handle_welcome(s, r)

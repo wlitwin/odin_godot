@@ -16,8 +16,9 @@ Pawn :: struct {
 	owner:     gd.Node2d,
 	net_id:    knet.Net_Id, // command wire identity (assigned by the session layer)
 	hp:        i32 `gd:"replicate"`,
-	x, y:      f32 `gd:"owner,interp"`, // multi-name: one desc entry per name
-	rot:       gd.Quaternion `gd:"owner,interp"`, // classified to hemisphere-safe nlerp
+	x, y:      f32 `gd:"owner"`, // multi-name: one desc entry per name
+	rot:       gd.Quaternion `gd:"owner"`, // classified to hemisphere-safe nlerp
+	snap_meter: f32 `gd:"owner,snap"`, // explicit opt-out from the continuous owner default
 	aim:       f32 `gd:"owner,interp=pawn_blend_aim"`, // custom blend math
 	heat:      f32 `gd:"replicate,wire=f16"`, // stock half-float wire encoding
 	charge:    i32 `gd:"replicate,wire=pawn_charge_codec"`, // custom fixed-size codec

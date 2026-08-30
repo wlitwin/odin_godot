@@ -482,6 +482,7 @@ ATTRS :: []Attr {
 	{"gd_input", .Kit_Declaration, "a constrained simulation input struct"},
 	{"gd_sample", .Kit_Primary, "an input sample"},
 	{"gd_step", .Kit_Primary, "a sim step"},
+	{"gd_event", .Kit_Primary, "a reliable presentation event with declared audience and timing"},
 	{"gd_cue", .Kit_Primary, "a presentation cue with an inferred or named entity anchor"},
 	{"gd_fact", .Kit_Primary, "the compatible earlier spelling for a presentation cue"},
 	{"gd_message", .Kit_Primary, "a typed app-message handler (kit/session app route)"},

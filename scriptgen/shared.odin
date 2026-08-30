@@ -311,6 +311,7 @@ GD_ATTRS := [?]string {
 	"gd_input",
 	"gd_sample",
 	"gd_step",
+	"gd_event",
 	"gd_cue",
 	"gd_fact",
 	"gd_half",

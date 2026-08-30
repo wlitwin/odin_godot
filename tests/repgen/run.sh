@@ -65,6 +65,8 @@ for needle in \
 	'offset_of(Pawn, hp)' \
 	'offset_of(Pawn, x)' \
 	'offset_of(Pawn, y)' \
+	'offset_of(Pawn, snap_meter)' \
+	'name = "snap_meter", flags = {.Owner_Stream}' \
 	'{.Interp, .Owner_Stream}' \
 	'{.Interp, .Predicted}' \
 	'{.Predicted}' \
@@ -117,7 +119,7 @@ for needle in \
 	'{field = "look", range = "", mask = "", finite = false, unit = true, enum_check = false}' \
 	'{path = "input.Pawn_Input", type_name = "Pawn_Input", class_id = 0, encoding = "raw", width = 16, bound = 256' \
 	'{path = "entity.Pawn.hit", entity = "Pawn", name = "hit", id = 47736, policy = {access = .Owner, prediction = .Optimistic, max_args_bytes = 4096}, model = .Scheduled' \
-	'{path = "entity.Board.pawn_bumped", entity = "Board", name = "pawn_bumped", id = 48390, anchor = "Pawn", schedule = .Watch, source = .Declared' \
+	'{path = "entity.Board.pawn_bumped", entity = "Board", name = "pawn_bumped", id = 48390, anchor = "Pawn", schedule = .Watch, audience = .Everyone, source = .Declared' \
 ; do
 	if ! grep -qF "$needle" "$GUARD"; then
 		echo "REPGEN_FAIL: structured NET_SCHEMA is missing: $needle"
@@ -191,6 +193,7 @@ for needle in \
 	'kboot.boot_lane(&self.boot, &self.lane)' \
 	'board_net_pump :: proc(self: ^Board, delta: f64, now: f64) -> kboot.Net_Frame' \
 	'board_events(self, events)' \
+	'board_net_frame :: proc(self: ^Board, delta: f64, now: f64) -> kboot.Net_Frame' \
 	'board_net_detach :: proc(self: ^Board)' \
 	'kboot.boot_net_detach(&self.boot)' \
 ; do
@@ -210,7 +213,8 @@ for needle in \
 	'ctx := &b.ses.ctx' \
 	'if _ok {return knet.action_outcome(.Applied)}' \
 	'_issue := knet.command_issue_checked(ctx, self, &chest_command_set, CHEST_CMD_OPEN)' \
-	'if !_issue.sent || (_issue.prediction_attempted && !_issue.prediction_applied) {return knet.action_outcome(.Rejected, _issue.reason, u32(_issue.seq))}' \
+	'if !_issue.sent {return knet.action_outcome(.Rejected, _issue.reason)}' \
+	'if _issue.prediction_attempted && !_issue.prediction_applied {return knet.action_outcome(.Rejected, _issue.reason, u32(_issue.seq))}' \
 	'return knet.action_outcome(.Predicted, seq = u32(_issue.seq))' \
 	'chest_seal_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Action_Outcome' \
 	'_issue := knet.command_issue_checked(ctx, self, &chest_command_set, CHEST_CMD_SEAL)' \
@@ -395,9 +399,11 @@ for needle in \
 	'_pawn_of_ref :: proc(b: ^kboot.Boot, ref: knet.Net_Ref(Pawn)) -> (^Pawn, bool)' \
 	'pawn_of :: proc {_pawn_of_id, _pawn_of_ref}' \
 	'pawn_owned_by :: proc(b: ^kboot.Boot, owner: knet.Player_Id) -> (^Pawn, bool)' \
-	'my_pawn :: proc(b: ^kboot.Boot) -> (^Pawn, bool)' \
+	'pawn_mine :: proc(b: ^kboot.Boot) -> (^Pawn, bool)' \
 	'pawn_ids :: proc(b: ^kboot.Boot, allocator := context.temp_allocator) -> []knet.Net_Id' \
 	'pawn_all :: proc(b: ^kboot.Boot, allocator := context.temp_allocator) -> []knet.Net_Entity(Pawn)' \
+	'pawn_despawn :: proc {_pawn_despawn_id, _pawn_despawn_ref, _pawn_despawn_ptr}' \
+	'pawn_teleport :: proc {_pawn_teleport_id, _pawn_teleport_ref, _pawn_teleport_ptr}' \
 	'kboot.boot_entity_rows(b, PAWN_TYPE, Pawn, allocator)' \
 	'pawn_spawn :: proc(b: ^kboot.Boot, owner := knet.PLAYER_ID_INVALID) -> (^Pawn, knet.Net_Id)' \
 	'kboot.boot_fire_spawn(b, PAWN_TYPE, owner)' \
@@ -497,11 +503,47 @@ if ! grep -qF 'lane.in_auth = true' "$GEN"; then
 fi
 # The corpse gate belongs only to anchored doors (pawn_bumped and
 # pawn_spotted), never the anchorless legacy declaration.
-if [ "$(grep -cF 'ksim.lane_tracks_entity(l, ' "$BGEN")" != "2" ] || grep -qF 'lane_tracks_entity(l, nil' "$BGEN"; then
-	echo "REPGEN_FAIL: the corpse gate must appear on both anchored doors and never on the anchorless one"
+if [ "$(grep -cF 'ksim.lane_tracks_entity(l, ' "$BGEN")" != "3" ] || grep -qF 'lane_tracks_entity(l, nil' "$BGEN"; then
+	echo "REPGEN_FAIL: the corpse gate must appear on all three anchored doors and never on the anchorless ones"
 	exit 1
 fi
 echo "  ok  cue doors generated (inferred/named/no anchor, typed entity refs, legacy fact, decode table)"
+
+# @(gd_event): one declaration chooses the existing runtime from its anchor.
+# Cooperative owner+interp anchors and explicit static events get the session
+# event table; sim anchors join the existing fact table/watch clock. Every
+# public announcement door takes ^Boot and carries no Fx/Cmd transport suffix.
+for needle in \
+	'EVENT_CHEST_SPARK :: u16(0x' \
+	'EVENT_BOARD_BLAST :: u16(0x' \
+	'chest_spark :: proc(b: ^kboot.Boot, chest: ^Chest, strength: f32)' \
+	'session_net_event_emit(b.ses, EVENT_CHEST_SPARK, chest.net_id, knet.writer_bytes(&w))' \
+	'board_blast :: proc(b: ^kboot.Boot, x: f32, y: f32)' \
+	'{name = "chest_spark", id = EVENT_CHEST_SPARK, audience = .Everyone, timing = .Anchored, anchored = true' \
+	'{name = "board_blast", id = EVENT_BOARD_BLAST, audience = .Observers, timing = .Immediate, anchored = false' \
+	'board_event_routes :: proc(self: ^Board, ses: ^ksess.Session)' \
+	'board_event_routes(self, &self.ses)' \
+	'FACT_PAWN_CHEERED :: u16(0x' \
+	'pawn_cheered :: proc(b: ^kboot.Boot, pawn: ^Pawn, style: u8)' \
+	'{id = FACT_PAWN_CHEERED, audience = .Observers, fx = _board_fact_pawn_cheered}' \
+; do
+	if ! grep -qF "$needle" "$BGEN"; then
+		echo "REPGEN_FAIL: generated file is missing gd_event artifact: $needle"
+		exit 1
+	fi
+done
+for needle in \
+	'event entity.Board.chest_spark id=62076 schedule=session-anchored anchor=Chest audience=everyone' \
+	'event entity.Board.board_blast id=32795 schedule=session-immediate anchor=none audience=observers' \
+	'cue entity.Board.pawn_cheered id=12720 schedule=watch anchor=Pawn audience=observers' \
+	'{path = "entity.Board.board_blast", entity = "Board", name = "board_blast", id = 32795, anchor = "", schedule = .Immediate, audience = .Observers' \
+; do
+	if ! grep -qF "$needle" "$GUARD"; then
+		echo "REPGEN_FAIL: wire schema is missing gd_event policy: $needle"
+		exit 1
+	fi
+done
+echo "  ok  gd_event lowers by anchor (coop anchored, sim watch, static immediate), with audience in runtime + fingerprint"
 
 # ---- @(gd_fact) contract violations are scriptgen-time errors ----
 # Five misuses in one lane-carrying package, plus the no-lane package: each
@@ -708,6 +750,105 @@ for want in \
 	fi
 done
 echo "  ok  cue misuses rejected: ambiguous/missing/non-entity anchors, bad config, untracked ref, duplicate declaration"
+
+# ---- @(gd_event) policy/clock refusals -----------------------------------
+EVENTBAD="$TMP/eventbad"
+mkdir -p "$EVENTBAD"
+cat > "$EVENTBAD/game.odin" <<'EOF'
+//gd:extends Node
+//gd:class EGame
+package repgen_eventbad
+
+import gd "godot:godot"
+import kboot "godot:kit/boot"
+import ksess "godot:kit/session"
+import ksim "godot:kit/sim"
+
+EGame :: struct {
+	owner: gd.Node,
+	boot: kboot.Boot,
+	ses: ksess.Session,
+	lane: ksim.Lane,
+	plain_scene: ^gd.Resource `gd:"entity=EPlain:31"`,
+}
+EInput :: struct {move: i8}
+@(gd_sample) egame_sample :: proc(self: ^EGame, tick: u64, input: ^EInput) {}
+
+@(gd_event)
+static_auto_fx :: proc(g: ^EGame, mine: bool) {}
+
+@(gd_event = "audience=owner,timing=immediate,anchor=none")
+static_owner_fx :: proc(g: ^EGame, mine: bool) {}
+
+@(gd_event = "timing=anchored")
+plain_anchored_fx :: proc(g: ^EGame, p: ^EPlain, mine: bool) {}
+
+@(gd_event = "timing=immediate")
+sim_immediate_fx :: proc(g: ^EGame, p: ^ESim, mine: bool) {}
+
+@(gd_event = "audience=nobody,timing=immediate")
+bad_audience_fx :: proc(g: ^EGame, mine: bool) {}
+
+@(gd_event = "timing=eventually")
+bad_timing_fx :: proc(g: ^EGame, mine: bool) {}
+
+@(gd_event = "timing=immediate")
+ghost_fx :: proc(g: ^EGame, ghost: ^EGhost, mine: bool) {}
+
+@(gd_event = "timing=auto")
+@(gd_cue)
+both_fx :: proc(g: ^EGame, p: ^ESim, mine: bool) {}
+EOF
+cat > "$EVENTBAD/plain.odin" <<'EOF'
+//gd:extends Node
+//gd:class EPlain
+package repgen_eventbad
+import gd "godot:godot"
+import knet "godot:kit/net"
+EPlain :: struct {owner: gd.Node, net_id: knet.Net_Id, hp: i32 `gd:"replicate"`}
+EOF
+cat > "$EVENTBAD/sim.odin" <<'EOF'
+//gd:extends Node
+//gd:class ESim
+package repgen_eventbad
+import gd "godot:godot"
+import knet "godot:kit/net"
+ESim :: struct {owner: gd.Node, net_id: knet.Net_Id, x: f32 `gd:"predict"`}
+@(gd_tick) esim_tick :: proc(self: ^ESim, input: EInput) {}
+EOF
+cat > "$EVENTBAD/ghost.odin" <<'EOF'
+//gd:extends Node
+//gd:class EGhost
+package repgen_eventbad
+import gd "godot:godot"
+import knet "godot:kit/net"
+EGhost :: struct {owner: gd.Node, net_id: knet.Net_Id, hp: i32 `gd:"replicate"`}
+EOF
+set +e
+EVENTBAD_OUT="$(run_scriptgen "$EVENTBAD" 2>&1)"
+EVENTBAD_RC=$?
+set -e
+if [ "$EVENTBAD_RC" -eq 0 ]; then
+	echo "REPGEN_FAIL: the @(gd_event) misuse package was accepted by scriptgen"
+	exit 1
+fi
+for want in \
+	'timing=auto cannot prove a framework-owned presentation clock' \
+	'audience=owner needs an entity anchor' \
+	'timing=anchored needs an entity with owner+interp state' \
+	'a sim-tracked anchor presents on its watch clock' \
+	'event audience "nobody" is unknown' \
+	'event timing "eventually" is unknown' \
+	'cooperative event entity EGhost must be a registered entity kind' \
+	'use one presentation declaration' \
+; do
+	if ! echo "$EVENTBAD_OUT" | grep -qF "$want"; then
+		echo "REPGEN_FAIL: gd_event misuse error missing: $want"
+		echo "$EVENTBAD_OUT" | tail -40
+		exit 1
+	fi
+done
+echo "  ok  gd_event refuses ambiguous clocks, invalid audiences/timing, unregistered refs, and duplicate declarations"
 
 # ---- the silent paths, closed: each of these compiled and silently never
 # ---- worked before — now each is a build error naming the fix ----
@@ -923,6 +1064,18 @@ if [ "$FP_BEFORE" = "$FP_INPUT" ]; then
 	echo "REPGEN_FAIL: an input-struct field change did NOT move the fingerprint (the blob memcpys — its layout IS the wire)"
 	exit 1
 fi
+# Event audience/timing are wire/presentation policy, not comments: peers that
+# disagree would deliver one occurrence to different screens/clocks.
+FPE="$TMP/fpe"
+mkdir -p "$FPE"
+cp "$ROOT/tests/repgen/fixture/"*.odin "$FPE/"
+sed -i.bak 's/audience=everyone,timing=auto/audience=owner,timing=auto/' "$FPE/board.odin" && rm -f "$FPE/board.odin.bak"
+run_scriptgen "$FPE"
+FP_EVENT=$(grep 'NET_FINGERPRINT ::' "$FPE/odin_godot_guard.gen.odin")
+if [ "$FP_BEFORE" = "$FP_EVENT" ]; then
+	echo "REPGEN_FAIL: a gd_event audience change did NOT move the fingerprint"
+	exit 1
+fi
 # Declaring the ISSUER param must NOT move it: `by` is framework-filled, never
 # wire bytes — a peer that added `by` to a predicate still interoperates.
 FPB="$TMP/fpb"
@@ -949,7 +1102,7 @@ if [ "$FP_BEFORE" = "$FP_ACCESS" ]; then
 	echo "REPGEN_FAIL: a command access-policy change did NOT move the fingerprint"
 	exit 1
 fi
-echo "  ok  NET_FINGERPRINT: stable across comments and issuer-param declarations, moves on replicated/input types and command access"
+echo "  ok  NET_FINGERPRINT: stable across comments and issuer params, moves on fields/inputs/command access/event policy"
 
 # ---- (3a): engine handle/heap types are a SCRIPTGEN-time error ----
 ENG="$TMP/eng"
@@ -1349,6 +1502,11 @@ camp_entity_spawned :: proc(self: ^Camp, id: knet.Net_Id, type: ksess.Entity_Typ
 	_ = id; _ = type; _ = owner
 }
 
+@(gd_event = "audience=observers,timing=immediate,anchor=none")
+camp_bell_fx :: proc(self: ^Camp, mine: bool, pitch: u8) {
+	_ = mine; _ = pitch
+}
+
 // NEGATIVE CONTROL: shares the `_kicked` tail but is a genuinely different
 // name (a query, cavecrawl's real case). It used to survive on a heuristic —
 // its prefix was more than one edit from the shell's snake, so the unclaimed
@@ -1371,6 +1529,11 @@ for needle in \
 	'camp_player_joined_then(self, e.id, e.rejoin)' \
 	'if self.boot.ses != nil && !self.boot.ses.is_host {' \
 	'camp_entity_spawned(self, e.id, e.type, e.owner)' \
+	'camp_net_frame :: proc(self: ^Camp, delta: f64, now: f64) -> kboot.Net_Frame' \
+	'camp_step(self, frame.ticks)' \
+	'camp_bell :: proc(b: ^kboot.Boot, pitch: u8)' \
+	'camp_event_routes :: proc(self: ^Camp, ses: ^ksess.Session)' \
+	'camp_event_routes(self, &self.ses)' \
 ; do
 	if ! grep -qF "$needle" "$SHELL_GEN"; then
 		echo "REPGEN_FAIL: coop-shell gen is missing: $needle"

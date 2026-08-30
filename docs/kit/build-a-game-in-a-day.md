@@ -82,12 +82,11 @@ halves](session.md#event-halves-and-generated-dispatch). A co-op authority step
 remains an explicit game decision because it commonly runs only while playing:
 
 ```odin
-frame := my_game_net_pump(self, delta, now_s())
-my_game_step(self, frame.ticks) // hosts run the declared tick; clients no-op
+frame := my_game_net_frame(self, delta, now_s())
 ```
 
 This is an events model, not an asynchronous callback model: generated dispatch
-runs synchronously inside `my_game_net_pump` and applies each hook's execution
+runs synchronously inside `my_game_net_frame` and applies each hook's execution
 policy. The component calls (`boot_attach`/`boot_pump`/`my_game_events`) and raw
 layer underneath (`wire_attach`/`wire_pump`, `session_tick`/`session_poll`) stay
 public for games that need custom ordering: [boot](boot.md), [netgd](netgd.md),
@@ -149,7 +148,7 @@ are done.**
 Give players' avatars owner-streamed fields:
 
 ```odin
-x, y: f32 `gd:"owner,interp"`,
+x, y: f32 `gd:"owner"`, // continuous owner fields interpolate by default
 ```
 
 The owner writes them every frame; the toolkit ships last-value snapshots on

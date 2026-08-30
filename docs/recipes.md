@@ -32,7 +32,7 @@ scrapyard, the co-op twin-stick example:
 ```odin
 Runner :: struct {
     owner:  gd.Node2d,
-    x, y:   f32 `gd:"owner,interp,wire=f16"`,
+    x, y:   f32 `gd:"owner,wire=f16"`, // continuous owner fields interpolate by default
     hp:     u8  `gd:"replicate"`,
     gun:    u8  `gd:"replicate"`,
 

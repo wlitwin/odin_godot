@@ -195,6 +195,20 @@ lane_spawn_reject :: proc(l: ^Lane, seq: u32) -> rawptr {
 	return nil
 }
 
+// Explicitly cancel one still-provisional spawn during its configuration
+// window. The installed spawn_free hook removes the engine node and Boot
+// census row. A committed/rekeyed entity is not a draft and returns false.
+lane_spawn_cancel :: proc(l: ^Lane, id: knet.Net_Id) -> bool {
+	if !lane_id_provisional(id) {return false}
+	for tr in l.tracked {
+		if tr.id == id && tr.provisional {
+			despawn_provisional(l, id, tr.entity)
+			return true
+		}
+	}
+	return false
+}
+
 // Sweep provisionals no authority spawn ever claimed — a lost fire. Call once
 // per client frame. Despawned entities are freed through the spawn_free hook
 // (and appended to `out`, if given, for a caller that frees nodes itself).

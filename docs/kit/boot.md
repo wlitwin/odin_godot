@@ -14,7 +14,8 @@ can instead use `kit/netgd` and `kit/session` directly.
 
 The normal game shell declares one direct `Boot`, `Session`, and `Comms` field.
 A simulation game also declares one direct `Lane`. From that shape, scriptgen
-generates `<game>_net_attach`, `<game>_net_pump`, and `<game>_net_detach`; no
+generates `<game>_net_attach`, `<game>_net_pump`, `<game>_net_frame`, and
+`<game>_net_detach`; no
 additional annotation is required.
 
 ```odin
@@ -46,8 +47,7 @@ my_game_net_attach(
 
 // _process
 if kboot.boot_phase(&self.boot) != .Menu {
-	frame := my_game_net_pump(self, delta, knet.now_s())
-	my_game_step(self, frame.ticks) // generated for a co-op @(gd_step="authority")
+	frame := my_game_net_frame(self, delta, knet.now_s())
 }
 ```
 
@@ -63,6 +63,12 @@ fields. The whole pair is validated before either layer starts. See
 session-event half. It returns a `kboot.Net_Frame`: `marks` contains positional
 comms markers and `ticks` is the number of co-op network ticks advanced this
 frame. The marker slice is temporary and must be consumed this frame.
+
+`my_game_net_frame` is the common complete operation: it calls the generated
+pump/event dispatch and then the generated cooperative authority step plus
+same-frame edge pass when one exists. Games that need visuals or authority work
+on a different side of event dispatch keep using `_net_pump` and `_step`
+separately; the convenience does not remove the explicit ordering path.
 
 `my_game_step` exists when a co-op game declares an
 `@(gd_step = "authority")` proc. A game with `kit/sim` attaches its lane with
@@ -102,8 +108,7 @@ the role gate and the loop:
 my_game_tick :: proc(self: ^MyGame) { /* decrement authority timers */ }
 
 // process():
-frame := my_game_net_pump(self, delta, now_s())
-my_game_step(self, frame.ticks) // generated authority gate, loop, and edge pass
+frame := my_game_net_frame(self, delta, now_s())
 ```
 
 ## Widgets and containers
@@ -348,6 +353,9 @@ The tag generates the factory table, entity type constant, typed spawn and query
 procedures, node map, and hook dispatch. The numeric ID (`3` above) is part of
 the wire and save formats. Keep it stable across compatible builds. Script
 generation rejects duplicate IDs, unknown structs, and invalid hook signatures.
+IDs remain explicit rather than path/name-hashed: a scene or type rename must
+not silently change save identity, and a visible small number keeps protocol
+migrations deliberate.
 
 Entity-specific options follow the type declaration in the same tag:
 
@@ -400,7 +408,7 @@ index):
 
 ```odin
 mob, ok := mob_of(&self.boot, id)          // the entity behind an id
-mine, ok := my_mob(&self.boot)             // this player's avatar
+mine, ok := mob_mine(&self.boot)           // this player's singular mob
 theirs, ok := mob_owned_by(&self.boot, pid)
 ref := mob_ref(id)                         // knet.Net_Ref(Mob), not a raw pointer
 mob, ok = mob_of(&self.boot, ref)          // same lookup, type checked
@@ -412,6 +420,8 @@ for tracked in mob_all(&self.boot) {       // one-pass, temp-allocated
 }
 for id in mob_ids(&self.boot) { ... }      // compatible ID-only view
 owner := kboot.boot_entity_owner(&self.boot, id) // the owner_pid map
+_ = mob_teleport(&self.boot, mob)          // owner-stream jump; ptr/ref/id overloads
+_ = mob_despawn(&self.boot, mob)           // authority lifecycle; exact-kind checked
 ```
 
 `Net_Ref(T)` contains the stable `Net_Id`, not an entity pointer. Different
@@ -429,6 +439,18 @@ Client-predicted entities are included while they live under provisional IDs;
 Boot carries the provisional-to-authoritative alias when a predicted spawn is
 rekeyed, so a reference retained at fire time continues resolving. The alias is
 retired with the entity; the reference then resolves false like any despawn.
+
+`*_mine` and `*_owned_by` are deliberately singular: zero matches returns
+false, one returns the entity, and multiple matches assert in development and
+return false in release instead of selecting an arbitrary first row. Filter
+`*_all` when a player may own several entities of that kind. All generated
+queries use the `<type>_*` prefix so they appear together in autocomplete.
+
+Every registered kind also generates `<type>_despawn` with pointer (when the
+struct has `net_id`), typed `Net_Ref`, and raw-id overloads; all verify the live
+concrete kind before mutating it. Kinds with owner-streamed state additionally
+generate `<type>_teleport`. The lower-level session procedures remain useful
+for deliberately mixed-kind batches.
 
 ## Host migration
 

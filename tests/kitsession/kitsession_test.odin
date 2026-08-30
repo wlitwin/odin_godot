@@ -60,6 +60,41 @@ Log_Probe :: struct {
 	records: [dynamic]ksess.Production_Log_Record,
 }
 
+Net_Event_Log :: struct {
+	fires:  int,
+	mine:   bool,
+	anchor: knet.Net_Id,
+	code:   u8,
+}
+
+net_event_present :: proc(
+	user: rawptr,
+	s: ^ksess.Session,
+	anchor: knet.Net_Id,
+	mine: bool,
+	args: []u8,
+) {
+	_ = s
+	log := cast(^Net_Event_Log)user
+	r := knet.reader_make(args)
+	code := knet.read_u8(&r)
+	if r.err {return}
+	log.fires += 1
+	log.mine = mine
+	log.anchor = anchor
+	log.code = code
+}
+
+NET_EVENT_ALL :: u16(101)
+NET_EVENT_STATIC_OBSERVERS :: u16(102)
+NET_EVENT_OWNER :: u16(103)
+
+net_event_table := [?]ksess.Net_Event_Desc {
+	{name = "all", id = NET_EVENT_ALL, audience = .Everyone, timing = .Anchored, anchored = true, present = net_event_present},
+	{name = "static-observers", id = NET_EVENT_STATIC_OBSERVERS, audience = .Observers, timing = .Immediate, present = net_event_present},
+	{name = "owner", id = NET_EVENT_OWNER, audience = .Owner, timing = .Anchored, anchored = true, present = net_event_present},
+}
+
 log_probe :: proc(user: rawptr, record: ksess.Production_Log_Record) {
 	p := cast(^Log_Probe)user
 	append(&p.records, record)
@@ -569,6 +604,203 @@ step :: proc(boxes: []^Peer_Box, now: ^f64) {
 }
 
 @(test)
+action_receipts_poll_authority_verdicts :: proc(t: ^testing.T) {
+	box: Peer_Box
+	box_make(&box, 1)
+	defer box_destroy(&box)
+	ksess.session_host_start(&box.s, "receipt-host")
+
+	// Authority-local answers are already final and consume no watched slot.
+	applied := ksess.session_action_receipt(&box.s, knet.action_outcome(.Applied))
+	if verdict, ready := ksess.session_action_poll(&box.s, applied); testing.expect(t, ready) {
+		testing.expect_value(t, verdict.state, ksess.Action_Verdict_State.Accepted)
+		testing.expect_value(t, verdict.reason, knet.Action_Reject_Reason.None)
+	}
+	refused := ksess.session_action_receipt(
+		&box.s,
+		knet.action_outcome(.Rejected, .Access),
+	)
+	if verdict, ready := ksess.session_action_poll(&box.s, refused); testing.expect(t, ready) {
+		testing.expect_value(t, verdict.state, ksess.Action_Verdict_State.Rejected)
+		testing.expect_value(t, verdict.reason, knet.Action_Reject_Reason.Access)
+	}
+
+	// Equal raw sequences on the two execution models are different asks.
+	immediate := ksess.session_action_receipt(
+		&box.s,
+		knet.action_outcome(.Predicted, seq = 17, model = .Immediate),
+	)
+	scheduled := ksess.session_action_receipt(
+		&box.s,
+		knet.action_outcome(.Predicted, seq = 17, model = .Scheduled),
+	)
+	if verdict, ready := ksess.session_action_poll(&box.s, immediate); testing.expect(t, !ready) {
+		testing.expect_value(t, verdict.state, ksess.Action_Verdict_State.Pending)
+	}
+	if verdict, ready := ksess.session_action_poll(&box.s, scheduled); testing.expect(t, !ready) {
+		testing.expect_value(t, verdict.state, ksess.Action_Verdict_State.Pending)
+	}
+
+	ksess.session_action_resolved(&box.s, .Immediate, 17, 101, 7, .None)
+	if verdict, ready := ksess.session_action_poll(&box.s, immediate); testing.expect(t, ready) {
+		testing.expect_value(t, verdict.state, ksess.Action_Verdict_State.Accepted)
+	}
+	// Resolving Immediate 17 must not wake Scheduled 17.
+	if verdict, ready := ksess.session_action_poll(&box.s, scheduled); testing.expect(t, !ready) {
+		testing.expect_value(t, verdict.state, ksess.Action_Verdict_State.Pending)
+	}
+	ksess.session_action_resolved(&box.s, .Scheduled, 17, 101, 7, .Rate)
+	if verdict, ready := ksess.session_action_poll(&box.s, scheduled); testing.expect(t, ready) {
+		testing.expect_value(t, verdict.state, ksess.Action_Verdict_State.Rejected)
+		testing.expect_value(t, verdict.reason, knet.Action_Reject_Reason.Rate)
+	}
+
+	// A result that lands before receipt registration is retained in the small
+	// race cache, including its full rejection reason.
+	ksess.session_action_resolved(&box.s, .Immediate, 22, 102, 8, .Timeout)
+	race_closed := ksess.session_action_receipt(
+		&box.s,
+		knet.action_outcome(.Predicted, seq = 22, model = .Immediate),
+	)
+	if verdict, ready := ksess.session_action_poll(&box.s, race_closed); testing.expect(t, ready) {
+		testing.expect_value(t, verdict.state, ksess.Action_Verdict_State.Rejected)
+		testing.expect_value(t, verdict.reason, knet.Action_Reject_Reason.Timeout)
+	}
+
+	// Receipt lifetime is explicit, and no receipt may cross the run reset.
+	forgotten := ksess.session_action_receipt(
+		&box.s,
+		knet.action_outcome(.Predicted, seq = 30, model = .Immediate),
+	)
+	ksess.session_action_forget(&box.s, forgotten)
+	if verdict, ready := ksess.session_action_poll(&box.s, forgotten); testing.expect(t, ready) {
+		testing.expect_value(t, verdict.state, ksess.Action_Verdict_State.Unavailable)
+	}
+	bounded: [ksess.MAX_ACTION_RECEIPTS]ksess.Action_Receipt
+	for i in 0 ..< len(bounded) {
+		bounded[i] = ksess.session_action_receipt(
+			&box.s,
+			knet.action_outcome(.Predicted, seq = u32(1000 + i), model = .Immediate),
+		)
+	}
+	overflow := ksess.session_action_receipt(
+		&box.s,
+		knet.action_outcome(.Predicted, seq = 2000, model = .Immediate),
+	)
+	if verdict, ready := ksess.session_action_poll(&box.s, overflow); testing.expect(t, ready) {
+		testing.expect_value(t, verdict.state, ksess.Action_Verdict_State.Unavailable)
+	}
+	for receipt in bounded {
+		ksess.session_action_forget(&box.s, receipt)
+	}
+	stale := ksess.session_action_receipt(
+		&box.s,
+		knet.action_outcome(.Predicted, seq = 31, model = .Immediate),
+	)
+	ksess.session_reset(&box.s)
+	if verdict, ready := ksess.session_action_poll(&box.s, stale); testing.expect(t, ready) {
+		testing.expect_value(t, verdict.state, ksess.Action_Verdict_State.Unavailable)
+	}
+}
+
+@(test)
+unsent_spawn_draft_can_cancel_without_becoming_world_state :: proc(t: ^testing.T) {
+	box: Peer_Box
+	box_make(&box, 1)
+	defer box_destroy(&box)
+	ksess.session_host_start(&box.s, "draft-host")
+
+	entity, id := ksess.session_spawn_make(&box.s, BOT_TYPE)
+	testing.expect(t, entity != nil)
+	testing.expect(t, ksess.session_spawn_pending(&box.s, id))
+	testing.expect(t, box.bots[id] != nil)
+	ksess.session_despawn(&box.s, id)
+	testing.expect(t, !ksess.session_spawn_pending(&box.s, id))
+	testing.expect(t, box.bots[id] == nil)
+	testing.expect_value(t, box.freed, 1)
+}
+
+@(test)
+net_events_route_audience_and_presentation_clock :: proc(t: ^testing.T) {
+	host, alice: Peer_Box
+	host_log, alice_log: Net_Event_Log
+	box_make(&host, 1)
+	box_make(&alice, 100)
+	defer box_destroy(&host)
+	defer box_destroy(&alice)
+	ksess.session_set_net_events(&host.s, &host_log, net_event_table[:])
+	ksess.session_set_net_events(&alice.s, &alice_log, net_event_table[:])
+	boxes := []^Peer_Box{&host, &alice}
+
+	ksess.session_host_start(&host.s, "host")
+	ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+	ksess.session_client_join(&alice.s)
+	pump(boxes)
+	drain(&host.s); drain(&alice.s)
+
+	body := Bot{hp = 10}
+	id := ksess.session_spawn(&host.s, BOT_TYPE, &body, &bot_command_set, owner = alice.s.me)
+	ksess.session_start_replicating(&host.s)
+	pump(boxes)
+	drain(&alice.s)
+
+	// Establish both sessions' monotonic clock before announcements.
+	_, _ = ksess.session_tick(&host.s, 0, 100)
+	_, _ = ksess.session_tick(&alice.s, 0, 100)
+	args := knet.writer_make()
+	defer knet.writer_destroy(&args)
+
+	// Everyone + anchored: Alice owns/draws the anchor live, so her received
+	// copy fires at the next frame drain. The host watches her interpolated
+	// stream and holds its local copy by interp_delay.
+	knet.write_u8(&args, 1)
+	testing.expect(t, ksess.session_net_event_emit(&host.s, NET_EVENT_ALL, id, knet.writer_bytes(&args)))
+	pump(boxes)
+	testing.expect_value(t, host_log.fires, 0)
+	testing.expect_value(t, alice_log.fires, 0)
+	_, _ = ksess.session_tick(&alice.s, 0, 100)
+	testing.expect_value(t, alice_log.fires, 1)
+	testing.expect(t, alice_log.mine)
+	testing.expect_value(t, alice_log.anchor, id)
+	_, _ = ksess.session_tick(&host.s, 0, 100.05)
+	testing.expect_value(t, host_log.fires, 0)
+	_, _ = ksess.session_tick(&host.s, 0, 100 + ksess.session_interp_delay(&host.s))
+	testing.expect_value(t, host_log.fires, 1)
+	testing.expect(t, !host_log.mine)
+
+	// Owner audience sends only Alice. The host neither presents nor queues.
+	knet.writer_reset(&args)
+	knet.write_u8(&args, 2)
+	testing.expect(t, ksess.session_net_event_emit(&host.s, NET_EVENT_OWNER, id, knet.writer_bytes(&args)))
+	pump(boxes)
+	_, _ = ksess.session_tick(&alice.s, 0, 101)
+	testing.expect_value(t, alice_log.fires, 2)
+	testing.expect_value(t, alice_log.code, u8(2))
+	testing.expect_value(t, host_log.fires, 1)
+
+	// Static observers excludes the announcing authority and reaches Alice
+	// immediately on her next session frame. It is never join-replayed.
+	knet.writer_reset(&args)
+	knet.write_u8(&args, 3)
+	testing.expect(t, ksess.session_net_event_emit(&host.s, NET_EVENT_STATIC_OBSERVERS, args = knet.writer_bytes(&args)))
+	pump(boxes)
+	_, _ = ksess.session_tick(&alice.s, 0, 102)
+	testing.expect_value(t, alice_log.fires, 3)
+	testing.expect_value(t, alice_log.code, u8(3))
+	testing.expect_value(t, alice_log.anchor, knet.NET_ID_INVALID)
+	testing.expect_value(t, host_log.fires, 1)
+
+	// A delayed occurrence belongs to this run. Reset drops it rather than
+	// firing presentation into a replacement world.
+	knet.writer_reset(&args)
+	knet.write_u8(&args, 4)
+	testing.expect(t, ksess.session_net_event_emit(&host.s, NET_EVENT_ALL, id, knet.writer_bytes(&args)))
+	ksess.session_reset(&host.s)
+	_, _ = ksess.session_tick(&host.s, 0, 200)
+	testing.expect_value(t, host_log.fires, 1)
+}
+
+@(test)
 world_over_the_session :: proc(t: ^testing.T) {
 	host, alice: Peer_Box
 	box_make(&host, 1)
@@ -618,10 +850,20 @@ world_over_the_session :: proc(t: ^testing.T) {
 	// executes, confirm event drains the pending.
 	knet.command_begin(&alice.s.ctx, id, BOT_HIT)
 	knet.write_i32(&alice.s.ctx.msg, 3)
-	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, BOT_HIT))
+	confirm_issue := knet.command_issue_checked(&alice.s.ctx, abot, &bot_command_set, BOT_HIT)
+	testing.expect(t, confirm_issue.prediction_applied)
+	confirm_receipt := ksess.session_action_receipt(
+		&alice.s,
+		knet.action_outcome(.Predicted, seq = u32(confirm_issue.seq)),
+	)
+	_, confirm_ready_early := ksess.session_action_poll(&alice.s, confirm_receipt)
+	testing.expect(t, !confirm_ready_early)
 	testing.expect_value(t, abot.hp, i32(5))
 	pump(boxes)
 	testing.expect_value(t, hbot.hp, i32(5))
+	if verdict, ready := ksess.session_action_poll(&alice.s, confirm_receipt); testing.expect(t, ready) {
+		testing.expect_value(t, verdict.state, ksess.Action_Verdict_State.Accepted)
+	}
 
 	hev := drain(&host.s)
 	exec_ok := false
@@ -646,10 +888,20 @@ world_over_the_session :: proc(t: ^testing.T) {
 	// still settles it (and the event names the entity).
 	knet.command_begin(&alice.s.ctx, id, BOT_HIT)
 	knet.write_i32(&alice.s.ctx.msg, 5)
-	testing.expect(t, !knet.command_issue(&alice.s.ctx, abot, &bot_command_set, BOT_HIT))
+	reject_issue := knet.command_issue_checked(&alice.s.ctx, abot, &bot_command_set, BOT_HIT)
+	testing.expect(t, reject_issue.sent)
+	testing.expect(t, !reject_issue.prediction_applied)
+	reject_receipt := ksess.session_action_receipt(
+		&alice.s,
+		knet.action_outcome(.Rejected, .Predicate, u32(reject_issue.seq)),
+	)
 	testing.expect_value(t, abot.hp, i32(5)) // local revert
 	pump(boxes)
 	testing.expect_value(t, hbot.hp, i32(5)) // host rejected too
+	if verdict, ready := ksess.session_action_poll(&alice.s, reject_receipt); testing.expect(t, ready) {
+		testing.expect_value(t, verdict.state, ksess.Action_Verdict_State.Rejected)
+		testing.expect_value(t, verdict.reason, knet.Action_Reject_Reason.Predicate)
+	}
 	aev3 := drain(&alice.s)
 	rejected := false
 	for ev in aev3 {

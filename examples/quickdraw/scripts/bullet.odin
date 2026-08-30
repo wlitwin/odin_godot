@@ -73,7 +73,7 @@ bullet_tick_then :: proc(g: ^Quickdraw, self: ^Bullet, by: knet.Player_Id, lande
 			gd.print_str(fmt.tprintf("QD_LOB_KILL by=%d on=%d", u64(by), u64(vpid)))
 		}
 	}
-	ksess.session_despawn(&g.ses, self.net_id)
+	_ = bullet_despawn(&g.boot, self)
 }
 
 bullet_process :: proc(self: ^Bullet, delta: f64) {

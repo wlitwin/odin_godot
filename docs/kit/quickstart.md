@@ -55,7 +55,7 @@ Player :: struct {
 	owner:  gd.Node2d,
 	skin:   gd.Polygon2d `gd:"onready=Skin"`,
 	net_id: knet.Net_Id,
-	x, y:   f32 `gd:"owner,interp,wire=f16"`,
+	x, y:   f32 `gd:"owner,wire=f16"`, // float owner streams interpolate by default
 	pid:    u8 `gd:"replicate"`,
 	mine:   bool,
 	tinted: bool,
@@ -111,7 +111,7 @@ HelloNet :: struct {
 The `entity=Player:1` tag associates wire type `1` with `Player` and generates:
 
 - `hello_net_entities`, which installs the entity factory;
-- `player_spawn`, `player_of`, `player_owned_by`, and `my_player`;
+- `player_spawn`, `player_of`, `player_owned_by`, and `player_mine`;
 - typed `player_ref` handles plus one-pass `player_all` iteration
   (`player_ids` remains available for ID-only code);
 - spawn/free bookkeeping hooks; and
@@ -301,7 +301,7 @@ hello_net_process :: proc(self: ^HelloNet, delta: f64) {
 	was := kboot.boot_phase(&self.boot)
 	if was == .Menu {return}
 
-	_ = hello_net_pump(self, delta, knet.now_s())
+	_ = hello_net_frame(self, delta, knet.now_s())
 	if self.me != nil {
 		dx, dy: f32
 		if gd.is_action_pressed("ui_right") {dx += 1}
@@ -321,7 +321,7 @@ hello_net_process :: proc(self: ^HelloNet, delta: f64) {
 when you need the frame on which a phase changes; do not maintain a second
 `started` flag for the same state.
 
-`hello_net_pump` returns a `kboot.Net_Frame` when you need comms markers or
+`hello_net_frame` returns a `kboot.Net_Frame` when you need comms markers or
 the co-op fixed-step count. Use the lower-level `boot_pump` plus
 `hello_net_events` only when event dispatch must occur at a custom point in the
 frame.

@@ -10,7 +10,7 @@
 #     post-impulse velocity — the touch resolved locally, that tick, at
 #     240ms RTT. That is the pattern: the contested object lives on every
 #     peer's predicted timeline.
-#   - the kick is a DECLARED CUE (@(gd_cue) ball_kicked_fx; the sole entity
+#   - the kick is a DECLARED EVENT (@(gd_event) ball_kicked_fx; the sole entity
 #     parameter is its inferred anchor, and the
 #     step announces through the generated ball_kicked door): the WATCHER,
 #     who never simulated the striker's press, presents SPB_KICK_SEEN from
@@ -121,8 +121,7 @@ for port in 4190 4197; do
         exit 0
     fi
     tail -n 20 "$mlog" "$slog" "$wlog"
-    echo "SPEEDBALL_NATIVE_FAIL"
-    exit 1
+    echo "SPEEDBALL_NATIVE_ATTEMPT_FAIL port=$port — retrying on another port"
 done
-echo "SPEEDBALL_NATIVE_FAIL: no free port"
+echo "SPEEDBALL_NATIVE_FAIL: all match attempts failed"
 exit 1

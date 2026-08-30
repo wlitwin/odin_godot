@@ -547,10 +547,13 @@ Entity_Tag :: struct {
 	born:                                                 string, // <target_snake>_born — Ev_Spawned time (fields SET; the dress),
 	// dispatched typed from the generated <game>_events
 	has_tick:                                             bool, // the target declares @(gd_tick) — the kinds row carries its Sim_Set
+	has_net_id:                                           bool, // pointer lifecycle helpers may address self.net_id
+	has_owner_stream:                                     bool, // generate typed teleport only for session owner-stream kinds
 	gen_spawn:                                            bool, // emit the typed `<entity>_spawn` helper (hand-written name wins)
 	// Which census accessors to emit (resolve_census): a hand-written proc
 	// of the same name suppresses that one, keeping its meaning.
-	gen_ref, gen_of, gen_owned, gen_my, gen_ids, gen_all: bool,
+	gen_ref, gen_of, gen_owned, gen_mine, gen_ids, gen_all: bool,
+	gen_despawn, gen_teleport: bool,
 }
 
 // The class's @(gd_sample)/@(gd_step) procs — the lane's GAME half (kit/sim).
@@ -646,6 +649,30 @@ Fact_Info :: struct {
 	arg_names:    [dynamic]string, // wire args after `mine`, author-named
 	arg_types:    [dynamic]string, // declared type text per arg (spliced into the door)
 	arg_wires:    [dynamic]string, // wire suffix per arg
+	audience:     string, // everyone/owner/observers (gd_cue/gd_fact = everyone)
+	boot_door:    bool, // @(gd_event) takes ^kboot.Boot; legacy cues take ^ksim.Lane
+	line:         int,
+	path:         string,
+}
+
+// A @(gd_event) whose cause lives on the cooperative session clock. The
+// authored presentation proc has the same shape as a sim cue; the generated
+// suffix-free ^Boot door encodes the tuple and session_net_event_emit owns
+// audience routing plus immediate/anchored presentation.
+Net_Event_Info :: struct {
+	name:         string,
+	fx_proc:      string,
+	game:         string,
+	anchor:       string,
+	anchor_param: string,
+	anchor_index: int,
+	entity_names: [dynamic]string,
+	entity_types: [dynamic]string,
+	arg_names:    [dynamic]string,
+	arg_types:    [dynamic]string,
+	arg_wires:    [dynamic]string,
+	audience:     string,
+	timing:       string, // immediate/anchored (auto is resolved before storage)
 	line:         int,
 	path:         string,
 }
@@ -707,6 +734,7 @@ Script :: struct {
 	step_boot:         bool,
 	input_classes:     [dynamic]Input_Class_Info, // resolved package-wide (resolve_sim), on the lane OWNER: every input class, sorted by id (0 = primary)
 	facts:             [dynamic]Fact_Info, // declared presentation cues (resolve_facts), on the lane OWNER — doors + decode thunks + the fact table ride its gen file
+	net_events:        [dynamic]Net_Event_Info, // cooperative @(gd_event) declarations — generated event table, decode thunks, and ^Boot doors
 	messages:          [dynamic]Message_Info, // declared typed app-messages (@(gd_message)) — route storage + a `_messages` registration proc + send doors ride this class's gen file
 	boot_field:        string, // the kboot.Boot field's name ("" = none) — generates the standard transport forwards
 	boot_fields:       int, // direct Boot fields (the net facade needs exactly one)
@@ -721,6 +749,7 @@ Script :: struct {
 	// bool yields independently to a hand-written proc of the same name.
 	net_attach:        bool,
 	net_pump:          bool,
+	net_frame:         bool,
 	net_detach:        bool,
 	std_forwards:      [dynamic]string, // which standard forwards were synthesized (bodies emitted by generate)
 	probes:            [dynamic]Probe_Info, // generated acid probes (resolve_probes; bodies emitted by generate)
@@ -2292,6 +2321,9 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 		// Declared world-pass facts land on the lane owner resolve_sim just
 		// settled.
 		resolve_facts(all[:], fact_decls[:], by_struct, proc_names)
+		// Unified @(gd_event) declarations choose the already-resolved sim fact
+		// clock or the cooperative session event router from their anchor.
+		resolve_net_events(all[:], fact_decls[:], by_struct, proc_names)
 		// With the lane owner now known, conventional game shells get the
 		// generated attach/pump/detach facade. (A multi-session shell stays on
 		// the explicit lower-level API; there is no safe field to guess.)
@@ -2415,6 +2447,7 @@ module_fingerprint :: proc(ctx: ^Module_Ctx) {
 		   len(s.entities) > 0 ||
 		   s.tick.proc_name != "" ||
 		   s.profile_type != "" ||
+		   len(s.net_events) > 0 ||
 		   len(s.messages) > 0 {
 			ctx.kit_wire = true
 			break
@@ -2732,6 +2765,7 @@ SUBPKG_KIT_FEATURES := [?]Subpkg_Kit_Feature {
 			return s.step.proc_name != "" || s.step_auth.proc_name != ""
 		}},
 	{"a @(gd_message) handler", true, proc(s: ^Script) -> bool {return len(s.messages) > 0}},
+	{"a @(gd_event) declaration", false, proc(s: ^Script) -> bool {return len(s.net_events) > 0}},
 	{
 		"a kboot.Boot field (the standard transport forwards)",
 		true,
@@ -3417,6 +3451,22 @@ schema_access_expr :: proc(access: string) -> string {
 	return ".Owner"
 }
 
+schema_fact_schedule_expr :: proc(schedule: string) -> string {
+	switch schedule {
+	case "immediate": return ".Immediate"
+	case "anchored":  return ".Anchored"
+	}
+	return ".Watch"
+}
+
+schema_fact_audience_expr :: proc(audience: string) -> string {
+	switch audience {
+	case "owner":     return ".Owner"
+	case "observers": return ".Observers"
+	}
+	return ".Everyone"
+}
+
 // Emit the public, package-level structured projection of the recursive ABI.
 // The Wire_ABI_Metadata rows were collected while the canonical text was
 // written; this function only renders those rows as Odin literals. It never
@@ -3569,12 +3619,14 @@ gen_net_schema :: proc(b: ^strings.Builder, meta: ^Wire_ABI_Metadata) {
 	for f in meta.facts {
 		fmt.sbprintf(
 			b,
-			"\t{{path = %q, entity = %q, name = %q, id = %d, anchor = %q, schedule = .Watch, source = %s, args = {{first = %d, count = %d}}}},\n",
+			"\t{{path = %q, entity = %q, name = %q, id = %d, anchor = %q, schedule = %s, audience = %s, source = %s, args = {{first = %d, count = %d}}}},\n",
 			f.path,
 			f.entity,
 			f.name,
 			f.id,
 			f.anchor,
+			schema_fact_schedule_expr(f.schedule),
+			schema_fact_audience_expr(f.audience),
 			f.source == "tick" ? ".Tick" : ".Declared",
 			f.args.first,
 			f.args.count,

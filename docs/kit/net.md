@@ -242,11 +242,96 @@ two sequence/id namespaces when a game uses both. Non-predicted actions keep a
 receipt-only entry, so they confirm, reject, and time out through exactly the
 same callback path without gaining speculative write privileges.
 
+**Waiting for the authority without language-level async.** A purchase dialog,
+transaction prompt, or similar UI may care about the final verdict for one
+particular issue. Turn the generated outcome into a session-scoped receipt and
+poll it from the frame loop:
+
+```odin
+outcome := spelunker_buy_cmd(&game.boot, game.me, ITEM_BOOTS)
+receipt := ksess.session_action_receipt(&game.ses, outcome)
+
+// A later frame:
+if verdict, ready := ksess.session_action_poll(&game.ses, receipt); ready {
+	switch verdict.state {
+	case .Accepted:    close_purchase_dialog()
+	case .Rejected:    show_purchase_error(verdict.reason)
+	case .Unavailable: show_connection_error()
+	case .Pending:     // `ready` is false for this state
+	}
+}
+```
+
+Receipts are optional and bounded (`MAX_ACTION_RECEIPTS`, 64 watched asks per
+run). A terminal poll consumes its watched slot; call `session_action_forget`
+when the owning UI disappears first. They cover both `.Immediate` and
+`.Scheduled` actions without aliasing equal raw sequences and preserve the
+typed rejection reason. A pending watched receipt becomes `.Unavailable`
+across reset/rehost. A small result cache closes the issue/result race for
+synchronous in-memory transports.
+
+This is an acknowledgement, not a remote-value return. Durable inventory,
+currency, ownership, and world state still come from replicated fields and
+their edges. No additional request/response protocol or wire message is
+created by a receipt.
+
 Generated command IDs are stable hashes of command names, not declaration
 positions. Reordering procedures does not renumber the protocol. Renaming a
 command intentionally creates a new ID; collisions within a command set are a
 build error. The session's schema fingerprint provides the broader
 compatibility gate.
+
+### Reliable presentation events
+
+`@(gd_event)` declares a typed, non-durable occurrence. The author keeps the
+presentation body under `_fx`; scriptgen generates the suffix-free announcement
+door taking the game's `^Boot`:
+
+```odin
+@(gd_event = "audience=everyone,timing=auto")
+chest_spark_fx :: proc(g: ^Game, chest: ^Chest, mine: bool, strength: f32) {
+	particles_restart(chest, strength)
+	if mine {camera_kick(g)}
+}
+
+// Authority gameplay code — no Fx/Rpc/send suffix and no role branch.
+chest_spark(&g.boot, chest, 0.8)
+```
+
+The signature is `(game, entity refs…, mine: bool, wire args…)`, with the game
+pointer first. One entity parameter is the inferred anchor; with several,
+write `anchor=PARAM`, or `anchor=none` for a world occurrence. Arguments after
+`mine` use the command wire primitives. The body returns nothing and is
+presentation only—damage, inventory, spawning, and other truth remain commands,
+authority steps, and replicated fields.
+
+The policy has two independent axes:
+
+- `audience=everyone` presents on every eligible screen.
+- `audience=owner` presents only on the anchor owner's screen and therefore
+  requires an anchor.
+- `audience=observers` excludes the anchor owner. With no anchor it excludes
+  the announcing authority, useful when the source already carries its effect.
+- `timing=immediate` presents from the next session-frame drain on receivers.
+- `timing=anchored` aligns non-owning screens with the anchor's presentation
+  clock; the owning/live screen receives no additional interpolation delay.
+- `timing=auto` is accepted only when scriptgen can prove the clock: a
+  sim-tracked anchor uses its watch clock, and a cooperative entity with
+  continuous `owner` state uses the session interpolation clock. Static and custom
+  clocks must say `immediate` or use the lower-level explicit scheduler.
+
+The anchor also chooses the existing transport implementation. A sim-tracked
+anchor lowers onto `SIM_FACT`; a cooperative/static event lowers onto the
+session's reliable event frame and presentation queue. Both enter the wire
+fingerprint with id, argument schema, anchor, audience, and timing. Neither is
+join-replayed. Cooperative/static events are authority-minted; clients ask
+through commands. A sim event may also present from the owning live pass, where
+it is derived from the same replayable tick rather than an unconfirmed
+standalone prediction.
+
+`@(gd_cue)` and legacy `@(gd_fact)` remain compatible sim-only spellings. New
+cross-model code should prefer `@(gd_event)`; tick `_fx`, field `_edge`, command
+`_then`, and resimulation `_apply` retain their distinct phase contracts.
 
 ### Network tick and interpolation
 
@@ -284,8 +369,10 @@ chest_take_then :: proc(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot
 }
 ```
 
-Owner-streamed, interpolated fields add flags: `x, y: f32 `gd:"owner,interp"``
-(the spelunker's position). Under the hood these become:
+Owner-streamed float/vector/quaternion fields interpolate by default:
+`x, y: f32 `gd:"owner"`` (the spelunker's position). Discrete owner fields
+snap automatically; write `snap` to opt a float-shaped generation/meter out of
+the continuous default. Under the hood these become:
 
 ```odin
 Field_Desc :: struct {

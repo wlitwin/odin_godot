@@ -2104,7 +2104,7 @@ resolve_onready_scripts :: proc(s: ^Script, by_struct: map[string]^Script) {
 // wire-id claims across the whole module (ids collide across FILES too).
 resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^map[int]string, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
 	// Every generated name on the entity side is keyed by the TARGET struct
-	// (`<t>_spawn`, `<t>_of`, `<t>_owned_by`, `my_<t>`, `<t>_ids`, and the
+	// (`<t>_spawn`, `<t>_of`, `<t>_owned_by`, `<t>_mine`, `<t>_ids`, and the
 	// `<t>_spawned`/`<t>_freed` hooks it pairs). Two scene fields naming the
 	// same struct is therefore not a second entity — it is the same five procs
 	// generated twice, which surfaced as an Odin redeclaration error pointing at
@@ -2155,6 +2155,10 @@ resolve_entities :: proc(s: ^Script, by_struct: map[string]^Script, seen_ids: ^m
 		seen_targets[e.target] = e.line
 		seen_ids[e.type_id] = fmt.aprintf("%s (%s:%d)", e.target, s.path, e.line)
 		e.has_tick = target.tick.proc_name != "" || len(target.block_ticks) > 0 // the kinds row carries the Sim_Set
+		e.has_net_id = target.net_id_type != ""
+		for r in target.replicates {
+			if r.owner {e.has_owner_stream = true; break}
+		}
 
 		tsnake := to_snake(e.target)
 		sp_name := strings.concatenate({tsnake, "_spawned"})
@@ -2926,10 +2930,12 @@ resolve_census :: proc(s: ^Script, taken: map[string]Proc_Site) {
 		e.gen_ref = yield(taken, fmt.tprintf("%s_ref", tsnake))
 		e.gen_of = yield(taken, fmt.tprintf("%s_of", tsnake))
 		e.gen_owned = yield(taken, fmt.tprintf("%s_owned_by", tsnake))
-		e.gen_my = yield(taken, fmt.tprintf("my_%s", tsnake))
+		e.gen_mine = yield(taken, fmt.tprintf("%s_mine", tsnake))
 		e.gen_ids = yield(taken, fmt.tprintf("%s_ids", tsnake))
 		e.gen_all = yield(taken, fmt.tprintf("%s_all", tsnake))
 		e.gen_spawn = yield(taken, fmt.tprintf("%s_spawn", tsnake))
+		e.gen_despawn = yield(taken, fmt.tprintf("%s_despawn", tsnake))
+		e.gen_teleport = e.has_owner_stream && yield(taken, fmt.tprintf("%s_teleport", tsnake))
 	}
 }
 
@@ -3100,6 +3106,7 @@ resolve_net_facade :: proc(s: ^Script, procs: map[string]Proc_Site) {
 	}
 	add(&s.net_attach, procs, net_facade_name(snake, "attach"))
 	add(&s.net_pump, procs, net_facade_name(snake, "pump"))
+	add(&s.net_frame, procs, net_facade_name(snake, "frame"))
 	add(&s.net_detach, procs, net_facade_name(snake, "detach"))
 }
 
@@ -3429,7 +3436,7 @@ Fact_Candidate :: struct {
 	line: int,
 	src:  string,
 	name: string,
-	attr: string, // gd_cue or gd_fact
+	attr: string, // gd_event, gd_cue, or gd_fact
 	pt:   ^ast.Proc_Type,
 	vd:   ^ast.Value_Decl
 }
@@ -3443,14 +3450,15 @@ scan_fact_procs :: proc(out: ^[dynamic]Fact_Candidate, path, src: string, file: 
 		if !is_proc {continue}
 		name_ident, _ := vd.names[0].derived.(^ast.Ident)
 		if name_ident == nil {continue}
+		has_event := has_attr(vd, "gd_event")
 		has_cue := has_attr(vd, "gd_cue")
 		has_fact :=has_attr(vd, "gd_fact")
-		if !has_cue && !has_fact {continue}
+		if !has_event && !has_cue && !has_fact {continue}
 		if pl.type == nil {continue}
 		append(out, Fact_Candidate{
 			path = path, line = name_ident.pos.line, src = src,
 			name = name_ident.name,
-				attr = has_cue ? "gd_cue" : "gd_fact", pt = pl.type, vd = vd
+				attr = has_event ? "gd_event" : (has_cue ? "gd_cue" : "gd_fact"), pt = pl.type, vd = vd
 		})
 	}
 }
@@ -3495,6 +3503,7 @@ resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, by_struct: ma
 	GENERATED_SUFFIXES :: [?]string{"_cmd", "_spawn", "_step", "_events"}
 
 	for cand in decls {
+		if cand.attr == "gd_event" {continue} // resolved by resolve_net_events below
 		loc := Loc{path = cand.path, line = cand.line}
 		is_cue := cand.attr == "gd_cue"
 		label := is_cue ? "@(gd_cue)" : "@(gd_fact)"
@@ -5095,7 +5104,7 @@ classify_backup :: proc(type_text: string) -> (kind: Backup_Kind, key: string, e
 lane_options :: proc(lane: decl.Lane) -> string {
 	switch lane {
 	case .Owner:
-		return "`interp`, `interp=angle`, `interp=BLEND_PROC`, `wire=f16`, or `wire=CODEC`"
+		return "`snap`, `interp`, `interp=angle`, `interp=BLEND_PROC`, `wire=f16`, or `wire=CODEC`"
 	case .Predict:
 		return "`interp`, `interp=angle`, `interp=BLEND_PROC`, `slack=N`, `glide=N`, `cut=N`, `wire=f16`, or `wire=CODEC`"
 	case .Delta, .None:
@@ -5201,6 +5210,7 @@ parse_replicate_info :: proc(
 		owner     = lane == .Owner,
 		predict   = lane == .Predict
 	}
+	snap_requested := false
 	for spec_raw, si in specs[1:] {
 		spec := strings.trim_space(spec_raw)
 		// A lane token in the OPTION list. This arm carried a migration door for
@@ -5305,11 +5315,31 @@ parse_replicate_info :: proc(
 			continue
 		}
 		switch spec {
+		case "snap":
+			if lane != .Owner {
+				error_at(floc, "%s.%s: `snap` is the owner-stream opt-out from automatic interpolation; %s fields already snap unless they explicitly ask for interp", struct_name, field_label, lane_token(lane))
+				continue
+			}
+			snap_requested = true
 		case "interp":
 			rep.interp = true
 		case "":
 		case:
 			error_at(floc, "%s.%s: unknown `%s` option %q — the %s lane takes %s", struct_name, field_label, lane_token(lane), spec, lane_token(lane), lane_options(lane))
+		}
+	}
+	if snap_requested && rep.interp {
+		error_at(floc, "%s.%s: `snap` and `interp` ask for opposite presentation policies; choose one", struct_name, field_label)
+		return {}, false
+	}
+	// Strong owner-stream default: continuous numeric/vector/quaternion fields
+	// interpolate automatically; discrete types have no stock blend and keep
+	// snapping. `snap` is the explicit opt-out for a float-shaped generation,
+	// meter, or other deliberately discontinuous value.
+	if lane == .Owner && !rep.interp && !snap_requested {
+		if kind := interp_lerp_kind(type_text); kind != "" {
+			rep.interp = true
+			rep.lerp = kind
 		}
 	}
 	// Bare `interp` must know HOW to blend: classify the declared type into a knet.Lerp_Kind

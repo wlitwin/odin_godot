@@ -207,7 +207,8 @@ script_needs :: proc(s: ^Script) -> (n: Gen_Needs) {
 		len(s.commands) > 0 ||
 		len(s.entities) > 0 ||
 		len(s.backups) > 0 ||
-		len(s.messages) > 0
+		len(s.messages) > 0 ||
+		len(s.net_events) > 0
 	n.intrinsics = len(s.replicates) > 0 || len(s.backups) > 0
 	// @(gd_tick) generates the sim-lane thunk + Sim_Set (kit/sim) — and an
 	// entity TABLE references a target's Sim_Set when that class ticks.
@@ -233,6 +234,10 @@ script_needs :: proc(s: ^Script) -> (n: Gen_Needs) {
 		s.succ_wiped != "" ||
 		s.succ_migrating != ""
 	coop_commands := len(s.commands) > 0 && s.tick.proc_name == "" && len(s.block_ticks) == 0
+	event_boot := len(s.net_events) > 0
+	for f in s.facts {
+		if f.boot_door {event_boot = true}
+	}
 	// entity tables (`entity=Name:id` scene fields) name ksess.Entity_Type and
 	// build kboot.Entity_Kind rows; the lane wiring names ksess.Session; the
 	// standard transport forwards route into netgd/ksess; the boot-routed step
@@ -247,7 +252,8 @@ script_needs :: proc(s: ^Script) -> (n: Gen_Needs) {
 		has_succ ||
 		s.profile_type != "" ||
 		len(s.messages) > 0 ||
-		coop_commands
+		coop_commands ||
+		len(s.net_events) > 0
 	// The unified `<verb>_cmd` wrappers take the game's one handle (^kboot.Boot)
 	// on BOTH models, so any class with commands names kboot.
 	n.kboot =
@@ -256,7 +262,9 @@ script_needs :: proc(s: ^Script) -> (n: Gen_Needs) {
 		has_succ ||
 		s.net_attach ||
 		s.net_pump ||
-		s.net_detach
+		s.net_frame ||
+		s.net_detach ||
+		event_boot
 	n.netgd = len(s.std_forwards) > 0
 	return
 }
@@ -1398,9 +1406,10 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				upper,
 				strings.to_upper(c.name),
 			)
+			w(b, "\tif !_issue.sent {return knet.action_outcome(.Rejected, _issue.reason)}\n")
 			w(
 				b,
-				"\tif !_issue.sent || (_issue.prediction_attempted && !_issue.prediction_applied) {return knet.action_outcome(.Rejected, _issue.reason, u32(_issue.seq))}\n",
+				"\tif _issue.prediction_attempted && !_issue.prediction_applied {return knet.action_outcome(.Rejected, _issue.reason, u32(_issue.seq))}\n",
 			)
 			w(b, "\treturn knet.action_outcome(.Predicted, seq = u32(_issue.seq))\n}\n\n")
 		}
@@ -1480,6 +1489,122 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				m.tag_ident,
 			)
 		}
+	}
+
+	// ---- @(gd_event): cooperative reliable presentation -----------------
+	// Sim-tracked declarations were lowered into s.facts and are emitted with
+	// the lane below. These are the session-clock/static rows: one generated
+	// table, one install proc, suffix-free ^Boot doors, and typed decode thunks.
+	if len(s.net_events) > 0 {
+		w(b, "// ---- @(gd_event) cooperative presentation routes ----\n")
+		for e in s.net_events {
+			fmt.sbprintf(
+				b,
+				"EVENT_%s :: u16(0x%x)\n",
+				strings.to_upper(e.name),
+				cmd_wire_id(e.name),
+			)
+		}
+		w(b, "\n")
+		for e in s.net_events {
+			fmt.sbprintf(
+				b,
+				"@(private = \"file\")\n_%s_event_%s :: proc(user: rawptr, ses: ^ksess.Session, anchor: knet.Net_Id, mine: bool, args: []u8) {{\n",
+				snake,
+				e.name,
+			)
+			fmt.sbprintf(b, "\tself := cast(^%s)user\n\t_ = ses\n", cls)
+			non_anchor_refs := len(e.entity_names)
+			if e.anchor_index >= 0 {non_anchor_refs -= 1}
+			if non_anchor_refs > 0 || len(e.arg_names) > 0 {
+				w(b, "\tr := knet.reader_make(args)\n")
+				for _, i in e.entity_names {
+					if i == e.anchor_index {continue}
+					fmt.sbprintf(b, "\t_entity_id%d := knet.read_net_id(&r)\n", i)
+				}
+				for wire, i in e.arg_wires {
+					fmt.sbprintf(b, "\t_a%d := knet.read_%s(&r)\n", i, wire)
+				}
+				w(b, "\tif r.err || len(knet.reader_remaining(&r)) != 0 {return}\n")
+			} else {
+				w(b, "\t_ = args\n")
+			}
+			for entity_type, i in e.entity_types {
+				id_expr := i == e.anchor_index ? "anchor" : fmt.tprintf("_entity_id%d", i)
+				fmt.sbprintf(
+					b,
+					"\t_entity%d_raw, _entity%d_ok := kboot.boot_entity(&self.%s, %s, %s_TYPE)\n\tif !_entity%d_ok {{return}}\n",
+					i,
+					i,
+					s.boot_field,
+					id_expr,
+					strings.to_upper(to_snake(entity_type)),
+					i,
+				)
+			}
+			if e.anchor_index < 0 {w(b, "\t_ = anchor\n")}
+			fmt.sbprintf(b, "\t%s(self", e.fx_proc)
+			for entity_type, i in e.entity_types {
+				fmt.sbprintf(b, ", cast(^%s)_entity%d_raw", entity_type, i)
+			}
+			w(b, ", mine")
+			for _, i in e.arg_names {fmt.sbprintf(b, ", _a%d", i)}
+			w(b, ")\n}\n\n")
+
+			fmt.sbprintf(b, "%s :: proc(b: ^kboot.Boot", e.name)
+			for entity_name, i in e.entity_names {
+				fmt.sbprintf(b, ", %s: ^%s", entity_name, e.entity_types[i])
+			}
+			for arg_name, i in e.arg_names {
+				fmt.sbprintf(b, ", %s: %s", arg_name, e.arg_types[i])
+			}
+			w(b, ") {\n")
+			w(b, "\tif b.ses == nil || !b.ses.is_host {return}\n")
+			for entity_name in e.entity_names {
+				fmt.sbprintf(b, "\tif %s == nil {{return}}\n", entity_name)
+			}
+			if len(e.entity_names) - (e.anchor_index >= 0 ? 1 : 0) > 0 || len(e.arg_names) > 0 {
+				w(b, "\tw := knet.writer_make(64, context.temp_allocator)\n")
+				for entity_name, i in e.entity_names {
+					if i == e.anchor_index {continue}
+					fmt.sbprintf(b, "\tknet.write_net_id(&w, %s.net_id)\n", entity_name)
+				}
+				for arg_name, i in e.arg_names {
+					fmt.sbprintf(b, "\tknet.write_%s(&w, %s)\n", e.arg_wires[i], arg_name)
+				}
+			}
+			anchor_expr := e.anchor_index >= 0 ? fmt.tprintf("%s.net_id", e.anchor_param) : "knet.NET_ID_INVALID"
+			args_expr := len(e.entity_names) - (e.anchor_index >= 0 ? 1 : 0) > 0 || len(e.arg_names) > 0 ? "knet.writer_bytes(&w)" : "nil"
+			fmt.sbprintf(
+				b,
+				"\t_ = ksess.session_net_event_emit(b.ses, EVENT_%s, %s, %s)\n}}\n\n",
+				strings.to_upper(e.name),
+				anchor_expr,
+				args_expr,
+			)
+		}
+		fmt.sbprintf(b, "@(private = \"file\")\n_%s_event_table := [?]ksess.Net_Event_Desc {{\n", snake)
+		for e in s.net_events {
+			fmt.sbprintf(
+				b,
+				"\t{{name = %q, id = EVENT_%s, audience = %s, timing = %s, anchored = %v, present = _%s_event_%s}},\n",
+				e.name,
+				strings.to_upper(e.name),
+				net_event_audience_expr(e.audience),
+				e.timing == "anchored" ? ".Anchored" : ".Immediate",
+				e.anchor_index >= 0,
+				snake,
+				e.name,
+			)
+		}
+		w(b, "}\n\n")
+		fmt.sbprintf(
+			b,
+			"%s_event_routes :: proc(self: ^%s, ses: ^ksess.Session) {{\n\tksess.session_set_net_events(ses, self, _%s_event_table[:])\n}}\n\n",
+			snake,
+			cls,
+			snake,
+		)
 	}
 
 	// ---- @(gd_tick): the sim-lane step thunk + Sim_Set (kit/sim) ----
@@ -2221,7 +2346,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				} else {
 					w(b, "// in it stay silent.\n")
 				}
-				fmt.sbprintf(b, "%s :: proc(l: ^ksim.Lane", f.name)
+				if f.boot_door {
+					fmt.sbprintf(b, "%s :: proc(b: ^kboot.Boot", f.name)
+				} else {
+					fmt.sbprintf(b, "%s :: proc(l: ^ksim.Lane", f.name)
+				}
 				for entity_name, i in f.entity_names {
 					fmt.sbprintf(b, ", %s: ^%s", entity_name, f.entity_types[i])
 				}
@@ -2229,6 +2358,9 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 					fmt.sbprintf(b, ", %s: %s", a, f.arg_types[i])
 				}
 				w(b, ") {\n")
+				if f.boot_door {
+					w(b, "\tif b.lane == nil {return}\n\tl := b.lane\n")
+				}
 				if f.anchor != "" {
 					// The corpse gate, FIRST: lane_fact skips the wire for an untracked
 					// anchor and fire_facts drops a filed fact whose anchor died, but the
@@ -2275,11 +2407,17 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				if f.anchor != "" {
 					w(b, "\tif ksim.lane_live(l) {\n")
 					fmt.sbprintf(b, "\t\t_owner := ksim.lane_owner_of(l, %s)\n", f.anchor_param)
-					w(
-						b,
-						"\t\t_mine := _owner != knet.PLAYER_ID_INVALID && _owner == ksim.lane_me(l)\n",
-					)
-					w(b, "\t\tif _mine || ksim.lane_is_authority(l) {\n")
+					if f.boot_door {
+						w(b, "\t\t_mine := (_owner != knet.PLAYER_ID_INVALID && _owner == ksim.lane_me(l)) || (_owner == knet.PLAYER_ID_INVALID && ksim.lane_is_authority(l))\n")
+					} else {
+						w(b, "\t\t_mine := _owner != knet.PLAYER_ID_INVALID && _owner == ksim.lane_me(l)\n")
+					}
+					local_condition := "_mine || ksim.lane_is_authority(l)"
+					switch f.audience {
+					case "owner": local_condition = "_mine"
+					case "observers": local_condition = "!_mine && ksim.lane_is_authority(l)"
+					}
+					fmt.sbprintf(b, "\t\tif %s {{\n", local_condition)
 					fmt.sbprintf(b, "\t\t\t%s(cast(^%s)ksim.lane_game(l)", f.fx_proc, cls)
 					for entity_name in f.entity_names {
 						fmt.sbprintf(b, ", %s", entity_name)
@@ -2289,7 +2427,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 						fmt.sbprintf(b, ", %s", a)
 					}
 					w(b, ")\n\t\t}\n\t}\n")
-				} else {
+				} else if f.audience != "observers" {
 					// Anchorless: the WORLD caused it — the authority's own live
 					// simulation is the causer (mine=true on its screen alone);
 					// every client presents from the broadcast, on the watch clock.
@@ -2366,8 +2504,9 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			for f in s.facts {
 				fmt.sbprintf(
 					b,
-					"\t{{id = FACT_%s, fx = _%s_fact_%s}},\n",
+					"\t{{id = FACT_%s, audience = %s, fx = _%s_fact_%s}},\n",
 					strings.to_upper(f.name),
+					net_event_audience_expr(f.audience),
 					snake,
 					f.name,
 				)
@@ -2783,7 +2922,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 		// (resolve_census) and keeps its own meaning.
 		for e in s.entities {
 			tsnake := to_snake(e.target)
-			if e.gen_ref || e.gen_of || e.gen_owned || e.gen_my || e.gen_ids || e.gen_all {
+			if e.gen_ref || e.gen_of || e.gen_owned || e.gen_mine || e.gen_ids || e.gen_all || e.gen_despawn || e.gen_teleport {
 				fmt.sbprintf(
 					b,
 					"// Census for %s: typed refs, lookup, ownership, and one-pass iteration —\n// no game-side maps or registry casts for the common shape.\n",
@@ -2828,15 +2967,15 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 					e.target,
 				)
 			}
-			if e.gen_my {
-				my_body :=
+			if e.gen_mine {
+				mine_body :=
 					e.gen_owned ? fmt.tprintf("return %s_owned_by(b, b.ses.me)", tsnake) : fmt.tprintf("e, _, ok := kboot.boot_owned_entity(b, %s_TYPE, b.ses.me)\n\treturn cast(^%s)e, ok", strings.to_upper(tsnake), e.target)
 				fmt.sbprintf(
 					b,
-					"my_%s :: proc(b: ^kboot.Boot) -> (^%s, bool) {{\n\t%s\n}}\n\n",
+					"%s_mine :: proc(b: ^kboot.Boot) -> (^%s, bool) {{\n\t%s\n}}\n\n",
 					tsnake,
 					e.target,
-					my_body,
+					mine_body,
 				)
 			}
 			if e.gen_ids {
@@ -2856,6 +2995,58 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 					strings.to_upper(tsnake),
 					e.target,
 				)
+			}
+			if e.gen_despawn {
+				fmt.sbprintf(
+					b,
+					"@(private = \"file\")\n_%s_despawn_id :: proc(b: ^kboot.Boot, id: knet.Net_Id) -> bool {{\n" +
+					"\tif b.ses == nil || !b.ses.is_host {{return false}}\n" +
+					"\tif _, ok := kboot.boot_entity(b, id, %s_TYPE); !ok {{return false}}\n" +
+					"\tksess.session_despawn(b.ses, id)\n\treturn true\n}}\n\n" +
+					"@(private = \"file\")\n_%s_despawn_ref :: proc(b: ^kboot.Boot, ref: knet.Net_Ref(%s)) -> bool {{return _%s_despawn_id(b, ref.id)}}\n\n",
+					tsnake,
+					strings.to_upper(tsnake),
+					tsnake,
+					e.target,
+					tsnake,
+				)
+				if e.has_net_id {
+					fmt.sbprintf(
+						b,
+						"@(private = \"file\")\n_%s_despawn_ptr :: proc(b: ^kboot.Boot, self: ^%s) -> bool {{return self != nil && _%s_despawn_id(b, self.net_id)}}\n\n" +
+						"%s_despawn :: proc {{_%s_despawn_id, _%s_despawn_ref, _%s_despawn_ptr}}\n\n",
+						tsnake, e.target, tsnake,
+						tsnake, tsnake, tsnake, tsnake,
+					)
+				} else {
+					fmt.sbprintf(b, "%s_despawn :: proc {{_%s_despawn_id, _%s_despawn_ref}}\n\n", tsnake, tsnake, tsnake)
+				}
+			}
+			if e.gen_teleport {
+				fmt.sbprintf(
+					b,
+					"@(private = \"file\")\n_%s_teleport_id :: proc(b: ^kboot.Boot, id: knet.Net_Id) -> bool {{\n" +
+					"\tif b.ses == nil {{return false}}\n" +
+					"\tif _, ok := kboot.boot_entity(b, id, %s_TYPE); !ok {{return false}}\n" +
+					"\tksess.session_teleport(b.ses, id)\n\treturn true\n}}\n\n" +
+					"@(private = \"file\")\n_%s_teleport_ref :: proc(b: ^kboot.Boot, ref: knet.Net_Ref(%s)) -> bool {{return _%s_teleport_id(b, ref.id)}}\n\n",
+					tsnake,
+					strings.to_upper(tsnake),
+					tsnake,
+					e.target,
+					tsnake,
+				)
+				if e.has_net_id {
+					fmt.sbprintf(
+						b,
+						"@(private = \"file\")\n_%s_teleport_ptr :: proc(b: ^kboot.Boot, self: ^%s) -> bool {{return self != nil && _%s_teleport_id(b, self.net_id)}}\n\n" +
+						"%s_teleport :: proc {{_%s_teleport_id, _%s_teleport_ref, _%s_teleport_ptr}}\n\n",
+						tsnake, e.target, tsnake,
+						tsnake, tsnake, tsnake, tsnake,
+					)
+				} else {
+					fmt.sbprintf(b, "%s_teleport :: proc {{_%s_teleport_id, _%s_teleport_ref}}\n\n", tsnake, tsnake, tsnake)
+				}
 			}
 			if e.gen_spawn {
 				// The typed spawn — the tag already knows the struct, so the
@@ -2905,10 +3096,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 	// lane owner has one Lane too. Keep those public (games legitimately read
 	// them), but make their routine lifecycle one call. The raw boot/session/
 	// lane doors remain available when a game needs custom frame ordering.
-	if s.net_attach || s.net_pump || s.net_detach {
+	if s.net_attach || s.net_pump || s.net_frame || s.net_detach {
 		w(b, "// ---- game-network facade: one attach, one frame pump, one detach ----\n\n")
 		net_attach_name := net_facade_name(snake, "attach")
 		net_pump_name := net_facade_name(snake, "pump")
+		net_frame_name := net_facade_name(snake, "frame")
 		net_detach_name := net_facade_name(snake, "detach")
 		has_net_lane :=
 			len(s.input_classes) > 0 ||
@@ -2969,6 +3161,9 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 			if len(s.messages) > 0 {
 				fmt.sbprintf(b, "\t%s_messages(self, &self.%s)\n", snake, s.session_field)
 			}
+			if len(s.net_events) > 0 {
+				fmt.sbprintf(b, "\t%s_event_routes(self, &self.%s)\n", snake, s.session_field)
+			}
 			if has_net_lane {
 				fmt.sbprintf(
 					b,
@@ -3012,6 +3207,23 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 				w(b, "\t_ = events\n")
 			}
 			w(b, "\treturn {marks = marks, ticks = ticks}\n}\n\n")
+		}
+		if s.net_frame {
+			fmt.sbprintf(
+				b,
+				"// The common complete frame: pump + event dispatch, then the cooperative\n" +
+				"// authority step/edge pass when one is declared. Custom-order games keep\n" +
+				"// calling the lower-level pump and step separately.\n" +
+				"%s :: proc(self: ^%s, delta: f64, now: f64) -> kboot.Net_Frame {{\n" +
+				"\tframe := %s(self, delta, now)\n",
+				net_frame_name,
+				cls,
+				net_pump_name,
+			)
+			if s.step_boot {
+				fmt.sbprintf(b, "\t%s_step(self, frame.ticks)\n", snake)
+			}
+			w(b, "\treturn frame\n}\n\n")
 		}
 		if s.net_detach {
 			fmt.sbprintf(

@@ -70,6 +70,8 @@ _register_player :: proc "contextless" () {
 	rt.register(
 		rt.Class_Desc {
 			name = "Player",
+			path = "res://scripts/player.odin",
+			global_name = "Player",
 			base = "Node2D",
 			size = size_of(Player),
 			align = align_of(Player),

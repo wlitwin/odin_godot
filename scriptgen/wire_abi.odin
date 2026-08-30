@@ -85,7 +85,7 @@ Wire_Action_Meta :: struct {
 }
 
 Wire_Fact_Meta :: struct {
-	path, entity, name, anchor, source: string,
+	path, entity, name, anchor, source, schedule, audience: string,
 	id:                                 int,
 	args:                               Wire_Span,
 }
@@ -1316,14 +1316,26 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
 			arg_span := Wire_Span {
 				first = len(meta.arguments),
 			}
-			fmt.sbprintf(
-				&b,
-				"cue entity.%s.%s id=%d schedule=watch anchor=%s\n",
-				s.struct_name,
-				f.name,
-				cmd_wire_id(f.name),
-				f.anchor == "" ? "none" : f.anchor,
-			)
+			if f.audience == "" || f.audience == "everyone" {
+				fmt.sbprintf(
+					&b,
+					"cue entity.%s.%s id=%d schedule=watch anchor=%s\n",
+					s.struct_name,
+					f.name,
+					cmd_wire_id(f.name),
+					f.anchor == "" ? "none" : f.anchor,
+				)
+			} else {
+				fmt.sbprintf(
+					&b,
+					"cue entity.%s.%s id=%d schedule=watch anchor=%s audience=%s\n",
+					s.struct_name,
+					f.name,
+					cmd_wire_id(f.name),
+					f.anchor == "" ? "none" : f.anchor,
+					f.audience,
+				)
+			}
 			for entity_type, i in f.entity_types {
 				if i == f.anchor_index {continue}
 				fmt.sbprintf(
@@ -1392,9 +1404,70 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
 					id = int(cmd_wire_id(f.name)),
 					anchor = f.anchor,
 					source = "declared",
+					schedule = "watch",
+					audience = f.audience,
 					args = arg_span,
 				},
 			)
+		}
+
+		for e in s.net_events {
+			event_path := fmt.tprintf("entity.%s.%s", s.struct_name, e.name)
+			arg_span := Wire_Span {first = len(meta.arguments)}
+			fmt.sbprintf(
+				&b,
+				"event entity.%s.%s id=%d schedule=session-%s anchor=%s audience=%s\n",
+				s.struct_name,
+				e.name,
+				cmd_wire_id(e.name),
+				e.timing,
+				e.anchor == "" ? "none" : e.anchor,
+				e.audience,
+			)
+			for entity_type, i in e.entity_types {
+				if i == e.anchor_index {continue}
+				fmt.sbprintf(
+					&b,
+					"event-arg entity.%s.%s.ref%d kind=net_id width=4 bound=1 target=%s\n",
+					s.struct_name,
+					e.name,
+					i,
+					entity_type,
+				)
+				append(&meta.arguments, Wire_Argument_Meta {
+					owner = event_path, name = e.entity_names[i], kind = "net_id",
+					target = entity_type, width = 4, bound = 1,
+				})
+			}
+			for wire, i in e.arg_wires {
+				kind, width, variable, ok := wire_command_arg_shape(wire)
+				if !ok {continue}
+				if variable {
+					fmt.sbprintf(
+						&b,
+						"event-arg entity.%s.%s.%s kind=%s width=variable bound=%d\n",
+						s.struct_name, e.name, e.arg_names[i], kind, WIRE_FIELD_MAX_BYTES,
+					)
+				} else {
+					fmt.sbprintf(
+						&b,
+						"event-arg entity.%s.%s.%s kind=%s width=%d bound=1\n",
+						s.struct_name, e.name, e.arg_names[i], kind, width,
+					)
+				}
+				append(&meta.arguments, Wire_Argument_Meta {
+					owner = event_path, name = e.arg_names[i], kind = kind,
+					width = width, bound = variable ? WIRE_FIELD_MAX_BYTES : 1,
+					variable = variable,
+				})
+			}
+			arg_span.count = len(meta.arguments) - arg_span.first
+			append(&meta.facts, Wire_Fact_Meta {
+				path = event_path, entity = s.struct_name, name = e.name,
+				id = int(cmd_wire_id(e.name)), anchor = e.anchor,
+				source = "declared", schedule = e.timing, audience = e.audience,
+				args = arg_span,
+			})
 		}
 	}
 	meta.canonical = strings.to_string(b)

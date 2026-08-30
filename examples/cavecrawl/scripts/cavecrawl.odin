@@ -685,7 +685,7 @@ level_depth_edge :: proc(g: ^CaveLobby, self: ^Level, old, new: u8) {
 		g.walking = false
 		// A jump, not a walk: remote screens snap instead of sliding my
 		// avatar across the whole map.
-		ksess.session_teleport(&g.ses, g.me_spel.net_id)
+		_ = spelunker_teleport(&g.boot, g.me_spel)
 		gd.print_str(fmt.tprintf("CAVE_FLOOR depth=%d", new))
 	}
 }

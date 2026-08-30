@@ -168,6 +168,8 @@ _register_ping :: proc "contextless" () {
 	rt.register(
 		rt.Class_Desc {
 			name = "Ping",
+			path = "res://scripts/ping.odin",
+			global_name = "Ping",
 			base = "Node",
 			size = size_of(Ping),
 			align = align_of(Ping),

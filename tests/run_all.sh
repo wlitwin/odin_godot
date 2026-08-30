@@ -94,6 +94,9 @@ TESTS=(
     # Pure-Odin unit tests for kit/session — player identity (reconnect tokens ->
     # stable Player_Ids), join/leave/reconnect, roster sync, zombie takeover.
     "kitsession|KITSESSION_OK|tests/kitsession/run.sh"
+    # Entity-census cardinality in both dev and release guard modes: singular
+    # ownership returns exactly one and ambiguity can never become first-match.
+    "kitboot|KITBOOT_OK|tests/kitboot/run.sh"
     # The kit's SCALE benchmark — delta/join/save CPU+bytes+memory at
     # 100/500/2000 entities, per-recipient fanout at 2/4/8 players, and forced
     # resimulation at 32/128/512 predicted entities. Timings use loose

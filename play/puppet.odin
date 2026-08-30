@@ -79,8 +79,8 @@ body_impel :: proc(body: gd.Rigid_Body2d, vx, vy: f32) {
 }
 
 Puppet :: struct {
-	x, y:   f32 `gd:"owner,interp,wire=f16"`, // pose: the owner stream every screen follows
-	rot:    f32 `gd:"owner,wire=f16"`, // SNAP, never lerp: an angle
+	x, y:   f32 `gd:"owner,wire=f16"`, // continuous owner fields interpolate by default
+	rot:    f32 `gd:"owner,snap,wire=f16"`, // SNAP, never lerp: an angle
 	// interpolated componentwise sweeps the long way around the ±π wrap —
 	// a spinning kicked ball whipped its markings a full turn in one sample.
 	vx, vy: f32 `gd:"owner,wire=f16"`, // momentum: carried across ownership handoffs

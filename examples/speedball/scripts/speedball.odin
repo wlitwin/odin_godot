@@ -413,7 +413,7 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 			// The kick moves ANOTHER entity (the ball), so it can't ride the
 			// kicker's own tick channel — it is a cross-entity cue. The door
 			// holds every gate: this call is role-free.
-			ball_kicked(&g.lane, k, b.roll.vx, b.roll.vy)
+			ball_kicked(&g.boot, k, b.roll.vx, b.roll.vy)
 		}
 	}
 
@@ -421,14 +421,14 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 
 // ---- the kick's presentation: a declared cue ------------------------------------
 
-// @(gd_cue) — the step discovers the kick (foot meets ball, cross-entity)
+// @(gd_event) — the step discovers the kick (foot meets ball, cross-entity)
 // and announces it through the generated `ball_kicked` door. `k` is the only
 // entity parameter, so scriptgen infers it as the anchor. This proc fires
 // on EVERY screen at its right time: the striker's live pass immediately
 // (mine=true — the touch resolved locally, that tick), the authority live,
 // and watchers when their watch clock reaches the kick's tick, beside the
 // delayed avatar that kicked. A resim replay never re-fires it.
-@(gd_cue)
+@(gd_event = "audience=everyone,timing=auto")
 ball_kicked_fx :: proc(g: ^Speedball, k: ^Kicker, mine: bool, bvx, bvy: f32) {
 	if mine {
 		gd.print_str(fmt.tprintf("SPB_KICK tick=%d bvx=%.1f bvy=%.1f", ksim.lane_now(&g.lane), bvx, bvy))

@@ -18,7 +18,7 @@ Kicker3 :: struct {
 	skin:    gd.Mesh_Instance3d `gd:"onready=Skin"`,
 	tag:     gd.Label3d `gd:"onready=Tag"`,
 	net_id:  knet.Net_Id,
-	pos:     [3]f32 `gd:"owner,interp,wire=f16"`,
+	pos:     [3]f32 `gd:"owner,wire=f16"`,
 	pid:     u8 `gd:"replicate"`, // the seat this avatar belongs to (color + team)
 	mine:    bool, // set by the factory: this peer drives (and streams) this body
 	hx, hz:  f32, // HOST grant-loop scratch: last sampled pose (intent = displacement)

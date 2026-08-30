@@ -140,7 +140,7 @@ boot_node :: proc(b: ^Boot, id: knet.Net_Id) -> (gd.Node, bool) {
 // owner mirror + an avatar_of mirror beside the factory — bookkeeping of
 // state the kit already holds (the registry's entity + owner, this ledger's
 // type). These queries read it back; scriptgen wraps them per `entity=` tag
-// as typed `<snake>_of` / `my_<snake>` / `<snake>_owned_by` /
+// as typed `<snake>_of` / `<snake>_mine` / `<snake>_owned_by` /
 // `<snake>_all`, so census hooks shrink to genuinely game-shaped
 // bookkeeping (or vanish). A per-type linked index makes a kind query walk
 // only that kind; generated iteration resolves entity + owner in one pass.
@@ -197,18 +197,37 @@ boot_entity_owner :: proc(b: ^Boot, id: knet.Net_Id) -> knet.Player_Id {
 	return knet.PLAYER_ID_INVALID
 }
 
-// A player's entity of `type` — the `avatar_of` map. First match wins (one
-// avatar per player per type is the friendslop shape).
+// A player's singular entity of `type` — the `avatar_of` map. Zero matches is
+// false; one is the answer; two is an invalid question, not permission to pick
+// whichever Net_Id happens to sort first. Call the generated `<type>_all` and
+// select explicitly when ownership is plural.
 boot_owned_entity :: proc(b: ^Boot, type: ksess.Entity_Type, owner: knet.Player_Id) -> (entity: rawptr, id: knet.Net_Id, ok: bool) {
 	if owner == knet.PLAYER_ID_INVALID {
 		return nil, 0, false
 	}
+	found: rawptr
+	found_id := knet.NET_ID_INVALID
+	has_found := false
 	for eid := b.ent_heads[type]; eid != knet.NET_ID_INVALID; eid = b.ent_next[eid] {
 		if e, found_owner, live := boot_entity_raw(b, eid, type); live && found_owner == owner {
-			return e, eid, true
+			if has_found {
+				assert(
+					false,
+					fmt.tprintf(
+						"entity kind %d ownership is plural for player %d (ids %d and %d) — the singular *_mine/*_owned_by query cannot choose; enumerate *_all and select explicitly",
+						u16(type), u64(owner), u64(found_id), u64(eid),
+					),
+				)
+				// Release builds still reject ambiguity instead of silently
+				// returning the first row after assertions are disabled.
+				return nil, 0, false
+			}
+			found = e
+			found_id = eid
+			has_found = true
 		}
 	}
-	return nil, 0, false
+	return found, found_id, has_found
 }
 
 // Every live id of `type`, temp-allocated by default. Kept for compatibility;
@@ -454,6 +473,25 @@ boot_spawn_send :: proc(b: ^Boot, id: knet.Net_Id) {
 	if b.ses != nil && b.ses.is_host {
 		ksess.session_spawn_send(b.ses, id)
 	}
+}
+
+// Cancel a typed spawn that has not been announced yet. This is the explicit
+// early-return/failed-validation companion to make -> configure -> send:
+//
+//     e, id := mob_spawn(&g.boot)
+//     if !dress(e) {kboot.boot_spawn_cancel(&g.boot, id); return}
+//     kboot.boot_spawn_send(&g.boot, id)
+//
+// It cannot delete a committed authoritative entity. On a predicting client it
+// only cancels a provisional spawn and routes cleanup through the lane's
+// installed node/census free hook.
+boot_spawn_cancel :: proc(b: ^Boot, id: knet.Net_Id) -> bool {
+	if b.ses != nil && b.ses.is_host {
+		if !ksess.session_spawn_pending(b.ses, id) {return false}
+		ksess.session_despawn(b.ses, id)
+		return true
+	}
+	return b.lane != nil && ksim.lane_spawn_cancel(b.lane, id)
 }
 
 // Client-side: make the node and track it PREDICTED (provisional id, born this

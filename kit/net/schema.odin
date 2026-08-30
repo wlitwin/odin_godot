@@ -119,6 +119,14 @@ Net_Action_Schema :: struct {
 
 Net_Fact_Schedule :: enum u8 {
 	Watch,
+	Immediate,
+	Anchored,
+}
+
+Net_Fact_Audience :: enum u8 {
+	Everyone,
+	Owner,
+	Observers,
 }
 
 Net_Fact_Source :: enum u8 {
@@ -133,6 +141,7 @@ Net_Fact_Schema :: struct {
 	id:       u16, // 0 is the entity tick's built-in fact channel
 	anchor:   string, // named entity class; "" is an anchorless world fact
 	schedule: Net_Fact_Schedule,
+	audience: Net_Fact_Audience,
 	source:   Net_Fact_Source,
 	args:     Net_Schema_Span,
 }
@@ -249,6 +258,8 @@ net_schema_valid :: proc(schema: ^Net_Schema) -> bool {
 		if fact.path == "" ||
 		   fact.entity == "" ||
 		   fact.name == "" ||
+		   fact.schedule > .Anchored ||
+		   fact.audience > .Observers ||
 		   !net_schema_span_valid(fact.args, len(schema.arguments)) {
 			return false
 		}

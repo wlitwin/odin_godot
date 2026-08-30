@@ -69,8 +69,8 @@ body3_impel :: proc(body: gd.Rigid_Body3d, vel, avel: [3]f32) {
 QUAT3_ID :: quaternion(w = f32(1), x = 0, y = 0, z = 0)
 
 Puppet3 :: struct {
-	pos:  [3]f32 `gd:"owner,interp,wire=f16"`, // pose: the owner stream every screen follows
-	rot:  gd.Quaternion `gd:"owner,interp"`, // .Quat nlerp — 3D rotation interps CORRECTLY
+	pos:  [3]f32 `gd:"owner,wire=f16"`, // continuous owner fields interpolate by default
+	rot:  gd.Quaternion `gd:"owner"`, // .Quat nlerp — 3D rotation interps CORRECTLY
 	vel:  [3]f32 `gd:"owner,wire=f16"`, // momentum: carried across ownership handoffs
 	avel: [3]f32 `gd:"owner,wire=f16"`, // tumble: the rolling contact must cross the seam too
 	body: gd.Rigid_Body3d, // the wrapped node — attach-time, never on the wire
