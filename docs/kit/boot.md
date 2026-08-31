@@ -59,22 +59,23 @@ Start with `kboot.network_profile`, then override ordinary `session` or `lane`
 fields. The whole pair is validated before either layer starts. See
 [Network profiles](profiles.md).
 
-`my_game_net_pump` advances the network stack and dispatches every declared
-session-event half. It returns a `kboot.Net_Frame`: `marks` contains positional
-comms markers and `ticks` is the number of co-op network ticks advanced this
-frame. The marker slice is temporary and must be consumed this frame.
-
 `my_game_net_frame` is the common complete operation: it calls the generated
 pump/event dispatch and then the generated cooperative authority step plus
-same-frame edge pass when one exists. Games that need visuals or authority work
-on a different side of event dispatch keep using `_net_pump` and `_step`
-separately; the convenience does not remove the explicit ordering path.
+same-frame edge pass when one exists. It returns a `kboot.Net_Frame`: `marks`
+contains positional comms markers and `ticks` is the number of co-op network
+ticks advanced this frame. The marker slice is temporary and must be consumed
+this frame.
 
 `my_game_step` exists when a co-op game declares an
 `@(gd_step = "authority")` proc. A game with `kit/sim` attaches its lane with
 the generated facade, and the pump advances that lane itself.
 
 ### Advanced: custom frame composition
+
+`my_game_net_pump` advances the network stack and dispatches every declared
+session-event half without running the generated cooperative step. Use it with
+`my_game_step` only when visuals or authority work must sit on a different side
+of event dispatch.
 
 The lower-level `boot_attach`, `<game>_entities`, `<game>_messages`,
 `<game>_lane_init`, `boot_lane`, `boot_pump`, and `<game>_events` procedures
@@ -131,14 +132,14 @@ nodes it drives by name and pours the stock behavior into them; everything else
 in the scene is your own chrome. The node names each widget requires are listed
 in [ui.md's adopt contract](ui.md#adopting-your-own-scenes).
 
-## The event loop
+## The generated event loop
 
-`<game>_net_pump` runs `boot_pump`, then passes its event slice to the generated
-`<game>_events` dispatcher. Boot applies stock reactions first; the generated
-dispatcher then calls the game's declared [event
-halves](session.md#event-halves-and-generated-dispatch). The lower-level
-`boot_pump` returns `(events, marks, ticks)` when a game needs to choose exactly
-where that dispatch occurs.
+`<game>_net_frame` is the normal loop: it runs the generated pump, passes its
+event slice to `<game>_events`, and then runs any generated cooperative
+authority step and same-frame edge pass. Boot applies stock reactions before
+the game's declared [event halves](session.md#event-halves-and-generated-dispatch).
+The lower-level `<game>_net_pump` and `boot_pump` remain available when a custom
+frame graph must choose exactly where dispatch or stepping occurs.
 
 ### The forwarding table
 
@@ -166,8 +167,8 @@ host disconnect may remain in the current phase while succession attempts to
 re-seat the player.
 
 `boot_phase` is current state, not an event. To run work once when the world
-arrives, read the phase before `<game>_net_pump` and compare it with the phase
-after the pump. See `examples/hello_sim`.
+arrives, read the phase before `<game>_net_frame` and compare it with the phase
+after the frame call. See `examples/hello_sim`.
 
 ## Teardown
 

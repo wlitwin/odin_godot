@@ -152,8 +152,9 @@ for _ in 0 ..< to_spawn {
 }
 ```
 
-Damage on hit goes through [kit/combat](combat.md)'s `hit`/`credit_*`; spawns/despawns go
-through the [session](session.md) factory (`session_spawn_make` / `session_despawn`).
+Damage on hit goes through [kit/combat](combat.md)'s `hit`/`credit_*`; entity
+lifetime uses the generated typed doors (`dweller_spawn`, `boot_spawn_send`,
+and `dweller_despawn`). See the [Boot entity factory](boot.md#the-entity-factory).
 
 ## Gotchas
 

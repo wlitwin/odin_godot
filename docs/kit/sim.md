@@ -56,7 +56,7 @@ client later reconciles to the resulting authority state.
 ## Defining a sim entity
 
 Tag the state, declare the input struct by using it, mark the step, and
-return facts. The name-paired halves consume those facts, and the generated
+return tick payloads. The name-paired halves consume those payloads, and the generated
 thunk holds every role gate:
 
 ```odin
@@ -81,7 +81,7 @@ runner_tick :: proc(self: ^Runner, input: Runner_Input) -> (fired: bool) {
 	if self.fire_cd > 0 {self.fire_cd -= 1}
 	if input.buttons & FIRE != 0 && self.fire_cd == 0 {
 		self.fire_cd = COOLDOWN
-		fired = true // a FACT, not a verdict — ticks can't reject
+		fired = true // an event trigger, not a verdict — ticks can't reject
 	}
 	return
 }
@@ -107,10 +107,10 @@ Tick shapes are `(self)`, `(self, input)`, `(self, lane)`, and
 `(self, input, lane)`: a pointer param is the lane, and a value param is
 the input. Both halves also accept game-less (self-first) shapes.
 
-### Presenting a fact on every screen
+### Presenting a tick payload on every screen
 
 The `_fx` above runs only for the acting player's live pass. To present the
-same fact on every screen, add `mine: bool` immediately after `self` (the
+same occurrence on every screen, add `mine: bool` immediately after `self` (the
 parameter name is significant):
 
 ```odin
@@ -123,30 +123,30 @@ runner_tick_fx :: proc(g: ^Game, self: ^Runner, mine: bool, fired: bool) {
 }
 ```
 
-- The actor presents the fact immediately with `mine = true`. Resimulation
+- The actor presents it immediately with `mine = true`. Resimulation
   does not present it again.
-- The authority presents facts from other actors as they execute, with
+- The authority presents payload events from other actors as they execute, with
   `mine = false`.
-- Other clients receive a reliable `SIM_FACT` and present it when their watch
-  clock reaches the fact's tick. This keeps an effect aligned with the delayed
-  entity that caused it. Facts are counted individually, so a batch cannot
+- Other clients receive the internal reliable `SIM_FACT` frame and present it
+  when their watch clock reaches the event's tick. This keeps an effect aligned
+  with the delayed entity that caused it. Occurrences are counted individually, so a batch cannot
   collapse two occurrences into one.
 
-The `mine = true` skip **assumes the actor's own live pass fired the same fact
+The `mine = true` skip **assumes the actor's own live pass fired the same event
 from the same input**, which holds true unless the actor's input for that
 tick was lost: the authority then held their last input, its everywhere pass
-fired the fact from the extrapolation, and the actor, running its own fresh
-input, may not have. Skipped, they miss that one-shot. Facts are cosmetic
-one-shots, and loss is allowed to drop them. If the actor **must** see a fact
+fired the event from the extrapolation, and the actor, running its own fresh
+input, may not have. Skipped, they miss that one-shot. Tick payload events are
+cosmetic one-shots, and loss is allowed to drop them. If the actor **must** see it
 regardless of loss, fire it from an **authority** world pass
 (`@(gd_step="authority")`) instead of the entity tick: an authority-minted
-fact includes the owner by construction.
+event includes the owner by construction.
 
 ### Events produced by a world pass
 
 Use `@(gd_event)` for a presentation event discovered outside a single
 entity's tick, such as contact between a player and a ball. A sim-tracked
-anchor lowers the declaration onto this lane's existing fact/watch clock:
+anchor lowers the declaration onto this lane's existing watch clock:
 
 ```odin
 // The presentation proc you write. `k` is the only entity, so it is the anchor.
@@ -163,7 +163,7 @@ if kicked {
 ```
 
 The generated helper applies the same live-pass, authority, watcher, and
-resimulation rules as a tick fact. The anchor chooses the entity timeline used
+resimulation rules as a tick payload event. The anchor chooses the entity timeline used
 for presentation and the owner used to derive `mine`; it is a particular proc
 parameter, not a class or category. If a game has hundreds of `Enemy`
 instances, `anchor=enemy` means "use the `enemy` pointer passed to this call."
@@ -179,7 +179,7 @@ Anchor selection is intentionally small:
   carrying entity references.
 
 Put all typed entity parameters between the game and `mine`. They must be
-lane-tracked script classes. The anchor travels in the fact header; every other
+lane-tracked script classes. The anchor travels in the internal event header; every other
 entity reference travels as a `Net_Id` and is resolved to that peer's local
 pointer before presentation. Arguments after `mine` must be wire primitives.
 Scriptgen rejects ambiguous anchors, names that are not entity parameters, and
@@ -191,13 +191,13 @@ that the authority never confirms may still appear locally. Speedball's kick is
 the worked example. `@(gd_event)` and its generated `^Boot` door are the sole
 declared presentation-event surface for both session and simulation clocks.
 
-For the rare inline probe that should not be a fact at all (a debug print in
+For the rare inline probe that should not be a network event at all (a debug print in
 a tick body), gate on `ksim.lane_live(&lane)`: it reflects the live pass, not
 a resim replay. Never read `lane.resimming` raw.
 
-For a `mine`-form tick fact, at least one returned value must be `bool`; the
-half runs on ticks where any boolean fact is true. All returned facts must be
-wire primitives. Scriptgen reports either violation at build time. Use a plain
+For a `mine`-form tick event, at least one returned value must be `bool`; the
+half runs on ticks where any boolean payload is true. All returned payloads
+must be wire primitives. Scriptgen reports either violation at build time. Use a plain
 owner-only `_fx` (without `mine`) for continuous local presentation such as an
 engine hum, or for an effect that should not appear on every screen.
 
@@ -276,7 +276,7 @@ In a package with no
 through the boot accumulator instead: scriptgen generates
 `<snake>_step(self, ticks)`: the role gate, the fixed-step loop, and the
 [same-frame edge pass](net.md#field-change-edges)
-in one proc the game calls with `boot_pump`'s ticks
+inside the normal `<game>_net_frame` call
 (cavecrawl's `cave_host_tick` is the worked example; there is no absolute
 tick in the coop loop, so this form is `proc(self)`; count ticks in your
 own `gd:"backup"` field). One declaration, two routings: promoting the game
@@ -298,8 +298,9 @@ Underneath, `<class>_lane_init` carries the input size, typed procs, and each
 pass wired to its slot; `boot_lane` makes Boot drive everything. Both remain
 public for a custom shell. The generated entity table
 carries each ticking class's `Sim_Set`, so the factory tracks and untracks
-entities on the lane itself; `boot_pump` runs `lane_frame` + `lane_present`
-every frame and forwards `Ev_Owner_Changed`.
+entities on the lane itself; `<game>_net_frame` drives the underlying
+`boot_pump`, which runs `lane_frame` + `lane_present` every frame and forwards
+`Ev_Owner_Changed`.
 
 Entity thunks run every simulated tick, live and replay identically, in
 track order, each fed its owner's input (`nil` coasts: an inputless entity
@@ -892,7 +893,7 @@ needs a `predict` float. scriptgen rejects each on the wrong field, spelled out.
   value it held at the replayed tick, and a client learns the change a
   transit late (quickdraw's `if self.hp <= 0` gate predicts a step the
   server refused around every death; the glide eats the pop). Fine when
-  the edge is rare; mirror the fact into a predicted field when it's hot.
+  the edge is rare; mirror that state into a predicted field when it's hot.
 - **Watched entities render in the past** (`watch_delay`), just like owner
   streams: the two-timelines discipline changes shape, but it doesn't vanish.
   Your own avatar is the one thing that never waits.
@@ -906,18 +907,18 @@ needs a `predict` float. scriptgen rejects each on the wrong field, spelled out.
 
 The repository currently implements the input pipeline, ledgers, snapshots,
 reconciliation, lane driver, lag compensation, watched interpolation,
-render-error smoothing, possession, predicted spawns, tick and world facts,
+render-error smoothing, possession, predicted spawns, tick payloads and world events,
 multiple input classes, generated authoring, and the `play/sim` blocks.
 
 `tests/kitsim` covers convergence under loss and blackout, input-class routing,
-glide versus snap behavior, and fact timing. `tests/repgen` covers generated
+glide versus snap behavior, and event timing. `tests/repgen` covers generated
 contracts. Quickdraw and Speedball add multi-process acceptance tests for the
 main competitive paths.
 
 This is not a claim of arbitrary scale. Declarative input constraints, unified
 traffic budgets and authority ingress, protocol-wide payload ceilings,
 decoder/property corpora, per-recipient snapshot budgets, AOI, and ack-safe
-sparse snapshots are implemented. Facts are capped at
+sparse snapshots are implemented. Simulation event tuples are capped at
 4 KiB, command arguments at the action-policy bound, input packets at 32 KiB,
 and every sim rider remains inside the session's 256 KiB app-message / 1 MiB
 packet envelope. The benchmark-backed supported starting points are published

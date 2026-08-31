@@ -230,5 +230,5 @@ security boundary against the host.
   [Session trust and admission](session.md#trust-and-admission).
 
 Continue with [kit/sim](sim.md) for discrete commands, predicted spawns,
-contested objects, world passes, facts, lag compensation, and reconciliation
+contested objects, world passes, presentation events, lag compensation, and reconciliation
 tuning.

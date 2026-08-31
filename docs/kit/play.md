@@ -171,8 +171,9 @@ flight continues. If the claim is denied or times out, the body freezes and the
 visual correction returns it to the actual owner's stream. Treat the claim as
 presentation prediction, not authority.
 
-`puppet_place` performs a reset or teleport. Pair it with `session_teleport` so
-remote interpolation cuts instead of blending through the discontinuity.
+`puppet_place` performs a reset or teleport. Pair it with the entity kind's
+generated teleport door—such as `ball_teleport(&game.boot, ball)`—so remote
+interpolation cuts instead of blending through the discontinuity.
 `puppet_shove` applies an impulse on the current simulator.
 
 ## `play.Puppet3`

@@ -189,7 +189,7 @@ divergence.
 | `comms`, `xfer`, `save`, `ui` | Session-level; use unchanged. |
 | `items` | Inventory state normally remains on reliable deltas. Pure slot and packing helpers are usable anywhere replay-safe. |
 | `interact` | Geometry helpers are replay-safe. Prompt and command examples are written for session replication. |
-| `combat` | Its networked projectile and predicted-health flow targets session replication. Reuse pure geometry and policy helpers; implement sim combat with predicted fields, commands, and facts. |
+| `combat` | Its networked projectile and predicted-health flow targets session replication. Reuse pure geometry and policy helpers; implement sim combat with predicted fields, commands, and events. |
 | `ai` | Perception and steering math can be reused. Run navigation and non-replayable decisions only in the authority pass. |
 | `nav` | Do not call Godot navigation queries from a resimulated tick. Call them from authority-only logic and feed replayable results into the simulation. |
 | `fx` | Presentation helpers are reusable. The tracer pool is the co-op projectile presentation path; sim projectiles are usually predicted entities. |

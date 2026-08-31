@@ -24,6 +24,25 @@ spawning, saves, and transports do not change when an entity moves to the
 simulation lane. See [Choosing a timeline model](timelines.md) for the tradeoffs
 and [the simulation quickstart](quickstart-sim.md) for a small conversion.
 
+## The canonical author surface
+
+Start with the generated, typed operation for each ordinary game task:
+
+| Task | Write this |
+| --- | --- |
+| Attach and drive networking | `<game>_net_attach`, then `<game>_net_frame` once per frame |
+| Replicated state | `gd:"replicate"`, `gd:"owner"`, or `gd:"predict"` on the field |
+| Request an authoritative mutation | `@(gd_command)` plus the generated `<verb>_cmd` wrapper; choose a typed `knet.ACTION_*` policy only when changing the secure owner-only default |
+| Wait for one command verdict | `session_action_receipt`, then `session_action_poll` from frame code |
+| Present a non-durable occurrence | One `@(gd_event)` `_fx` body and its generated suffix-free announce door |
+| Find entities | `<type>_mine`, `<type>_owned_by`, `<type>_of`, and `<type>_all`; retain a typed `<type>_ref` across frames |
+| Change entity lifetime | `<type>_spawn`, `boot_spawn_send`/`boot_spawn_cancel`, `<type>_despawn`, and `<type>_teleport` |
+
+The component and raw session procedures remain available for a custom frame
+graph, custom factory, or deliberately mixed-kind batch. Reference pages mark
+those primitives as **Advanced**; they are implementation layers, not competing
+spellings of the normal path.
+
 Both models share one generated canonical wire ABI. scriptgen recursively
 checks every raw network value for fixed widths, explicit enum storage, bounded
 containers, and padding-free layout, then hashes the readable schema into the
@@ -32,7 +51,8 @@ discovering the mismatch by corrupting state.
 
 The root scripts package also receives `NET_SCHEMA`, an allocation-free
 `knet.Net_Schema` projection of that same ABI walk. It exposes entity fields,
-inputs and constraints, immediate/tick actions and policies, facts and anchors,
+inputs and constraints, immediate/tick actions and policies, presentation
+events and anchors,
 profiles, messages, recursive type nodes, and both fingerprints for tooling and
 diagnostics.
 
@@ -90,7 +110,7 @@ Most games use the packages in these layers:
 
 | Layer | Packages | Responsibility |
 | --- | --- | --- |
-| Game integration | [boot](boot.md), [network profiles](profiles.md) | Connects the stock lobby, validated network configuration, transport, session, generated entity factory, and per-frame pump. |
+| Game integration | [boot](boot.md), [network profiles](profiles.md) | Connects the stock lobby, validated network configuration, transport, session, generated entity factory, and generated net frame. |
 | Session | [session](session.md), [save](save.md), [comms](comms.md), [xfer](xfer.md) | Player identity and roster, reconnects, entity lifetime, app messages, saves, chat, and large payloads. |
 | Replication | [net](net.md), [sim](sim.md) | Field descriptors, deltas, owner streams, commands, fixed-tick simulation, prediction, reconciliation, and lag compensation. |
 | Transport | [netgd](netgd.md), [steamgd](steamgd.md) | Godot `MultiplayerPeer` integration, ENet/WebRTC setup, network simulation, join codes, and Steam lobbies. |
@@ -104,7 +124,7 @@ engine-facing integration.
 
 | Package | Purpose |
 | --- | --- |
-| [`godot:kit/boot`](boot.md) | Standard lobby-to-game lifecycle, frame pump, generated entity factory, transport forwarding, and host succession. |
+| [`godot:kit/boot`](boot.md) | Standard lobby-to-game lifecycle, generated net frame, entity factory, transport forwarding, and host succession. |
 | [`godot:kit/netcfg`](profiles.md) | Engine-free named session/lane profiles and complete-stack validation; re-exported through `kboot`. |
 | [`godot:kit/net`](net.md) | Wire codecs, entity descriptors and registry, reliable deltas, owner streams, interpolation, and commands. |
 | [`godot:kit/session`](session.md) | Stable player identities, roster, replication scheduling, entity lifetime, stats, moderation, interest management, and backup state. |

@@ -13,7 +13,7 @@ shipment of something big.
 **Lane compatibility: lane-agnostic.** Transfers ride the session's app channel;
 neither lane's tick machinery is involved. Never *consume* a payload inside a
 sim tick, because arrival timing is wall-clock, not sim-deterministic. Land it
-in frame code and let facts or fields carry the consequences.
+in frame code and let events or fields carry the consequences.
 
 ## How it routes
 

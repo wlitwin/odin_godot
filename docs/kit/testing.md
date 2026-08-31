@@ -17,7 +17,7 @@ natively, and compiles the same fingerprint/layout assertions for web, Linux,
 and Windows targets. The native pass queries the generated `NET_SCHEMA` field,
 action, argument, type, and message tables; a profile-only package pins that
 projection too, while `tests/repgen` covers inputs, constraints, entity ids,
-scheduled actions, and facts. The fixture also proves a schema drift is denied by the real JOIN
+scheduled actions, and presentation events. The fixture also proves a schema drift is denied by the real JOIN
 handshake and pins recursive diagnostics across replicated fields, input
 records, profiles, and typed messages, including platform-width integers,
 implicit enums, pointers, hidden padding, and unsupported containers.
@@ -27,6 +27,10 @@ negative fixtures for removed event attributes, quoted command policies, and
 redundant owner interpolation, then scans production source for retired action
 aliases and ID-only census generation. A compatibility spelling cannot return
 without making the complete suite fail.
+
+`tests/kitdocs/run.sh` guards the prose around that language. It verifies every
+relative link in `docs/kit`, rejects retired symbols, and prevents tutorial
+pages from teaching raw session lifecycle or `_net_pump` as the ordinary path.
 
 `tests/kitstress/run.sh` is the optimized scale/operations gate. It prints
 three receipts:
@@ -49,7 +53,7 @@ Launch N *real* headless processes of your *real* main scene under an
 injected bad link (`netgd`'s shim, driven by your `*_LATENCY` / `*_JITTER`
 / `*_LOSS` env vars: a slow wire, a wobbly one, a lossy one). A GDScript
 `SceneTree` driver presses the same `@(gd_method)`s your buttons fire (no
-mocks anywhere) and prints an UPPERCASE tag for every fact worth
+mocks anywhere) and prints an UPPERCASE tag for every observable worth
 asserting. Your `run.sh` sources the harness, wraps each scenario in an
 **act**, and asserts over the **logs**:
 
@@ -115,7 +119,7 @@ proc that takes a probe's name suppresses the generated probe of that name.
 
 - **Verdicts come from logs, not exit codes.** The launch subshell owns
   the pids; drivers print `ROLE_DONE` / `ROLE_FAIL` instead.
-- **Assert each fact on every peer that should observe it**, and assert
+- **Assert each event on every peer that should observe it**, and assert
   byte-identical (`expect_same`) where determinism matters: seeds,
   checksums, blob contents.
 - **Branch on what the process BECAME, not what you launched.** Under

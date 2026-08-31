@@ -133,10 +133,11 @@ is the reference; the production relay speaks it at `/rtc`) becomes a phonebook 
 ENet. The host registers its bound port under a minted code; a joiner trades the code for the
 host's observed endpoint; the join proceeds exactly as `begin_join` does.
 
-**A kit game uses the boot doors**, the same shape as every other door, and `boot_pump` runs
-the whole rendezvous (the host's minted code lands in the lobby status and `boot_room_code`; a
-joiner's resolved endpoint walks through `boot_join` on its own; a bad code restores the menu
-with the reason):
+**A kit game uses the boot doors**, the same shape as every other door, and its
+generated `<game>_net_frame` drives the whole rendezvous through Boot (the
+host's minted code lands in the lobby status and `boot_room_code`; a
+joiner's resolved endpoint walks through `boot_join` on its own; a bad code
+restores the menu with the reason):
 
 ```odin
 // host — instead of boot_host (also: kui.lobby_show_code reveals the stock
@@ -359,7 +360,8 @@ degradation with a stated consequence:
 | `address` | no rendezvous handle for a peer | **host migration is off**, and `succession_torch` says so once, naming the transport |
 
 `transport_host` / `transport_join` open a wire and the wire remembers its transport;
-`transport_service` (the per-frame pump, driven for you by `boot_pump`), `transport_close`,
+`transport_service` (the per-frame pump, driven for you by generated
+`<game>_net_frame` through Boot), `transport_close`,
 `wire_link_quality`, and the succession handoff all dispatch through that remembered
 transport. A wire opened the RAW way (`gd.host` by hand, then `wire_attach`) never named one
 and reads as ENet. This is safe because every ENet verb class-checks the installed peer and

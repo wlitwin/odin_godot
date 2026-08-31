@@ -77,10 +77,10 @@ fingerprint.
 
 `NET_SCHEMA` is the tooling/debugging view of that same walk. It contains flat
 static tables for entity kinds, recursive type nodes, replicated fields, input
-classes and constraints, actions, presentation facts, argument layouts,
+classes and constraints, actions, presentation events, argument layouts,
 outcome layouts, profiles, and typed messages. Each action carries its resolved
 `Action_Policy`, `.Immediate`/`.Scheduled` model, argument/outcome spans, and
-named consequence metadata; each fact carries its named anchor and watch-clock
+named consequence metadata; each presentation event carries its named anchor and watch-clock
 schedule. The schema also carries both fingerprints and the exact canonical
 string that produced `NET_ABI_FINGERPRINT`.
 
@@ -131,7 +131,7 @@ The common policies are:
 
 | Declaration | Access | Client execution |
 | --- | --- | --- |
-| `@(gd_command)` or `knet.ACTION_OWNER` | owner | waits for authority state |
+| bare `@(gd_command)` (its resolved policy is `knet.ACTION_OWNER`) | owner | waits for authority state |
 | `knet.ACTION_OWNER_PREDICTED` | owner | optimistic |
 | `knet.ACTION_ANY_SEAT` | any playing seat | waits for authority state |
 | `knet.ACTION_ANY_SEAT_PREDICTED` | any playing seat | optimistic when that peer has a prediction ledger |
@@ -438,7 +438,7 @@ signatures are supported:
 @(gd_half) door_toggle_then :: proc(self: ^Door, by: knet.Player_Id)   // entity-local: no game param
 ```
 
-**Payload returns.** A verb may return `(bool, facts…)`: results after the
+**Payload returns.** A verb may return `(bool, payloads…)`: results after the
 applied bool are in-process values handed straight to the `_then` (they never
 cross the wire). Payload types are unconstrained, since the generated call site
 lets the compiler hold the `_then` signature to them.
@@ -667,7 +667,7 @@ The semantics:
   alone can't carry an occurrence: warp serials, spawn seqs, dedup windows.
   When the occurrence carries payload or must fire exactly-once under resim, it
   has outgrown edges: that's a `_then` consequence, a session event, a
-  [Fire announcement](combat.md), or a sim-lane fact.
+  [Fire announcement](combat.md), or a sim-lane tick payload event.
 - **First sight seeds; resync re-seeds silently.** Spawn values are a
   baseline, not an edge; a wholesale catch-up (interest re-entry or a full
   snapshot) is history, not gameplay. Initial presentation belongs in a typed
@@ -689,17 +689,21 @@ The semantics:
   [two-timelines table](#the-two-timelines-presenting-consequences)
   (scoreboards, hp, inventories: never delay these). A row-2 consequence (a
   lid on the render clock) calls `session_present` inside the body.
-- **Edges say "it changed"; facts say "it happened N times."** Two hits
+- **Edges say "it changed"; events say "it happened N times."** Two hits
   coalescing into one net tick were always one delta: they are one edge.
-  When multiplicity or arguments matter, that is a FACT: the sim lane's
-  mine-form `_fx`, or a verb's consequence.
+  When multiplicity or arguments matter, use the sim lane's mine-form `_fx`,
+  a declared `@(gd_event)`, or a verb's consequence.
 
 Delta lane only, held at build time: an `_edge` on a `predict` field errors
 toward the mine-form `_fx` (resims would scrub it), on an `owner` field toward
 dress-from-fields (it interpolates every frame). `play/edge` remains for
 NON-replicated local state, where this machinery can't see.
 
-## Registering entities
+## Advanced: registry primitives
+
+Normal games register and mutate entity lifetime through the generated Boot
+factory and typed `<type>_*` doors. These procedures are the engine-free
+registry layer beneath that surface.
 
 ```odin
 registry_spawn :: proc(reg: ^Registry, entity: rawptr, set: ^Command_Set, owner := PLAYER_ID_INVALID) -> Net_Id
@@ -785,7 +789,7 @@ replays.
 ## Typed app messages
 
 Almost everything is *state, not messages*: replicate a field, predict a
-[verb](#the-command-loop), broadcast a fact. But a few things are genuinely
+[verb](#the-command-loop), announce a presentation event. But a few things are genuinely
 message-shaped: a **directed signal** (a whisper, an emote to one peer), an
 **out-of-band request/response**, an **app notification tied to no entity**,
 where *"if you weren't there, you don't get it"* is the correct behavior, not a
@@ -851,7 +855,7 @@ decoder loops, clones, or calls game code:
 | Command arguments | 4 KiB by default; at most 65,535 B with an explicit policy |
 | Profile row | 256 B |
 | App message / entity blob | 256 KiB |
-| Simulation fact tuple | 4 KiB |
+| Simulation event tuple (`SIM_FACT` wire frame) | 4 KiB |
 
 Outgoing session packets pass the same door, so the authority cannot announce
 a packet every receiver would reject. Delta and stream batches stop before the
@@ -890,8 +894,8 @@ movement. Applying a door-open animation immediately can make the door appear
 to open before the delayed remote player reaches it. Apply authoritative state
 immediately, but schedule spatial presentation with the cause when appropriate.
 
-`session_present` selects immediate or delayed presentation from a fact only the
-game knows: whether the local player's simulation caused the effect.
+`session_present` selects immediate or delayed presentation from one decision
+only the game knows: whether the local player's simulation caused the effect.
 
 ```odin
 ksess.session_present(
@@ -983,8 +987,8 @@ The fix is one more field and a closed form:
 - **Kill on the `DeadAt` stamp, not on arrival**, and *not* through
   `session_present` (you drew the cause; see above).
 - **Bounces** are a re-based tuple (new `origin`/`dir`/`Birth`), plus a
-  replicated segment counter whose *edge* is the bounce sound, not a
-  fact, because a fact leaves a late
+  replicated segment counter whose *edge* is the bounce sound, not a transient
+  event, because a transient event leaves a late
   joiner flying the original segment.
 
 Steady-state cost is ~nil (a live projectile is a few bytes of tuple); the

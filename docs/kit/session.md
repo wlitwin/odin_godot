@@ -58,7 +58,9 @@ other places where only the authority can mutate shared truth.
 
 ### Entity factory and late join
 
-`session_spawn_make` sends authority-side creation through the same
+The normal Boot surface is generated and typed: `<type>_spawn`,
+`boot_spawn_send`/`boot_spawn_cancel`, and `<type>_despawn`. At the advanced
+session layer, `session_spawn_make` sends authority-side creation through the same
 `Make_Entity_Proc` used on clients. `session_despawn` similarly calls the
 installed free procedure on every role. A late joiner's welcome and complete
 world snapshot use the same reliable ordered channel, so entities are created
@@ -140,7 +142,7 @@ hidden padding are build errors. Generated target-side size/alignment assertions
 close the loop between scriptgen's view and the compiler that builds the game.
 
 `NET_ABI_FINGERPRINT` hashes that readable schema. The complete generated
-`NET_FINGERPRINT` also covers entity ids, facts, RPC signatures, and the
+`NET_FINGERPRINT` also covers entity ids, presentation events, RPC signatures, and the
 session's `PROTOCOL_REV`; the guard registers it as the session default at load.
 JOIN carries it, so equal contracts seat normally while a mismatch is refused as
 `Ev_Join_Denied{.Version}`. A checked host also refuses fingerprint-less clients
@@ -208,7 +210,8 @@ the session still works, it just spends memory it does not own.
 ## Start, drive, drain
 
 ([kit/boot](boot.md) drives this whole section for you: `boot_host`/
-`boot_join` call the starts, `boot_pump` ticks and drains. What follows is
+`boot_join` call the starts, and generated `<game>_net_frame` ticks and drains
+through Boot. What follows is
 the layer underneath, which stays public for games that want the ritual
 their own way.)
 
@@ -267,8 +270,9 @@ low-level integrations may install it before starting the session.
 
 A [kit/boot](boot.md) game can replace the manual event switch with generated
 event halves. Each declared proc pairs by name with a session event. The
-generated `<game>_net_pump` forwards them automatically; the lower-level
-`<game>_events(self, events)` remains available for custom frame ordering.
+generated `<game>_net_frame` forwards them automatically and runs any declared
+cooperative authority step. The lower-level `<game>_net_pump` and
+`<game>_events(self, events)` remain available for custom frame ordering.
 Undeclared events are ignored.
 
 ```odin
@@ -282,8 +286,7 @@ cave_lobby_player_joined :: proc(self: ^CaveLobby, id: knet.Player_Id, rejoin: b
 cave_lobby_player_joined_then :: proc(self: ^CaveLobby, id: knet.Player_Id, rejoin: bool) { ... }
 
 // _process
-frame := cave_lobby_net_pump(self, delta, now_s())
-cave_lobby_step(self, frame.ticks) // generated co-op authority step, if declared
+_ = cave_lobby_net_frame(self, delta, now_s())
 ```
 
 The half names are the event names (`_seated`, `_welcomed`, `_player_joined`,
@@ -1041,7 +1044,7 @@ commands are exactly-once, access-gated, and dedup-windowed; owner-stream sender
 ownership-checked at the host; sim inputs are structurally checked, capped, and semantically
 validated when the game declares a validator; spectator seats are receive-only at four
 separate admission points; malicious-but-well-formed traffic is rate/byte bounded by
-the named profiles; packet, field, message, profile, fact, command, blob, and
+the named profiles; packet, field, message, profile, event, command, blob, and
 replication containers are admitted against semantic ceilings before allocation;
 and schema mismatch is rejected during the join.
 These defenses cover malformed traffic, application mistakes, and version skew;

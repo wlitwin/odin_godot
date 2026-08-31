@@ -119,16 +119,21 @@ chest_scene: ^gd.Resource `gd:"entity=Chest:2"`,
 
 The generated `cave_lobby_net_attach` installs `cave_lobby_entities` as part of
 the standard stack. Every peer, the host included, builds a spawn the same way
-(instantiate under `boot.world`, free on despawn, id→node ledger). A custom
-shell may call the entity installer directly. Your bookkeeping is a typed,
-name-paired hook:
+(instantiate under `boot.world`, free on despawn, id→node ledger). The same tag
+generates the typed census, so ordinary lookup and iteration need no mirror map:
 
 ```odin
-@(gd_half)
-chest_spawned :: proc(game: ^CaveLobby, self: ^Chest, id: knet.Net_Id, owner: knet.Player_Id) {
-	game.chests[id] = self
+if chest, ok := chest_of(&self.boot, id); ok {
+	inspect(chest)
+}
+for tracked in chest_all(&self.boot) {
+	inspect(tracked.entity)
 }
 ```
+
+A custom shell may call the entity installer directly. Typed `_spawned` and
+`_freed` hooks remain for genuinely game-shaped indexes or bookkeeping, not for
+recreating the registry.
 
 The host spawns typed. The tag generates a `chest_spawn` helper, so
 world-building code exists exactly once and no cast ever appears:
@@ -159,7 +164,8 @@ past, staying smooth through jitter and drops. Two contracts to respect:
   on someone else's avatar are expressed as replicated state the owner reacts
   to (hp came back → walk out of the grave yourself).
 - **Jumps are teleports.** On a level change, blink, or respawn, call
-  `ksess.session_teleport(&ses, id)` on the frame you write the jumped
+  the generated typed door—`spelunker_teleport(&self.boot, self.me)`, for
+  example—on the frame you write the jumped
   position, or remote screens will slide your avatar across the whole map.
 
 ## 4. Verbs — the intent pipeline (1 hour)

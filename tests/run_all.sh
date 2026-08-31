@@ -72,6 +72,9 @@ TESTS=(
 	# redundant owner interpolation, ID-only census views, and boolean action
 	# aliases must all stay rejected/absent.
 	"authorsurface|AUTHOR_SURFACE_OK|tests/author_surface/run.sh"
+	# Kit prose integrity: every local link resolves and normal-path guides keep
+	# generated frame/lifecycle/event/query APIs as the canonical surface.
+	"kitdocs|KITDOCS_OK|tests/kitdocs/run.sh"
 	# Cross-platform build policy: cache invalidation, isolated/atomic publication,
 	# failure + stale cleanup, and concurrent builds. Bash always runs; PowerShell runs
 	# when available (the dedicated .#build-parity shell supplies it).

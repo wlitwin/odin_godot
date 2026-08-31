@@ -9,7 +9,7 @@ into the [session](session.md) stat registry.
 confirmation, host-validated hits, `fire_announce`/tracers) are the coop lane's model. A
 [sim-lane](sim.md) game expresses the same ideas natively: hp as a `predict` field, hits
 as verbs judged under [lag comp](sim.md), fired shots as predicted spawns or declared
-facts (in the sim lane, projectile *entities* supersede tracers; see [sim.md](sim.md)).
+events (in the sim lane, projectile *entities* supersede tracers; see [sim.md](sim.md)).
 The pure math (range/cone checks and damage arithmetic) is replay-safe. The
 `Cooldowns` and ability bundles have not been covered by
 simulation-descriptor tests; do not put them on the simulation lane without

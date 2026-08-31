@@ -18,8 +18,9 @@ authority without a player avatar.
 `kboot.Boot` connects the common Godot-facing parts of a Kit game: lobby and HUD
 widgets, `netgd` transport, session, comms, generated entity factory, frame pump,
 and an optional simulation lane. For the conventional direct-field shell,
-scriptgen emits `<game>_net_attach`, `<game>_net_pump`, `<game>_net_frame`, and
-`<game>_net_detach`; the component-level `boot_*` procedures remain available.
+scriptgen emits `<game>_net_attach`, the normal `<game>_net_frame`, and
+`<game>_net_detach`. `<game>_net_pump` and component-level `boot_*` procedures
+are the custom-order primitives underneath.
 
 `boot_phase` reports `.Menu`, `.Connecting`, `.Lobby`, or `.Playing` from the
 current session state.
@@ -225,7 +226,7 @@ the event tick, not immediately when the packet arrives.
 The generated package-level `NET_SCHEMA` value: structured, allocation-free
 metadata for the same canonical wire contract hashed into the session
 fingerprint. It lists entity kinds and fields, recursive types, input classes
-and constraints, actions and policies, facts, profiles, and messages. Runtime
+and constraints, actions and policies, presentation events, profiles, and messages. Runtime
 callbacks remain in their execution descriptors; the net schema is the stable
 read-only view for diagnostics and tooling.
 
