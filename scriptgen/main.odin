@@ -45,7 +45,6 @@ package scriptgen
 // Usage:
 //   scriptgen <scripts_dir>
 //     - emits one odin_godot_scripts.gen.odin (plus the guard and boot shims) in <scripts_dir>
-//   (a legacy `-res:<dir>` flag is accepted but ignored — stubs are no longer emitted.)
 // ----------------------------------------------------------------------------
 
 import "core:fmt"
@@ -449,11 +448,12 @@ Command_Outcome :: struct {
 }
 
 // The value carried by @(gd_command=...). Bare attributes resolve to the secure
-// owner-only default. New declarations carry a typed knet.Action_Policy
-// expression; `legacy` retains the old comma-string reader as a migration path.
+// owner-only default. A configured declaration must carry a typed
+// knet.Action_Policy expression. A quoted value is retained only long enough
+// to produce a migration diagnostic; it is never interpreted.
 Command_Config :: struct {
-	policy_expr: string,
-	legacy:      string,
+	policy_expr:   string,
+	invalid_quote: string,
 }
 
 // One @(gd_command[=POLICY]) proc — a host-authoritative action with a typed
@@ -552,7 +552,7 @@ Entity_Tag :: struct {
 	gen_spawn:                                            bool, // emit the typed `<entity>_spawn` helper (hand-written name wins)
 	// Which census accessors to emit (resolve_census): a hand-written proc
 	// of the same name suppresses that one, keeping its meaning.
-	gen_ref, gen_of, gen_owned, gen_mine, gen_ids, gen_all: bool,
+	gen_ref, gen_of, gen_owned, gen_mine, gen_all: bool,
 	gen_despawn, gen_teleport: bool,
 }
 
@@ -628,14 +628,13 @@ Tick_Info :: struct {
 	// cross the wire, so they must be wire primitives)
 }
 
-// One declared presentation cue — preferably `@(gd_cue)`, with `@(gd_fact)`
-// retained as the original compatible spelling — on a `<event>_fx` proc.
-// scriptgen generates the announce DOOR under the bare event name: the
-// step (or an authority half) calls `<event>(l, anchor?, args…)` and the door
+// One sim-routed `@(gd_event)` on a `<event>_fx` proc. Scriptgen generates the
+// announce DOOR under the bare event name: the step (or an authority half)
+// calls `<event>(&boot, anchor?, args…)` and the door
 // holds every gate — the authority broadcasts (SIM_FACT, watchers fire on the
 // watch clock), the causer's live pass fires now (mine=true), a resim replay
 // never re-fires, and screens with no part stay silent. Resolved package-wide
-// onto the lane OWNER (resolve_facts): facts ride the lane's watch clock.
+// onto the lane owner by resolve_net_events: sim events ride its watch clock.
 Fact_Info :: struct {
 	name:         string, // the bare event name — the generated door (fx name minus `_fx`)
 	fx_proc:      string, // the author's half: `<name>_fx`
@@ -645,18 +644,17 @@ Fact_Info :: struct {
 	anchor_index: int, // index in entity_* (-1 = no entity anchor)
 	entity_names: [dynamic]string, // typed entity refs before `mine`, in author order
 	entity_types: [dynamic]string, // struct name per entity ref; the anchor rides the header,
-	// other refs ride as Net_Id values in the cue tuple
+	// other refs ride as Net_Id values in the event tuple
 	arg_names:    [dynamic]string, // wire args after `mine`, author-named
 	arg_types:    [dynamic]string, // declared type text per arg (spliced into the door)
 	arg_wires:    [dynamic]string, // wire suffix per arg
-	audience:     string, // everyone/owner/observers (gd_cue/gd_fact = everyone)
-	boot_door:    bool, // @(gd_event) takes ^kboot.Boot; legacy cues take ^ksim.Lane
+	audience:     string, // everyone/owner/observers
 	line:         int,
 	path:         string,
 }
 
 // A @(gd_event) whose cause lives on the cooperative session clock. The
-// authored presentation proc has the same shape as a sim cue; the generated
+// authored presentation proc has the same shape on either runtime; the generated
 // suffix-free ^Boot door encodes the tuple and session_net_event_emit owns
 // audience routing plus immediate/anchored presentation.
 Net_Event_Info :: struct {
@@ -733,7 +731,7 @@ Script :: struct {
 	// the coop game's fixed step, role-gated, with the same-frame edge pass inside.
 	step_boot:         bool,
 	input_classes:     [dynamic]Input_Class_Info, // resolved package-wide (resolve_sim), on the lane OWNER: every input class, sorted by id (0 = primary)
-	facts:             [dynamic]Fact_Info, // declared presentation cues (resolve_facts), on the lane OWNER — doors + decode thunks + the fact table ride its gen file
+	facts:             [dynamic]Fact_Info, // sim-routed @(gd_event) declarations — doors + decode thunks + the fact table ride the lane owner's gen file
 	net_events:        [dynamic]Net_Event_Info, // cooperative @(gd_event) declarations — generated event table, decode thunks, and ^Boot doors
 	messages:          [dynamic]Message_Info, // declared typed app-messages (@(gd_message)) — route storage + a `_messages` registration proc + send doors ride this class's gen file
 	boot_field:        string, // the kboot.Boot field's name ("" = none) — generates the standard transport forwards
@@ -959,7 +957,6 @@ SESSION_EVENTS := [?]Session_Ev {
 		variant = "Ev_Command_Executed",
 		role = .Host,
 		params = {
-			{"ok", "bool", "e.ok"},
 			{"player", "knet.Player_Id", "e.player"},
 			{"entity", "knet.Net_Id", "e.entity"},
 			{"cmd", "u16", "e.cmd"},
@@ -1095,8 +1092,8 @@ warn_at :: proc(loc: Loc, format: string, args: ..any) {
 // `scriptgen: wrote …` lines because a yield is part of what the run PRODUCED,
 // not a complaint about it.
 //
-// (A declared cue's announce door is the one exception, and it refuses instead of
-// yielding — see resolve_facts, where the reason is written down.)
+// (A declared event's announce door is the one exception, and it refuses
+// instead of yielding — see resolve_net_events, where the reason is written down.)
 @(private = "file")
 g_yielded: map[string]bool
 
@@ -1754,10 +1751,9 @@ main :: proc() {
 	}
 	scripts_dir := ""
 	for a in args {
-		// `-res:<dir>` is a legacy flag from the two-file (stub) model — accepted but
-		// ignored now that the authored source IS the attached resource.
 		if strings.has_prefix(a, "-res:") {
-			continue
+			fmt.eprintln("scriptgen: -res was removed; authored Odin source is the attached resource")
+			os.exit(2)
 		}
 		// `-godot:<path>` — the `godot:` collection root, so nested `using` bundles
 		// imported from `godot:kit/*` can be resolved (nested-replicate-fields Phase 2).
@@ -2222,7 +2218,7 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 	// DECLARED kit surface is in by now — the home file's and the helpers') so the teaching
 	// error arrives before whatever secondary complaint the resolve passes would make about
 	// the same declaration. The stragglers that only exist after name pairing (session and
-	// succession halves, world-pass facts) are caught by the second sweep further down.
+	// succession halves, presentation events) are caught by the second sweep further down.
 	condemned := false
 	if !is_root {
 		for &pend in pending {
@@ -2318,9 +2314,6 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 		all := make([dynamic]^Script, context.temp_allocator)
 		for &pend in pending {append(&all, &pend.script)}
 		resolve_sim(all[:])
-		// Declared world-pass facts land on the lane owner resolve_sim just
-		// settled.
-		resolve_facts(all[:], fact_decls[:], by_struct, proc_names)
 		// Unified @(gd_event) declarations choose the already-resolved sim fact
 		// clock or the cooperative session event router from their anchor.
 		resolve_net_events(all[:], fact_decls[:], by_struct, proc_names)
@@ -2347,14 +2340,13 @@ process_pkg_dir :: proc(ctx: ^Module_Ctx, scripts_dir: string, is_root: bool) {
 	}
 
 	// The SECOND kit sweep: the surfaces that only exist after name pairing — session
-	// and succession halves, world-pass facts, the boot transport forwards. Everything
+	// and succession halves, presentation events, the boot transport forwards. Everything
 	// they need was resolved just above, so a subpackage that paired one is named now.
 	if !is_root {
 		if len(fact_decls) > 0 {
 			error_at(
 				Loc{path = fact_decls[0].path},
-				"@(%s) in the script subpackage %q — %s",
-				fact_decls[0].attr,
+				"@(gd_event) in the script subpackage %q — %s",
 				rel,
 				subpkg_kit_fix(rel, ctx.root),
 			)
@@ -2781,7 +2773,7 @@ SUBPKG_KIT_FEATURES := [?]Subpkg_Kit_Feature {
 				s.succ_migrating != "" \
 			)
 		}},
-	{"a declared presentation cue", false, proc(s: ^Script) -> bool {return len(s.facts) > 0}},
+	{"a declared sim presentation event", false, proc(s: ^Script) -> bool {return len(s.facts) > 0}},
 	{
 		"an input class (the sim lane's wire input)",
 		false,
@@ -3282,7 +3274,7 @@ net_fingerprint :: proc(
 			fmt.sbprintf(&b, "%s\n", c)
 		}
 
-		// Declared world-pass facts: their ids ride SIM_FACT and their tuples
+		// Sim-routed declared events: their ids ride SIM_FACT and their tuples
 		// cross the wire — a drifted fact set is a drifted protocol.
 		fcts := make([dynamic]string, context.temp_allocator)
 		for f in s.facts {

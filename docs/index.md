@@ -72,7 +72,7 @@ use → ship.**
 - **[Gameplay recipes: the kit + play recipe](recipes.md)** is the compositional *pattern*
   the tutorial uses without naming: an entity is a struct of `play` primitives, and each
   networked behavior is sliced into seven authority/time slots (State, Cadence, Intent,
-  Authority, Prediction, Reconcile, Cue). It includes one worked example (a gun) and five
+  Authority, Prediction, Reconcile, Presentation). It includes one worked example (a gun) and five
   real items set against the skeleton. Read this when "how do I structure *this* gameplay
   item?" is the question. It's the multiplayer answer to Godot's component-composition
   articles.

@@ -215,13 +215,13 @@ sync_node_on_packet :: proc(self: ^SyncNode, id: gd.Int, packet: gd.Packed_Byte_
 			authority = true,
 			by        = knet.Player_Id(id),
 		}
-		ok := knet.command_execute(self, &sync_node_command_set, h.cmd, &r, &env)
+		reason := knet.command_execute(self, &sync_node_command_set, h.cmd, &r, &env)
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
 		knet.write_u8(&w, MSG_RESULT)
-		knet.command_result_write(&w, h, ok, self, &sync_node_command_set)
+		knet.command_result_write(&w, h, reason, self, &sync_node_command_set, truth = reason == .Predicate)
 		_ = netgd.send_reliable(self.owner, int(id), knet.writer_bytes(&w))
-		gd.print_str(fmt.tprintf("SYNC_CMD_EXEC ok=%v hp=%d", ok, self.hp))
+		gd.print_str(fmt.tprintf("SYNC_CMD_EXEC ok=%v hp=%d", reason == .None, self.hp))
 		self.cmds += 1
 		if self.cmds == 1 {
 			// Diverge SILENTLY (no delta): the client's next prediction runs
@@ -230,7 +230,7 @@ sync_node_on_packet :: proc(self: ^SyncNode, id: gd.Int, packet: gd.Packed_Byte_
 		}
 	case MSG_RESULT:
 		res := knet.command_result_read(&r)
-		if res.ok {
+		if res.reason == .None {
 			knet.command_confirm(&self.ses.ctx, res.seq)
 			ok := self.hp == 48 && knet.pending_count(&self.ses.ctx.pending) == 0
 			gd.print_str(

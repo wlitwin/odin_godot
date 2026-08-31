@@ -50,7 +50,7 @@ Quickdraw :: struct {
 	drone_scene:  ^gd.Resource `gd:"entity=Drone:3"`,
 
 	// The census is GENERATED (gunner_of / gunner_mine / gunner_owned_by /
-	// gunner_ids read the kit's own ledgers) — the only bookkeeping left is
+	// gunner_all reads the kit's own ledgers) — the only bookkeeping left is
 	// the hot my-avatar pointer the sample and bots poke every tick.
 	me_gun:       ^Gunner,
 

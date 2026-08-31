@@ -334,7 +334,7 @@ cover both immediate co-op and tick-scheduled actions:
 
 - confirmed: `seq`, `entity`, `cmd`, `model`;
 - rejected: those fields plus typed `reason`; and
-- executed: `ok`, `player`, the addressed fields, `reason`, `seq`, and `model`.
+- executed: `player`, the addressed fields, `reason`, `seq`, and `model`.
 
 The generated `_command_confirmed`, `_command_rejected`, and
 `_command_executed` halves receive those fields positionally. Reasons are
@@ -344,6 +344,12 @@ callbacks retain the real sequence, entity, and command. `model` is
 source from raw ids.
 
 ## The replicated world
+
+For a normal `Boot` game, generated typed helpers are the sole gameplay
+surface: `<type>_spawn`, `<type>_despawn`, `<type>_teleport`, and
+`boot_spawn_send`/`boot_spawn_cancel`. The signatures below are the advanced
+raw layer those helpers implement, for custom factories and deliberately
+mixed-kind batches.
 
 ```odin
 session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_ID_INVALID) -> (entity: rawptr, id: knet.Net_Id)

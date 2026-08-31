@@ -7,7 +7,7 @@ that keeps its own emitter (a flaming torch, a pyre) authors it in its own scene
 
 Presentation is lane-agnostic; the triggers differ. Bursts, flashes, and tweens fire from
 wherever presentation runs, whether that is coop `_edge` halves and announces or sim `_fx`
-halves and [declared facts](sim.md). The tracer pool and `fire_announce` are the coop answer
+halves and [declared events](sim.md). The tracer pool and `fire_announce` are the coop answer
 for projectiles specifically; in a sim game, projectiles are predicted *entities* that carry
 their own visuals (see [sim.md](sim.md)).
 

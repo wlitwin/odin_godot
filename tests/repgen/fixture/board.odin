@@ -96,30 +96,30 @@ board_contact :: proc(self: ^Board, tick: u64) {
 board_step :: proc(self: ^Board, tick: u64) {
 }
 
-// Declared presentation cue: one entity parameter makes the anchor unambiguous,
+// Declared presentation event: one entity parameter makes the anchor unambiguous,
 // so the author does not name it in the attribute. The generated bare door
 // holds every network/timeline gate.
-@(gd_cue)
+@(gd_event)
 pawn_bumped_fx :: proc(g: ^Board, p: ^Pawn, mine: bool, force: f32) {
 }
 
 // With several entity parameters, the attribute names the PARAMETER that owns
 // the presentation timeline. The other pointer crosses the wire as its Net_Id
-// and is resolved before the cue is presented.
-@(gd_cue = "anchor=scout")
+// and is resolved before the event is presented.
+@(gd_event = "anchor=scout")
 pawn_spotted_fx :: proc(g: ^Board, p: ^Pawn, scout: ^Scout, mine: bool, strength: u8) {
 }
 
 // `anchor=none` deliberately chooses the authority/world clock even though a
 // typed entity is part of the presentation. Its pointer is still sent safely
 // as a stable Net_Id and resolved on each peer.
-@(gd_cue = "anchor=none")
+@(gd_event = "anchor=none")
 pawn_echoed_fx :: proc(g: ^Board, p: ^Pawn, mine: bool) {
 }
 
-// The old spelling remains source- and wire-compatible. No entity parameters
-// means an anchorless world cue: the authority is the local causer.
-@(gd_fact)
+// No entity parameters means an anchorless sim event: the lane-owning game
+// supplies the watch clock and the authority is the local causer.
+@(gd_event = "anchor=none")
 board_horn_fx :: proc(g: ^Board, mine: bool, side: u8) {
 }
 

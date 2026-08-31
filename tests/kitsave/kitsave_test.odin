@@ -199,7 +199,7 @@ the_save_saga :: proc(t: ^testing.T) {
 	// executes and answers (this is what the cavecrawl act-2 rejoiner does).
 	knet.command_begin(&alice2.s.ctx, bot_id, 0)
 	knet.write_i32(&alice2.s.ctx.msg, 11)
-	testing.expect(t, knet.command_issue(&alice2.s.ctx, alice2.bots[bot_id], &bot_set, 0))
+	testing.expect(t, knet.command_issue(&alice2.s.ctx, alice2.bots[bot_id], &bot_set, 0).prediction_applied)
 	pump([]^Peer_Box{&host2, &alice2})
 	testing.expect_value(t, host2.bots[bot_id].hp, i32(50)) // 61 - 11, authoritatively
 	confirmed := false

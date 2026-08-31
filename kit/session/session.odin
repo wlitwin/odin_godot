@@ -231,7 +231,6 @@ Ev_Blob_Changed :: struct {
 }
 
 Ev_Command_Executed :: struct {
-	ok:     bool, // compatibility mirror: reason == .None
 	reason: knet.Action_Reject_Reason,
 	model:  knet.Action_Model,
 	seq:    knet.Intent_Seq,
@@ -1691,7 +1690,6 @@ session_action_executed :: proc(
 	append(
 		&s.events,
 		Ev_Command_Executed {
-			ok = reason == .None,
 			reason = reason,
 			model = model,
 			seq = knet.Intent_Seq(seq),
@@ -3751,7 +3749,7 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 		w := knet.writer_make()
 		defer knet.writer_destroy(&w)
 		knet.write_u8(&w, SES_RESULT)
-		result := knet.registry_host_command_checked(
+		result := knet.registry_host_command(
 			&s.reg,
 			&s.ctx,
 			pid,

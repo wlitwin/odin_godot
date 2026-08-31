@@ -1042,7 +1042,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
 			}
 			fmt.sbprintf(
 				&b,
-				"cue entity.%s.%s id=0 schedule=watch anchor=self source=tick\n",
+				"event entity.%s.%s id=0 schedule=watch anchor=self source=tick\n",
 				s.struct_name,
 				s.tick.proc_name,
 			)
@@ -1053,7 +1053,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
 				if variable {
 					fmt.sbprintf(
 						&b,
-						"cue-arg entity.%s.%s.fact%d kind=%s width=variable bound=%d\n",
+						"event-arg entity.%s.%s.fact%d kind=%s width=variable bound=%d\n",
 						s.struct_name,
 						s.tick.proc_name,
 						i,
@@ -1063,7 +1063,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
 				} else {
 					fmt.sbprintf(
 						&b,
-						"cue-arg entity.%s.%s.fact%d kind=%s width=%d bound=1\n",
+						"event-arg entity.%s.%s.fact%d kind=%s width=%d bound=1\n",
 						s.struct_name,
 						s.tick.proc_name,
 						i,
@@ -1319,7 +1319,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
 			if f.audience == "" || f.audience == "everyone" {
 				fmt.sbprintf(
 					&b,
-					"cue entity.%s.%s id=%d schedule=watch anchor=%s\n",
+					"event entity.%s.%s id=%d schedule=watch anchor=%s audience=everyone\n",
 					s.struct_name,
 					f.name,
 					cmd_wire_id(f.name),
@@ -1328,7 +1328,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
 			} else {
 				fmt.sbprintf(
 					&b,
-					"cue entity.%s.%s id=%d schedule=watch anchor=%s audience=%s\n",
+					"event entity.%s.%s id=%d schedule=watch anchor=%s audience=%s\n",
 					s.struct_name,
 					f.name,
 					cmd_wire_id(f.name),
@@ -1340,7 +1340,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
 				if i == f.anchor_index {continue}
 				fmt.sbprintf(
 					&b,
-					"cue-arg entity.%s.%s.ref%d kind=net_id width=4 bound=1 target=%s\n",
+					"event-arg entity.%s.%s.ref%d kind=net_id width=4 bound=1 target=%s\n",
 					s.struct_name,
 					f.name,
 					i,
@@ -1364,7 +1364,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
 				if variable {
 					fmt.sbprintf(
 						&b,
-						"cue-arg entity.%s.%s.%s kind=%s width=variable bound=%d\n",
+						"event-arg entity.%s.%s.%s kind=%s width=variable bound=%d\n",
 						s.struct_name,
 						f.name,
 						f.arg_names[i],
@@ -1374,7 +1374,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
 				} else {
 					fmt.sbprintf(
 						&b,
-						"cue-arg entity.%s.%s.%s kind=%s width=%d bound=1\n",
+						"event-arg entity.%s.%s.%s kind=%s width=%d bound=1\n",
 						s.struct_name,
 						f.name,
 						f.arg_names[i],

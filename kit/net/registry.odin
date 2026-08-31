@@ -944,7 +944,7 @@ Registry_Command_Outcome :: struct {
 // header always receives a compact verdict, even when its entity went stale;
 // malformed headers and replayed sequences remain silent because they cannot
 // be correlated safely and replying would amplify garbage.
-registry_host_command_checked :: proc(
+registry_host_command :: proc(
 	reg: ^Registry,
 	ctx: ^Command_Ctx,
 	by: Player_Id,
@@ -973,14 +973,14 @@ registry_host_command_checked :: proc(
 	}
 	if admission != .None {
 		assert(action_reject_reason_valid(admission))
-		command_result_write_reason(out, h, admission)
+		command_result_write(out, h, admission)
 		result.responded = true
 		result.reason = admission
 		return result
 	}
 	e, found := &reg.entries[h.entity]
 	if !found {
-		command_result_write_reason(out, h, .Stale)
+		command_result_write(out, h, .Stale)
 		result.responded = true
 		result.reason = .Stale
 		return result
@@ -990,7 +990,7 @@ registry_host_command_checked :: proc(
 	// for timeout.
 	c := command_find(e.set, h.cmd)
 	if c == nil {
-		command_result_write_reason(out, h, .Malformed)
+		command_result_write(out, h, .Malformed)
 		result.responded = true
 		result.reason = .Malformed
 		return result
@@ -998,13 +998,13 @@ registry_host_command_checked :: proc(
 	// registry_host_command is the REMOTE ingress. Authority-authored calls run
 	// through their generated local wrapper and never arrive here.
 	if !action_access_allows(c.policy, by, e.owner, false) {
-		command_result_write_reason(out, h, .Access)
+		command_result_write(out, h, .Access)
 		result.responded = true
 		result.reason = .Access
 		return result
 	}
 	if !action_args_allowed(c.policy, len(reader_remaining(r))) {
-		command_result_write_reason(out, h, .Malformed)
+		command_result_write(out, h, .Malformed)
 		result.responded = true
 		result.reason = .Malformed
 		return result
@@ -1018,10 +1018,10 @@ registry_host_command_checked :: proc(
 		user      = ctx.game_user,
 		by        = by,
 	}
-	result.reason = command_execute_reason(e.entity, e.set, h.cmd, r, &env)
+	result.reason = command_execute(e.entity, e.set, h.cmd, r, &env)
 	// Predicate races need the authority's current truth. Admission/syntax
 	// refusals never ran gameplay and stay header-only.
-	command_result_write_reason(
+	command_result_write(
 		out,
 		h,
 		result.reason,
@@ -1031,24 +1031,6 @@ registry_host_command_checked :: proc(
 	)
 	result.responded = true
 	return result
-}
-
-// Compatibility result for low-level callers that only distinguish accepted
-// from refused. New session code consumes registry_host_command_checked so it
-// can surface the typed reason.
-registry_host_command :: proc(
-	reg: ^Registry,
-	ctx: ^Command_Ctx,
-	by: Player_Id,
-	r: ^Reader,
-	out: ^Writer,
-) -> (
-	responded: bool,
-	ok: bool,
-	h: Command_Header,
-) {
-	result := registry_host_command_checked(reg, ctx, by, r, out)
-	return result.responded, result.responded && result.reason == .None, result.header
 }
 
 // Client side: route a received result to its entity. Unknown entity (it
@@ -1064,7 +1046,7 @@ registry_client_result :: proc(
 	if r.err {
 		return res
 	}
-	if res.ok {
+	if res.reason == .None {
 		command_confirm(ctx, res.seq)
 		// Bless: the entity keeps its speculative values (the authority just
 		// said yes) but the pending that licensed them is gone — without the

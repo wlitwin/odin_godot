@@ -77,7 +77,7 @@ Slopball :: struct {
 	kicker_scene: ^gd.Resource `gd:"entity=Kicker:1"`,
 	ball_scene:   ^gd.Resource `gd:"entity=Ball:2"`,
 
-	// The census is GENERATED (kicker_of / kicker_ids / kicker_owned_by) —
+	// The census is GENERATED (kicker_of / kicker_all / kicker_owned_by) —
 	// what's left is the hot pointers the input and probes poke every frame.
 	me_kick: ^Kicker, // my avatar (nil until spawned)
 	ball:    ^Ball,

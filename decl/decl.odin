@@ -446,14 +446,13 @@ export_specs_list :: proc(allocator := context.allocator) -> string {
 // shares a proc with a method-family attribute (the kit verbs never join the
 // engine's method tables).
 //
-// THE LINE BETWEEN Kit_Primary AND Half, since `gd_fact` sat on the wrong side
-// of it until the halves became declarative: a PRIMARY makes a declaration —
+// THE LINE BETWEEN Kit_Primary AND Half: a PRIMARY makes a declaration —
 // something downstream is generated FROM it (a verb's wrapper, a tick's thunk,
-// a fact's announce door and its wire id). A HALF pairs with a declaration made
+// an event's announce door and its wire id). A HALF pairs with a declaration made
 // elsewhere and generates nothing; the name says which declaration, the
-// attribute says only that pairing is INTENDED. `gd_fact` generates a door and
-// claims a wire id, so it is a primary that happens to bind its bearer by name;
-// `gd_half` is the one member of Half, and pairing with nothing is its error.
+// attribute says only that pairing is INTENDED. `gd_event` generates a door and
+// claims a wire id; `gd_half` is the one member of Half, and pairing with
+// nothing is its error.
 Attr_Family :: enum u8 {
 	Kit_Primary, // the toolkit verbs: the proc IS a command / tick / sample / step / fact door
 	Kit_Declaration, // a toolkit type declaration (currently @(gd_input) on an input struct)
@@ -483,8 +482,6 @@ ATTRS :: []Attr {
 	{"gd_sample", .Kit_Primary, "an input sample"},
 	{"gd_step", .Kit_Primary, "a sim step"},
 	{"gd_event", .Kit_Primary, "a reliable presentation event with declared audience and timing"},
-	{"gd_cue", .Kit_Primary, "a presentation cue with an inferred or named entity anchor"},
-	{"gd_fact", .Kit_Primary, "the compatible earlier spelling for a presentation cue"},
 	{"gd_message", .Kit_Primary, "a typed app-message handler (kit/session app route)"},
 	{"gd_half", .Half, "a pairing half; the NAME says what it pairs with"}
 }

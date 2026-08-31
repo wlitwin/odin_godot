@@ -62,7 +62,7 @@ Thing :: struct {
 	using m: Move,   // promoted
 	d:       Deep,   // plain, one level deeper
 }
-@(gd_command="predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 thing_bump :: proc(self: ^Thing, n: i32) -> bool { self.hp += n; return true }
 ODIN
 
@@ -100,7 +100,7 @@ Hero :: struct {
 	tint:     u8 `gd:"replicate"`,
 	using cs: bundle.State,
 }
-@(gd_command="predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 hero_hit :: proc(self: ^Hero, n: i32) -> bool { self.hp -= n; return true }
 ODIN
 
@@ -130,7 +130,7 @@ Fighter :: struct {
 	hp:     i32 `gd:"replicate"`,
 	aim:    Aim,   // PLAIN embed -> aim_sensitivity / aim_reticle / aim_fired
 }
-@(gd_command="predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 fighter_hit :: proc(self: ^Fighter, n: i32) -> bool { self.hp -= n; return true }
 ODIN
 if ! "$SGEN" "$comp" -godot:"$ROOT" >/dev/null 2>&1; then fail "plain embed with export/onready/signal must NOT error"; fi
@@ -154,7 +154,7 @@ Nope :: struct {
 	hp:      i32 `gd:"replicate"`,
 	using i: Inner,
 }
-@(gd_command="predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 nope_bump :: proc(self: ^Nope, n: i32) -> bool { self.hp += n; return true }
 ODIN
 
@@ -187,7 +187,7 @@ G :: struct {
 	using m: Machine(Gun_State),  // m.cur : Gun_State
 	hold:    Holder(Payload),     // hold.tag + hold.item.hp (substitution T=Payload)
 }
-@(gd_command="predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 g_bump :: proc(self: ^G, n: i32) -> bool { self.hold.tag += u8(n); return true }
 ODIN
 if ! "$SGEN" "$gen" -godot:"$ROOT" >/dev/null 2>&1; then fail "generic instantiation must resolve, not error"; fi
@@ -214,7 +214,7 @@ HeroB :: struct {
 	using cd:  kcombat.Cooldowns(3),   // cds:[3]u16 replicate (imported generic bundle)
 	using bag: kitems.Inventory(8),    // slots:[8]Slot replicate (imported generic bundle)
 }
-@(gd_command="predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 herob_fire :: proc(self: ^HeroB, slot: i32) -> bool { return kcombat.cd_try(&self.cd, int(slot), {cooldown = 10}) }
 ODIN
 if ! "$SGEN" "$kit" -godot:"$ROOT" >/dev/null 2>&1; then fail "embedding real kit bundles (Cooldowns/Inventory) must resolve"; fi
@@ -237,7 +237,7 @@ import knet "godot:kit/net"
 
 Gun :: struct { ammo: u16 `gd:"replicate"` }
 // predicted, OWNER-THREADED (reads its wielder): the ^Runner 2nd param is not a wire arg.
-@(gd_command="predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 gun_fire :: proc(g: ^Gun, owner: ^Runner, dx: i32) -> bool { if owner.hp == 0 {return false}; g.ammo -= 1; return true }
 // plain (non-predicted), no owner, no args.
 @(gd_command)
@@ -272,7 +272,7 @@ mkdir -p "$coll/play"
 cat >"$coll/play/gun.odin" <<'ODIN'
 package play
 Gun :: struct { ammo: u16 `gd:"replicate"` }
-@(gd_command="predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 gun_fire :: proc(g: ^Gun, owner: ^$E, dx: i32) -> bool { g.ammo -= 1; return true }
 ODIN
 ic="$work/impcmd"
@@ -634,7 +634,7 @@ Chest :: struct {
 	gold:   i32 `gd:"replicate"`,
 }
 
-@(gd_command = "predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 chest_take :: proc(self: ^Chest, n: i32) -> bool {
 	if self.gold < n {return false}
 	self.gold -= n
@@ -686,7 +686,7 @@ Door :: struct {
 	open:   u8 `gd:"replicate"`,
 }
 
-@(gd_command = "any_seat")
+@(gd_command = knet.ACTION_ANY_SEAT)
 door_toggle :: proc(self: ^Door) -> bool {
 	self.open = 1 - self.open
 	return true
@@ -695,7 +695,7 @@ ODIN
 "$SGEN" "$as" -godot:"$ROOT" >"$as/out.log" 2>&1 \
 	|| fail "any_seat on a co-op world interaction must build"
 grep -q 'DOOR_POLICY_TOGGLE :: knet.ACTION_ANY_SEAT' "$as/odin_godot_scripts.gen.odin" \
-	|| fail "a legacy co-op any_seat annotation must migrate to the typed Any_Seat policy"
+	|| fail "a typed co-op Any_Seat policy must survive generation"
 
 # ---- fixture: generated acid probes — per entity kind, count/my/field
 # @(gd_method)s the test driver reads replicated state through; a
@@ -1358,7 +1358,7 @@ GrMob :: struct {
 	owner:  gd.Node,
 	net_id: knet.Net_Id,
 	hp:     i32 `gd:"replicate"`,
-	x, y:   f32 `gd:"owner,interp,wire=f16"`,
+	x, y:   f32 `gd:"owner,wire=f16"`,
 	px:     f32 `gd:"predict,interp,slack=0.5,glide=0.1,cut=32"`,
 	fuel:   u16 `gd:"predict"`,
 }
@@ -1508,18 +1508,18 @@ out="$("$SGEN" "$hf" -godot:"$ROOT" 2>&1)"
 echo "$out" | grep -q 'no scene field declares `entity=Name:id`' \
 	|| fail "an untagged census hook must name the TAG as the fix, not a rename"
 
-# @(gd_fact) and @(gd_half) are the two sides of one line — a fact DECLARES the
+# @(gd_event) and @(gd_half) are the two sides of one line — an event DECLARES the
 # door scriptgen generates, a half PAIRS with a declaration made elsewhere — so
 # wearing both is refused rather than resolved into a proc that is somehow each.
 perl -pi -e 's/^\@\(gd_half\)\nhf_game_spawned.*\n//' "$hf/mob.odin"
 perl -0777 -pi -e 's/\n\@\(gd_half\)\nhf_game_spawned[^\n]*\n//' "$hf/mob.odin"
-perl -0777 -pi -e 's/\@\(gd_half\)\nhf_bump_then/\@(gd_fact)\n\@(gd_half)\nhf_bump_then/' "$hf/mob.odin"
+perl -0777 -pi -e 's/\@\(gd_half\)\nhf_bump_then/\@(gd_event)\n\@(gd_half)\nhf_bump_then/' "$hf/mob.odin"
 out="$("$SGEN" "$hf" -godot:"$ROOT" 2>&1)"
-[[ $? -ne 0 ]] || fail "@(gd_fact) plus @(gd_half) on one proc must fail the build"
-echo "$out" | grep -q 'two sides of one line' \
-	|| fail "the fact/half overlap refusal must say which attribute declares and which pairs"
+[[ $? -ne 0 ]] || fail "@(gd_event) plus @(gd_half) on one proc must fail the build"
+echo "$out" | grep -q 'declares the presentation door' \
+	|| fail "the event/half overlap refusal must say which attribute declares and which pairs"
 echo "$out" | grep -q 'Drop @(gd_half)' \
-	|| fail "the fact/half overlap refusal must name the fix"
+	|| fail "the event/half overlap refusal must name the fix"
 
 # ---------------------------------------------------------------------------
 # THE FORGOTTEN ATTRIBUTE — the same bug one step earlier than the sweep above.
@@ -1688,7 +1688,7 @@ NestedTag :: struct {
 	hp:     i32 \`gd:"replicate"\`,
 	aim:    Aim,
 }
-@(gd_command="predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 nestedtag_hit :: proc(self: ^NestedTag, n: i32) -> bool { self.hp -= n; return true }
 ODIN
 	local out rc
@@ -1865,7 +1865,7 @@ ODIN
 }
 quat_lane 'predict,interp' || fail "gd:\"predict,interp\" on a quat must be ACCEPTED — the sim lane glides predicted rotations now"
 quat_lane 'predict' || fail "gd:\"predict\" (no interp) on a quat must be ACCEPTED — a non-interp predicted field snaps by design"
-quat_lane 'owner,interp' || fail "gd:\"owner,interp\" on a quat must be ACCEPTED — owner-streamed quats glide (quat_nlerp)"
+quat_lane 'owner' || fail "gd:\"owner\" on a quat must be ACCEPTED — owner-streamed quats glide (quat_nlerp)"
 quat_lane 'replicate,interp' || fail "gd:\"replicate,interp\" on a quat must be ACCEPTED — delta-lane quats glide (quat_nlerp)"
 
 # ---- fixture 21: a gd-tagged BUNDLE from res://shared/ names its limitation ---

@@ -74,11 +74,14 @@ separately; the convenience does not remove the explicit ordering path.
 `@(gd_step = "authority")` proc. A game with `kit/sim` attaches its lane with
 the generated facade, and the pump advances that lane itself.
 
+### Advanced: custom frame composition
+
 The lower-level `boot_attach`, `<game>_entities`, `<game>_messages`,
 `<game>_lane_init`, `boot_lane`, `boot_pump`, and `<game>_events` procedures
-remain public. Use them when event dispatch or lane installation must occur at
-a custom point in the frame. A shell with multiple direct sessions or lanes is
-left on these explicit APIs because the generator cannot safely guess a graph.
+are primitives for a genuinely custom frame graph, not alternate spellings of
+`<game>_net_frame`. Use them only when event dispatch or lane installation must
+occur at a custom point. A shell with multiple direct sessions or lanes is left
+on these explicit APIs because the generator cannot safely guess a graph.
 
 ## Standard signal methods
 
@@ -418,7 +421,6 @@ for tracked in mob_all(&self.boot) {       // one-pass, temp-allocated
 	_ = tracked.id
 	_ = tracked.owner
 }
-for id in mob_ids(&self.boot) { ... }      // compatible ID-only view
 owner := kboot.boot_entity_owner(&self.boot, id) // the owner_pid map
 _ = mob_teleport(&self.boot, mob)          // owner-stream jump; ptr/ref/id overloads
 _ = mob_despawn(&self.boot, mob)           // authority lifecycle; exact-kind checked
@@ -433,8 +435,8 @@ The pointer in `Net_Entity(T)` is frame-local: retain `tracked.ref`, not
 
 The per-type index is sorted by `Net_Id`, so a query walks only that entity
 kind and cross-entity simulation passes have the same order on every peer.
-`*_all` resolves the pointer and current owner together instead of the old
-`*_ids` + `*_of` + owner triple lookup. ID-only access remains for compatibility.
+`*_all` is the sole enumeration surface: it resolves the pointer, stable ref,
+ID, and current owner together in one pass.
 Client-predicted entities are included while they live under provisional IDs;
 Boot carries the provisional-to-authoritative alias when a predicted spawn is
 rekeyed, so a reference retained at fire time continues resolving. The alias is

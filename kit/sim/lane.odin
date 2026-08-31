@@ -341,7 +341,7 @@ Lane :: struct {
 	// fx thunk when the watch clock reaches the fact's tick (lane_present).
 	facts:                 [dynamic]Fact_In,
 
-	// declared cues (@(gd_cue), or compatible @(gd_fact)): the package's fact table, id →
+	// sim-routed @(gd_event) declarations: the package's event table, id →
 	// decode thunk, installed by the generated <snake>_lane_init. Kind 0 is
 	// reserved for entity-tick facts (routed through the anchor's Sim_Set.fx).
 	fact_set:              []Fact_Desc,
@@ -386,13 +386,13 @@ Fact_In :: struct {
 	args: []u8, // owned — the fact tuple, wire-encoded
 }
 
-// One declared cue (@(gd_cue), or compatible @(gd_fact)): its stable wire id (an FNV-1a
-// hash of the event name — the command-id law: reordering declarations never
+// One sim-routed @(gd_event): its stable wire id (an FNV-1a hash of the event
+// name — the command-id law: reordering declarations never
 // renumbers the wire) and its decode thunk. scriptgen emits the package's
 // table; the generated lane_init installs it.
 Fact_Desc :: struct {
 	id:       u16, // never 0 — kind 0 on the wire means "the anchor set's tick fx"
-	audience: ksess.Net_Event_Audience, // zero = Everyone (legacy gd_cue/gd_fact)
+	audience: ksess.Net_Event_Audience,
 	fx:       Fx_Thunk, // entity = the anchor (nil for an anchorless world fact)
 }
 
@@ -447,10 +447,10 @@ lane_tracks_entity :: proc(l: ^Lane, entity: rawptr) -> bool {
 	return false
 }
 
-// Resolve between the two stable identities a generated cue needs. The
+// Resolve between the two stable identities a generated event needs. The
 // anchor itself rides SIM_FACT's header; any additional typed entity
-// parameters ride as Net_Id values in the cue tuple and are resolved again
-// when the receiving screen's watch clock presents the cue.
+// parameters ride as Net_Id values in the event tuple and are resolved again
+// when the receiving screen's watch clock presents the event.
 lane_entity_id :: proc(l: ^Lane, entity: rawptr) -> (knet.Net_Id, bool) {
 	for &tr in l.tracked {
 		if tr.entity == entity {
@@ -958,15 +958,9 @@ lane_track_set :: proc(
 		)
 	}
 	for &cmd in set.commands {
-		// Sim_Cmd itself fixes the execution model. Stamp it here as well so
-		// hand-built legacy literals (whose promoted Action_Desc.model omitted to
-		// the zero value) gain accurate shared metadata without a migration edit.
-		cmd.action.model = .Scheduled
+		assert(cmd.action.model == .Scheduled, "lane_track_set: sim actions declare model=.Scheduled")
 		assert(knet.action_desc_valid(cmd.action, .Scheduled), "lane_track_set: invalid scheduled action descriptor")
-		assert(
-			(cmd.exec != nil) != (cmd.exec_checked != nil),
-			"lane_track_set: each action needs exactly one bool or checked exec thunk",
-		)
+		assert(cmd.exec != nil, "lane_track_set: each action needs one typed exec thunk")
 	}
 	lane_track(l, id, entity, set.entity_desc, owner, allocator)
 	tr := &l.tracked[len(l.tracked) - 1]
@@ -1021,8 +1015,8 @@ lane_claimed :: proc(l: ^Lane, id: knet.Net_Id) -> f32 {
 }
 
 // Broadcast a fact to every screen that didn't simulate it live — the
-// generated thunks (an entity tick's mine-form `_fx`, a declared @(gd_cue)
-// door, or its compatible @(gd_fact) spelling) call this on the authority. Reliable (facts are one-shots, like
+// generated thunks (an entity tick's mine-form `_fx` or a sim-routed
+// @(gd_event) door) call this on the authority. Reliable (events are one-shots, like
 // verdicts). Receivers file it and fire the matching fx thunk when their
 // watch clock reaches `l.step_tick` — beside the delayed avatar that caused
 // it. `kind` 0 = an entity-tick fact (routed to the anchor set's fx); a
@@ -1078,7 +1072,7 @@ lane_fact :: proc(l: ^Lane, entity: rawptr, args: []u8, kind: u16 = 0) {
 	} else {
 		assert(
 			kind != 0,
-			"an entity-tick fact always has its entity — nil anchors belong to declared @(gd_fact) doors",
+			"an entity-tick event always has its entity — nil anchors belong to anchorless @(gd_event) doors",
 		)
 	}
 	skip := l.in_auth ? knet.PLAYER_ID_INVALID : owner

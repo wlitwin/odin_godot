@@ -113,7 +113,7 @@ The `entity=Player:1` tag associates wire type `1` with `Player` and generates:
 - `hello_net_entities`, which installs the entity factory;
 - `player_spawn`, `player_of`, `player_owned_by`, and `player_mine`;
 - typed `player_ref` handles plus one-pass `player_all` iteration
-  (`player_ids` remains available for ID-only code);
+  with `player_all` as the sole enumeration view;
 - spawn/free bookkeeping hooks; and
 - scalar probes used by the integration-test harness.
 

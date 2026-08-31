@@ -1719,21 +1719,17 @@ scan_half_procs :: proc(idx: ^map[string]Half_Candidate, path, src: string, file
 			)
 			continue
 		}
-		// @(gd_cue) / @(gd_fact) are the other side of the line: they DECLARE a
-		// presentation door (scriptgen generates its announce proc and claims a wire id for
-		// it) and merely requires its bearer be named `<event>_fx`. A half
+		// @(gd_event) is the other side of the line: it DECLARES a presentation
+		// door (scriptgen generates its announce proc and claims a wire id) and
+		// merely requires its bearer be named `<event>_fx`. A half
 		// declares nothing and generates nothing. Wearing both would ask
-		// resolve_facts to build a door and the unpaired sweep to demand a
+		// event resolution to build a door and the unpaired sweep to demand a
 		// partner for the same proc, so it is refused rather than resolved.
-		if has_attr(vd, "gd_cue") || has_attr(vd, "gd_fact") {
-			decl_attr := has_attr(vd, "gd_cue") ? "gd_cue" : "gd_fact"
+		if has_attr(vd, "gd_event") {
 			error_at(
 				Loc{path, name_ident.pos.line},
-				"%s: @(%s) and @(gd_half) are the two sides of one line — @(%s) declares the presentation door, while @(gd_half) pairs with a declaration made elsewhere. Drop @(gd_half): the `_fx` name is @(%s)'s own shape rule",
+				"%s: @(gd_event) declares the presentation door, while @(gd_half) pairs with a declaration made elsewhere. Drop @(gd_half): the `_fx` name is gd_event's own shape rule",
 				name_ident.name,
-				decl_attr,
-				decl_attr,
-				decl_attr
 			)
 			continue
 		}
@@ -2338,57 +2334,16 @@ build_command_info :: proc(
 		policy_max_args = 4096,
 	}
 	ok := true
-	access := "owner"
-	predict := false
-	access_set := false
-
-	for part in strings.split(config.legacy, ",") {
-		tok := strings.trim_space(part)
-		switch tok {
-		case "":
-		case "predict":
-			predict = true
-		case "owner":
-			if access_set {
-				error_at(loc, "command %s: access declared more than once", proc_name)
-				ok = false
-			}
-			access = "owner"
-			access_set = true
-		case "any_seat":
-			if access_set {
-				error_at(loc, "command %s: access declared more than once", proc_name)
-				ok = false
-			}
-			access = "any_seat"
-			access_set = true
-		case "authority":
-			if access_set {
-				error_at(loc, "command %s: access declared more than once", proc_name)
-				ok = false
-			}
-			access = "authority"
-			access_set = true
-		case:
-			error_at(loc, "command %s: unknown config token %q (expected `predict`, `owner`, `any_seat`, or `authority`)", proc_name, tok)
-			ok = false
-		}
+	if config.invalid_quote != "" {
+		error_at(
+			loc,
+			"command %s: quoted command policies were removed; use a typed knet.Action_Policy such as knet.ACTION_OWNER_PREDICTED or knet.ACTION_ANY_SEAT",
+			proc_name,
+		)
+		return cmd, false
 	}
 	if config.policy_expr != "" {
 		cmd.policy_expr = config.policy_expr
-	} else {
-		switch access {
-		case "owner":
-			cmd.policy_expr = predict ? "knet.ACTION_OWNER_PREDICTED" : "knet.ACTION_OWNER"
-		case "any_seat":
-			cmd.policy_expr = predict ? "knet.ACTION_ANY_SEAT_PREDICTED" : "knet.ACTION_ANY_SEAT"
-		case "authority":
-			if predict {
-				error_at(loc, "command %s: authority-only actions cannot be predicted by clients", proc_name)
-				ok = false
-			}
-			cmd.policy_expr = "knet.ACTION_AUTHORITY"
-		}
 	}
 	if pa, pp, pm, pok := wire_policy_shape(cmd.policy_expr); pok {
 		cmd.policy_access = pa
@@ -2797,7 +2752,7 @@ parse_step :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^as
 		return
 	}
 	if pt.results != nil {
-		error_at(loc, "step %s: no results — world-pass facts are state; entity ticks carry payloads", proc_name)
+		error_at(loc, "step %s: no results — world-pass presentation uses @(gd_event); entity ticks carry payloads", proc_name)
 		return
 	}
 	if authority {
@@ -2842,14 +2797,14 @@ flatten_param_types :: proc(src: string, pt: ^ast.Proc_Type) -> []string {
 // One top-level proc as the name index sees it: where it was written, and
 // whether it DECLARED itself a half. Two passes ask this index questions that
 // are the same question from opposite sides. The yield paths (census
-// accessors, acid probes, transport forwards, and the fact door that refuses
+// accessors, acid probes, transport forwards, and the event door that refuses
 // instead of yielding) ask "is this generated name already a real proc?" — the
 // answer is presence alone, which is why `half` is ignored there and a
 // deliberate override still yields in silence. The half passes ask "is the
 // name I just failed to find in the half index a real proc that simply never
 // said so?" — see demand_half. `half` is what keeps that second question
 // honest: a proc that DID wear @(gd_half) and was refused during collection
-// (a config value on the attribute, an @(gd_cue)/@(gd_fact) beside it) must never be
+// (a config value on the attribute, an @(gd_event) beside it) must never be
 // told to add the attribute it already has.
 Proc_Site :: struct {
 	loc:  Loc,
@@ -2931,7 +2886,6 @@ resolve_census :: proc(s: ^Script, taken: map[string]Proc_Site) {
 		e.gen_of = yield(taken, fmt.tprintf("%s_of", tsnake))
 		e.gen_owned = yield(taken, fmt.tprintf("%s_owned_by", tsnake))
 		e.gen_mine = yield(taken, fmt.tprintf("%s_mine", tsnake))
-		e.gen_ids = yield(taken, fmt.tprintf("%s_ids", tsnake))
 		e.gen_all = yield(taken, fmt.tprintf("%s_all", tsnake))
 		e.gen_spawn = yield(taken, fmt.tprintf("%s_spawn", tsnake))
 		e.gen_despawn = yield(taken, fmt.tprintf("%s_despawn", tsnake))
@@ -3426,17 +3380,14 @@ resolve_sim :: proc(scripts: []^Script) {
 	}
 }
 
-// A `@(gd_cue)` or legacy `@(gd_fact)` declaration found in the package scan —
-// a world-pass presentation proc held until resolve_facts (the lane owner isn't known
-// before resolve_sim settles it). Collected by ATTRIBUTE, not suffix, so a
-// misnamed declaration surfaces as a build error instead of a proc that
-// silently never fires.
+// A `@(gd_event)` declaration found in the package scan. Collected by
+// ATTRIBUTE, not suffix, so a misnamed declaration surfaces as a build error
+// instead of a proc that silently never fires.
 Fact_Candidate :: struct {
 	path: string,
 	line: int,
 	src:  string,
 	name: string,
-	attr: string, // gd_event, gd_cue, or gd_fact
 	pt:   ^ast.Proc_Type,
 	vd:   ^ast.Value_Decl
 }
@@ -3450,434 +3401,23 @@ scan_fact_procs :: proc(out: ^[dynamic]Fact_Candidate, path, src: string, file: 
 		if !is_proc {continue}
 		name_ident, _ := vd.names[0].derived.(^ast.Ident)
 		if name_ident == nil {continue}
-		has_event := has_attr(vd, "gd_event")
-		has_cue := has_attr(vd, "gd_cue")
-		has_fact :=has_attr(vd, "gd_fact")
-		if !has_event && !has_cue && !has_fact {continue}
+		if has_attr(vd, "gd_cue") || has_attr(vd, "gd_fact") {
+			error_at(
+				Loc{path = path, line = name_ident.pos.line},
+				"%s: gd_cue and gd_fact were removed; declare this presentation occurrence with @(gd_event)",
+				name_ident.name,
+			)
+			continue
+		}
+		if !has_attr(vd, "gd_event") {continue}
 		if pl.type == nil {continue}
 		append(out, Fact_Candidate{
 			path = path, line = name_ident.pos.line, src = src,
-			name = name_ident.name,
-				attr = has_event ? "gd_event" : (has_cue ? "gd_cue" : "gd_fact"), pt = pl.type, vd = vd
+			name = name_ident.name, pt = pl.type, vd = vd
 		})
 	}
 }
 
-// Resolve every `@(gd_cue)` declaration (and the compatible `@(gd_fact)`
-// spelling). The author writes ONE presentation proc,
-// `<event>_fx(game, entities…, mine, args…)`; scriptgen generates the announce
-// DOOR under the bare `<event>` name, and the door holds every gate the tick
-// facts already get: the
-// authority broadcasts (watchers fire on the watch clock, beside the delayed
-// avatar), the causer's live pass fires now (mine=true), a resim replay never
-// re-fires, screens with no part stay silent. An ANCHORED fact names an
-// entity param after the game — the watch-clock anchor, the mine derivation
-// (its tracked owner), and the despawn-drop all key on it. No anchor = a
-// WORLD fact: the authority alone causes it (mine=true on its screen), every
-// client presents it on the watch clock.
-resolve_facts :: proc(scripts: []^Script, decls: []Fact_Candidate, by_struct: map[string]^Script, taken: map[string]Proc_Site) {
-	if len(decls) == 0 {return}
-
-	// The lane owner resolve_sim settled: the class carrying @(gd_sample) or a
-	// lane-routed @(gd_step). Facts ride its lane's watch clock.
-	owner: ^Script
-	for s in scripts {
-		if len(s.samples) > 0 || s.step.proc_name != "" || (s.step_auth.proc_name != "" && !s.step_boot) {
-			owner = s
-			break
-		}
-	}
-
-	// The suffixes of names SCRIPTGEN ITSELF emits. A fact's announce door is a
-	// generated proc under the bare event name, so an event called `foo_events`
-	// would emit a second `foo_events` beside the session dispatch — a
-	// redeclaration error pointing at generated code the author never wrote.
-	//
-	// This list used to also carry the six PAIRING suffixes (`_then`, `_fx`,
-	// `_apply`, `_edge`, `_spawned`, `_freed`) and had to grow with every new
-	// pairing form. Those rows are gone because they were never the check that
-	// caught anything: a door colliding with a hand-written half is a collision
-	// with a REAL proc, which `taken` below catches by exact name and explains
-	// far better. What is left is the part `taken` cannot see — names that do
-	// not exist until generate() writes them.
-	GENERATED_SUFFIXES :: [?]string{"_cmd", "_spawn", "_step", "_events"}
-
-	for cand in decls {
-		if cand.attr == "gd_event" {continue} // resolved by resolve_net_events below
-		loc := Loc{path = cand.path, line = cand.line}
-		is_cue := cand.attr == "gd_cue"
-		label := is_cue ? "@(gd_cue)" : "@(gd_fact)"
-
-		if has_attr(cand.vd, "gd_cue") && has_attr(cand.vd, "gd_fact") {
-			error_at(
-				loc,
-				"%s: @(gd_cue) replaces @(gd_fact) at the authoring surface — use one declaration, not both",
-				cand.name
-			)
-			continue
-		}
-
-		cue_anchor := ""
-		cue_anchor_set := false
-		config_ok := true
-		config, _ := attr_value(cand.vd, cand.attr)
-		if is_cue {
-			for part in strings.split(config, ",") {
-				tok := strings.trim_space(part)
-				switch {
-				case tok == "" || tok == "everyone":
-				case strings.has_prefix(tok, "anchor="):
-					if cue_anchor_set {
-						error_at(loc, "%s: cue anchor declared more than once", cand.name)
-						config_ok = false
-						continue
-					}
-					cue_anchor = strings.trim_space(tok[len("anchor="):])
-					if cue_anchor == "" {
-						error_at(
-							loc,
-							"%s: `anchor=` needs an entity parameter name or `none`",
-							cand.name
-						)
-						config_ok = false
-					}
-					cue_anchor_set = true
-				case:
-					error_at(
-						loc,
-						"%s: unknown cue config token %q (expected `everyone`, `anchor=PARAM`, or `anchor=none`)",
-						cand.name,
-						tok
-					)
-					config_ok = false
-				}
-			}
-			if !config_ok {continue}
-		} else if config != "" {
-			error_at(loc,
-				"%s: @(gd_fact) takes no config; use @(gd_cue=\"anchor=PARAM\") for a named anchor", cand.name)
-			continue
-		}
-		if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_message") ||
-		   has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") ||
-		   has_attr(cand.vd, "gd_connect") ||
-		   has_attr(cand.vd, "gd_tick") || has_attr(cand.vd, "gd_step") || has_attr(cand.vd, "gd_sample") ||
-		   has_attr(cand.vd, "gd_half") {
-			error_at(loc,
-				"%s: %s is a plain presentation declaration — it never registers, ticks, or decides; drop the other attribute", cand.name,
-				label)
-			continue
-		}
-		if !strings.has_suffix(cand.name, "_fx") {
-			error_at(
-				loc,
-				"%s: a declared cue is presentation — name it `%s_fx`; the step announces through the generated bare `%s` door",
-				cand.name, cand.name, cand.name
-			)
-			continue
-		}
-		door := strings.trim_suffix(cand.name, "_fx")
-		if owner == nil {
-			error_at(
-				loc,
-				"%s: %s rides the sim lane's watch clock, and this package has no lane (no @(gd_sample)/@(gd_step)) — coop presentation is `_edge` halves and session events (net.md)",
-				cand.name,
-				label
-			)
-			continue
-		}
-
-		// The door is a generated proc under the bare event name — refuse the
-		// names that can't be it.
-		tick_clash := false
-		for s in scripts {
-			if s.tick.proc_name != "" && door == s.tick.proc_name {
-				error_at(
-					loc,
-					"%s: that is %s's tick `_fx` — an entity tick's facts already broadcast through its own channel (return them from the tick); %s is for world-pass cues",
-					cand.name, s.struct_name,
-					label
-				)
-				tick_clash = true
-				break
-			}
-		}
-		if tick_clash {continue}
-		reserved_clash := false
-		for suf in GENERATED_SUFFIXES {
-			if strings.has_suffix(door, suf) {
-				error_at(
-					loc,
-					"%s: the event name %q ends in %q, which scriptgen generates names with — the door would collide with generated code the author never wrote; rename the event",
-					cand.name, door, suf
-				)
-				reserved_clash = true
-				break
-			}
-		}
-		if reserved_clash {continue}
-		if _, hand := taken[door]; hand {
-			// THE ONE EXCEPTION to name-shadowing. Everywhere else in this
-			// language a hand-written proc of the generated name simply wins
-			// (census accessors, acid probes, the transport forwards — see
-			// note_yield). A fact door refuses, because it is not a convenience
-			// that can be re-implemented: the generated body is FOUR gates the
-			// caller has no way to reproduce from game code — it broadcasts the
-			// tuple through ksim.lane_fact only on the authority, fires the `_fx`
-			// half on the causer's LIVE pass with mine=true, fires it on every
-			// watching screen when that screen's watch clock reaches the fact's
-			// tick with mine=false, and stays silent through resim replays so a
-			// reconcile can't re-announce. A shadowing proc would compile, look
-			// right, and quietly present the event once, locally, on whoever
-			// happened to call it. So it is named, not yielded to.
-			error_at(
-				loc,
-				"%s: `%s` is the GENERATED announce door's name and a proc already claims it — rename the hand-written `%s`. Unlike the census/probe/forward names (a same-named proc there simply wins), the door can't be yielded: its body holds the authority-broadcast, the mine=true live fire, the watch-clock fire on watching screens, and the resim silence — gates no hand-written proc can reproduce",
-				cand.name, door, door
-			)
-			continue
-		}
-		if cmd_wire_id(door) == 0 {
-			error_at(loc, "%s: the event name hashes to the reserved fact kind 0 — rename the event", cand.name)
-			continue
-		}
-
-		// Legacy fact shape: (game[, anchor], mine, wire args…). Cue shape:
-		// (game[, entity refs…], mine, wire args…). A cue infers its sole entity
-		// ref as the anchor; with several refs, `anchor=PARAM` chooses the one
-		// whose presentation clock and owner derive timing and `mine`.
-		if cand.pt.results != nil {
-			error_at(loc,
-				"%s: a cue presents, it decides nothing — no results (consequences belong to verbs and ticks)", cand.name)
-			continue
-		}
-		types := make([dynamic]string, context.temp_allocator)
-		names := make([dynamic]string, context.temp_allocator)
-		if cand.pt.params != nil {
-			for f in cand.pt.params.list {
-				t := strings.trim_space(node_text(cand.src, f.type))
-				for ni in 0 ..< max(1, len(f.names)) {
-					append(&types, t)
-					nm := ""
-					if ni < len(f.names) {
-						if ident, iok := f.names[ni].derived.(^ast.Ident); iok && ident != nil {
-							nm = ident.name
-						}
-					}
-					append(&names, nm)
-				}
-			}
-		}
-		game_type := fmt.tprintf("^%s", owner.struct_name)
-		if !(len(types) > 0 && types[0] == game_type) {
-			error_at(
-				loc,
-				"%s: the first param is the game — `g: %s` (the lane owner; the generated door threads it via lane_game)",
-				cand.name, game_type
-			)
-			continue
-		}
-		info := Fact_Info {
-			name         = door,
-			fx_proc      = cand.name,
-			game         = owner.struct_name,
-			anchor_index = -1,
-			line         = cand.line,
-			path         = cand.path
-		}
-		at := 1
-		shape_ok := true
-		if is_cue {
-			mine_at := -1
-			for i in 1 ..< len(types) {
-				if types[i] == "bool" && names[i] == "mine" {
-					mine_at = i
-					break
-				}
-			}
-			if mine_at < 0 {
-				error_at(
-					loc,
-					"%s: `mine: bool` is required after the cue's entity parameters and before its wire arguments",
-					cand.name
-				)
-				continue
-			}
-			for i in 1 ..< mine_at {
-				if !strings.has_prefix(types[i], "^") {
-					error_at(
-						loc,
-						"%s: parameter %q before `mine` is not an entity pointer — put entity refs before `mine` and wire arguments after it",
-						cand.name,
-						names[i]
-					)
-					shape_ok = false
-					break
-				}
-				target := types[i][1:]
-				if target == owner.struct_name {
-					error_at(
-						loc,
-						"%s: the game parameter cannot also be a cue entity reference",
-						cand.name
-					)
-					shape_ok = false
-					break
-				}
-				target_script, is_script := by_struct[target]
-				if !is_script {
-					error_at(
-						loc,
-						"%s: cue entity parameter `%s` has type %s, which is not a script class in this package",
-						cand.name,
-						names[i],
-						types[i]
-					)
-					shape_ok = false
-					break
-				}
-				if target_script.tick.proc_name == "" && len(target_script.block_ticks) == 0 {
-					error_at(
-						loc,
-						"%s: cue entity parameter `%s` is %s, which is not tracked by the simulation lane — pass its knet.Net_Id or presentation coordinates as wire arguments instead",
-						cand.name,
-						names[i],
-						target
-					)
-					shape_ok = false
-					break
-				}
-				entity_name := names[i] != "" ? names[i] : fmt.tprintf("entity%d", i - 1)
-				if entity_name == "l" {
-					error_at(
-						loc,
-						"%s: `l` is the generated door's lane param — rename the entity parameter",
-						cand.name
-					)
-					shape_ok = false
-					break
-				}
-				append(&info.entity_names, entity_name)
-				append(&info.entity_types, target)
-			}
-			if !shape_ok {continue}
-
-			switch {
-			case cue_anchor_set && cue_anchor == "none":
-			// Explicit world/authority clock; every entity ref rides in the tuple.
-			case cue_anchor_set:
-				for entity_name, i in info.entity_names {
-					if entity_name == cue_anchor {
-						info.anchor_index = i
-						break
-					}
-				}
-				if info.anchor_index < 0 {
-					error_at(
-						loc,
-						"%s: `anchor=%s` does not name one of the cue's entity parameters",
-						cand.name,
-						cue_anchor
-					)
-					continue
-				}
-			case len(info.entity_names) == 0:
-			// Anchorless world cue.
-			case len(info.entity_names) == 1:
-				info.anchor_index = 0
-			case:
-				error_at(
-					loc,
-					"%s: the cue has %d entity parameters — choose the presentation timeline with `anchor=PARAM` (or `anchor=none` for the authority/world clock)",
-					cand.name,
-					len(info.entity_names)
-				)
-				continue
-			}
-			at = mine_at + 1
-		} else {
-			// Preserve @(gd_fact)'s original positional contract exactly.
-		if len(types) > at && strings.has_prefix(types[at], "^") {
-			target := types[at][1:]
-			if target == owner.struct_name {
-				error_at(loc,
-						"%s: the game is not an anchor — a world fact just omits the param", cand.name)
-				continue
-			}
-			if _, is_script := by_struct[target]; !is_script {
-				error_at(
-					loc,
-						"%s: anchor `%s` is not a script class in this package",
-					cand.name, types[at]
-				)
-				continue
-			}
-			anchor_param := names[at] != "" ? names[at] : "anchor"
-				append(&info.entity_names, anchor_param)
-				append(&info.entity_types, target)
-				info.anchor_index = 0
-			at += 1
-		}
-		if !(len(types) > at && types[at] == "bool" && names[at] == "mine") {
-			error_at(
-				loc,
-					"%s: `mine: bool` comes after the game or anchor parameter",
-				cand.name
-			)
-			continue
-		}
-		at += 1
-		}
-		if
-
-		info.anchor_index >= 0{
-			info.
-			anchor = info.entity_types[info.anchor_index]
-			info. anchor_param = info.entity_names[info.anchor_index]
-		}
-		args_ok := true
-		for i in at ..< len(types) {
-			wire, _, wok := command_wire_type(types[i])
-			if !wok {
-				error_at(
-					loc,
-					"%s: the cue tuple crosses the wire to watching screens, and %q is not a wire primitive (fixed-width ints, f32/f64, bool, string, knet.Net_Id, knet.Player_Id)",
-					cand.name, types[i]
-				)
-				args_ok = false
-				break
-			}
-			if names[i] == "l" {
-				error_at(loc, "%s: `l` is the generated door's lane param — rename yours", cand.name)
-				args_ok = false
-				break
-			}
-			append(&info.arg_names, names[i] != "" ? names[i] : fmt.tprintf("a%d", i - at))
-			append(&info.arg_types, types[i])
-			append(&info.arg_wires, wire)
-		}
-		if !args_ok {continue}
-
-		// One event, one door: a second declaration of the same name (any
-		// file) or a u16 hash collision is fatal on the wire — name both.
-		dup := false
-		for f in owner.facts {
-			if f.name == door {
-				error_at(loc, "%s: fact %q is already declared at %s:%d — one door per event", cand.name, door, f.path, f.line)
-				dup = true
-				break
-			}
-			if cmd_wire_id(f.name) == cmd_wire_id(door) {
-				error_at(loc, "facts %q and %q collide on wire id 0x%x — rename one event", f.name, door, cmd_wire_id(door))
-				dup = true
-				break
-			}
-		}
-		if dup {continue}
-
-		append(&owner.facts, info)
-	}
-}
 
 // Pair a game shell's SESSION EVENT halves — the name-paired replacement for
 // the event-drain switch. For each SESSION_EVENTS row the game may declare:
@@ -4475,10 +4015,10 @@ attr_value :: proc(vd: ^ast.Value_Decl, name: string) -> (string, bool) {
 	return "", false
 }
 
-// Read @(gd_command=...) without erasing its type. Quoted comma strings are
-// retained only for source compatibility; every other expression is copied
-// verbatim into the generated knet.Action_Policy constant, where Odin type-
-// checks it. A bare marker resolves later to ACTION_OWNER.
+// Read @(gd_command=...) without erasing its type. Every configured expression
+// is copied verbatim into the generated knet.Action_Policy constant, where Odin
+// type-checks it. Quoted values survive only as a rejected-form diagnostic. A
+// bare marker resolves later to ACTION_OWNER.
 command_config :: proc(vd: ^ast.Value_Decl, src: string) -> Command_Config {
 	for attr in vd.attributes {
 		for elem in attr.elems {
@@ -4488,7 +4028,7 @@ command_config :: proc(vd: ^ast.Value_Decl, src: string) -> Command_Config {
 			if !iok || ident.name != "gd_command" {continue}
 			raw := strings.trim_space(node_text(src, fv.value))
 			if len(raw) >= 2 && (raw[0] == '"' || raw[0] == '`') {
-				return Command_Config{legacy = strings.trim(raw, "\"`")}
+				return Command_Config{invalid_quote = raw}
 			}
 			return Command_Config{policy_expr = raw}
 		}
@@ -5104,7 +4644,7 @@ classify_backup :: proc(type_text: string) -> (kind: Backup_Kind, key: string, e
 lane_options :: proc(lane: decl.Lane) -> string {
 	switch lane {
 	case .Owner:
-		return "`snap`, `interp`, `interp=angle`, `interp=BLEND_PROC`, `wire=f16`, or `wire=CODEC`"
+		return "`snap`, `interp=angle`, `interp=BLEND_PROC`, `wire=f16`, or `wire=CODEC`"
 	case .Predict:
 		return "`interp`, `interp=angle`, `interp=BLEND_PROC`, `slack=N`, `glide=N`, `cut=N`, `wire=f16`, or `wire=CODEC`"
 	case .Delta, .None:
@@ -5322,6 +4862,15 @@ parse_replicate_info :: proc(
 			}
 			snap_requested = true
 		case "interp":
+			if lane == .Owner {
+				error_at(
+					floc,
+					"%s.%s: bare `interp` is redundant on the owner lane and was removed; continuous `gd:\"owner\"` fields interpolate automatically (drop `interp`, or use `snap` to opt out)",
+					struct_name,
+					field_label,
+				)
+				continue
+			}
 			rep.interp = true
 		case "":
 		case:

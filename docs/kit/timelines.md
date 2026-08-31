@@ -137,7 +137,7 @@ These rules apply across the models:
    not the physics server's current-frame transforms.
 
 `kit/net` exposes edge halves for reliable replicated changes. `kit/sim` exposes
-tick facts and declared facts so presentation can run once on the appropriate
+tick payloads and declared events so presentation can run once on the appropriate
 clock without firing during resimulation.
 
 ## Authority is not the same as security

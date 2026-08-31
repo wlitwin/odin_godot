@@ -68,6 +68,10 @@ TESTS=(
     # Golden test for scriptgen's nested replicated/tagged-field discovery (same-package,
     # imported bundles, and the loud plain-nesting guardrail) — drives the binary, no Godot.
 	"scriptgen|SCRIPTGEN_OK|tests/scriptgen/run.sh"
+	# Breaking API guard: retired event attributes, quoted command policies,
+	# redundant owner interpolation, ID-only census views, and boolean action
+	# aliases must all stay rejected/absent.
+	"authorsurface|AUTHOR_SURFACE_OK|tests/author_surface/run.sh"
 	# Cross-platform build policy: cache invalidation, isolated/atomic publication,
 	# failure + stale cleanup, and concurrent builds. Bash always runs; PowerShell runs
 	# when available (the dedicated .#build-parity shell supplies it).

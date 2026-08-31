@@ -1,9 +1,10 @@
 package scriptgen
 
-// @(gd_event) resolution. The declaration deliberately shares the authored
-// presentation shape with @(gd_cue), but chooses its existing runtime from the
-// anchor: sim-tracked anchors become watch-clock facts; cooperative entities
-// and explicit static/immediate occurrences become session net events.
+// @(gd_event) resolution. The anchor selects the existing runtime:
+// sim-tracked anchors become watch-clock events; cooperative entities and
+// explicit static/immediate occurrences become session net events. An
+// anchorless event in a lane-owning game also selects the watch clock unless
+// it explicitly requests immediate timing.
 
 import "core:fmt"
 import "core:odin/ast"
@@ -58,9 +59,8 @@ net_event_audience_expr :: proc(audience: string) -> string {
 	return ".Everyone"
 }
 
-// Resolve new declarations after resolve_sim has classified every entity and
-// identified the lane owner. Existing gd_cue/gd_fact declarations remain in
-// resolve_facts unchanged.
+// Resolve declarations after resolve_sim has classified every entity and
+// identified the lane owner.
 resolve_net_events :: proc(
 	scripts: []^Script,
 	decls: []Fact_Candidate,
@@ -69,12 +69,7 @@ resolve_net_events :: proc(
 ) {
 	GENERATED_SUFFIXES :: [?]string{"_cmd", "_spawn", "_step", "_events", "_event_routes"}
 	for cand in decls {
-		if cand.attr != "gd_event" {continue}
 		loc := Loc{path = cand.path, line = cand.line}
-		if has_attr(cand.vd, "gd_cue") || has_attr(cand.vd, "gd_fact") {
-			error_at(loc, "%s: use one presentation declaration — @(gd_event), @(gd_cue), or legacy @(gd_fact), never more than one", cand.name)
-			continue
-		}
 		if has_attr(cand.vd, "gd_command") || has_attr(cand.vd, "gd_message") ||
 		   has_attr(cand.vd, "gd_method") || has_attr(cand.vd, "gd_rpc") ||
 		   has_attr(cand.vd, "gd_connect") || has_attr(cand.vd, "gd_tick") ||
@@ -230,7 +225,9 @@ resolve_net_events :: proc(
 
 		anchor_script: ^Script
 		if anchor_index >= 0 {anchor_script = by_struct[entity_types[anchor_index]]}
-		sim_route := anchor_script != nil && (anchor_script.tick.proc_name != "" || len(anchor_script.block_ticks) > 0)
+		sim_route :=
+			(anchor_script != nil && (anchor_script.tick.proc_name != "" || len(anchor_script.block_ticks) > 0)) ||
+			(anchor_index < 0 && game.lane_fields == 1 && timing != "immediate")
 		if sim_route {
 			if timing == "immediate" {
 				error_at(loc, "%s: a sim-tracked anchor presents on its watch clock; use timing=auto/anchored (immediate sim events are intentionally not inferred)", cand.name)
@@ -301,7 +298,7 @@ resolve_net_events :: proc(
 				anchor_index = anchor_index, entity_names = entity_names,
 				entity_types = entity_types, arg_names = arg_names,
 				arg_types = arg_types, arg_wires = arg_wires,
-				audience = audience, boot_door = true,
+				audience = audience,
 				line = cand.line, path = cand.path,
 			}
 			if anchor_index >= 0 {
@@ -311,7 +308,7 @@ resolve_net_events :: proc(
 			dup := false
 			for f in game.facts {
 				if f.name == door || cmd_wire_id(f.name) == cmd_wire_id(door) {
-					error_at(loc, "%s: sim event %q duplicates/collides with cue %q at %s:%d", cand.name, door, f.name, f.path, f.line)
+					error_at(loc, "%s: sim event %q duplicates/collides with event %q at %s:%d", cand.name, door, f.name, f.path, f.line)
 					dup = true
 					break
 				}

@@ -320,7 +320,7 @@ Runner :: struct {
 <section id="recipes">
 <h2>5 · Recipes</h2>
 <h3>The 7-slot recipe <span class="d">(where each part of a behavior lives)</span></h3>
-<p>① <b>State</b> — replicated field / play.Machine · ② <b>Cadence</b> — play.Pace (client wall-clock pacer when cooldown &lt; RTT) · ③ <b>Intent</b> — @(gd_command) · ④ <b>Authority</b> — command hook + host_*_tick · ⑤ <b>Prediction</b> — predict body (only what's deterministic from shared inputs) · ⑥ <b>Reconcile</b> — snap on host TRANSITIONS, not every frame · ⑦ <b>Cue</b> — Edge/step → anim/marker/sfx (never decide there). An item's shape IS which slots it skips: gun fills all 7; revive skips ⑤⑥; mob brain is host-only (skips ③⑤⑥); match phase = one singleton Machine; pickup = proximity scan (no command).</p>
+<p>① <b>State</b> — replicated field / play.Machine · ② <b>Cadence</b> — play.Pace (client wall-clock pacer when cooldown &lt; RTT) · ③ <b>Intent</b> — @(gd_command) · ④ <b>Authority</b> — command hook + host_*_tick · ⑤ <b>Prediction</b> — predict body (only what's deterministic from shared inputs) · ⑥ <b>Reconcile</b> — snap on host TRANSITIONS, not every frame · ⑦ <b>Presentation</b> — Edge/step → anim/marker/sfx (never decide there). An item's shape IS which slots it skips: gun fills all 7; revive skips ⑤⑥; mob brain is host-only (skips ③⑤⑥); match phase = one singleton Machine; pickup = proximity scan (no command).</p>
 <div class="cols"><div>
 <h3>Replicated entity</h3>
 <pre>//gd:extends Node2D

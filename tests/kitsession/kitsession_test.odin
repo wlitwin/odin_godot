@@ -850,7 +850,7 @@ world_over_the_session :: proc(t: ^testing.T) {
 	// executes, confirm event drains the pending.
 	knet.command_begin(&alice.s.ctx, id, BOT_HIT)
 	knet.write_i32(&alice.s.ctx.msg, 3)
-	confirm_issue := knet.command_issue_checked(&alice.s.ctx, abot, &bot_command_set, BOT_HIT)
+	confirm_issue := knet.command_issue(&alice.s.ctx, abot, &bot_command_set, BOT_HIT)
 	testing.expect(t, confirm_issue.prediction_applied)
 	confirm_receipt := ksess.session_action_receipt(
 		&alice.s,
@@ -868,7 +868,7 @@ world_over_the_session :: proc(t: ^testing.T) {
 	hev := drain(&host.s)
 	exec_ok := false
 	for ev in hev {
-		if ex, ok := ev.(ksess.Ev_Command_Executed); ok && ex.ok {
+		if ex, ok := ev.(ksess.Ev_Command_Executed); ok && ex.reason == .None {
 			exec_ok = true
 		}
 	}
@@ -888,7 +888,7 @@ world_over_the_session :: proc(t: ^testing.T) {
 	// still settles it (and the event names the entity).
 	knet.command_begin(&alice.s.ctx, id, BOT_HIT)
 	knet.write_i32(&alice.s.ctx.msg, 5)
-	reject_issue := knet.command_issue_checked(&alice.s.ctx, abot, &bot_command_set, BOT_HIT)
+	reject_issue := knet.command_issue(&alice.s.ctx, abot, &bot_command_set, BOT_HIT)
 	testing.expect(t, reject_issue.sent)
 	testing.expect(t, !reject_issue.prediction_applied)
 	reject_receipt := ksess.session_action_receipt(
@@ -2838,7 +2838,7 @@ type_hooks_route_and_catch_all_falls_back :: proc(t: ^testing.T) {
 	abot := alice.bots[id]
 	knet.command_begin(&alice.s.ctx, id, BOT_HIT)
 	knet.write_i32(&alice.s.ctx.msg, 3)
-	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, BOT_HIT))
+	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, BOT_HIT).prediction_applied)
 	step(boxes, &now)
 	testing.expect_value(t, len(typed.calls), 1)
 	testing.expect_value(t, typed.calls[0], u64(id) << 16 | u64(u16(BOT_HIT)))
@@ -3431,7 +3431,7 @@ write_guard_names_a_client_rogue_write :: proc(t: ^testing.T) {
 	// Coop speculation is exempt while pending, blessed once it settles.
 	knet.command_begin(&alice.s.ctx, id, BOT_HIT)
 	knet.write_i32(&alice.s.ctx.msg, 3)
-	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, BOT_HIT))
+	testing.expect(t, knet.command_issue(&alice.s.ctx, abot, &bot_command_set, BOT_HIT).prediction_applied)
 	_, _, _, dirty = knet.registry_write_guard(&alice.s.reg, &alice.s.ctx)
 	testing.expect(t, !dirty, "an in-flight prediction is legal divergence")
 	pump(boxes) // the confirm lands and blesses the speculative bytes

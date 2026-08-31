@@ -12,7 +12,7 @@ import ksess "godot:kit/session"
 import psim "godot:play/sim"
 
 // The census hooks, down to the game-shaped lines — the generated queries
-// (kicker_of / kicker_ids / kicker_owned_by, kboot.boot_entity_owner) answer
+// (kicker_of / kicker_all / kicker_owned_by, kboot.boot_entity_owner) answer
 // everything the old three maps did.
 @(gd_half)
 kicker_spawned :: proc(game: ^Claimball, self: ^Kicker, id: knet.Net_Id, owner: knet.Player_Id) {

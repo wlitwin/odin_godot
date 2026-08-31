@@ -450,14 +450,14 @@ take_cmd :: proc(b: ^Peer_Box, chest: knet.Net_Id, slot: u8, count: u16, px, py:
 	knet.write_u16(&b.s.ctx.msg, count)
 	knet.write_f32(&b.s.ctx.msg, px)
 	knet.write_f32(&b.s.ctx.msg, py)
-	return knet.command_issue(&b.s.ctx, b.chests[chest], &chest_set, CHEST_TAKE)
+	return knet.command_issue(&b.s.ctx, b.chests[chest], &chest_set, CHEST_TAKE).prediction_applied
 }
 
 toggle_cmd :: proc(b: ^Peer_Box, door: knet.Net_Id, px, py: f32) -> bool {
 	knet.command_begin(&b.s.ctx, door, DOOR_TOGGLE)
 	knet.write_f32(&b.s.ctx.msg, px)
 	knet.write_f32(&b.s.ctx.msg, py)
-	return knet.command_issue(&b.s.ctx, b.doors[door], &door_set, DOOR_TOGGLE)
+	return knet.command_issue(&b.s.ctx, b.doors[door], &door_set, DOOR_TOGGLE).prediction_applied
 }
 
 // Every gem this peer can see, anywhere in the world — conservation checks.
@@ -480,14 +480,14 @@ gems_in_view :: proc(b: ^Peer_Box) -> int {
 drop_cmd :: proc(b: ^Peer_Box, avatar: knet.Net_Id, slot: u8) -> bool {
 	knet.command_begin(&b.s.ctx, avatar, SPEL_DROP)
 	knet.write_u8(&b.s.ctx.msg, slot)
-	return knet.command_issue(&b.s.ctx, b.spelunkers[avatar], &spel_set, SPEL_DROP)
+	return knet.command_issue(&b.s.ctx, b.spelunkers[avatar], &spel_set, SPEL_DROP).prediction_applied
 }
 
 grab_cmd :: proc(b: ^Peer_Box, pickup: knet.Net_Id, px, py: f32) -> bool {
 	knet.command_begin(&b.s.ctx, pickup, PICKUP_GRAB)
 	knet.write_f32(&b.s.ctx.msg, px)
 	knet.write_f32(&b.s.ctx.msg, py)
-	return knet.command_issue(&b.s.ctx, b.pickups[pickup], &pickup_set, PICKUP_GRAB)
+	return knet.command_issue(&b.s.ctx, b.pickups[pickup], &pickup_set, PICKUP_GRAB).prediction_applied
 }
 
 // ---- tests -----------------------------------------------------------------------
@@ -582,7 +582,7 @@ out_of_reach_never_flickers :: proc(t: ^testing.T) {
 	saw_reject := false
 	for ev in hev {
 		if ex, ok := ev.(ksess.Ev_Command_Executed); ok {
-			testing.expect(t, !ex.ok)
+			testing.expect_value(t, ex.reason, knet.Action_Reject_Reason.Predicate)
 			testing.expect_value(t, ex.player, cv.bob.s.me)
 			testing.expect_value(t, ex.entity, cv.chest_id)
 			saw_reject = true

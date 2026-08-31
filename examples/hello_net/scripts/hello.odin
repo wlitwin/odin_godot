@@ -40,7 +40,7 @@ HelloNet :: struct {
 
 	// THE declaration: this exported scene bodies a replicated entity. The
 	// tag mints the wire id, the factory, typed player_spawn(), the census
-	// (player_mine / player_of / player_ids), and the acid probes.
+	// (player_mine / player_of / player_all), and the acid probes.
 	player_scene: ^gd.Resource `gd:"entity=Player:1"`,
 
 	me: ^Player, // my avatar (set by the census hook in player.odin)

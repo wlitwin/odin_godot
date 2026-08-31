@@ -142,7 +142,7 @@ regardless of loss, fire it from an **authority** world pass
 (`@(gd_step="authority")`) instead of the entity tick: an authority-minted
 fact includes the owner by construction.
 
-### Cues produced by a world pass
+### Events produced by a world pass
 
 Use `@(gd_event)` for a presentation event discovered outside a single
 entity's tick, such as contact between a player and a ball. A sim-tracked
@@ -170,7 +170,8 @@ instances, `anchor=enemy` means "use the `enemy` pointer passed to this call."
 
 Anchor selection is intentionally small:
 
-- No entity parameters means a world cue. The authority is its local producer.
+- No entity parameters means a world event. In a lane-owning game, `timing=auto`
+  selects the watch clock and the authority is its local producer.
 - One entity parameter is the inferred anchor.
 - With two or more entity parameters, name one parameter explicitly, such as
   `@(gd_event="anchor=target,timing=auto")`.
@@ -184,12 +185,11 @@ pointer before presentation. Arguments after `mine` must be wire primitives.
 Scriptgen rejects ambiguous anchors, names that are not entity parameters, and
 untracked entity types at build time.
 
-Announce an anchored cue before untracking or despawning its anchor; otherwise
-the generated corpse gate rejects it and no peer presents it. A predicted cue
+Announce an anchored event before untracking or despawning its anchor; otherwise
+the generated corpse gate rejects it and no peer presents it. A predicted event
 that the authority never confirms may still appear locally. Speedball's kick is
-the worked example. `@(gd_cue)` and `@(gd_fact)` remain source-compatible
-sim-only spellings with their older `^Lane` announcement door; new
-cross-model presentation uses `@(gd_event)` and `^Boot`.
+the worked example. `@(gd_event)` and its generated `^Boot` door are the sole
+declared presentation-event surface for both session and simulation clocks.
 
 For the rare inline probe that should not be a fact at all (a debug print in
 a tick body), gate on `ksim.lane_live(&lane)`: it reflects the live pass, not

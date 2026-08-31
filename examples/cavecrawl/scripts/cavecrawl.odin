@@ -629,7 +629,6 @@ cave_lobby_state_applied :: proc(self: ^CaveLobby, entities: int) {
 @(gd_half)
 cave_lobby_command_executed :: proc(
 	self: ^CaveLobby,
-	ok: bool,
 	player: knet.Player_Id,
 	entity: knet.Net_Id,
 	cmd: u16,
@@ -639,7 +638,7 @@ cave_lobby_command_executed :: proc(
 ) {
 	_, _, _ = player, seq, model
 	gd.print_str(
-		fmt.tprintf("CAVE_EXEC ok=%v reason=%v entity=%d cmd=%d", ok, reason, u32(entity), cmd),
+		fmt.tprintf("CAVE_EXEC ok=%v reason=%v entity=%d cmd=%d", reason == .None, reason, u32(entity), cmd),
 	)
 }
 

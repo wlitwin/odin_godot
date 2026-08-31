@@ -439,7 +439,7 @@ run_check_overlay :: proc(
     // diagnostic silently filters out and validate reports a broken buffer
     // CLEAN. The parser wants machine-readable output; ask for it.
     check := fmt.ctprintf(
-		"NO_COLOR=1 %s check %s -collection:godot=%s -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_input -custom-attribute:gd_sample -custom-attribute:gd_step -custom-attribute:gd_event -custom-attribute:gd_cue -custom-attribute:gd_fact -custom-attribute:gd_half -custom-attribute:gd_message > %s 2>&1",
+		"NO_COLOR=1 %s check %s -collection:godot=%s -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect -custom-attribute:gd_rpc -custom-attribute:gd_command -custom-attribute:gd_tick -custom-attribute:gd_input -custom-attribute:gd_sample -custom-attribute:gd_step -custom-attribute:gd_event -custom-attribute:gd_half -custom-attribute:gd_message > %s 2>&1",
         shell_quote(odin_bin, context.temp_allocator),
         q_pkg_ov,
         shell_quote(root, context.temp_allocator),

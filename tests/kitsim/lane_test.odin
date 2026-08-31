@@ -63,7 +63,7 @@ Lane_Box :: struct {
 	fx_mine:         bool,
 	fx_x:            f32, // the fact's wire-decoded payload
 
-	// declared world-pass fact probe (@(gd_fact) doors): one recorder slot
+	// declared sim-event probe (@(gd_event) doors): one recorder slot
 	// per kind under test — calls, the mine bit, the watch clock at fire,
 	// and whether the thunk saw a nil entity (the anchorless form)
 	df_calls:        [6]int,
@@ -885,19 +885,19 @@ mover_surge_exec :: proc(
 	args: []u8,
 	lane: ^ksim.Lane,
 	by: knet.Player_Id,
-) -> bool {
+) -> knet.Action_Reject_Reason {
 	m := cast(^Mover)entity
-	if m.hp <= 0 {return false}
+	if m.hp <= 0 {return .Predicate}
 	m.hp -= 1
 	m.x += 50
-	return true
+	return .None
 }
 
 @(test)
 lane_rejects_replayed_bounded_and_stale_authority_traffic :: proc(t: ^testing.T) {
 	desc := mover_desc()
 	cmds := [?]ksim.Sim_Cmd {
-		{id = 0, exec = mover_surge_exec, policy = {prediction = .Optimistic, max_args_bytes = 8}},
+		{id = 0, model = .Scheduled, exec = mover_surge_exec, policy = {prediction = .Optimistic, max_args_bytes = 8}},
 	}
 	set := ksim.Sim_Set {
 		entity_desc = &desc,
@@ -1110,7 +1110,7 @@ lane_rewind_envelope_uses_authority_link_evidence :: proc(t: ^testing.T) {
 lane_action_byte_budget_is_per_seat_and_refills :: proc(t: ^testing.T) {
 	desc := mover_desc()
 	cmds := [?]ksim.Sim_Cmd {
-		{id = 0, exec = mover_surge_exec, policy = knet.ACTION_ANY_SEAT_PREDICTED},
+		{id = 0, model = .Scheduled, exec = mover_surge_exec, policy = knet.ACTION_ANY_SEAT_PREDICTED},
 	}
 	set := ksim.Sim_Set {
 		entity_desc = &desc,
@@ -1189,8 +1189,8 @@ lane_action_byte_budget_is_per_seat_and_refills :: proc(t: ^testing.T) {
 lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 	desc := mover_desc()
 	cmds := [?]ksim.Sim_Cmd {
-		{id = 0, exec = mover_surge_exec, policy = knet.ACTION_OWNER_PREDICTED},
-		{id = 1, exec = mover_surge_exec, policy = knet.ACTION_OWNER},
+		{id = 0, model = .Scheduled, exec = mover_surge_exec, policy = knet.ACTION_OWNER_PREDICTED},
+		{id = 1, model = .Scheduled, exec = mover_surge_exec, policy = knet.ACTION_OWNER},
 	}
 	set := ksim.Sim_Set {
 		entity_desc = &desc,
@@ -1246,7 +1246,7 @@ lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 	alice.movers[20].hp = 1 // state; the delta WALK is kit/net's job, absent here)
 
 	// 1) SPECULATION: the effect lands on alice's screen before any round trip.
-	testing.expect(t, ksim.lane_command(&alice.lane, 20, 0, nil), "the verb schedules")
+	testing.expect(t, ksim.lane_command(&alice.lane, 20, 0, nil).scheduled, "the verb schedules")
 	ksim.lane_frame(&alice.lane, DT) // executes at her next tick — nothing delivered yet
 	testing.expect_value(t, alice.movers[20].x, f32(50))
 	testing.expect_value(t, alice.movers[20].hp, i32(0))
@@ -1267,7 +1267,7 @@ lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 	// 2) HONEST REJECTION: an empty purse says no on both timelines; nothing moves.
 	testing.expect(
 		t,
-		ksim.lane_command(&alice.lane, 20, 0, nil),
+		ksim.lane_command(&alice.lane, 20, 0, nil).scheduled,
 		"a rejectable verb still schedules",
 	)
 	settle(boxes, 90)
@@ -1288,7 +1288,7 @@ lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 	// the authority's truth says no. Her speculation applies, the verdict
 	// unwinds the delta-lane write, the reconcile scrubs the predicted one.
 	alice.movers[20].hp = 1 // stale client-side delta state, deliberately
-	testing.expect(t, ksim.lane_command(&alice.lane, 20, 0, nil), "schedules on stale state")
+	testing.expect(t, ksim.lane_command(&alice.lane, 20, 0, nil).scheduled, "schedules on stale state")
 	ksim.lane_frame(&alice.lane, DT)
 	testing.expect_value(t, alice.movers[20].x, f32(100)) // speculated
 	testing.expect_value(t, alice.movers[20].hp, i32(0))
@@ -1301,7 +1301,7 @@ lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 	// 4) The AUTHORITY's own verb: no wire, no speculation — its execution is
 	// the truth, and the watched view carries it to every client.
 	host.movers[10].hp = 1
-	testing.expect(t, ksim.lane_command(&host.lane, 10, 0, nil), "the host schedules its own verb")
+	testing.expect(t, ksim.lane_command(&host.lane, 10, 0, nil).scheduled, "the host schedules its own verb")
 	settle(boxes, 90)
 	testing.expect_value(t, host.movers[10].x, f32(50))
 	testing.expect(t, near(alice.movers[10].x, 50), "the watched view carried the verb") // blended
@@ -1314,7 +1314,7 @@ lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 	before := alice.movers[20].x
 	testing.expect(
 		t,
-		ksim.lane_command(&alice.lane, 20, 1, nil),
+		ksim.lane_command(&alice.lane, 20, 1, nil).scheduled,
 		"the non-predicted verb schedules",
 	)
 	ksim.lane_frame(&alice.lane, DT)
@@ -1329,7 +1329,7 @@ lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 	// the pipe beyond the lane horizon and inspect the same callback surface.
 	host.movers[20].hp = 1
 	alice.movers[20].hp = 1
-	issue := ksim.lane_command_checked(&alice.lane, 20, 1, nil)
+	issue := ksim.lane_command(&alice.lane, 20, 1, nil)
 	testing.expect(t, issue.scheduled && issue.reason == .None && issue.seq != 0)
 	for _ in 0 ..< alice.lane.slots + 4 {
 		ksim.lane_frame(&alice.lane, DT)
@@ -1342,10 +1342,10 @@ lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
 }
 
 // Patch-mode, ungated: a relative nudge (chain-test filler).
-mover_dash_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool {
+mover_dash_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> knet.Action_Reject_Reason {
 	m := cast(^Mover)entity
 	m.x += 25
-	return true
+	return .None
 }
 
 // Apply-mode pair: the verb keeps the predicate + the delta write (execute
@@ -1357,12 +1357,12 @@ mover_boost_exec :: proc(
 	args: []u8,
 	lane: ^ksim.Lane,
 	by: knet.Player_Id,
-) -> bool {
+) -> knet.Action_Reject_Reason {
 	m := cast(^Mover)entity
-	if m.hp <= 0 {return false}
+	if m.hp <= 0 {return .Predicate}
 	m.hp -= 1
 	mover_boost_apply(entity, args, lane)
-	return true
+	return .None
 }
 mover_boost_apply :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane) {
 	m := cast(^Mover)entity
@@ -1373,8 +1373,8 @@ mover_boost_apply :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane) {
 lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 	desc := mover_desc()
 	cmds := [?]ksim.Sim_Cmd {
-		{id = 0, exec = mover_surge_exec, policy = knet.ACTION_OWNER_PREDICTED},
-		{id = 1, exec = mover_dash_exec, policy = knet.ACTION_OWNER_PREDICTED},
+		{id = 0, model = .Scheduled, exec = mover_surge_exec, policy = knet.ACTION_OWNER_PREDICTED},
+		{id = 1, model = .Scheduled, exec = mover_dash_exec, policy = knet.ACTION_OWNER_PREDICTED},
 	}
 	set := ksim.Sim_Set {
 		entity_desc = &desc,
@@ -1386,9 +1386,9 @@ lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 	// PREDICTION to every seat, never command authority; id 2 stays closed to
 	// pin the split.
 	cmds_c := [?]ksim.Sim_Cmd {
-		{id = 0, exec = mover_surge_exec, policy = knet.ACTION_ANY_SEAT_PREDICTED},
-		{id = 1, exec = mover_dash_exec, policy = knet.ACTION_ANY_SEAT_PREDICTED},
-		{id = 2, exec = mover_surge_exec, policy = knet.ACTION_OWNER_PREDICTED},
+		{id = 0, model = .Scheduled, exec = mover_surge_exec, policy = knet.ACTION_ANY_SEAT_PREDICTED},
+		{id = 1, model = .Scheduled, exec = mover_dash_exec, policy = knet.ACTION_ANY_SEAT_PREDICTED},
+		{id = 2, model = .Scheduled, exec = mover_surge_exec, policy = knet.ACTION_OWNER_PREDICTED},
 	}
 	set_c := ksim.Sim_Set {
 		entity_desc = &desc,
@@ -1441,14 +1441,14 @@ lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 	settle(boxes, 60)
 
 	// Not contested, not mine: the gate holds.
-	denied := ksim.lane_command_checked(&alice.lane, 10, 0, nil)
+	denied := ksim.lane_command(&alice.lane, 10, 0, nil)
 	testing.expect(t, !denied.scheduled, "a host-owned entity refuses a client's verb")
 	testing.expect_value(t, denied.reason, knet.Action_Reject_Reason.Access)
 
 	// Contested but the verb never opted in: prediction scope is not command
 	// scope — predict-world marks avatars contested, and their verbs must not
 	// open to every seat for free.
-	denied = ksim.lane_command_checked(&alice.lane, 30, 2, nil)
+	denied = ksim.lane_command(&alice.lane, 30, 2, nil)
 	testing.expect(
 		t,
 		!denied.scheduled,
@@ -1461,7 +1461,7 @@ lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 	alice.movers[30].hp = 1
 	testing.expect(
 		t,
-		ksim.lane_command(&alice.lane, 30, 0, nil),
+		ksim.lane_command(&alice.lane, 30, 0, nil).scheduled,
 		"a contested entity takes any seat's verb",
 	)
 	ksim.lane_frame(&alice.lane, DT)
@@ -1475,8 +1475,8 @@ lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 	// THE CHAIN: two verbs in flight; the FIRST is rejected on divergent
 	// state, the second survives — the unwind must not clobber it.
 	alice.movers[30].hp = 1 // stale purse: the authority's is spent
-	testing.expect(t, ksim.lane_command(&alice.lane, 30, 0, nil), "surge schedules on stale state")
-	testing.expect(t, ksim.lane_command(&alice.lane, 30, 1, nil), "a second verb queues behind it")
+	testing.expect(t, ksim.lane_command(&alice.lane, 30, 0, nil).scheduled, "surge schedules on stale state")
+	testing.expect(t, ksim.lane_command(&alice.lane, 30, 1, nil).scheduled, "a second verb queues behind it")
 	ksim.lane_frame(&alice.lane, DT)
 	testing.expect_value(t, alice.movers[30].x, f32(125)) // 50 kept + 50 spec + 25 spec
 	testing.expect_value(t, alice.movers[30].hp, i32(0))
@@ -1496,7 +1496,7 @@ lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
 lane_apply_verbs_ride_resims :: proc(t: ^testing.T) {
 	desc := mover_desc()
 	cmds := [?]ksim.Sim_Cmd {
-		{exec = mover_boost_exec, apply = mover_boost_apply, policy = knet.ACTION_OWNER_PREDICTED},
+		{model = .Scheduled, exec = mover_boost_exec, apply = mover_boost_apply, policy = knet.ACTION_OWNER_PREDICTED},
 	}
 	set := ksim.Sim_Set {
 		entity_desc = &desc,
@@ -1549,7 +1549,7 @@ lane_apply_verbs_ride_resims :: proc(t: ^testing.T) {
 	// loss with) while alice keeps simulating. The server executes the late
 	// verb at ITS next tick — the reschedule path — and every replay re-RUNS
 	// the apply half against corrected state instead of re-pinning bytes.
-	testing.expect(t, ksim.lane_command(&alice.lane, 20, 0, nil), "the boost schedules")
+	testing.expect(t, ksim.lane_command(&alice.lane, 20, 0, nil).scheduled, "the boost schedules")
 	for _ in 0 ..< 10 {
 		alice.ax = 1 // moving through the blackout: corrections will cross the verb tick
 		ksim.lane_frame(&alice.lane, DT)
@@ -1578,7 +1578,7 @@ lane_apply_verbs_ride_resims :: proc(t: ^testing.T) {
 	before := host.movers[20].x
 	testing.expect(
 		t,
-		ksim.lane_command(&alice.lane, 20, 0, nil),
+		ksim.lane_command(&alice.lane, 20, 0, nil).scheduled,
 		"a rejectable boost still schedules",
 	)
 	for _ in 0 ..< 90 {
@@ -2381,10 +2381,10 @@ shooter_fire_exec :: proc(
 	args: []u8,
 	lane: ^ksim.Lane,
 	by: knet.Player_Id,
-) -> bool {
+) -> knet.Action_Reject_Reason {
 	b := cast(^Lane_Box)ksim.lane_game(lane)
 	shooter := cast(^Mover)entity
-	if shooter.hp <= 0 {return false} 	// out of ammo — the authority may refuse a stale-purse fire
+	if shooter.hp <= 0 {return .Predicate} 	// out of ammo — the authority may refuse a stale-purse fire
 	shooter.hp -= 1
 	p := new(Mover)
 	p.x = shooter.x
@@ -2402,7 +2402,7 @@ shooter_fire_exec :: proc(
 		b.cli_proj = p
 		b.cli_proj_id = id
 	}
-	return true
+	return .None
 }
 
 @(test)
@@ -2413,7 +2413,7 @@ lane_predicted_projectile :: proc(t: ^testing.T) {
 		tick        = proj_fly_thunk,
 		input_size  = 0,
 	}
-	fire := [?]ksim.Sim_Cmd{{exec = shooter_fire_exec, policy = knet.ACTION_OWNER_PREDICTED}}
+	fire := [?]ksim.Sim_Cmd{{model = .Scheduled, exec = shooter_fire_exec, policy = knet.ACTION_OWNER_PREDICTED}}
 	set := ksim.Sim_Set {
 		entity_desc = &desc,
 		tick        = mover_tick_thunk,
@@ -2470,7 +2470,7 @@ lane_predicted_projectile :: proc(t: ^testing.T) {
 	settle(boxes, 60) // anchor + converge
 
 	// FIRE — the shot leaves alice's screen this instant, before any round trip.
-	testing.expect(t, ksim.lane_command(&alice.lane, SHOOTER, 0, nil), "the fire schedules")
+	testing.expect(t, ksim.lane_command(&alice.lane, SHOOTER, 0, nil).scheduled, "the fire schedules")
 	ksim.lane_frame(&alice.lane, DT) // executes at her next tick
 	born := alice.lane.ticker.tick
 	testing.expect(t, alice.cli_proj != nil, "alice's projectile exists the instant she fires")
@@ -2528,7 +2528,7 @@ lane_predicted_projectile_rejected :: proc(t: ^testing.T) {
 		tick        = proj_fly_thunk,
 		input_size  = 0,
 	}
-	fire := [?]ksim.Sim_Cmd{{exec = shooter_fire_exec, policy = knet.ACTION_OWNER_PREDICTED}}
+	fire := [?]ksim.Sim_Cmd{{model = .Scheduled, exec = shooter_fire_exec, policy = knet.ACTION_OWNER_PREDICTED}}
 	set := ksim.Sim_Set {
 		entity_desc = &desc,
 		tick        = mover_tick_thunk,
@@ -2587,7 +2587,7 @@ lane_predicted_projectile_rejected :: proc(t: ^testing.T) {
 	host.movers[SHOOTER].hp = 0
 	testing.expect(
 		t,
-		ksim.lane_command(&alice.lane, SHOOTER, 0, nil),
+		ksim.lane_command(&alice.lane, SHOOTER, 0, nil).scheduled,
 		"the fire schedules on stale ammo",
 	)
 	ksim.lane_frame(&alice.lane, DT) // client speculates the spawn
@@ -2619,18 +2619,18 @@ lane_predicted_projectile_rejected :: proc(t: ^testing.T) {
 
 // The rejectable gate: predicated on delta-lane hp (the authority's purse
 // says no), spawns nothing.
-chain_gate_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool {
+chain_gate_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> knet.Action_Reject_Reason {
 	m := cast(^Mover)entity
 	if m.hp <= 0 {
-		return false
+		return .Predicate
 	}
 	m.hp -= 1
-	return true
+	return .None
 }
 
 // The surviving fire: spawns — through the boot door's contract (reuse the
 // exec's existing spawn on a re-execution, never mint a ghost).
-chain_fire_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> bool {
+chain_fire_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> knet.Action_Reject_Reason {
 	b := cast(^Lane_Box)ksim.lane_game(lane)
 	shooter := cast(^Mover)entity
 	if ksim.lane_is_authority(lane) {
@@ -2643,12 +2643,12 @@ chain_fire_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.P
 		ksim.lane_track_set(&b.lane, id, p, b.proj_set, by)
 		b.host_proj = p
 		b.host_proj_id = id
-		return true
+		return .None
 	}
 	if e0, id0, exists := ksim.lane_spawn_of_exec(lane); exists {
 		b.cli_proj = cast(^Mover)e0
 		b.cli_proj_id = id0
-		return true
+		return .None
 	}
 	p := new(Mover)
 	p.x = shooter.x
@@ -2657,7 +2657,7 @@ chain_fire_exec :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.P
 	b.movers[id] = p
 	b.cli_proj = p
 	b.cli_proj_id = id
-	return true
+	return .None
 }
 
 @(test)
@@ -2669,8 +2669,8 @@ lane_reject_chain_keeps_one_projectile :: proc(t: ^testing.T) {
 		input_size  = 0,
 	}
 	cmds := [?]ksim.Sim_Cmd {
-		{id = 1, exec = chain_gate_exec, policy = knet.ACTION_OWNER_PREDICTED},
-		{id = 2, exec = chain_fire_exec, policy = knet.ACTION_OWNER_PREDICTED},
+		{id = 1, model = .Scheduled, exec = chain_gate_exec, policy = knet.ACTION_OWNER_PREDICTED},
+		{id = 2, model = .Scheduled, exec = chain_fire_exec, policy = knet.ACTION_OWNER_PREDICTED},
 	}
 	set := ksim.Sim_Set {
 		entity_desc = &desc,
@@ -2728,10 +2728,10 @@ lane_reject_chain_keeps_one_projectile :: proc(t: ^testing.T) {
 	// refuses it. The fire behind it survives either way — the verb burst.
 	alice.movers[SHOOTER].hp = 1
 	host.movers[SHOOTER].hp = 0
-	testing.expect(t, ksim.lane_command(&alice.lane, SHOOTER, 1, nil), "the gate schedules")
+	testing.expect(t, ksim.lane_command(&alice.lane, SHOOTER, 1, nil).scheduled, "the gate schedules")
 	testing.expect(
 		t,
-		ksim.lane_command(&alice.lane, SHOOTER, 2, nil),
+		ksim.lane_command(&alice.lane, SHOOTER, 2, nil).scheduled,
 		"the fire schedules behind it",
 	)
 	ksim.lane_frame(&alice.lane, DT) // both speculate; the fire spawns ONE provisional
@@ -2903,7 +2903,7 @@ lane_facts_reach_every_screen_on_time :: proc(t: ^testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Declared world-pass facts (@(gd_fact) doors): the same every-screen laws as
+// Declared sim events (@(gd_event) doors): the same every-screen laws as
 // tick facts, minted from the WORLD passes. Four laws pinned:
 //   (1) everywhere-pass anchored fact — the anchor owner's live pass fires
 //       mine=true once (broadcast skips them: no echo double-fire), the

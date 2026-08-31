@@ -139,7 +139,7 @@ for needle in \
 	'if r.err || len(knet.reader_remaining(&r)) != 0 {return .Malformed}' \
 	'PAWN_POLICY_MARK :: knet.ACTION_AUTHORITY' \
 	'{action = {name = "mark", id = PAWN_CMD_MARK, model = .Scheduled, policy = PAWN_POLICY_MARK' \
-	'exec_checked = _pawn_simcmd_mark}' \
+	'exec = _pawn_simcmd_mark}' \
 	'_pawn_action_hit_args := [?]knet.Action_Argument_Desc' \
 	'{name = "amount", type_name = "i32", wire_kind = "i32"}' \
 	'_pawn_action_loot_outcomes := [?]knet.Action_Outcome_Value_Desc' \
@@ -151,7 +151,7 @@ for needle in \
 	'_ok := pawn_salute(self, by, _a0)' \
 	'pawn_salute_cmd :: proc(b: ^kboot.Boot, self: ^Pawn, style: u8) -> knet.Action_Outcome' \
 	'knet.write_player_id(&_w, who)' \
-	'_issue := ksim.lane_command_checked(b.lane, self.net_id, PAWN_CMD_HIT, knet.writer_bytes(&_w))' \
+	'_issue := ksim.lane_command(b.lane, self.net_id, PAWN_CMD_HIT, knet.writer_bytes(&_w))' \
 	'_ok, _p0 := pawn_loot(self, _a0)' \
 	'if _ok && ksim.lane_is_authority(lane) {' \
 	'pawn_loot_then(self, by, _a0, _p0)' \
@@ -159,7 +159,7 @@ for needle in \
 	'_pawn_simcmd_hit_apply :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane)' \
 	'PAWN_POLICY_HIT :: knet.ACTION_OWNER_PREDICTED' \
 	'{action = {name = "hit", id = PAWN_CMD_HIT, model = .Scheduled, policy = PAWN_POLICY_HIT' \
-	'exec_checked = _pawn_simcmd_hit, apply = _pawn_simcmd_hit_apply}' \
+	'exec = _pawn_simcmd_hit, apply = _pawn_simcmd_hit_apply}' \
 ; do
 	if ! grep -qF "$needle" "$GEN"; then
 		echo "REPGEN_FAIL: generated file is missing sim-command artifact: $needle"
@@ -212,12 +212,12 @@ for needle in \
 	'chest_open_cmd :: proc(b: ^kboot.Boot, self: ^Chest, amount: i32) -> knet.Action_Outcome' \
 	'ctx := &b.ses.ctx' \
 	'if _ok {return knet.action_outcome(.Applied)}' \
-	'_issue := knet.command_issue_checked(ctx, self, &chest_command_set, CHEST_CMD_OPEN)' \
+	'_issue := knet.command_issue(ctx, self, &chest_command_set, CHEST_CMD_OPEN)' \
 	'if !_issue.sent {return knet.action_outcome(.Rejected, _issue.reason)}' \
 	'if _issue.prediction_attempted && !_issue.prediction_applied {return knet.action_outcome(.Rejected, _issue.reason, u32(_issue.seq))}' \
 	'return knet.action_outcome(.Predicted, seq = u32(_issue.seq))' \
 	'chest_seal_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Action_Outcome' \
-	'_issue := knet.command_issue_checked(ctx, self, &chest_command_set, CHEST_CMD_SEAL)' \
+	'_issue := knet.command_issue(ctx, self, &chest_command_set, CHEST_CMD_SEAL)' \
 	'chest_lockdown_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Action_Outcome' \
 	'session_action_rejection(b.ses, self.net_id, CHEST_POLICY_LOCKDOWN)' \
 	'CHEST_POLICY_LOCKDOWN :: knet.ACTION_AUTHORITY' \
@@ -320,7 +320,7 @@ for stale in 'lane_fact' '_pawn_fx' 'fx = _pawn_fx'; do
 		exit 1
 	fi
 done
-echo "  ok  every-screen _fx: event gate, authority broadcast, inline _mine call, decode thunk, Sim_Set fx wiring (old form untouched)"
+echo "  ok  tick-return _fx: event gate, authority broadcast, inline _mine call, decode thunk, Sim_Set fx wiring"
 
 # The `<field>_edge` half (pawn_hp_edge): the thunk casts and derefs old, the
 # Edge_Desc table indexes the descriptor FIELD, and the command set carries it
@@ -400,7 +400,6 @@ for needle in \
 	'pawn_of :: proc {_pawn_of_id, _pawn_of_ref}' \
 	'pawn_owned_by :: proc(b: ^kboot.Boot, owner: knet.Player_Id) -> (^Pawn, bool)' \
 	'pawn_mine :: proc(b: ^kboot.Boot) -> (^Pawn, bool)' \
-	'pawn_ids :: proc(b: ^kboot.Boot, allocator := context.temp_allocator) -> []knet.Net_Id' \
 	'pawn_all :: proc(b: ^kboot.Boot, allocator := context.temp_allocator) -> []knet.Net_Entity(Pawn)' \
 	'pawn_despawn :: proc {_pawn_despawn_id, _pawn_despawn_ref, _pawn_despawn_ptr}' \
 	'pawn_teleport :: proc {_pawn_teleport_id, _pawn_teleport_ref, _pawn_teleport_ptr}' \
@@ -415,6 +414,10 @@ for needle in \
 		exit 1
 	fi
 done
+if grep -qF 'pawn_ids :: proc' "$BGEN"; then
+	echo "REPGEN_FAIL: generated compatibility pawn_ids accessor returned"
+	exit 1
+fi
 echo "  ok  entity table generated (TYPE const, kinds row, typed census hooks, <game>_entities wrapper)"
 
 # @(gd_sample)/@(gd_step) artifacts (board.odin's lane game half): a rawptr
@@ -458,29 +461,29 @@ for needle in \
 done
 echo "  ok  lane wiring generated (per-class typed samples, primary + lane_add_input_class, board_lane_init)"
 
-# @(gd_cue) artifacts (plus the compatible @(gd_fact) spelling): a stable FNV
+# Sim-routed @(gd_event) artifacts: a stable FNV
 # id const per event, the announce DOOR under the bare event name holding every gate
 # (authority broadcast via lane_fact with the kind; anchored = owner-derived
 # `mine` on the live pass; anchorless = the authority's live pass alone), the
 # decode thunk per event, the package fact table, and its install inside
 # board_lane_init. The doors compile with the package (the odin check above).
 for needle in \
-	'FACT_PAWN_BUMPED :: u16(0x' \
-	'FACT_PAWN_SPOTTED :: u16(0x' \
-	'FACT_PAWN_ECHOED :: u16(0x' \
-	'FACT_BOARD_HORN :: u16(0x' \
-	'pawn_bumped :: proc(l: ^ksim.Lane, p: ^Pawn, force: f32)' \
-	'pawn_spotted :: proc(l: ^ksim.Lane, p: ^Pawn, scout: ^Scout, strength: u8)' \
+	'EVENT_PAWN_BUMPED :: u16(0x' \
+	'EVENT_PAWN_SPOTTED :: u16(0x' \
+	'EVENT_PAWN_ECHOED :: u16(0x' \
+	'EVENT_BOARD_HORN :: u16(0x' \
+	'pawn_bumped :: proc(b: ^kboot.Boot, p: ^Pawn, force: f32)' \
+	'pawn_spotted :: proc(b: ^kboot.Boot, p: ^Pawn, scout: ^Scout, strength: u8)' \
 	'if !ksim.lane_tracks_entity(l, p) {' \
-	'board_horn :: proc(l: ^ksim.Lane, side: u8)' \
-	'ksim.lane_fact(l, p, knet.writer_bytes(&_fw), FACT_PAWN_BUMPED)' \
+	'board_horn :: proc(b: ^kboot.Boot, side: u8)' \
+	'ksim.lane_fact(l, p, knet.writer_bytes(&_fw), EVENT_PAWN_BUMPED)' \
 	'_entity_id0, _entity_ok0 := ksim.lane_entity_id(l, p)' \
-	'ksim.lane_fact(l, scout, knet.writer_bytes(&_fw), FACT_PAWN_SPOTTED)' \
-	'pawn_echoed :: proc(l: ^ksim.Lane, p: ^Pawn)' \
-	'ksim.lane_fact(l, nil, knet.writer_bytes(&_fw), FACT_PAWN_ECHOED)' \
-	'ksim.lane_fact(l, nil, knet.writer_bytes(&_fw), FACT_BOARD_HORN)' \
+	'ksim.lane_fact(l, scout, knet.writer_bytes(&_fw), EVENT_PAWN_SPOTTED)' \
+	'pawn_echoed :: proc(b: ^kboot.Boot, p: ^Pawn)' \
+	'ksim.lane_fact(l, nil, knet.writer_bytes(&_fw), EVENT_PAWN_ECHOED)' \
+	'ksim.lane_fact(l, nil, knet.writer_bytes(&_fw), EVENT_BOARD_HORN)' \
 	'_owner := ksim.lane_owner_of(l, p)' \
-	'_mine := _owner != knet.PLAYER_ID_INVALID && _owner == ksim.lane_me(l)' \
+	'_mine := (_owner != knet.PLAYER_ID_INVALID && _owner == ksim.lane_me(l)) || (_owner == knet.PLAYER_ID_INVALID && ksim.lane_is_authority(l))' \
 	'if ksim.lane_is_authority(l) && ksim.lane_live(l) {' \
 	'_board_fact_pawn_bumped :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8)' \
 	'pawn_bumped_fx(cast(^Board)ksim.lane_game(lane), cast(^Pawn)entity, mine, _a0)' \
@@ -502,12 +505,12 @@ if ! grep -qF 'lane.in_auth = true' "$GEN"; then
 	exit 1
 fi
 # The corpse gate belongs only to anchored doors (pawn_bumped and
-# pawn_spotted), never the anchorless legacy declaration.
+# pawn_spotted), never the anchorless declarations.
 if [ "$(grep -cF 'ksim.lane_tracks_entity(l, ' "$BGEN")" != "3" ] || grep -qF 'lane_tracks_entity(l, nil' "$BGEN"; then
 	echo "REPGEN_FAIL: the corpse gate must appear on all three anchored doors and never on the anchorless ones"
 	exit 1
 fi
-echo "  ok  cue doors generated (inferred/named/no anchor, typed entity refs, legacy fact, decode table)"
+echo "  ok  sim event doors generated (inferred/named/no anchor, typed entity refs, decode table)"
 
 # @(gd_event): one declaration chooses the existing runtime from its anchor.
 # Cooperative owner+interp anchors and explicit static events get the session
@@ -523,9 +526,9 @@ for needle in \
 	'{name = "board_blast", id = EVENT_BOARD_BLAST, audience = .Observers, timing = .Immediate, anchored = false' \
 	'board_event_routes :: proc(self: ^Board, ses: ^ksess.Session)' \
 	'board_event_routes(self, &self.ses)' \
-	'FACT_PAWN_CHEERED :: u16(0x' \
+	'EVENT_PAWN_CHEERED :: u16(0x' \
 	'pawn_cheered :: proc(b: ^kboot.Boot, pawn: ^Pawn, style: u8)' \
-	'{id = FACT_PAWN_CHEERED, audience = .Observers, fx = _board_fact_pawn_cheered}' \
+	'{id = EVENT_PAWN_CHEERED, audience = .Observers, fx = _board_fact_pawn_cheered}' \
 ; do
 	if ! grep -qF "$needle" "$BGEN"; then
 		echo "REPGEN_FAIL: generated file is missing gd_event artifact: $needle"
@@ -535,7 +538,7 @@ done
 for needle in \
 	'event entity.Board.chest_spark id=62076 schedule=session-anchored anchor=Chest audience=everyone' \
 	'event entity.Board.board_blast id=32795 schedule=session-immediate anchor=none audience=observers' \
-	'cue entity.Board.pawn_cheered id=12720 schedule=watch anchor=Pawn audience=observers' \
+	'event entity.Board.pawn_cheered id=12720 schedule=watch anchor=Pawn audience=observers' \
 	'{path = "entity.Board.board_blast", entity = "Board", name = "board_blast", id = 32795, anchor = "", schedule = .Immediate, audience = .Observers' \
 ; do
 	if ! grep -qF "$needle" "$GUARD"; then
@@ -545,211 +548,7 @@ for needle in \
 done
 echo "  ok  gd_event lowers by anchor (coop anchored, sim watch, static immediate), with audience in runtime + fingerprint"
 
-# ---- @(gd_fact) contract violations are scriptgen-time errors ----
-# Five misuses in one lane-carrying package, plus the no-lane package: each
-# must surface as a teaching error, never a half that silently can't fire.
-FBAD="$TMP/factbad"
-mkdir -p "$FBAD"
-cat > "$FBAD/fgame.odin" <<'EOF'
-//gd:extends Node
-//gd:class FGame
-package repgen_factbad
-
-import gd "godot:godot"
-
-FGame :: struct {
-	owner: gd.Node,
-}
-
-F_In :: struct {
-	ax: i8,
-}
-
-@(gd_sample)
-fgame_sample :: proc(self: ^FGame, tick: u64, input: ^F_In) {
-}
-
-@(gd_fact)
-f_bad_name :: proc(g: ^FGame, mine: bool, v: f32) { // not `_fx`-named
-}
-
-@(gd_fact)
-f_nomine_fx :: proc(g: ^FGame, v: f32) { // the mine-form marker missing
-}
-
-@(gd_fact)
-f_struct_fx :: proc(g: ^FGame, mine: bool, v: F_In) { // not a wire primitive
-}
-
-@(gd_fact)
-f_verdict_fx :: proc(g: ^FGame, mine: bool) -> bool { // a fact decides nothing
-	return false
-}
-
-@(gd_fact)
-f_taken_fx :: proc(g: ^FGame, mine: bool) { // the door's name is claimed below
-}
-
-f_taken :: proc() {
-}
-EOF
-cat > "$FBAD/fpawn.odin" <<'EOF'
-//gd:extends Node2D
-//gd:class FPawn
-package repgen_factbad
-
-import gd "godot:godot"
-import knet "godot:kit/net"
-
-FPawn :: struct {
-	owner:  gd.Node2d,
-	net_id: knet.Net_Id,
-	x:      f32 `gd:"predict"`,
-}
-
-@(gd_tick)
-fpawn_tick :: proc(self: ^FPawn, input: F_In) {
-}
-EOF
-set +e
-FBAD_OUT="$(run_scriptgen "$FBAD" 2>&1)"
-FBAD_RC=$?
-set -e
-if [ "$FBAD_RC" -eq 0 ]; then
-	echo "REPGEN_FAIL: the @(gd_fact) misuse package was accepted by scriptgen"
-	exit 1
-fi
-for want in \
-	"a declared cue is presentation" \
-	'`mine: bool` comes after' \
-	"not a wire primitive" \
-	"a cue presents, it decides nothing" \
-	"GENERATED announce door's name" \
-; do
-	if ! echo "$FBAD_OUT" | grep -qF "$want"; then
-		echo "REPGEN_FAIL: fact misuse error missing: $want"
-		echo "$FBAD_OUT" | tail -20
-		exit 1
-	fi
-done
-
-FNOLANE="$TMP/factnolane"
-mkdir -p "$FNOLANE"
-cat > "$FNOLANE/ngame.odin" <<'EOF'
-//gd:extends Node
-//gd:class NGame
-package repgen_factnolane
-
-import gd "godot:godot"
-
-NGame :: struct {
-	owner: gd.Node,
-}
-
-@(gd_fact)
-n_horn_fx :: proc(g: ^NGame, mine: bool) {
-}
-EOF
-set +e
-FNOLANE_OUT="$(run_scriptgen "$FNOLANE" 2>&1)"
-FNOLANE_RC=$?
-set -e
-if [ "$FNOLANE_RC" -eq 0 ] || ! echo "$FNOLANE_OUT" | grep -qF "this package has no lane"; then
-	echo "REPGEN_FAIL: a @(gd_fact) in a laneless package must error (facts ride the watch clock)"
-	echo "$FNOLANE_OUT" | tail -10
-	exit 1
-fi
-echo "  ok  fact misuses rejected: bad name, no mine, non-wire arg, results, taken door, laneless package"
-
-# ---- @(gd_cue) anchor contract violations are scriptgen-time errors ----
-CUEBAD="$TMP/cuebad"
-mkdir -p "$CUEBAD"
-cat > "$CUEBAD/cgame.odin" <<'EOF'
-//gd:extends Node
-//gd:class CGame
-package repgen_cuebad
-
-import gd "godot:godot"
-
-CGame :: struct {owner: gd.Node}
-C_In :: struct {axis: i8}
-
-@(gd_sample)
-cgame_sample :: proc(self: ^CGame, tick: u64, input: ^C_In) {}
-
-@(gd_cue)
-c_ambiguous_fx :: proc(g: ^CGame, source: ^CPawn, target: ^CPawn, mine: bool) {}
-
-@(gd_cue = "anchor=missing")
-c_missing_fx :: proc(g: ^CGame, source: ^CPawn, mine: bool) {}
-
-@(gd_cue = "anchor=power")
-c_primitive_fx :: proc(g: ^CGame, source: ^CPawn, mine: bool, power: u8) {}
-
-@(gd_cue = "anchor=")
-c_empty_fx :: proc(g: ^CGame, source: ^CPawn, mine: bool) {}
-
-@(gd_cue = "audience=owner")
-c_config_fx :: proc(g: ^CGame, source: ^CPawn, mine: bool) {}
-
-@(gd_cue)
-c_untracked_fx :: proc(g: ^CGame, prop: ^CProp, mine: bool) {}
-
-@(gd_cue)
-@(gd_fact)
-c_both_fx :: proc(g: ^CGame, source: ^CPawn, mine: bool) {}
-EOF
-cat > "$CUEBAD/cpawn.odin" <<'EOF'
-//gd:extends Node2D
-//gd:class CPawn
-package repgen_cuebad
-
-import gd "godot:godot"
-
-CPawn :: struct {
-	owner: gd.Node2d,
-	x: f32 `gd:"predict"`,
-}
-
-@(gd_tick)
-cpawn_tick :: proc(self: ^CPawn, input: C_In) {}
-EOF
-cat > "$CUEBAD/cprop.odin" <<'EOF'
-//gd:extends Node2D
-//gd:class CProp
-package repgen_cuebad
-
-import gd "godot:godot"
-
-CProp :: struct {
-	owner: gd.Node2d,
-	x: f32 `gd:"predict"`,
-}
-EOF
-set +e
-CUEBAD_OUT="$(run_scriptgen "$CUEBAD" 2>&1)"
-CUEBAD_RC=$?
-set -e
-if [ "$CUEBAD_RC" -eq 0 ]; then
-	echo "REPGEN_FAIL: the @(gd_cue) misuse package was accepted by scriptgen"
-	exit 1
-fi
-for want in \
-	"the cue has 2 entity parameters" \
-	'`anchor=missing` does not name one of the cue' \
-	'`anchor=power` does not name one of the cue' \
-	'`anchor=` needs an entity parameter name' \
-	'unknown cue config token "audience=owner"' \
-	'is not tracked by the simulation lane' \
-	'@(gd_cue) replaces @(gd_fact)' \
-; do
-	if ! echo "$CUEBAD_OUT" | grep -qF "$want"; then
-		echo "REPGEN_FAIL: cue misuse error missing: $want"
-		echo "$CUEBAD_OUT" | tail -30
-		exit 1
-	fi
-done
-echo "  ok  cue misuses rejected: ambiguous/missing/non-entity anchors, bad config, untracked ref, duplicate declaration"
+# Retired presentation attributes are covered by the author-surface rejection gate below.
 
 # ---- @(gd_event) policy/clock refusals -----------------------------------
 EVENTBAD="$TMP/eventbad"
@@ -774,9 +573,6 @@ EGame :: struct {
 EInput :: struct {move: i8}
 @(gd_sample) egame_sample :: proc(self: ^EGame, tick: u64, input: ^EInput) {}
 
-@(gd_event)
-static_auto_fx :: proc(g: ^EGame, mine: bool) {}
-
 @(gd_event = "audience=owner,timing=immediate,anchor=none")
 static_owner_fx :: proc(g: ^EGame, mine: bool) {}
 
@@ -795,9 +591,6 @@ bad_timing_fx :: proc(g: ^EGame, mine: bool) {}
 @(gd_event = "timing=immediate")
 ghost_fx :: proc(g: ^EGame, ghost: ^EGhost, mine: bool) {}
 
-@(gd_event = "timing=auto")
-@(gd_cue)
-both_fx :: proc(g: ^EGame, p: ^ESim, mine: bool) {}
 EOF
 cat > "$EVENTBAD/plain.odin" <<'EOF'
 //gd:extends Node
@@ -833,14 +626,12 @@ if [ "$EVENTBAD_RC" -eq 0 ]; then
 	exit 1
 fi
 for want in \
-	'timing=auto cannot prove a framework-owned presentation clock' \
 	'audience=owner needs an entity anchor' \
 	'timing=anchored needs an entity with owner+interp state' \
 	'a sim-tracked anchor presents on its watch clock' \
 	'event audience "nobody" is unknown' \
 	'event timing "eventually" is unknown' \
 	'cooperative event entity EGhost must be a registered entity kind' \
-	'use one presentation declaration' \
 ; do
 	if ! echo "$EVENTBAD_OUT" | grep -qF "$want"; then
 		echo "REPGEN_FAIL: gd_event misuse error missing: $want"
@@ -848,7 +639,7 @@ for want in \
 		exit 1
 	fi
 done
-echo "  ok  gd_event refuses ambiguous clocks, invalid audiences/timing, unregistered refs, and duplicate declarations"
+echo "  ok  gd_event refuses invalid audiences/timing and unregistered or clockless refs"
 
 # ---- the silent paths, closed: each of these compiled and silently never
 # ---- worked before — now each is a build error naming the fix ----
@@ -1830,7 +1621,7 @@ import gd "godot:godot"
 Comet :: struct {
 	owner: gd.Node,
 	x:     f32 `gd:"predict"`,
-	tail:  f32 `gd:"owner,interp"`,
+	tail:  f32 `gd:"owner"`,
 }
 
 @(gd_tick)
@@ -2691,7 +2482,7 @@ Bare :: struct {
 	hp:    i32, // not replicated
 }
 
-@(gd_command = "predict")
+@(gd_command = knet.ACTION_OWNER_PREDICTED)
 bare_hit :: proc(self: ^Bare, amount: i32) -> bool {
 	self.hp -= amount
 	return true

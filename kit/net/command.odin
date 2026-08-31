@@ -116,20 +116,9 @@ action_outcome :: proc(
 }
 
 // It applied on THIS peer (authoritatively on the host, optimistically on a
-// client) — the role-free "should I show local feedback?" check. The overload
-// keeps low-level code returning Command_Outcome source-compatible while
-// generated wrappers return the detailed Action_Outcome.
-command_state_ok :: proc(r: Command_Outcome) -> bool {
-	return r != .Rejected
-}
-
-action_outcome_ok :: proc(r: Action_Outcome) -> bool {
-	return command_state_ok(r.state)
-}
-
-command_ok :: proc {
-	command_state_ok,
-	action_outcome_ok,
+// client) — the role-free "should I show local feedback?" check.
+command_ok :: proc(r: Action_Outcome) -> bool {
+	return r.state != .Rejected
 }
 
 Command_Env :: struct {
@@ -167,10 +156,6 @@ Action_Access :: enum u8 {
 	Any_Seat,
 	Authority,
 }
-
-// Compatibility spelling for low-level code written before commands and sim
-// verbs shared the action vocabulary. New APIs and generated code say Action.
-Command_Access :: Action_Access
 
 // Whether a client runs an action before the authority answers. This is typed
 // separately from access: opening a verb to any seat never silently enables
@@ -456,7 +441,7 @@ Command_Issue_Result :: struct {
 // means local policy/size admission refused the action. A locally rejected
 // optimistic run is still sent because this peer may be stale; the two
 // prediction fields let the wrapper preserve that distinction for presentation.
-command_issue_checked :: proc(
+command_issue :: proc(
 	ctx: ^Command_Ctx,
 	entity: rawptr,
 	set: ^Command_Set,
@@ -523,13 +508,6 @@ command_issue_checked :: proc(
 	return result
 }
 
-// Compatibility escape hatch: historically this returned only whether the
-// optimistic run applied. Generated code uses command_issue_checked so it can
-// also distinguish a policy/size refusal from a non-predicted send.
-command_issue :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd: Cmd_Id) -> bool {
-	return command_issue_checked(ctx, entity, set, cmd).prediction_applied
-}
-
 // ---------------------------------------------------------------------------
 // Host receive path. The session layer frames/reads the message kind, then:
 // read_header → dedup → resolve the entity (registry) → execute → result_write.
@@ -567,7 +545,7 @@ command_dedup :: proc(ctx: ^Command_Ctx, peer_key: u64, seq: Intent_Seq) -> bool
 // state: declared fields are captured first and restored on any failure. `env`
 // is this run's identity (authority + issuer + game pointer) — the thunk fires
 // the verb's `_then` consequence off it when the proc applies.
-command_execute_reason :: proc(
+command_execute :: proc(
 	entity: rawptr,
 	set: ^Command_Set,
 	cmd: u16,
@@ -595,17 +573,6 @@ command_execute_reason :: proc(
 	return .None
 }
 
-// Compatibility form for low-level callers that only need accepted/refused.
-command_execute :: proc(
-	entity: rawptr,
-	set: ^Command_Set,
-	cmd: u16,
-	r: ^Reader,
-	env: ^Command_Env,
-) -> bool {
-	return command_execute_reason(entity, set, cmd, r, env) == .None
-}
-
 // Result message: confirm = header only (the client's optimistic state already
 // matches; nothing replays). Reject = header + a FULL field snapshot — the
 // authoritative truth, superseding whatever the client predicted against.
@@ -613,7 +580,7 @@ command_execute :: proc(
 // its capture and the normal state lane corrects any newer authority change.
 // This keeps rate/access replies small while still delivering their typed
 // reason immediately instead of disguising them as timeouts.
-command_result_write_reason :: proc(
+command_result_write :: proc(
 	w: ^Writer,
 	h: Command_Header,
 	reason: Action_Reject_Reason,
@@ -633,18 +600,6 @@ command_result_write_reason :: proc(
 	}
 }
 
-// Compatibility spelling: a false gameplay bool is a predicate rejection and
-// retains the historical authoritative-truth payload.
-command_result_write :: proc(
-	w: ^Writer,
-	h: Command_Header,
-	ok: bool,
-	entity: rawptr,
-	set: ^Command_Set,
-) {
-	command_result_write_reason(w, h, ok ? .None : .Predicate, entity, set, truth = !ok)
-}
-
 // ---------------------------------------------------------------------------
 // Client result path: read → resolve res.entity (caller) → confirm / reject.
 
@@ -652,7 +607,6 @@ Command_Result :: struct {
 	seq:       Intent_Seq,
 	entity:    Net_Id,
 	cmd:       u16,
-	ok:        bool, // compatibility mirror: reason == .None
 	reason:    Action_Reject_Reason,
 	has_truth: bool,
 }
@@ -669,7 +623,6 @@ command_result_read :: proc(r: ^Reader) -> Command_Result {
 		r.err = true
 		return res
 	}
-	res.ok = res.reason == .None
 	return res
 }
 

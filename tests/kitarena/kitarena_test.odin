@@ -337,7 +337,7 @@ throw_cmd :: proc(b: ^Peer_Box, avatar: knet.Net_Id, dx, dy: f32) -> bool {
 	knet.command_begin(&b.s.ctx, avatar, CMD_THROW)
 	knet.write_f32(&b.s.ctx.msg, dx)
 	knet.write_f32(&b.s.ctx.msg, dy)
-	return knet.command_issue(&b.s.ctx, b.brawlers[avatar], &brawler_set, CMD_THROW)
+	return knet.command_issue(&b.s.ctx, b.brawlers[avatar], &brawler_set, CMD_THROW).prediction_applied
 }
 
 // ---- tests -----------------------------------------------------------------------

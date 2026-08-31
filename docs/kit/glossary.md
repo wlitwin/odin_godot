@@ -28,8 +28,8 @@ current session state.
 
 The generated index of live entities of each declared type. An
 `entity=Player:1` field generates typed queries such as `player_of`,
-`player_owned_by`, `player_ref`, and `player_all` (`player_ids` remains the
-ID-only view). `Net_Ref(Player)` is the pointer-free value to retain;
+`player_owned_by`, `player_ref`, and `player_all`. `Net_Ref(Player)` is the
+pointer-free value to retain;
 `Net_Entity(Player)` is a temporary iteration row carrying its live typed
 pointer, owner, and ID. The census avoids maintaining a second game map that can
 drift from the session registry.
@@ -90,7 +90,7 @@ peer.
 `Net_Id` identifies an entity within a session. It is not a Godot instance ID or
 a persistent save identity.
 
-## Event and cue
+## Presentation event
 
 A one-shot presentation occurrence declared with `@(gd_event)`. Scriptgen
 generates a suffix-free `^Boot` announce proc from its `_fx` declaration. Its
@@ -102,16 +102,15 @@ With one entity parameter the anchor is inferred; several require
 Events do not mutate authoritative state and are not replayed to joiners. Kit
 suppresses sim events during resimulation, presents live/owning screens without
 another interpolation delay, and schedules observers on the anchor's clock.
-`@(gd_cue)` and `@(gd_fact)` are compatible sim-only spellings.
 
-## Fact
+## Tick payload event
 
-A one-shot simulation-lane presentation event associated with a tick. A tick
-proc can return facts to a name-paired `_fx` half. A cue uses the same runtime
-fact channel for cross-entity or world presentation.
+A one-shot simulation-lane presentation occurrence associated with a tick. A
+tick proc can return payload values to a name-paired `_fx` half. Cross-entity
+or world occurrences use `@(gd_event)` instead.
 
-Facts do not mutate authoritative state. Kit suppresses them during
-resimulation, presents local facts immediately, and schedules remote facts on
+Tick payloads do not mutate authoritative state. Kit suppresses them during
+resimulation, presents local payloads immediately, and schedules remote payloads on
 the watched timeline.
 
 ## Factory

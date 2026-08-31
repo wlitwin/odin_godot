@@ -360,12 +360,13 @@ drain_events :: proc(self: ^AcidSession, now: f64) {
 			)
 		case ksess.Ev_Command_Executed:
 			self.cmds += 1
-			if e.ok {
+			accepted := e.reason == .None
+			if accepted {
 				// The gameplay hook for the stat registry: credit the striker.
 				ksess.session_stat_add(&self.ses, self.owner_pid, self.strikes_col, 1)
 			}
 			gd.print_str(
-				fmt.tprintf("ACID_EXEC ok=%v hp=%d st=%d", e.ok, self.orb.hp, self.orb.stamina),
+				fmt.tprintf("ACID_EXEC ok=%v hp=%d st=%d", accepted, self.orb.hp, self.orb.stamina),
 			)
 		case ksess.Ev_Command_Confirmed:
 			self.got += 1

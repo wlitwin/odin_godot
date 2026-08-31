@@ -230,19 +230,6 @@ boot_owned_entity :: proc(b: ^Boot, type: ksess.Entity_Type, owner: knet.Player_
 	return found, found_id, has_found
 }
 
-// Every live id of `type`, temp-allocated by default. Kept for compatibility;
-// new loops prefer generated `<snake>_all`, which resolves the typed
-// entity and owner in this same pass.
-boot_entity_ids :: proc(b: ^Boot, type: ksess.Entity_Type, allocator := context.temp_allocator) -> []knet.Net_Id {
-	ids := make([dynamic]knet.Net_Id, allocator)
-	for eid := b.ent_heads[type]; eid != knet.NET_ID_INVALID; eid = b.ent_next[eid] {
-		if _, _, live := boot_entity_raw(b, eid, type); live {
-			append(&ids, eid)
-		}
-	}
-	return ids[:]
-}
-
 // The typed, one-pass census behind generated `<snake>_all`. T is named
 // by the entity= tag at generation time; boot_entity_raw still checks the
 // runtime kind before any cast. Rows are a temp snapshot: retain `.ref`, not

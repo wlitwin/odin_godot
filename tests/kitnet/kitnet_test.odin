@@ -596,8 +596,8 @@ host_handle :: proc(
 		user      = hctx.game_user,
 		by        = knet.Player_Id(peer),
 	}
-	ok := knet.command_execute(host, set, h.cmd, &r, &env)
-	knet.command_result_write(result, h, ok, host, set)
+	reason := knet.command_execute(host, set, h.cmd, &r, &env)
+	knet.command_result_write(result, h, reason, host, set, truth = reason == .Predicate)
 	return true
 }
 
@@ -610,7 +610,7 @@ client_handle_result :: proc(
 ) {
 	r := knet.reader_make(bytes)
 	res := knet.command_result_read(&r)
-	if res.ok {
+	if res.reason == .None {
 		knet.command_confirm(cctx, res.seq)
 	} else {
 		knet.command_reject(cctx, res, &r, client, set)
@@ -645,8 +645,8 @@ command_predict_confirm :: proc(t: ^testing.T) {
 	// Issue add(+5): predicted immediately, message captured.
 	knet.command_begin(&cctx, knet.Net_Id(1), CMD_ADD)
 	knet.write_i32(&cctx.msg, 5)
-	predicted := knet.command_issue(&cctx, &client, &set, CMD_ADD)
-	testing.expect(t, predicted, "prediction should apply")
+	issue := knet.command_issue(&cctx, &client, &set, CMD_ADD)
+	testing.expect(t, issue.prediction_applied, "prediction should apply")
 	testing.expect_value(t, client.hp, i32(15))
 	testing.expect_value(t, knet.pending_count(&cctx.pending), 1)
 	testing.expect_value(t, len(cap.msgs), 1)
@@ -691,7 +691,7 @@ action_policy_bounds_before_send_and_rejects_trailing_args :: proc(t: ^testing.T
 	// before prediction and before transport.
 	knet.command_begin(&ctx, 1, CMD_ADD)
 	knet.write_i32(&ctx.msg, 5)
-	issue := knet.command_issue_checked(&ctx, &client, &set, CMD_ADD)
+	issue := knet.command_issue(&ctx, &client, &set, CMD_ADD)
 	testing.expect(t, !issue.sent && !issue.prediction_attempted)
 	testing.expect_value(t, issue.reason, knet.Action_Reject_Reason.Malformed)
 	testing.expect_value(t, client.hp, i32(10))
@@ -702,7 +702,7 @@ action_policy_bounds_before_send_and_rejects_trailing_args :: proc(t: ^testing.T
 	cmds[0].policy.max_args_bytes = 4
 	knet.command_begin(&ctx, 1, CMD_ADD)
 	knet.write_i32(&ctx.msg, 5)
-	issue = knet.command_issue_checked(&ctx, &client, &set, CMD_ADD)
+	issue = knet.command_issue(&ctx, &client, &set, CMD_ADD)
 	testing.expect(t, issue.sent && issue.prediction_attempted && issue.prediction_applied)
 	testing.expect_value(t, issue.reason, knet.Action_Reject_Reason.None)
 	testing.expect(t, issue.seq != 0)
@@ -725,7 +725,7 @@ action_policy_bounds_before_send_and_rejects_trailing_args :: proc(t: ^testing.T
 	}
 	testing.expect_value(
 		t,
-		knet.command_execute_reason(&host, &set, u16(CMD_ADD), &r, &env),
+		knet.command_execute(&host, &set, u16(CMD_ADD), &r, &env),
 		knet.Action_Reject_Reason.Malformed,
 	)
 	testing.expect_value(t, host.hp, i32(20))
@@ -766,7 +766,7 @@ command_predict_reject_carries_truth :: proc(t: ^testing.T) {
 
 	knet.command_begin(&cctx, knet.Net_Id(1), CMD_ADD)
 	knet.write_i32(&cctx.msg, 5)
-	testing.expect(t, knet.command_issue(&cctx, &client, &set, CMD_ADD))
+	testing.expect(t, knet.command_issue(&cctx, &client, &set, CMD_ADD).prediction_applied)
 	testing.expect_value(t, client.hp, i32(15))
 
 	result := knet.writer_make()
@@ -801,7 +801,7 @@ command_local_reject_restores_and_still_sends :: proc(t: ^testing.T) {
 
 	knet.command_begin(&cctx, knet.Net_Id(1), CMD_ADD)
 	knet.write_i32(&cctx.msg, 5)
-	issue := knet.command_issue_checked(&cctx, &client, &set, CMD_ADD)
+	issue := knet.command_issue(&cctx, &client, &set, CMD_ADD)
 	testing.expect(t, issue.sent && issue.prediction_attempted && !issue.prediction_applied)
 	testing.expect_value(t, issue.reason, knet.Action_Reject_Reason.Predicate)
 	testing.expect_value(t, client.hp, i32(10)) // restored
@@ -829,7 +829,7 @@ command_execute_restores_torn_state :: proc(t: ^testing.T) {
 	env := knet.Command_Env {
 		authority = true,
 	}
-	testing.expect(t, !knet.command_execute(&host, &set, u16(CMD_TORN), &r, &env)) // receive path: the raw wire id
+	testing.expect_value(t, knet.command_execute(&host, &set, u16(CMD_TORN), &r, &env), knet.Action_Reject_Reason.Predicate) // receive path: the raw wire id
 	testing.expect_value(t, host.hp, i32(42))
 	testing.expect_value(t, host.x, f32(1))
 
@@ -841,7 +841,7 @@ command_execute_restores_torn_state :: proc(t: ^testing.T) {
 	cctx := knet.command_ctx_make()
 	defer knet.command_ctx_destroy(&cctx)
 	knet.command_begin(&cctx, knet.Net_Id(1), CMD_TORN)
-	testing.expect(t, !knet.command_issue(&cctx, &client, &set, CMD_TORN))
+	testing.expect(t, !knet.command_issue(&cctx, &client, &set, CMD_TORN).prediction_applied)
 	testing.expect_value(t, client.hp, i32(42))
 	testing.expect_value(t, client.x, f32(1))
 }
@@ -973,7 +973,7 @@ command_then_fires_on_authority_only :: proc(t: ^testing.T) {
 
 	knet.command_begin(&cctx, knet.Net_Id(1), LOOT)
 	knet.write_i32(&cctx.msg, 5)
-	testing.expect(t, knet.command_issue(&cctx, &client, &set, LOOT), "prediction applies")
+	testing.expect(t, knet.command_issue(&cctx, &client, &set, LOOT).prediction_applied, "prediction applies")
 	testing.expect_value(t, client.hp, i32(15))
 	testing.expect_value(t, log.fires, 0) // on spec: the consequence stays quiet
 
@@ -1009,12 +1009,12 @@ command_malformed_input_rejects :: proc(t: ^testing.T) {
 	env := knet.Command_Env {
 		authority = true,
 	}
-	testing.expect(t, !knet.command_execute(&host, &set, u16(CMD_ADD), &r, &env)) // receive path: the raw wire id
+	testing.expect_value(t, knet.command_execute(&host, &set, u16(CMD_ADD), &r, &env), knet.Action_Reject_Reason.Malformed) // receive path: the raw wire id
 	testing.expect_value(t, host.hp, i32(10))
 
 	// Unknown command index from a hostile/mismatched peer: rejected, no panic.
 	r2 := knet.reader_make(nil)
-	testing.expect(t, !knet.command_execute(&host, &set, 200, &r2, &env))
+	testing.expect_value(t, knet.command_execute(&host, &set, 200, &r2, &env), knet.Action_Reject_Reason.Malformed)
 }
 
 @(test)
@@ -1060,7 +1060,7 @@ command_access_is_enforced_before_predicate :: proc(t: ^testing.T) {
 		knet.write_u8(&w, value)
 		r := knet.reader_make(knet.writer_bytes(&w))
 		out := knet.writer_make(32, context.temp_allocator)
-		result := knet.registry_host_command_checked(reg, ctx, by, &r, &out)
+		result := knet.registry_host_command(reg, ctx, by, &r, &out)
 		responded = result.responded
 		reason = result.reason
 		ok = reason == .None
@@ -1104,7 +1104,8 @@ command_non_predicted_defers_to_host :: proc(t: ^testing.T) {
 
 	knet.command_begin(&cctx, knet.Net_Id(1), CMD_MARK)
 	knet.write_u8(&cctx.msg, 4)
-	testing.expect(t, !knet.command_issue(&cctx, &client, &set, CMD_MARK))
+	issue := knet.command_issue(&cctx, &client, &set, CMD_MARK)
+	testing.expect(t, issue.sent && !issue.prediction_attempted && !issue.prediction_applied)
 	testing.expect_value(t, client.state, u8(1)) // untouched: no prediction declared
 	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
 	testing.expect_value(t, knet.pending_action_count(&cctx.pending), 1)
@@ -1127,7 +1128,7 @@ command_non_predicted_defers_to_host :: proc(t: ^testing.T) {
 	cctx.now_tick = 100
 	knet.command_begin(&cctx, knet.Net_Id(1), CMD_MARK)
 	knet.write_u8(&cctx.msg, 5)
-	_ = knet.command_issue_checked(&cctx, &client, &set, CMD_MARK)
+	_ = knet.command_issue(&cctx, &client, &set, CMD_MARK)
 	creg := knet.registry_make()
 	defer knet.registry_destroy(&creg)
 	expired := make([dynamic]knet.Expired_Command)
@@ -1424,10 +1425,10 @@ registry_delta_replays_pending_prediction :: proc(t: ^testing.T) {
 	// Client predicts TWO adds back to back: +5 then +3.
 	knet.command_begin(&cctx, id, CMD_ADD)
 	knet.write_i32(&cctx.msg, 5)
-	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD).prediction_applied)
 	knet.command_begin(&cctx, id, CMD_ADD)
 	knet.write_i32(&cctx.msg, 3)
-	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD).prediction_applied)
 	testing.expect_value(t, client.hp, i32(18))
 	testing.expect_value(t, knet.pending_count(&cctx.pending), 2)
 
@@ -1437,8 +1438,8 @@ registry_delta_replays_pending_prediction :: proc(t: ^testing.T) {
 	res1 := knet.writer_make()
 	defer knet.writer_destroy(&res1)
 	rr := knet.reader_make(cap.msgs[0])
-	responded, ok, _ := knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7), &rr, &res1)
-	testing.expect(t, responded && ok)
+	first := knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7), &rr, &res1)
+	testing.expect(t, first.responded && first.reason == .None)
 	testing.expect_value(t, host.hp, i32(15))
 	cr1 := knet.reader_make(knet.writer_bytes(&res1))
 	_ = knet.registry_client_result(&creg, &cctx, &cr1)
@@ -1460,8 +1461,8 @@ registry_delta_replays_pending_prediction :: proc(t: ^testing.T) {
 	res2 := knet.writer_make()
 	defer knet.writer_destroy(&res2)
 	rr2 := knet.reader_make(cap.msgs[1])
-	responded, ok, _ = knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7), &rr2, &res2)
-	testing.expect(t, responded && ok)
+	second := knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7), &rr2, &res2)
+	testing.expect(t, second.responded && second.reason == .None)
 	cr2 := knet.reader_make(knet.writer_bytes(&res2))
 	_ = knet.registry_client_result(&creg, &cctx, &cr2)
 	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
@@ -1508,10 +1509,10 @@ registry_truncated_delta_is_transactional :: proc(t: ^testing.T) {
 	// Two predicted adds in flight: +5 then +3 — the client shows 18.
 	knet.command_begin(&cctx, id, CMD_ADD)
 	knet.write_i32(&cctx.msg, 5)
-	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD).prediction_applied)
 	knet.command_begin(&cctx, id, CMD_ADD)
 	knet.write_i32(&cctx.msg, 3)
-	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD).prediction_applied)
 	testing.expect_value(t, client.hp, i32(18))
 
 	// The host's own tick moves hp to 12; the delta arrives TRUNCATED inside
@@ -1566,7 +1567,7 @@ registry_delta_untouched_fields_do_not_double_apply :: proc(t: ^testing.T) {
 
 	knet.command_begin(&cctx, id, CMD_ADD)
 	knet.write_i32(&cctx.msg, 5)
-	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD).prediction_applied)
 	testing.expect_value(t, client.hp, i32(15))
 
 	// The host changed an UNRELATED field: the delta's mask does not carry hp.
@@ -1613,7 +1614,7 @@ registry_replay_precondition_failure_drops_prediction :: proc(t: ^testing.T) {
 
 	knet.command_begin(&cctx, id, CMD_ADD)
 	knet.write_i32(&cctx.msg, 5)
-	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD).prediction_applied)
 	testing.expect_value(t, client.hp, i32(15))
 
 	// Authoritative state now LOCKS the entity (CMD_ADD's reject condition):
@@ -1664,21 +1665,21 @@ registry_command_routing :: proc(t: ^testing.T) {
 	// Confirmed command through the registry resolver.
 	knet.command_begin(&cctx, hid, CMD_ADD)
 	knet.write_i32(&cctx.msg, 5)
-	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD))
+	testing.expect(t, knet.command_issue(&cctx, &client, &pset, CMD_ADD).prediction_applied)
 	result := knet.writer_make()
 	defer knet.writer_destroy(&result)
 	rr := knet.reader_make(cap.msgs[0])
-	responded, ok, h := knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7), &rr, &result)
-	testing.expect(t, responded && ok)
+	confirmed := knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7), &rr, &result)
+	testing.expect(t, confirmed.responded && confirmed.reason == .None)
 	testing.expect_value(t, host.hp, i32(15))
 	testing.expect(
 		t,
-		h.entity == hid && h.cmd == u16(CMD_ADD),
+		confirmed.header.entity == hid && confirmed.header.cmd == u16(CMD_ADD),
 		"the header comes back for command hooks",
 	)
 	res_r := knet.reader_make(knet.writer_bytes(&result))
 	res := knet.registry_client_result(&creg, &cctx, &res_r)
-	testing.expect(t, res.ok)
+	testing.expect_value(t, res.reason, knet.Action_Reject_Reason.None)
 	testing.expect_value(t, knet.pending_count(&cctx.pending), 0)
 
 	// A command naming an entity the host no longer has receives an addressed,
@@ -1689,7 +1690,7 @@ registry_command_routing :: proc(t: ^testing.T) {
 	_ = knet.command_issue(&cctx, &client, &pset, CMD_ADD) // predicts against the local copy
 	knet.writer_reset(&result)
 	rr2 := knet.reader_make(cap.msgs[1])
-	stale := knet.registry_host_command_checked(&sreg, &hctx, knet.Player_Id(7), &rr2, &result)
+	stale := knet.registry_host_command(&sreg, &hctx, knet.Player_Id(7), &rr2, &result)
 	testing.expect(t, stale.responded)
 	testing.expect_value(t, stale.reason, knet.Action_Reject_Reason.Stale)
 	stale_r := knet.reader_make(knet.writer_bytes(&result))
@@ -2668,7 +2669,6 @@ reject_truth_spares_the_sim_lane :: proc(t: ^testing.T) {
 		knet.Command_Result {
 			seq = 1,
 			entity = 1,
-			ok = false,
 			reason = .Predicate,
 			has_truth = true,
 		},

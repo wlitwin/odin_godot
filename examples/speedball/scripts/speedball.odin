@@ -43,7 +43,7 @@ Speedball :: struct {
 	kicker_scene: ^gd.Resource `gd:"entity=Kicker:1"`,
 	ball_scene:   ^gd.Resource `gd:"entity=Ball:2"`,
 
-	// The census is GENERATED (kicker_of / kicker_ids / kicker_owned_by) —
+	// The census is GENERATED (kicker_of / kicker_all / kicker_owned_by) —
 	// what's left is the hot pointers the sample, bots, and probes poke.
 	me_kick: ^Kicker,
 	ball:      ^Ball,
@@ -411,7 +411,7 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 			b.roll.vx += aim.x * KICK_POWER
 			b.roll.vy += aim.y * KICK_POWER
 			// The kick moves ANOTHER entity (the ball), so it can't ride the
-			// kicker's own tick channel — it is a cross-entity cue. The door
+			// kicker's own tick channel — it is a cross-entity event. The door
 			// holds every gate: this call is role-free.
 			ball_kicked(&g.boot, k, b.roll.vx, b.roll.vy)
 		}
@@ -419,7 +419,7 @@ sp_step :: proc(g: ^Speedball, tick: u64) {
 
 }
 
-// ---- the kick's presentation: a declared cue ------------------------------------
+// ---- the kick's presentation: a declared event ----------------------------------
 
 // @(gd_event) — the step discovers the kick (foot meets ball, cross-entity)
 // and announces it through the generated `ball_kicked` door. `k` is the only

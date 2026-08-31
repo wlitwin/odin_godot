@@ -13,7 +13,7 @@ import ksess "godot:kit/session"
 import "core:fmt"
 
 // The census hooks, down to the game-shaped lines — the generated queries
-// (kicker_of / kicker_ids / kicker_owned_by) answer what the old maps did.
+// (kicker_of / kicker_all / kicker_owned_by) answer what the old maps did.
 @(gd_half)
 kicker_spawned :: proc(game: ^Slopball, self: ^Kicker, id: knet.Net_Id, owner: knet.Player_Id) {
 	// Census time: fields NOT set yet. `mine` is role knowledge (who drives

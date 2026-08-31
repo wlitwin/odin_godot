@@ -83,11 +83,11 @@ fills a particular *slot* in Layer 2 (next section); the last column previews wh
 
 | Primitive | What it is | Pure? | Usually the… |
 |---|---|---|---|
-| `play.Edge(T)` | A client-local shadow of a value; `see` reports the one frame it moved. | ✅ | **Cue** trigger |
+| `play.Edge(T)` | A client-local shadow of a value; `see` reports the one frame it moved. | ✅ | **Presentation** trigger |
 | `play.Pace(T)` | A re-armable deadline: *is it time yet? then schedule the next.* `Deadlines(K,T)` keys several. | ✅ | **Cadence** gate |
 | `play.Machine(S)` | A state machine that **owns** its replicated `cur` (host writes, every peer steps). | ✅ | **State** (a mode) |
-| `play.anim` | Presentation float clocks: `decay`/`ramp`/`advance`/`hold`/`pulse`. | ✅ | **Cue** rendering |
-| `play.marker` | Lazy world-markers: `show`/`follow`/`fill`/`depth` over a built node. | ❌ engine | **Cue** rendering |
+| `play.anim` | Presentation float clocks: `decay`/`ramp`/`advance`/`hold`/`pulse`. | ✅ | **Presentation** rendering |
+| `play.marker` | Lazy world-markers: `show`/`follow`/`fill`/`depth` over a built node. | ❌ engine | **Presentation** rendering |
 | `play.Puppet` | Single-owner engine physics: the owner's RigidBody2D solver streams pose+velocity; every other screen freezes the body and glides it. `session_set_owner` moves the seat, momentum crosses the seam. | ❌ engine | **State** (a shared body) |
 | `play.Puppet3` | The 3D sibling: RigidBody3D, quaternion rotation (stream-layer `.Quat` nlerp; 3D rotation interps *correctly*, unlike 2D's snap), angular velocity across the seam. Same feel ledger, meters. | ❌ engine | **State** (a shared body) |
 
@@ -113,9 +113,9 @@ fills some subset of seven slots:
 | 4 | **Authority** | Who decides, and what decays each tick? | host only | the command hook + `host_*_tick` |
 | 5 | **Prediction** | How does it feel instant? | client | the `predict` command body |
 | 6 | **Reconcile** | How does the guess heal back to truth? | client | snap on a host *transition* |
-| 7 | **Cue** | How does it read, once per change, on every screen? | everyone (presentation) | `play.Edge`/`step` → `anim`/`marker` |
+| 7 | **Presentation** | How does it read, once per change, on every screen? | everyone | `play.Edge`/`step` → `anim`/`marker` |
 
-**Not every item fills every slot.** A cosmetic pickup is State + Authority + Cue with no
+**Not every item fills every slot.** A cosmetic pickup is State + Authority + Presentation with no
 Intent. A mob has no player behind it, so it skips Intent, Prediction, and Reconcile
 entirely. Treat the skeleton as a *checklist to walk*, not a mandate to fill; the
 [matrix](#the-same-skeleton-five-ways) below shows which items skip what.
@@ -230,7 +230,7 @@ gun_reconcile :: proc(self: ^Scrapyard, r: ^Runner) {
 }
 ```
 
-**7. Cue**: presentation reacts once per change, on every screen, driven by `play.step` off
+**7. Presentation**: presentation reacts once per change, on every screen, driven by `play.step` off
 the replicated `cur`. It never decides anything:
 
 ```odin
@@ -247,7 +247,7 @@ gun_edges :: proc(self: ^Scrapyard) {
 ```
 
 The host observes its own `set`; each client observes replication deliver `cur`; **both** run
-`step`, so the enter/exit cues fire identically on every screen with no RPC and no
+`step`, so the enter/exit reactions fire identically on every screen with no RPC and no
 coordination. Host and client running the same `step` off the same state is the mechanism
 underneath the whole recipe.
 
@@ -267,7 +267,7 @@ it skips.**
 | **Authority** | fire hook + tick dwell | `host_honor_revive` | the `*_brain` procs | `play.set` sites | proximity scan |
 | **Prediction** | `try_fire` + `jam_roll` | — | — | — | — |
 | **Reconcile** | `gun_reconcile` | — | — | — | — |
-| **Cue** | `gun_edges` (step) | revive-bar marker | telegraph + logs | `step` → banner | despawn |
+| **Presentation** | `gun_edges` (step) | revive-bar marker | telegraph + logs | `step` → banner | despawn |
 
 **Revive: a channeled ability.** A plain (non-predicted) command: `runner_revive` only
 asserts the target is down; `host_honor_revive` re-checks `kinter.in_range` and the reviver's
@@ -282,7 +282,7 @@ play.fill(cast(gd.Node2d)self.revive_fill, f32(pct) / 255)   // bar shows on EVE
 ```
 
 **Mob brain: a host-only actor.** No player is behind it, so it fills only Cadence +
-Authority + State + Cue and **skips Intent, Prediction, and Reconcile outright.** Its whole
+Authority + State + Presentation and **skips Intent, Prediction, and Reconcile outright.** Its whole
 behavior is one host proc; its timers are a `play.Deadlines`-style bundle of `Pace` on the net
 tick:
 
@@ -310,7 +310,7 @@ if all_runners_down(self) { play.set(&w.stage, STAGE_OVER); play.arm(&self.over_
 ```
 
 **Pickup: an ambient world rule.** No command at all: the host scans proximity each tick,
-credits the stat, and despawns the entity. It fills only Authority + State + Cue. The client
+credits the stat, and despawns the entity. It fills only Authority + State + Presentation. The client
 "feels" it as its scrap counter ticking up. This is the fewest slots an item can fill and
 still be a thing:
 
@@ -381,7 +381,7 @@ that trip people up have hard rules:
    state *changes*, detected via `play.see` on the replicated `cur`. Those moments are the
    boundaries where the two already agree.
 
-5. **Cue off edges, on every peer, and never decide there.** Presentation reads
+5. **Present off edges, on every peer, and never decide there.** Presentation reads
    `play.step` / `play.Edge` transitions and fires effects; it's pure, runs identically on
    host and client, and has zero authority. A snapshot catch-up (a late join) must
    `play.sync` the shadows first so a wound taken out of view doesn't replay as a fresh hit.
@@ -396,7 +396,7 @@ dance each time.
 
 - **[kit/ overview](kit/index.md)**: the per-package reference for the systems the Intent
   and Authority slots are built on (`session`, `combat`, `interact`, `net`, …).
-- **[Pure-Odin Events](events.md)**: when a Cue wants a real one-to-many dispatch across
+- **[Pure-Odin Events](events.md)**: when presentation wants a real one-to-many dispatch across
   systems instead of a per-frame edge read.
 - **The `play/` source**: every primitive is documented at its definition
   (`play/edge.odin`, `pace.odin`, `fsm.odin`, `anim.odin`, `marker.odin`); the doc comments

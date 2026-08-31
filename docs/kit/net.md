@@ -235,7 +235,7 @@ game_command_rejected :: proc(
 | `Timeout` | No final authority result arrived before the safety horizon. |
 
 `game_command_confirmed` receives `(seq, entity, cmd, model)`. On the authority,
-`game_command_executed` receives `(ok, player, entity, cmd, reason, seq, model)`
+`game_command_executed` receives `(player, entity, cmd, reason, seq, model)`
 for both execution models. These are generated callbacks: gameplay code never
 parses a verdict packet or maintains a sequence map. `model` disambiguates the
 two sequence/id namespaces when a game uses both. Non-predicted actions keep a
@@ -317,8 +317,9 @@ The policy has two independent axes:
   clock; the owning/live screen receives no additional interpolation delay.
 - `timing=auto` is accepted only when scriptgen can prove the clock: a
   sim-tracked anchor uses its watch clock, and a cooperative entity with
-  continuous `owner` state uses the session interpolation clock. Static and custom
-  clocks must say `immediate` or use the lower-level explicit scheduler.
+  continuous `owner` state uses the session interpolation clock. An anchorless
+  event in a lane-owning game uses that lane's watch clock. Other static and
+  custom clocks must say `immediate` or use the lower-level explicit scheduler.
 
 The anchor also chooses the existing transport implementation. A sim-tracked
 anchor lowers onto `SIM_FACT`; a cooperative/static event lowers onto the
@@ -329,8 +330,7 @@ through commands. A sim event may also present from the owning live pass, where
 it is derived from the same replayable tick rather than an unconfirmed
 standalone prediction.
 
-`@(gd_cue)` and legacy `@(gd_fact)` remain compatible sim-only spellings. New
-cross-model code should prefer `@(gd_event)`; tick `_fx`, field `_edge`, command
+`@(gd_event)` is the sole declared presentation-event form. Tick `_fx`, field `_edge`, command
 `_then`, and resimulation `_apply` retain their distinct phase contracts.
 
 ### Network tick and interpolation
@@ -757,21 +757,23 @@ Call `registry_sample_streams` once per *frame* (not per net tick) with
 `t = timeline_now - interp_delay`. Unknown ids in a stream batch are skipped by length
 rather than abandoning the batch: the next tick supersedes everything anyway.
 
-## The command loop
+## Advanced: the command-loop primitives
+
+Generated `<verb>_cmd` wrappers are the sole gameplay authoring surface. The
+procedures below are implementation primitives for a custom session shell; they
+do not provide an alternate boolean API.
 
 ```odin
 command_ctx_make :: proc(allocator := context.allocator) -> Command_Ctx
 command_begin :: proc(ctx: ^Command_Ctx, entity: Net_Id, cmd: Cmd_Id)
-command_issue :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd: Cmd_Id) -> bool
-command_issue_checked :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd: Cmd_Id) -> Command_Issue_Result
-registry_host_command :: proc(reg: ^Registry, ctx: ^Command_Ctx, peer_key: u64, r: ^Reader, out: ^Writer) -> (responded: bool, ok: bool, h: Command_Header)
-registry_host_command_checked :: proc(reg: ^Registry, ctx: ^Command_Ctx, by: Player_Id, r: ^Reader, out: ^Writer, admission := Action_Reject_Reason.None) -> Registry_Command_Outcome
+command_issue :: proc(ctx: ^Command_Ctx, entity: rawptr, set: ^Command_Set, cmd: Cmd_Id) -> Command_Issue_Result
+registry_host_command :: proc(reg: ^Registry, ctx: ^Command_Ctx, by: Player_Id, r: ^Reader, out: ^Writer, admission := Action_Reject_Reason.None) -> Registry_Command_Outcome
 registry_client_result :: proc(reg: ^Registry, ctx: ^Command_Ctx, r: ^Reader, me := PLAYER_ID_INVALID) -> Command_Result
 registry_expire_pending :: proc(reg: ^Registry, ctx: ^Command_Ctx, max_age_ticks: u64, me := PLAYER_ID_INVALID, out: ^[dynamic]Expired_Command = nil) -> int
 ```
 
-You rarely call these by hand: the generated `<proc>_cmd` wrapper is the whole author
-surface (`chest_take_cmd(&boot, chest, slot, px, py)`), and [kit/session](session.md)
+The generated `<proc>_cmd` wrapper is the normal path
+(`chest_take_cmd(&boot, chest, slot, px, py)`), and [kit/session](session.md)
 installs the send hook and drives the host/client/expiry paths. Guarantees the loop owns:
 `false` really means "no mutation" (declared fields are captured before the run and
 restored on any rejection, on both peers; a command can never leave torn replicated

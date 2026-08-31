@@ -22,6 +22,12 @@ handshake and pins recursive diagnostics across replicated fields, input
 records, profiles, and typed messages, including platform-width integers,
 implicit enums, pointers, hidden padding, and unsupported containers.
 
+`tests/author_surface/run.sh` guards the authoring language itself. It compiles
+negative fixtures for removed event attributes, quoted command policies, and
+redundant owner interpolation, then scans production source for retired action
+aliases and ID-only census generation. A compatibility spelling cannot return
+without making the complete suite fail.
+
 `tests/kitstress/run.sh` is the optimized scale/operations gate. It prints
 three receipts:
 

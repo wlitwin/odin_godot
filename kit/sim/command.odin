@@ -41,14 +41,9 @@ import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
 // Generated per verb: decode args, run the verb (and its `_apply` half when
-// declared), fire its `_then` on the authority at execution time. Returns
-// the verb's verdict.
-Cmd_Exec :: proc(entity: rawptr, args: []u8, lane: ^Lane, by: knet.Player_Id) -> bool
-
-// Generated verbs use the detailed form so decode failures stay distinct from
-// gameplay predicate failures. `exec` above remains for hand-built tables; the
-// runtime maps its false result to Predicate.
-Cmd_Exec_Checked :: proc(
+// declared), fire its `_then` on the authority at execution time. The typed
+// rejection reason keeps decode and gameplay failures distinct.
+Cmd_Exec :: proc(
 	entity: rawptr,
 	args: []u8,
 	lane: ^Lane,
@@ -80,8 +75,7 @@ Sim_Cmd :: struct {
 	// The same callback-free descriptor embedded by knet.Command_Desc. Only the
 	// execution callbacks below differ between the two models.
 	using action: knet.Action_Desc(Cmd_Id),
-	exec:         Cmd_Exec, // compatibility bool thunk (nil when exec_checked is generated)
-	exec_checked: Cmd_Exec_Checked,
+	exec:         Cmd_Exec,
 	apply:        Cmd_Apply, // nil = patch mode (recorded post-bytes replay)
 }
 
@@ -93,13 +87,10 @@ sim_cmd_execute :: proc(
 	lane: ^Lane,
 	by: knet.Player_Id,
 ) -> knet.Action_Reject_Reason {
-	if cmd.exec_checked != nil {
-		return cmd.exec_checked(entity, args, lane, by)
-	}
 	if cmd.exec == nil {
 		return .Malformed
 	}
-	return cmd.exec(entity, args, lane, by) ? .None : .Predicate
+	return cmd.exec(entity, args, lane, by)
 }
 
 // id → slot in the entity's command slice (-1 = unknown id: reject). Sets are
@@ -154,7 +145,7 @@ Cmd_Out :: struct {
 	cmd:          Cmd_Id, // the verb's stable wire id (Sim_Cmd.id — resolved by lookup, never a position)
 	args:         []u8, // owned
 	executed:     bool,
-	ok:           bool, // the LOCAL predicate's verdict (apply-mode resims gate on it)
+	local_reason: knet.Action_Reject_Reason, // apply-mode resims gate on the typed local verdict
 	mask:         u64, // predict-subset ordinals the verb changed
 	patch:        []u8, // their post-exec bytes, packed (owned)
 	revert:       []u8, // delta-subset capture from before the exec (owned)
@@ -264,7 +255,7 @@ Lane_Command_Result :: struct {
 
 // Detailed issue result for generated wrappers. The final authority verdict is
 // delivered through the same session command callbacks as co-op actions.
-lane_command_checked :: proc(
+lane_command :: proc(
 	l: ^Lane,
 	id: knet.Net_Id,
 	cmd: Cmd_Id,
@@ -340,11 +331,6 @@ lane_command_checked :: proc(
 	knet.write_bytes(w, args)
 	ksess.session_app_flush(l.ses, ksess.HOST_PEER) // reliable: verbs are one-shots
 	return {scheduled = true, seq = l.cmd_seq}
-}
-
-// Compatibility escape hatch for hand-written callers.
-lane_command :: proc(l: ^Lane, id: knet.Net_Id, cmd: Cmd_Id, args: []u8) -> bool {
-	return lane_command_checked(l, id, cmd, args).scheduled
 }
 
 @(private)
@@ -558,7 +544,7 @@ run_cmds :: proc(l: ^Lane, t: u64) {
 			cmd_exec_local(l, &c, tr, l.ses.me)
 		} else if l.resimming && c.executed && c.verdict != .Rejected {
 			if ap := tr.cmds[slot].apply; ap != nil {
-				if c.ok {
+				if c.local_reason == .None {
 					ap(tr.entity, c.args, l) // exact: re-run with corrected pre-state
 				}
 			} else if c.mask != 0 {
@@ -628,7 +614,7 @@ cmd_exec_local :: proc(l: ^Lane, c: ^Cmd_Out, tr: ^Tracked, me: knet.Player_Id, 
 	entity, dsc, cmds, hist := tr.entity, tr.desc, tr.cmds, tr.hist
 	idx := sim_cmd_find(cmds, c.cmd) // the verb's slot, resolved from its stable id
 	if idx < 0 {
-		c.ok = false // unknown verb id — same-build issue makes this unreachable
+		c.local_reason = .Malformed // unknown verb id — same-build issue makes this unreachable
 		return
 	}
 	if n := delta_lane_size(dsc); n > 0 {
@@ -644,9 +630,9 @@ cmd_exec_local :: proc(l: ^Lane, c: ^Cmd_Out, tr: ^Tracked, me: knet.Player_Id, 
 	c.patch = nil
 	l.cmd_exec_seq = u32(c.seq) // a predicted spawn inside this verb tags itself with the seq (spawn keys are raw u32)
 	local_reason := sim_cmd_execute(&cmds[idx], entity, c.args, l, me)
-	c.ok = local_reason == .None
+	c.local_reason = local_reason
 	l.cmd_exec_seq = 0
-	if c.ok && cmds[idx].apply == nil {
+	if c.local_reason == .None && cmds[idx].apply == nil {
 		scratch := make([]u8, hist.size, context.temp_allocator)
 		mask, n := cmd_patch_diff(scratch, pre, entity, dsc)
 		if n > 0 {
@@ -737,7 +723,7 @@ cmd_settle :: proc(l: ^Lane) {
 		}
 		c.executed = false
 		c.mask = 0
-		c.ok = false
+		c.local_reason = .None
 		for o in later {
 			// A survivor's re-exec may SPAWN (lane_spawn_predicted appends to
 			// l.tracked and can REALLOCATE it) — a ^Tracked held across the
