@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/workbench.odin" id="workbench"]
+[ext_resource type="PackedScene" path="res://main.tscn" id="game"]
+
+[node name="ReplayWorkbench" type="Node"]
+script = ExtResource("workbench")
+game_scene = ExtResource("game")

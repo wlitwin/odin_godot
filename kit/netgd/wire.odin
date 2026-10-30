@@ -296,6 +296,7 @@ wire_listen :: proc "contextless" (
 	on_net_down: cstring = "",
 ) -> gd.Error {
 	mp := gd.node_get_multiplayer(wire.node)
+	defer gd.release_ref(mp)
 	if cast(rawptr)mp == nil {return .Failed}
 	obj := cast(gd.Object)wire.node
 	if err := gd.connect_to(cast(gd.Object)mp, "peer_packet", obj, on_packet); err != .Ok {
@@ -570,11 +571,15 @@ wire_link_quality :: proc(wire: ^Session_Wire, peer: ksess.Peer_Id) -> (rtt_ms, 
 @(private)
 enet_peer_stats :: proc(node: gd.Node, peer: ksess.Peer_Id) -> (rtt_ms, jitter_ms, loss_pct: f64, ok: bool) {
 	mp := gd.node_get_multiplayer(node)
+	defer gd.release_ref(mp)
 	if cast(rawptr)mp == nil {return}
+	if !active_remote_peer(mp,peer) {return}
 	p := gd.multiplayer_api_get_multiplayer_peer(mp)
+	defer gd.release_ref(p)
 	if cast(rawptr)p == nil {return}
 	if !bool(gd.object_is_class(cast(gd.Object)p, gd.sname("ENetMultiplayerPeer"))) {return}
 	pkt := gd.e_net_multiplayer_peer_get_peer(cast(gd.E_Net_Multiplayer_Peer)p, gd.Int(peer))
+	defer gd.release_ref(pkt)
 	if cast(rawptr)pkt == nil {return}
 	rtt_ms = gd.e_net_packet_peer_get_statistic(pkt, .Peer_Round_Trip_Time)
 	jitter_ms = gd.e_net_packet_peer_get_statistic(pkt, .Peer_Round_Trip_Time_Variance)
@@ -591,11 +596,15 @@ enet_peer_stats :: proc(node: gd.Node, peer: ksess.Peer_Id) -> (rtt_ms, jitter_m
 // their rendezvous blobs are lobby ids). ok=false off-ENet or unknown peer.
 peer_address :: proc(node: gd.Node, peer: ksess.Peer_Id, allocator := context.temp_allocator) -> (addr: string, ok: bool) {
 	mp := gd.node_get_multiplayer(node)
+	defer gd.release_ref(mp)
 	if cast(rawptr)mp == nil {return "", false}
+	if !active_remote_peer(mp,peer) {return "",false}
 	p := gd.multiplayer_api_get_multiplayer_peer(mp)
+	defer gd.release_ref(p)
 	if cast(rawptr)p == nil {return "", false}
 	if !bool(gd.object_is_class(cast(gd.Object)p, gd.sname("ENetMultiplayerPeer"))) {return "", false}
 	pkt := gd.e_net_multiplayer_peer_get_peer(cast(gd.E_Net_Multiplayer_Peer)p, gd.Int(peer))
+	defer gd.release_ref(pkt)
 	if cast(rawptr)pkt == nil {return "", false}
 	gs := gd.e_net_packet_peer_get_remote_address(pkt)
 	defer gd.free_string(gs)
@@ -615,8 +624,10 @@ peer_address :: proc(node: gd.Node, peer: ksess.Peer_Id, allocator := context.te
 // dies, or the kicked player sees a mystery host-crash instead of the truth.
 drop_peer :: proc "contextless" (node: gd.Node, peer: ksess.Peer_Id) {
 	mp := gd.node_get_multiplayer(node)
+	defer gd.release_ref(mp)
 	if cast(rawptr)mp == nil {return}
 	p := gd.multiplayer_api_get_multiplayer_peer(mp)
+	defer gd.release_ref(p)
 	if cast(rawptr)p == nil {return}
 	gd.multiplayer_peer_disconnect_peer(p, gd.Int(peer), false)
 }
@@ -692,10 +703,14 @@ web_close :: proc(wire: ^Session_Wire) {
 // ENet feature; begin_host installed the peer this reaches).
 wire_punch :: proc(wire: ^Session_Wire, ip: cstring, port: int) {
 	mp := gd.node_get_multiplayer(wire.node)
+	defer gd.release_ref(mp)
 	if cast(rawptr)mp == nil {return}
 	peer := gd.multiplayer_api_get_multiplayer_peer(mp)
+	defer gd.release_ref(peer)
 	if cast(rawptr)peer == nil {return}
+	if !gd.object_is_class(cast(gd.Object)peer,gd.sname("ENetMultiplayerPeer")) {return}
 	host := gd.e_net_multiplayer_peer_get_host(cast(gd.E_Net_Multiplayer_Peer)peer)
+	defer gd.release_ref(host)
 	if cast(rawptr)host == nil {return}
 	addr := gd.new_string_cstring(ip)
 	defer gd.free_string(addr)
@@ -705,4 +720,12 @@ wire_punch :: proc(wire: ^Session_Wire, ip: cstring, port: int) {
 	for _ in 0 ..< 3 {
 		gd.e_net_connection_socket_send(host, addr, gd.Int(port), pkt)
 	}
+}
+
+@(private)
+active_remote_peer :: proc "contextless" (mp:gd.Multiplayer_Api,peer:ksess.Peer_Id)->bool {
+	if !gd.multiplayer_api_has_multiplayer_peer(mp) {return false}
+	ids:=gd.multiplayer_api_get_peers(mp);defer gd.free_packed_int32_array(ids)
+	for i in 0..<gd.packed_int32_array_size(&ids) {if ksess.Peer_Id(gd.packed_int32_array_get(&ids,i))==peer {return true}}
+	return false
 }

@@ -60,7 +60,7 @@ canvas_item_material_set_blend_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1786054936)
     }
     self := self
-    blend_mode_ := blend_mode_
+    blend_mode_ := Int(blend_mode_)
     args := []__bindgen_gde.TypePtr {
         &blend_mode_,
     }
@@ -78,7 +78,9 @@ canvas_item_material_get_blend_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Canvas_Item_Material_Blend_Mode(__return_storage)
     return
 }
 
@@ -92,7 +94,7 @@ canvas_item_material_set_light_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 628074070)
     }
     self := self
-    light_mode_ := light_mode_
+    light_mode_ := Int(light_mode_)
     args := []__bindgen_gde.TypePtr {
         &light_mode_,
     }
@@ -110,7 +112,9 @@ canvas_item_material_get_light_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Canvas_Item_Material_Light_Mode(__return_storage)
     return
 }
 
@@ -174,7 +178,9 @@ canvas_item_material_get_particles_anim_h_frames :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -206,7 +212,9 @@ canvas_item_material_get_particles_anim_v_frames :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

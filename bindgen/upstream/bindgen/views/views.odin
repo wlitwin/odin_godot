@@ -61,6 +61,9 @@ Method :: struct {
     vararg:      bool,
     hash:        i64,
     return_type: Maybe(string),
+    // Numeric metadata refines the public type, not the engine ptrcall ABI.
+    // Narrow integer/float results still require an Int/Float return slot.
+    return_storage: Maybe(string),
     // For vararg methods (which go through object_method_bind_call and return a
     // Variant): true when the declared return type is itself `Variant` (pass it
     // straight through), false when it must be converted (e.g. `Error`).
@@ -71,6 +74,7 @@ Method :: struct {
 Method_Arg :: struct {
     name: string,
     type: string,
+    storage: Maybe(string),
 }
 
 // A typed property accessor generated from a class `properties` entry. The

@@ -94,7 +94,9 @@ visual_shader_node_custom__get_return_icon_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Port_Type(__return_storage)
     return
 }
 
@@ -109,7 +111,9 @@ visual_shader_node_custom__get_input_port_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -127,7 +131,9 @@ visual_shader_node_custom__get_input_port_type :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &port_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Port_Type(__return_storage)
     return
 }
 
@@ -177,11 +183,13 @@ visual_shader_node_custom__get_default_input_port :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1894493699)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &type_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -196,7 +204,9 @@ visual_shader_node_custom__get_output_port_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -214,7 +224,9 @@ visual_shader_node_custom__get_output_port_type :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &port_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Port_Type(__return_storage)
     return
 }
 
@@ -247,7 +259,9 @@ visual_shader_node_custom__get_property_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -283,7 +297,9 @@ visual_shader_node_custom__get_property_default_index :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -320,8 +336,8 @@ visual_shader_node_custom__get_code :: proc "contextless" (
     self := self
     input_vars_ := input_vars_
     output_vars_ := output_vars_
-    mode_ := mode_
-    type_ := type_
+    mode_ := Int(mode_)
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &input_vars_,
         &output_vars_,
@@ -343,8 +359,8 @@ visual_shader_node_custom__get_func_code :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1924221678)
     }
     self := self
-    mode_ := mode_
-    type_ := type_
+    mode_ := Int(mode_)
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
         &type_,
@@ -363,7 +379,7 @@ visual_shader_node_custom__get_global_code :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3956542358)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -397,8 +413,8 @@ visual_shader_node_custom__is_available :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1932120545)
     }
     self := self
-    mode_ := mode_
-    type_ := type_
+    mode_ := Int(mode_)
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
         &type_,
@@ -421,7 +437,9 @@ visual_shader_node_custom_get_option_index :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &option_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

@@ -1,0 +1,15 @@
+{
+  "protocol": 7,
+  "content": "0x5253435241503043",
+  "bytes": 53283,
+  "assets": 0,
+  "sha256": "ea8c02c89ea384e78e52f56ac031691dd8da051bbebc1e0b695b47bc40df2298",
+  "test_token_label": "protocol-upgrade-owner",
+  "provenance": "Content-42 import accepted and resumed by the content-43 game; original recorded receipts are in docs/replay/results/workbench-2026-09-07/upgrade/receipts.json",
+  "validated_by": {
+    "path": "/Users/walter/data/code/odin/odin_godot/examples/replay_scrapyard/bin/libodinscripts.dylib",
+    "sha256": "16036218c9ee67e366ee9b8ee20225717aea844cf6c58358c3c74ca5518c6c59"
+  },
+  "tick": "13",
+  "hash": "5165365752760899147"
+}

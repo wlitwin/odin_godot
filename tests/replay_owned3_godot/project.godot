@@ -1,0 +1,17 @@
+config_version=5
+[application]
+config/name="Replay 3D Ownership Probe"
+run/main_scene="res://probe.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+[display]
+window/size/viewport_width=960
+window/size/viewport_height=600
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+[rendering]
+renderer/rendering_method="gl_compatibility"
+
+[physics]
+common/physics_interpolation=true
+3d/default_gravity=9.8

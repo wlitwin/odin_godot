@@ -607,7 +607,9 @@ navigation_server3d_map_get_iteration_id :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &map_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -725,7 +727,9 @@ navigation_server3d_region_get_iteration_id :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &region_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1050,7 +1054,9 @@ navigation_server3d_region_get_navigation_layers :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &region_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1146,7 +1152,9 @@ navigation_server3d_region_get_connections_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &region_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1332,7 +1340,9 @@ navigation_server3d_link_get_iteration_id :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &link_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1484,7 +1494,9 @@ navigation_server3d_link_get_navigation_layers :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &link_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1917,7 +1929,9 @@ navigation_server3d_agent_get_max_neighbors :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &agent_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2297,7 +2311,9 @@ navigation_server3d_agent_get_avoidance_layers :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &agent_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -2335,7 +2351,9 @@ navigation_server3d_agent_get_avoidance_mask :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &agent_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -2768,7 +2786,9 @@ navigation_server3d_obstacle_get_avoidance_layers :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &obstacle_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -2994,11 +3014,13 @@ navigation_server3d_get_process_info :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1938440894)
     }
     self := self
-    process_info_ := process_info_
+    process_info_ := Int(process_info_)
     args := []__bindgen_gde.TypePtr {
         &process_info_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

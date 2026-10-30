@@ -54,7 +54,9 @@ curve_get_point_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -92,8 +94,8 @@ curve_add_point :: proc "contextless" (
     position_ := position_
     left_tangent_ := left_tangent_
     right_tangent_ := right_tangent_
-    left_mode_ := left_mode_
-    right_mode_ := right_mode_
+    left_mode_ := Int(left_mode_)
+    right_mode_ := Int(right_mode_)
     args := []__bindgen_gde.TypePtr {
         &position_,
         &left_tangent_,
@@ -101,7 +103,9 @@ curve_add_point :: proc "contextless" (
         &left_mode_,
         &right_mode_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -191,7 +195,9 @@ curve_set_point_offset :: proc "contextless" (
         &index_,
         &offset_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -281,7 +287,9 @@ curve_get_point_left_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Curve_Tangent_Mode(__return_storage)
     return
 }
 
@@ -299,7 +307,9 @@ curve_get_point_right_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Curve_Tangent_Mode(__return_storage)
     return
 }
 
@@ -355,7 +365,7 @@ curve_set_point_left_mode :: proc "contextless" (
     }
     self := self
     index_ := index_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &mode_,
@@ -375,7 +385,7 @@ curve_set_point_right_mode :: proc "contextless" (
     }
     self := self
     index_ := index_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &mode_,
@@ -580,7 +590,9 @@ curve_get_bake_resolution :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

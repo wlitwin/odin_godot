@@ -1,0 +1,7 @@
+[gd_scene load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/probe.odin" id="1"]
+[ext_resource type="Script" path="res://fake_steam.gd" id="2"]
+[node name="SteamProbe" type="Node"]
+script = ExtResource("1")
+[node name="FakeSteam" type="Node" parent="."]
+script = ExtResource("2")

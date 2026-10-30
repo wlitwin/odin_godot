@@ -1,0 +1,25 @@
+[gd_scene format=3]
+[ext_resource type="Texture2D" path="res://assets/fx_vignette.png" id="vignette"]
+
+[node name="ScreenFx" type="CanvasLayer"]
+layer = 1
+
+[node name="Vignette" type="TextureRect" parent="."]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("vignette")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="FloorVeil" type="ColorRect" parent="."]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)

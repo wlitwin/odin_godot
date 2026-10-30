@@ -54,7 +54,7 @@ drawable_texture2d_set_format :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2875673594)
     }
     self := self
-    format_ := format_
+    format_ := Int(format_)
     args := []__bindgen_gde.TypePtr {
         &format_,
     }
@@ -109,7 +109,7 @@ drawable_texture2d_setup :: proc "contextless" (
     self := self
     width_ := width_
     height_ := height_
-    format_ := format_
+    format_ := Int(format_)
     color_ := color_
     use_mipmaps_ := use_mipmaps_
     args := []__bindgen_gde.TypePtr {

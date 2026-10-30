@@ -244,10 +244,14 @@ OFFLINE := Transport {
 offline_open_host :: proc(wire: ^Session_Wire, at: Endpoint, name: string, token: u64, dedicated: bool) -> bool {
 	_ = at
 	mp := gd.node_get_multiplayer(wire.node)
+	defer gd.release_ref(mp)
 	if cast(rawptr)mp == nil {
 		return false
 	}
-	gd.multiplayer_api_set_multiplayer_peer(mp, gd.new_offline_multiplayer_peer())
+	peer:=gd.new_offline_multiplayer_peer()
+	gd.ref_counted_init_ref(peer)
+	defer gd.release_ref(peer)
+	gd.multiplayer_api_set_multiplayer_peer(mp,peer)
 	ksess.session_host_start(wire.ses, name, token, dedicated)
 	return true
 }

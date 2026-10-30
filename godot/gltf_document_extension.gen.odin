@@ -55,7 +55,9 @@ gltf_document_extension__import_preflight :: proc "contextless" (
         &state_,
         &extensions_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -94,7 +96,9 @@ gltf_document_extension__parse_node_extensions :: proc "contextless" (
         &gltf_node_,
         &extensions_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -121,7 +125,9 @@ gltf_document_extension__parse_image_data :: proc "contextless" (
         &mime_type_,
         &ret_image_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -160,7 +166,9 @@ gltf_document_extension__parse_texture_json :: proc "contextless" (
         &texture_json_,
         &ret_gltf_texture_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -202,7 +210,9 @@ gltf_document_extension__import_post_parse :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &state_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -220,7 +230,9 @@ gltf_document_extension__import_pre_generate :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &state_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -271,7 +283,9 @@ gltf_document_extension__import_node :: proc "contextless" (
         &json_,
         &node_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -292,7 +306,9 @@ gltf_document_extension__import_post :: proc "contextless" (
         &state_,
         &root_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -331,7 +347,9 @@ gltf_document_extension__export_preflight :: proc "contextless" (
         &state_,
         &root_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -375,7 +393,9 @@ gltf_document_extension__export_post_convert :: proc "contextless" (
         &state_,
         &root_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -393,7 +413,9 @@ gltf_document_extension__export_preserialize :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &state_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -501,7 +523,9 @@ gltf_document_extension__save_image_at_path :: proc "contextless" (
         &image_format_,
         &lossy_quality_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -528,7 +552,9 @@ gltf_document_extension__serialize_texture_json :: proc "contextless" (
         &gltf_texture_,
         &image_format_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -555,7 +581,9 @@ gltf_document_extension__export_node :: proc "contextless" (
         &json_,
         &node_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -573,7 +601,9 @@ gltf_document_extension__export_post :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &state_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

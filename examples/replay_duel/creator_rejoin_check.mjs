@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const root=process.argv[2];
+const saved=readFileSync(`${root}/saved-listen.log`,'utf8');
+const returned=readFileSync(`${root}/listen.log`,'utf8');
+const survivor=readFileSync(`${root}/dial.log`,'utf8');
+assert.match(saved,/RDP_SAVED seat=0 head=240 /);
+assert.match(returned,/RDP_RESTORED /);
+assert.match(survivor,/RDP_REJOIN_WAIT /);
+assert.match(survivor,/RDP_NATIVE_TRANSPORT_REOPEN attempt=1 /);
+assert.match(survivor,/RDP_NATIVE_CREATOR_REBOUND local=1 physical_local=\d+ retired_transport=true frontiers_retained=true/);
+assert.equal((survivor.match(/RDP_LIVE_REBOUND /g)??[]).length,1);
+assert.match(survivor,/RDP_LIVE_REBOUND count=1 old=1 new=1 /);
+assert.doesNotMatch(survivor,/RDP_RESTORED /);
+console.log('REPLAY_NATIVE_CREATOR_CHECK_OK restored_slot=0 survivor_slot=1 physical_source_reused=1');

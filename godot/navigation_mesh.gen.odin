@@ -66,7 +66,7 @@ navigation_mesh_set_sample_partition_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2472437533)
     }
     self := self
-    sample_partition_type_ := sample_partition_type_
+    sample_partition_type_ := Int(sample_partition_type_)
     args := []__bindgen_gde.TypePtr {
         &sample_partition_type_,
     }
@@ -84,7 +84,9 @@ navigation_mesh_get_sample_partition_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Navigation_Mesh_Sample_Partition_Type(__return_storage)
     return
 }
 
@@ -98,7 +100,7 @@ navigation_mesh_set_parsed_geometry_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3064713163)
     }
     self := self
-    geometry_type_ := geometry_type_
+    geometry_type_ := Int(geometry_type_)
     args := []__bindgen_gde.TypePtr {
         &geometry_type_,
     }
@@ -116,7 +118,9 @@ navigation_mesh_get_parsed_geometry_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Navigation_Mesh_Parsed_Geometry_Type(__return_storage)
     return
 }
 
@@ -148,7 +152,9 @@ navigation_mesh_get_collision_mask :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -200,7 +206,7 @@ navigation_mesh_set_source_geometry_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2700825194)
     }
     self := self
-    mask_ := mask_
+    mask_ := Int(mask_)
     args := []__bindgen_gde.TypePtr {
         &mask_,
     }
@@ -218,7 +224,9 @@ navigation_mesh_get_source_geometry_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Navigation_Mesh_Source_Geometry_Mode(__return_storage)
     return
 }
 
@@ -922,7 +930,9 @@ navigation_mesh_get_polygon_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const root=process.argv[2];
+const logs=Object.fromEntries(['listen','dial','watch'].map(role=>[role,readFileSync(`${root}/${role}.log`,'utf8')]));
+assert.match(logs.listen,/RDP_WATCH_SOURCE_RETIRED confirmed=\d+ player_continues=true/);
+assert.match(logs.dial,/RDP_WATCH_SOURCE_RESUMED local=1 anchor=\d+ confirmed=\d+/);
+assert.match(logs.watch,/REPLAY_DUEL_WATCH_FAILOVER_OK rebinds=1 extra_resets=0/);
+const point=logs.watch.match(/RDP_WATCH_REBOUND tick=(\d+) chain=(\d+) binding=78 retained=true/);
+assert.ok(point && Number(point[1])>=250 && Number(point[1])<900);
+assert.equal((logs.watch.match(/RDP_WATCH_RESET /g)??[]).length,1);
+console.log(`REPLAY_DUEL_WATCH_FAILOVER_CHECK_OK anchor=${point[1]} chain=${point[2]}`);

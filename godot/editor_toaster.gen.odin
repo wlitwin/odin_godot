@@ -56,7 +56,7 @@ editor_toaster_push_toast :: proc "contextless" (
     }
     self := self
     message_ := message_
-    severity_ := severity_
+    severity_ := Int(severity_)
     tooltip_ := tooltip_
     args := []__bindgen_gde.TypePtr {
         &message_,

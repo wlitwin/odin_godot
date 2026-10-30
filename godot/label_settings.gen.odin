@@ -162,7 +162,9 @@ label_settings_get_font_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -226,7 +228,9 @@ label_settings_get_outline_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -290,7 +294,9 @@ label_settings_get_shadow_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -369,7 +375,9 @@ label_settings_get_stacked_outline_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -478,7 +486,9 @@ label_settings_get_stacked_outline_size :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -531,7 +541,9 @@ label_settings_get_stacked_shadow_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -716,7 +728,9 @@ label_settings_get_stacked_shadow_outline_size :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

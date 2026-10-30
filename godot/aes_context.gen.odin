@@ -57,7 +57,7 @@ aes_context_start :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3122411423)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     key_ := key_
     iv_ := iv_
     args := []__bindgen_gde.TypePtr {
@@ -65,7 +65,9 @@ aes_context_start :: proc "contextless" (
         &key_,
         &iv_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

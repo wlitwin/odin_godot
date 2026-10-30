@@ -135,7 +135,7 @@ geometry_instance3d_set_cast_shadows_setting :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 856677339)
     }
     self := self
-    shadow_casting_setting_ := shadow_casting_setting_
+    shadow_casting_setting_ := Int(shadow_casting_setting_)
     args := []__bindgen_gde.TypePtr {
         &shadow_casting_setting_,
     }
@@ -153,7 +153,9 @@ geometry_instance3d_get_cast_shadows_setting :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Geometry_Instance3d_Shadow_Casting_Setting(__return_storage)
     return
 }
 
@@ -359,7 +361,7 @@ geometry_instance3d_set_visibility_range_fade_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1440117808)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -377,7 +379,9 @@ geometry_instance3d_get_visibility_range_fade_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Geometry_Instance3d_Visibility_Range_Fade_Mode(__return_storage)
     return
 }
 
@@ -493,7 +497,7 @@ geometry_instance3d_set_lightmap_scale :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2462696582)
     }
     self := self
-    scale_ := scale_
+    scale_ := Int(scale_)
     args := []__bindgen_gde.TypePtr {
         &scale_,
     }
@@ -511,7 +515,9 @@ geometry_instance3d_get_lightmap_scale :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Geometry_Instance3d_Lightmap_Scale(__return_storage)
     return
 }
 
@@ -525,7 +531,7 @@ geometry_instance3d_set_gi_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2548557163)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -543,7 +549,9 @@ geometry_instance3d_get_gi_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Geometry_Instance3dgi_Mode(__return_storage)
     return
 }
 

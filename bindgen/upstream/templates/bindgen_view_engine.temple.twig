@@ -66,7 +66,11 @@ new_{{ this.snake_name }} :: proc "contextless" () -> {{ this.self }} {
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, {{ i64(method.hash) }})
     }
 {% for arg in method.args %}
+{% if storage, wide_arg := arg.storage.(string); wide_arg %}
+    {{ arg.name }}_ := {{ storage }}({{ arg.name }}_)
+{% else %}
     {{ arg.name }}_ := {{ arg.name }}_
+{% end %}
     __fv_{{ arg.name }} := variant_from(&{{ arg.name }}_)
 {% end %}
     __argv: [64]__bindgen_gde.VariantPtr
@@ -113,14 +117,24 @@ new_{{ this.snake_name }} :: proc "contextless" () -> {{ this.self }} {
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, {{ i64(method.hash) }})
     }
 {% for arg in method.args %}
+{% if storage, wide_arg := arg.storage.(string); wide_arg %}
+    {{ arg.name }}_ := {{ storage }}({{ arg.name }}_)
+{% else %}
     {{ arg.name }}_ := {{ arg.name }}_
+{% end %}
 {% end %}
     args := []__bindgen_gde.TypePtr {
 {% for arg in method.args %}
         &{{ arg.name }}_,
 {% end %}
     }
+{% if storage, wide_return := method.return_storage.(string); wide_return %}
+    __return_storage: {{ storage }}
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = {{ return_type }}(__return_storage)
+{% else %}
     __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+{% end %}
     return
 }
 
@@ -136,7 +150,11 @@ new_{{ this.snake_name }} :: proc "contextless" () -> {{ this.self }} {
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, {{ i64(method.hash) }})
     }
 {% for arg in method.args %}
+{% if storage, wide_arg := arg.storage.(string); wide_arg %}
+    {{ arg.name }}_ := {{ storage }}({{ arg.name }}_)
+{% else %}
     {{ arg.name }}_ := {{ arg.name }}_
+{% end %}
 {% end %}
     args := []__bindgen_gde.TypePtr {
 {% for arg in method.args %}
@@ -170,7 +188,11 @@ new_{{ this.snake_name }} :: proc "contextless" () -> {{ this.self }} {
     }
     self := self
 {% for arg in method.args %}
+{% if storage, wide_arg := arg.storage.(string); wide_arg %}
+    {{ arg.name }}_ := {{ storage }}({{ arg.name }}_)
+{% else %}
     {{ arg.name }}_ := {{ arg.name }}_
+{% end %}
     __fv_{{ arg.name }} := variant_from(&{{ arg.name }}_)
 {% end %}
     __argv: [64]__bindgen_gde.VariantPtr
@@ -219,14 +241,24 @@ new_{{ this.snake_name }} :: proc "contextless" () -> {{ this.self }} {
     }
     self := self
 {% for arg in method.args %}
+{% if storage, wide_arg := arg.storage.(string); wide_arg %}
+    {{ arg.name }}_ := {{ storage }}({{ arg.name }}_)
+{% else %}
     {{ arg.name }}_ := {{ arg.name }}_
+{% end %}
 {% end %}
     args := []__bindgen_gde.TypePtr {
 {% for arg in method.args %}
         &{{ arg.name }}_,
 {% end %}
     }
+{% if storage, wide_return := method.return_storage.(string); wide_return %}
+    __return_storage: {{ storage }}
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = {{ return_type }}(__return_storage)
+{% else %}
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+{% end %}
     return
 }
 
@@ -244,7 +276,11 @@ new_{{ this.snake_name }} :: proc "contextless" () -> {{ this.self }} {
     }
     self := self
 {% for arg in method.args %}
+{% if storage, wide_arg := arg.storage.(string); wide_arg %}
+    {{ arg.name }}_ := {{ storage }}({{ arg.name }}_)
+{% else %}
     {{ arg.name }}_ := {{ arg.name }}_
+{% end %}
 {% end %}
     args := []__bindgen_gde.TypePtr {
 {% for arg in method.args %}

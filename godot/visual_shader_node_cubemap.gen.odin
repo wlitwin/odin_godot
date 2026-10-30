@@ -59,7 +59,7 @@ visual_shader_node_cubemap_set_source :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1625400621)
     }
     self := self
-    value_ := value_
+    value_ := Int(value_)
     args := []__bindgen_gde.TypePtr {
         &value_,
     }
@@ -77,7 +77,9 @@ visual_shader_node_cubemap_get_source :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Cubemap_Source(__return_storage)
     return
 }
 
@@ -123,7 +125,7 @@ visual_shader_node_cubemap_set_texture_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1899718876)
     }
     self := self
-    value_ := value_
+    value_ := Int(value_)
     args := []__bindgen_gde.TypePtr {
         &value_,
     }
@@ -141,7 +143,9 @@ visual_shader_node_cubemap_get_texture_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Cubemap_Texture_Type(__return_storage)
     return
 }
 

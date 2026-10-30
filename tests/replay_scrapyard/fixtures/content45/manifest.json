@@ -1,0 +1,12 @@
+{
+  "protocol": 7,
+  "content": "0x5253435241503045",
+  "bytes": 53283,
+  "assets": 0,
+  "sha256": "786338b2c587395aad5f6b4fb6a94a9088967f58550eaaadeecd5b559fc51b65",
+  "test_token_label": "protocol-upgrade-owner",
+  "provenance": "Converted from the frozen content-44 run by the actual content-45 CLI before adding Arc flashes. State, tick, identity and assets unchanged.",
+  "tick": "13",
+  "hash": "5165365752760899147",
+  "producer_sha256": "d7a4f8217e4946fd56601a0287880cb75a38c3304aea7ebefab1773c93c46ecc"
+}

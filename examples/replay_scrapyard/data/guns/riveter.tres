@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="GunDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/defs/gun_def.odin" id="1"]
+[ext_resource type="Script" path="res://scripts/defs/projectile_def.odin" id="2"]
+
+[sub_resource type="Resource" id="proj"]
+script = ExtResource("2")
+speed = 12.0
+ttl = 45
+
+[resource]
+script = ExtResource("1")
+id = 1
+name = "riveter"
+kind = 1
+cooldown = 6
+dmg = 1
+mag = 20
+reload_ticks = 108
+jam_per_mille = 30
+jam_taps = 3
+projectile = SubResource("proj")
+sprite_pos = Vector2(64, 64)
+sprite_size = Vector2(32, 16)

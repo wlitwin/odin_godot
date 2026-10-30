@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="StatusDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/defs/status_def.odin" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = 2
+name = "burn"
+duration = 240
+max_stacks = 1
+move_mult = 1.0
+dot_dmg = 1
+dot_every = 30
+taken_mult = 1.0
+dealt_mult = 1.0
+tint = Color(1.0, 0.55, 0.25, 0.6)

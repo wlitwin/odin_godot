@@ -114,7 +114,9 @@ script_reload :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &keep_state_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

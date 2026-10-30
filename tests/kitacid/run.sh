@@ -172,8 +172,10 @@ attempt() {
 	grep -q "OBSERVER_DONE" "$olog" || { echo "  FAIL: observer did not finish cleanly"; ok=0; }
 
 	# ---- backup hosting: exactly ONE client holds the re-hostable snapshot ----
-	local nbackup=$(( $(grep -c "ACID_BACKUP bytes=" "$wlog") > 0 ? 1 : 0 ))
-	local obackup=$(( $(grep -c "ACID_BACKUP bytes=" "$olog") > 0 ? 1 : 0 ))
+	# A graceful departure legitimately selects a replacement holder. Check
+	# one recipient while both clients are present; keep all later raw receipts.
+	local nbackup=$(awk '/ACID_PLAYER_LEFT/{exit} /ACID_BACKUP bytes=/{n++} END{print (n>0 ? 1 : 0)}' "$wlog")
+	local obackup=$(awk '/ACID_PLAYER_LEFT/{exit} /ACID_BACKUP bytes=/{n++} END{print (n>0 ? 1 : 0)}' "$olog")
 	[[ $((nbackup + obackup)) == 1 ]] \
 		|| { echo "  FAIL: expected exactly one designated backup client (owner=$nbackup observer=$obackup)"; ok=0; }
 

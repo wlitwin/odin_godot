@@ -113,7 +113,7 @@ crypto_sign :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1673662703)
     }
     self := self
-    hash_type_ := hash_type_
+    hash_type_ := Int(hash_type_)
     hash_ := hash_
     key_ := key_
     args := []__bindgen_gde.TypePtr {
@@ -138,7 +138,7 @@ crypto_verify :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2805902225)
     }
     self := self
-    hash_type_ := hash_type_
+    hash_type_ := Int(hash_type_)
     hash_ := hash_
     signature_ := signature_
     key_ := key_
@@ -206,7 +206,7 @@ crypto_hmac_digest :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2368951203)
     }
     self := self
-    hash_type_ := hash_type_
+    hash_type_ := Int(hash_type_)
     key_ := key_
     msg_ := msg_
     args := []__bindgen_gde.TypePtr {

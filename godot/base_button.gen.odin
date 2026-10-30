@@ -250,7 +250,7 @@ base_button_set_action_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1985162088)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -268,7 +268,9 @@ base_button_get_action_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Button_Action_Mode(__return_storage)
     return
 }
 
@@ -282,7 +284,7 @@ base_button_set_button_mask :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3950145251)
     }
     self := self
-    mask_ := mask_
+    mask_ := Int(mask_)
     args := []__bindgen_gde.TypePtr {
         &mask_,
     }
@@ -300,7 +302,9 @@ base_button_get_button_mask :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Mouse_Button_Mask(__return_storage)
     return
 }
 
@@ -315,7 +319,9 @@ base_button_get_draw_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Button_Draw_Mode(__return_storage)
     return
 }
 

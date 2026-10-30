@@ -144,7 +144,7 @@ rd_pipeline_rasterization_state_set_cull_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2662586502)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -162,7 +162,9 @@ rd_pipeline_rasterization_state_get_cull_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Polygon_Cull_Mode(__return_storage)
     return
 }
 
@@ -176,7 +178,7 @@ rd_pipeline_rasterization_state_set_front_face :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2637251213)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -194,7 +196,9 @@ rd_pipeline_rasterization_state_get_front_face :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Polygon_Front_Face(__return_storage)
     return
 }
 
@@ -386,7 +390,9 @@ rd_pipeline_rasterization_state_get_patch_control_points :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 

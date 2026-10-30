@@ -279,7 +279,9 @@ font_get_font_style :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Font_Style(__return_storage)
     return
 }
 
@@ -294,7 +296,9 @@ font_get_font_weight :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -309,7 +313,9 @@ font_get_font_stretch :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -374,11 +380,13 @@ font_get_spacing :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1310880908)
     }
     self := self
-    spacing_ := spacing_
+    spacing_ := Int(spacing_)
     args := []__bindgen_gde.TypePtr {
         &spacing_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -434,12 +442,12 @@ font_get_string_size :: proc "contextless" (
     }
     self := self
     text_ := text_
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     width_ := width_
     font_size_ := font_size_
-    justification_flags_ := justification_flags_
-    direction_ := direction_
-    orientation_ := orientation_
+    justification_flags_ := Int(justification_flags_)
+    direction_ := Int(direction_)
+    orientation_ := Int(orientation_)
     args := []__bindgen_gde.TypePtr {
         &text_,
         &alignment_,
@@ -472,14 +480,14 @@ font_get_multiline_string_size :: proc "contextless" (
     }
     self := self
     text_ := text_
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     width_ := width_
     font_size_ := font_size_
     max_lines_ := max_lines_
-    brk_flags_ := brk_flags_
-    justification_flags_ := justification_flags_
-    direction_ := direction_
-    orientation_ := orientation_
+    brk_flags_ := Int(brk_flags_)
+    justification_flags_ := Int(justification_flags_)
+    direction_ := Int(direction_)
+    orientation_ := Int(orientation_)
     args := []__bindgen_gde.TypePtr {
         &text_,
         &alignment_,
@@ -518,13 +526,13 @@ font_draw_string :: proc "contextless" (
     canvas_item_ := canvas_item_
     pos_ := pos_
     text_ := text_
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     width_ := width_
     font_size_ := font_size_
     modulate_ := modulate_
-    justification_flags_ := justification_flags_
-    direction_ := direction_
-    orientation_ := orientation_
+    justification_flags_ := Int(justification_flags_)
+    direction_ := Int(direction_)
+    orientation_ := Int(orientation_)
     oversampling_ := oversampling_
     args := []__bindgen_gde.TypePtr {
         &canvas_item_,
@@ -567,15 +575,15 @@ font_draw_multiline_string :: proc "contextless" (
     canvas_item_ := canvas_item_
     pos_ := pos_
     text_ := text_
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     width_ := width_
     font_size_ := font_size_
     max_lines_ := max_lines_
     modulate_ := modulate_
-    brk_flags_ := brk_flags_
-    justification_flags_ := justification_flags_
-    direction_ := direction_
-    orientation_ := orientation_
+    brk_flags_ := Int(brk_flags_)
+    justification_flags_ := Int(justification_flags_)
+    direction_ := Int(direction_)
+    orientation_ := Int(orientation_)
     oversampling_ := oversampling_
     args := []__bindgen_gde.TypePtr {
         &canvas_item_,
@@ -619,14 +627,14 @@ font_draw_string_outline :: proc "contextless" (
     canvas_item_ := canvas_item_
     pos_ := pos_
     text_ := text_
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     width_ := width_
     font_size_ := font_size_
     size_ := size_
     modulate_ := modulate_
-    justification_flags_ := justification_flags_
-    direction_ := direction_
-    orientation_ := orientation_
+    justification_flags_ := Int(justification_flags_)
+    direction_ := Int(direction_)
+    orientation_ := Int(orientation_)
     oversampling_ := oversampling_
     args := []__bindgen_gde.TypePtr {
         &canvas_item_,
@@ -671,16 +679,16 @@ font_draw_multiline_string_outline :: proc "contextless" (
     canvas_item_ := canvas_item_
     pos_ := pos_
     text_ := text_
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     width_ := width_
     font_size_ := font_size_
     max_lines_ := max_lines_
     size_ := size_
     modulate_ := modulate_
-    brk_flags_ := brk_flags_
-    justification_flags_ := justification_flags_
-    direction_ := direction_
-    orientation_ := orientation_
+    brk_flags_ := Int(brk_flags_)
+    justification_flags_ := Int(justification_flags_)
+    direction_ := Int(direction_)
+    orientation_ := Int(orientation_)
     oversampling_ := oversampling_
     args := []__bindgen_gde.TypePtr {
         &canvas_item_,

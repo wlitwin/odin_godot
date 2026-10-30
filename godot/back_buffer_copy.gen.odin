@@ -85,7 +85,7 @@ back_buffer_copy_set_copy_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1713538590)
     }
     self := self
-    copy_mode_ := copy_mode_
+    copy_mode_ := Int(copy_mode_)
     args := []__bindgen_gde.TypePtr {
         &copy_mode_,
     }
@@ -103,7 +103,9 @@ back_buffer_copy_get_copy_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Back_Buffer_Copy_Copy_Mode(__return_storage)
     return
 }
 

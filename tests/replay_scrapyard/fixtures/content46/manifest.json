@@ -1,0 +1,12 @@
+{
+  "protocol": 7,
+  "content": "0x5253435241503046",
+  "bytes": 53283,
+  "assets": 0,
+  "sha256": "fd4e90a8caee9476dfa96efc3036e65d387ac21b2646c88a5d1793bae1244dfe",
+  "test_token_label": "protocol-upgrade-owner",
+  "provenance": "Converted from frozen content45 by the actual content46 CLI before adding receipt-time dash actions. Source untouched; state, tick, identity and assets retained.",
+  "tick": "13",
+  "hash": "5165365752760899147",
+  "producer_sha256": "c35e6ba3234fa954d780ef0149de03c3dc419ff1bef647ddd3394511aa217c25"
+}

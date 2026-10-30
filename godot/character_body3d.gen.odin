@@ -296,7 +296,9 @@ character_body3d_get_platform_floor_layers :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -328,7 +330,9 @@ character_body3d_get_platform_wall_layers :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -343,7 +347,9 @@ character_body3d_get_max_slides :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -502,7 +508,7 @@ character_body3d_set_motion_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2690739026)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -520,7 +526,9 @@ character_body3d_get_motion_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Character_Body3d_Motion_Mode(__return_storage)
     return
 }
 
@@ -534,7 +542,7 @@ character_body3d_set_platform_on_leave :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1459986142)
     }
     self := self
-    on_leave_apply_velocity_ := on_leave_apply_velocity_
+    on_leave_apply_velocity_ := Int(on_leave_apply_velocity_)
     args := []__bindgen_gde.TypePtr {
         &on_leave_apply_velocity_,
     }
@@ -552,7 +560,9 @@ character_body3d_get_platform_on_leave :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Character_Body3d_Platform_On_Leave(__return_storage)
     return
 }
 
@@ -780,7 +790,9 @@ character_body3d_get_slide_collision_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

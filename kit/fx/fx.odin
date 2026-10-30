@@ -96,6 +96,7 @@ flash :: proc(node: gd.Node, color: gd.Color) {
 	if cast(rawptr)node == nil {return}
 	gd.canvas_item_set_modulate(cast(gd.Canvas_Item)node, color)
 	tw := gd.node_create_tween(node)
+	defer gd.release_ref(tw)
 	white := gd.Color{1, 1, 1, 1}
 	v := gd.variant_from_color(&white)
 	defer gd.variant_destroy(&v)
@@ -106,7 +107,8 @@ flash :: proc(node: gd.Node, color: gd.Color) {
 	defer gd.free_string(s)
 	np := gd.new_node_path_string(s)
 	defer gd.free_node_path(np)
-	_ = gd.tween_tween_property(tw, cast(gd.Object)node, np, v, 0.3)
+	tweener:=gd.tween_tween_property(tw, cast(gd.Object)node, np, v, 0.3)
+	gd.release_ref(tweener)
 }
 
 // ---- floating text ---------------------------------------------------------------

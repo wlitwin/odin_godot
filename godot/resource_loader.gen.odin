@@ -67,14 +67,16 @@ resource_loader_load_threaded_request :: proc "contextless" (
     path_ := path_
     type_hint_ := type_hint_
     use_sub_threads_ := use_sub_threads_
-    cache_mode_ := cache_mode_
+    cache_mode_ := Int(cache_mode_)
     args := []__bindgen_gde.TypePtr {
         &path_,
         &type_hint_,
         &use_sub_threads_,
         &cache_mode_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -95,7 +97,9 @@ resource_loader_load_threaded_get_status :: proc "contextless" (
         &path_,
         &progress_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Resource_Loader_Thread_Load_Status(__return_storage)
     return
 }
 
@@ -131,7 +135,7 @@ resource_loader_load :: proc "contextless" (
     self := self
     path_ := path_
     type_hint_ := type_hint_
-    cache_mode_ := cache_mode_
+    cache_mode_ := Int(cache_mode_)
     args := []__bindgen_gde.TypePtr {
         &path_,
         &type_hint_,

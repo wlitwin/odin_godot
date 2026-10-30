@@ -239,7 +239,7 @@ editor_export_platform_gen_export_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2976483270)
     }
     self := self
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &flags_,
     }
@@ -270,7 +270,9 @@ editor_export_platform_export_project_files :: proc "contextless" (
         &save_cb_,
         &shared_cb_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -291,7 +293,7 @@ editor_export_platform_export_project :: proc "contextless" (
     preset_ := preset_
     debug_ := debug_
     path_ := path_
-    flags_ := flags_
+    flags_ := Int(flags_)
     notify_ := notify_
     args := []__bindgen_gde.TypePtr {
         &preset_,
@@ -300,7 +302,9 @@ editor_export_platform_export_project :: proc "contextless" (
         &flags_,
         &notify_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -320,14 +324,16 @@ editor_export_platform_export_pack :: proc "contextless" (
     preset_ := preset_
     debug_ := debug_
     path_ := path_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &preset_,
         &debug_,
         &path_,
         &flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -347,14 +353,16 @@ editor_export_platform_export_zip :: proc "contextless" (
     preset_ := preset_
     debug_ := debug_
     path_ := path_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &preset_,
         &debug_,
         &path_,
         &flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -376,7 +384,7 @@ editor_export_platform_export_pack_patch :: proc "contextless" (
     debug_ := debug_
     path_ := path_
     patches_ := patches_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &preset_,
         &debug_,
@@ -384,7 +392,9 @@ editor_export_platform_export_pack_patch :: proc "contextless" (
         &patches_,
         &flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -406,7 +416,7 @@ editor_export_platform_export_zip_patch :: proc "contextless" (
     debug_ := debug_
     path_ := path_
     patches_ := patches_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &preset_,
         &debug_,
@@ -414,7 +424,9 @@ editor_export_platform_export_zip_patch :: proc "contextless" (
         &patches_,
         &flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -444,7 +456,7 @@ editor_export_platform_add_message :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 782767225)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     category_ := category_
     message_ := message_
     args := []__bindgen_gde.TypePtr {
@@ -466,7 +478,9 @@ editor_export_platform_get_message_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -484,7 +498,9 @@ editor_export_platform_get_message_type :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Editor_Export_Platform_Export_Message_Type(__return_storage)
     return
 }
 
@@ -535,7 +551,9 @@ editor_export_platform_get_worst_message_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Editor_Export_Platform_Export_Message_Type(__return_storage)
     return
 }
 
@@ -568,7 +586,9 @@ editor_export_platform_ssh_run_on_remote :: proc "contextless" (
         &output_,
         &port_fwd_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -628,7 +648,9 @@ editor_export_platform_ssh_push_to_remote :: proc "contextless" (
         &src_file_,
         &dst_file_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

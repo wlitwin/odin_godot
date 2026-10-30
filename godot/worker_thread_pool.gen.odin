@@ -94,7 +94,9 @@ worker_thread_pool_wait_for_task_completion :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &task_id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -175,7 +177,9 @@ worker_thread_pool_get_group_processed_element_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &group_id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 

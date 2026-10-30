@@ -1,0 +1,9 @@
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+REPLAY_CAVE_DEFINITIONS floors=2 waves=2/2 gems=3/5
+REPLAY_CAVE_READY
+REPLAY_CAVE_SCATTER depth=1 sum=976669602
+REPLAY_CAVE_SAVED tick=39 hash=9173296044292344123
+REPLAY_CAVE_SAVED tick=82 hash=11488868689867752898
+REPLAY_CAVE_SAVE_READY tick=82
+REPLAY_CAVE_FAIL save timeout saved

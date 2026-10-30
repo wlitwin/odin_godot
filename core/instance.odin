@@ -1460,7 +1460,10 @@ inst_refcount_incremented :: proc "c" (instance: gdext.ExtensionScriptInstanceDa
 
 @(private)
 inst_refcount_decremented :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) -> bool {
-	return false
+	// Godot ANDs this result with its reference-count-zero check. Odin has no
+	// separate GC ownership to defer destruction, so permit normal teardown.
+	// Returning false strands scripted Resources in ObjectDB at count zero.
+	return true
 }
 
 @(private)

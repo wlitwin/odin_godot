@@ -135,7 +135,9 @@ skeleton_profile_get_group_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -243,7 +245,9 @@ skeleton_profile_get_bone_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -261,7 +265,9 @@ skeleton_profile_find_bone :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &bone_name_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -355,7 +361,9 @@ skeleton_profile_get_tail_direction :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &bone_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Skeleton_Profile_Tail_Direction(__return_storage)
     return
 }
 
@@ -371,7 +379,7 @@ skeleton_profile_set_tail_direction :: proc "contextless" (
     }
     self := self
     bone_idx_ := bone_idx_
-    tail_direction_ := tail_direction_
+    tail_direction_ := Int(tail_direction_)
     args := []__bindgen_gde.TypePtr {
         &bone_idx_,
         &tail_direction_,

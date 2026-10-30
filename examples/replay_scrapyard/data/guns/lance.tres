@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="GunDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/defs/gun_def.odin" id="1"]
+[ext_resource type="Script" path="res://scripts/defs/projectile_def.odin" id="2"]
+
+[sub_resource type="Resource" id="proj"]
+script = ExtResource("2")
+speed = 30.0
+ttl = 12
+
+[resource]
+script = ExtResource("1")
+id = 5
+name = "lance"
+kind = 3
+cooldown = 50
+dmg = 2
+mag = 5
+reload_ticks = 110
+jam_per_mille = 6
+jam_taps = 3
+projectile = SubResource("proj")
+sprite_pos = Vector2(96, 48)
+sprite_size = Vector2(32, 16)

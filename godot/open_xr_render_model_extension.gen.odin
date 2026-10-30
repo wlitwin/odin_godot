@@ -171,7 +171,9 @@ open_xr_render_model_extension_render_model_get_confidence :: proc "contextless"
     args := []__bindgen_gde.TypePtr {
         &render_model_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Xr_Pose_Tracking_Confidence(__return_storage)
     return
 }
 
@@ -207,7 +209,9 @@ open_xr_render_model_extension_render_model_get_animatable_node_count :: proc "c
     args := []__bindgen_gde.TypePtr {
         &render_model_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 

@@ -48,7 +48,7 @@ rd_uniform_set_uniform_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1664894931)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -66,7 +66,9 @@ rd_uniform_get_uniform_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Uniform_Type(__return_storage)
     return
 }
 
@@ -98,7 +100,9 @@ rd_uniform_get_binding :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

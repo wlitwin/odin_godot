@@ -1,0 +1,11 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/views/ability_preview.odin" id="script"]
+[ext_resource type="Resource" path="res://data/abilities/salvefield.tres" id="ability"]
+[node name="AbilityPreview" type="Node2D"]
+position = Vector2(700, 360)
+script = ExtResource("script")
+definition = ExtResource("ability")
+[node name="Area" type="Line2D" parent="."]
+width = 3.0
+[node name="Info" type="Label" parent="."]
+position = Vector2(-200, 190)

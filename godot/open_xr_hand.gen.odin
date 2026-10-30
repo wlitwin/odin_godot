@@ -68,7 +68,7 @@ open_xr_hand_set_hand :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1849328560)
     }
     self := self
-    hand_ := hand_
+    hand_ := Int(hand_)
     args := []__bindgen_gde.TypePtr {
         &hand_,
     }
@@ -86,7 +86,9 @@ open_xr_hand_get_hand :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Hand_Hands(__return_storage)
     return
 }
 
@@ -132,7 +134,7 @@ open_xr_hand_set_motion_range :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3326516003)
     }
     self := self
-    motion_range_ := motion_range_
+    motion_range_ := Int(motion_range_)
     args := []__bindgen_gde.TypePtr {
         &motion_range_,
     }
@@ -150,7 +152,9 @@ open_xr_hand_get_motion_range :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Hand_Motion_Range(__return_storage)
     return
 }
 
@@ -164,7 +168,7 @@ open_xr_hand_set_skeleton_rig :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1528072213)
     }
     self := self
-    skeleton_rig_ := skeleton_rig_
+    skeleton_rig_ := Int(skeleton_rig_)
     args := []__bindgen_gde.TypePtr {
         &skeleton_rig_,
     }
@@ -182,7 +186,9 @@ open_xr_hand_get_skeleton_rig :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Hand_Skeleton_Rig(__return_storage)
     return
 }
 
@@ -196,7 +202,7 @@ open_xr_hand_set_bone_update :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3144625444)
     }
     self := self
-    bone_update_ := bone_update_
+    bone_update_ := Int(bone_update_)
     args := []__bindgen_gde.TypePtr {
         &bone_update_,
     }
@@ -214,7 +220,9 @@ open_xr_hand_get_bone_update :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Hand_Bone_Update(__return_storage)
     return
 }
 

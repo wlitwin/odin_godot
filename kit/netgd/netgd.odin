@@ -25,6 +25,7 @@ package kit_netgd
 // stateless sugar.
 
 import gd "godot:godot"
+import ksess "godot:kit/session"
 import "godot:gdext"
 import "core:mem"
 
@@ -38,6 +39,8 @@ UNRELIABLE_ORDERED :: gd.Multiplayer_Peer_Transfer_Mode.Transfer_Mode_Unreliable
 // Send raw bytes to `peer` (0 = broadcast to all peers, >0 = that peer only,
 // <0 = everyone except -peer — engine semantics). The bytes are copied into the
 // engine packet; the caller's buffer is untouched and reusable immediately.
+// A disconnected transport or absent positive target returns Err_Unavailable
+// before invoking Godot's send path; this is not a successful delivery receipt.
 send_to :: proc "contextless" (
 	node: gd.Node,
 	peer: int,
@@ -46,7 +49,12 @@ send_to :: proc "contextless" (
 	channel: int,
 ) -> gd.Error {
 	mp := gd.node_get_multiplayer(node)
+	defer gd.release_ref(mp)
 	if cast(rawptr)mp == nil {return .Failed}
+	transport:=gd.multiplayer_api_get_multiplayer_peer(mp)
+	defer gd.release_ref(transport)
+	if transport==nil || gd.multiplayer_peer_get_connection_status(transport)!=.Connection_Connected {return .Err_Unavailable}
+	if peer>0 && !active_remote_peer(mp,ksess.Peer_Id(peer)) {return .Err_Unavailable}
 	// The default MultiplayerAPI implementation IS SceneMultiplayer; a project
 	// that swapped in a custom MultiplayerAPIExtension is outside the toolkit's
 	// support (documented), so this cast is the supported path.
@@ -84,6 +92,7 @@ send_stream :: proc "contextless" (node: gd.Node, peer: int, bytes: []u8) -> gd.
 // Call it once, after the node is inside the tree (get_multiplayer needs that).
 listen_packets :: proc "contextless" (node: gd.Node, method: cstring) -> gd.Error {
 	mp := gd.node_get_multiplayer(node)
+	defer gd.release_ref(mp)
 	if cast(rawptr)mp == nil {return .Failed}
 	return gd.connect_to(cast(gd.Object)mp, "peer_packet", cast(gd.Object)node, method)
 }

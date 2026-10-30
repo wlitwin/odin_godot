@@ -138,7 +138,7 @@ style_box_set_content_margin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4290182280)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     offset_ := offset_
     args := []__bindgen_gde.TypePtr {
         &margin_,
@@ -174,7 +174,7 @@ style_box_get_content_margin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2869120046)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     args := []__bindgen_gde.TypePtr {
         &margin_,
     }
@@ -192,7 +192,7 @@ style_box_get_margin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2869120046)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     args := []__bindgen_gde.TypePtr {
         &margin_,
     }

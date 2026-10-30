@@ -1,0 +1,7 @@
+[gd_scene format=3]
+[node name="Baked" type="Node2D"]
+[node name="Offset" type="Node2D" parent="."]
+position = Vector2(10, 20)
+scale = Vector2(2, 3)
+[node name="Spawn" type="Marker2D" parent="Offset"]
+position = Vector2(4, 5)

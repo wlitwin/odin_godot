@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Replay Duel</title>
+<style>
+:root{color-scheme:dark;font:17px system-ui;background:#101b24;color:#e3edf7}body{max-width:34rem;margin:10vh auto;padding:1.5rem}h1{font-size:3rem;margin-bottom:.5rem}p{line-height:1.6;color:#abbfce}label{display:block;margin-top:1.2rem}input,button,select{font:inherit;padding:.7rem;border:1px solid #4b6478;border-radius:.3rem;background:#172937;color:inherit}input{box-sizing:border-box;width:100%;margin-top:.4rem}button{cursor:pointer;background:#235b85;margin-top:1rem}form{border-top:1px solid #304959;margin-top:2rem;padding-top:1rem}.row{display:flex;gap:.7rem}small{color:#abbfce}
+</style>
+<h1>Replay Duel</h1><p>A two-player projectile duel. Move with A/D, jump with Space and fire with J. Share a join link from the game to invite your opponent, or a watch link for spectators.</p>
+<section><h2>Match invitations</h2><p>Create a match and share its invitation. Your participant credentials stay in this browser. Keep your Save &amp; pause file to restore an ongoing match.</p>
+<label>Match service<input id="service" type="url" placeholder="wss://your-match-service.example" required></label>
+<label><input id="local" type="checkbox" style="width:auto"> Local development service</label>
+<label>Match invitation<input id="invite" autocomplete="off"></label>
+<div class="row"><button id="party-create">Create match</button><button id="party-join">Join match</button><button id="party-rejoin">Rejoin recent</button></div><small id="party-note"></small></section>
+<h2>Direct demo and supplied credentials</h2>
+<label>Signaling server<input id="relay" type="url" required></label>
+<label>Participant credential (authenticated matches)<input id="credential" type="file" accept=".json"></label><small id="credential-note">Use the personal file issued by your match provider.</small>
+<label>Participant archive (optional)<input id="archive" type="file" accept=".rply"></label><small id="archive-note">To rejoin a match that is still open, import the file you downloaded with Save &amp; pause. To restart a closed match, both players need compatible participant files.</small>
+<button id="host">Create a match</button>
+<form id="join"><label>Room code<input id="room" required maxlength="64" autocomplete="off"></label><div class="row"><select id="role" aria-label="Join as"><option value="dial">Player</option><option value="watch">Spectator</option></select><button>Join room</button></div></form>
+<p><small>This local demo connects two trusted players directly. Use Save &amp; pause before closing a player tab. Keep the match creator’s tab open for live rejoin.</small></p>
+<script src="web_archive.js"></script>
+<script>
+const relay=document.querySelector('#relay'),room=document.querySelector('#room');
+relay.value=new URLSearchParams(location.search).get('url')||`ws://${location.hostname}:9080/rtc`;
+const query=new URLSearchParams(location.search),requiresArchive=query.get('resume')==='1';
+const service=document.querySelector('#service'),invite=document.querySelector('#invite'),local=document.querySelector('#local');
+service.value=query.get('service')||'';invite.value=query.get('invite')||'';local.checked=query.get('local')==='1';
+room.value=query.get('room')||'';document.querySelector('#role').value=query.get('role')==='watch'?'watch':'dial';
+let archiveReady=false,archiveBusy=false,credentialBusy=false,credentialFailed=false;
+const credentialNote=document.querySelector('#credential-note');
+const watchOption=document.querySelector('#role option[value=watch]');
+watchOption.disabled=!!replayDuelCredentialLoad()||query.get('auth')==='1';
+if(replayDuelCredentialLoad())credentialNote.textContent='Participant credential loaded';
+document.querySelector('#credential').onchange=async e=>{credentialBusy=true;credentialFailed=true;try{await replayDuelCredentialImport(e.target.files[0]);credentialFailed=false;watchOption.disabled=true;credentialNote.textContent='Participant credential imported';}catch(error){credentialNote.textContent=String(error);}finally{credentialBusy=false;}};
+
+document.querySelector("#archive").onchange=async e=>{archiveReady=false;archiveBusy=true;try {await replayDuelUpload(e.target.files[0]);archiveReady=true;document.querySelector("#archive-note").textContent="Participant file imported";} catch(error){document.querySelector("#archive-note").textContent=String(error);} finally{archiveBusy=false;}};
+function enter(role){const credential=replayDuelCredentialLoad();if(credentialBusy||credentialFailed)return;if(role==='watch'&&(credential||query.get('auth')==='1')){credentialNote.textContent='This admission profile supports players only.';return;}if(query.get('auth')==='1'&&!credential){credentialNote.textContent='Import your participant credential to join this match.';return;}if(credential&&role!=='watch'&&credential.member!==(role==='listen'?1:2)){credentialNote.textContent='This credential belongs to the other player role.';return;}if(requiresArchive&&!archiveReady){document.querySelector("#archive-note").textContent="Choose your participant file to resume.";return;}if(!relay.reportValidity()||archiveBusy||(!archiveReady&&document.querySelector("#archive").files.length))return;const target=new URL('index.html',location.href);target.search=new URLSearchParams({role,url:relay.value,room:room.value.trim(),watch:credential?'0':'1',live_rejoin:'1',auth:credential?'1':'0',stage:archiveReady?'resume':''});location.href=target;}
+document.querySelector('#host').onclick=()=>enter('listen');
+document.querySelector('#join').onsubmit=e=>{e.preventDefault();enter(document.querySelector('#role').value);};
+function enterParty(party){
+ if(!service.reportValidity()||archiveBusy)return;
+ if(party==='join'&&!invite.value.trim()){document.querySelector('#party-note').textContent='Paste a complete match invitation.';return;}
+ if(requiresArchive&&!archiveReady){document.querySelector('#party-note').textContent='Import your participant file to resume.';return;}
+ const target=new URL('index.html',location.href);
+ target.search=new URLSearchParams({party,service:service.value,invite:party==='join'?invite.value.trim():'',local:local.checked?'1':'0',role:party==='join'?'dial':'listen',watch:'0',live_rejoin:'1',stage:archiveReady?'resume':''});
+ location.href=target;
+}
+document.querySelector('#party-create').onclick=()=>enterParty('create');
+document.querySelector('#party-join').onclick=()=>enterParty('join');
+document.querySelector('#party-rejoin').onclick=()=>enterParty('rejoin');
+</script></html>

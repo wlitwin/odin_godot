@@ -55,7 +55,9 @@ open_xr_render_model_manager_get_tracker :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Render_Model_Manager_Render_Model_Tracker(__return_storage)
     return
 }
 
@@ -69,7 +71,7 @@ open_xr_render_model_manager_set_tracker :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2814627380)
     }
     self := self
-    tracker_ := tracker_
+    tracker_ := Int(tracker_)
     args := []__bindgen_gde.TypePtr {
         &tracker_,
     }

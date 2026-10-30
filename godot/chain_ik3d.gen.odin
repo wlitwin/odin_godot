@@ -110,7 +110,9 @@ chain_ik3d_get_root_bone :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -186,7 +188,9 @@ chain_ik3d_get_end_bone :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -240,7 +244,7 @@ chain_ik3d_set_end_bone_direction :: proc "contextless" (
     }
     self := self
     index_ := index_
-    bone_direction_ := bone_direction_
+    bone_direction_ := Int(bone_direction_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &bone_direction_,
@@ -262,7 +266,9 @@ chain_ik3d_get_end_bone_direction :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Skeleton_Modifier3d_Bone_Direction(__return_storage)
     return
 }
 
@@ -342,7 +348,9 @@ chain_ik3d_get_joint_bone :: proc "contextless" (
         &index_,
         &joint_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -360,7 +368,9 @@ chain_ik3d_get_joint_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

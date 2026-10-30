@@ -357,7 +357,9 @@ gpu_particles3d_get_amount :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -477,7 +479,9 @@ gpu_particles3d_get_fixed_fps :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -631,7 +635,9 @@ gpu_particles3d_get_seed :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -645,7 +651,7 @@ gpu_particles3d_set_draw_order :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1208074815)
     }
     self := self
-    order_ := order_
+    order_ := Int(order_)
     args := []__bindgen_gde.TypePtr {
         &order_,
     }
@@ -663,7 +669,9 @@ gpu_particles3d_get_draw_order :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gpu_Particles3d_Draw_Order(__return_storage)
     return
 }
 
@@ -715,7 +723,9 @@ gpu_particles3d_get_draw_passes :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -936,7 +946,7 @@ gpu_particles3d_set_transform_align :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3892425954)
     }
     self := self
-    align_ := align_
+    align_ := Int(align_)
     args := []__bindgen_gde.TypePtr {
         &align_,
     }
@@ -954,7 +964,9 @@ gpu_particles3d_get_transform_align :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gpu_Particles3d_Transform_Align(__return_storage)
     return
 }
 
@@ -968,7 +980,7 @@ gpu_particles3d_set_transform_align_channel_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 540833286)
     }
     self := self
-    channel_filter_ := channel_filter_
+    channel_filter_ := Int(channel_filter_)
     args := []__bindgen_gde.TypePtr {
         &channel_filter_,
     }
@@ -986,7 +998,9 @@ gpu_particles3d_get_transform_align_channel_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Server_Particles_Transform_Align_Custom_Src(__return_storage)
     return
 }
 
@@ -1000,7 +1014,7 @@ gpu_particles3d_set_transform_align_axis :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3781785913)
     }
     self := self
-    align_ := align_
+    align_ := Int(align_)
     args := []__bindgen_gde.TypePtr {
         &align_,
     }
@@ -1018,7 +1032,9 @@ gpu_particles3d_get_transform_align_axis :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Server_Particles_Transform_Align_Axis(__return_storage)
     return
 }
 

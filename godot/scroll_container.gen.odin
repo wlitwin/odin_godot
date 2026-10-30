@@ -80,7 +80,9 @@ scroll_container_get_h_scroll :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -112,7 +114,9 @@ scroll_container_get_v_scroll :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -190,7 +194,7 @@ scroll_container_set_horizontal_scroll_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2750506364)
     }
     self := self
-    enable_ := enable_
+    enable_ := Int(enable_)
     args := []__bindgen_gde.TypePtr {
         &enable_,
     }
@@ -208,7 +212,9 @@ scroll_container_get_horizontal_scroll_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Scroll_Container_Scroll_Mode(__return_storage)
     return
 }
 
@@ -222,7 +228,7 @@ scroll_container_set_vertical_scroll_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2750506364)
     }
     self := self
-    enable_ := enable_
+    enable_ := Int(enable_)
     args := []__bindgen_gde.TypePtr {
         &enable_,
     }
@@ -240,7 +246,9 @@ scroll_container_get_vertical_scroll_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Scroll_Container_Scroll_Mode(__return_storage)
     return
 }
 
@@ -304,7 +312,9 @@ scroll_container_get_deadzone :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -318,7 +328,7 @@ scroll_container_set_scroll_hint_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 578158943)
     }
     self := self
-    scroll_hint_mode_ := scroll_hint_mode_
+    scroll_hint_mode_ := Int(scroll_hint_mode_)
     args := []__bindgen_gde.TypePtr {
         &scroll_hint_mode_,
     }
@@ -336,7 +346,9 @@ scroll_container_get_scroll_hint_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Scroll_Container_Scroll_Hint_Mode(__return_storage)
     return
 }
 

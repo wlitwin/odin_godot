@@ -66,7 +66,9 @@ iterate_ik3d_get_max_iterations :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -218,7 +220,7 @@ iterate_ik3d_set_joint_rotation_axis :: proc "contextless" (
     self := self
     index_ := index_
     joint_ := joint_
-    axis_ := axis_
+    axis_ := Int(axis_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &joint_,
@@ -244,7 +246,9 @@ iterate_ik3d_get_joint_rotation_axis :: proc "contextless" (
         &index_,
         &joint_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Skeleton_Modifier3d_Rotation_Axis(__return_storage)
     return
 }
 
@@ -350,7 +354,7 @@ iterate_ik3d_set_joint_limitation_right_axis :: proc "contextless" (
     self := self
     index_ := index_
     joint_ := joint_
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &joint_,
@@ -376,7 +380,9 @@ iterate_ik3d_get_joint_limitation_right_axis :: proc "contextless" (
         &index_,
         &joint_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Skeleton_Modifier3d_Secondary_Direction(__return_storage)
     return
 }
 

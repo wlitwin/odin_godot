@@ -1,0 +1,26 @@
+{
+  "diff.odin": {
+    "original_sha256": "ef6373019d64b2657a2406a08f291121e693721862107cc6535925f112c44d54",
+    "adapted_sha256": "d7a238dd70414187aaa2f5c7f270df29dc7e1fde1a16540d640ef1923730f6c2"
+  },
+  "codec.odin": {
+    "original_sha256": "4c6d1130cd29c13a9b382bbe54e6f4f3ac322b85f1d2695821d67ce10dd256ab",
+    "adapted_sha256": "73bec6390af8b9bdf45d4f32a67dfd60570aaceed5ce11d8a73d6b8affbbba9b"
+  },
+  "union.odin": {
+    "original_sha256": "f4d25d25d18f68d6e43c938572d763a5fc5754b262b0467cee967ffea383e4d2",
+    "adapted_sha256": "3e012833d44b48a5acfdef2b60410225500df93368b65a4b91fecc4abed2d4a6"
+  },
+  "envelope.odin": {
+    "original_sha256": "ad98a7c0ca8bb49fc579cfca48bc796240490441761ea76bc516eee22b2bef6d",
+    "adapted_sha256": "64ad0e328ebaaec5baad22d27715f6a2b8fe71546eff5a4cf9b5c4435efbe78b"
+  },
+  "validation.odin": {
+    "original_sha256": "15fb36eb23d376a7b3a66b671044c08640c617f3f8eae027333a4f67fb732498",
+    "adapted_sha256": "5dc048f64aef23383a570ed0cf4726a7464def13f01b6989b15e9b38d58aecfe"
+  },
+  "schema.odin": {
+    "original_sha256": "06ff3d91eb53764990512b338460669b47c550b611edeba9499c6c990226233f",
+    "adapted_sha256": "feefc6f243b0c08d5da8152e0abea1d74aaa98c82ed2042af1e28eff12536cd5"
+  }
+}

@@ -1,0 +1,8 @@
+[configuration]
+entry_symbol = "odin_godot_init"
+compatibility_minimum = "4.7"
+[libraries]
+macos.debug = "res://bin/libodin_godot.dylib"
+macos.release = "res://bin/libodin_godot.dylib"
+linux.debug.x86_64 = "res://bin/libodin_godot.so"
+linux.release.x86_64 = "res://bin/libodin_godot.so"

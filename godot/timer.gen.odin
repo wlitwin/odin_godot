@@ -273,7 +273,7 @@ timer_set_timer_process_callback :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3469495063)
     }
     self := self
-    callback_ := callback_
+    callback_ := Int(callback_)
     args := []__bindgen_gde.TypePtr {
         &callback_,
     }
@@ -291,7 +291,9 @@ timer_get_timer_process_callback :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Timer_Timer_Process_Callback(__return_storage)
     return
 }
 

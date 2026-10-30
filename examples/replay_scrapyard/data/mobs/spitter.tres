@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MobDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/defs/mob_def.odin" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = 2
+name = "spitter"
+hp = 4
+speed = 95.0
+bite = 0
+body_r = 15.0
+scale = 1.15

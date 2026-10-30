@@ -49,13 +49,15 @@ hmac_context_start :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3537364598)
     }
     self := self
-    hash_type_ := hash_type_
+    hash_type_ := Int(hash_type_)
     key_ := key_
     args := []__bindgen_gde.TypePtr {
         &hash_type_,
         &key_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -73,7 +75,9 @@ hmac_context_update :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &data_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

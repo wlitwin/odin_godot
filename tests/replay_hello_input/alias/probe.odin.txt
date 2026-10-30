@@ -1,0 +1,6 @@
+//gd:extends Node2D
+//gd:class ReplayAliasAudit
+package replay_alias_audit
+import gd "godot:godot"
+import game "../shared/hello"
+ReplayAliasAudit :: struct {owner:gd.Node2d,timeline:game.Timeline}

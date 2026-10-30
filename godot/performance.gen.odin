@@ -116,7 +116,7 @@ performance_get_monitor :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1943275655)
     }
     self := self
-    monitor_ := monitor_
+    monitor_ := Int(monitor_)
     args := []__bindgen_gde.TypePtr {
         &monitor_,
     }
@@ -140,7 +140,7 @@ performance_add_custom_monitor :: proc "contextless" (
     id_ := id_
     callable_ := callable_
     arguments_ := arguments_
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &id_,
         &callable_,

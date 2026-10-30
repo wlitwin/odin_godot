@@ -55,7 +55,7 @@ convert_transform_modifier3d_set_apply_transform_mode :: proc "contextless" (
     }
     self := self
     index_ := index_
-    transform_mode_ := transform_mode_
+    transform_mode_ := Int(transform_mode_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &transform_mode_,
@@ -77,7 +77,9 @@ convert_transform_modifier3d_get_apply_transform_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Convert_Transform_Modifier3d_Transform_Mode(__return_storage)
     return
 }
 
@@ -93,7 +95,7 @@ convert_transform_modifier3d_set_apply_axis :: proc "contextless" (
     }
     self := self
     index_ := index_
-    axis_ := axis_
+    axis_ := Int(axis_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &axis_,
@@ -115,7 +117,9 @@ convert_transform_modifier3d_get_apply_axis :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Vector3_Vector3_Axis(__return_storage)
     return
 }
 
@@ -207,7 +211,7 @@ convert_transform_modifier3d_set_reference_transform_mode :: proc "contextless" 
     }
     self := self
     index_ := index_
-    transform_mode_ := transform_mode_
+    transform_mode_ := Int(transform_mode_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &transform_mode_,
@@ -229,7 +233,9 @@ convert_transform_modifier3d_get_reference_transform_mode :: proc "contextless" 
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Convert_Transform_Modifier3d_Transform_Mode(__return_storage)
     return
 }
 
@@ -245,7 +251,7 @@ convert_transform_modifier3d_set_reference_axis :: proc "contextless" (
     }
     self := self
     index_ := index_
-    axis_ := axis_
+    axis_ := Int(axis_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &axis_,
@@ -267,7 +273,9 @@ convert_transform_modifier3d_get_reference_axis :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Vector3_Vector3_Axis(__return_storage)
     return
 }
 

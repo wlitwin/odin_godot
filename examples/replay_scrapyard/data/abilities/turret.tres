@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="AbilityDef" format=3]
+[ext_resource type="Script" path="res://scripts/defs/ability_def.odin" id="script"]
+[ext_resource type="Resource" path="res://data/deployables/shared_turret.tres" id="turret"]
+[resource]
+script = ExtResource("script")
+id = 7
+name = "shared turret"
+family = 5
+cooldown = 900
+range = 160.0
+radius = 16.0
+arc_cos = 0.7
+speed = 10.0
+dmg = 0
+status = null
+self_buff = false
+duration = 0
+pulse = 30
+turret = ExtResource("turret")

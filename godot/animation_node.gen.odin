@@ -270,7 +270,9 @@ animation_node_get_input_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -288,7 +290,9 @@ animation_node_find_input :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &name_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -414,7 +418,7 @@ animation_node_blend_animation :: proc "contextless" (
     seeked_ := seeked_
     is_external_seeking_ := is_external_seeking_
     blend_ := blend_
-    looped_flag_ := looped_flag_
+    looped_flag_ := Int(looped_flag_)
     args := []__bindgen_gde.TypePtr {
         &animation_,
         &time_,
@@ -451,7 +455,7 @@ animation_node_blend_node :: proc "contextless" (
     seek_ := seek_
     is_external_seeking_ := is_external_seeking_
     blend_ := blend_
-    filter_ := filter_
+    filter_ := Int(filter_)
     sync_ := sync_
     test_only_ := test_only_
     args := []__bindgen_gde.TypePtr {
@@ -491,7 +495,7 @@ animation_node_blend_input :: proc "contextless" (
     seek_ := seek_
     is_external_seeking_ := is_external_seeking_
     blend_ := blend_
-    filter_ := filter_
+    filter_ := Int(filter_)
     sync_ := sync_
     test_only_ := test_only_
     args := []__bindgen_gde.TypePtr {

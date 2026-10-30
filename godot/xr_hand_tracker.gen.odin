@@ -124,7 +124,7 @@ xr_hand_tracker_set_hand_tracking_source :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2958308861)
     }
     self := self
-    source_ := source_
+    source_ := Int(source_)
     args := []__bindgen_gde.TypePtr {
         &source_,
     }
@@ -142,7 +142,9 @@ xr_hand_tracker_get_hand_tracking_source :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Xr_Hand_Tracker_Hand_Tracking_Source(__return_storage)
     return
 }
 
@@ -157,8 +159,8 @@ xr_hand_tracker_set_hand_joint_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3028437365)
     }
     self := self
-    joint_ := joint_
-    flags_ := flags_
+    joint_ := Int(joint_)
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &joint_,
         &flags_,
@@ -176,11 +178,13 @@ xr_hand_tracker_get_hand_joint_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1730972401)
     }
     self := self
-    joint_ := joint_
+    joint_ := Int(joint_)
     args := []__bindgen_gde.TypePtr {
         &joint_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Xr_Hand_Tracker_Hand_Joint_Flags(__return_storage)
     return
 }
 
@@ -195,7 +199,7 @@ xr_hand_tracker_set_hand_joint_transform :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2529959613)
     }
     self := self
-    joint_ := joint_
+    joint_ := Int(joint_)
     transform_ := transform_
     args := []__bindgen_gde.TypePtr {
         &joint_,
@@ -214,7 +218,7 @@ xr_hand_tracker_get_hand_joint_transform :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1090840196)
     }
     self := self
-    joint_ := joint_
+    joint_ := Int(joint_)
     args := []__bindgen_gde.TypePtr {
         &joint_,
     }
@@ -233,7 +237,7 @@ xr_hand_tracker_set_hand_joint_radius :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2723659615)
     }
     self := self
-    joint_ := joint_
+    joint_ := Int(joint_)
     radius_ := radius_
     args := []__bindgen_gde.TypePtr {
         &joint_,
@@ -252,7 +256,7 @@ xr_hand_tracker_get_hand_joint_radius :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3400025734)
     }
     self := self
-    joint_ := joint_
+    joint_ := Int(joint_)
     args := []__bindgen_gde.TypePtr {
         &joint_,
     }
@@ -271,7 +275,7 @@ xr_hand_tracker_set_hand_joint_linear_velocity :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1978646737)
     }
     self := self
-    joint_ := joint_
+    joint_ := Int(joint_)
     linear_velocity_ := linear_velocity_
     args := []__bindgen_gde.TypePtr {
         &joint_,
@@ -290,7 +294,7 @@ xr_hand_tracker_get_hand_joint_linear_velocity :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 547240792)
     }
     self := self
-    joint_ := joint_
+    joint_ := Int(joint_)
     args := []__bindgen_gde.TypePtr {
         &joint_,
     }
@@ -309,7 +313,7 @@ xr_hand_tracker_set_hand_joint_angular_velocity :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1978646737)
     }
     self := self
-    joint_ := joint_
+    joint_ := Int(joint_)
     angular_velocity_ := angular_velocity_
     args := []__bindgen_gde.TypePtr {
         &joint_,
@@ -328,7 +332,7 @@ xr_hand_tracker_get_hand_joint_angular_velocity :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 547240792)
     }
     self := self
-    joint_ := joint_
+    joint_ := Int(joint_)
     args := []__bindgen_gde.TypePtr {
         &joint_,
     }

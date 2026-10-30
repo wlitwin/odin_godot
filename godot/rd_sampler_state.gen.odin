@@ -48,7 +48,7 @@ rd_sampler_state_set_mag_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1493420382)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -66,7 +66,9 @@ rd_sampler_state_get_mag_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Sampler_Filter(__return_storage)
     return
 }
 
@@ -80,7 +82,7 @@ rd_sampler_state_set_min_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1493420382)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -98,7 +100,9 @@ rd_sampler_state_get_min_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Sampler_Filter(__return_storage)
     return
 }
 
@@ -112,7 +116,7 @@ rd_sampler_state_set_mip_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1493420382)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -130,7 +134,9 @@ rd_sampler_state_get_mip_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Sampler_Filter(__return_storage)
     return
 }
 
@@ -144,7 +150,7 @@ rd_sampler_state_set_repeat_u :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 246127626)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -162,7 +168,9 @@ rd_sampler_state_get_repeat_u :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Sampler_Repeat_Mode(__return_storage)
     return
 }
 
@@ -176,7 +184,7 @@ rd_sampler_state_set_repeat_v :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 246127626)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -194,7 +202,9 @@ rd_sampler_state_get_repeat_v :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Sampler_Repeat_Mode(__return_storage)
     return
 }
 
@@ -208,7 +218,7 @@ rd_sampler_state_set_repeat_w :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 246127626)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -226,7 +236,9 @@ rd_sampler_state_get_repeat_w :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Sampler_Repeat_Mode(__return_storage)
     return
 }
 
@@ -368,7 +380,7 @@ rd_sampler_state_set_compare_op :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2573711505)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -386,7 +398,9 @@ rd_sampler_state_get_compare_op :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Compare_Operator(__return_storage)
     return
 }
 
@@ -464,7 +478,7 @@ rd_sampler_state_set_border_color :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1115869595)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -482,7 +496,9 @@ rd_sampler_state_get_border_color :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Sampler_Border_Color(__return_storage)
     return
 }
 

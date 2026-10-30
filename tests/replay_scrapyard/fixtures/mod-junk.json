@@ -1,0 +1,5 @@
+{"guns": [{"id": 0, "name": "junkcannon", "kind": "bolt",
+           "cooldown": 20, "dmg": 9, "mag": 8, "reload_ticks": 72,
+           "jam_per_mille": 12, "jam_taps": 3, "speed": 16, "ttl": 40,
+           "sprite_pos": [32, 48], "sprite_size": [32, 16]}],
+ "mobs": [{"id": 1, "hp": 30, "speed": 52, "bite": 2, "body_r": 26, "scale": 2.0}]}

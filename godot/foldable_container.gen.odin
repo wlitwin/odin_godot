@@ -176,7 +176,7 @@ foldable_container_set_title_alignment :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2312603777)
     }
     self := self
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     args := []__bindgen_gde.TypePtr {
         &alignment_,
     }
@@ -194,7 +194,9 @@ foldable_container_get_title_alignment :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Horizontal_Alignment(__return_storage)
     return
 }
 
@@ -240,7 +242,7 @@ foldable_container_set_title_text_direction :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 119160795)
     }
     self := self
-    text_direction_ := text_direction_
+    text_direction_ := Int(text_direction_)
     args := []__bindgen_gde.TypePtr {
         &text_direction_,
     }
@@ -258,7 +260,9 @@ foldable_container_get_title_text_direction :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Text_Direction(__return_storage)
     return
 }
 
@@ -272,7 +276,7 @@ foldable_container_set_title_text_overrun_behavior :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1008890932)
     }
     self := self
-    overrun_behavior_ := overrun_behavior_
+    overrun_behavior_ := Int(overrun_behavior_)
     args := []__bindgen_gde.TypePtr {
         &overrun_behavior_,
     }
@@ -290,7 +294,9 @@ foldable_container_get_title_text_overrun_behavior :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Overrun_Behavior(__return_storage)
     return
 }
 
@@ -304,7 +310,7 @@ foldable_container_set_title_position :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2276829442)
     }
     self := self
-    title_position_ := title_position_
+    title_position_ := Int(title_position_)
     args := []__bindgen_gde.TypePtr {
         &title_position_,
     }
@@ -322,7 +328,9 @@ foldable_container_get_title_position :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Foldable_Container_Title_Position(__return_storage)
     return
 }
 

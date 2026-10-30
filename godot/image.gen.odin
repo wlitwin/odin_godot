@@ -140,7 +140,7 @@ image_create :: proc "contextless" (
     width_ := width_
     height_ := height_
     use_mipmaps_ := use_mipmaps_
-    format_ := format_
+    format_ := Int(format_)
     args := []__bindgen_gde.TypePtr {
         &width_,
         &height_,
@@ -165,7 +165,7 @@ image_create_empty :: proc "contextless" (
     width_ := width_
     height_ := height_
     use_mipmaps_ := use_mipmaps_
-    format_ := format_
+    format_ := Int(format_)
     args := []__bindgen_gde.TypePtr {
         &width_,
         &height_,
@@ -191,7 +191,7 @@ image_create_from_data :: proc "contextless" (
     width_ := width_
     height_ := height_
     use_mipmaps_ := use_mipmaps_
-    format_ := format_
+    format_ := Int(format_)
     data_ := data_
     args := []__bindgen_gde.TypePtr {
         &width_,
@@ -232,7 +232,9 @@ image_get_width :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -247,7 +249,9 @@ image_get_height :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -292,7 +296,9 @@ image_get_format :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Image_Format(__return_storage)
     return
 }
 
@@ -336,7 +342,7 @@ image_convert :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2120693146)
     }
     self := self
-    format_ := format_
+    format_ := Int(format_)
     args := []__bindgen_gde.TypePtr {
         &format_,
     }
@@ -354,7 +360,9 @@ image_get_mipmap_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -388,7 +396,7 @@ image_resize_to_po2 :: proc "contextless" (
     }
     self := self
     square_ := square_
-    interpolation_ := interpolation_
+    interpolation_ := Int(interpolation_)
     args := []__bindgen_gde.TypePtr {
         &square_,
         &interpolation_,
@@ -410,7 +418,7 @@ image_resize :: proc "contextless" (
     self := self
     width_ := width_
     height_ := height_
-    interpolation_ := interpolation_
+    interpolation_ := Int(interpolation_)
     args := []__bindgen_gde.TypePtr {
         &width_,
         &height_,
@@ -495,7 +503,9 @@ image_generate_mipmaps :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &renormalize_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -530,7 +540,7 @@ image_set_data :: proc "contextless" (
     width_ := width_
     height_ := height_
     use_mipmaps_ := use_mipmaps_
-    format_ := format_
+    format_ := Int(format_)
     data_ := data_
     args := []__bindgen_gde.TypePtr {
         &width_,
@@ -571,7 +581,9 @@ image_load :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -589,7 +601,9 @@ image_save_png :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -625,7 +639,9 @@ image_save_jpg :: proc "contextless" (
         &path_,
         &quality_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -670,7 +686,9 @@ image_save_exr :: proc "contextless" (
         &color_image_,
         &max_linear_value_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -712,7 +730,9 @@ image_save_dds :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -751,7 +771,9 @@ image_save_webp :: proc "contextless" (
         &lossy_,
         &quality_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -787,7 +809,9 @@ image_detect_alpha :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Image_Alpha_Mode(__return_storage)
     return
 }
 
@@ -816,11 +840,13 @@ image_detect_used_channels :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2703139984)
     }
     self := self
-    source_ := source_
+    source_ := Int(source_)
     args := []__bindgen_gde.TypePtr {
         &source_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Image_Used_Channels(__return_storage)
     return
 }
 
@@ -836,15 +862,17 @@ image_compress :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2975424957)
     }
     self := self
-    mode_ := mode_
-    source_ := source_
-    astc_format_ := astc_format_
+    mode_ := Int(mode_)
+    source_ := Int(source_)
+    astc_format_ := Int(astc_format_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
         &source_,
         &astc_format_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -860,15 +888,17 @@ image_compress_from_channels :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4212890953)
     }
     self := self
-    mode_ := mode_
-    channels_ := channels_
-    astc_format_ := astc_format_
+    mode_ := Int(mode_)
+    channels_ := Int(channels_)
+    astc_format_ := Int(astc_format_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
         &channels_,
         &astc_format_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -883,7 +913,9 @@ image_decompress :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -912,7 +944,7 @@ image_rotate_90 :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1901204267)
     }
     self := self
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &direction_,
     }
@@ -1360,7 +1392,9 @@ image_load_png_from_buffer :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &buffer_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1378,7 +1412,9 @@ image_load_jpg_from_buffer :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &buffer_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1396,7 +1432,9 @@ image_load_webp_from_buffer :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &buffer_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1414,7 +1452,9 @@ image_load_tga_from_buffer :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &buffer_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1432,7 +1472,9 @@ image_load_bmp_from_buffer :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &buffer_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1450,7 +1492,9 @@ image_load_ktx_from_buffer :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &buffer_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1468,7 +1512,9 @@ image_load_dds_from_buffer :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &buffer_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1486,7 +1532,9 @@ image_load_exr_from_buffer :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &buffer_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1507,7 +1555,9 @@ image_load_svg_from_buffer :: proc "contextless" (
         &buffer_,
         &scale_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1528,7 +1578,9 @@ image_load_svg_from_string :: proc "contextless" (
         &svg_str_,
         &scale_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

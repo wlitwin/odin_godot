@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ReplayCaveLevelDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/defs/level.odin" id="1"]
+[ext_resource type="PackedScene" path="res://levels/level_1.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+scene = ExtResource("2")
+gems = 3
+torches = 2
+wave_counts = PackedInt32Array(2, 3)
+wave_rests = PackedInt32Array(40, 40)
+
+rift_min = Vector2(380, 60)
+rift_max = Vector2(430, 300)

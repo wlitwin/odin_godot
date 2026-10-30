@@ -61,7 +61,7 @@ label3d_set_horizontal_alignment :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2312603777)
     }
     self := self
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     args := []__bindgen_gde.TypePtr {
         &alignment_,
     }
@@ -79,7 +79,9 @@ label3d_get_horizontal_alignment :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Horizontal_Alignment(__return_storage)
     return
 }
 
@@ -93,7 +95,7 @@ label3d_set_vertical_alignment :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1796458609)
     }
     self := self
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     args := []__bindgen_gde.TypePtr {
         &alignment_,
     }
@@ -111,7 +113,9 @@ label3d_get_vertical_alignment :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Vertical_Alignment(__return_storage)
     return
 }
 
@@ -221,7 +225,7 @@ label3d_set_text_direction :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1418190634)
     }
     self := self
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &direction_,
     }
@@ -239,7 +243,9 @@ label3d_get_text_direction :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Direction(__return_storage)
     return
 }
 
@@ -285,7 +291,7 @@ label3d_set_structured_text_bidi_override :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 55961453)
     }
     self := self
-    parser_ := parser_
+    parser_ := Int(parser_)
     args := []__bindgen_gde.TypePtr {
         &parser_,
     }
@@ -303,7 +309,9 @@ label3d_get_structured_text_bidi_override :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Structured_Text_Parser(__return_storage)
     return
 }
 
@@ -399,7 +407,9 @@ label3d_get_render_priority :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -431,7 +441,9 @@ label3d_get_outline_render_priority :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -495,7 +507,9 @@ label3d_get_font_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -527,7 +541,9 @@ label3d_get_outline_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -573,7 +589,7 @@ label3d_set_autowrap_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3289138044)
     }
     self := self
-    autowrap_mode_ := autowrap_mode_
+    autowrap_mode_ := Int(autowrap_mode_)
     args := []__bindgen_gde.TypePtr {
         &autowrap_mode_,
     }
@@ -591,7 +607,9 @@ label3d_get_autowrap_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Autowrap_Mode(__return_storage)
     return
 }
 
@@ -605,7 +623,7 @@ label3d_set_autowrap_trim_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2809697122)
     }
     self := self
-    autowrap_trim_flags_ := autowrap_trim_flags_
+    autowrap_trim_flags_ := Int(autowrap_trim_flags_)
     args := []__bindgen_gde.TypePtr {
         &autowrap_trim_flags_,
     }
@@ -623,7 +641,9 @@ label3d_get_autowrap_trim_flags :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Line_Break_Flag(__return_storage)
     return
 }
 
@@ -637,7 +657,7 @@ label3d_set_justification_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2877345813)
     }
     self := self
-    justification_flags_ := justification_flags_
+    justification_flags_ := Int(justification_flags_)
     args := []__bindgen_gde.TypePtr {
         &justification_flags_,
     }
@@ -655,7 +675,9 @@ label3d_get_justification_flags :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Justification_Flag(__return_storage)
     return
 }
 
@@ -766,7 +788,7 @@ label3d_set_draw_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1285833066)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     enabled_ := enabled_
     args := []__bindgen_gde.TypePtr {
         &flag_,
@@ -785,7 +807,7 @@ label3d_get_draw_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 259226453)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     args := []__bindgen_gde.TypePtr {
         &flag_,
     }
@@ -803,7 +825,7 @@ label3d_set_billboard_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4202036497)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -821,7 +843,9 @@ label3d_get_billboard_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Billboard_Mode(__return_storage)
     return
 }
 
@@ -835,7 +859,7 @@ label3d_set_alpha_cut_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2549142916)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -853,7 +877,9 @@ label3d_get_alpha_cut_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Label3d_Alpha_Cut_Mode(__return_storage)
     return
 }
 
@@ -931,7 +957,7 @@ label3d_set_alpha_antialiasing :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3212649852)
     }
     self := self
-    alpha_aa_ := alpha_aa_
+    alpha_aa_ := Int(alpha_aa_)
     args := []__bindgen_gde.TypePtr {
         &alpha_aa_,
     }
@@ -949,7 +975,9 @@ label3d_get_alpha_antialiasing :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Alpha_Anti_Aliasing(__return_storage)
     return
 }
 
@@ -995,7 +1023,7 @@ label3d_set_texture_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 22904437)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1013,7 +1041,9 @@ label3d_get_texture_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Texture_Filter(__return_storage)
     return
 }
 

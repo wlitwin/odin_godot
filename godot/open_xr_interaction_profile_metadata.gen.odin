@@ -144,7 +144,7 @@ open_xr_interaction_profile_metadata_register_io_path :: proc "contextless" (
     toplevel_path_ := toplevel_path_
     openxr_path_ := openxr_path_
     openxr_extension_names_ := openxr_extension_names_
-    action_type_ := action_type_
+    action_type_ := Int(action_type_)
     args := []__bindgen_gde.TypePtr {
         &interaction_profile_,
         &display_name_,

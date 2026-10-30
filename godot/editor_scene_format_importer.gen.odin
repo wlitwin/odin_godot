@@ -162,10 +162,10 @@ editor_scene_format_importer_add_import_option_advanced :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3674075649)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     name_ := name_
     default_value_ := default_value_
-    hint_ := hint_
+    hint_ := Int(hint_)
     hint_string_ := hint_string_
     usage_flags_ := usage_flags_
     args := []__bindgen_gde.TypePtr {

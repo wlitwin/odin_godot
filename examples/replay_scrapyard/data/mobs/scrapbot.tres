@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MobDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/defs/mob_def.odin" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = 0
+name = "scrapbot"
+hp = 3
+speed = 125.0
+bite = 1
+body_r = 14.0
+scale = 1.0

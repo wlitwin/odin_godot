@@ -281,6 +281,7 @@ make_peer :: proc(node: gd.Node, method: cstring, steam_id: u64) -> bool {
 		return false
 	}
 	mp := gd.node_get_multiplayer(node)
+	defer gd.release_ref(mp)
 	if cast(rawptr)mp == nil {
 		return false
 	}

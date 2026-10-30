@@ -19,6 +19,9 @@ Write Godot scripts in compiled Odin. New here? Start at the addon
 
 ## Build multiplayer
 
+- **[Replay](replay.md)** — the experimental value-world, rollback and session
+  library, with a separately included offline/native multiplayer starter.
+
 - **[The friendslop toolkit](kit/index.md)** — reusable multiplayer systems under
   `godot:kit/*`: host-authoritative sessions with reconnect identity, declarative
   replication with client prediction, chat, items, combat, NPCs, save/resume,

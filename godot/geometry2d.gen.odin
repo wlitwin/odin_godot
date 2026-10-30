@@ -514,7 +514,7 @@ geometry2d_offset_polygon :: proc "contextless" (
     self := self
     polygon_ := polygon_
     delta_ := delta_
-    join_type_ := join_type_
+    join_type_ := Int(join_type_)
     args := []__bindgen_gde.TypePtr {
         &polygon_,
         &delta_,
@@ -539,8 +539,8 @@ geometry2d_offset_polyline :: proc "contextless" (
     self := self
     polyline_ := polyline_
     delta_ := delta_
-    join_type_ := join_type_
-    end_type_ := end_type_
+    join_type_ := Int(join_type_)
+    end_type_ := Int(end_type_)
     args := []__bindgen_gde.TypePtr {
         &polyline_,
         &delta_,

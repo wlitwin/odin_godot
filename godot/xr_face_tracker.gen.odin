@@ -194,7 +194,7 @@ xr_face_tracker_get_blend_shape :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 330010046)
     }
     self := self
-    blend_shape_ := blend_shape_
+    blend_shape_ := Int(blend_shape_)
     args := []__bindgen_gde.TypePtr {
         &blend_shape_,
     }
@@ -213,7 +213,7 @@ xr_face_tracker_set_blend_shape :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2352588791)
     }
     self := self
-    blend_shape_ := blend_shape_
+    blend_shape_ := Int(blend_shape_)
     weight_ := weight_
     args := []__bindgen_gde.TypePtr {
         &blend_shape_,

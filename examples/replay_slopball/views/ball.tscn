@@ -1,0 +1,34 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://meshes/ball_skin.tres" id="mesh_4"]
+[ext_resource type="ArrayMesh" path="res://meshes/ball_dot.tres" id="mesh_5"]
+
+
+
+[sub_resource type="CircleShape2D" id="shape_ball"]
+radius = 8.0
+
+[sub_resource type="PhysicsMaterial" id="mat_ball"]
+friction = 0.2
+bounce = 0.85
+
+[node name="Ball" type="RigidBody2D"]
+collision_layer = 4
+collision_mask = 3
+gravity_scale = 0.0
+physics_material_override = SubResource("mat_ball")
+linear_damp = 0.55
+angular_damp = 1.0
+
+[node name="Shape" type="CollisionShape2D" parent="."]
+shape = SubResource("shape_ball")
+
+[node name="Look" type="Node2D" parent="."]
+
+[node name="Skin" type="MeshInstance2D" parent="Look"]
+self_modulate = Color(0.95, 0.93, 0.85, 1)
+mesh = ExtResource("mesh_4")
+
+[node name="Dot" type="MeshInstance2D" parent="Look"]
+self_modulate = Color(0.2, 0.2, 0.25, 1)
+mesh = ExtResource("mesh_5")

@@ -130,11 +130,11 @@ editor_inspector_plugin__parse_property :: proc "contextless" (
     }
     self := self
     object_ := object_
-    type_ := type_
+    type_ := Int(type_)
     name_ := name_
-    hint_type_ := hint_type_
+    hint_type_ := Int(hint_type_)
     hint_string_ := hint_string_
-    usage_flags_ := usage_flags_
+    usage_flags_ := Int(usage_flags_)
     wide_ := wide_
     args := []__bindgen_gde.TypePtr {
         &object_,

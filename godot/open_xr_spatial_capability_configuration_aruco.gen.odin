@@ -81,7 +81,7 @@ open_xr_spatial_capability_configuration_aruco_set_aruco_dict :: proc "contextle
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2268055963)
     }
     self := self
-    aruco_dict_ := aruco_dict_
+    aruco_dict_ := Int(aruco_dict_)
     args := []__bindgen_gde.TypePtr {
         &aruco_dict_,
     }
@@ -99,7 +99,9 @@ open_xr_spatial_capability_configuration_aruco_get_aruco_dict :: proc "contextle
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Spatial_Capability_Configuration_Aruco_Aruco_Dict(__return_storage)
     return
 }
 

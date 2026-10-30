@@ -128,6 +128,7 @@ write_file :: proc(path: cstring, bytes: []u8) -> bool {
 	gpath := gd.new_string_cstring(path) // caller-owned engine String (Ergonomics rule)
 	defer gd.free_string(gpath)
 	f := gd.file_access_open(gpath, .Write)
+	defer gd.release_ref(f)
 	if cast(rawptr)f == nil {
 		return false
 	}
@@ -157,6 +158,7 @@ read_file :: proc(path: cstring, allocator := context.allocator) -> (bytes: []u8
 		return nil, false
 	}
 	f := gd.file_access_open(gpath, .Read)
+	defer gd.release_ref(f)
 	if cast(rawptr)f == nil {
 		return nil, false
 	}

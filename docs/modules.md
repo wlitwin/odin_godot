@@ -390,6 +390,24 @@ cannot be embedded from `shared/`. `scriptgen` resolves tagged bundles inside th
 package tree and in `godot:` collection packages only, so tags on a shared struct's fields
 would never register. An untagged plain-data struct from `shared/` is fine.
 
+Plain shared types may also be aliases, including generic runtime owners such as
+`Timeline :: replay.Timeline(World, Input, Event)`. Scriptgen now follows the named
+shape and its inline fields before deciding that no Godot metadata would be lost.
+Generic arguments retain the package/import context where they were supplied;
+aliases cannot hide tagged fields, typed signals or composed methods/ticks. Cyclic,
+unresolved or over-budget shapes keep the existing refusal. An engine-import
+normalization context that collides with a user package named `gd` is also refused
+conservatively; use an unambiguous import alias. The proof is bounded
+to 64 nested resolutions and 4,096 visited type expressions per candidate.
+Pointer/container/callback boundaries retain the existing opaque composition
+policy; this does not add automatic hoisting through arrays or pointers.
+
+Accepting a runtime-owner alias does not make that owner copyable or serializable.
+For example, Replay Timeline allocations still have one owner and must be used by
+pointer. The pure shared package remains subject to the same no-globals/no-script
+rules. See [focused and application acceptance](../tests/replay_shared_alias/README.md).
+
+
 ### Reload: one shared edit rebuilds every module
 
 The shared tree belongs to no module, so its content hash is folded into **every** module's:

@@ -2163,4 +2163,55 @@ hide_menu :: proc (w: ^World) {
 ODIN
 "$ODIN" check "$hguard" -collection:godot="$ROOT" -no-entry-point >/dev/null 2>&1 || fail "the .owner spelling must compile (handle family broke)"
 
+# Method value ownership is explicit and survives the composed-method path.
+mv="$work/method_values"
+mkdir -p "$mv"
+cat >"$mv/value.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Values
+package method_values
+import gd "godot:godot"
+Block :: struct {n:int}
+@(gd_method="owned_return")
+block_title :: proc(self:^Block)->gd.String {return gd.new_string_odin("block")}
+Values :: struct {owner:gd.Node,part:Block}
+@(gd_method)
+values_echo :: proc(self:^Values,value:string)->string {return value}
+@(gd_method="borrowed_args,owned_return")
+values_clone :: proc(self:^Values,value:gd.Array)->gd.Array {return gd.new_array_array(value)}
+ODIN
+"$SGEN" "$mv" -godot:"$ROOT" >"$work/method-values.log" 2>&1 || fail "method value fixture generation"
+"$ODIN" check "$mv" -collection:godot="$ROOT" -no-entry-point -custom-attribute:gd_method || fail "method value fixture compilation"
+grep -q 'defer _destroy_r' "$mv/odin_godot_scripts.gen.odin" || fail "owned return destructor missing"
+grep -q 'defer _destroy_a0' "$mv/odin_godot_scripts.gen.odin" || fail "borrowed argument destructor missing"
+grep -q 'block_title(&self.part)' "$mv/odin_godot_scripts.gen.odin" || fail "composed return route missing"
+for invalid in typo scalar node native dynamic variant; do
+ cat >"$mv/value.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Values
+package method_values
+import gd "godot:godot"
+Values :: struct {owner:gd.Node}
+ODIN
+ case "$invalid" in
+  typo) echo '@(gd_method="typo") values_bad :: proc(self:^Values) {}' >>"$mv/value.odin" ;;
+  scalar) echo '@(gd_method="owned_return") values_bad :: proc(self:^Values)->i64 {return 1}' >>"$mv/value.odin" ;;
+  node) echo '@(gd_method="owned_return") values_bad :: proc(self:^Values)->gd.Node {return self.owner}' >>"$mv/value.odin" ;;
+  native) echo '@(gd_method="owned_return") values_bad :: proc(self:^Values)->string {return "text"}' >>"$mv/value.odin" ;;
+  variant) echo '@(gd_method) values_bad :: proc(self:^Values)->gd.Variant {return {}}' >>"$mv/value.odin" ;;
+  dynamic) echo '@(gd_method=123) values_bad :: proc(self:^Values) {}' >>"$mv/value.odin" ;;
+ esac
+ if "$SGEN" "$mv" -godot:"$ROOT" >"$work/method-$invalid.log" 2>&1; then fail "invalid method ownership $invalid accepted"; fi
+ grep -q 'method.*values_bad' "$work/method-$invalid.log" || fail "missing ownership diagnostic for $invalid"
+done
+cat >"$mv/value.odin" <<'ODIN'
+//gd:extends Node
+//gd:class Values
+package method_values
+import gd "godot:godot"
+Values :: struct {owner:gd.Node,text:string `gd:"export"`}
+ODIN
+if "$SGEN" "$mv" -godot:"$ROOT" >"$work/native-export.log" 2>&1; then fail "native string export accepted incompatible storage"; fi
+grep -q 'native string exports' "$work/native-export.log" || fail "missing native string export diagnostic"
+
 echo "SCRIPTGEN_OK"

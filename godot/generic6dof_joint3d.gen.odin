@@ -83,7 +83,7 @@ generic6dof_joint3d_set_param_x :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2018184242)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &param_,
@@ -102,7 +102,7 @@ generic6dof_joint3d_get_param_x :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2599835054)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &param_,
     }
@@ -121,7 +121,7 @@ generic6dof_joint3d_set_param_y :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2018184242)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &param_,
@@ -140,7 +140,7 @@ generic6dof_joint3d_get_param_y :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2599835054)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &param_,
     }
@@ -159,7 +159,7 @@ generic6dof_joint3d_set_param_z :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2018184242)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &param_,
@@ -178,7 +178,7 @@ generic6dof_joint3d_get_param_z :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2599835054)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &param_,
     }
@@ -197,7 +197,7 @@ generic6dof_joint3d_set_flag_x :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2451594564)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &flag_,
@@ -216,7 +216,7 @@ generic6dof_joint3d_get_flag_x :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2122427807)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     args := []__bindgen_gde.TypePtr {
         &flag_,
     }
@@ -235,7 +235,7 @@ generic6dof_joint3d_set_flag_y :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2451594564)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &flag_,
@@ -254,7 +254,7 @@ generic6dof_joint3d_get_flag_y :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2122427807)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     args := []__bindgen_gde.TypePtr {
         &flag_,
     }
@@ -273,7 +273,7 @@ generic6dof_joint3d_set_flag_z :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2451594564)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &flag_,
@@ -292,7 +292,7 @@ generic6dof_joint3d_get_flag_z :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2122427807)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     args := []__bindgen_gde.TypePtr {
         &flag_,
     }

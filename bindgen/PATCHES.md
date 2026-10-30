@@ -598,3 +598,25 @@ rawptr → handle RETURN direction needed casts:
 - The refusal is pinned in `tests/scriptgen/run.sh` (handle_guard fixture): a
   `^Menu` passed to `canvas_item_set_visible` must NOT compile; the `.owner`
   spelling must.
+
+## Scalar and enum ptrcall storage — 2026-09-14
+
+Engine return metadata such as `int32` describes a public numeric refinement;
+it does not reduce the pointer-call return slot. Godot encodes integer results
+through an eight-byte slot. The generator previously passed the address of its
+narrow named return directly, exposing undersized storage. Public enums can also
+be four bytes on WebAssembly, while engine enum arguments/results use eight bytes.
+
+`views.engine_scalar_storage` now selects the ABI temporary for narrow scalars,
+enums and bitfields. The engine templates marshal arguments and return values
+through those temporaries. Public signatures, enum definitions and caller types
+remain unchanged. The current API audit covers 1,125 narrow numeric returns,
+1,021 enum/flag returns and 1,349 enum/flag arguments. Both static and instance
+methods are included; fixed vararg enum arguments are boxed from the wide value.
+
+Native and real browser regression checks live in
+[`tests/replay_ptrcall_abi`](../tests/replay_ptrcall_abi/README.md). They demonstrate
+actual engine write width with a protected canary and exercise signed/unsigned
+extrema and enum conversion. The generated-file audit is checked against
+`extension_api.json`, with mutation tests for unsafe storage patterns. Regeneration
+continues to leave handwritten Godot files and the owned `gdext` runtime alone.

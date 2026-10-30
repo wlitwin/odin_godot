@@ -84,7 +84,7 @@ collision_polygon2d_set_build_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2780803135)
     }
     self := self
-    build_mode_ := build_mode_
+    build_mode_ := Int(build_mode_)
     args := []__bindgen_gde.TypePtr {
         &build_mode_,
     }
@@ -102,7 +102,9 @@ collision_polygon2d_get_build_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Collision_Polygon2d_Build_Mode(__return_storage)
     return
 }
 

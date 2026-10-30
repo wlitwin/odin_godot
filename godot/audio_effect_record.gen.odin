@@ -80,7 +80,7 @@ audio_effect_record_set_format :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 60648488)
     }
     self := self
-    format_ := format_
+    format_ := Int(format_)
     args := []__bindgen_gde.TypePtr {
         &format_,
     }
@@ -98,7 +98,9 @@ audio_effect_record_get_format :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Audio_Stream_Wav_Format(__return_storage)
     return
 }
 

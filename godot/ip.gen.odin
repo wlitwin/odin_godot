@@ -64,7 +64,7 @@ ip_resolve_hostname :: proc "contextless" (
     }
     self := self
     host_ := host_
-    ip_type_ := ip_type_
+    ip_type_ := Int(ip_type_)
     args := []__bindgen_gde.TypePtr {
         &host_,
         &ip_type_,
@@ -85,7 +85,7 @@ ip_resolve_hostname_addresses :: proc "contextless" (
     }
     self := self
     host_ := host_
-    ip_type_ := ip_type_
+    ip_type_ := Int(ip_type_)
     args := []__bindgen_gde.TypePtr {
         &host_,
         &ip_type_,
@@ -106,12 +106,14 @@ ip_resolve_hostname_queue_item :: proc "contextless" (
     }
     self := self
     host_ := host_
-    ip_type_ := ip_type_
+    ip_type_ := Int(ip_type_)
     args := []__bindgen_gde.TypePtr {
         &host_,
         &ip_type_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -129,7 +131,9 @@ ip_get_resolve_item_status :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Ip_Resolver_Status(__return_storage)
     return
 }
 

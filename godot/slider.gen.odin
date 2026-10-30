@@ -72,7 +72,9 @@ slider_get_ticks :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -119,7 +121,9 @@ slider_get_ticks_position :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Slider_Tick_Position(__return_storage)
     return
 }
 
@@ -133,7 +137,7 @@ slider_set_ticks_position :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2952822224)
     }
     self := self
-    ticks_on_border_ := ticks_on_border_
+    ticks_on_border_ := Int(ticks_on_border_)
     args := []__bindgen_gde.TypePtr {
         &ticks_on_border_,
     }

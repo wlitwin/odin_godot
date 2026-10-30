@@ -1,0 +1,72 @@
+{
+  "version": 2,
+  "variants": [
+    "kit",
+    "server",
+    "owner"
+  ],
+  "repetitions": 3,
+  "roles": [
+    "host",
+    "client"
+  ],
+  "render_max_fps": 60,
+  "network_hz": 20,
+  "receive_delay_ms_per_process": 120,
+  "measurement_ms": 16000,
+  "warmup_ms": 1000,
+  "seed": 1337,
+  "content_overrides": [
+    "both authored floor resources use zero-count waves; inventory, doors, movement, AI implementation and assets otherwise retained",
+    "original run seed fixed to 1337"
+  ],
+  "host_anchor": [
+    120,
+    120
+  ],
+  "client_anchor": [
+    160,
+    120
+  ],
+  "client_waypoints": [
+    [
+      300,
+      120
+    ],
+    [
+      300,
+      180
+    ],
+    [
+      560,
+      180
+    ],
+    [
+      160,
+      180
+    ],
+    [
+      160,
+      120
+    ]
+  ],
+  "endpoint_tolerance_px": 8,
+  "gameplay_gate": "guest takes all three gems, host observes conserved inventory and opened door; both remain alive on floor one; no mobs",
+  "backups": "both copy complete checkpoints every five seconds; Kit succession metadata remains included, Replay has no external coordinator in this cohort",
+  "byte_scope": "all per-connection application payload/envelope bytes sent; excludes ENet/IP framing and retransmission",
+  "time_scope": "inclusive Odin game process callback wall microseconds, excluding comparison probes/driver; not CPU-only",
+  "limits": [
+    "different prediction/ownership, presentation and recovery services remain part of each implementation",
+    "waypoint intent is shared; exact input trajectories and arrival positions need not agree",
+    "quiet interaction workload only; no combat or overall framework performance conclusion",
+    "mechanical source counts are not a human usability study"
+  ],
+  "client_view_gate": "transient predicted/partially delivered totals are recorded (0..6); final visible total must equal 3. Authority total must remain 3 in every sample.",
+  "baseline_overlay": "isolated game releases the owned World2D reference after the unchanged navigation-map lookup; original Kit/game sources remain untouched; failed pristine pilot retained",
+  "interaction_timing": "record visible bag/door separately, then await command confirmation plus the expected received result before advancing; no comparison of Kit prediction against Replay confirmation",
+  "observation_scopes": {
+    "render": "actual node positions",
+    "visible_inventory": "Kit local replicated/predicted fields; Replay predicted world used by its HUD",
+    "raw_state": "Kit current local entity fields (may include prediction); Replay authority-observed world"
+  }
+}

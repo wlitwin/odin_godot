@@ -13,6 +13,10 @@ multiplayer sessions, replication with prediction, items/combat/NPCs, save/resum
 host migration, and ENet + Steam + WebRTC (browser) transports. Start at
 [docs/kit/](docs/kit/index.md).
 
+The addon also includes **Replay**, an experimental simulation-first multiplayer
+library beside Kit, and `template/replay/` as a separate starter project. See the
+[Replay guide](docs/replay.md) for its API model and supported envelopes.
+
 ---
 
 ## How it works (read this first)

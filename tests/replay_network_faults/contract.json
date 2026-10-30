@@ -1,0 +1,44 @@
+{
+  "version": 2,
+  "scenario": "replay_sustained_swarm_raw_udp",
+  "sample_ms": 20000,
+  "repetitions": 2,
+  "workload": "Existing forty-enemy offensive swarm, zero-bite/large-magazine fixtures, two stationary players, ordinary spawn/fire/damage/death/pickup paths.",
+  "conditions": {
+    "lossy": {
+      "latency_ms": 120,
+      "jitter_ms": 20,
+      "loss": 0.05,
+      "duplicate": 0.05,
+      "bytes_per_second": 0,
+      "queue_bytes": 65536,
+      "queue_packets": 128,
+      "rate_burst_bytes": 1500
+    },
+    "rate_limited": {
+      "latency_ms": 120,
+      "jitter_ms": 20,
+      "loss": 0.02,
+      "duplicate": 0.02,
+      "bytes_per_second": 262144,
+      "queue_bytes": 65536,
+      "queue_packets": 128,
+      "rate_burst_bytes": 1500
+    }
+  },
+  "acceptance": {
+    "minimum_authority_living": 32,
+    "maximum_authority_living": 44,
+    "minimum_authority_kills": 20,
+    "minimum_client_tick_progress": 1000,
+    "maximum_client_resyncs": 3,
+    "settle_ms": 8000,
+    "final_peer_convergence": true,
+    "proxy_bounds_verified": true
+  },
+  "limits": [
+    "Replay acceptance only; this is not a Kit/Replay performance comparison.",
+    "The proxy operates below ENet on raw datagrams, including reliable traffic retransmission.",
+    "Stationary offensive workload does not cover movement/status-heavy full-game parity."
+  ]
+}

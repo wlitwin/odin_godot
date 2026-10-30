@@ -1,0 +1,5 @@
+[gd_scene format=3]
+[node name="Rock" type="Node2D"]
+[node name="Glyph" type="Label" parent="."]
+text = "●"
+modulate = Color(1, 0.9, 0.4, 1)

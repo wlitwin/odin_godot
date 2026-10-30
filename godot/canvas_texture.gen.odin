@@ -208,7 +208,7 @@ canvas_texture_set_texture_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1037999706)
     }
     self := self
-    filter_ := filter_
+    filter_ := Int(filter_)
     args := []__bindgen_gde.TypePtr {
         &filter_,
     }
@@ -226,7 +226,9 @@ canvas_texture_get_texture_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Canvas_Item_Texture_Filter(__return_storage)
     return
 }
 
@@ -240,7 +242,7 @@ canvas_texture_set_texture_repeat :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1716472974)
     }
     self := self
-    repeat_ := repeat_
+    repeat_ := Int(repeat_)
     args := []__bindgen_gde.TypePtr {
         &repeat_,
     }
@@ -258,7 +260,9 @@ canvas_texture_get_texture_repeat :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Canvas_Item_Texture_Repeat(__return_storage)
     return
 }
 

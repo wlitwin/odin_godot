@@ -1,0 +1,5 @@
+node_modules/
+line_project/.godot/
+line_project/out/
+*.uid
+__pycache__/

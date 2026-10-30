@@ -130,7 +130,9 @@ style_box_flat_get_border_width_min :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -145,7 +147,7 @@ style_box_flat_set_border_width :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 437707142)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     width_ := width_
     args := []__bindgen_gde.TypePtr {
         &margin_,
@@ -164,11 +166,13 @@ style_box_flat_get_border_width :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1983885014)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     args := []__bindgen_gde.TypePtr {
         &margin_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -232,7 +236,7 @@ style_box_flat_set_corner_radius :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2696158768)
     }
     self := self
-    corner_ := corner_
+    corner_ := Int(corner_)
     radius_ := radius_
     args := []__bindgen_gde.TypePtr {
         &corner_,
@@ -251,11 +255,13 @@ style_box_flat_get_corner_radius :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3982397690)
     }
     self := self
-    corner_ := corner_
+    corner_ := Int(corner_)
     args := []__bindgen_gde.TypePtr {
         &corner_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -270,7 +276,7 @@ style_box_flat_set_expand_margin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4290182280)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     size_ := size_
     args := []__bindgen_gde.TypePtr {
         &margin_,
@@ -306,7 +312,7 @@ style_box_flat_get_expand_margin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2869120046)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     args := []__bindgen_gde.TypePtr {
         &margin_,
     }
@@ -438,7 +444,9 @@ style_box_flat_get_shadow_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -566,7 +574,9 @@ style_box_flat_get_corner_detail :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

@@ -99,7 +99,9 @@ animation_mixer_add_animation_library :: proc "contextless" (
         &name_,
         &library_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -348,7 +350,7 @@ animation_mixer_set_callback_mode_process :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2153733086)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -366,7 +368,9 @@ animation_mixer_get_callback_mode_process :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Mixer_Animation_Callback_Mode_Process(__return_storage)
     return
 }
 
@@ -380,7 +384,7 @@ animation_mixer_set_callback_mode_method :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 742218271)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -398,7 +402,9 @@ animation_mixer_get_callback_mode_method :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Mixer_Animation_Callback_Mode_Method(__return_storage)
     return
 }
 
@@ -412,7 +418,7 @@ animation_mixer_set_callback_mode_discrete :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1998944670)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -430,7 +436,9 @@ animation_mixer_get_callback_mode_discrete :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Mixer_Animation_Callback_Mode_Discrete(__return_storage)
     return
 }
 
@@ -462,7 +470,9 @@ animation_mixer_get_audio_max_polyphony :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -666,8 +676,8 @@ animation_mixer_capture :: proc "contextless" (
     self := self
     name_ := name_
     duration_ := duration_
-    trans_type_ := trans_type_
-    ease_type_ := ease_type_
+    trans_type_ := Int(trans_type_)
+    ease_type_ := Int(ease_type_)
     args := []__bindgen_gde.TypePtr {
         &name_,
         &duration_,

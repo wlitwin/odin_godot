@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MobDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/defs/mob_def.odin" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = 4
+name = "titan"
+hp = 600
+speed = 40.0
+bite = 3
+body_r = 40.0
+scale = 3.5

@@ -235,7 +235,7 @@ animation_player_set_auto_capture_transition_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1058637742)
     }
     self := self
-    auto_capture_transition_type_ := auto_capture_transition_type_
+    auto_capture_transition_type_ := Int(auto_capture_transition_type_)
     args := []__bindgen_gde.TypePtr {
         &auto_capture_transition_type_,
     }
@@ -253,7 +253,9 @@ animation_player_get_auto_capture_transition_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Tween_Transition_Type(__return_storage)
     return
 }
 
@@ -267,7 +269,7 @@ animation_player_set_auto_capture_ease_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1208105857)
     }
     self := self
-    auto_capture_ease_type_ := auto_capture_ease_type_
+    auto_capture_ease_type_ := Int(auto_capture_ease_type_)
     args := []__bindgen_gde.TypePtr {
         &auto_capture_ease_type_,
     }
@@ -285,7 +287,9 @@ animation_player_get_auto_capture_ease_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Tween_Ease_Type(__return_storage)
     return
 }
 
@@ -472,8 +476,8 @@ animation_player_play_with_capture :: proc "contextless" (
     custom_blend_ := custom_blend_
     custom_speed_ := custom_speed_
     from_end_ := from_end_
-    trans_type_ := trans_type_
-    ease_type_ := ease_type_
+    trans_type_ := Int(trans_type_)
+    ease_type_ := Int(ease_type_)
     args := []__bindgen_gde.TypePtr {
         &name_,
         &duration_,
@@ -930,7 +934,7 @@ animation_player_set_process_callback :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1663839457)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -948,7 +952,9 @@ animation_player_get_process_callback :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Player_Animation_Process_Callback(__return_storage)
     return
 }
 
@@ -962,7 +968,7 @@ animation_player_set_method_call_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3413514846)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -980,7 +986,9 @@ animation_player_get_method_call_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Player_Animation_Method_Call_Mode(__return_storage)
     return
 }
 

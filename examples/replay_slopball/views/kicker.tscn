@@ -1,0 +1,27 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://meshes/kicker_skin.tres" id="mesh_3"]
+
+
+
+[sub_resource type="CircleShape2D" id="shape_kick"]
+radius = 9.0
+
+[node name="Kicker" type="CharacterBody2D"]
+collision_layer = 2
+collision_mask = 5
+
+[node name="Shape" type="CollisionShape2D" parent="."]
+shape = SubResource("shape_kick")
+
+[node name="Skin" type="MeshInstance2D" parent="."]
+self_modulate = Color(0.8, 0.8, 0.8, 1)
+mesh = ExtResource("mesh_3")
+
+[node name="Tag" type="Label" parent="."]
+offset_left = -20.0
+offset_top = -26.0
+offset_right = 20.0
+offset_bottom = -12.0
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 9

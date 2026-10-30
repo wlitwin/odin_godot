@@ -182,6 +182,9 @@ map_variant :: proc(type_text: string) -> (Variant_Info, bool) {
 		return other("Projection")
 	case "Color":
 		return other("Color")
+	// Variant is a tagged union, not an Object handle; this boundary requires a concrete type.
+	case "Variant":
+		return {}, false
 	// ---- misc handles ----
 	case "Rid":
 		return other("Rid")
@@ -306,6 +309,8 @@ Method_Info :: struct {
 	gd_name:   string, // the name exposed to GDScript (namespaced for a composed block method)
 	args:      [dynamic]Arg,
 	ret:       Variant_Info, // .Nil kind => void
+	ret_type: string,
+	borrowed_args, owned_return, return_refcounted: bool,
 	line:      int, // 1-based source line of the proc decl (duplicate-name diagnostics)
 	// Method-composition (the engine-facing dual of verb-composition): a @(gd_method)/@(gd_rpc)
 	// whose receiver is an EMBEDDED sub-struct is hoisted onto the entity's method table, routed
@@ -710,6 +715,7 @@ Script :: struct {
 	icon:              string, // `//gd:icon <res-path>` — custom class icon (""=none)
 	groups:            [dynamic]string, // `//gd:group a b` — joined on READY by the core
 	exports:           [dynamic]Export_Info,
+	replay_view:        Replay_View_Info,
 	onready_scripts:   [dynamic]Onready_Script_Ref, // `^ScriptStruct` onready fields, validated module-wide (resolve_onready_scripts)
 	lifecycles:        [dynamic]Lifecycle_Info,
 	methods:           [dynamic]Method_Info,
@@ -1407,7 +1413,7 @@ index_pkg_dir :: proc(dir: string) {
 			}
 			is_rpc := has_attr(vd, "gd_rpc")
 			if has_attr(vd, "gd_method") || is_rpc {
-				if mi, mok := build_method_info(src, pt, loc, name_ident.name, base, true); mok {
+				if mi, mok := build_method_info(src, pt, loc, name_ident.name, base, true, vd); mok {
 					if is_rpc {
 						mi.is_rpc = true
 						rconfig, _ := attr_value(vd, "gd_rpc")
@@ -1614,16 +1620,25 @@ package_name_of :: proc(dir: string) -> string {
 // exactly like the aliased form. (It used to be alias-only: a bare import silently
 // skipped the embed's fields and verbs, which cost a real debugging session — the
 // gun compiled, ran, and just never replicated.) Only the godot: collection resolves;
-// other collections stay engine/core leaves. godot:godot is excluded (engine types);
+// other collections stay engine/core leaves. godot:godot keeps only an internal
+// @engine marker (authored engine qualifiers are normalized to gd.);
 // `_` imports are side-effect only.
 collect_file_imports :: proc(file: ^ast.File) -> map[string]string {
 	m := make(map[string]string)
 	for imp in file.imports {
 		if imp.name.text == "_" {continue}
 		full := strings.trim(imp.fullpath, "\"")
-		if full == "godot:godot" {continue}
+		if full == "godot:godot" {m["@engine"] = full;continue}
 		name := imp.name.text
 		if name == "" {
+   // Bare standard-library imports use the final package path component in
+   // the authored type spelling. Retain that vocabulary for plain shared-type
+   // classification; these are opaque leaves, never composition sources.
+   if strings.has_prefix(full,"core:") || strings.has_prefix(full,"base:") || strings.has_prefix(full,"vendor:") {
+    name=full[strings.index_byte(full,':')+1:]
+    if slash:=strings.last_index(name,"/");slash>=0 {name=name[slash+1:]}
+    if name!="" {m[name]=full};continue
+   }
 			dir, dok := resolve_import_dir(full)
 			if !dok {
 				// A BARE import of a SHARED package (`import "../shared/ids"`): bind its

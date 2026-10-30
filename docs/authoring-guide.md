@@ -1090,12 +1090,71 @@ structs/arrays you manipulate with normal operators.
 | `int`, `i8/i16/i32/i64`, `u8..u64`, `uint`, `gd.Int` | `Int` | width-narrowed via `size_of` |
 | `f32`, `f64`, `gd.Float`, `gd.Real` | `Float` | |
 | `bool` | `Bool` | |
-| `string`, `gd.String` | `String` | |
+| `string` | `String` | Method arguments/results are converted as UTF-8; use `gd.String` for exported storage. |
+| `gd.String` | `String` | Engine value with explicit ownership. |
 | `gd.Vector2`, `gd.Vector3`, `gd.Color` | matching | |
 | `gd.String_Name` | `String_Name` | |
 | `^gd.<Object subclass>`, `gd.Node`, `gd.Object`, ... | `Object` | object handle |
 
 Unsupported types produce a clear `scriptgen` error (no silent miscompile).
+Raw `gd.Variant` signatures are not supported at this method boundary; use a
+concrete supported type or a lower-level Variant dispatch API.
+
+### Method value ownership
+
+Use ordinary Odin strings for textual method APIs:
+
+```odin
+@(gd_method)
+player_echo :: proc(self: ^Player, text: string) -> string {return text}
+```
+
+The trampoline converts the incoming Godot String into temporary UTF-8 storage,
+copies returned text into the outgoing Variant, and releases its Godot argument
+copy when the call finishes.
+Keep returned storage valid until marshaling finishes: literals, instance-owned
+strings and `context.temp_allocator` data work; a view into a local stack array
+does not. Copy an argument with `strings.clone` if you retain it across frames.
+The trampoline does not free an Odin string you return from your own allocator.
+
+A bare `@(gd_method)` preserves the earlier engine-value contract: owning builtin
+argument copies belong to the callee, while returned Godot values are borrowed.
+Thus existing methods that free their `gd.String`/`gd.Array` parameters or return
+an instance-owned value keep working. Object-handle arguments are borrowed pointers,
+not owning builtin copies.
+
+For new engine-value APIs, state ownership in the existing attribute:
+
+```odin
+@(gd_method="borrowed_args,owned_return")
+player_copy_values :: proc(self: ^Player, values: gd.Array) -> gd.Array {
+    return gd.new_array_array(values)
+}
+
+@(gd_method="owned_return")
+player_description :: proc(self: ^Player) -> gd.String {
+    return gd.new_string_odin("Ready")
+}
+```
+
+`borrowed_args` makes the trampoline release its builtin argument copies after
+the call. Treat those values as borrowed; use a Godot copy constructor before
+retaining or replacing a handle. A copied Array/Dictionary reference may still
+share mutable contents—ownership does not imply a deep copy.
+
+`owned_return` transfers one owned builtin reference to the trampoline, which
+releases it after the outgoing Variant retains the value. It also supports a
+**declared RefCounted subclass** with one owned reference (factory results, or a
+new object after `ref_counted_init_ref`). It rejects Node/Object/scalar results;
+a Variant does not own a Node's lifetime. Native Odin string results already use
+the conversion path and do not take this option. Returning a borrowed argument
+as `owned_return` requires first acquiring a separate reference.
+
+The options also follow composed methods and property accessors when the accessor
+proc has the annotated `gd_method`. Unannotated accessors retain the legacy
+contract. A String property's getter may return an Odin `string`, which is copied;
+its actual exported storage remains `gd.String`. Native `string` exports are
+rejected by scriptgen and reflection because their storage is not a Godot String.
 
 ## Threads & memory
 
@@ -1634,3 +1693,22 @@ These virtuals **dispatch into Odin** when invoked (verified headless by calling
 directly). Whether the editor auto-invokes them during a *live* Inspector rebuild (after
 `add_inspector_plugin()` and selecting a handled object in the dock) is a UI-driven path
 that is **visual-only** (not asserted headless).
+
+
+### Optional Replay view descriptors
+
+`//gd:replay_view` is an optional header declaration for Node2D presentation
+scripts. It generates a typed descriptor over public Replay/Godot helpers, without
+adding wire fields, simulation lifecycle hooks or authority/sampling policy:
+
+```odin
+//gd:replay_view value=value,present=enemy_present,validate=enemy_validate,retired=enemy_retire,appearance=skin,configure=enemy_configure
+```
+
+`value` names a direct display field; optional `appearance` names a typed Resource
+script pointer. `present` is required, `validate`/`retired` are optional, and
+`appearance`/`configure` must be paired. Unknown/duplicate options, missing fields
+and incompatible callbacks fail generation/compilation. Generated descriptors and
+handwritten descriptors share the same implementation. See
+[adapter bindings](../replay/godot/adapter-bindings.md) for ownership, lifetimes,
+scene validation and the distinct permanent-runner and entity-enemy examples.

@@ -69,7 +69,7 @@ open_xr_spatial_entity_extension_supports_capability :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1940837202)
     }
     self := self
-    capability_ := capability_
+    capability_ := Int(capability_)
     args := []__bindgen_gde.TypePtr {
         &capability_,
     }
@@ -88,8 +88,8 @@ open_xr_spatial_entity_extension_supports_component_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 26842779)
     }
     self := self
-    capability_ := capability_
-    component_type_ := component_type_
+    capability_ := Int(capability_)
+    component_type_ := Int(component_type_)
     args := []__bindgen_gde.TypePtr {
         &capability_,
         &component_type_,

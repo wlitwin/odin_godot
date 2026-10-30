@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="ScrapRunnerStyle" format=3]
+[ext_resource type="Script" path="res://scripts/views/runner_style.odin" id="script"]
+[ext_resource type="Texture2D" path="res://assets/gz2/runner_becca_idle.png" id="idle"]
+[ext_resource type="Texture2D" path="res://assets/gz2/runner_becca_run.png" id="run"]
+[resource]
+script = ExtResource("script")
+id = 0
+idle = ExtResource("idle")
+run = ExtResource("run")

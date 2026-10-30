@@ -6,3 +6,6 @@ config_version=5
 config/name="OdinGodotCodegen"
 run/main_scene="res://codegen.tscn"
 config/features=PackedStringArray("4.6")
+
+[editor_plugins]
+enabled=PackedStringArray("res://addons/acceptance/plugin.cfg")

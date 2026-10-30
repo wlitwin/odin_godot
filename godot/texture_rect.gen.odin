@@ -97,7 +97,7 @@ texture_rect_set_expand_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1870766882)
     }
     self := self
-    expand_mode_ := expand_mode_
+    expand_mode_ := Int(expand_mode_)
     args := []__bindgen_gde.TypePtr {
         &expand_mode_,
     }
@@ -115,7 +115,9 @@ texture_rect_get_expand_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Texture_Rect_Expand_Mode(__return_storage)
     return
 }
 
@@ -193,7 +195,7 @@ texture_rect_set_stretch_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 58788729)
     }
     self := self
-    stretch_mode_ := stretch_mode_
+    stretch_mode_ := Int(stretch_mode_)
     args := []__bindgen_gde.TypePtr {
         &stretch_mode_,
     }
@@ -211,7 +213,9 @@ texture_rect_get_stretch_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Texture_Rect_Stretch_Mode(__return_storage)
     return
 }
 

@@ -13,31 +13,17 @@ PROJ="$ROOT/tests/resources"
 # Build the scripts dll (ItemData + Holder + boot) + the core dll.
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
 
-# Make the scripts dll path unambiguous for the core's dynlib load.
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
-
-# First pass: write .godot/extension_list.cfg + import so the runtime loads the extension.
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
-
-# Pass 1: EDITOR context — a custom resource is editable in-editor (real instance);
-# assert the @export vars show + an edit/save/reload round-trip persists, with NO crash
-# or missing-virtual error (gotcha #4). Prints RESOURCES_EDITOR_OK.
-ELOG="$(mktemp)"
-trap 'rm -f "$ELOG"' EXIT
-set +e
-"$GODOT" --editor --headless --path "$PROJ" --script test_editor_resources.gd >"$ELOG" 2>&1
-set -e
-cat "$ELOG"
-if grep -qE "signal 11|must be overridden|Required virtual" "$ELOG"; then
-    echo "RESOURCES_FAIL: editor logged a crash / missing-virtual error"
-    grep -nE "signal 11|must be overridden|Required virtual" "$ELOG" | head
-    exit 1
+case "$(uname -s)" in Darwin) ext=dylib ;; Linux) ext=so ;; *) ext=dll ;; esac
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.$ext"
+work="${RESOURCES_LOGS:-$(mktemp -d)}"
+mkdir -p "$work"
+"$GODOT" --headless --path "$PROJ" --editor --quit-after 120 >"$work/import.log" 2>&1
+RESOURCES_EDITOR_CHECK=1 "$GODOT" --editor --headless --path "$PROJ" --quit-after 900 >"$work/editor.log" 2>&1
+"$GODOT" --headless --path "$PROJ" --script test_resources.gd >"$work/runtime.log" 2>&1
+cat "$work/editor.log" "$work/runtime.log"
+rg -q '^RESOURCES_EDITOR_OK$' "$work/editor.log"
+rg -q '^RESOURCES_OK$' "$work/runtime.log"
+if rg -q 'SCRIPT ERROR|ERROR:|instances were leaked|resources still in use|RIDs.*leaked|Scan thread aborted' "$work/"*.log; then
+ cat "$work/"*.log
+ exit 1
 fi
-if ! grep -q "RESOURCES_EDITOR_OK" "$ELOG"; then
-    echo "RESOURCES_FAIL: editor-context resource check did not pass"
-    exit 1
-fi
-
-# Pass 2: runtime (real instance) — instantiate + @export + method + .tres round-trip +
-# resource-typed @export. Prints RESOURCES_OK (what run_all greps for).
-"$GODOT" --headless --path "$PROJ" --script test_resources.gd

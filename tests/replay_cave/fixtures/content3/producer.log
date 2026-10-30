@@ -1,0 +1,9 @@
+warning: Git tree '/Users/walter/data/code/odin/odin_godot' is dirty
+odin_godot dev shell  (target: Godot 4.7.1 stable)
+  odin:  /nix/store/bp9vf6k9bsawaf0yvds0zbwadr22j3pf-odin-dev-2026-04/bin/odin  odin version dev-2026-04
+  emcc:  /nix/store/wwcamwhybgsw9gb1y73g3hi1qy3qf33d-emscripten-5.0.6/bin/emcc
+  godot: /Applications/Godot.app/Contents/MacOS/Godot
+LEGACY_DIRECTOR name=waiting tick=4 director=Director{wave = 1, remaining = 2, next_spawn = 20, rest_until = 0, done = false} live=0
+LEGACY_DIRECTOR name=pending tick=5 director=Director{wave = 1, remaining = 2, next_spawn = 20, rest_until = 0, done = false} live=0
+LEGACY_DIRECTOR name=spawning tick=22 director=Director{wave = 1, remaining = 1, next_spawn = 30, rest_until = 0, done = false} live=1
+LEGACY_DIRECTOR name=rest tick=10 director=Director{wave = 1, remaining = 0, next_spawn = 20, rest_until = 41, done = false} live=0

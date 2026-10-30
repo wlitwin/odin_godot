@@ -62,13 +62,15 @@ resource_saver_save :: proc "contextless" (
     self := self
     resource_ := resource_
     path_ := path_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &resource_,
         &path_,
         &flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -89,7 +91,9 @@ resource_saver_set_uid :: proc "contextless" (
         &resource_,
         &uid_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

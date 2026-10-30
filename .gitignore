@@ -37,6 +37,8 @@ tests/*/.export_build/
 examples/*/out/
 examples/*/.export_build/
 tests/.logs/
+# Replay outcome reports, run artifacts, and archived source snapshots.
+/docs/replay/results/
 tests/rpc_net/.runlogs/
 tests/kitsync/.runlogs/
 tests/kitacid/.runlogs/
@@ -52,12 +54,15 @@ examples/*/.coopsignal.log
 /result-*
 
 # ── editor / misc ───────────────────────────────────────────────────
+__pycache__/
+*.pyc
 *.tmp
 .DS_Store
 # stray repo-root logs (e.g. a redirected error.log)
 /*.log
 
 # ── web browser-test deps (puppeteer-core, installed by the web test) ──
+node_modules
 /tests/web/node_modules/
 /tests/web/package.json
 /tests/web/package-lock.json

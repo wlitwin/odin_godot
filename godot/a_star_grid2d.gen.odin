@@ -238,7 +238,7 @@ a_star_grid2d_set_cell_shape :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4130591146)
     }
     self := self
-    cell_shape_ := cell_shape_
+    cell_shape_ := Int(cell_shape_)
     args := []__bindgen_gde.TypePtr {
         &cell_shape_,
     }
@@ -256,7 +256,9 @@ a_star_grid2d_get_cell_shape :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = A_Star_Grid2d_Cell_Shape(__return_storage)
     return
 }
 
@@ -370,7 +372,7 @@ a_star_grid2d_set_diagonal_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1017829798)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -388,7 +390,9 @@ a_star_grid2d_get_diagonal_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = A_Star_Grid2d_Diagonal_Mode(__return_storage)
     return
 }
 
@@ -402,7 +406,7 @@ a_star_grid2d_set_default_compute_heuristic :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1044375519)
     }
     self := self
-    heuristic_ := heuristic_
+    heuristic_ := Int(heuristic_)
     args := []__bindgen_gde.TypePtr {
         &heuristic_,
     }
@@ -420,7 +424,9 @@ a_star_grid2d_get_default_compute_heuristic :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = A_Star_Grid2d_Heuristic(__return_storage)
     return
 }
 
@@ -434,7 +440,7 @@ a_star_grid2d_set_default_estimate_heuristic :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1044375519)
     }
     self := self
-    heuristic_ := heuristic_
+    heuristic_ := Int(heuristic_)
     args := []__bindgen_gde.TypePtr {
         &heuristic_,
     }
@@ -452,7 +458,9 @@ a_star_grid2d_get_default_estimate_heuristic :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = A_Star_Grid2d_Heuristic(__return_storage)
     return
 }
 

@@ -1,0 +1,100 @@
+[gd_scene format=3]
+[ext_resource type="Texture2D" path="res://assets/ui/metal_btn_dark.png" id="steel"]
+[ext_resource type="Theme" path="res://assets/ui/metal_theme.tres" id="theme"]
+[sub_resource type="StyleBoxTexture" id="plate"]
+texture = ExtResource("steel")
+region_rect = Rect2(0, 0, 64, 32)
+texture_margin_left = 9.0
+texture_margin_top = 9.0
+texture_margin_right = 9.0
+texture_margin_bottom = 9.0
+content_margin_left = 18.0
+content_margin_top = 14.0
+content_margin_right = 18.0
+content_margin_bottom = 14.0
+
+[node name="Menu" type="PanelContainer"]
+visible = false
+z_index = 41
+layout_mode = 1
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.05
+anchor_bottom = 0.95
+offset_left = -230.0
+offset_right = 230.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("theme")
+theme_override_styles/panel = SubResource("plate")
+[node name="Scroll" type="ScrollContainer" parent="."]
+layout_mode = 2
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="Column" type="VBoxContainer" parent="Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+[node name="Title" type="Label" parent="Scroll/Column"]
+layout_mode = 2
+text = "S C R A P Y A R D"
+horizontal_alignment = 1
+[node name="Hint" type="Label" parent="Scroll/Column"]
+layout_mode = 2
+text = "Paused for you — the yard keeps moving"
+autowrap_mode = 3
+horizontal_alignment = 1
+[node name="Resume" type="Button" parent="Scroll/Column"]
+layout_mode = 2
+text = "Return to the yard"
+[node name="Save" type="Button" parent="Scroll/Column"]
+layout_mode = 2
+text = "Save run"
+[node name="Spray" type="Button" parent="Scroll/Column"]
+layout_mode = 2
+text = "Choose spray PNG"
+[node name="CopyParty" type="Button" parent="Scroll/Column"]
+visible = false
+layout_mode = 2
+text = "Copy party invite"
+[node name="Keys" type="Label" parent="Scroll/Column"]
+layout_mode = 2
+text = "Esc closes this menu · Hold Tab for the tally"
+horizontal_alignment = 1
+
+
+[node name="Volume" type="HBoxContainer" parent="Scroll/Column"]
+layout_mode = 2
+alignment = 1
+[node name="Down" type="Button" parent="Scroll/Column/Volume"]
+layout_mode = 2
+text = "−"
+[node name="Value" type="Label" parent="Scroll/Column/Volume"]
+layout_mode = 2
+text = "Sound 80%"
+[node name="Up" type="Button" parent="Scroll/Column/Volume"]
+layout_mode = 2
+text = "+"
+[node name="Shake" type="Button" parent="Scroll/Column"]
+layout_mode = 2
+text = "Camera motion: on"
+[node name="Fullscreen" type="Button" parent="Scroll/Column"]
+layout_mode = 2
+text = "Fullscreen: off"
+[node name="SettingsStatus" type="Label" parent="Scroll/Column"]
+layout_mode = 2
+autowrap_mode = 3
+text = ""
+horizontal_alignment = 1
+
+[node name="SprayPreview" type="TextureRect" parent="Scroll/Column"]
+layout_mode = 2
+custom_minimum_size = Vector2(64, 64)
+expand_mode = 1
+stretch_mode = 5
+
+
+[node name="Quit" type="Button" parent="Scroll/Column"]
+layout_mode = 2
+text = "Quit"

@@ -25,6 +25,21 @@ Engine_Class :: struct {
 @(private = "file")
 default_imports := []Import{{name = "__bindgen_gde", path = "godot:gdext"}}
 
+@(private = "file")
+engine_scalar_storage :: proc(type: g.Any_Type, public_type: string) -> Maybe(string) {
+    switch public_type {
+    case "i8", "u8", "i16", "u16", "i32", "u32": return "Int"
+    case "f32": return "Float"
+    }
+    #partial switch value in type {
+    case ^g.Enum, ^g.Bit_Field,
+         ^g.Class_Enum(g.Engine_Class), ^g.Class_Bit_Field(g.Engine_Class),
+         ^g.Class_Enum(g.Builtin_Class), ^g.Class_Bit_Field(g.Builtin_Class):
+        return "Int"
+    }
+    return nil
+}
+
 _constant_constructor :: proc(initializer: g.Initialize_By_Constructor, current_package: string) -> (result: string) {
     sb := strings.builder_make()
 
@@ -142,6 +157,7 @@ engine_class :: proc(class: ^g.Engine_Class, allocator: mem.Allocator) -> (engin
         if class_method.return_type != nil {
             resolved_return := resolve_qualified_type(class_method.return_type, package_name) // TODO: other package modes
             method.return_type = resolved_return
+            method.return_storage = engine_scalar_storage(class_method.return_type, resolved_return)
             method.ret_is_variant = resolved_return == "Variant"
             ensure_imports(&engine_class.imports, class_method.return_type, package_name) // TODO: other package modes
         }
@@ -152,6 +168,7 @@ engine_class :: proc(class: ^g.Engine_Class, allocator: mem.Allocator) -> (engin
                 type = resolve_qualified_type(class_method_arg.type, package_name), // TODO: other package modes
                 // TODO: defaults?
             }
+            method.args[arg_idx].storage = engine_scalar_storage(class_method_arg.type, method.args[arg_idx].type)
 
             ensure_imports(&engine_class.imports, class_method_arg.type, package_name) // TODO: other package modes
         }

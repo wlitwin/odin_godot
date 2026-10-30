@@ -1,0 +1,372 @@
+[gd_scene load_steps=7 format=3]
+[ext_resource type="Script" path="res://scripts/cave.odin" id="1"]
+[ext_resource type="Script" path="res://web_migration.gd" id="2"]
+[ext_resource type="Script" path="res://browser_save_test.gd" id="browser_save_test"]
+[ext_resource type="Script" path="res://online_web_test.gd" id="online_test"]
+[ext_resource type="Resource" path="res://levels/level_1.tres" id="floor1"]
+[ext_resource type="Resource" path="res://levels/level_2.tres" id="floor2"]
+[node name="ReplayCave" type="Node2D"]
+script = ExtResource("1")
+floor1_def = ExtResource("floor1")
+floor2_def = ExtResource("floor2")
+[node name="OnlineAcceptance" type="Node" parent="."]
+script = ExtResource("online_test")
+[node name="Title" type="Label" parent="."]
+offset_left = 48.0
+offset_top = 24.0
+theme_override_font_sizes/font_size = 30
+text = "REPLAY / CAVECRAWL"
+[node name="Status" type="Label" parent="."]
+offset_left = 48.0
+offset_top = 72.0
+offset_right = 690.0
+offset_bottom = 140.0
+theme_override_font_sizes/font_size = 18
+text = "Choose how to play."
+[node name="Help" type="Label" parent="."]
+offset_left = 48.0
+offset_top = 142.0
+text = "WASD / arrows move   E use   Space / click throw   Q drop   R heal   G set down   F ping   Tab scores   Enter chat"
+[node name="Stage" type="Node2D" parent="."]
+position = Vector2(48, 210)
+scale = Vector2(1.5, 1.5)
+[node name="Floor" type="Polygon2D" parent="Stage"]
+z_index = -20
+color = Color(0.12, 0.14, 0.18, 1)
+polygon = PackedVector2Array(0, 0, 640, 0, 640, 370, 0, 370)
+[node name="Inventory" type="Label" parent="."]
+offset_left = 1020.0
+offset_top = 212.0
+offset_right = 1190.0
+offset_bottom = 750.0
+theme_override_font_sizes/font_size = 16
+text = "INVENTORY"
+[node name="Prompt" type="Label" parent="."]
+offset_left = 48.0
+offset_top = 770.0
+theme_override_font_sizes/font_size = 18
+
+[node name="BrowserMigration" type="Node" parent="."]
+script=ExtResource("2")
+
+[node name="Social" type="CanvasLayer" parent="."]
+layer = 10
+[node name="Chat" type="VBoxContainer" parent="Social"]
+offset_left = 720.0
+offset_top = 8.0
+offset_right = 1185.0
+offset_bottom = 142.0
+mouse_filter = 2
+[node name="Lines" type="RichTextLabel" parent="Social/Chat"]
+layout_mode = 2
+custom_minimum_size = Vector2(440, 80)
+theme_override_font_sizes/normal_font_size = 14
+bbcode_enabled = false
+fit_content = false
+scroll_following = true
+[node name="Input" type="LineEdit" parent="Social/Chat"]
+layout_mode = 2
+placeholder_text = "Enter to chat"
+max_length = 240
+[node name="Notice" type="Label" parent="Social/Chat"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+[node name="Scoreboard" type="PanelContainer" parent="Social"]
+visible = false
+offset_left = 250.0
+offset_top = 270.0
+offset_right = 950.0
+offset_bottom = 500.0
+mouse_filter = 2
+[node name="Column" type="VBoxContainer" parent="Social/Scoreboard"]
+layout_mode = 2
+[node name="Title" type="Label" parent="Social/Scoreboard/Column"]
+layout_mode = 2
+text = "CAVE SCOREBOARD"
+horizontal_alignment = 1
+[node name="Grid" type="GridContainer" parent="Social/Scoreboard/Column"]
+layout_mode = 2
+columns = 8
+theme_override_constants/h_separation = 24
+
+[node name="Header0" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "Player"
+
+[node name="Header1" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "Kills"
+
+[node name="Header2" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "Deaths"
+
+[node name="Header3" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "Damage"
+
+[node name="Header4" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "Slain"
+
+[node name="Header5" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "Gems"
+
+[node name="Header6" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "HP"
+
+[node name="Header7" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "Ping (ms)"
+tooltip_text = "Application round-trip time to the authority; -- means unavailable or stale"
+
+[node name="Row0_0" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row0_1" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row0_2" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row0_3" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row0_4" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row0_5" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row0_6" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row0_7" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "--"
+
+[node name="Row1_0" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row1_1" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row1_2" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row1_3" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row1_4" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row1_5" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row1_6" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row1_7" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "--"
+
+[node name="Row2_0" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row2_1" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row2_2" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row2_3" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row2_4" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row2_5" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row2_6" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row2_7" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "--"
+
+[node name="Row3_0" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row3_1" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row3_2" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row3_3" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row3_4" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row3_5" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row3_6" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "0"
+
+[node name="Row3_7" type="Label" parent="Social/Scoreboard/Column/Grid"]
+layout_mode = 2
+text = "--"
+
+[node name="Lobby" type="CanvasLayer" parent="."]
+layer = 12
+[node name="Panel" type="PanelContainer" parent="Lobby"]
+offset_left = 310.0
+offset_top = 235.0
+offset_right = 890.0
+offset_bottom = 700.0
+[node name="Column" type="VBoxContainer" parent="Lobby/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+[node name="Title" type="Label" parent="Lobby/Panel/Column"]
+layout_mode = 2
+text = "GATHER THE PARTY"
+horizontal_alignment = 1
+[node name="NameLabel" type="Label" parent="Lobby/Panel/Column"]
+layout_mode = 2
+text = "Your name"
+[node name="Name" type="LineEdit" parent="Lobby/Panel/Column"]
+keep_editing_on_text_submit = true
+layout_mode = 2
+max_length = 48
+placeholder_text = "Spelunker"
+[node name="Address" type="LineEdit" parent="Lobby/Panel/Column"]
+layout_mode = 2
+text = "127.0.0.1"
+placeholder_text = "Host address"
+[node name="Port" type="SpinBox" parent="Lobby/Panel/Column"]
+layout_mode = 2
+min_value = 1.0
+max_value = 65535.0
+value = 49422.0
+prefix = "Port"
+
+[node name="PartyCode" type="LineEdit" parent="Lobby/Panel/Column"]
+visible = false
+layout_mode = 2
+max_length = 160
+placeholder_text = "Paste a party invite"
+
+[node name="PartyHint" type="Label" parent="Lobby/Panel/Column"]
+visible = false
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Friends with the invite can keep the party running if you disconnect."
+autowrap_mode = 3
+[node name="Status" type="Label" parent="Lobby/Panel/Column"]
+layout_mode = 2
+text = "Play solo, host a party, or join friends."
+autowrap_mode = 3
+[node name="ProfileStatus" type="Label" parent="Lobby/Panel/Column"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+autowrap_mode = 3
+[node name="Roster" type="Label" parent="Lobby/Panel/Column"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 110)
+[node name="Buttons" type="HFlowContainer" parent="Lobby/Panel/Column"]
+layout_mode = 2
+
+[node name="Solo" type="Button" parent="Lobby/Panel/Column/Buttons"]
+layout_mode = 2
+text = "Play solo"
+
+[node name="Host" type="Button" parent="Lobby/Panel/Column/Buttons"]
+layout_mode = 2
+text = "Host"
+
+[node name="Join" type="Button" parent="Lobby/Panel/Column/Buttons"]
+layout_mode = 2
+text = "Join"
+
+[node name="Rejoin" type="Button" parent="Lobby/Panel/Column/Buttons"]
+visible = false
+layout_mode = 2
+text = "Rejoin recent party"
+
+[node name="CopyInvite" type="Button" parent="Lobby/Panel/Column/Buttons"]
+visible = false
+layout_mode = 2
+text = "Copy party invite"
+
+[node name="Resume" type="Button" parent="Lobby/Panel/Column/Buttons"]
+layout_mode = 2
+text = "Resume save"
+
+[node name="Ready" type="Button" parent="Lobby/Panel/Column/Buttons"]
+layout_mode = 2
+text = "Ready / unready"
+
+[node name="Start" type="Button" parent="Lobby/Panel/Column/Buttons"]
+layout_mode = 2
+text = "Start"
+
+[node name="Leave" type="Button" parent="Lobby/Panel/Column/Buttons"]
+layout_mode = 2
+text = "Leave party"
+
+[node name="SaveStatus" type="Label" parent="Lobby/Panel/Column"]
+layout_mode = 2
+autowrap_mode = 3
+[node name="Save" type="Button" parent="Lobby/Panel/Column/Buttons"]
+layout_mode = 2
+visible = false
+text = "Save run"
+
+[node name="BrowserSaveTest" type="Node" parent="."]
+script = ExtResource("browser_save_test")
+
+[node name="Moderation" type="VBoxContainer" parent="Lobby/Panel/Column"]
+visible = false
+layout_mode = 2
+[node name="Players" type="OptionButton" parent="Lobby/Panel/Column/Moderation"]
+layout_mode = 2
+[node name="Remove" type="Button" parent="Lobby/Panel/Column/Moderation"]
+layout_mode = 2
+text = "Remove and block rejoin"
+[node name="Notice" type="Label" parent="Lobby/Panel/Column/Moderation"]
+layout_mode = 2
+autowrap_mode = 3
+text = "The selected player cannot rejoin this party."

@@ -1,0 +1,17 @@
+config_version=5
+[application]
+config/name="Replay Slopball"
+run/main_scene="res://slopball.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+[display]
+window/size/viewport_width=640
+window/size/viewport_height=360
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+[rendering]
+renderer/rendering_method="gl_compatibility"
+
+[physics]
+common/physics_interpolation=true
+2d/default_gravity=0.0

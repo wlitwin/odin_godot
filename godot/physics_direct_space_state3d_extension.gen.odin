@@ -109,7 +109,9 @@ physics_direct_space_state3d_extension__intersect_point :: proc "contextless" (
         &r_results_,
         &max_results_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -151,7 +153,9 @@ physics_direct_space_state3d_extension__intersect_shape :: proc "contextless" (
         &r_result_count_,
         &max_results_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

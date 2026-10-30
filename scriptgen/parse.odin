@@ -240,6 +240,9 @@ scan_markers :: proc(src: string, s: ^Script, pkg_line: int) {
 			for n in names {
 				append(&s.groups, n)
 			}
+		} else if rest, ok := marker_arg(body, "replay_view"); ok {
+			s.marked=true
+			parse_replay_view_marker(s,strings.trim_space(rest),loc)
 		} else if _, ok := marker_arg(body, "signal"); ok {
 			// The comment-marker signal form is GONE (breaking change) — signals are typed
 			// struct fields now. Point straight at the replacement instead of "unknown marker".
@@ -251,7 +254,7 @@ scan_markers :: proc(src: string, s: ^Script, pkg_line: int) {
 			// A `//gd:` line that matches no known marker is almost always a typo
 			// (`//gd:extend`, `//gd:singal`) that would otherwise silently no-op — and the
 			// `//gd:` namespace is reserved, so erroring is safe.
-			error_at(loc, "unknown //gd: marker %q (expected one of: extends/class/tool/icon/group)", body)
+			error_at(loc, "unknown //gd: marker %q (expected one of: extends/class/tool/icon/group/replay_view)", body)
 		}
 	}
 }
@@ -969,8 +972,11 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
 	// Past here is RECORDING, and recording is top-level-only: an embed's
 	// exports are registered by the runtime reflection walk under their
 	// namespaced (`aim_sensitivity`) names, not by this table.
+	if strings.trim_space(tf.type_text) == "string" {
+		error_at(tf.loc, "%s.%s: native string exports do not share Godot String storage; use gd.String for an export (native string is supported in methods)", s.struct_name, label)
+		return
+	}
 	if nested {return}
-
 	vi, ok := map_variant(tf.type_text)
 	if !ok {
 		error_at(tf.loc, "%s.%s: export field of unsupported type %q", s.struct_name, label, tf.type_text)
@@ -1389,6 +1395,7 @@ parse_script :: proc(path, src: string) -> (Script, bool) {
 	}
 
 	scan_bound_procs(&s, path, src, &file)
+	validate_replay_view_fields(&s,struct_type,src)
 
 	return s, true
 }
@@ -1546,7 +1553,7 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
 			}
 		}
 		if is_gd_method {
-			m, _ := build_method_info(src, pt, Loc{path, name_ident.pos.line}, proc_name, s.struct_name, false)
+			m, _ := build_method_info(src, pt, Loc{path, name_ident.pos.line}, proc_name, s.struct_name, false, vd)
 			append(&s.methods, m)
 
 			// `@(gd_connect="signal")` — auto-connect owner.signal -> this method on READY.
@@ -3948,7 +3955,8 @@ build_method_info :: proc(
 	pt: ^ast.Proc_Type,
 	loc: Loc,
 	proc_name, struct_name: string,
-	allow_owner: bool
+	allow_owner: bool,
+	vd: ^ast.Value_Decl = nil,
 ) -> (
 	Method_Info,
 	bool
@@ -3993,8 +4001,10 @@ build_method_info :: proc(
 			ok = false
 		} else {
 			m.ret = vi
+			m.ret_type = strings.trim_space(rtext)
 		}
 	}
+	if vd != nil {ok = method_ownership(&m, vd, loc) && ok}
 	return m, ok
 }
 
@@ -4514,9 +4524,10 @@ unresolved_embed_check :: proc(
 		}
 		// The SHARED vocabulary tree (res://shared/…): a legal import from any module,
 		// but NOT a bundle source — scriptgen resolves nested bundles in the module's own
-		// package tree and in godot: collections only. Name the limitation instead of
-		// dropping the fields, which is exactly the silence this check exists for.
+		// package tree and in godot: collections only. Plain shared shapes (including
+		// runtime aliases) may be skipped only after proving no metadata is lost.
 		if !strings.contains_rune(imp, ':') && from_dir != "" && under_shared(resolve_lexical(from_dir, imp)) {
+			if shared_embed_plain(Struct_Def{dir=from_dir,imports=imports},t) {return}
 			error_at(
 				loc,
 				"%s.%s: %q comes from the SHARED package %q — res://shared/ carries plain types, constants and pure procs, and scriptgen does not resolve gd:\"…\"-tagged BUNDLES across it, so tags on its fields would SILENTLY never register (replicate, backup and composed verbs all vanish). A tagged bundle lives in the module itself or in a godot: collection package; an untagged POD struct from shared/ is fine by value.",

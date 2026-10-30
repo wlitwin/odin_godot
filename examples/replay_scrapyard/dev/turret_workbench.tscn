@@ -1,0 +1,5 @@
+[gd_scene format=3]
+[ext_resource type="PackedScene" path="res://dev/ability_workbench.tscn" id="workbench"]
+[ext_resource type="Resource" path="res://data/abilities/turret.tres" id="ability"]
+[node name="SharedTurretWorkbench" instance=ExtResource("workbench")]
+ability = ExtResource("ability")

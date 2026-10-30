@@ -82,7 +82,7 @@ open_xr_spatial_anchor_capability_is_persistence_scope_supported :: proc "contex
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3651771626)
     }
     self := self
-    scope_ := scope_
+    scope_ := Int(scope_)
     args := []__bindgen_gde.TypePtr {
         &scope_,
     }
@@ -119,7 +119,7 @@ open_xr_spatial_anchor_capability_create_persistence_context :: proc "contextles
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 856276630)
     }
     self := self
-    scope_ := scope_
+    scope_ := Int(scope_)
     user_callback_ := user_callback_
     args := []__bindgen_gde.TypePtr {
         &scope_,

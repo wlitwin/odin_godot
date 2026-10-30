@@ -1,0 +1,12 @@
+{
+  "protocol": 7,
+  "content": "0x5253435241503042",
+  "test_token_label": "protocol-upgrade-owner",
+  "bytes": 53283,
+  "assets": 0,
+  "sha256": "f5c07f206fad3cf979861a5df7f4b7c6d839b5be3b28904b167bf539af0ae833",
+  "producer_binary": "/tmp/replay-comparison-idle-regression/replay/project/bin/libodinscripts.dylib",
+  "producer_sha256": "6b9eed4d4ab744696f917f592d5a9211153d8f0f3377f270de346793129bc3e8",
+  "hash": "5165365752760899147",
+  "tick": "13"
+}

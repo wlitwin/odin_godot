@@ -89,7 +89,7 @@ gpu_particles_collision_sdf3d_set_resolution :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1155629297)
     }
     self := self
-    resolution_ := resolution_
+    resolution_ := Int(resolution_)
     args := []__bindgen_gde.TypePtr {
         &resolution_,
     }
@@ -107,7 +107,9 @@ gpu_particles_collision_sdf3d_get_resolution :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gpu_Particles_Collision_Sdf3d_Resolution(__return_storage)
     return
 }
 
@@ -203,7 +205,9 @@ gpu_particles_collision_sdf3d_get_bake_mask :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 

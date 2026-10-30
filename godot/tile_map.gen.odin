@@ -202,7 +202,9 @@ tile_map_get_rendering_quadrant_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -217,7 +219,9 @@ tile_map_get_layers_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -461,7 +465,9 @@ tile_map_get_layer_y_sort_origin :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &layer_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -499,7 +505,9 @@ tile_map_get_layer_z_index :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &layer_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -621,7 +629,7 @@ tile_map_set_collision_visibility_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3193440636)
     }
     self := self
-    collision_visibility_mode_ := collision_visibility_mode_
+    collision_visibility_mode_ := Int(collision_visibility_mode_)
     args := []__bindgen_gde.TypePtr {
         &collision_visibility_mode_,
     }
@@ -639,7 +647,9 @@ tile_map_get_collision_visibility_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Tile_Map_Visibility_Mode(__return_storage)
     return
 }
 
@@ -653,7 +663,7 @@ tile_map_set_navigation_visibility_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3193440636)
     }
     self := self
-    navigation_visibility_mode_ := navigation_visibility_mode_
+    navigation_visibility_mode_ := Int(navigation_visibility_mode_)
     args := []__bindgen_gde.TypePtr {
         &navigation_visibility_mode_,
     }
@@ -671,7 +681,9 @@ tile_map_get_navigation_visibility_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Tile_Map_Visibility_Mode(__return_storage)
     return
 }
 
@@ -744,7 +756,9 @@ tile_map_get_cell_source_id :: proc "contextless" (
         &coords_,
         &use_proxies_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -792,7 +806,9 @@ tile_map_get_cell_alternative_tile :: proc "contextless" (
         &coords_,
         &use_proxies_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -924,7 +940,9 @@ tile_map_get_layer_for_body_rid :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &body_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1256,7 +1274,7 @@ tile_map_get_neighbor_cell :: proc "contextless" (
     }
     self := self
     coords_ := coords_
-    neighbor_ := neighbor_
+    neighbor_ := Int(neighbor_)
     args := []__bindgen_gde.TypePtr {
         &coords_,
         &neighbor_,

@@ -286,7 +286,7 @@ gltf_document_set_root_node_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 463633402)
     }
     self := self
-    root_node_mode_ := root_node_mode_
+    root_node_mode_ := Int(root_node_mode_)
     args := []__bindgen_gde.TypePtr {
         &root_node_mode_,
     }
@@ -304,7 +304,9 @@ gltf_document_get_root_node_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gltf_Document_Root_Node_Mode(__return_storage)
     return
 }
 
@@ -318,7 +320,7 @@ gltf_document_set_texture_map_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3144426102)
     }
     self := self
-    texture_map_mode_ := texture_map_mode_
+    texture_map_mode_ := Int(texture_map_mode_)
     args := []__bindgen_gde.TypePtr {
         &texture_map_mode_,
     }
@@ -336,7 +338,9 @@ gltf_document_get_texture_map_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gltf_Document_Texture_Map_Mode(__return_storage)
     return
 }
 
@@ -350,7 +354,7 @@ gltf_document_set_visibility_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2803579218)
     }
     self := self
-    visibility_mode_ := visibility_mode_
+    visibility_mode_ := Int(visibility_mode_)
     args := []__bindgen_gde.TypePtr {
         &visibility_mode_,
     }
@@ -368,7 +372,9 @@ gltf_document_get_visibility_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gltf_Document_Visibility_Mode(__return_storage)
     return
 }
 
@@ -395,7 +401,9 @@ gltf_document_append_from_file :: proc "contextless" (
         &flags_,
         &base_path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -422,7 +430,9 @@ gltf_document_append_from_buffer :: proc "contextless" (
         &state_,
         &flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -446,7 +456,9 @@ gltf_document_append_from_scene :: proc "contextless" (
         &state_,
         &flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -512,7 +524,9 @@ gltf_document_write_to_filesystem :: proc "contextless" (
         &state_,
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

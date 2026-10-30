@@ -67,7 +67,7 @@ visual_shader_node_derivative_func_set_op_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 377800221)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &type_,
     }
@@ -85,7 +85,9 @@ visual_shader_node_derivative_func_get_op_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Derivative_Func_Op_Type(__return_storage)
     return
 }
 
@@ -99,7 +101,7 @@ visual_shader_node_derivative_func_set_function :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1944704156)
     }
     self := self
-    func_ := func_
+    func_ := Int(func_)
     args := []__bindgen_gde.TypePtr {
         &func_,
     }
@@ -117,7 +119,9 @@ visual_shader_node_derivative_func_get_function :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Derivative_Func_Function(__return_storage)
     return
 }
 
@@ -131,7 +135,7 @@ visual_shader_node_derivative_func_set_precision :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 797270566)
     }
     self := self
-    precision_ := precision_
+    precision_ := Int(precision_)
     args := []__bindgen_gde.TypePtr {
         &precision_,
     }
@@ -149,7 +153,9 @@ visual_shader_node_derivative_func_get_precision :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Derivative_Func_Precision(__return_storage)
     return
 }
 

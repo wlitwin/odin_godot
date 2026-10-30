@@ -510,7 +510,9 @@ theme_get_font_size :: proc "contextless" (
         &name_,
         &theme_type_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -792,7 +794,9 @@ theme_get_constant :: proc "contextless" (
         &name_,
         &theme_type_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1015,7 +1019,9 @@ theme_get_default_font_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1047,7 +1053,7 @@ theme_set_theme_item :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2492983623)
     }
     self := self
-    data_type_ := data_type_
+    data_type_ := Int(data_type_)
     name_ := name_
     theme_type_ := theme_type_
     value_ := value_
@@ -1072,7 +1078,7 @@ theme_get_theme_item :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2191024021)
     }
     self := self
-    data_type_ := data_type_
+    data_type_ := Int(data_type_)
     name_ := name_
     theme_type_ := theme_type_
     args := []__bindgen_gde.TypePtr {
@@ -1096,7 +1102,7 @@ theme_has_theme_item :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1739311056)
     }
     self := self
-    data_type_ := data_type_
+    data_type_ := Int(data_type_)
     name_ := name_
     theme_type_ := theme_type_
     args := []__bindgen_gde.TypePtr {
@@ -1121,7 +1127,7 @@ theme_rename_theme_item :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3900867553)
     }
     self := self
-    data_type_ := data_type_
+    data_type_ := Int(data_type_)
     old_name_ := old_name_
     name_ := name_
     theme_type_ := theme_type_
@@ -1146,7 +1152,7 @@ theme_clear_theme_item :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2965505587)
     }
     self := self
-    data_type_ := data_type_
+    data_type_ := Int(data_type_)
     name_ := name_
     theme_type_ := theme_type_
     args := []__bindgen_gde.TypePtr {
@@ -1168,7 +1174,7 @@ theme_get_theme_item_list :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3726716710)
     }
     self := self
-    data_type_ := data_type_
+    data_type_ := Int(data_type_)
     theme_type_ := theme_type_
     args := []__bindgen_gde.TypePtr {
         &data_type_,
@@ -1188,7 +1194,7 @@ theme_get_theme_item_type_list :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1316004935)
     }
     self := self
-    data_type_ := data_type_
+    data_type_ := Int(data_type_)
     args := []__bindgen_gde.TypePtr {
         &data_type_,
     }

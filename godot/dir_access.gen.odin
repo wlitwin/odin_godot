@@ -62,7 +62,9 @@ dir_access_get_open_error :: proc "contextless" (
     }
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -126,7 +128,9 @@ dir_access_get_drive_count :: proc "contextless" (
     }
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -174,7 +178,9 @@ dir_access_make_dir_absolute :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -190,7 +196,9 @@ dir_access_make_dir_recursive_absolute :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -228,7 +236,9 @@ dir_access_copy_absolute :: proc "contextless" (
         &to_,
         &chmod_flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -247,7 +257,9 @@ dir_access_rename_absolute :: proc "contextless" (
         &from_,
         &to_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -263,7 +275,9 @@ dir_access_remove_absolute :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -279,7 +293,9 @@ dir_access_list_dir_begin :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -368,7 +384,9 @@ dir_access_get_current_drive :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -386,7 +404,9 @@ dir_access_change_dir :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &to_dir_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -422,7 +442,9 @@ dir_access_make_dir :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -440,7 +462,9 @@ dir_access_make_dir_recursive :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -515,7 +539,9 @@ dir_access_copy :: proc "contextless" (
         &to_,
         &chmod_flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -536,7 +562,9 @@ dir_access_rename :: proc "contextless" (
         &from_,
         &to_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -554,7 +582,9 @@ dir_access_remove :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -611,7 +641,9 @@ dir_access_create_link :: proc "contextless" (
         &source_,
         &target_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

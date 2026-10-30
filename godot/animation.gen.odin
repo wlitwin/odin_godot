@@ -87,13 +87,15 @@ animation_add_track :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3843682357)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     at_position_ := at_position_
     args := []__bindgen_gde.TypePtr {
         &type_,
         &at_position_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -125,7 +127,9 @@ animation_get_track_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -143,7 +147,9 @@ animation_track_get_type :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &track_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Track_Type(__return_storage)
     return
 }
 
@@ -197,12 +203,14 @@ animation_find_track :: proc "contextless" (
     }
     self := self
     path_ := path_
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &path_,
         &type_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -376,7 +384,9 @@ animation_position_track_insert_key :: proc "contextless" (
         &time_,
         &position_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -400,7 +410,9 @@ animation_rotation_track_insert_key :: proc "contextless" (
         &time_,
         &rotation_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -424,7 +436,9 @@ animation_scale_track_insert_key :: proc "contextless" (
         &time_,
         &scale_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -448,7 +462,9 @@ animation_blend_shape_track_insert_key :: proc "contextless" (
         &time_,
         &amount_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -571,7 +587,9 @@ animation_track_insert_key :: proc "contextless" (
         &key_,
         &transition_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -719,7 +737,9 @@ animation_track_get_key_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &track_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -781,7 +801,7 @@ animation_track_find_key :: proc "contextless" (
     self := self
     track_idx_ := track_idx_
     time_ := time_
-    find_mode_ := find_mode_
+    find_mode_ := Int(find_mode_)
     limit_ := limit_
     backward_ := backward_
     args := []__bindgen_gde.TypePtr {
@@ -791,7 +811,9 @@ animation_track_find_key :: proc "contextless" (
         &limit_,
         &backward_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -807,7 +829,7 @@ animation_track_set_interpolation_type :: proc "contextless" (
     }
     self := self
     track_idx_ := track_idx_
-    interpolation_ := interpolation_
+    interpolation_ := Int(interpolation_)
     args := []__bindgen_gde.TypePtr {
         &track_idx_,
         &interpolation_,
@@ -829,7 +851,9 @@ animation_track_get_interpolation_type :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &track_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Interpolation_Type(__return_storage)
     return
 }
 
@@ -901,7 +925,7 @@ animation_value_track_set_update_mode :: proc "contextless" (
     }
     self := self
     track_idx_ := track_idx_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &track_idx_,
         &mode_,
@@ -923,7 +947,9 @@ animation_value_track_get_update_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &track_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Update_Mode(__return_storage)
     return
 }
 
@@ -1019,7 +1045,9 @@ animation_bezier_track_insert_key :: proc "contextless" (
         &in_handle_,
         &out_handle_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1208,7 +1236,9 @@ animation_audio_track_insert_key :: proc "contextless" (
         &start_offset_,
         &end_offset_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1402,7 +1432,9 @@ animation_animation_track_insert_key :: proc "contextless" (
         &time_,
         &animation_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1672,7 +1704,7 @@ animation_set_loop_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3155355575)
     }
     self := self
-    loop_mode_ := loop_mode_
+    loop_mode_ := Int(loop_mode_)
     args := []__bindgen_gde.TypePtr {
         &loop_mode_,
     }
@@ -1690,7 +1722,9 @@ animation_get_loop_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Loop_Mode(__return_storage)
     return
 }
 

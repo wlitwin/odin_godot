@@ -90,7 +90,7 @@ input_is_key_pressed :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1938909964)
     }
     self := self
-    keycode_ := keycode_
+    keycode_ := Int(keycode_)
     args := []__bindgen_gde.TypePtr {
         &keycode_,
     }
@@ -108,7 +108,7 @@ input_is_physical_key_pressed :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1938909964)
     }
     self := self
-    keycode_ := keycode_
+    keycode_ := Int(keycode_)
     args := []__bindgen_gde.TypePtr {
         &keycode_,
     }
@@ -126,7 +126,7 @@ input_is_key_label_pressed :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1938909964)
     }
     self := self
-    keycode_ := keycode_
+    keycode_ := Int(keycode_)
     args := []__bindgen_gde.TypePtr {
         &keycode_,
     }
@@ -144,7 +144,7 @@ input_is_mouse_button_pressed :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1821097125)
     }
     self := self
-    button_ := button_
+    button_ := Int(button_)
     args := []__bindgen_gde.TypePtr {
         &button_,
     }
@@ -164,7 +164,7 @@ input_is_joy_button_pressed :: proc "contextless" (
     }
     self := self
     device_ := device_
-    button_ := button_
+    button_ := Int(button_)
     args := []__bindgen_gde.TypePtr {
         &device_,
         &button_,
@@ -444,7 +444,7 @@ input_get_joy_axis :: proc "contextless" (
     }
     self := self
     device_ := device_
-    axis_ := axis_
+    axis_ := Int(axis_)
     args := []__bindgen_gde.TypePtr {
         &device_,
         &axis_,
@@ -1188,7 +1188,9 @@ input_get_mouse_button_mask :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Mouse_Button_Mask(__return_storage)
     return
 }
 
@@ -1202,7 +1204,7 @@ input_set_mouse_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2228490894)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1220,7 +1222,9 @@ input_get_mouse_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Input_Mouse_Mode(__return_storage)
     return
 }
 
@@ -1288,7 +1292,7 @@ input_set_default_cursor_shape :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2124816902)
     }
     self := self
-    shape_ := shape_
+    shape_ := Int(shape_)
     args := []__bindgen_gde.TypePtr {
         &shape_,
     }
@@ -1306,7 +1310,9 @@ input_get_current_cursor_shape :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Input_Cursor_Shape(__return_storage)
     return
 }
 
@@ -1323,7 +1329,7 @@ input_set_custom_mouse_cursor :: proc "contextless" (
     }
     self := self
     image_ := image_
-    shape_ := shape_
+    shape_ := Int(shape_)
     hotspot_ := hotspot_
     args := []__bindgen_gde.TypePtr {
         &image_,

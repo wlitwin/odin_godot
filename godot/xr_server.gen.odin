@@ -159,7 +159,7 @@ xr_server_center_on_hmd :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1450904707)
     }
     self := self
-    rotation_mode_ := rotation_mode_
+    rotation_mode_ := Int(rotation_mode_)
     keep_height_ := keep_height_
     args := []__bindgen_gde.TypePtr {
         &rotation_mode_,
@@ -243,7 +243,9 @@ xr_server_get_interface_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

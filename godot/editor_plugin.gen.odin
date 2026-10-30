@@ -139,7 +139,9 @@ editor_plugin__forward_3d_gui_input :: proc "contextless" (
         &viewport_camera_,
         &event_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -524,7 +526,7 @@ editor_plugin_add_control_to_container :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3092750152)
     }
     self := self
-    container_ := container_
+    container_ := Int(container_)
     control_ := control_
     args := []__bindgen_gde.TypePtr {
         &container_,
@@ -544,7 +546,7 @@ editor_plugin_remove_control_from_container :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3092750152)
     }
     self := self
-    container_ := container_
+    container_ := Int(container_)
     control_ := control_
     args := []__bindgen_gde.TypePtr {
         &container_,
@@ -680,7 +682,7 @@ editor_plugin_add_control_to_dock :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2994930786)
     }
     self := self
-    slot_ := slot_
+    slot_ := Int(slot_)
     control_ := control_
     shortcut_ := shortcut_
     args := []__bindgen_gde.TypePtr {
@@ -817,7 +819,9 @@ editor_plugin_update_overlays :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1269,7 +1273,7 @@ editor_plugin_add_context_menu_plugin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1904221872)
     }
     self := self
-    slot_ := slot_
+    slot_ := Int(slot_)
     plugin_ := plugin_
     args := []__bindgen_gde.TypePtr {
         &slot_,

@@ -1,0 +1,4 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/authoring_check.odin" id="script"]
+[node name="ValidateContent" type="Node2D"]
+script = ExtResource("script")

@@ -1,0 +1,19 @@
+package main
+import "core:os"
+import "core:fmt"
+import r "godot:replay"
+import net "godot:replay/net"
+import game "godot:examples/replay_scrapyard/shared/game"
+main :: proc() {
+ w:=game.initial(dedicated=true,encounter_count=0)
+ w.director.rest_until=321
+ s:net.Server(game.World,game.Control,game.Action,game.Event,game.SEATS);defer net.server_destroy(&s)
+ cfg:=net.DEFAULT_CONFIG;cfg.content=game.CONTENT
+ assert(net.server_init(&s,r.Frame(game.World){tick=100,state=w},game.model(),{},cfg)==.None)
+ for _ in 0..<3 {assert(net.server_step(&s)==.None)}
+ cp:net.Checkpoint(game.World,game.Control,game.Action,game.SEATS);defer net.checkpoint_destroy(&cp)
+ assert(net.checkpoint_capture(&s,&cp)==.None)
+ bytes,err:=net.checkpoint_encode(&cp,game.model());defer delete(bytes);assert(err==.None)
+ assert(os.write_entire_file("/private/tmp/replay-succession-20260919/content48.checkpoint",bytes)==nil)
+ fmt.printf("CAPTURE_CONTENT48_OK content=%x tick=%d epoch=%d bytes=%d\n",game.CONTENT,cp.header.tick,cp.header.epoch,len(bytes))
+}

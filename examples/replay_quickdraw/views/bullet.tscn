@@ -1,0 +1,20 @@
+[gd_scene format=3]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_d3jvy"]
+_surfaces = [{
+"aabb": AABB(-4, -3, 0, 8, 6, 1e-05),
+"format": 34359742465,
+"index_count": 6,
+"index_data": PackedByteArray(3, 0, 0, 0, 1, 0, 1, 0, 2, 0, 3, 0),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray(0, 0, 128, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 64, 0, 0, 0, 0, 0, 0, 128, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 192, 0, 0, 0, 0)
+}]
+
+[node name="Bullet" type="Node2D" unique_id=1959557328]
+
+[node name="Skin" type="MeshInstance2D" parent="." unique_id=865506823]
+self_modulate = Color(0.95, 0.75, 0.2, 1)
+z_index = 4
+mesh = SubResource("ArrayMesh_d3jvy")

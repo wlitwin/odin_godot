@@ -1,0 +1,9 @@
+warning: Git tree '/Users/walter/data/code/odin/odin_godot' is dirty
+error (ignored): SQLite database '/Users/walter/.cache/nix/eval-cache-v6/127066ba3fcebb7fa1298cf2dcdd8894ab14a297329cf57a74283aa872fdb08d.sqlite' is busy
+odin_godot dev shell  (target: Godot 4.7.1 stable)
+  odin:  /nix/store/bp9vf6k9bsawaf0yvds0zbwadr22j3pf-odin-dev-2026-04/bin/odin  odin version dev-2026-04
+  emcc:  /nix/store/wwcamwhybgsw9gb1y73g3hi1qy3qf33d-emscripten-5.0.6/bin/emcc
+  godot: /Applications/Godot.app/Contents/MacOS/Godot
+CAVE_C5_RELIC name=resting tick=100 relic=Relic{position = [200, 150], carrier = 0, version = 7}
+CAVE_C5_RELIC name=carried tick=100 relic=Relic{position = [200, 150], carrier = 1, version = 7}
+CAVE_C5_RELIC name=restart tick=100 relic=Relic{position = [200, 150], carrier = 1, version = 7}

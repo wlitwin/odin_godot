@@ -52,9 +52,9 @@ editor_inspector_instantiate_property_editor :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1429914152)
     }
     object_ := object_
-    type_ := type_
+    type_ := Int(type_)
     path_ := path_
-    hint_ := hint_
+    hint_ := Int(hint_)
     hint_text_ := hint_text_
     usage_ := usage_
     wide_ := wide_

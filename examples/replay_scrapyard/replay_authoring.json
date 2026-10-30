@@ -1,0 +1,5 @@
+{
+  "worker": "res://tools/authoring.py",
+  "ability": "res://data/abilities/salvefield.tres",
+  "workbench": "res://dev/ability_workbench.tscn"
+}

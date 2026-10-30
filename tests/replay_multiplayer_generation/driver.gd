@@ -1,0 +1,53 @@
+extends SceneTree
+func _initialize():run.call_deferred()
+func run():
+ var node:Node=load("res://main.tscn").instantiate();root.add_child(node)
+ var peer=load("res://fake_peer.gd").new();assert(node.attach(peer))
+ peer.join(7);assert(node.generation(7)==1)
+ peer.join(7);assert(node.generation(7)==1 and node.value("peers")==1)
+ peer.join(9);assert(node.generation(9)==2)
+ peer.enqueue(7,11);assert(node.read(1)==2 and node.value("generation")==1) # Buffer_Too_Small
+ peer.enqueue(7,12);peer.enqueue(9,33)
+ peer.leave(7);assert(node.generation(7)==0)
+ peer.join(7);assert(node.generation(7)==3)
+ peer.enqueue(7,22)
+ assert(node.read(8)==1 and node.value("from")==9 and node.value("generation")==2 and node.value("byte")==33)
+ assert(node.read(8)==1 and node.value("from")==7 and node.value("generation")==3 and node.value("byte")==22)
+ assert(node.read(8)==0 and node.value("retired")==2)
+ # Capacity counts live peers, even if retired raw packets remain queued.
+ peer.join(11);assert(peer.denied==[11] and node.value("rejected")==1)
+ peer.enqueue(9,44);peer.leave(9);peer.join(11)
+ assert(node.generation(11)==4)
+ peer.enqueue(11,55)
+ assert(node.read(8)==1 and node.value("from")==11 and node.value("byte")==55 and node.value("generation")==4)
+ # Packets preceding a new connection must not acquire its generation.
+ peer.leave(7);peer.enqueue(13,66);peer.join(13);peer.enqueue(13,77)
+ assert(node.generation(13)==5)
+ assert(node.read(8)==1 and node.value("from")==13 and node.value("byte")==77 and node.value("generation")==5)
+ peer.leave(13);node.exhaust();peer.join(15)
+ assert(peer.denied==[11,15] and node.generation(15)==0)
+ node.close();assert(node.generation(11)==0)
+ assert(not peer.peer_connected.has_connections() and not peer.peer_disconnected.has_connections())
+ var second:Node=load("res://main.tscn").instantiate();root.add_child(second)
+ var other=load("res://fake_peer.gd").new();assert(second.attach(other) and second.delay())
+ other.join(7);other.join(9);other.enqueue(7,11);other.enqueue(9,33);second.poll(0)
+ other.leave(7);other.join(7);other.enqueue(7,22);second.poll(200)
+ assert(second.read(8)==1 and second.value("from")==9 and second.value("byte")==33 and second.value("generation")==2)
+ assert(second.read(8)==0);second.poll(400)
+ assert(second.read(8)==1 and second.value("from")==7 and second.value("byte")==22 and second.value("generation")==3)
+ assert(second.value("delayed_retired")==1)
+ second.close();second.queue_free();other=null
+ var third:Node=load("res://main.tscn").instantiate();root.add_child(third)
+ var failed=load("res://fake_peer.gd").new();assert(third.attach(failed))
+ failed.join(7);failed.enqueue(7,11)
+ failed.status=MultiplayerPeer.CONNECTION_DISCONNECTED;third.poll(0)
+ assert(third.generation(7)==0 and third.value("peers")==0)
+ failed.status=MultiplayerPeer.CONNECTION_CONNECTED;failed.join(7);failed.enqueue(7,22)
+ failed.leave(7);failed.join(7);failed.enqueue(7,33)
+ assert(third.read(8)==1 and third.value("byte")==33 and third.value("generation")==3)
+ assert(third.value("retired")==2)
+ third.close();third.queue_free();failed=null
+ print("REPLAY_MULTIPLAYER_GENERATION_OK reused=7 generations=1,3 pending_and_backend_retired=2 other_peer_preserved=true bounded_registry=true exhaustion=true")
+ node.queue_free();peer=null
+ await process_frame;await process_frame
+ quit(0)

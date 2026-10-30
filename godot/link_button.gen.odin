@@ -85,7 +85,7 @@ link_button_set_text_overrun_behavior :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1008890932)
     }
     self := self
-    overrun_behavior_ := overrun_behavior_
+    overrun_behavior_ := Int(overrun_behavior_)
     args := []__bindgen_gde.TypePtr {
         &overrun_behavior_,
     }
@@ -103,7 +103,9 @@ link_button_get_text_overrun_behavior :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Overrun_Behavior(__return_storage)
     return
 }
 
@@ -149,7 +151,7 @@ link_button_set_text_direction :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 119160795)
     }
     self := self
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &direction_,
     }
@@ -167,7 +169,9 @@ link_button_get_text_direction :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Text_Direction(__return_storage)
     return
 }
 
@@ -245,7 +249,7 @@ link_button_set_underline_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4032947085)
     }
     self := self
-    underline_mode_ := underline_mode_
+    underline_mode_ := Int(underline_mode_)
     args := []__bindgen_gde.TypePtr {
         &underline_mode_,
     }
@@ -263,7 +267,9 @@ link_button_get_underline_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Link_Button_Underline_Mode(__return_storage)
     return
 }
 
@@ -277,7 +283,7 @@ link_button_set_structured_text_bidi_override :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 55961453)
     }
     self := self
-    parser_ := parser_
+    parser_ := Int(parser_)
     args := []__bindgen_gde.TypePtr {
         &parser_,
     }
@@ -295,7 +301,9 @@ link_button_get_structured_text_bidi_override :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Structured_Text_Parser(__return_storage)
     return
 }
 

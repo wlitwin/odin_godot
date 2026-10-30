@@ -94,7 +94,7 @@ csg_polygon3d_set_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3158377035)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -112,7 +112,9 @@ csg_polygon3d_get_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Csg_Polygon3d_Mode(__return_storage)
     return
 }
 
@@ -208,7 +210,9 @@ csg_polygon3d_get_spin_sides :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -254,7 +258,7 @@ csg_polygon3d_set_path_interval_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3744240707)
     }
     self := self
-    interval_type_ := interval_type_
+    interval_type_ := Int(interval_type_)
     args := []__bindgen_gde.TypePtr {
         &interval_type_,
     }
@@ -272,7 +276,9 @@ csg_polygon3d_get_path_interval_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Csg_Polygon3d_Path_Interval_Type(__return_storage)
     return
 }
 
@@ -350,7 +356,7 @@ csg_polygon3d_set_path_rotation :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1412947288)
     }
     self := self
-    path_rotation_ := path_rotation_
+    path_rotation_ := Int(path_rotation_)
     args := []__bindgen_gde.TypePtr {
         &path_rotation_,
     }
@@ -368,7 +374,9 @@ csg_polygon3d_get_path_rotation :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Csg_Polygon3d_Path_Rotation(__return_storage)
     return
 }
 

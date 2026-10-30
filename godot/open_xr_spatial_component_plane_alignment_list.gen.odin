@@ -58,7 +58,9 @@ open_xr_spatial_component_plane_alignment_list_get_plane_alignment :: proc "cont
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Spatial_Component_Plane_Alignment_List_Plane_Alignment(__return_storage)
     return
 }
 

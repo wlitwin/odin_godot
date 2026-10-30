@@ -48,7 +48,7 @@ system_font_set_antialiasing :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1669900)
     }
     self := self
-    antialiasing_ := antialiasing_
+    antialiasing_ := Int(antialiasing_)
     args := []__bindgen_gde.TypePtr {
         &antialiasing_,
     }
@@ -66,7 +66,9 @@ system_font_get_antialiasing :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Font_Antialiasing(__return_storage)
     return
 }
 
@@ -240,7 +242,7 @@ system_font_set_hinting :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1827459492)
     }
     self := self
-    hinting_ := hinting_
+    hinting_ := Int(hinting_)
     args := []__bindgen_gde.TypePtr {
         &hinting_,
     }
@@ -258,7 +260,9 @@ system_font_get_hinting :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Hinting(__return_storage)
     return
 }
 
@@ -272,7 +276,7 @@ system_font_set_subpixel_positioning :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4225742182)
     }
     self := self
-    subpixel_positioning_ := subpixel_positioning_
+    subpixel_positioning_ := Int(subpixel_positioning_)
     args := []__bindgen_gde.TypePtr {
         &subpixel_positioning_,
     }
@@ -290,7 +294,9 @@ system_font_get_subpixel_positioning :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Subpixel_Positioning(__return_storage)
     return
 }
 
@@ -386,7 +392,9 @@ system_font_get_msdf_pixel_range :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -418,7 +426,9 @@ system_font_get_msdf_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

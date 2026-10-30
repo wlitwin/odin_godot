@@ -90,7 +90,7 @@ geometry3d_build_cylinder_planes :: proc "contextless" (
     radius_ := radius_
     height_ := height_
     sides_ := sides_
-    axis_ := axis_
+    axis_ := Int(axis_)
     args := []__bindgen_gde.TypePtr {
         &radius_,
         &height_,
@@ -119,7 +119,7 @@ geometry3d_build_capsule_planes :: proc "contextless" (
     height_ := height_
     sides_ := sides_
     lats_ := lats_
-    axis_ := axis_
+    axis_ := Int(axis_)
     args := []__bindgen_gde.TypePtr {
         &radius_,
         &height_,

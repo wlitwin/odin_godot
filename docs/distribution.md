@@ -52,6 +52,7 @@ addons/odin_godot/
     linux/libodin_godot.so         prebuilt core (dist-cross only)
     windows/libodin_godot.dll      prebuilt core (dist-cross only)
   core/  godot/  gdext/  libgd/  runtime/   the Odin `godot:` collection
+  kit/  play/  replay/             multiplayer/gameplay source collections
   scriptgen/                       //gd: codegen preprocessor (sources)
   build/                           build_scripts.sh, build_cross.sh, build_web.sh, …
   extension_api.json
@@ -60,6 +61,19 @@ addons/odin_godot/
 
 The addon root mirrors the repo's collection layout, so the bundled build scripts resolve
 `-collection:godot=$ODIN_GODOT_ROOT` (pointing at the addon) exactly as they do in-repo.
+
+Replay now ships as an experimental source collection beside Kit, with a separate
+`template/replay/` project and a download-oriented `docs/replay.md` guide. Source
+collections are hidden from Godot's scene scanner using `.gdignore`; the Odin
+compiler still resolves imports from them. The default Hello starter is unchanged.
+
+The [Replay distribution gate](../tests/replay_distribution/README.md) builds an
+isolated source snapshot, installs the Nix-produced addon into an external project,
+compiles with only that addon's collection path and runs native solo/network and
+actual browser acceptance. It includes current untracked implementation files in
+the snapshot without modifying the shared Git index. Normal Git-flake release
+builds still require all intended files to be committed; this test does not publish,
+tag or bypass the release runbook.
 
 ## Cross-compiling directly (without nix build)
 

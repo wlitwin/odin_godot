@@ -157,7 +157,7 @@ gradient_texture2d_set_fill :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3623927636)
     }
     self := self
-    fill_ := fill_
+    fill_ := Int(fill_)
     args := []__bindgen_gde.TypePtr {
         &fill_,
     }
@@ -175,7 +175,9 @@ gradient_texture2d_get_fill :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gradient_Texture2d_Fill(__return_storage)
     return
 }
 
@@ -253,7 +255,7 @@ gradient_texture2d_set_repeat :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1357597002)
     }
     self := self
-    repeat_ := repeat_
+    repeat_ := Int(repeat_)
     args := []__bindgen_gde.TypePtr {
         &repeat_,
     }
@@ -271,7 +273,9 @@ gradient_texture2d_get_repeat :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gradient_Texture2d_Repeat(__return_storage)
     return
 }
 

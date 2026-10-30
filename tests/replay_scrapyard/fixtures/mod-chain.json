@@ -1,0 +1,5 @@
+{"status": [{"id": 3, "name": "soak", "duration": 120, "max_stacks": 3,
+             "move_mult": 1.0, "dot_dmg": 2, "dot_every": 20,
+             "taken_mult": 1.0, "dealt_mult": 1.0, "tint": [0.4, 0.6, 1.0, 0.6]}],
+ "combos": [{"present": 2, "incoming": 1, "reaction": "transmute",
+             "dmg": 0, "radius": 0, "output": 3, "consume": true}]}

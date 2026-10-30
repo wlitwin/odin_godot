@@ -54,7 +54,9 @@ tab_container_get_tab_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -86,7 +88,9 @@ tab_container_get_current_tab :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -101,7 +105,9 @@ tab_container_get_previous_tab :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -193,7 +199,7 @@ tab_container_set_tab_alignment :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2413632353)
     }
     self := self
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     args := []__bindgen_gde.TypePtr {
         &alignment_,
     }
@@ -211,7 +217,9 @@ tab_container_get_tab_alignment :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Tab_Bar_Alignment_Mode(__return_storage)
     return
 }
 
@@ -225,7 +233,7 @@ tab_container_set_tabs_position :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 256673370)
     }
     self := self
-    tabs_position_ := tabs_position_
+    tabs_position_ := Int(tabs_position_)
     args := []__bindgen_gde.TypePtr {
         &tabs_position_,
     }
@@ -243,7 +251,9 @@ tab_container_get_tabs_position :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Tab_Container_Tab_Position(__return_storage)
     return
 }
 
@@ -491,7 +501,9 @@ tab_container_get_tab_icon_max_width :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &tab_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -661,7 +673,9 @@ tab_container_get_tab_idx_at_point :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &point_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -679,7 +693,9 @@ tab_container_get_tab_idx_from_control :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &control_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -807,7 +823,9 @@ tab_container_get_tabs_rearrange_group :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -853,7 +871,7 @@ tab_container_set_tab_focus_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3232914922)
     }
     self := self
-    focus_mode_ := focus_mode_
+    focus_mode_ := Int(focus_mode_)
     args := []__bindgen_gde.TypePtr {
         &focus_mode_,
     }
@@ -871,7 +889,9 @@ tab_container_get_tab_focus_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Focus_Mode(__return_storage)
     return
 }
 

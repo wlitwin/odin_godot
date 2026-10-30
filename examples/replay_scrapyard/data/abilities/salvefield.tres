@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="AbilityDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/defs/ability_def.odin" id="1"]
+
+[ext_resource type="Resource" path="res://data/status/salve.tres" id="status_status"]
+
+[resource]
+script = ExtResource("1")
+id = 5
+name = "salvefield"
+family = 4
+cooldown = 900
+range = 220
+radius = 90
+arc_cos = 0.7
+speed = 10.0
+dmg = 0
+status = ExtResource("status_status")
+self_buff = false
+duration = 360
+pulse = 30

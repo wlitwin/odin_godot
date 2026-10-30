@@ -50,7 +50,7 @@ aim_modifier3d_set_forward_axis :: proc "contextless" (
     }
     self := self
     index_ := index_
-    axis_ := axis_
+    axis_ := Int(axis_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &axis_,
@@ -72,7 +72,9 @@ aim_modifier3d_get_forward_axis :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Skeleton_Modifier3d_Bone_Axis(__return_storage)
     return
 }
 
@@ -126,7 +128,7 @@ aim_modifier3d_set_primary_rotation_axis :: proc "contextless" (
     }
     self := self
     index_ := index_
-    axis_ := axis_
+    axis_ := Int(axis_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &axis_,
@@ -148,7 +150,9 @@ aim_modifier3d_get_primary_rotation_axis :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Vector3_Vector3_Axis(__return_storage)
     return
 }
 

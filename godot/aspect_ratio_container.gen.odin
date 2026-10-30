@@ -91,7 +91,7 @@ aspect_ratio_container_set_stretch_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1876743467)
     }
     self := self
-    stretch_mode_ := stretch_mode_
+    stretch_mode_ := Int(stretch_mode_)
     args := []__bindgen_gde.TypePtr {
         &stretch_mode_,
     }
@@ -109,7 +109,9 @@ aspect_ratio_container_get_stretch_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Aspect_Ratio_Container_Stretch_Mode(__return_storage)
     return
 }
 
@@ -123,7 +125,7 @@ aspect_ratio_container_set_alignment_horizontal :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2147829016)
     }
     self := self
-    alignment_horizontal_ := alignment_horizontal_
+    alignment_horizontal_ := Int(alignment_horizontal_)
     args := []__bindgen_gde.TypePtr {
         &alignment_horizontal_,
     }
@@ -141,7 +143,9 @@ aspect_ratio_container_get_alignment_horizontal :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Aspect_Ratio_Container_Alignment_Mode(__return_storage)
     return
 }
 
@@ -155,7 +159,7 @@ aspect_ratio_container_set_alignment_vertical :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2147829016)
     }
     self := self
-    alignment_vertical_ := alignment_vertical_
+    alignment_vertical_ := Int(alignment_vertical_)
     args := []__bindgen_gde.TypePtr {
         &alignment_vertical_,
     }
@@ -173,7 +177,9 @@ aspect_ratio_container_get_alignment_vertical :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Aspect_Ratio_Container_Alignment_Mode(__return_storage)
     return
 }
 

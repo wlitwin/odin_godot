@@ -203,7 +203,9 @@ animation_node_blend_space1d_find_blend_point_by_name :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &name_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -235,7 +237,9 @@ animation_node_blend_space1d_get_blend_point_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -397,7 +401,7 @@ animation_node_blend_space1d_set_blend_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2600869457)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -415,7 +419,9 @@ animation_node_blend_space1d_get_blend_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Node_Blend_Space1d_Blend_Mode(__return_storage)
     return
 }
 
@@ -461,7 +467,7 @@ animation_node_blend_space1d_set_sync_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1065895142)
     }
     self := self
-    sync_mode_ := sync_mode_
+    sync_mode_ := Int(sync_mode_)
     args := []__bindgen_gde.TypePtr {
         &sync_mode_,
     }
@@ -479,7 +485,9 @@ animation_node_blend_space1d_get_sync_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Node_Blend_Space1d_Sync_Mode(__return_storage)
     return
 }
 

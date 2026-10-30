@@ -1316,3 +1316,19 @@ generation_bound_state_is_detected_recursively :: proc(t: ^testing.T) {
 	testing.expect(t, bool(proc_pointer.generation_bound_state), "a pointer directly to a procedure must retain its code generation")
 	testing.expect(t, !engine_only.generation_bound_state, "ordinary Godot handles and Variant values must not block reload")
 }
+
+
+Native_Text_Export :: struct {
+ owner:gd.Node,
+ text:string `gd:"export"`,
+ good:gd.String `gd:"export"`,
+}
+@(test)
+native_string_export_rejects_incompatible_engine_storage :: proc(t:^testing.T) {
+ before:=len(rt.registration_errors())
+ desc:=rt.reflect_class_desc(Native_Text_Export,info("Native_Text_Export"))
+ errors:=new_errors_since(before)
+ testing.expect_value(t,len(errors),1)
+ _,bad:=find_export(desc,"text");_,good:=find_export(desc,"good")
+ testing.expect(t,!bad && good)
+}

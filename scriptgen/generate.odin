@@ -195,10 +195,11 @@ Gen_Section :: struct {
 // its sections, so an import is emitted exactly when at least one section names it
 // — never one no section uses (an unused import is a compile error in Odin).
 Gen_Needs :: struct {
-	knet, intrinsics, ksim, ksess, kboot, netgd: bool,
+	knet, intrinsics, ksim, ksess, kboot, netgd, replay_view: bool,
 }
 
 script_needs :: proc(s: ^Script) -> (n: Gen_Needs) {
+    n.replay_view=s.replay_view.line!=0
 	// A gd:"replicate" field needs the kit/net descriptor + the POD compile-time
 	// check (commands imply replicates — parse validation enforces it — but keep the
 	// condition independent for robustness). @(gd_message) thunks name knet.Player_Id.
@@ -263,6 +264,7 @@ script_needs :: proc(s: ^Script) -> (n: Gen_Needs) {
 		s.net_detach ||
 		event_boot
 	n.netgd = len(s.std_forwards) > 0
+	for ex in s.exports {if ex.getter != "" {n.intrinsics = true}}
 	return
 }
 
@@ -321,6 +323,7 @@ emit_imports :: proc(b: ^strings.Builder, sections: []Gen_Section) {
 		need.ksess |= n.ksess
 		need.kboot |= n.kboot
 		need.netgd |= n.netgd
+		need.replay_view |= n.replay_view
 	}
 
 	t: Import_Table
@@ -337,6 +340,7 @@ emit_imports :: proc(b: ^strings.Builder, sections: []Gen_Section) {
 	if need.ksess {import_add(&t, "ksess", "godot:kit/session")}
 	if need.kboot {import_add(&t, "kboot", "godot:kit/boot")}
 	if need.netgd {import_add(&t, "netgd", "godot:kit/netgd")}
+	if need.replay_view {import_add(&t,"rview","godot:replay/godot")}
 	fixed := len(t.lines)
 
 	// verb-composition: import each package a COMPOSED command's/method's/block
@@ -535,6 +539,7 @@ emit_action_desc :: proc(
 
 // One script's section: everything below the shared header/imports/ctors.
 emit_script :: proc(b: ^strings.Builder, s: ^Script) {
+    emit_replay_view(b,s)
 	w :: strings.write_string
 	cls := s.struct_name
 	snake := to_snake(cls)
@@ -724,8 +729,16 @@ emit_method_trampoline :: proc(b: ^strings.Builder, s: ^Script, m: Method_Info) 
 			fmt.sbprintf(b, "\t_a%d: bool\n\t_to_%s(&_a%d, args[%d])\n", i, tag, i, i)
 			append(&call_args, fmt.tprintf("_a%d", i))
 		case .Other:
-			fmt.sbprintf(b, "\t_a%d: %s\n\t_to_%s(&_a%d, args[%d])\n", i, a.type_text, tag, i, i)
-			append(&call_args, fmt.tprintf("_a%d", i))
+			if strings.trim_space(a.type_text) == "string" {
+				fmt.sbprintf(b,"\t_a%d: gd.String\n\t_to_String(&_a%d, args[%d])\n",i,i,i)
+				emit_method_release(b,".String",fmt.tprintf("_a%d",i))
+				fmt.sbprintf(b,"\t_s%d := gd.gd_string_to_odin(_a%d, context.temp_allocator)\n",i,i)
+				append(&call_args,fmt.tprintf("_s%d",i))
+			} else {
+				fmt.sbprintf(b, "\t_a%d: %s\n\t_to_%s(&_a%d, args[%d])\n", i, a.type_text, tag, i, i)
+				if m.borrowed_args && method_builtin_destructor(a.vi.enum_name) {emit_method_release(b,a.vi.enum_name,fmt.tprintf("_a%d",i))}
+				append(&call_args, fmt.tprintf("_a%d", i))
+			}
 		case .Nil:
 		}
 	}
@@ -750,7 +763,13 @@ emit_method_trampoline :: proc(b: ^strings.Builder, s: ^Script, m: Method_Info) 
 		case .Float:
 			fmt.sbprintf(b, "\t_rv := f64(_r)\n\t_from_%s(ret, &_rv)\n", tag)
 		case .Bool, .Other:
-			fmt.sbprintf(b, "\t_rv := _r\n\t_from_%s(ret, &_rv)\n", tag)
+			if m.ret_type == "string" {
+				w(b,"\t_rv := gd.new_string_odin(_r)\n\tdefer gd.free_string(_rv)\n\t_from_String(ret, &_rv)\n")
+			} else {
+				if m.owned_return && !m.return_refcounted {emit_method_release(b,m.ret.enum_name,"_r")}
+				fmt.sbprintf(b, "\t_rv := _r\n\t_from_%s(ret, &_rv)\n", tag)
+				if m.return_refcounted {w(b,"\tif _r != nil && gd.ref_counted_unreference(cast(gd.Ref_Counted)_r) {gdext.object_destroy(_r)}\n")}
+			}
 		case .Nil:
 		}
 	}
@@ -767,6 +786,11 @@ emit_accessor_wrappers :: proc(b: ^strings.Builder, s: ^Script, ex: Export_Info)
 	cls := s.struct_name
 	snake := to_snake(cls)
 	tag := ctor_tag(ex.vi.enum_name)
+	getter_owned, getter_refcounted, setter_borrowed: bool
+	for method in s.methods {
+		if method.proc_name == ex.getter {getter_owned, getter_refcounted = method.owned_return, method.return_refcounted}
+		if method.proc_name == ex.setter {setter_borrowed = method.borrowed_args}
+	}
 
 	if ex.getter != "" {
 		fmt.sbprintf(b, "// getter for @export `%s` -> %s\n", ex.name, ex.getter)
@@ -779,14 +803,25 @@ emit_accessor_wrappers :: proc(b: ^strings.Builder, s: ^Script, ex: Export_Info)
 		w(b, "\tcontext = rt.script_context()\n")
 		w(b, "\t_ensure_ctors()\n")
 		fmt.sbprintf(b, "\tself := cast(^%s)self_raw\n", cls)
-		fmt.sbprintf(b, "\t_r := %s(self)\n", ex.getter)
+		fmt.sbprintf(b, "\t_Return_Type :: intrinsics.type_proc_return_type(type_of(%s), 0)\n\t_r := %s(self)\n", ex.getter, ex.getter)
 		switch ex.vi.kind {
 		case .Int:
 			fmt.sbprintf(b, "\t_rv := i64(_r)\n\t_from_%s(ret, &_rv)\n", tag)
 		case .Float:
 			fmt.sbprintf(b, "\t_rv := f64(_r)\n\t_from_%s(ret, &_rv)\n", tag)
 		case .Bool, .Other:
+			if ex.vi.enum_name == ".String" {
+				w(b,"\twhen _Return_Type == string {\n\t\t_rv := gd.new_string_odin(_r)\n\t\tdefer gd.free_string(_rv)\n\t\t_from_String(ret, &_rv)\n\t} else {\n")
+			}
+			if ex.vi.enum_name == ".Object" {
+				w(b,"\t#assert(_Return_Type == gd.Object || _Return_Type == gd.Ref_Counted, \"getter must return an engine object handle\")\n")
+			} else {
+				fmt.sbprintf(b,"\t#assert(_Return_Type == %s, \"getter must return the declared export type\")\n",ex.type_text)
+			}
+			if getter_owned && !getter_refcounted {emit_method_release(b,ex.vi.enum_name,"_r")}
 			fmt.sbprintf(b, "\t_rv := _r\n\t_from_%s(ret, &_rv)\n", tag)
+			if getter_refcounted {w(b,"\tif _r != nil && gd.ref_counted_unreference(cast(gd.Ref_Counted)_r) {gdext.object_destroy(_r)}\n")}
+			if ex.vi.enum_name == ".String" {w(b,"\t}\n")}
 		case .Nil:
 		}
 		w(b, "}\n\n")
@@ -815,6 +850,7 @@ emit_accessor_wrappers :: proc(b: ^strings.Builder, s: ^Script, ex: Export_Info)
 			fmt.sbprintf(b, "\t%s(self, _v)\n", ex.setter)
 		case .Other:
 			fmt.sbprintf(b, "\t_v: %s\n\t_to_%s(&_v, value)\n", ex.type_text, tag)
+			if setter_borrowed && method_builtin_destructor(ex.vi.enum_name) {emit_method_release(b,ex.vi.enum_name,"_v")}
 			fmt.sbprintf(b, "\t%s(self, _v)\n", ex.setter)
 		case .Nil:
 		}

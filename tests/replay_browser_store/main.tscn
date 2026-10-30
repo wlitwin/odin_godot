@@ -1,0 +1,7 @@
+[gd_scene load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/probe.odin" id="probe"]
+[ext_resource type="Script" path="res://driver.gd" id="driver"]
+[node name="Probe" type="Node"]
+script=ExtResource("probe")
+[node name="Driver" type="Node" parent="."]
+script=ExtResource("driver")

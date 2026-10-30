@@ -1,0 +1,58 @@
+{
+  "scenario": "solo_three_wave_gauntlet",
+  "version": 2,
+  "seed": 1337,
+  "players": 1,
+  "hz": 60,
+  "fps": 60,
+  "wave_base": 4,
+  "waves": [
+    4,
+    4,
+    5
+  ],
+  "rest_ticks": 300,
+  "weapon": {
+    "id": 0,
+    "magazine": 255,
+    "jam_per_mille": 0,
+    "damage": 2
+  },
+  "controller": "sign(cos(elapsed_ms/700)), sign(sin(elapsed_ms/700)); nearest-live-target autofire; no casts, heals, boosts or invulnerability",
+  "maximum_ms": 180000,
+  "finale": {
+    "barrels": 2,
+    "offsets": [
+      [
+        150,
+        0
+      ],
+      [
+        150,
+        50
+      ]
+    ],
+    "maximum_ms": 25000,
+    "minimum_blasts": 2,
+    "controller": "Shared cover visibility graph; ordinary movement to a safe firing position, unchanged autofire",
+    "maximum_navigation_nodes": 192,
+    "minimum_firing_distance": 100,
+    "obstruction_check": {
+      "optional": true,
+      "position": [
+        788,
+        588
+      ],
+      "stationary_fire_ms": 1500,
+      "required_barrel_health_change": 0
+    },
+    "maximum_movement_speed_px_s": 350,
+    "movement_clock": "max(wall elapsed, simulation tick elapsed); 12 px observation slack"
+  },
+  "limits": [
+    "Controller phase uses time since the first live world in both games, rather than original absolute boot time.",
+    "Authority, update timing, spawn-clock origin, aiming and collision implementations remain those of each real game.",
+    "One scripted survival trajectory is not a difficulty or human-feel equivalence claim.",
+    "The original runner script is never executed; copies and state are isolated."
+  ]
+}

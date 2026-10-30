@@ -114,7 +114,7 @@ physical_bone3d_set_joint_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2289552604)
     }
     self := self
-    joint_type_ := joint_type_
+    joint_type_ := Int(joint_type_)
     args := []__bindgen_gde.TypePtr {
         &joint_type_,
     }
@@ -132,7 +132,9 @@ physical_bone3d_get_joint_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Physical_Bone3d_Joint_Type(__return_storage)
     return
 }
 
@@ -273,7 +275,9 @@ physical_bone3d_get_bone_id :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -415,7 +419,7 @@ physical_bone3d_set_linear_damp_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1244972221)
     }
     self := self
-    linear_damp_mode_ := linear_damp_mode_
+    linear_damp_mode_ := Int(linear_damp_mode_)
     args := []__bindgen_gde.TypePtr {
         &linear_damp_mode_,
     }
@@ -433,7 +437,9 @@ physical_bone3d_get_linear_damp_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Physical_Bone3d_Damp_Mode(__return_storage)
     return
 }
 
@@ -447,7 +453,7 @@ physical_bone3d_set_angular_damp_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1244972221)
     }
     self := self
-    angular_damp_mode_ := angular_damp_mode_
+    angular_damp_mode_ := Int(angular_damp_mode_)
     args := []__bindgen_gde.TypePtr {
         &angular_damp_mode_,
     }
@@ -465,7 +471,9 @@ physical_bone3d_get_angular_damp_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Physical_Bone3d_Damp_Mode(__return_storage)
     return
 }
 

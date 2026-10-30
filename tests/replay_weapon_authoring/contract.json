@@ -1,0 +1,13 @@
+{
+  "feature": "add_existing_family_weapon",
+  "version": 1,
+  "weapon": {"id":7,"name":"stapler","family":0,"cooldown_ticks":12,"damage":3,"magazine":3,"reload_ticks":60,"jam_per_mille":0,"speed":12,"ttl_ticks":30,"region":[0,48,32,16]},
+  "cases": ["shared_resource","host_only_resource"],
+  "conditions": ["local","delayed"],
+  "repetitions": 2,
+  "players": 2,
+  "shot_goal_per_player": 7,
+  "target": {"kind":1,"hp":20,"speed":0,"bite":0,"count":1,"offset_from_seat2":[120,0]},
+  "requirements": ["Select weapon through ordinary shop cycling after receiving the host catalog.","Both peers see the catalog values, HUD name and actual sprite region.","One host shot deals exactly three damage before either peer continues firing.","Each peer spends seven rounds, reloads at least twice and finishes with two rounds.","The host records twenty damage, one kill and no live target after drain.","A client without the resource or its generated stock row receives the host definition."],
+  "scope": "Native content-authoring and gameplay acceptance, not human authoring time or a performance comparison. Both primary games remain unchanged."
+}

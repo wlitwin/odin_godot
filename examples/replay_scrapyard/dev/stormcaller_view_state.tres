@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ScrapEnemyPreview" format=3]
+[ext_resource type="Script" path="res://scripts/views/enemy_preview.odin" id="script"]
+[ext_resource type="Resource" path="res://data/mobs/stormcaller.tres" id="definition"]
+[resource]
+script = ExtResource("script")
+definition = ExtResource("definition")
+attacking = true
+warning = true
+fraction = 0.7
+warning_radius = 180.0

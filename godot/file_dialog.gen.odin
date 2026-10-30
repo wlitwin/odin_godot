@@ -316,7 +316,9 @@ file_dialog_get_option_default :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &option_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -408,7 +410,9 @@ file_dialog_get_option_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -588,7 +592,7 @@ file_dialog_set_file_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3654936397)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -606,7 +610,9 @@ file_dialog_get_file_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = File_Dialog_File_Mode(__return_storage)
     return
 }
 
@@ -620,7 +626,7 @@ file_dialog_set_display_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2692197101)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -638,7 +644,9 @@ file_dialog_get_display_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = File_Dialog_Display_Mode(__return_storage)
     return
 }
 
@@ -682,7 +690,7 @@ file_dialog_set_access :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4104413466)
     }
     self := self
-    access_ := access_
+    access_ := Int(access_)
     args := []__bindgen_gde.TypePtr {
         &access_,
     }
@@ -700,7 +708,9 @@ file_dialog_get_access :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = File_Dialog_Access(__return_storage)
     return
 }
 
@@ -811,7 +821,7 @@ file_dialog_set_customization_flag_enabled :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3849177100)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     enabled_ := enabled_
     args := []__bindgen_gde.TypePtr {
         &flag_,
@@ -830,7 +840,7 @@ file_dialog_is_customization_flag_enabled :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3722277863)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     args := []__bindgen_gde.TypePtr {
         &flag_,
     }

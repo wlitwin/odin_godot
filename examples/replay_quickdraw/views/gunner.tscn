@@ -1,0 +1,53 @@
+[gd_scene format=4]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_61r1y"]
+_surfaces = [{
+"aabb": AABB(-9, -9, 0, 18, 18, 1e-05),
+"format": 34359742465,
+"index_count": 18,
+"index_data": PackedByteArray("BwAAAAEAAQACAAMAAwAEAAUABQAGAAcABwABAAMAAwAFAAcA"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 8,
+"vertex_data": PackedByteArray("AAAQQQAAAAAAAAAAzczMQM3MzEAAAAAAAAAAAAAAEEEAAAAAzczMwM3MzEAAAAAAAAAQwQAAAAAAAAAAzczMwM3MzMAAAAAAAAAAAAAAEMEAAAAAzczMQM3MzMAAAAAA")
+}]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_4e84v"]
+_surfaces = [{
+"aabb": AABB(2, -2, 0, 13, 4, 1e-05),
+"format": 34359742465,
+"index_count": 6,
+"index_data": PackedByteArray("AwAAAAEAAQACAAMA"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray("AAAAQAAAAMAAAAAAAABwQQAAAMAAAAAAAABwQQAAAEAAAAAAAAAAQAAAAEAAAAAA")
+}]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_ahfj5"]
+_surfaces = [{
+"aabb": AABB(4, -1, 0, 96, 2, 1e-05),
+"format": 34359742465,
+"index_count": 6,
+"index_data": PackedByteArray("AwAAAAEAAQACAAMA"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray("AACAQAAAgL8AAAAAAADIQgAAgL8AAAAAAADIQgAAgD8AAAAAAACAQAAAgD8AAAAA")
+}]
+
+[node name="Gunner" type="Node2D" unique_id=892595928]
+
+[node name="Skin" type="MeshInstance2D" parent="." unique_id=1793996608]
+self_modulate = Color(0.8, 0.8, 0.8, 1)
+mesh = SubResource("ArrayMesh_61r1y")
+
+[node name="Gun" type="MeshInstance2D" parent="." unique_id=423656648]
+self_modulate = Color(0.16, 0.14, 0.12, 1)
+mesh = SubResource("ArrayMesh_4e84v")
+
+[node name="Beam" type="MeshInstance2D" parent="." unique_id=437762548]
+visible = false
+self_modulate = Color(1, 0.9, 0.45, 0.85)
+z_index = 5
+mesh = SubResource("ArrayMesh_ahfj5")

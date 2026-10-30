@@ -85,7 +85,7 @@ xr_hand_modifier3d_set_bone_update :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3635701455)
     }
     self := self
-    bone_update_ := bone_update_
+    bone_update_ := Int(bone_update_)
     args := []__bindgen_gde.TypePtr {
         &bone_update_,
     }
@@ -103,7 +103,9 @@ xr_hand_modifier3d_get_bone_update :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Xr_Hand_Modifier3d_Bone_Update(__return_storage)
     return
 }
 

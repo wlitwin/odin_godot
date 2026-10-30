@@ -25,11 +25,16 @@ grep -q 'offset_of(BareProbe, health)' "$GEN" \
 # Make the scripts dll path unambiguous for the core's dynlib load.
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
 
-# First pass: write .godot/extension_list.cfg + import so the runtime loads the extension.
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
-
-# Pass 1: editor-context placeholder property list (group markers + default-value virtual).
-"$GODOT" --editor --headless --path "$PROJ" --script test_editor.gd
-
-# Pass 2: runtime real-instance behavior (onready refs, applied defaults, getter/setter).
-"$GODOT" --headless --path "$PROJ" --script test_runtime.gd
+# Import and both assertion passes must finish without engine errors/leaks.
+work="${CODEGEN_LOGS:-$(mktemp -d)}"
+mkdir -p "$work"
+"$GODOT" --headless --path "$PROJ" --editor --quit-after 120 >"$work/import.log" 2>&1
+CODEGEN_EDITOR_CHECK=1 "$GODOT" --editor --headless --path "$PROJ" --quit-after 900 >"$work/editor.log" 2>&1
+"$GODOT" --headless --path "$PROJ" --script test_runtime.gd >"$work/runtime.log" 2>&1
+cat "$work/editor.log" "$work/runtime.log"
+rg -q '^CODEGEN_EDITOR_OK$' "$work/editor.log"
+rg -q '^CODEGEN_OK$' "$work/runtime.log"
+if rg -q 'SCRIPT ERROR|ERROR:|instances were leaked|resources still in use|RIDs.*leaked|Scan thread aborted' "$work/"*.log; then
+ cat "$work/"*.log
+ exit 1
+fi

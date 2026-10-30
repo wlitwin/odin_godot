@@ -105,6 +105,25 @@ func _initialize() -> void:
 		_fail("method off resource-typed @export got %s" % str(got.call("item_total"))); return
 	print("  ok  resource-typed @export stores ItemData + method dispatch works")
 
+	# The exported Resource reference must keep an Odin-scripted resource alive,
+	# then permit destruction when the last owning reference goes away.
+	var transient := Resource.new()
+	transient.set_script(script)
+	var lifetime: WeakRef = weakref(transient)
+	var lifetime_id := transient.get_instance_id()
+	node.set("data", transient)
+	transient = null
+	if lifetime.get_ref() == null:
+		_fail("exported resource died while its holder still owned it"); return
+	node.set("data", null)
+	if lifetime.get_ref() != null:
+		_fail("Odin resource survived its last reference"); return
+	# A resource vetoed at refcount zero cannot be resurrected by WeakRef, but
+	# still occupies ObjectDB. Check actual destruction as well.
+	if is_instance_id_valid(lifetime_id):
+		_fail("Odin resource remained in ObjectDB at reference count zero"); return
+	print("  ok  Odin resource lifetime follows its owning references")
+
 	node.free()
 	print("RESOURCES_OK")
 	quit(0)

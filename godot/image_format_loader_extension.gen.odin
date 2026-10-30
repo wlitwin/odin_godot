@@ -68,7 +68,7 @@ image_format_loader_extension__load_image :: proc "contextless" (
     self := self
     image_ := image_
     fileaccess_ := fileaccess_
-    flags_ := flags_
+    flags_ := Int(flags_)
     scale_ := scale_
     args := []__bindgen_gde.TypePtr {
         &image_,
@@ -76,7 +76,9 @@ image_format_loader_extension__load_image :: proc "contextless" (
         &flags_,
         &scale_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

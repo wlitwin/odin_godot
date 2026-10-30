@@ -63,7 +63,7 @@ native_menu_has_feature :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1708975490)
     }
     self := self
-    feature_ := feature_
+    feature_ := Int(feature_)
     args := []__bindgen_gde.TypePtr {
         &feature_,
     }
@@ -81,7 +81,7 @@ native_menu_has_system_menu :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 718213027)
     }
     self := self
-    menu_id_ := menu_id_
+    menu_id_ := Int(menu_id_)
     args := []__bindgen_gde.TypePtr {
         &menu_id_,
     }
@@ -99,7 +99,7 @@ native_menu_get_system_menu :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 469707506)
     }
     self := self
-    menu_id_ := menu_id_
+    menu_id_ := Int(menu_id_)
     args := []__bindgen_gde.TypePtr {
         &menu_id_,
     }
@@ -117,7 +117,7 @@ native_menu_get_system_menu_name :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1281499290)
     }
     self := self
-    menu_id_ := menu_id_
+    menu_id_ := Int(menu_id_)
     args := []__bindgen_gde.TypePtr {
         &menu_id_,
     }
@@ -135,7 +135,7 @@ native_menu_get_system_menu_text :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1281499290)
     }
     self := self
-    menu_id_ := menu_id_
+    menu_id_ := Int(menu_id_)
     args := []__bindgen_gde.TypePtr {
         &menu_id_,
     }
@@ -154,7 +154,7 @@ native_menu_set_system_menu_text :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3925225603)
     }
     self := self
-    menu_id_ := menu_id_
+    menu_id_ := Int(menu_id_)
     name_ := name_
     args := []__bindgen_gde.TypePtr {
         &menu_id_,
@@ -429,7 +429,9 @@ native_menu_add_submenu_item :: proc "contextless" (
         &tag_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -454,7 +456,7 @@ native_menu_add_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &rid_,
@@ -465,7 +467,9 @@ native_menu_add_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -490,7 +494,7 @@ native_menu_add_check_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &rid_,
@@ -501,7 +505,9 @@ native_menu_add_check_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -528,7 +534,7 @@ native_menu_add_icon_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &rid_,
@@ -540,7 +546,9 @@ native_menu_add_icon_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -567,7 +575,7 @@ native_menu_add_icon_check_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &rid_,
@@ -579,7 +587,9 @@ native_menu_add_icon_check_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -604,7 +614,7 @@ native_menu_add_radio_check_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &rid_,
@@ -615,7 +625,9 @@ native_menu_add_radio_check_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -642,7 +654,7 @@ native_menu_add_icon_radio_check_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &rid_,
@@ -654,7 +666,9 @@ native_menu_add_icon_radio_check_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -683,7 +697,7 @@ native_menu_add_multistate_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &rid_,
@@ -696,7 +710,9 @@ native_menu_add_multistate_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -717,7 +733,9 @@ native_menu_add_separator :: proc "contextless" (
         &rid_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -738,7 +756,9 @@ native_menu_find_item_index_with_text :: proc "contextless" (
         &rid_,
         &text_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -759,7 +779,9 @@ native_menu_find_item_index_with_tag :: proc "contextless" (
         &rid_,
         &tag_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -780,7 +802,9 @@ native_menu_find_item_index_with_submenu :: proc "contextless" (
         &rid_,
         &submenu_rid_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -969,7 +993,9 @@ native_menu_get_item_accelerator :: proc "contextless" (
         &rid_,
         &idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Key(__return_storage)
     return
 }
 
@@ -1053,7 +1079,9 @@ native_menu_get_item_state :: proc "contextless" (
         &rid_,
         &idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1074,7 +1102,9 @@ native_menu_get_item_max_states :: proc "contextless" (
         &rid_,
         &idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1116,7 +1146,9 @@ native_menu_get_item_indentation_level :: proc "contextless" (
         &rid_,
         &idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1341,7 +1373,7 @@ native_menu_set_item_accelerator :: proc "contextless" (
     self := self
     rid_ := rid_
     idx_ := idx_
-    keycode_ := keycode_
+    keycode_ := Int(keycode_)
     args := []__bindgen_gde.TypePtr {
         &rid_,
         &idx_,
@@ -1531,7 +1563,9 @@ native_menu_set_item_index :: proc "contextless" (
         &idx_,
         &target_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1549,7 +1583,9 @@ native_menu_get_item_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &rid_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

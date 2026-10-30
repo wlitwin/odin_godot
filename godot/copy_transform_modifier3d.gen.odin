@@ -62,7 +62,7 @@ copy_transform_modifier3d_set_copy_flags :: proc "contextless" (
     }
     self := self
     index_ := index_
-    copy_flags_ := copy_flags_
+    copy_flags_ := Int(copy_flags_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &copy_flags_,
@@ -84,7 +84,9 @@ copy_transform_modifier3d_get_copy_flags :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Copy_Transform_Modifier3d_Transform_Flag(__return_storage)
     return
 }
 
@@ -100,7 +102,7 @@ copy_transform_modifier3d_set_axis_flags :: proc "contextless" (
     }
     self := self
     index_ := index_
-    axis_flags_ := axis_flags_
+    axis_flags_ := Int(axis_flags_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &axis_flags_,
@@ -122,7 +124,9 @@ copy_transform_modifier3d_get_axis_flags :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Copy_Transform_Modifier3d_Axis_Flag(__return_storage)
     return
 }
 
@@ -138,7 +142,7 @@ copy_transform_modifier3d_set_invert_flags :: proc "contextless" (
     }
     self := self
     index_ := index_
-    axis_flags_ := axis_flags_
+    axis_flags_ := Int(axis_flags_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &axis_flags_,
@@ -160,7 +164,9 @@ copy_transform_modifier3d_get_invert_flags :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Copy_Transform_Modifier3d_Axis_Flag(__return_storage)
     return
 }
 

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ComboDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/defs/combo_def.odin" id="1"]
+
+[ext_resource type="Resource" path="res://data/status/salve.tres" id="status_present"]
+[ext_resource type="Resource" path="res://data/status/rally.tres" id="status_incoming"]
+[ext_resource type="Resource" path="res://data/status/surge.tres" id="status_output"]
+
+[resource]
+script = ExtResource("1")
+present = ExtResource("status_present")
+incoming = ExtResource("status_incoming")
+reaction = 1
+dmg = 0
+radius = 0.0
+output = ExtResource("status_output")
+consume = true

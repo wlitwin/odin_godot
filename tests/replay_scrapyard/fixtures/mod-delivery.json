@@ -1,0 +1,9 @@
+{"status": [{"id": 5, "name": "battlecry", "duration": 600, "max_stacks": 1,
+             "move_mult": 1.0, "dot_dmg": 0, "dot_every": 0,
+             "taken_mult": 1.0, "dealt_mult": 2.0, "tint": [1.0, 0.85, 0.3, 0.5]}],
+ "abilities": [{"id": 1, "name": "battlecry", "family": "buff", "cooldown": 120,
+                "range": 200, "radius": 0, "arc_cos": 0, "speed": 1,
+                "dmg": 0, "status": 5, "self_buff": true},
+               {"id": 2, "name": "shockwave", "family": "nova", "cooldown": 120,
+                "range": 0, "radius": 140, "arc_cos": 0, "speed": 1,
+                "dmg": 3, "status": 0, "self_buff": false}]}

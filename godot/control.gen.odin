@@ -246,7 +246,9 @@ control__get_tooltip_auto_translate_mode_at :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &at_position_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Node_Auto_Translate_Mode(__return_storage)
     return
 }
 
@@ -341,7 +343,9 @@ control__get_cursor_shape :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &at_position_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -527,7 +531,7 @@ control_set_anchors_preset :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 509135270)
     }
     self := self
-    preset_ := preset_
+    preset_ := Int(preset_)
     keep_offsets_ := keep_offsets_
     args := []__bindgen_gde.TypePtr {
         &preset_,
@@ -548,8 +552,8 @@ control_set_offsets_preset :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3724524307)
     }
     self := self
-    preset_ := preset_
-    resize_mode_ := resize_mode_
+    preset_ := Int(preset_)
+    resize_mode_ := Int(resize_mode_)
     margin_ := margin_
     args := []__bindgen_gde.TypePtr {
         &preset_,
@@ -571,8 +575,8 @@ control_set_anchors_and_offsets_preset :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3724524307)
     }
     self := self
-    preset_ := preset_
-    resize_mode_ := resize_mode_
+    preset_ := Int(preset_)
+    resize_mode_ := Int(resize_mode_)
     margin_ := margin_
     args := []__bindgen_gde.TypePtr {
         &preset_,
@@ -595,7 +599,7 @@ control_set_anchor :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2302782885)
     }
     self := self
-    side_ := side_
+    side_ := Int(side_)
     anchor_ := anchor_
     keep_offset_ := keep_offset_
     push_opposite_anchor_ := push_opposite_anchor_
@@ -618,7 +622,7 @@ control_get_anchor :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2869120046)
     }
     self := self
-    side_ := side_
+    side_ := Int(side_)
     args := []__bindgen_gde.TypePtr {
         &side_,
     }
@@ -637,7 +641,7 @@ control_set_offset :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4290182280)
     }
     self := self
-    side_ := side_
+    side_ := Int(side_)
     offset_ := offset_
     args := []__bindgen_gde.TypePtr {
         &side_,
@@ -656,7 +660,7 @@ control_get_offset :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2869120046)
     }
     self := self
-    offset_ := offset_
+    offset_ := Int(offset_)
     args := []__bindgen_gde.TypePtr {
         &offset_,
     }
@@ -677,7 +681,7 @@ control_set_anchor_and_offset :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4031722181)
     }
     self := self
-    side_ := side_
+    side_ := Int(side_)
     anchor_ := anchor_
     offset_ := offset_
     push_opposite_anchor_ := push_opposite_anchor_
@@ -1182,7 +1186,7 @@ control_set_focus_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3232914922)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1200,7 +1204,9 @@ control_get_focus_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Focus_Mode(__return_storage)
     return
 }
 
@@ -1215,7 +1221,9 @@ control_get_focus_mode_with_override :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Focus_Mode(__return_storage)
     return
 }
 
@@ -1229,7 +1237,7 @@ control_set_focus_behavior_recursive :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4256832521)
     }
     self := self
-    focus_behavior_recursive_ := focus_behavior_recursive_
+    focus_behavior_recursive_ := Int(focus_behavior_recursive_)
     args := []__bindgen_gde.TypePtr {
         &focus_behavior_recursive_,
     }
@@ -1247,7 +1255,9 @@ control_get_focus_behavior_recursive :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Focus_Behavior_Recursive(__return_storage)
     return
 }
 
@@ -1340,7 +1350,7 @@ control_find_valid_focus_neighbor :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1543910170)
     }
     self := self
-    side_ := side_
+    side_ := Int(side_)
     args := []__bindgen_gde.TypePtr {
         &side_,
     }
@@ -1358,7 +1368,7 @@ control_set_h_size_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 394851643)
     }
     self := self
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &flags_,
     }
@@ -1376,7 +1386,9 @@ control_get_h_size_flags :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Size_Flags(__return_storage)
     return
 }
 
@@ -1422,7 +1434,7 @@ control_set_v_size_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 394851643)
     }
     self := self
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &flags_,
     }
@@ -1440,7 +1452,9 @@ control_get_v_size_flags :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Size_Flags(__return_storage)
     return
 }
 
@@ -2094,7 +2108,9 @@ control_get_theme_font_size :: proc "contextless" (
         &name_,
         &theme_type_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2136,7 +2152,9 @@ control_get_theme_constant :: proc "contextless" (
         &name_,
         &theme_type_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2415,7 +2433,9 @@ control_get_theme_default_font_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2444,7 +2464,7 @@ control_set_h_grow_direction :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2022385301)
     }
     self := self
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &direction_,
     }
@@ -2462,7 +2482,9 @@ control_get_h_grow_direction :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Grow_Direction(__return_storage)
     return
 }
 
@@ -2476,7 +2498,7 @@ control_set_v_grow_direction :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2022385301)
     }
     self := self
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &direction_,
     }
@@ -2494,7 +2516,9 @@ control_get_v_grow_direction :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Grow_Direction(__return_storage)
     return
 }
 
@@ -2508,7 +2532,7 @@ control_set_tooltip_auto_translate_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 776149714)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -2526,7 +2550,9 @@ control_get_tooltip_auto_translate_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Node_Auto_Translate_Mode(__return_storage)
     return
 }
 
@@ -2622,7 +2648,7 @@ control_set_default_cursor_shape :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 217062046)
     }
     self := self
-    shape_ := shape_
+    shape_ := Int(shape_)
     args := []__bindgen_gde.TypePtr {
         &shape_,
     }
@@ -2640,7 +2666,9 @@ control_get_default_cursor_shape :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Cursor_Shape(__return_storage)
     return
 }
 
@@ -2658,7 +2686,9 @@ control_get_cursor_shape :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &at_position_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Cursor_Shape(__return_storage)
     return
 }
 
@@ -2673,7 +2703,7 @@ control_set_focus_neighbor :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2024461774)
     }
     self := self
-    side_ := side_
+    side_ := Int(side_)
     neighbor_ := neighbor_
     args := []__bindgen_gde.TypePtr {
         &side_,
@@ -2692,7 +2722,7 @@ control_get_focus_neighbor :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2757935761)
     }
     self := self
-    side_ := side_
+    side_ := Int(side_)
     args := []__bindgen_gde.TypePtr {
         &side_,
     }
@@ -2886,7 +2916,7 @@ control_set_accessibility_live :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 353443434)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -2904,7 +2934,9 @@ control_get_accessibility_live :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Accessibility_Server_Accessibility_Live_Mode(__return_storage)
     return
 }
 
@@ -3046,7 +3078,7 @@ control_set_mouse_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3891156122)
     }
     self := self
-    filter_ := filter_
+    filter_ := Int(filter_)
     args := []__bindgen_gde.TypePtr {
         &filter_,
     }
@@ -3064,7 +3096,9 @@ control_get_mouse_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Mouse_Filter(__return_storage)
     return
 }
 
@@ -3079,7 +3113,9 @@ control_get_mouse_filter_with_override :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Mouse_Filter(__return_storage)
     return
 }
 
@@ -3093,7 +3129,7 @@ control_set_mouse_behavior_recursive :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 849284636)
     }
     self := self
-    mouse_behavior_recursive_ := mouse_behavior_recursive_
+    mouse_behavior_recursive_ := Int(mouse_behavior_recursive_)
     args := []__bindgen_gde.TypePtr {
         &mouse_behavior_recursive_,
     }
@@ -3111,7 +3147,9 @@ control_get_mouse_behavior_recursive :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Mouse_Behavior_Recursive(__return_storage)
     return
 }
 
@@ -3335,7 +3373,7 @@ control_set_layout_direction :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3310692370)
     }
     self := self
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &direction_,
     }
@@ -3353,7 +3391,9 @@ control_get_layout_direction :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Layout_Direction(__return_storage)
     return
 }
 

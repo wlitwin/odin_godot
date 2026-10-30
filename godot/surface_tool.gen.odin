@@ -63,7 +63,7 @@ surface_tool_set_skin_weight_count :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 618679515)
     }
     self := self
-    count_ := count_
+    count_ := Int(count_)
     args := []__bindgen_gde.TypePtr {
         &count_,
     }
@@ -81,7 +81,9 @@ surface_tool_get_skin_weight_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Surface_Tool_Skin_Weight_Count(__return_storage)
     return
 }
 
@@ -97,7 +99,7 @@ surface_tool_set_custom_format :: proc "contextless" (
     }
     self := self
     channel_index_ := channel_index_
-    format_ := format_
+    format_ := Int(format_)
     args := []__bindgen_gde.TypePtr {
         &channel_index_,
         &format_,
@@ -119,7 +121,9 @@ surface_tool_get_custom_format :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &channel_index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Surface_Tool_Custom_Format(__return_storage)
     return
 }
 
@@ -133,7 +137,7 @@ surface_tool_begin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2230304113)
     }
     self := self
-    primitive_ := primitive_
+    primitive_ := Int(primitive_)
     args := []__bindgen_gde.TypePtr {
         &primitive_,
     }
@@ -499,7 +503,9 @@ surface_tool_get_primitive_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Mesh_Primitive_Type(__return_storage)
     return
 }
 
@@ -549,7 +555,7 @@ surface_tool_create_from_arrays :: proc "contextless" (
     }
     self := self
     arrays_ := arrays_
-    primitive_type_ := primitive_type_
+    primitive_type_ := Int(primitive_type_)
     args := []__bindgen_gde.TypePtr {
         &arrays_,
         &primitive_type_,

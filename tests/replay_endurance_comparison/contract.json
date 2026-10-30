@@ -1,0 +1,200 @@
+{
+  "scenario": "moving_injury_dash_reload_swarm",
+  "version": 3,
+  "seed": 1337,
+  "players": 2,
+  "hz": 60,
+  "frame_cap": 60,
+  "sample_ms": 20000,
+  "target_living": 40,
+  "minimum_living": 32,
+  "maximum_living": 44,
+  "spawn_batch_max": 4,
+  "spawn_interval_ticks": 6,
+  "weapon": {
+    "id": 0,
+    "magazine": 8,
+    "jam_per_mille": 0,
+    "damage": 2,
+    "cooldown_ticks": 20
+  },
+  "enemy": {
+    "kind": 0,
+    "hp": 3,
+    "bite": 0
+  },
+  "repetitions": 3,
+  "receive_delay_ms_per_process": 120,
+  "jitter_ms": 0,
+  "loss_permyriad": 0,
+  "duplicate_permyriad": 0,
+  "minimum_kills_during_window": 20,
+  "minimum_shots_per_player": 30,
+  "maximum_shots_per_player": 60,
+  "scope": "Moving forty-enemy swarm with stock eight-round bolter, no random jams, frostwave/battlecry, ten dash intents, and scheduled stock burn/salve exposure through normal status paths. Scrapbot bite remains zero to isolate injury from the defined hazard schedule. Rally plus salve uses the stock surge reaction and its healing/movement multiplier.",
+  "limits": [
+    "Authority and presentation implementations differ.",
+    "Spawn requests enter through each game's existing development path at different scheduling boundaries.",
+    "Population, body lifetimes, shot totals and loot attribution are measured, not assumed identical.",
+    "Callback time includes networking, simulation and presentation; it is not CPU-only.",
+    "Kit uses owner-streamed movement; Replay simulates movement authoritatively and predicts it.",
+    "Ability admission/origin and status replication timing differ; measure exposure instead of assuming the same transient effects.",
+    "Player burn/salve exposure is scheduled by the host fixture; normal status decay, damage/healing and rollback execute afterward. This does not measure natural incoming-hit rates.",
+    "Dash is owner-clocked in Kit and fixed-tick predicted in Replay; actual distance, durations and observation edges may differ.",
+    "Random jams remain disabled; changing waves and broader enemy injury sources are separate workloads.",
+    "Lossy datagrams include ENet reliable retransmissions; correctness/recovery intervals are measured separately from the delay-only condition.",
+    "Unavailable authority frames during resync are recorded explicitly, not interpreted as zero health. At most two seconds of the lossy window may be unavailable.",
+    "The isolated Replay copy explicitly uses receipt-time cooperative actions. Stock Replay schedules other actions while dash uses a versioned receipt-time policy; the fixture explicitly disables that classifier and selects receipt timing for every action."
+  ],
+  "warmup": {
+    "steady_ms": 2000,
+    "maximum_prediction_depth": "measured lead + 30 ticks",
+    "maximum_facts_ahead_ticks": 30
+  },
+  "freshness": {
+    "maximum_facts_ahead_ticks": 30,
+    "maximum_prediction_depth": "measured lead + 30 ticks",
+    "client_received_tick_advance": [
+      1140,
+      1260
+    ],
+    "authority_tick_advance": [
+      1180,
+      1220
+    ],
+    "reason": "A received authority frame advances at snapshot delivery boundaries. Both endpoints may be up to 30 ticks behind contiguous facts; compare inclusive 20-second process windows and report actual advance/lag."
+  },
+  "movement": {
+    "segment_ms": 1000,
+    "directions": [
+      [
+        0,
+        1
+      ],
+      [
+        -1,
+        0
+      ],
+      [
+        0,
+        -1
+      ],
+      [
+        1,
+        0
+      ]
+    ],
+    "minimum_travel_px_per_player": 1000,
+    "minimum_axis_span_px": 80
+  },
+  "casts": [
+    {
+      "at_ms": 2000,
+      "slot": 0,
+      "ability": 3
+    },
+    {
+      "at_ms": 3000,
+      "slot": 1,
+      "ability": 4
+    },
+    {
+      "at_ms": 11000,
+      "slot": 0,
+      "ability": 3
+    },
+    {
+      "at_ms": 19000,
+      "slot": 1,
+      "ability": 4
+    }
+  ],
+  "status_requirements": {
+    "mob_chill_samples_min": 20,
+    "rally_samples_min_per_player": 60,
+    "cooldown_rises_per_slot": 2
+  },
+  "dash_ms": [
+    500,
+    2500,
+    4500,
+    6500,
+    8500,
+    10500,
+    12500,
+    14500,
+    16500,
+    18500
+  ],
+  "hazards": [
+    {
+      "at_ms": 2000,
+      "status": 2
+    },
+    {
+      "at_ms": 5000,
+      "status": 5
+    },
+    {
+      "at_ms": 8000,
+      "status": 5
+    },
+    {
+      "at_ms": 12000,
+      "status": 2
+    },
+    {
+      "at_ms": 15000,
+      "status": 5
+    },
+    {
+      "at_ms": 18000,
+      "status": 5
+    }
+  ],
+  "health_requirements": {
+    "hp_min": 1,
+    "hp_max": 10,
+    "minimum_hp_drops": 5,
+    "minimum_hp_rises": 3,
+    "minimum_burn_samples": 200,
+    "minimum_salve_samples": 150,
+    "minimum_reload_entries": 3,
+    "dashes_per_player": 10,
+    "minimum_surge_samples": 200
+  },
+  "conditions": {
+    "delay": {
+      "receive_delay_ms": 120,
+      "raw_udp": null,
+      "max_facts_ahead": 30,
+      "max_resyncs": 0,
+      "minimum_client_ticks": 1140,
+      "maximum_unavailable_ms": 0
+    },
+    "lossy": {
+      "receive_delay_ms": 0,
+      "raw_udp": {
+        "latency_ms": 120,
+        "jitter_ms": 20,
+        "loss": 0.05,
+        "duplicate": 0.05,
+        "bytes_per_second": 0,
+        "queue_bytes": 65536,
+        "queue_packets": 128,
+        "rate_burst_bytes": 1500
+      },
+      "max_facts_ahead": 120,
+      "max_resyncs": 3,
+      "minimum_client_ticks": 1000,
+      "maximum_unavailable_ms": 2000
+    }
+  },
+  "replay_action_timing": "Receipt",
+  "cast_submission_contract": "Kit immediate Action_Outcome sequence identifies a sent client command even when local prediction rejects. Authority application and observed cooldown/status work remain separately required.",
+  "dash_delivery": {
+    "replay": "Receipt action with sequence and settled verdict",
+    "minimum_confirmed_per_local_player": 10,
+    "maximum_refused": 0
+  }
+}

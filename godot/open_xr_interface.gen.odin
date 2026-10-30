@@ -130,7 +130,9 @@ open_xr_interface_get_session_state :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Interface_Session_State(__return_storage)
     return
 }
 
@@ -254,7 +256,9 @@ open_xr_interface_get_foveation_level :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -418,8 +422,8 @@ open_xr_interface_set_motion_range :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 855158159)
     }
     self := self
-    hand_ := hand_
-    motion_range_ := motion_range_
+    hand_ := Int(hand_)
+    motion_range_ := Int(motion_range_)
     args := []__bindgen_gde.TypePtr {
         &hand_,
         &motion_range_,
@@ -437,11 +441,13 @@ open_xr_interface_get_motion_range :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3955838114)
     }
     self := self
-    hand_ := hand_
+    hand_ := Int(hand_)
     args := []__bindgen_gde.TypePtr {
         &hand_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Interface_Hand_Motion_Range(__return_storage)
     return
 }
 
@@ -455,11 +461,13 @@ open_xr_interface_get_hand_tracking_source :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4092421202)
     }
     self := self
-    hand_ := hand_
+    hand_ := Int(hand_)
     args := []__bindgen_gde.TypePtr {
         &hand_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Interface_Hand_Tracked_Source(__return_storage)
     return
 }
 
@@ -474,13 +482,15 @@ open_xr_interface_get_hand_joint_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 720567706)
     }
     self := self
-    hand_ := hand_
-    joint_ := joint_
+    hand_ := Int(hand_)
+    joint_ := Int(joint_)
     args := []__bindgen_gde.TypePtr {
         &hand_,
         &joint_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Interface_Hand_Joint_Flags(__return_storage)
     return
 }
 
@@ -495,8 +505,8 @@ open_xr_interface_get_hand_joint_rotation :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1974618321)
     }
     self := self
-    hand_ := hand_
-    joint_ := joint_
+    hand_ := Int(hand_)
+    joint_ := Int(joint_)
     args := []__bindgen_gde.TypePtr {
         &hand_,
         &joint_,
@@ -516,8 +526,8 @@ open_xr_interface_get_hand_joint_position :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3529194242)
     }
     self := self
-    hand_ := hand_
-    joint_ := joint_
+    hand_ := Int(hand_)
+    joint_ := Int(joint_)
     args := []__bindgen_gde.TypePtr {
         &hand_,
         &joint_,
@@ -537,8 +547,8 @@ open_xr_interface_get_hand_joint_radius :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 901522724)
     }
     self := self
-    hand_ := hand_
-    joint_ := joint_
+    hand_ := Int(hand_)
+    joint_ := Int(joint_)
     args := []__bindgen_gde.TypePtr {
         &hand_,
         &joint_,
@@ -558,8 +568,8 @@ open_xr_interface_get_hand_joint_linear_velocity :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3529194242)
     }
     self := self
-    hand_ := hand_
-    joint_ := joint_
+    hand_ := Int(hand_)
+    joint_ := Int(joint_)
     args := []__bindgen_gde.TypePtr {
         &hand_,
         &joint_,
@@ -579,8 +589,8 @@ open_xr_interface_get_hand_joint_angular_velocity :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3529194242)
     }
     self := self
-    hand_ := hand_
-    joint_ := joint_
+    hand_ := Int(hand_)
+    joint_ := Int(joint_)
     args := []__bindgen_gde.TypePtr {
         &hand_,
         &joint_,
@@ -708,7 +718,7 @@ open_xr_interface_set_cpu_level :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2940842095)
     }
     self := self
-    level_ := level_
+    level_ := Int(level_)
     args := []__bindgen_gde.TypePtr {
         &level_,
     }
@@ -725,7 +735,7 @@ open_xr_interface_set_gpu_level :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2940842095)
     }
     self := self
-    level_ := level_
+    level_ := Int(level_)
     args := []__bindgen_gde.TypePtr {
         &level_,
     }

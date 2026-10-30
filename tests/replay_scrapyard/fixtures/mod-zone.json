@@ -1,0 +1,4 @@
+{"abilities": [{"id": 2, "name": "napalm", "family": "zone", "cooldown": 240,
+                "range": 260, "radius": 200, "arc_cos": 0, "speed": 1,
+                "dmg": 2, "status": 2, "self_buff": false,
+                "duration": 2400, "pulse": 15}]}

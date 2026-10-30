@@ -1,0 +1,13 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/views/enemy.odin" id="script"]
+[ext_resource type="PackedScene" path="res://views/components/telegraph.tscn" id="telegraph"]
+
+[ext_resource type="PackedScene" path="res://views/components/charge.tscn" id="charge"]
+[ext_resource type="Resource" path="res://visuals/enemies/scrapbot.tres" id="appearance"]
+[node name="Mob" type="Node2D"]
+script = ExtResource("script")
+appearance = ExtResource("appearance")
+[node name="Body" type="Sprite2D" parent="."]
+z_index = 1
+[node name="Telegraph" parent="." instance=ExtResource("telegraph")]
+[node name="Charge" parent="." instance=ExtResource("charge")]

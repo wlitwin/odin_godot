@@ -52,7 +52,9 @@ web_rtc_multiplayer_peer_create_server :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &channels_config_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -73,7 +75,9 @@ web_rtc_multiplayer_peer_create_client :: proc "contextless" (
         &peer_id_,
         &channels_config_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -94,7 +98,9 @@ web_rtc_multiplayer_peer_create_mesh :: proc "contextless" (
         &peer_id_,
         &channels_config_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -118,7 +124,9 @@ web_rtc_multiplayer_peer_add_peer :: proc "contextless" (
         &peer_id_,
         &unreliable_lifetime_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

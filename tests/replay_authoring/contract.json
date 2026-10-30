@@ -1,0 +1,23 @@
+{
+  "feature": "paid_revive",
+  "version": 1,
+  "cost": 3,
+  "recipient_credit": 3,
+  "revived_hp": 4,
+  "reach": 56,
+  "channel_seconds": 2,
+  "players": 3,
+  "rules": [
+    "Existing connected, living-rescuer and downed-target checks remain in force.",
+    "A revive requires at least three scrap and recipient capacity for three u32 scrap.",
+    "On success, debit the rescuer, credit the teammate and revive once.",
+    "Insufficient funds stop/reset channel progress; continued held input can resume after funding.",
+    "Competing rescuers produce one successful transfer; either authority-accepted winner is valid."
+  ],
+  "cases": ["funded", "funding_while_held", "contended"],
+  "conditions": ["local", "delayed"],
+  "repetitions": 2,
+  "preservation": "Feature and probes install only into isolated copies. Original Kit/Scrapyard and the main Replay game remain unchanged.",
+  "scope": "Source changes and executable behavior, not human authoring time or whole-framework superiority. Save/migration feature acceptance remains separate.",
+  "parity_limits": ["Kit uses owner-clock channels and host consequences; Replay uses scheduled controls and a replayable reducer.", "Movement authority and UI/input bindings differ; test participants remain stationary."]
+}

@@ -1,0 +1,13 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/views/equipment.odin" id="script"]
+[node name="Beacon" type="Polygon2D"]
+script = ExtResource("script")
+speed = 6.0
+height = 5.0
+scale_pulse = 0.25
+fade_pulse = true
+position = Vector2(0, -26)
+visible = false
+z_index = 20
+color = Color(1, 0.85, 0.2, 1)
+polygon = PackedVector2Array(0, 0, -7, -11, 7, -11)

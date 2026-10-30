@@ -49,7 +49,7 @@ rd_shader_source_set_stage_source :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 620821314)
     }
     self := self
-    stage_ := stage_
+    stage_ := Int(stage_)
     source_ := source_
     args := []__bindgen_gde.TypePtr {
         &stage_,
@@ -68,7 +68,7 @@ rd_shader_source_get_stage_source :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3354920045)
     }
     self := self
-    stage_ := stage_
+    stage_ := Int(stage_)
     args := []__bindgen_gde.TypePtr {
         &stage_,
     }
@@ -86,7 +86,7 @@ rd_shader_source_set_language :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3422186742)
     }
     self := self
-    language_ := language_
+    language_ := Int(language_)
     args := []__bindgen_gde.TypePtr {
         &language_,
     }
@@ -104,7 +104,9 @@ rd_shader_source_get_language :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Shader_Language(__return_storage)
     return
 }
 

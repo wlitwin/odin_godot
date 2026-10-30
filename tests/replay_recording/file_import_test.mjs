@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+
+const source=fs.readFileSync(new URL('../../replay/godot/file_import.odin',import.meta.url),'utf8');
+const script=source.match(/FILE_IMPORT_JS :: `([\s\S]*?)`/)[1];
+const inputs=[];
+const scope={document:{createElement(){const input={style:{},click(){},remove(){this.removed=true;}};inputs.push(input);return input;},body:{appendChild(){}}}};
+vm.createContext(scope);assert.equal(vm.runInContext(script,scope),1);const api=scope.ReplayFileImportV1;
+assert.equal(vm.runInContext(script,scope),1);assert.equal(scope.ReplayFileImportV1,api);
+let id=api.open(100),input=inputs.at(-1),reads=0;
+input.files=[{size:101,arrayBuffer(){reads++;throw Error('oversize read');}}];await input.onchange();assert.equal(reads,0);assert.equal(api.state(id),3);api.close(id);
+id=api.open(100);input=inputs.at(-1);input.files=[{size:3,async arrayBuffer(){return new Uint8Array([1,2,3]).buffer;}}];await input.onchange();assert.equal(api.state(id),1);assert.deepEqual([...new Uint8Array(api.bytes(id))],[1,2,3]);assert.equal(input.removed,true);api.close(id);assert.equal(api.bytes(id),null);
+id=api.open(100);input=inputs.at(-1);let complete;
+input.files=[{size:1,arrayBuffer(){return new Promise(resolve=>complete=resolve);}}];const pending=input.onchange();api.close(id);complete(new Uint8Array([7]).buffer);await pending;assert.equal(api.state(id),3);assert.equal(api.bytes(id),null);
+id=api.open(100);input=inputs.at(-1);input.oncancel();assert.equal(api.state(id),2);assert.equal(input.removed,true);api.close(id);
+id=api.open(100);input=inputs.at(-1);input.files=[{size:3,async arrayBuffer(){return new Uint8Array([1]).buffer;}}];await input.onchange();assert.equal(api.state(id),3);api.close(id);
+id=api.open(100);input=inputs.at(-1);input.files=[{size:3,async arrayBuffer(){throw Error('read failed');}}];await input.onchange();assert.equal(api.state(id),3);api.close(id);
+assert.equal(api.open(0),0);assert.equal(api.open(16777217),0);
+const live=Array.from({length:8},()=>api.open(100));assert.equal(new Set(live).size,8);assert.equal(api.open(100),0);for(const key of live)api.close(key);
+console.log('REPLAY_FILE_IMPORT_OK bounds cancellation late completion malformed size and concurrency');

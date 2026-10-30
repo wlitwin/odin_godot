@@ -55,7 +55,7 @@ web_query :: proc(key: string, allocator := context.temp_allocator) -> string {
 					if kv[j] == '=' {eq = j;break}
 				}
 				if eq > 0 && kv[:eq] == key {
-					return uri_decode(kv[eq + 1:], allocator)
+					return query_decode(kv[eq + 1:], allocator)
 				}
 				start = i + 1
 			}
@@ -68,7 +68,11 @@ web_query :: proc(key: string, allocator := context.temp_allocator) -> string {
 
 // uri_decode percent-decodes `s` (enough for query values: %XX escapes; malformed
 // escapes pass through verbatim). Allocated from `allocator`.
-uri_decode :: proc(s: string, allocator := context.temp_allocator) -> string {
+// Query form encoding treats raw '+' as space, while %2B remains a literal plus.
+// URI paths continue using uri_decode's percent-only behavior.
+query_decode :: proc(s:string,allocator:=context.temp_allocator)->string {return uri_decode(s,allocator,true)}
+
+uri_decode :: proc(s: string, allocator := context.temp_allocator, plus_as_space:bool=false) -> string {
 	out := make([]u8, len(s), allocator)
 	n := 0
 	i := 0
@@ -83,7 +87,7 @@ uri_decode :: proc(s: string, allocator := context.temp_allocator) -> string {
 				continue
 			}
 		}
-		out[n] = s[i]
+		out[n] = plus_as_space && s[i]=='+' ? u8(' ') : s[i]
 		n += 1
 		i += 1
 	}

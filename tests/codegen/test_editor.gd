@@ -1,5 +1,5 @@
 @tool
-extends SceneTree
+extends RefCounted
 
 # ----------------------------------------------------------------------------
 # Editor-context verification for the richer-authoring codegen.
@@ -15,12 +15,12 @@ extends SceneTree
 #
 # Prints CODEGEN_EDITOR_OK, or CODEGEN_FAIL: <which>.
 #
-# Run:  $GODOT --editor --headless --path tests/codegen --script test_editor.gd
+# Run: CODEGEN_EDITOR_CHECK=1 $GODOT --editor --headless --path tests/codegen
 # ----------------------------------------------------------------------------
 
 func _fail(which: String) -> void:
 	print("CODEGEN_FAIL: ", which)
-	quit(1)
+	tree.quit(1)
 
 # Index of the first property entry matching name (and, if usage_mask != 0, that usage bit).
 func _index_of(props: Array, pname: String, usage_mask: int) -> int:
@@ -33,12 +33,17 @@ func _index_of(props: Array, pname: String, usage_mask: int) -> int:
 		return i
 	return -1
 
-func _initialize() -> void:
+var tree: SceneTree
+func run(editor_tree: SceneTree) -> void:
+	tree = editor_tree
+	_run_checks()
+
+func _run_checks() -> void:
 	if not Engine.is_editor_hint():
 		_fail("not running in editor context (is_editor_hint false)"); return
 
 	var n = load("res://codegen.tscn").instantiate()
-	get_root().add_child(n)
+	tree.root.add_child(n)
 
 	var props = n.get_property_list()
 
@@ -77,5 +82,6 @@ func _initialize() -> void:
 		_fail("default: placeholder speed value got %s want 200" % str(n.get("speed"))); return
 	print("  ok  (3) defaults: placeholder shows speed=200")
 
+	n.free()
 	print("CODEGEN_EDITOR_OK")
-	quit(0)
+	tree.quit(0)

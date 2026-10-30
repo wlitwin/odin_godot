@@ -59,7 +59,9 @@ open_xr_spatial_component_plane_semantic_label_list_get_plane_semantic_label :: 
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Spatial_Component_Plane_Semantic_Label_List_Plane_Semantic_Label(__return_storage)
     return
 }
 

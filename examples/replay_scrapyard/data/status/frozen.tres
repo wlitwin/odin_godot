@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="StatusDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/defs/status_def.odin" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = 7
+name = "frozen"
+duration = 180
+max_stacks = 1
+move_mult = 0.0
+dot_dmg = 0
+dot_every = 0
+taken_mult = 1.25
+dealt_mult = 1.0
+tint = Color(0.8, 0.93, 1.0, 0.7)

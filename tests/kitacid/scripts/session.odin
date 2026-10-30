@@ -134,6 +134,7 @@ acid_session_start_host :: proc(self: ^AcidSession, port: gd.Int) {
 		gd.print_str(fmt.tprintf("LISTEN_FAIL err=%v", err))
 		return
 	}
+	if gd.on_peer_disconnected(self.owner,"peer_left")!=.Ok {gd.print_str("LISTEN_FAIL peer_left");return}
 	self.ses.send = session_send
 	self.ses.send_user = self
 	self.boot.ses = &self.ses
@@ -154,6 +155,7 @@ start_client :: proc(self: ^AcidSession, port: int, token: u64, name: string) {
 		gd.print_str(fmt.tprintf("LISTEN_FAIL err=%v", err))
 		return
 	}
+	if gd.on_peer_disconnected(self.owner,"peer_left")!=.Ok {gd.print_str("LISTEN_FAIL peer_left");return}
 	self.ses.send = session_send
 	self.ses.send_user = self
 	self.boot.ses = &self.ses
@@ -161,6 +163,13 @@ start_client :: proc(self: ^AcidSession, port: int, token: u64, name: string) {
 	ksess.session_client_start(&self.ses, token, name)
 	self.started = true
 	gd.print_str("JOIN_OK")
+}
+
+// A released ENet peer now sends its normal disconnect during shutdown. Keep
+// the session roster current while the server waits for both done receipts.
+@(gd_method)
+acid_session_peer_left :: proc(self:^AcidSession,id:gd.Int) {
+	ksess.session_peer_disconnected(&self.ses,ksess.Peer_Id(id))
 }
 
 @(gd_method)

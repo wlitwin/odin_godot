@@ -113,7 +113,7 @@ lightmap_gi_set_bake_quality :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1192215803)
     }
     self := self
-    bake_quality_ := bake_quality_
+    bake_quality_ := Int(bake_quality_)
     args := []__bindgen_gde.TypePtr {
         &bake_quality_,
     }
@@ -131,7 +131,9 @@ lightmap_gi_get_bake_quality :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Lightmap_Gi_Bake_Quality(__return_storage)
     return
 }
 
@@ -163,7 +165,9 @@ lightmap_gi_get_bounces :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -209,7 +213,7 @@ lightmap_gi_set_generate_probes :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 549981046)
     }
     self := self
-    subdivision_ := subdivision_
+    subdivision_ := Int(subdivision_)
     args := []__bindgen_gde.TypePtr {
         &subdivision_,
     }
@@ -227,7 +231,9 @@ lightmap_gi_get_generate_probes :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Lightmap_Gi_Generate_Probes(__return_storage)
     return
 }
 
@@ -273,7 +279,7 @@ lightmap_gi_set_environment_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2282650285)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -291,7 +297,9 @@ lightmap_gi_get_environment_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Lightmap_Gi_Environment_Mode(__return_storage)
     return
 }
 
@@ -451,7 +459,9 @@ lightmap_gi_get_max_texture_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -611,7 +621,9 @@ lightmap_gi_get_denoiser_range :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -689,7 +701,7 @@ lightmap_gi_set_shadowmask_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3451066572)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -707,7 +719,9 @@ lightmap_gi_get_shadowmask_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Lightmap_Gi_Data_Shadowmask_Mode(__return_storage)
     return
 }
 

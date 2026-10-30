@@ -1,0 +1,8 @@
+warning: Git tree '/Users/walter/data/code/odin/odin_godot' is dirty
+odin_godot dev shell  (target: Godot 4.7.1 stable)
+  odin:  /nix/store/bp9vf6k9bsawaf0yvds0zbwadr22j3pf-odin-dev-2026-04/bin/odin  odin version dev-2026-04
+  emcc:  /nix/store/wwcamwhybgsw9gb1y73g3hi1qy3qf33d-emscripten-5.0.6/bin/emcc
+  godot: /Applications/Godot.app/Contents/MacOS/Godot
+CAVE_C4_FIXTURE name=before-descent tick=100 depth=1 hp=65 stamina=3 rock=7 heal=11 chill=13
+CAVE_C4_FIXTURE name=after-descent tick=101 depth=2 hp=100 stamina=10 rock=0 heal=0 chill=0
+CAVE_C4_FIXTURE name=before-restart tick=100 depth=2 hp=65 stamina=3 rock=7 heal=11 chill=13

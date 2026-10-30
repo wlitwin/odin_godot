@@ -52,7 +52,9 @@ x509_certificate_save :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -70,7 +72,9 @@ x509_certificate_load :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -103,7 +107,9 @@ x509_certificate_load_from_string :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &string_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

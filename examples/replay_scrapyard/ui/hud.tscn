@@ -1,0 +1,283 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/hud.odin" id="1_hud"]
+[ext_resource type="Texture2D" path="res://assets/ui/metal_btn_dark.png" id="2_steel"]
+[ext_resource type="Theme" path="res://assets/ui/metal_theme.tres" id="3_theme"]
+
+[node name="CombatHUD" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme = ExtResource("3_theme")
+script = ExtResource("1_hud")
+
+[node name="Prompt" type="Label" parent="."]
+visible = false
+modulate = Color(1, 0.85, 0.3, 1)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.76
+anchor_right = 0.5
+anchor_bottom = 0.76
+offset_left = -140.0
+offset_right = 140.0
+offset_bottom = 26.0
+horizontal_alignment = 1
+text = "◆ hold F — revive your friend"
+
+[node name="Vitals" type="NinePatchRect" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 12.0
+offset_top = 30.0
+offset_right = 182.0
+offset_bottom = 54.0
+mouse_filter = 2
+texture = ExtResource("2_steel")
+region_rect = Rect2(0, 0, 64, 32)
+patch_margin_left = 9
+patch_margin_top = 9
+patch_margin_right = 9
+patch_margin_bottom = 9
+
+[node name="Fill" type="ColorRect" parent="Vitals"]
+layout_mode = 0
+offset_left = 7.0
+offset_top = 7.0
+offset_right = 163.0
+offset_bottom = 17.0
+mouse_filter = 2
+color = Color(0.4, 0.8, 0.4, 1)
+
+[node name="Text" type="Label" parent="Vitals"]
+layout_mode = 0
+offset_left = 66.0
+offset_right = 106.0
+offset_bottom = 18.0
+theme_override_font_sizes/font_size = 12
+text = "10/10"
+
+[node name="Pip0" type="Control" parent="Vitals"]
+layout_mode = 0
+offset_left = 184.0
+offset_right = 232.0
+offset_bottom = 22.0
+mouse_filter = 2
+
+[node name="Name" type="Label" parent="Vitals/Pip0"]
+modulate = Color(0.8, 0.85, 0.9, 0.8)
+layout_mode = 0
+offset_top = -2.0
+offset_right = 40.0
+offset_bottom = 14.0
+theme_override_font_sizes/font_size = 10
+text = "Q"
+
+[node name="Bg" type="ColorRect" parent="Vitals/Pip0"]
+layout_mode = 0
+offset_top = 14.0
+offset_right = 48.0
+offset_bottom = 22.0
+mouse_filter = 2
+color = Color(0.1, 0.11, 0.14, 0.9)
+
+[node name="Fill" type="ColorRect" parent="Vitals/Pip0"]
+layout_mode = 0
+offset_top = 14.0
+offset_right = 36.0
+offset_bottom = 22.0
+mouse_filter = 2
+color = Color(0.55, 0.95, 0.4, 1)
+
+[node name="Pip1" type="Control" parent="Vitals"]
+layout_mode = 0
+offset_left = 246.0
+offset_right = 294.0
+offset_bottom = 22.0
+mouse_filter = 2
+
+[node name="Name" type="Label" parent="Vitals/Pip1"]
+modulate = Color(0.8, 0.85, 0.9, 0.8)
+layout_mode = 0
+offset_top = -2.0
+offset_right = 40.0
+offset_bottom = 14.0
+theme_override_font_sizes/font_size = 10
+text = "E"
+
+[node name="Bg" type="ColorRect" parent="Vitals/Pip1"]
+layout_mode = 0
+offset_top = 14.0
+offset_right = 48.0
+offset_bottom = 22.0
+mouse_filter = 2
+color = Color(0.1, 0.11, 0.14, 0.9)
+
+[node name="Fill" type="ColorRect" parent="Vitals/Pip1"]
+layout_mode = 0
+offset_top = 14.0
+offset_right = 36.0
+offset_bottom = 22.0
+mouse_filter = 2
+color = Color(1, 0.6, 0.25, 1)
+
+[node name="Pip2" type="Control" parent="Vitals"]
+layout_mode = 0
+offset_left = 308.0
+offset_right = 356.0
+offset_bottom = 22.0
+mouse_filter = 2
+
+[node name="Name" type="Label" parent="Vitals/Pip2"]
+modulate = Color(0.8, 0.85, 0.9, 0.8)
+layout_mode = 0
+offset_top = -2.0
+offset_right = 40.0
+offset_bottom = 14.0
+theme_override_font_sizes/font_size = 10
+text = "SHIFT"
+
+[node name="Bg" type="ColorRect" parent="Vitals/Pip2"]
+layout_mode = 0
+offset_top = 14.0
+offset_right = 48.0
+offset_bottom = 22.0
+mouse_filter = 2
+color = Color(0.1, 0.11, 0.14, 0.9)
+
+[node name="Fill" type="ColorRect" parent="Vitals/Pip2"]
+layout_mode = 0
+offset_top = 14.0
+offset_right = 36.0
+offset_bottom = 22.0
+mouse_filter = 2
+color = Color(0.5, 0.85, 1, 1)
+
+[node name="St0" type="ColorRect" parent="Vitals"]
+visible = false
+layout_mode = 0
+offset_left = 376.0
+offset_top = 8.0
+offset_right = 388.0
+offset_bottom = 20.0
+mouse_filter = 2
+
+[node name="St1" type="ColorRect" parent="Vitals"]
+visible = false
+layout_mode = 0
+offset_left = 394.0
+offset_top = 8.0
+offset_right = 406.0
+offset_bottom = 20.0
+mouse_filter = 2
+
+[node name="St2" type="ColorRect" parent="Vitals"]
+visible = false
+layout_mode = 0
+offset_left = 412.0
+offset_top = 8.0
+offset_right = 424.0
+offset_bottom = 20.0
+mouse_filter = 2
+
+[node name="St3" type="ColorRect" parent="Vitals"]
+visible = false
+layout_mode = 0
+offset_left = 430.0
+offset_top = 8.0
+offset_right = 442.0
+offset_bottom = 20.0
+mouse_filter = 2
+
+[node name="Ammo" type="NinePatchRect" parent="."]
+visible = false
+self_modulate = Color(1, 1, 1, 0.38)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -160.0
+offset_top = -96.0
+offset_right = -12.0
+offset_bottom = -12.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+texture = ExtResource("2_steel")
+region_rect = Rect2(0, 0, 64, 32)
+patch_margin_left = 9
+patch_margin_top = 9
+patch_margin_right = 9
+patch_margin_bottom = 9
+
+[node name="Gun" type="Label" parent="Ammo"]
+modulate = Color(0.75, 0.8, 0.88, 0.9)
+layout_mode = 0
+offset_left = 12.0
+offset_top = 4.0
+offset_right = 130.0
+offset_bottom = 27.0
+text = "scrapper"
+
+[node name="Count" type="Label" parent="Ammo"]
+layout_mode = 0
+offset_left = 12.0
+offset_top = 18.0
+offset_right = 140.0
+offset_bottom = 62.0
+theme_override_font_sizes/font_size = 32
+text = "8 / 8"
+
+[node name="State" type="Label" parent="Ammo"]
+layout_mode = 0
+offset_left = 12.0
+offset_top = 58.0
+offset_right = 140.0
+offset_bottom = 82.0
+theme_override_font_sizes/font_size = 18
+text = ""
+
+[node name="BossPlate" type="NinePatchRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 96.0
+offset_right = 200.0
+offset_bottom = 126.0
+grow_horizontal = 2
+mouse_filter = 2
+texture = ExtResource("2_steel")
+region_rect = Rect2(0, 0, 64, 32)
+patch_margin_left = 9
+patch_margin_top = 9
+patch_margin_right = 9
+patch_margin_bottom = 9
+
+[node name="Fill" type="ColorRect" parent="BossPlate"]
+layout_mode = 0
+offset_left = 7.0
+offset_top = 7.0
+offset_right = 393.0
+offset_bottom = 23.0
+mouse_filter = 2
+color = Color(0.78, 0.2, 0.3, 1)
+
+[node name="Name" type="Label" parent="BossPlate"]
+modulate = Color(1, 0.9, 0.9, 1)
+layout_mode = 0
+offset_left = 120.0
+offset_top = 3.0
+offset_right = 320.0
+offset_bottom = 26.0
+text = "SCRAP TITAN  600/600"
+

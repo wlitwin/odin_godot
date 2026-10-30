@@ -175,7 +175,7 @@ accessibility_server_create_element :: proc "contextless" (
     }
     self := self
     window_id_ := window_id_
-    role_ := role_
+    role_ := Int(role_)
     args := []__bindgen_gde.TypePtr {
         &window_id_,
         &role_,
@@ -197,7 +197,7 @@ accessibility_server_create_sub_element :: proc "contextless" (
     }
     self := self
     parent_rid_ := parent_rid_
-    role_ := role_
+    role_ := Int(role_)
     insert_pos_ := insert_pos_
     args := []__bindgen_gde.TypePtr {
         &parent_rid_,
@@ -401,7 +401,7 @@ accessibility_server_update_set_role :: proc "contextless" (
     }
     self := self
     id_ := id_
-    role_ := role_
+    role_ := Int(role_)
     args := []__bindgen_gde.TypePtr {
         &id_,
         &role_,
@@ -861,7 +861,7 @@ accessibility_server_update_set_live :: proc "contextless" (
     }
     self := self
     id_ := id_
-    live_ := live_
+    live_ := Int(live_)
     args := []__bindgen_gde.TypePtr {
         &id_,
         &live_,
@@ -882,7 +882,7 @@ accessibility_server_update_add_action :: proc "contextless" (
     }
     self := self
     id_ := id_
-    action_ := action_
+    action_ := Int(action_)
     callable_ := callable_
     args := []__bindgen_gde.TypePtr {
         &id_,
@@ -1153,7 +1153,7 @@ accessibility_server_update_set_popup_type :: proc "contextless" (
     }
     self := self
     id_ := id_
-    popup_ := popup_
+    popup_ := Int(popup_)
     args := []__bindgen_gde.TypePtr {
         &id_,
         &popup_,
@@ -1391,7 +1391,7 @@ accessibility_server_update_set_text_align :: proc "contextless" (
     }
     self := self
     id_ := id_
-    align_ := align_
+    align_ := Int(align_)
     args := []__bindgen_gde.TypePtr {
         &id_,
         &align_,
@@ -1441,7 +1441,7 @@ accessibility_server_update_set_flag :: proc "contextless" (
     }
     self := self
     id_ := id_
-    flag_ := flag_
+    flag_ := Int(flag_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &id_,

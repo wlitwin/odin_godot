@@ -181,7 +181,7 @@ editor_spin_slider_set_control_state :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1324557109)
     }
     self := self
-    state_ := state_
+    state_ := Int(state_)
     args := []__bindgen_gde.TypePtr {
         &state_,
     }
@@ -199,7 +199,9 @@ editor_spin_slider_get_control_state :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Editor_Spin_Slider_Control_State(__return_storage)
     return
 }
 

@@ -1,0 +1,267 @@
+[gd_scene format=3]
+[ext_resource type="Texture2D" path="res://assets/ui/metal_btn_dark.png" id="steel"]
+[ext_resource type="Theme" path="res://assets/ui/metal_theme.tres" id="theme"]
+[sub_resource type="StyleBoxTexture" id="plate"]
+texture = ExtResource("steel")
+region_rect = Rect2(0, 0, 64, 32)
+texture_margin_left = 9.0
+texture_margin_top = 9.0
+texture_margin_right = 9.0
+texture_margin_bottom = 9.0
+content_margin_left = 18.0
+content_margin_top = 14.0
+content_margin_right = 18.0
+content_margin_bottom = 14.0
+
+[node name="Lobby" type="PanelContainer"]
+layout_mode = 1
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.04
+anchor_bottom = 0.96
+offset_left = -330.0
+offset_right = 330.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("theme")
+theme_override_styles/panel = SubResource("plate")
+[node name="Scroll" type="ScrollContainer" parent="."]
+layout_mode = 2
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="Layout" type="VBoxContainer" parent="Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+[node name="Title" type="Label" parent="Scroll/Layout"]
+layout_mode = 2
+text = "S C R A P Y A R D   /   R E P L A Y"
+horizontal_alignment = 1
+[node name="Name" type="LineEdit" parent="Scroll/Layout"]
+layout_mode = 2
+text = "runner"
+placeholder_text = "Your name"
+[node name="Doors" type="HFlowContainer" parent="Scroll/Layout"]
+layout_mode = 2
+alignment = 1
+[node name="Solo" type="Button" parent="Scroll/Layout/Doors"]
+layout_mode = 2
+text = "Solo"
+[node name="Host" type="Button" parent="Scroll/Layout/Doors"]
+layout_mode = 2
+text = "Host"
+[node name="Resume" type="Button" parent="Scroll/Layout/Doors"]
+layout_mode = 2
+text = "Resume solo"
+[node name="Join" type="Button" parent="Scroll/Layout/Doors"]
+layout_mode = 2
+text = "Join"
+[node name="Watch" type="Button" parent="Scroll/Layout/Doors"]
+layout_mode = 2
+text = "Watch"
+[node name="Rejoin" type="Button" parent="Scroll/Layout/Doors"]
+visible = false
+layout_mode = 2
+text = "Rejoin recent party"
+[node name="Party" type="VBoxContainer" parent="Scroll/Layout"]
+visible = false
+layout_mode = 2
+[node name="Code" type="LineEdit" parent="Scroll/Layout/Party"]
+layout_mode = 2
+max_length = 160
+placeholder_text = "Paste a party invite"
+[node name="Hint" type="Label" parent="Scroll/Layout/Party"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Invited friends can keep the party running if you disconnect."
+autowrap_mode = 3
+[node name="Notice" type="Label" parent="Scroll/Layout/Party"]
+layout_mode = 2
+text = "Create a party or paste an invite to join friends."
+autowrap_mode = 3
+[node name="CopyInvite" type="Button" parent="Scroll/Layout/Party"]
+visible = false
+layout_mode = 2
+text = "Copy party invite"
+[node name="Roster" type="VBoxContainer" parent="Scroll/Layout"]
+layout_mode = 2
+visible = false
+theme_override_constants/separation = 6
+
+[node name="Row0" type="Control" parent="Scroll/Layout/Roster"]
+layout_mode = 2
+custom_minimum_size = Vector2(560, 62)
+mouse_filter = 2
+[node name="Body" type="Sprite2D" parent="Scroll/Layout/Roster/Row0"]
+position = Vector2(26, 31)
+scale = Vector2(2, 2)
+hframes = 6
+[node name="Name" type="Label" parent="Scroll/Layout/Roster/Row0"]
+offset_left = 60.0
+offset_right = 400.0
+offset_top = 2.0
+offset_bottom = 28.0
+clip_text = true
+text_overrun_behavior = 3
+[node name="Iron" type="Label" parent="Scroll/Layout/Roster/Row0"]
+offset_left = 60.0
+offset_top = 30.0
+offset_right = 575.0
+offset_bottom = 58.0
+clip_text = true
+text_overrun_behavior = 3
+theme_override_font_sizes/font_size = 14
+[node name="Lamp" type="Label" parent="Scroll/Layout/Roster/Row0"]
+offset_left = 420.0
+offset_right = 576.0
+offset_bottom = 28.0
+horizontal_alignment = 2
+
+[node name="Row1" type="Control" parent="Scroll/Layout/Roster"]
+layout_mode = 2
+custom_minimum_size = Vector2(560, 62)
+mouse_filter = 2
+[node name="Body" type="Sprite2D" parent="Scroll/Layout/Roster/Row1"]
+position = Vector2(26, 31)
+scale = Vector2(2, 2)
+hframes = 6
+[node name="Name" type="Label" parent="Scroll/Layout/Roster/Row1"]
+offset_left = 60.0
+offset_right = 400.0
+offset_top = 2.0
+offset_bottom = 28.0
+clip_text = true
+text_overrun_behavior = 3
+[node name="Iron" type="Label" parent="Scroll/Layout/Roster/Row1"]
+offset_left = 60.0
+offset_top = 30.0
+offset_right = 575.0
+offset_bottom = 58.0
+clip_text = true
+text_overrun_behavior = 3
+theme_override_font_sizes/font_size = 14
+[node name="Lamp" type="Label" parent="Scroll/Layout/Roster/Row1"]
+offset_left = 420.0
+offset_right = 576.0
+offset_bottom = 28.0
+horizontal_alignment = 2
+
+[node name="Row2" type="Control" parent="Scroll/Layout/Roster"]
+layout_mode = 2
+custom_minimum_size = Vector2(560, 62)
+mouse_filter = 2
+[node name="Body" type="Sprite2D" parent="Scroll/Layout/Roster/Row2"]
+position = Vector2(26, 31)
+scale = Vector2(2, 2)
+hframes = 6
+[node name="Name" type="Label" parent="Scroll/Layout/Roster/Row2"]
+offset_left = 60.0
+offset_right = 400.0
+offset_top = 2.0
+offset_bottom = 28.0
+clip_text = true
+text_overrun_behavior = 3
+[node name="Iron" type="Label" parent="Scroll/Layout/Roster/Row2"]
+offset_left = 60.0
+offset_top = 30.0
+offset_right = 575.0
+offset_bottom = 58.0
+clip_text = true
+text_overrun_behavior = 3
+theme_override_font_sizes/font_size = 14
+[node name="Lamp" type="Label" parent="Scroll/Layout/Roster/Row2"]
+offset_left = 420.0
+offset_right = 576.0
+offset_bottom = 28.0
+horizontal_alignment = 2
+
+[node name="Row3" type="Control" parent="Scroll/Layout/Roster"]
+layout_mode = 2
+custom_minimum_size = Vector2(560, 62)
+mouse_filter = 2
+[node name="Body" type="Sprite2D" parent="Scroll/Layout/Roster/Row3"]
+position = Vector2(26, 31)
+scale = Vector2(2, 2)
+hframes = 6
+[node name="Name" type="Label" parent="Scroll/Layout/Roster/Row3"]
+offset_left = 60.0
+offset_right = 400.0
+offset_top = 2.0
+offset_bottom = 28.0
+clip_text = true
+text_overrun_behavior = 3
+[node name="Iron" type="Label" parent="Scroll/Layout/Roster/Row3"]
+offset_left = 60.0
+offset_top = 30.0
+offset_right = 575.0
+offset_bottom = 58.0
+clip_text = true
+text_overrun_behavior = 3
+theme_override_font_sizes/font_size = 14
+[node name="Lamp" type="Label" parent="Scroll/Layout/Roster/Row3"]
+offset_left = 420.0
+offset_right = 576.0
+offset_bottom = 28.0
+horizontal_alignment = 2
+
+[node name="Picks" type="GridContainer" parent="Scroll/Layout"]
+columns = 4
+layout_mode = 2
+size_flags_horizontal = 4
+[node name="LookPrev" type="Button" parent="Scroll/Layout/Picks"]
+layout_mode = 2
+text = "‹ Skin"
+
+[node name="Look" type="Button" parent="Scroll/Layout/Picks"]
+layout_mode = 2
+text = "Skin ›"
+[node name="IronPrev" type="Button" parent="Scroll/Layout/Picks"]
+layout_mode = 2
+text = "‹ Iron"
+
+[node name="Iron" type="Button" parent="Scroll/Layout/Picks"]
+layout_mode = 2
+text = "Iron ›"
+[node name="Abilities" type="GridContainer" parent="Scroll/Layout"]
+columns = 4
+layout_mode = 2
+size_flags_horizontal = 4
+[node name="LeftPrev" type="Button" parent="Scroll/Layout/Abilities"]
+layout_mode = 2
+text = "‹ Q ability"
+
+[node name="Left" type="Button" parent="Scroll/Layout/Abilities"]
+layout_mode = 2
+text = "Q ability ›"
+[node name="RightPrev" type="Button" parent="Scroll/Layout/Abilities"]
+layout_mode = 2
+text = "‹ E ability"
+
+[node name="Right" type="Button" parent="Scroll/Layout/Abilities"]
+layout_mode = 2
+text = "E ability ›"
+[node name="Picked" type="Label" parent="Scroll/Layout"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Loadout is assigned by seat until changed."
+horizontal_alignment = 1
+[node name="Spray" type="Button" parent="Scroll/Layout"]
+layout_mode = 2
+text = "Choose spray PNG"
+[node name="Actions" type="HBoxContainer" parent="Scroll/Layout"]
+layout_mode = 2
+alignment = 1
+[node name="Ready" type="Button" parent="Scroll/Layout/Actions"]
+layout_mode = 2
+text = "READY"
+[node name="Start" type="Button" parent="Scroll/Layout/Actions"]
+layout_mode = 2
+text = "START"
+[node name="Note" type="Label" parent="Scroll/Layout"]
+layout_mode = 2
+text = "WASD move • Shift dash • Mouse fire
+Q/E cast selected abilities toward the mouse
+G stamps your spray • F5 saves the solo/host run"
+horizontal_alignment = 1
+

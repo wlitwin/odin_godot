@@ -49,7 +49,7 @@ rd_shader_spirv_set_stage_bytecode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3514097977)
     }
     self := self
-    stage_ := stage_
+    stage_ := Int(stage_)
     bytecode_ := bytecode_
     args := []__bindgen_gde.TypePtr {
         &stage_,
@@ -68,7 +68,7 @@ rd_shader_spirv_get_stage_bytecode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3816765404)
     }
     self := self
-    stage_ := stage_
+    stage_ := Int(stage_)
     args := []__bindgen_gde.TypePtr {
         &stage_,
     }
@@ -87,7 +87,7 @@ rd_shader_spirv_set_stage_compile_error :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 620821314)
     }
     self := self
-    stage_ := stage_
+    stage_ := Int(stage_)
     compile_error_ := compile_error_
     args := []__bindgen_gde.TypePtr {
         &stage_,
@@ -106,7 +106,7 @@ rd_shader_spirv_get_stage_compile_error :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3354920045)
     }
     self := self
-    stage_ := stage_
+    stage_ := Int(stage_)
     args := []__bindgen_gde.TypePtr {
         &stage_,
     }

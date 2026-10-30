@@ -135,7 +135,9 @@ look_at_modifier3d_get_bone :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -149,7 +151,7 @@ look_at_modifier3d_set_forward_axis :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3199955933)
     }
     self := self
-    forward_axis_ := forward_axis_
+    forward_axis_ := Int(forward_axis_)
     args := []__bindgen_gde.TypePtr {
         &forward_axis_,
     }
@@ -167,7 +169,9 @@ look_at_modifier3d_get_forward_axis :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Skeleton_Modifier3d_Bone_Axis(__return_storage)
     return
 }
 
@@ -181,7 +185,7 @@ look_at_modifier3d_set_primary_rotation_axis :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1144690656)
     }
     self := self
-    axis_ := axis_
+    axis_ := Int(axis_)
     args := []__bindgen_gde.TypePtr {
         &axis_,
     }
@@ -199,7 +203,9 @@ look_at_modifier3d_get_primary_rotation_axis :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Vector3_Vector3_Axis(__return_storage)
     return
 }
 
@@ -309,7 +315,7 @@ look_at_modifier3d_set_origin_from :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4254695669)
     }
     self := self
-    origin_from_ := origin_from_
+    origin_from_ := Int(origin_from_)
     args := []__bindgen_gde.TypePtr {
         &origin_from_,
     }
@@ -327,7 +333,9 @@ look_at_modifier3d_get_origin_from :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Look_At_Modifier3d_Origin_From(__return_storage)
     return
 }
 
@@ -391,7 +399,9 @@ look_at_modifier3d_get_origin_bone :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -501,7 +511,7 @@ look_at_modifier3d_set_transition_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1058637742)
     }
     self := self
-    transition_type_ := transition_type_
+    transition_type_ := Int(transition_type_)
     args := []__bindgen_gde.TypePtr {
         &transition_type_,
     }
@@ -519,7 +529,9 @@ look_at_modifier3d_get_transition_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Tween_Transition_Type(__return_storage)
     return
 }
 
@@ -533,7 +545,7 @@ look_at_modifier3d_set_ease_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1208105857)
     }
     self := self
-    ease_type_ := ease_type_
+    ease_type_ := Int(ease_type_)
     args := []__bindgen_gde.TypePtr {
         &ease_type_,
     }
@@ -551,7 +563,9 @@ look_at_modifier3d_get_ease_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Tween_Ease_Type(__return_storage)
     return
 }
 

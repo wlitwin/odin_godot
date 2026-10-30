@@ -464,6 +464,10 @@ walk_field :: proc(info: Class_Info, fname: string, fti: ^runtime.Type_Info, off
 		return
 	}
 
+	if reflect.is_string(fti) {
+		record_error(cls, name_c, "native string exports do not share Godot String storage; use gd.String")
+		return
+	}
 	vt, vok := variant_type_for(fti.id)
 	if !vok {
 		record_error(cls, name_c, "export field of unsupported type")

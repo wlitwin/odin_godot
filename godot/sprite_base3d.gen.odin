@@ -240,7 +240,9 @@ sprite_base3d_get_render_priority :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -286,7 +288,7 @@ sprite_base3d_set_axis :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1144690656)
     }
     self := self
-    axis_ := axis_
+    axis_ := Int(axis_)
     args := []__bindgen_gde.TypePtr {
         &axis_,
     }
@@ -304,7 +306,9 @@ sprite_base3d_get_axis :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Vector3_Vector3_Axis(__return_storage)
     return
 }
 
@@ -319,7 +323,7 @@ sprite_base3d_set_draw_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1135633219)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     enabled_ := enabled_
     args := []__bindgen_gde.TypePtr {
         &flag_,
@@ -338,7 +342,7 @@ sprite_base3d_get_draw_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1733036628)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     args := []__bindgen_gde.TypePtr {
         &flag_,
     }
@@ -356,7 +360,7 @@ sprite_base3d_set_alpha_cut_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 227561226)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -374,7 +378,9 @@ sprite_base3d_get_alpha_cut_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Sprite_Base3d_Alpha_Cut_Mode(__return_storage)
     return
 }
 
@@ -452,7 +458,7 @@ sprite_base3d_set_alpha_antialiasing :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3212649852)
     }
     self := self
-    alpha_aa_ := alpha_aa_
+    alpha_aa_ := Int(alpha_aa_)
     args := []__bindgen_gde.TypePtr {
         &alpha_aa_,
     }
@@ -470,7 +476,9 @@ sprite_base3d_get_alpha_antialiasing :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Alpha_Anti_Aliasing(__return_storage)
     return
 }
 
@@ -516,7 +524,7 @@ sprite_base3d_set_billboard_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4202036497)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -534,7 +542,9 @@ sprite_base3d_get_billboard_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Billboard_Mode(__return_storage)
     return
 }
 
@@ -548,7 +558,7 @@ sprite_base3d_set_texture_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 22904437)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -566,7 +576,9 @@ sprite_base3d_get_texture_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Texture_Filter(__return_storage)
     return
 }
 

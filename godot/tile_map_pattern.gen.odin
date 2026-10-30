@@ -116,7 +116,9 @@ tile_map_pattern_get_cell_source_id :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &coords_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -152,7 +154,9 @@ tile_map_pattern_get_cell_alternative_tile :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &coords_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

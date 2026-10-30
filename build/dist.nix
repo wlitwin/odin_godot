@@ -33,7 +33,6 @@ stdenvNoCC.mkDerivation ({
 
   buildPhase = ''
     runHook preBuild
-    export HOME=$TMPDIR
     export ODIN_GODOT_ROOT=$PWD
     ${lib.optionalString isDarwin ''
       # darwin-only impurity — see the __noChroot / NIX_ENFORCE_PURITY note below.
@@ -82,7 +81,7 @@ stdenvNoCC.mkDerivation ({
     # declaration schema — the gd: tag vocabulary and the id-hash law — and it is NOT
     # optional: `runtime` and `scriptgen` both import it, so a bundle without it fails to
     # compile at the consumer's first build.
-    cp -r core godot gdext libgd runtime decl flow flowgd events kit play $A/
+    cp -r core godot gdext libgd runtime decl flow flowgd events kit play replay $A/
     cp -r scriptgen $A/scriptgen
     # Only the CONSUMER-facing build scripts — not the repo's dev/test builders
     # (build_phase*.sh) or the nix package def (dist.nix), which a consumer never runs.
@@ -129,6 +128,7 @@ stdenvNoCC.mkDerivation ({
     cp dist/addons/odin_godot/icon.svg $A/icon.svg
     mkdir -p $A/docs
     cp build/addon-docs/getting-started.md build/addon-docs/index.md $A/docs/
+    cp build/addon-docs/replay.md $A/docs/replay.md
     cp docs/authoring-guide.md docs/workflow.md docs/exporting.md docs/debugging.md docs/modules.md docs/events.md docs/recipes.md $A/docs/
     mkdir -p $A/docs/design
     cp docs/design/native-boundary.md $A/docs/design/
@@ -162,7 +162,7 @@ stdenvNoCC.mkDerivation ({
     # destabilizes the editor. A `.gdignore` makes Godot skip a dir (odin's path-based
     # collection resolution is unaffected). The addon root stays scannable so Godot still
     # discovers odin_godot.gdextension.
-    for d in core godot gdext libgd runtime decl scriptgen template build docs; do
+    for d in core godot gdext libgd runtime decl flow flowgd events kit play replay scriptgen template build docs; do
       touch "$A/$d/.gdignore"
     done
     # The raw engine inputs are gitignored (regenerated from the pinned Godot) and are NOT

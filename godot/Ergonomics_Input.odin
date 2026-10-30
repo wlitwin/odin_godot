@@ -65,6 +65,8 @@ ensure_action :: proc "contextless" (im: Input_Map, n: String_Name) {
 action_add_key :: proc "contextless" (action: cstring, keycode: i64) {
 	im := singleton_input_map()
 	ev := new_input_event_key()
+	ref_counted_init_ref(ev)
+	defer release_ref(ev)
 	input_event_key_set_keycode(ev, Key(keycode))
 	input_event_key_set_physical_keycode(ev, Key(keycode))
 	n := new_string_name_cstring(action, true)
@@ -78,6 +80,8 @@ action_add_key :: proc "contextless" (action: cstring, keycode: i64) {
 action_add_mouse_button :: proc "contextless" (action: cstring, button_index: i64) {
 	im := singleton_input_map()
 	ev := new_input_event_mouse_button()
+	ref_counted_init_ref(ev)
+	defer release_ref(ev)
 	input_event_mouse_button_set_button_index(ev, Mouse_Button(button_index))
 	n := new_string_name_cstring(action, true)
 	ensure_action(im, n)

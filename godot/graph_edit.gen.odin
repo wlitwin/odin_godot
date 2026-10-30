@@ -168,7 +168,9 @@ graph_edit_connect_node :: proc "contextless" (
         &to_port_,
         &keep_alive_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -303,7 +305,9 @@ graph_edit_get_connection_count :: proc "contextless" (
         &from_node_,
         &from_port_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -657,7 +661,7 @@ graph_edit_set_panning_scheme :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 18893313)
     }
     self := self
-    scheme_ := scheme_
+    scheme_ := Int(scheme_)
     args := []__bindgen_gde.TypePtr {
         &scheme_,
     }
@@ -675,7 +679,9 @@ graph_edit_get_panning_scheme :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Graph_Edit_Panning_Scheme(__return_storage)
     return
 }
 
@@ -849,7 +855,7 @@ graph_edit_set_grid_pattern :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1074098205)
     }
     self := self
-    pattern_ := pattern_
+    pattern_ := Int(pattern_)
     args := []__bindgen_gde.TypePtr {
         &pattern_,
     }
@@ -867,7 +873,9 @@ graph_edit_get_grid_pattern :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Graph_Edit_Grid_Pattern(__return_storage)
     return
 }
 
@@ -931,7 +939,9 @@ graph_edit_get_snapping_distance :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

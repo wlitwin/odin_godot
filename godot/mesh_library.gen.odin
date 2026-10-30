@@ -127,7 +127,7 @@ mesh_library_set_item_mesh_cast_shadow :: proc "contextless" (
     }
     self := self
     id_ := id_
-    shadow_casting_setting_ := shadow_casting_setting_
+    shadow_casting_setting_ := Int(shadow_casting_setting_)
     args := []__bindgen_gde.TypePtr {
         &id_,
         &shadow_casting_setting_,
@@ -303,7 +303,9 @@ mesh_library_get_item_mesh_cast_shadow :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Server_Shadow_Casting_Setting(__return_storage)
     return
 }
 
@@ -357,7 +359,9 @@ mesh_library_get_item_navigation_layers :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -428,7 +432,9 @@ mesh_library_find_item_by_name :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &name_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -472,7 +478,9 @@ mesh_library_get_item_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -487,7 +495,9 @@ mesh_library_get_last_unused_item_id :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

@@ -238,7 +238,7 @@ sprite_frames_set_animation_loop_mode :: proc "contextless" (
     }
     self := self
     anim_ := anim_
-    loop_mode_ := loop_mode_
+    loop_mode_ := Int(loop_mode_)
     args := []__bindgen_gde.TypePtr {
         &anim_,
         &loop_mode_,
@@ -260,7 +260,9 @@ sprite_frames_get_animation_loop_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &anim_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Sprite_Frames_Loop_Mode(__return_storage)
     return
 }
 
@@ -350,7 +352,9 @@ sprite_frames_get_frame_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &anim_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

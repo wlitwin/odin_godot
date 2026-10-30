@@ -87,7 +87,7 @@ fast_noise_lite_set_noise_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2624461392)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &type_,
     }
@@ -105,7 +105,9 @@ fast_noise_lite_get_noise_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Fast_Noise_Lite_Noise_Type(__return_storage)
     return
 }
 
@@ -137,7 +139,9 @@ fast_noise_lite_get_seed :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -215,7 +219,7 @@ fast_noise_lite_set_fractal_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4132731174)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &type_,
     }
@@ -233,7 +237,9 @@ fast_noise_lite_get_fractal_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Fast_Noise_Lite_Fractal_Type(__return_storage)
     return
 }
 
@@ -265,7 +271,9 @@ fast_noise_lite_get_fractal_octaves :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -407,7 +415,7 @@ fast_noise_lite_set_cellular_distance_function :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1006013267)
     }
     self := self
-    func_ := func_
+    func_ := Int(func_)
     args := []__bindgen_gde.TypePtr {
         &func_,
     }
@@ -425,7 +433,9 @@ fast_noise_lite_get_cellular_distance_function :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Fast_Noise_Lite_Cellular_Distance_Function(__return_storage)
     return
 }
 
@@ -471,7 +481,7 @@ fast_noise_lite_set_cellular_return_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2654169698)
     }
     self := self
-    ret_ := ret_
+    ret_ := Int(ret_)
     args := []__bindgen_gde.TypePtr {
         &ret_,
     }
@@ -489,7 +499,9 @@ fast_noise_lite_get_cellular_return_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Fast_Noise_Lite_Cellular_Return_Type(__return_storage)
     return
 }
 
@@ -535,7 +547,7 @@ fast_noise_lite_set_domain_warp_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3629692980)
     }
     self := self
-    domain_warp_type_ := domain_warp_type_
+    domain_warp_type_ := Int(domain_warp_type_)
     args := []__bindgen_gde.TypePtr {
         &domain_warp_type_,
     }
@@ -553,7 +565,9 @@ fast_noise_lite_get_domain_warp_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Fast_Noise_Lite_Domain_Warp_Type(__return_storage)
     return
 }
 
@@ -631,7 +645,7 @@ fast_noise_lite_set_domain_warp_fractal_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3999408287)
     }
     self := self
-    domain_warp_fractal_type_ := domain_warp_fractal_type_
+    domain_warp_fractal_type_ := Int(domain_warp_fractal_type_)
     args := []__bindgen_gde.TypePtr {
         &domain_warp_fractal_type_,
     }
@@ -649,7 +663,9 @@ fast_noise_lite_get_domain_warp_fractal_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Fast_Noise_Lite_Domain_Warp_Fractal_Type(__return_storage)
     return
 }
 
@@ -681,7 +697,9 @@ fast_noise_lite_get_domain_warp_fractal_octaves :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

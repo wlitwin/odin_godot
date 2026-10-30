@@ -83,8 +83,8 @@ tween_interpolate_value :: proc "contextless" (
     delta_value_ := delta_value_
     elapsed_time_ := elapsed_time_
     duration_ := duration_
-    trans_type_ := trans_type_
-    ease_type_ := ease_type_
+    trans_type_ := Int(trans_type_)
+    ease_type_ := Int(ease_type_)
     args := []__bindgen_gde.TypePtr {
         &initial_value_,
         &delta_value_,
@@ -386,7 +386,7 @@ tween_set_process_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 855258840)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -404,7 +404,7 @@ tween_set_pause_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3363368837)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -477,7 +477,9 @@ tween_get_loops_left :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -509,7 +511,7 @@ tween_set_trans :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3965963875)
     }
     self := self
-    trans_ := trans_
+    trans_ := Int(trans_)
     args := []__bindgen_gde.TypePtr {
         &trans_,
     }
@@ -527,7 +529,7 @@ tween_set_ease :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1208117252)
     }
     self := self
-    ease_ := ease_
+    ease_ := Int(ease_)
     args := []__bindgen_gde.TypePtr {
         &ease_,
     }

@@ -118,7 +118,7 @@ retarget_modifier3d_set_enable_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2687954213)
     }
     self := self
-    enable_flags_ := enable_flags_
+    enable_flags_ := Int(enable_flags_)
     args := []__bindgen_gde.TypePtr {
         &enable_flags_,
     }
@@ -136,7 +136,9 @@ retarget_modifier3d_get_enable_flags :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Retarget_Modifier3d_Transform_Flag(__return_storage)
     return
 }
 

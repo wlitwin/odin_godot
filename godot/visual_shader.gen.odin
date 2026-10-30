@@ -80,7 +80,7 @@ visual_shader_set_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3978014962)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -100,7 +100,7 @@ visual_shader_add_node :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1560769431)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     node_ := node_
     position_ := position_
     id_ := id_
@@ -124,7 +124,7 @@ visual_shader_get_node :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3784670312)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     id_ := id_
     args := []__bindgen_gde.TypePtr {
         &type_,
@@ -146,7 +146,7 @@ visual_shader_set_node_position :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2726660721)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     id_ := id_
     position_ := position_
     args := []__bindgen_gde.TypePtr {
@@ -168,7 +168,7 @@ visual_shader_get_node_position :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2175036082)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     id_ := id_
     args := []__bindgen_gde.TypePtr {
         &type_,
@@ -188,7 +188,7 @@ visual_shader_get_node_list :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2370592410)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &type_,
     }
@@ -206,11 +206,13 @@ visual_shader_get_valid_node_id :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 629467342)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &type_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -225,7 +227,7 @@ visual_shader_remove_node :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 844050912)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     id_ := id_
     args := []__bindgen_gde.TypePtr {
         &type_,
@@ -246,7 +248,7 @@ visual_shader_replace_node :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3144735253)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     id_ := id_
     new_class_ := new_class_
     args := []__bindgen_gde.TypePtr {
@@ -271,7 +273,7 @@ visual_shader_is_node_connection :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3922381898)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     from_node_ := from_node_
     from_port_ := from_port_
     to_node_ := to_node_
@@ -301,7 +303,7 @@ visual_shader_can_connect_nodes :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3922381898)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     from_node_ := from_node_
     from_port_ := from_port_
     to_node_ := to_node_
@@ -331,7 +333,7 @@ visual_shader_connect_nodes :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3081049573)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     from_node_ := from_node_
     from_port_ := from_port_
     to_node_ := to_node_
@@ -343,7 +345,9 @@ visual_shader_connect_nodes :: proc "contextless" (
         &to_node_,
         &to_port_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -361,7 +365,7 @@ visual_shader_disconnect_nodes :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2268060358)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     from_node_ := from_node_
     from_port_ := from_port_
     to_node_ := to_node_
@@ -390,7 +394,7 @@ visual_shader_connect_nodes_forced :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2268060358)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     from_node_ := from_node_
     from_port_ := from_port_
     to_node_ := to_node_
@@ -415,7 +419,7 @@ visual_shader_get_node_connections :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1441964831)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &type_,
     }
@@ -435,7 +439,7 @@ visual_shader_attach_node_to_frame :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2479945279)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     id_ := id_
     frame_ := frame_
     args := []__bindgen_gde.TypePtr {
@@ -457,7 +461,7 @@ visual_shader_detach_node_from_frame :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 844050912)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     id_ := id_
     args := []__bindgen_gde.TypePtr {
         &type_,
@@ -479,8 +483,8 @@ visual_shader_add_varying :: proc "contextless" (
     }
     self := self
     name_ := name_
-    mode_ := mode_
-    type_ := type_
+    mode_ := Int(mode_)
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &name_,
         &mode_,

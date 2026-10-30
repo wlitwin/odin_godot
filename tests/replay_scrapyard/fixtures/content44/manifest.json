@@ -1,0 +1,12 @@
+{
+  "protocol": 7,
+  "content": "0x5253435241503044",
+  "bytes": 53283,
+  "assets": 0,
+  "sha256": "871f6be247a99b02f63338d9192dc2712768d16cd20c0527154d6eee20c7ee20",
+  "test_token_label": "protocol-upgrade-owner",
+  "provenance": "Converted from the frozen content-43 run with the actual content-44 CLI before adding Wall events. State, tick, identity and assets unchanged.",
+  "tick": "13",
+  "hash": "5165365752760899147",
+  "producer_sha256": "3feaaf3daebd1fdbcf120a4869ee5e6429c0466c6195c195e47025bc6c59056b"
+}

@@ -65,7 +65,7 @@ hinge_joint3d_set_param :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3082977519)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &param_,
@@ -84,7 +84,7 @@ hinge_joint3d_get_param :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4066002676)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &param_,
     }
@@ -103,7 +103,7 @@ hinge_joint3d_set_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1083494620)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     enabled_ := enabled_
     args := []__bindgen_gde.TypePtr {
         &flag_,
@@ -122,7 +122,7 @@ hinge_joint3d_get_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2841369610)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     args := []__bindgen_gde.TypePtr {
         &flag_,
     }

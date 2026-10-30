@@ -1,0 +1,19 @@
+package main
+import "core:os"
+import "core:fmt"
+import r "godot:replay"
+import net "godot:replay/net"
+import game "godot:examples/replay_cavecrawl/shared/owner_cave"
+main :: proc() {
+ s:net.Server(game.World,game.Control,game.Action,game.Event,game.SEATS);defer net.server_destroy(&s)
+ cfg:=net.DEFAULT_CONFIG;cfg.content=game.CONTENT;cfg.hz=game.HZ
+ assert(net.server_init(&s,r.Frame(game.World){state=game.initial()},game.model(),{},cfg,local_seat=1)==.None)
+ assert(net.server_set_local_token(&s,net.Token{0=19})==.None)
+ assert(net.server_step(&s)==.None)
+ _,issued:=net.server_issue(&s,game.Action{verb=.Door});assert(issued==.None)
+ cp:net.Checkpoint(game.World,game.Control,game.Action,game.SEATS);defer net.checkpoint_destroy(&cp)
+ assert(net.checkpoint_capture(&s,&cp)==.None && len(cp.actions)==1)
+ bytes,error:=net.checkpoint_encode(&cp,game.model());defer delete(bytes);assert(error==.None)
+ assert(os.write_entire_file("/private/tmp/replay-cave-context-20260919/owner1.checkpoint",bytes)==nil)
+ fmt.printf("OWNER1_CAPTURE_OK content=%x tick=%d pending=%d bytes=%d\n",game.CONTENT,cp.frame.tick,len(cp.actions),len(bytes))
+}

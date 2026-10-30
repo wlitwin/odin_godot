@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+
+[node name="Kicker" type="Node2D"]
+
+[node name="Skin" type="Polygon2D" parent="."]
+color = Color(0.8, 0.8, 0.8, 1)
+polygon = PackedVector2Array(9, 0, 6.4, 6.4, 0, 9, -6.4, 6.4, -9, 0, -6.4, -6.4, 0, -9, 6.4, -6.4)

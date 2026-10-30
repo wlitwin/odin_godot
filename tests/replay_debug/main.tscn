@@ -1,0 +1,4 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/probe.odin" id="probe"]
+[node name="ReplayDebugProbe" type="Node2D"]
+script = ExtResource("probe")

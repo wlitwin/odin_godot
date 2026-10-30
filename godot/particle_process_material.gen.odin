@@ -230,7 +230,7 @@ particle_process_material_set_param :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 676779352)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &param_,
@@ -249,7 +249,7 @@ particle_process_material_get_param :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2623708480)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &param_,
     }
@@ -268,7 +268,7 @@ particle_process_material_set_param_min :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2295964248)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &param_,
@@ -287,7 +287,7 @@ particle_process_material_get_param_min :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3903786503)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &param_,
     }
@@ -306,7 +306,7 @@ particle_process_material_set_param_max :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2295964248)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &param_,
@@ -325,7 +325,7 @@ particle_process_material_get_param_max :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3903786503)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &param_,
     }
@@ -344,7 +344,7 @@ particle_process_material_set_param_texture :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 526976089)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     texture_ := texture_
     args := []__bindgen_gde.TypePtr {
         &param_,
@@ -363,7 +363,7 @@ particle_process_material_get_param_texture :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3489372978)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &param_,
     }
@@ -766,7 +766,7 @@ particle_process_material_set_particle_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1711815571)
     }
     self := self
-    particle_flag_ := particle_flag_
+    particle_flag_ := Int(particle_flag_)
     enable_ := enable_
     args := []__bindgen_gde.TypePtr {
         &particle_flag_,
@@ -785,7 +785,7 @@ particle_process_material_get_particle_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3895316907)
     }
     self := self
-    particle_flag_ := particle_flag_
+    particle_flag_ := Int(particle_flag_)
     args := []__bindgen_gde.TypePtr {
         &particle_flag_,
     }
@@ -835,7 +835,7 @@ particle_process_material_set_emission_shape :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 461501442)
     }
     self := self
-    shape_ := shape_
+    shape_ := Int(shape_)
     args := []__bindgen_gde.TypePtr {
         &shape_,
     }
@@ -853,7 +853,9 @@ particle_process_material_get_emission_shape :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Particle_Process_Material_Emission_Shape(__return_storage)
     return
 }
 
@@ -1045,7 +1047,9 @@ particle_process_material_get_emission_point_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1508,7 +1512,9 @@ particle_process_material_get_sub_emitter_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Particle_Process_Material_Sub_Emitter_Mode(__return_storage)
     return
 }
 
@@ -1522,7 +1528,7 @@ particle_process_material_set_sub_emitter_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2161806672)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1572,7 +1578,9 @@ particle_process_material_get_sub_emitter_amount_at_end :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1604,7 +1612,9 @@ particle_process_material_get_sub_emitter_amount_at_collision :: proc "contextle
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1636,7 +1646,9 @@ particle_process_material_get_sub_emitter_amount_at_start :: proc "contextless" 
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1731,7 +1743,7 @@ particle_process_material_set_collision_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 653804659)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1749,7 +1761,9 @@ particle_process_material_get_collision_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Particle_Process_Material_Collision_Mode(__return_storage)
     return
 }
 

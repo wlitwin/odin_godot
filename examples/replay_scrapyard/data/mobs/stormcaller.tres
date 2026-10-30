@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MobDef" format=3]
+[ext_resource type="Script" path="res://scripts/defs/mob_def.odin" id="script"]
+[ext_resource type="Resource" path="res://data/attacks/storm_pulse.tres" id="pulse"]
+[resource]
+script = ExtResource("script")
+id = 6
+name = "stormcaller"
+hp = 12
+speed = 65.0
+bite = 0
+body_r = 17.0
+scale = 1.3
+pulse = ExtResource("pulse")

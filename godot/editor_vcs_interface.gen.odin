@@ -595,8 +595,8 @@ editor_vcs_interface_create_status_file :: proc "contextless" (
     }
     self := self
     file_path_ := file_path_
-    change_type_ := change_type_
-    area_ := area_
+    change_type_ := Int(change_type_)
+    area_ := Int(area_)
     args := []__bindgen_gde.TypePtr {
         &file_path_,
         &change_type_,

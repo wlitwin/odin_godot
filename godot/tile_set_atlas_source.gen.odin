@@ -425,7 +425,9 @@ tile_set_atlas_source_get_tile_animation_columns :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &atlas_coords_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -517,7 +519,7 @@ tile_set_atlas_source_set_tile_animation_mode :: proc "contextless" (
     }
     self := self
     atlas_coords_ := atlas_coords_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &atlas_coords_,
         &mode_,
@@ -539,7 +541,9 @@ tile_set_atlas_source_get_tile_animation_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &atlas_coords_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Tile_Set_Atlas_Source_Tile_Animation_Mode(__return_storage)
     return
 }
 
@@ -577,7 +581,9 @@ tile_set_atlas_source_get_tile_animation_frames_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &atlas_coords_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -660,7 +666,9 @@ tile_set_atlas_source_create_alternative_tile :: proc "contextless" (
         &atlas_coords_,
         &alternative_id_override_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -721,7 +729,9 @@ tile_set_atlas_source_get_next_alternative_tile_id :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &atlas_coords_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

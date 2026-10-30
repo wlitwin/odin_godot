@@ -64,7 +64,9 @@ e_net_multiplayer_peer_create_server :: proc "contextless" (
         &in_bandwidth_,
         &out_bandwidth_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -97,7 +99,9 @@ e_net_multiplayer_peer_create_client :: proc "contextless" (
         &out_bandwidth_,
         &local_port_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -115,7 +119,9 @@ e_net_multiplayer_peer_create_mesh :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &unique_id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -136,7 +142,9 @@ e_net_multiplayer_peer_add_mesh_peer :: proc "contextless" (
         &peer_id_,
         &host_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

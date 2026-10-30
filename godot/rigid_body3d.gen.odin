@@ -141,7 +141,7 @@ rigid_body3d_set_center_of_mass_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3625866032)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -159,7 +159,9 @@ rigid_body3d_get_center_of_mass_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rigid_Body3d_Center_Of_Mass_Mode(__return_storage)
     return
 }
 
@@ -348,7 +350,7 @@ rigid_body3d_set_linear_damp_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1802035050)
     }
     self := self
-    linear_damp_mode_ := linear_damp_mode_
+    linear_damp_mode_ := Int(linear_damp_mode_)
     args := []__bindgen_gde.TypePtr {
         &linear_damp_mode_,
     }
@@ -366,7 +368,9 @@ rigid_body3d_get_linear_damp_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rigid_Body3d_Damp_Mode(__return_storage)
     return
 }
 
@@ -380,7 +384,7 @@ rigid_body3d_set_angular_damp_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1802035050)
     }
     self := self
-    angular_damp_mode_ := angular_damp_mode_
+    angular_damp_mode_ := Int(angular_damp_mode_)
     args := []__bindgen_gde.TypePtr {
         &angular_damp_mode_,
     }
@@ -398,7 +402,9 @@ rigid_body3d_get_angular_damp_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rigid_Body3d_Damp_Mode(__return_storage)
     return
 }
 
@@ -494,7 +500,9 @@ rigid_body3d_get_max_contacts_reported :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -509,7 +517,9 @@ rigid_body3d_get_contact_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -990,7 +1000,7 @@ rigid_body3d_set_freeze_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1319914653)
     }
     self := self
-    freeze_mode_ := freeze_mode_
+    freeze_mode_ := Int(freeze_mode_)
     args := []__bindgen_gde.TypePtr {
         &freeze_mode_,
     }
@@ -1008,7 +1018,9 @@ rigid_body3d_get_freeze_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rigid_Body3d_Freeze_Mode(__return_storage)
     return
 }
 

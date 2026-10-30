@@ -1,0 +1,5604 @@
+# Replay implementation progress
+
+The active priority is [framework completion](framework-completion.md), following
+the user's 2026-09-20 direction to defer exhaustive parity across every game.
+The original [roadmap](roadmap.md), separate ports and comparisons remain references.
+Preserve the original frameworks/projects and their separately runnable Replay ports.
+Update this file with actual evidence, not planned capability.
+
+## Framework-first closure assessment — 2026-09-20
+
+The revised framework-first queue is complete. The support assessment maps modes,
+transports, platforms, resource limits and authoring/runtime tradeoffs, and retains
+Replay as experimental alongside Kit. A real native service-kill case clears Party
+readiness after 10.46 seconds while admitted encrypted links reach the tick-1200
+reference. Automatic background control reconnect is explicitly unsupported.
+
+The actual Nix addon recipe builds from a frozen current snapshot and runs in an
+external consumer project using only packaged collection/build inputs. Offline,
+host/client/observer and actual Chrome export cases pass; all 233 packaged Replay
+source files match the snapshot. No artifact was published. The latest framework
+smoke already covers 400 unit tests plus recipes/target/archive checks.
+
+See the [final audit](release-assessment.md), [support envelope](../../replay/support.md)
+and [final receipts](results/framework-release-2026-09-20/README.md). Original
+frameworks/projects remain preserved. Deferred full-game parity and broader live
+Steam/platform/public-deployment work are not represented as finished.
+
+## Endpoint separation and framework onboarding — 2026-09-20
+
+`P2P_Direct_Options.listen` now selects a local address/port independently of the
+advertised endpoint. Defaults preserve existing behavior; malformed values fail
+before opening the listener. Fifteen adapter tests/WASM checks pass. A real native
+TLS/ENet case advertises UDP forwarding ports while binding distinct local ports,
+then repeats that separation for a returning creator. Encrypted gameplay converges
+at tick 600 and the survivor follows the new advertised endpoint.
+
+The framework now has a consolidated getting-started guide, compatibility policy,
+native/WASM checked lifecycle recipes and a bounded smoke command with individual
+receipts. No new game-content matrix was added. See [delivery evidence](results/framework-delivery-2026-09-20/README.md).
+The remaining shared task is the supported-envelope/release assessment, including
+explicit classification of failed P2P control reconnection.
+
+## Shared framework acceptance audit — 2026-09-20
+
+The eight completion gates now map to current APIs, test coverage and explicit
+support boundaries. Selected suites pass 362 unit tests plus target/recording
+checks. One current four-process observer fault/refresh capture delivers all 21
+kicks, preserves the pending confirmed effect exactly once and replays identically
+on native/WASM through tick 2400. The old unrecorded C2 failure remains historically
+unexplained; it does not justify another open-ended game parity campaign.
+
+The audit exposed an optimized native P2P corpus crash. IR/assembly and debugger
+evidence show a compiler register-clobber miscompile of an inlined test-model
+factory. A fixture-only no-inline boundary preserves direct model calls; the full
+default/optimized native/WASM P2P command now passes. No runner behavior was changed.
+Stale README/architecture/recovery capability claims and the old checkpoint
+protocol-number description were corrected.
+
+The [audit](framework-audit.md) leaves three concrete areas in the
+[closure queue](framework-gaps.md): native bind/advertised endpoint separation,
+setup/recovery/compatibility documentation and a supported-envelope release
+assessment. Original projects remain preserved. [Focused receipts](results/framework-audit-2026-09-20/README.md)
+retain the failure and final checks without duplicating the codebase.
+
+## Native P2P admission integration — 2026-09-20
+
+`P2P_Direct` now owns two-player authenticated ENet, endpoint discovery and physical
+connection replacement over the reusable Party/pair-key APIs. Registration and
+pair replies share separate Router lanes on one control socket. Each process
+registers its current endpoint without rewriting its immutable enrollment request.
+
+Real native TLS cases pass for creator and guest return after process kill. Both
+advance incarnation, retain the survivor's runner and converge at tick 600 to
+9353382615414616636. Creator return changes ports and the survivor follows the
+new signed endpoint. A browser rejoin regression still reaches its tick-900
+reference. Seven link, sixteen provisioning and fourteen adapter tests/WASM pass.
+The exposed double-disconnect cleanup error is fixed; signed registration refusal
+also clears native link keys.
+
+This closes the focused two-player native admission integration. Public deployment,
+independent crypto review, other topologies/platforms and the remaining shared
+framework audit stay explicit. See [receipts](results/native-p2p-2026-09-20/README.md)
+and the [finite closure queue](framework-gaps.md). Original projects are preserved.
+
+## Priority correction — framework first, 2026-09-20
+
+Full game-by-game parity is no longer the framework completion gate. Ports serve
+as representative integration tests and authoring examples. The current work is
+native P2P admission; next comes a finite audit of shared APIs/correctness gaps,
+then stabilization and delivery. Game-only content/presentation differences move
+to follow-up. No deferred item is being represented as verified parity.
+
+Native admission foundation now has a per-pair authenticated/encrypted transport
+and an optional registered-member pair-key service. Seven link tests and sixteen
+P2P provisioning tests pass, including WASM checks. These are core tests, not
+native gameplay acceptance. The next step is to connect the pair service/client
+and link wrapper to the native party/ENet owner. See [link contract](../../replay/p2p/link/README.md)
+and [pair service](../../replay/p2p/provision/pairs.md). Current receipts are in
+`/private/tmp/replay-native-link-20260920/{link-first,pairs-tests}.log`; no game
+parity campaign was added for this framework-only increment.
+
+## M7 P2P party client and browser Duel integration — 2026-09-20
+
+The reusable registration client now performs challenged process rebind, waits for
+a complete roster and maintains authenticated roster reads. Godot `P2P_Party`
+composes it with the existing durable enrollment/profile owner. A separate Duel
+service combines bounded private SQLite rooms and authenticated mesh signaling.
+Browser Duel now creates, joins and rejoins through this service, deriving runner
+scope from the enrolled match rather than test session 123.
+
+Thirteen core/client/provider tests, thirteen Godot adapter tests, WASM checking
+and the native ENet Duel regression pass. Two final independent-profile Chrome
+cases exercise the real invitation controls, forced guest-before-creator signaling,
+packet faults, a participant download, process kill and durable rejoin. Both guest
+and creator returns advance incarnation 2 to 3, preserve the surviving runner and
+converge at tick 900 to hash 826411474463535637. Creator return also retains RTC ID
+1 while advancing the connection generation. The sharing UI now provides a DOM
+Copy button and selectable fallback after Godot's queued callback exposed a Web
+clipboard limitation. A real permission-denial/success pair verifies that flow.
+
+The native launcher keeps its existing ENet mode; provisioned native gameplay
+admission, public TLS/TURN deployment, broader outages, accounts and human review
+remain work. Original projects and sibling Scrapyard are preserved. See
+[client contract](../../replay/godot/p2p_party.md) and
+[evidence/limits](results/p2p-party-2026-09-20/README.md). M0–M9 remains active.
+
+## M7 durable fixed-roster P2P provisioning — 2026-09-20
+
+`replay/p2p/provision` now owns a durable 2–8 player enrollment count, bounded
+room service, seat-reserving invitations, exact enrollment retries and authenticated
+roster/registration operations. It reuses the existing enrollment protocol and
+client journal. No member receives simulation authority, and authority commands
+and removal extensions are unreachable through the P2P control entry point.
+
+The native SQLite backend persists count, credentials, invites and request frontiers
+in one revision. The Godot signaling provider reads committed membership for every
+admission, so rebind invalidates old incarnations without changing the match code.
+Ten core/client/provider tests, WASM checking, three SQLite tests and process kills
+before/after commit pass. A separate native Godot TLS server/client fixture creates
+three enrollments and reopens them in fresh processes with identical keys and a
+newer incarnation. Existing authority/provisioning/admission suites also pass.
+
+This is the provisioning foundation, not a completed public P2P game flow. Duel's
+client owner/menu, browser enrollment and signaling/gameplay integration remain
+next; human accounts and public deployment also remain open. Originals are
+preserved and the full M0–M9 goal remains active. See [contract](../../replay/p2p/provision/README.md)
+and [evidence](results/p2p-provision-2026-09-20/README.md).
+
+## M3/M5 native Steam Room lifecycle integration — 2026-09-20
+
+Room now accepts the native Steam gameplay backend through explicit canonical
+Steam-ID/virtual-port endpoints and fresh peer construction. Registration binds the
+local initialized runtime ID; signed coordinator grants determine remote targets.
+Bootstrap, redirect, takeover, old-host return and published restore share target
+validation before destructive connection changes. Existing endpoint/RPC/save
+schemas remain unchanged.
+
+Four endpoint/core tests, the existing Steam adapter/Session contract suite and
+new factory/endpoint failure cases pass. Four carrier recovery cases, repeated
+handoff to epoch three and fresh-process return pass through Steam-shaped API
+objects backed by local ENet, with exact host/client call destinations, fresh peers
+and virtual ports zero/65535. Native ENet and Chrome RTC recovery/save regressions
+also pass. These are not Valve network packets or live-account acceptance.
+
+No app ID, live host/test role or addon was configured; an isolated live test setup
+has been requested. Live multi-account Steam, lobby UX, SteamGameServer and broader
+platform/deployment gates remain open. See [contract](../../replay/godot/steam_room.md)
+and [evidence/limits](results/steam-room-2026-09-20/README.md). Originals remain
+preserved and the full M0–M9 goal stays active.
+
+## M2 shared runtime aliases accepted without losing tag guardrails — 2026-09-20
+
+Scriptgen now proves an unresolved shared type has no inline Godot metadata before
+accepting it. The proof follows aliases and generics in their defining/caller import
+contexts, recognizes engine/stdlib leaves and stays bounded. Tagged fields, methods,
+ticks and signals remain refused, including aliases and ambiguous `gd` imports.
+Hello now declares its actual field as `game.Timeline`.
+
+Thirty-one focused cases and the existing full generator suite pass. Isolated Kit
+Cavecrawl/Quickdraw/Speedball generated outputs are byte-identical to the previous
+generator. Native/WASM Hello, four-rate input and same-frame pause tests, delayed
+networking, rendered/native/Chrome editing, export/import, playback and branching
+pass. The failed stdlib and engine-alias collision candidates remain recorded.
+
+The [M2 ledger](m2-acceptance.md) closes this concrete authoring defect while retaining
+human visual/play-feel review. Original sources and pre-existing unrelated generator
+changes are preserved. See [implementation/evidence](results/shared-alias-2026-09-20/README.md).
+The complete M0–M9 goal remains active.
+
+## M2 acceptance audit and ordinary Hello pause fix — 2026-09-20
+
+An actual Godot baseline reproduced a paused fire tap leaking into resumed play.
+Hello now discards paused gameplay edges/clock remainder and gates already-held
+controls until release. Native 30/60/120/144-FPS and real Chrome keyboard cases
+pass; explicit production-process timing gives identical 60-tick/five-shot/160-unit
+movement per second, preserves short presses and bounds catch-up. The complete
+native/rendered/Chrome history, field editing, export/import, playback, branching
+and delayed network regressions pass. Core/view/diagnostic suites total 64 tests,
+with native/WASM recording execution.
+
+The [M2 audit](m2-acceptance.md) now lists concrete evidence for every implementation
+item and acceptance gate. It also reproduces the still-open shared Timeline alias
+scriptgen failure and retains the human visual/play-feel review requirement. M2
+is not marked complete. See [baseline failure and current receipts](results/hello-input-2026-09-20/README.md).
+Originals remain preserved, and full M0–M9 work remains active.
+
+## M4/M5 durable host moderation and successor exclusion — 2026-09-20
+
+Cavecrawl now has a host-only named player selector and removal control. Direct
+sessions retain checkpointed token bans; Room queues a separate authenticated
+coordinator operation and reports its durable result. Disabling a member atomically
+invalidates its prepared nomination and records the request frontier. Room mirrors
+the disabled roster before gameplay/restore and selects another eligible successor.
+
+Thirty-six authority, twelve provisioning and 182 network tests pass, along with
+frozen old/new RPC compatibility and SQLite kills before/after commit. Native
+removal of a prepared member two, fresh-process denial, replacement by member three,
+planned/crash takeover and continued loot pass. Unsupported-service and all-removal-
+replies-lost cases preserve lease progress and resolve boundedly. Chrome planned/
+crash cases verify actual RTC traffic and continued play. Rendered native selector
+rename/removal, the full C9 campaign and all owner-profile carrier regressions pass.
+
+Revoked credentials authenticate only a minimal denial. The game block is scoped
+to the room identity; invitations and independently authorized new identities remain
+separate. Game content/save schemas and original projects are preserved. See
+[contract](../../replay/authority/moderation.md), [Room integration](../../replay/godot/room_moderation.md)
+and [evidence/failed fixtures](results/cave-moderation-2026-09-20/README.md). Broader
+UX/deployment, other game integrations and full M0–M9 acceptance remain open.
+
+## M2/M4 bounded rock motion between simulation ticks — 2026-09-20
+
+`view.Tick_Phase` and Godot's `session_tick_phase` now track bounded render progress
+against actual simulation heads. Stalls cannot wrap visuals backward; fencing and
+pause hold them, and view/epoch changes reset scope. Observer phase starts at
+snapshot arrival. Cavecrawl previews each live rock by at most one tick, clips
+against visible bodies without applying hits, and centers its authored glyph.
+C9/O3 simulation/content/save contracts remain unchanged.
+
+Six final native cases cover both motion profiles at 30/60/144 FPS with separate
+host/client/observer processes and 120 ms receive delay. Every sampled same-tick
+pair moves forward, with one-tick bounds, no backward step on advancing heads and
+no expired views. The initial 144-FPS observer cohort failed the stronger continuity
+gate; its unrelated local-clock seed is fixed and the rejected evidence is retained.
+
+Twenty-four view tests/WASM, four model/adapter tests, both native visual contracts,
+rendered/Chrome checks and all three normal/owner/faulted full campaigns pass.
+Complete frame hashes remain unchanged by visual sampling. Pre-tick cast/contact
+prediction, broader parity, deployment and the full roadmap remain open. See
+[API](../../replay/view/phase.md), [game behavior](../../examples/replay_cavecrawl/projectiles.md)
+and [evidence](results/cave-rocks-2026-09-20/README.md).
+
+## M4 generation-bound dweller impacts and C9/O3 compatibility — 2026-09-20
+
+Rock contacts now emit a copied-pose dweller Hit, with projectile occurrence identity
+and exact target generation/slot. Yellow sparks and red flashes survive source
+removal without tinting a recycled body. Damage/collision behavior and saved world
+layout stay unchanged; the new event sequence is explicitly versioned as C9/O3.
+Genuine C8/O2 saves convert with exact frame and ledger preservation. Their recordings
+retain explicit historical models; native/WASM verification rejects the new event
+rules when deliberately substituted. All 18 C1–C8/O1–O2 save fixtures convert safely.
+
+C9 normal/faulted and final O3 campaigns present 24 dweller impacts on all peers,
+retaining complete gameplay/hash checks. Native generation/color/cancellation,
+rendered and Chrome lifecycle checks pass, as do both current typed checkpoint
+backends and Chrome O3 planned/crash/save gates. The 35 base, 12 owner and two
+compatibility tests pass, with actual WASM archive continuation/verification.
+
+An O3 campaign failure exposed a hard-coded heal expectation after live enemy damage.
+A diagnostic recorded 30→20 from a bite, then a correct 20→45 heal. The revised
+fixture verifies exact authoritative healing, stamina, cooldown and action acceptance;
+the failed runs remain recorded. See [evidence and limits](results/cave-impact-2026-09-20/README.md).
+Originals remain preserved; remaining parity, deployment and full-roadmap gates stay open.
+
+## M2/M4 bounded visual cues and Cavecrawl combat feedback — 2026-09-20
+
+`view.Cues(Value)` now maps journal changes into a bounded pool of detached visual
+instances. Unique renderer keys, retained consumed IDs, explicit epoch reset,
+correction, confirmation, cancellation and expiry share one typed helper. Copied
+values reject reference-bearing payloads. Full pools drop cosmetic work explicitly.
+
+Cavecrawl's common frontend now renders player/dweller death bursts and player hit
+sparks/flashes, using the original particle settings/colors. The ordinary and
+faulted server-motion campaigns and owner-motion campaign each present two player
+deaths, twelve slain dwellers and five player hits on all three processes, alongside
+the unchanged full campaign/world-hash gates. Native/rendered lifecycle checks,
+actual color checks, 22 view tests/WASM and Chrome particle lifecycle checks pass.
+
+The simulation, content and save schemas remain unchanged. Nonlethal dweller Hit
+occurrences, render-rate rock presentation and broader visual parity remain open;
+bite feedback is broader than the original rock-tracer contact renderer. The
+parity ledger also now explicitly tracks missing moderation UI and coordinated
+revocation, and reflects the already completed owner/browser/comparison work.
+See [cue API](../../replay/view/cues.md), [game behavior](../../examples/replay_cavecrawl/feedback.md)
+and [receipts](results/cave-feedback-2026-09-20/README.md). Full M0–M9 completion remains open.
+
+## M3/M9 compact recent-fact bundles — 2026-09-20
+
+The recent-fact redundancy stream now optionally shares its envelope and connection
+scope across up to four facts. Feature 4096/kind 27 retains complete occurrences,
+recipient filtering, independent packet decoding and the same reliable stream,
+four-tick window and send cadence. Four empty entries cost 81 instead of 389 bytes.
+Older peers keep the previous encoding; Session exposes an opt-out.
+
+Six same-binary Cavecrawl cases pass their gameplay, confirmation and backup gates.
+Median host application output drops from 9.869 to 6.849 KiB/s (**30.6%**); client
+traffic is essentially unchanged. Callback measurements do not show a CPU speedup.
+The 182 network tests, seven recipient-view tests, WASM checks, frozen old/new-peer
+matrix and final native/Chrome gameplay/recovery/save aggregates pass. Browser
+counters require compact sends by the authority before and after takeover.
+
+An event-heavy smaller-recipient test exposed oversized sends in the first
+candidate. The final sender respects the advertised recipient limit; the failing
+case and intermediate runs remain recorded separately. See [format](../../replay/net/recent_facts.md)
+and [measurements, receipts and limits](results/compact-recent-facts-2026-09-20/README.md).
+Originals remain preserved. Full parity, deployment, stress, human comparison and
+the complete M0–M9 acceptance gates remain open.
+
+## M3/M9 negotiated compact owner observations — 2026-09-20
+
+A live Cavecrawl packet meter attributes 80,320 of 119,454 client transmit bytes
+to 320 full observations. Their 63,680 canonical body bytes are mostly zero.
+Replay now optionally negotiates a packet-local zero bitmap (feature 2048,
+kind 26), retaining the complete canonical value and full-format fallback.
+No previous packet, new allocation, changed cadence, game/schema version or
+weaker admission predicate is involved. Dense values retain kind 14.
+
+All 176 network tests and WASM checking pass, including compact loss/reordering,
+malformed/canonical rejection, signed zero, no partial admission and opt-out/reset.
+Frozen old-server/new-client and new-server/old-client tests retain full packets;
+new/new peers use compact packets with the same model contract. A diagnostic live
+case sends all 320 observations in 30,582 bytes instead of 80,320. In six same-binary
+A/B pairs, median client application traffic falls from 7.285 to 4.245 KiB/s (41.7%).
+Host traffic is essentially unchanged; callback variation does not establish a CPU
+improvement. Full raw and compact gameplay/backup predicates pass.
+
+Native owner/context suites and the full Chrome planned/crash/save aggregate pass.
+Browser receipts require compact sends both before and after takeover. The context
+fixture now suppresses both logical observation encodings. See [format and contract](../../replay/net/observations.md)
+and [evidence and limits](results/compact-observations-2026-09-20/README.md).
+Original Kit/game projects remain unchanged. Downstream traffic, broader platform/
+deployment, full parity and the complete M0–M9 goal remain open.
+
+## M9 three-profile Cavecrawl comparison — 2026-09-20
+
+Nine sequential native pairs now compare the original Kit game, Replay C8 server
+motion and Replay O2 owner motion under common quiet-world waypoint/loot/door
+intent. All authority samples conserve three gems, both final views settle, and
+both sides retain periodic backups. Three repetitions rotate execution order.
+Visible response and command-confirmed completion are measured separately.
+
+Median local movement response is 14/34/14 ms (Kit/server/owner). Owner confirmed
+loot/door timing is 316/337 ms versus Kit 327/314 ms; server motion is 596/566 ms.
+Median host/client application traffic is 0.677/0.479 KiB/s for Kit,
+8.487/4.816 for server motion and 9.863/7.298 for owner motion. Replay callback wall
+means are about 340–401 µs versus Kit 81–85 µs, with p95 below 1 ms in this scope.
+These are three-run medians on one machine, not total CPU/network costs or a
+full-game adoption decision. Mechanical source counts and their feature-set
+limitations accompany the result.
+
+A pristine pilot completes gameplay but leaks the World2D reference obtained by
+navigation-map lookup. Only the isolated comparison copy adds the matching release;
+original Kit/game files stay unchanged. The first nine-pair contract is retained
+but superseded: it mixed Kit prediction with Replay authority observations for
+interaction timing. Contract 2 separates those meanings and passes all nine pairs.
+See [protocol, measurements and limits](results/cave-profile-comparison-2026-09-20/README.md).
+
+The result supports retaining Replay as experimental: it offers cross-entity
+prediction and an explicit motion-policy choice, with remaining small-world traffic/
+callback costs to address. Full parity, stress/deployment, human ergonomic/play-feel
+comparison and the complete M0–M9 goal remain open.
+
+## M4 scoped owner action context — 2026-09-20
+
+`owned.Action_Context(Value)` now copies a producer value with its object/epoch/
+revision scope. Reading it validates the authenticated current owner and value
+without changing pose state or stream frontiers. Newer samples may overtake a
+command; ownership/life/epoch cuts retire it. The game selects range/leash rules.
+Cavecrawl O2 uses issued origins for interactions and the original 64-pixel throw
+leash. Common C8 gameplay still uses its current authoritative position.
+
+A real host/client/observer gate suppresses 33 client motion packets while keeping
+reliable actions flowing. The client stands locally near x=300 while authority
+still has x=102. Accepted-pose semantics refuse the take; the normal contextual
+request awards exactly three gems without moving the accepted avatar. Unblocking
+motion then advances it normally. Eleven owned-library, twelve owner-game and 33
+C8 model tests pass. They include original Kit range/leash checks, overtaking
+motion, stale scopes, exact pending-context serialization and old-epoch refusal.
+
+An actual O1 checkpoint captured before the change converts explicitly, preserving
+world, ownership, controls, membership and pending-action frontiers. Old actions
+retain accepted-pose semantics. CLI preservation checks and a fresh Godot resume
+pass at the exact converted frame hash, followed by new loot. Native owner flow/
+fault/migration and typed service restore regressions pass. The final Chrome suite
+passes planned/crash migration, scope/RTC checks and browser-save recovery.
+
+That validation exposed two integration edges: marker expiry/scope cleanup was
+waiting for a gameplay frame during recovery, and a command entered just after
+restore was dropped before its owner scope became ready. Markers now retire without
+waiting for a frame; unsubmitted local intents wait in a bounded FIFO. Browser
+assertions remain intact, and failed attempts are retained. See [evidence and limits](results/owner-action-context-2026-09-20/README.md).
+Originals remain preserved. Full parity, deployment and the complete roadmap stay open.
+
+## M4/M5 owner-motion Cavecrawl in Chrome — 2026-09-19
+
+The owner-motion profile now passes real WebRTC planned and abrupt recovery.
+Three browsers retain carrier 3 through planned takeover; two survivors retain it
+after the host process is killed. Owner epoch/revision advance, accepted samples
+resume, and a fresh release retires ownership. Existing loot/door, lobby, chat,
+telemetry and profile-reload assertions remain, with actual RTC bytes checked for
+every surviving participant. Planned checkpoint 363 reports zero known lost ticks;
+crash checkpoint 356 reports ten. These are individual local runs, not latency bounds.
+
+The browser-save gate uses the actual default owner namespace. It restores an
+exact saved tick/hash after killing Chrome, continues gameplay and saving, rejects
+a stale competing writer, preserves corrupt archives/identities, and leaves a
+synthetic record in the server-profile namespace unchanged. Common preparation
+now exposes the owner transformation for browser fixtures and stops copying 3,446
+unneeded npm dependency files into generated native projects; authored output is
+unchanged. No simulation, game content, lease or rollback bound changed.
+
+A first crash fixture retained an inapplicable planned-only assertion that the old
+marker must survive until the epoch transition. Its recorded marker was already
+absent. The final crash gate checks no old marker in the new epoch; planned mode
+retains the stronger early-retirement assertion. The failed run is preserved.
+See [receipts and limits](results/cave-owner-browser-2026-09-19/README.md).
+
+Originals remain preserved. Other browsers/public deployment, richer recovery,
+original command/pose/presentation parity and paired comparisons remain open. The
+complete roadmap stays active.
+
+## M4 separate owner-motion Cavecrawl profile — 2026-09-19
+
+`examples/replay_cavecrawl_owned` now builds a separate cooperative profile from
+shared gameplay/assets/UI. Its composed world stores versioned avatar/relic poses;
+accepted observations feed the common C8 reducer without host movement integration.
+A local producer renders immediately and supplies latest-observation controls.
+Inventory, combat, AI, progression and authority remain ordinary replayable gameplay.
+The content ID, default port, native user directory and browser/Party namespaces
+are separate; no existing C8 or Kit save is silently converted.
+
+Seven owner-model tests and the 33 existing C8 tests pass, with model/full-app WASM
+checking. Tests cover inventory, wrong/recycled/stale scopes, exact checkpoint
+installation, epoch rebinding, floor retention and life resets. A same-position
+respawn test exposed stale previous-life motion; respawn/revive now retire that
+scope. Late legitimate owner poses can still settle after health/victory changes.
+Native solo, normal/faulted loot/door and three-process relic handoff pass. Four
+carrier cases (planned/crash, successor/guest carrier) retain ownership, continue
+movement and accept a new-epoch release. The original Replay C8 app still passes
+native solo/network checks. The service registers the new typed checkpoint model;
+publication/restart/restore reaches epoch 2 and tick 11. Its fixture also updates
+the stale Scrapyard content literal and verifies current content 49 restoration.
+
+See [receipts and boundaries](results/cave-owner-2026-09-19/README.md). This adds a
+usable native owner-motion profile, not full original-game parity. Browser execution,
+command-origin timing, remote presentation, richer recovery and paired comparison
+remain required. Original Kit and game projects remain preserved; M0–M9 stays active.
+
+## M2/M3/M6 confirmed effects survive same-epoch resync — 2026-09-19
+
+A real Resync/Welcome regression reproduced a lost confirmed observer effect both
+before its watched clock matured and after it entered the consumer queue. The
+receiver previously destroyed that journal during same-epoch checkpoint installation.
+`journal_rebase` now preserves queued output, matures retained confirmed effects,
+cancels abandoned predictions and retires old tracking atomically. Capacity is
+checked before changing the world. Existing journaled action verdicts keep their
+route; only newly recovered Welcome results use Session's synthetic route.
+
+All 170 network and 19 presentation tests pass, with WASM checking. The cases
+include backpressure/retry, unchanged world on deferral, verdict deduplication,
+wrapped/sparse history, unknown-gap exclusion and the existing epoch-discovery and
+recovery gates. A faulted four-process Claimball run requests a checkpoint while
+kick 215 is confirmed but unwatched. It presents that kick once, all eleven match
+kicks, and passes the unchanged competitive/effect checker. Its exact stream
+replayed against the prior receiver loses two presentation changes at frame 444;
+every other recorded frame field, including the complete world hash, agrees.
+The fixed receiver passes all 5,668 frames/28,140 operations. An earlier normal
+fault capture also remains identical over 5,673 frames/28,145 operations. Both
+streams replay in standalone WASM and reject corrupted input.
+
+See [evidence and limits](results/resync-effects-2026-09-19/README.md). This establishes
+a separate journal-loss defect. It does not explain the historical C2
+Facts_Overflow or promise delivery for unknown history gaps. Original Kit/game
+files remain preserved, and the full roadmap stays active.
+
+## M5/M8 recorded Scrapyard succession timers — 2026-09-19
+
+Content 49 adds the original 150-tick director/attack/reinforcement timer reset
+through the existing recorded authority policy. `World.authority_epoch` identifies
+new epochs even between dedicated authorities with seat zero. Restore installs
+an exact checkpoint; the first committed tick performs the reset. Initial startup,
+aborted ticks, active telegraphs, popper damage and complete transient pools retain
+their documented behavior. Old contents 42–48 convert explicitly and seed the prior
+epoch. Content-48 recordings retain a separate historical verifier.
+
+All 108 Scrapyard tests, original arena/movement oracle and WASM checks pass.
+Nine historical saves convert and resume exact converted hashes in fresh Godot
+processes. Three historical recordings pass native/WASM replay, corruption rejection,
+state-mismatch reporting and invalid-input preflight. Two infrastructure servers
+and two real players pass planned and crash/return combat takeover in both native
+and Chrome: exact checkpoint, active ordnance/cooldowns, at least thirty living
+mobs, new shots/casts/kills in the same run, and a prepared reverse backup.
+See [receipts and limits](results/scrapyard-succession-2026-09-19/README.md).
+
+This closes the missing timer behavior and the tested local dedicated combat cases.
+It does not establish broad loss/load/public-network acceptance or full original
+parity. The original Kit files and game projects remain unchanged; the full M0–M9
+goal stays active.
+
+## M5 browser infrastructure Room acceptance — 2026-09-14
+
+Four real Chrome processes now exercise two avatarless infrastructure identities
+and two playable clients over authenticated RTC. Planned, crash/fresh-process
+return and repeated takeover restore exact Scrapyard frames, keep infrastructure
+at seat zero and players at seats 1/2, and require a prepared backup to the
+returned/demoted server. Every successful case records connected RTC traffic for
+all four live participants. Repeated takeover reaches epoch 3.
+
+The fixture preserves native assertions while using browser-controller barriers.
+Its checkpoint observer uses a complete owned-buffer copy to avoid a large WASM
+aggregate expansion. Native-only export settings, JavaScript formatting and driver
+cleanup issues were corrected with their failed attempts retained. One immediate
+RTC sample failed in an earlier crash run; a later diagnostic run passed without
+needing a retry sample, so the earlier sample's cause remains unestablished.
+See [evidence and limits](results/dedicated-browser-2026-09-14/README.md).
+
+This adds local browser infrastructure acceptance. Public/Steam deployment,
+dedicated combat stress, other roadmap gaps and human comparisons remain open.
+Originals remain preserved and the full M0–M9 goal is active.
+
+## M5/M8 dedicated Room identities and server comparison — 2026-09-14
+
+The original and Replay Scrapyard server acts now run independently with an
+avatarless authority, two clients, six kills, one core per client and floor-two
+progression. The shared controller and original launcher overrides are explicit;
+raw player IDs, spawn positions and damage distribution remain comparison limits.
+
+That review exposed a Room bootstrap bug: a requested Server became a player Host.
+Room now preserves Server on authority and Observer while following, and it can
+select trusted infrastructure observers for complete backups without a playable
+seat. `session_backup_peer` addresses an admitted connection; dedicated takeover
+restores seat zero without requiring a playable checkpoint token.
+Explicit successor identity can now resolve its current connection without a
+playable-seat constraint; reversed client admission verifies member 2 taking over
+in seat 3. Cave and Scrapyard use this identity-based configuration.
+
+Five-process native planned, crash/return and repeated handoff gates restore exact
+Scrapyard frames and keep both infrastructure processes at seat zero and real
+players at seats 1/2. Cooperative Cave carrier regressions and 252 network/authority/
+Room/SQLite tests pass. Fixture age, admission-order and coordinated-shutdown assumptions
+were corrected with retained failed attempts; these are distinct from the reproduced
+bootstrap/backup-status defects. See [evidence](results/dedicated-rooms-2026-09-14/README.md).
+
+Original projects remain preserved. Broader mode/physics parity, browser/Steam
+infrastructure deployment and dedicated combat-failover remain open. The complete
+M0–M9 goal remains active.
+
+## M5/M9 delayed restore-grant renewal — 2026-09-14
+
+A delayed Restore reply can arrive after its request-start local deadline even
+though the coordinator has only just reserved the actor. Room previously attempted
+another Restore in that state. It now retains the exact prepared point and requests
+a cheap correlated renewal. Installation still requires a successful renewal and
+a live permit. An expired coordinator reservation refuses renewal.
+
+A deterministic SQLite/Room test fails before the fix and passes afterward; its
+negative case verifies refusal with no runtime installation. A native Scrapyard
+fixture reproduces the expired-grant failure, and the low-level fixture now follows
+Room's renewal-before-install protocol. Delayed Cave/Speedball/Scrapyard restores
+all reach tick 11 in epoch 2. Full native and browser party restores preserve exact
+saved hashes, three player identities and an observer, continue combat/chat, and
+publish revision 2 despite the delayed grant. Existing planned/crash handoff expiry
+regressions pass. Authority, Room-core and SQLite suites total 83 passing tests.
+
+See [evidence and limits](results/restore-renewal-2026-09-14/README.md). This fixes a
+reproduced path; it does not establish the exact cause of the earlier uninstrumented
+Scrapyard failure. No protocol, world schema, game content or lease duration changed.
+Originals remain preserved and the full roadmap remains active.
+
+## M3/M4/M5 recorded authority observations and prop adoption — 2026-09-14
+
+Replay now exposes an opt-in, versioned `Model.authority` policy over a recorded
+`Batch.authority` observation. The server records its local seat each tick;
+clients receive the consequences through replication. The callback participates
+in ordinary simulation rollback and permit gating, with prior authority identity
+kept in game state. Restore preserves the exact checkpoint frame; the first
+committed new-authority tick applies gameplay changes.
+
+C8 Cavecrawl uses this primitive to adopt the old host's relic while preserving
+avatars and other carriers. Planned/crash native tests verify adoption in the
+first committed frame, movement and release. Three browsers observe host-to-
+successor transfer and release. Four existing carrier cases, full campaigns,
+33 Cave tests, 167 network tests and fifteen old-save conversions pass. A focused
+second-restore-before-first-tick test also passes.
+
+Batch's diagnostic input schema changed. Explicit conversion for unchanged models
+with authority policies disabled preserves older recordings without inventing
+observations. Three old Scrapyard native/browser recordings convert and verify
+on native/WASM, including corruption, mismatch and input-preflight checks.
+
+C8 checkpoint service/gameplay restore passed on a fresh full run. An earlier
+Scrapyard continuation failed without a specific stage; diagnostics were added,
+the first failure is retained, and its cause remains unestablished. See
+[evidence and limits](results/authority-observation-2026-09-14/README.md).
+
+Originals remain preserved. Old-host relic adoption is implemented; owner-streamed
+poses, disconnected-avatar floor gating, wider shared-authority policies, visual/
+human comparisons and full-roadmap stabilization remain open.
+
+## M4/M5 Cavecrawl carrier lifecycle and recovery — 2026-09-14
+
+C7 retains relic ownership/version through death, revive, respawn and ordinary
+connection loss, matching the original carry loop and departure handling. An
+absent carrier leaves the relic parked; reserved rejoin reattaches it. Explicit
+replacement with a different identity releases the old seat's relic instead.
+
+Thirty-one Cave tests, native death/respawn observations, corrected-input complete
+frame/events and fourteen C1–C6 conversions pass. Four live planned/crash recovery
+cases preserve carrying by the successor or continuing guest, then accept a fresh
+release. Three browsers retain a guest's relic through RTC handoff and observe
+its release in the new epoch. Full normal/faulted campaigns and C7 checkpoint
+service restart/gameplay restore also pass. See [evidence](results/cave-carrier-2026-09-14/README.md).
+
+Original Kit and games remain preserved. Inspection identified another specific
+comparison boundary: Kit adopts the old host's non-avatar props on takeover,
+including its carried relic. Replay preserves carrier identity. That adoption
+policy needs a recorded authority-change operation and remains open, along with
+owner-streamed movement and broader parity/full-roadmap acceptance.
+
+## M4 Cavecrawl relic lifetime — 2026-09-14
+
+C6 retains the relic across floor descent, including its carrier/version, and
+releases it at its last simulated position on restart. Initial placement is
+`(120, 80)` and the carry offset is `(10, -12)`, following the original procedures.
+Replay still uses server-simulated carrying and releases on death/disconnect;
+those policies remain explicit differences.
+
+Twenty-seven Cave tests pass, including corrected-input complete frame/events and
+C5 archive conversion. Actual Godot transition frames verify resting/carried
+descent and restart release. Twelve C1–C5 saves convert and resume exactly.
+Normal/faulted full campaigns, C6 checkpoint service restart/gameplay restore
+and real three-browser host handoff/social checks pass. See [evidence and compatibility](results/cave-relic-2026-09-14/README.md).
+
+Originals remain preserved. This closes the relic floor-lifetime row; broader
+movement, death/disconnect, visual/human and full-roadmap gates remain open.
+
+## M4 Cavecrawl avatar state on descent — 2026-09-14
+
+C5 separates initial start, descent and restart. Descent preserves avatar health,
+stamina, cooldowns, active chill, bags and ledger after ordinary tick updates.
+Restart restores run fields while retaining active effects and cumulative state,
+matching the reviewed original procedures. Reserved disconnected players retain
+respawn deadlines so rejoin cannot leave an unrevivable corpse.
+
+Twenty-three Cave tests pass, including corrected-input frame/event equality.
+Actual Godot retained frames confirm the descent/restart values. Nine C1–C4 saves
+convert and resume exactly in fresh processes; normal/faulted complete campaigns,
+C5 checkpoint publication/service restart and browser handoff/social gates pass.
+A compiler process crashed during the first service build; a fresh build/run
+completed, with the failure retained. See [evidence and compatibility](results/cave-floor-state-2026-09-14/README.md).
+
+Originals remain unchanged. Relic floor lifetime/carry and spawn-position/owner-
+streaming correspondence remain explicit gaps; this closes the avatar-state row,
+not full Cavecrawl parity or the M0–M9 roadmap.
+
+## M4 Cavecrawl director pacing and C4 conversion — 2026-09-14
+
+Cavecrawl now matches the original active-floor wave director: announce first,
+spawn one per tick, anchor rest to the last actual death, skip rest for empty
+waves, continue a started wave when players depart, and reset den selection per
+floor. The former 20-tick initial delay/10-tick spacing were a port mismatch.
+
+Six named scenarios plus 256 generated plans match unchanged Kit director output
+for 1,000 ticks each on native and WASM. Eighteen Cave tests cover frame/event
+revisions, saturation and overflow rollback. The unchanged full normal/faulted
+campaign requirements pass through two floors, 12 slain dwellers, eight gems and
+both death paths with shared victory-frame hashes. The observer comparison now
+waits for its authority completion tick before judging totals.
+
+Content C4 rejects old saves until explicit conversion. Six C1/C2/C3 archives
+convert and resume exactly in fresh native processes; C3 entities/cursors and
+pending spawn/rest deadlines are retained. Registered checkpoint publication,
+service restart and the three-peer browser handoff/social regression pass. See
+[evidence and limits](results/cave-director-2026-09-14/README.md).
+
+Original sources remain preserved. The director corpus stays within the 16-live-
+dweller bound; excess requested spawns wait for capacity. The review also records
+an outstanding avatar-vitals/cooldown difference on floor descent. Broader parity
+and the full M0–M9 goal remain active.
+
+## M4 Cavecrawl latency and named markers — 2026-09-14
+
+Cavecrawl's scoreboard now shows shared authority-measured application RTT, with
+unknown/stale values explicit and observer/departed rows excluded. Ping views use
+the name stamped at acceptance, survive renames without relabeling, and retire on
+expiry, floor/run or authority-scope changes. Enter submits the name field through
+existing profile/lobby commands; invalid names keep editing and typing captures
+social/gameplay shortcuts.
+
+The final native host/client/observer gate passes actual F/Enter input, measured
+rows, rename, simultaneous old/new marker labels, expiry and rejoin. The Chrome
+three-member handoff gate passes fresh epoch-2 telemetry, successor-local zero,
+continued loot/chat and early removal of an old-epoch marker. Telemetry, Comms and
+Cave model gates pass 10/9/13 tests respectively, including WASM checking. See
+[receipts and remaining limits](results/cave-social-details-2026-09-14/README.md).
+No gameplay/content/archive format changed; originals remain preserved. Broader
+Cavecrawl parity, public deployment and the complete M0–M9 goal stay open.
+
+## M3/M9 receive budgets preserve reliable packets — 2026-09-14
+
+Both receive loops now give the transport the remaining byte allowance and defer
+on `Buffer_Too_Small`. Previously they dequeued a crossing packet and discarded it.
+A reproducible observer case lost 64 of 96 effects, and a large-action case applied
+only one of two submissions. Both now pass at the unchanged 65,536-byte budget,
+without extra buffers or resends. Unknown senders also consume the receive budget.
+
+The network suite passes 164 tests, transport 23 and trace 9, with WASM checks.
+Real ENet and Chrome RTC verify short-buffer retention, including 64 KiB reliable
+payloads and restart. A fresh four-process Claimball fault run presents all 19
+kicks with zero resyncs and exact transport/state/effect replay. See
+[reproduction and retained evidence](results/receive-budget-2026-09-14/README.md).
+
+This is an independently demonstrated defect, not an established explanation of
+the old C2 failure. That missing-trace investigation remains open; its historical
+collection now restores the original server receive loop as well. Original Kit/
+game sources and sibling Scrapyard remain preserved. The full roadmap stays active.
+
+## M2/M3/M8 network simulation recordings — 2026-09-14
+
+Scrapyard now uses the recording tools through an opt-in developer-menu export.
+A generic network-model adapter replays complete batches, including controls,
+actions, joins/reset masks, historical aim data and recorded admission decisions.
+Context-aware input preflight validates every executable batch before any step;
+admission callbacks and transport/session state are not replayed.
+
+The final native host/client and Chrome solo exports verify in fresh native and
+standalone WASM processes, including complete states and ordered event batches.
+Changed-state files produce owned mismatch reports; invalid final controls execute
+zero replay steps. The network suite passes 161 tests, diagnostics 10, and the
+unchanged Scrapyard model/oracle gate 102. Both native peers continue without resync.
+See [workload, timings and source evidence](results/network-recording-2026-09-14/README.md).
+
+The full Scrapyard world exposed a WASM local-count limit in multi-frame diagnostic
+copies. Borrowed entries and explicit disjoint fixed-value copies reduce the raw
+module's largest local count from 77,660 to 5,068; canonical file data and core
+equality semantics are unchanged. Standalone linking supplies the same math
+library used by the web build and produces a module with no imports.
+
+Export remains synchronous (about 87–165 ms in the final cases), opt-in and bounded.
+These recordings are simulation evidence, not network recovery archives. Original
+projects are preserved; broader parity/performance/platform and M0–M9 work remain.
+
+## M2 loaded recording playback — 2026-09-14
+
+A reusable playback owner now loads and verifies a recording transactionally,
+then samples expected frame copies without simulating or emitting old effects.
+Hello can open native/browser files, play/seek, inspect mismatch fields, return
+to its untouched original game or explicitly continue from the selected frame.
+Malformed/context/model/aborted replacements preserve the old recording.
+
+Ten diagnostic tests, WASM checks and the controlled browser-import lifecycle
+gate pass. A fresh native headless/rendered and Chrome workflow passes file
+selection, cancellation, rejection, pause/input preservation, branching and pending
+import teardown. Existing Hello/Loot/history/export/network gates also pass. The
+native picker is clamped to the small game viewport after a rendered test exposed
+unreachable controls; teardown no longer releases focus outside the scene tree.
+See [sources, captures and limits](results/recording-playback-2026-09-14/README.md).
+
+Original Kit/game projects and sibling Scrapyard remain preserved. Continuous
+recording, multi-window assembly and the remaining M0–M9 work stay active.
+
+## M2/M3 portable local gameplay recordings — 2026-09-14
+
+The history dock now exports a bounded replayable suffix with its complete starting
+frame, inputs, expected frames and ordered events. Native storage and Chrome
+file downloads feed the same headless verifier, which reports the first state/event
+mismatch through existing audit diagnostics. The codec checks all gameplay schemas,
+including zero-step files, and requires explicit content/build/timestep identity.
+
+Thirty core tests and seven diagnostic tests pass. Final native headless/rendered
+exports, Chrome downloads and the delayed network regression gate pass; eight
+archives execute consistently in native and freestanding WASM. Both targets reject
+a corrupted copy of every archive. Chrome records zero rendering conflicts.
+See [recorded files, controls and limits](results/local-recording-2026-09-14/README.md).
+
+Originals remain preserved. This adds persistent recent gameplay windows;
+continuous recording, multi-window assembly, a loaded-recording playback UI and
+the remaining full-roadmap gates stay open.
+
+## M2/M3 validated local field editing — 2026-09-14
+
+A schema-driven scalar editor now edits a copied paused frame in Hello. Apply
+checks numeric ranges, schema validity and game invariants before replacing the
+preview; Reset/selection/Resume discard edits, and an explicit Branch accepts the
+complete frame under a new presentation epoch. Original history stays unchanged.
+
+All 28 schema tests and WASM checking pass. Native headless/rendered and real
+Chrome controls exercise rejected edits, preview/reset/resume, an edited-position
+branch, input guards and effect suppression; the existing Hello/Loot and delayed
+four-peer network gates pass. Chrome records zero buffer-target conflicts.
+See [receipts and limits](results/field-editor-2026-09-14/README.md).
+The menu is capped at 2048 leaves; union tags are read-only. Persistent recording,
+coordinated multi-field transactions and network-runner editing remain open.
+Original Kit/game sources and sibling Scrapyard remain preserved.
+
+## M8/M9 cover-aware solo gauntlet — 2026-09-14
+
+A shared ordinary-input navigation controller now completes the fixed-offset
+barrel finale when cover blocks the stationary player. Three normal Kit/Replay
+pairs and a deterministic obstruction pair pass all eight games and 138 report
+checks; a reversed obstruction pair passes another 40 checks. Blocked stationary
+shots must preserve barrel health before movement opens a firing lane.
+
+Wave/rest/reward/survival and blast requirements remain. The older stationary
+cohort and incomplete recorder pilots remain rejected, rather than relabeled.
+See [scenario, movement evidence and limits](results/solo-navigation-2026-09-14/README.md).
+Originals are unchanged. This closes the scoped scripted solo continuation gap;
+difficulty, human feel and the remaining parity/deployment roadmap remain active.
+
+## M9 borrowed world validation — 2026-09-14
+
+The Scrapyard validation chain now avoids nested full-world copies while retaining
+its public value APIs and all predicates. A differential oracle matches all six
+validators across 37,114 scalar-field cases and verifies no borrowed input mutation;
+102 model tests and WASM checking pass. The full paired cohort again passes
+24 windows and 64 report checks.
+
+Client p95 callback costs are lower in the recorded delay/raw-loss cohorts, while
+median and total diagnostic-frame changes are mixed. Exact-binary stack samples
+confirm removal of the targeted copy chain. See [evidence and limits](results/borrowed-validation-2026-09-14/README.md).
+No schema/content or gameplay rule changes were made. Originals remain preserved;
+remaining performance, authoring/parity and platform/deployment gates stay active.
+
+## M9 current public-history paired comparison — 2026-09-14
+
+The fresh full native jam/swarm matrix passes all 24 process windows and 64 report
+checks with content48 and the existing isolated Kit owner-control baseline. Replay
+host output medians are 37,099/37,392 B/s in delay/raw-loss conditions. All Replay
+windows have zero resyncs. Client callback costs remain higher than Kit's; the
+separate verified phase diagnostic identifies correction/replay as substantial work.
+
+The [complete comparison](results/public-history-comparison-2026-09-14/README.md)
+records workload differences, precise conditions, costs, figures and the limits of
+comparing this cohort to older versions. The bandwidth improvement does not imply
+uniform CPU improvement or full adoption readiness. Originals remain preserved;
+authoring/parity, platform/deployment and the remaining roadmap gates stay active.
+
+## M3/M5/M9 authority hit history and loaded raw TURN acceptance — 2026-09-14
+
+Scrapyard content 48 now uses the existing authority-only field mechanism and
+explicit public replication/prediction policies for rewind history. A captured
+real delta attributed 7,581 of 7,861 changed bytes to this cache. Public snapshots
+fall from 52,724 to 24,148 bytes while complete checkpoints retain all history.
+
+Planned and crash runs now pass the same 40-mob UDP TURN profile with 1% loss,
+0.5% duplication and 20–25 ms delay per traversal. Facts-ahead maxima are 7/8 against
+limit 30; exact recoveries report 0/68 known lost ticks against limit 120. Adaptive
+codec coverage now checks projection/size/delivery/support rather than demanding
+an unhelpful encoding, while legacy and grouped-archive checks remain intact.
+
+The explicit converter and nine fresh native resumes pass for contents 42–47;
+native historical rail and mend combat, 102 model tests and WASM checks pass.
+A separate newest-eligible snapshot selection bug is fixed and passes all 159
+network tests, including a deterministic fact-burst regression. See
+[results, policy changes and limits](results/authority-hit-history-2026-09-14/README.md).
+Originals remain preserved. Broader deployment/platform/parity work and the full
+roadmap remain active.
+
+## M9 Godot pointer-call ABI correction — 2026-09-14
+
+The binding generator now uses ABI-sized storage for narrow integer returns and
+engine enum arguments/returns. Guarded native and real browser checks demonstrate
+eight-byte engine writes, including four-byte public enums on WebAssembly.
+The audit covers 1,125 narrow returns, 1,021 enum/flag returns and 1,349 enum/flag
+arguments while preserving public signatures and handwritten bindings. RTC
+ordering/restart/gameplay and the existing loaded message-fault regression pass.
+
+Snapshot-path recording also rejected three attempted networking changes; the
+production RTC source retains the preceding control-stream implementation. Loaded
+raw-loss recovery continues to restore exact worlds, but the final profile still
+fails freshness at 58 facts-ahead ticks against limit 30. See
+[ABI correction, measurements and rejected candidates](results/ptrcall-abi-2026-09-14/README.md).
+The remaining network work and full roadmap stay active; originals remain preserved.
+
+## M3/M9 RTC control stream and loaded raw-fault failure — 2026-09-14
+
+The browser adapter now negotiates a separate reliable unordered stream for
+credit/fence traffic, retaining the original path with older peers. Both real
+mixed-version directions, RTC mesh/order/restart/gameplay checks and the loaded
+message-fault workload pass. Direct Scrapyard Rooms now read validated ICE settings;
+the loaded fixture can exercise real UDP TURN faults with isolated builds.
+
+Raw loaded migration restores exact checkpoints and continues actions/worlds, but
+the full gate remains rejected for snapshot freshness: the new-stream planned/crash
+runs reach 58/48 facts-ahead ticks against the unchanged limit 30. Credit delivery
+improves in the recorded diagnostics without resolving that failure. See
+[implementation, rejected runs and compatibility evidence](results/rtc-control-stream-2026-09-14/README.md).
+Originals remain preserved; the full roadmap remains active.
+
+## M3/M5/M9 browser TURN datagram faults — 2026-09-14
+
+A bounded UDP proxy now exercises actual Chrome-to-Coturn datagrams while the
+Slopball application fault adapter stays at zero. The relay-only baseline and
+three delay/loss/duplication runs pass exact checkpoint/solver restoration,
+continued scoring, observer/host rejoin, successor publication and common worlds.
+The fault runs drop 249/528/584 encrypted DTLS records; planned handoff loses zero
+ticks, and the two crash runs report 15/18 known lost ticks.
+
+Four proxy checks and thirteen report mutation cases pass. An initial probe failure
+is retained: selected candidate-pair lookup and DTLS 1.3 header recognition were
+corrected without changing runtime or game acceptance. See [results and limits](results/browser-turn-udp-faults-2026-09-14/README.md).
+Originals remain preserved. Loaded Scrapyard raw-WebRTC loss, public deployment,
+broader platform and human comparison remain open in the full active roadmap.
+
+## M5 recovery-backup status — 2026-09-14
+
+Room now retains accepted backup observations across pending RPCs and exposes
+waiting/preparing/confirmed/stale/checking/recovering states using scoped approval,
+trust, retention, live host-side connection checks and known progress. Claimball,
+Speedball, Quickdraw and both Slopball ports use the shared status. Prior recovery
+context no longer substitutes for a current fresh backup.
+
+Eleven adapter tests, shared/app WASM checks, five native UI gates and representative
+browser published restores pass. A live dependency barrier proves stale age 121
+against limit 120, refreshed approval, handoff, and pending status after the backup
+peer leaves. See [contract and receipts](results/recovery-backup-status-2026-09-14/README.md).
+Wire/model/authority policy and originals remain unchanged. Broader deployment,
+recovery, platform and human comparisons remain in the active full roadmap.
+
+## M5/M9 crash during held checkpoint traffic — 2026-09-14
+
+Fresh loaded Scrapyard validation passes planned migration and 300/400 ms reliable
+pauses. A stronger fixture then kills the host with a checkpoint transfer still
+queued, recovering the previous approved point. Two fault seeds pass exact recovery,
+seat/action continuation and ten/eleven common worlds with 39/48 known lost ticks.
+Samples during the hold retain freshness/credit/memory/no-resync limits.
+
+Measured fault plans and late arming are now recorded and checked; 26 report
+mutation cases reject incorrect held-transfer evidence. No runtime/model/protocol
+or acceptance limit changed. See [receipts and scope](results/loaded-held-checkpoint-2026-09-14/README.md).
+Original games remain preserved. Raw network/deployment, wider interruption and
+human/authoring comparisons remain work; the full roadmap stays active.
+
+## M3/M9 archived C2 fault recording — 2026-09-14
+
+The trace fixture now reconstructs the archived Claimball C2 app and the exact
+receiver/Room sources from the original failure. It supports bounded fault-seed
+selection and old/current replay against the same historical game model. Seven
+live fault/stall schedules preserve every observer kick and replay all operations
+and state/effect hashes exactly on both receivers.
+
+This adds a reproducible historical investigation command, not a fix claim: the
+older missing-effects failure still has no failing trace. See [provenance and receipts](results/claimball-c2-recording-2026-09-14/README.md).
+Shipping games/runtime and originals remain unchanged. The full roadmap and broader
+failure reproduction, deployment and comparison work remain active.
+
+## M3/M9 live transport recording — 2026-09-14
+
+The new optional transport trace package records bounded owned observations and
+replays exact calls/results without a network. Nine native contract tests, WASM
+checking and portable metadata checks pass. Claimball captures real faulted ENet
+observer delivery, actual pump times and per-frame state/effect hashes.
+
+Four live schedules, including 1.8/2.0-second observer stalls, replay exactly with
+all effects and zero resyncs. Deliberately changed world/effect expectations are
+rejected. Both stalled recordings also pass against the pre-backlog receiver;
+these schedules do not explain the historical observer loss, which remains open.
+See [recordings, failures and limits](results/transport-recording-2026-09-14/README.md).
+No shipping game/receiver policy changed. Original games remain preserved and the
+full roadmap, broader failure reproduction and deployment/comparison work remain active.
+
+## M4/M5 owner-streamed browser-local saves — 2026-09-14
+
+Both Slopball ports now expose named browser Solo checkpoints through the shared
+storage adapter. Independent decode and fresh-process tests verify exact saved
+worlds and first solver seeds, including 3D quaternion/spin. Continued goals,
+Play again, another save, automatic resume, stale-tab conflict preservation,
+corrupt slot/identity handling and alternate slots pass.
+
+Native UI/profile/WASM/file-save regressions pass. Both browser Party migration/
+publication matrices remain valid, with 32 clean RTC observations and 16 checks
+confirming no local slots were created by Party saves. See [receipts and limits](results/owner-streamed-browser-save-2026-09-14/README.md).
+Models/scenes/shared runtime and originals are unchanged. Broader storage/browser/
+deployment/failure coverage and human comparison remain work; the full goal is active.
+
+## M5 owner-streamed published recovery matrix — 2026-09-14
+
+Slopball3D now passes native WSS/ENet and browser RTC recovery after all four games
+and the service are killed. Both Slopball ports additionally pass restoration by
+trusted seat two while the creator is absent, followed by creator rejoin. The eight
+final cases validate exact saved worlds, first solver pose/momentum (including 3D
+quaternions/spin), observer exclusion, retained seats/names, new kicks/goals/chat,
+common worlds and revision-two publication by the selected authority.
+
+Known lost ticks range from 15 to 18. Sixteen final RTC observations have zero
+graphics conflicts. No application, model, shared runtime or service logic changed;
+normal Room/Party methods provide recovery. See [matrix and limits](results/owner-streamed-party-restore-2026-09-14/README.md).
+Original games remain preserved. Browser-local saves, broader returning/failure/
+deployment combinations and human comparison remain work; the full roadmap is active.
+
+## M4/M5 Slopball3D Parties and browser migration — 2026-09-14
+
+The 3D owner-streamed port now uses shared native/browser Party controls, profile
+adapters and a typed service publication backend. Native UI/profile/WASM, Party
+and original planned/crash migration gates pass. Four-browser cases restore exact
+approved spinning frames and actual solver position, quaternion and both velocity
+vectors, then continue kicks/goals, observer/fresh-host rejoin, named chat, common
+worlds and publication. Known lost ticks are 0/52; graphics traces are clean.
+
+Two fixture timing failures exposed stale spinning candidates; the final trigger
+requires host/nominee agreement on the same approved point before recovery. A
+reproduced file-resume bot corner stall is fixed with a reachable side stance; the
+same saved checkpoint and full save regression now complete. Physics,
+model, shared runtime and original games are unchanged. See [receipts and limits](results/slopball3d-online-2026-09-14/README.md).
+Full-party shutdown, local browser saves, broader deployment/failure/solver coverage
+and human comparison remain work. The full roadmap stays active.
+
+## M5 Slopball whole-party published restore — 2026-09-14
+
+Native WSS/ENet and browser RTC fixtures now kill all four games and the service,
+reopen the existing database, register the observer first, restore the published
+world in epoch two and compare the first actual solver seed against an independent
+checkpoint decode. Names/seats, spinning momentum, new kicks/goals/chat, common
+world digests, guest-save refusal and renewed publication pass. Known lost ticks
+are 17/16; browser graphics traces are clean.
+
+A repeated native run exposed a seed-monitoring gap for Observer-to-Owner changes
+within an existing scope. Both 2D/3D probes now cover it; native UI/profile/WASM,
+file-save regressions and nine ownership tests pass. See [evidence and limits](results/slopball-party-restore-2026-09-14/README.md).
+Shared runtime/model/service logic and original games remain unchanged. 3D Party,
+local browser saves, broader recovery/deployment and human comparison remain work;
+the complete roadmap stays active.
+
+## M4/M5 Slopball Parties and browser migration — 2026-09-14
+
+The 2D owner-streamed port now uses shared native/browser Party controls, separate
+personal/Party credentials and a typed service checkpoint backend. Native Party,
+UI/profile/WASM and direct file-save regressions pass. Four-browser planned/crash
+cases restore exact moving checkpoints and actual solver momentum, continue with
+new kicks/goals, rejoin observers and a fresh old host, retain named chat and agree
+on common world digests. Publication in both epochs is independently decoded.
+
+Known lost ticks are 0/24. A reproduced Polygon2D buffer failure led to immutable
+authored meshes preserving geometry/physics; the final 16 RTC observations have
+zero graphics conflicts. See [receipts and limitations](results/slopball-online-2026-09-14/README.md).
+Whole-party shutdown recovery, local browser saves, 3D Party workflows, public
+and human comparison remain work. Original games and shared runtime are unchanged;
+the full roadmap stays active.
+
+## M4 Slopball repeated matches — 2026-09-14
+
+Both owner-streamed ports now restart through a round-scoped Play again command,
+retaining the session/roster while resetting match state. Every body gets a newer
+ownership revision; old samples/offers cannot move the new match. Candidate resets
+are atomic on exhaustion and gameplay events have round-specific identities.
+
+Fourteen model tests per dimension, both native UI/profile/WASM and two-match gates,
+a rendered 3D repeat, faulted networking and planned/crash physics migration pass.
+The new kickoff checks actual poses/velocities, driver scopes and cleared previews.
+Content advances to B24/D4; originals remain intact. See [receipts and limits](results/slopball-rounds-2026-09-14/README.md).
+Public/browser, broader solver/recovery and human comparison remain work; the full
+roadmap stays active.
+
+## M4 native owner-streamed Slopball saves — 2026-09-14
+
+Both Slopball ports now expose native Save/F5 and Resume solo/host. Fresh-process
+fixtures independently decode a scored moving checkpoint, kill writer processes,
+restore the exact world in epoch two and verify the first eligible solver seed.
+The final 3D source includes nonzero spin and nontrivial quaternion orientation.
+Same-seat/name rejoin, new kicks/goals/chat, a common continued world and successful
+replacement all pass. Invalid restores and failed writes preserve files/profiles.
+
+2D restores tick 365 / digest 5442236069327637914; 3D restores tick 325 / digest
+4613504259302443187. Both first-seed position/velocity errors are zero. Native
+UI/profile/WASM and rendered menu/restore checks pass. The initial identity-rotation
+3D receipt is retained separately from the stronger final case. See [receipts](results/slopball-native-save-2026-09-14/README.md).
+Models B23/D3, shared framework and original games remain unchanged. Browser/Party,
+broader solver/recovery and human comparison remain work; the full roadmap is active.
+
+## M4/M6 measured Slopball ownership intent — 2026-09-14
+
+Both owner-streamed ball games now use accepted ground-plane displacement at eligible
+arbitration passes, matching the originals' absolute-axis measure and 0.6 px / 0.015 m
+thresholds. Replayable position/scope baselines accumulate through cooldown and reset
+on joins/cuts/epoch changes. Input bits and reported velocity no longer stand in for
+movement. Content advances to B23/D3.
+
+Three before-model cases fail in each game and pass after the change; final suites
+have eleven tests each, covering blocked/sparse/duplicate/conflicting observations,
+vertical-only motion, discontinuities and serialized baselines. Native UI/profile,
+WASM, faulted network and planned/crash physics migration regressions pass in both
+dimensions. Original games remain intact. See [receipts and scope](results/slopball-measured-intent-2026-09-14/README.md).
+Full ordering/solver/human parity and the broader roadmap remain open.
+
+## M4/M6 Slopball3D native session UI — 2026-09-14
+
+The 3D port now has native lobby/start, profiles, literal/named-observer chat,
+scoreboard and leave/rejoin. Waiting rejects solver samples; typing suppresses
+movement/kicks while the owned ball continues. Body drivers reset between sessions,
+retaining scene collision settings and skin position/quaternion. Content D2 changes
+the world/action schema explicitly.
+
+Three model tests, native UI/profile and app WASM checks pass. Clean/faulted network
+and planned/crash physics migration gates retain exact momentum/quaternion seeding,
+loft/spin, goals and common-tick assertions. A viewport-scaling refinement makes the
+copied UI readable on the 3D canvas; final rendered bounds/UI checks pass. See
+[receipts and limits](results/slopball3d-ui-2026-09-14/README.md).
+Original games and the 2D Replay port are preserved. Broader owner-stream parity,
+Party/browser/save flows and human comparison remain work; the full roadmap is active.
+
+## M4/M6 Slopball native session UI — 2026-09-13
+
+The separate 2D Slopball port now has Solo/Host/Join/Watch menus, native profiles,
+leader Start, literal/named-observer chat, authoritative scoreboard and leave/rejoin.
+Waiting rejects solver observations; typing suppresses movement/kicks while ball
+simulation continues. Body adapters reset between sessions and restore scene-authored
+collision settings. B22 explicitly changes the world/action schema.
+
+Three model tests, native UI/profile and app WASM checks pass, alongside rendered
+UI, clean/faulted network and final planned/crash physics migration gates. A wrong
+collision-mask assignment and getter/setter type mismatches were corrected; their
+logs remain. Exact momentum seeding and the original goal/common-tick thresholds
+are retained. See [receipts and limits](results/slopball-ui-2026-09-13/README.md).
+Original games and the separate 3D port are preserved. Wider owner-stream parity,
+Party/browser/save flows and human comparison remain work; the full roadmap is active.
+
+## M5 Room transition expiry — 2026-09-13
+
+A deterministic test reproduces permanent Room failure when a valid lease expires
+between outer preflight and redirect/rejoin. Room now preserves the old runtime
+and prepared state as a fenced pause, waiting for fresh authenticated control.
+Poisoned clocks and unrelated errors still fail. Published-restore preflight has
+the same preservation check; no deadlines, clocks or recovery limits are relaxed.
+
+Five Godot-adapter core, 31 authority and 158 network tests pass with WASM checks.
+Live planned/crash Claimball migrations inject expiry on every surviving peer,
+verify unchanged old epoch/head, then finish exact moving-checkpoint restore, new
+spikes/chat and common-world agreement. A production build also passes native
+UI/profile and whole-party WSS restore/publication regression. See [receipts](results/room-transition-expiry-2026-09-13/README.md).
+
+This establishes a specific cause/fix. The earlier pre-handoff browser Fenced
+incident remains unproven as the same mechanism. Original games remain preserved,
+and the full roadmap remains active.
+
+## M6 Claimball browser-local saves — 2026-09-13
+
+Claimball Solo now uses the shared browser checkpoint-slot adapter, with named
+identity-scoped slots, asynchronous receipts, blocked Leave during writing and
+revision conflicts. Native and browser restore share policy checks. Chrome SIGKILL
+followed by a fresh process restores tick 727 / digest 2669993641906651355 in epoch
+two, then new spikes, match completion/restart and a second save pass. Automatic
+resume, stale-tab preservation, corrupt slot/identity preservation and an alternate
+slot all pass. The first fixture's migration-vs-file receipt flag mix-up is retained.
+
+Native UI/profile/save regression and the Party handoff/publication regression pass;
+Party publication creates no local slots. C3 gameplay/schema and original projects
+remain unchanged. See [receipts and limits](results/claimball-browser-save-2026-09-13/README.md).
+Broader deployment/recovery, prior intermittent failures and human comparison remain
+work; the full roadmap stays active.
+
+## M5/M6 Claimball whole-party restoration — 2026-09-13
+
+Native WSS/ENet and browser RTC gates now kill all players, the observer and the
+service, reopen the same database with creation disabled, and restore the published
+world. An independent reader verifies publication one's complete moving/scored
+state before shutdown. The observer registers first without authority; the owner
+returns in epoch 2 / incarnation 3, restores the exact tick/digest, and players
+reclaim their seats and prediction boundaries. New spikes/chat and publication two
+pass, with independent decode and a common authoritative world.
+
+Native restores tick 943 / digest 4350654133034237056; browser restores tick 1241 /
+digest 1338415966109077840. Both report 16 known lost ticks. Continued publication
+ticks are 1156/1603, each with two new spikes. Browser RTC/graphics/layout checks
+pass. No runtime or game-model change was needed. See [receipts and limits](results/claimball-party-restore-2026-09-13/README.md).
+
+Original projects remain preserved. Public deployment, browser-local saves,
+broader recovery/platforms and the earlier intermittent failures remain work; the
+full roadmap stays active.
+
+## M5/M6 Claimball Parties and browser RTC — 2026-09-13
+
+Claimball now uses shared Party/profile/RTC adapters for native/browser create,
+invite, watch and rejoin menus. The service has a typed C3 checkpoint backend.
+Four-browser planned and owner-SIGKILL cases pass exact moving checkpoint restore,
+new spikes, observer rejoin, fresh host return, retained/new chat, one-avatar client
+prediction and common authoritative worlds. Both publish revision 2 / epoch 2;
+independent native readers decode the stored complete worlds. Sixteen RTC traffic
+observations report zero graphics-buffer conflicts.
+
+Native Party UI and standalone UI/profile/save regressions pass. Initial missing
+scene controls and a standalone-only shutdown fixture were corrected. A first-run
+browser Fenced failure remains unexplained; later instrumented passes do not
+resolve it. No lease/clock/network rule was relaxed. See [receipts and limits](results/claimball-online-2026-09-13/README.md).
+
+Original projects and the C3 model remain unchanged. Public deployment,
+browser-local saves, whole-party restoration, broader recovery/network and human
+comparison remain work; the full roadmap stays active.
+
+## M5/M6 Claimball native Room migration — 2026-09-13
+
+Claimball now routes commands/frames through standalone Session or authenticated
+Room and preserves the playing view during recovery. Planned handoff and owner
+SIGKILL restore exact complete moving/scored checkpoints at ticks 865/841 in epoch
+2. The nominee predicts one avatar but retains all three players in its backup;
+remaining clients still predict one after migration. New spikes, retained/new chat
+and common post-action worlds pass. Planned loss is zero known ticks; the crash
+run reports 35 known lost ticks. A rendered handoff also passes.
+
+The shared development coordinator gained Claimball room 50. A duplicate Odin
+package-name failure was fixed by naming the shared package `claimball_pitch`.
+C3 schema/packet fingerprints and network contract remain identical, and an old
+C3 save decodes unchanged. Nine model tests, native UI/profile, final app WASM and
+standalone save/resume regressions pass. Room file-save/resume guards preserve
+files. See [receipts and limits](results/claimball-migration-2026-09-13/README.md).
+
+Original games and existing Kit edits remain preserved. Public Party/browser,
+observer/fresh-return/consecutive recovery, durable publication and broader
+comparison remain work. The full roadmap stays active.
+
+## M6 Claimball native save/resume — 2026-09-13
+
+Claimball now exposes Save/F5 and Resume solo/host through existing checkpoint
+APIs. Native ownership/policy/epoch checks precede opening a session; failed writes
+preserve committed data. Exact fresh-process restore, same-seat rejoin, new spike
+commands, match restart/chat and one-avatar prediction pass. A second save replaces
+the original file with the continued round/epoch, independently decoded.
+
+The final moving checkpoint restores tick 792 / digest 4856576859445229138 in epoch
+2 with a 1–0 score and active ball motion/cooldown. Both peers later agree at
+round-two tick 1116 / digest 4188661095800727518. Replacement tick 1159 decodes as
+round 2 / epoch 2. Wrong owner, damaged/missing data, protected policy, exhausted
+epoch and failed staging-write cases preserve files. Native UI/profile, app WASM
+and rendered menu/restore checks pass. See [receipts and limits](results/claimball-save-2026-09-13/README.md).
+
+C3 gameplay/schema and shared framework source are unchanged. Original games are
+preserved. Dedicated resume controls, browser saves, automatic online recovery and
+broader comparison remain work; the full roadmap remains active.
+
+## M6 Claimball repeated matches — 2026-09-13
+
+Claimball's new Play again command names a completed round, retains the session and
+roster, and resets match state. It rejects guests, observers, stale rounds and
+insufficient rosters. The local projection preserves its read-only outsiders;
+round-aware effects and view cuts prevent old-match presentation from leaking into
+the new match. Content C3 explicitly changes the world/action/event schema.
+
+Nine native model tests and WASM checks pass, including a failing-then-passing
+round event-lifetime regression. A fresh build passes UI/profile/app
+WASM checks and two complete matches headless and rendered. Every peer agrees on
+round-two 1–0, five kicks and retained names/seats/chat; actual node positions cut
+to the new pitch. A dedicated-server gate verifies a client leader
+restarting through projection, with both clients retaining one predicted avatar.
+The existing contested fault gate also passes with all 18 observer
+kicks and zero resyncs. See [receipts and limits](results/claimball-rounds-2026-09-13/README.md).
+Original projects are preserved. Saves, online recovery, browser/Steam, human
+comparison and the earlier intermittent observer failure remain open.
+
+## M3/M9 receive-batch fact overflow — 2026-09-13
+
+A deterministic regression reproduces unnecessary Facts_Overflow when a supported
+256-packet receive batch spans 140 authority ticks: snapshots and facts are queued,
+but confirmation previously waited until the entire receive loop ended. Both
+players and observers discard retained events. The exact final test also fails
+against the archived previous receiver, with and without a delayed middle fact.
+
+The receiver now attempts to install a usable retained snapshot before a valid
+fact would exhaust its ring. It matures watched effects before prediction reuses
+slots, then continues reception. Mid-batch work does not add elapsed presentation
+time. No usable snapshot still means resync, and history/output/traffic limits are
+unchanged. The four positive cases preserve every watched effect once; the missing
+snapshot case retains explicit resync. All 158 network tests, 11 recovery tests and
+16 presentation tests pass, including their WASM checks. A fresh Claimball build also passes UI/profile/app-WASM,
+contested packet faults and the 800 ms pause gate, with every observer kick retained.
+See [results and limits](results/receive-backlog-2026-09-13/README.md).
+
+This fixes a proven receive-batch failure. It does not establish the exact cause
+of the earlier intermittent Claimball ENet observer failure, which remains open.
+Original Kit/game projects remain preserved; the full roadmap is still active.
+
+## M6 Claimball native session UI — 2026-09-13
+
+The separate Replay Claimball game now opens Solo/Host/Join/Watch menus, stores
+native identity/name preferences, waits for leader Start, and supports literal
+player/observer chat, authoritative score/team/ping rows and leave/rejoin. Names
+and commands live in content C2. Leader checks read the outside roster while each
+client continues to predict only its own avatar and the shared ball.
+
+Five model tests and WASM checks pass. Native headless/rendered UI and fresh-process
+profile gates pass, as do the original clean network/contest and 800 ms pause gates.
+The first fault run resynchronized its observer at confirmed tick 174 and delivered
+12 of 16 kick effects. Final state agreed; effect completeness failed. Three
+instrumented fault runs subsequently pass, with no established root cause for the
+original failure. It is retained as open, and no networking rule, history bound or
+acceptance threshold was weakened. See [receipts and reproduction](results/claimball-ui-2026-09-13/README.md).
+
+Original game sources, the existing Kit state and sibling Scrapyard are preserved.
+Claimball rounds/save/online recovery/browser work and the full roadmap remain open.
+
+## M5/M8 observer crash recovery and fresh return — 2026-09-13
+
+The named-observer fixture now kills the host, verifies exact promotion to epoch 2,
+returns the original host to seat 1 in a fresh process, and keeps the observer live
+through renegotiation and a new message. It then kills/reopens the observer with a
+new label, verifies seat zero and denied pings, and checks that prior labels remain
+stamped once in all three histories. A fresh final-source build passes native chat
+and the browser sequence. Eleven report mutation cases pass.
+
+The observer status line now shows observer controls/waiting information instead
+of player-only combat instructions. No gameplay, identity, admission or protocol
+rule changes. See [receipts and limits](results/observer-recovery-2026-09-13/README.md).
+This is a local zero-mob lifecycle gate, not broader combat/deployment/spectator
+completion. Original Kit and sibling Scrapyard remain preserved; the full roadmap
+and separate duplicate-live-identity preference remain open.
+
+## M4/M8 observer display names — 2026-09-13
+
+Session/Comms now negotiate observer chat labels through Features bit 1024 and the
+existing request-name field. Raw packet version/schema stay unchanged; old servers
+retain empty claims. Names are captured per submission and remain stamped on
+history. The authority still supplies identity/seat, players cannot override names
+through this path, and observers cannot place markers. Scrapyard shows an explicit
+`(observer)` label even when the chosen text matches a player's name.
+
+Nine comms and 156 network tests pass, plus the Godot adapter and relevant WASM
+checks. Native host/client/observer chat produces matching history and world hashes;
+a startup warm-up now precedes the unchanged 350 ms input-blocking/live-simulation
+check. Its earlier failure is retained. A three-browser planned handoff preserves
+both old labels, restores exactly, retains one authority/two players, and allows a
+new named observer message after negotiation in epoch 2. Seven report mutation
+checks pass. See [scope and evidence](results/observer-names-2026-09-13/README.md).
+
+This addresses named observer chat, not all spectator or identity parity. The
+separate duplicate-live-identity preference remains unresolved and its behavior is
+unchanged. Public/deployment, other platform, human and broader parity requirements
+remain open. Original Kit and sibling Scrapyard remain preserved; the full roadmap
+is active.
+
+## M5/M9 reliable checkpoint delivery — 2026-09-13
+
+Stage probes show the loaded backup delay is primarily transfer time: the captured
+unreliable run has 89-tick median age at first observed validation, followed by
+about 182 ms to first observed approval. Consecutive archive and intra-array delta
+diagnostics yield only modest size savings; no new delta/entropy format is retained.
+
+Recovery now negotiates existing reliable-channel delivery with Features bit 512.
+Older peers retain the unreliable path. Chunk retries belong to the reliable
+transport, replies upgrade only after valid traffic, and late datagrams cannot
+downgrade them. Canonical archives, exact recovery Points, normal service order,
+shared byte budgets, staging limits and the 120-tick rollback policy are unchanged.
+
+The first loaded reliable run observes 24-tick median validation age; three final
+checkpoint streams each send eleven chunks once in about 200 ms. Planned handoff
+and three crash seeds pass with known rollback 0/18/35/22 and maximum facts lag
+22/20/20/22. Exact restore, returned-member action and common world hashes pass.
+A 200 ms offer-stage reliable pause also passes with 20 known lost ticks; the
+chunk-stage pause holds 25 messages / 13,955 bytes and passes with 31 known lost
+ticks, 25-tick maximum lag and eleven common worlds. Fifteen
+transfer, eleven recovery, 154 network, eleven asset and 23 transport tests pass;
+four transfer corpus cases match in native/WASM default and speed builds. Eighteen
+report checks exercise mutation rejection. Earlier failed runs are preserved.
+
+See [evidence, API and limits](results/reliable-checkpoints-2026-09-13/README.md).
+Reliable congestion, broader traffic/models, public/cross-device deployment and
+human/authoring/parity requirements remain part of the active full roadmap.
+Original Kit and sibling Scrapyard remain preserved.
+
+## M2/M8/M9 immutable polygon views and normal browser play — 2026-09-13
+
+A Godot-only reproduction identifies the polygon index-update path behind the
+browser warnings. Line animation is clean; Polygon2D color/point changes produce
+119 conflicts in 119 frames. Self modulation alone still fails on resize. Replay
+now uses immutable ArrayMesh instances for its procedural polygons, with instance
+tint/transforms and unit-arc geometry. A bounded mesh helper owns replacement
+references correctly; its initial reference-management crash is fixed and retained.
+Loot scene points/colors/hierarchy are preserved in mesh resources. The original
+scene and game remain untouched.
+
+The model suite passes 99 cases, its WASM check and the original arena/movement
+oracle. Native ownership and seven view scenarios pass. The three-peer browser UI
+scenario passes all 134 observations with zero buffer conflicts over 211,691 /
+201,240 / 159,101 binds, browser ownership receipts, and ten common world hashes.
+Pixel comparison differs by at most one 8-bit channel step. The UI harness now
+waits for cooldown readiness and confirms application before repeated casts; the
+prior failure was an unexpired cooldown, not a missing buff emitter. Six report
+mutation cases and the trace forwarding/bounds test pass.
+
+The heavy browser gameplay windows also pass without graphics warnings, with
+18-tick maximum client facts lag. Its abrupt migration does not pass: prepared
+tick 1976 is 165 ticks behind final known tick 2141, so the unchanged 120-tick policy
+correctly refuses takeover. This newer evidence reopens loaded migration
+availability despite the preceding passing cohort. No causal throughput claim is
+made from these separately timed runs.
+
+See [diagnosis, implementation and receipts](results/immutable-polygons-2026-09-13/README.md).
+Broader hardware, normal-play visual/listening parity, public deployment, human
+playtests/authoring and recovery stability remain open. Original Kit and sibling
+Scrapyard are preserved; the full roadmap remains active.
+
+## M5/M9 negotiated checkpoint layout and loaded recovery — 2026-09-13
+
+Schema-aware checkpoint compression is now integrated. A borrowed immutable schema
+and section offset define a plan fingerprint; the receiver uses its own matching
+plan. A new optional offer carries that fingerprint. Features bit 256 requires
+existing block-compression bit 128, remains immutable for the admitted connection,
+and resets on reconnect. Old peers retain their existing representation. Recovery
+obtains the Frame plan from its owned checkpoint codec automatically. Reconstructed
+raw bytes still pass SHA-256, canonical envelope and typed atomic installation.
+
+The real 53,931-byte captured checkpoint transfers in 11,273 bytes under simulated
+faults and restores to exact canonical bytes. Thirteen transfer unit tests pass;
+three executable corpus cases produce identical native/WASM output in default and
+speed builds. The initial freestanding test wrapper lacked an allocator and is
+fixed. Ten recovery, 154 network and eleven asset tests also pass with applicable
+WASM checks. Sixteen report mutation checks reject altered evidence.
+
+A same-build browser cohort passes planned handoff and three crash seeds. Known
+lost ticks are 0/94/55/94; maximum facts lag is 20/20/19/23, below the unchanged
+30-tick gameplay gate. Both sides validate schema-grouped checkpoints before the
+trigger, with 39–40 living mobs and additional firing. Every run restores the exact
+checkpoint, reaches one epoch-2 authority, returns the old member, confirms a new
+follower dash and matches ten common worlds. A final fresh build after tightening
+raw-fallback metadata accounting also passes: 86 known lost ticks and 19-tick lag.
+The 120-tick rollback limit, shared budgets, eight-packet queue and normal scheduling
+remain unchanged. The earlier rejected priority policies stay removed.
+
+See [source, receipts and limitations](results/checkpoint-layout-2026-09-13/README.md).
+This satisfies the tested local loaded-migration scenario, not universal recovery
+availability or all of M5/M9. WebGL buffer diagnostics and full visual/listening
+parity still need normal-play review; the benchmark's shop HUD occludes part of the
+arena, so prior captures alone do not identify a missing-actor cause. Public,
+cross-device, human authoring/playtest and broader adoption requirements remain.
+Original Kit and sibling Scrapyard remain preserved; the full roadmap stays active.
+
+## M5/M9 checkpoint admission and real-payload analysis — 2026-09-13
+
+A deterministic staging-capacity test reproduces checkpoint starvation and shows
+bounded early admission can make progress. Real browser candidates recover exact
+worlds after host kills, but each-frame and 50 ms schedules reach 32 and 35 ticks
+of facts lag against the unchanged 30-tick gameplay gate. A profiling run of the
+same paced build passes, showing variation rather than establishing stability.
+Both early-send policies and their active tests have been removed and preserved
+as rejected experiments. Session/Link retain their prior scheduling. The optional
+smaller per-call Sender output allowance remains, with nine transfer and ten
+recovery tests plus WASM checks passing after removal.
+
+The loaded fixture now proves live population and additional firing at the trigger,
+bounds Chrome startup, and supports opt-in checkpoint capture. Fifteen report
+mutation cases pass. A captured 53,931-byte checkpoint validates its raw SHA-256,
+canonical envelope and typed forty-mob state. Existing compression uses 16,042
+bytes; applying the existing Frame schema shuffle plan first uses 11,273 bytes
+and roundtrips exactly. Simple byte-plane grouping makes it larger. This is an
+offline result; negotiated schema-aware checkpoint compression is the next concrete
+implementation to test. No new wire format is deployed by this increment.
+
+See [experiment receipts and limits](results/checkpoint-admission-2026-09-13/README.md).
+The full roadmap, loaded crash reliability and separate browser rendering issue
+remain open. Original Kit and sibling Scrapyard are preserved.
+
+## M5/M9 checkpoint compression and loaded migration — 2026-09-13
+
+Checkpoint transfer now optionally compresses archives into independent LZ4 blocks,
+negotiated per admitted connection. Raw archive identity, hashes, retention and
+atomic typed installation remain unchanged; old peers retain ordinary offers.
+The 1 MiB cap also bounds decompression allocations. Native/WASM corpus output
+matches in default and speed builds. Focused suites pass 2 compression, 8 transfer,
+153 network, 10 recovery and 11 asset cases, plus applicable WASM checks.
+
+A loaded browser planned handoff passes the unchanged jam gameplay gates, exact
+final checkpoint restore, zero lost ticks, old-host rejoin, a new confirmed dash
+and ten common world hashes. An active 53,979-byte archive uses 15,139 wire bytes.
+Thirteen report checks reject altered receipts. The release-export assertion bug
+in the first planned harness is fixed and its timeout preserved.
+
+Abrupt host loss remains open: the original run's backup was 187 known ticks old;
+the compressed crash run's backup was 139 ticks old. Both correctly refuse takeover
+against the unchanged 120-tick limit. Session's gameplay-first admission to the
+shared unreliable queue is the next contention hypothesis to test. No new queue
+priority policy is retained. WebGL buffer errors and absent visible actors in the
+capture also require a separate rendering investigation. See [evidence and limits](results/checkpoint-compression-2026-09-13/README.md).
+
+Original Kit and sibling Scrapyard remain preserved. The complete roadmap is active.
+
+## M3/M9 heavy browser RTC and bounded staging — 2026-09-13
+
+A separate browser fixture now runs the existing forty-mob jam workload with
+shuffled snapshots, parity and action copies over RTC. Shared gameplay/observation
+checks retain their native thresholds; the transport fault scope is explicit.
+Message injection delays delivery 40±10 ms, erases/duplicates only unreliable data
+at five percent, and uses bounded queues. A FIFO drain preserves reliable order.
+Hardware WebGL and speed-optimized WASM retain the viewport and frame-sample gate.
+Earlier startup, timer-order, software-renderer and cleanup failures remain recorded.
+
+Corrected hardware runs exposed 35–36-tick freshness gaps. An unsuccessful priority
+candidate was removed. The retained fix bounds RTC's staged unreliable datagrams
+to eight per recipient, applying backpressure earlier without dropping accepted
+messages or changing reliable order/wire formats. Large logical messages remain
+admissible when their queue is empty. All 23 transport, 152 network, ten recovery
+and three Godot-core tests pass with applicable WASM checks.
+
+Three browser seeds pass the full workload and post-blackout checks. Max facts
+ahead are 18/20/19 ticks, max world-progress gaps 217/201/218 ms, and resyncs/stalls
+remain zero. Shuffled snapshots actually cross RTC. Credit stays at most 16 and
+assembly memory peaks below 14 KiB. A 400 ms blackout triggers fences, an eleventh
+dash confirms, common worlds agree, and acknowledged checkpoints advance. Their
+age can still be several seconds, so migration availability under sustained load
+is not established. Native report regression has 64 cases; browser report checks
+eight altered receipts. See [evidence and limits](results/browser-stress-2026-09-13/README.md).
+
+Original games remain preserved. The full roadmap stays active, including wider
+hardware/software rendering, raw network/deployment faults, loaded migration and
+human/authoring/adoption requirements.
+
+## M8/M9 snapshot rate and freshness decision — 2026-09-13
+
+Scrapyard now defaults to one snapshot every three simulation ticks: a requested
+20 Hz snapshot rate with unchanged 60 Hz simulation. `RSY_SNAPSHOT_EVERY` / browser
+`snapshot_every` keeps the interval configurable. The comparison records requested
+and effective intervals and rejects mismatches; gameplay/freshness thresholds stay
+unchanged.
+
+The explicitly configured three-tick candidate passes the full 24-window matrix
+and 64 report checks. Same-binary interval 1/2/3 diagnostics pass the existing
+Replay-only workload gates. Intervals 1/2 remain budget-limited at about 252 KB/s;
+interval 3 uses about 203 KB/s and delivers 400 snapshots per measured 20-second window.
+CPU results are not monotonic across the single diagnostic pairs, so no uniform
+CPU win is claimed. Raw-loss full-cohort output is about 205 KB/s, with max world
+progress gaps 315/264/161 ms and no resyncs, stalls or unreadable intervals.
+
+Only after that evidence did the fallback default change to 3. A fresh final
+browser build without an override verifies interval 3 on all peers, 12 common frames,
+zero resyncs and the gameplay/UI gate. [Evidence](results/snapshot-rate-2026-09-13/README.md)
+separates candidate configuration from final-default verification. Original games
+remain preserved. Total costs, heavier browser encoding/faults, deployment and
+human/authoring acceptance remain within the active full roadmap.
+
+## M3/M9 bounded action copies and periodic heartbeat delivery — 2026-09-13
+
+Controlled tests distinguish a reliable heartbeat holding up a later action from
+a lost reliable action. Heartbeats now use unreliable periodic delivery. Capable
+peers additionally copy up to four pending, contiguous sent requests per 100 ms,
+within a 1,024-byte limit. The reliable stream remains active. Full-bundle validation,
+weighted ingress credit and the shared primary admission/timing/order/verdict path
+preserve authority policy and deduplication. Large actions keep reliable fallback;
+Welcome resets negotiation/retry state. Base contracts/checkpoints are unchanged.
+
+The 152 network tests, seven interest tests, ten recovery tests, three Godot-core
+tests, WASM checks and six frozen compatibility cases pass. Real ENet targeted
+heartbeat/action loss improves from 617/629 ms before to 296/287 ms after, with
+one action applied. A strict primary-packet selector avoids confusing nested copy
+envelopes with a primary. These are individual controlled runs, not a general
+latency guarantee or proof of the exact earlier cohort packet loss.
+
+The fresh full jam cohort passes all 24 windows and 63 report checks, including
+the previously failing cast observations. Replay has no measured resyncs, stalls
+or unreadable intervals; raw-loss copies cost 724–881 B/s. The three-browser RTC
+UI gate passes with 12 common frames, actual action-copy traffic and zero resyncs.
+[Evidence](results/action-delivery-2026-09-13/README.md) preserves prior failures
+and the CPU/traffic limitations. Original games remain preserved; the full goal
+stays active, including snapshot-rate/cost, broader faults, deployment and human
+acceptance requirements.
+
+## M3/M9 schema-derived snapshot shuffle — 2026-09-12
+
+The canonical schema now compiles a reversible byte permutation for large fixed
+arrays. Optional shuffled LZ4 packets retain every history/query value and include
+a separate transform signature. Old formats remain available, a size heuristic
+skips already compact deltas, and a new candidate must win after its signature.
+Canonical fingerprints and checkpoint/state semantics are unchanged. Scratch is
+lazy and bounded to twice the canonical snapshot size per server/receiving client.
+
+The frozen-codec 256-case corpus agrees on native and executed WASM; 144 network,
+25 schema, seven interest, ten recovery and three Godot-core tests pass with WASM
+checks, six frozen network cases and the existing native/WASM/amd64 union corpus.
+The actual-game history profile reduces selected payloads about 25% at a 16-tick
+base age and 38% at 32 ticks, with explicit extra CPU work. Same-binary phase runs
+raise client completed snapshots from 322 to 493 while host output remains near
+252 KB/s; host/client mean callback cost also increases. This is a delivery-rate/
+CPU tradeoff, not a uniform speed or bandwidth win.
+
+The fresh full cohort completes 24 windows but is rejected: a Kit raw-loss client
+records 19 kills against the required 20, and a Replay client misses a late second
+battlecry observation. That action reaches authority at 19.799 s after submission
+at 19.001 s, near the 20-second measurement end. No resync/stall explains it, and
+its transport cause remains unproven. Delay passes twelve windows and 61 report
+checks. No threshold changed or failed cohort was discarded.
+
+The fresh browser UI regression passes with 13 common frames and zero resyncs,
+but this light workload never selects the new wire format; heavier browser wire
+coverage remains open. [Evidence and limits](results/schema-shuffle-2026-09-12/README.md)
+record that distinction. Original games remain preserved and the full goal stays
+active. Next work includes late action delivery and snapshot rate/freshness policy.
+
+## M3/M9 snapshot parity and queue-pressure recovery — 2026-09-09
+
+A controlled regression removes two data parts from every new snapshot while
+facts continue: before, world tick 94 stalls behind facts 193; after, parity keeps
+the world at 192 near authority 200 without resync. The negotiated extension adds
+two P/Q parity shards per group of up to eight data shards, under the same egress
+budget. Complete digest, canonical state and scope validation remain mandatory.
+Client parity memory shares the existing four-assembly lifetime limits; no extra
+sender history or wire/checkpoint schema is introduced. A local opt-out is available.
+
+The independent 8,064-case codec corpus agrees on native and executed WASM in
+default/speed builds. All 139 network tests, seven interest tests, ten recovery
+tests, three Godot-core tests, WASM checks and six frozen compatibility cases pass.
+The fresh full jam cohort passes 24 runtime windows and 63 report checks. Replay's
+raw-loss max world-progress gaps are 482/483/433 ms, with no resyncs, prediction
+stalls or unreadable intervals. Parity uses about 65 KB/s inside the existing
+roughly 252 KB/s sender budget. The previous failed cohort remains recorded.
+
+The fresh three-browser RTC gameplay/UI gate also passes, with 11 common world
+frames, parity delivery/reconstruction on its parts-only client, and zero resyncs.
+See [implementation, evidence and limits](results/snapshot-erasure-2026-09-09/README.md).
+This resolves the controlled erasure failure and passes the named real workloads;
+it does not guarantee arbitrary-loss recovery or acceptable total cost. Original
+Kit and Scrapyard remain preserved; the full M0–M9 goal stays active.
+
+## M3/M9 bounded snapshot selection and queue-pressure finding — 2026-09-09
+
+Snapshot selection now uses a bounded sparse preflight and the existing LZ4 stage
+to avoid fully encoding a losing candidate. Selected kind/bytes, sparse ties,
+full-snapshot fallback, wire/checkpoint formats and workspace size stay unchanged.
+The new 768-case/seven-budget native/executed-WASM corpus passes in default/speed
+builds. Six delta tests, 132 network tests, ten recovery tests, WASM checks and six
+frozen compatibility cases pass. The actual-game profile verifies 6,000 identical
+encodings and reduces selection CPU across all five baseline ages.
+
+A verified pre-change binary and a fresh delay diagnostic measure host snapshot-
+delta mean 263.4→209.8 µs. Whole-frame host mean changes only slightly and client
+mean does not improve. The full fresh cohort completes 24 windows but is rejected:
+Kit misses a raw-loss cast observation, and Replay's raw-loss pair 2 has one refused
+dash, two resyncs and a 3.682-second world-progress gap. Its facts keep advancing
+while snapshot completion stops; the proxy records 147 downstream capacity drops.
+Delay passes its twelve windows and report checks. No threshold changed or failed
+cohort was discarded. [Evidence](results/delta-selection-2026-09-09/README.md) keeps
+CPU findings separate from the unresolved queue/fragment recovery failure.
+
+Original games remain preserved. Next transport work must reproduce sustained
+incomplete snapshots under queue pressure and restore the required responsiveness; cost, broader deployment and remaining M0–M9 gates stay open.
+
+## M3/M9 missing-fact repair and full jam cohort — 2026-09-09
+
+Instrumented raw-loss traces show complete snapshots waiting behind missing facts.
+A new regression holds the reliable fact at tick 101 and removes its recent-fact
+copies: the original client remains at tick 100, while the repair path reaches
+138 before reliable delivery resumes. Negotiated requests repair up to four ticks
+per 100 ms using canonical Facts, historical recipient filtering and existing
+budgets. Scope/range checks, lost request/reply retries, duplicate delivery,
+privacy, old-peer fallback and oversized/budget limits have focused coverage.
+Base contracts and checkpoint formats are unchanged; oversized facts retain the
+reliable fallback.
+
+All 132 network tests, seven interest tests, ten recovery tests, WASM checks and
+six frozen compatibility cases pass. The fresh full Scrapyard jam comparison
+passes 24 windows and 63 report checks across delay and raw loss. Replay's raw-loss
+maximum world-progress gaps are 464/781/601 ms with no resyncs, unreadable intervals
+or prediction stalls; the one-pair instrumented before pilot records 932 ms.
+The pilot is not a matched multi-run baseline. The remaining 781 ms gap still
+waits on facts, and Replay's CPU/traffic costs remain substantially higher than
+Kit's in this workload. See [evidence and limits](results/fact-repair-2026-09-09/README.md).
+
+Original Kit and the sibling Scrapyard remain preserved and independently runnable.
+This closes a named full comparison run; the full M0–M9 goal remains active.
+
+## M5 competing fresh recovery and transfer contention — 2026-09-09
+
+A new regression reproduced a terminal Room error when checkpoint lookup returned
+temporary Busy. Status/download contention now backs off and starts a fresh status
+request; authority-request Busy still retains its prepared checkpoint and existing
+decision semantics. No authority, lease or rollback policy is relaxed.
+
+Two native Cavecrawl races start from the same saved two-player world with all
+original processes gone. Both fresh returners retain that checkpoint before being
+released. Simultaneous release elects seat 1 in the captured run; releasing the
+guest first elects seat 2. The losing process follows the winner, executes a loot
+action, and the winner stores publication 2. The browser RTC race elects seat 2 and
+passes the same continuation. Independent readers confirm epoch 2, the actual
+winner and three conserved gems. All 39 storage/protocol/Room tests, three
+Godot-core tests, WASM checks and existing process-kill gates pass. See
+[evidence](results/restore-contention-2026-09-09/README.md).
+
+This closes the demonstrated contention error and adds actual-game race coverage.
+It does not establish broad distributed availability or complete M0–M9. Wider
+failure/deployment scenarios, workload/performance/comparison and human gates remain.
+Original Kit and Scrapyard remain preserved; the full goal stays active.
+
+## M5/M6 Speedball party save and scored-match recovery — 2026-09-09
+
+Speedball now routes party Save/F5 through Room, exposes asynchronous success/error
+state and optional automatic cadence, and provides recovery progress/retry through
+the existing rejoin menu. Browser solo save controls remain separate. Save, handoff
+and recovery controls have distinct positions; the final browser gate verifies and
+captures the layout without overlap.
+
+Native verified-TLS and fresh-browser RTC gates save a scored round, exit the source
+game, kill/restart the service and rejoin with preserved score/winner/round/kick count,
+personal identity and seat. Native restores tick 561; the final browser run restores
+tick 571. Both use incarnation 3/epoch 2, admit a new guest, restart and win round 2,
+exchange chat and publish revision 2. Independent readers validate final round-2
+scores, kicks and names. Nine model tests/WASM checks pass, as do existing planned
+and crash party migration gates and direct-file save/resume/failure regressions.
+See [evidence](results/speedball-party-restore-2026-09-09/README.md).
+
+Browser control uses explicit loopback development WS and real RTC. Public/Steam
+deployment, broader workload/recovery cases, comparison/performance and human gates
+remain open. Original projects stay separate and preserved; the full M0–M9 goal
+remains active.
+
+## M5 atomic external assets and Scrapyard cold-cache recovery — 2026-09-09
+
+Room publications now atomically store the raw checkpoint and an optional complete
+asset package. A deployment-selected dependency policy requires current references
+and executable pending work; missing/extra/invalid assets fail before publication.
+Restore validates and installs the package before requesting authority, and its
+commit guard rechecks the package descriptor. Protocol 3 carries signed payload
+descriptors; authority Points and existing persistent/gameplay formats stay unchanged.
+
+Scrapyard declares current/pending spray dependencies and uses the existing PNG
+validator. Native and fresh-browser tests restore the stamped 2,103-byte spray after
+the original process/service exit with an empty cache; the browser deletes its
+local spray record first. Both resume in epoch 2/incarnation 3, fire and publish
+revision 2. Independent readers validate the exact asset and continued state.
+Room now reuses schema metadata and refreshes leases before installation/capture;
+exact restore/status retries avoid repeated expensive validation. Lease durations
+and rollback limits are unchanged.
+
+All 38 storage/protocol tests, 98 Scrapyard model tests, 11 asset tests and three
+Godot-core tests pass, with WASM checks and atomic publication/restore kill gates.
+The asset kill test observes either the complete old root/assets or complete new
+root/replacement asset. Cavecrawl's raw-checkpoint party recovery regression passes.
+See [evidence](results/durable-assets-2026-09-09/README.md) and
+[asset contract](../../replay/provision/checkpoint/assets.md).
+
+This profile remains bounded to 1 MiB per transferred checkpoint/package and 32
+dependencies; larger assets, deduplication and broader game/workload/deployment
+acceptance remain open. Original Kit and Scrapyard are preserved. The complete
+M0–M9 goal stays active.
+
+## M5 Room/Party abandoned-session recovery — 2026-09-09
+
+Fresh trusted Rooms now query/download a published checkpoint when no live host
+remains, validate the model and stable seat, wait for asset preparation, request
+the guarded restore grant and initialize Session under the new epoch. Live hosts
+take precedence. Room multiplexes restore/save/RPC traffic and exposes progress,
+policy failure and explicit retry. Fresh-process recovery distinguishes the
+service-known tick from a nonexistent local confirmation history.
+
+Cavecrawl's actual Rejoin menu passes native and fresh-browser recovery after the
+source game exits and the service is killed. Native restores tick 43 with three
+gems as incarnation 3/epoch 2; browser restores tick 44. A new guest then joins,
+executes a torch action and the restored host publishes revision 2. Independent
+readers validate both continued saves (local seat 1, three gems, two torches).
+Thirty-two lifecycle/storage tests, three Godot-core tests, WASM checks and all
+existing persistence/restore kill gates pass. The original live migration/rejoin
+gate still passes. See [evidence](results/room-restore-2026-09-09/README.md) and
+[Room's restore contract](../../replay/godot/room_restore.md).
+
+Asset-preparation tests hold authority ungranted, explicitly retry storage failure
+and recover a dropped download ACK while preparing. Native uses verified TLS;
+browser uses explicit loopback development WS with real RTC. Other game acceptance,
+durable external assets, broader recovery/deployment cases and remaining M0–M9
+work stay open. Original Kit and Scrapyard remain preserved; the full goal is active.
+
+## M5 guarded fresh-process publication restore — 2026-09-09
+
+Checkpoint protocol 2 adds a separate Restore request using the authority Lease's
+request frontier. Registration may replace an expired owner's incarnation only in
+a recovery-enabled service after lease expiry/quarantine; it grants no lease.
+Restore validates the exact durable publication, trusted host/infrastructure and
+playable-seat eligibility, rollback/release policy and Record CAS, then atomically
+persists the new epoch, recovered Point and request result. Admitted Busy/Too_Old
+results are durable too, preventing delayed rejected requests from becoming grants.
+
+Fresh native processes restore all three actual game models through verified TLS:
+incarnation 2 obtains epoch 2 and advances each saved tick-1 world to tick 11.
+Thirty storage/protocol/restore tests, 31 authority tests and 127 network tests pass.
+Process kills before/after the restore commit preserve respectively epoch 1/request
+2 or epoch 2/request 3, with publication 1 intact and inactive coordinator startup.
+The full Cavecrawl WASM build and browser save/migration/rejoin regression pass;
+its saved successor inventory is independently decoded. See
+[evidence](results/published-restore-2026-09-09/README.md) and the [restore contract](../../replay/provision/checkpoint/restore.md).
+
+Game/checkpoint/Record/Bundle formats stay unchanged; checkpoint-transfer clients
+and services must upgrade together to protocol 2. Room/Party restoration UI,
+external asset durability, fresh-process loss reporting and browser restore execution
+remain open. Original Kit and Scrapyard are preserved; the complete M0–M9 goal
+stays active.
+
+## M5 Room save lifecycle and active Cavecrawl publication — 2026-09-09
+
+`room_save` now owns status lookup, current-world capture, authenticated transfer
+and durable completion. Room's single control receiver dispatches checkpoint and
+authority traffic so uploads do not drain lease replies. Party passes optional
+automatic save cadence; role/generation changes interrupt old work and preserve
+uncertain prepared bytes. An exact stored result resolves a lost reply without
+republishing. Publication requires WSS or an explicit loopback WS development opt-in.
+
+Cavecrawl's save action and party button use this path. Native manual publication
+passes across migration; automatic publication reaches revision 10/tick 154 in
+epoch 2. The browser Room/RTC gate saves revisions 1 and 2, with the successor's
+checkpoint at tick 533. Fresh native database readers decode both final saves with
+local seat 2, three gems and two torches. Room isolation, handoff with zero known
+lost ticks and old-host rejoin remain intact. All 23 storage/protocol/Room lifecycle
+tests, three Godot-core tests, WASM checks and existing persistence crash gates pass.
+See [evidence](results/room-save-2026-09-09/README.md) and [API contract](../../replay/godot/room_save.md).
+
+The browser gate uses explicit loopback development WS with real RTC; native uses
+verified TLS. These are active-game publications, not all-members-gone restoration.
+Fresh-process restore grants, external asset durability and remaining game UI/save
+integration are still required. Original Kit and Scrapyard remain preserved; the
+complete M0–M9 goal stays active.
+
+## M5 standalone service checkpoints for the game ports — 2026-09-09
+
+The standalone room service now selects compiled Cavecrawl, Speedball and Scrapyard
+checkpoint backends from its deployment content ID. An optional required model
+name fails mismatches before database access. A bounded checkpoint Hub mirrors
+admitted resident rooms without lazy storage loads or coordinator restarts, and
+multiplexes authenticated checkpoint traffic with the existing service protocols.
+
+All three actual game models pass native verified-TLS publication/download and
+service-kill/restart acceptance. Tick-1 archives of 4,038, 741 and 53,067 bytes
+respectively remain byte-identical when downloaded by fresh trusted incarnation 2
+with zero authority lease. Two hub tests add unknown-room/no-restart checks and
+independent publications for two rooms sharing one transport; all 21 storage/hub
+tests, ten provisioning tests, their WASM checks and existing crash gates pass.
+The existing Cavecrawl party test also passes handoff to epoch 2 with zero known
+lost ticks, gem conservation and old-host rejoin as incarnation 3. See
+[evidence and scope](results/service-checkpoints-2026-09-09/README.md).
+
+This is seeded game-state persistence and service integration. Room/Party still
+need publication cadence/status/UI, browser transfer execution, durable external
+assets and explicit restore authorization for a fresh process. Download does not
+reactivate gameplay. Original Kit and Scrapyard remain preserved; the full M0–M9
+goal remains active.
+
+## M5 authenticated room checkpoint transfer — 2026-09-09
+
+The checkpoint library now supplies signed upload/download/status endpoints over
+the existing bounded blob transfer. Requests bind the registered identity, process
+nonce, connection generation and coordinator generation. Data also binds the exact
+request hash and transfer ID. Trusted-host permissions gate reads; live ownership,
+typed contract validation, final commit authorization and SQLite CAS gate writes.
+An expired uploader releases its slot; exact committed retries do not renew leases.
+
+Nineteen provisioning-storage/protocol tests and the WASM check pass, covering
+multi-chunk loss/duplication/reordering, expiry during upload/backend work,
+revocation, reused connections, stale transfers, competing coordinators and
+publication retries. Existing persistence process-kill gates and 30 authority tests
+also pass. Native verified-TLS clients upload and download a checkpoint, then a
+service restart and fresh trusted incarnation 2 download the same publication 1,
+tick 1, world value 8 with zero remaining authority lease. See
+[evidence](results/checkpoint-protocol-2026-09-09/README.md).
+
+The standalone service still needs deployment-selected model/backend registration;
+Room/Party save cadence/UI, browser execution, asset preparation and durable
+fresh-incarnation restore authorization remain open. Download is not gameplay
+reactivation. Original Kit and Scrapyard remain preserved; the full M0–M9 goal
+stays active.
+
+## M5 durable room checkpoint storage — 2026-09-09
+
+The native provisioning SQLite store now retains a bounded typed checkpoint and
+publication metadata in one transaction. Full coordinator-Record comparison and
+publication revision CAS fence competing writers; exact retries acknowledge the
+existing publication without reviving authority. Owned loads validate context,
+hash/envelope integrity and the supplied game model.
+
+Nine storage tests pass, including coordinator restart, stale publication,
+wrong owner/context/model, corruption and read-only rejection. Actual publisher
+processes killed before/after commit recover respectively revision 1/tick 1/value 8
+and revision 2/tick 2/value 9. Reopening the coordinator keeps epoch 1 inactive.
+See [evidence](results/room-publication-2026-09-09/README.md) and the
+[remaining publication/resume plan](../../replay/provision/checkpoints.md).
+
+This is trusted storage only. Authenticated transfer, fresh-process restore
+authorization, all-members-gone Room recovery and game UI remain open. Original
+Kit and Scrapyard remain preserved; the full M0–M9 goal stays active.
+
+## M3/M7 native connection generations and queued-data fencing — 2026-09-09
+
+The shared MultiplayerPeer adapter now records a generation per accepted
+connection and the backend FIFO boundary preceding it. Reused IDs cannot relabel
+old pending/backend packets; other peers' traffic remains deliverable. Duplicate
+connects are idempotent, capacity stays bounded and generation exhaustion refuses
+new connections. ENet exposes the metadata and the Steam wrapper forwards it.
+
+The Godot fixture, real ENet, Steam contract/Session checks, 21 transport tests,
+both native P2P rejoin directions and the complete Duel WASM build pass. The Steam
+regression caught and fixed its initially missing forwarding callback. See
+[evidence and scope](results/native-generations-2026-09-09/README.md).
+
+Generations are local connection metadata within an owner lifetime, not account
+authentication or a wire-format change. Original projects remain preserved and
+the complete M0–M9 goal stays active.
+
+## M7 native listening-participant recovery — 2026-09-09
+
+The surviving native dialing process can now replace its ENet transport when the
+original listening participant returns from its saved archive. Explicit transport
+reopening handles reuse of physical server ID 1 while retaining logical identity,
+world, input/ACK frontiers and timeline/input/hash storage. The fixed loopback
+provider remains distinct from authenticated public admission.
+
+The creator-return and existing dialing-peer-return gates both reach the tick-600
+reference hash with 57 shots and 18 hits. The complete Duel WASM build checks shared
+code compatibility. See [evidence and bounds](results/native-creator-rejoin-2026-09-09/README.md).
+Missing/forgotten inputs are still rejected; this does not replace a required
+participant or authorize a new roster. Original projects remain preserved and the
+full M0–M9 goal stays active.
+
+## M4/M9 reusable copied action intents — 2026-09-09
+
+The library now owns the copied pending payload and epoch-scoped action tickets
+previously tracked by Scrapyard's dash code. Session/Room wrappers retain blocked
+input, filter speculative/foreign/duplicate results, and process recovery's known,
+retained, retired and unknown outcomes without blindly retrying gameplay. A reused
+sequence in a new epoch cannot consume an old result.
+
+All 127 network tests and the expanded WASM check pass. Native Godot verifies
+resync delivery and an actual checkpoint/recovery-report path through a Room
+authority, including retained work and sequence reuse. Scrapyard's input guards,
+native party handoff/return, a live faulted request trace and full WASM build pass.
+Its eight direct tracking fields become one intent field; custom bookkeeping
+before the probe drops from 28 to 14 nonblank lines. See [evidence and limits](results/action-intent-2026-09-09/README.md).
+
+These are source measurements and functional checks, not human usability or a
+new paired performance result. Original projects remain preserved; the full
+M0–M9 goal and its remaining authoring, workload, recovery/platform and human gates remain active.
+
+## M7 confirmed spectator source failover — 2026-09-09
+
+`watch_rebind` retains the confirmed world and returns a session/epoch/content,
+contract, tick and state/event/chain anchor. A replacement source must prove that
+retained history; a strictly increasing stream binding fences old traffic. Invalid
+requests are atomic, and a rebind cannot clear divergence or skip continuity with
+a fresh later baseline. Existing history-gap resets remain available after a
+verified source has resumed delivery.
+
+All 33 P2P tests pass. A three-player corpus switches sources twice across four
+fault seeds, native/WASM and default/speed builds with identical final hashes.
+The three-process native Duel changes sources during play, retains the complete
+world immediately, adds no presentation reset and reaches the players' tick-900
+reference. The previous blackout/reset gate and full web-module build also pass.
+See [evidence and scope](results/watch-failover-2026-09-09/README.md).
+
+The native fixture uses configured loopback participants and a private anchor
+file; public spectator admission and browser source-switch provider integration
+remain open. Original projects remain preserved and the full M0–M9 goal stays active.
+
+## M3/M9 unreliable snapshot acknowledgments — 2026-09-09
+
+Snapshot ACKs now use unreliable latest-state delivery, retaining existing periodic
+repeats and monotonic binding/ID/hash checks. Holding an old reliable ACK reproduced
+action blocking in the ordered transport model. A targeted real-ENet drop measured
+534 ms action round trip before and 285/287 ms after on a 120 ms-per-way link.
+All 120 network tests, ten recovery tests and six frozen compatibility cases pass.
+
+The fresh cohort passes Replay's twelve delay/raw-loss windows and the paired
+delay condition with 61 report cases. The full pair matrix remains rejected for a
+Kit client battlecry observation; Replay's raw observed-state gaps still reach
+1.369 seconds. See [implementation, evidence and limits](results/snapshot-ack-2026-09-09/README.md).
+
+Original Kit and Scrapyard remain preserved. This closes a demonstrated ACK/action
+blocking mechanism, not the full M0–M9 goal or the remaining responsiveness,
+workload, recovery, deployment/platform and human-review requirements.
+
+## M9 stress-aim origin and impact accounting — 2026-09-09
+
+A buffered ballistic ledger accounts for every shot, hit, cover impact and miss in
+copied diagnostic games; twelve verifier cases check its conservation rules. It
+reproduces low kill output and identifies substantial client misses/cover hits.
+The actual stress helper also fails a focused regression because it aims from an
+older authoritative player position. It now uses the predicted local origin, while
+retaining the observed enemy census and existing game rules; client/host tests pass.
+
+The fresh comparison passes twelve delay windows and 61 report cases, with all
+Replay kill counts above the unchanged minimum. Raw loss remains rejected because
+one client misses the second battlecry observation; authority casts execute.
+A follow-up diagnostic reports a legitimate cooldown refusal when delayed dash
+arrivals fall only 62 ticks apart. See [evidence and limits](results/aim-origin-2026-09-09/README.md).
+
+Original Kit and Scrapyard remain preserved. Observation freshness and the full
+paired raw-loss gate remain open within the active M0–M9 goal.
+
+## M8/M9 Scrapyard dash actions and save conversion — 2026-09-09
+
+Scrapyard content 47 moves authored dash input to receipt-time actions with
+captured direction, queue-admission consumption and sequence-based results. The
+legacy control bit remains for imported recorded inputs. Frozen old action schemas
+and explicit content 42–46 conversion preserve pending state; 97 model tests, eight
+fresh native save resumes, a focused Godot input regression and a full WASM build
+pass. The input test also fixes a reproduced lobby-press leak into the yard.
+The current-content native TLS party gate passes active-combat handoff, successor
+asset recovery and the original host's return under a newer incarnation.
+
+All 120 local Replay dash submissions in the full 24-window cohort are confirmed,
+with ten dashes per player. A separate sequence audit demonstrates three already-
+late first arrivals executing once at newly admitted authority ticks. The full
+paired workload is still rejected: three Replay runs have fewer than the required
+20 kills, and raw observed-state gaps reach 3.037 seconds. See [evidence and limits](results/dash-actions-2026-09-09/README.md).
+
+The delay pilot and 61 scoped report checks pass. No new paired performance result
+is accepted. Original Kit and Scrapyard remain preserved; the full M0–M9 goal stays active.
+
+## M3/M4 versioned per-action timing — 2026-09-09
+
+`Model.action_schedule` now selects scheduled or receipt-time delivery by validated
+action payload. A nonzero version ID and pure callback are required together;
+the ID participates in the connection/checkpoint contract. Existing models retain
+their contract and timing. Mixed actions share sequence IDs, FIFO order, bounded
+queues and settled outcomes. Only receipt-time payloads can enter during resync.
+
+All 117 network tests, ten recovery tests and six frozen snapshot compatibility
+cases pass. Native Godot verifies both policies through Session during an actual
+fact-overflow resync. Explicit checkpoint conversions stamp the target policy
+while preserving already-admitted action ticks. See [implementation and evidence](results/action-schedule-2026-09-09/README.md).
+
+This supplies the library primitive for discrete intents alongside competitive
+scheduled actions. Scrapyard still sends dash through scheduled controls; its
+recorded raw-loss failure remains open until the port, save conversion and live
+comparison are completed. Original Kit and all original games remain preserved;
+the full M0–M9 goal remains active.
+
+## M9 jam-clearing combat comparison — 2026-09-09
+
+A separate stress profile adds normal gun jams and three-pull clearing to the
+moving endurance swarm. It preserves identity-derived salts and verifies seeded
+duds, live shots, clear outcomes, ammo/mode/taps and settled gun-state convergence.
+Twelve delay-condition windows and 60 report checks pass. The full 24-window matrix
+is rejected: raw-loss pair 2 exposes stale Kit cooldown observations and a missing
+Replay dash, still absent after settling. See the [workload and evidence](results/jam-clearing-2026-09-09/README.md).
+
+The original sources and earlier accepted endurance workload remain preserved.
+This adds measured jam coverage and a new input-loss reproduction; it does not
+close raw-loss acceptance or the full M0–M9 goal.
+The buffered audit also supports this profile. A same-build repeat delivers all
+thirty remote dashes; an earlier diagnostic attempt fails repeated resync/drain.
+Both are retained, and neither explains away the original single-dash failure.
+
+## M3/M4/M9 receipt queue through resync and full endurance gate — 2026-09-09
+
+Receipt-mode actions can now join the existing bounded queue during a same-epoch
+resync with an established identity. They keep their sequence IDs and wait for
+Welcome before sending or predicting. Other phase/model restrictions, validation,
+permits and capacity remain. Three new tests plus an actual wire-overflow and
+Godot Session continuation verify no early send and one settled result per sequence.
+All 110 network tests, ten recovery tests and six snapshot compatibility cases pass.
+
+The fresh full endurance matrix passes 24 process windows and 56 report checks,
+including both receive-delay and raw-loss conditions. The core/Godot tests exercise
+resync queueing directly; this cohort had no measured resync, so it alone does not
+establish causality. Replay remains more expensive in this comparison and raw
+observed-frame gaps reach 1.398 s. See [measurements and limits](results/receipt-resync-2026-09-09/README.md).
+
+Original Kit and Scrapyard remain preserved. Prior failed cohorts are retained;
+this closes one named acceptance run, not the full M0–M9 objective. Other workloads,
+recovery boundaries, authoring/deployment/platform gates and human review remain.
+
+## M9 cast-submission measurement correction — 2026-09-09
+
+The alleged Kit submission refusal was a failed local prediction against a stale
+cooldown; the command still reached the authority and executed in that earlier
+cohort. The isolated comparison now records generated Action_Outcome sequences
+and separates submission from prediction, preserving Kit's original game path.
+Authority/cooldown/status work remains independently required.
+
+All 58 existing Kit network tests pass. A fresh 24-window matrix passes its twelve
+delay-condition windows and 54 report tests, including valid sent-but-locally-
+rejected outcomes. The full raw-loss matrix remains rejected for missing authority
+cast work and a Replay resync/dash failure in the new run. See
+[corrected interpretation and evidence](results/cast-submission-2026-09-09/README.md).
+
+This corrects the prior measurement diagnosis, not the full network envelope.
+Original Kit and Scrapyard remain preserved. The full M0–M9 goal remains active.
+
+## M3/M9 input-frontier and consumption fixes — 2026-09-08
+
+A buffered audit reproduced the missing dash: the press remained latched for
+450 ms, but a small old correction freed tick 869 after the authority had already
+advanced; it arrived at authority head 904 and was never accepted. Scheduled input
+now waits behind validated authority progress, including scoped snapshot parts.
+Session/Room expose an actual control-consumption receipt, and Scrapyard uses it
+instead of treating any timeline-head advance as a sampled input.
+
+All 107 network tests, ten recovery tests, six snapshot compatibility cases and a
+native Godot capture/catch-up/Room fixture pass. The final endurance run records ten
+dashes for every Replay player; all six raw-loss Replay windows pass the strict
+workload and convergence checks. The paired delay condition passes twelve windows
+and 49 report tests. See [audit and results](results/input-frontier-2026-09-08/README.md).
+
+The paired raw-loss matrix remains rejected because a Kit control client locally
+refused one frostwave. Scoped Replay success is distinct from full paired acceptance.
+Original Kit and Scrapyard remain preserved. Broader faults, remaining gameplay
+workloads, platforms/deployment and human review remain part of the active M0–M9 goal.
+
+## M3/M4/M9 endurance workload and explicit receipt actions — 2026-09-08
+
+A separate paired Scrapyard workload adds stock eight-round reloads, ten dash
+intents, scheduled burn/salve exposure and the stock surge reaction to the moving
+forty-enemy swarm, with delay and raw UDP loss conditions. The original complete
+cohort exposed stale action rejections and prediction-limit resyncs. The client
+now stalls at the prediction bound without discarding retained state; an explicit
+Receipt action policy accepts cooperative requests at authority receipt time while
+preserving ordering, deduplication, admission and atomicity. Scheduled remains the
+default and keeps its original contract. Only the isolated comparison model opts in.
+
+All 103 network tests, ten recovery tests and six snapshot compatibility cases
+pass. Three delay-condition pairs pass twelve process windows and 49 report checks:
+players reach HP 4, recover, dash ten times and reload five times. Median client
+callback p95 is 727 µs for the Kit owner-control copy and 3,393 µs for Replay;
+application output remains much higher in Replay. See
+[evidence, controls and limits](results/scrapyard-endurance-2026-09-08/README.md).
+
+The full raw-loss matrix remains rejected. Receipt-time casts execute on the
+authority and no measurement resync occurs, but one remote player executes only
+eight of ten dashes; its longest observed authority-tick progress gap is 1.663 s.
+The cause of the missing short input edges is not yet proven. Capture/consumption,
+scheduled arrival and clock discipline need an input-receipt audit next. No gate
+was relaxed to label this complete. Original Kit and Scrapyard stay preserved;
+full M0–M9 work remains active.
+
+## M3/M7 connection generations and creator recovery — 2026-09-08
+
+Transport adapters can now supply local connection generations. Memory and RTC
+expose them; Delay, Router, Fragments and Remap propagate/fence buffered work.
+Retired packets, fragment assemblies, pending backpressure, outgoing work and old
+delivery frontiers cannot enter a replacement connection under the same peer ID.
+Unversioned adapters retain their previous interface behavior.
+
+The authenticated Duel now supports either participant returning. The creator's
+browser saves and is killed; the joining browser keeps its runner through timeout.
+Creator ID 1 returns with generation 2, is verified against the admitted member,
+and both peers reach tick 600 with checksum 9353382615414616636 and reconciled shot
+occurrences. The combined gate also exercises ordinary joining-player rejoin and
+continued allocation of physical IDs by the same service.
+
+The 21 transport, 97 network, 10 recovery and 28 P2P tests pass. Raw RTC large-message,
+mesh/replacement and Hello gameplay checks pass, as does authenticated signaling
+continuation with healthy generations preserved. See
+[recorded behavior and limits](results/p2p-creator-recovery-2026-09-08/README.md).
+
+The service and fixed match stay alive, and the original creator supplies its own
+compatible archive. Native listening-process replacement, spectator source failover,
+public provisioning and broader roadmap requirements remain open. Original Kit and
+games stay preserved; the full M0–M9 objective remains active.
+
+## M7 challenged P2P admission provider — 2026-09-08
+
+`Rendezvous` now accepts a trusted authorization provider while preserving the
+existing authority Service policy. A fixed-match registry authenticates P2P
+members with scoped, challenged HMAC proofs. Optional mesh introductions carry
+exact member/incarnation metadata; Duel verifies it before initial binding and
+live rejoin. The lobby imports personal credentials into tab sessionStorage and
+keeps keys out of join URLs.
+
+Four admission tests pass. A native three-member signaling gate admits the roster,
+rejects five attack cases, forwards client-to-client messages and overwrites spoofed
+senders. The real browser gate imports credentials, refuses missing-credential
+navigation, saves and kills one participant, authenticates its fresh browser and
+continues with the live survivor to tick 600, checksum 9353382615414616636 and
+correct shot reconciliation. The 30 authority tests, existing authenticated RTC
+continuation/expiry gate, 28 P2P tests and plain browser fault gate also pass.
+See [recorded results and limits](results/p2p-admission-2026-09-08/README.md).
+
+Public account/invite provisioning, authenticated spectator admission, policies
+for terminating established direct matches, listening-transport replacement and
+broader deployment/platform work remain. Authentication does not establish honest
+simulation or recover missing input history. Original Kit and games remain separate;
+the full M0–M9 objective stays active.
+
+## M7 browser live peer rejoin and Save & pause — 2026-09-08
+
+The browser Duel now connects the retained-runner rejoin API to fresh WebRTC
+identities. Its actual Save & pause control stops local sampling before capturing
+the protocol archive and requesting a download, while received inputs and event
+reconciliation continue. The lobby supports importing that file to rejoin a match
+whose creator stayed open. The user owns download completion; the UI says to keep
+the completed file before closing.
+
+The real Chrome gate clicks the button during play, checks the downloaded length
+and unchanged head/sampled frontier, kills only the dialing browser with SIGKILL,
+and retains the creator through timeout. A fresh browser imports the file and
+joins the same room with a new RTC ID. The survivor's frame/allocation remain
+unchanged across rebind; both reach tick 600 with the reference world, checksum
+9353382615414616636 and reconciled shot counts. The native live rejoin regression
+also passes. All five browser scenarios pass, including existing fault, spectator,
+coordinated restore and keyboard gates. Both manual-save browser archives replay
+natively without mismatch. See [recorded evidence](results/p2p-browser-rejoin-2026-09-08/README.md).
+
+The local signaling fixture trusts the fixed player roles. Authenticated public
+admission, replacement of the listening transport process, arbitrary stale-save
+crash recovery, other browser engines and broader M0–M9 work remain open. Both
+frameworks and original game projects remain separate.
+
+## M7 retained-runner live peer rejoin — 2026-09-08
+
+`p2p.reconnect` restarts a provider-approved transport handshake while preserving
+the survivor's simulation, captured inputs, received/ACK frontiers and history
+allocations. It works after timeout, requires old-connection traffic to be excluded,
+and rejects failed/divergent or unsettled runners. The returning participant
+restores its own archive; incompatible forgotten or evicted inputs fail explicitly.
+There is no authority election, world replacement or input regeneration.
+
+The native Duel gate kills only the saved dialing participant, retains the listener
+through timeout, binds the replacement ENet identity and reaches the tick-600
+reference world with matching shot reconciliation. A four-seed three-player corpus
+restarts two different participants separately after timeout, retaining both other
+runners each time. Native and executed WASM agree under default/speed builds at
+tick 360, checksum 3406894391857810507. All 28 P2P tests and archive replay checks
+pass. See [evidence and boundaries](results/p2p-live-rejoin-2026-09-08/README.md).
+
+The saved participant stops sampling before being killed; arbitrary stale saves
+may lack already-sent local inputs and cannot recover this way. Browser live rejoin,
+authenticated admission, listening-transport replacement, broader platform checks
+and the rest of M0–M9 remain active. Original Kit and games stay preserved.
+
+## M1/M3/M9 explicit exact correction reuse — 2026-09-08
+
+`correct_reusing` can retain unchanged correction records when the complete
+predecessor state and rewritten input match byte for byte. Changed inputs/state
+simulate normally; convergence can enable later reuse. Every rewriter call and
+authoritative event replacement remains, failure is atomic, and audit/full
+correction still execute the entire suffix. Client/Session use is opt-in and
+separately reports retained versus simulated work.
+
+The 28 core tests, 97 network tests, recovery/compatibility checks and a 128-case
+native/WASM/default/speed differential corpus pass. The exact fingerprint is
+15977830660284153961. A matching 64 KiB synthetic state improves, but the final
+three-pair mixed cohort reuses only 111–133 records per client; its p95 remains
+about 3.27 ms. Twelve process windows and 37 report cases pass. See
+[measurements and limits](results/correction-reuse-2026-09-08/README.md).
+
+This option stays off by default and does not solve the mixed workload's main
+replay cost. Broader performance, platform/deployment, authoring and playtest work
+remain. Original frameworks/games stay preserved; the full M0–M9 goal stays active.
+
+## M3/M9 staged LZ4 encoder — 2026-09-08
+
+The mixed workload phase profile identifies substantial snapshot codec/selection
+cost. Two byte-identical decoder word-loop experiments were slower and rejected.
+The retained encoder stages one complete block before publishing it, avoiding the
+second match search while preserving short-output atomicity. Workspace increases
+from 16,384 to 82,192 bytes per server; wire/checkpoint formats and decoder stay exact.
+
+A 440-case frozen-reference comparison and the existing 768-case native/WASM/LZ4
+oracle corpus pass. All 96 network tests, six frozen-version compatibility cases and
+ten recovery tests pass. A fresh corrected-baseline mixed cohort passes twelve
+process windows and thirty-five report cases. Replay host median p95 is 1,845 µs;
+host p50 does not improve. Diagnostic mean snapshot-delta cost falls from 401.1 to
+301.9 µs, while whole-frame variation remains explicit. See
+[measurements, rejected candidates and limits](results/lz4-staging-2026-09-08/README.md).
+
+The encoder saves measured work at a fixed memory cost; it does not change fidelity,
+cadence or validation. Remaining replay/presentation/bandwidth cost, broader
+workloads/platforms/deployment and playtests stay on the roadmap. Original Kit and
+games remain preserved; the complete M0–M9 objective stays active.
+
+## M9 corrected-baseline mixed performance cohort — 2026-09-08
+
+The mixed runner now has an explicit isolated owner-control mode. Kit is built
+against a copied framework with the audited unwind repair; Replay uses the original
+collection root. Normal mixed adapters/timing boundaries remain, without the causal
+audit's packet-bracketing probes. Reports verify per-implementation collection
+roots, the one-file source change and its declared hashes, and reject backward
+owner motion in the corrected client trace. Original-format reports remain readable.
+
+Three alternating pairs pass all twelve process windows and thirty-five report
+acceptance/rejection cases. Corrected Kit owner reversals are zero. Median p95
+callbacks are 899/804 µs for Kit host/client versus 2,024/3,467 µs for Replay;
+application output is about 29,110/2,092 versus 252,349/17,645 B/s. Replay clients
+retain p95 five extra fact-lag ticks, maxima 5–7, with no measurement resync.
+Movement is much closer; shot/kill and other transient differences remain explicit.
+See [source, raw data, validation and figures](results/mixed-owner-control-2026-09-08/README.md).
+
+This provides the previously missing corrected-baseline timing cohort. The copied
+repair is not a production Kit change or a general owner-command semantic approval.
+Broader workloads, authoring/debugging effort, platform/deployment checks and human
+playtests remain. Original projects are preserved; the full M0–M9 goal stays active.
+
+## M9 movement discrepancy resolved to owner unwind — 2026-09-08
+
+The mixed cohort's large second-player movement loss now has a reproduced
+mechanism. Kit delta reconciliation unwinds pending snapshots without preserving
+live owner-streamed coordinates. A small engine-free case restores x=100 instead
+of the current 140 during an unrelated clock delta, while ammo replay and the
+simulation lane stay correct. An isolated skip for local/predicted owners preserves
+140 and passes all 58 existing Kit networking tests.
+
+Three alternating real-game original/control pairs show 401–442 backward moves
+inside original client packet processing, always with pending predictions. The
+control has zero, and normal movement has zero in both variants. Player-2 path
+length recovers to about 4,290–4,297 client-observed pixels. Population, ability/
+status work, conservation and final peer convergence pass across twelve processes;
+twelve report validation cases pass. See [the diagnosis and control](results/owner-unwind-2026-09-08/README.md).
+
+Only copied framework/game directories contain the diagnostic repair. Original Kit,
+original Scrapyard and the primary Replay port remain unchanged. Earlier mixed
+costs retain their measured values but now explicitly carry the baseline defect;
+corrected-baseline timing and remaining trajectory/outcome work are still needed.
+The complete M0–M9 objective stays active.
+
+## M9 mixed movement/status comparison — 2026-09-08
+
+A new isolated Scrapyard cohort extends the sustained offensive swarm with cardinal
+player movement and stock frostwave/battlecry casts. Spawn, target, movement and
+cast-intent dispatch run inside each timed game callback; read-only census records
+actual player paths/HP/loadout, cooldown rises, rally exposure and chilled enemies.
+The old 255-round/no-jam/zero-bite fixture remains explicit. No original or primary
+Replay game sources are patched.
+
+All twelve process windows pass across three alternating pairs, followed by thirty
+report acceptance/rejection cases. Both games retain 38–40 living enemies, two
+cooldown cycles per slot, four submitted casts per player, observed movement/status
+work, authority health/loot/kill conservation and settled-peer convergence. Replay
+client fact-lag p95 is five ticks, maxima 5–7, with no measurement resync.
+
+Kit remains cheaper in this cohort: median p95 callbacks 791/656 µs for host/client,
+versus 1,901/3,229 µs for Replay; median application output about 30,856/2,092 versus
+252,362/17,583 B/s. Player paths and kills materially differ, so these are inclusive
+product-workload observations, not a framework-only ratio. Source/binary hashes,
+raw receipts, report mutation checks and standalone figures are retained in
+[the mixed result](results/scrapyard-mixed-2026-09-08/README.md).
+
+Player injury, DOT/combo/dash/reload combinations, changing waves, combined raw
+faults, broader authoring/debugging work, platforms and human playtests remain.
+Original Kit and both game versions stay preserved. The full M0–M9 goal stays active.
+
+## M6 Speedball browser solo checkpoints — 2026-09-08
+
+Browser solo play now uses named, personal-identity-scoped save slots through the
+existing Browser_Checkpoint adapter. Submission and completed-write receipts have
+different UI states. Resume validates the same complete checkpoint through the
+shared native/browser restore function. Stale tabs retain their observed revision;
+conflicts and corrupt records do not trigger an overwrite or identity replacement.
+New solo play can use another slot without altering a damaged archive.
+
+The Chrome gate kills the owned browser with SIGKILL after the completion receipt,
+then verifies the same identity/name and exact scored/moving frame in a new process.
+It continues through two new spikes, match completion/restart and a round-2 save.
+Two tabs demonstrate CAS conflict preservation; archive and identity corruption
+cases keep the underlying records unchanged. Saved/error screens were inspected.
+See [evidence and limits](results/speedball-browser-save-2026-09-08/README.md).
+
+The nine model tests/WASM, native save/UI and browser party planned/host-loss gates
+remain the regression set. Public deployment, Room save publication, other browsers,
+Steam, full comparisons and wider playtests remain. Original Kit, original games
+and sibling Scrapyard stay preserved; the complete M0–M9 objective stays active.
+
+## M5/M6 Speedball browser party lifecycle — 2026-09-08
+
+Speedball now exports its existing value model and scene to Web. Launch settings
+map to browser query parameters, Party/Room selects RTC, and personal identity/name
+loads through the existing IndexedDB adapters. Connection controls wait for the
+profile; native environment/file behavior remains available. Room credentials stay
+in their own namespace. No gameplay schema/content change was required.
+
+Chrome host/player/observer scenarios pass planned handoff and host-browser loss
+with exact moving/scored checkpoint restoration. The observer stays in seat 0 and
+can leave/rejoin. A fresh browser process retains personal identity, display name,
+invite and seat under a newer incarnation. New spikes/chat and matching canonical
+worlds are required. Actual selected RTC candidate-pair traffic is recorded before
+and after recovery. Rendered menu/observer/returned-host captures were inspected.
+
+The nine model tests/WASM and native profile, UI, save/resume and party regressions
+pass. See [results, export preparation findings and limits](results/speedball-browser-2026-09-08/README.md).
+Browser file saves, public TLS/TURN deployment, other browsers/Steam, raw faults,
+full comparisons and wider playtests remain work. Original Kit, original games and
+sibling Scrapyard remain preserved; the complete M0–M9 objective stays active.
+
+## M5/M6 Speedball native party front door and observers — 2026-09-08
+
+Configured native Speedball deployments now use the shared Party helper for Create,
+invite Join, Watch only, Rejoin Recent and Copy Invite. Durable room credentials
+stay separate from the personal identity/name profile. The menu states that trusted
+invitees can host and keep the match running; the selected gameplay observer mode
+does not itself revoke that membership capability.
+
+The Room driver now preserves an explicitly requested Observer role when joining,
+instead of always opening a player client. Native WSS tests keep the observer in
+seat 0 without checkpoint reception through planned/crash migration and a subsequent
+leave/rejoin. A fresh former-host process reuses its credential and stable invite,
+gets a newer incarnation and retains seat 1. The promoted guest restores the exact
+moving/scored checkpoint, accepts two new spikes, exchanges observer chat and agrees
+with both other peers on a later canonical world.
+
+The three provision adapter tests and twelve durable enrollment tests pass, along
+with the Godot adapter WASM checks. Native party, rendered scene, direct UI/save,
+contested-ball and fixed-roster migration gates remain the verification set. See
+[receipts, screenshots and preparation findings](results/speedball-party-2026-09-08/README.md).
+
+Browser/Steam integration, public deployment, Room/browser saves, all-members-gone
+recovery and wider visual/playtest/comparison requirements remain. Original Kit,
+original Speedball and sibling Scrapyard remain preserved. The complete M0–M9 goal
+stays active.
+
+## M3/M6 direct epoch discovery and Speedball file resume — 2026-09-08
+
+Speedball now exposes native Save/F5, a save-file field and Resume solo/Resume host.
+It validates the complete archive and saved host identity before starting a fresh
+authority. A scored moving pitch restores exactly, reconnecting peers retain seats
+and names, and new spikes, match completion, round restart and chat continue.
+Damaged/missing archives and another participant's profile fail visibly; failed
+staging writes preserve the completed save. Content remains revision 4.
+
+The first real fresh-client test exposed a missing direct-join primitive: the
+old handshake required callers to supply the current epoch. New optional protocol-7
+query/reply kinds 20/21 resolve it before Hello, using a fresh challenge, content/
+contract checks and the selected transport peer. The query contains no reconnect
+credential and reserves no seat. Both endpoints opt in. Leased endpoints and
+running clients retain strict epoch/recovery rules; Room still obtains its grant
+from the coordinator. Base contracts and checkpoint layouts remain unchanged.
+
+All 96 network tests, ten recovery tests, six frozen-version compatibility cases,
+nine Speedball model tests and WASM checks pass. Native save/fresh-process recovery,
+solo/contested-ball, UI, two-match restart and Room migration remain the acceptance
+set. See [evidence, preparation failures and limits](results/speedball-save-2026-09-08/README.md).
+
+Manual file resume is for stopped direct runtimes; it retires pending commands,
+marks remote seats disconnected and does not provide election or fencing. Room/
+browser save integration, public rooms, broader parity/comparison and platform/
+playtest requirements remain. Original Kit and original game projects stay preserved;
+the complete M0–M9 objective remains active.
+
+## M6 Speedball repeated matches and persistent identity — 2026-09-08
+
+The pitch now accepts a round-scoped Play again command from its first connected
+seat after a win. It resets score, ball/kickoff, player motion/cooldowns and per-match
+counters while retaining the roster, names, settings, network session and command
+sequence. Old-round requests cannot restart a later match. Prediction can rewind
+the command and restore the completed match. Content ID is now
+`0x5253504545444234`; previous archives are not silently converted.
+
+Native interactive play uses Replay's existing identity/name storage helpers.
+Separate per-player profile paths retain identity across process death; malformed
+files fail before connection without replacement. Explicit test tokens bypass
+profile reads/writes, and existing launch gates now supply them explicitly.
+
+Nine pure-model tests plus WASM pass. A three-process delayed-ENet gate completes
+two matches, checks guest rejection/roster preservation and exchanges chat. A fresh-
+process gate kills the client, recovers its name/seat, and checks corruption and
+override behavior. Existing solo/contested-ball, social UI and Room migration gates
+remain required regressions. See [evidence and remaining scope](results/speedball-rounds-2026-09-08/README.md).
+
+The original game already persisted reconnect identity through Kit boot; it did
+not expose Play again or a match save/load menu. Restart and saved display names
+are Replay additions. Match save/resume, public room discovery and broader port/
+comparison/platform/playtest requirements remain. Original projects stay preserved;
+the complete M0–M9 goal remains active.
+
+## M5/M6 Speedball native host migration — 2026-09-08
+
+Replay Speedball now composes its existing simulation, comms and views with the
+Room driver. A configured local coordinator supports planned handoff and abrupt
+host loss without replacing the original game. Recovery resets presentation
+smoothing/event bookkeeping, reapplies client cosmetic policy and resumes chat.
+The handoff button follows network authority; manual start follows the first
+connected game seat. This rule change uses content ID `0x5253504545444233`.
+
+Three-member native gates require an exactly restored, moving, scored checkpoint,
+two new accepted spikes, chat in epoch 2 and matching later world hashes among all
+survivors. Pure model/WASM checks and the existing solo, dedicated contested-ball
+and direct social/lifecycle gates also pass. A rendered test exposed the lobby
+reappearing during reconnection; the UI now retains the last known match view while
+showing recovery progress. See [receipts, captures and limits](results/speedball-room-2026-09-08/README.md).
+
+This project's Room path currently uses a fixed local three-member fixture.
+Public room discovery/enrollment, lobby/consecutive-migration integration, restart,
+saves and browser/Steam/play-feel parity remain work. Original Kit, original
+Speedball and sibling Scrapyard remain preserved. The complete roadmap stays active.
+
+## M6 Speedball session and social front door — 2026-09-08
+
+Replay Speedball now has a scene-authored Solo/Host/Join/Watch menu, validated
+names and direct address/port entry, host-controlled manual start, chat/input
+capture, held scores with round-trip telemetry, departed rows, leave/rejoin and
+host-departure handling. Scripted auto-start/bot roles retain their existing gates.
+The pitch rules remain; name/start state and commands use new content ID
+`0x5253504545444232`, without an implicit old-save conversion claim.
+
+Six model tests and the WASM check pass. Solo and four-process contested-ball gates
+pass: two spikes, matching 0–1 score/winner and centered ball; local spike response
+within three ticks / 40 ms. The three-process UI gate passes names/start authority,
+literal chat, input capture, score/ping, leave/rejoin and host departure with clean
+shutdown. Native Space/Tab interaction and rendered menu/pitch/scores were captured
+and inspected. See [source, screenshots and validation](results/speedball-ui-2026-09-08/README.md).
+
+The [port ledger](../../examples/replay_speedball/parity.md) retains trust/timeline
+differences and remaining restart/save/Room/browser/Steam/visual-playtest work.
+Original Speedball, other original games and Kit remain preserved. This advances
+the separate port; the complete M0–M9 goal stays active.
+
+## M3/M9 sustained faults below ENet — 2026-09-08
+
+A new bounded UDP proxy injects real datagram delay, jitter, loss, duplication and
+rate pressure beneath native Godot ENet. The final version-2 matrix passes both
+conditions twice: eight process receipts and thirteen report checks, with packet
+accounting/bounds reconstructed independently. All final game totals converge.
+One lossy window records two resyncs and 115 unavailable samples, within its
+explicit acceptance limits; the other three windows have no resync. This is an
+actual ENet loopback envelope, not an Internet or full-game performance claim.
+
+The work fixes sender burst excess and zero-echo input lockout. A bounded clock
+recovery path acquires initial accepted inputs without retiming queued actions.
+Recent small facts use a negotiated bounded bundle to bridge reliable-channel
+gaps while preserving reliable delivery and exactly-once confirmation. Bundling
+replaces an earlier packet-heavy version that starved browser telemetry. Per-peer
+admission reserves modest framing/retry headroom while counters remain actual bytes.
+The proxy's initial timer-drift error is fixed and its earlier failures retained.
+
+All 93 network tests, six frozen-version compatibility cases, recovery/interest
+and WASM checks pass; the 96-case startup corpus passes. Full browser gameplay/UI,
+telemetry and mixed encodings pass, as do planned/crash native migrations. See
+[evidence, intermediate failures and limits](results/raw-udp-faults-2026-09-08/README.md).
+Original Kit and original games, game simulation sources, canonical schemas and
+checkpoint formats remain preserved.
+
+Continue broader browser/SCTP fault-credit tests, mixed movement/status stress,
+remaining ports and authoring/debugging/platform/deployment/playtest gates. The
+earlier unclassified live failures are not presumed to have this same cause.
+The complete M0–M9 goal stays active.
+
+## M3/M9 lossless snapshot-delta compression — 2026-09-08
+
+A new exact-byte payload profile identifies collision history as about 93% of
+sparse delta size at sixteen-tick baseline age. That history remains intact for
+simulation and historical queries. Negotiated LZ4 over canonical XOR bytes reduces
+the selected profile payload from about 9,774 to 6,969 bytes without changing the
+world hash, schemas or checkpoint format. It is selected only when smaller than
+sparse/full encoding. Frozen pre-extension and parts-only runners interoperate.
+
+The pure-Odin codec passes 768 native/WASM cases in default/optimized builds and
+bidirectional checks against LZ4 1.10.0. Complete preflight preserves output on
+failure; bounds, terminal rules, aliases, corruption and partial streams are tested.
+Word scans preserve its exact fingerprint while cutting the measured age-sixteen
+encode cost from about 205 to 90 microseconds. There is no runtime foreign library.
+
+All 89 network tests, recovery/interest checks and the 96-case startup corpus pass.
+The optimized swarm cohort passes twelve process receipts and twenty report checks.
+Median/p95 extra lag behind received facts is now 3/4 ticks. The host still spends
+its configured bandwidth budget and clients perform more correction work; these
+costs remain explicit. The mixed browser party proves both LZ4 and parts-only paths
+with matching worlds; one client records a prediction-limit resync and continues.
+Planned/crash native migration passes. See [measurements, source and retained experiments](results/lz4-deltas-2026-09-08/README.md).
+
+Original Kit and original games are preserved. Further payload/history and
+prediction-cost work, sustained actual fault/credit-pressure tests, remaining
+ports/authoring/platform/deployment/playtest requirements and earlier unclassified
+live failures remain. The complete M0–M9 goal stays active.
+
+## M3/M9 negotiated snapshot parts — 2026-09-08
+
+Large snapshots now use negotiated 512–1,024-byte unreliable parts after a reliable
+baseline. Existing facts, canonical validation, recipient projection, byte budgets
+and checkpoint formats remain. Senders retain one pending message per recipient;
+clients retain four bounded, expiring assemblies and publish only complete validated
+messages. Scoped capability negotiation preserves the protocol-7 base contract.
+Frozen pre-extension runners interoperate in both directions with current code.
+
+All 84 network tests pass, including loss/reordering/corruption/backpressure,
+reconnects and a 60,000-byte frame using part indices above 128. Recovery/interest
+and WASM checks pass; the 96-case startup corpus passes. Three unchanged swarm
+pairs pass twelve process receipts and twenty report checks. Replay's median lag
+behind received facts falls from nine ticks to four–five, p95 seventeen to six.
+Host output rises from about 43 KB/s to 263 KB/s, near its configured budget, and
+client replay work increases. Host callback cost falls in this cohort; client cost
+rises. This is a latency/cost tradeoff, not a compression or readiness claim.
+
+The browser gate now asserts actual fragment traffic: host 36 fragmented snapshots,
+91 parts; both clients receive parts with no resync and twelve matching world
+frames. Planned and crash native migration pass. See [data, source and limits](results/snapshot-parts-2026-09-08/README.md).
+Original Kit and original games remain preserved; game simulation sources and
+wire/checkpoint formats are unchanged.
+
+Continue measuring/reducing snapshot payload and correction cost, including
+whether duplicated game history belongs in recipient snapshots. Sustained actual
+network loss/credit pressure, mixed stress, remaining port/authoring/platform/
+deployment/playtest requirements and the previously unclassified live failures
+remain. The full M0–M9 goal stays active.
+
+## M3/M9 watched catch-up ordering and failure diagnostics — 2026-09-08
+
+A deterministic regression now proves a presentation-ring bug: a supported high
+prediction lead and receive budget let one pump catch up a stalled client, then
+bootstrap prediction over an old watched occurrence before advancing its watch
+clock. The failure was `Predicted_Batch / Capacity` at tick 182 over retained tick
+54. The pump now matures watched history before rebuilding prediction. No capacity,
+event identity, timing policy, schema or protocol was relaxed.
+
+The client records the exact failed presentation operation and tick/slot context;
+Scrapyard prints it on error. A new 96-schedule Scrapyard startup corpus exercises
+actual profile/ready/start, forty spawn actions, jitter and bounded stalls, with
+exactly-once start/entry effects and final liveness/population checks. All cases
+pass; one uses a recorded prediction-limit resync. The focused regression and
+74 network / 16 view / 10 recovery tests pass, with WASM checks. Planned/crash
+native migration and the final three-browser gameplay/UI gate pass.
+
+See [source, before/after and live evidence](results/watched-catchup-2026-09-08/README.md).
+The earlier Godot `frame Presentation` lacked enough context to identify its cause;
+this regression is not proof of that same cause. One browser attempt also timed
+out on an unobserved lob without a verdict. A subsequent run with action tracing
+passes; both failures remain unclassified and retained. Optional browser action
+tracing and network counters improve the next investigation. Large-snapshot
+freshness remains unchanged and needs its own fix/comparison.
+
+Continue snapshot delivery/freshness work and the unresolved live failure audit,
+then remaining mixed/fault stress, authoring/debugging, port/platform/deployment
+and human playtest gates. Original Kit and original games remain preserved; the
+complete M0–M9 goal stays active.
+
+## M9 sustained offensive population comparison — 2026-09-08
+
+The new [swarm harness](../../tests/replay_swarm_comparison/README.md) replenishes
+forty stock scrapbots through ordinary spawn/AI/fire/damage/death/pickup paths in
+isolated Kit and Replay games. Shared zero-bite and 255-round/no-jam fixtures keep
+the stationary offensive workload active for twenty seconds. Three alternating
+pairs pass twelve process receipts and twenty report checks. Population remains
+38–40, conservation holds and final host/client state converges.
+
+Median callback p50/p95/p99 microseconds: Kit host 319/805/1086, client 278/674/930;
+Replay host 1227/2180/2579, client 609/1661/3351. This is a game-callback comparison,
+with different authority/presentation and measured churn, not a framework-only
+ratio. See [complete data, source and failures](results/scrapyard-swarm-2026-09-08/README.md).
+
+The workload exposed a material snapshot freshness cost: large reliable snapshots
+await acknowledgment, leaving received authority frames a median nine and p95
+seventeen ticks behind already-received facts. The initial host-style tick bound
+and subsequent four-tick warmup rule rejected earlier cohorts; version 2 explicitly
+bounds/reports delivery lag instead. The original failed receipts are retained.
+One separate diagnostic also hit `frame Presentation` during fill and remains an
+unresolved stability finding. Neither the final passing cohort nor lower callback
+cost in some samples establishes readiness.
+
+Next: reproduce and fix that presentation failure, then improve bounded large-state
+snapshot delivery and compare freshness/cost without relaxing this workload.
+Movement, mixed status/ability/fault stress, further authoring/debugging studies,
+remaining ports and wider platform/playtest/deployment requirements remain. Original
+Kit and all original games are preserved; the full M0–M9 goal stays active.
+
+## M3/M9 sparse canonical validation blocks — 2026-09-08
+
+The schema compiler now groups zero-valid checks inside existing direct-copy
+spans and uses a bounded per-call probe to select grouped or original scalar
+validation. Padding, excluded fields, reversed scalars and union storage are
+never included in a zero scan. First-error reporting, transactional output,
+canonical bytes and fingerprints remain unchanged.
+
+Frozen-code mutation oracles pass in native/WASM, default/optimized builds;
+113 schema/network/recovery/interest tests and cross-target union checks pass.
+The initial-world microbenchmark improves about 25% encode / 23% decode, while
+dense values retain about 3–4% overhead and one world schema adds 163,520 bytes
+of metadata. Earlier regressing experiments remain recorded. Three real combat
+pairs, full three-browser gameplay/UI and planned/crash migration pass. See
+[measurements and tradeoffs](results/codec-blocks-2026-09-08/README.md).
+
+Kit still has lower callback cost in the current encounter. Broader distributions,
+full stress/latency/authoring comparisons, remaining ports and platform/playtest
+coverage remain requirements. Original Kit and games are preserved; the complete
+roadmap stays active.
+
+## M2/M9 angular corrections and shared-core acceptance — 2026-09-08
+
+The presentation smoothers now retain 2D/3D angular error, preserving same-tick
+correction continuity while normal motion proceeds. Quaternion composition uses
+short arcs and equivalent signs; cuts and invalid-input behavior are explicit.
+Body2/Body3 apply the correction to visual-child offset/rotation while leaving
+solver publication separate. A frozen-kinematic readback exposed the need to use
+the visible parent node for rendering until the physics transform catches up.
+
+The final shared-core audit passes fourteen suites (258 counted unit tests plus
+corpora/WASM checks). Thirty numbered rotation checks pass in native and WASM,
+default and optimized builds. Actual Godot native/browser adapter checks pass,
+as do live 2D/3D owner transfers with momentum and both Slopball network games.
+The initial interest compiler crash, unchanged recheck and fixture setup findings
+are retained. See [evidence and limits](results/angular-smoothing-2026-09-08/README.md).
+
+No gameplay schema/protocol changed. Broader platforms, visual/perceptual review,
+remaining ports and full comparisons/playtests remain required. Original Kit and
+game projects are preserved; the complete roadmap stays active.
+
+## M9 existing-family weapon authoring experiment — 2026-09-08
+
+The same new weapon is now exercised in isolated Kit and Replay projects. Both
+add one identical 24-line resource and no handwritten gameplay/network code;
+Replay also generates two stock-table lines for use without Godot. Separate cold
+client builds lack both the resource and Replay's compiled row. Training-target
+content and test adapters are recorded outside the feature boundary.
+
+All 32 peer receipts pass: shared and host-only resource cases, local/120-ms
+receive-delay conditions, twice in alternating order. Cold clients receive the
+host's new row, select it through the shop and display its name/region. A first
+shot deals three damage; each player fires seven rounds and reloads twice. The
+20-damage/one-kill result converges. Standalone seven/eight-gun catalog checks and
+17 report rejection/acceptance cases pass. See [source, data and limits](results/weapon-authoring-2026-09-08/README.md).
+
+Two preliminary setup races are retained separately. The final driver waits for
+both declarations and initial equipped states before cycling. Verified binaries
+were reused in fresh copies after the GDScript-only barrier change. No game or
+weapon law was weakened.
+
+This is an existing-family data extension, not a human productivity or performance
+claim. New-family mechanics, save/migration/browser acceptance for this weapon,
+other authoring cases, broader runtime/platform and playtest requirements remain.
+Original games and frameworks are preserved; the full roadmap stays active.
+
+## M9 paid-revive authoring experiment — 2026-09-08
+
+A new comparison harness installs the same three-scrap paid revive into isolated
+Kit and Replay game copies. Feature-only patches, before/after source, categories,
+net added library calls and build/source hashes are separate from test adapters
+and the pre-existing Kit ownership cleanup. Neither primary game changes its rules.
+
+The complete matrix passes 72 peer receipts: funded, funding while held and
+contended revives, local/120-ms receive-delay conditions, twice in alternating
+order. Authority currency is conserved, every peer converges, and continued held
+input never charges again. A preliminary shutdown race is retained; the final
+driver quiesces all peers after settled receipts before releasing their scenes.
+Report tamper checks cover the complete plan, feature/source/binary evidence,
+receipts, authority traces and teardown.
+
+Kit changes four files (18 added/one removed nonblank line); Replay changes three
+(ten added/three removed). Kit adds nine session API call occurrences; Replay adds
+no new runtime calls for the value transaction. Remote samples show revived health
+before wallet credit in 20 of 24 Kit peer runs and none of 24 Replay runs; both
+converge. These are source and sampled-state observations, not human productivity,
+latency percentiles or an adoption verdict. See [patches, data and limits](results/paid-revive-authoring-2026-09-08/README.md).
+
+Other specified authoring changes, feature save/migration/fault acceptance, timed
+human and seeded-debugging studies, full runtime/stress comparisons, remaining
+port parity and platform/playtest coverage remain requirements. The full M0–M9
+roadmap stays active; original Kit/Scrapyard and the primary Replay game are preserved.
+
+## M8/M3 igniter paths, recorded spread hops and content-46 conversion — 2026-09-08
+
+Igniter presentation now preserves the original five local / one remote ASCII
+tongues, centered flight and expiry. Spread records actual source/destination,
+status and credit as an explicit Arc flash before recursive target application;
+observed bolts use the original kink, color and fade. View nodes are created on
+first use. Flame reconciliation handles a replacement cast/path even when the
+pool generation and displayed tick stay unchanged.
+
+Content advances to 46 because the Flash enum changes the world contract; world
+byte width remains 52,600, protocol 7 and checkpoint layout 4. The explicit
+converter accepts contents 42–45 using old-world/event/action descriptors. The
+content-45 fixture was captured with the real old converter before the change.
+Seven fresh-process resumes and the CLI safety/identity/asset checks pass.
+
+All 95 model/view/oracle tests and WASM checks pass, including active arc archive
+restoration. Native captures and full three-browser gameplay pass; the browser
+scenario also observes the stock shock/barrel wipe and next-yard reset. Planned
+and crash migration continue combat and converge under content 46. Native and browser party
+admission, asset-aware handoff and durable/fresh rejoin pass. See [evidence and compatibility
+authoring cost](results/scrapyard-cast-paths-2026-09-08/README.md).
+
+Remaining launch/contact feedback, other port parity, full authoring/runtime
+comparisons, broader platforms, listening and human playtests remain requirements.
+Original Kit and game projects are preserved; the full roadmap stays active.
+
+## M8 filled area effects and buff bursts — 2026-09-08
+
+Novas, reaction/lob-impact flashes and grenade blasts now use filled 24-point
+discs with payload colors and expansion/fade from their displayed lifetime.
+Standing zones retain their original constant fill until removal. Buffs emit the
+original warm wearer burst once; the observer retains its highest tick across
+rewind and seeds loads/recovery silently. No combat rule, gameplay schema or
+checkpoint fields changed.
+
+All 90 model/view/oracle tests and WASM checks pass. Native lifecycle checks and
+inspected captures cover nova, zone, buff and reaction visuals. Nine browser area
+observations across three peers and the full UI/gameplay gate pass. Planned/crash
+migration both restore the filled zone and continue combat to matching worlds.
+See [measurements, captures and timing limits](results/scrapyard-areas-2026-09-08/README.md).
+
+Cone tongues, visible spread-hop arcs, remaining impact details, other ports,
+full comparisons, broader platforms, listening and human playtests remain work.
+The original framework and games are preserved; the full roadmap stays active.
+
+## M8 glob-disc presentation — 2026-09-08
+
+Slime/sparkjar lobs and enemy spit now use the original ten-point filled discs,
+payload colors, depth and pulsing scale. The original's paths are straight; prior
+ledger wording about an arc/trail was corrected. Positions/removal still follow
+Replay's predicted-own/observed-remote simulation views. Separate bounded banks
+handle concurrent predicted/observed lob occupancy, with pulse resets on hiding,
+reuse, rewind and epoch changes. No gameplay schema or checkpoint fields changed.
+
+All 87 model/view/oracle tests and WASM checks pass. Native headless/headed visual
+gates, captures, nine browser glob receipts across three peers and the complete
+browser UI/gameplay gate pass. Planned/crash migration both render the restored
+lob before combat continuation and world convergence. See [data and limitations](results/scrapyard-globs-2026-09-08/README.md).
+
+Cone/nova/buff/reaction/zone presentation, remaining ports and comparisons,
+platform coverage, listening and human playtests remain requirements. The original
+framework and games are preserved; the full roadmap remains active.
+
+## M8/M2 tally parity and session round-trip telemetry — 2026-09-08
+
+Scrapyard's authored tally now includes the original registered Deaths column and
+Ping ms. Original runner downs never increment the registered death stat, so its
+zero-valued behavior is preserved. Gameplay content, world/actions/events and
+checkpoint formats are unchanged. Unknown/stale measurements display `--`.
+
+The optional `replay/telemetry` component measures authority-clock probe/echo
+round trips over an admitted application lane, relays bounded reports and remains
+outside rollback/checkpoints. Ten core tests plus WASM checks pass. The real Godot
+adapter regression proves routed reports during Resyncing and disables readback
+when fenced or closed; an initial close-path failure was fixed and retained.
+
+Native menu/layout and full three-browser gameplay/UI pass. Planned and crash
+combat migration now require fresh epoch-2 measurements from the new authority,
+with zero for its local seat; survivors converge and continue combat. See [tally,
+measurements and evidence](results/scrapyard-tally-2026-09-08/README.md). The paired
+comparison meter now includes all Replay application lanes so telemetry traffic
+is included in future results. Historical measurement scopes remain documented.
+
+Remaining actor/ability and other port parity, sustained stress and authoring
+comparisons, broader platform coverage and human playtests remain requirements.
+Original Kit and Scrapyard remain preserved; the full roadmap stays active.
+
+## M9 canonical snapshot scan optimization — 2026-09-08
+
+Hashing advances across zero words using exact FNV arithmetic; delta encoding
+skips equal words while retaining short-prefix handling and the original run
+format. All 25 schema, six delta, 72 network and ten recovery tests pass, and an
+executed native/WASM oracle corpus agrees exactly. Protocols and canonical bytes
+are unchanged. Three paired combat runs, the separate phase diagnostic, three-
+browser gameplay/UI and native planned/crash combat migration also pass.
+
+The canonical-world microbenchmark improves hashing 7.83× and delta encoding
+6.26×, while alternating changes retain a 6.5% delta regression. Replay host
+callback p50 median is 698 µs versus 985 µs in the previous timing-feedback cohort;
+client median is 982 versus 994 µs. Cohorts are separate, and Replay still costs
+more than Kit. The phase diagnostic locates the expected hashing/delta reduction;
+encoding, replay and presentation remain substantial. See [measurements, tradeoffs
+and retained compiler failure](results/snapshot-scans-2026-09-08/README.md).
+
+Broader stress/latency and authoring comparisons, remaining port parity, platform
+coverage and human playtests remain requirements. Original projects remain
+preserved; the full roadmap stays active.
+
+## M3/M9 scheduled-input timing feedback — 2026-09-08
+
+Clients now refine their welcome-derived bootstrap lead from acknowledged input
+turnaround using a bounded local send-time ring and recent peak window. Existing
+snapshot input frontiers also permit faster bounded clock slew when arrival lead
+is far from its reserve. Queued input/action ticks remain unchanged; no packet,
+checkpoint or gameplay schema changed. Local stalls and connection/authority/
+welcome boundaries clear calibration; spectators/latest-observation models stay
+outside scheduled-input timing.
+
+All 72 network tests and ten recovery tests pass, including a delayed-welcome
+regression (62 → 12 ticks), latency/jitter changes, unchanged action due ticks,
+backpressure, local stalls and reconnect. Three alternating combat pairs pass:
+client lead stays at 22–23 ticks instead of 62/22/23. Client callback p50 median
+moves from 1042 to 994 µs, while host time rises slightly; no broad speedup claim
+is made. Native planned/crash migration and full three-browser gameplay/UI also
+pass. See [timing policy and evidence](results/input-timing-2026-09-08/README.md).
+
+Snapshot costs, broader stress/latency envelopes, remaining port parity, platform
+coverage, authoring comparisons and paired human playtests remain requirements.
+Original Kit and games remain preserved; the full roadmap stays active.
+
+## M9 paired combat encounter — 2026-09-08
+
+The comparison harness now drives four real enemies, approach/bites, nearest-target
+fire, damage/death and pickups in isolated original/Replay games. Spawn and targeting
+work execute inside each timed callback. Per-enemy traces, conservation checks,
+observed active intervals, observer overhead and source/build/environment fingerprints
+make the workload and its limits reviewable. Three alternating pairs, a separate
+phase-profile pair and sixteen report-validation cases pass.
+
+Replay completes the same required offensive/pickup/shot totals but costs more in
+this workload: median callback p50 host/client 915/1042 µs versus Kit 253/204 µs;
+application output about 24.6/16.0 kB/s versus 4.1/2.0 kB/s. Health loss and pickup
+attribution differ and remain recorded. One client retains a 62-tick prediction
+lead; snapshot work and replay are concrete profiling priorities. No performance
+superiority or full parity/adoption claim is made. See [data, figures and decision](results/scrapyard-combat-comparison-2026-09-08/README.md).
+
+Sustained stress, further combat/movement/status/migration scenarios, other ports,
+authoring-change measurements, broader platforms and human paired playtests remain
+requirements. Original projects are preserved; the full roadmap stays active.
+
+## M8 Scrapyard automatic preferences — 2026-09-08
+
+All four staging pickers now include an automatic mode, stored locally and resolved
+to concrete IDs before profile declaration. New profiles default to automatic;
+legacy profile-v1 records remain explicit. The version-2 local record adds four
+mode bits, with strict identity/schema/value checks. Gameplay content 45 and
+world/action/event/checkpoint shapes remain unchanged.
+
+All 85 model/oracle tests pass. Native/browser fresh-process and changed-seat gates
+prove automatic re-resolution and fixed explicit choices, including committed
+IndexedDB records. Existing native/browser profile corruption, conflict and failed-
+write protections pass. Early-admission mode rebasing was fixed and covered by a
+new runtime regression; planned/crash lobby migration and the complete three-browser
+UI suite also pass. See [automatic preference evidence](results/scrapyard-automatic-2026-09-08/README.md).
+
+Remaining actor/ability and scoreboard details, wider platform/browser coverage,
+hardware listening, playtests and full M9 comparisons remain requirements. Original
+Kit and game projects remain independent; the full roadmap stays active.
+
+## M8 Scrapyard staging muster — 2026-09-07
+
+The authored staging scene now has fixed idle-frame previews, names/loadouts,
+readiness lamps, both picker directions and late Drop In. Local choices preview
+immediately, remote rows use confirmed profiles, picks clear readiness, and rapid
+Ready toggles use the latest local intent. Host Start can ready itself first while
+retaining the simulation's all-ready guard. Restored epochs/connections/player
+generations reset old UI choices and Start/readiness intents.
+
+All 81 model/oracle tests pass. Native views and faulted host/client/observer
+staging, planned/crash lobby recovery, full Chrome staging/UI/gameplay acceptance,
+and native/browser party profile/asset/handoff/fresh-rejoin gates pass. Final
+browser layout checks also prevent chat from covering the muster. See
+[muster evidence](results/scrapyard-muster-2026-09-07/README.md).
+
+The original previews are static frame zero, correcting earlier roadmap wording
+that called them animated. Automatic-by-seat reset choices, remaining actor/ability
+presentation and scoreboard columns, broader platform/browser coverage, listening,
+playtests and full M9 comparisons remain work. Original Kit and games remain separate;
+the full roadmap stays active.
+
+## M8/M5 Scrapyard menu, tally and communications resync — 2026-09-07
+
+The Escape menu/tally now use authored steel scenes with dimming, centered bounds,
+scroll access, focus handling and healing credit. Local menu presses are discarded
+while physical holds remain tracked; Enter on Resume stays out of chat and a held
+Shift does not become a fresh dash. Tab release reaches the tally during chat.
+Quit unloads the game/session, then exits natively after resource retirement or
+leaves a closed-yard screen in the browser.
+
+A controlled adapter regression found that gameplay Resyncing disabled Comms,
+retiring a queued request and rejecting a reliable incoming line on an admitted
+connection. The adapter now keeps communications active across that baseline
+replacement while respecting fencing/admission. The native Godot regression,
+WASM check and six existing communications tests pass.
+
+Native menu/held-input/layout tests, three clean shutdowns, persisted settings,
+faulted three-peer healing/tally checks and full three-Chrome UI/ordnance/menu/Quit
+acceptance pass. Fourteen shared browser frames agree; the remaining two peers
+continue after the third quits. See [menu evidence](results/scrapyard-menu-2026-09-07/README.md).
+
+Remaining concrete presentation work includes the original muster’s animated
+player previews/readiness rows and bidirectional pickers, broader actor/ability
+presentation, and original scoreboard transport/death columns. Other platforms,
+hardware listening, playtests and full M9 comparisons also remain required. Original
+Kit and games are unchanged by this slice; the full roadmap stays active.
+
+## M8 Scrapyard rails and grenade views — 2026-09-07
+
+Rail sweeps now emit the existing Wall fact with an independent identity key;
+projectile and player sources cannot alias in one tick. Grenades restore their
+original shell shape and stationary fading ember trail. A pure sampler uses
+confirmed ticks, resets reused slots/recovery baselines, and skips missing-history
+backfill. Gameplay and the content-45 wire/checkpoint contract stay unchanged.
+
+All 79 model tests and the movement oracle pass. Native visual and wall-regression
+checks, full WASM/release export, three-browser UI/ordnance acceptance, a prior
+content-45 save resume, and grenade-trail planned/crash migration pass. Browser
+peers agree over fourteen common frames. The native recovery fixture observes
+trails on all peers before takeover and verifies old node identities are gone.
+See [ordnance view evidence](results/scrapyard-ordnance-view-2026-09-07/README.md).
+
+Native and Chrome now cover rail contacts and grenade bounce/trail/fuse views.
+Remaining actor/menu parity, other platforms/browsers, hardware listening,
+playtests and full M9 authoring/combat comparisons remain requirements. Original
+Kit and games remain separate and unchanged by this slice; the full goal stays active.
+
+## M8 Scrapyard terminal cover contacts — 2026-09-07
+
+Ballistic and spit collisions now retain the resolved endpoint and outward normal
+in a confirmed Wall event. The renderer restores the original three-spark fan,
+color, speed and lifetime, with spatial Hit audio. Cosmetic capacity reserves all
+possible subsequent action-feedback identities; dense contacts cannot crowd out
+later damage. Content 45 changes the event contract without changing world state.
+
+All 76 model tests and the movement oracle pass, along with native/WASM builds,
+visible/headless contact/fan/expiry checks, content-42/43/44 conversion and six
+fresh-process resumes. The faulted 40-enemy gate and planned/crash migration also
+pass; see [wall evidence](results/scrapyard-walls-2026-09-07/README.md).
+
+This closes ballistic/spit terminal cover feedback. Rail and bouncing-grenade
+contacts still have separate presentation work. Browser spark rendering, broader
+platforms, hardware listening, actor/menu details, playtests and full M9 comparison
+remain requirements. Original Kit and games remain separate; the full roadmap
+stays active.
+
+## M8 Scrapyard directional wounds — 2026-09-07
+
+The local wound chevron now uses the existing hit origin and the victim's recorded
+proxy position at that tick. It stays stationary, expires, and rejects missing
+history or replaced generations; ambient self-origin damage has no bearing. The
+same helper corrects hurt burst/sound placement, which had used the origin as if
+it were the victim location. No gameplay/event/checkpoint schema changed.
+
+All 73 model/oracle tests, native/WASM builds, visible/headless geometry/lifetime
+checks and a faulted three-peer revival gate pass. The victim observes directions
+with zero history misses in that fixture; spectators receive none. See
+[wound evidence](results/scrapyard-wounds-2026-09-07/README.md).
+
+Exact wall contacts are not retained after projectile removal and need explicit
+contact metadata. That work, remaining actor/menu behavior, broader platforms,
+browser visuals, hardware listening, playtests and the full comparison remain
+requirements. Original projects and the shared index are preserved; the full
+roadmap stays active.
+
+## M8 Scrapyard screen effects — 2026-09-07
+
+The original health vignette, zoom kicks and floor veil now render above the yard
+and below the HUD. A pure helper seeds initial/epoch observations silently and
+drives health/transition presentation. Camera motion-off immediately clears offset
+and zoom and blocks further kicks, without changing the settings record.
+
+All 72 model tests and the original movement oracle pass. Native checks cover
+health/heal, resizing, boss kick, disabling mid-kick, continued motion-free combat
+and veil expiry; settings regressions pass. Three actual Chrome processes also
+verify the vignette and prior UI flows, with thirteen common world frames. See
+[screen evidence](results/scrapyard-screen-2026-09-07/README.md) and inspected captures.
+
+Directional wounds, wall impacts, actor/menu details, other browsers/devices,
+hardware audio, playtests and the full comparison remain required. Original
+projects and the shared index are preserved; the full roadmap stays active.
+
+## M8/M9 Scrapyard combat feedback — 2026-09-07
+
+Bounded local pools now present hit/dash/pickup bursts, layered death/blast
+effects, debris, per-target observed damage numbers and pickup/healing text.
+Journal identities and target generation/tick identities prevent replayed begins;
+scope changes clear old views. Gameplay/checkpoint schemas are unchanged.
+
+The live fixture passes damage, pickup, expiry and floor cleanup. All 71 model
+tests, native/WASM compilation, faulted 40-enemy stress and planned/crash recovery
+pass. Stress reports no pool drops, and recovery reports no old-epoch effects.
+The fixture now waits for a ready-roster checkpoint before starting its timed
+attack. The frame timer includes deferred feedback/audio/social upkeep, so its
+measurement scope is broader than earlier frame timing. See
+[feedback evidence](results/scrapyard-feedback-2026-09-07/README.md).
+
+Wall impacts, directional wounds, lens/vignette/transition veils, browser visuals,
+hardware listening, playtests and full comparison remain work. Native captures
+use Dummy audio. Original projects and the shared index remain preserved, and
+the full roadmap stays active.
+
+## M8 Scrapyard actor poses and feedback — 2026-09-07
+
+Downed runners now freeze/tilt/dim, hide equipment and show a beacon; revival and
+respawn restore their pose. Original muzzle cells, reload flags and ghost tint
+are restored. Journal identities control runner shot/hurt cues, while observed
+enemy health and proximity drive hit/wobble and attack/death rows. Generation,
+warp and epoch boundaries reset transient state; pooled sprite reuse resets
+rotation/facing too.
+
+All 71 model/oracle tests pass, with native/WASM compilation and a live actor
+fixture covering damage, muzzle, reload, down/respawn, enemy attack/death and prop
+reuse. Three-peer revival and watched-host-crash checks retain pose/camera/world
+equality assertions. [Actor evidence](results/scrapyard-actors-2026-09-07/README.md)
+includes inspected captures and the fixture correction.
+
+Native captures use Dummy audio. Remaining particles/debris/damage numbers,
+lens/vignette/transition-veil and actor/menu details, browser visuals, hardware
+listening, playtests and the full comparison remain required. Original projects
+and the shared index remain preserved; the full roadmap stays active.
+
+## M8/M9 Scrapyard browser UI and copy lowering — 2026-09-07
+
+Three actual Chrome processes now exercise chat focus/escape and literal text,
+late-join history without old markers, middle-mouse pings, clicked shop purchases,
+health/jam/cooldown HUD and downed/revived camera behavior. They agree on eleven
+common authoritative frames. The opt-in bridge prepares test state through existing
+admitted actions; ordinary interactions use real canvas input. See
+[browser UI evidence](results/scrapyard-browser-ui-2026-09-07/README.md).
+
+The first build exposed expensive aggregate lowering in the chat-history fallback:
+Binaryen spent over thirteen minutes optimizing and reported 44.3 GB peak physical
+footprint. A separate owned fallback read removes the one full-frame aggregate
+store. Standard web builds then finish in roughly 26–31 seconds with every optimizer
+pass enabled; all 70 model tests and the real browser gate pass. IR, a live sample
+and a timed repeat are retained. The browser fixture's credential and completion
+mode mismatches were corrected without weakening its UI checks.
+
+Original projects and the shared index remain preserved. Other browsers/devices,
+hardware audio, named-observer metadata, broader actor/menu parity, human playtests
+and the full comparison/adoption decision remain work. The full roadmap stays active.
+
+## M8 Scrapyard positional pings — 2026-09-07
+
+Middle-mouse pings now use shared communications with the original gold diamond,
+pulse/fade, floating name and sound. Stamped delivery drives bounded local rigs;
+coordinates and floor/run identity are validated without adding simulation or
+checkpoint fields. Expiry and scope changes remove markers, observers cannot
+submit them, and late history excludes them.
+
+All 70 game tests and the original movement oracle pass, with native and WASM
+compilation. A visible three-process fixture checks actual middle-mouse input,
+name/position, menu/chat blocking, observer restrictions, late history and node
+expiry. The full run sends recent markers before descent and verifies their
+removal before natural expiry on all peers. See
+[ping evidence](results/scrapyard-pings-2026-09-07/README.md).
+
+Native captures use Dummy audio. Named-observer metadata, broader presentation,
+browser/platform interaction, hardware listening, playtests and the full comparison
+remain requirements. Original projects and the shared index remain preserved;
+the full roadmap stays active.
+
+## M8 Scrapyard chat and yard history — 2026-09-07
+
+The game now uses shared Replay communications beside Session/Room for named chat,
+late-join scrollback and yard history. Focus/Enter/Escape handling blocks gameplay
+input while typing without pausing the simulation. Names come from approved state,
+with compatibility fallbacks for legacy Unicode names; history is rendered as plain
+text. Each newly confirmed authority tick supplies roster/wave/run announcements
+through a bounded queue, and takeover baselines the checkpoint before announcing
+the new keeper once. Gameplay schemas/content remain unchanged.
+
+All 69 game tests, the original movement oracle, six communications tests and
+native/WASM compilation pass. A visible three-process fixture checks focus,
+literal text, stamped names, identical histories and a late observer. Full run and
+gauntlet fixtures retain system messages once. Planned/crash migration with a
+paused spray dependency preserves received chat and delivers new messages while
+retaining exact live-combat recovery checks. See
+[chat evidence](results/scrapyard-chat-2026-09-07/README.md).
+
+History remains ephemeral and bounded; the combined fixture now finishes setup
+before starting its timed attack. Positional pings, named-observer metadata,
+broader actor/menu and browser/platform interaction, hardware listening, playtests
+and the full comparison remain requirements. Original projects and the shared
+index remain preserved; the full roadmap stays active.
+
+## M8 Scrapyard borrowed camera — 2026-09-07
+
+The downed player's camera now follows a living connected teammate, keeps an
+eligible target, returns on revival and reselects after loss. Eligibility reads
+confirmed state; camera position follows the displayed rig. Generation and rendered
+warp identities guard body replacement and reset camera smoothing on floor warps.
+Camera lifetime stays with the game root, and local HUD/input ownership stays local.
+Original nameplate scale/tint/placement are restored too.
+
+All 66 model tests, the original movement oracle, native/WASM builds, visible
+three-peer revival, full run/floor continuation and planned/crash migration checks
+pass. The crash variant downs a follower, verifies it watches the host, kills that
+host and requires it to follow the surviving teammate while still down after
+recovery. [Camera evidence](results/scrapyard-camera-2026-09-07/README.md) records
+actual rig positions, world hashes and inspected captures.
+
+Native captures use Dummy audio. Original chat/history, broader actor/menu
+presentation, browser/platform interaction, human camera/listening checks and the
+full comparison remain requirements. Original projects and the shared index are
+preserved; the full roadmap remains active.
+
+## M8 Scrapyard transitions and recovery narration — 2026-09-07
+
+The original departure/wipe/note panels now accompany a current-state wave/rest
+display. A pure projection reads confirmed world/tick data; checkpoint restore
+needs no UI history or local deadlines. Countdown audio/jolt uses the existing
+forward observer with silent restore/epoch boundaries. Room-phase narration runs
+even when gameplay frames are unavailable and clears after recovery.
+
+All 65 model tests and the original movement oracle pass, including real
+checkpoint encode/decode/restore of rest/clear/departure/wipe displays. Native
+build/WASM compilation, three-peer run and three-wave gauntlet, and planned/crash
+migration checks pass. Captures and receipts are in
+[transition evidence](results/scrapyard-transitions-2026-09-07/README.md).
+
+The current-state wave panel does not establish original system-chat/history
+parity. That feed, the downed-player camera, remaining menu/UI behavior, additional
+platform/browser work, hardware audio and the full comparison remain requirements.
+Native captures use Dummy audio. Original projects and the shared index remain
+preserved, and the full roadmap remains active.
+
+## M8 Scrapyard combat HUD — 2026-09-07
+
+An authored HUD scene restores the original health plate, cooldown pips, draining
+status indicators, large magazine, Titan health and revive prompt. Its Odin class
+borrows predicted local player/tick and confirmed world values for each paint;
+it retains no Session/world and adds no replicated fields. Scene dimensions drive
+fill sizes and the magazine's clear-stage climb and descent restoration.
+
+Native visible/headless player and boss gates pass through real health/status,
+gun, cast/dash, purchase and combat transitions. WASM compilation, existing
+workbench/shop checks, three-process interrupted/completed revival and the full
+two-clear/wipe run also pass. The multiplayer checks cover prompt lifetime,
+spectator HUD policy and restored magazine placement alongside whole-world hashes.
+See [HUD evidence](results/scrapyard-hud-2026-09-07/README.md) and inspected captures.
+
+Native captures use Dummy audio; hardware listening and broader browser/platform
+interaction remain open. Original transition/wave presentation and the full
+comparison still require work. Original projects and the shared index remain
+preserved; the full roadmap remains active.
+
+## M8 Scrapyard counter and purchasing UI — 2026-09-07
+
+The original bottom card layout and steel UI theme now replace the tall overlay.
+Nine live cards and the original 1–8 purchase shortcuts share one submission path;
+9 swaps iron. Cards show prices/levels/health/ownership, disable unavailable buys,
+explain hover/focus, and prevent clicks from firing the gun. The menu blocks buys.
+Model prices are shared constants without changing reducer behavior or content ID.
+
+Visible and headless input gates cover clicks, shortcuts, full/partial health,
+owned/affordability states, menu blocking, mouse isolation and resize. All 62
+model tests, the original movement oracle, WASM compilation and existing workbench
+cases pass. The multiplayer run now buys through card signals on host/client,
+then verifies two clears, departure cancellation, three floor layouts and a common
+world hash after wipe/reset. [Shop evidence](results/scrapyard-shop-2026-09-07/README.md)
+includes inspected captures showing the gate unobstructed.
+
+Visual tests use Dummy audio because the local CoreAudio limitation remains open.
+Broader original HUD and browser/platform interaction parity, listening/playtests
+and the full comparison remain required. Original projects and the shared index
+are preserved; the full goal remains active.
+
+## M8 Scrapyard scenery and gate — 2026-09-07
+
+The separate port restores the original dirt/tuft scatter, pad/boom animation and
+direction arrow as local presentation derived from floor key and confirmed stage.
+Spectators now retain their world view through floor clears and wipe presentation.
+The extended three-process run verifies three distinct matching scenery layouts,
+retired-node cleanup, opening/closing/arrow behavior, canceled departure, two
+clears and an equal final world hash. Native and WASM compilation pass.
+
+The visible run passes with Dummy audio. Default CoreAudio runs retain playback
+objects; an independent plain-Godot reproduction shows the same stalled mix clock
+and retained resources. Hardware audio/listening remain open. Captures also expose
+the existing tall shop overlay; original bottom cards/HUD layout and full visual
+parity are still required. See [scenery evidence](results/scrapyard-scenery-2026-09-07/README.md).
+Original sources and the shared index are unchanged; the full roadmap stays active.
+
+## M9 consumer distribution and Replay starter — 2026-09-07
+
+The addon recipe now includes the Replay source collection, an experimental
+consumer guide and a separate shared-coin starter. All bundled source collections
+are hidden from Godot's scene scanner without affecting Odin imports. The original
+Hello template and Kit remain included. The build no longer repurposes HOME.
+
+An isolated Nix build from a bounded current-source snapshot installs into an
+external project without changing the shared Git index. Using only the installed
+addon, the consumer compiles and runs solo plus separate host/client/observer
+processes, conserves the shared coin and executes an actual browser export. All 159
+Replay source files match the frozen snapshot, and consumer Odin sources contain
+no original-checkout paths. The full release ZIP also builds with macOS/Linux/Windows
+cores, safe paths, writable owner modes and matching checksum. See
+[distribution evidence](results/distribution-2026-09-07/README.md).
+
+This is an unpublished local experimental build, not completion of game parity,
+Linux/Windows runtime acceptance or the M9 adoption decision. Public deployment,
+remaining recovery/platform gates and full comparison/human playtests remain work.
+Original projects and the worktree's Git index remain preserved.
+
+## M3/M5 short-lived relay credentials — 2026-09-07
+
+An independent authenticated relay provider now issues Coturn-compatible expiring
+credentials for enabled room members. Fresh connection-bound challenges prevent
+captured Acquire requests from minting on another connection. The server keeps its
+signing secret; replies bind request scope/nonce/sequence. The client uses monotonic
+validity, refreshes in the background and refuses expired settings for new RTC peers.
+
+Forty-nine targeted tests pass with WASM checks. Actual Cavecrawl and Scrapyard
+provider-mode gates wait beyond the original selected credential's expiry, then
+migrate/rejoin through newer credentials. Scrapyard retains its asset barrier and
+active checkpoint. Native WSS issuance/handoff/rejoin and the original direct RTC
+fixtures also pass. See [credential evidence](results/relay-credentials-2026-09-07/README.md).
+
+Initial relay acquisition is part of Party readiness; the native fixture now waits
+for that boundary. Room owns a borrow of Party's runtime credential source, and
+Cavecrawl closes them in the proper order. Public deployment, clock-skew/long-duration
+outage envelopes, in-place ICE restart, billing controls and the broader roadmap
+remain work. Original projects remain separate and the full goal stays active.
+
+## M3/M5 relay outage and RTC continuation — 2026-09-07
+
+Same-term gameplay reconnect now carries the authenticated RTC reservation into
+the replacement transport when epoch, incarnation, service URL and room code match.
+The provider still requires a fresh authorization challenge and validates the
+reservation against the current member. New terms/destinations do not inherit it.
+The client runtime and action ledger stay available for Welcome reconciliation.
+
+Real Coturn UDP/TCP stop-and-restart gates keep both game processes and the room
+service alive, preserve epoch/incarnations/logical peer ID and loot, and confirm a
+new guest action over a newly selected relay pair. A longer UDP outage also passes.
+Individual restart-to-action observations are about 8.8 s, 7.8 s and 9.2 s; these
+are diagnostic samples, not a benchmark. Three continuation contract tests, thirty
+authority tests, WASM checks, and existing planned/signaling browser regressions
+pass. See [outage evidence](results/relay-outage-2026-09-07/README.md).
+
+Public deployment, credential issuance/renewal, ICE restart, combined coordinator
+outages, additional games/platforms and broader recovery UX remain work. Original
+game projects remain separate and the full roadmap stays active.
+
+## M3/M5 TURN relay configuration and acceptance — 2026-09-07
+
+Party now copies validated deployment ICE settings into Room, preserving them
+through migration and rejoin. Games read native environment configuration or a
+browser bootstrap object, keeping relay credentials out of query parameters and
+saved enrollment/game state. The validator checks bounded JSON/server/URL/credential
+shape and explicit relay-only requirements before signaling.
+
+Actual Coturn 4.9.0 gates pass Cavecrawl over UDP and TCP relay transports and
+Scrapyard's asset-aware active-combat flow over UDP. Browser `getStats` confirms
+selected relay candidates and bytes in both directions at join, takeover and
+fresh-process return. Wrong TURN credentials produce no gameplay/direct fallback;
+corrected settings let the same stored membership rejoin. Twenty-two ICE cases,
+ownership/Room propagation, fourteen enrollment/provisioning tests and WASM checks
+pass. See [relay evidence](results/turn-relay-2026-09-07/README.md).
+
+These are isolated loopback relay gates, not public Internet deployment. DNS,
+HTTPS/WSS, `turns:` acceptance, credential issuance/refresh, long-session expiry,
+relay outages and broader browser/platform coverage remain work. Coturn was built
+in a temporary directory from pinned source; no system or public relay was installed.
+Original game projects remain separate and the full roadmap remains active.
+
+## M4/M5/M8 shared Party setup and Scrapyard menus — 2026-09-07
+
+The reusable `Party` helper now owns durable enrollment, recent-room selection,
+reproducible invitations and Room option setup for both Cavecrawl and Scrapyard.
+Scrapyard's menu keeps personal progression identity distinct from its room token
+and retains asset-aware checkpoint preparation. Correlated invitation refusal is
+separate from existing membership, and competing start actions are blocked during
+enrollment.
+
+Twelve enrollment/Party tests, 62 Scrapyard model tests and 13 Cavecrawl model tests
+pass. Native TLS and actual Chrome RTC menus exercise pre-existing profiles, a
+withheld-spray preparation barrier, exact active-combat takeover with zero lost
+ticks, and fresh-process rejoin with the same invite/loadout and a new accepted
+shot. Cavecrawl's native/browser menu regressions and Scrapyard's earn/load/error
+profile regression pass. See [shared Party evidence](results/scrapyard-party-2026-09-07/README.md).
+
+The fixture now starts timed combat after asset synchronization and checks fresh
+join readiness independently of migration receipts. Successful profile tests use
+the existing scene cleanup helper; corrupt-startup early-exit resource warnings
+remain recorded. Public deployment, broader failure/identity UX, full parity,
+other platforms, Steam and comparison/human playtest work remain in the full goal.
+
+## M4/M5 online Cavecrawl party menus and room service — 2026-09-07
+
+Cavecrawl now exposes Create/Join/Rejoin Recent/Copy Invite when a room service is
+configured. Its enrollment slots remain immutable; a separate CAS recent-room
+reference selects the resume target. Co-op invites are reproducible from persisted
+creator material and scoped role/use/index/service inputs, so restart retries do
+not create extra uses. The UI states the co-op hosting permission. Room can select
+an eligible connected successor from the authenticated roster and accepts verified
+native control TLS options.
+
+The standalone macOS/Linux room service handles durable admission/authority and
+per-room challenged RTC signaling. Native menu acceptance passes a zero-loss handoff,
+conserved guest loot, stable invite and returned creator at incarnation 3 with a new
+accepted action. Actual Chrome processes pass the same flow and isolated concurrent
+rooms. Twenty-five targeted tests, the existing lobby/reopen fixture and returned/
+repeated migration regressions pass. See [party-menu evidence](results/cave-online-menu-2026-09-07/README.md).
+
+An initial native shutdown abort exposed a temporary-allocation path retained as
+owned; it is fixed and the complete gate passes. A browser driver cleanup issue
+was diagnosed separately from successful gameplay and fixed before the final gate.
+Public TLS/TURN, invitation rotation/revocation UX, all-participants-gone game
+recovery, other game menus/platforms and broader play/comparison work remain open.
+Original projects remain separate and the complete roadmap remains active.
+
+## M5 durable client enrollment — 2026-09-07
+
+Create/Join requests now have a client journal that gates transmission on the
+pending-record CAS receipt and gates credential use on the successful-grant receipt.
+An immutable slot binds the exact service URL/content/request, with explicit refusal,
+conflict and corruption handling. Optional native SQLite and Godot IndexedDB drivers
+share this state machine; Replay/Godot does not acquire a mandatory SQLite dependency.
+
+Seven new tests plus sixteen provisioning/storage regressions pass with WASM checks.
+Native TLS clients are killed after request persistence, before grant persistence,
+and after grant persistence; fresh clients retain the same request/credential and
+finally load ready without networking. Chrome kills, an aborted grant transaction,
+competing creators/completers and corrupt records have actual browser acceptance.
+See [client enrollment evidence](results/client-enrollment-2026-09-07/README.md).
+
+Native storage currently covers macOS/Linux; the browser fixture explicitly uses
+loopback WS, with native verified TLS exercised separately. Game menus, invite
+operation persistence, service packaging, other storage platforms, public TLS/relay
+deployment and profile/account lifecycle remain work. The complete roadmap remains
+active and original game projects remain separate.
+
+## M5 create/join protocol and verified TLS — 2026-09-07
+
+The admission owner now has a bounded multi-room hub and canonical create/invite/
+join/revoke protocol. Clients correlate replies and retry the same operation;
+ambiguous creation requires durable inventory reload. Dedicated rooms cannot be
+created through the public request path with infrastructure credentials. A Godot
+connection wrapper requires verified TLS by default, reconnects while retaining
+pending requests, and maps successful grants into Room options with registration.
+
+Sixteen targeted tests pass, including bounded SQLite inventory and URL/permission
+guards, with WASM checks. Separate Godot TLS processes reject wrong CAs/hostnames,
+create/enroll/authenticate, retry on a new socket, and recover identical credentials
+after a server kill/restart. Graceful shutdown releases a pending TLS handshake.
+The existing real Chrome authority/control-reconnect gate also passes. See
+[TLS provisioning evidence](results/provision-tls-2026-09-07/README.md).
+
+This establishes native loopback TLS acceptance, not public deployment or browser
+enrollment. Durable client requests/credentials, service entry point, game menus,
+multi-room signaling, quotas/retirement and Internet reachability remain work.
+The original games remain available; the full M0–M9 goal is still active.
+
+## M5 durable room admission — 2026-09-07
+
+The new `replay/provision` owner persists authority decisions, credentials,
+enrollment retry records and finite invite consumption in one CAS. Join installs
+the new key into the existing live service only after commit. Ordinary and trusted
+co-op invites have distinct authority permissions; dedicated rooms refuse trusted
+player invites. Exact retries survive restart and revocation without consuming a
+second use. Disabled/rebound members retain their stable credential history.
+
+Six core and three private-SQLite tests pass, including authenticated planned
+handoff with newly issued credentials. Separate processes are killed before and
+after a join transaction commits; fresh owners respectively enroll once or return
+the exact committed credential. Thirty authority tests, two existing SQLite tests,
+the prior store crash fixture and WASM checks pass. See
+[admission evidence](results/room-provisioning-2026-09-07/README.md).
+
+This is the server-side admission boundary. Public create/join transport and TLS,
+client credential persistence, room/invite UI, quotas/retirement and deployment
+reachability remain work. Current slots are bounded for the room's lifetime. The
+original projects are unchanged by this addition, and the full goal remains active.
+
+## M3 Steam adapter and shared peer ownership — 2026-09-07
+
+An explicit Steam Session backend now wraps GodotSteam's direct peer interface,
+with typed initialization/configuration errors, bounded packets/connections and
+Steam-ID mapping. ENet shares the same MultiplayerPeer lifetime/packet adapter.
+The existing gameplay protocol and original game projects remain available.
+
+Separate Godot contract processes pass 64 KiB reliable/unreliable transfer,
+short-buffer retention, Replay handshake/action/checkpoint behavior and constructor
+failure cleanup. Core endpoint guards and WASM compilation pass. The real pinned
+GodotSteam 4.22.1 extension loads and exposes the expected API under Godot 4.7.1,
+without Steam initialization. Existing ENet and planned Cavecrawl migration gates
+also pass. [Steam adapter evidence](results/steam-adapter-2026-09-07/README.md)
+keeps contract tests distinct from native capability and live-network acceptance.
+
+The live two-account/device runner is ready, but no Valve-network success is
+claimed. Lobby/invite UX, game-port Steam integration, SteamGameServer and Steam
+migration remain required work; Room rejects the unsupported Steam recovery profile.
+The user has been asked about the live test setup. Other full-roadmap work continues.
+
+## M9 compiled validation and renewed firing comparison — 2026-09-07
+
+The measured snapshot codec bottleneck now uses compact precompiled validation
+instructions for flat schemas. Field order, byte representation, finite values,
+enum/bit-set membership, endian handling and transactional failure remain intact;
+guarded unions keep their existing validator. In an alternating reference/current
+codec benchmark, encode/decode time falls about 39%/40% with identical output.
+The large schema also executes identically on WASM and rejects late corruption.
+
+The final three-pair firing comparison passes the unchanged workload limits, with
+Replay callback p50 736/1,041 µs and Kit 222/195 µs for host/client. Replay still costs
+more overall. A rejected intermediate block exposed a receive-side backlog at
+measurement start; new timing observations and a settled-receive warmup make that
+condition explicit without relaxing the report limits. 23 schema, 68 network,
+six recipient-view and 24 P2P tests pass with cross-target checks.
+
+[Compiled-validation evidence](results/compiled-validation-2026-09-07/README.md)
+retains before/after profiles, alternating codec samples, the rejected comparison,
+accepted paired runs, source and exact build hashes. Startup timing, full combat
+and authoring comparisons, remaining parity/deployment/platforms and human playtests
+remain part of the full active roadmap. Original projects remain available.
+
+## M3/M4 recipient views and interest management — 2026-09-07
+
+An optional server transmission policy now filters recipient state, held controls
+and gameplay facts before they enter the wire. Client simulation groups remain a
+separate authored closure. Complete authority checkpoints retain hidden state, and
+restored/departing authorities apply the appropriate view/group boundaries. Stable
+policy IDs enter contracts; zero-policy behavior and older contracts are preserved.
+Invalid views fail closed instead of falling back to a complete world.
+
+Six new tests, 68 network tests and ten recovery tests pass, with real Godot/ENet
+host/client/observer acceptance. Native and actual WASM execution agree on 720
+canonical replica samples. In the fixed observer fixture, bytes fall from 69,360
+to 33,282 (about 52%); this is not a general performance claim. Cavecrawl/Scrapyard
+model regressions pass 13/62 tests. [Recipient-view evidence](results/recipient-views-2026-09-07/README.md)
+records contracts, traces, source/artifacts, measurements and diagnosed fixture
+issues. Sparse/dynamic storage, broader groups/platforms, remaining parity,
+provisioning, comparisons and human review stay in the full active roadmap.
+
+## M4/M5 durable local browser saves — 2026-09-07
+
+Reusable browser identity and checkpoint helpers now let Cavecrawl open a local
+runner only after its credential is persistent, load a validated token-scoped slot,
+and report save completion from the IndexedDB transaction receipt. A stale writer
+keeps its observed revision and is refused instead of refreshing merely to replace
+another page's archive. Corrupt identity/archive records remain untouched. Local
+save storage refuses permit/custom-policy recovery; Room keeps its approved path.
+
+Real Chrome checks pass identity convergence, a forced browser kill after save,
+exact frame/name/inventory resume, a fresh action and second save, stale-tab refusal,
+corrupt record preservation and refusal to start under a corrupt identity. Native
+policy/identity tests, native lobby and save/resume, and browser Room migration also
+pass. [Browser-save evidence](results/cave-browser-save-2026-09-07/README.md) retains
+receipts, hashes, source/artifacts and the diagnosed fixture issues. The native save
+fixture now isolates its display-name preference as well as its token and archive.
+
+The current game/model protocols remain unchanged. Browser storage limits still
+apply; wider platforms, public provisioning, remaining parity, comparisons and
+human review remain part of the full active roadmap. Original games stay available.
+
+## M4 replayable lobby, names and another-run flow — 2026-09-07
+
+Cavecrawl now has a native connection menu and a reusable value-based party lobby:
+names, ready masks, party leader, phase and run number. Normal validated actions
+control readiness and Start; recorded departures select a new leader. Local name
+preferences use native staged writes or browser IndexedDB CAS. Comms stamps approved
+names into history without resetting retry state on rename. Escape/Leave supports
+reopening the same scene; the victory button starts a new run while retaining the
+profile and cumulative ledger.
+
+Real native buttons, guarded Start, renaming, named chat/scoreboard, fresh-process
+preferences and leave/reopen pass. Planned migration and killed-host recovery from
+a waiting lobby retain names and allow the new leader to start. Browser planned/crash
+runs continue gameplay/social traffic, then a fresh Chrome process loads the name
+without its old URL override. Both earlier Replay save versions convert and resume
+through the new combined world/action conversion API. Four lobby, six Comms,
+thirteen cave and 68 network tests pass, plus the query-decoding regression.
+
+The full faulted campaign and a second full campaign followed by actual Another run
+also pass across host/client/observer. [Lobby evidence](results/cave-lobby-2026-09-07/README.md)
+records state hashes, screenshots, source/artifact provenance and diagnosed fixture
+and query-decoding failures. Public provisioning, latency columns, wider parity and
+platforms, durable browser cave saves, comparisons and human review remain active.
+Original Cavecrawl and sibling Scrapyard stay unchanged and separately available.
+
+## M4 session communications and Cavecrawl social UI — 2026-09-07
+
+An optional Comms service now routes bounded host-ordered chat and transient
+positional markers over admitted game connections. Independent application lanes
+allow it to coexist with the existing asset lane under shared router budgets.
+Speaker/scope validation, retry deduplication, rate/capacity results and bounded
+late-join history have pure tests. Cavecrawl adds an actual chat input, input-focus
+isolation, F pings and a grid scoreboard backed by authority-observed game stats.
+
+Native host/client/late-observer checks pass, as do chat before/after planned and
+killed-host migration. Three-process Chrome/WebRTC migration also continues chat
+and a new ping with the scoreboard visible. The full faulted campaign still reaches
+victory with identical final state across all peers. Six Comms, ten recovery and
+eleven cave tests pass, with native/WASM builds and retained rendered evidence.
+
+[Social UI evidence](results/cave-social-2026-09-07/README.md) distinguishes ephemeral
+scrollback from durable gameplay saves and records the font-dependent marker issue
+fixed by a Godot triangle. Lobby/profile names, latency columns, wider policies,
+deployment, comparisons and human play review remain active roadmap requirements.
+Original Cavecrawl and sibling Scrapyard remain unchanged and separately runnable.
+
+## M2/M4 captured Cavecrawl authoring and save conversion — 2026-09-07
+
+Floor Resources now become validated values in World before Session startup. The
+port reads the original stock/wave plans and scene markers, supports one to eight
+waves, and retains those gameplay definitions through snapshots and saves. The
+host's captured values override clients' local authoring values. Scene assets stay
+local presentation dependencies; rectangular navigation remains an explicit port.
+Seeded decoration reproduces the original integer positions and checksums.
+
+Actual Resource editing, post-start mutation isolation, fresh-process resume and
+host/client/observer tests pass. Six malformed authoring inputs reject cleanly.
+Eleven pure cave tests and 67 generic network tests pass. An extracted original
+scatter oracle agrees with native and actual WASM execution. A genuine earlier
+Replay save converts through a new explicit world-schema mapper and resumes with
+matching frame hash; source bytes, session ledgers and authority rules are retained.
+Ordinary decode stays strict under the new Cavecrawl content ID.
+
+The full faulted campaign also passes under captured definitions, with a shared
+victory frame after both floors. Planned and killed-host native and Chrome/WebRTC migration retain
+loot and allow fresh actions. [Authoring evidence](results/cave-definitions-2026-09-07/README.md)
+records receipts, diagnosed failures, source and artifact hashes. Complete UI/chat,
+visual parity, broader deployment and comparisons remain in the active roadmap.
+Original Cavecrawl and sibling Scrapyard remain unchanged and separately available.
+
+## M4 full Cavecrawl gameplay campaign — 2026-09-07
+
+A new real-process host/client/observer story now reaches final escape through
+ordinary movement and validated actions. It covers chest/drop/grab handoff, relic
+carry/set-down, friendly-fire death and spills, revive before respawn, stale pickup
+generation refusal, healing, automatic bleed-out respawn, all four waves and both
+doors. New public helper methods submit existing actions; no world-editing test
+path was added and the game schema/rules did not change.
+
+Latency-only and faulted campaigns pass with 12 dwellers slain, two client deaths
+and eight retained gems. Each compares a shared post-victory world frame across all
+three processes. The faulted run records actual 201/55/57 drops and 202/46/50
+duplicates. A phase-receipt verifier enforces completion/conservation/deadlines;
+seven pure game tests and the Godot script's WASM check also pass.
+
+[Campaign evidence](results/cave-campaign-2026-09-07/README.md) retains both completed
+runs and the diagnosed initial revive-range failure. This closes the initial full
+campaign validation gap, while resource/UI/navigation parity, wider recovery and
+public/human comparison remain active requirements. Original Cavecrawl and sibling
+Scrapyard remain unchanged and independently available.
+
+## M1/M3 tagged value unions — 2026-09-07
+
+Replay now accepts value-safe tagged unions in world state, controls, actions and
+events. Canonical encoding uses a validated four-byte discriminator, the selected
+variant's fields and zeroed unused payload. Nested/non-nil unions and public
+projections have explicit rules; private bytes are never reinterpreted across a
+variant switch. Diagnostics distinguish inactive fields from real zero values.
+Existing non-union wire contracts and copy paths remain available unchanged.
+
+Core/schema/network/P2P suites pass 24/20/66/24 tests. A union-valued replay corpus
+executes to identical fingerprints, bytes and hashes on ARM64, optimized native,
+WASM default/optimized and x86-64 through Rosetta. Separate Godot/ENet host/client
+processes also agree after four typed inventory transfers under latency, jitter,
+loss and duplication, and pass clean teardown/WASM checks.
+
+[Tagged-union evidence](results/tagged-unions-2026-09-07/README.md) includes the type
+contract, vectors, source, build and real-process receipts. Broader platforms,
+dynamic storage, remaining game parity/deployment and human comparisons remain
+part of the active full roadmap. Original projects stay independently available.
+
+## M2/M9 live developer diagnostics — 2026-09-07
+
+An opt-in Godot overlay now samples local timeline/Session counters at four Hz and
+runs explicit F9 audits. It formats owned first-failure evidence with exact field
+paths and expected/replayed values. F8 toggles visibility; normal scene defaults
+allocate no diagnostic UI. Recent audits stop at authority-correction boundaries
+and retained-history edges rather than guessing an unknown generating input.
+
+A rendered fixture reports an injected `inventory[1]` change from 7 to 8 at tick 2,
+preserves the recorded value and passes hide/show and subsequent clean-audit checks.
+Hello's local timeline and real Cavecrawl host/client processes use the same panel;
+the client's audit succeeds over its replayable suffix after correction. Core,
+formatter and network suites pass 23/2/65 tests, with fixture/port WASM checks.
+
+[Live-diagnostic evidence](results/live-diagnostics-2026-09-07/README.md) retains
+rendered output, logs, source and binary hashes. This does not complete a time-travel
+editor or imply cross-peer determinism. Richer tooling, game parity, deployment,
+authoring comparisons and human playtests remain in the active full roadmap.
+Original projects remain available and the sibling Scrapyard tree is unchanged.
+
+## M1/M3/M9 owned audit evidence and field inspection — 2026-09-07
+
+Local audit can now retain the preceding frame, recorded input, expected/replayed
+state and both event batches at its first mismatch. Capture ownership is independent
+of history and scratch. Canonical field diffs locate values with projection-aware,
+endian-independent paths, validate both inputs before output and preserve an exact
+total when the display buffer is bounded. Enum names and large integers remain
+readable without losing bits through JSON tooling.
+
+A Scrapyard inspection CLI validates two current saves and reports precise world
+field changes without modifying either file. Its gate verifies health 8→7, scrap
+0→7, an ability timer 899→898 and an unused projectile generation 0→1, plus equal,
+truncated, corrupt, incompatible and explicit cross-tick cases.
+
+Core/schema/network/P2P suites pass 22/13/65/24 tests, with WASM checks and preserved
+native/WASM P2P archive replay agreement. [Field-diagnostic evidence](results/field-diagnostics-2026-09-07/README.md)
+retains exact reports, source snapshots and checks. This is local diagnosis, not an
+editor time-travel UI or automatic peer disclosure. The full M0–M9 goal remains
+active; original projects stay separately available and sibling Scrapyard is unchanged.
+
+## M2/M8/M9 event audio and local settings — 2026-09-07
+
+A bounded Godot audio adapter now consumes journal changes with a retained one-shot
+ledger. Confirmation and cancel/reappearance do not replay heard clips, and delayed
+cancellation cannot stop a stolen/reused voice. Scrapyard now uses the original SFX
+and music assets, positional playback, two-deck crossfades and owned shot-family
+event data. Additional sounds observe forward authoritative state with silent
+join/restore baselines. Short intermediate states can still be coalesced by snapshots.
+
+The Esc menu adds persisted volume/shake controls, fullscreen and a spray preview.
+Native restart/corruption and real Chrome commit/kill/reload/conflict/corruption
+checks pass. The pure suites pass 62 game, 65 network and 16 view tests. Real Godot
+players pass cancellation/ownership tests and produce captured nonzero PCM under
+the Dummy driver; game scripts and audio adapters pass WASM checks.
+
+Content advances to `...3044` for event detail; explicit imports preserve content-42
+and content-43 archives and their pending action frontiers. Five fresh save resumes
+pass with original world hashes and continued combat. Planned/crash spray migration
+passes with an intentionally paused follower, a bounded eventual download and a
+strict successor dependency gate. The crash run reports 82 known lost ticks.
+
+[Audio/settings evidence](results/audio-settings-2026-09-07/README.md) includes PCM
+receipts, browser records, source/provenance, rendered settings and diagnosed
+integration failures. CoreAudio produced no mixer frames in both Replay and a
+Godot-only probe in this environment; hardware playback remains unverified. Complete
+listening/visual parity, deployment and human playtests remain in the active full
+roadmap. The original sibling Scrapyard working tree remains unchanged.
+
+## M8/M9 editor workbench and action-schema evolution — 2026-09-07
+
+A separate F6 workbench now boots the actual Scrapyard game and submits recorded,
+locally authorized development edits for damage, statuses, jam, grants and smite.
+It previews the shop, boss, props, wipe, notice, Esc menu and Tab tally. Profiles
+are disabled and preview save/spray paths are isolated. The menu blocks local
+input while simulation continues; vitals remain visible in the clear/shop phase.
+
+Native panel/boss/wipe cases and a rendered inspection pass. A real client is
+refused all six edits, after which the authority's grants reach it and both peers
+compare their full world. Unit checks pass: 65 network, 11 asset, 59 game and nine
+recovery tests, with WASM checks for game scripts and conversion. Planned and crash
+spray migration also pass under the new content contract; the crash case reports
+118–119 known lost ticks and restores the exact prepared world/image.
+
+Scrapyard content advances to `...3043` for its new action payload. The explicit
+importer now preserves protocol-6/7 content-42 saves through a frozen original
+action schema. A reusable action-schema converter preserves common archive sections
+and pending accepted/refused requests; the bundle helper can explicitly advance
+content while preserving image records. Genuine older saves resume in four fresh
+processes with exact original world hashes and continued combat.
+
+[Workbench evidence](results/workbench-2026-09-07/README.md) retains the screenshot,
+source snapshots, tests, migration receipts, importer provenance and diagnosed
+setup failures. Original settings/audio, menu spray preview, complete visual parity,
+full comparisons, deployment and human playtests remain required work. Original
+projects stay separate; the sibling Scrapyard working tree remains unchanged.
+
+## M9 paired active weapon workload — 2026-09-07
+
+A second paired comparison now drives sustained fire and reloads through the real
+Kit and Replay game paths. Both isolated copies use the same range, weapon settings
+and nine-round budget per player. Three alternating pairs pass with 18 accepted
+rounds, three observed reloads per player, a peak of four authoritative projectiles,
+full final magazines and clean shutdown. Input transitions and sampled weapon/
+projectile observations remain available with the raw timing and traffic data.
+
+The comparison records a tradeoff: median host/client game callback p50 is
+206/174 µs for Kit and 856/1134 µs for Replay; application output is approximately
+3.9/2.0 KB/s versus 23.8/17.9 KB/s. Replay's authority observes the client's ninth
+shot earlier in this scenario (median 4.784 s versus 5.334 s), with the original
+client showing longer reload gaps. These are whole-game callback and range timing
+results. They do not isolate framework CPU, RTT or human-perceived responsiveness.
+
+The [firing evidence](results/firing-comparison-2026-09-07/README.md) includes
+workload/source/build hashes, all three alternating pairs, failed setup diagnostics
+and comparison tooling. Six corrupted-evidence cases are rejected by the report
+validator. A fresh one-pair idle regression also passes; both comparison scenarios
+are registered in the main test suite. Original projects remain separate and the
+sibling Scrapyard working tree remains unchanged.
+
+Full AI/damage/movement stress, broader ports/deployment, authoring studies and
+human playtests remain part of the active full M0–M9 objective.
+
+## M4/M9 explicit archive conversion — 2026-09-06
+
+Protocol-6 / checkpoint-4 archives can now be explicitly converted to protocol 7
+when the game schema, content and model contract still match. The bridge validates
+the original contract and every archive section before changing the two stamps.
+It preserves world/roster/pending work, bans, custom-policy bytes, epochs and permit
+requirements. The normal loader continues to reject incompatible archives.
+
+A bundle root replacement API retains exact asset records/payloads. Scrapyard's
+standalone converter adds identity, metadata, complete current-frame spray
+references and bounded PNG-header checks. It publishes through a staged new file;
+existing paths, including symlinks, cannot be overwritten. Coordinated/custom-policy
+archives require an application-owned upgrade path and are rejected by this CLI.
+
+Sixty-four network, ten asset and nine recovery tests pass, with WASM checks. The complete native
+regression gate converts genuine saves emitted by the retained older binary and
+resumes plain, spray and raw-checkpoint outputs in fresh current Godot processes.
+Original ticks 13/14 and exact frame hashes match; the saved lob lands once, the
+zone continues and new gunfire succeeds. The spray restores all 44,459 bytes from
+the bundle. Rejection and competing-publication cases preserve source files and
+existing destinations. The gate is registered in the main suite.
+
+[Conversion evidence](results/protocol-upgrade-2026-09-06/README.md) includes source
+snapshots/hashes, old fixture provenance, build/binary hashes and raw receipts.
+The CLI is native-only; other game-content versions, browser import UX, coordinated
+software upgrade, full port parity, active comparisons and deployment remain work
+under the full M0–M9 goal. Original projects remain available; the sibling Scrapyard
+working tree remains unchanged.
+
+## M3/M9 packet-local input compression — 2026-09-06
+
+Scheduled controls now retain their full eight-sample loss-recovery window while
+compressing repetition inside each packet. Consecutive ticks, identical canonical
+controls and repeated view stamps are omitted. Changing view stamps use a bounded
+byte bitmap/XOR form when smaller. Every packet starts with a complete sample;
+no prior packet or acknowledged input baseline is required to decode it. The full
+input form remains a fallback, and scheduled timing/admission semantics are unchanged.
+
+The protocol advances to version 7. Generation/serial, connection ownership,
+control-language, view provenance and complete-window validation remain mandatory.
+Malformed flags/counts/bitmaps, truncation, trailing bytes and a late invalid
+control cannot partially admit earlier records. The archive layout remains version
+4, but protocol-6 peers/archives require explicit conversion or update.
+
+Sixty network tests and their WASM check pass, including compact/full equivalence,
+independent decoding, duplicates, view provenance and malformed-packet cases. Nine
+recovery tests pass. Native and real-browser planned/crash spray migration continue
+to restore the prepared world, image and new gameplay; browser survivors compare
+11/13 shared authoritative frames in the recorded runs.
+
+Three paired idle runs reduce client application output from roughly 39.0 KB/s
+to 17.7 KB/s while preserving the sample window and send cadence. Host output is
+essentially unchanged. [Compact-input evidence](results/compact-inputs-2026-09-06/README.md)
+retains build hashes, raw measurements, tests and migration logs. This is a bandwidth
+result for the declared idle scenario, not a general responsiveness/performance
+claim. Remaining parity, active workload comparisons, deployment and human tests
+stay in the full active roadmap. Original game projects remain preserved.
+
+## M9 snapshot digest reuse — 2026-09-06
+
+Detailed snapshot timing now separates canonical encoding/decoding, delta work,
+hashing, cache retention, model validation and transport submission. The phases
+are optional diagnostics nested inside Snapshot/Pump and do not enter the wire
+or simulation contract. Timing errors remain nonfatal.
+
+The measurements exposed duplicate hashing of unchanged canonical bytes. The
+server now reuses its computed target digest when retaining the sent snapshot.
+The client computes and verifies the reconstructed target digest once, then
+reuses it for cache retention and acknowledgement. Full snapshots also compute
+their own digest. No wire-provided digest bypasses verification.
+
+Five delta and 57 network tests pass with WASM checks. A new network regression
+repairs an envelope checksum around a deliberately false target digest and checks
+that the receiver rejects it without caching the snapshot. Duplicate cache IDs
+still require equal bytes, even with a supplied matching digest.
+
+In the final diagnostic, cache-subphase medians fall to 5/4 µs host/client from
+146/384 µs before reuse. Three paired runs report Replay callback p50 medians of
+869/1168 µs, versus the previous 1010/1508 µs. These are sequential measurement
+blocks on one machine, not a confidence interval or a general speedup guarantee.
+Idle traffic is unchanged and Replay remains costlier than Kit in this scenario.
+
+The comparison harness now waits for observed project-specific build processes:
+an editor worker can outlive editor exit. Wait receipts and binary fingerprints
+are retained in the [snapshot evidence](results/snapshot-digests-2026-09-06/README.md).
+The complete roadmap remains active, including further snapshot/input overhead,
+matched active workloads, parity, deployment and human comparison.
+
+## M9 first verified paired idle comparison — 2026-09-06
+
+The shared comparison harness now runs an empty, cleared arena with two stationary
+players, matching seed, positions, health and loadouts. It waits for authoritative
+declarations, excludes warmup, collects three paired repetitions in alternating
+order, and retains samples and process RSS. Replay now accepts a zero-enemy wave
+and clears it without a fictitious death/rest, matching the original arena mode;
+the experimental content ID advances to `0x5253435241503042`.
+
+The harness exposed an optimization-validation bug: editor import rebuilt scripts
+with development settings after the initial optimized build. The corrected flow
+propagates flags, builds explicitly after editor exit, fingerprints the binaries,
+and verifies they remain unchanged through measurement. Earlier runs are retained
+as invalid optimized-build evidence. The final script builds use `-debug -o:speed`.
+
+Verified median per-run game-callback p50 values are 212/206 µs for Kit host/client
+and 1010/1508 µs for Replay. Output is about 2.13/2.01 KB/s versus 17.72/39.05 KB/s.
+These are whole game callbacks and application protocol bytes; UI/audio, authority
+models and protocol cadences differ. This is an idle workload result, not a general
+framework ratio or adoption verdict. Replay's remaining idle cost is material.
+
+Snapshot profiling motivated a local codec optimization: validation indices and
+contiguous copy spans are compiled once, preserving padding exclusion, endian
+conversion, field diagnostics and transactional validation. The wire/fingerprint
+is unchanged. Ten schema, 56 network and 55 game tests pass with WASM checks. The
+optimization's standalone contribution is not isolated by the final paired data.
+
+[Comparison evidence](results/idle-comparison-2026-09-06/README.md) retains verified
+build hashes, all paired samples, separate phase diagnostics and failed setup
+attempts. Further snapshot/input-traffic work, matched active workloads, broader
+platform/deployment coverage, remaining game parity and human playtests stay in
+the active full roadmap. Both game versions remain independently available.
+
+## M9 shared ownership and clean baseline teardown — 2026-09-06
+
+The common input helpers now release constructor references after InputMap keeps
+its binding. Godot/Kit multiplayer helpers release temporary API/peer references;
+ENet/offline installation keeps only the engine's required ownership. File helpers
+release closed FileAccess objects, and hit flashes release returned Tween/Tweener
+references. Replay's input facade reuses the corrected common helpers.
+
+The real-engine regression reproduces growth of 256 input objects, 640 multiplayer
+references and 128 peer references before the fixes. It now reports zero growth
+for those operations, repeated file I/O and completed tweens, and passes its WASM
+check. Disconnected sends and absent peer queries return explicit unavailable
+results without calling Godot's invalid-peer paths. The native multiplayer acid
+gate passes on its first final attempt after its raw test wiring forwards real
+disconnects and its backup-recipient assertion ends at the first departure.
+
+The original Scrapyard also owns unreleased loaded resources and game containers.
+An explicit, optional ownership overlay now applies only to an isolated copy;
+it records changed-file hashes and preserves pristine sources. A fresh-copy
+gauntlet and original multiplayer stress run both pass with clean shutdown and
+zero remaining resource delta. The harness waits for actual resource retirement,
+with a deadline, because audio playback cleanup is asynchronous.
+
+[Ownership evidence](results/shared-ownership-2026-09-06/README.md) retains the
+pristine failures, overlay manifest, intermediate audio/tween findings and final
+logs. These are lifecycle-adjusted baseline results, not unmodified-game results
+or a performance verdict. Matching workloads/builds, remaining game parity,
+deployment and paired comparison remain active roadmap requirements. The original
+Scrapyard project and its user data are untouched; Kit remains available with the
+shared ownership fixes.
+
+## M8 continuous gauntlet finale — 2026-09-06
+
+The gauntlet now continues after its 4/4/5 waves and saved rest deadlines into
+the original two-barrel chain. An explicitly enabled development action uses
+ordinary admission, action logging and replayable pool allocation. The authority
+accepts only its local player seat; a guest's request receives an Invalid verdict.
+Default headless models refuse development commands. The experimental game content
+ID advances to `0x5253435241503041` because the action schema changes.
+
+Normal and faulted three-process gates pass the full sequence: thirteen enemies,
+three rests, one clear award per player, then two barrel blasts from one host shot.
+All peers compare the complete world after the finale. The fault gate uses 120 ms
+receive delay, 20 ms jitter, 10% loss and 10% duplication. The model suite passes
+54 cases, including spawn replay/history/allocation, permission and capacity tests,
+and both model/script WASM checks pass.
+
+An isolated copy of the original game also completes its authored gauntlet checks.
+Its cleanup reports 247 leaked ObjectDB instances, 91 resources still in use and
+15 texture RID allocations, so the stricter baseline gate correctly fails. Original
+gameplay sources and the original user-data namespace are untouched; the original
+`run.sh` and its profile deletion are never executed. [Finale evidence](results/gauntlet-finale-2026-09-06/README.md)
+retains both implementations' receipts and the baseline failure.
+
+The Replay fixture still uses two players, support abilities and stock gun limits;
+the original act uses one player and mag-255/no-jam overrides. Its finale setup
+also lacks the new fixture's navigation to a clear area. These are mechanical
+acceptance results, not matched difficulty, timing or performance measurements.
+Remaining parity, baseline cleanup, deployment and paired comparison stay in the
+active full roadmap. Both frameworks and both game versions remain available.
+
+## M8 browser run bundles and persistent sprays — 2026-09-06
+
+Browser solo saves now use the same complete checkpoint-and-image bundle as
+native saves. New encode/decode helpers separate bundle validation from storage,
+so the browser can wait for an IndexedDB commit receipt. The game keeps the
+previous saved tick/hash on a failed replacement and isolates named run slots
+from profile/spray keys. Resume validates identity, content and dependency
+completeness before opening a runner.
+
+Browser spray selection now validates and pins the image before storage, then
+adopts it only after commit. Fresh runs load the saved preference. Complete run
+resume uses its bundled image, including when a newer preference exists or the
+separate preference record has been deleted. Native resume follows the same rule.
+
+The final browser gate saves active combat with image A, stores preference B,
+rejects a stale run replacement, kills Chrome and deletes both source PNG files.
+A fresh run restores B; two fresh resumes restore A and exactly the original
+world at tick 22/hash 139778540719925543. The saved lob lands once and new gunfire
+succeeds. The bundle is 97,838 bytes. A slot called `profile` preserves every
+existing record, while missing-asset, wrong-identity and corrupted saves fail
+without replacing the good save. Native run/asset-save regressions and nine asset
+tests plus their WASM check pass.
+
+[Evidence](results/browser-runs-2026-09-06/README.md) includes the saved bundle,
+receipts, process logs and the inspected restored scene. The gate is registered
+as `replayscrapwebsave`. Broader storage/browser/deployment failure cases, remaining
+game parity and paired framework comparison remain requirements. The full roadmap
+is active; original Kit and all original game projects remain preserved.
+
+## M8/M9 browser identity and profile storage — 2026-09-06
+
+The Godot adapter now has explicit asynchronous IndexedDB operations for bounded
+blobs. A write submission is separate from its transaction completion receipt.
+Revision comparison prevents a stale tab from overwriting a newer record, and
+failed/aborted transactions retain the prior record. Missing, conflict, corruption,
+size, availability and I/O failures remain explicit. The JS bridge owns its data;
+no browser callback retains an Odin pointer.
+
+Scrapyard waits for its browser identity/profile before opening a runner. Its
+confirmed preferences and earned upgrades use the existing validated profile
+codec; local saved state changes only after the commit receipt. The HUD shows
+saving/saved/failed loadout and upgrade status. The browser gate earns two cores,
+buys a plate, kills Chrome and reloads the same identity and exact profile bytes,
+including the restored loadout and 14-HP plate entry. It also preserves a competing
+record on conflict and refuses a corrupted profile before opening a session.
+The native earn/reload/corruption/failed-write profile gate remains green.
+
+[Storage evidence](results/browser-storage-2026-09-06/README.md) records exact-content
+1 MiB/16 MiB round trips, fresh/killed browser recovery, stale-tab conflicts,
+transaction failure receipts, and the game scenario. Gates are registered as
+`replaybrowserstore` and `replayscrapwebprofile`. The writer's bounded base64 bridge
+adds temporary string copies; the payload bound is not a process-memory claim.
+
+The full roadmap remains active. Browser run bundles and persistent sprays, public
+provisioning/TLS/TURN, other browser engines, Steam, remaining game parity and the
+paired comparison still need work. Original Kit and all original games remain
+independently runnable.
+
+## M8 browser Scrapyard and large-state startup — 2026-09-06
+
+Scrapyard now runs its shared value simulation through the browser Room/RTC path.
+A three-Chrome gate uploads a real PNG, proves that the successor cannot prepare
+a checkpoint before the image arrives, then migrates an active zone/lob attack.
+Planned handoff and process death both restore the exact prepared frame and image,
+retain seats and complete new combat. The final gate compares 10 and 11 shared
+authoritative whole-world hashes respectively. Native spray migration remains green.
+
+The port exposed framework defects in fragment queue draining, recovered action
+verdict presentation, correction selection while reliable facts lag, and large
+snapshot backlog before baseline acknowledgement. These now have bounded handling
+and regression coverage. In the final browser gate, each follower receives one
+full bootstrap snapshot and all peers have zero startup resyncs/fragment rejection.
+The network suite passes 56 native tests and its WASM check. A targeted test in an
+isolated copy with the snapshot guards disabled reproduces 46 full snapshots where
+two are expected; the working implementation passes.
+
+The final guest fault-to-continued-combat intervals were 3.853 s planned and 9.056 s
+crash. Those include more work than the corresponding 1.358/1.312 s Room timer.
+Crash recovery loses 120 known ticks to its older acknowledged backup; planned
+recovery loses none. [Browser evidence](results/scrapyard-browser-2026-09-06/README.md)
+retains before/after traces, counters, world hashes, screenshots and native results.
+The gate is registered as `replayscrapwebmigration`; [run instructions](../../examples/replay_scrapyard/browser.md)
+describe tooling and the local fixture.
+
+The full roadmap remains active. Browser profile/save durability, public
+provisioning/TLS/TURN, Steam, remaining game parity and the paired comparison still
+need implementation/evidence. Both game versions and original Kit remain preserved.
+
+## M5 authenticated signaling continuation — 2026-09-06
+
+The RTC adapter and native rendezvous frontend now preserve healthy gameplay
+channels across signaling-only disconnects. A bounded reservation holds the
+identity/peer ID; continuation requires both the instance token and a fresh member
+proof. Tokens are compared in constant time, and expired/obsolete memberships do
+not silently become new IDs. Grant-based configuration enables automatic retries.
+
+A four-browser gate verifies unchanged connection generations/IDs, packets received
+during the signaling outage, wrong-token rejection despite a valid member proof,
+and a late join after recovery. Cavecrawl also continues in epoch 1 with zero
+migrations and a newly accepted guest action after host/client signaling recovery.
+Planned/crash Room and legacy plain-relay RTC regressions remain green.
+[Continuation evidence](results/signaling-resume-2026-09-06/README.md) records the
+before/after counters, logs and exact acceptance limits.
+
+Longer outages, interrupted-handshake/provider-restart combinations, public
+provisioning/TLS/TURN, other browsers and remaining game parity/comparison still
+need work. The full roadmap remains active and both game versions are preserved.
+
+## M5 broader browser failure matrix — 2026-09-06
+
+Cavecrawl's real-browser gate now also passes repeated handoff through epoch 3,
+control partition/fencing and rejoin, successor loss during handoff, and a killed
+host returning in a fresh Chrome process. The return obtains incarnation 103,
+reclaims seat 1 and performs a new accepted pickup. Guests retain inventory and
+seat identity and complete newly accepted actions after each recovery.
+
+The repeat gate exposed a test arrival bug: checking x alone could issue a door
+action while still at a different y coordinate. A read-only authoritative distance
+probe now gates those interactions in browser and native fixtures. The corrected
+browser cases and native return/repeat gates pass; the failed attempt is retained.
+
+Driver event timestamps now distinguish fault-to-action time from Room's local
+interruption timer. First continued guest actions occur after 2.351 s for handoff,
+4.657 s for the control partition, 4.253 s for host death and 9.739 s for successor
+loss in these runs. The longer successor-loss interval is an operational cost to
+investigate, not hidden behind the 551 ms local timer. [Matrix evidence](results/browser-failure-matrix-2026-09-06/README.md)
+contains raw events, logs, screenshots and the full timing definitions.
+
+The full roadmap remains active. Signaling-only reconnect, wider browser/OS clock
+and suspension coverage, public provisioning/TLS/TURN, asset-heavy browser ports,
+remaining game parity and final comparison are still open.
+
+## M5 authenticated RTC and browser host migration — 2026-09-06
+
+A native challenged signaling frontend now verifies RTC room creation/join against
+the live authority Service. It consumes connection-bound challenges once, expires
+unused challenges, enforces member/incarnation/owner checks, and bounds relay work.
+Three real browsers exchange full-size packets after rejecting non-owner creation;
+duplicate creators, cross-connection proof replay and expired challenges are also
+checked. Legacy unauthenticated relay support remains a separate adapter mode.
+
+Room now owns browser clock/nonce and RTC authorization/configuration through
+role changes. Explicit `Migration_Transport` targets combine a trusted provider
+URL with a signed-view-derived room code, preserving native endpoint record/wire
+compatibility. The real Cavecrawl browser project passes planned handoff (old host
+rejoins) and SIGKILL recovery. The surviving guest keeps three gems and its seat,
+then completes a newly accepted door action in epoch 2. Receipts show checkpoint
+239/zero lost ticks/893 ms protocol interruption for planned mode and checkpoint
+246/15 known lost ticks/932 ms for crash mode. These are not total kill-to-recovery
+latencies or percentile measurements.
+
+[Evidence](results/authenticated-rtc-migration-2026-09-06/README.md) includes browser
+logs, rendered recovery views, native migration regression and 30 authority tests.
+The recovered view exposed missing web emoji glyphs; a bundled, licensed Noto
+Emoji fallback now renders them, and a repeated planned gate passes. The broader
+browser failure matrix, signaling reconnect, public provisioning, TLS/TURN, other
+browsers and asset-heavy ports remain required. The full roadmap
+continues; no game/Kit baseline was replaced.
+
+## M5 browser control and authenticated rendezvous prerequisites — 2026-09-06
+
+A raw WebSocket adapter now supports a browser control connection to the native,
+SQLite-backed authority Service. It owns bounded socket/packet storage, keeps
+binary and text messages distinct and preserves small-read retention. A real
+Chrome gate exchanges a 64 KiB packet, obtains signed grants, reconnects control
+without resetting its RPC state, rejects a corrupted MAC and poisons an existing
+lease after a backward clock sample.
+
+Room's control backend is now selectable independently from gameplay. Native
+Cavecrawl passes planned and crash migration over WebSocket control while its
+gameplay stays on ENet. Guest receipts report 421 ms/zero known lost ticks for the
+planned run and 732 ms/11 known lost ticks after the killed host. Thirty authority
+tests include clock suspension/overflow and challenged rendezvous proof checks.
+
+The paired clock takes conservative incremental elapsed deltas and explicitly
+states its wall-clock assumptions; it is not an unconditional browser suspension
+guarantee. Rendezvous signing binds the current authority and process identity,
+so a room code alone cannot authorize creation. The actual signaling challenge
+frontend and RTC/Room integration are still required before browser migration.
+
+[Evidence](results/browser-control-2026-09-06/README.md) and the concrete
+[remaining browser migration work](browser-migration.md) are recorded. The full
+M0–M9 objective remains active; these prerequisites do not waive the real-browser
+handoff/crash/partition gates, deployment, game parity or final comparison.
+
+## M9 Godot value ownership and authoring checks — 2026-09-06
+
+The generated-return review lead now has a reproducer: 2,048 fresh String returns
+retain 8,445,952 bytes in Godot's native memory counter, and temporary returned/
+argument containers retain resources after their intended last reference. Explicit
+`owned_return` and `borrowed_args` contracts release exactly those copies while
+preserving the legacy behavior of bare methods. Contracts also follow composed
+methods and property accessor routes. The fixed String loop has zero measured
+growth; Array/Dictionary/Callable/RefCounted and retained-property checks pass.
+
+Ordinary Odin `string` methods now convert UTF-8 correctly instead of treating an
+Odin string as Godot String storage. Native String getters are also copied safely.
+Unsupported native string exports and raw Variant method signatures reject before
+incompatible marshalling. The [authoring contract](../authoring-guide.md#method-value-ownership)
+explains ownership, retained copies and return lifetimes. Replay's relevant game
+callbacks/results and browser fixture entrypoints use these paths.
+
+Native and Chrome execution, 29 reflection tests, generator composition/negative
+cases, Scrapyard mod and asset-save recovery, and Duel keyboard/link acceptance
+pass. Editor codegen/resource assertions now run as opt-in EditorPlugins using the
+standard editor lifecycle. Their former custom SceneTree entrypoints leaked editor
+RIDs even in a minimal project without Odin. Strict runners now reject teardown
+errors rather than accepting only an assertion sentinel.
+
+[Ownership evidence](results/method-ownership-2026-09-06/README.md) includes the
+failure, fixed measurements, browser/resource lifetime checks, regression logs and
+editor control. These are specific ownership and test-harness fixes, not a complete
+binding audit or framework comparison. The full roadmap remains active; browser
+migration/deployment, remaining parity and final comparison still need work.
+
+## M7 playable P2P browser duel and recovery — 2026-09-06
+
+Replay Duel now selects raw RTC on web and retains native ENet. The existing
+integer model, rollback runner and spectator protocol run unchanged. Browser
+launch parameters reuse the binding's environment/query abstraction. A small
+lobby creates/joins matches, hosts share player/viewer links, and the game renders
+fighter facing from simulation state. Short jump/fire edges are retained while
+waiting to capture input.
+
+Real separate-Chrome-process gates pass 600 ticks of delayed/lost/duplicated
+inputs and a three-second blackout: prediction stops at its eight-tick horizon,
+then both peers reach reference hash 9353382615414616636. A late viewer recovers
+from a six-second blackout that exceeds history, resets from 387 to 655 and plays
+545 further ticks; all three reach the 1200-tick reference hash
+9004447930841423017 with reconciled shot events.
+
+Coordinated browser recovery exports each participant's own 8,981-byte archive at
+tick 240. The driver verifies the downloaded files and terminal browser exit
+codes. Fresh browsers import the files via the lobby and IndexedDB, establish a
+new room, restore distinct 232/236 confirmation frontiers, and finish at the same
+600-tick reference. Browser-created archives also reexecute natively. This does
+not turn one participant's Frame into a live-peer rejoin protocol, nor establish
+automatic Godot browser-filesystem flush durability. Native ENet gameplay/restore
+and 24 P2P tests plus native/WASM archive checks remain green.
+
+The [browser evidence](results/p2p-browser-2026-09-06/README.md) retains successful
+runs, artifacts, rendered views and failed diagnostic/driver attempts. The input
+probe now uses numeric method results and Godot's JSON serializer; hand-formatted
+JSON conflicted with Odin's braced formatting. Clipboard acceptance accounts for
+Chrome's separate sanitized-write permission and asynchronous completion. The
+final interactive gate verifies actual keyboard movement, jumping, and a shot
+observed by both peers, plus the copied join link.
+
+Public room/TURN provisioning, additional browser engines, broader native targets,
+live-peer rejoin, spectator source failover, browser authority migration and
+remaining game parity/comparison are still open. The full roadmap remains active;
+original game projects and Kit remain separate. The return-value ownership
+review lead recorded here is resolved by the M9 entry above.
+
+## M3 browser transport and Session acceptance — 2026-09-06
+
+Replay now owns raw WebRTC connections/data channels independently of Godot's
+high-level multiplayer API. A bounded fragmentation adapter preserves the public
+64 KiB packet limit. Native tests cover reliable ordering, small-buffer retention,
+queue backpressure, partial unreliable expiry and disconnect cleanup.
+
+The first browser trial exposed Godot dropping reliable data when its JS receive
+ring filled. Receiver credit now limits outstanding physical data packets to 16
+per channel; acknowledgments follow application receipt. Lost unreliable traffic
+can release its credit through a reliable probe without retransmitting gameplay.
+The adapter bounds signaling, pending ICE, buffers and callback lifetime; closing
+and reopening the same address cannot target a stale callback at a replacement.
+
+The real-browser gate exchanges full-size reliable messages, trailing small
+messages and unreliable traffic across three direct peers. It closes one browser,
+checks both survivors, introduces a replacement and reopens that adapter in place.
+A second three-browser scenario uses `Session` with the ordinary Hello model:
+movement and one firing action converge to canonical world hash
+3275504495331254914 on host, client and observer. Fifty-two network tests and the
+native Cavecrawl co-op gate also pass. Logs include the initial buffer failure and
+the test driver's resolved cleanup issue; no retry hides a failed assertion.
+
+See the [adapter contract](../../replay/godot/rtc.md) and
+[browser evidence](results/browser-rtc-2026-09-06/README.md). This is local Chrome
+acceptance using a loopback signaling fixture. Public room authentication,
+STUN/TURN reachability, browser migration, P2P browser gameplay, playable game UI
+and additional browser engines remain open. Current Room endpoints are ENet;
+unsupported RTC migration calls explicitly reject. The full roadmap remains
+active, and both original and Replay game projects remain separate.
+
+## M9 optimized build and large-copy lowering — 2026-09-06
+
+The optimized Scrapyard build now completes with ordinary -o:speed flags. Minimal
+IR exposed fourteen aggregate stores of large worlds/frames/snapshots, originating
+in conditional selection and parallel/multi-result assignments. Splitting those
+copies and selecting local world pointers in presentation eliminates all fourteen
+sites. Lifecycle resets already used memset and were left alone; public frame
+reads still return owned values. A timed full repeat build completes in 21.74 seconds,
+versus the earlier incomplete attempt stopped at 23m56s in SLP vectorization.
+
+Fifty-two network tests, optimized normal/fault stress, image-aware planned/crash
+migration, self-contained asset save recovery and script WASM checking pass.
+Optimized presentation p95 is 208/283 microseconds for host/client in the normal
+run. Compiler mode and copy code both changed from the earlier development profile;
+no isolated runtime speedup or framework-adoption conclusion is inferred.
+[Copy-lowering evidence](results/scrapyard-copy-lowering-2026-09-06/README.md) includes
+before/after IR, exact sites, the timed build, raw samples and regression receipts.
+
+Baseline errors, paired comparison, remaining parity/recovery and deployment stay
+open. The full roadmap goal remains active; original projects remain separate.
+
+## M8 stress gate and M9 profiling evidence — 2026-09-06
+
+The 40-enemy stress gate now passes normal and faulted two-process runs. Both
+peers observe slime/burn during a three-second window after the swarm peaks, then
+converge after their completion receipts. Magazine/no-jam overrides match the
+original harness's declared knobs. Nearest-target firing is stationary. Raw phase
+timings, protocol bytes and RSS observations are recorded separately from gameplay.
+
+The runtime profiler distinguishes ordinary advance, snapshot processing,
+correction/replay and inclusive network pumping. Scrapyard adds presentation and
+whole-frame samples through a bounded recorder. Fifty-two network tests show that
+profiling does not change execution or protocol bytes; script WASM checking passes.
+Normal development-build p95 is 83 microseconds for advances, 1381 microseconds for
+client correction/replay, and 3796/5152 microseconds for host/client presentation
+commands. Each timeline's backing allocations total 16,795,648 bytes at history 128.
+These are wall-time diagnostics, not release CPU/GPU claims.
+
+An isolated original project reaches its stress assertions but logs peer-query
+errors and cleanup leaks. Its sources/profile namespace stay separate; the original
+run.sh deletion path is never executed. Replay's -o:speed attempt was still active
+at 23m56s and was stopped after process sampling identified LLVM SLP vectorization
+as the active bottleneck. The completed runs use -o:minimal; no fair optimized A/B
+comparison or adoption decision is claimed. [Stress evidence](results/scrapyard-stress-2026-09-06/README.md)
+contains raw samples, repeated preliminary runs, the baseline errors, compiler
+sampling, source hashes and the next comparison requirements.
+
+The full goal remains active. Release-build scaling, matched traces/paired runs,
+remaining parity/recovery, cache policy and deployment still need work.
+
+## M8 host-only mods and sparse content — 2026-09-06
+
+Fresh authorities load JSON5 overlays in filename order; followers and resumed
+worlds use the catalog carried by authority state. Each file replaces full rows and
+appends combination rules transactionally. File/parse/catalog bounds reject invalid
+work without partial changes. The original mod, chain, delivery and zone JSON
+fixtures are preserved and tested. Sparse gun/status/ability IDs now have explicit
+presence checks, and loadout/workshop selection skips holes. Unavailable saved
+preferences normalize to available rows without discarding the rest of the profile.
+
+Fifty-one native game cases pass, including actual modded transmutation/DOT,
+doubled nova damage and a persistent hostile zone. The real host/client/late-observer
+scenario ignores decoy client mod files, selects gun 9/ability 11 through ordinary
+buttons, fights with the host's data and compares complete worlds. Normal and
+faulted runs agree at tick 655 / `5966026934393736095` and tick 651 /
+`6442825136525909112`. Fresh-process save resume retains the same modded catalog.
+
+Planned and crash combat migration also preserve the host-only gun/mob overrides
+without reloading them on the successor. Their comparison points are tick 465 /
+`8450164524488159654` and tick 409 / `5993474841467005873`. Script WASM checking
+passes. [Mod evidence](results/scrapyard-mods-2026-09-06/README.md) records exact fixtures,
+logs, bounds, source hashes and an archive. The catalog layout/stock fingerprint
+are unchanged; game content is now `0x5253435241503040` for the changed validation
+and sparse selection rules.
+
+Full original-act/visual parity, wider network effect scenarios, stress, cache policy,
+remaining recovery/identity cases, deployment and M9 comparison remain required.
+The full goal stays active, and original Kit/Scrapyard sources remain separate.
+
+## M8 self-contained asset saves — 2026-09-06
+
+Manual Scrapyard saves now contain both the authority checkpoint and every image
+referenced by its players. The reusable asset bundle codec sorts/deduplicates
+references, checks complete-file/asset integrity and preflights cache installation.
+It supports a 1 MiB root, 32 assets and a 16 MiB file; native tests include a bundle
+larger than the network envelope limit without changing that network limit.
+
+The real-process gate captures a client-supplied spray during combat, kills all
+processes, deletes the original PNG and restarts the host alone. The host restores
+the exact checkpoint plus the image/placement before another peer connects. A new
+observer then receives the image; the old lob lands and new gunfire succeeds. Both
+agree at tick 531 / `1620066121801326474`. The file is 98,381 bytes, including the
+44,462-byte image. Removing the asset while keeping a valid checkpoint/container
+is rejected without modifying the good save.
+
+Nine asset cases, Godot-script WASM checking and existing solo/co-op save gates
+pass. A dedicated fresh-process check also resumes a current-compatible plain
+checkpoint whose world has no external assets. Wrong identity and corrupt files
+still fail closed. [Bundle evidence](results/scrapyard-save-assets-2026-09-06/README.md)
+contains logs, source fingerprints and an archive.
+
+The complete roadmap remains active. Host-only JSON mods, persistent general cache
+policy, remaining recovery/identity cases, browser/Steam paths, full parity/polish
+and M9 comparison still require work. Original Kit and game sources remain separate.
+
+## M8 asset primitives, sprays and preparation dependencies — 2026-09-06
+
+The reusable `replay/transfer` package now carries bounded canonical blobs; recovery
+keeps its existing facade and packet namespace, verified against a pre-extraction
+offer digest. Optional application traffic has its own router lane under the same
+aggregate budget. The new asset cache uses immutable SHA-256 references, copy-only
+reads and explicit quota/pin ownership. Peer exchange covers two-way transfer, late
+caches, new authority bindings, scoped requests, per-peer serving and content checks.
+
+Scrapyard now has a PNG picker, G stamping, one movable decal per runner, replacement
+and late-join reconstruction. Images stay outside simulation frames. An upload
+announcement lets the authority validate/cache bytes before admitting Set_Spray;
+that infrastructure decision is recorded in the normal action ledger and is never
+requeried during replay. Native coverage passes 51 network, 7 asset, 4 transfer,
+11 transport and 47 game cases. Recovery's 9 cases, real ENet transfer, P2P's 24
+cases/target archive checks and final script WASM checking pass as recorded.
+
+The faulted spray scenario exchanges distinct images, joins observers before and
+after replacement, preserves placement, moves a stamp and rejects an invalid PNG
+without overwriting the accepted file. All four processes agree at tick 802 /
+`6002322300499812212`. The canonical world is 52,600 bytes / 18,557 fields; content
+is now `0x5253435241503039`.
+
+Room can gate preparation on external checkpoint dependencies. The live test pauses
+successor asset service until a candidate demonstrably lacks its referenced PNG,
+then resumes delivery. Planned/crash takeovers retain the image and exact combat
+frame and continue playing. Planned compares tick 413 / `6537769302980145083` with
+zero known loss; crash compares tick 426 / `4394232613863895485` with 80 known lost
+ticks. Incomplete candidates may refresh while the prior approved point remains
+retained. Deliberately unavailable-asset fallback still needs its own live gate.
+
+[Asset evidence](results/scrapyard-assets-2026-09-06/README.md) records successes,
+failures, screenshots, source hashes and a source archive. It also records a test
+filename collision I caused and the reconstructed admission coverage that now
+passes. Original Kit and sibling Scrapyard remain separate and unchanged.
+
+The full goal remains active. Next work includes asset payloads in manual save
+bundles/cache persistence, host-only mod overlays, remaining recovery/identity
+coverage, browser/Steam paths, full parity/polish and M9 comparison.
+
+## M8 three-wave gauntlet and stronger completion checks — 2026-09-06
+
+A real host/client/observer scenario now clears the 4/4/5 enemy plan, records all
+three saved five-second rest deadlines and rejects early wave/floor completion.
+The latency/jitter/loss/duplication run finishes with thirteen spawns, one clear
+and one core for each player. Both players finish at health ten.
+
+The initial run exposed a weak comparison boundary: gameplay checks passed at
+clear, but the shared hash was sampled just before it. Completion receipts now
+carry their observed tick, and the common comparison waits for a tick at or after
+all receipts. The faulted gauntlet agrees on the cleared world at tick 1642 /
+`6607938560567871771`. Current-content planned/crash combat migration and a fresh
+co-op save/rejoin also pass this stronger check; script WASM checking passes.
+
+[Gauntlet evidence](results/scrapyard-gauntlet-2026-09-06/README.md) records the initial
+boundary issue, final results and original-act differences. The original's barrel
+finale is currently covered separately, not as a matched continuous gauntlet.
+Stress/content transfer, remaining parity/recovery, polish, deployment and M9
+comparison remain work. The full roadmap goal stays active.
+
+## M8 cross-player storm and friendly surge — 2026-09-06
+
+New real-process scenarios exercise the existing effect reducers without production
+simulation changes. Slime/frost on player one and spark/ignite on player two prove
+cross-seat freeze/shatter credit, burn/chill cancellation and shock conduction.
+A separate support actor and late spectator also verify friendly surge, eleven
+zone pulses, healing and expiry. Final storm receipts show nine casts, three lobs,
+nine reactions and all 126 damage credited to player two; four processes agree
+under 120 ms receive delay plus 20 ms jitter, 10% loss and 10% duplication.
+
+The normal ability regression now explicitly requires every peer to observe surge.
+It exposed a scenario timing race: a peer could miss frozen before the next attack
+consumed it. The driver now waits for prerequisite observation receipts before
+issuing consuming actions. Corrected normal/fault scenarios pass; no simulation or
+transport rule was changed for the test. [Storm/surge evidence](results/scrapyard-storm-2026-09-06/README.md)
+records the failure, final receipts, screenshots, source hashes and differences
+from the original acts. Full original-act parity/comparison remains open.
+
+## M8 Scrapyard profiles, Room recovery and run saves — 2026-09-06
+
+The separate game now persists stable local identities and canonical owner-bound
+co-op profiles. Only observed authority updates write cores, parts and loadouts;
+an opening claim applies once per occupant, so redeclaring preferences cannot
+refund expenditure. Fresh-process reload, corrupted-file rejection and failed-write
+preservation pass in Godot. These files preserve the original local co-op trust
+model; they are not a secure competitive economy.
+
+Scrapyard now uses the shared Room driver for prepared combat checkpoints. Planned
+and killed-host scenarios restore exactly the approved complete frame while a zone,
+lob and cast cooldown are active, continue the old attack, issue new casts and
+compare the full world across all survivors. The old host rejoins planned runs.
+A deliberately slow final transfer holds the source frozen for 7,589 ms with zero
+known planned loss. This exposed and fixed two shared problems: Room retired its
+lease before a large final checkpoint could finish, and frozen gameplay queues
+blocked the background acknowledgment. Room now renews the frozen reservation
+under a phase-aware gameplay permit and drains unadmitted traffic within budgets.
+It retires/releases only the exact prepared final point. Fifty network cases pass;
+Quickdraw planned/crash and Cavecrawl successor-loss/repeated migration regressions
+also pass.
+
+Lobby declarations retry confirmed stale/future verdicts for the latest local
+idempotent setter. Lobby Start permission follows saved connection state: a departed
+leader is replaced by a connected runner and a returned host does not preempt it.
+Planned and crash staging migrations preserve loadouts/seats, re-ready, start and
+agree on the full world. Forty-five native game cases, the original arena/movement
+oracle and model WASM check pass.
+
+F5 saves a complete uncoordinated solo/host run; Resume solo opens the same identity's
+archive in a fresh process. A killed-source test installs the exact saved tick/hash,
+continues the saved lob once and exercises new gunfire. Wrong tokens and corrupted
+archives fail without overwriting the source. Manual saves do not bypass Room
+leases. The saved world is authoritative over newer local-profile preferences.
+A second gate kills host/client/observer, restores the host archive, and starts fresh
+joining processes at the resumed epoch. It preserves the client's earlier cast,
+accepts a new cast, and all three agree at tick 390 / `6339768800914903333`.
+The first attempt exposed missing explicit epoch configuration on uncoordinated
+join; `RSY_EPOCH` now supplies it. Room discovery remains automatic. Final script
+WASM checking and the profile regression pass; the new menu was captured/inspected.
+
+[Recovery evidence](results/scrapyard-recovery-2026-09-06/README.md) includes successful
+runs, the failed attempts that exposed these issues, source fingerprints and
+reproduction commands. The canonical world remains 52,404 bytes / 18,409 fields;
+the lobby rule update bumps Scrapyard content to `0x5253435241503038`.
+
+Full recovery/identity coverage, stress/content-transfer acts, authored parity,
+UI/audio, deployment, paired playtests and measured comparison remain required.
+M0–M9 is still active; original Kit and all original game sources remain separate.
+
+## M8 Scrapyard run loop, shops, parts and revives — 2026-09-06
+
+Interactive play now enables the run loop by default, with isolated fixtures
+explicitly opting out. Value-owned director state drives the original wave/count/
+rest formulas, depth roster, horde and boss precedence, and barrel scatter. The
+Clear stage awards one core per connected runner, exposes shop/workshop purchases,
+and requires living players to regroup on the east gate. Departure is a saved
+180-tick telegraph; stepping off cancels it. Floor teardown clears hazards and
+query history while preserving pool generations, and runner warp counters prevent
+interpolation across the move. Active iron is separate from the claimed starter.
+
+A wipe resets the run after 150 saved ticks, clearing scrap, boosts and statuses
+while keeping parts, cores and the current iron. The new wave observes the reset
+rest. Belt, plate, catalyst and magnet rules are integrated with firing, health,
+status duration and pickup reach. Hold F to revive: the authority validates range,
+liveness, target identity and 120 ticks of continued input. This is an explicit
+trust/timing difference from the original owner's progress/claim contract.
+
+`replay/play` supplies a paced Director with spawn backpressure and a tick-owned
+Channel. Fifty 400-tick traces match the original director; native boundaries and
+WASM checks pass. Forty-one native game cases plus the arena/movement oracle cover
+membership, clear rewards, cancellation, horde/boss plans, ghost reaping, purchases,
+parts, reset rules, revive interruption and actual checkpoint continuation during
+departure. Godot-script WASM checking passes. World size is 52,380 canonical bytes /
+18,397 fields; no scaling claim is inferred.
+
+Host/client/observer run gates pass normally and with 120 ms receive delay, 20 ms
+jitter and 10% loss/duplication. They clear two floors, buy boosts and plates, cancel
+one departure, enter the horde floor, take an enemy-caused wipe and reset correctly.
+The faulted run agrees at tick 2963 on `5543274483590906686`. The final faulted revive
+case interrupts a hold, verifies a post-release frame on every peer, then revives
+once and agrees at tick 1130 on `6112176620998805881`. The ability regression also
+passes (tick 1003 / `2496256245403488495`). The shop view was inspected.
+
+The first run driver stopped before collecting its loot; the corrected driver
+collects before shopping. The first revive fault driver let observers miss a brief
+zero-progress state; it now waits for each peer's release receipt. These failures,
+[successful results](results/scrapyard-run-2026-09-06/README.md), source fingerprints
+and visual evidence are retained. Test wave/rest overrides are explicit; ordinary
+play keeps the authored defaults. Original Kit and sibling game files remain intact.
+
+Parts/cores are currently in-world checkpointed values, not yet a durable profile/
+bank service. That integration, full live combat migration, editor-workbench parity,
+deployment, visual/audio/human playtests and the paired-framework evaluation remain
+required. The complete M0–M9 goal stays active.
+
+## M8 Scrapyard player abilities and action feedback — 2026-09-06
+
+All six authored abilities now load into the saved catalog and run through reliable
+predicted cast actions: slime lob, igniter cone, frostwave nova, battlecry buff,
+salvefield zone and sparkjar lob. Staging selects two abilities; Q carries a point
+and E a direction. The reducer validates the slot, live caster, aim and cooldown,
+then applies ordinary cross-entity effects. Lobs, zones, cast counters, credit and
+cooldowns are complete saved values. Standing zones reach late spectators through
+the world snapshot. Full pools reject before spending cooldown.
+
+The existing cooldown primitive gains ready-only admission. `emit_fold` explicitly
+combines shared feedback within a tick while ordinary duplicate emits still reject.
+A native regression found that action rejection restored state but not earlier
+events modified by that action; rollback now restores the event storage too.
+Twenty core and 49 network cases pass, with WASM checks. Thirty-three native game
+cases and the arena/movement oracle pass, including targeting, cross-player
+reactions, capacity gates, folded feedback, complete cast rewind and actual archive
+continuation with both a live lob and a pulsing zone. Model/script WASM checks pass.
+
+Three players and a late spectator exercise all six resources across seven casts,
+three landed lobs, eleven zone pulses, freeze/shatter/spread/surge reactions,
+attribution and regeneration. All four compare the complete world at a shared tick.
+The 120 ms receive-delay run agrees at tick 702 on `3953288046821540538`; adding
+20 ms jitter and 10% loss/duplication agrees at tick 715 on `6891776058214254367`.
+The observer joins with 328/329 ticks remaining on the active zone. In-world setup
+is explicit: stationary targets and wounded crew, followed by ordinary actions.
+The complete world is 52,133 canonical bytes / 18,265 fields; catalog fingerprint
+is `209990796429492326`.
+
+The headed check caught a scaled-stroke bug that exaggerated the visible zone
+radius. The corrected ring keeps a constant world stroke; final zone/reaction
+screenshots were inspected and the headed run agrees at tick 671 on
+`5926682002815953590`. [Evidence](results/scrapyard-abilities-2026-09-06/README.md)
+retains before/after failures, logs, images and source/content hashes. Original
+Kit and sibling game files remain unchanged.
+
+Full director/run progression, shops/workbench, wipe/revive, durable profiles/banks,
+live combat migration scenarios, deployment, visual/audio/feel parity and the
+paired-framework comparison remain required. The complete M0–M9 goal stays active.
+
+## M8 Scrapyard enemy brains, effects and reactions — 2026-09-06
+
+All six stock enemy types now run in the saved simulation: melee scuttlers/hulks,
+ranged spitters, self-detonating poppers, the Titan's wind/add/enrage phases and
+chain-reacting barrels. Enemy projectiles, telegraphs, cooldowns, reap times,
+maximum health and status credit are value-owned. Boss adds reserve a pair together;
+only lifetimes present at the start of the enemy pass think that tick. Boss/prop
+payout rules and incoming crew damage follow the original procedures.
+
+`replay/play` adds reusable effect stack/expiry and telegraph clocks. Nine isolated
+4,096-tick comparisons agree with the original procedures; native boundaries,
+WASM and cached-baseline routes pass. The Godot loader and native generator now
+include eight statuses and eight combo rows, with catalog fingerprint
+`7744525252725736970`. Slot/table ordering, depth-bounded reactions, DOT pulse phase
+and generation-aware attribution are implemented in the game. Work exhaustion
+aborts the complete candidate; a 64-target stock spread passes within its budget.
+
+Twenty-seven native game cases pass, including the original arena/movement oracle,
+existing weapons, reaction priority, DOT seat reuse, barrel chains, bounded cycles,
+atomic work-limit failure, player modifiers/pulse phase, spitter timing, popper
+rollback, Titan phases/payouts and actual checkpoint continuation through boss
+wind-up, airborne spit and attributed status. Model/Godot-script WASM checks pass.
+The complete world is 47,734 canonical bytes / 16,389 fields; costs remain visible
+for later comparison rather than treated as a scaling claim.
+
+Real host/client/observer mixed, boss and barrel cases pass normally and with
+120 ms receive delay, 20 ms jitter, 10% loss/duplication. The faulted mixed case
+agrees at tick 820 on `48030704919957457` (two spits, one pop, three credited kills,
+27 damage and nine scrap). The faulted boss case agrees at tick 1251 on
+`3533698096418010415` (two slams, two adds, 42 damage, 21 scrap and six total cores).
+The faulted barrel case agrees at tick 326 on `6570705249148597318` (two chained
+barrels, two DOT pulses, one status landing, 28 damage and three scrap).
+The 36-HP test override and declared barrel placements are explicit; play retains
+the authored 600-HP Titan by default. A headed wind-up screenshot was inspected.
+[Raw results](results/scrapyard-enemies-2026-09-06/README.md) include source/content
+fingerprints, native/real-process logs and common-tick markers. Original games and
+Kit source remain intact.
+
+Verification also found a presentation-clock bug: after sparse delivery/stalls,
+a client could keep drawing old or over-wide snapshot brackets and have legitimate
+weapon queries rejected. A native regression fails on the old behavior. The observed
+clock now catches up within its configured delay/slack and skips gaps wider than
+the permitted view span; held aiming stamps and server checks remain unchanged.
+Forty-eight network cases and five Quickdraw cases pass with WASM checks. A traced
+weapon rerun accepts all eight rail queries and its healing query with no rejected/
+expired views. Before/after traces and final real-process checks are retained in
+the same results directory. Final faulted enemy/weapon checks and Quickdraw
+rewound/live/lob scenarios pass; the final healing case succeeds on its first query.
+
+Player ability controls/delivery, full director/progression, shops/workbench,
+wipe/revive, profile/bank persistence, combat migration, deployments, full visual/
+feel parity and the paired-framework evaluation remain required. The complete
+M0–M9 goal stays active.
+
+## M8 Scrapyard grenade/lance/mender and historical queries — 2026-09-06
+
+All seven stock gun families are now enabled. `replay/play` adds pure carom and
+beam queries. Seventy-two 300-step motion traces and 513 beam judgments match the
+original expressions compiled in isolation; native boundaries, WASM and the cached
+baseline route pass. Grenades carry position, velocity, fuse, firing payload and
+identity in the world; contact/fuse blasts spare the crew. Beam/blast visuals also
+have saved lifetimes and bounded storage.
+
+Lance/mender queries use the existing validated view-time protocol and 32 frames
+of compact collision proxies in World. `net.query_view` now shares live/historical
+resolution between Scrapyard and Quickdraw; each game supplies its proxy blender. Godot draws and stamps the same quantized
+view; the bot aims from that scene. Queries read historical geometry, check current
+entity generations/liveness and apply current wounds/heals without rewinding live
+objects. Missing/expired history deals no damage/healing and records the rejected
+query. The lance pierces; the mender hits the first living friend (even at full HP),
+with no self-heal or revival.
+
+Seventeen native Scrapyard tests, original arena/movement comparison, model/script
+WASM checks and an additional birth-endpoint regression pass. New cases cover
+historical wounds, slot reuse, absent history, healing blockers, grenade safety,
+blast rollback and actual grenade/reload/query-history checkpoint continuation.
+The shared helper also passes 47 native network cases and five Quickdraw cases,
+with their WASM checks. The canonical world is 42,321 bytes / 13,702 fields; the increase is recorded,
+not presented as a performance improvement.
+
+Real host/client/observer grenade/lance and healing gates pass normally and with
+120 ms receive delay, 20 ms jitter, 10% loss/duplication. The faulted combat run
+agrees at tick 895 on hash `8832595129416730921`, seven blasts, eight historical
+rails, four kills, 29 damage, 12 scrap and 15 shot effects. The faulted healing run
+agrees at tick 447 on hash `8070556161467172700`, one historical healing shot and
+one HP restored. Both report zero resyncs, rejected queries and deferred egress.
+Application-byte/large-reliable-snapshot counters are retained for M9 evaluation.
+Final real-process checks after the shared query-helper extraction also pass,
+including Quickdraw solo. That final faulted healing run has one rejected query
+followed by a successful historical query (two pulls total), recorded explicitly
+rather than treated as a live fallback. A headed healing run also passes; the beam, recipient and enemy were inspected.
+
+An early harness read a missing observation as zero health; it now checks
+availability. The first healing setup exposed the healer to the enemy first;
+ordinary movement now places the recipient ahead. Both failures are retained with
+[successful results and limits](results/scrapyard-ordnance-2026-09-06/README.md).
+Original Kit and sibling game files remain unchanged. Remaining enemy brains,
+abilities/statuses/chains, director/progression, combat migration and the full
+identity/persistence/deployment/comparison gates remain required. The full M0–M9
+goal stays active.
+
+## M8 Scrapyard ballistic/melee combat and resource lifetime — 2026-09-06
+
+`replay/play` now has a pure magazine/reload/jam mechanism. Sixteen isolated
+comparisons against the original Kit gun (4,096 ticks / 6,144 pulls each) agree on
+complete transition hashes; three native boundary cases and WASM checking pass.
+The original gun remains unchanged.
+
+Replay Scrapyard loads all seven authored gun resources, projectile subresources,
+and six mob resources into a validated value catalog. Godot and native stock agree
+at fingerprint `17831446703124821416`. The catalog, gun state/cadence, stable enemy/
+shot/drop pools, enemy timers and combat counters all live in the complete world.
+Four ballistic irons and the scrapbot/hulk brains are playable. Swept shots obey
+cover and see prior projectile kills; death payout and hoover preserve scrap.
+Explicit capacity handling preserves ammo and money, and per-player feedback
+aggregation fits the network event budget even with 64 simultaneous deaths.
+
+Eleven native Scrapyard cases, the original arena/movement oracle, model WASM and
+Godot-script WASM checks pass. New cases include cover/corpse recensus, bounded
+storage, dense deaths, rollback of death/payout/pickup, tiny aim/tick exhaustion,
+and complete authority-archive continuation during a shot/reload. Canonical world
+size is 10,677 bytes / 4,008 fields; this is not a CPU/bandwidth benchmark.
+
+Normal, faulted and headed host/client/observer gates pass. Each requires four
+kills, exactly 29 damage and 12 scrap, both shooters and reconciled shot effects,
+then compares the entire world at a common authoritative tick. The final fault
+run (120 ms receive delay, 20 ms jitter, 10% loss/duplication) agrees at tick 764 on
+hash `3611655386058487739`, shots 8/19 and 27 effects. The arena regression still
+settles at x=1339/662 with one dash each. Screenshots were inspected; full visual/
+feel parity remains pending.
+
+The first bot run killed every enemy but could not collect piles behind cover;
+its ordinary-input navigation was fixed. Successful gameplay then exposed a shared
+runtime resource-lifetime bug: `inst_refcount_decremented` returned false, vetoing
+Godot destruction at count zero. It now permits normal teardown. A resource-holder
+regression proves actual ObjectDB destruction (WeakRef alone misses stranded
+count-zero objects), and the runtime test requires its success marker and rejects
+script errors/leaks. The mouse binding uses Replay's existing ownership helper.
+Game/runtime resource processes now exit cleanly; the existing editor test still
+has separate early-shutdown UI warnings. Original Kit and sibling game files remain
+unchanged. The [results](results/scrapyard-combat-2026-09-06/README.md) retain both
+failures, successful logs, screenshots and source/property fingerprints.
+
+The [combat contract](../../examples/replay_scrapyard/combat.md) records differences:
+fixed-tick versus owner-wall pacing, seat-based jam salt, exact cover contact,
+stable iteration order, seeded spawn flavor and tick-owned corpse reap. Remaining
+gun families/brains, abilities/statuses, director/progression, combat migration and
+full identity/persistence/deployment/comparison gates remain required. The full
+M0–M9 goal stays active.
+
+## M8 Scrapyard arena/staging/movement slice — 2026-09-06
+
+`examples/replay_scrapyard` now exists independently of the sibling original. Its
+value-world reducer includes seeded cover, profiles/readiness, host start/drop-in,
+runner movement/dash and semantic events; Godot supplies the staging UI, original
+sprite/prop assets, camera and local/remote views. Combat/progression are explicitly
+not active in this first slice. The [port ledger](../../examples/replay_scrapyard/roadmap.md)
+keeps all original acts and remaining slices as requirements.
+
+An isolated native oracle compiles selected unmodified original arena/movement
+procedures. Twelve arena layouts, every cover record and 48 movement traces match
+the new rules exactly, including final f32 position bits. Four native tests cover
+staging, collision/name boundaries, dash rewind and mid-dash checkpoint continuation;
+WASM instantiation passes. Python is now included in the pinned dev shell for these
+source/content tools rather than relying on the macOS SDK shim.
+
+Host/client/observer gates pass at 120 ms receive delay and with added jitter/loss/
+duplication. They agree on seed 1337/floor 1, arena checksum `16291010191845827494`,
+loadouts, settled runner x positions 1339/662, one dash per player and two reconciled
+dash effects. A headed solo run passes and the rendered yard was inspected. The
+[recorded results](results/scrapyard-arena-2026-09-06/README.md) retain logs, baseline/
+source fingerprints and a screenshot.
+
+The original project and profiles were not modified or cleared. Network authority
+and timing differ: Replay uses fixed-tick server authority/local prediction, while
+the original streams owner-local movement. Dash quantization and full visual/feel
+parity remain evaluation work. Gun data/behavior, mobs, combat composition, run
+progression, recovery/deployment and the paired-framework comparison remain pending.
+The full M0–M9 goal stays active.
+
+## M4/M5 3D owner physics and separate Slopball3D — 2026-09-06
+
+`Body3` now applies the existing owner/driver protocol to real RigidBody3D and
+CharacterBody3D nodes. It seeds global pose, quaternion orientation, linear/angular
+velocity and sleeping state through PhysicsServer, freezes observers, and separates
+skin correction from physics. New 3D view primitives normalize quaternion blends
+and select a common hemisphere. Fourteen native view cases and WASM instantiation
+pass, including opposite quaternion signs, short-arc interpolation and correction.
+
+The separate Replay Slopball3D project uses original script-free pitch/body assets
+with hashes. Solo, three-process and jitter/loss/duplication gates pass with real
+gravity, lofted kicks and tumble. The client takes ownership and scores; all screens
+receive one goal and converge near tick 600. The normal run reaches about 0.49 m
+peak ball height and at least 16 rad/s observed peak spin across participants. These
+are initial scenario results, not full visual/feel parity.
+
+A separate two-process 3D probe seeds linear velocity (0.965711, -8.687468, 0.482856)
+and angular velocity (0.148716, 0.297431, 0.446147) at handoff. Measured component
+errors are zero and the absolute orientation-quaternion dot product is 1. The old
+solver stops. A native full-game checkpoint test preserves pose/momentum, rejects
+old-epoch samples, accepts the new scope and audits value replay.
+
+The Room planned/crash gates also pass in 3D. They restore the exact approved world,
+seed the new solver including orientation, continue with fresh successor kicks and
+a goal for its team, and compare surviving clients at a common tick. Recorded
+checkpoints are 327 (planned) and 160 (crash), with zero measured seed error. The
+common-tick digests agree at ticks 669 and 685. Original 2D/3D Kit games remain intact.
+
+The first solo run completed gameplay but crashed during material teardown: a raw
+RefCounted material was locally released without first owning a reference. Explicit
+`init_ref` now establishes that ownership before assignment/release; subsequent
+solo, network, probe and migration runs exit cleanly. The failure is retained with
+the successful evidence. Full lobby/UI parity, preview/moving contests, broader
+recovery/deployment and human review remain open, along with Scrapyard and comparison.
+The [3D receipts](results/owner-3d-2026-09-06/README.md) retain source fingerprints,
+raw process logs and the exact seed/digest measurements.
+The complete roadmap goal stays active.
+
+## M4/M5 moving engine-physics migration — 2026-09-06
+
+Replay Slopball now uses either its standalone Session or the existing authenticated
+Room driver. The migration gate runs coordinator, host, trusted successor and guest,
+with 120 ms gameplay receive delay. It triggers while the original owner's ball is
+moving, exercises planned release and process-kill recovery, verifies the complete
+installed frame against the exact coordinator-approved checkpoint, and validates
+the new solver's pose/velocity seed. The successor then makes new physical kicks
+and scores for its own team. Surviving clients compare canonical whole-world hashes
+at a common tick; planned mode also rejoins the old host.
+
+Both modes pass. The recorded planned checkpoint is tick 200 with velocity
+(147.268707, 0.037537), zero known lost ticks and 145 ms Room interruption. The crash
+case restores tick 162 with velocity (204.186127, 0.052045), 53 known lost ticks and
+204 ms Room interruption. Both report zero measured pose/velocity seed error.
+Interruption is the driver's observed protocol interval, not total crash downtime.
+The common-tick world digests agree at ticks 585 and 543, respectively.
+
+`body2_suspend` freezes publication/solving without assigning a new epoch/tick to
+cached old-world presentation. Actual recovered state performs the epoch rebase;
+an older checkpoint tick is therefore valid in the new epoch. The native game
+recovery test also round-trips a complete checkpoint, preserves momentum, rejects
+an old-epoch observation without moving the body, accepts a fresh scope, and audits
+the resulting value replay.
+
+The harness writes shared JSON markers through staged rename and keeps clients live
+while a common-tick comparison is proposed/acknowledged. It can propose a newer tick
+when an unreliable snapshot was missed without weakening equality. Physics contact
+caches are not restored; [raw receipts](results/physics-migration-2026-09-06/README.md)
+record the actual checkpoints, seeds and common-tick comparisons. Moving contests,
+other recovery timings, 3D, full Slopball
+parity and the remaining Scrapyard/comparison roadmap remain open. Original games
+remain separate and the complete goal stays active.
+
+## M4 owner observations and initial Slopball 2D port — 2026-09-05
+
+The authoritative runner now negotiates `Model.control_timing = .Latest_Observation`.
+A bounded single-observation packet is coalesced into the next authority tick, with
+identity/generation/serial, time bounds, value validation and monotonic delivery
+frontiers. It records accepted values in ordinary input history. Scheduled input
+contracts and archive/wire layouts retain their previous behavior. Timing-policy
+mismatches reject before play or checkpoint installation.
+
+`replay/owned` supplies value-owned keys/scopes, owners, sample frontiers, pending
+handoffs, explicit cuts and epoch rebinding. An offer reserves a revision and complete
+momentum baseline; the current owner remains accepted until the prepared owner's
+first valid sample commits. Canceled/expired revisions are never reused. `Driver`
+keeps local producer sequences outside the world. `Body2` handles PhysicsServer
+state seeding, frozen observers, rigid/character samples and separate skin smoothing.
+
+The separate Replay Slopball project uses the original script-free body/pitch assets
+with provenance. Its reducer handles arbitration and scoring without engine calls;
+actual Godot bodies supply the observations. Solo, three-process 120 ms receive-delay,
+and jitter/loss/duplication gates pass. The client becomes owner, its solver kicks
+and scores, and each screen receives one goal. The final normal run agrees at tick
+600 on owner 2, revision 2, score 0/1 and ball position (4.937, 191.441). The fault run
+compares settled positions near tick 600, not exact dynamic same-tick simulation.
+
+A separate two-process solver gate transfers a moving/spinning body and verifies
+linear velocity (31.012335, 11.629622) and angular velocity 0.261846 at the new solver's
+seed, with zero measured component error. It also verifies the old solver stops.
+Nine native owner tests plus WASM instantiation, 46 network tests, nine recovery
+tests and the real authority-checkpoint ENet gate pass.
+
+The first Slopball network run exposed a presentation-policy reset: the client's
+manually installed Confirmed policy disappeared during Welcome reconstruction,
+playing a predicted goal and then the authoritative goal. `Model.event_policy` now
+persists through journal initialization/reconstruction, including recovery. A native
+Welcome/reconnect regression and the rerun game gates pass. The failed receipt is
+retained alongside the successful results.
+
+See [results and limits](results/owner-streams-2026-09-05/README.md), [owner state](../../replay/owned/README.md)
+and [Body2](../../replay/godot/body2.md). Full Slopball parity, multi-goal/moving
+contests, physics reconnect/migration, dedicated-server parity, scaled-hierarchy
+visual correction, 3D, lobby/feel review and the rest of M4/M8/M9 remain pending.
+The full goal stays active; original Kit, games and sibling Scrapyard remain intact.
+
+## M7 target execution, CPU and input-latency measurements — 2026-09-05
+
+The deterministic corpus now executes default and speed-optimized builds on native
+arm64, freestanding WASM and a macOS x86-64 binary under Rosetta. All four seeds
+produce identical complete state/event hashes and counters in all six variants.
+The launcher verifies the x86-64 Mach-O architecture and can require Rosetta instead
+of skipping unavailable translation. This extends ISA/optimizer evidence on this
+Mac; independent x86 hardware, other operating systems and browser networking remain
+unverified. The Nix cross-link emits a warning about an ignored arm64 runtime archive;
+the resulting x86-64 binaries execute successfully.
+
+P2P profiling now measures forward steps, suffix replay, confirmed hashing, protocol
+pumps, and input capture-to-first-simulation latency. Clocks and capture marks are
+runtime-only; changing clock domains resets them, and restore never carries timestamps
+from a previous process. Failed clocks cannot change gameplay. The authoritative
+runner aliases the same clock contract. Twenty-four native P2P cases, 19 core cases
+plus Loot, 42 authoritative-network cases and WASM instantiation pass; native/WASM
+archive replay still agrees.
+
+The optimized native benchmark executes two peers and Memory transport for 2,400
+ticks with matched inputs, validates the full reference world, and compares profiling
+on/off over five trials per case. Median process CPU is 19.528 ms for LAN, 21.385 ms
+for the faulted two-tick delay, and 21.164 ms for faulted eight-tick delay. Profiling
+adds approximately 1.9–3.0% to those medians. The timed region includes codecs and
+Memory transport, excludes setup/reference/cleanup, and uses accelerated virtual
+time. These are small 520-byte-world measurements, not Godot CPU or scaling claims.
+
+Real ENet/Godot runs compare two/eight delay ticks at 120 ms receive delay per side
+plus jitter/loss/duplication, with identical 600-tick gameplay. Both end at chain
+`9353382615414616636`. Capture-to-simulation means are 41.5–46.5 ms with two delay
+ticks and 137.5–138.9 ms with eight; replayed ticks fall from 343–355 to 158–167 per
+peer. These are individual runs, and the metric excludes physical device/display
+latency. The operation measurements are wall times; nested pump/replay/hash totals
+must not be added. No Kit comparison or optimal-delay claim follows from these data.
+
+The [profiling contract](../../replay/p2p/profiling.md) documents boundaries and
+reproduction commands; [raw logs and summaries](results/p2p-profile-2026-09-05/README.md)
+retain the target, CPU, real-process latency and profiled recovery results.
+Broader deployment, earlier co-op/parity work, Scrapyard and
+the paired-framework evaluation remain pending. The full goal stays active and the
+original frameworks/game projects remain intact.
+
+## M7 confirmed spectators and shared transfer core — 2026-09-05
+
+`Watch` and `Watch_Source` now deliver confirmed P2P history to a participant outside
+the player roster. Late join starts from a current confirmed baseline. Later records
+replay confirmed inputs in a shadow runtime, verify every state/event chain and
+install atomically. A mismatch preserves the last good world; a history gap produces
+an explicit reset/skipped range for view and event-journal reconstruction. Spectator
+ACKs never enter the players' input/confirmation frontiers.
+
+The checkpoint receiver's chunk transport is now a reusable `Blob_Receiver`, with
+an expected envelope kind and transactional application validation callback. The
+existing typed receiver wraps it and preserves authority-checkpoint retention and
+policy validation. Chunk sizes, budgets, retries, receipts and migration wire format
+remain the same. The spectator uses a distinct confirmed-history envelope.
+
+The real three-process Duel gate joins the viewer after tick 150, blackouts its
+separate ENet connection for six seconds, and verifies that players advance beyond
+retained history. It then requires at least 128 ticks of ordinary spectator replay
+after the new baseline, plus new shot occurrences. Both players and spectator reach
+tick 900 with chain `826411474463535637`, 107 shots, 18 hits and kills 3/2, equal to
+the independent complete reference world. The spectator has no guessed inputs.
+
+Twenty-two native P2P cases and WASM instantiation pass, along with actual native/
+WASM archive replay. Native recovery/authority cases, real ENet checkpoint transfer
+and coordinated Duel restart pass. A crash-migration regression exposed insufficient
+setup gating in the old fixture: backup sequence 2 did not establish that the loot/
+door transition had entered the acknowledged and coordinator-prepared checkpoint.
+The fixture now waits for both tick frontiers and records them before triggering
+migration. The crash gate passes with gameplay tick 105, acknowledged/prepared 114,
+and recovery at 114; conservation and subsequent actions remain required. The first
+failure had no frontier diagnostics, so its precise recovered inventory location
+and cause cannot be established from that log alone.
+
+The [spectator contract](../../replay/p2p/spectators.md) records ownership, trust,
+history-gap behavior and limits. Spectators currently trust one admitted viewing
+source; source failover, automated rebinding and delayed disclosure are pending.
+The final [logs and source fingerprints](results/p2p-spectators-2026-09-05/README.md)
+include the successful gates, the earlier crash-fixture failure and one compiler
+exit-139 build. The subsequent final build and spectator run succeeded; the compiler
+failure's root cause is still unestablished.
+Broader native/browser targets, profiling and earlier co-op/parity work remain open,
+followed by Scrapyard and the paired-framework comparison. The full goal is active.
+
+## M7 archives, coordinated recovery and divergence replay — 2026-09-05
+
+P2P archives now preserve the retained complete world/event execution, speculative
+suffix, future captured inputs, sparse input buffers, ACK/receive frontiers,
+rolling hashes, roster and match contract. Bounded canonical decoding validates
+counts before allocation. Restore reexecutes every retained tick transactionally
+and reports the first state/event digest mismatch. Diverged recordings preserve
+their stopped phase and checksum disagreement metadata.
+
+Protocol version 2 adds durable receive frontiers to the fresh-runtime handshake.
+Coordinated restoration can resend inputs a peer had acknowledged after its save;
+an archive that forgot inputs already received elsewhere fails explicitly. Stable
+logical IDs are rebound to fresh physical transport IDs using `transport.Remap`.
+This is all-peer recovery, not live-peer rejoin or authenticated provisioning.
+
+The Godot Duel gate saves at speculative head 240, kills both processes, restores
+fresh processes and continues to 600 with matching checksum `9353382615414616636`,
+full reference-world equality and shot journal reconciliation. One recorded run
+restores from different confirmed ticks 235/232; another from 234/234. Native
+regressions force asymmetric durable ACK/receive frontiers and unavailable history.
+
+A standalone Duel archive verifier works without Godot/networking. Native-created
+session and divergence archives also decode/replay in freestanding WASM, with
+identical full reports. The injected execution difference is first found at tick
+12 on both targets. Sixteen native P2P tests, 18 core tests plus Loot, 10 transport
+tests, and Cavecrawl's existing save/resume gate pass. See the retained
+[archives, logs and limits](results/p2p-archives-2026-09-05/README.md).
+
+Spectator catch-up, live rejoin/roster policies, broader deployment, full-length
+recording tools and other native targets remain M7 work. The earlier co-op/parity
+follow-through, Scrapyard port and paired-framework evaluation remain pending.
+Original Kit/game projects and sibling Scrapyard stay intact; the full goal is active.
+
+## M7 initial deterministic peer runner — 2026-09-05
+
+The new `replay/p2p` runner exchanges fixed-roster inputs with bounded windows,
+ACK/retransmission, immutable captured samples, input delay, remote prediction and
+a bounded speculation horizon. It repairs a changed suffix transactionally without
+advancing confirmation, then confirms only fully known input ticks. Rolling
+canonical state/event checksums detect divergent execution. Conflicting received
+inputs fail the match; timeouts disconnect. It does not elect an authority or
+replace another peer's world with a snapshot.
+
+`replay/deterministic` adds checked fixed-width Q24.8 math and integer queries.
+The new Replay Duel stores projectile allocation, RNG, damage/death/respawn and
+movement in a complete integer world. Four 2,400-tick corpora execute on native
+arm64 and freestanding WASM with identical canonical state/event hashes and game
+counters. The WASM module imports no host simulation functions. This establishes
+the tested model/corpus, not determinism of arbitrary callbacks or all targets.
+
+The real two-process ENet duel passes at 120 ms receive delay per side plus jitter,
+loss and duplication. Both reach tick 600 with checksum `9353382615414616636`,
+57 shots, 18 hits and kills 3/2, equal to an independent reference world. Rollback
+and waiting occur on both peers; the eight-tick prediction horizon has visible
+throughput/input-delay tradeoffs at this RTT. All original projects remain intact.
+
+Ten native peer tests cover the integer duel, two/three-peer meshes, blackout stalls,
+input conflicts, contract gating, divergence, timeout, float rejection and oversized
+packet consumption, alongside WASM instantiation. Core suffix-rewrite and fixed-math
+tests also pass. Full match archives with pending frontiers, spectators, divergence
+recordings, authenticated provisioning, other native/browser runtimes and broader
+performance work remain M7 requirements. M4/M6/M8/M9 are still open.
+
+## M5 rejected-claim liveness — 2026-09-05
+
+An early signed Claim now has a deterministic regression fixture. Before the fix,
+the coordinator returned Busy while the owner remained live, but Room stayed in
+Claiming and stopped preparing newer replicas. It remained at prepared sequence 2
+while the source reached acknowledged transfer sequence 72. This isolated the
+stale-point failure in the driver rather than the checkpoint transfer layer.
+
+Rejected claims now return to Following/preparation. `last_command`/`last_result`
+retain the completed coordinator decision, and `claim_rejections`/`busy_claims`
+provide explicit counts. The test requires Busy followed by a newer prepared point,
+then crashes the owner after tick 600 and checks exact combat restoration,
+continued actions/hits and common-tick state agreement. Normal and gameplay-fault
+runs pass; [before/after logs](results/early-claim-2026-09-05/README.md) are retained.
+
+The fix does not relax coordinator fencing, eligibility or rollback limits. It
+addresses a reproduced stale-Claiming failure; the precise triggering reply of the
+older uninstrumented timeout remains unknown. Native authority/recovery gates,
+Quickdraw's normal planned/crash gates and Cavecrawl's control-partition/successor-loss
+gates pass. The full legacy suite was
+not rerun, and M4/M6 follow-through plus M7–M9 remain active roadmap work.
+
+## M6 Claimball contests, faults and replay timing — 2026-09-05
+
+Claimball now has two-active-player contest gates with explicit tick-based input
+stopping/settling. Both the 240 ms RTT run and the jitter/loss/duplication run pass:
+both players kick and claim, local speculative effects reconcile, remote effects
+arrive once, score agrees and the final slow ball converges spatially. The
+[recorded faulted run](results/claimball-contest-2026-09-05/README.md) had 22 kicks,
+three canceled speculative starts, 926 dropped and 891 duplicated unreliable
+packets, and no resyncs. Selected Godot poses still match prediction/observation.
+The claim policy remains proximity/speed/reset based; overlapping remote kick
+events do not by themselves establish an obsolete local claim.
+
+The runner now accepts an optional microsecond profiling clock, installed by the
+Godot Session facade. Replay attempts expose total/max wall time, maximum completed
+depth and conservative histogram percentile bounds. Native tests verify identical
+timed/untimed gameplay and continued play when the clock is unavailable. In the
+faulted contest both clients' p95/p99 bounds were 128/256 µs with a 23-tick maximum
+depth; maxima were 585/676 µs. These small-workload wall-time results exclude decode,
+journal and rendering and do not establish CPU/scale or paired-framework claims.
+
+An intermittent baseline check also resynced an idle client twice and skipped two
+cosmetics. A deterministic short-stall fixture exposed one unnecessary-resync path:
+an authoritative snapshot could be ahead of the client even though all its facts
+were retained. The runner now adopts that complete state, preserves the journal/
+queues and rebuilds prediction lead. The 800 ms real-main-thread-stall gate passes
+with one catch-up, zero resyncs and all five kick effects. Resync reasons/frontiers
+are now observable. The earlier uninstrumented intermittent case is not proven to
+have the same cause; keep monitoring it rather than treating a clean rerun as proof.
+
+Validation includes 42 network tests, 24 authority tests and nine recovery tests with WASM fixtures,
+plus the real contest/fault gates. The first three-goal contest timed out while
+still playing; it was replaced by a fixed workload, not counted as success.
+Broader blackout/rejoin, visual-transition and boundary-policy work remains, along
+with M4 owner streams and M7–M9. Originals are preserved.
+
+The post-fix Quickdraw regression passed planned handoff, but one crash attempt
+stayed in Claiming with backup sequence 2 after the source reached tick 346.
+An instrumented crash-only rerun passed (checkpoint 131, 28 known lost ticks).
+The timed-out attempt's precise rejection/transfer cause is not established;
+backup-tick, control/reply and transfer-error probes now accompany failures.
+The later rejected-claim increment above isolates and fixes one reproducible
+stale-Claiming path; the rerun alone did not establish that cause.
+
+## M6 authored groups and initial Claimball — 2026-09-05
+
+`Model.group` now projects complete authoritative snapshots into a closed
+prediction value and validates that footprint after simulation/actions. Removed
+remote members do not step; their complete authoritative state remains separately
+available for observed presentation. Local inputs/actions/view stamps retain their
+identity through correction. Reconnect and newer-authority recovery reapply the
+projection. The [contract](../../replay/net/groups.md) is explicit about reusing the
+same carrier type, manual dependency validation, one group per client and current
+public-state limits. This establishes scoped simulation, not sparse storage.
+
+Timestamped `history.Boundary(T)` values have explicit exact/held/missing/future/
+expired results. A native moving-gate test verifies historical collision, bounded
+hold exhaustion, changed-boundary correction and replay. Claimball's current
+profile deliberately predicts no outside-avatar contacts, matching its baseline.
+
+The separate [Claimball port](../../examples/replay_claimball/README.md) and
+[recorded four-process gate](results/claimball-2026-09-05/README.md) pass at 240 ms
+RTT. Each player simulates one avatar plus the ball; the striker retains its claim
+during distant fast flight, while the idle player/observer remain observed. Actual
+Godot nodes match the selected poses (maximum measured predicted error 0.000015
+pixels, observed error zero). All screens agree on five kicks and the final 0–1
+score/reset. The idle player's hidden ball prediction still corrected by up to
+267.328 pixels. Competing claims and human visual quality remain unproven.
+
+Validation includes 40 network tests, 16 core tests/headless loot and three
+Claimball model/view tests with WASM checks, plus 24 authority and nine recovery
+tests and their WASM fixtures. Claimball's solo gate, Speedball's real network and
+Quickdraw's planned/crash combat migration gates still pass. The full legacy suite
+was not rerun. M6 needs broader interaction/metric/parity work; M4 owner streams
+and M7–M9 remain active.
+
+## M6 initial Speedball slice — 2026-09-05
+
+The separate [Replay Speedball](../../examples/replay_speedball/README.md) now has
+a pure complete-pitch model, reusable momentum/rolling/contact helpers, predicted
+kicks/spikes/goals, authoritative score presentation and correction smoothing.
+The original game and scenes remain unchanged; copied scene provenance and the
+intent-only spike validation difference are documented. The runner's existing
+one-action-per-seat-per-tick policy services the two-command burst on successive
+ticks. This is an initial port, not full UI/platform/parity completion.
+
+The [four-process ENet receipt](results/speedball-2026-09-05/README.md) passes at
+240 ms RTT: two spikes accepted once, actual Godot-node displacement over 12 game
+pixels in three ticks / 44 ms before acknowledgement, predicted local kicks,
+one canceled/replaced remote speculative flash, exactly two observer kick effects,
+and matching 0–1 score/winner/centered ball. Maximum recorded ball correction was
+268.602 game pixels, including possible reset disagreements; visual quality and
+detailed cause/CPU measurements remain open. This is not a paired Kit comparison.
+
+This port exposed stale remote guesses during state correction. A native regression
+failed with −2 versus the expected −14 remote position. The runner now seeds remote
+prediction from the latest authoritative held-input boundary and applies `hold`
+once per replayed/live prediction tick. Local controls, action IDs and aiming
+stamps remain exact. Core correction can atomically rewrite guessed suffix inputs;
+late replay failure preserves the previous inputs/state/events. Detached correction
+notices compare one prediction tick before/after replay, letting views smooth
+correction independently from forward movement. A large-world WASM fixture now
+keeps its runtime owner on the heap instead of exceeding the stack warning limit.
+
+Validation: 15 core tests/headless loot, 36 network tests, 12 view tests, five
+Speedball model tests, 24 authority tests and nine recovery tests, with their WASM
+fixtures. Speedball solo/network gates and Quickdraw's normal and planned/crash
+combat migration gates passed after the replay change. One Odin build exited with
+signal 11; later builds passed, without an established compiler fix. The complete
+legacy suite was not rerun. Claimball/partial prediction, broader game parity,
+M4 owner streams and M7–M9 remain active work.
+
+## M5/M6 live Quickdraw combat recovery — 2026-09-05
+
+Quickdraw now uses the same Room driver as Cavecrawl for explicit trusted-member
+hosting and takeover. Its four-process gate requests handoff or kills the host
+after combat has produced a dead target awaiting respawn, flying lobs, active
+weapon cooldowns, equipment and collision history. The new authority reads its
+installed baseline and compares the entire frame with the exact approved archive;
+the test then requires new hits, respawn, a new purchase and matching canonical
+world digests at a common tick on all surviving clients. Planned mode also checks
+that the old host rejoins seat 1. Both modes pass at 240 ms gameplay RTT.
+
+`Session_Options.remote_observed` preserves local/remote effect policy through
+role changes. Quickdraw resets views on epoch/Welcome changes and scopes beam
+cancellation to the full occurrence ID. Recovery now reports installation wall
+time, and takeover reuses the existing receiver's schema cache before releasing
+the old Session. A native authority test verifies the restored runtime remains
+valid after that cache is destroyed.
+
+Latest [recorded combat migration receipts](results/quickdraw-migration-2026-09-05/README.md):
+planned checkpoint 127, no known lost ticks, 1,415 ms trigger-to-ready for the
+surviving shooter; crash checkpoint 131, 28 known lost ticks, 2,508 ms trigger-to-ready.
+Installed archives were 6,262 / 6,226 bytes; measured runtime installation took
+47,434 / 37,848 microseconds. These are single-run wall-time receipts, not CPU
+percentiles or an old/new-framework performance comparison. Some initial shots
+after rejoin had no valid observed bracket and correctly missed; later historical
+queries and gameplay continued.
+
+Validation: Quickdraw planned/crash migration, normal duel/lob gate (15 historical
+hits vs zero live, all effects, 13 predicted/landed lobs at a 16 ms maximum local
+sample-to-node delay), five native Quickdraw tests/WASM, 24 authority tests/WASM,
+and the existing Cavecrawl planned migration gate. The complete legacy suite was
+not rerun. M6 still needs ball-game ports, prediction scopes and broader parity;
+M4 owner streams and M7–M9 remain open.
+
+Two existing scriptgen interop limits surfaced while adding the harness: a direct
+untagged `game.Controls` field from `res://shared` was rejected as an unresolved
+bundle, and a method parameter declared as Odin `string` received a Godot String
+constructor without conversion. The harness now stores scalar device input and
+uses an explicitly owned `gd.String` parameter/conversion. Original scriptgen and
+Kit sources are unchanged. Fixing those authoring paths with generator regression
+tests remains an M2/M9 ergonomics item; the workaround is not a general solution.
+
+## M6 initial Quickdraw slice — 2026-09-05
+
+The separate [Replay Quickdraw](../../examples/replay_quickdraw/README.md) project
+now ports movement/dash, hitscan, HP/death/respawn, gold/boots, independent drone
+steering and predicted lobs into a complete Odin world. Original Quickdraw and
+sibling Scrapyard remain unchanged. Arena/view asset provenance is recorded.
+
+The runner adds `Model.step_view`, input-bound observed snapshot brackets, bounded
+authority-side query validation and `Model.event_owner` with an opt-in mixed
+presentation policy. `replay/history` stores copied collision proxies inside the
+world; ray queries never temporarily reposition live entities. Rejected/expired
+view contexts disable historical queries while valid movement continues. Complete
+archives retain validated view contexts and collision history. Gameplay protocol
+is now 6 and archive format 4; older experimental formats reject explicitly.
+
+The [recorded three-process ENet gate](results/quickdraw-2026-09-05/README.md) passed
+at 240 ms injected RTT: 15 historical hits versus zero live hits, 20/20 local and
+watched effects in both shot phases, and 13 predicted lobs subsequently confirmed
+as landed on all processes. Each predicted projectile's Godot node appeared before
+authority acknowledgement; maximum sample-to-node delay was 16 ms. Two purchases
+settled once in the lob phase. The record includes raw logs, application bytes,
+correction/replay counts and a prior unexplained development-run effect discrepancy
+that remains a fault/performance coverage item.
+
+Validation for this increment: five native Quickdraw scenarios plus WASM type-check,
+33 network scenarios plus WASM, 14 core tests/headless loot, 12 view tests, 24 authority
+tests and nine recovery tests with their WASM fixtures. Real Godot solo Quickdraw,
+Cavecrawl process-crash save/resume and coordinated planned migration passed after
+the protocol change. The latter reached epoch 2 with zero known lost ticks and a
+580 ms reported interruption. The complete legacy suite was not rerun.
+
+At that initial slice, remaining M6 work included Quickdraw UI/scenario/fault parity,
+detailed correction/CPU metrics, live competitive migration (now covered by the
+increment above), Speedball/Claimball and authored prediction
+scope/boundary handling remain. Full-world prediction with mixed presentation is
+not partial prediction. M4 owner streams/parity and M7–M9 also remain open.
+
+## Completed increments
+
+- **M0:** architecture, implementation sequence, source baseline inventory, and
+  paired-game comparison protocol written.
+- **M1:** typed complete-world history, input revision, atomic suffix replay,
+  pools/RNG/lifetime, local audit, and checkpoint continuation. Eleven native
+  tests plus the headless loot example and WASM type-check passed.
+- **M2 initial implementation:** bounded event journal with Begin/Update/Cancel/
+  Confirm, speculative/confirmed/watched policies, monotonic confirmation,
+  queue backpressure, frame/pose sampling, positional smoothing, fixed-step clock,
+  buffered button edges, static 2D kinematics/cooldowns, and a Godot Node2D map.
+  Separate Hello and Loot scenes compile and pass real headless Godot tests.
+  Scene resource ownership is explicitly retained/released; the gates reject
+  leaked-resource engine errors.
+- **M3 foundations:** canonical field codecs with public/authority projections,
+  versioned/checksummed envelopes, whole-world authoritative correction and explicit
+  resync, deterministic fault transport, and a direct Godot ENet adapter. The
+  adapter transferred and validated world envelopes over both delivery modes in
+  a server plus two-client test, including a fresh project-cache startup.
+- **M3 gameplay runner:** typed server/client/observer model, seat/connection
+  admission, token digests, tick-stamped controls, reliable sequenced actions and
+  verdicts, authoritative facts/snapshots, prediction/correction, explicit blackout
+  resync, reconnect, observed frame history, and input-lead adjustment. The Hello
+  network scene passes a four-process ENet gameplay gate at 120 ms receive delay
+  on each process.
+- **M3 snapshot protocol:** acknowledged canonical baselines, sparse XOR deltas,
+  bounded sender/receiver caches, missing-baseline full recovery, compact facts,
+  rotating outbound scheduling, and per-peer/per-pump egress budgets. Protocol
+  version 2 passes native and real Godot gameplay gates. A paired Hello-model
+  trace produces identical simulation state with compression on/off and more than
+  50% lower application traffic in that scenario. This is a protocol comparison,
+  not the later old-framework-versus-Replay game comparison.
+
+Current focused validation includes 14 core tests, 11 presentation/game tests,
+9 schema tests, 5 deterministic transport tests, WASM type-checks, the headless
+loot executable, both Godot scene acceptance tests, and the three-process ENet
+transport/codec gate. The runner now has twenty-four engine-free scenarios plus four
+standalone delta/cache tests, a WASM
+type-check, and four-process real gameplay acceptance. Individual gates are rerun
+when their dependencies change.
+The complete legacy repository suite has not been rerun for this additive increment.
+
+Latest verified Godot receipts:
+
+```text
+REPLAY_HELLO_WALK x=144.000015258789
+REPLAY_HELLO_RESTORE tick=2 views=3
+REPLAY_HELLO_OK
+REPLAY_LOOT_VIEW_OK
+```
+
+## Remaining M2 follow-through
+
+- Expanded frame-sampling/confirmation tests and the WASM fixture pass; keep them green.
+- Human visual/play-feel review has not been performed. The tests establish
+  view lifetime/input/effect behavior, not subjective polish.
+- More specialized physics, angular correction smoothing, animation/audio effect
+  adapters, and new codegen sugar should follow concrete game requirements.
+- Existing scriptgen accepts direct generic `replay.Timeline(...)` fields, but
+  rejects a shared-package alias to that runtime as an unresolved tagged bundle.
+  The examples spell the generic directly. Revisit alias diagnostics during
+  authoring stabilization rather than silently weakening Kit's existing checks.
+
+## Next milestone
+
+M4 is underway: basic room controls and a separate Cavecrawl implementation now
+exist. Locks, custom admission, kicks, bans/unbans, and explicit seat replacement
+are implemented; fresh-occupant initialization is a tick input. Twenty-four runner
+tests pass, including lock/reconnect, ban, fresh-seat behavior, and checkpoints. Follow
+[runner documentation](../../replay/net/README.md) for the implemented contract.
+The separate Cavecrawl model implements loot, doors, carrying, rocks, statuses,
+death/revive, dweller AI, waves, and floor progression. Seven pure/network-model
+tests plus solo and co-op Godot loot/door gates pass. Its original floor scenes and
+entity visuals are preserved in a separate project, with original script attachments
+removed. See the port's parity matrix for gaps; full original-game parity is not claimed.
+Automatic host migration, integrated replication/authority fencing, owner-streamed
+physics, and performance comparison remain open. Durable authority archives and
+save/resume now exist; see the latest increment below.
+The full roadmap goal remains active.
+
+Tooling follow-up: immediate fresh-project `--import` shutdown crashed in the
+existing editor integration. Normal headless editor startup with 120 frames to
+drain queued work passed on a fresh cache; the ENet gate uses that path. Do not
+claim the immediate-import issue is fixed. Existing framework/game sources were
+not changed to work around it.
+
+Compiler integration notes: this Odin toolchain produced nil type IDs for generic
+type expressions in a `[]typeid` literal, and nil callbacks when passing the
+generic network thunk directly as a procedure value. Packet schemas now initialize
+their generic types directly, and the core receives a concrete typed thunk. Both
+are exercised by the instantiated runner tests; avoid reintroducing those forms.
+
+An additional real-process run passed with `REPLAY_JITTER=20`, `REPLAY_LOSS=1000`,
+and `REPLAY_DUPLICATE=1000`, alongside 120 ms receive delay on each process.
+Loss/duplication affect the unreliable application channel; reliable packets retain
+ordering/delivery guarantees. This is not an ENet congestion/retransmission benchmark.
+Native tests also cover lost ACKs, missing bases, forged ACKs, outbound-rate recovery,
+and reliable blackouts.
+
+The new Godot Session facade owns shared setup/pump/action/view-event routing;
+Cavecrawl exercises it. Input binding helpers release their retained event resources,
+and large snapshots use reliable fallback above the configured datagram limit.
+Original Kit and original Cavecrawl/Scrapyard gameplay sources remain unchanged.
+
+## Durable saves and recovery increment
+
+Archive v1 stores the complete authority frame (including private fields), exact
+network settings, roster/token hashes, room lock/bans/custom policy data, pending
+membership and actions/inputs, and received/settled action frontiers with recent
+outcomes. Decode preflights the bounded canonical body and validates the full
+archive before installation. A fresh authority can restore it at a newer epoch,
+including promotion of an existing guest seat. Pending actions are preserved or
+explicitly retired according to caller policy. There is no external-effect outbox.
+
+Seven new runner scenarios bring the native suite to **24 tests**, with allocator
+tracking and WASM instantiation of capture/codec/restore. They also exposed and
+fixed a same-tick rejoin/leave ordering issue and protect the host's local token
+against being reused for a second remote seat.
+
+The Godot facade now supplies persistent profiles, staged archive writes/reads,
+`session_save`, and explicit `session_resume`. Cavecrawl provides F5 save and an
+opt-in resume launch. Profiles/saves are isolated from the original game. Two new
+real-process gates passed and are registered in the main test list:
+
+```text
+REPLAY_CAVE_SAVE_RESUME_OK tick=82 epoch=2
+REPLAY_CAVE_RECOVERY_OK
+```
+
+The solo gate saves during an active projectile, creates an incomplete next staging
+file, kills the writer, checks the exact restored frame hash in a new process,
+and continues playing. The co-op gate restores a killed host and a restarted guest
+at 120 ms receive delay per process; the guest retains their reserved seat and
+loot, and continued actions converge. This gate supplies the new epoch explicitly
+and does not claim migration of a surviving client. Native macOS process recovery
+is verified; power-loss and browser persistence are not.
+
+The final checks also passed the cave's seven pure gameplay tests, the complete
+generated cave scripts' WASM type-check (including Session/storage), the original
+new-port solo walk/loot/door gate, and Hello's four-process network gate. These are
+focused checks for this increment, not a rerun of the complete legacy suite.
+
+[Recovery contract](recovery.md) records the API, format, ownership, failure policy,
+and next M5 sequence. Replication to a trusted successor, authority selection and
+fencing, surviving-client frontier reconciliation, and actual planned/abrupt
+takeover remain required. M4/M5 and the full-roadmap goal remain active.
+
+## Checkpoint replication increment
+
+`replay/recovery` now transfers bounded archive chunks to an explicitly trusted
+transport peer/binding. It repairs loss/reordering/duplication, rate-limits output,
+validates the whole archive and custom policy support, and acknowledges the exact
+SHA-256 archive identity. A new offer names the authority's last acknowledged
+archive to retain, so losing a newer Ready receipt cannot strand the authority
+with a reference to an evicted checkpoint. Failed/partial transfers preserve the
+stored archives. Receipt guarantees concern process memory, not disk durability.
+
+Eight native tests and WASM instantiation pass. Cases include malformed offers and
+chunk indices, timeout/retry, wrong senders, same-archive binding replacement,
+lost Ready/canceled replacement, semantic archive rejection, unsupported custom
+room policy, and a private cave archive larger than the transport packet limit.
+The net suite's 24 native tests and WASM check also pass after tightening archive
+configuration validation against the restored runner's minimum egress requirement.
+
+The real Godot ENet gate passes with 120 ms receive delay on each process, 20 ms
+jitter, 10% unreliable loss and 10% duplication:
+
+```text
+REPLAY_REPLICA_CAPTURE bytes=75591 tick=49 cpu_us=39591
+REPLAY_REPLICA_SENDER_OK tick=49 elapsed_ms=2043 tx_bytes=173838 retries=95
+REPLAY_REPLICA_SUCCESSOR_OK bytes=75591 tick=49 validation_us=193712 restore_us=108260
+REPLAY_REPLICA_ENET_OK
+```
+
+The archive contains the real cave model after looting and throwing a rock, plus
+72,000 bytes of authority-only fixture data. The successor validates, restores the
+complete frame under epoch 2, and advances simulation. The gate does not promote
+it into a network authority or migrate surviving players; it specifically proves
+the transfer/restore component. Both new gates are registered in `tests/run_all.sh`.
+The actual generated Godot probe also type-checks for WASM; no browser runtime is
+claimed. An initial Odin debug-build crash did not reproduce in subsequent direct
+and normal builds; no compiler fix is claimed.
+
+These are single debug-run measurements, not performance percentiles. The observed
+encode/validation setup cost makes reusable canonical schema metadata a concrete
+follow-up before frequent large-world replication. Shared-wire dispatch, combined
+traffic scheduling, coordinator-approved fencing, and surviving-client recovery
+remain the next integration steps. Original frameworks and games remain untouched.
+
+## Gameplay integration and archive codec reuse
+
+`Checkpoint_Codec` now keeps canonical schema metadata across archive operations.
+The cached path produces identical bytes and retains content/type/value/contract
+validation; misuse with another type set is rejected. Receivers warm the codec
+during initialization, and the new replication link warms its publisher when a
+target is selected. The same 75,591-byte debug ENet fixture recorded:
+
+| Operation | Earlier run | Warm-metadata run |
+| --- | ---: | ---: |
+| Capture/encode | 39,591 us | 1,574 us |
+| Accumulated receiver processing/validation | 193,712 us | 7,304 us |
+
+These are individual instrumentation receipts, not a statistical benchmark.
+Fresh server restore still builds runtime schemas (139,521 us in the warm run).
+
+`transport.Router` provides separate bounded packet/byte queues over one underlying
+connection and a combined output budget with gameplay capacity reserved. Reliable
+overflow retains the packet; unreliable background overflow can be repaired by the
+replication protocol. `recovery.Link` connects this router to the actual authority/
+client runner, periodically captures checkpoints, preserves target sequence numbers
+across reauthorization, and stops sending/acknowledging work when that admitted
+connection is removed or changes generation. Backup failures do not stop gameplay.
+
+The Godot Session now owns this integration. The application explicitly authorizes
+a recipient with `session_backup_seat`; receivers opt in. The Cavecrawl gate proved
+live movement, loot, and door actions while both endpoints agreed on checkpoint
+sequence 8 at tick 99 over the same ENet connection, with 120 ms receive delay each,
+20 ms jitter, 10% loss and 10% duplication:
+
+```text
+REPLAY_CAVE_BACKUP_HOST tick=99 sequence=8
+REPLAY_CAVE_BACKUP_CLIENT tick=99 sequence=8
+REPLAY_CAVE_REPLICATION_OK
+```
+
+Focused validation passed: 25 runner tests, 9 recovery tests, 8 transport tests,
+WASM instantiation of the integrated link and generated cave scripts, the large
+ENet archive gate, live Cavecrawl replication, and both existing cave save/crash
+recovery gates. The native integration fixture also checks that an unselected
+observer receives no archive, game protocols reject no misrouted backup packets,
+same-peer retargeting progresses, and kicking the recipient stops backup work.
+The new live gate is registered in the main suite. The full legacy suite was not
+rerun for this additive increment.
+
+Next: coordinator-approved leadership/fencing, partition behavior, and surviving-
+client frontier reconciliation, followed by actual planned and abrupt host takeover.
+The full M0–M9 goal remains active; original Kit/game/Scrapyard sources remain unchanged.
+
+## Authority decisions and lease enforcement
+
+`replay/authority` now implements one-room authority decisions over an explicit
+durable-CAS callback: trusted member/incarnation eligibility, bootstrap grants,
+deduplicated renewals, successor nomination, prepared checkpoint claims, planned
+retirement, abrupt expiry, coordinator restart quarantine, and epoch/revision
+floors. A failed commit or reversed clock fences the instance. The current test
+backend is an in-memory ledger, not a production durable service.
+
+Correlated `Lease` replies derive a conservative local deadline from the request
+start, with bounded clock drift and margin. Native clocks include suspended time
+on macOS/Linux/Windows; unsupported targets fail closed. Mac runtime and Linux/
+Windows/WASM type-checks pass. `Prepared` keeps an owned archive beyond receiver
+slot lifetime and only restores under the exact live owner grant.
+
+The network runner checks required permits at input, packet, send, and simulation
+boundaries. A new timeline commit gate checks again after simulation but before
+publishing the candidate; the complete history ring and action frontier survive
+expiry during a tick. The client also restores its pending prediction flag. Godot
+Session exposes a fenced pause and clears fixed-step backlog.
+
+Twelve authority tests pass, including opposite clock drift, delayed/replayed
+replies, storage failure and coordinator replacement, competing claims, consecutive
+migrations and old-host return, eligibility, canonical decision records, prepared
+archive lifetime/restore, and server/client expiry during simulation. Fourteen core,
+25 runner, and 9 recovery tests also pass. The Godot native-clock gate ran the real
+cave model, stopped at tick 20 on lease expiry, and rejected a late renewal:
+
+```text
+REPLAY_LEASE_GODOT_OK stopped_tick=20 elapsed_ms=1184
+```
+
+The new gates are registered in the main suite. The existing live cave replication
+gate also passes after the protocol change. This increment changes experimental
+network protocol to **4** and archive format to **2**, preserving `require_permit`
+across checkpoints; old Replay archives reject explicitly. Original Kit saves and
+games are untouched. Earlier performance/archive-size receipts describe their
+then-current formats.
+
+The [authority contract](../../replay/authority/README.md) specifies assumptions and
+limits. It does not claim a deployed coordinator, production durability, Byzantine
+host resistance, resource-side effect fencing, or actual real-process host takeover.
+Next: authenticated coordinator RPCs and durable storage, then endpoint/epoch
+discovery, surviving-client frontier reconciliation, and planned/crash takeover
+acceptance. M5 and the full roadmap remain active.
+
+The final Hello four-process protocol gate also passes. One cave recovery run
+failed its guest's post-resume inventory assertion; the instrumented rerun passed.
+Review identified an independent-shutdown race in that harness: the host could
+quit before a delayed/resyncing guest inspected its state, and unavailable probe
+state reads as zero. The host now waits for an explicit guest-verification marker,
+and the guest waits for state availability while retaining the same conservation
+checks. Normal recovery and a forced 1,800 ms guest stall both pass. This change
+does not disable cave combat or alter gameplay rules.
+
+## Authenticated coordinator service and SQLite decisions
+
+The authority package now exposes authenticated control RPCs and a client wrapper
+that correlates replies with its Lease. Per-participant HMAC-SHA-256 keys, process
+identity, client nonce, request sequence, and request hash bind the conversation.
+The service stages a command and commits its decision/result/replay frontier in a
+single durable CAS, including Query and rejected commands. Old mutations cannot
+follow a newer read or reexecute after restart; retrying a renewal does not extend
+the lease again. Decision record format is now version 2; the gameplay protocol
+and checkpoint format remain 4/2.
+
+The native SQLite adapter verifies WAL/FULL synchronization, enables fullfsync,
+serializes CAS with BEGIN IMMEDIATE, and requires explicit file creation. The Nix
+toolchain now includes SQLite. Two store tests cover reopen/stale competing CAS
+and write failure; a subprocess killed mid-transaction recovers the previous epoch,
+known tick, and request frontier. This verifies process-crash recovery on this Mac,
+not physical power-loss behavior or arbitrary filesystem durability.
+
+Nineteen authority tests and WASM instantiation pass. The service also passed a
+real three-process Godot gate with an actual cave checkpoint and private fixture
+data. The old owner retired, the successor restored at epoch 2, and the old process
+verified that it remained fenced. The coordinator was then killed and reopened
+from SQLite while the successor stayed alive. After quarantine, the successor
+resumed its retained world under epoch 3:
+
+```text
+REPLAY_SERVICE_READY generation=1 epoch=0
+REPLAY_SERVICE_OLD_OWNER_FENCED
+REPLAY_SERVICE_TRANSFER_READY epoch=2 tick=49
+REPLAY_SERVICE_READY generation=2 epoch=2
+REPLAY_SERVICE_RESTART_OK epoch=3 generation=2 tick=152
+REPLAY_AUTHORITY_SERVICE_OK
+```
+
+The unchanged owner can now recover after a coordinator restart with either its
+retained current world or the exact checkpoint in a previously committed but
+unconsumed grant. A new epoch and quarantine are mandatory. Retired leases can
+receive control metadata without becoming valid gameplay permits again.
+
+The [service contract](../../replay/authority/service.md) records APIs, trust,
+durability, and scope. The gate uses explicit fixture provisioning and a separate
+checkpoint connection; it does not yet migrate surviving game clients. Next:
+member/endpoint provisioning and the session driver for endpoint/epoch changes,
+pending-action reconciliation, and planned/crash takeover in the playable games.
+M5 and the full roadmap remain active. Original framework/game sources are intact.
+
+## Surviving-client migration and the Room driver
+
+`net.client_authority` now quarantines old pending actions until the new Welcome
+resolves the durable frontiers. Applied, rejected, retained, retired, and unknown
+settled outcomes are distinct. New sequence allocation starts from the recovered
+ledger, avoiding gaps after unreplicated work is lost. Old-host local pending
+actions are carried into rejoin reconciliation, and promoted clients obtain the
+same report against their prepared checkpoint. Recovery validates complete verdict
+frontiers before resetting prediction.
+
+The presentation journal can end an epoch with explicit cancellations. Session
+preserves/drains those changes across role replacement, and Cavecrawl now keys
+verdict display by epoch plus sequence. A prior cancellation cannot masquerade as
+a new accepted action. The Room driver combines the authenticated control client,
+lease, gameplay Session, prepared copies, periodic replication, final freeze/release,
+takeover, old-host rejoin, and surviving-client redirect/retry. It reports actual
+checkpoint tick separately from the later Welcome tick, known rollback, and local
+protocol interruption. The cave HUD shows recovery and known rollback.
+
+Four-process gates now keep a guest running through both planned handoff and a
+killed host. The guest retains its three gems and issues a freshly acknowledged
+door action in epoch 2. Planned mode also rejoins the old host as a player, and
+the service's reported recovery kind is checked. Example receipts:
+
+```text
+REPLAY_MIGRATION_GUEST_OK epoch=2 migrations=1 checkpoint=108 known_lost=0 interruption_ms=414
+REPLAY_MIGRATION_PLANNED_OK
+REPLAY_MIGRATION_GUEST_OK epoch=2 migrations=1 checkpoint=101 known_lost=7 interruption_ms=745
+REPLAY_MIGRATION_CRASH_OK
+```
+
+Gameplay receive delay is 120 ms per process. An additional planned run passed
+with 20 ms jitter, 10% loss, and 10% duplication. These are single-run receipts,
+not percentile latency measurements. The latest native suites pass 29 runner,
+12 presentation, and 20 authority cases, with WASM type-checks. Standalone cave
+play, save/resume and live replication also passed after the Session integration.
+An Odin WASM-check process exited unexpectedly once; the subsequent check passed
+without a source workaround, and no compiler fix is claimed.
+
+The [Room contract](../../replay/godot/room.md) documents the new API and limits.
+This is substantial M5 progress, not its full completion: dynamic incarnation/
+endpoint provisioning, successor loss, repeated and partitioned real migrations,
+return of a killed host, broader combat cases, and a competitive migration gate
+still need implementation/evidence. Original Kit and game projects remain separate.
+
+## Fresh process identities and extended live recovery
+
+Known members now obtain a service-assigned increasing incarnation through an
+authenticated, expiring Challenge/Rebind exchange. Challenges bind the client nonce,
+endpoint, current incarnation, and coordinator generation; they change no durable
+identity until a valid proof commits. Permissions and game-token binding remain
+provisioner-owned. Old proofs, old nonces, expired challenges, and proofs from a
+previous coordinator instance cannot reactivate a process. A currently leased
+authority cannot be replaced through registration.
+
+The gameplay Hello/checkpoint now carries incarnation metadata. Room checks it
+against the authenticated roster and the stable game-token hash, resolves the
+successor's latest incarnation, and rejects stale-instance packets. A validated
+new instance reclaims its reserved seat and action frontier. The current
+experimental versions are gameplay protocol 5, checkpoint 3, control RPC 2, and
+decision record 3; old experimental formats require explicit conversion.
+
+The live Cavecrawl matrix now additionally passes:
+
+```text
+REPLAY_MIGRATION_RETURNED_OK incarnation=103 seat=1
+REPLAY_MIGRATION_RETURN_OK
+REPLAY_MIGRATION_GUEST_OK epoch=3 migrations=2 checkpoint=142 known_lost=0 interruption_ms=919
+REPLAY_MIGRATION_REPEAT_OK
+REPLAY_MIGRATION_PARTITION_OK
+REPLAY_MIGRATION_SUCCESSOR_LOSS_OK
+```
+
+The returned-host test kills the original process, completes migration, starts a
+fresh process, checks its newer incarnation/original seat, and performs a new
+accepted action. The repeated test keeps the guest alive through two handoffs.
+The partition test suppresses only the old host's control pumping, verifies a
+fixed game head after lease expiry, and rejoins it after the successor takes over.
+The loss test kills the selected successor during handoff and recovers the frozen
+surviving owner under a new epoch. If release already sealed a checkpoint, fallback
+requires that exact world hash/tick/size. Neither path revives a retired epoch or
+merges divergent inventories.
+
+Focused checks pass: 30 network tests, 24 authority tests, 9 recovery tests,
+SQLite reopen/CAS/failure tests and its killed-writer recovery gate, the authenticated
+service handoff/restart gate, Hello network gameplay, and the generated cave's WASM
+type-check. New extended/partition gates are registered in the main test list.
+See [registration](../../replay/authority/registration.md) for the precise guarantees.
+
+M5 still needs fuller combat/loot timing coverage and competitive migration, along
+with broader deployment/provisioning UX. The next work can exercise these mechanisms
+in the competitive examples while continuing M4's remaining co-op primitives/parity.
+The full M0–M9 goal remains active. Original Kit, games, and Scrapyard remain intact.

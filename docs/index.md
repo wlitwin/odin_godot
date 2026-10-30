@@ -79,6 +79,13 @@ use → ship.**
 
 ## Learn from the examples
 
+The experimental [Replay library](../replay/README.md) explores a complete-world
+simulation model alongside Kit. Its [roadmap](replay/roadmap.md) and
+[comparison plan](replay/comparison.md) preserve both versions of future game
+ports. [Replay loot](../examples/replay_loot/README.md) is the headless model;
+[Replay Hello and Loot](../examples/replay_hello/README.md) add tested Godot views.
+Networking and full-game ports are planned.
+
 - `examples/cavecrawl` is the **co-op reference** (see [kit/](kit/index.md)):
   the main Kit packages in one game, covered by a latency-injected,
   multi-process integration test (`run.sh`).
@@ -125,3 +132,5 @@ verified, for contributors:
   blockers found and fixed, in-browser verification.
 - [design/wasm-spike.md](design/wasm-spike.md): the original Odin → Emscripten SIDE_MODULE
   proof-of-concept.
+
+- [Replay editor authoring workflow](../replay/editor/README.md)

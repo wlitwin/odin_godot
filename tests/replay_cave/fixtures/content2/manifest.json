@@ -1,0 +1,7 @@
+{
+  "content": "0x4341564552504c32",
+  "token_label": "cave-lobby-legacy",
+  "binary_sha256": "58b666f027653ee0f3535b36ea0eb9fa05e0dafb5fa36d9df336fb984a5496c2",
+  "save_sha256": "efe3cd77bf3ff0b28d3c35bc307cd67df76d9604f9a29312bf12435cfa2ea1fd",
+  "note": "Producer emitted SAVE_READY at tick 82. The standalone harness was not killed before its saved-phase timeout; the archive is validated independently by converter tests."
+}

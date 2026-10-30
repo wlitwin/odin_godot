@@ -1,0 +1,29 @@
+{
+  "protocol": 6,
+  "checkpoint_version": 4,
+  "content": "0x5253435241503042",
+  "test_token_label": "protocol-upgrade-owner",
+  "godot": "4.7.1.stable.official.a13da4feb",
+  "producer_project": "/tmp/replay-comparison-idle-verified/replay/project",
+  "note": "Genuine output of retained protocol-6 binary; no version bytes were patched. See docs/replay/results/protocol-upgrade-2026-09-06.",
+  "producer_binary": {
+    "/tmp/replay-comparison-idle-verified/replay/project/bin/libodinscripts.dylib": "8a524f8c823f248768f5b2b0031faaa9822e4d7e9bd7463356690b13641ace74",
+    "/tmp/replay-comparison-idle-verified/replay/project/save_test.gd": "285a2a19d56f174b2d6c7839e75e75b4d1b10d2df4f9677ccc1b7e20d58a2b0b"
+  },
+  "fixtures": {
+    "plain": {
+      "sha256": "831c360e380fe4649fcd51ff2a2b8a069e7247aa74210e30bacd127157589d3d",
+      "bytes": 53283,
+      "assets": 0,
+      "hash": "5165365752760899147",
+      "tick": "13"
+    },
+    "spray": {
+      "sha256": "26c58cf3609baf7316808bffe38114fd023755ebc3afbf9fbb5a5568723c7f50",
+      "bytes": 97798,
+      "assets": 1,
+      "hash": "4873772538835509789",
+      "tick": "14"
+    }
+  }
+}

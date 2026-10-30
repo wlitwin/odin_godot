@@ -258,7 +258,9 @@ tile_data_get_z_index :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -290,7 +292,9 @@ tile_data_get_y_sort_origin :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -328,7 +332,9 @@ tile_data_get_occluder_polygons_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &layer_id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -579,7 +585,9 @@ tile_data_get_collision_polygons_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &layer_id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -780,7 +788,9 @@ tile_data_get_terrain_set :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -812,7 +822,9 @@ tile_data_get_terrain :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -827,7 +839,7 @@ tile_data_set_terrain_peering_bit :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1084452308)
     }
     self := self
-    peering_bit_ := peering_bit_
+    peering_bit_ := Int(peering_bit_)
     terrain_ := terrain_
     args := []__bindgen_gde.TypePtr {
         &peering_bit_,
@@ -846,11 +858,13 @@ tile_data_get_terrain_peering_bit :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3831796792)
     }
     self := self
-    peering_bit_ := peering_bit_
+    peering_bit_ := Int(peering_bit_)
     args := []__bindgen_gde.TypePtr {
         &peering_bit_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -864,7 +878,7 @@ tile_data_is_valid_terrain_peering_bit :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 845723972)
     }
     self := self
-    peering_bit_ := peering_bit_
+    peering_bit_ := Int(peering_bit_)
     args := []__bindgen_gde.TypePtr {
         &peering_bit_,
     }

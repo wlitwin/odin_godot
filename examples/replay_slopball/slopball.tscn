@@ -1,0 +1,284 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://meshes/slopball_pitch.tres" id="mesh_2"]
+[ext_resource type="ArrayMesh" path="res://meshes/slopball_mid_line.tres" id="mesh_3"]
+[ext_resource type="ArrayMesh" path="res://meshes/slopball_goal_left.tres" id="mesh_4"]
+[ext_resource type="ArrayMesh" path="res://meshes/slopball_goal_right.tres" id="mesh_5"]
+
+
+[ext_resource type="Script" path="res://scripts/slopball.odin" id="1_slop"]
+
+[sub_resource type="RectangleShape2D" id="shape_h"]
+size = Vector2(640, 8)
+
+[sub_resource type="RectangleShape2D" id="shape_v"]
+size = Vector2(8, 122)
+
+[node name="ReplaySlopball" type="Node2D"]
+script = ExtResource("1_slop")
+
+[node name="Pitch" type="MeshInstance2D" parent="."]
+z_index = -10
+self_modulate = Color(0.09, 0.16, 0.1, 1)
+mesh = ExtResource("mesh_2")
+
+[node name="MidLine" type="MeshInstance2D" parent="."]
+z_index = -9
+self_modulate = Color(0.16, 0.24, 0.17, 1)
+mesh = ExtResource("mesh_3")
+
+[node name="GoalLeft" type="MeshInstance2D" parent="."]
+z_index = -9
+self_modulate = Color(0.22, 0.3, 0.5, 0.5)
+mesh = ExtResource("mesh_4")
+
+[node name="GoalRight" type="MeshInstance2D" parent="."]
+z_index = -9
+self_modulate = Color(0.55, 0.32, 0.2, 0.5)
+mesh = ExtResource("mesh_5")
+
+[node name="WallTop" type="StaticBody2D" parent="."]
+position = Vector2(320, 4)
+
+[node name="Shape" type="CollisionShape2D" parent="WallTop"]
+shape = SubResource("shape_h")
+
+[node name="WallBottom" type="StaticBody2D" parent="."]
+position = Vector2(320, 356)
+
+[node name="Shape" type="CollisionShape2D" parent="WallBottom"]
+shape = SubResource("shape_h")
+
+[node name="WallLeftUpper" type="StaticBody2D" parent="."]
+position = Vector2(4, 69)
+
+[node name="Shape" type="CollisionShape2D" parent="WallLeftUpper"]
+shape = SubResource("shape_v")
+
+[node name="WallLeftLower" type="StaticBody2D" parent="."]
+position = Vector2(4, 291)
+
+[node name="Shape" type="CollisionShape2D" parent="WallLeftLower"]
+shape = SubResource("shape_v")
+
+[node name="WallRightUpper" type="StaticBody2D" parent="."]
+position = Vector2(636, 69)
+
+[node name="Shape" type="CollisionShape2D" parent="WallRightUpper"]
+shape = SubResource("shape_v")
+
+[node name="WallRightLower" type="StaticBody2D" parent="."]
+position = Vector2(636, 291)
+
+[node name="Shape" type="CollisionShape2D" parent="WallRightLower"]
+shape = SubResource("shape_v")
+
+[node name="BackstopLeft" type="StaticBody2D" parent="."]
+position = Vector2(-8, 180)
+
+[node name="Shape" type="CollisionShape2D" parent="BackstopLeft"]
+shape = SubResource("shape_v")
+
+[node name="BackstopRight" type="StaticBody2D" parent="."]
+position = Vector2(648, 180)
+
+[node name="Shape" type="CollisionShape2D" parent="BackstopRight"]
+shape = SubResource("shape_v")
+
+[node name="Status" type="Label" parent="."]
+offset_left = 200.0
+offset_top = 12.0
+offset_right = 620.0
+offset_bottom = 38.0
+text = "Replay Slopball"
+
+[node name="UI" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="Lobby" type="PanelContainer" parent="UI"]
+offset_left = 80.0
+offset_top = 35.0
+offset_right = 560.0
+offset_bottom = 317.0
+
+[node name="Column" type="VBoxContainer" parent="UI/Lobby"]
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="UI/Lobby/Column"]
+text = "S L O P B A L L"
+horizontal_alignment = 1
+
+[node name="Name" type="HBoxContainer" parent="UI/Lobby/Column"]
+[node name="Label" type="Label" parent="UI/Lobby/Column/Name"]
+text = "NAME"
+[node name="Value" type="LineEdit" parent="UI/Lobby/Column/Name"]
+size_flags_horizontal = 3
+max_length = 48
+text = "Kicker"
+
+[node name="Address" type="HBoxContainer" parent="UI/Lobby/Column"]
+[node name="Value" type="LineEdit" parent="UI/Lobby/Column/Address"]
+size_flags_horizontal = 3
+text = "127.0.0.1"
+[node name="Port" type="SpinBox" parent="UI/Lobby/Column/Address"]
+min_value = 1.0
+max_value = 65535.0
+value = 49570.0
+
+[node name="Buttons" type="HBoxContainer" parent="UI/Lobby/Column"]
+
+[node name="Solo" type="Button" parent="UI/Lobby/Column/Buttons"]
+size_flags_horizontal = 3
+text = "SOLO"
+
+[node name="Host" type="Button" parent="UI/Lobby/Column/Buttons"]
+size_flags_horizontal = 3
+text = "HOST"
+
+[node name="Join" type="Button" parent="UI/Lobby/Column/Buttons"]
+size_flags_horizontal = 3
+text = "JOIN"
+
+[node name="Watch" type="Button" parent="UI/Lobby/Column/Buttons"]
+size_flags_horizontal = 3
+text = "WATCH"
+
+[node name="Saved" type="HBoxContainer" parent="UI/Lobby/Column"]
+[node name="Label" type="Label" parent="UI/Lobby/Column/Saved"]
+text = "SAVE FILE"
+[node name="Path" type="LineEdit" parent="UI/Lobby/Column/Saved"]
+size_flags_horizontal = 3
+max_length = 4096
+text = "user://slopball.replay"
+[node name="Resume" type="HBoxContainer" parent="UI/Lobby/Column"]
+[node name="Solo" type="Button" parent="UI/Lobby/Column/Resume"]
+size_flags_horizontal = 3
+text = "RESUME SOLO"
+[node name="Host" type="Button" parent="UI/Lobby/Column/Resume"]
+size_flags_horizontal = 3
+text = "RESUME HOST"
+
+[node name="Party" type="VBoxContainer" parent="UI/Lobby/Column"]
+visible = false
+[node name="Code" type="LineEdit" parent="UI/Lobby/Column/Party"]
+placeholder_text = "Paste a party invite"
+max_length = 256
+[node name="Hint" type="Label" parent="UI/Lobby/Column/Party"]
+theme_override_font_sizes/font_size = 11
+text = "Invited friends can host and keep the match running."
+autowrap_mode = 2
+[node name="Choices" type="HBoxContainer" parent="UI/Lobby/Column/Party"]
+[node name="Watch" type="CheckBox" parent="UI/Lobby/Column/Party/Choices"]
+text = "Watch only"
+[node name="Rejoin" type="Button" parent="UI/Lobby/Column/Party/Choices"]
+size_flags_horizontal = 3
+text = "REJOIN RECENT"
+[node name="Copy" type="Button" parent="UI/Lobby/Column/Party/Choices"]
+text = "COPY INVITE"
+
+[node name="Roster" type="Label" parent="UI/Lobby/Column"]
+clip_text = true
+text = ""
+[node name="Start" type="Button" parent="UI/Lobby/Column"]
+visible = false
+text = "START MATCH"
+[node name="Notice" type="Label" parent="UI/Lobby/Column"]
+text = "Host a pitch or join one."
+autowrap_mode = 2
+
+[node name="Leave" type="Button" parent="UI"]
+visible = false
+offset_left = 556.0
+offset_top = 8.0
+offset_right = 632.0
+offset_bottom = 34.0
+text = "LEAVE"
+
+[node name="Chat" type="PanelContainer" parent="UI"]
+visible = false
+offset_left = 8.0
+offset_top = 238.0
+offset_right = 310.0
+offset_bottom = 332.0
+[node name="Column" type="VBoxContainer" parent="UI/Chat"]
+[node name="Lines" type="RichTextLabel" parent="UI/Chat/Column"]
+custom_minimum_size = Vector2(296, 48)
+theme_override_font_sizes/normal_font_size = 11
+scroll_following = true
+[node name="Input" type="LineEdit" parent="UI/Chat/Column"]
+placeholder_text = "Enter to chat · Esc to cancel"
+max_length = 240
+[node name="Notice" type="Label" parent="UI/Chat/Column"]
+theme_override_font_sizes/font_size = 11
+
+[node name="Scoreboard" type="PanelContainer" parent="UI"]
+visible = false
+offset_left = 70.0
+offset_top = 70.0
+offset_right = 570.0
+offset_bottom = 240.0
+[node name="Column" type="VBoxContainer" parent="UI/Scoreboard"]
+[node name="Score" type="Label" parent="UI/Scoreboard/Column"]
+text = "LEFT 0 — 0 RIGHT"
+horizontal_alignment = 1
+[node name="Grid" type="GridContainer" parent="UI/Scoreboard/Column"]
+columns = 3
+theme_override_constants/h_separation = 12
+
+
+[node name="Save" type="Button" parent="UI"]
+visible = false
+offset_left = 8.0
+offset_top = 72.0
+offset_right = 145.0
+offset_bottom = 98.0
+theme_override_font_sizes/font_size = 12
+text = "SAVE · F5"
+[node name="SaveNotice" type="Label" parent="UI"]
+visible = false
+offset_left = 155.0
+offset_top = 106.0
+offset_right = 632.0
+offset_bottom = 128.0
+theme_override_font_sizes/font_size = 12
+horizontal_alignment = 1
+
+[node name="Again" type="Button" parent="UI"]
+visible = false
+offset_left = 254.0
+offset_top = 40.0
+offset_right = 386.0
+offset_bottom = 72.0
+text = "Play again"
+
+[node name="Handoff" type="Button" parent="UI"]
+visible = false
+offset_left = 8.0
+offset_top = 40.0
+offset_right = 145.0
+offset_bottom = 66.0
+theme_override_font_sizes/font_size = 12
+text = "HAND OFF HOST"
+[node name="Recovery" type="Label" parent="UI"]
+visible = false
+offset_left = 155.0
+offset_top = 78.0
+offset_right = 632.0
+offset_bottom = 100.0
+theme_override_font_sizes/font_size = 12
+horizontal_alignment = 1
+
+[node name="CopyInvite" type="Button" parent="UI"]
+visible = false
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 145.0
+offset_bottom = 34.0
+theme_override_font_sizes/font_size = 12
+text = "COPY INVITE"
+
+[node name="Legend" type="Label" parent="UI"]
+offset_left = 100.0
+offset_top = 337.0
+theme_override_font_sizes/font_size = 12
+text = "WASD move · Space kick · Tab scores · Enter chat"

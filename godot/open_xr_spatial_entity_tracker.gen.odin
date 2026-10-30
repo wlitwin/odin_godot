@@ -117,7 +117,7 @@ open_xr_spatial_entity_tracker_set_spatial_tracking_state :: proc "contextless" 
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2170234447)
     }
     self := self
-    spatial_tracking_state_ := spatial_tracking_state_
+    spatial_tracking_state_ := Int(spatial_tracking_state_)
     args := []__bindgen_gde.TypePtr {
         &spatial_tracking_state_,
     }
@@ -135,7 +135,9 @@ open_xr_spatial_entity_tracker_get_spatial_tracking_state :: proc "contextless" 
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Spatial_Entity_Tracker_Entity_Tracking_State(__return_storage)
     return
 }
 

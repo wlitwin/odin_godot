@@ -58,7 +58,9 @@ packed_scene_pack :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -72,7 +74,7 @@ packed_scene_instantiate :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2628778455)
     }
     self := self
-    edit_state_ := edit_state_
+    edit_state_ := Int(edit_state_)
     args := []__bindgen_gde.TypePtr {
         &edit_state_,
     }

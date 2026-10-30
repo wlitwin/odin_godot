@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ScrapEnemyArchetype" format=3]
+[ext_resource type="Script" path="res://scripts/views/enemy_archetype.odin" id="script"]
+[ext_resource type="Resource" path="res://data/mobs/spitter.tres" id="definition"]
+[ext_resource type="PackedScene" path="res://entities/mob.tscn" id="scene"]
+[ext_resource type="Resource" path="res://visuals/enemies/spitter.tres" id="appearance"]
+[resource]
+script = ExtResource("script")
+definition = ExtResource("definition")
+scene = ExtResource("scene")
+appearance = ExtResource("appearance")

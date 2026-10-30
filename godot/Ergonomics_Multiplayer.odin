@@ -10,7 +10,7 @@ package godot
 //
 //     if is_host { gd.host(self.owner, 7777) } else { gd.join(self.owner, "127.0.0.1", 7777) }
 //     ...
-//     gd.connect_to(gd.multiplayer(self.owner), "peer_connected", self.owner, "on_peer")
+//     gd.on_peer_connected(self.owner, "on_peer")
 //     ...
 //     // inside an @(gd_rpc) proc, read who sent it:
 //     sender := gd.rpc_sender_id(self.owner)
@@ -26,10 +26,12 @@ package godot
 
 import gdext "godot:gdext"
 
-// multiplayer returns the MultiplayerAPI for `node`'s scene tree (nil before the node is in a
-// tree). Use it as the signal emitter for peer_connected / peer_disconnected:
+// multiplayer returns an OWNED MultiplayerAPI reference for `node`'s scene tree
+// (nil before the node is in a tree). Consume it with release_ref when done:
 //
-//     gd.connect_to(gd.multiplayer(self.owner), "peer_connected", self.owner, "on_peer_joined")
+//     mp := gd.multiplayer(self.owner)
+//     defer gd.release_ref(mp)
+//     gd.connect_to(mp, "peer_connected", self.owner, "on_peer_joined")
 multiplayer :: proc "contextless" (node: Node) -> Multiplayer_Api {
 	return node_get_multiplayer(node)
 }
@@ -45,9 +47,12 @@ host :: proc "contextless" (node: Node, port: int, max_peers := 32) -> bool {
 	} else {
 		peer := new_e_net_multiplayer_peer()
 		if cast(rawptr)peer == nil {return false}
+		ref_counted_init_ref(peer)
+		defer release_ref(peer)
 		err := e_net_multiplayer_peer_create_server(peer, Int(port), Int(max_peers), 0, 0, 0)
 		if err != .Ok {return false}
 		mp := node_get_multiplayer(node)
+		defer release_ref(mp)
 		if cast(rawptr)mp == nil {return false}
 		multiplayer_api_set_multiplayer_peer(mp, cast(Multiplayer_Peer)peer)
 		return true
@@ -66,11 +71,14 @@ join :: proc "contextless" (node: Node, address: cstring, port: int) -> bool {
 	} else {
 		peer := new_e_net_multiplayer_peer()
 		if cast(rawptr)peer == nil {return false}
+		ref_counted_init_ref(peer)
+		defer release_ref(peer)
 		addr := new_string_cstring(address)
 		defer free_string(addr)
 		err := e_net_multiplayer_peer_create_client(peer, addr, Int(port), 0, 0, 0, 0)
 		if err != .Ok {return false}
 		mp := node_get_multiplayer(node)
+		defer release_ref(mp)
 		if cast(rawptr)mp == nil {return false}
 		multiplayer_api_set_multiplayer_peer(mp, cast(Multiplayer_Peer)peer)
 		return true
@@ -83,6 +91,7 @@ join :: proc "contextless" (node: Node, address: cstring, port: int) -> bool {
 // next host/join starts from a clean MultiplayerAPI. No-op before a peer is in a tree.
 multiplayer_clear_peer :: proc "contextless" (node: Node) {
 	mp := node_get_multiplayer(node)
+	defer release_ref(mp)
 	if cast(rawptr)mp == nil {return}
 	none: Multiplayer_Peer
 	multiplayer_api_set_multiplayer_peer(mp, none)
@@ -92,7 +101,8 @@ multiplayer_clear_peer :: proc "contextless" (node: Node) {
 // offline (single-player) peer this is also true. False before a peer is assigned.
 is_server :: proc "contextless" (node: Node) -> bool {
 	mp := node_get_multiplayer(node)
-	if cast(rawptr)mp == nil {return false}
+	defer release_ref(mp)
+	if cast(rawptr)mp == nil || !multiplayer_api_has_multiplayer_peer(mp) {return false}
 	return bool(multiplayer_api_is_server(mp))
 }
 
@@ -100,7 +110,8 @@ is_server :: proc "contextless" (node: Node) -> bool {
 // positive id; 0 means no peer is assigned).
 my_peer_id :: proc "contextless" (node: Node) -> int {
 	mp := node_get_multiplayer(node)
-	if cast(rawptr)mp == nil {return 0}
+	defer release_ref(mp)
+	if cast(rawptr)mp == nil || !multiplayer_api_has_multiplayer_peer(mp) {return 0}
 	return int(multiplayer_api_get_unique_id(mp))
 }
 
@@ -108,6 +119,7 @@ my_peer_id :: proc "contextless" (node: Node) -> int {
 // from INSIDE an `@(gd_rpc)` proc. Returns 0 when not in an RPC (or a call_local dispatch).
 rpc_sender_id :: proc "contextless" (node: Node) -> int {
 	mp := node_get_multiplayer(node)
+	defer release_ref(mp)
 	if cast(rawptr)mp == nil {return 0}
 	return int(multiplayer_api_get_remote_sender_id(mp))
 }
@@ -117,7 +129,8 @@ rpc_sender_id :: proc "contextless" (node: Node) -> int {
 // this is a regular `proc` (needs an Odin context — script methods already have one).
 connected_peers :: proc(node: Node) -> []int {
 	mp := node_get_multiplayer(node)
-	if cast(rawptr)mp == nil {return nil}
+	defer release_ref(mp)
+	if cast(rawptr)mp == nil || !multiplayer_api_has_multiplayer_peer(mp) {return nil}
 	arr := multiplayer_api_get_peers(mp)
 	defer free_packed_int32_array(arr)
 	n := int(packed_int32_array_size(&arr))
@@ -136,6 +149,7 @@ connected_peers :: proc(node: Node) -> []int {
 //     gd.on_peer_connected(self.owner, "on_peer_joined")  // -> net_node_on_peer_joined(self, id)
 on_peer_connected :: proc "contextless" (node: Node, method: cstring) -> Error {
 	mp := node_get_multiplayer(node)
+	defer release_ref(mp)
 	if cast(rawptr)mp == nil {return .Failed}
 	return connect_to(cast(Object)mp, "peer_connected", cast(Object)node, method)
 }
@@ -143,6 +157,7 @@ on_peer_connected :: proc "contextless" (node: Node, method: cstring) -> Error {
 // on_peer_disconnected — `on_peer_connected` for the `peer_disconnected(id)` signal.
 on_peer_disconnected :: proc "contextless" (node: Node, method: cstring) -> Error {
 	mp := node_get_multiplayer(node)
+	defer release_ref(mp)
 	if cast(rawptr)mp == nil {return .Failed}
 	return connect_to(cast(Object)mp, "peer_disconnected", cast(Object)node, method)
 }

@@ -234,7 +234,9 @@ tree_get_column_expand_ratio :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &column_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -252,7 +254,9 @@ tree_get_column_width :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &column_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -367,7 +371,9 @@ tree_get_selected_column :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -382,7 +388,9 @@ tree_get_pressed_button :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -396,7 +404,7 @@ tree_set_select_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3223887270)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -414,7 +422,9 @@ tree_get_select_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Tree_Select_Mode(__return_storage)
     return
 }
 
@@ -460,7 +470,9 @@ tree_get_columns :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -490,7 +502,9 @@ tree_get_edited_column :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -583,7 +597,9 @@ tree_get_column_at_position :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &position_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -601,7 +617,9 @@ tree_get_drop_section_at_position :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &position_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -619,7 +637,9 @@ tree_get_button_id_at_position :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &position_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -757,7 +777,7 @@ tree_set_column_title_alignment :: proc "contextless" (
     }
     self := self
     column_ := column_
-    title_alignment_ := title_alignment_
+    title_alignment_ := Int(title_alignment_)
     args := []__bindgen_gde.TypePtr {
         &column_,
         &title_alignment_,
@@ -779,7 +799,9 @@ tree_get_column_title_alignment :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &column_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Horizontal_Alignment(__return_storage)
     return
 }
 
@@ -795,7 +817,7 @@ tree_set_column_title_direction :: proc "contextless" (
     }
     self := self
     column_ := column_
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &column_,
         &direction_,
@@ -817,7 +839,9 @@ tree_get_column_title_direction :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &column_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Text_Direction(__return_storage)
     return
 }
 
@@ -968,7 +992,7 @@ tree_set_scroll_hint_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 415911924)
     }
     self := self
-    scroll_hint_mode_ := scroll_hint_mode_
+    scroll_hint_mode_ := Int(scroll_hint_mode_)
     args := []__bindgen_gde.TypePtr {
         &scroll_hint_mode_,
     }
@@ -986,7 +1010,9 @@ tree_get_scroll_hint_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Tree_Scroll_Hint_Mode(__return_storage)
     return
 }
 
@@ -1146,7 +1172,9 @@ tree_get_drop_mode_flags :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

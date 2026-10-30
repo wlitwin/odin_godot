@@ -1,0 +1,24 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://closed.gd" id="script"]
+[ext_resource type="Theme" path="res://assets/ui/metal_theme.tres" id="theme"]
+[node name="YardClosed" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("theme")
+script = ExtResource("script")
+[node name="Message" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Y A R D   C L O S E D
+
+You can close this tab."
+horizontal_alignment = 1
+vertical_alignment = 1

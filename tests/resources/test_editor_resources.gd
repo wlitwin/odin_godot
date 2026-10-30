@@ -1,4 +1,5 @@
-extends SceneTree
+@tool
+extends RefCounted
 
 # ----------------------------------------------------------------------------
 # Editor-context custom-resource check (gotcha #4). Run with `--editor --headless`.
@@ -10,14 +11,16 @@ extends SceneTree
 # property list (so the Inspector shows them), and an edit-then-save-then-reload round-trip
 # persists the values — all WITHOUT a crash / missing-virtual error.
 #
-# Run:  $GODOT --editor --headless --path tests/resources --script test_editor_resources.gd
+# Run: RESOURCES_EDITOR_CHECK=1 $GODOT --editor --headless --path tests/resources
 # ----------------------------------------------------------------------------
 
 func _fail(msg: String) -> void:
 	print("RESOURCES_EDITOR_FAIL: ", msg)
-	quit(1)
+	tree.quit(1)
 
-func _initialize() -> void:
+var tree: SceneTree
+func run(editor_tree: SceneTree) -> void:
+	tree = editor_tree
 	if not Engine.is_editor_hint():
 		_fail("expected editor context"); return
 
@@ -51,4 +54,4 @@ func _initialize() -> void:
 	print("  ok  editor edit -> save -> reload persists @export values")
 
 	print("RESOURCES_EDITOR_OK")
-	quit(0)
+	tree.quit(0)

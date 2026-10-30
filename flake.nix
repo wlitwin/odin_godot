@@ -61,6 +61,9 @@
           binutils      # objcopy / ld for native link + symbol steps
           emscripten    # 5.0.6; produces a browser-loadable SIDE_MODULE (EMCC= to pin 4.0.20)
           gnumake
+          lz4           # Native reference oracle for Replay’s pure-Odin codec tests
+          sqlite        # Replay authority service: durable, transactional decision ledger
+          python3       # Replay content/baseline extraction tools; avoid macOS SDK shims
           nodejs        # web milestone: COOP/COEP serve.sh + headless-browser drive.mjs
         ];
 
@@ -81,6 +84,7 @@
         devShells.default = pkgs.mkShell {
           name = "odin_godot-dev";
           packages = toolchain;
+          LZ4_LIB_DIR = "${pkgs.lz4.lib}/lib";
 
           shellHook = ''
             ${godotHook}

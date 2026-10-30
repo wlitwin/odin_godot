@@ -1,0 +1,37 @@
+package main
+import "core:os"
+import "core:fmt"
+import r "godot:replay"
+import net "godot:replay/net"
+import d "godot:replay/diagnostic"
+import base "godot:examples/replay_cavecrawl/shared/cave"
+import owner "godot:examples/replay_cavecrawl/shared/owner_cave"
+seed :: proc(w:^base.World) {
+ w.director={wave=1,done=true}
+ _,ok:=r.pool_insert(&w.dwellers,base.Dweller{position={200,120},home={200,120},hp=70});assert(ok)
+ _,ok=r.pool_insert(&w.rocks,base.Rock{position={170,120},velocity={12,0},left=24,shooter=1});assert(ok)
+}
+capture :: proc(world:$W,model:net.Model(W,$C,$A,base.Event,base.SEATS),content:u64,name:string,action:A) {
+ s:net.Server(W,C,A,base.Event,base.SEATS);defer net.server_destroy(&s)
+ cfg:=net.DEFAULT_CONFIG;cfg.hz=base.HZ;cfg.content=content
+ assert(net.server_init(&s,r.Frame(W){state=world},model,{},cfg,local_seat=1)==.None)
+ assert(net.server_set_local_token(&s,net.Token{0=37})==.None)
+ assert(net.server_step(&s)==.None)
+ frame,_:=r.current(&s.timeline);assert(frame.state.dwellers.values[0].hp==70 && frame.state.rocks.count==1)
+ _,issued:=net.server_issue(&s,action);assert(issued==.None)
+ cp:net.Checkpoint(W,C,A,base.SEATS);defer net.checkpoint_destroy(&cp)
+ assert(net.checkpoint_capture(&s,&cp)==.None && len(cp.actions)==1)
+ bytes,error:=net.checkpoint_encode(&cp,model);defer delete(bytes);assert(error==.None)
+ assert(os.write_entire_file(fmt.tprintf("/private/tmp/replay-cave-impact-20260920/%s.checkpoint",name),bytes)==nil)
+ for _ in 0..<3 {assert(net.server_step(&s)==.None)}
+ recording:d.Recording(W,net.Batch(C,A,base.SEATS),net.Net_Event(base.Event));defer d.recording_destroy(&recording)
+ identity:=d.Recording_Context{content=content,build=1,tick_hz=base.HZ}
+ assert(d.recording_capture(&recording,&s.timeline,identity,max_ticks=4).error==.None)
+ recorded,record_error:=d.recording_encode(&recording);defer delete(recorded);assert(record_error==.None)
+ assert(os.write_entire_file(fmt.tprintf("/private/tmp/replay-cave-impact-20260920/%s.rplrec",name),recorded)==nil)
+ fmt.printf("CAVE_IMPACT_CAPTURE_OK name=%s content=%x pending=%d records=%d events=%d\n",name,content,len(cp.actions),len(recording.ticks),len(recording.events))
+}
+main :: proc() {
+ b:=base.initial();seed(&b);capture(b,base.model(),base.CONTENT,"c8",base.Action{verb=.Door})
+ o:=owner.initial();seed(&o.cave);capture(o,owner.model(),owner.CONTENT,"o2",owner.Action{verb=.Door})
+}

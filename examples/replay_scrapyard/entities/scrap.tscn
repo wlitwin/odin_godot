@@ -1,0 +1,37 @@
+[gd_scene format=4]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_epram"]
+_surfaces = [{
+"aabb": AABB(-6, -6, 0, 12, 12, 1e-05),
+"format": 34359742465,
+"index_count": 18,
+"index_data": PackedByteArray("BwAAAAEAAQACAAMAAwAEAAUABQAGAAcABwABAAMAAwAFAAcA"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 8,
+"vertex_data": PackedByteArray("AADAQAAAAAAAAAAAAABAQAAAQEAAAAAAAAAAAAAAwEAAAAAAAABAwAAAQEAAAAAAAADAwAAAAAAAAAAAAABAwAAAQMAAAAAAAAAAAAAAwMAAAAAAAABAQAAAQMAAAAAA")
+}]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_lmxro"]
+_surfaces = [{
+"aabb": AABB(-2, -2, 0, 4, 4, 1e-05),
+"format": 34359742465,
+"index_count": 6,
+"index_data": PackedByteArray("AwAAAAEAAQACAAMA"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 4,
+"vertex_data": PackedByteArray("AAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAMAAAAAA")
+}]
+
+[node name="Scrap" type="Node2D" unique_id=243285567]
+visible = false
+z_index = 1
+
+[node name="Gear" type="MeshInstance2D" parent="." unique_id=1573237647]
+self_modulate = Color(0.95, 0.78, 0.3, 1)
+mesh = SubResource("ArrayMesh_epram")
+
+[node name="Hub" type="MeshInstance2D" parent="." unique_id=1168325647]
+self_modulate = Color(0.6, 0.48, 0.2, 1)
+mesh = SubResource("ArrayMesh_lmxro")

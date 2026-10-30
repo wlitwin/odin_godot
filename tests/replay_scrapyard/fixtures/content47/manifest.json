@@ -1,0 +1,12 @@
+{
+  "protocol": 7,
+  "content": "0x5253435241503047",
+  "bytes": 53283,
+  "assets": 0,
+  "sha256": "d716ba5942576fc406cf2942a32b722085c8e8d3ccb2c0dc47ad18e5cbc1e721",
+  "test_token_label": "protocol-upgrade-owner",
+  "provenance": "Produced by the actual content47 converter before changing history visibility; source content46 retained.",
+  "producer_sha256": "d22d6a3d8b5713e7d8de4bb0a3d72d3ec8410a8b9ce26658f1f14cf5c26f2986",
+  "tick": "13",
+  "hash": "5165365752760899147"
+}

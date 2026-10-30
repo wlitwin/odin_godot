@@ -165,3 +165,6 @@ atomic_odin_dll "$ROOT/core" "$CORE_DLL" -debug
 echo "Built:"
 echo "  $CORE_DLL"
 for d in "${BUILT_DLLS[@]}"; do echo "  $d"; done
+
+# Optional Replay authoring UI; projects opt in with replay_authoring.json.
+if [[ -f "$PROJ/replay_authoring.json" ]];then python3 "$ROOT/replay/editor/install.py" "$PROJ";fi

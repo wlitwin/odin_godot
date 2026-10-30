@@ -1,0 +1,18 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/views/weapon.odin" id="script"]
+[ext_resource type="Texture2D" path="res://assets/gz2/weapons.png" id="atlas"]
+[node name="Gun" type="Sprite2D"]
+script = ExtResource("script")
+muzzle_seconds = 0.09
+texture = ExtResource("atlas")
+region_enabled = true
+region_rect = Rect2(0, 16, 16, 16)
+position = Vector2(2, 2)
+offset = Vector2(7, 0)
+z_index = 1
+[node name="Flash" type="Sprite2D" parent="."]
+visible = false
+texture = ExtResource("atlas")
+region_enabled = true
+region_rect = Rect2(0, 0, 16, 16)
+position = Vector2(22, 0)

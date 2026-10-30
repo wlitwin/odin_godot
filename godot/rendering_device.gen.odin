@@ -755,7 +755,7 @@ rendering_device_texture_create_shared_from_slice :: proc "contextless" (
     layer_ := layer_
     mipmap_ := mipmap_
     mipmaps_ := mipmaps_
-    slice_type_ := slice_type_
+    slice_type_ := Int(slice_type_)
     args := []__bindgen_gde.TypePtr {
         &view_,
         &with_texture_,
@@ -787,10 +787,10 @@ rendering_device_texture_create_from_extension :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3732868568)
     }
     self := self
-    type_ := type_
-    format_ := format_
-    samples_ := samples_
-    usage_flags_ := usage_flags_
+    type_ := Int(type_)
+    format_ := Int(format_)
+    samples_ := Int(samples_)
+    usage_flags_ := Int(usage_flags_)
     image_ := image_
     width_ := width_
     height_ := height_
@@ -833,7 +833,9 @@ rendering_device_texture_update :: proc "contextless" (
         &layer_,
         &data_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -878,7 +880,9 @@ rendering_device_texture_get_data_async :: proc "contextless" (
         &layer_,
         &callback_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -893,8 +897,8 @@ rendering_device_texture_is_format_supported_for_usage :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2592520478)
     }
     self := self
-    format_ := format_
-    usage_flags_ := usage_flags_
+    format_ := Int(format_)
+    usage_flags_ := Int(usage_flags_)
     args := []__bindgen_gde.TypePtr {
         &format_,
         &usage_flags_,
@@ -1015,7 +1019,9 @@ rendering_device_texture_copy :: proc "contextless" (
         &src_layer_,
         &dst_layer_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1048,7 +1054,9 @@ rendering_device_texture_clear :: proc "contextless" (
         &base_layer_,
         &layer_count_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1069,7 +1077,9 @@ rendering_device_texture_resolve_multisample :: proc "contextless" (
         &from_texture_,
         &to_texture_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1164,7 +1174,7 @@ rendering_device_framebuffer_format_create_empty :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 555930169)
     }
     self := self
-    samples_ := samples_
+    samples_ := Int(samples_)
     args := []__bindgen_gde.TypePtr {
         &samples_,
     }
@@ -1189,7 +1199,9 @@ rendering_device_framebuffer_format_get_texture_samples :: proc "contextless" (
         &format_,
         &render_pass_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Texture_Samples(__return_storage)
     return
 }
 
@@ -1257,7 +1269,7 @@ rendering_device_framebuffer_create_empty :: proc "contextless" (
     }
     self := self
     size_ := size_
-    samples_ := samples_
+    samples_ := Int(samples_)
     validate_with_format_ := validate_with_format_
     args := []__bindgen_gde.TypePtr {
         &size_,
@@ -1333,8 +1345,8 @@ rendering_device_sampler_is_format_supported_for_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2247922238)
     }
     self := self
-    format_ := format_
-    sampler_filter_ := sampler_filter_
+    format_ := Int(format_)
+    sampler_filter_ := Int(sampler_filter_)
     args := []__bindgen_gde.TypePtr {
         &format_,
         &sampler_filter_,
@@ -1357,7 +1369,7 @@ rendering_device_vertex_buffer_create :: proc "contextless" (
     self := self
     size_bytes_ := size_bytes_
     data_ := data_
-    creation_bits_ := creation_bits_
+    creation_bits_ := Int(creation_bits_)
     args := []__bindgen_gde.TypePtr {
         &size_bytes_,
         &data_,
@@ -1427,10 +1439,10 @@ rendering_device_index_buffer_create :: proc "contextless" (
     }
     self := self
     size_indices_ := size_indices_
-    format_ := format_
+    format_ := Int(format_)
     data_ := data_
     use_restart_indices_ := use_restart_indices_
-    creation_bits_ := creation_bits_
+    creation_bits_ := Int(creation_bits_)
     args := []__bindgen_gde.TypePtr {
         &size_indices_,
         &format_,
@@ -1597,7 +1609,7 @@ rendering_device_uniform_buffer_create :: proc "contextless" (
     self := self
     size_bytes_ := size_bytes_
     data_ := data_
-    creation_bits_ := creation_bits_
+    creation_bits_ := Int(creation_bits_)
     args := []__bindgen_gde.TypePtr {
         &size_bytes_,
         &data_,
@@ -1622,8 +1634,8 @@ rendering_device_storage_buffer_create :: proc "contextless" (
     self := self
     size_bytes_ := size_bytes_
     data_ := data_
-    usage_ := usage_
-    creation_bits_ := creation_bits_
+    usage_ := Int(usage_)
+    creation_bits_ := Int(creation_bits_)
     args := []__bindgen_gde.TypePtr {
         &size_bytes_,
         &data_,
@@ -1647,7 +1659,7 @@ rendering_device_texture_buffer_create :: proc "contextless" (
     }
     self := self
     size_bytes_ := size_bytes_
-    format_ := format_
+    format_ := Int(format_)
     data_ := data_
     args := []__bindgen_gde.TypePtr {
         &size_bytes_,
@@ -1726,7 +1738,9 @@ rendering_device_buffer_copy :: proc "contextless" (
         &dst_offset_,
         &size_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1753,7 +1767,9 @@ rendering_device_buffer_update :: proc "contextless" (
         &size_bytes_,
         &data_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1777,7 +1793,9 @@ rendering_device_buffer_clear :: proc "contextless" (
         &offset_,
         &size_bytes_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1828,7 +1846,9 @@ rendering_device_buffer_get_data_async :: proc "contextless" (
         &offset_bytes_,
         &size_bytes_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -1873,12 +1893,12 @@ rendering_device_render_pipeline_create :: proc "contextless" (
     shader_ := shader_
     framebuffer_format_ := framebuffer_format_
     vertex_format_ := vertex_format_
-    primitive_ := primitive_
+    primitive_ := Int(primitive_)
     rasterization_state_ := rasterization_state_
     multisample_state_ := multisample_state_
     stencil_state_ := stencil_state_
     color_blend_state_ := color_blend_state_
-    dynamic_state_flags_ := dynamic_state_flags_
+    dynamic_state_flags_ := Int(dynamic_state_flags_)
     for_render_pass_ := for_render_pass_
     specialization_constants_ := specialization_constants_
     args := []__bindgen_gde.TypePtr {
@@ -2012,7 +2032,7 @@ rendering_device_blas_create :: proc "contextless" (
     }
     self := self
     geometries_ := geometries_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &geometries_,
         &flags_,
@@ -2033,7 +2053,7 @@ rendering_device_tlas_create :: proc "contextless" (
     }
     self := self
     max_instance_count_ := max_instance_count_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &max_instance_count_,
         &flags_,
@@ -2056,7 +2076,9 @@ rendering_device_blas_build :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &blas_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -2077,7 +2099,9 @@ rendering_device_tlas_build :: proc "contextless" (
         &tlas_,
         &instances_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -2119,7 +2143,9 @@ rendering_device_hit_sbt_set_pipeline :: proc "contextless" (
         &hit_sbt_,
         &raytracing_pipeline_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -2161,7 +2187,9 @@ rendering_device_hit_sbt_range_free :: proc "contextless" (
         &hit_sbt_,
         &range_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -2188,7 +2216,9 @@ rendering_device_hit_sbt_range_update :: proc "contextless" (
         &offset_,
         &hit_group_indices_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -2206,7 +2236,9 @@ rendering_device_screen_get_width :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &screen_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2224,7 +2256,9 @@ rendering_device_screen_get_height :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &screen_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2284,7 +2318,7 @@ rendering_device_draw_list_begin :: proc "contextless" (
     }
     self := self
     framebuffer_ := framebuffer_
-    draw_flags_ := draw_flags_
+    draw_flags_ := Int(draw_flags_)
     clear_color_values_ := clear_color_values_
     clear_depth_value_ := clear_depth_value_
     clear_stencil_value_ := clear_stencil_value_
@@ -2325,10 +2359,10 @@ rendering_device_draw_list_begin_split :: proc "contextless" (
     self := self
     framebuffer_ := framebuffer_
     splits_ := splits_
-    initial_color_action_ := initial_color_action_
-    final_color_action_ := final_color_action_
-    initial_depth_action_ := initial_depth_action_
-    final_depth_action_ := final_depth_action_
+    initial_color_action_ := Int(initial_color_action_)
+    final_color_action_ := Int(final_color_action_)
+    initial_depth_action_ := Int(initial_depth_action_)
+    final_depth_action_ := Int(final_depth_action_)
     clear_color_values_ := clear_color_values_
     clear_depth_ := clear_depth_
     clear_stencil_ := clear_stencil_
@@ -2981,7 +3015,9 @@ rendering_device_get_captured_timestamps_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -3064,7 +3100,7 @@ rendering_device_has_feature :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1772728326)
     }
     self := self
-    feature_ := feature_
+    feature_ := Int(feature_)
     args := []__bindgen_gde.TypePtr {
         &feature_,
     }
@@ -3082,7 +3118,7 @@ rendering_device_limit_get :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1559202131)
     }
     self := self
-    limit_ := limit_
+    limit_ := Int(limit_)
     args := []__bindgen_gde.TypePtr {
         &limit_,
     }
@@ -3101,7 +3137,9 @@ rendering_device_get_frame_delay :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -3144,8 +3182,8 @@ rendering_device_barrier :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3718155691)
     }
     self := self
-    from_ := from_
-    to_ := to_
+    from_ := Int(from_)
+    to_ := Int(to_)
     args := []__bindgen_gde.TypePtr {
         &from_,
         &to_,
@@ -3311,7 +3349,7 @@ rendering_device_get_memory_usage :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 251690689)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &type_,
     }
@@ -3331,7 +3369,7 @@ rendering_device_get_driver_resource :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 501815484)
     }
     self := self
-    resource_ := resource_
+    resource_ := Int(resource_)
     rid_ := rid_
     index_ := index_
     args := []__bindgen_gde.TypePtr {

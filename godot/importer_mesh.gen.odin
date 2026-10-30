@@ -104,7 +104,9 @@ importer_mesh_get_blend_shape_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -136,7 +138,7 @@ importer_mesh_set_blend_shape_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 227983991)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -154,7 +156,9 @@ importer_mesh_get_blend_shape_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Mesh_Blend_Shape_Mode(__return_storage)
     return
 }
 
@@ -174,7 +178,7 @@ importer_mesh_add_surface :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1740448849)
     }
     self := self
-    primitive_ := primitive_
+    primitive_ := Int(primitive_)
     arrays_ := arrays_
     blend_shapes_ := blend_shapes_
     lods_ := lods_
@@ -204,7 +208,9 @@ importer_mesh_get_surface_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -222,7 +228,9 @@ importer_mesh_get_surface_primitive_type :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &surface_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Mesh_Primitive_Type(__return_storage)
     return
 }
 
@@ -297,7 +305,9 @@ importer_mesh_get_surface_lod_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &surface_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

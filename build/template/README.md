@@ -1,5 +1,9 @@
 # Your scripts go here — odin_godot starter template
 
+For the separate experimental Replay multiplayer starter, use `replay/` instead.
+It includes its own project, scene, scripts and pure gameplay model. Do not merge
+both starters into one scripts package without adapting their package declarations.
+
 odin_godot ships a **prebuilt core** (the engine integration); your gameplay code is
 **yours**, compiled into a separate *scripts dll*. A fresh project therefore has nothing
 to build until you add scripts — this template is that starting point.

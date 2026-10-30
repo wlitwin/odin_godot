@@ -103,7 +103,9 @@ gltf_accessor_get_buffer_view :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -167,7 +169,9 @@ gltf_accessor_get_component_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gltf_Accessor_Gltf_Component_Type(__return_storage)
     return
 }
 
@@ -181,7 +185,7 @@ gltf_accessor_set_component_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1780020221)
     }
     self := self
-    component_type_ := component_type_
+    component_type_ := Int(component_type_)
     args := []__bindgen_gde.TypePtr {
         &component_type_,
     }
@@ -263,7 +267,9 @@ gltf_accessor_get_accessor_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gltf_Accessor_Gltf_Accessor_Type(__return_storage)
     return
 }
 
@@ -277,7 +283,7 @@ gltf_accessor_set_accessor_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2347728198)
     }
     self := self
-    accessor_type_ := accessor_type_
+    accessor_type_ := Int(accessor_type_)
     args := []__bindgen_gde.TypePtr {
         &accessor_type_,
     }
@@ -295,7 +301,9 @@ gltf_accessor_get_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -423,7 +431,9 @@ gltf_accessor_get_sparse_indices_buffer_view :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -487,7 +497,9 @@ gltf_accessor_get_sparse_indices_component_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gltf_Accessor_Gltf_Component_Type(__return_storage)
     return
 }
 
@@ -501,7 +513,7 @@ gltf_accessor_set_sparse_indices_component_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1780020221)
     }
     self := self
-    sparse_indices_component_type_ := sparse_indices_component_type_
+    sparse_indices_component_type_ := Int(sparse_indices_component_type_)
     args := []__bindgen_gde.TypePtr {
         &sparse_indices_component_type_,
     }
@@ -519,7 +531,9 @@ gltf_accessor_get_sparse_values_buffer_view :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

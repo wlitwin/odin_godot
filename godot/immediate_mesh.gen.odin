@@ -49,7 +49,7 @@ immediate_mesh_surface_begin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2794442543)
     }
     self := self
-    primitive_ := primitive_
+    primitive_ := Int(primitive_)
     material_ := material_
     args := []__bindgen_gde.TypePtr {
         &primitive_,

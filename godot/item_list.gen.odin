@@ -73,7 +73,9 @@ item_list_add_item :: proc "contextless" (
         &icon_,
         &selectable_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -94,7 +96,9 @@ item_list_add_icon_item :: proc "contextless" (
         &icon_,
         &selectable_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -186,7 +190,7 @@ item_list_set_item_text_direction :: proc "contextless" (
     }
     self := self
     idx_ := idx_
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &idx_,
         &direction_,
@@ -208,7 +212,9 @@ item_list_get_item_text_direction :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Text_Direction(__return_storage)
     return
 }
 
@@ -262,7 +268,7 @@ item_list_set_item_auto_translate_mode :: proc "contextless" (
     }
     self := self
     idx_ := idx_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &idx_,
         &mode_,
@@ -284,7 +290,9 @@ item_list_get_item_auto_translate_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Node_Auto_Translate_Mode(__return_storage)
     return
 }
 
@@ -821,7 +829,9 @@ item_list_get_item_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -898,7 +908,9 @@ item_list_get_fixed_column_width :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -962,7 +974,9 @@ item_list_get_max_text_lines :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -994,7 +1008,9 @@ item_list_get_max_columns :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1008,7 +1024,7 @@ item_list_set_select_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 928267388)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1026,7 +1042,9 @@ item_list_get_select_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Item_List_Select_Mode(__return_storage)
     return
 }
 
@@ -1040,7 +1058,7 @@ item_list_set_icon_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2025053633)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1058,7 +1076,9 @@ item_list_get_icon_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Item_List_Icon_Mode(__return_storage)
     return
 }
 
@@ -1318,7 +1338,9 @@ item_list_get_item_at_position :: proc "contextless" (
         &position_,
         &exact_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1396,7 +1418,7 @@ item_list_set_scroll_hint_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2917787337)
     }
     self := self
-    scroll_hint_mode_ := scroll_hint_mode_
+    scroll_hint_mode_ := Int(scroll_hint_mode_)
     args := []__bindgen_gde.TypePtr {
         &scroll_hint_mode_,
     }
@@ -1414,7 +1436,9 @@ item_list_get_scroll_hint_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Item_List_Scroll_Hint_Mode(__return_storage)
     return
 }
 
@@ -1460,7 +1484,7 @@ item_list_set_text_overrun_behavior :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1008890932)
     }
     self := self
-    overrun_behavior_ := overrun_behavior_
+    overrun_behavior_ := Int(overrun_behavior_)
     args := []__bindgen_gde.TypePtr {
         &overrun_behavior_,
     }
@@ -1478,7 +1502,9 @@ item_list_get_text_overrun_behavior :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Overrun_Behavior(__return_storage)
     return
 }
 

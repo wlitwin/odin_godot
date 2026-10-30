@@ -1,0 +1,59 @@
+{
+  "scenario": "sustained_offensive_swarm",
+  "version": 2,
+  "seed": 1337,
+  "players": 2,
+  "hz": 60,
+  "frame_cap": 60,
+  "sample_ms": 20000,
+  "target_living": 40,
+  "minimum_living": 32,
+  "maximum_living": 44,
+  "spawn_batch_max": 4,
+  "spawn_interval_ticks": 6,
+  "weapon": {
+    "id": 0,
+    "magazine": 255,
+    "jam_per_mille": 0,
+    "damage": 2,
+    "cooldown_ticks": 20
+  },
+  "enemy": {
+    "kind": 0,
+    "hp": 3,
+    "bite": 0
+  },
+  "repetitions": 3,
+  "receive_delay_ms_per_process": 120,
+  "jitter_ms": 0,
+  "loss_permyriad": 0,
+  "duplicate_permyriad": 0,
+  "minimum_kills_during_window": 20,
+  "minimum_shots_per_player": 45,
+  "maximum_shots_per_player": 75,
+  "scope": "Stationary shooters, stock enemy AI with a shared zero-bite fixture, replenished enemies, ordinary firing/death/pickups. No ability casts. This is a sustained offensive workload, not full game or movement/status stress parity.",
+  "limits": [
+    "Authority and presentation implementations differ.",
+    "Spawn requests enter through each game's existing development path at different scheduling boundaries.",
+    "Population, body lifetimes, shot totals and loot attribution are measured, not assumed identical.",
+    "Callback time includes networking, simulation and presentation; it is not CPU-only."
+  ],
+  "warmup": {
+    "steady_ms": 2000,
+    "maximum_prediction_depth": "measured lead + 30 ticks",
+    "maximum_facts_ahead_ticks": 30
+  },
+  "freshness": {
+    "maximum_facts_ahead_ticks": 30,
+    "maximum_prediction_depth": "measured lead + 30 ticks",
+    "client_received_tick_advance": [
+      1140,
+      1260
+    ],
+    "authority_tick_advance": [
+      1180,
+      1220
+    ],
+    "reason": "A received authority frame advances at snapshot delivery boundaries. Both endpoints may be up to 30 ticks behind contiguous facts; compare inclusive 20-second process windows and report actual advance/lag."
+  }
+}

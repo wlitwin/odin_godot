@@ -60,7 +60,9 @@ flow_container_get_line_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -74,7 +76,7 @@ flow_container_set_alignment :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 575250951)
     }
     self := self
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     args := []__bindgen_gde.TypePtr {
         &alignment_,
     }
@@ -92,7 +94,9 @@ flow_container_get_alignment :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Flow_Container_Alignment_Mode(__return_storage)
     return
 }
 
@@ -106,7 +110,7 @@ flow_container_set_last_wrap_alignment :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2899697495)
     }
     self := self
-    last_wrap_alignment_ := last_wrap_alignment_
+    last_wrap_alignment_ := Int(last_wrap_alignment_)
     args := []__bindgen_gde.TypePtr {
         &last_wrap_alignment_,
     }
@@ -124,7 +128,9 @@ flow_container_get_last_wrap_alignment :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Flow_Container_Last_Wrap_Alignment_Mode(__return_storage)
     return
 }
 

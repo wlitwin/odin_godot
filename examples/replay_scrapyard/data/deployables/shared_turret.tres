@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="TurretDef" format=3]
+[ext_resource type="Script" path="res://scripts/defs/turret_def.odin" id="script"]
+[resource]
+script = ExtResource("script")
+ammo = 24
+cadence = 6
+damage = 2
+speed = 16.0
+ttl = 40
+use_radius = 64.0

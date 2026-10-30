@@ -55,7 +55,7 @@ area2d_set_gravity_space_override_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2879900038)
     }
     self := self
-    space_override_mode_ := space_override_mode_
+    space_override_mode_ := Int(space_override_mode_)
     args := []__bindgen_gde.TypePtr {
         &space_override_mode_,
     }
@@ -73,7 +73,9 @@ area2d_get_gravity_space_override_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Area2d_Space_Override(__return_storage)
     return
 }
 
@@ -247,7 +249,7 @@ area2d_set_linear_damp_space_override_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2879900038)
     }
     self := self
-    space_override_mode_ := space_override_mode_
+    space_override_mode_ := Int(space_override_mode_)
     args := []__bindgen_gde.TypePtr {
         &space_override_mode_,
     }
@@ -265,7 +267,9 @@ area2d_get_linear_damp_space_override_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Area2d_Space_Override(__return_storage)
     return
 }
 
@@ -279,7 +283,7 @@ area2d_set_angular_damp_space_override_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2879900038)
     }
     self := self
-    space_override_mode_ := space_override_mode_
+    space_override_mode_ := Int(space_override_mode_)
     args := []__bindgen_gde.TypePtr {
         &space_override_mode_,
     }
@@ -297,7 +301,9 @@ area2d_get_angular_damp_space_override_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Area2d_Space_Override(__return_storage)
     return
 }
 
@@ -393,7 +399,9 @@ area2d_get_priority :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

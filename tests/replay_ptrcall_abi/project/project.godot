@@ -1,0 +1,4 @@
+config_version=5
+[application]
+config/name="Replay ptrcall ABI"
+config/features=PackedStringArray("4.7")

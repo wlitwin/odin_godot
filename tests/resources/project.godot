@@ -5,3 +5,6 @@ config_version=5
 
 config/name="OdinGodotResources"
 config/features=PackedStringArray("4.6")
+
+[editor_plugins]
+enabled=PackedStringArray("res://addons/acceptance/plugin.cfg")

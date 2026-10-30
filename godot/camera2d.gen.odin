@@ -88,7 +88,7 @@ camera2d_set_anchor_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2050398218)
     }
     self := self
-    anchor_mode_ := anchor_mode_
+    anchor_mode_ := Int(anchor_mode_)
     args := []__bindgen_gde.TypePtr {
         &anchor_mode_,
     }
@@ -106,7 +106,9 @@ camera2d_get_anchor_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Camera2d_Anchor_Mode(__return_storage)
     return
 }
 
@@ -152,7 +154,7 @@ camera2d_set_process_callback :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4201947462)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -170,7 +172,9 @@ camera2d_get_process_callback :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Camera2d_Camera2d_Process_Callback(__return_storage)
     return
 }
 
@@ -278,7 +282,7 @@ camera2d_set_limit :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 437707142)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     limit_ := limit_
     args := []__bindgen_gde.TypePtr {
         &margin_,
@@ -297,11 +301,13 @@ camera2d_get_limit :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1983885014)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     args := []__bindgen_gde.TypePtr {
         &margin_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -476,7 +482,7 @@ camera2d_set_drag_margin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4290182280)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     drag_margin_ := drag_margin_
     args := []__bindgen_gde.TypePtr {
         &margin_,
@@ -495,7 +501,7 @@ camera2d_get_drag_margin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2869120046)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     args := []__bindgen_gde.TypePtr {
         &margin_,
     }

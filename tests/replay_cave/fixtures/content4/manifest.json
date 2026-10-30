@@ -1,0 +1,16 @@
+{
+  "content": "0x4341564552504c34",
+  "files": {
+    "source.tar.gz": "853b9330cd9406beeac2c00d39756fbafdd326c100c7d70908ee89643a3b953d",
+    "before-descent.replay": "840bb9e287362d1117c0d342e421c28e4a1a8eebc20d0af8c5c56fb2fb12754a",
+    "after-descent.replay": "bb2bb03b879f421fe1a2e3ba563b627899b57503b8451ea38ae9d27d690bd2fb",
+    "before-restart.replay": "f4e2dc3f24ea44d50aa53361af31917378535225561e24853c89484b25bcc254",
+    "producer.log": "acb3c2e8b2eca48c69694b7c885993e2471b2e856b46db5a62d34162d856c3d7"
+  },
+  "model_sources": {
+    "examples/replay_cavecrawl/shared/cave/scatter.odin": "fcaa45a23132e6b2ae6db65323ba98c70f10e5355baf951851155e94e268e3ad",
+    "examples/replay_cavecrawl/shared/cave/types.odin": "96ce88c0be74f97c5d0f76bae446e100f9a61cb2d61451989ace6d4dba43b0cf",
+    "examples/replay_cavecrawl/shared/cave/simulation.odin": "a129e1252129df69ad259c26a970fa2f5c0198d97282cdafeecd25e3900d01ef",
+    "examples/replay_cavecrawl/shared/cave/actions.odin": "848c12259c6ee4509f95e057b1ed1ce33f01438eb5073f76666ad9c0835fccd3"
+  }
+}

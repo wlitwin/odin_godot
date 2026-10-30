@@ -136,7 +136,7 @@ rich_text_label_add_hr :: proc "contextless" (
     width_ := width_
     height_ := height_
     color_ := color_
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     width_in_percent_ := width_in_percent_
     height_in_percent_ := height_in_percent_
     args := []__bindgen_gde.TypePtr {
@@ -175,13 +175,13 @@ rich_text_label_add_image :: proc "contextless" (
     width_ := width_
     height_ := height_
     color_ := color_
-    inline_align_ := inline_align_
+    inline_align_ := Int(inline_align_)
     region_ := region_
     key_ := key_
     pad_ := pad_
     tooltip_ := tooltip_
-    width_unit_ := width_unit_
-    height_unit_ := height_unit_
+    width_unit_ := Int(width_unit_)
+    height_unit_ := Int(height_unit_)
     alt_text_ := alt_text_
     args := []__bindgen_gde.TypePtr {
         &image_,
@@ -222,17 +222,17 @@ rich_text_label_update_image :: proc "contextless" (
     }
     self := self
     key_ := key_
-    mask_ := mask_
+    mask_ := Int(mask_)
     image_ := image_
     width_ := width_
     height_ := height_
     color_ := color_
-    inline_align_ := inline_align_
+    inline_align_ := Int(inline_align_)
     region_ := region_
     pad_ := pad_
     tooltip_ := tooltip_
-    width_unit_ := width_unit_
-    height_unit_ := height_unit_
+    width_unit_ := Int(width_unit_)
+    height_unit_ := Int(height_unit_)
     args := []__bindgen_gde.TypePtr {
         &key_,
         &mask_,
@@ -476,11 +476,11 @@ rich_text_label_push_paragraph :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3089306873)
     }
     self := self
-    alignment_ := alignment_
-    base_direction_ := base_direction_
+    alignment_ := Int(alignment_)
+    base_direction_ := Int(base_direction_)
     language_ := language_
-    st_parser_ := st_parser_
-    justification_flags_ := justification_flags_
+    st_parser_ := Int(st_parser_)
+    justification_flags_ := Int(justification_flags_)
     tab_stops_ := tab_stops_
     args := []__bindgen_gde.TypePtr {
         &alignment_,
@@ -524,7 +524,7 @@ rich_text_label_push_list :: proc "contextless" (
     }
     self := self
     level_ := level_
-    type_ := type_
+    type_ := Int(type_)
     capitalize_ := capitalize_
     bullet_ := bullet_
     args := []__bindgen_gde.TypePtr {
@@ -549,7 +549,7 @@ rich_text_label_push_meta :: proc "contextless" (
     }
     self := self
     data_ := data_
-    underline_mode_ := underline_mode_
+    underline_mode_ := Int(underline_mode_)
     tooltip_ := tooltip_
     args := []__bindgen_gde.TypePtr {
         &data_,
@@ -641,7 +641,7 @@ rich_text_label_push_table :: proc "contextless" (
     }
     self := self
     columns_ := columns_
-    inline_align_ := inline_align_
+    inline_align_ := Int(inline_align_)
     align_to_row_ := align_to_row_
     name_ := name_
     args := []__bindgen_gde.TypePtr {
@@ -956,7 +956,7 @@ rich_text_label_set_structured_text_bidi_override :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 55961453)
     }
     self := self
-    parser_ := parser_
+    parser_ := Int(parser_)
     args := []__bindgen_gde.TypePtr {
         &parser_,
     }
@@ -974,7 +974,9 @@ rich_text_label_get_structured_text_bidi_override :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Structured_Text_Parser(__return_storage)
     return
 }
 
@@ -1020,7 +1022,7 @@ rich_text_label_set_text_direction :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 119160795)
     }
     self := self
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &direction_,
     }
@@ -1038,7 +1040,9 @@ rich_text_label_get_text_direction :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Text_Direction(__return_storage)
     return
 }
 
@@ -1084,7 +1088,7 @@ rich_text_label_set_horizontal_alignment :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2312603777)
     }
     self := self
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     args := []__bindgen_gde.TypePtr {
         &alignment_,
     }
@@ -1102,7 +1106,9 @@ rich_text_label_get_horizontal_alignment :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Horizontal_Alignment(__return_storage)
     return
 }
 
@@ -1116,7 +1122,7 @@ rich_text_label_set_vertical_alignment :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1796458609)
     }
     self := self
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     args := []__bindgen_gde.TypePtr {
         &alignment_,
     }
@@ -1134,7 +1140,9 @@ rich_text_label_get_vertical_alignment :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Vertical_Alignment(__return_storage)
     return
 }
 
@@ -1148,7 +1156,7 @@ rich_text_label_set_justification_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2877345813)
     }
     self := self
-    justification_flags_ := justification_flags_
+    justification_flags_ := Int(justification_flags_)
     args := []__bindgen_gde.TypePtr {
         &justification_flags_,
     }
@@ -1166,7 +1174,9 @@ rich_text_label_get_justification_flags :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Justification_Flag(__return_storage)
     return
 }
 
@@ -1212,7 +1222,7 @@ rich_text_label_set_autowrap_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3289138044)
     }
     self := self
-    autowrap_mode_ := autowrap_mode_
+    autowrap_mode_ := Int(autowrap_mode_)
     args := []__bindgen_gde.TypePtr {
         &autowrap_mode_,
     }
@@ -1230,7 +1240,9 @@ rich_text_label_get_autowrap_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Autowrap_Mode(__return_storage)
     return
 }
 
@@ -1244,7 +1256,7 @@ rich_text_label_set_autowrap_trim_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2809697122)
     }
     self := self
-    autowrap_trim_flags_ := autowrap_trim_flags_
+    autowrap_trim_flags_ := Int(autowrap_trim_flags_)
     args := []__bindgen_gde.TypePtr {
         &autowrap_trim_flags_,
     }
@@ -1262,7 +1274,9 @@ rich_text_label_get_autowrap_trim_flags :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Line_Break_Flag(__return_storage)
     return
 }
 
@@ -1517,7 +1531,9 @@ rich_text_label_get_tab_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1724,7 +1740,9 @@ rich_text_label_get_selection_from :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1739,7 +1757,9 @@ rich_text_label_get_selection_to :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1940,7 +1960,9 @@ rich_text_label_get_progress_bar_delay :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1972,7 +1994,9 @@ rich_text_label_get_visible_characters :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1987,7 +2011,9 @@ rich_text_label_get_visible_characters_behavior :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Visible_Characters_Behavior(__return_storage)
     return
 }
 
@@ -2001,7 +2027,7 @@ rich_text_label_set_visible_characters_behavior :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3383839701)
     }
     self := self
-    behavior_ := behavior_
+    behavior_ := Int(behavior_)
     args := []__bindgen_gde.TypePtr {
         &behavior_,
     }
@@ -2054,7 +2080,9 @@ rich_text_label_get_character_line :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &character_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2072,7 +2100,9 @@ rich_text_label_get_character_paragraph :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &character_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2087,7 +2117,9 @@ rich_text_label_get_total_character_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2134,7 +2166,9 @@ rich_text_label_get_line_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2167,7 +2201,9 @@ rich_text_label_get_visible_line_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2182,7 +2218,9 @@ rich_text_label_get_paragraph_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2197,7 +2235,9 @@ rich_text_label_get_visible_paragraph_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2212,7 +2252,9 @@ rich_text_label_get_content_height :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2227,7 +2269,9 @@ rich_text_label_get_content_width :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2245,7 +2289,9 @@ rich_text_label_get_line_height :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &line_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2263,7 +2309,9 @@ rich_text_label_get_line_width :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &line_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

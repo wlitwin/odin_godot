@@ -128,7 +128,7 @@ color_picker_set_color_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1579114136)
     }
     self := self
-    color_mode_ := color_mode_
+    color_mode_ := Int(color_mode_)
     args := []__bindgen_gde.TypePtr {
         &color_mode_,
     }
@@ -146,7 +146,9 @@ color_picker_get_color_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Color_Picker_Color_Mode_Type(__return_storage)
     return
 }
 
@@ -514,7 +516,7 @@ color_picker_set_picker_shape :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3981373861)
     }
     self := self
-    shape_ := shape_
+    shape_ := Int(shape_)
     args := []__bindgen_gde.TypePtr {
         &shape_,
     }
@@ -532,7 +534,9 @@ color_picker_get_picker_shape :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Color_Picker_Picker_Shape_Type(__return_storage)
     return
 }
 

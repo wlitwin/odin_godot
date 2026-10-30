@@ -1,0 +1,30 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/views/runner.odin" id="script"]
+[ext_resource type="PackedScene" path="res://views/components/weapon.tscn" id="weapon"]
+[ext_resource type="PackedScene" path="res://views/components/reload.tscn" id="reload"]
+[ext_resource type="PackedScene" path="res://views/components/beacon.tscn" id="beacon"]
+[ext_resource type="Texture2D" path="res://assets/gz2/runner_becca_idle.png" id="becca_idle"]
+[ext_resource type="Resource" path="res://visuals/runners/becca.tres" id="look_0"]
+[ext_resource type="Resource" path="res://visuals/runners/joe.tres" id="look_1"]
+[ext_resource type="Resource" path="res://visuals/runners/unknown.tres" id="look_2"]
+[node name="Runner" type="Node2D"]
+script = ExtResource("script")
+z_index = 2
+appearances = Array[Resource]([ExtResource("look_0"), ExtResource("look_1"), ExtResource("look_2")])
+fps = 10.0
+down_angle = 1.4
+[node name="Body" type="Sprite2D" parent="."]
+texture = ExtResource("becca_idle")
+hframes = 6
+[node name="Gun" parent="." instance=ExtResource("weapon")]
+[node name="Reload" parent="." instance=ExtResource("reload")]
+[node name="Beacon" parent="." instance=ExtResource("beacon")]
+[node name="Nameplate" type="Label" parent="."]
+offset_left = -14.0
+offset_top = -34.0
+offset_right = 66.0
+offset_bottom = -11.0
+scale = Vector2(0.45, 0.45)
+modulate = Color(1, 1, 1, 0.5)
+mouse_filter = 2
+text = "runner"

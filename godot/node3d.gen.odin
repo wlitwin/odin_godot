@@ -186,7 +186,7 @@ node3d_set_rotation_order :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1820889989)
     }
     self := self
-    order_ := order_
+    order_ := Int(order_)
     args := []__bindgen_gde.TypePtr {
         &order_,
     }
@@ -204,7 +204,9 @@ node3d_get_rotation_order :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Euler_Order(__return_storage)
     return
 }
 
@@ -218,7 +220,7 @@ node3d_set_rotation_edit_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 141483330)
     }
     self := self
-    edit_mode_ := edit_mode_
+    edit_mode_ := Int(edit_mode_)
     args := []__bindgen_gde.TypePtr {
         &edit_mode_,
     }
@@ -236,7 +238,9 @@ node3d_get_rotation_edit_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Node3d_Rotation_Edit_Mode(__return_storage)
     return
 }
 

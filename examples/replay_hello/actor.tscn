@@ -1,0 +1,5 @@
+[gd_scene format=3]
+
+[node name="ActorView" type="Polygon2D"]
+color = Color(1, 1, 1, 1)
+polygon = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)

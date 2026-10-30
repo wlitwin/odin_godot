@@ -66,7 +66,9 @@ array_mesh_get_blend_shape_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -132,7 +134,7 @@ array_mesh_set_blend_shape_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 227983991)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -150,7 +152,9 @@ array_mesh_get_blend_shape_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Mesh_Blend_Shape_Mode(__return_storage)
     return
 }
 
@@ -168,11 +172,11 @@ array_mesh_add_surface_from_arrays :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1796411378)
     }
     self := self
-    primitive_ := primitive_
+    primitive_ := Int(primitive_)
     arrays_ := arrays_
     blend_shapes_ := blend_shapes_
     lods_ := lods_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &primitive_,
         &arrays_,
@@ -297,7 +301,9 @@ array_mesh_surface_get_array_len :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &surf_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -315,7 +321,9 @@ array_mesh_surface_get_array_index_len :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &surf_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -333,7 +341,9 @@ array_mesh_surface_get_format :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &surf_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Mesh_Array_Format(__return_storage)
     return
 }
 
@@ -351,7 +361,9 @@ array_mesh_surface_get_primitive_type :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &surf_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Mesh_Primitive_Type(__return_storage)
     return
 }
 
@@ -369,7 +381,9 @@ array_mesh_surface_find_by_name :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &name_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -442,7 +456,9 @@ array_mesh_lightmap_unwrap :: proc "contextless" (
         &transform_,
         &texel_size_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

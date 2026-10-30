@@ -65,7 +65,7 @@ input_event_key_set_keycode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 888074362)
     }
     self := self
-    keycode_ := keycode_
+    keycode_ := Int(keycode_)
     args := []__bindgen_gde.TypePtr {
         &keycode_,
     }
@@ -83,7 +83,9 @@ input_event_key_get_keycode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Key(__return_storage)
     return
 }
 
@@ -97,7 +99,7 @@ input_event_key_set_physical_keycode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 888074362)
     }
     self := self
-    physical_keycode_ := physical_keycode_
+    physical_keycode_ := Int(physical_keycode_)
     args := []__bindgen_gde.TypePtr {
         &physical_keycode_,
     }
@@ -115,7 +117,9 @@ input_event_key_get_physical_keycode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Key(__return_storage)
     return
 }
 
@@ -129,7 +133,7 @@ input_event_key_set_key_label :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 888074362)
     }
     self := self
-    key_label_ := key_label_
+    key_label_ := Int(key_label_)
     args := []__bindgen_gde.TypePtr {
         &key_label_,
     }
@@ -147,7 +151,9 @@ input_event_key_get_key_label :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Key(__return_storage)
     return
 }
 
@@ -179,7 +185,9 @@ input_event_key_get_unicode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -193,7 +201,7 @@ input_event_key_set_location :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 634453155)
     }
     self := self
-    location_ := location_
+    location_ := Int(location_)
     args := []__bindgen_gde.TypePtr {
         &location_,
     }
@@ -211,7 +219,9 @@ input_event_key_get_location :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Key_Location(__return_storage)
     return
 }
 
@@ -243,7 +253,9 @@ input_event_key_get_keycode_with_modifiers :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Key(__return_storage)
     return
 }
 
@@ -258,7 +270,9 @@ input_event_key_get_physical_keycode_with_modifiers :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Key(__return_storage)
     return
 }
 
@@ -273,7 +287,9 @@ input_event_key_get_key_label_with_modifiers :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Key(__return_storage)
     return
 }
 
